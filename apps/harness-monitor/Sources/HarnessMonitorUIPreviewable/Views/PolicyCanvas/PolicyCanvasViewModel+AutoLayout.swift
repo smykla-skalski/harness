@@ -7,8 +7,11 @@ extension PolicyCanvasViewModel {
   }
 
   @discardableResult
-  func refreshRoutingHintsForCurrentLayout() -> Bool {
-    refreshRoutingHints(
+  func restoreMissingRoutingHintsForCurrentLayout() -> Bool {
+    guard routingHints?.isEmpty != false else {
+      return false
+    }
+    return refreshRoutingHints(
       to: policyCanvasRoutingHintsForCurrentLayout(
         nodes: nodes,
         groups: groups,
@@ -66,7 +69,7 @@ extension PolicyCanvasViewModel {
         || preservesManualAnchors
         || policyCanvasNeedsDefaultArrangement(nodes: nodes, groups: groups)
     else {
-      refreshRoutingHintsForCurrentLayout()
+      restoreMissingRoutingHintsForCurrentLayout()
       requestExplicitRoutesAndCenteringIfNeeded()
       notifyStatus("Layout already tidy")
       return
@@ -137,7 +140,9 @@ extension PolicyCanvasViewModel {
     }
 
     guard !nodeChanges.isEmpty || !edgeChanges.isEmpty else {
-      refreshRoutingHints(to: nextRoutingHints)
+      if routingHints?.isEmpty != false {
+        refreshRoutingHints(to: nextRoutingHints)
+      }
       requestExplicitRoutesAndCenteringIfNeeded()
       notifyStatus("Layout already matches the current anchors")
       return

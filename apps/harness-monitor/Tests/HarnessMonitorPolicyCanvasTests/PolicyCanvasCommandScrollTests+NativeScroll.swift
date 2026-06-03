@@ -501,6 +501,14 @@ extension PolicyCanvasCommandScrollTests {
       abs(finalRect.origin.y - expectedOrigin.y) < 1.5,
       "Expected y origin \(expectedOrigin.y), got \(finalRect.origin.y); \(debugMessage)"
     )
+    #expect(
+      abs(finalRect.midX - routeOutput.visibleBounds.midX) < 1.5,
+      "Expected visible x center \(routeOutput.visibleBounds.midX), got \(finalRect.midX); \(debugMessage)"
+    )
+    #expect(
+      abs(finalRect.midY - routeOutput.visibleBounds.midY) < 1.5,
+      "Expected visible y center \(routeOutput.visibleBounds.midY), got \(finalRect.midY); \(debugMessage)"
+    )
   }
 
   @MainActor
@@ -610,6 +618,96 @@ extension PolicyCanvasCommandScrollTests {
       expectedOrigin=\(expectedOrigin) restoredOrigin=\(restoredOrigin) \
       finalOrigin=\(finalRect.origin) pendingCentering=\(viewModel.hasPendingViewportCenteringRequest)
       """
+    )
+    #expect(abs(finalRect.midX - routeOutput.visibleBounds.midX) < 1.5)
+    #expect(abs(finalRect.midY - routeOutput.visibleBounds.midY) < 1.5)
+  }
+
+  @MainActor
+  @Test("Reformat recenters the live saved default graph at far zoom")
+  func reformatRecentersTheLiveSavedDefaultGraphAtFarZoom() async throws {
+    let frame = CGRect(x: 0, y: 0, width: 1_200, height: 800)
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: liveSavedDefaultPolicyDocument(revision: 947),
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "default-canvas"
+    )
+    viewModel.setZoom(0.39)
+    let host = NSHostingView(
+      rootView: PolicyCanvasViewportSwitchTestHost(viewModel: viewModel)
+    )
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = frame
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        guard let scrollView = descendant(of: host, as: PolicyCanvasNativeScrollView.self) else {
+          return false
+        }
+        return scrollView.contentView.bounds.width > 1
+          && scrollView.contentView.bounds.height > 1
+          && !viewModel.hasPendingViewportCenteringRequest
+      }
+    )
+
+    let scrollView = try #require(descendant(of: host, as: PolicyCanvasNativeScrollView.self))
+    #expect(scrollView.applyScrollRequest(CGPoint(x: 4_400, y: 3_400)) == .applied(true))
+
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+
+    let routeOutput = await PolicyCanvasRouteWorker().compute(
+      input: PolicyCanvasRouteWorkerInput(
+        graphGeneration: viewModel.routeComputationGeneration,
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        fontScale: 1,
+        routingHints: viewModel.routingHints,
+        algorithmSelection: viewModel.algorithmSelection
+      )
+    )
+
+    let didCenter = await waitUntil(timeout: .seconds(2)) {
+      window.layoutIfNeeded()
+      host.layoutSubtreeIfNeeded()
+      guard let visibleRect = try? visibleContentRect(in: scrollView) else {
+        return false
+      }
+      return abs(visibleRect.midX - routeOutput.visibleBounds.midX) < 1.5
+        && abs(visibleRect.midY - routeOutput.visibleBounds.midY) < 1.5
+        && !viewModel.hasPendingViewportCenteringRequest
+    }
+    let finalRect = try visibleContentRect(in: scrollView)
+    let debugMessage = """
+      didCenter=\(didCenter) finalRect=\(finalRect) \
+      routeVisibleBounds=\(routeOutput.visibleBounds) zoom=\(viewModel.zoom) \
+      clipBounds=\(scrollView.contentView.bounds)
+      """
+    #expect(didCenter, Comment(rawValue: debugMessage))
+    #expect(
+      abs(finalRect.midX - routeOutput.visibleBounds.midX) < 1.5,
+      "Expected visible x center \(routeOutput.visibleBounds.midX), got \(finalRect.midX); \(debugMessage)"
+    )
+    #expect(
+      abs(finalRect.midY - routeOutput.visibleBounds.midY) < 1.5,
+      "Expected visible y center \(routeOutput.visibleBounds.midY), got \(finalRect.midY); \(debugMessage)"
     )
   }
 
