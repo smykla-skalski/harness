@@ -56,8 +56,8 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(scrollPoint.y == 380)
   }
 
-  @Test("initial viewport document scroll point centers the anchor in document coordinates")
-  func initialViewportDocumentScrollPointCentersAnchor() {
+  @Test("initial viewport document scroll point centers the visible graph bounds")
+  func initialViewportDocumentScrollPointCentersVisibleGraphBounds() {
     let visibleBounds = CGRect(x: 520, y: 480, width: 2_000, height: 1_200)
     let viewportSize = CGSize(width: 800, height: 600)
     let zoom: CGFloat = 0.8
@@ -66,13 +66,13 @@ extension PolicyCanvasViewModelLayoutTests {
       viewportSize: viewportSize,
       zoom: zoom
     )
-    let expectedAnchor = policyCanvasInitialViewportAnchorPoint(
-      visibleBounds: visibleBounds,
-      zoom: 1
+    let viewportCenter = CGPoint(
+      x: scrollPoint.x + (viewportSize.width / (zoom * 2)),
+      y: scrollPoint.y + (viewportSize.height / (zoom * 2))
     )
 
-    #expect(abs((scrollPoint.x + (viewportSize.width / (zoom * 2))) - expectedAnchor.x) < 0.001)
-    #expect(abs((scrollPoint.y + (viewportSize.height / (zoom * 2))) - expectedAnchor.y) < 0.001)
+    #expect(abs(viewportCenter.x - visibleBounds.midX) < 0.001)
+    #expect(abs(viewportCenter.y - visibleBounds.midY) < 0.001)
   }
 
   @Test("pasted PR dry-run route output stays centered with balanced visible whitespace")
@@ -369,7 +369,8 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(viewModel.routeComputationRequestGeneration == 0)
   }
 
-  @Test("a reflow re-requests viewport centering so a switched or reformatted canvas lands on content")
+  @Test(
+    "a reflow re-requests viewport centering so a switched or reformatted canvas lands on content")
   func reflowReRequestsViewportCentering() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(

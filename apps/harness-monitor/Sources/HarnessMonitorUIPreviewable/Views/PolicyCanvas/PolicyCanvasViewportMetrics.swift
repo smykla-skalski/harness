@@ -1,6 +1,6 @@
 import Foundation
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 @MainActor
 func policyCanvasVisibleBounds(
@@ -184,15 +184,24 @@ func policyCanvasInitialViewportDocumentScrollPoint(
   viewportSize: CGSize,
   zoom: CGFloat
 ) -> CGPoint {
-  let anchorPoint = policyCanvasInitialViewportAnchorPoint(
-    visibleBounds: visibleBounds,
-    zoom: 1
-  )
+  let anchorPoint = policyCanvasInitialViewportDocumentAnchorPoint(visibleBounds: visibleBounds)
   return policyCanvasDocumentCenteredScrollPoint(
     anchorPoint: anchorPoint,
     viewportSize: viewportSize,
     zoom: zoom
   )
+}
+
+func policyCanvasInitialViewportDocumentAnchorPoint(
+  visibleBounds: CGRect
+) -> CGPoint {
+  guard !visibleBounds.isNull else {
+    return CGPoint(
+      x: PolicyCanvasLayout.minimumCanvasSize.width / 2,
+      y: PolicyCanvasLayout.minimumCanvasSize.height / 2
+    )
+  }
+  return CGPoint(x: visibleBounds.midX, y: visibleBounds.midY)
 }
 
 @MainActor
