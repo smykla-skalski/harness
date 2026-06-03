@@ -39,9 +39,6 @@ public func policyCanvasVisiblePortSides(
   {
     return visibleSides
   }
-  guard nodeIsActive || hasPendingEdge else {
-    return []
-  }
   return [endpoint.side ?? policyCanvasDefaultPortSide(for: endpoint.kind)]
 }
 
