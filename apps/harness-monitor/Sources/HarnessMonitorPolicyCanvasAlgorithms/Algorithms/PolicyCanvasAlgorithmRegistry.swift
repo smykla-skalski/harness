@@ -173,6 +173,8 @@ enum PolicyCanvasAlgorithmRegistry {
     switch id {
     case PolicyCanvasAlgorithmDefaults.noOpPortMarkers:
       PolicyCanvasNoOpPortMarkerPlacement()
+    case PolicyCanvasAlgorithmDefaults.routeTerminalPortMarkers:
+      PolicyCanvasRouteTerminalPortMarkerPlacement()
     default:
       PolicyCanvasCollisionDerivedPortMarkerPlacement()
     }
