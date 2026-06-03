@@ -247,23 +247,12 @@ private let policyCanvasAlgorithmsTarget: Target = .target(
     dependencies: [
         .target(name: "HarnessMonitorPolicyModels")
     ],
-    settings: .settings(
-        base: [
-            "CODE_SIGN_STYLE": "Automatic",
-            "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-canvas-algorithms",
-            "PRODUCT_MODULE_NAME": "HarnessMonitorPolicyCanvasAlgorithms",
-            "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
-        ],
-        // Debug-only: let InjectionIII / InjectionNext recompile the layout and
-        // routing algorithms (this module) into a running lab. Compile flags
-        // only - the interposable link flag lives on the framework that folds
-        // this static framework in (HarnessMonitorPolicyCanvas).
-        configurations: [
-            .debug(name: "Debug", settings: BuildSettings.policyCanvasHotReloadCompileOverrides),
-            .debug(name: "Preview"),
-            .release(name: "Release")
-        ]
-    ),
+    settings: .settings(base: [
+        "CODE_SIGN_STYLE": "Automatic",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-canvas-algorithms",
+        "PRODUCT_MODULE_NAME": "HarnessMonitorPolicyCanvasAlgorithms",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]),
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:feature:policy-canvas", "tag:layer:core"])
 )
 
@@ -567,16 +556,8 @@ private let policyCanvasTarget: Target = {
                 "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-canvas",
                 "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
             ],
-            // Debug merges the hot-reload overrides onto the canvas preview
-            // overrides so the lab can interpose the layout/routing algorithms
-            // (folded in from HarnessMonitorPolicyCanvasAlgorithms) plus the
-            // canvas views and view model that compile into this framework.
             configurations: [
-                .debug(name: "Debug", settings: BuildSettings.merging(
-                    BuildSettings.canvasPreviewCompilationOverrides,
-                    BuildSettings.policyCanvasHotReloadCompileOverrides,
-                    BuildSettings.policyCanvasHotReloadLinkOverrides
-                )),
+                .debug(name: "Debug", settings: BuildSettings.canvasPreviewCompilationOverrides),
                 .debug(name: "Preview", settings: BuildSettings.canvasPreviewCompilationOverrides),
                 .release(name: "Release")
             ]
@@ -669,32 +650,16 @@ private let policyCanvasLabHostTarget: Target = .target(
     infoPlist: .file(path: "Resources/HarnessMonitor-Info.plist"),
     sources: ["Sources/HarnessMonitorPolicyCanvasLabHost/**/*.swift"],
     dependencies: [.target(name: "HarnessMonitorPolicyCanvas")],
-    settings: .settings(
-        base: [
-            "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
-            "CODE_SIGN_STYLE": "Automatic",
-            "GENERATE_INFOPLIST_FILE": "NO",
-            "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
-            "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-canvas-lab",
-            "PRODUCT_MODULE_NAME": "HarnessMonitorPolicyCanvasLab",
-            "PRODUCT_NAME": "Harness Monitor Policy Canvas Lab",
-            "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
-        ],
-        // Debug-only: the lab is the hot-reload host. It links interposable so
-        // the injector can rebind symbols, and turns hardened runtime off so it
-        // can dlopen the recompiled bundle. The lab declares no entitlements
-        // file, so it is not sandboxed and needs no sandbox exception. Never
-        // applied to Release.
-        configurations: [
-            .debug(name: "Debug", settings: BuildSettings.merging(
-                BuildSettings.policyCanvasHotReloadCompileOverrides,
-                BuildSettings.policyCanvasHotReloadLinkOverrides,
-                ["ENABLE_HARDENED_RUNTIME": "NO"]
-            )),
-            .debug(name: "Preview"),
-            .release(name: "Release")
-        ]
-    ),
+    settings: .settings(base: [
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
+        "CODE_SIGN_STYLE": "Automatic",
+        "GENERATE_INFOPLIST_FILE": "NO",
+        "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-canvas-lab",
+        "PRODUCT_MODULE_NAME": "HarnessMonitorPolicyCanvasLab",
+        "PRODUCT_NAME": "Harness Monitor Policy Canvas Lab",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]),
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:feature:policy-canvas", "tag:layer:app"])
 )
 
