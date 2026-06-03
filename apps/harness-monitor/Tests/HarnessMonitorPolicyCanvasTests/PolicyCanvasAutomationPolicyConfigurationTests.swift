@@ -146,8 +146,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(accessibilitySource.contains("policyCanvasWorkflowStatusStack"))
   }
 
-  @Test("Policy library pane keeps native list drag rows with measured width")
-  func policyLibraryPaneKeepsNativeListDragRowsWithMeasuredWidth() throws {
+  @Test("Policy library pane keeps command drag rows with measured width")
+  func policyLibraryPaneKeepsCommandDragRowsWithMeasuredWidth() throws {
     let layoutSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift")
     let toolRailSource = try previewableSourceFile(
@@ -166,11 +166,14 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(toolRailSource.contains("PolicyCanvasLibraryPaneTextWidths(rows: libraryRows)"))
     #expect(!toolRailSource.contains(".fixedSize(horizontal: true"))
 
-    #expect(toolRailSource.contains("List(Self.libraryRows)"))
-    #expect(toolRailSource.contains(".listStyle(.plain)"))
-    #expect(toolRailSource.contains(".scrollContentBackground(.hidden)"))
-    #expect(toolRailSource.contains(".listRowInsets("))
-    #expect(!toolRailSource.contains("ScrollView {"))
+    #expect(toolRailSource.contains("ScrollView {"))
+    #expect(toolRailSource.contains("ForEach(Self.libraryRows)"))
+    #expect(toolRailSource.contains("A native List owns row gesture arbitration"))
+    #expect(toolRailSource.contains(".padding(EdgeInsets("))
+    #expect(!toolRailSource.contains("List(Self.libraryRows)"))
+    #expect(!toolRailSource.contains(".listStyle(.plain)"))
+    #expect(!toolRailSource.contains(".scrollContentBackground(.hidden)"))
+    #expect(!toolRailSource.contains(".listRowInsets("))
     #expect(!toolRailSource.contains("LazyVStack"))
     #expect(visualStyleSource.contains(dashboardHostSurface))
     #expect(toolRailSource.contains(".background(PolicyCanvasVisualStyle.dashboardHostBackground)"))
