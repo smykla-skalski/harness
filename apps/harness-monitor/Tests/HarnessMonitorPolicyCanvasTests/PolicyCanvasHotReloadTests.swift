@@ -57,5 +57,13 @@ struct PolicyCanvasHotReloadTests {
     #expect(viewModel.documentDirty)
     #expect(!viewModel.shouldApplyExternalDocument(richPolicyDocument(revision: 2)))
   }
+
+  /// The injection chime must resolve to a real macOS system sound. A typo in
+  /// the sound name would silently no-op and drop the audible cue that tells the
+  /// user a hot reload landed and the lab window is worth a glance.
+  @Test("the hot-reload chime resolves a real system sound")
+  func reloadChimeResolvesSystemSound() {
+    #expect(PolicyCanvasHotReload.reloadChimeSound() != nil)
+  }
 }
 #endif

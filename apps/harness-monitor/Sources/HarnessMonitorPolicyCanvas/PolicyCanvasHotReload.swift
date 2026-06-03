@@ -1,4 +1,5 @@
 #if DEBUG
+import AppKit
 import Foundation
 import HarnessMonitorKit
 
@@ -9,11 +10,12 @@ import HarnessMonitorKit
 /// `HarnessMonitorPolicyCanvas` framework link `-Xlinker -interposable` so the
 /// statically dispatched layout and routing code is rebindable (see
 /// `BuildSettings.policyCanvasHotReloadLinkOverrides`). After a successful swap
-/// the injector posts `INJECTION_BUNDLE_NOTIFICATION`; the lab observes it and
-/// forces a reflow so the freshly injected code recomputes. Node positions are
-/// cached on the view model and edge routes are gated by a generation counter,
-/// so a plain redraw keeps showing the pre-edit graph - the forced reflow is
-/// what makes an algorithm change visible.
+/// the injector posts `INJECTION_BUNDLE_NOTIFICATION`; the lab observes it,
+/// recomputes the displayed document so the freshly injected code takes effect,
+/// and plays a short chime. Node positions are cached on the view model and edge
+/// routes are gated by a generation counter, so a plain redraw keeps showing the
+/// pre-edit graph - the forced document reload is what makes an algorithm change
+/// visible, and the chime tells you to glance at the window.
 ///
 /// Workflow and prerequisites: `docs/agent-guides/policy-canvas-hot-reload.md`.
 public enum PolicyCanvasHotReload {
@@ -41,6 +43,25 @@ public enum PolicyCanvasHotReload {
       "Policy Canvas Lab hot reload: install InjectionIII or InjectionNext in "
         + "/Applications to enable live editing"
     )
+  }
+
+  /// Name of the macOS system sound played after a successful injection. "Glass"
+  /// is a gentle, distinctive chime; swap in any name from
+  /// `/System/Library/Sounds` to taste.
+  public static let reloadChimeSoundName = "Glass"
+
+  /// Resolve the configured system sound. Split out from `playReloadChime` so a
+  /// test can confirm the name maps to a real sound without producing audio.
+  @MainActor
+  static func reloadChimeSound() -> NSSound? {
+    NSSound(named: NSSound.Name(reloadChimeSoundName))
+  }
+
+  /// Play a short chime so you know to glance at the lab window when an
+  /// injection lands. Best effort - silent if the named sound is missing.
+  @MainActor
+  public static func playReloadChime() {
+    reloadChimeSound()?.play()
   }
 }
 
