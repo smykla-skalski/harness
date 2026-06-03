@@ -127,26 +127,17 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     }
   }
 
-  @Test("palette drag item providers export native string payloads")
-  func paletteDragItemProvidersExportNativeStringPayloads() {
+  @Test("palette drag payloads stay SwiftUI string values")
+  func paletteDragPayloadsStaySwiftUIStringValues() {
     let viewModel = PolicyCanvasViewModel.sample()
-    let providerCases = [
-      (
-        viewModel.palettePayload(for: PolicyCanvasNodeKind.source),
-        viewModel.paletteItemProvider(for: PolicyCanvasNodeKind.source)
-      ),
-      (
-        viewModel.palettePayload(for: PolicyCanvasAutomationPaletteItem.ocrImages),
-        viewModel.paletteItemProvider(for: PolicyCanvasAutomationPaletteItem.ocrImages)
-      ),
+    let payloads = [
+      viewModel.palettePayload(for: PolicyCanvasNodeKind.source),
+      viewModel.palettePayload(for: PolicyCanvasAutomationPaletteItem.ocrImages),
     ]
-    let nativeStringType = NSPasteboard.PasteboardType.string.rawValue
 
-    for (payload, provider) in providerCases {
+    for payload in payloads {
       #expect(!payload.isEmpty)
-      #expect(provider.registeredTypeIdentifiers.contains(nativeStringType))
-      #expect(provider.hasItemConformingToTypeIdentifier(nativeStringType))
-      #expect(provider.canLoadObject(ofClass: NSString.self))
+      #expect(payload.contains("|"))
     }
   }
 

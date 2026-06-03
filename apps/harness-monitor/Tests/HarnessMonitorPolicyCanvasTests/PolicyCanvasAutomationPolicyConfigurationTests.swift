@@ -102,21 +102,12 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let rowViewsSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasLibraryRowViews.swift"
     )
-    let viewModelCommandsSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasViewModel+Commands.swift"
-    )
 
     #expect(rowViewsSource.contains(".contentShape(.rect)"))
-    #expect(rowViewsSource.contains(".onDrag {"))
-    #expect(rowViewsSource.contains("viewModel.paletteItemProvider(for: kind)"))
-    #expect(rowViewsSource.contains("viewModel.paletteItemProvider(for: item)"))
     #expect(rowViewsSource.contains(".draggable(viewModel.palettePayload(for: kind))"))
     #expect(rowViewsSource.contains(".draggable(viewModel.palettePayload(for: item))"))
-    #expect(
-      viewModelCommandsSource.contains(
-        "func policyCanvasPaletteItemProvider(payload: String) -> NSItemProvider"
-      )
-    )
+    #expect(!rowViewsSource.contains(".onDrag {"))
+    #expect(!rowViewsSource.contains("paletteItemProvider"))
     #expect(!rowViewsSource.contains(".onDragSessionUpdated"))
     #expect(!rowViewsSource.contains("DragSession"))
     #expect(!rowViewsSource.contains("NSCursor"))
