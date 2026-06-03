@@ -143,7 +143,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!source.contains("ScrollViewReader {"))
     #expect(source.contains(".task(id: selectionFocusRequest?.id)"))
     #expect(source.contains("let hostedSnapshot = policyCanvasViewportHostedSnapshot("))
-    #expect(source.contains("let selectionScrollPoint ="))
+    #expect(source.contains("let selectionAnchorPoint ="))
     #expect(source.contains("onZoomChange: { zoom in"))
     #expect(!source.contains("content: AnyView("))
     #expect(coordinatorSource.contains("struct PolicyCanvasViewportHostedSnapshot"))
@@ -199,7 +199,8 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("viewportCenteringGeneration: viewModel.viewportCenteringGeneration"))
     #expect(source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
     #expect(source.contains("cachedRouteOutputsByCanvasIdentity"))
-    #expect(source.contains("let cachedRouteOutput = cachedRouteOutputsByCanvasIdentity[newIdentity]"))
+    #expect(
+      source.contains("let cachedRouteOutput = cachedRouteOutputsByCanvasIdentity[newIdentity]"))
     #expect(source.contains("cachedRouteOutputsByCanvasIdentity[pipelineIdentity] ="))
     #expect(source.contains(".onChange(of: viewModel.routeComputationRequestGeneration"))
     #expect(
@@ -290,7 +291,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(centeringFunction.contains("restoredSceneState == nil || !usesRestoredViewportState"))
     #expect(centeringFunction.contains("if usesRestoredViewportState, let restoredViewportOrigin"))
     #expect(centeringFunction.contains("requestViewportScroll(to: restoredViewportOrigin"))
-    #expect(centeringFunction.contains("policyCanvasInitialViewportDocumentScrollPoint"))
+    #expect(centeringFunction.contains("policyCanvasInitialViewportDocumentAnchorPoint"))
   }
 
   @Test("deferred viewport observations persist under their originating canvas")
@@ -455,7 +456,8 @@ struct PolicyCanvasCommandScrollTests {
     }
     let remaining = source[start.upperBound...]
     let endMarkers = ["\n  func ", "\n  private func "]
-    let end = endMarkers
+    let end =
+      endMarkers
       .compactMap { remaining.range(of: $0)?.lowerBound }
       .min()
     guard let end else {

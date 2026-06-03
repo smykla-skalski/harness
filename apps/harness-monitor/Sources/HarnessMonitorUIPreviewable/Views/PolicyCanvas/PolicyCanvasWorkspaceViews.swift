@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 struct PolicyCanvasViewport: View {
   let viewModel: PolicyCanvasViewModel
@@ -133,8 +133,9 @@ struct PolicyCanvasViewport: View {
           viewModel.setZoom(zoom)
         },
         onViewportChange: { observedState, observedIdentity in
-          guard observedIdentity != viewModel.pipelineIdentity
-            || !viewModel.hasPendingViewportCenteringRequest
+          guard
+            observedIdentity != viewModel.pipelineIdentity
+              || !viewModel.hasPendingViewportCenteringRequest
           else {
             return
           }
@@ -183,7 +184,6 @@ struct PolicyCanvasViewport: View {
         )
         focusSelectionIfNeeded(
           request: selectionFocusRequest,
-          viewportSize: proxy.size,
           routeOutput: routeOutput
         )
         bindCommandFocus()
@@ -199,14 +199,12 @@ struct PolicyCanvasViewport: View {
       .onChange(of: routeOutput.signature, initial: false) {
         focusSelectionIfNeeded(
           request: selectionFocusRequest,
-          viewportSize: proxy.size,
           routeOutput: routeOutput
         )
       }
       .task(id: selectionFocusRequest?.id) {
         focusSelectionIfNeeded(
           request: selectionFocusRequest,
-          viewportSize: proxy.size,
           routeOutput: routeOutput
         )
       }
@@ -417,22 +415,16 @@ extension PolicyCanvasViewport {
     Task { @MainActor in
       await Task.yield()
       await Task.yield()
-      let selectionScrollPoint =
-        policyCanvasViewportCenteringSelectionScrollPoint(
+      let selectionAnchorPoint =
+        policyCanvasViewportCenteringSelectionDocumentAnchorPoint(
           behavior: viewModel.viewportCenteringBehavior,
           selection: viewModel.selection,
           viewModel: viewModel,
-          routeOutput: routeOutput,
-          viewportSize: viewportSize,
-          zoom: targetZoom
+          routeOutput: routeOutput
         )
       requestViewportScroll(
-        to: selectionScrollPoint
-          ?? policyCanvasInitialViewportDocumentScrollPoint(
-            visibleBounds: visibleBounds,
-            viewportSize: viewportSize,
-            zoom: targetZoom
-          ),
+        centeredOnDocumentAnchor: selectionAnchorPoint
+          ?? policyCanvasInitialViewportDocumentAnchorPoint(visibleBounds: visibleBounds),
         consumesViewportCenteringRequest: true
       )
     }
@@ -440,19 +432,16 @@ extension PolicyCanvasViewport {
 
   private func focusSelectionIfNeeded(
     request: PolicyCanvasViewportSelectionFocusRequest?,
-    viewportSize: CGSize,
     routeOutput: PolicyCanvasRouteWorkerOutput
   ) {
     guard let request, handledSelectionFocusRequestID != request.id else {
       return
     }
     guard
-      let scrollPoint = policyCanvasSelectionViewportDocumentScrollPoint(
+      let anchorPoint = policyCanvasSelectionViewportDocumentAnchorPoint(
         selection: request.selection,
         viewModel: viewModel,
-        routeOutput: routeOutput,
-        viewportSize: viewportSize,
-        zoom: viewModel.zoom
+        routeOutput: routeOutput
       )
     else {
       return
@@ -461,7 +450,7 @@ extension PolicyCanvasViewport {
     Task { @MainActor in
       await Task.yield()
       await Task.yield()
-      requestViewportScroll(to: scrollPoint)
+      requestViewportScroll(centeredOnDocumentAnchor: anchorPoint)
     }
   }
 
@@ -496,10 +485,30 @@ extension PolicyCanvasViewport {
     to point: CGPoint,
     consumesViewportCenteringRequest: Bool = false
   ) {
+    requestViewportScroll(
+      target: .contentOrigin(point),
+      consumesViewportCenteringRequest: consumesViewportCenteringRequest
+    )
+  }
+
+  private func requestViewportScroll(
+    centeredOnDocumentAnchor anchorPoint: CGPoint,
+    consumesViewportCenteringRequest: Bool = false
+  ) {
+    requestViewportScroll(
+      target: .centeredDocumentAnchor(anchorPoint),
+      consumesViewportCenteringRequest: consumesViewportCenteringRequest
+    )
+  }
+
+  private func requestViewportScroll(
+    target: PolicyCanvasViewportScrollTarget,
+    consumesViewportCenteringRequest: Bool = false
+  ) {
     scrollApplicatorRequestID &+= 1
     scrollApplicatorRequest = PolicyCanvasViewportScrollRequest(
       id: scrollApplicatorRequestID,
-      point: point,
+      target: target,
       consumesViewportCenteringRequest: consumesViewportCenteringRequest
     )
   }

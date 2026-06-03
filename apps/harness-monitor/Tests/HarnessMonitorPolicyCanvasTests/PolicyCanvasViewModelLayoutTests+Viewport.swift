@@ -56,6 +56,31 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(scrollPoint.y == 380)
   }
 
+  @Test("document centered scroll point allows leading and top whitespace")
+  func documentCenteredScrollPointAllowsLeadingAndTopWhitespace() {
+    let scrollPoint = policyCanvasDocumentCenteredScrollPoint(
+      anchorPoint: CGPoint(x: 760, y: 520),
+      viewportSize: CGSize(width: 1_300, height: 1_050),
+      zoom: 0.36
+    )
+
+    #expect(abs(scrollPoint.x - -1_045.555_555_555_555_7) < 0.001)
+    #expect(abs(scrollPoint.y - -938.333_333_333_333_5) < 0.001)
+  }
+
+  @Test("viewport scroll anchor resolves against the native visible content size")
+  func viewportScrollAnchorResolvesAgainstNativeVisibleContentSize() {
+    let target = PolicyCanvasViewportScrollTarget.centeredDocumentAnchor(
+      CGPoint(x: 760, y: 520)
+    )
+    let origin = target.contentOrigin(
+      forVisibleContentSize: CGSize(width: 3_620, height: 2_900)
+    )
+
+    #expect(origin.x == -1_050)
+    #expect(origin.y == -930)
+  }
+
   @Test("initial viewport document scroll point centers the visible graph bounds")
   func initialViewportDocumentScrollPointCentersVisibleGraphBounds() {
     let visibleBounds = CGRect(x: 520, y: 480, width: 2_000, height: 1_200)
