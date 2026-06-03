@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Snapshot of a dashboard-side policy pipeline update deferred while the user
 /// has unsaved local edits. Held by `PolicyCanvasViewModel` until the caller
@@ -119,10 +119,12 @@ extension PolicyCanvasViewModel {
     )
     nodes = cleanLayout.nodes
     groups = cleanLayout.groups
-    routingHints = cleanLayout.routingHints
     edges = foldedEdges.map { edge in
       policyCanvasApplyingPreferredPortSides(edge, nodes: cleanLayout.nodes)
     }
+    routingHints =
+      policyCanvasRoutingHintsForCurrentLayout(nodes: nodes, groups: groups, edges: edges)
+      ?? cleanLayout.routingHints
     zoom = Self.sanitizedZoom(CGFloat(document.layout.zoom), fallback: 1)
     reconcileGroupFrames()
     resetNextNodeNumber()
@@ -175,10 +177,11 @@ extension PolicyCanvasViewModel {
     latestSimulation = simulation ?? audit?.latestSimulation
     nodes = policyCanvasAssignTrustedLayoutSources(graph.nodes)
     groups = graph.groups
-    routingHints = nil
     edges = policyCanvasFoldParallelBranches(graph.mappedEdges).map { edge in
       policyCanvasApplyingPreferredPortSides(edge, nodes: nodes)
     }
+    routingHints = policyCanvasRoutingHintsForCurrentLayout(
+      nodes: nodes, groups: groups, edges: edges)
     zoom = Self.sanitizedZoom(CGFloat(document.layout.zoom), fallback: 1)
     resetNextNodeNumber()
     markLoadedDocumentRevision(document.revision)

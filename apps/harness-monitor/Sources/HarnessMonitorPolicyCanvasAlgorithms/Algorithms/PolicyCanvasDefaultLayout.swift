@@ -127,6 +127,46 @@ public func applyDefaultPolicyCanvasLayout(
   return (metrics: result.metrics, routingHints: routingHints)
 }
 
+/// Derive routing metadata from the layout that is already on the canvas.
+///
+/// Route hints are a pure function of node/group positions and displayed edges;
+/// they should not be a second persisted source of truth. Use this when loading
+/// trusted saved coordinates or when a no-op reformat needs to refresh route
+/// geometry without moving nodes.
+public func policyCanvasRoutingHintsForCurrentLayout(
+  nodes: [PolicyCanvasNode],
+  groups: [PolicyCanvasGroup],
+  edges: [PolicyCanvasEdge]
+) -> PolicyCanvasLayoutRoutingHints? {
+  guard !nodes.isEmpty, !edges.isEmpty else {
+    return nil
+  }
+  let graph = policyCanvasLayoutGraph(
+    nodes: nodes,
+    groups: groups,
+    edges: edges,
+    mode: .initialLoad
+  )
+  let normalizedGroups = PolicyCanvasLayeredLayoutEngine().normalizedGroups(for: graph)
+  let layoutGroupIDByNodeID = Dictionary(
+    uniqueKeysWithValues: normalizedGroups.flatMap { group in
+      group.nodeIDs.map { ($0, group.layoutID) }
+    }
+  )
+  let nodePositions = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
+  let groupFramesByLayoutID = policyCanvasRebuiltGroupFramesByLayoutID(
+    normalizedGroups: normalizedGroups,
+    layoutGroupIDByNodeID: layoutGroupIDByNodeID,
+    nodePositions: nodePositions
+  )
+  return policyCanvasLayoutRoutingHints(
+    graph: graph,
+    nodePositions: nodePositions,
+    layoutGroupIDByNodeID: layoutGroupIDByNodeID,
+    groupFramesByLayoutID: groupFramesByLayoutID
+  )
+}
+
 public func policyCanvasNormalizeMinimumOrigin(
   nodes: [PolicyCanvasNode],
   groups: [PolicyCanvasGroup],

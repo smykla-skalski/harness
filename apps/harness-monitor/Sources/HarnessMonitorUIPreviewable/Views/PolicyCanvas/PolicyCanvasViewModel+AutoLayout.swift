@@ -1,9 +1,29 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 extension PolicyCanvasViewModel {
   var canReflowLayout: Bool {
     !nodes.isEmpty
+  }
+
+  @discardableResult
+  func refreshRoutingHintsForCurrentLayout() -> Bool {
+    refreshRoutingHints(
+      to: policyCanvasRoutingHintsForCurrentLayout(
+        nodes: nodes,
+        groups: groups,
+        edges: edges
+      )
+    )
+  }
+
+  @discardableResult
+  func refreshRoutingHints(to nextRoutingHints: PolicyCanvasLayoutRoutingHints?) -> Bool {
+    guard routingHints != nextRoutingHints else {
+      return false
+    }
+    routingHints = nextRoutingHints
+    return true
   }
 
   func reflowLayout(
@@ -46,6 +66,7 @@ extension PolicyCanvasViewModel {
         || preservesManualAnchors
         || policyCanvasNeedsDefaultArrangement(nodes: nodes, groups: groups)
     else {
+      refreshRoutingHintsForCurrentLayout()
       requestExplicitRoutesAndCenteringIfNeeded()
       notifyStatus("Layout already tidy")
       return
@@ -116,6 +137,7 @@ extension PolicyCanvasViewModel {
     }
 
     guard !nodeChanges.isEmpty || !edgeChanges.isEmpty else {
+      refreshRoutingHints(to: nextRoutingHints)
       requestExplicitRoutesAndCenteringIfNeeded()
       notifyStatus("Layout already matches the current anchors")
       return
