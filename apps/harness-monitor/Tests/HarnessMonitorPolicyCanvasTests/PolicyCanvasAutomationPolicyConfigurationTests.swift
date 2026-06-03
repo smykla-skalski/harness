@@ -97,17 +97,17 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(contributionsSource.contains("selectedActions"))
   }
 
-  @Test("Policy canvas library rows use a closed-hand cursor only while dragging")
-  func policyCanvasLibraryRowsUseAClosedHandCursorOnlyWhileDragging() throws {
+  @Test("Policy canvas library rows leave drag session ownership to SwiftUI")
+  func policyCanvasLibraryRowsLeaveDragSessionOwnershipToSwiftUI() throws {
     let rowViewsSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasLibraryRowViews.swift"
     )
 
-    #expect(rowViewsSource.contains(".onDragSessionUpdated { session in"))
-    #expect(rowViewsSource.contains("NSCursor.closedHand.push()"))
-    #expect(rowViewsSource.contains("NSCursor.pop()"))
-    #expect(rowViewsSource.contains("case .ended, .dataTransferCompleted:"))
-    #expect(!rowViewsSource.contains("NSCursor.pointingHand"))
+    #expect(rowViewsSource.contains(".draggable(viewModel.palettePayload(for: kind))"))
+    #expect(rowViewsSource.contains(".draggable(viewModel.palettePayload(for: item))"))
+    #expect(!rowViewsSource.contains(".onDragSessionUpdated"))
+    #expect(!rowViewsSource.contains("DragSession"))
+    #expect(!rowViewsSource.contains("NSCursor"))
   }
 
   @Test("Policy canvas workflow status floats as a stacked overlay")
