@@ -33,16 +33,6 @@ func policyCanvasBridgedRoute(
   )
 }
 
-func policyCanvasSegmentAxis(dx: CGFloat, dy: CGFloat) -> PolicyCanvasSegmentAxis? {
-  if abs(dx) > 0.001 {
-    return .horizontal
-  }
-  if abs(dy) > 0.001 {
-    return .vertical
-  }
-  return nil
-}
-
 func policyCanvasRouteSourceSide(_ route: PolicyCanvasEdgeRoute) -> PolicyCanvasPortSide? {
   guard route.points.count >= 2 else {
     return nil

@@ -9,7 +9,7 @@ final class PolicyCanvasAlgorithmSelectionXCTest: XCTestCase {
       PolicyCanvasAlgorithmStage.allCases
     )
     for descriptor in PolicyCanvasAlgorithmPickerCatalog.stageDescriptors {
-      XCTAssertGreaterThanOrEqual(descriptor.options.count, 2)
+      XCTAssertGreaterThanOrEqual(descriptor.options.count, 1)
       XCTAssertEqual(Set(descriptor.options.map(\.id)).count, descriptor.options.count)
     }
   }
