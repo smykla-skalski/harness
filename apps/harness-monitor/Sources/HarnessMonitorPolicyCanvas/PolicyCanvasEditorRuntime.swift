@@ -51,21 +51,7 @@ extension HarnessMonitorStore: PolicyCanvasEditorRuntime {
   public func savePolicyCanvasDraft(document: TaskBoardPolicyPipelineDocument) async
     -> TaskBoardPolicyPipelineDocument?
   {
-    guard let client = apiClient,
-      let canvasId = globalTaskBoardPolicyCanvasWorkspace?.activeCanvasId
-    else {
-      return nil
-    }
-    do {
-      let response = try await HarnessMonitorStore.saveTaskBoardPolicyPipelineDraft(
-        using: client,
-        canvasId: canvasId,
-        document: document
-      )
-      return await adoptTaskBoardPolicyPipelineSaveResponse(response)
-    } catch {
-      return nil
-    }
+    await saveTaskBoardPolicyPipelineDraft(document: document)
   }
 
   public func promotePolicyCanvas(revision: UInt64) async -> Bool {
