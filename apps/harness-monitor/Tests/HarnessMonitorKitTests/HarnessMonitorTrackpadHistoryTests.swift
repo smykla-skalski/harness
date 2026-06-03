@@ -7,8 +7,8 @@ import Testing
 
 @Suite("Harness Monitor trackpad history")
 struct HarnessMonitorTrackpadHistoryTests {
-  @Test("Trackpad history defaults to enabled")
-  func defaultsToEnabled() {
+  @Test("Trackpad history defaults to disabled")
+  func defaultsToDisabled() {
     let suiteName = "HarnessMonitorTrackpadHistoryTests.defaults"
     guard let defaults = UserDefaults(suiteName: suiteName) else {
       Issue.record("Failed to create UserDefaults suite")
@@ -17,11 +17,11 @@ struct HarnessMonitorTrackpadHistoryTests {
     defaults.removePersistentDomain(forName: suiteName)
     defer { defaults.removePersistentDomain(forName: suiteName) }
 
-    #expect(HarnessMonitorTrackpadNavigationDefaults.read(userDefaults: defaults))
+    #expect(!HarnessMonitorTrackpadNavigationDefaults.read(userDefaults: defaults))
   }
 
-  @Test("Trackpad history reads the stored override")
-  func readsStoredOverride() {
+  @Test("Trackpad history reads the stored enabled override")
+  func readsStoredEnabledOverride() {
     let suiteName = "HarnessMonitorTrackpadHistoryTests.override"
     guard let defaults = UserDefaults(suiteName: suiteName) else {
       Issue.record("Failed to create UserDefaults suite")
@@ -30,9 +30,9 @@ struct HarnessMonitorTrackpadHistoryTests {
     defaults.removePersistentDomain(forName: suiteName)
     defer { defaults.removePersistentDomain(forName: suiteName) }
 
-    defaults.set(false, forKey: HarnessMonitorTrackpadNavigationDefaults.enabledKey)
+    defaults.set(true, forKey: HarnessMonitorTrackpadNavigationDefaults.enabledKey)
 
-    #expect(!HarnessMonitorTrackpadNavigationDefaults.read(userDefaults: defaults))
+    #expect(HarnessMonitorTrackpadNavigationDefaults.read(userDefaults: defaults))
   }
 
   @Test("Positive gesture amount resolves to back when back navigation is available")
