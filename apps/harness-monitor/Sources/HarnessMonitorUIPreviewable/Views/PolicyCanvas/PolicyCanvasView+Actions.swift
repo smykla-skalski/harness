@@ -156,6 +156,7 @@ extension PolicyCanvasView {
 
         await MainActor.run {
           setRuntimePolicyCanvasActionInFlight(false)
+          let savedRevision = savedDocument?.revision
           handlePolicyCanvasSaveCompletion(
             viewModel: viewModel,
             savedDocument,
@@ -164,6 +165,9 @@ extension PolicyCanvasView {
             reason: reason
           )
           viewModel.endForegroundSave()
+          if let savedRevision, (dashboardSnapshot.document?.revision ?? 0) >= savedRevision {
+            applyDashboardSnapshot()
+          }
         }
       }
     )
@@ -214,6 +218,9 @@ extension PolicyCanvasView {
   }
 
   func applyDashboardSnapshot() {
+    guard !viewModel.isSavingDraft else {
+      return
+    }
     let snapshot = dashboardSnapshot
     if !viewModel.documentDirty {
       viewModel.applyPersistedDocument(

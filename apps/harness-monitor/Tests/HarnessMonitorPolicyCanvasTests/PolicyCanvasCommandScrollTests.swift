@@ -225,6 +225,7 @@ struct PolicyCanvasCommandScrollTests {
 
     #expect(selectionPreviewSource.contains("policyCanvasViewModel.applyPersistedDocument("))
     #expect(!selectionPreviewSource.contains("forceDocumentReload: true"))
+    #expect(snapshotFunction.contains("guard !viewModel.isSavingDraft else"))
     #expect(snapshotFunction.contains("viewModel.applyPersistedDocument("))
     #expect(!snapshotFunction.contains("forceDocumentReload: true"))
   }

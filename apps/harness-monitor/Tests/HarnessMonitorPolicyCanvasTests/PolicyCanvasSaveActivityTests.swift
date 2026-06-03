@@ -112,6 +112,31 @@ struct PolicyCanvasSaveActivityTests {
     #expect(performSaveBody[submitRange.lowerBound...].contains(".exportDocument()"))
   }
 
+  @Test("successful save reconciles dashboard snapshot after adopting backing")
+  func successfulSaveReconcilesDashboardSnapshotAfterAdoptingBacking() throws {
+    let source = try policyCanvasSourceFile("PolicyCanvasView+Actions.swift")
+    let performSaveRange = try #require(source.range(of: "func performSave("))
+    let nextFunctionRange = try #require(
+      source.range(
+        of: "\n  func requestPromote(",
+        range: performSaveRange.upperBound..<source.endIndex
+      )
+    )
+    let performSaveBody = source[performSaveRange.lowerBound..<nextFunctionRange.lowerBound]
+    let completionRange = try #require(
+      performSaveBody.range(of: "handlePolicyCanvasSaveCompletion(")
+    )
+    let endSaveRange = try #require(performSaveBody.range(of: "viewModel.endForegroundSave()"))
+    let reconcileRange = try #require(performSaveBody.range(of: "applyDashboardSnapshot()"))
+
+    #expect(performSaveBody.contains("let savedRevision = savedDocument?.revision"))
+    #expect(completionRange.lowerBound < endSaveRange.lowerBound)
+    #expect(endSaveRange.lowerBound < reconcileRange.lowerBound)
+    #expect(
+      performSaveBody.contains(
+        "if let savedRevision, (dashboardSnapshot.document?.revision ?? 0) >= savedRevision {"))
+  }
+
   @Test("a clean successful save clears save activity back to idle")
   func resolveSuccessfulSaveClearsToIdle() {
     let viewModel = PolicyCanvasViewModel.sample()
