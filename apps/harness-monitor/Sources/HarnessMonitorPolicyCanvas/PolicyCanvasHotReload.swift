@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+import HarnessMonitorKit
 
 /// Hot-reload support for the Policy Canvas Lab (Debug builds only).
 ///
@@ -39,6 +40,31 @@ public enum PolicyCanvasHotReload {
     print(
       "Policy Canvas Lab hot reload: install InjectionIII or InjectionNext in "
         + "/Applications to enable live editing"
+    )
+  }
+}
+
+@MainActor
+extension PolicyCanvasViewModel {
+  /// Re-render the lab after an injection so the freshly compiled layout and
+  /// routing algorithms take effect on the currently displayed document.
+  ///
+  /// Uses a forced document reload, not `reflowLayout`. A reload re-runs
+  /// `policyCanvasCleanInitialLayout` with the current algorithm selection (the
+  /// injected code), recomputes routes, and leaves `documentDirty` false.
+  /// `reflowLayout` would mark the document dirty, and then
+  /// `shouldApplyExternalDocument`'s dirty guard blocks every later policy
+  /// switch from updating the canvas.
+  func applyHotReloadedAlgorithms(
+    document: TaskBoardPolicyPipelineDocument?,
+    simulation: TaskBoardPolicyPipelineSimulationResult?,
+    audit: TaskBoardPolicyPipelineAuditSummary?
+  ) {
+    applyDocument(
+      document: document,
+      simulation: simulation,
+      audit: audit,
+      forceDocumentReload: true
     )
   }
 }
