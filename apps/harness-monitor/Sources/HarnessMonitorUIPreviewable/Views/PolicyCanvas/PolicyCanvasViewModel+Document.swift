@@ -144,7 +144,7 @@ extension PolicyCanvasViewModel {
     notifyStatus("Loaded revision \(document.revision)")
   }
 
-  public func applyCachedCanvasPreview(
+  public func applyPersistedDocument(
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
@@ -340,15 +340,15 @@ extension PolicyCanvasViewModel {
 extension PolicyCanvasViewModel {
 
   /// Apply any pending dashboard update, overwriting local edits. The
-  /// underlying `applyDocument(...)` clears `documentDirty` and the pending
+  /// underlying persisted-document path clears `documentDirty` and the pending
   /// storage itself on the clean path, so this method does no pre-apply state
   /// writes — pre-clearing would leave state "clean but stale" if
-  /// `applyDocument` ever short-circuits mid-execution.
+  /// the document adoption ever short-circuits mid-execution.
   func applyPendingUpdate() {
     guard let pending = pendingDocumentUpdate else {
       return
     }
-    applyDocument(
+    applyPersistedDocument(
       document: pending.document,
       simulation: pending.simulation,
       audit: pending.audit,

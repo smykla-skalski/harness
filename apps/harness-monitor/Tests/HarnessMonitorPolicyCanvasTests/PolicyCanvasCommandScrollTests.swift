@@ -198,6 +198,9 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("appliedRouteKey: appliedRouteKey"))
     #expect(source.contains("viewportCenteringGeneration: viewModel.viewportCenteringGeneration"))
     #expect(source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
+    #expect(source.contains("cachedRouteOutputsByCanvasIdentity"))
+    #expect(source.contains("let cachedRouteOutput = cachedRouteOutputsByCanvasIdentity[newIdentity]"))
+    #expect(source.contains("cachedRouteOutputsByCanvasIdentity[pipelineIdentity] ="))
     #expect(source.contains(".onChange(of: viewModel.routeComputationRequestGeneration"))
     #expect(
       source.contains("await rebuildRoutes(for: routeKey, pipelineIdentity: routeCacheIdentity)"))
@@ -208,8 +211,8 @@ struct PolicyCanvasCommandScrollTests {
       !source.contains(".onChange(of: viewModel.viewportCenteringGeneration, initial: false)"))
   }
 
-  @Test("canvas pane switching uses the fast preview apply path")
-  func canvasPaneSwitchingUsesFastPreviewApplyPath() throws {
+  @Test("canvas pane switching uses the persisted document apply path")
+  func canvasPaneSwitchingUsesPersistedDocumentApplyPath() throws {
     let selectionPreviewSource = try previewableSourceFile(
       named: "Views/Dashboard/DashboardPolicyCanvasRouteView+IO.swift"
     )
@@ -220,9 +223,9 @@ struct PolicyCanvasCommandScrollTests {
       in: actionsSource
     )
 
-    #expect(selectionPreviewSource.contains("policyCanvasViewModel.applyCachedCanvasPreview("))
+    #expect(selectionPreviewSource.contains("policyCanvasViewModel.applyPersistedDocument("))
     #expect(!selectionPreviewSource.contains("forceDocumentReload: true"))
-    #expect(snapshotFunction.contains("viewModel.applyCachedCanvasPreview("))
+    #expect(snapshotFunction.contains("viewModel.applyPersistedDocument("))
     #expect(!snapshotFunction.contains("forceDocumentReload: true"))
   }
 

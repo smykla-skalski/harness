@@ -47,6 +47,27 @@ struct PolicyCanvasViewModelLayoutTests {
     )
   }
 
+  @Test("live startup trusts persisted canvas coordinates instead of repairing layout")
+  func liveStartupTrustsPersistedCanvasCoordinates() {
+    let document = overlappingDefaultPolicyDocument(revision: 15)
+    let rawPositions = Dictionary(
+      uniqueKeysWithValues: document.layout.nodes.map { layout in
+        (layout.nodeId, CGPoint(x: CGFloat(layout.x), y: CGFloat(layout.y)))
+      }
+    )
+
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: document,
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "default-canvas"
+    )
+
+    for node in viewModel.nodes {
+      #expect(node.position == rawPositions[node.id])
+    }
+  }
+
   @Test("loaded default graph starts centered with balanced canvas whitespace")
   func loadedDefaultGraphStartsCenteredWithBalancedCanvasWhitespace() {
     let viewModel = PolicyCanvasViewModel.sample()
