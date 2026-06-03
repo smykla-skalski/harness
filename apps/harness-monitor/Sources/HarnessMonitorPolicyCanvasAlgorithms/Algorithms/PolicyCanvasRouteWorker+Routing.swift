@@ -224,7 +224,7 @@ extension PolicyCanvasPreparedRouteInput {
         corridorHint: corridorHint
       )
       ?? sourceTerminal?.side
-    let preferredSourceSide = policyCanvasPreferredSourceSide(
+    let resolvedPreferredSourceSide = policyCanvasPreferredSourceSide(
       input: PolicyCanvasPreferredSourceSideInput(
         fixedSide: fixedSourceSide,
         forcedFanOutSide: edgeContext.familyPreference.forcedSourceSide,
@@ -235,6 +235,20 @@ extension PolicyCanvasPreparedRouteInput {
         targetFrame: nodeIndex[edge.target.nodeID]?.frame
       )
     )
+    // A fan-in feeder forced to the top can only land on its single visible top
+    // marker dot, which sits at the source's horizontal center. When an obstacle
+    // covers that center escape column within the turn lead - a comb-dropped sink
+    // overhanging the top edge, or the source's own group title sitting just above
+    // its row - the top port is unusable and an output cannot leave leading toward
+    // a collector to its side, so drop it to the bottom and let the router take it
+    // down and around rather than diving through the obstacle.
+    let preferredSourceSide: PolicyCanvasPortSide =
+      resolvedPreferredSourceSide == .top
+      && fixedSourceSide == nil
+      && edge.source.kind == .output
+      && policyCanvasTopDepartureCenterColumnBlocked(
+        sourceFrame: sourceFrame, obstacles: shared.obstacles)
+      ? .bottom : resolvedPreferredSourceSide
     // Drop the marker terminal when its side disagrees with the chosen source side,
     // so the route anchors to the chosen side's port instead of the collision-derived
     // one (a fan-in rail forced back to its source's top must not keep a stale bottom

@@ -320,6 +320,88 @@ struct PolicyCanvasRoutingFixesTests {
     #expect(cost < 0.001, "separated route still encroaches: \(separated.points)")
   }
 
+  @Test("corridor candidates keep semantic source sides for flexible output edges")
+  func corridorCandidatesKeepSemanticSourceSidesForFlexibleOutputEdges() {
+    let edge = PolicyCanvasEdge(
+      id: "agent-high",
+      source: PolicyCanvasPortEndpoint(nodeID: "risk", portID: "high", kind: .output),
+      target: PolicyCanvasPortEndpoint(nodeID: "consensus", portID: "in", kind: .input),
+      label: "high risk"
+    )
+    let sourceAnchor = CGPoint(x: 3228, y: 1756)
+    let targetAnchor = CGPoint(x: 2772, y: 1696)
+    let spacingBySide = Dictionary(
+      uniqueKeysWithValues: PolicyCanvasPortSide.allSides.map { ($0, lineSpacing) }
+    )
+    let request = PolicyCanvasResolvedDisplayedRouteRequest(
+      router: PolicyCanvasVisibilityRouter(),
+      edge: edge,
+      source: sourceAnchor,
+      target: targetAnchor,
+      routeLane: 0,
+      sourceFanoutLane: 0,
+      targetFanoutLane: 0,
+      lineSpacing: lineSpacing,
+      obstacles: [],
+      groups: [],
+      sourceGroupID: nil,
+      targetGroupID: nil,
+      sourceAnchor: (point: sourceAnchor, side: .trailing),
+      targetAnchor: (point: targetAnchor, side: .leading),
+      sourceCandidates: [
+        (point: sourceAnchor, side: .trailing),
+        (point: CGPoint(x: 3144, y: 1804), side: .bottom),
+        (point: CGPoint(x: 3144, y: 1708), side: .top),
+      ],
+      targetCandidates: [(point: targetAnchor, side: .leading)],
+      sourceSpacingBySide: spacingBySide,
+      targetSpacingBySide: spacingBySide,
+      corridorHint: PolicyCanvasEdgeCorridorHint(
+        key: PolicyCanvasRouteCorridorKey(
+          sourceScopeID: "risk",
+          targetScopeID: "consensus",
+          targetNodeID: "consensus",
+          label: "high risk",
+          laneIndex: 0
+        ),
+        horizontalLaneY: 1600,
+        verticalLaneX: 3004
+      )
+    )
+
+    let candidates = policyCanvasCorridorAlignedCandidates(request: request)
+
+    #expect(
+      candidates.allSatisfy { policyCanvasRouteSourceSide($0) != .leading },
+      "corridor candidates synthesized an impossible leading output departure: \(candidates.map(\.points))"
+    )
+  }
+
+  // MARK: Routing - top departure center escape column blocked
+
+  @Test("a center-column obstacle blocks the top departure; a side or high one does not")
+  func centerColumnObstacleBlocksTopDeparture() {
+    // x-agent-risk's center column (x=3144) is covered by x-allow2, a node-height
+    // sink dropped directly above it - the only top marker dot is buried.
+    let agentRisk = CGRect(x: 3060, y: 1708, width: 168, height: 96)
+    let allow2 = CGRect(x: 3060, y: 1640, width: 168, height: 96)
+    #expect(policyCanvasTopDepartureCenterColumnBlocked(sourceFrame: agentRisk, obstacles: [allow2]))
+    // x-evidence's center column (x=1916) is covered by its own x-checks group
+    // title just above its row; a center-only top dot cannot be saved by a lateral
+    // shift, so this is blocked too.
+    let evidence = CGRect(x: 1832, y: 1480, width: 168, height: 96)
+    let checksTitle = CGRect(x: 1796, y: 1436, width: 180, height: 34)
+    #expect(policyCanvasTopDepartureCenterColumnBlocked(sourceFrame: evidence, obstacles: [checksTitle]))
+    // An obstacle entirely left of the center column does not block it.
+    let sideTitle = CGRect(x: 1680, y: 1436, width: 120, height: 34)
+    #expect(!policyCanvasTopDepartureCenterColumnBlocked(sourceFrame: evidence, obstacles: [sideTitle]))
+    // An obstacle clearing the turn lead above the edge does not block it.
+    let highTitle = CGRect(x: 1796, y: 1398, width: 180, height: 34)
+    #expect(!policyCanvasTopDepartureCenterColumnBlocked(sourceFrame: evidence, obstacles: [highTitle]))
+    // No overhang at all.
+    #expect(!policyCanvasTopDepartureCenterColumnBlocked(sourceFrame: agentRisk, obstacles: []))
+  }
+
   // MARK: Helpers
 
   private func fanInHint(busY: CGFloat, ordinal: Int) -> PolicyCanvasEdgeCorridorHint {
