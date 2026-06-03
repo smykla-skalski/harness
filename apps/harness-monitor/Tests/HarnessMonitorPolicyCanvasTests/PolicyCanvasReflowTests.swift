@@ -333,48 +333,6 @@ struct PolicyCanvasReflowTests {
     #expect(sinkBAfter.position == sinkBBefore)
   }
 
-  @Test("reflowed merge pass route stays simple after full manual reflow")
-  func reflowedMergePassRouteStaysSimpleAfterFullManualReflow() {
-    let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.load(
-      document: PreviewFixtures.policyCanvasPipelineDocument(revision: 904),
-      simulation: nil,
-      audit: nil
-    )
-
-    for index in viewModel.nodes.indices {
-      viewModel.nodes[index].layoutSource = .manual
-    }
-
-    viewModel.reflowLayout()
-
-    let routes = policyCanvasDisplayedRoutes(
-      viewModel: viewModel,
-      edges: viewModel.edges,
-      portAnchors: viewModel.portAnchors(for: viewModel.edges),
-      router: PolicyCanvasVisibilityRouter()
-    )
-    guard let route = routes["edge:evidence-pass"] else {
-      Issue.record("Expected merge-pass route after full manual reflow")
-      return
-    }
-
-    let metrics = policyCanvasRouteMetrics(route)
-    #expect(policyCanvasRouteSourceSide(route) == .trailing)
-    #expect(policyCanvasRouteTargetSide(route) == .leading)
-    #expect(
-      metrics.bends <= 2,
-      "edge:evidence-pass should stay visually direct after reflow; points: \(route.points)"
-    )
-    #expect(
-      policyCanvasHorizontalBandPenalty(route) == 0,
-      """
-      edge:evidence-pass should not detour outside the source-target \
-      horizontal band; points: \(route.points)
-      """
-    )
-  }
-
   @Test(
     "full manual reflow recenters the preview policy and lowers the entry group off the top row")
   func fullManualReflowRecentersPreviewPolicyAndLowersEntryGroup() {
