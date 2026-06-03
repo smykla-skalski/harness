@@ -134,8 +134,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(accessibilitySource.contains("policyCanvasWorkflowStatusStack"))
   }
 
-  @Test("Policy library pane is a non-resizable content-sized button stack")
-  func policyLibraryPaneIsNonResizableButtonStack() throws {
+  @Test("Policy library pane keeps native list drag rows without split resizing")
+  func policyLibraryPaneKeepsNativeListDragRowsWithoutSplitResizing() throws {
     let layoutSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift")
     let toolRailSource = try previewableSourceFile(
@@ -151,8 +151,12 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
 
     #expect(toolRailSource.contains(".fixedSize(horizontal: true"))
 
-    #expect(!toolRailSource.contains("List("))
-    #expect(toolRailSource.contains("ScrollView"))
+    #expect(toolRailSource.contains("List(Self.libraryRows)"))
+    #expect(toolRailSource.contains(".listStyle(.plain)"))
+    #expect(toolRailSource.contains(".scrollContentBackground(.hidden)"))
+    #expect(toolRailSource.contains(".listRowInsets("))
+    #expect(!toolRailSource.contains("ScrollView {"))
+    #expect(!toolRailSource.contains("LazyVStack"))
     #expect(visualStyleSource.contains(dashboardHostSurface))
     #expect(toolRailSource.contains(".background(PolicyCanvasVisualStyle.dashboardHostBackground)"))
     #expect(!toolRailSource.contains(".background(PolicyCanvasVisualStyle.railBackground)"))

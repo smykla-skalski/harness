@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 struct PolicyCanvasComponentLibraryPane: View {
   let viewModel: PolicyCanvasViewModel
@@ -10,19 +10,12 @@ struct PolicyCanvasComponentLibraryPane: View {
   var body: some View {
     let metrics = PolicyCanvasToolRailMetrics(fontScale: fontScale)
     VStack(alignment: .leading, spacing: 0) {
-      ScrollView {
-        // An eager VStack of buttons, not a List or LazyVStack: the palette is
-        // an object library of draggable command buttons, not selectable data,
-        // so the rows carry the button role rather than list-row semantics. The
-        // pane sizes to its widest row (see `.fixedSize` below), which needs
-        // every row measured up front; the rows are constant and cheap.
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(Self.libraryRows) { row in
-            rowView(row, metrics: metrics)
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+      List(Self.libraryRows) { row in
+        rowView(row, metrics: metrics)
       }
+      .listStyle(.plain)
+      .scrollContentBackground(.hidden)
+      .environment(\.defaultMinListRowHeight, 1)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasToolRail)
     }
     .frame(maxHeight: .infinity, alignment: .topLeading)
@@ -47,16 +40,19 @@ struct PolicyCanvasComponentLibraryPane: View {
     switch row {
     case .header(_, let title):
       PolicyCanvasLibraryKindHeader(title: title)
-        .padding(EdgeInsets(top: isFirstRow ? 10 : 18, leading: 16, bottom: 6, trailing: 10))
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: isFirstRow ? 10 : 18, leading: 16, bottom: 6, trailing: 10))
+        .listRowBackground(Color.clear)
     case .base(let kind):
       PolicyCanvasBaseComponentRow(viewModel: viewModel, kind: kind, metrics: metrics)
-        .padding(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
+        .listRowBackground(Color.clear)
     case .variant(let item):
       PolicyCanvasAutomationVariantRow(viewModel: viewModel, item: item, metrics: metrics)
-        .padding(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
+        .listRowBackground(Color.clear)
     }
   }
 
