@@ -105,7 +105,8 @@ public func policyCanvasLaneAssignments(
 
 public func policyCanvasRouteFamilyPreferences(
   edges: [PolicyCanvasEdge],
-  nodeFramesByID: [String: CGRect] = [:]
+  nodeFramesByID: [String: CGRect] = [:],
+  nodeGroupIDsByID: [String: String?] = [:]
 ) -> [String: PolicyCanvasRouteFamilyPreference] {
   let sharedTargetCounts = Dictionary(grouping: edges, by: \.target).mapValues(\.count)
   // Distinct feeder nodes per target: a true multi-source fan-in (several
@@ -154,8 +155,12 @@ public func policyCanvasRouteFamilyPreferences(
       // lanes so each rail descends in its own source-ordered column and the
       // rails land on their markers without crossing.
       let isMultiSourceFanIn = distinctSourceNodeCounts[edge.target, default: 1] >= 3
+      let crossesGroupBoundary =
+        nodeGroupIDsByID[edge.source.nodeID] != nodeGroupIDsByID[edge.target.nodeID]
       let forcedSourceSide: PolicyCanvasPortSide? =
-        (belowChildCounts[edge.source.nodeID, default: 0] >= 3 && targetBelowSource(edge))
+        (belowChildCounts[edge.source.nodeID, default: 0] >= 3
+          && targetBelowSource(edge)
+          && !crossesGroupBoundary)
         ? .bottom : nil
       return (
         edge.id,

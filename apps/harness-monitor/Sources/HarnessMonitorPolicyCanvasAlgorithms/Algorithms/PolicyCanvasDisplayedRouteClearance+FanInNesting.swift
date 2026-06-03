@@ -61,6 +61,15 @@ public func policyCanvasNestedFanInRoutes(
     {
       continue
     }
+    if let prepared,
+      policyCanvasNestedFanInRoutesIntersectObstacles(
+        nestedRoutes: nested,
+        family: family,
+        prepared: prepared
+      )
+    {
+      continue
+    }
     for (id, route) in nested {
       result[id] = route
     }
@@ -197,6 +206,39 @@ private func policyCanvasNestedFanInRoutesConflictExternally(
       if overlap > PolicyCanvasLayout.gridSize {
         return true
       }
+    }
+  }
+
+  return false
+}
+
+private func policyCanvasNestedFanInRoutesIntersectObstacles(
+  nestedRoutes: [String: PolicyCanvasEdgeRoute],
+  family: [PolicyCanvasEdge],
+  prepared: PolicyCanvasPreparedRouteInput
+) -> Bool {
+  let edgeByID = Dictionary(uniqueKeysWithValues: family.map { ($0.id, $0) })
+  let groupTitleObstacles = policyCanvasGroupTitleFrames(prepared.groups).map {
+    $0.insetBy(dx: 0.5, dy: 0.5)
+  }
+  let nodeFramesByID = Dictionary(
+    uniqueKeysWithValues: prepared.nodes.map { node in
+      (node.id, node.frame.insetBy(dx: 0.5, dy: 0.5))
+    }
+  )
+
+  for (edgeID, route) in nestedRoutes {
+    guard let edge = edgeByID[edgeID] else {
+      continue
+    }
+    let nodeObstacles = prepared.nodes.compactMap { node -> CGRect? in
+      guard node.id != edge.source.nodeID, node.id != edge.target.nodeID else {
+        return nil
+      }
+      return nodeFramesByID[node.id]
+    }
+    if policyCanvasRouteIntersectsObstacles(route, obstacles: nodeObstacles + groupTitleObstacles) {
+      return true
     }
   }
 

@@ -206,22 +206,32 @@ extension PolicyCanvasPreparedRouteInput {
     let sourceTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .source)
     let targetTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .target)
     let corridorHint = shared.routingHints?.edgeHint(for: edge.id)
+    let sourceFrame = nodeIndex[edge.source.nodeID]?.frame
     let fixedSourceSide = edge.source.side
     let fixedTargetSide =
       edge.target.side
       ?? policyCanvasGeometryAwareForcedTargetSide(
         forced: edgeContext.familyPreference.forcedTargetSide,
-        sourceFrame: nodeIndex[edge.source.nodeID]?.frame,
+        sourceFrame: sourceFrame,
         targetFrame: nodeIndex[edge.target.nodeID]?.frame
       )
+    let naturalSourceSide = policyCanvasResolvedPortSide(for: edge.source)
+    let effectiveSourceTerminalSide =
+      preferredFlexibleSourceSide(
+        terminalSide: sourceTerminal?.side,
+        naturalSide: naturalSourceSide,
+        sourceFrame: sourceFrame,
+        corridorHint: corridorHint
+      )
+      ?? sourceTerminal?.side
     let preferredSourceSide = policyCanvasPreferredSourceSide(
       input: PolicyCanvasPreferredSourceSideInput(
         fixedSide: fixedSourceSide,
         forcedFanOutSide: edgeContext.familyPreference.forcedSourceSide,
-        terminalSide: sourceTerminal?.side,
-        natural: policyCanvasResolvedPortSide(for: edge.source),
+        terminalSide: effectiveSourceTerminalSide,
+        natural: naturalSourceSide,
         isFanInMember: edgeContext.familyPreference.forcedTargetSide == .top,
-        sourceFrame: nodeIndex[edge.source.nodeID]?.frame,
+        sourceFrame: sourceFrame,
         targetFrame: nodeIndex[edge.target.nodeID]?.frame
       )
     )
@@ -354,6 +364,37 @@ extension PolicyCanvasPreparedRouteInput {
     return naturalSide
   }
 
+  private func preferredFlexibleSourceSide(
+    terminalSide: PolicyCanvasPortSide?,
+    naturalSide: PolicyCanvasPortSide,
+    sourceFrame: CGRect?,
+    corridorHint: PolicyCanvasEdgeCorridorHint?
+  ) -> PolicyCanvasPortSide? {
+    guard
+      let terminalSide,
+      let sourceFrame,
+      naturalSide == .leading || naturalSide == .trailing,
+      terminalSide == .top || terminalSide == .bottom,
+      let corridorHint,
+      let verticalLaneX = corridorHint.verticalLaneX
+    else {
+      return nil
+    }
+    switch naturalSide {
+    case .leading:
+      guard verticalLaneX <= sourceFrame.minX + 0.5 else {
+        return nil
+      }
+    case .trailing:
+      guard verticalLaneX >= sourceFrame.maxX - 0.5 else {
+        return nil
+      }
+    case .top, .bottom:
+      return nil
+    }
+    return naturalSide
+  }
+
   private func routingObstacles() -> [CGRect] {
     policyCanvasCanonicalObstacles(nodes.map(\.frame) + policyCanvasGroupTitleFrames(groups))
   }
@@ -367,7 +408,8 @@ extension PolicyCanvasPreparedRouteInput {
     let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
     let familyPreferences = policyCanvasRouteFamilyPreferences(
       edges: edges,
-      nodeFramesByID: nodeIndex.mapValues(\.frame)
+      nodeFramesByID: nodeIndex.mapValues(\.frame),
+      nodeGroupIDsByID: nodeIndex.mapValues(\.groupID)
     )
     let edgeLanes = policyCanvasSharedTargetRouteLaneAssignments(
       edges: edges,
