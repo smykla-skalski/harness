@@ -178,6 +178,41 @@ struct PolicyCanvasLabRoutingQualityTests {
     )
   }
 
+  @Test("extreme sample review routes avoid incompatible interior corridor sharing")
+  func extremeSampleReviewRoutesAvoidIncompatibleInteriorCorridorSharing() async throws {
+    let laidOutGraph = try laidOutLabGraph(sampleID: "extreme")
+    let graph = await routedLabGraph(laidOutGraph: laidOutGraph)
+    let routeInput = PolicyCanvasRouteWorkerInput(
+      nodes: graph.nodes,
+      groups: graph.groups,
+      edges: graph.edges,
+      fontScale: 1,
+      routingHints: laidOutGraph.routingHints,
+      algorithmSelection: .harnessCurrent
+    )
+    let prepared = PolicyCanvasPreparedRouteInput(input: routeInput)
+    let overlap = try policyCanvasLabIncompatibleInteriorOverlap(
+      leftID: "xe:route-review",
+      rightID: "xe:route-verify",
+      routes: graph.output.routes,
+      edges: graph.edges,
+      routingHints: laidOutGraph.routingHints,
+      prepared: prepared
+    )
+
+    #expect(
+      overlap <= PolicyCanvasLayout.gridSize,
+      """
+      extreme review routes still share an incompatible interior corridor
+      overlap=\(overlap)
+      reviewPrePost=\(String(describing: graph.routesBeforePostProcessing["xe:route-review"]?.points))
+      review=\(String(describing: graph.output.routes["xe:route-review"]?.points))
+      verifyPrePost=\(String(describing: graph.routesBeforePostProcessing["xe:route-verify"]?.points))
+      verify=\(String(describing: graph.output.routes["xe:route-verify"]?.points))
+      """
+    )
+  }
+
   @Test("multi-group routing is deterministic when edge order reverses")
   func multiGroupRoutingIsDeterministicAcrossEdgeOrder() async throws {
     let laidOutGraph = try laidOutLabGraph(sampleID: "multi-group")
