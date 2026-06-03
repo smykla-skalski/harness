@@ -5,8 +5,25 @@ import SwiftUI
 
 struct PolicyCanvasViewportScrollRequest: Equatable {
   let id: UInt64
-  let point: CGPoint
+  let target: PolicyCanvasViewportScrollTarget
   let consumesViewportCenteringRequest: Bool
+}
+
+enum PolicyCanvasViewportScrollTarget: Equatable {
+  case contentOrigin(CGPoint)
+  case centeredDocumentAnchor(CGPoint)
+
+  func contentOrigin(forVisibleContentSize visibleContentSize: CGSize) -> CGPoint {
+    switch self {
+    case .contentOrigin(let point):
+      return point
+    case .centeredDocumentAnchor(let anchorPoint):
+      return CGPoint(
+        x: anchorPoint.x - (visibleContentSize.width / 2),
+        y: anchorPoint.y - (visibleContentSize.height / 2)
+      )
+    }
+  }
 }
 
 struct PolicyCanvasViewportObservedState: Equatable, Sendable {

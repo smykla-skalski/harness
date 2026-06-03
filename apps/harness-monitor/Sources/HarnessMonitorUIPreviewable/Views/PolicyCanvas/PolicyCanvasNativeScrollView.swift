@@ -1,7 +1,7 @@
 import AppKit
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 @MainActor
 final class PolicyCanvasNativeScrollView: NSScrollView {
@@ -72,7 +72,8 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     size: CGSize
   ) {
     cancelWheelScrollSmoothing()
-    let hadStableViewport = hasLaidOutDocumentRootInViewport
+    let hadStableViewport =
+      hasLaidOutDocumentRootInViewport
       && contentView.bounds.width > 1
       && contentView.bounds.height > 1
       && documentView != nil
@@ -137,8 +138,9 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     }
     let workspacePoint =
       adaptiveWorkspaceLayout?.workspacePoint(forContentPoint: point) ?? point
-    expandAdaptiveWorkspaceIfNeeded(toContainViewportOrigin: workspacePoint)
-    let target = clampedDocumentPoint(workspacePoint)
+    let containedWorkspacePoint =
+      expandAdaptiveWorkspaceIfNeeded(toContainViewportOrigin: workspacePoint)
+    let target = clampedDocumentPoint(containedWorkspacePoint)
     let current = currentDocumentOffset
     let shouldScroll = abs(current.x - target.x) > 1 || abs(current.y - target.y) > 1
     if shouldScroll {
@@ -149,6 +151,11 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     }
     reportViewportStateIfNeeded()
     return .applied(shouldScroll)
+  }
+
+  func applyScrollRequest(_ target: PolicyCanvasViewportScrollTarget) -> ScrollRequestResult {
+    let point = target.contentOrigin(forVisibleContentSize: contentView.bounds.size)
+    return applyScrollRequest(point)
   }
 
   override func magnify(with event: NSEvent) {
@@ -297,40 +304,61 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
 
   private func expandAdaptiveWorkspaceIfNeeded(
     toContainViewportOrigin targetOrigin: CGPoint
-  ) {
+  ) -> CGPoint {
     guard
       let adaptiveWorkspaceLayout,
       let hostedDocumentView = documentView as? PolicyCanvasNativeDocumentView,
       contentView.bounds.width > 1,
       contentView.bounds.height > 1
     else {
-      return
+      return targetOrigin
+    }
+
+    let guardBand = policyCanvasAdaptiveWorkspaceGuardBand(
+      viewportSize: contentView.bounds.size
+    )
+    var contentOrigin = adaptiveWorkspaceLayout.contentOrigin
+    var workspaceSize = adaptiveWorkspaceLayout.workspaceSize
+    var adjustedTargetOrigin = targetOrigin
+
+    if targetOrigin.x < 0 {
+      let growth = -targetOrigin.x + guardBand.width
+      contentOrigin.x += growth
+      workspaceSize.width += growth
+      adjustedTargetOrigin.x += growth
+    }
+    if targetOrigin.y < 0 {
+      let growth = -targetOrigin.y + guardBand.height
+      contentOrigin.y += growth
+      workspaceSize.height += growth
+      adjustedTargetOrigin.y += growth
     }
 
     let expandedWorkspaceSize = CGSize(
       width: max(
-        adaptiveWorkspaceLayout.workspaceSize.width,
-        targetOrigin.x + contentView.bounds.width
+        workspaceSize.width,
+        adjustedTargetOrigin.x + contentView.bounds.width
       ),
       height: max(
-        adaptiveWorkspaceLayout.workspaceSize.height,
-        targetOrigin.y + contentView.bounds.height
+        workspaceSize.height,
+        adjustedTargetOrigin.y + contentView.bounds.height
       )
     )
-    guard expandedWorkspaceSize != adaptiveWorkspaceLayout.workspaceSize else {
-      return
-    }
 
     let expandedLayout = PolicyCanvasAdaptiveWorkspaceLayout(
       contentSize: adaptiveWorkspaceLayout.contentSize,
-      contentOrigin: adaptiveWorkspaceLayout.contentOrigin,
+      contentOrigin: contentOrigin,
       workspaceSize: expandedWorkspaceSize
     )
+    guard expandedLayout != adaptiveWorkspaceLayout else {
+      return adjustedTargetOrigin
+    }
     isAdjustingAdaptiveWorkspace = true
     self.adaptiveWorkspaceLayout = expandedLayout
     hostedDocumentView.hostedState.update(workspaceLayout: expandedLayout)
     hostedDocumentView.updateSize(expandedWorkspaceSize)
     isAdjustingAdaptiveWorkspace = false
+    return adjustedTargetOrigin
   }
 
   private func armAdaptiveExpansionIfNeeded(for visibleOrigin: CGPoint) {

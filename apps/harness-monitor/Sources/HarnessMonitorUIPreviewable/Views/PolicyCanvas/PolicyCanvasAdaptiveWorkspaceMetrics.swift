@@ -1,6 +1,6 @@
 import Foundation
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 struct PolicyCanvasAdaptiveWorkspaceLayout: Equatable, Sendable {
   let contentSize: CGSize
@@ -128,7 +128,7 @@ func policyCanvasExpandedAdaptiveWorkspaceLayout(
   )
 }
 
-private func policyCanvasAdaptiveWorkspaceGuardBand(
+func policyCanvasAdaptiveWorkspaceGuardBand(
   viewportSize: CGSize
 ) -> CGSize {
   CGSize(

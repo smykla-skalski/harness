@@ -174,8 +174,8 @@ func policyCanvasDocumentCenteredScrollPoint(
 ) -> CGPoint {
   let resolvedZoom = max(zoom, 0.001)
   return CGPoint(
-    x: max(anchorPoint.x - (viewportSize.width / (resolvedZoom * 2)), 0),
-    y: max(anchorPoint.y - (viewportSize.height / (resolvedZoom * 2)), 0)
+    x: anchorPoint.x - (viewportSize.width / (resolvedZoom * 2)),
+    y: anchorPoint.y - (viewportSize.height / (resolvedZoom * 2))
   )
 }
 
@@ -223,6 +223,25 @@ func policyCanvasViewportCenteringSelectionScrollPoint(
       routeOutput: routeOutput,
       viewportSize: viewportSize,
       zoom: zoom
+    )
+  }
+}
+
+@MainActor
+func policyCanvasViewportCenteringSelectionDocumentAnchorPoint(
+  behavior: PolicyCanvasViewportCenteringBehavior,
+  selection: PolicyCanvasSelection?,
+  viewModel: PolicyCanvasViewModel,
+  routeOutput: PolicyCanvasRouteWorkerOutput = .empty
+) -> CGPoint? {
+  guard behavior == .selectionIfPresent else {
+    return nil
+  }
+  return selection.flatMap { selection in
+    policyCanvasSelectionViewportDocumentAnchorPoint(
+      selection: selection,
+      viewModel: viewModel,
+      routeOutput: routeOutput
     )
   }
 }
@@ -285,6 +304,28 @@ func policyCanvasSelectionViewportDocumentScrollPoint(
   viewportSize: CGSize,
   zoom: CGFloat
 ) -> CGPoint? {
+  guard
+    let anchorPoint = policyCanvasSelectionViewportDocumentAnchorPoint(
+      selection: selection,
+      viewModel: viewModel,
+      routeOutput: routeOutput
+    )
+  else {
+    return nil
+  }
+  return policyCanvasDocumentCenteredScrollPoint(
+    anchorPoint: anchorPoint,
+    viewportSize: viewportSize,
+    zoom: zoom
+  )
+}
+
+@MainActor
+func policyCanvasSelectionViewportDocumentAnchorPoint(
+  selection: PolicyCanvasSelection,
+  viewModel: PolicyCanvasViewModel,
+  routeOutput: PolicyCanvasRouteWorkerOutput
+) -> CGPoint? {
   let anchorPoint: CGPoint?
   switch selection {
   case .node(let nodeID):
@@ -311,11 +352,7 @@ func policyCanvasSelectionViewportDocumentScrollPoint(
   guard let anchorPoint else {
     return nil
   }
-  return policyCanvasDocumentCenteredScrollPoint(
-    anchorPoint: anchorPoint,
-    viewportSize: viewportSize,
-    zoom: zoom
-  )
+  return anchorPoint
 }
 
 func policyCanvasCanvasPoint(

@@ -1,7 +1,7 @@
 import AppKit
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
   var snapshot: PolicyCanvasViewportHostedSnapshot
@@ -171,7 +171,7 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
       guard let request, appliedRequest != request else {
         return
       }
-      switch scrollView.applyScrollRequest(request.point) {
+      switch scrollView.applyScrollRequest(request.target) {
       case .applied(let didScroll):
         onFulfillRequest?(request, didScroll)
         appliedRequest = request
