@@ -140,6 +140,97 @@ struct PolicyCanvasRoutingFixesTests {
         with: previousEdge, otherCorridorKey: realizedKey))
   }
 
+  @Test("incompatible side-port siblings shift onto separate target handoff columns")
+  func incompatibleSidePortSiblingsShiftOntoSeparateTargetHandoffColumns() {
+    let previousRoute = PolicyCanvasEdgeRoute(
+      points: [
+        CGPoint(x: 3228, y: 1300),
+        CGPoint(x: 3248, y: 1300),
+        CGPoint(x: 3248, y: 1384.2),
+        CGPoint(x: 3876, y: 1384.2),
+        CGPoint(x: 3876, y: 1312.1),
+        CGPoint(x: 3960, y: 1312.1),
+      ],
+      labelPosition: .zero
+    )
+    let currentRoute = PolicyCanvasEdgeRoute(
+      points: [
+        CGPoint(x: 3528, y: 1300),
+        CGPoint(x: 3564, y: 1300),
+        CGPoint(x: 3564, y: 1365),
+        CGPoint(x: 3876, y: 1365),
+        CGPoint(x: 3876, y: 1287.9),
+        CGPoint(x: 3960, y: 1287.9),
+      ],
+      labelPosition: .zero
+    )
+    let previousEdge = edge(
+      id: "wait-merge",
+      sourceNodeID: "wait",
+      targetNodeID: "merge",
+      label: "resumed"
+    )
+    let currentEdge = edge(
+      id: "event-merge",
+      sourceNodeID: "event",
+      targetNodeID: "merge",
+      label: "ready"
+    )
+    let spacingBySide = Dictionary(
+      uniqueKeysWithValues: PolicyCanvasPortSide.allSides.map { ($0, lineSpacing) }
+    )
+    let request = PolicyCanvasResolvedDisplayedRouteRequest(
+      router: PolicyCanvasVisibilityRouter(),
+      edge: currentEdge,
+      source: currentRoute.points.first ?? .zero,
+      target: currentRoute.points.last ?? .zero,
+      routeLane: 0,
+      sourceFanoutLane: 0,
+      targetFanoutLane: 0,
+      lineSpacing: lineSpacing,
+      obstacles: [],
+      groups: [],
+      sourceGroupID: "x-orchestration",
+      targetGroupID: "x-orchestration",
+      sourceAnchor: (point: currentRoute.points.first ?? .zero, side: .trailing),
+      targetAnchor: (point: currentRoute.points.last ?? .zero, side: .leading),
+      sourceCandidates: [(point: currentRoute.points.first ?? .zero, side: .trailing)],
+      targetCandidates: [(point: currentRoute.points.last ?? .zero, side: .leading)],
+      sourceSpacingBySide: spacingBySide,
+      targetSpacingBySide: spacingBySide,
+      corridorHint: nil
+    )
+    let previousRoutes = [
+      PolicyCanvasDisplayedRouteCachedClearance(
+        PolicyCanvasDisplayedRouteClearance(
+          edge: previousEdge,
+          corridorKey: nil,
+          route: previousRoute,
+          minimumSpacing: lineSpacing
+        )
+      )
+    ]
+    let partition = PolicyCanvasDisplayedRoutePreviousRoutePartition(
+      request: request,
+      previousRoutes: previousRoutes
+    )
+
+    let separated = policyCanvasSeparatedIncompatibleDisplayedRoute(
+      currentRoute,
+      request: request,
+      previousRoutePartition: partition,
+      baseMetrics: policyCanvasRouteMetrics(currentRoute)
+    )
+    let cost = policyCanvasRouteMaxIncompatibleParallelCost(
+      separated,
+      with: [previousRoute],
+      minimumSpacing: lineSpacing
+    )
+
+    #expect(separated.points != currentRoute.points)
+    #expect(cost < 0.001, "separated route still encroaches: \(separated.points)")
+  }
+
   // MARK: Helpers
 
   private func fanInHint(busY: CGFloat, ordinal: Int) -> PolicyCanvasEdgeCorridorHint {

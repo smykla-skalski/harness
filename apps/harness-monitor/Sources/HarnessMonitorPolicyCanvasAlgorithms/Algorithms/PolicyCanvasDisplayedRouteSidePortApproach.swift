@@ -14,27 +14,37 @@ import SwiftUI
 // stays orthogonal, keeps the same port sides, and clears every obstacle, so a
 // jog that genuinely dodges something is left untouched.
 func policyCanvasTargetLocalSidePortApproachRoute(
-  _ route: PolicyCanvasEdgeRoute,
-  request: PolicyCanvasResolvedDisplayedRouteRequest
+  _ originalRoute: PolicyCanvasEdgeRoute,
+  request: PolicyCanvasResolvedDisplayedRouteRequest,
+  previousRoutePartition: PolicyCanvasDisplayedRoutePreviousRoutePartition
 ) -> PolicyCanvasEdgeRoute {
   guard
-    route.points.count >= 5,
-    let sourceSide = policyCanvasRouteSourceSide(route),
-    let targetSide = policyCanvasRouteTargetSide(route),
+    originalRoute.points.count >= 5,
+    let sourceSide = policyCanvasRouteSourceSide(originalRoute),
+    let targetSide = policyCanvasRouteTargetSide(originalRoute),
     targetSide == .leading || targetSide == .trailing
   else {
-    return route
+    return originalRoute
   }
 
-  let widenedRoute =
+  let route =
     policyCanvasWidenedSidePortTerminalHandoffRoute(
-      route,
+      originalRoute,
       request: request,
       sourceSide: sourceSide,
       targetSide: targetSide
     )
-    ?? route
-  let route = widenedRoute
+    .flatMap { widenedRoute in
+      policyCanvasRoutePreservesIncompatibleParallelClearance(
+        widenedRoute,
+        over: originalRoute,
+        request: request,
+        previousRoutePartition: previousRoutePartition
+      )
+      ? widenedRoute
+      : nil
+    }
+    ?? originalRoute
   let count = route.points.count
 
   let target = route.points[count - 1]
@@ -89,7 +99,13 @@ func policyCanvasTargetLocalSidePortApproachRoute(
     policyCanvasRouteIsOrthogonal(candidate),
     policyCanvasRouteSourceSide(candidate) == sourceSide,
     policyCanvasRouteTargetSide(candidate) == targetSide,
-    !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles)
+    !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles),
+    policyCanvasRoutePreservesIncompatibleParallelClearance(
+      candidate,
+      over: route,
+      request: request,
+      previousRoutePartition: previousRoutePartition
+    )
   else {
     return route
   }
@@ -158,6 +174,40 @@ private func policyCanvasWidenedSidePortTerminalHandoffRoute(
     return nil
   }
   return candidate
+}
+
+private func policyCanvasRoutePreservesIncompatibleParallelClearance(
+  _ candidate: PolicyCanvasEdgeRoute,
+  over route: PolicyCanvasEdgeRoute,
+  request: PolicyCanvasResolvedDisplayedRouteRequest,
+  previousRoutePartition: PolicyCanvasDisplayedRoutePreviousRoutePartition
+) -> Bool {
+  policyCanvasRouteIncompatibleParallelCost(
+    candidate,
+    request: request,
+    previousRoutePartition: previousRoutePartition
+  )
+    <= policyCanvasRouteIncompatibleParallelCost(
+      route,
+      request: request,
+      previousRoutePartition: previousRoutePartition
+    ) + 0.001
+}
+
+private func policyCanvasRouteIncompatibleParallelCost(
+  _ route: PolicyCanvasEdgeRoute,
+  request: PolicyCanvasResolvedDisplayedRouteRequest,
+  previousRoutePartition: PolicyCanvasDisplayedRoutePreviousRoutePartition
+) -> CGFloat {
+  let conflictingRoutes = previousRoutePartition.conflictingRoutes(for: route)
+  guard !conflictingRoutes.isEmpty else {
+    return 0
+  }
+  return policyCanvasRouteMaxIncompatibleParallelCost(
+    route,
+    with: conflictingRoutes.map(\.clearance.route),
+    minimumSpacing: policyCanvasRouteMinimumSpacing(request: request, route: route)
+  )
 }
 
 // Straighten the final approach into a top/bottom port fed from a side exit.

@@ -151,7 +151,11 @@ func policyCanvasCollisionAwareDisplayedRoute(
     )
   else {
     return policyCanvasTargetLocalVerticalPortApproachRoute(
-      policyCanvasTargetLocalSidePortApproachRoute(best.route, request: request),
+      policyCanvasTargetLocalSidePortApproachRoute(
+        best.route,
+        request: request,
+        previousRoutePartition: previousRoutePartition
+      ),
       request: request
     )
   }
@@ -192,16 +196,19 @@ func policyCanvasCollisionAwareDisplayedRoute(
     separatedRoute,
     request: request
   )
+  let secondSeparatedRoute = policyCanvasSeparatedIncompatibleDisplayedRoute(
+    targetLocalRoute,
+    request: request,
+    previousRoutePartition: previousRoutePartition,
+    baseMetrics: baseMetrics
+  )
+  let sidePortRoute = policyCanvasTargetLocalSidePortApproachRoute(
+    secondSeparatedRoute,
+    request: request,
+    previousRoutePartition: previousRoutePartition
+  )
   return policyCanvasTargetLocalVerticalPortApproachRoute(
-    policyCanvasTargetLocalSidePortApproachRoute(
-      policyCanvasSeparatedIncompatibleDisplayedRoute(
-        targetLocalRoute,
-        request: request,
-        previousRoutePartition: previousRoutePartition,
-        baseMetrics: baseMetrics
-      ),
-      request: request
-    ),
+    sidePortRoute,
     request: request
   )
 }

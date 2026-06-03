@@ -124,7 +124,8 @@ func policyCanvasSeparatedIncompatibleDisplayedRoute(
   let candidateRoutes = policyCanvasSeparationCandidateRoutes(
     route,
     horizontalCandidates: horizontalCandidates,
-    targetSide: targetSide
+    targetSide: targetSide,
+    lineSpacing: request.lineSpacing
   )
   var seen: Set<[CGPoint]> = []
   for candidate in candidateRoutes
@@ -186,10 +187,11 @@ private func policyCanvasSeparationHorizontalLanes(
 private func policyCanvasSeparationCandidateRoutes(
   _ route: PolicyCanvasEdgeRoute,
   horizontalCandidates: [CGFloat],
-  targetSide: PolicyCanvasPortSide
+  targetSide: PolicyCanvasPortSide,
+  lineSpacing: CGFloat
 ) -> [PolicyCanvasEdgeRoute] {
   var candidateRoutes: [PolicyCanvasEdgeRoute] = []
-  candidateRoutes.reserveCapacity(horizontalCandidates.count * 2)
+  candidateRoutes.reserveCapacity(horizontalCandidates.count * 3)
   for lane in horizontalCandidates {
     if let aligned = policyCanvasAlignedHorizontalBundleRoute(route, targetY: lane) {
       candidateRoutes.append(aligned)
@@ -202,7 +204,85 @@ private func policyCanvasSeparationCandidateRoutes(
       candidateRoutes.append(handoff)
     }
   }
+  candidateRoutes.append(
+    contentsOf: policyCanvasSidePortHandoffColumnCandidates(
+      route,
+      targetSide: targetSide,
+      lineSpacing: lineSpacing
+    )
+  )
   return candidateRoutes
+}
+
+private func policyCanvasSidePortHandoffColumnCandidates(
+  _ route: PolicyCanvasEdgeRoute,
+  targetSide: PolicyCanvasPortSide,
+  lineSpacing: CGFloat
+) -> [PolicyCanvasEdgeRoute] {
+  guard targetSide == .leading || targetSide == .trailing else {
+    return []
+  }
+  let count = route.points.count
+  guard count >= 5 else {
+    return []
+  }
+  let target = route.points[count - 1]
+  let stubStart = route.points[count - 2]
+  let jogStart = route.points[count - 3]
+  let exitStart = route.points[count - 4]
+  guard
+    abs(stubStart.y - target.y) < 0.001, abs(stubStart.x - target.x) > 0.001,
+    abs(jogStart.x - stubStart.x) < 0.001, abs(jogStart.y - stubStart.y) > 0.001,
+    abs(exitStart.y - jogStart.y) < 0.001, abs(exitStart.x - jogStart.x) > 0.001
+  else {
+    return []
+  }
+
+  let sourceSide = policyCanvasRouteSourceSide(route)
+  let minimumHandoff = max(PolicyCanvasLayout.nodeSize.width / 2, PolicyCanvasLayout.gridSize * 4)
+  let step = max(lineSpacing, PolicyCanvasLayout.gridSize)
+  var candidates: [PolicyCanvasEdgeRoute] = []
+  for delta in [1, -1, 2, -2, 3, -3] {
+    let handoffX = jogStart.x + (CGFloat(delta) * step)
+    switch targetSide {
+    case .leading:
+      guard handoffX + PolicyCanvasLayout.gridSize * 2 < target.x else {
+        continue
+      }
+      guard target.x - handoffX >= minimumHandoff else {
+        continue
+      }
+    case .trailing:
+      guard handoffX - PolicyCanvasLayout.gridSize * 2 > target.x else {
+        continue
+      }
+      guard handoffX - target.x >= minimumHandoff else {
+        continue
+      }
+    case .top, .bottom:
+      continue
+    }
+    guard (handoffX - exitStart.x).sign == (target.x - exitStart.x).sign else {
+      continue
+    }
+    var points = route.points
+    points[count - 3] = CGPoint(x: handoffX, y: jogStart.y)
+    points[count - 2] = CGPoint(x: handoffX, y: stubStart.y)
+    let compressed = PolicyCanvasVisibilityRouter.compressCollinear(points)
+    let candidate = PolicyCanvasEdgeRoute(
+      points: compressed,
+      labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: compressed)
+    )
+    guard
+      policyCanvasRouteIsOrthogonal(candidate),
+      policyCanvasRouteSourceSide(candidate) == sourceSide,
+      policyCanvasRouteTargetSide(candidate) == targetSide
+    else {
+      continue
+    }
+    candidates.append(candidate)
+  }
+  return candidates
 }
 
 func policyCanvasTargetLocalHorizontalDisplayedRoute(
