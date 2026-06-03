@@ -26,6 +26,27 @@ struct PolicyCanvasLabRoutingQualityTests {
     )
   }
 
+  private func routeBodyHits(
+    route: PolicyCanvasEdgeRoute,
+    edge: PolicyCanvasEdge,
+    nodes: [PolicyCanvasNode],
+    nodeFrames: [String: CGRect],
+    titleFrames: [(PolicyCanvasGroup, CGRect)]
+  ) -> [String] {
+    let endpointIDs = Set([edge.source.nodeID, edge.target.nodeID])
+    if let nodeHit = nodes.first(where: { node in
+      !endpointIDs.contains(node.id) && route.segmentsIntersect(rect: nodeFrames[node.id] ?? .null)
+    }) {
+      return ["crosses node \(nodeHit.id)"]
+    }
+    if let titleHit = titleFrames.first(where: { _, frame in
+      route.segmentsIntersect(rect: frame.insetBy(dx: 0.5, dy: 0.5))
+    }) {
+      return ["crosses group title \(titleHit.0.id)"]
+    }
+    return []
+  }
+
   @Test("extreme sample routes stay inside a local vertical band")
   func extremeRoutesStayInsideLocalVerticalBand() async throws {
     let laidOutGraph = try laidOutLabGraph(sampleID: "extreme")
@@ -213,6 +234,331 @@ struct PolicyCanvasLabRoutingQualityTests {
     )
   }
 
+  @Test("extreme sample live routes avoid node and group title bodies")
+  @MainActor
+  func extremeSampleLiveRoutesAvoidNodeAndGroupTitleBodies() async throws {
+    let scene = try await liveRoutedLabScene(sampleID: "extreme")
+    let nodeFrames = Dictionary(
+      uniqueKeysWithValues: scene.viewModel.nodes.map { node in
+        (node.id, policyCanvasNodeFrame(node).insetBy(dx: 0.5, dy: 0.5))
+      }
+    )
+    let titleFrames = Array(zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups)))
+    var hits: [String] = []
+
+    for edge in scene.edges {
+      guard let route = scene.output.routes[edge.id] else {
+        hits.append("\(edge.id): missing route")
+        continue
+      }
+      let endpointIDs = Set([edge.source.nodeID, edge.target.nodeID])
+      if let nodeHit = scene.viewModel.nodes.first(where: { node in
+        !endpointIDs.contains(node.id) && route.segmentsIntersect(rect: nodeFrames[node.id] ?? .null)
+      }) {
+        hits.append("\(edge.id) crosses node \(nodeHit.id); route \(route.points)")
+        continue
+      }
+      if let titleHit = titleFrames.first(where: { _, frame in
+        route.segmentsIntersect(rect: frame.insetBy(dx: 0.5, dy: 0.5))
+      }) {
+        hits.append("\(edge.id) crosses group title \(titleHit.0.id); route \(route.points)")
+      }
+    }
+
+    #expect(
+      hits.isEmpty,
+      """
+      extreme live routes still pass through node or group-title bodies
+      hits=\(hits)
+      """
+    )
+  }
+
+  @Test("extreme sample live routes attach to semantic visible port sides")
+  @MainActor
+  func extremeSampleLiveRoutesAttachToSemanticVisiblePortSides() async throws {
+    let scene = try await liveRoutedLabScene(sampleID: "extreme")
+    var violations: [String] = []
+
+    for edge in scene.edges where !edge.effectivePinnedPortSide {
+      guard let route = scene.output.routes[edge.id] else {
+        violations.append("\(edge.id): missing route")
+        continue
+      }
+      let sourceSide = policyCanvasRouteSourceSide(route)
+      let sourceCandidates = scene.viewModel.portAnchorCandidates(for: edge.source)
+      if !sourceCandidates.contains(where: { $0.side == sourceSide }) {
+        violations.append(
+          "\(edge.id) source side \(String(describing: sourceSide)) not in \(sourceCandidates); route \(route.points)"
+        )
+      }
+      let targetSide = policyCanvasRouteTargetSide(route)
+      let targetCandidates = scene.viewModel.portAnchorCandidates(for: edge.target)
+      if !targetCandidates.contains(where: { $0.side == targetSide }) {
+        violations.append(
+          "\(edge.id) target side \(String(describing: targetSide)) not in \(targetCandidates); route \(route.points)"
+        )
+      }
+    }
+
+    #expect(
+      violations.isEmpty,
+      """
+      extreme live routes still attach to impossible semantic port sides
+      violations=\(violations)
+      """
+    )
+  }
+
+  @Test("extreme route-agent keeps a rightward source departure")
+  @MainActor
+  func extremeSampleRouteAgentKeepsARightwardSourceDeparture() async throws {
+    let scene = try await liveRoutedLabScene(sampleID: "extreme")
+    let route = try #require(scene.output.routes["xe:route-agent"])
+
+    #expect(
+      policyCanvasRouteSourceSide(route) == .trailing,
+      "route-agent should leave x-route to the right; route=\(route.points)"
+    )
+  }
+
+  @Test("extreme route-verify keeps a rightward source departure")
+  @MainActor
+  func extremeSampleRouteVerifyKeepsARightwardSourceDeparture() async throws {
+    let scene = try await liveRoutedLabScene(sampleID: "extreme")
+    let route = try #require(scene.output.routes["xe:route-verify"])
+
+    #expect(
+      policyCanvasRouteSourceSide(route) == .trailing,
+      "route-verify should leave x-route to the right; route=\(route.points)"
+    )
+  }
+
+  @Test("extreme sample live route terminals land on visible marker dots")
+  @MainActor
+  func extremeSampleLiveRouteTerminalsLandOnVisibleMarkerDots() async throws {
+    let scene = try await liveRoutedLabScene(sampleID: "extreme")
+    let scenario = PolicyCanvasTerminalScenario(
+      viewModel: scene.viewModel,
+      edges: scene.edges,
+      routes: scene.output.routes
+    )
+    let assertions = PolicyCanvasRoutingTerminalTests()
+
+    assertions.assertMarkerOffsets(
+      scenario: scenario,
+      markerLayout: scene.output.portMarkerLayout,
+      assertion: PolicyCanvasTerminalAssertion(
+        role: .source,
+        endpoint: \.source,
+        routePoint: { $0.points.first },
+        routeSide: policyCanvasRouteSourceSide,
+        label: "source"
+      )
+    )
+    assertions.assertMarkerOffsets(
+      scenario: scenario,
+      markerLayout: scene.output.portMarkerLayout,
+      assertion: PolicyCanvasTerminalAssertion(
+        role: .target,
+        endpoint: \.target,
+        routePoint: { $0.points.last },
+        routeSide: policyCanvasRouteTargetSide,
+        label: "target"
+      )
+    )
+  }
+
+  @Test("extreme sample live connected endpoints remain visible")
+  @MainActor
+  func extremeSampleLiveConnectedEndpointsRemainVisible() async throws {
+    let scene = try await liveRoutedLabScene(sampleID: "extreme")
+    let invisibleEndpoints = scene.edges.flatMap { edge -> [String] in
+      [
+        (label: "source", endpoint: edge.source),
+        (label: "target", endpoint: edge.target),
+      ].compactMap { entry in
+        let sides = policyCanvasVisiblePortSides(
+          for: entry.endpoint,
+          visibility: scene.output.portVisibility
+        )
+        guard sides.isEmpty else {
+          return nil
+        }
+        return "\(edge.id) \(entry.label)=\(entry.endpoint)"
+      }
+    }
+
+    #expect(
+      invisibleEndpoints.isEmpty,
+      """
+      connected endpoints lost visible sides in the live extreme sample
+      invisibleEndpoints=\(invisibleEndpoints)
+      """
+    )
+  }
+
+  @Test("extreme sample live routes avoid real X-crossings")
+  @MainActor
+  func extremeSampleLiveRoutesAvoidRealXCrossings() async throws {
+    let scene = try await liveRoutedLabScene(sampleID: "extreme")
+    let realized = scene.edges.compactMap { edge in
+      scene.output.routes[edge.id].map { (id: edge.id, route: $0) }
+    }
+    var crossings: [String] = []
+
+    for leftIndex in realized.indices {
+      for rightIndex in realized.index(after: leftIndex)..<realized.endIndex
+      where policyCanvasRoutesProperlyCross(realized[leftIndex].route, realized[rightIndex].route) {
+        crossings.append("\(realized[leftIndex].id) x \(realized[rightIndex].id)")
+      }
+    }
+
+    #expect(
+      crossings.isEmpty,
+      """
+      extreme live routes still have real X-crossings
+      crossings=\(crossings)
+      """
+    )
+  }
+
+  @Test("extreme x-human fan-in post-processing does not introduce body hits")
+  @MainActor
+  func extremeSampleLiveXHumanFanInPostProcessingDoesNotIntroduceBodyHits() async throws {
+    let scene = try await liveRoutedLabScene(sampleID: "extreme")
+    let edgeIDs = ["xe:sw-draft", "xe:missing-0", "xe:missing-1", "xe:missing-2"]
+    let nodeFrames = Dictionary(
+      uniqueKeysWithValues: scene.viewModel.nodes.map { node in
+        (node.id, policyCanvasNodeFrame(node).insetBy(dx: 0.5, dy: 0.5))
+      }
+    )
+    let titleFrames = Array(zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups)))
+    let regressions = edgeIDs.compactMap { edgeID -> String? in
+      guard
+        let edge = scene.edges.first(where: { $0.id == edgeID }),
+        let before = scene.routesBeforePostProcessing[edgeID],
+        let after = scene.output.routes[edgeID]
+      else {
+        return "\(edgeID): missing route state"
+      }
+      let beforeHits = routeBodyHits(
+        route: before,
+        edge: edge,
+        nodes: scene.viewModel.nodes,
+        nodeFrames: nodeFrames,
+        titleFrames: titleFrames
+      )
+      let afterHits = routeBodyHits(
+        route: after,
+        edge: edge,
+        nodes: scene.viewModel.nodes,
+        nodeFrames: nodeFrames,
+        titleFrames: titleFrames
+      )
+      guard beforeHits.isEmpty, !afterHits.isEmpty else {
+        return nil
+      }
+      return "\(edgeID) before=\(before.points) after=\(after.points) hits=\(afterHits)"
+    }
+
+    #expect(
+      regressions.isEmpty,
+      """
+      x-human fan-in post-processing introduced node/group-title hits
+      regressions=\(regressions)
+      """
+    )
+  }
+
+  @Test("extreme residual body hits are not introduced by post-processing")
+  @MainActor
+  func extremeSampleLiveResidualBodyHitsAreNotIntroducedByPostProcessing() async throws {
+    let scene = try await liveRoutedLabScene(sampleID: "extreme")
+    let edgeIDs = ["xe:missing-0", "xe:missing-2", "xe:route-verify"]
+    let nodeFrames = Dictionary(
+      uniqueKeysWithValues: scene.viewModel.nodes.map { node in
+        (node.id, policyCanvasNodeFrame(node).insetBy(dx: 0.5, dy: 0.5))
+      }
+    )
+    let titleFrames = Array(zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups)))
+    let regressions = edgeIDs.compactMap { edgeID -> String? in
+      guard
+        let edge = scene.edges.first(where: { $0.id == edgeID }),
+        let before = scene.routesBeforePostProcessing[edgeID],
+        let after = scene.output.routes[edgeID]
+      else {
+        return "\(edgeID): missing route state"
+      }
+      let beforeHits = routeBodyHits(
+        route: before,
+        edge: edge,
+        nodes: scene.viewModel.nodes,
+        nodeFrames: nodeFrames,
+        titleFrames: titleFrames
+      )
+      let afterHits = routeBodyHits(
+        route: after,
+        edge: edge,
+        nodes: scene.viewModel.nodes,
+        nodeFrames: nodeFrames,
+        titleFrames: titleFrames
+      )
+      guard beforeHits.isEmpty, !afterHits.isEmpty else {
+        return nil
+      }
+      return "\(edgeID) before=\(before.points) after=\(after.points) hits=\(afterHits)"
+    }
+
+    #expect(
+      regressions.isEmpty,
+      """
+      residual live body hits were introduced during post-processing
+      regressions=\(regressions)
+      """
+    )
+  }
+
+  @Test("extreme residual missing rails avoid local body blockers")
+  @MainActor
+  func extremeSampleLiveResidualMissingRailsAvoidLocalBodyBlockers() async throws {
+    let scene = try await liveRoutedLabScene(sampleID: "extreme")
+    let edgeIDs = ["xe:missing-0", "xe:missing-2"]
+    let nodeFrames = Dictionary(
+      uniqueKeysWithValues: scene.viewModel.nodes.map { node in
+        (node.id, policyCanvasNodeFrame(node).insetBy(dx: 0.5, dy: 0.5))
+      }
+    )
+    let titleFrames = Array(zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups)))
+    let hits = edgeIDs.compactMap { edgeID -> String? in
+      guard
+        let edge = scene.edges.first(where: { $0.id == edgeID }),
+        let route = scene.output.routes[edgeID]
+      else {
+        return "\(edgeID): missing route"
+      }
+      let routeHits = routeBodyHits(
+        route: route,
+        edge: edge,
+        nodes: scene.viewModel.nodes,
+        nodeFrames: nodeFrames,
+        titleFrames: titleFrames
+      )
+      guard !routeHits.isEmpty else {
+        return nil
+      }
+      return "\(edgeID) route=\(route.points) hits=\(routeHits)"
+    }
+
+    #expect(
+      hits.isEmpty,
+      """
+      residual missing rails still hit local body blockers
+      hits=\(hits)
+      """
+    )
+  }
+
   @Test("multi-group routing is deterministic when edge order reverses")
   func multiGroupRoutingIsDeterministicAcrossEdgeOrder() async throws {
     let laidOutGraph = try laidOutLabGraph(sampleID: "multi-group")
@@ -248,6 +594,37 @@ struct PolicyCanvasLabRoutingQualityTests {
   ) async throws -> PolicyCanvasLabRoutedGraph {
     let laidOutGraph = try laidOutLabGraph(sampleID: sampleID)
     return await routedLabGraph(laidOutGraph: laidOutGraph, reversesEdges: reversesEdges)
+  }
+
+  @MainActor
+  private func liveRoutedLabScene(
+    sampleID: String
+  ) async throws -> PolicyCanvasLiveLabScene {
+    let sample = try #require(PolicyCanvasLabSamples.sample(id: sampleID))
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: sample.document, simulation: nil, audit: nil)
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+    let edges = viewModel.edges
+    let routeInput = PolicyCanvasRouteWorkerInput(
+      nodes: viewModel.nodes,
+      groups: viewModel.groups,
+      edges: edges,
+      fontScale: 1,
+      routingHints: viewModel.routingHints,
+      algorithmSelection: .harnessCurrent
+    )
+    let prepared = PolicyCanvasPreparedRouteInput(input: routeInput)
+    let diagnostics = await routeDiagnostics(prepared: prepared, input: routeInput)
+    let output = await PolicyCanvasRouteWorker().compute(input: routeInput)
+    return PolicyCanvasLiveLabScene(
+      viewModel: viewModel,
+      edges: edges,
+      initialRoutes: diagnostics.initialRoutes,
+      initialPortMarkerLayout: diagnostics.initialPortMarkerLayout,
+      routesBeforePostProcessing: diagnostics.convergedState.routes,
+      portMarkerLayoutBeforePostProcessing: diagnostics.convergedState.portMarkerLayout,
+      output: output
+    )
   }
 
   private func laidOutLabGraph(sampleID: String) throws -> PolicyCanvasLaidOutLabGraph {
@@ -498,6 +875,55 @@ private struct PolicyCanvasLabRouteDiagnostics {
   let initialRoutes: [String: PolicyCanvasEdgeRoute]
   let initialPortMarkerLayout: PolicyCanvasPortMarkerLayout
   let convergedState: PolicyCanvasLabRouteComputationState
+}
+
+@MainActor
+private struct PolicyCanvasLiveLabScene {
+  let viewModel: PolicyCanvasViewModel
+  let edges: [PolicyCanvasEdge]
+  let initialRoutes: [String: PolicyCanvasEdgeRoute]
+  let initialPortMarkerLayout: PolicyCanvasPortMarkerLayout
+  let routesBeforePostProcessing: [String: PolicyCanvasEdgeRoute]
+  let portMarkerLayoutBeforePostProcessing: PolicyCanvasPortMarkerLayout
+  let output: PolicyCanvasRouteWorkerOutput
+}
+
+private func policyCanvasRoutesProperlyCross(
+  _ left: PolicyCanvasEdgeRoute,
+  _ right: PolicyCanvasEdgeRoute
+) -> Bool {
+  for (a0, a1) in zip(left.points, left.points.dropFirst()) {
+    for (b0, b1) in zip(right.points, right.points.dropFirst())
+    where policyCanvasSegmentsProperlyCross(a0, a1, b0, b1) {
+      return true
+    }
+  }
+  return false
+}
+
+private func policyCanvasSegmentsProperlyCross(
+  _ a0: CGPoint,
+  _ a1: CGPoint,
+  _ b0: CGPoint,
+  _ b1: CGPoint
+) -> Bool {
+  let tolerance: CGFloat = 0.5
+  let aHorizontal = abs(a0.y - a1.y) < tolerance
+  let aVertical = abs(a0.x - a1.x) < tolerance
+  let bHorizontal = abs(b0.y - b1.y) < tolerance
+  let bVertical = abs(b0.x - b1.x) < tolerance
+  if aHorizontal, bVertical {
+    let crossX = b0.x
+    let crossY = a0.y
+    return crossX > min(a0.x, a1.x) + tolerance
+      && crossX < max(a0.x, a1.x) - tolerance
+      && crossY > min(b0.y, b1.y) + tolerance
+      && crossY < max(b0.y, b1.y) - tolerance
+  }
+  if aVertical, bHorizontal {
+    return policyCanvasSegmentsProperlyCross(b0, b1, a0, a1)
+  }
+  return false
 }
 
 private func policyCanvasLabLabelOverlapPairs(
