@@ -166,15 +166,19 @@ public struct TaskBoardPolicyPipelineLayout: Codable, Equatable, Sendable {
   }
 
   enum CodingKeys: String, CodingKey {
+    case zoom
+    case offset
     case nodes
   }
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    zoom = try container.decodeIfPresent(Double.self, forKey: .zoom) ?? 1
+    offset =
+      try container.decodeIfPresent(TaskBoardPolicyCanvasPoint.self, forKey: .offset)
+      ?? .zero
     nodes =
       try container.decodeIfPresent([TaskBoardPolicyPipelineNodeLayout].self, forKey: .nodes) ?? []
-    zoom = 1
-    offset = .zero
   }
 }
 
@@ -236,6 +240,23 @@ public struct TaskBoardPolicyCanvasPoint: Codable, Equatable, Sendable {
   public init(x: Double, y: Double) {
     self.x = x
     self.y = y
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case x
+    case y
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    x = try container.decode(Double.self, forKey: .x)
+    y = try container.decode(Double.self, forKey: .y)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(Int(x.rounded()), forKey: .x)
+    try container.encode(Int(y.rounded()), forKey: .y)
   }
 }
 

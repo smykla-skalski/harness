@@ -248,7 +248,7 @@ pub struct TaskBoardPolicyPipelineAuditRequest {
     pub canvas_id: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TaskBoardPolicyCanvasSummary {
     pub canvas_id: String,
     pub title: String,
@@ -267,7 +267,7 @@ pub struct TaskBoardPolicyCanvasSummary {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TaskBoardPolicyCanvasWorkspaceResponse {
     pub schema_version: u32,
     pub active_canvas_id: String,

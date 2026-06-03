@@ -207,6 +207,7 @@ pub(super) fn layout_for(nodes: &[PolicyGraphNode]) -> PolicyGraphLayout {
                 y: layout_position(&node.id, index).1,
             })
             .collect(),
+        ..PolicyGraphLayout::default()
     }
 }
 

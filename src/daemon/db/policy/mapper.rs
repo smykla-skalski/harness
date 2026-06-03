@@ -44,6 +44,9 @@ pub(crate) fn disassemble_canvas(
         graph_schema_version: i64::from(document.schema_version),
         revision: i64::try_from(document.revision).unwrap_or(i64::MAX),
         mode: mode_to_str(document.mode).to_string(),
+        layout_zoom: document.layout.zoom,
+        layout_offset_x: i64::from(document.layout.offset.x),
+        layout_offset_y: i64::from(document.layout.offset.y),
         policy_trace_ids_json: to_json(&document.policy_trace_ids)?,
         latest_simulation_json: record.latest_simulation.as_ref().map(to_json).transpose()?,
         created_at: record.created_at.clone(),
@@ -116,7 +119,7 @@ pub(crate) fn assemble_canvas(set: CanvasRowSet) -> Result<PolicyCanvasRecord, C
             .map(edge_from_row)
             .collect::<Result<Vec<_>, _>>()?,
         groups: assemble_groups(groups, &group_nodes),
-        layout: assemble_layout(&nodes),
+        layout: assemble_layout(&canvas, &nodes),
         policy_trace_ids: from_json(&canvas.policy_trace_ids_json, "policy_trace_ids")?,
     };
     Ok(PolicyCanvasRecord {
@@ -295,7 +298,7 @@ fn assemble_groups(
         .collect()
 }
 
-fn assemble_layout(nodes: &[NodeRow]) -> PolicyGraphLayout {
+fn assemble_layout(canvas: &CanvasRow, nodes: &[NodeRow]) -> PolicyGraphLayout {
     let entries = nodes
         .iter()
         .filter_map(|row| match (row.layout_x, row.layout_y) {
@@ -307,7 +310,14 @@ fn assemble_layout(nodes: &[NodeRow]) -> PolicyGraphLayout {
             _ => None,
         })
         .collect();
-    PolicyGraphLayout { nodes: entries }
+    PolicyGraphLayout {
+        zoom: canvas.layout_zoom,
+        offset: crate::task_board::policy_graph::PolicyCanvasPoint {
+            x: narrow(canvas.layout_offset_x),
+            y: narrow(canvas.layout_offset_y),
+        },
+        nodes: entries,
+    }
 }
 
 fn layout_index(layout: &PolicyGraphLayout) -> HashMap<&str, (i32, i32)> {
@@ -373,7 +383,11 @@ mod tests {
 
     #[test]
     fn canvas_round_trips_through_rows() {
-        let record = PolicyCanvasRecord::new("Default", PolicyGraph::seeded_v2(), None);
+        let mut document = PolicyGraph::seeded_v2();
+        document.layout.zoom = 1.25;
+        document.layout.offset =
+            crate::task_board::policy_graph::PolicyCanvasPoint { x: 320, y: 181 };
+        let record = PolicyCanvasRecord::new("Default", document, None);
         let rows = disassemble_canvas(&record, 0).expect("disassemble canvas");
         let restored = assemble_canvas(rows).expect("assemble canvas");
         assert_eq!(restored, record);

@@ -257,6 +257,9 @@ async fn insert_canvas(
         .bind(row.graph_schema_version)
         .bind(row.revision)
         .bind(&row.mode)
+        .bind(row.layout_zoom)
+        .bind(row.layout_offset_x)
+        .bind(row.layout_offset_y)
         .bind(&row.policy_trace_ids_json)
         .bind(&row.latest_simulation_json)
         .bind(&row.created_at)
@@ -368,9 +371,9 @@ const UPSERT_WORKSPACE: &str = "INSERT INTO policy_workspace (singleton, active_
     updated_at = excluded.updated_at";
 const INSERT_CANVAS: &str = "INSERT INTO policy_canvases (canvas_id, position, title, \
     is_manual_ocr_paste_canvas, is_review_text_paste_dry_run_canvas, is_review_screenshot_extraction_canvas, \
-    graph_schema_version, revision, mode, \
+    graph_schema_version, revision, mode, layout_zoom, layout_offset_x, layout_offset_y, \
     policy_trace_ids_json, latest_simulation_json, created_at, updated_at) \
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)";
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)";
 const INSERT_NODE: &str = "INSERT INTO policy_nodes (canvas_id, node_id, position, label, kind_tag, \
     kind_config_json, automation_json, input_ports_json, output_ports_json, group_id, layout_x, \
     layout_y) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)";

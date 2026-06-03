@@ -22,6 +22,7 @@ pub(crate) fn review_screenshot_extraction_document() -> PolicyGraph {
         groups: vec![review_screenshot_group()],
         layout: PolicyGraphLayout {
             nodes: review_screenshot_layout(),
+            ..PolicyGraphLayout::default()
         },
         policy_trace_ids: vec!["review-screenshot-extraction-canvas-v2".to_string()],
     }

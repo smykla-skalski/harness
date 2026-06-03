@@ -22,6 +22,7 @@ pub(crate) fn review_text_paste_dry_run_document() -> PolicyGraph {
         groups: vec![review_text_paste_group()],
         layout: PolicyGraphLayout {
             nodes: review_text_paste_layout(),
+            ..PolicyGraphLayout::default()
         },
         policy_trace_ids: vec!["review-text-paste-dry-run-canvas-v1".to_string()],
     }

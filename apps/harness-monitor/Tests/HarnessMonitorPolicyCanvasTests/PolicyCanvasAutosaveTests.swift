@@ -432,4 +432,41 @@ struct PolicyCanvasAutosaveTests {
     let map = PolicyCanvasView.decodePipelineStateMap("not-valid-json{")
     #expect(map.isEmpty)
   }
+
+  @Test("background flush is not gated on a pending autosave task")
+  func backgroundFlushIsNotGatedOnPendingAutosaveTask() throws {
+    let source = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
+    let scenePhaseHandler = try sourceClosure(
+      marker: ".onChange(of: scenePhase)",
+      endMarker: "\n      .confirmationDialog(",
+      in: source
+    )
+
+    #expect(scenePhaseHandler.contains("viewModel.documentDirty"))
+    #expect(!scenePhaseHandler.contains("viewModel.autosaveTask != nil"))
+  }
+
+  private func previewableSourceFile(named path: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent(path)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func sourceClosure(marker: String, endMarker: String, in source: String) throws -> String {
+    guard let start = source.range(of: marker),
+      let end = source[start.upperBound...].range(of: endMarker)
+    else {
+      throw CocoaError(.fileReadCorruptFile)
+    }
+    return String(source[start.lowerBound..<end.lowerBound])
+  }
 }
