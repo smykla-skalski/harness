@@ -3,6 +3,14 @@ import SwiftUI
 
 @main
 struct HarnessMonitorPolicyCanvasLabApp: App {
+  init() {
+    #if DEBUG
+    // Load the InjectionIII / InjectionNext bundle so source edits to the
+    // layout and routing algorithms hot-reload into this running window.
+    PolicyCanvasHotReload.loadInjectionBundle()
+    #endif
+  }
+
   var body: some Scene {
     WindowGroup("Policy Canvas Lab") {
       PolicyCanvasLabWindowView()
