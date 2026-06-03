@@ -97,20 +97,29 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(contributionsSource.contains("selectedActions"))
   }
 
-  @Test("Policy canvas library rows leave drag session ownership to SwiftUI")
-  func policyCanvasLibraryRowsLeaveDragSessionOwnershipToSwiftUI() throws {
+  @Test("Policy canvas library rows start native drag sessions")
+  func policyCanvasLibraryRowsStartNativeDragSessions() throws {
     let rowViewsSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasLibraryRowViews.swift"
     )
+    let dragSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasPaletteDragSource.swift"
+    )
 
-    #expect(rowViewsSource.contains(".contentShape(.rect)"))
-    #expect(rowViewsSource.contains(".draggable(viewModel.palettePayload(for: kind))"))
-    #expect(rowViewsSource.contains(".draggable(viewModel.palettePayload(for: item))"))
+    #expect(rowViewsSource.contains("PolicyCanvasPaletteDragSource("))
+    #expect(rowViewsSource.contains("payload: viewModel.palettePayload(for: kind)"))
+    #expect(rowViewsSource.contains("payload: viewModel.palettePayload(for: item)"))
     #expect(!rowViewsSource.contains(".onDrag {"))
+    #expect(!rowViewsSource.contains(".draggable("))
     #expect(!rowViewsSource.contains("paletteItemProvider"))
     #expect(!rowViewsSource.contains(".onDragSessionUpdated"))
     #expect(!rowViewsSource.contains("DragSession"))
     #expect(!rowViewsSource.contains("NSCursor"))
+    #expect(dragSource.contains("NSViewRepresentable"))
+    #expect(dragSource.contains("NSDraggingSource"))
+    #expect(dragSource.contains("override func mouseDragged"))
+    #expect(dragSource.contains("beginDraggingSession(with: [draggingItem]"))
+    #expect(dragSource.contains("policyCanvasAcceptedTextPasteboardTypes"))
   }
 
   @Test("Policy canvas workflow status floats as a stacked overlay")

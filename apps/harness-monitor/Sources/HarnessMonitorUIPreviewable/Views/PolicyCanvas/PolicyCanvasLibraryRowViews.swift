@@ -28,26 +28,38 @@ struct PolicyCanvasBaseComponentRow: View {
   @State private var isHovering = false
 
   var body: some View {
-    Button {
-      viewModel.createNode(kind: kind, at: viewModel.nextPaletteDropCenter())
-    } label: {
-      PolicyCanvasComponentRowContent(
-        title: kind.libraryTitle,
-        subtitle: kind.librarySubtitle,
-        symbolName: kind.symbolName,
-        accent: kind.accentColor,
-        isHovering: isHovering,
-        metrics: metrics
+    PolicyCanvasComponentRowContent(
+      title: kind.libraryTitle,
+      subtitle: kind.librarySubtitle,
+      symbolName: kind.symbolName,
+      accent: kind.accentColor,
+      isHovering: isHovering,
+      metrics: metrics
+    )
+    .overlay {
+      PolicyCanvasPaletteDragSource(
+        payload: viewModel.palettePayload(for: kind),
+        previewTitle: kind.libraryTitle,
+        previewSymbolName: kind.symbolName,
+        activate: addNode,
+        setHovering: { isHovering = $0 }
       )
-    }
-    .harnessPlainButtonStyle()
-    .contentShape(.rect)
-    .draggable(viewModel.palettePayload(for: kind)) {
-      PolicyCanvasPaletteDragChip(kind: kind, metrics: metrics)
     }
     .onHover { isHovering = $0 }
     .help("Add \(kind.title)")
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(kind.libraryTitle)
+    .accessibilityValue(kind.librarySubtitle)
+    .accessibilityHint("Click to add, or drag to place on the canvas")
+    .accessibilityAddTraits(.isButton)
+    .accessibilityAction {
+      addNode()
+    }
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasPaletteItem(kind.rawValue))
+  }
+
+  private func addNode() {
+    viewModel.createNode(kind: kind, at: viewModel.nextPaletteDropCenter())
   }
 }
 
@@ -60,28 +72,40 @@ struct PolicyCanvasAutomationVariantRow: View {
   @State private var isHovering = false
 
   var body: some View {
-    Button {
-      viewModel.createAutomationNode(item: item, at: viewModel.nextPaletteDropCenter())
-    } label: {
-      PolicyCanvasComponentRowContent(
-        title: item.libraryTitle,
-        subtitle: item.librarySubtitle,
-        symbolName: item.symbolName,
-        accent: item.nodeKind.accentColor,
-        isHovering: isHovering,
-        metrics: metrics
+    PolicyCanvasComponentRowContent(
+      title: item.libraryTitle,
+      subtitle: item.librarySubtitle,
+      symbolName: item.symbolName,
+      accent: item.nodeKind.accentColor,
+      isHovering: isHovering,
+      metrics: metrics
+    )
+    .overlay {
+      PolicyCanvasPaletteDragSource(
+        payload: viewModel.palettePayload(for: item),
+        previewTitle: item.libraryTitle,
+        previewSymbolName: item.symbolName,
+        activate: addNode,
+        setHovering: { isHovering = $0 }
       )
-    }
-    .harnessPlainButtonStyle()
-    .contentShape(.rect)
-    .draggable(viewModel.palettePayload(for: item)) {
-      PolicyCanvasAutomationVariantDragChip(item: item, metrics: metrics)
     }
     .onHover { isHovering = $0 }
     .help(item.subtitle)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(item.libraryTitle)
+    .accessibilityValue(item.librarySubtitle)
+    .accessibilityHint("Click to add, or drag to place on the canvas")
+    .accessibilityAddTraits(.isButton)
+    .accessibilityAction {
+      addNode()
+    }
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.policyCanvasPaletteItem("automation.\(item.rawValue)")
     )
+  }
+
+  private func addNode() {
+    viewModel.createAutomationNode(item: item, at: viewModel.nextPaletteDropCenter())
   }
 }
 
@@ -138,41 +162,5 @@ private struct PolicyCanvasComponentRowContent: View {
 
   private var glyphSize: CGFloat {
     max(12, (13 * metrics.scale).rounded())
-  }
-}
-
-// Drag preview for automation presets. Already a mini node card, kept in sync
-// with `PolicyCanvasNodeCard`'s chip + elevated-surface language.
-private struct PolicyCanvasAutomationVariantDragChip: View {
-  let item: PolicyCanvasAutomationPaletteItem
-  let metrics: PolicyCanvasToolRailMetrics
-
-  var body: some View {
-    HStack(spacing: 8) {
-      Image(systemName: item.symbolName)
-        .scaledFont(.system(size: max(14, metrics.iconSize - 1), weight: .semibold))
-        .foregroundStyle(item.nodeKind.accentColor.opacity(0.84))
-        .frame(width: 22, height: 22)
-        .background(
-          item.nodeKind.accentColor.opacity(0.10),
-          in: RoundedRectangle(cornerRadius: 5)
-        )
-
-      Text(item.libraryTitle)
-        .scaledFont(.callout.weight(.semibold))
-        .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
-        .lineLimit(1)
-    }
-    .padding(.horizontal, metrics.chipHorizontalPadding)
-    .padding(.vertical, metrics.chipVerticalPadding)
-    .background(
-      PolicyCanvasVisualStyle.elevatedSurface.opacity(0.96),
-      in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
-        .stroke(item.nodeKind.accentColor.opacity(0.26), lineWidth: 1)
-    }
-    .shadow(color: .black.opacity(0.22), radius: 6, x: 0, y: 3)
   }
 }
