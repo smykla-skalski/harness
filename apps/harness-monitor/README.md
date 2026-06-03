@@ -28,9 +28,7 @@ mise run monitor:test:scripts
 
 For parallel development, each user/agent/session must use a separate full git worktree for Monitor edits, Tuist generation, builds/tests, daemon/bridge work, and XcodeBuildMCP. Lanes are still useful, but they only isolate build/runtime side effects inside a worktree; they do not replace a separate checkout.
 
-There are no `monitor:agent:*` tasks. Use the standard `monitor:*` tasks and
-set `HARNESS_MONITOR_BUILD_LANE` or `HARNESS_MONITOR_RUNTIME_LANE` for
-agent/session isolation.
+Use `monitor:*` tasks and set `HARNESS_MONITOR_BUILD_LANE` or `HARNESS_MONITOR_RUNTIME_LANE` for agent/session isolation.
 
 Focused task entrypoints (run `mise run monitor:generate` first if the workspace is not materialized):
 
