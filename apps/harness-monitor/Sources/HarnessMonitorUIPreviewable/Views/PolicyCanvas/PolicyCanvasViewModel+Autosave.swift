@@ -3,9 +3,32 @@ import HarnessMonitorKit
 import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
 
-public struct PolicyCanvasDraftSaveRequest: Sendable {
-  public let document: TaskBoardPolicyPipelineDocument
+public enum PolicyCanvasDraftSaveReason: Sendable {
+  case manualSave
+  case autosave
+
+  var rejectedStatus: String {
+    switch self {
+    case .manualSave:
+      return "Save rejected, restored previous canvas"
+    case .autosave:
+      return "Autosave rejected, restored previous canvas"
+    }
+  }
+}
+
+public struct PolicyCanvasDraftSaveTransaction: Sendable {
+  let snapshot: PolicyCanvasSnapshot
+  let exportPayload: PolicyCanvasDocumentExportPayload
   let generation: UInt64
+
+  public func runLocalPreflight() async -> Int {
+    await exportPayload.runLocalPreflight()
+  }
+
+  public func exportDocument() -> TaskBoardPolicyPipelineDocument {
+    exportPayload.exportDocument()
+  }
 }
 
 extension PolicyCanvasViewModel {
@@ -212,24 +235,43 @@ extension PolicyCanvasViewModel {
     clearRecoveryBuffer()
   }
 
-  public func draftSaveRequest() -> PolicyCanvasDraftSaveRequest {
-    let generation = documentGeneration
-    return PolicyCanvasDraftSaveRequest(
-      document: exportDocument(),
-      generation: generation
+  public func beginDraftSaveTransaction() -> PolicyCanvasDraftSaveTransaction {
+    let snapshot = snapshotState()
+    let transaction = PolicyCanvasDraftSaveTransaction(
+      snapshot: snapshot,
+      exportPayload: documentExportPayload(from: snapshot),
+      generation: documentGeneration
     )
+    beginForegroundSave()
+    return transaction
   }
 
   @discardableResult
-  public func adoptSuccessfulManualDraftSave(
-    request: PolicyCanvasDraftSaveRequest,
-    savedDocument: TaskBoardPolicyPipelineDocument
+  public func finishDraftSaveTransaction(
+    _ transaction: PolicyCanvasDraftSaveTransaction,
+    savedDocument: TaskBoardPolicyPipelineDocument?,
+    reason: PolicyCanvasDraftSaveReason
   ) -> Bool {
-    markManualSaveSucceeded()
-    return resolveSuccessfulSave(
-      saveGeneration: request.generation,
+    defer { endForegroundSave() }
+    guard let savedDocument else {
+      captureRecoveryBuffer()
+      if reason == .autosave {
+        markAutosaveFailed()
+      }
+      markSaveActivityFailed()
+      restoreState(transaction.snapshot, reason: reason.rejectedStatus)
+      return false
+    }
+    if reason == .autosave {
+      markAutosaveSucceeded()
+    } else {
+      markManualSaveSucceeded()
+    }
+    let needsFollowUp = resolveSuccessfulSave(
+      saveGeneration: transaction.generation,
       savedDocument: savedDocument
     )
+    return !needsFollowUp
   }
 
   /// Synchronous helper the host view calls BEFORE spawning its save Task.

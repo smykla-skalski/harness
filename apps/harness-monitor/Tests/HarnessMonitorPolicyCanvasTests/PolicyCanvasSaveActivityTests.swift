@@ -123,18 +123,23 @@ struct PolicyCanvasSaveActivityTests {
       )
     )
     let performSaveBody = source[performSaveRange.lowerBound..<nextFunctionRange.lowerBound]
-    let completionRange = try #require(
-      performSaveBody.range(of: "handlePolicyCanvasSaveCompletion(")
+    let beginRange = try #require(
+      performSaveBody.range(of: "viewModel.beginDraftSaveTransaction()")
     )
-    let endSaveRange = try #require(performSaveBody.range(of: "viewModel.endForegroundSave()"))
+    let completionRange = try #require(
+      performSaveBody.range(of: "viewModel.finishDraftSaveTransaction(")
+    )
     let reconcileRange = try #require(performSaveBody.range(of: "applyDashboardSnapshot()"))
 
     #expect(performSaveBody.contains("let savedRevision = savedDocument?.revision"))
-    #expect(completionRange.lowerBound < endSaveRange.lowerBound)
-    #expect(endSaveRange.lowerBound < reconcileRange.lowerBound)
+    #expect(beginRange.lowerBound < completionRange.lowerBound)
+    #expect(completionRange.lowerBound < reconcileRange.lowerBound)
+    #expect(!performSaveBody.contains("viewModel.endForegroundSave()"))
     #expect(
       performSaveBody.contains(
-        "if let savedRevision, (dashboardSnapshot.document?.revision ?? 0) >= savedRevision {"))
+        "if savedCleanly, let savedRevision,"
+      )
+    )
   }
 
   @Test("a clean successful save clears save activity back to idle")

@@ -98,8 +98,16 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
       at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
     )
 
-    XCTAssertTrue(dashboardPolicySource.contains("let saveRequest = policyCanvasViewModel.draftSaveRequest()"))
-    XCTAssertTrue(dashboardPolicySource.contains("policyCanvasViewModel.adoptSuccessfulManualDraftSave("))
+    XCTAssertTrue(
+      dashboardPolicySource.contains(
+        "let transaction = policyCanvasViewModel.beginDraftSaveTransaction()"
+      )
+    )
+    XCTAssertTrue(dashboardPolicySource.contains("policyCanvasViewModel.finishDraftSaveTransaction("))
+    XCTAssertTrue(dashboardPolicySource.contains("await store.savePolicyCanvasDraft("))
+    XCTAssertFalse(dashboardPolicySource.contains("policyCanvasViewModel.draftSaveRequest("))
+    XCTAssertFalse(dashboardPolicySource.contains("policyCanvasViewModel.adoptSuccessfulManualDraftSave("))
+    XCTAssertFalse(dashboardPolicySource.contains("saveTaskBoardPolicyPipelineDraft("))
     XCTAssertFalse(dashboardPolicySource.contains("policyCanvasViewModel.documentGeneration"))
     XCTAssertFalse(dashboardPolicySource.contains("policyCanvasViewModel.resolveSuccessfulSave("))
     XCTAssertFalse(dashboardPolicySource.contains("policyCanvasViewModel.markManualSaveSucceeded()"))

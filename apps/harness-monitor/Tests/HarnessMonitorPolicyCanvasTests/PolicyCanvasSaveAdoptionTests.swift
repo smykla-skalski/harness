@@ -132,6 +132,75 @@ struct PolicyCanvasSaveAdoptionTests {
     #expect(viewModel.documentDirty == true)
   }
 
+  @Test("draft save transaction clean success exits saving and adopts the saved backing")
+  func draftSaveTransactionCleanSuccessAdoptsBacking() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: policyDocument(revision: 5), simulation: nil, audit: nil)
+    viewModel.createNode(kind: .condition, at: CGPoint(x: 120, y: 120))
+    let transaction = viewModel.beginDraftSaveTransaction()
+    var saved = transaction.exportDocument()
+    saved.revision = 6
+
+    let savedCleanly = viewModel.finishDraftSaveTransaction(
+      transaction,
+      savedDocument: saved,
+      reason: .manualSave
+    )
+
+    #expect(savedCleanly)
+    #expect(viewModel.isSavingDraft == false)
+    #expect(viewModel.documentDirty == false)
+    #expect(viewModel.backingDocument?.revision == 6)
+  }
+
+  @Test("draft save transaction failure rolls back through the same recovery path")
+  func draftSaveTransactionFailureRollsBack() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: policyDocument(revision: 5), simulation: nil, audit: nil)
+    viewModel.createNode(kind: .condition, at: CGPoint(x: 120, y: 120))
+    let transaction = viewModel.beginDraftSaveTransaction()
+    let sentNodeIDs = Set(transaction.exportDocument().nodes.map(\.id))
+    viewModel.createNode(kind: .condition, at: CGPoint(x: 300, y: 300))
+
+    let savedCleanly = viewModel.finishDraftSaveTransaction(
+      transaction,
+      savedDocument: nil,
+      reason: .manualSave
+    )
+
+    #expect(savedCleanly == false)
+    #expect(viewModel.isSavingDraft == false)
+    #expect(viewModel.documentDirty)
+    #expect(viewModel.saveActivity == .failed)
+    #expect(Set(viewModel.exportDocument().nodes.map(\.id)) == sentNodeIDs)
+    #expect(viewModel.hasRecoverableEdits)
+  }
+
+  @Test("draft save transaction edited during save stays dirty and re-arms autosave")
+  func draftSaveTransactionEditedDuringSaveReArmsAutosave() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: policyDocument(revision: 5), simulation: nil, audit: nil)
+    viewModel.createNode(kind: .condition, at: CGPoint(x: 120, y: 120))
+    var triggerFired = 0
+    viewModel.autosaveTrigger = { @MainActor in triggerFired += 1 }
+    let transaction = viewModel.beginDraftSaveTransaction()
+    var saved = transaction.exportDocument()
+    saved.revision = 6
+    viewModel.createNode(kind: .condition, at: CGPoint(x: 300, y: 300))
+
+    let savedCleanly = viewModel.finishDraftSaveTransaction(
+      transaction,
+      savedDocument: saved,
+      reason: .manualSave
+    )
+
+    #expect(savedCleanly == false)
+    #expect(viewModel.isSavingDraft == false)
+    #expect(viewModel.documentDirty)
+    #expect(viewModel.lastSelfSavedRevision == 6)
+    #expect(triggerFired == 1)
+  }
+
   @Test("endForegroundSave re-arms autosave when edits remain after the save")
   func endForegroundSaveReArmsWhenDirty() {
     let viewModel = PolicyCanvasViewModel.sample()

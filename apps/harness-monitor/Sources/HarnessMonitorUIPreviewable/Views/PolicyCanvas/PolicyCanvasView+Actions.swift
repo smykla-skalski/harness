@@ -8,56 +8,12 @@ private let policyCanvasSaveSignposter = OSSignposter(
   category: "policy-canvas.perf"
 )
 
-@MainActor
-private func handlePolicyCanvasSaveCompletion(
-  viewModel: PolicyCanvasViewModel,
-  _ savedDocument: TaskBoardPolicyPipelineDocument?,
-  saveGeneration: UInt64,
-  snapshot: PolicyCanvasSnapshot,
-  reason: PolicyCanvasView.SaveReason
-) {
-  if let savedDocument {
-    if reason == .autosave {
-      viewModel.markAutosaveSucceeded()
-    } else {
-      // Manual save clears the consecutive-failure counter and exits the
-      // .disabled state so the next dirty flip can resume autosave.
-      viewModel.markManualSaveSucceeded()
-    }
-    // Adopt the saved revision as the clean backing in place. The live graph
-    // already shows the saved content, so re-point backing without a reload
-    // (no viewport recenter, no undo wipe) and record the revision as our own
-    // so the daemon's echo is never read as a remote change. Generation
-    // reconciliation keeps the canvas dirty when the user edited during the
-    // round-trip; endForegroundSave then re-arms the follow-up save once
-    // isSavingDraft clears.
-    _ = viewModel.resolveSuccessfulSave(
-      saveGeneration: saveGeneration,
-      savedDocument: savedDocument
-    )
-  } else {
-    viewModel.captureRecoveryBuffer()
-    if reason == .autosave {
-      viewModel.markAutosaveFailed()
-    }
-    viewModel.markSaveActivityFailed()
-    let rollbackReason =
-      reason == .autosave
-      ? "Autosave rejected, restored previous canvas"
-      : "Save rejected, restored previous canvas"
-    viewModel.restoreState(snapshot, reason: rollbackReason)
-  }
-}
-
 extension PolicyCanvasView {
   /// Shared save flow used by both the manual Save button and the debounced
   /// autosave task. `reason` distinguishes the two so the outcome surface
   /// (`lastAutosaveOutcome`) is only touched on the autosave path — manual
   /// saves do not pretend to be the last autosave attempt.
-  enum SaveReason: Sendable {
-    case manualSave
-    case autosave
-  }
+  typealias SaveReason = PolicyCanvasDraftSaveReason
 
   func saveDraft() {
     guard remoteActionsEnabled else {
@@ -102,9 +58,7 @@ extension PolicyCanvasView {
   }
 
   func performSave(reason: SaveReason) {
-    let snapshot = viewModel.snapshotState()
-    let exportPayload = viewModel.documentExportPayload(from: snapshot)
-    let saveGeneration = viewModel.documentGeneration
+    let transaction = viewModel.beginDraftSaveTransaction()
     let canvasIdentifier = runtime?.policyCanvasSnapshot.activeCanvasId ?? "missing"
     // Deferred (tracking-id P3I.3): saveTaskBoardPolicyPipelineDraft now returns
     // the saved document (or nil), so the daemon's bumped revision is adopted
@@ -117,11 +71,10 @@ extension PolicyCanvasView {
     // deferred to a follow-up wave. Until then, the failure ceiling (item 1)
     // bounds the worst-case decompensation: three rejects of any kind flip
     // the subsystem to .disabled and surface a sticky affordance.
-    viewModel.beginForegroundSave()
     setRuntimePolicyCanvasActionInFlight(true)
     HarnessMonitorAsyncWorkQueue.shared.submit(
       HarnessMonitorAsyncWorkQueue.WorkItem(title: "Saving policy canvas") {
-        let localPreflightErrorCount = await exportPayload.runLocalPreflight()
+        let localPreflightErrorCount = await transaction.runLocalPreflight()
         if localPreflightErrorCount > 0 {
           await MainActor.run {
             viewModel.notifyStatus(
@@ -134,7 +87,7 @@ extension PolicyCanvasView {
           "policy_canvas.save.export",
           id: exportSignpostID
         )
-        let document = exportPayload.exportDocument()
+        let document = transaction.exportDocument()
         policyCanvasSaveSignposter.endInterval(
           "policy_canvas.save.export",
           exportInterval,
@@ -157,15 +110,14 @@ extension PolicyCanvasView {
         await MainActor.run {
           setRuntimePolicyCanvasActionInFlight(false)
           let savedRevision = savedDocument?.revision
-          handlePolicyCanvasSaveCompletion(
-            viewModel: viewModel,
-            savedDocument,
-            saveGeneration: saveGeneration,
-            snapshot: snapshot,
+          let savedCleanly = viewModel.finishDraftSaveTransaction(
+            transaction,
+            savedDocument: savedDocument,
             reason: reason
           )
-          viewModel.endForegroundSave()
-          if let savedRevision, (dashboardSnapshot.document?.revision ?? 0) >= savedRevision {
+          if savedCleanly, let savedRevision,
+            (dashboardSnapshot.document?.revision ?? 0) >= savedRevision
+          {
             applyDashboardSnapshot()
           }
         }
