@@ -41,12 +41,13 @@ func policyCanvasCorridorAlignedCandidates(
   guard let corridorHint = request.corridorHint, let corridorX = corridorHint.verticalLaneX else {
     return []
   }
+  let availableSourceSides = Set(request.sourceCandidates.map(\.side) + [request.sourceAnchor.side])
   let sourceFacingSide: PolicyCanvasPortSide =
     corridorX >= request.sourceAnchor.point.x ? .trailing : .leading
   let sourceSides = policyCanvasOrderedUniquePortSides([
     sourceFacingSide,
     request.sourceAnchor.side,
-  ])
+  ]).filter { availableSourceSides.contains($0) }
   let targetSides = policyCanvasOrderedUniquePortSides(request.targetCandidates.map(\.side))
   var routes: [PolicyCanvasEdgeRoute] = []
   for sourceSide in sourceSides {
@@ -97,6 +98,10 @@ private func policyCanvasSynthesisedCorridorRoute(
   horizontalLaneY: CGFloat,
   sourceFacingSide: PolicyCanvasPortSide
 ) -> PolicyCanvasEdgeRoute? {
+  let availableSourceSides = Set(request.sourceCandidates.map(\.side) + [request.sourceAnchor.side])
+  guard availableSourceSides.contains(sourceFacingSide) else {
+    return nil
+  }
   let nodeWidth = PolicyCanvasLayout.nodeSize.width
   let nodeHeight = PolicyCanvasLayout.nodeSize.height
   let sourcePoint = request.sourceAnchor.point
@@ -146,7 +151,9 @@ private func policyCanvasSynthesisedCorridorRoute(
     lineSpacing: request.lineSpacing
   )
   let horizontalRange =
-    min(corridorX, targetEscape.routed.x)...max(corridorX, targetEscape.routed.x)
+    min(sourceEscape.routed.x, corridorX, targetEscape.routed.x)...max(
+      sourceEscape.routed.x, corridorX, targetEscape.routed.x
+    )
   let effectiveHorizontalLaneY = policyCanvasCorridorHorizontalLaneClearingTarget(
     hint: horizontalLaneY,
     targetSide: targetSide,

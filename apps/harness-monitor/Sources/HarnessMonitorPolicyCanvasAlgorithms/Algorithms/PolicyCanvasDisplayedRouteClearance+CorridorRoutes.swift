@@ -124,8 +124,8 @@ func policyCanvasAlignedCorridorIntersectionRoute(
   let routeContext = policyCanvasRouteContext(for: request)
   let intersectionHorizontalRange =
     min(
-      alignedVerticalLaneX, targetEscape.routed.x)...max(
-      alignedVerticalLaneX, targetEscape.routed.x)
+      sourceEscape.routed.x, alignedVerticalLaneX, targetEscape.routed.x)...max(
+      sourceEscape.routed.x, alignedVerticalLaneX, targetEscape.routed.x)
   let effectiveHorizontalLaneY = policyCanvasCorridorHorizontalLaneClearingTarget(
     hint: corridorHint.horizontalLaneY,
     targetSide: targetSide,
