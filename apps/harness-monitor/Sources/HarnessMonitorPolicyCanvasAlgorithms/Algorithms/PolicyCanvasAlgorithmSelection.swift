@@ -205,6 +205,9 @@ enum PolicyCanvasAlgorithmDefaults {
   static let orthogonalNudgedRouteProcessing = PolicyCanvasAlgorithmID(
     "orthogonal-nudged-route-processing"
   )
+  static let claudeCrossingAwareRouteProcessing = PolicyCanvasAlgorithmID(
+    "claude-crossing-aware-route-processing"
+  )
   static let obstacleAwareGreedyLabelPlacement = PolicyCanvasAlgorithmID(
     "obstacle-aware-greedy-label-placement"
   )
@@ -328,6 +331,7 @@ enum PolicyCanvasAlgorithmDefaults {
         option(firstFeasibleRouteSelection, "First Feasible Route Selection")
       ],
       .routePostProcessing: [
+        option(claudeCrossingAwareRouteProcessing, "Claude Crossing-Aware Route Processing"),
         option(orthogonalNudgedRouteProcessing, "Orthogonal Nudged Route Processing"),
         option(collinearRouteCompression, "Collinear Route Compression"),
       ],
