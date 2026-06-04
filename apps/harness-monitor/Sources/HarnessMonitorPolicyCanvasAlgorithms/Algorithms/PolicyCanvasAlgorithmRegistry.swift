@@ -196,9 +196,14 @@ enum PolicyCanvasAlgorithmRegistry {
   }
 
   private static func routePostProcessingAlgorithm(
-    for _: PolicyCanvasAlgorithmID
+    for id: PolicyCanvasAlgorithmID
   ) -> any PolicyCanvasRoutePostProcessingAlgorithm {
-    PolicyCanvasCollinearRouteCompression()
+    switch id {
+    case PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing:
+      PolicyCanvasOrthogonalNudgingRouteProcessing()
+    default:
+      PolicyCanvasCollinearRouteCompression()
+    }
   }
 
   private static func labelPlacementAlgorithm(
