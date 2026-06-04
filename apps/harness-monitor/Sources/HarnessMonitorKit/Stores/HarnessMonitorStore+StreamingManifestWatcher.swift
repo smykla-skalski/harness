@@ -2,21 +2,21 @@ import Foundation
 
 actor ManifestWatcherStartupWorker {
   func loadSeed(
-    environment: HarnessMonitorEnvironment
+    manifestURL: URL
   ) -> ManifestWatcherStartupSeed {
-    let manifestURL = HarnessMonitorPaths.manifestURL(using: environment).standardizedFileURL
-    let daemonRoot = manifestURL.deletingLastPathComponent()
+    let normalizedManifestURL = manifestURL.standardizedFileURL
+    let daemonRoot = normalizedManifestURL.deletingLastPathComponent()
     try? FileManager.default.createDirectory(
       at: daemonRoot,
       withIntermediateDirectories: true
     )
 
     guard
-      let data = FileManager.default.contents(atPath: manifestURL.path),
+      let data = FileManager.default.contents(atPath: normalizedManifestURL.path),
       let manifest = Self.decodeManifest(from: data)
     else {
       return ManifestWatcherStartupSeed(
-        manifestURL: manifestURL,
+        manifestURL: normalizedManifestURL,
         currentEndpoint: "",
         currentStartedAt: nil,
         currentRevision: 0
@@ -24,7 +24,7 @@ actor ManifestWatcherStartupWorker {
     }
 
     return ManifestWatcherStartupSeed(
-      manifestURL: manifestURL,
+      manifestURL: normalizedManifestURL,
       currentEndpoint: manifest.endpoint,
       currentStartedAt: manifest.startedAt,
       currentRevision: manifest.revision
@@ -54,9 +54,9 @@ extension HarnessMonitorStore {
       return
     }
     let worker = manifestWatcherStartupWorker
-    let environment = HarnessMonitorEnvironment.current
+    let requestedManifestURL = manifestURL.standardizedFileURL
     manifestWatcherStartTask = Task { @MainActor [weak self] in
-      let seed = await worker.loadSeed(environment: environment)
+      let seed = await worker.loadSeed(manifestURL: requestedManifestURL)
       guard
         !Task.isCancelled,
         let self,
@@ -65,6 +65,11 @@ extension HarnessMonitorStore {
         return
       }
       self.manifestWatcherStartTask = nil
+      if self.manifestURL.standardizedFileURL != requestedManifestURL {
+        let refreshedSeed = await worker.loadSeed(manifestURL: self.manifestURL)
+        self.installManifestWatcher(refreshedSeed)
+        return
+      }
       self.installManifestWatcher(seed)
     }
   }
