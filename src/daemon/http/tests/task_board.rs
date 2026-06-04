@@ -175,7 +175,20 @@ async fn run_task_board_http_policy_pipeline_flow() {
     let (base_url, server) = serve_http(state).await;
     let client = reqwest::Client::new();
 
-    let pipeline = get_json(&client, &base_url, http_paths::TASK_BOARD_POLICY_PIPELINE).await;
+    let workspace = get_json(&client, &base_url, http_paths::TASK_BOARD_POLICY_CANVASES).await;
+    let active_canvas_id = workspace["active_canvas_id"]
+        .as_str()
+        .expect("active canvas id")
+        .to_string();
+    let pipeline = get_json(
+        &client,
+        &base_url,
+        &format!(
+            "{}?canvas_id={active_canvas_id}",
+            http_paths::TASK_BOARD_POLICY_PIPELINE
+        ),
+    )
+    .await;
     assert_eq!(pipeline["schema_version"].as_u64(), Some(2));
     assert_eq!(pipeline["mode"].as_str(), Some("draft"));
 
@@ -183,7 +196,10 @@ async fn run_task_board_http_policy_pipeline_flow() {
         &client,
         &base_url,
         http_paths::TASK_BOARD_POLICY_PIPELINE,
-        json!({ "document": pipeline }),
+        json!({
+            "canvas_id": active_canvas_id.clone(),
+            "document": pipeline,
+        }),
     )
     .await;
     assert!(
@@ -199,7 +215,10 @@ async fn run_task_board_http_policy_pipeline_flow() {
         &client,
         &base_url,
         http_paths::TASK_BOARD_POLICY_SIMULATE,
-        json!({ "document": save["document"].clone() }),
+        json!({
+            "canvas_id": active_canvas_id.clone(),
+            "document": save["document"].clone(),
+        }),
     )
     .await;
     assert_eq!(simulation["revision"].as_u64(), Some(saved_revision));
@@ -214,12 +233,24 @@ async fn run_task_board_http_policy_pipeline_flow() {
         &client,
         &base_url,
         http_paths::TASK_BOARD_POLICY_PROMOTE,
-        json!({ "revision": saved_revision }),
+        json!({
+            "canvas_id": active_canvas_id.clone(),
+            "revision": saved_revision,
+        }),
     )
     .await;
     assert_eq!(promote["document"]["mode"].as_str(), Some("enforced"));
 
-    let audit = get_json(&client, &base_url, http_paths::TASK_BOARD_POLICY_AUDIT).await;
+    let audit = get_json(
+        &client,
+        &base_url,
+        &format!(
+            "{}?canvas_id={}",
+            http_paths::TASK_BOARD_POLICY_AUDIT,
+            active_canvas_id
+        ),
+    )
+    .await;
     assert_eq!(audit["active_revision"].as_u64(), Some(saved_revision));
     assert_eq!(audit["mode"].as_str(), Some("enforced"));
     assert_eq!(

@@ -190,12 +190,26 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
                 test_websocket_state_with_empty_async_db(&sandbox.path().join("daemon.sqlite"))
                     .await;
             let connection = Arc::new(Mutex::new(ConnectionState::new()));
+            let workspace_response = dispatch(
+                &request(
+                    "req-policy-workspace",
+                    ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET,
+                    json!({}),
+                ),
+                &state,
+                &connection,
+            )
+            .await;
+            let active_canvas_id = response_result(&workspace_response)["active_canvas_id"]
+                .as_str()
+                .expect("active canvas id")
+                .to_string();
 
             let get_response = dispatch(
                 &request(
                     "req-policy-get",
                     ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
-                    json!({}),
+                    json!({ "canvas_id": active_canvas_id.clone() }),
                 ),
                 &state,
                 &connection,
@@ -208,7 +222,10 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
                 &request(
                     "req-policy-save",
                     ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
-                    json!({ "document": pipeline.clone() }),
+                    json!({
+                        "canvas_id": active_canvas_id.clone(),
+                        "document": pipeline.clone(),
+                    }),
                 ),
                 &state,
                 &connection,
@@ -223,7 +240,10 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
                 &request(
                     "req-policy-simulate",
                     ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE,
-                    json!({ "document": save["document"].clone() }),
+                    json!({
+                        "canvas_id": active_canvas_id.clone(),
+                        "document": save["document"].clone(),
+                    }),
                 ),
                 &state,
                 &connection,
@@ -237,7 +257,10 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
                 &request(
                     "req-policy-promote",
                     ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE,
-                    json!({ "revision": saved_revision }),
+                    json!({
+                        "canvas_id": active_canvas_id.clone(),
+                        "revision": saved_revision,
+                    }),
                 ),
                 &state,
                 &connection,
@@ -250,7 +273,7 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
                 &request(
                     "req-policy-audit",
                     ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
-                    json!({}),
+                    json!({ "canvas_id": active_canvas_id }),
                 ),
                 &state,
                 &connection,
