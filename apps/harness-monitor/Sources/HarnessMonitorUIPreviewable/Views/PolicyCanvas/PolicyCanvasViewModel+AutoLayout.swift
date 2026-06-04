@@ -43,7 +43,7 @@ extension PolicyCanvasViewModel {
         requestRouteComputation()
       }
     }
-    let requestExplicitRoutesAndCenteringIfNeeded = { [self] in
+    let requestRoutesAndCenterIfNeeded = { [self] in
       requestExplicitRoutesIfNeeded()
       if requestsRouteComputation {
         requestViewportCentering(.documentAfterRouteComputation)
@@ -70,7 +70,7 @@ extension PolicyCanvasViewModel {
         || policyCanvasNeedsDefaultArrangement(nodes: nodes, groups: groups)
     else {
       restoreMissingRoutingHintsForCurrentLayout()
-      requestExplicitRoutesAndCenteringIfNeeded()
+      requestRoutesAndCenterIfNeeded()
       notifyStatus("Layout already tidy")
       return
     }
@@ -143,7 +143,7 @@ extension PolicyCanvasViewModel {
       if routingHints?.isEmpty != false {
         refreshRoutingHints(to: nextRoutingHints)
       }
-      requestExplicitRoutesAndCenteringIfNeeded()
+      requestRoutesAndCenterIfNeeded()
       notifyStatus("Layout already matches the current anchors")
       return
     }

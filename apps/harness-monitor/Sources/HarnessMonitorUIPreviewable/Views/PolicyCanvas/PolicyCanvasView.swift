@@ -220,7 +220,6 @@ public struct PolicyCanvasView: View {
     let _ = HarnessMonitorPerfTrace.countBodyEval("PolicyCanvasView")
     policyCanvasSplitLayout
       .focusable()
-      .focusEffectDisabled()
       .focused($canvasKeyboardFocusedState)
       .frame(minHeight: 620)
       .accessibilityElement(children: .contain)

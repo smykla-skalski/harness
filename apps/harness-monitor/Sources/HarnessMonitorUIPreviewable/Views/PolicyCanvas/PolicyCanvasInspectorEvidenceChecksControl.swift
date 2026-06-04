@@ -39,7 +39,7 @@ struct PolicyCanvasInspectorEvidenceChecksControl: View {
       } label: {
         Label("Add check", systemImage: "plus")
       }
-      .buttonStyle(.glass)
+      .harnessGlassButtonStyle()
       .controlSize(.small)
     }
     .accessibilityIdentifier(
