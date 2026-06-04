@@ -10,14 +10,17 @@ struct PolicyCanvasViewportOverlayModifier: ViewModifier {
   let minimapVisible: Bool
   let resolvedCanvasColorScheme: ColorScheme?
   let minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
+  let showsEdgeLegend: Bool
   let requestViewportScroll: @MainActor (CGPoint) -> Void
 
   func body(content: Content) -> some View {
     content
       .overlay(alignment: .topLeading) {
-        PolicyCanvasEdgeKindLegend()
-          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
-          .padding(14)
+        if showsEdgeLegend {
+          PolicyCanvasEdgeKindLegend()
+            .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
+            .padding(14)
+        }
       }
       .overlay(alignment: .bottomLeading) {
         PolicyCanvasZoomControls(viewModel: viewModel)

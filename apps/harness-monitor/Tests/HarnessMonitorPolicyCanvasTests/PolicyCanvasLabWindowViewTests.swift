@@ -242,6 +242,22 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     )
   }
 
+  func testLabHidesEdgeLegend() throws {
+    let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
+    let viewportSurfaceSource = try previewablePolicyCanvasSourceFile(
+      named: "PolicyCanvasViewportSurface.swift"
+    )
+    let overlaySource = try previewablePolicyCanvasSourceFile(
+      named: "PolicyCanvasViewportOverlayModifier.swift"
+    )
+
+    XCTAssertTrue(windowSource.contains("showsEdgeLegend: false"))
+    XCTAssertTrue(viewportSurfaceSource.contains("let showsEdgeLegend: Bool"))
+    XCTAssertTrue(overlaySource.contains("let showsEdgeLegend: Bool"))
+    XCTAssertTrue(overlaySource.contains("if showsEdgeLegend"))
+    XCTAssertTrue(overlaySource.contains("PolicyCanvasEdgeKindLegend()"))
+  }
+
   private func policyCanvasSourceFile(named name: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =

@@ -139,7 +139,8 @@ public struct PolicyCanvasLabWindowView: View {
       audit: displayedSnapshot.audit,
       algorithmSelection: algorithmSelection,
       minimapCenteringMode: .clickViewport,
-      canvasColorScheme: windowThemeMode.colorScheme
+      canvasColorScheme: windowThemeMode.colorScheme,
+      showsEdgeLegend: false
     )
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
