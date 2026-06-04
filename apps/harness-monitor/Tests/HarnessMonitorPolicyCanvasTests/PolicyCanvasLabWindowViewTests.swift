@@ -163,6 +163,15 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(
       controlsSource.contains("if stageIndex < stageDescriptors.count - 1")
     )
+    XCTAssertFalse(
+      controlsSource.contains(
+        """
+        }
+              .sharedBackgroundVisibility(.hidden)
+              if stageIndex < stageDescriptors.count - 1 {
+        """
+      )
+    )
     XCTAssertFalse(controlsSource.contains("ToolbarItemGroup(placement: .primaryAction)"))
   }
 
