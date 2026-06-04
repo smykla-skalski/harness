@@ -16,8 +16,7 @@ struct PolicyCanvasLabSamplesTests {
     "minimal": PolicyCanvasLabSampleMinimumCounts(nodes: 2, edges: 1, groups: 1),
     "linear": PolicyCanvasLabSampleMinimumCounts(nodes: 6, edges: 5, groups: 3),
     "branching": PolicyCanvasLabSampleMinimumCounts(nodes: 9, edges: 10, groups: 3),
-    "default-like": PolicyCanvasLabSampleMinimumCounts(nodes: 16, edges: 21, groups: 3),
-    "real-default": PolicyCanvasLabSampleMinimumCounts(nodes: 18, edges: 22, groups: 3),
+    "default": PolicyCanvasLabSampleMinimumCounts(nodes: 18, edges: 22, groups: 3),
     "multi-group": PolicyCanvasLabSampleMinimumCounts(nodes: 14, edges: 21, groups: 4),
     "extreme": PolicyCanvasLabSampleMinimumCounts(nodes: 32, edges: 41, groups: 6),
   ]
@@ -26,23 +25,25 @@ struct PolicyCanvasLabSamplesTests {
   func catalogOrderAndUniqueIDs() {
     let ids = PolicyCanvasLabSamples.all.map(\.id)
     #expect(
-      ids == ["minimal", "linear", "branching", "real-default", "multi-group", "extreme"]
+      ids == ["minimal", "linear", "branching", "default", "multi-group", "extreme"]
     )
     #expect(Set(ids).count == ids.count)
     #expect(PolicyCanvasLabSamples.sample(id: PolicyCanvasLabSamples.defaultSelectionID) != nil)
   }
 
-  @Test("Picker catalog hides legacy default-like and promotes Default")
-  func pickerCatalogPromotesRealDefault() throws {
+  @Test("Picker catalog exposes a single Default sample")
+  func pickerCatalogExposesSingleDefault() throws {
     let ids = PolicyCanvasLabSamples.all.map(\.id)
 
     #expect(
-      ids == ["minimal", "linear", "branching", "real-default", "multi-group", "extreme"]
+      ids == ["minimal", "linear", "branching", "default", "multi-group", "extreme"]
     )
+    #expect(ids.filter { $0.contains("default") } == ["default"])
     #expect(!ids.contains("default-like"))
-    #expect(PolicyCanvasLabSamples.defaultSelectionID == "real-default")
+    #expect(PolicyCanvasLabSamples.sample(id: "default-like") == nil)
+    #expect(PolicyCanvasLabSamples.defaultSelectionID == "default")
     #expect(
-      try #require(PolicyCanvasLabSamples.sample(id: "real-default")).name == "Default"
+      try #require(PolicyCanvasLabSamples.sample(id: "default")).name == "Default"
     )
   }
 
@@ -202,23 +203,6 @@ struct PolicyCanvasLabSamplesTests {
         )
       }
     }
-  }
-
-  @Test("Reference default-like layout preserves coordinate-assignment spread")
-  func referenceDefaultLikeLayoutPreservesCoordinateAssignmentSpread() throws {
-    let sample = try #require(PolicyCanvasLabSamples.sample(id: "default-like"))
-    let graph = try referenceLaidOutGraph(for: sample)
-    let passChainIDs = [
-      "c-checks", "c-branch", "c-reviewer", "c-conflicts", "c-draft", "c-risk",
-    ]
-    let nodePositionsByID = Dictionary(uniqueKeysWithValues: graph.nodes.map { ($0.id, $0) })
-    let centerYValues = passChainIDs.compactMap { nodePositionsByID[$0]?.position.y }
-    let spread = (centerYValues.max() ?? 0) - (centerYValues.min() ?? 0)
-
-    #expect(
-      spread >= PolicyCanvasLayout.nodeSize.height,
-      "reference layout flattened the pass chain instead of preserving Brandes-Kopf Y spread"
-    )
   }
 
   private func referenceLaidOutGraph(

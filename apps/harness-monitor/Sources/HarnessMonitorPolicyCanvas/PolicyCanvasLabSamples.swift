@@ -32,20 +32,16 @@ public enum PolicyCanvasLabSamples {
     PolicyCanvasLabSample(id: "minimal", name: "Minimal", document: minimal),
     PolicyCanvasLabSample(id: "linear", name: "Linear", document: linear),
     PolicyCanvasLabSample(id: "branching", name: "Branching", document: branching),
-    PolicyCanvasLabSample(id: "real-default", name: "Default", document: realDefault),
+    PolicyCanvasLabSample(id: "default", name: "Default", document: realDefault),
     PolicyCanvasLabSample(id: "multi-group", name: "Multi-group", document: multiGroup),
     PolicyCanvasLabSample(id: "extreme", name: "Extreme", document: extreme),
   ]
 
-  private static let hiddenSamples: [PolicyCanvasLabSample] = [
-    PolicyCanvasLabSample(id: "default-like", name: "Default-like", document: defaultLike)
-  ]
-
   /// The sample the lab selects when no live policy is present.
-  public static let defaultSelectionID = "real-default"
+  public static let defaultSelectionID = "default"
 
   public static func sample(id: String) -> PolicyCanvasLabSample? {
-    all.first { $0.id == id } ?? hiddenSamples.first { $0.id == id }
+    all.first { $0.id == id }
   }
 }
 

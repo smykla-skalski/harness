@@ -71,7 +71,7 @@ struct PolicyCanvasLabPickerRuntimeTests {
     let frame = CGRect(x: 0, y: 0, width: 1_400, height: 900)
     let host = NSHostingView(
       rootView: PolicyCanvasLabPickerHarness(
-        selection: .sample("default-like"),
+        selection: .sample("default"),
         algorithmSelection: .referenceRouting
       )
     )
@@ -104,7 +104,7 @@ struct PolicyCanvasLabPickerRuntimeTests {
     #expect(!harnessPositions.isEmpty)
 
     host.rootView = PolicyCanvasLabPickerHarness(
-      selection: .sample("default-like"),
+      selection: .sample("default"),
       algorithmSelection: .referencePure
     )
     window.layoutIfNeeded()
@@ -125,7 +125,7 @@ struct PolicyCanvasLabPickerRuntimeTests {
     let frame = CGRect(x: 0, y: 0, width: 1_400, height: 900)
     let host = NSHostingView(
       rootView: PolicyCanvasLabPickerHarness(
-        selection: .sample("default-like"),
+        selection: .sample("default"),
         includesGroupsInLayout: true
       )
     )
@@ -158,7 +158,7 @@ struct PolicyCanvasLabPickerRuntimeTests {
     )
 
     host.rootView = PolicyCanvasLabPickerHarness(
-      selection: .sample("default-like"),
+      selection: .sample("default"),
       includesGroupsInLayout: false
     )
     window.layoutIfNeeded()

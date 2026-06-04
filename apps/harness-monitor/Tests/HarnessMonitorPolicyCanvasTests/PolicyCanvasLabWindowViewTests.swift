@@ -62,7 +62,7 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
   }
 
   func testLabDocumentCanStripPolicyGroupsBeforeCanvasImport() throws {
-    let document = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "default-like")?.document)
+    let document = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "default")?.document)
 
     XCTAssertFalse(document.groups.isEmpty)
     XCTAssertTrue(document.nodes.contains { $0.groupId != nil })
@@ -78,7 +78,7 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
   }
 
   func testLabDocumentPreservesPolicyGroupsWhenEnabled() throws {
-    let document = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "default-like")?.document)
+    let document = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "default")?.document)
 
     XCTAssertEqual(
       PolicyCanvasLabSnapshotSupport.document(document, includesGroups: true),
@@ -128,7 +128,7 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
     let controlsSource = try policyCanvasSourceFile(named: "PolicyCanvasLabToolbarControls.swift")
 
-    XCTAssertTrue(windowSource.contains("@State private var includesGroupsInLayout = true"))
+    XCTAssertTrue(windowSource.contains("@State private var includesGroupsInLayout = false"))
     XCTAssertTrue(
       windowSource.contains(
         "PolicyCanvasLabGroupsToggle(includesGroupsInLayout: $includesGroupsInLayout)"
