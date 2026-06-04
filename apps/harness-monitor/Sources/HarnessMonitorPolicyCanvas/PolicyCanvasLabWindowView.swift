@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
@@ -12,6 +13,11 @@ public struct PolicyCanvasLabWindowView: View {
   @State private var allowsEmptyLiveSnapshot: Bool
   @State private var sampleSelection: PolicyCanvasLabSelection
   @State private var algorithmSelection: PolicyCanvasAlgorithmSelection
+  @AppStorage(PolicyCanvasLabToolbarDefaults.sampleSelectionKey)
+  private var storedSampleSelectionRaw = PolicyCanvasLabToolbarDefaults.defaultSampleSelectionRawValue
+  @AppStorage(PolicyCanvasLabToolbarDefaults.algorithmSelectionKey)
+  private var storedAlgorithmSelectionRaw =
+    PolicyCanvasLabToolbarDefaults.defaultAlgorithmSelectionRawValue
   @AppStorage(PolicyCanvasLabThemeDefaults.modeKey)
   private var windowThemeMode = PolicyCanvasLabThemeMode.defaultValue
 
@@ -22,7 +28,8 @@ public struct PolicyCanvasLabWindowView: View {
     allowsLiveBootstrap: Bool = false,
     initialSelection: PolicyCanvasLabSelection = .sample(PolicyCanvasLabSamples.defaultSelectionID),
     fixtureDocument: TaskBoardPolicyPipelineDocument? =
-      PolicyCanvasLabSnapshotSupport.fixtureDocument()
+      PolicyCanvasLabSnapshotSupport.fixtureDocument(),
+    defaults: UserDefaults = .standard
   ) {
     let resolvedLiveSnapshot =
       liveSnapshot
@@ -36,8 +43,10 @@ public struct PolicyCanvasLabWindowView: View {
       resolvedLiveSnapshot.document.map(
         PolicyCanvasLabSnapshotSupport.hasVisibleGraph
       ) ?? false
+    let initialToolbarSelection =
+      PolicyCanvasLabToolbarDefaults.selection(in: defaults) ?? initialSelection
     let normalizedSelection = Self.normalizedInitialSelection(
-      initialSelection,
+      initialToolbarSelection,
       fixtureDocument: fixtureDocument,
       liveGraphVisible: liveGraphVisible,
       allowsLiveBootstrap: allowsLiveBootstrap
@@ -56,7 +65,24 @@ public struct PolicyCanvasLabWindowView: View {
     )
     _allowsEmptyLiveSnapshot = State(initialValue: liveGraphVisible)
     _sampleSelection = State(initialValue: normalizedSelection)
-    _algorithmSelection = State(initialValue: .referenceRouting)
+    _algorithmSelection = State(
+      initialValue: PolicyCanvasLabToolbarDefaults.algorithmSelection(in: defaults)
+    )
+    _storedSampleSelectionRaw = AppStorage(
+      wrappedValue: PolicyCanvasLabToolbarDefaults.defaultSampleSelectionRawValue,
+      PolicyCanvasLabToolbarDefaults.sampleSelectionKey,
+      store: defaults
+    )
+    _storedAlgorithmSelectionRaw = AppStorage(
+      wrappedValue: PolicyCanvasLabToolbarDefaults.defaultAlgorithmSelectionRawValue,
+      PolicyCanvasLabToolbarDefaults.algorithmSelectionKey,
+      store: defaults
+    )
+    _windowThemeMode = AppStorage(
+      wrappedValue: PolicyCanvasLabThemeMode.defaultValue,
+      PolicyCanvasLabThemeDefaults.modeKey,
+      store: defaults
+    )
   }
 
   private static func normalizedInitialSelection(
@@ -157,6 +183,10 @@ public struct PolicyCanvasLabWindowView: View {
     }
     .onChange(of: sampleSelection) { _, newSelection in
       applySelection(newSelection)
+      storedSampleSelectionRaw = PolicyCanvasLabToolbarDefaults.rawValue(for: newSelection)
+    }
+    .onChange(of: algorithmSelection) { _, newSelection in
+      storedAlgorithmSelectionRaw = PolicyCanvasLabToolbarDefaults.rawValue(for: newSelection)
     }
   }
 

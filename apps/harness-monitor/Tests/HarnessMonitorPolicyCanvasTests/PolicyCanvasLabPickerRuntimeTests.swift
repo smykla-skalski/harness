@@ -189,6 +189,63 @@ struct PolicyCanvasLabPickerRuntimeTests {
   }
 
   @MainActor
+  @Test("the lab window restores persisted sample and algorithm toolbar selections")
+  func labWindowRestoresPersistedToolbarSelections() async throws {
+    let suiteName = "PolicyCanvasLabPickerRuntimeTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    let sampleKey = "policyCanvasLabSampleSelection"
+    let algorithmKey = "policyCanvasLabAlgorithmSelection"
+
+    defer {
+      defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    defaults.removePersistentDomain(forName: suiteName)
+    defaults.set("minimal", forKey: sampleKey)
+    defaults.set(PolicyCanvasAlgorithmSelection.referencePure.cacheIdentity, forKey: algorithmKey)
+
+    let frame = CGRect(x: 0, y: 0, width: 1_400, height: 900)
+    let host = NSHostingView(
+      rootView: PolicyCanvasLabWindowView(
+        fixtureDocument: nil,
+        defaults: defaults
+      )
+    )
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = frame
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil(timeout: .seconds(4)) {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        guard
+          let documentView = descendant(of: host, as: PolicyCanvasNativeDocumentView.self)
+        else {
+          return false
+        }
+        let viewModel = documentView.hostedState.snapshot.viewModel
+        let ids = Set(viewModel.nodes.map(\.id))
+        return ids == ["entry", "finish"]
+          && viewModel.algorithmSelection == .referencePure
+      }
+    )
+  }
+
+  @MainActor
   @Test("the lab window keeps sample node groups in the rendered canvas")
   func labWindowKeepsSampleNodeGroupsInRenderedCanvas() async throws {
     let frame = CGRect(x: 0, y: 0, width: 1_400, height: 900)

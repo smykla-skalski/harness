@@ -206,6 +206,35 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertFalse(windowSource.contains("sampleMenuItem(title:"))
   }
 
+  func testLabToolbarSelectionsPersistToLabScopedDefaults() throws {
+    let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
+
+    XCTAssertTrue(
+      windowSource.contains("@AppStorage(PolicyCanvasLabToolbarDefaults.sampleSelectionKey)")
+    )
+    XCTAssertTrue(
+      windowSource.contains("@AppStorage(PolicyCanvasLabToolbarDefaults.algorithmSelectionKey)")
+    )
+    XCTAssertTrue(
+      windowSource.contains(
+        "PolicyCanvasLabToolbarDefaults.selection(in: defaults) ?? initialSelection"
+      )
+    )
+    XCTAssertTrue(
+      windowSource.contains("PolicyCanvasLabToolbarDefaults.algorithmSelection(in: defaults)")
+    )
+    XCTAssertTrue(
+      windowSource.contains(
+        "storedSampleSelectionRaw = PolicyCanvasLabToolbarDefaults.rawValue(for: newSelection)"
+      )
+    )
+    XCTAssertTrue(
+      windowSource.contains(
+        "storedAlgorithmSelectionRaw = PolicyCanvasLabToolbarDefaults.rawValue(for: newSelection)"
+      )
+    )
+  }
+
   func testLabThemePickerIsWindowScopedAndDecoupledFromAppTheme() throws {
     let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
     let viewportSurfaceSource = try previewablePolicyCanvasSourceFile(
