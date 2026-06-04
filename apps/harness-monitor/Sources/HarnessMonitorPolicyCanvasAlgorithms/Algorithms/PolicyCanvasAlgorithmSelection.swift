@@ -116,8 +116,8 @@ public struct PolicyCanvasAlgorithmSelection: Equatable, Hashable, Sendable {
 
   /// The production pipeline (and the default fill): the harness Sugiyama
   /// layout paired with reference-form routing - padded visibility-graph A*,
-  /// first-feasible selection, collinear compression, route-terminal port
-  /// markers - in place of the retired declutter/fan-in post-processing pile.
+  /// first-feasible selection, crossing-aware orthogonal nudging, route-terminal
+  /// port markers - in place of the retired declutter/fan-in post-processing pile.
   public static let referenceRouting = Self(
     selectedAlgorithmIDs: PolicyCanvasAlgorithmDefaults.harnessCurrentIDs
   )
@@ -205,9 +205,6 @@ enum PolicyCanvasAlgorithmDefaults {
   static let orthogonalNudgedRouteProcessing = PolicyCanvasAlgorithmID(
     "orthogonal-nudged-route-processing"
   )
-  static let claudeCrossingAwareRouteProcessing = PolicyCanvasAlgorithmID(
-    "claude-crossing-aware-route-processing"
-  )
   static let obstacleAwareGreedyLabelPlacement = PolicyCanvasAlgorithmID(
     "obstacle-aware-greedy-label-placement"
   )
@@ -239,9 +236,9 @@ enum PolicyCanvasAlgorithmDefaults {
   /// The production default pipeline and the fill used for any unspecified
   /// stage: the harness Sugiyama layout (better crossing reduction, anchored
   /// reflow, group-aware packing) paired with reference-form routing - padded
-  /// visibility-graph A*, first-feasible selection, collinear compression, and
-  /// route-terminal port markers - in place of the retired declutter/fan-in
-  /// post-processing pile.
+  /// visibility-graph A*, first-feasible selection, crossing-aware orthogonal
+  /// nudging, and route-terminal port markers - in place of the retired
+  /// declutter/fan-in post-processing pile.
   static let harnessCurrentIDs: [PolicyCanvasAlgorithmStage: PolicyCanvasAlgorithmID] = [
     .cycleBreaking: depthFirstBackEdgeReversal,
     .rankAssignment: harnessGroupAwareLongestPath,
@@ -253,7 +250,7 @@ enum PolicyCanvasAlgorithmDefaults {
     .portMarkerPlacement: routeTerminalPortMarkers,
     .edgeRouting: paddedOrthogonalVisibilityAStar,
     .routeSelection: firstFeasibleRouteSelection,
-    .routePostProcessing: collinearRouteCompression,
+    .routePostProcessing: orthogonalNudgedRouteProcessing,
     .labelPlacement: obstacleAwareGreedyLabelPlacement,
     .metrics: harnessReadabilityMetrics,
   ]
@@ -331,7 +328,6 @@ enum PolicyCanvasAlgorithmDefaults {
         option(firstFeasibleRouteSelection, "First Feasible Route Selection")
       ],
       .routePostProcessing: [
-        option(claudeCrossingAwareRouteProcessing, "Claude Crossing-Aware Route Processing"),
         option(orthogonalNudgedRouteProcessing, "Orthogonal Nudged Route Processing"),
         option(collinearRouteCompression, "Collinear Route Compression"),
       ],

@@ -13,7 +13,7 @@ import CoreGraphics
 /// gate's 8pt threshold; body hits count routes whose segments cut a node or
 /// group-title frame. The pass rejects any shift that adds a crossing or a body
 /// hit not already present in the pre-spread baseline.
-enum PolicyCanvasClaudeRouteMetrics {
+enum PolicyCanvasNudgeRouteMetrics {
   /// The pre-spread routing the result is measured against: the crossing pairs
   /// that already existed (keyed `lowerID|higherID`) and the edges whose route
   /// already cut a node or group-title body. A spread is kept only if it adds

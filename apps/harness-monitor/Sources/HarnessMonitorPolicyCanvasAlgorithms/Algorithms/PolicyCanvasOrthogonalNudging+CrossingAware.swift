@@ -1,6 +1,6 @@
 import CoreGraphics
 
-/// Crossing-aware global route post-process (Path A).
+/// Crossing-aware global orthogonal nudging - the route post-processing default.
 ///
 /// The first-feasible selector routes every edge independently, so members of a
 /// fan-in - or any edges that happen to run the same corridor - are left stacked
@@ -19,7 +19,7 @@ import CoreGraphics
 /// is never spread into a new crossing or a node body. Port stubs (a route's first
 /// and last segment) are never shifted, so the terminal-on-dot marker contract
 /// holds by construction.
-struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProcessingAlgorithm {
+struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProcessingAlgorithm {
   /// Interior collinear overlap longer than this reads as a stacked rail and must
   /// be cleared - matches the fan-in channel gate threshold.
   private let overlapThreshold: CGFloat = 8
@@ -58,7 +58,7 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
     _ routes: [String: [CGPoint]],
     obstacles: [CGRect]
   ) -> [String: [CGPoint]] {
-    let baseline = PolicyCanvasClaudeRouteMetrics.baseline(of: routes, obstacles: obstacles)
+    let baseline = PolicyCanvasNudgeRouteMetrics.baseline(of: routes, obstacles: obstacles)
     let processor = PolicyCanvasOrthogonalNudgeProcessor(
       obstacles: obstacles,
       fans: PolicyCanvasFanContext.make(from: routes)
@@ -81,7 +81,7 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
           ) {
             working = apply(chosen, to: working)
             for edgeID in Set(chosen.map { $0.segment.edgeID }) where working[edgeID] != nil {
-              entries[edgeID] = PolicyCanvasClaudeRouteMetrics.entry(
+              entries[edgeID] = PolicyCanvasNudgeRouteMetrics.entry(
                 id: edgeID, points: working[edgeID] ?? []
               )
             }
@@ -103,9 +103,9 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
   /// edges' entries are refreshed.
   private func entryCache(
     of pointsByEdge: [String: [CGPoint]]
-  ) -> [String: PolicyCanvasClaudeRouteMetrics.RouteEntry] {
+  ) -> [String: PolicyCanvasNudgeRouteMetrics.RouteEntry] {
     pointsByEdge.reduce(into: [:]) { cache, element in
-      cache[element.key] = PolicyCanvasClaudeRouteMetrics.entry(
+      cache[element.key] = PolicyCanvasNudgeRouteMetrics.entry(
         id: element.key, points: element.value
       )
     }
@@ -121,9 +121,9 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
   private func bestSpread(
     _ offsets: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)],
     working: [String: [CGPoint]],
-    entries: [String: PolicyCanvasClaudeRouteMetrics.RouteEntry],
+    entries: [String: PolicyCanvasNudgeRouteMetrics.RouteEntry],
     obstacles: [CGRect],
-    baseline: PolicyCanvasClaudeRouteMetrics.Baseline
+    baseline: PolicyCanvasNudgeRouteMetrics.Baseline
   ) -> [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]? {
     let channelEdges = Set(offsets.map { $0.segment.edgeID })
     let sortedEdges = channelEdges.sorted()
@@ -139,7 +139,7 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
     let channelPoints = channelEdges.reduce(into: [String: [CGPoint]]()) { slice, id in
       slice[id] = working[id]
     }
-    let scoring = PolicyCanvasClaudeRouteMetrics.Scoring(
+    let scoring = PolicyCanvasNudgeRouteMetrics.Scoring(
       fixed: fixed,
       obstacles: nearbyObstacles,
       baseline: baseline,
@@ -147,8 +147,8 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
     )
     func localPenalty(
       of state: [String: [CGPoint]]
-    ) -> PolicyCanvasClaudeRouteMetrics.LocalPenalty {
-      PolicyCanvasClaudeRouteMetrics.localPenalty(
+    ) -> PolicyCanvasNudgeRouteMetrics.LocalPenalty {
+      PolicyCanvasNudgeRouteMetrics.localPenalty(
         channelEdges: sortedEdges,
         pointsByEdge: state,
         scoring: scoring
@@ -189,9 +189,9 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
   /// with the whole graph, only with the channel's neighbourhood.
   private func relevantFixed(
     channelEdges: Set<String>,
-    entries: [String: PolicyCanvasClaudeRouteMetrics.RouteEntry],
+    entries: [String: PolicyCanvasNudgeRouteMetrics.RouteEntry],
     band: CGRect?
-  ) -> [PolicyCanvasClaudeRouteMetrics.RouteEntry] {
+  ) -> [PolicyCanvasNudgeRouteMetrics.RouteEntry] {
     let fixed = entries.keys.sorted()
       .filter { !channelEdges.contains($0) }
       .compactMap { entries[$0] }
@@ -200,7 +200,7 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
     }
     return fixed.filter { entry in
       entry.bounds.intersects(band)
-        && PolicyCanvasClaudeRouteMetrics.segmentsEnter(entry, band)
+        && PolicyCanvasNudgeRouteMetrics.segmentsEnter(entry, band)
     }
   }
 

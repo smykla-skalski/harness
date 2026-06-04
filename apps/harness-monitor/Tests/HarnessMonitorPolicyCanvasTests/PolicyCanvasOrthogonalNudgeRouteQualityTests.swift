@@ -5,17 +5,17 @@ import Testing
 @testable import HarnessMonitorPolicyCanvas
 @testable import HarnessMonitorPolicyCanvasAlgorithms
 
-/// Acceptance gate for the crossing-aware route post-process (Path A). The
-/// orthogonal nudge clears interior overlaps but trades them for X-crossings it
-/// introduces by spreading a riser into a foreign edge's stub span. This pass must
-/// clear the same overlaps while adding *zero* crossings over the no-nudge
-/// (`collinearRouteCompression`) baseline - strictly better than the nudge, which
-/// adds three on `branching`/`multi-group`. The proven nudge-introduced pairs are
-/// `coll-allow`x`coll-human` (branching) and `pre-intake`x`pre-deny` /
-/// `rv-else`x`dp-fail` (multi-group); none may appear in the added set.
-@Suite("Policy canvas Claude crossing-aware route processing", .serialized)
+/// Acceptance gate for the crossing-aware orthogonal nudge - the production
+/// route post-process default. A naive nudge clears interior overlaps but trades
+/// them for X-crossings it introduces by spreading a riser into a foreign edge's
+/// stub span. This pass must clear the same overlaps while adding *zero* crossings
+/// over the no-nudge (`collinearRouteCompression`) baseline. The pairs a naive
+/// nudge introduced are `coll-allow`x`coll-human` (branching) and
+/// `pre-intake`x`pre-deny` / `rv-else`x`dp-fail` (multi-group); none may appear in
+/// the added set.
+@Suite("Policy canvas orthogonal nudge route quality", .serialized)
 @MainActor
-struct PolicyCanvasClaudeCrossingAwareRouteTests {
+struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
   /// Collinear overlap of an interior segment between two edges, longer than this,
   /// reads as two wires stacked on one rail. Matches the fan-in channel gate.
   private static let overlapThreshold: CGFloat = 8
@@ -31,15 +31,15 @@ struct PolicyCanvasClaudeCrossingAwareRouteTests {
       stage: .routePostProcessing,
       with: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
     )
-    let claude = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
+    let nudged = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
       stage: .routePostProcessing,
-      with: PolicyCanvasAlgorithmDefaults.claudeCrossingAwareRouteProcessing
+      with: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
     )
     var totals = ""
     var regressions: [String] = []
     for sampleID in PolicyCanvasLabSamples.all.map(\.id) {
       let base = try await routedScene(sampleID: sampleID, selection: baseline)
-      let after = try await routedScene(sampleID: sampleID, selection: claude)
+      let after = try await routedScene(sampleID: sampleID, selection: nudged)
       let baseOverlaps = interiorOverlapPairs(routes: base.routes, edges: base.edges)
       let baseCrossings = Set(crossingPairs(routes: base.routes, edges: base.edges))
       let afterOverlaps = interiorOverlapPairs(routes: after.routes, edges: after.edges)
@@ -63,13 +63,11 @@ struct PolicyCanvasClaudeCrossingAwareRouteTests {
     )
   }
 
-  /// Where the nudge can only de-overlap by adding crossings (the crowded
-  /// branching and multi-group corridors), the crossing-aware pass clears overlaps
-  /// the baseline had while adding none. This is the concrete improvement over
-  /// both the baseline (which leaves the overlaps stacked) and the nudge (which
-  /// trades them for X-crossings).
-  @Test("clears clearable overlaps with no crossing where the nudge needs one")
-  func clearsClearableOverlapsWhereTheNudgeAddsCrossings() async throws {
+  /// In the crowded branching and multi-group corridors - where a naive nudge
+  /// could only de-overlap by adding crossings - the crossing-aware pass clears
+  /// overlaps the baseline left stacked while adding none.
+  @Test("clears clearable overlaps without adding a crossing")
+  func clearsClearableOverlapsWithoutAddingCrossings() async throws {
     let baseline = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
       stage: .routePostProcessing,
       with: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
@@ -78,19 +76,12 @@ struct PolicyCanvasClaudeCrossingAwareRouteTests {
       stage: .routePostProcessing,
       with: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
     )
-    let claude = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
-      stage: .routePostProcessing,
-      with: PolicyCanvasAlgorithmDefaults.claudeCrossingAwareRouteProcessing
-    )
     for sampleID in ["branching", "multi-group"] {
       let base = try await routedScene(sampleID: sampleID, selection: baseline)
-      let nudge = try await routedScene(sampleID: sampleID, selection: nudged)
-      let after = try await routedScene(sampleID: sampleID, selection: claude)
+      let after = try await routedScene(sampleID: sampleID, selection: nudged)
       let baseOverlaps = interiorOverlapPairs(routes: base.routes, edges: base.edges)
       let afterOverlaps = interiorOverlapPairs(routes: after.routes, edges: after.edges)
       let baseCrossings = Set(crossingPairs(routes: base.routes, edges: base.edges))
-      let nudgeAdded = Set(crossingPairs(routes: nudge.routes, edges: nudge.edges))
-        .subtracting(baseCrossings)
       let afterAdded = Set(crossingPairs(routes: after.routes, edges: after.edges))
         .subtracting(baseCrossings)
       #expect(
@@ -101,10 +92,6 @@ struct PolicyCanvasClaudeCrossingAwareRouteTests {
         afterAdded.isEmpty,
         "\(sampleID): the crossing-aware pass added crossings \(afterAdded.sorted())"
       )
-      #expect(
-        !nudgeAdded.isEmpty,
-        "\(sampleID): expected the nudge to add a crossing here so the comparison is meaningful"
-      )
     }
   }
 
@@ -114,9 +101,9 @@ struct PolicyCanvasClaudeCrossingAwareRouteTests {
   /// produce byte-identical routes under the preset.
   @Test("routing under the preset is independent of edge input order")
   func deterministicAcrossEdgeOrder() async throws {
-    let claude = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
+    let nudged = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
       stage: .routePostProcessing,
-      with: PolicyCanvasAlgorithmDefaults.claudeCrossingAwareRouteProcessing
+      with: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
     )
     let sample = try #require(PolicyCanvasLabSamples.sample(id: "multi-group"))
     let document =
@@ -132,7 +119,7 @@ struct PolicyCanvasClaudeCrossingAwareRouteTests {
         edges: edges,
         fontScale: 1,
         routingHints: viewModel.routingHints,
-        algorithmSelection: claude
+        algorithmSelection: nudged
       )
       return await PolicyCanvasRouteWorker().compute(input: input).routes
     }

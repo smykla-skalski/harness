@@ -59,11 +59,23 @@ extension PolicyCanvasPreparedRouteInput {
       input: PolicyCanvasLabelPlacementInput(prepared: self, routes: routes)
     )
     let visibleBounds = visibleBounds(routes: routes, labelPositions: labelPositions)
+    // Refit the port markers to the post-processed routes. The converged layout
+    // (routeState.portMarkerLayout) is fitted to the pre-post-process routes;
+    // collinear compression barely moves them so it stays aligned, but the
+    // crossing-aware nudge spreads a fan into parallel lanes, so its dots must be
+    // refitted to the final geometry or a terminal lands off its dot.
+    let portMarkerLayout = algorithms.portMarkerPlacement.placeMarkers(
+      input: PolicyCanvasPortMarkerPlacementInput(
+        prepared: self,
+        routes: routes,
+        nodeIndex: nodeIndex
+      )
+    )
     return PolicyCanvasPreparedRouteComputation(
       routes: routes,
       labelPositions: labelPositions,
       portVisibility: portVisibility(routes: routes, nodeIndex: nodeIndex),
-      portMarkerLayout: routeState.portMarkerLayout,
+      portMarkerLayout: portMarkerLayout,
       visibleBounds: visibleBounds
     )
   }
