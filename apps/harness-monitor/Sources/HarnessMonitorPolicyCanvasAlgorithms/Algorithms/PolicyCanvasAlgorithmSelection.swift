@@ -202,6 +202,9 @@ enum PolicyCanvasAlgorithmDefaults {
   static let collinearRouteCompression = PolicyCanvasAlgorithmID(
     "collinear-route-compression"
   )
+  static let orthogonalNudgedRouteProcessing = PolicyCanvasAlgorithmID(
+    "orthogonal-nudged-route-processing"
+  )
   static let obstacleAwareGreedyLabelPlacement = PolicyCanvasAlgorithmID(
     "obstacle-aware-greedy-label-placement"
   )
@@ -325,7 +328,8 @@ enum PolicyCanvasAlgorithmDefaults {
         option(firstFeasibleRouteSelection, "First Feasible Route Selection")
       ],
       .routePostProcessing: [
-        option(collinearRouteCompression, "Collinear Route Compression")
+        option(orthogonalNudgedRouteProcessing, "Orthogonal Nudged Route Processing"),
+        option(collinearRouteCompression, "Collinear Route Compression"),
       ],
       .labelPlacement: [
         option(obstacleAwareGreedyLabelPlacement, "Obstacle-Aware Greedy Label Placement"),
