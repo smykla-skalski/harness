@@ -2,24 +2,32 @@ import CoreGraphics
 
 /// Crossing, overlap, and body-hit metrics for the crossing-aware post-process.
 ///
-/// The proper-cross predicate mirrors the fan-in channel gate exactly - a
-/// horizontal segment's interior cut by a vertical segment's interior at 0.5pt
-/// tolerance - so a candidate lane assignment is scored against the same crossing
-/// count the gate measures. Overlap counts interior collinear stacks past the
-/// gate's 8pt threshold; body hits count routes whose segments cross a node or
-/// group-title frame. The pass uses these to reject any lane shift that would add
-/// a crossing or a body hit while clearing an overlap.
+/// Scoring is *local*. Shifting one channel can only change the crossings and
+/// overlaps of pairs that involve that channel's edges - every pair that excludes
+/// the channel is byte-identical across all of its candidate placements. So a
+/// candidate is scored against just the moved edges (one another plus the fixed
+/// rest), which orders placements exactly as a full-scene rescore would, at a
+/// fraction of the cost. The proper-cross predicate mirrors the fan-in channel
+/// gate exactly - a horizontal segment's interior cut by a vertical segment's
+/// interior at 0.5pt tolerance. Overlap counts interior collinear stacks past the
+/// gate's 8pt threshold; body hits count routes whose segments cut a node or
+/// group-title frame. The pass rejects any shift that adds a crossing or a body
+/// hit not already present in the pre-spread baseline.
 enum PolicyCanvasClaudeRouteMetrics {
-  struct Snapshot {
+  /// The pre-spread routing the result is measured against: the crossing pairs
+  /// that already existed (keyed `lowerID|higherID`) and the edges whose route
+  /// already cut a node or group-title body. A spread is kept only if it adds
+  /// neither a crossing nor a body hit beyond this set.
+  struct Baseline {
     let crossings: Set<String>
-    let overlapPairs: Int
-    let bodyHits: Int
+    let bodyHitEdges: Set<String>
   }
 
-  /// Lexicographic penalty of a candidate spread versus the pre-spread base: never
-  /// add a body hit, then never add a crossing, then minimise interior overlaps.
-  /// `isLower` is the comparison the spread search uses to pick the best placement.
-  struct Penalty {
+  /// Penalty of one channel placement, scored only over pairs that involve the
+  /// channel's edges. Lexicographic: never add a body hit, then never add a
+  /// crossing, then minimise interior overlaps. `isLower` is the comparison the
+  /// spread search uses to pick the best placement.
+  struct LocalPenalty {
     let addedBodyHits: Int
     let addedCrossings: Int
     let overlapPairs: Int
@@ -35,60 +43,149 @@ enum PolicyCanvasClaudeRouteMetrics {
     }
   }
 
-  private struct RouteEntry {
+  struct RouteEntry {
     let id: String
     let points: [CGPoint]
+    /// Interior segments (stubs dropped) used for overlap scoring.
     let interior: [PolicyCanvasRouteSegment]
+    /// All segments including the port stubs, cached so the channel-band prune can
+    /// test a route without rebuilding its polyline each time it is consulted.
+    let segments: [PolicyCanvasRouteSegment]
+    /// Bounding box of the whole polyline. Two routes can only cross or overlap
+    /// where their boxes meet, so this prunes far-apart pairs before the segment
+    /// test - a route outside the shifting channel's band cannot interact with it.
+    let bounds: CGRect
   }
 
-  static func snapshot(
+  static func entry(id: String, points: [CGPoint]) -> RouteEntry {
+    let segments = policyCanvasRouteSegments(
+      PolicyCanvasEdgeRoute(points: points, labelPosition: .zero)
+    )
+    let bounds = points.reduce(CGRect.null) { $0.union(CGRect(origin: $1, size: .zero)) }
+    return RouteEntry(
+      id: id,
+      points: points,
+      interior: Array(segments.dropFirst().dropLast()),
+      segments: segments,
+      bounds: bounds
+    )
+  }
+
+  /// Whether any of a route's segments enters `rect`, mirroring the obstacle
+  /// intersection test but reading the entry's cached segments directly.
+  static func segmentsEnter(_ entry: RouteEntry, _ rect: CGRect) -> Bool {
+    entry.segments.contains { segment in
+      if segment.isHorizontal {
+        let low = min(segment.start.x, segment.end.x)
+        let high = max(segment.start.x, segment.end.x)
+        return rect.minY < segment.start.y && rect.maxY > segment.start.y
+          && max(0, min(high, rect.maxX) - max(low, rect.minX)) > 0.001
+      }
+      if segment.isVertical {
+        let low = min(segment.start.y, segment.end.y)
+        let high = max(segment.start.y, segment.end.y)
+        return rect.minX < segment.start.x && rect.maxX > segment.start.x
+          && max(0, min(high, rect.maxY) - max(low, rect.minY)) > 0.001
+      }
+      return false
+    }
+  }
+
+  /// Build the once-per-spread baseline: every existing crossing pair and every
+  /// body-hitting edge in the pre-spread routing. O(routes^2) but computed a
+  /// single time, not per candidate placement.
+  static func baseline(
     of pointsByEdge: [String: [CGPoint]],
-    obstacles: [CGRect],
-    overlapThreshold: CGFloat
-  ) -> Snapshot {
-    let ordered = pointsByEdge.keys.sorted()
-    var routes: [RouteEntry] = []
-    var bodyHits = 0
-    for id in ordered {
-      guard let points = pointsByEdge[id] else {
-        continue
-      }
-      let route = PolicyCanvasEdgeRoute(points: points, labelPosition: .zero)
-      let segments = policyCanvasRouteSegments(route)
-      routes.append(
-        RouteEntry(id: id, points: points, interior: Array(segments.dropFirst().dropLast()))
-      )
-      if policyCanvasRouteIntersectsObstacles(route, obstacles: obstacles) {
-        bodyHits += 1
-      }
+    obstacles: [CGRect]
+  ) -> Baseline {
+    let entries = pointsByEdge.keys.sorted().compactMap { id in
+      pointsByEdge[id].map { entry(id: id, points: $0) }
     }
     var crossings: Set<String> = []
-    var overlapPairs = 0
-    for left in routes.indices {
-      for right in routes.index(after: left)..<routes.endIndex {
-        if properlyCross(routes[left].points, routes[right].points) {
-          crossings.insert("\(routes[left].id)|\(routes[right].id)")
-        }
-        let overlap = maximumInteriorOverlap(routes[left].interior, routes[right].interior)
-        if overlap > overlapThreshold {
-          overlapPairs += 1
-        }
+    var bodyHitEdges: Set<String> = []
+    for left in entries.indices {
+      let route = PolicyCanvasEdgeRoute(points: entries[left].points, labelPosition: .zero)
+      if policyCanvasRouteIntersectsObstacles(route, obstacles: obstacles) {
+        bodyHitEdges.insert(entries[left].id)
+      }
+      for right in entries.index(after: left)..<entries.endIndex
+      where properlyCross(entries[left].points, entries[right].points) {
+        crossings.insert(crossingKey(entries[left].id, entries[right].id))
       }
     }
-    return Snapshot(crossings: crossings, overlapPairs: overlapPairs, bodyHits: bodyHits)
+    return Baseline(crossings: crossings, bodyHitEdges: bodyHitEdges)
   }
 
-  /// Lexicographic penalty of a candidate versus the pre-spread base: added body
-  /// hits first (never trade a clean route into a node), then added crossings,
-  /// then the absolute interior-overlap pair count. Lower wins; the zero-shift
-  /// option is the floor, so a channel can be left stacked but never regressed
-  /// into a new crossing or body hit.
-  static func penalty(of candidate: Snapshot, base: Snapshot) -> Penalty {
-    Penalty(
-      addedBodyHits: max(0, candidate.bodyHits - base.bodyHits),
-      addedCrossings: candidate.crossings.subtracting(base.crossings).count,
-      overlapPairs: candidate.overlapPairs
+  /// Per-channel scoring invariants: the routes that stay fixed, the obstacles near
+  /// the channel band, the pre-spread baseline, and the overlap threshold. Bundled
+  /// so the placement scorers take one context instead of a long parameter list.
+  struct Scoring {
+    let fixed: [RouteEntry]
+    let obstacles: [CGRect]
+    let baseline: Baseline
+    let overlapThreshold: CGFloat
+  }
+
+  /// Score a candidate placement of one channel: build the moved edges' entries
+  /// and test them against the fixed rest and one another, counting crossings and
+  /// body hits not already in the baseline plus the interior overlaps that remain.
+  static func localPenalty(
+    channelEdges: [String],
+    pointsByEdge: [String: [CGPoint]],
+    scoring: Scoring
+  ) -> LocalPenalty {
+    let moved = channelEdges.compactMap { id in
+      pointsByEdge[id].map { entry(id: id, points: $0) }
+    }
+    var addedBodyHits = 0
+    for movedEntry in moved where !scoring.baseline.bodyHitEdges.contains(movedEntry.id) {
+      let route = PolicyCanvasEdgeRoute(points: movedEntry.points, labelPosition: .zero)
+      if policyCanvasRouteIntersectsObstacles(route, obstacles: scoring.obstacles) {
+        addedBodyHits += 1
+      }
+    }
+    var addedCrossings = 0
+    var overlapPairs = 0
+    for index in moved.indices {
+      for rightIndex in moved.index(after: index)..<moved.endIndex {
+        accumulate(
+          moved[index], moved[rightIndex], scoring: scoring,
+          addedCrossings: &addedCrossings, overlapPairs: &overlapPairs
+        )
+      }
+      for fixedEntry in scoring.fixed {
+        accumulate(
+          moved[index], fixedEntry, scoring: scoring,
+          addedCrossings: &addedCrossings, overlapPairs: &overlapPairs
+        )
+      }
+    }
+    return LocalPenalty(
+      addedBodyHits: addedBodyHits, addedCrossings: addedCrossings, overlapPairs: overlapPairs
     )
+  }
+
+  private static func accumulate(
+    _ left: RouteEntry,
+    _ right: RouteEntry,
+    scoring: Scoring,
+    addedCrossings: inout Int,
+    overlapPairs: inout Int
+  ) {
+    if properlyCross(left.points, right.points),
+      !scoring.baseline.crossings.contains(crossingKey(left.id, right.id))
+    {
+      addedCrossings += 1
+    }
+    if maximumInteriorOverlap(left.interior, right.interior) > scoring.overlapThreshold {
+      overlapPairs += 1
+    }
+  }
+
+  /// Order-independent key for an edge pair, matching the order the baseline scan
+  /// inserts crossings (`lowerID|higherID`) so the local subtraction lines up.
+  static func crossingKey(_ left: String, _ right: String) -> String {
+    left < right ? "\(left)|\(right)" : "\(right)|\(left)"
   }
 
   static func maximumInteriorOverlap(

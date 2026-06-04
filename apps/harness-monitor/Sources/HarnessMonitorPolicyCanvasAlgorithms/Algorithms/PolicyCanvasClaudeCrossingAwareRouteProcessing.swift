@@ -52,15 +52,13 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
 
   /// Iteratively spread shared lanes into parallel lanes, choosing for every
   /// channel the spread direction that clears its overlap without introducing an
-  /// orthogonal-axis crossing or a body hit. `base` is the pre-spread routing - the
-  /// crossing/body-hit count the result must never exceed.
+  /// orthogonal-axis crossing or a body hit. `baseline` is the pre-spread routing -
+  /// the crossing/body-hit set the result must never exceed.
   private func spread(
     _ routes: [String: [CGPoint]],
     obstacles: [CGRect]
   ) -> [String: [CGPoint]] {
-    let base = PolicyCanvasClaudeRouteMetrics.snapshot(
-      of: routes, obstacles: obstacles, overlapThreshold: overlapThreshold
-    )
+    let baseline = PolicyCanvasClaudeRouteMetrics.baseline(of: routes, obstacles: obstacles)
     let processor = PolicyCanvasOrthogonalNudgeProcessor(
       obstacles: obstacles,
       fans: PolicyCanvasFanContext.make(from: routes)
@@ -68,6 +66,7 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
     var pointsByEdge = routes
     for _ in 0..<iterations {
       var working = pointsByEdge
+      var entries = entryCache(of: working)
       var applied = false
       let segments = decompose(working)
       for axis in [PolicyCanvasSegmentAxis.horizontal, .vertical] {
@@ -77,8 +76,15 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
           guard !offsets.isEmpty else {
             continue
           }
-          if let chosen = bestSpread(offsets, working: working, obstacles: obstacles, base: base) {
+          if let chosen = bestSpread(
+            offsets, working: working, entries: entries, obstacles: obstacles, baseline: baseline
+          ) {
             working = apply(chosen, to: working)
+            for edgeID in Set(chosen.map { $0.segment.edgeID }) where working[edgeID] != nil {
+              entries[edgeID] = PolicyCanvasClaudeRouteMetrics.entry(
+                id: edgeID, points: working[edgeID] ?? []
+              )
+            }
             applied = true
           }
         }
@@ -91,29 +97,136 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
     return pointsByEdge
   }
 
-  /// Score both spread directions for one channel against the live routing and
-  /// return the better, or nil to leave the channel stacked. The zero-shift state
-  /// is the floor, so a spread is chosen only when it does not add a body hit or a
-  /// crossing over leaving the channel alone - and, among non-regressing options,
-  /// the one that removes the most overlap wins.
+  /// Route entries for every edge, segment-decomposed once per spread iteration.
+  /// `bestSpread` reads the fixed (non-channel) routes from here instead of
+  /// re-decomposing them for each channel; after a channel is applied only its own
+  /// edges' entries are refreshed.
+  private func entryCache(
+    of pointsByEdge: [String: [CGPoint]]
+  ) -> [String: PolicyCanvasClaudeRouteMetrics.RouteEntry] {
+    pointsByEdge.reduce(into: [:]) { cache, element in
+      cache[element.key] = PolicyCanvasClaudeRouteMetrics.entry(
+        id: element.key, points: element.value
+      )
+    }
+  }
+
+  /// Score every candidate placement for one channel and return the best, or nil
+  /// to leave the channel stacked. Only the channel's own edges move, so the rest
+  /// of the scene is built once into `fixed` and each placement is scored locally
+  /// against it - identical ordering to a full-scene rescore, far cheaper. The
+  /// zero-shift state is the floor, so a spread is chosen only when it does not add
+  /// a body hit or a crossing over leaving the channel alone, and among
+  /// non-regressing options the one that removes the most overlap wins.
   private func bestSpread(
     _ offsets: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)],
     working: [String: [CGPoint]],
+    entries: [String: PolicyCanvasClaudeRouteMetrics.RouteEntry],
     obstacles: [CGRect],
-    base: PolicyCanvasClaudeRouteMetrics.Snapshot
+    baseline: PolicyCanvasClaudeRouteMetrics.Baseline
   ) -> [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]? {
-    var chosen: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]?
-    var bestPenalty = penalty(of: working, obstacles: obstacles, base: base)
-    for candidate in placements(from: offsets) {
-      let candidatePenalty = penalty(
-        of: apply(candidate, to: working), obstacles: obstacles, base: base
+    let channelEdges = Set(offsets.map { $0.segment.edgeID })
+    let sortedEdges = channelEdges.sorted()
+    let band = channelBand(offsets: offsets)
+    let fixed = relevantFixed(channelEdges: channelEdges, entries: entries, band: band)
+    // Only obstacles inside the swept band can be newly hit by a shift; an edge
+    // that hits anything outside it already did so before the shift and so sits in
+    // the baseline already, so the body-hit test need not rescan every node frame.
+    let nearbyObstacles = band.map { rect in obstacles.filter { $0.intersects(rect) } } ?? obstacles
+    // Score against only the channel's own points: every placement shifts the same
+    // few edges, so slicing them out of `working` avoids copying the whole route
+    // dictionary per candidate while `localPenalty` reads exactly these ids.
+    let channelPoints = channelEdges.reduce(into: [String: [CGPoint]]()) { slice, id in
+      slice[id] = working[id]
+    }
+    let scoring = PolicyCanvasClaudeRouteMetrics.Scoring(
+      fixed: fixed,
+      obstacles: nearbyObstacles,
+      baseline: baseline,
+      overlapThreshold: overlapThreshold
+    )
+    func localPenalty(
+      of state: [String: [CGPoint]]
+    ) -> PolicyCanvasClaudeRouteMetrics.LocalPenalty {
+      PolicyCanvasClaudeRouteMetrics.localPenalty(
+        channelEdges: sortedEdges,
+        pointsByEdge: state,
+        scoring: scoring
       )
+    }
+    // Zero-shift floor. If the channel already has no overlap, body hit, or added
+    // crossing there is nothing a spread could improve - no placement can score
+    // below an all-zero penalty - so skip the search entirely.
+    let floor = localPenalty(of: channelPoints)
+    guard floor.addedBodyHits > 0 || floor.addedCrossings > 0 || floor.overlapPairs > 0 else {
+      return nil
+    }
+    var chosen: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]?
+    var bestPenalty = floor
+    for candidate in placements(from: offsets) {
+      let candidatePenalty = localPenalty(of: apply(candidate, to: channelPoints))
       if candidatePenalty.isLower(than: bestPenalty) {
         bestPenalty = candidatePenalty
         chosen = candidate
+        // A fully clean placement - no overlap, no added crossing, no body hit - is
+        // optimal; nothing can score below an all-zero penalty, so stop the search.
+        // The first placement to reach it is exactly what a full scan would pick.
+        if candidatePenalty.addedBodyHits == 0, candidatePenalty.addedCrossings == 0,
+          candidatePenalty.overlapPairs == 0
+        {
+          break
+        }
       }
     }
     return chosen
+  }
+
+  /// Fixed (non-channel) routes that could plausibly meet this channel: those whose
+  /// bounding box falls inside the band the channel sweeps across all of its
+  /// candidate placements (its current extent grown by the largest lane shift). A
+  /// route outside that band cannot cross or overlap any placement, so it is
+  /// dropped before the per-placement segment scoring - the cost no longer scales
+  /// with the whole graph, only with the channel's neighbourhood.
+  private func relevantFixed(
+    channelEdges: Set<String>,
+    entries: [String: PolicyCanvasClaudeRouteMetrics.RouteEntry],
+    band: CGRect?
+  ) -> [PolicyCanvasClaudeRouteMetrics.RouteEntry] {
+    let fixed = entries.keys.sorted()
+      .filter { !channelEdges.contains($0) }
+      .compactMap { entries[$0] }
+    guard let band else {
+      return fixed
+    }
+    return fixed.filter { entry in
+      entry.bounds.intersects(band)
+        && PolicyCanvasClaudeRouteMetrics.segmentsEnter(entry, band)
+    }
+  }
+
+  /// The thin band one channel sweeps across all of its placements: the lane it
+  /// sits on grown perpendicular by the largest shift, spanning the segments'
+  /// length. Every crossing or overlap a shift can add or remove lies inside this
+  /// band, so a fixed route none of whose segments enter it scores identically
+  /// under every placement and is dropped - an exact prune, not a bbox guess.
+  private func channelBand(
+    offsets: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]
+  ) -> CGRect? {
+    guard let axis = offsets.first?.segment.axis else {
+      return nil
+    }
+    let reach = (offsets.map { abs($0.offset) }.max() ?? 0) + 2 * laneGap + 1
+    let positions = offsets.map { $0.segment.position }
+    let spanLow = (offsets.map { $0.segment.lowerBound }.min() ?? 0) - reach
+    let spanHigh = (offsets.map { $0.segment.upperBound }.max() ?? 0) + reach
+    let laneLow = (positions.min() ?? 0) - reach
+    let laneHigh = (positions.max() ?? 0) + reach
+    switch axis {
+    case .horizontal:
+      return CGRect(x: spanLow, y: laneLow, width: spanHigh - spanLow, height: laneHigh - laneLow)
+    case .vertical:
+      return CGRect(x: laneLow, y: spanLow, width: laneHigh - laneLow, height: spanHigh - spanLow)
+    }
   }
 
   /// Spread placements to score for one channel: the fan/bus-ordered offsets and
@@ -133,19 +246,6 @@ struct PolicyCanvasClaudeCrossingAwareRouteProcessing: PolicyCanvasRoutePostProc
       }
     }
     return result
-  }
-
-  private func penalty(
-    of pointsByEdge: [String: [CGPoint]],
-    obstacles: [CGRect],
-    base: PolicyCanvasClaudeRouteMetrics.Snapshot
-  ) -> PolicyCanvasClaudeRouteMetrics.Penalty {
-    PolicyCanvasClaudeRouteMetrics.penalty(
-      of: PolicyCanvasClaudeRouteMetrics.snapshot(
-        of: pointsByEdge, obstacles: obstacles, overlapThreshold: overlapThreshold
-      ),
-      base: base
-    )
   }
 
   /// Deterministic channel order so the greedy per-channel choice is independent
