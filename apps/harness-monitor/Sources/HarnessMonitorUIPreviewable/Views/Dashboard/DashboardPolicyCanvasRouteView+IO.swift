@@ -14,7 +14,7 @@ extension DashboardPolicyCanvasRouteView {
       workspace: workspace,
       selectedCanvasId: canvas.canvasId
     )
-    selectedCanvasPreview = preview
+    setCanvasSelectionPreview(preview)
     guard let preview else {
       return
     }
@@ -37,10 +37,10 @@ extension DashboardPolicyCanvasRouteView {
 
   @MainActor
   func clearCanvasSelectionPreview() {
-    guard selectedCanvasPreview != nil else {
+    guard currentCanvasSelectionPreview != nil else {
       return
     }
-    selectedCanvasPreview = nil
+    setCanvasSelectionPreview(nil)
   }
 
   var nextCanvasTitle: String {

@@ -48,8 +48,12 @@ struct DashboardPolicyCanvasRouteView: View {
     }
   }
 
-  var workspace: TaskBoardPolicyCanvasWorkspace? {
-    dashboardUI.taskBoardPolicyCanvasWorkspace
+  var workspace: TaskBoardPolicyCanvasWorkspace? { dashboardUI.taskBoardPolicyCanvasWorkspace }
+
+  var currentCanvasSelectionPreview: DashboardPolicyCanvasSelectionPreview? { selectedCanvasPreview }
+
+  func setCanvasSelectionPreview(_ preview: DashboardPolicyCanvasSelectionPreview?) {
+    selectedCanvasPreview = preview
   }
 
   private var detailUsesLiveCanvas: Bool {
@@ -61,9 +65,7 @@ struct DashboardPolicyCanvasRouteView: View {
       || dashboardUI.taskBoardPolicyCanvasWorkspace != nil
   }
 
-  private var isCanvasMutationDisabled: Bool {
-    dashboardUI.isBusy || store.isDaemonActionInFlight
-  }
+  private var isCanvasMutationDisabled: Bool { dashboardUI.isBusy || store.isDaemonActionInFlight }
 
   private var refreshTaskID: DashboardPolicyCanvasRefreshTaskID {
     DashboardPolicyCanvasRefreshTaskID(

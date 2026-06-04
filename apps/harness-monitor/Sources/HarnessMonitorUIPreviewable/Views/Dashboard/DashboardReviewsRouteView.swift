@@ -2,7 +2,7 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
-enum DashboardReviewsContentDetailWidthRestoration {
+enum DashboardReviewsDetailWidthStorage {
   static let storageKey = "dashboard.reviews.content-detail-width"
   static let defaultWidth = SessionContentDetailSplitLayout.defaultContentWidth
 }
@@ -54,8 +54,8 @@ struct DashboardReviewsRouteView: View {
   var collapsedRepositoriesStorage = ""
   @SceneStorage("dashboard.reviews.collapsed-secondary-queues")
   var collapsedSecondaryQueuesStorage = ""
-  @AppStorage(DashboardReviewsContentDetailWidthRestoration.storageKey)
-  var contentDetailWidth = DashboardReviewsContentDetailWidthRestoration.defaultWidth
+  @AppStorage(DashboardReviewsDetailWidthStorage.storageKey)
+  var contentDetailWidth = DashboardReviewsDetailWidthStorage.defaultWidth
   @SceneStorage("dashboard.reviews.problem-checks-only")
   var showsProblemChecksOnly = false
   @SceneStorage("dashboard.reviews.detail-mode")
@@ -100,17 +100,6 @@ struct DashboardReviewsRouteView: View {
     )
   }
 
-  var reloadTaskKey: DashboardReviewsReloadTaskKey {
-    DashboardReviewsReloadTaskKey(
-      preferencesSignature: routeResolvedPreferences.cacheHash,
-      isConnected: isReviewsReloadConnected(store.connectionState)
-    )
-  }
-
-  var normalizedPreferences: DashboardReviewsPreferences {
-    routeResolvedPreferences.preferences
-  }
-
   var routeStateStorage: DashboardReviewsRouteViewState {
     routeState
   }
@@ -119,78 +108,8 @@ struct DashboardReviewsRouteView: View {
     reviewsPreferencesStore
   }
 
-  var groupMode: DashboardReviewsGroupMode {
-    DashboardReviewsGroupMode(rawValue: groupModeRaw) ?? .repository
-  }
-
-  var listPresentationInput: DashboardReviewsListPresentationInput {
-    let preferences = routeResolvedPreferences
-    return DashboardReviewsListPresentationInput(
-      items: routeResponse.items,
-      itemsVersion: routeResponseItemsVersion,
-      filterModeRaw: filterModeRaw,
-      sortModeRaw: sortModeRaw,
-      groupModeRaw: groupModeRaw,
-      categoryModeRaw: categoryModeRaw,
-      searchText: searchText,
-      configuredRepositories: preferences.repositories,
-      configuredOrganizations: preferences.organizations,
-      configuredAuthors: preferences.authors,
-      pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs,
-      pinnedRepositoryIDs: routePinnedRepositories.repositoryIDs,
-      snoozedPullRequests: routeSnoozedPullRequests,
-      needsMeOn: needsMeOn,
-      dependenciesOnlyOn: dependenciesOnlyOn,
-      showSnoozedOnly: showSnoozedOnly,
-      viewerLogin: routeResponse.viewerLogin
-    )
-  }
-
-  var presentationTaskID: DashboardReviewsPresentationTaskID {
-    DashboardReviewsPresentationTaskID(
-      itemsVersion: routeResponseItemsVersion,
-      filterModeRaw: filterModeRaw,
-      sortModeRaw: sortModeRaw,
-      groupModeRaw: groupModeRaw,
-      categoryModeRaw: categoryModeRaw,
-      searchText: searchText,
-      preferencesSignature: routeResolvedPreferences.cacheHash,
-      pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs,
-      pinnedRepositoryIDs: routePinnedRepositories.repositoryIDs,
-      snoozedPullRequests: routeSnoozedPullRequests,
-      needsMeOn: needsMeOn,
-      dependenciesOnlyOn: dependenciesOnlyOn,
-      showSnoozedOnly: showSnoozedOnly,
-      viewerLogin: routeResponse.viewerLogin
-    )
-  }
-
-  var presentationSelectionID: DashboardReviewsPresentationSelectionID {
-    DashboardReviewsPresentationSelectionID(
-      selectedIDs: routeSelectedIDs,
-      persistedPrimarySelectionID: persistedPrimarySelectionID,
-      sortModeRaw: sortModeRaw
-    )
-  }
-
-  var filteredItems: [ReviewItem] {
-    routeCachedPresentation.filteredItems
-  }
-
-  var groupedItems: [DashboardReviewsRepositoryGroup] {
-    routeCachedPresentation.groupedItems
-  }
-
-  var selectedItems: [ReviewItem] {
-    routeCachedPresentation.selectedItems
-  }
-
-  var primaryDetailItem: ReviewItem? {
-    routeCachedPresentation.primaryDetailItem
-  }
-
-  var relativeUpdatedLabels: [String: String] {
-    routeCachedPresentation.relativeUpdatedLabels
+  var routeOpenAnythingReviews: OpenAnythingDashboardReviewRegistry {
+    openAnythingReviews
   }
 
   var body: some View {
@@ -384,56 +303,5 @@ struct DashboardReviewsRouteView: View {
         routeSelectedIDs = [pullRequestID]
       }
       .harnessFocusedSceneValue(\.dashboardReviewsCommands, reviewCommandFocus)
-  }
-
-  private func applyPendingReviewSelectionIfNeeded() {
-    guard let request = openAnythingReviews.selectionRequest else { return }
-    // The selector may be a node-id `pullRequestID` (Open Anything) or a
-    // deep-link slug ("owner/repo#number") from a `harness://` link. Resolve to
-    // the loaded item so every downstream selection keys on the node id.
-    guard
-      let resolvedID = routeResponse.items
-        .first(where: { $0.matchesDeepLinkSelector(request.pullRequestID) })?
-        .pullRequestID
-    else {
-      return
-    }
-    // A deep link that names a file drives a deliberate jump through the
-    // navigation history: it pushes one entry and arms the reviews restore
-    // request, which switches into Files mode and applies the file + line
-    // range. Without a history (previews/tests) fall back to PR-only selection.
-    if let filePath = request.filePath, !filePath.isEmpty,
-      let windowNavigationHistory
-    {
-      windowNavigationHistory.requestReviewsFileJump(
-        DashboardReviewsHistorySelection(
-          selectedPullRequestIDs: [resolvedID],
-          primaryPullRequestID: resolvedID,
-          detailMode: .files,
-          selectedFilePath: filePath,
-          lineSelection: request.lineSelection
-        )
-      )
-      openAnythingReviews.finishSelection(requestID: request.requestID)
-      return
-    }
-    routeSelectedIDs = [resolvedID]
-    persistedPrimarySelectionID = resolvedID
-    openAnythingReviews.finishSelection(requestID: request.requestID)
-  }
-
-  // Legacy filter values - `"blocked"` filter and `"dependencies"` category -
-  // migrate once per session to the new toggle-based flags.
-  private func applyLegacyFilterMigrationIfNeeded() {
-    guard !routeState.legacyFilterMigrationApplied else { return }
-    routeState.legacyFilterMigrationApplied = true
-    if filterModeRaw == "blocked" {
-      needsMeOn = true
-      filterModeRaw = DashboardReviewsFilterMode.all.rawValue
-    }
-    if categoryModeRaw == DashboardReviewsCategoryMode.dependencies.rawValue {
-      dependenciesOnlyOn = true
-      categoryModeRaw = DashboardReviewsCategoryMode.defaultMode.rawValue
-    }
   }
 }
