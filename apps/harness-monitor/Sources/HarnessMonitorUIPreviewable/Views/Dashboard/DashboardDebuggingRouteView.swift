@@ -297,9 +297,7 @@ struct DashboardDebuggingRouteView: View {
   private func clearRecentImages() {
     recentImages = recentStore.clear()
   }
-
 }
-
 extension DashboardDebuggingRouteView {
   fileprivate var ocrSection: some View {
     DashboardDiagnosticsSection(title: "OCR") {
@@ -373,9 +371,6 @@ extension DashboardDebuggingRouteView {
     }
   }
 
-  // actionRow and resultList read/write the view's @State, so they stay in the
-  // same file as that state (SwiftLint's private_swiftui_state keeps @State
-  // private, unreachable from a cross-file extension).
   var actionRow: some View {
     HarnessMonitorWrapLayout(
       spacing: HarnessMonitorTheme.spacingSM,

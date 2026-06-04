@@ -1,5 +1,4 @@
 import Foundation
-
 extension HarnessMonitorStore {
   nonisolated static func loadTaskBoardPolicyPipelineSnapshot(
     using client: any HarnessMonitorClientProtocol,
@@ -50,7 +49,6 @@ extension HarnessMonitorStore {
       )
       return
     }
-
     async let pipeline = Self.loadTaskBoardPolicyPipelineSnapshot(using: client)
     async let audit = loadTaskBoardPolicyAudit(using: client)
     let measuredPipeline = await pipeline
@@ -130,7 +128,6 @@ extension HarnessMonitorStore {
       return nil
     }
   }
-
   nonisolated public static func saveTaskBoardPolicyPipelineDraft(
     using client: any HarnessMonitorClientProtocol,
     canvasId: String,
@@ -143,7 +140,6 @@ extension HarnessMonitorStore {
       )
     )
   }
-
   @discardableResult
   public func adoptTaskBoardPolicyPipelineSaveResponse(
     _ response: TaskBoardPolicyPipelineSaveDraftResponse
@@ -170,7 +166,6 @@ extension HarnessMonitorStore {
     }
     return response.document
   }
-
   @discardableResult
   public func simulateTaskBoardPolicyPipeline(
     document: TaskBoardPolicyPipelineDocument? = nil
@@ -208,7 +203,6 @@ extension HarnessMonitorStore {
       return false
     }
   }
-
   @discardableResult
   public func promoteTaskBoardPolicyPipeline(revision: UInt64) async -> Bool {
     guard let client else {
@@ -242,7 +236,6 @@ extension HarnessMonitorStore {
       return false
     }
   }
-
   nonisolated func loadTaskBoardPolicyAudit(
     using client: any HarnessMonitorClientProtocol,
     canvasId: String? = nil
@@ -257,7 +250,6 @@ extension HarnessMonitorStore {
       return nil
     }
   }
-
   @discardableResult
   public func createTaskBoardPolicyCanvas(title: String? = nil) async -> Bool {
     guard let client else {
@@ -283,7 +275,6 @@ extension HarnessMonitorStore {
       return false
     }
   }
-
   @discardableResult
   public func duplicateTaskBoardPolicyCanvas(
     canvasId: String,
@@ -312,7 +303,6 @@ extension HarnessMonitorStore {
       return false
     }
   }
-
   @discardableResult
   public func renameTaskBoardPolicyCanvas(
     canvasId: String,
@@ -337,7 +327,6 @@ extension HarnessMonitorStore {
       return false
     }
   }
-
   @discardableResult
   public func activateTaskBoardPolicyCanvas(canvasId: String) async -> Bool {
     guard let client else {
@@ -363,7 +352,6 @@ extension HarnessMonitorStore {
       return false
     }
   }
-
   @discardableResult
   public func deleteTaskBoardPolicyCanvas(canvasId: String) async -> Bool {
     guard let client else {
@@ -390,7 +378,6 @@ extension HarnessMonitorStore {
       return false
     }
   }
-
   @discardableResult
   public func toggleTaskBoardPolicyCanvasEnforcement() async -> Bool {
     guard let client else {
@@ -421,5 +408,4 @@ extension HarnessMonitorStore {
       return false
     }
   }
-
 }
