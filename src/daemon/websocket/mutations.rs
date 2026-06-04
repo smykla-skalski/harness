@@ -3,6 +3,8 @@ use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 
+mod request_parts;
+
 use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::http::{DaemonHttpState, error_status_and_body};
@@ -14,44 +16,8 @@ use crate::daemon::service;
 use crate::errors::CliError;
 
 use super::frames::{error_response, error_response_with_payload, ok_response};
-use super::params::{extract_session_agent_id, extract_session_id, extract_string_param};
-
-#[derive(Debug, Clone, Copy)]
-enum ActorBinding {
-    ControlPlane,
-    Preserve,
-}
-
-impl ActorBinding {
-    fn apply(self, params: &mut Value) {
-        if matches!(self, Self::ControlPlane) {
-            bind_control_plane_actor_value(params);
-        }
-    }
-}
-
-fn task_mutation_request_parts(
-    request: &WsRequest,
-    actor_binding: ActorBinding,
-) -> Result<(String, String, Value), Box<WsResponse>> {
-    let Some(session_id) = extract_session_id(&request.params) else {
-        return Err(Box::new(error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing session_id",
-        )));
-    };
-    let Some(task_id) = extract_string_param(&request.params, "task_id") else {
-        return Err(Box::new(error_response(
-            &request.id,
-            "MISSING_PARAM",
-            "missing task_id",
-        )));
-    };
-    let mut params = request.params.clone();
-    actor_binding.apply(&mut params);
-    Ok((session_id, task_id, params))
-}
+use super::params::{extract_session_agent_id, extract_session_id};
+use request_parts::{ActorBinding, task_mutation_request_parts};
 
 pub(crate) fn dispatch_query<T: serde::Serialize>(
     request_id: &str,
