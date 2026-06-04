@@ -12,11 +12,6 @@ public struct PolicyCanvasLabWindowView: View {
   @State private var allowsEmptyLiveSnapshot: Bool
   @State private var sampleSelection: PolicyCanvasLabSelection
   @State private var algorithmSelection: PolicyCanvasAlgorithmSelection
-  // Off by default: the algorithm work is on the bare node + edge graph. The
-  // group band layout is the structural cause of most overlaps and forced
-  // crossings, so the lab renders group-free until that work lands. Flip the
-  // toolbar toggle to see the grouped layout.
-  @State private var includesGroupsInLayout = false
   @AppStorage(PolicyCanvasLabThemeDefaults.modeKey)
   private var windowThemeMode = PolicyCanvasLabThemeMode.defaultValue
 
@@ -126,10 +121,7 @@ public struct PolicyCanvasLabWindowView: View {
   }
 
   private var renderedPolicyDocument: TaskBoardPolicyPipelineDocument? {
-    PolicyCanvasLabSnapshotSupport.document(
-      displayedSnapshot.document,
-      includesGroups: includesGroupsInLayout
-    )
+    displayedSnapshot.document
   }
 
   public var body: some View {
@@ -145,9 +137,6 @@ public struct PolicyCanvasLabWindowView: View {
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         samplePicker
-      }
-      ToolbarItem(placement: .primaryAction) {
-        PolicyCanvasLabGroupsToggle(includesGroupsInLayout: $includesGroupsInLayout)
       }
       ToolbarItem(placement: .primaryAction) {
         PolicyCanvasLabAlgorithmPresetPicker(algorithmSelection: $algorithmSelection)
