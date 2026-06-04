@@ -253,6 +253,9 @@ public struct PolicyCanvasLabToolbarTextMenuLabel: View {
   @ScaledMetric(relativeTo: .callout)
   private var itemSpacing = 6.0
 
+  @ScaledMetric(relativeTo: .callout)
+  private var horizontalContentPadding = 6.0
+
   public var body: some View {
     HStack(spacing: itemSpacing) {
       Text(title)
@@ -263,5 +266,6 @@ public struct PolicyCanvasLabToolbarTextMenuLabel: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityHidden(true)
     }
+    .padding(.horizontal, horizontalContentPadding)
   }
 }
