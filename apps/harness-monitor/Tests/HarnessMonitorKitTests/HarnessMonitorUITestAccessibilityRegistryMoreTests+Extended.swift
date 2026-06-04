@@ -107,7 +107,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
     let sessionToolbar = try sourceFile(named: "SessionWindowToolbar.swift")
     let settingsView = try sourceFile(named: "SettingsView.swift")
-    let policyCanvasLab = try sourceFile(named: "PolicyCanvasLabWindowView.swift")
+    let policyCanvasLabSources = try sourceFiles(pathContaining: "PolicyCanvasLab")
 
     #expect(killSwitchToolbar.contains("ToolbarItemGroup(placement: .primaryAction)"))
     #expect(!killSwitchToolbar.contains(".buttonStyle(.glass)"))
@@ -162,7 +162,11 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
         """
       )
     )
-    #expect(!policyCanvasLab.contains("PolicyEnforcementKillSwitchToolbarGroup(store: store)"))
+    #expect(
+      policyCanvasLabSources.allSatisfy {
+        !$0.contains("PolicyEnforcementKillSwitchToolbarGroup(store: store)")
+      }
+    )
   }
 
   @Test("Passive task-drop borders stay static while targeted feedback owns animation")

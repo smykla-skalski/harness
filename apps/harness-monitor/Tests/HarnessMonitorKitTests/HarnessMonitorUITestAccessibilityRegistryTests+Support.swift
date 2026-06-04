@@ -37,6 +37,10 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
   func sourceFile(named name: String) throws -> String {
     try accessibilityRegistrySourceFile(named: name)
   }
+
+  func sourceFiles(pathContaining fragment: String) throws -> [String] {
+    try accessibilityRegistrySourceFiles(pathContaining: fragment)
+  }
 }
 
 private func accessibilityRegistrySourceFile(named name: String) throws -> String {
@@ -78,6 +82,11 @@ private func accessibilityRegistrySourceFile(named name: String) throws -> Strin
   return try String(contentsOf: resolvedURL, encoding: .utf8)
 }
 
+private func accessibilityRegistrySourceFiles(pathContaining fragment: String) throws -> [String] {
+  try accessibilityRegistryMatchingSourceURLs(pathContaining: fragment)
+    .map { try String(contentsOf: $0, encoding: .utf8) }
+}
+
 private func accessibilityRegistrySourceRoots() -> [URL] {
   let repoRoot = accessibilityRegistryRepoRoot()
   return [
@@ -91,6 +100,23 @@ private func accessibilityRegistrySourceRoots() -> [URL] {
       "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
     ),
   ]
+}
+
+private func accessibilityRegistryMatchingSourceURLs(pathContaining fragment: String) -> [URL] {
+  let sourceRoots = accessibilityRegistrySourceRoots()
+  let matches =
+    sourceRoots.flatMap { sourceRoot in
+      FileManager.default.enumerator(
+        at: sourceRoot,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles]
+      )?
+      .compactMap { element -> URL? in
+        guard let url = element as? URL else { return nil }
+        return url.path.contains(fragment) ? url : nil
+      } ?? []
+    }
+  return Array(Set(matches)).sorted { $0.path < $1.path }
 }
 
 private func accessibilityRegistryRepoRoot() -> URL {
