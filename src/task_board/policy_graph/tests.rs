@@ -9,16 +9,16 @@ use crate::task_board::policy::{
 };
 
 use super::{
-    DEFAULT_POLICY_CANVAS_TITLE, GraphPolicyGate, MANUAL_OCR_PASTE_CANVAS_TITLE, PORT_IMAGE,
-    PORT_IN, PORT_TEXT, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace,
-    PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
-    PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphMode, PolicyGraphNode,
-    PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphOCRConfiguration,
-    PolicyGraphReviewPullRequestExtraction, PolicyGraphValidationIssue,
-    PolicyPipelinePromoteRequest, PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
-    REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE, REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
-    apply_create, apply_delete, apply_duplicate, apply_import, apply_promote, apply_rename,
-    apply_save_draft, apply_set_active, apply_simulate, apply_toggle_enforcement,
+    DEFAULT_POLICY_CANVAS_TITLE, GraphPolicyGate, MANUAL_OCR_PASTE_CANVAS_TITLE, PORT_IN,
+    PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace, PolicyEvidencePredicate,
+    PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge, PolicyGraphEdgeCondition,
+    PolicyGraphGroup, PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
+    PolicyGraphOCRConfiguration, PolicyGraphReviewPullRequestExtraction,
+    PolicyGraphValidationIssue, PolicyPipelinePromoteRequest, PolicyWaitCondition, PolicyWaitStep,
+    PolicyWorkflowEntry, REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE,
+    REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE, apply_create, apply_delete, apply_duplicate,
+    apply_import, apply_promote, apply_rename, apply_save_draft, apply_set_active, apply_simulate,
+    apply_toggle_enforcement,
 };
 
 const NODE_WIDTH: i32 = 168;
@@ -26,6 +26,8 @@ const NODE_HEIGHT: i32 = 96;
 
 #[path = "tests_workspace.rs"]
 mod canvas_workspace;
+#[path = "tests_hub.rs"]
+mod hub_routing;
 #[path = "tests_routing.rs"]
 mod if_then_else_routing;
 #[path = "tests_persistence.rs"]
@@ -302,77 +304,6 @@ fn seeded_workspace_is_valid_and_contains_seeded_canvases() {
 }
 
 #[test]
-fn hub_validation_rejects_incompatible_fanout_payload() {
-    let mut graph = manual_ocr_hub_graph();
-    graph.nodes.push(PolicyGraphNode {
-        id: "review-sink".to_owned(),
-        label: "Copy PR list".to_owned(),
-        kind: PolicyGraphNodeKind::CopyReviewPullRequestList,
-        automation: Some(PolicyGraphAutomationBinding {
-            is_enabled: true,
-            event_source: "manualOCRPaste".to_owned(),
-            priority: None,
-            content_kinds: Vec::new(),
-            preprocessors: Vec::new(),
-            actions: vec!["copyReviewPullRequestList".to_owned()],
-            postprocessors: Vec::new(),
-            source_app_mode: "allExceptDenied".to_owned(),
-            allowed_bundle_identifiers: Vec::new(),
-            denied_bundle_identifiers: Vec::new(),
-            ocr_configuration: None,
-            review_pull_request_extraction: None,
-        }),
-        input_ports: vec![PORT_IN.to_owned()],
-        output_ports: Vec::new(),
-        group_id: None,
-    });
-    graph.edges.push(PolicyGraphEdge {
-        id: "edge:hub-review-sink".to_owned(),
-        from_node: "hub".to_owned(),
-        from_port: "out_3".to_owned(),
-        to_node: "review-sink".to_owned(),
-        to_port: PORT_IN.to_owned(),
-        label: None,
-        condition: PolicyGraphEdgeCondition::Always,
-    });
-
-    let report = graph.validate();
-
-    assert!(
-        report.issues.iter().any(|issue| matches!(
-            issue,
-            PolicyGraphValidationIssue::IncompatiblePayloadEdge {
-                edge_id,
-                provided,
-                required,
-            } if edge_id == "edge:hub-review-sink"
-                && provided == "text"
-                && required == "pull_requests"
-        )),
-        "Hub must reject text fan-out into pull-request consumer: {:?}",
-        report.issues
-    );
-}
-
-#[test]
-fn hub_simulation_visits_all_compatible_fanout_branches() {
-    let graph = manual_ocr_hub_graph();
-
-    assert!(graph.validate().is_valid(), "Hub graph should validate");
-
-    let result = graph.simulate(&PolicyInput::new(PolicyAction::Sync));
-
-    assert!(
-        result
-            .visited_node_ids
-            .windows(5)
-            .any(|window| window == ["source", "ocr", "hub", "debug", "persist"]),
-        "simulation should visit every Hub branch in deterministic order: {:?}",
-        result.visited_node_ids
-    );
-}
-
-#[test]
 fn reason_codes_are_stable_for_key_default_paths() {
     let graph = PolicyGraph::seeded_v2();
     let decision = graph
@@ -410,155 +341,6 @@ fn predicate_passes_is_positive_admits_count_evidence() {
         !predicate_passes(PolicyEvidencePredicate::IsTrue, 2),
         "IsTrue must reject non-one counts to stay bool-only",
     );
-}
-
-fn manual_ocr_hub_graph() -> PolicyGraph {
-    PolicyGraph {
-        schema_version: super::POLICY_GRAPH_SCHEMA_VERSION,
-        revision: super::POLICY_GRAPH_INITIAL_REVISION,
-        mode: PolicyGraphMode::Enforced,
-        nodes: vec![
-            PolicyGraphNode {
-                id: "source".to_owned(),
-                label: "Manual OCR Paste".to_owned(),
-                kind: PolicyGraphNodeKind::ActionStep(super::PolicyActionStep {
-                    action_id: "automation.manual_ocr_paste".to_owned(),
-                }),
-                automation: Some(PolicyGraphAutomationBinding {
-                    is_enabled: true,
-                    event_source: "manualOCRPaste".to_owned(),
-                    priority: None,
-                    content_kinds: vec!["image".to_owned()],
-                    preprocessors: Vec::new(),
-                    actions: Vec::new(),
-                    postprocessors: Vec::new(),
-                    source_app_mode: "allExceptDenied".to_owned(),
-                    allowed_bundle_identifiers: Vec::new(),
-                    denied_bundle_identifiers: Vec::new(),
-                    ocr_configuration: None,
-                    review_pull_request_extraction: None,
-                }),
-                input_ports: Vec::new(),
-                output_ports: vec![PORT_IMAGE.to_owned()],
-                group_id: None,
-            },
-            PolicyGraphNode {
-                id: "ocr".to_owned(),
-                label: "OCR image".to_owned(),
-                kind: PolicyGraphNodeKind::OcrImage,
-                automation: None,
-                input_ports: vec![PORT_IN.to_owned()],
-                output_ports: vec![PORT_TEXT.to_owned()],
-                group_id: None,
-            },
-            PolicyGraphNode {
-                id: "hub".to_owned(),
-                label: "Hub".to_owned(),
-                kind: PolicyGraphNodeKind::Hub,
-                automation: None,
-                input_ports: vec![PORT_IN.to_owned()],
-                output_ports: vec!["out_1".to_owned(), "out_2".to_owned(), "out_3".to_owned()],
-                group_id: None,
-            },
-            PolicyGraphNode {
-                id: "debug".to_owned(),
-                label: "Open Debugging".to_owned(),
-                kind: PolicyGraphNodeKind::ActionStep(super::PolicyActionStep {
-                    action_id: "dashboard.open_debugging".to_owned(),
-                }),
-                automation: Some(PolicyGraphAutomationBinding {
-                    is_enabled: true,
-                    event_source: "manualOCRPaste".to_owned(),
-                    priority: None,
-                    content_kinds: Vec::new(),
-                    preprocessors: Vec::new(),
-                    actions: vec!["openDashboardDebugging".to_owned()],
-                    postprocessors: Vec::new(),
-                    source_app_mode: "allExceptDenied".to_owned(),
-                    allowed_bundle_identifiers: Vec::new(),
-                    denied_bundle_identifiers: Vec::new(),
-                    ocr_configuration: None,
-                    review_pull_request_extraction: None,
-                }),
-                input_ports: vec![PORT_IN.to_owned()],
-                output_ports: Vec::new(),
-                group_id: None,
-            },
-            PolicyGraphNode {
-                id: "persist".to_owned(),
-                label: "Persist OCR result".to_owned(),
-                kind: PolicyGraphNodeKind::ActionStep(super::PolicyActionStep {
-                    action_id: "ocr.persist_result".to_owned(),
-                }),
-                automation: Some(PolicyGraphAutomationBinding {
-                    is_enabled: true,
-                    event_source: "manualOCRPaste".to_owned(),
-                    priority: None,
-                    content_kinds: Vec::new(),
-                    preprocessors: Vec::new(),
-                    actions: vec![
-                        "rememberRecentScan".to_owned(),
-                        "showFeedback".to_owned(),
-                        "recordMetadata".to_owned(),
-                    ],
-                    postprocessors: vec![
-                        "sourceSpecificTextCleanup".to_owned(),
-                        "persistResult".to_owned(),
-                        "auditEvent".to_owned(),
-                    ],
-                    source_app_mode: "allExceptDenied".to_owned(),
-                    allowed_bundle_identifiers: Vec::new(),
-                    denied_bundle_identifiers: Vec::new(),
-                    ocr_configuration: None,
-                    review_pull_request_extraction: None,
-                }),
-                input_ports: vec![PORT_IN.to_owned()],
-                output_ports: Vec::new(),
-                group_id: None,
-            },
-        ],
-        edges: vec![
-            PolicyGraphEdge {
-                id: "edge:source-ocr".to_owned(),
-                from_node: "source".to_owned(),
-                from_port: PORT_IMAGE.to_owned(),
-                to_node: "ocr".to_owned(),
-                to_port: PORT_IN.to_owned(),
-                label: None,
-                condition: PolicyGraphEdgeCondition::Always,
-            },
-            PolicyGraphEdge {
-                id: "edge:ocr-hub".to_owned(),
-                from_node: "ocr".to_owned(),
-                from_port: PORT_TEXT.to_owned(),
-                to_node: "hub".to_owned(),
-                to_port: PORT_IN.to_owned(),
-                label: None,
-                condition: PolicyGraphEdgeCondition::Always,
-            },
-            PolicyGraphEdge {
-                id: "edge:hub-debug".to_owned(),
-                from_node: "hub".to_owned(),
-                from_port: "out_1".to_owned(),
-                to_node: "debug".to_owned(),
-                to_port: PORT_IN.to_owned(),
-                label: None,
-                condition: PolicyGraphEdgeCondition::Always,
-            },
-            PolicyGraphEdge {
-                id: "edge:hub-persist".to_owned(),
-                from_node: "hub".to_owned(),
-                from_port: "out_2".to_owned(),
-                to_node: "persist".to_owned(),
-                to_port: PORT_IN.to_owned(),
-                label: None,
-                condition: PolicyGraphEdgeCondition::Always,
-            },
-        ],
-        groups: Vec::new(),
-        layout: super::PolicyGraphLayout::default(),
-        policy_trace_ids: vec!["manual-ocr-hub-test".to_owned()],
-    }
 }
 
 fn reviews_auto_test_graph() -> PolicyGraph {
