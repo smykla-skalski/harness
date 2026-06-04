@@ -90,6 +90,14 @@ extension PolicyCanvasLayeredLayoutEngine {
       nodePositions: accumulator.nodePositions,
       edges: inputs.graph.edges
     )
+    // The comb arranges a group's terminals by topology with no awareness of
+    // foreign groups, so a lifted collector or dropped branch terminal can land
+    // on top of another group's node. Clear those cross-group collisions before
+    // the frames are rebuilt from the final positions.
+    nodePositions = policyCanvasResolveCrossGroupNodeOverlaps(
+      nodePositions: nodePositions,
+      layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID
+    )
     var groupFrames = accumulator.groupFrames
     var groupFramesByLayoutID = accumulator.groupFramesByLayoutID
 
