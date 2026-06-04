@@ -15,13 +15,13 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
 
   private let centeringClipView = PolicyCanvasCenteringClipView()
   private var interactionEnabled = true
-  private var adaptiveWorkspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout?
+  var adaptiveWorkspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout?
   private var isAdjustingAdaptiveWorkspace = false
-  private var isPreservingViewportCenter = false
+  var isPreservingViewportCenter = false
   private var isPreservingViewportFrameResize = false
   private var isApplyingViewportScrollRequest = false
-  private var hasLaidOutDocumentRootInViewport = false
-  private var lastReportedViewportState: PolicyCanvasViewportObservedState?
+  var hasLaidOutDocumentRootInViewport = false
+  var lastReportedViewportState: PolicyCanvasViewportObservedState?
   private var adaptiveExpansionArmed = false
   var isSamplingWheelScrollTarget = false
   var wheelScrollAnimation: PolicyCanvasWheelScrollAnimation?
@@ -230,11 +230,11 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     markDocumentRootLaidOutIfPossible()
   }
 
-  fileprivate func beginViewportFrameResizePreservation() {
+  func beginViewportFrameResizePreservation() {
     isPreservingViewportFrameResize = true
   }
 
-  fileprivate func endViewportFrameResizePreservation() {
+  func endViewportFrameResizePreservation() {
     isPreservingViewportFrameResize = false
   }
 
@@ -261,7 +261,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     )
   }
 
-  private func expandAdaptiveWorkspaceIfNeeded() {
+  func expandAdaptiveWorkspaceIfNeeded() {
     guard
       !isAdjustingAdaptiveWorkspace,
       adaptiveExpansionArmed,
@@ -395,178 +395,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     return adaptiveWorkspaceLayout
   }
 
-  private var visibleWorkspaceRect: CGRect {
+  var visibleWorkspaceRect: CGRect {
     contentView.bounds
-  }
-
-  private func markDocumentRootLaidOutIfPossible() {
-    if documentView != nil, contentView.bounds.width > 1, contentView.bounds.height > 1 {
-      hasLaidOutDocumentRootInViewport = true
-    }
-  }
-
-  private func reflectDocumentRootUpdate(shouldExpand: Bool) {
-    super.reflectScrolledClipView(contentView)
-    guard shouldExpand else {
-      return
-    }
-    expandAdaptiveWorkspaceIfNeeded()
-  }
-
-  private func visibleContentCenterToPreserve() -> CGPoint? {
-    guard
-      let adaptiveWorkspaceLayout,
-      contentView.bounds.width > 1,
-      contentView.bounds.height > 1,
-      documentView != nil
-    else {
-      return nil
-    }
-    return visibleContentCenter(in: adaptiveWorkspaceLayout)
-  }
-
-  private func visibleContentCenter(
-    in workspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout
-  ) -> CGPoint {
-    let visibleContentRect = workspaceLayout.contentRect(forWorkspaceRect: visibleWorkspaceRect)
-    return CGPoint(x: visibleContentRect.midX, y: visibleContentRect.midY)
-  }
-
-  private func scrollToPreserveContentCenter(
-    _ contentCenter: CGPoint,
-    in workspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout
-  ) {
-    let workspaceCenter = workspaceLayout.workspacePoint(forContentPoint: contentCenter)
-    let targetOrigin = CGPoint(
-      x: workspaceCenter.x - (contentView.bounds.width / 2),
-      y: workspaceCenter.y - (contentView.bounds.height / 2)
-    )
-    guard
-      abs(contentView.bounds.origin.x - targetOrigin.x) > 0.5
-        || abs(contentView.bounds.origin.y - targetOrigin.y) > 0.5
-    else {
-      return
-    }
-    isPreservingViewportCenter = true
-    contentView.scroll(to: targetOrigin)
-    super.reflectScrolledClipView(contentView)
-    isPreservingViewportCenter = false
-  }
-
-  private func scrollToPreserveContentCenterIfPossible(_ contentCenter: CGPoint) {
-    guard let adaptiveWorkspaceLayout else {
-      return
-    }
-    scrollToPreserveContentCenter(contentCenter, in: adaptiveWorkspaceLayout)
-  }
-
-  private func reportViewportStateIfNeeded() {
-    let observedState = PolicyCanvasViewportObservedState(
-      visibleContentRect: adaptiveWorkspaceLayout?.contentRect(
-        forWorkspaceRect: visibleWorkspaceRect)
-        ?? visibleWorkspaceRect,
-      zoom: magnification
-    )
-    guard !approximatelyMatchesLastReportedViewportState(observedState) else {
-      return
-    }
-    lastReportedViewportState = observedState
-    viewportDidChange?(observedState)
-  }
-
-  private func approximatelyMatchesLastReportedViewportState(
-    _ observedState: PolicyCanvasViewportObservedState
-  ) -> Bool {
-    guard let lastReportedViewportState else {
-      return false
-    }
-    return abs(lastReportedViewportState.zoom - observedState.zoom) < 0.001
-      && abs(
-        lastReportedViewportState.visibleContentRect.minX - observedState.visibleContentRect.minX)
-        < 0.5
-      && abs(
-        lastReportedViewportState.visibleContentRect.minY - observedState.visibleContentRect.minY)
-        < 0.5
-      && abs(
-        lastReportedViewportState.visibleContentRect.width - observedState.visibleContentRect.width)
-        < 0.5
-      && abs(
-        lastReportedViewportState.visibleContentRect.height
-          - observedState.visibleContentRect.height)
-        < 0.5
-  }
-}
-
-final class PolicyCanvasCenteringClipView: NSClipView {
-  override init(frame frameRect: NSRect) {
-    super.init(frame: frameRect)
-    drawsBackground = false
-    backgroundColor = .clear
-    wantsLayer = true
-    layer?.masksToBounds = true
-    disableScrollCopyReuse()
-  }
-
-  @available(*, unavailable)
-  required init?(coder: NSCoder) {
-    fatalError("init(coder:) has not been implemented")
-  }
-
-  private func disableScrollCopyReuse() {
-    let setter = NSSelectorFromString("setCopiesOnScroll:")
-    guard responds(to: setter) else {
-      return
-    }
-    // AppKit's legacy scroll-copy path reuses old backing pixels while only
-    // redrawing the newly exposed strip. The canvas relayouts and magnifies
-    // inside the clip view, so stale copied strips are worse than a redraw.
-    setValue(false, forKey: "copiesOnScroll")
-  }
-
-  override func setFrameSize(_ newSize: NSSize) {
-    let preservedCenter: CGPoint?
-    if bounds.width > 1, bounds.height > 1, documentView != nil {
-      preservedCenter = CGPoint(x: bounds.midX, y: bounds.midY)
-    } else {
-      preservedCenter = nil
-    }
-
-    let scrollView = enclosingScrollView as? PolicyCanvasNativeScrollView
-    scrollView?.beginViewportFrameResizePreservation()
-    defer {
-      scrollView?.endViewportFrameResizePreservation()
-    }
-
-    super.setFrameSize(newSize)
-
-    guard let preservedCenter else {
-      return
-    }
-
-    let targetOrigin = CGPoint(
-      x: preservedCenter.x - (bounds.width / 2),
-      y: preservedCenter.y - (bounds.height / 2)
-    )
-    guard
-      abs(bounds.origin.x - targetOrigin.x) > 0.5
-        || abs(bounds.origin.y - targetOrigin.y) > 0.5
-    else {
-      return
-    }
-    scroll(to: targetOrigin)
-  }
-
-  override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
-    var constrained = super.constrainBoundsRect(proposedBounds)
-    guard let documentView else {
-      return constrained
-    }
-    if documentView.frame.width < constrained.width {
-      constrained.origin.x = -((constrained.width - documentView.frame.width) / 2)
-    }
-    if documentView.frame.height < constrained.height {
-      constrained.origin.y = -((constrained.height - documentView.frame.height) / 2)
-    }
-    return constrained
   }
 }
