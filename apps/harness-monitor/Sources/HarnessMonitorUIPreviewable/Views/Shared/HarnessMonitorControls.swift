@@ -262,4 +262,8 @@ extension View {
   public func harnessGlassButtonStyle() -> some View {
     buttonStyle(.glass)
   }
+
+  public func harnessGlassButtonStyle(controlSize: ControlSize) -> some View {
+    buttonStyle(.glass).controlSize(controlSize)
+  }
 }

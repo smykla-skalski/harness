@@ -38,8 +38,7 @@ struct PolicyCanvasInspectorSwitchCasesControl: View {
       } label: {
         Label("Add case", systemImage: "plus")
       }
-      .harnessGlassButtonStyle()
-      .controlSize(.small)
+      .harnessGlassButtonStyle(controlSize: .small)
     }
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.policyCanvasInspectorField(field.accessibilityKey)
