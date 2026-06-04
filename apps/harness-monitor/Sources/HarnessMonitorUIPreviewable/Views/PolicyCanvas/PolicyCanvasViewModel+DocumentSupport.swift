@@ -86,16 +86,21 @@ extension PolicyCanvasViewModel {
     var loadedNodes = document.nodes.map {
       policyCanvasNode($0, layout: document.layout)
     }
-    assignGroupMembership(from: document.groups, to: &loadedNodes)
-    let loadedGroups = document.groups.enumerated().map { offset, group in
-      policyCanvasGroup(offset: offset, element: group, nodes: loadedNodes)
+    // The canvas drops groups: the layout is driven purely by the dataflow graph
+    // and no group boxes are drawn. This is the single load chokepoint (both
+    // applyDocument and applyPersistedDocument route through it), so clearing
+    // membership and returning no groups here makes layout, rendering, and
+    // routing all ungrouped. The engine re-derives implicit groups from a node's
+    // groupID, so the membership must be cleared, not just the group list.
+    for index in loadedNodes.indices {
+      loadedNodes[index].groupID = nil
     }
     let mappedEdges = document.edges.compactMap { edge in
       policyCanvasEdge(edge, nodes: loadedNodes, assignPreferredPortSides: false)
     }
     return PolicyCanvasLoadedGraph(
       nodes: loadedNodes,
-      groups: loadedGroups,
+      groups: [],
       mappedEdges: mappedEdges
     )
   }
