@@ -145,6 +145,27 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertFalse(controlsSource.contains("Text(\"Groups\")"))
   }
 
+  func testLabAlgorithmPickersUseSeparateToolbarGlassBubbles() throws {
+    let controlsSource = try policyCanvasSourceFile(named: "PolicyCanvasLabToolbarControls.swift")
+
+    XCTAssertTrue(controlsSource.contains("PolicyCanvasLabStageToolbar"))
+    XCTAssertTrue(
+      controlsSource.contains("ToolbarSpacer(.fixed, placement: .primaryAction)")
+    )
+    XCTAssertTrue(controlsSource.contains(".sharedBackgroundVisibility(.hidden)"))
+    XCTAssertTrue(
+      controlsSource.contains(
+        "let stageDescriptors = PolicyCanvasAlgorithmPickerCatalog.stageDescriptors"
+      )
+    )
+    XCTAssertTrue(controlsSource.contains("stageDescriptors.firstIndex("))
+    XCTAssertTrue(controlsSource.contains("where: { $0.stage == stage }"))
+    XCTAssertTrue(
+      controlsSource.contains("if stageIndex < stageDescriptors.count - 1")
+    )
+    XCTAssertFalse(controlsSource.contains("ToolbarItemGroup(placement: .primaryAction)"))
+  }
+
   func testLabToolbarTextMenusUseNativeButtonChromeOnly() throws {
     let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
     let controlsSource = try policyCanvasSourceFile(named: "PolicyCanvasLabToolbarControls.swift")
