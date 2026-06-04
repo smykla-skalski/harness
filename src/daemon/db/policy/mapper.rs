@@ -13,9 +13,9 @@ use super::super::db_error;
 use super::rows::{CanvasRow, EdgeRow, GroupNodeRow, GroupRow, NodeRow, WorkspaceRow};
 use crate::errors::CliError;
 use crate::task_board::policy_graph::{
-    PolicyCanvasEnforcementSnapshot, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace,
-    PolicyGraph, PolicyGraphEdge, PolicyGraphGroup, PolicyGraphLayout, PolicyGraphMode,
-    PolicyGraphNode, PolicyGraphNodeLayout, PolicyGraphNodeLayoutSource,
+    PolicyCanvasEnforcementSnapshot, PolicyCanvasPoint, PolicyCanvasRecord, PolicyCanvasRect,
+    PolicyCanvasWorkspace, PolicyGraph, PolicyGraphEdge, PolicyGraphGroup, PolicyGraphLayout,
+    PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeLayout, PolicyGraphNodeLayoutSource,
 };
 
 /// All rows that make up a single persisted canvas.
@@ -322,7 +322,7 @@ fn assemble_layout(canvas: &CanvasRow, nodes: &[NodeRow]) -> Result<PolicyGraphL
         .collect::<Result<Vec<_>, CliError>>()?;
     Ok(PolicyGraphLayout {
         zoom: canvas.layout_zoom,
-        offset: crate::task_board::policy_graph::PolicyCanvasPoint {
+        offset: PolicyCanvasPoint {
             x: narrow(canvas.layout_offset_x),
             y: narrow(canvas.layout_offset_y),
         },

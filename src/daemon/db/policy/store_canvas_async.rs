@@ -35,6 +35,10 @@ impl AsyncDaemonDb {
     /// # Errors
     /// Returns [`CliError`] on revision conflicts, unknown canvases, validation
     /// serialization failures, or SQL failures.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "transactional canvas save measures load and write timing in one path"
+    )]
     pub(crate) async fn save_policy_canvas_draft(
         &self,
         canvas_id: &str,

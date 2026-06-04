@@ -38,6 +38,10 @@ pub(super) fn ingest_search_node(
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "batch ingest merges items, continuations, missing ids, and label caches in one pass"
+)]
 pub(super) fn ingest_nodes_chunk(
     nodes: Vec<Option<SearchNode>>,
     chunk: &[String],

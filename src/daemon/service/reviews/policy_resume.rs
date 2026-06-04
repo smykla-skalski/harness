@@ -7,6 +7,7 @@ use tokio::task::JoinHandle;
 use tokio::time::interval as tokio_interval;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::service::observe_async_db;
 use crate::daemon::service::reviews::policy_audit::record_policy_run_resume_result;
 use crate::daemon::service::reviews::policy_executor::{
     build_policy_provider_registry, daemon_policy_executor_with_audit,
@@ -34,7 +35,7 @@ pub(crate) async fn resume_reviews_policy_event(
             event.subject_key
         ))
     })?;
-    let audit_db = crate::daemon::service::observe_async_db();
+    let audit_db = observe_async_db();
     let executor = daemon_policy_executor_with_audit(&subject.repository, audit_db.clone())?;
     resume_reviews_policy_event_with_executor_and_audit_db(
         default_board_root(),
@@ -158,10 +159,10 @@ async fn resume_due_reviews_policy_timer_run(
         log_invalid_timer_run_subject(ready_run);
         return Vec::new();
     };
-    let audit_db = crate::daemon::service::observe_async_db();
+    let audit_db = observe_async_db();
     let Some(executor) = daemon_policy_executor_with_audit(&subject.repository, audit_db.clone())
         .inspect_err(|error| {
-            log_timer_run_executor_resolve_error(ready_run, &subject.repository, error)
+            log_timer_run_executor_resolve_error(ready_run, &subject.repository, error);
         })
         .ok()
     else {

@@ -4,8 +4,8 @@ use crate::reviews::{ReviewTarget, ReviewsFileCommentRequest};
 use crate::task_board::policy_graph::cached_gate_policy;
 use crate::task_board::store::default_board_root;
 use crate::task_board::{
-    PolicyAction, PolicyDecision, PolicyGraph, PolicyGraphMode, PolicyInput, PolicyReasonCode,
-    PolicySubject,
+    PolicyAction, PolicyDecision, PolicyEvidence, PolicyGraph, PolicyGraphMode, PolicyInput,
+    PolicyReasonCode, PolicySubject,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -103,7 +103,7 @@ pub(crate) fn enforce_review_pull_request_policy(
             paths: paths.to_vec(),
             ..PolicySubject::default()
         },
-        evidence: Default::default(),
+        evidence: PolicyEvidence::default(),
     };
     enforce_reviews_policy_input(mutation, &document, &input, None)
 }

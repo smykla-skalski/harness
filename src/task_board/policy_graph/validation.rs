@@ -153,7 +153,6 @@ fn payload_required_by_node(node: &PolicyGraphNode) -> PayloadKind {
         PolicyGraphNodeKind::OcrImage => PayloadKind::Image,
         PolicyGraphNodeKind::ResolveReviewPullRequests => PayloadKind::Text,
         PolicyGraphNodeKind::CopyReviewPullRequestList => PayloadKind::PullRequests,
-        PolicyGraphNodeKind::Hub => PayloadKind::Unknown,
         PolicyGraphNodeKind::ActionStep(_) => payload_required_by_automation(node),
         _ => PayloadKind::Unknown,
     }

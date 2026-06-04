@@ -58,11 +58,8 @@ pub struct ReviewsQueryResponse {
     pub items: Vec<ReviewItem>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>>,
-    /// GitHub login of the authenticated viewer that fetched this set of
-    /// pull requests. Drives the Reviews detail pane's "(you)" reviewer
-    /// marker and the comment composer's "Commenting as @viewer" caption.
-    /// `None` when the daemon could not resolve the login (revoked token,
-    /// network error). The UI degrades gracefully.
+    /// GitHub login of the authenticated viewer for "(you)" reviewer and
+    /// "Commenting as @viewer" UI copy. `None` means lookup failed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub viewer_login: Option<String>,
 }
@@ -87,6 +84,10 @@ pub struct ReviewsSummary {
 }
 
 /// Per-PR state flags bundled into at most 3 booleans.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire flags map directly to distinct UI toggles and daemon state"
+)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ReviewItemFlags {
     #[serde(default)]

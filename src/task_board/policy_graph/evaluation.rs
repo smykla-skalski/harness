@@ -46,7 +46,7 @@ impl PolicyGraph {
                 .iter()
                 .find(|candidate| candidate.id == node_id)?;
             visited.push(node.id.clone());
-            match self.evaluation_step(node, input, &mut boundaries)? {
+            match self.evaluation_step(node, input, &mut boundaries) {
                 EvaluationStep::Continue(next_node_ids) => pending.extend(next_node_ids),
                 EvaluationStep::Terminal(decision) => return Some((decision, visited, boundaries)),
             }
@@ -86,7 +86,7 @@ impl PolicyGraph {
         node: &PolicyGraphNode,
         input: &PolicyInput,
         boundaries: &mut Vec<PolicyRuntimeBoundary>,
-    ) -> Option<EvaluationStep> {
+    ) -> EvaluationStep {
         match &node.kind {
             PolicyGraphNodeKind::Trigger { .. }
             | PolicyGraphNodeKind::WorkflowEntry(_)
@@ -95,76 +95,70 @@ impl PolicyGraph {
             | PolicyGraphNodeKind::OcrImage
             | PolicyGraphNodeKind::ResolveReviewPullRequests
             | PolicyGraphNodeKind::EventWait(_)
-            | PolicyGraphNodeKind::Handoff(_) => Some(EvaluationStep::Continue(
+            | PolicyGraphNodeKind::Handoff(_) => EvaluationStep::Continue(
                 self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)
                     .into_iter()
                     .collect(),
-            )),
-            PolicyGraphNodeKind::CopyReviewPullRequestList => Some(EvaluationStep::Terminal(
-                require_human(PolicyReasonCode::HumanRequired),
-            )),
+            ),
+            PolicyGraphNodeKind::CopyReviewPullRequestList => {
+                EvaluationStep::Terminal(require_human(PolicyReasonCode::HumanRequired))
+            }
             PolicyGraphNodeKind::WaitStep(step) => {
                 boundaries.push(PolicyRuntimeBoundary {
                     node_id: node.id.clone(),
                     resume_key: step.resume_key.clone(),
                     wait: step.wait.clone(),
                 });
-                Some(EvaluationStep::Continue(
+                EvaluationStep::Continue(
                     self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)
                         .into_iter()
                         .collect(),
-                ))
+                )
             }
-            PolicyGraphNodeKind::ActionGate { .. } => Some(EvaluationStep::Continue(
+            PolicyGraphNodeKind::ActionGate { .. } => EvaluationStep::Continue(
                 self.next_node_for_action(&node.id, input.action)
                     .into_iter()
                     .collect(),
-            )),
+            ),
             PolicyGraphNodeKind::EvidenceCheck { checks } => {
                 let condition = evidence_condition(checks, input);
-                Some(EvaluationStep::Continue(
-                    self.next_node(&node.id, &condition).into_iter().collect(),
-                ))
+                EvaluationStep::Continue(self.next_node(&node.id, &condition).into_iter().collect())
             }
             PolicyGraphNodeKind::IfThenElse(condition) => {
                 let branch = if_then_else_condition(*condition, input);
-                Some(EvaluationStep::Continue(
-                    self.next_node(&node.id, &branch).into_iter().collect(),
-                ))
+                EvaluationStep::Continue(self.next_node(&node.id, &branch).into_iter().collect())
             }
-            PolicyGraphNodeKind::Switch(switch) => Some(EvaluationStep::Continue(
+            PolicyGraphNodeKind::Switch(switch) => EvaluationStep::Continue(
                 self.next_node_for_port(&node.id, switch_port(switch, input))
                     .into_iter()
                     .collect(),
-            )),
+            ),
             PolicyGraphNodeKind::RiskClassifier {
                 field, threshold, ..
             } => {
                 let condition = risk_condition(*field, *threshold, input);
-                Some(EvaluationStep::Continue(
-                    self.next_node(&node.id, &condition).into_iter().collect(),
-                ))
+                EvaluationStep::Continue(self.next_node(&node.id, &condition).into_iter().collect())
             }
-            PolicyGraphNodeKind::Hub => Some(EvaluationStep::Continue(self.next_nodes(&node.id))),
+            PolicyGraphNodeKind::Hub => EvaluationStep::Continue(self.next_nodes(&node.id)),
             PolicyGraphNodeKind::HumanGate { reason_code } => {
-                Some(EvaluationStep::Terminal(require_human(*reason_code)))
+                EvaluationStep::Terminal(require_human(*reason_code))
             }
             PolicyGraphNodeKind::ConsensusGate { reason_code } => {
-                Some(EvaluationStep::Terminal(require_consensus(*reason_code)))
+                EvaluationStep::Terminal(require_consensus(*reason_code))
             }
             PolicyGraphNodeKind::DryRunGate { reason_code } => {
-                Some(EvaluationStep::Terminal(dry_run_only(*reason_code)))
+                EvaluationStep::Terminal(dry_run_only(*reason_code))
             }
             PolicyGraphNodeKind::SupervisorRule {
                 decision,
                 reason_codes,
-            } => Some(EvaluationStep::Terminal(supervisor_decision(
+            } => EvaluationStep::Terminal(supervisor_decision(
                 *decision,
                 supervisor_reason_code(reason_codes),
-            ))),
-            PolicyGraphNodeKind::Finish(finish) => Some(EvaluationStep::Terminal(
-                supervisor_decision(finish.decision, finish.reason_code),
             )),
+            PolicyGraphNodeKind::Finish(finish) => {
+                EvaluationStep::Terminal(supervisor_decision(finish.decision, finish.reason_code))
+            }
         }
     }
 

@@ -76,6 +76,10 @@ impl ReviewsGitHubClient {
         })
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "search fanout accumulates shared dedupe and continuation state across pages"
+    )]
     async fn fetch_updates_scope(
         &self,
         request: &ReviewsQueryRequest,

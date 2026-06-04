@@ -1,3 +1,4 @@
+use std::process::id;
 use std::sync::Arc;
 
 use crate::daemon::audit_events::{AuditEventRecordDraft, record_audit_event};
@@ -19,7 +20,7 @@ pub(super) async fn record_daemon_started(
         serde_json::json!({
             "endpoint": endpoint,
             "sandboxed": sandboxed,
-            "pid": std::process::id(),
+            "pid": id(),
         }),
     )
     .await;
@@ -34,14 +35,14 @@ pub(super) async fn record_daemon_stopped(
             "info",
             "success",
             "Daemon stopped".to_owned(),
-            serde_json::json!({ "pid": std::process::id() }),
+            serde_json::json!({ "pid": id() }),
         ),
         Err(error) => (
             "error",
             "failure",
             format!("Daemon stopped after serve failure: {error}"),
             serde_json::json!({
-                "pid": std::process::id(),
+                "pid": id(),
                 "error": error.to_string(),
             }),
         ),
