@@ -230,12 +230,31 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         "HarnessMonitorAccessibility.sessionRow(session.sessionId)"
       )
     )
-    #expect(
-      auditView.contains("HarnessMonitorAccessibility.dashboardAuditRoot")
+    try expectDashboardAuditIdentifierUsage(in: auditView)
+    #expect(diagnosticsView.contains("HarnessMonitorAccessibility.dashboardDiagnosticsRoot"))
+    expectDashboardDebuggingIdentifierUsage(
+      debuggingView: debuggingView,
+      screenshotsView: debuggingScreenshotsView,
+      resultCardView: debuggingResultCard,
+      previewView: debuggingPreview
     )
-    #expect(
-      auditView.contains("HarnessMonitorAccessibility.dashboardAuditDetailDivider")
+    expectDashboardSidebarIdentifierUsage(
+      dashboardView: dashboardView,
+      sidebarSessionsView: dashboardSidebarSessionsView
     )
+    #expect(dashboardRouteContent.contains("HarnessMonitorAccessibility.dashboardScrollView"))
+    #expect(
+      auditView.contains("HarnessMonitorAccessibility.dashboardAuditScrollView"))
+    #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
+    #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
+    #expect(dashboardRouteContent.contains("DashboardAuditRouteView("))
+    #expect(dashboardRouteContent.contains("DashboardReviewsRouteView("))
+    #expect(dashboardToolbar.contains("SleepPreventionToolbarButton("))
+  }
+
+  private func expectDashboardAuditIdentifierUsage(in auditView: String) throws {
+    #expect(auditView.contains("HarnessMonitorAccessibility.dashboardAuditRoot"))
+    #expect(auditView.contains("HarnessMonitorAccessibility.dashboardAuditDetailDivider"))
     #expect(auditView.contains("SessionContentDetailSplitView("))
     #expect(auditView.contains("DashboardAuditDayDivider(label: dayDividerLabel)"))
     #expect(!auditView.contains("SessionTimelineDayDivider(label: dayDividerLabel)"))
@@ -262,8 +281,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(auditView.contains("DashboardAuditLoadMoreButton(action: loadMoreEvents)"))
     #expect(!auditView.contains("dashboardUI.auditEvents.isEmpty"))
     #expect(!auditView.contains("notificationHistory.map(HarnessMonitorAuditEvent.notification)"))
-    #expect(
-      auditView.contains(".animation(.snappy(duration: 0.18), value: rows.map(\\.id))"))
+    #expect(auditView.contains(".animation(.snappy(duration: 0.18), value: rows.map(\\.id))"))
     let badgeRange = try #require(
       auditView.range(of: "DashboardAuditOutcomeBadge(event: row.event)")
     )
@@ -280,47 +298,49 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(auditView.contains("HarnessMonitorJSONCodeBlock(rawJSON: payload)"))
     #expect(!auditView.contains("DashboardAuditTextBlock(title: \"Payload\", text: payload)"))
-    #expect(diagnosticsView.contains("HarnessMonitorAccessibility.dashboardDiagnosticsRoot"))
+  }
+
+  private func expectDashboardDebuggingIdentifierUsage(
+    debuggingView: String,
+    screenshotsView: String,
+    resultCardView: String,
+    previewView: String
+  ) {
+    #expect(debuggingView.contains("HarnessMonitorAccessibility.dashboardDebuggingRoot"))
     #expect(
-      debuggingView.contains("HarnessMonitorAccessibility.dashboardDebuggingRoot")
-    )
-    #expect(
-      debuggingScreenshotsView.contains(
+      screenshotsView.contains(
         "HarnessMonitorAccessibility.dashboardDebuggingOCRShotWatcher"
       )
     )
     #expect(
-      debuggingScreenshotsView.contains(
+      screenshotsView.contains(
         "HarnessMonitorAccessibility.dashboardDebuggingOCRShotStatus"
       )
     )
     #expect(
-      debuggingResultCard.contains(
+      resultCardView.contains(
         "HarnessMonitorAccessibility.dashboardDebuggingOCRResultPreviewButton"
       )
     )
     #expect(
-      debuggingPreview.contains("HarnessMonitorAccessibility.dashboardDebuggingOCRPreviewText")
+      previewView.contains("HarnessMonitorAccessibility.dashboardDebuggingOCRPreviewText")
     )
+  }
+
+  private func expectDashboardSidebarIdentifierUsage(
+    dashboardView: String,
+    sidebarSessionsView: String
+  ) {
     #expect(dashboardView.contains("HarnessMonitorSidebar("))
     #expect(dashboardView.contains("List(selection: dashboardSelectionBinding)"))
     #expect(dashboardView.contains("SessionSidebarRow("))
     #expect(!dashboardView.contains("Section(\"Routes\")"))
     #expect(dashboardView.contains("DashboardSidebarRecentSessionsSection("))
-    #expect(dashboardSidebarSessionsView.contains("Section(\"Recent sessions\")"))
-    #expect(dashboardSidebarSessionsView.contains("SessionSidebarRow("))
-    #expect(dashboardSidebarSessionsView.contains("subtitle: subtitle"))
-    #expect(
-      dashboardSidebarSessionsView.contains("projectAndWorktreeDisplayLabel(separator: \"·\")"))
+    #expect(sidebarSessionsView.contains("Section(\"Recent sessions\")"))
+    #expect(sidebarSessionsView.contains("SessionSidebarRow("))
+    #expect(sidebarSessionsView.contains("subtitle: subtitle"))
+    #expect(sidebarSessionsView.contains("projectAndWorktreeDisplayLabel(separator: \"·\")"))
     #expect(dashboardView.contains(".harnessMonitorSidebarListChrome("))
-    #expect(dashboardRouteContent.contains("HarnessMonitorAccessibility.dashboardScrollView"))
-    #expect(
-      auditView.contains("HarnessMonitorAccessibility.dashboardAuditScrollView"))
-    #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
-    #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
-    #expect(dashboardRouteContent.contains("DashboardAuditRouteView("))
-    #expect(dashboardRouteContent.contains("DashboardReviewsRouteView("))
-    #expect(dashboardToolbar.contains("SleepPreventionToolbarButton("))
   }
 
   private func expectReviewsIdentifierUsage() throws {
@@ -365,65 +385,5 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
     #expect(reviewsView.contains("SessionContentDetailSplitView("))
-  }
-
-  private func expectSessionWindowIdentifierUsage() throws {
-    let rootView = try sourceFile(named: "SessionWindowRootView.swift")
-    let windowView = try sourceFile(named: "SessionWindowView.swift")
-    let createRuntimeView = try sourceFile(named: "SessionWindowCreateAgentRuntimePane.swift")
-    let sidebarView = try sourceFile(named: "SessionSidebar.swift")
-    let sharedSidebarView = try sourceFile(named: "HarnessMonitorSidebar.swift")
-    let sidebarFooterView = try sourceFile(named: "SessionSidebarFooter.swift")
-    let inspectorView = try sourceFile(named: "SessionWindowInspector.swift")
-    let toolbarView = try sourceFile(named: "SessionWindowToolbar.swift")
-    let sharedToolbarView = try sourceFile(named: "HarnessMonitorWindowToolbar.swift")
-
-    #expect(windowView.contains("HarnessMonitorAccessibility.sessionWindowShell"))
-    #expect(
-      rootView.contains(
-        "HarnessMonitorAccessibility.sessionWindowToolbarSeparatorSuppressed"
-      )
-    )
-    #expect(sidebarView.contains("HarnessMonitorAccessibility.sessionWindowSidebar"))
-    #expect(sidebarView.contains("HarnessMonitorSidebar("))
-    #expect(sidebarView.contains("accessibilityValue: decisionSelectionAccessibilityValue"))
-    #expect(sidebarView.contains(".harnessMonitorSidebarListChrome(rowSize: sidebarRowSize)"))
-    #expect(sharedSidebarView.contains("HarnessMonitorSidebarListChromeModifier"))
-    #expect(sharedSidebarView.contains("SessionSidebarFooter(model: statusModel)"))
-    #expect(sharedSidebarView.contains(".accessibilityIdentifier(accessibilityIdentifier)"))
-    #expect(sharedSidebarView.contains(".accessibilityValue(accessibilityValue)"))
-    #expect(
-      sidebarFooterView.contains("HarnessMonitorAccessibility.sessionWindowStatusSurface")
-    )
-    #expect(sidebarFooterView.contains(".harnessMCPText("))
-    #expect(
-      createRuntimeView.contains("HarnessMonitorAccessibility.sessionWindowCreateProviderPane"))
-    #expect(
-      createRuntimeView.contains(
-        ".accessibilityTestProbe(\n      HarnessMonitorAccessibility.sessionWindowCreateProviderPane"
-      )
-    )
-    #expect(!createRuntimeView.contains("sessionWindowCreateModePicker"))
-    #expect(toolbarView.contains(".harnessMCPButton("))
-    #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionWindowFocusModeButton"))
-    #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateBackButton"))
-    #expect(toolbarView.contains("HarnessMonitorAccessibility.sessionNavigateForwardButton"))
-    #expect(toolbarView.contains("HarnessMonitorWindowToolbar {"))
-    #expect(sharedToolbarView.contains("struct HarnessMonitorWindowToolbar<"))
-    #expect(
-      inspectorView.contains(
-        ".accessibilityTestProbe(\n      HarnessMonitorAccessibility.sessionWindowInspector"
-      )
-    )
-    #expect(
-      !inspectorView.contains(
-        ".accessibilityIdentifier(HarnessMonitorAccessibility.sessionWindowInspector)"
-      )
-    )
-    #expect(
-      inspectorView.contains(
-        "HarnessMonitorAccessibility.sessionWindowInspectorCloseButton"
-      )
-    )
   }
 }

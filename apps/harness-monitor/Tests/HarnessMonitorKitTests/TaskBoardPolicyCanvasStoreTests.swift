@@ -127,14 +127,16 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
           latestSimulation: nil
         ),
         makeTaskBoardPolicyCanvasSummary(
-          canvasId: "canvas-enforced",
-          title: "Effective Canvas",
-          revision: enforcedDocument.revision,
-          mode: .enforced,
-          document: nil,
-          nodeCount: enforcedDocument.nodes.count,
-          edgeCount: enforcedDocument.edges.count,
-          groupCount: enforcedDocument.groups.count
+          .init(
+            canvasId: "canvas-enforced",
+            title: "Effective Canvas",
+            revision: enforcedDocument.revision,
+            mode: .enforced,
+            document: nil,
+            nodeCount: enforcedDocument.nodes.count,
+            edgeCount: enforcedDocument.edges.count,
+            groupCount: enforcedDocument.groups.count
+          )
         ),
       ]
     )
@@ -261,24 +263,28 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
           latestSimulation: nil
         ),
         makeTaskBoardPolicyCanvasSummary(
-          canvasId: "canvas-effective-1",
-          title: "Effective One",
-          revision: firstEffectiveDocument.revision,
-          mode: .enforced,
-          document: nil,
-          nodeCount: firstEffectiveDocument.nodes.count,
-          edgeCount: firstEffectiveDocument.edges.count,
-          groupCount: firstEffectiveDocument.groups.count
+          .init(
+            canvasId: "canvas-effective-1",
+            title: "Effective One",
+            revision: firstEffectiveDocument.revision,
+            mode: .enforced,
+            document: nil,
+            nodeCount: firstEffectiveDocument.nodes.count,
+            edgeCount: firstEffectiveDocument.edges.count,
+            groupCount: firstEffectiveDocument.groups.count
+          )
         ),
         makeTaskBoardPolicyCanvasSummary(
-          canvasId: "canvas-effective-2",
-          title: "Effective Two",
-          revision: secondEffectiveDocument.revision,
-          mode: .enforced,
-          document: nil,
-          nodeCount: secondEffectiveDocument.nodes.count,
-          edgeCount: secondEffectiveDocument.edges.count,
-          groupCount: secondEffectiveDocument.groups.count
+          .init(
+            canvasId: "canvas-effective-2",
+            title: "Effective Two",
+            revision: secondEffectiveDocument.revision,
+            mode: .enforced,
+            document: nil,
+            nodeCount: secondEffectiveDocument.nodes.count,
+            edgeCount: secondEffectiveDocument.edges.count,
+            groupCount: secondEffectiveDocument.groups.count
+          )
         ),
       ]
     )
@@ -329,25 +335,29 @@ private struct PolicyCanvasState: Equatable {
   }
 }
 
+private struct TaskBoardPolicyCanvasSummaryInput {
+  var canvasId: String
+  var title: String
+  var revision: UInt64
+  var mode: TaskBoardPolicyPipelineMode
+  var document: TaskBoardPolicyPipelineDocument?
+  var nodeCount: Int
+  var edgeCount: Int
+  var groupCount: Int
+}
+
 private func makeTaskBoardPolicyCanvasSummary(
-  canvasId: String,
-  title: String,
-  revision: UInt64,
-  mode: TaskBoardPolicyPipelineMode,
-  document: TaskBoardPolicyPipelineDocument?,
-  nodeCount: Int,
-  edgeCount: Int,
-  groupCount: Int
+  _ input: TaskBoardPolicyCanvasSummaryInput
 ) -> TaskBoardPolicyCanvasSummary {
   TaskBoardPolicyCanvasSummary(
-    canvasId: canvasId,
-    title: title,
-    revision: revision,
-    mode: mode,
-    document: document,
-    nodeCount: nodeCount,
-    edgeCount: edgeCount,
-    groupCount: groupCount,
+    canvasId: input.canvasId,
+    title: input.title,
+    revision: input.revision,
+    mode: input.mode,
+    document: input.document,
+    nodeCount: input.nodeCount,
+    edgeCount: input.edgeCount,
+    groupCount: input.groupCount,
     updatedAt: "2026-05-31T00:00:00Z"
   )
 }
