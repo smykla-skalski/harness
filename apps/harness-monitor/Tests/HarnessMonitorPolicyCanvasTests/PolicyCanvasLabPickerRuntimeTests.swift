@@ -120,6 +120,75 @@ struct PolicyCanvasLabPickerRuntimeTests {
   }
 
   @MainActor
+  @Test("changing the lab sample after an algorithm edit replaces the rendered document")
+  func changingSampleAfterAlgorithmEditReplacesRenderedDocument() async throws {
+    let frame = CGRect(x: 0, y: 0, width: 1_400, height: 900)
+    let host = NSHostingView(
+      rootView: PolicyCanvasLabPickerHarness(
+        selection: .sample("default"),
+        algorithmSelection: .referenceRouting
+      )
+    )
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = frame
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil(timeout: .seconds(3)) {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        return nodePositions(in: host).count >= 16
+      }
+    )
+
+    let originalPositions = nodePositions(in: host)
+
+    host.rootView = PolicyCanvasLabPickerHarness(
+      selection: .sample("default"),
+      algorithmSelection: .referencePure
+    )
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil(timeout: .seconds(3)) {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        return nodePositionsChanged(from: originalPositions, to: nodePositions(in: host))
+      }
+    )
+
+    host.rootView = PolicyCanvasLabPickerHarness(
+      selection: .sample("minimal"),
+      algorithmSelection: .referencePure
+    )
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil(timeout: .seconds(4)) {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        let ids = nodeIDs(in: host)
+        return ids == ["entry", "finish"]
+      }
+    )
+  }
+
+  @MainActor
   @Test("the lab window keeps sample node groups in the rendered canvas")
   func labWindowKeepsSampleNodeGroupsInRenderedCanvas() async throws {
     let frame = CGRect(x: 0, y: 0, width: 1_400, height: 900)
@@ -230,6 +299,14 @@ private func nodePositions(in root: NSView) -> [String: CGPoint] {
       ($0.id, $0.position)
     }
   )
+}
+
+@MainActor
+private func nodeIDs(in root: NSView) -> Set<String> {
+  guard let documentView = descendant(of: root, as: PolicyCanvasNativeDocumentView.self) else {
+    return []
+  }
+  return Set(documentView.hostedState.snapshot.viewModel.nodes.map(\.id))
 }
 
 @MainActor
