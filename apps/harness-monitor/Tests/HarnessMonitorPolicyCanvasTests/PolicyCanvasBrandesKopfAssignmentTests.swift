@@ -232,12 +232,14 @@ struct PolicyCanvasBrandesKopfAssignmentTests {
     // Block-relative coordinates after placement: every block packs to 0.
     let x: [String: CGFloat] = ["A": 0, "A1": 0, "M": 0, "M1": 0, "L": 0]
     let shift = policyCanvasBKAccumulateShifts(
-      layers: layers,
-      positions: positions,
-      sink: sink,
-      x: x,
-      direction: .upLeft,
-      rowStep: 100
+      context: PolicyCanvasBKShiftAccumulationContext(
+        layers: layers,
+        positions: positions,
+        sink: sink,
+        x: x,
+        direction: .upLeft,
+        rowStep: 100
+      )
     )
     #expect(shift["M"] == -100)
     #expect(shift["L"] == -200)
