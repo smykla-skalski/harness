@@ -189,6 +189,10 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     )
     XCTAssertTrue(windowSource.contains(".controlSize(.small)"))
     XCTAssertTrue(controlsSource.contains(".controlSize(.small)"))
+    XCTAssertTrue(controlsSource.contains("private var horizontalContentPadding = 6.0"))
+    XCTAssertTrue(
+      controlsSource.contains(".padding(.horizontal, horizontalContentPadding)")
+    )
     XCTAssertFalse(windowSource.contains("PolicyCanvasLabToolbarTextMenuStyle"))
     XCTAssertFalse(controlsSource.contains("PolicyCanvasLabToolbarTextMenuStyle"))
     XCTAssertFalse(controlsSource.contains(".harnessControlPill"))
