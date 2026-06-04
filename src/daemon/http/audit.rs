@@ -1,6 +1,7 @@
 use axum::extract::{Query, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
+use std::time::Instant;
 
 use crate::daemon::protocol::{
     HarnessMonitorAuditDateRange, HarnessMonitorAuditEventsRequest, http_paths,
@@ -47,7 +48,7 @@ pub(super) async fn get_audit_events(
     State(state): State<DaemonHttpState>,
     Query(query): Query<AuditEventsQuery>,
 ) -> Response {
-    let start = std::time::Instant::now();
+    let start = Instant::now();
     let request_id = extract_request_id(&headers);
     if let Err(response) = require_auth(&headers, &state) {
         return *response;

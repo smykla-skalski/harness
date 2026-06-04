@@ -276,11 +276,14 @@ pub struct PolicyGraphGroup {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolicyGraphLayout {
     #[serde(
-        default = "default_policy_graph_zoom",
-        skip_serializing_if = "is_default_policy_graph_zoom"
+        default = "defaults::default_policy_graph_zoom",
+        skip_serializing_if = "defaults::is_default_policy_graph_zoom"
     )]
     pub zoom: f64,
-    #[serde(default, skip_serializing_if = "is_default_policy_canvas_point")]
+    #[serde(
+        default,
+        skip_serializing_if = "defaults::is_default_policy_canvas_point"
+    )]
     pub offset: PolicyCanvasPoint,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nodes: Vec<PolicyGraphNodeLayout>,
@@ -289,23 +292,11 @@ pub struct PolicyGraphLayout {
 impl Default for PolicyGraphLayout {
     fn default() -> Self {
         Self {
-            zoom: default_policy_graph_zoom(),
+            zoom: defaults::default_policy_graph_zoom(),
             offset: PolicyCanvasPoint::default(),
             nodes: Vec::new(),
         }
     }
-}
-
-fn default_policy_graph_zoom() -> f64 {
-    1.0
-}
-
-fn is_default_policy_graph_zoom(zoom: &f64) -> bool {
-    *zoom == default_policy_graph_zoom()
-}
-
-fn is_default_policy_canvas_point(point: &PolicyCanvasPoint) -> bool {
-    *point == PolicyCanvasPoint::default()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

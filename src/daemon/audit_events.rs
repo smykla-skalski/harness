@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{HarnessMonitorAuditEvent, StreamEvent};
+use crate::daemon::service::observe_sender;
 use crate::daemon::state;
 use crate::errors::CliError;
 use crate::workspace::utc_now;
@@ -80,6 +81,10 @@ pub(crate) async fn record_audit_event(
     persist_audit_event(async_db, &event).await;
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "audit persistence branches separately for db and legacy-event fallback"
+)]
 async fn persist_audit_event(async_db: &Arc<AsyncDaemonDb>, event: &HarnessMonitorAuditEvent) {
     match async_db.upsert_audit_event(event).await {
         Ok(()) => broadcast_audit_event(event),
@@ -100,8 +105,12 @@ async fn persist_audit_event(async_db: &Arc<AsyncDaemonDb>, event: &HarnessMonit
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "audit push broadcasting has explicit early returns for each failure mode"
+)]
 fn broadcast_audit_event(event: &HarnessMonitorAuditEvent) {
-    let Some(sender) = crate::daemon::service::observe_sender() else {
+    let Some(sender) = observe_sender() else {
         return;
     };
     let Ok(payload) = serde_json::to_value(event) else {
@@ -141,7 +150,7 @@ fn audit_event_from_result<T>(
             "error".to_owned(),
             "failure".to_owned(),
             format!("{} failed: {error}", draft.title),
-            payload_with_error(draft.payload_json, error),
+            Some(payload_with_error(draft.payload_json, error)),
         ),
     };
 
@@ -165,7 +174,7 @@ fn audit_event_from_result<T>(
     }
 }
 
-fn payload_with_error(payload: Option<Value>, error: &CliError) -> Option<Value> {
+fn payload_with_error(payload: Option<Value>, error: &CliError) -> Value {
     let mut object = match payload {
         Some(Value::Object(object)) => object,
         Some(value) => {
@@ -176,5 +185,5 @@ fn payload_with_error(payload: Option<Value>, error: &CliError) -> Option<Value>
         None => Map::new(),
     };
     object.insert("error".to_owned(), Value::String(error.to_string()));
-    Some(Value::Object(object))
+    Value::Object(object)
 }

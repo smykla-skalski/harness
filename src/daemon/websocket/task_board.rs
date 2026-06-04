@@ -8,6 +8,7 @@ use crate::daemon::protocol::{
     TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
     TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
 };
+use crate::errors::CliError;
 use serde::de::DeserializeOwned;
 
 use super::frames::error_response;
@@ -463,7 +464,7 @@ async fn record_task_board_audit_result<T>(
     title: &'static str,
     subject: Option<&str>,
     payload_json: serde_json::Value,
-    result: &Result<T, crate::errors::CliError>,
+    result: &Result<T, CliError>,
 ) {
     record_audit_result(
         state.async_db.get(),

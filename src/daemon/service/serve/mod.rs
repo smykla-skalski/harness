@@ -35,6 +35,10 @@ use tracing::field::{Empty, display};
 ///
 /// # Errors
 /// Returns [`CliError`] if the server fails to start or bind.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "daemon serve wires startup, runtime, and teardown in one lifecycle path"
+)]
 pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     validate_serve_config(&config)?;
     log_sandbox_startup(config.sandboxed);

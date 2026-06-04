@@ -3,6 +3,7 @@ use std::slice::from_ref;
 use std::sync::Arc;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::service::observe_async_db;
 use crate::daemon::service::reviews::policy_audit::record_policy_run_start_result;
 use crate::daemon::service::reviews::policy_executor::{
     build_policy_provider_registry, daemon_policy_executor_with_audit,
@@ -94,8 +95,7 @@ pub(crate) fn preview_reviews_policy_with_root(
 pub async fn start_reviews_policy_run(
     request: &ReviewsPolicyRunStartRequest,
 ) -> Result<ReviewsPolicyRunResponse, CliError> {
-    start_reviews_policy_run_with_audit_db(request, crate::daemon::service::observe_async_db())
-        .await
+    start_reviews_policy_run_with_audit_db(request, observe_async_db()).await
 }
 
 pub(crate) async fn start_reviews_policy_run_with_audit_db(
@@ -143,7 +143,7 @@ fn log_started_background_runs(started_runs: usize) {
 /// failures are logged and reported as `false`.
 async fn start_background_reviews_policy_run_for_item(item: &ReviewItem) -> bool {
     let target = item.target();
-    let audit_db = crate::daemon::service::observe_async_db();
+    let audit_db = observe_async_db();
     let Some(executor) = resolve_background_run_executor(&target, audit_db.clone()) else {
         return false;
     };

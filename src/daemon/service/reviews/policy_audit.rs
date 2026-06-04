@@ -181,6 +181,10 @@ impl PolicyRunAuditDescriptor {
         }
     }
 
+    #[expect(
+        clippy::unused_self,
+        reason = "descriptor methods keep the status-specific copy together"
+    )]
     fn summary(&self, run: &ReviewsPolicyRunResponse) -> String {
         let subject = policy_run_subject(run);
         match run.status {

@@ -201,7 +201,7 @@ fn build_review_item(
         || (String::new(), None),
         |author| (author.login.unwrap_or_default(), author.avatar_url),
     );
-    let viewer_is_requested_reviewer = viewer_login.map_or(false, |viewer_login| {
+    let viewer_is_requested_reviewer = viewer_login.is_some_and(|viewer_login| {
         node.review_requests
             .as_ref()
             .is_some_and(|review_requests| {

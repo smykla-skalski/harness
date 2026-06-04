@@ -12,6 +12,7 @@ use crate::daemon::protocol::{
     ReviewsTimelineRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
+use crate::errors::CliError;
 use serde::de::DeserializeOwned;
 
 use super::frames::error_response;
@@ -448,7 +449,7 @@ async fn record_reviews_audit_result<T>(
     title: &'static str,
     targets: &[ReviewTarget],
     payload_json: serde_json::Value,
-    result: &Result<T, crate::errors::CliError>,
+    result: &Result<T, CliError>,
 ) {
     record_github_audit_result(
         state,
@@ -469,7 +470,7 @@ async fn record_github_audit_result<T>(
     subject: Option<String>,
     payload_json: serde_json::Value,
     related_urls: Vec<String>,
-    result: &Result<T, crate::errors::CliError>,
+    result: &Result<T, CliError>,
 ) {
     record_audit_result(
         state.async_db.get(),
