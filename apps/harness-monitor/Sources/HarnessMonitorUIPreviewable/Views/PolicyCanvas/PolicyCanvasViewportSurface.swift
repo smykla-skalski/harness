@@ -74,6 +74,19 @@ public struct PolicyCanvasViewportSurface: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
     .environment(\.policyCanvasReducedMotion, systemReduceMotion)
+    .task {
+      // Lab capture affordance. The fixture-load path renders the document's
+      // authored positions without running the auto-arrange engine, so an agent
+      // screenshot of a fixture shows the saved seeds, not the engine output.
+      // When this env is set the surface forces an unconstrained reflow on
+      // appear so the capture reflects the layered engine. The shipping policy
+      // canvas uses PolicyCanvasView, not this surface, and never sets the env.
+      if ProcessInfo.processInfo.environment[
+        "HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW"
+      ] == "1" {
+        viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+      }
+    }
     .onChange(of: snapshot, initial: false) { oldSnapshot, newSnapshot in
       viewModel.algorithmSelection = newSnapshot.algorithmSelection
       if oldSnapshot.document != newSnapshot.document {

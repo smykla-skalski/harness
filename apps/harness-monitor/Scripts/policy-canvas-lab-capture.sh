@@ -74,6 +74,14 @@ if [[ -n "$FIXTURE" ]]; then
   rm -f "$DECODE_LOG" 2>/dev/null
 fi
 
+# 3b. Optional force-reflow env: when set, the lab runs the auto-arrange engine
+#     on appear instead of rendering the document's authored seed positions, so
+#     the capture reflects the layered engine output.
+reflow_env=()
+if [[ "${HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW:-}" == "1" ]]; then
+  reflow_env=(--env "HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW=1")
+fi
+
 # 4. Relaunch: close any prior standalone lab host from this lane's build
 #    products, then force a fresh instance so the fixture env applies.
 for _ in $(seq 1 12); do
@@ -88,6 +96,7 @@ done
 # window id (works across Spaces) without stealing the developer's focus.
 open -g -n "$APP" \
   ${fixture_env[@]+"${fixture_env[@]}"} \
+  ${reflow_env[@]+"${reflow_env[@]}"} \
   || { echo "error: open failed" >&2; exit 1; }
 
 # 5. Window finder (CGWindowList), emitted as: windowID \t area \t title. Uses
