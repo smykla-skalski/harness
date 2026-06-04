@@ -120,13 +120,13 @@ struct PolicyCanvasLabPickerRuntimeTests {
   }
 
   @MainActor
-  @Test("changing the lab group switch strips groups from the rendered canvas")
-  func changingGroupSwitchStripsRenderedCanvasGroups() async throws {
+  @Test("the lab window keeps sample node groups in the rendered canvas")
+  func labWindowKeepsSampleNodeGroupsInRenderedCanvas() async throws {
     let frame = CGRect(x: 0, y: 0, width: 1_400, height: 900)
     let host = NSHostingView(
-      rootView: PolicyCanvasLabPickerHarness(
-        selection: .sample("default"),
-        includesGroupsInLayout: true
+      rootView: PolicyCanvasLabWindowView(
+        initialSelection: .sample("default"),
+        fixtureDocument: nil
       )
     )
     let window = NSWindow(
@@ -156,26 +156,6 @@ struct PolicyCanvasLabPickerRuntimeTests {
         return !snapshot.groupIDs.isEmpty && snapshot.nodeGroupIDs.contains { $0 != nil }
       }
     )
-
-    host.rootView = PolicyCanvasLabPickerHarness(
-      selection: .sample("default"),
-      includesGroupsInLayout: false
-    )
-    window.layoutIfNeeded()
-    host.layoutSubtreeIfNeeded()
-
-    #expect(
-      await waitUntil(timeout: .seconds(3)) {
-        window.layoutIfNeeded()
-        host.layoutSubtreeIfNeeded()
-        guard let snapshot = groupingSnapshot(in: host) else {
-          return false
-        }
-        return snapshot.nodeIDs.count >= 16
-          && snapshot.groupIDs.isEmpty
-          && snapshot.nodeGroupIDs.allSatisfy { $0 == nil }
-      }
-    )
   }
 }
 
@@ -188,25 +168,19 @@ private struct PolicyCanvasLabPickerRenderedSnapshot: Equatable {
 private struct PolicyCanvasLabPickerHarness: View {
   let selection: PolicyCanvasLabSelection
   let algorithmSelection: PolicyCanvasAlgorithmSelection
-  let includesGroupsInLayout: Bool
 
   init(
     selection: PolicyCanvasLabSelection,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
-    includesGroupsInLayout: Bool = true
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
   ) {
     self.selection = selection
     self.algorithmSelection = algorithmSelection
-    self.includesGroupsInLayout = includesGroupsInLayout
   }
 
   var body: some View {
     let renderedSnapshot = snapshot(for: selection)
     PolicyCanvasViewportSurface(
-      document: PolicyCanvasLabSnapshotSupport.document(
-        renderedSnapshot.document,
-        includesGroups: includesGroupsInLayout
-      ),
+      document: renderedSnapshot.document,
       simulation: renderedSnapshot.simulation,
       audit: renderedSnapshot.audit,
       algorithmSelection: algorithmSelection

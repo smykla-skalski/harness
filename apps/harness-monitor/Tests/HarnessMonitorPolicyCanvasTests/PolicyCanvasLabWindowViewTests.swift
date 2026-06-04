@@ -124,16 +124,12 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(source.contains("algorithmSelection: algorithmSelection"))
   }
 
-  func testLabToolbarExposesGroupsToggleBeforeAlgorithmPickers() throws {
+  func testLabSamplePickerToolbarDoesNotExposeGroupsToggle() throws {
     let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
     let controlsSource = try policyCanvasSourceFile(named: "PolicyCanvasLabToolbarControls.swift")
 
-    XCTAssertTrue(windowSource.contains("@State private var includesGroupsInLayout = false"))
-    XCTAssertTrue(
-      windowSource.contains(
-        "PolicyCanvasLabGroupsToggle(includesGroupsInLayout: $includesGroupsInLayout)"
-      )
-    )
+    XCTAssertFalse(windowSource.contains("includesGroupsInLayout"))
+    XCTAssertFalse(windowSource.contains("PolicyCanvasLabGroupsToggle"))
     XCTAssertTrue(windowSource.contains("ToolbarItem(placement: .primaryAction)"))
     XCTAssertTrue(
       windowSource.contains(
@@ -144,8 +140,9 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(controlsSource.contains("@ToolbarContentBuilder"))
     XCTAssertFalse(windowSource.contains("ToolbarItemGroup(placement: .primaryAction)"))
     XCTAssertFalse(windowSource.contains(".sharedBackgroundVisibility(.automatic)"))
-    XCTAssertTrue(controlsSource.contains("Toggle(isOn: $includesGroupsInLayout)"))
-    XCTAssertTrue(controlsSource.contains("Text(\"Groups\")"))
+    XCTAssertFalse(controlsSource.contains("PolicyCanvasLabGroupsToggle"))
+    XCTAssertFalse(controlsSource.contains("Toggle(isOn: $includesGroupsInLayout)"))
+    XCTAssertFalse(controlsSource.contains("Text(\"Groups\")"))
   }
 
   func testLabToolbarTextMenusUseNativeButtonChromeOnly() throws {
