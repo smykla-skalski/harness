@@ -1,0 +1,329 @@
+import CoreGraphics
+import Foundation
+import Testing
+
+@testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
+
+/// Fan-in / fan-out channel quality. When several edges converge on one port (or
+/// diverge from one port) their interior segments must run in distinct lanes -
+/// never stacking collinearly on a shared corridor. The nudge may still trade a
+/// few overlaps for X-crossings while the H/V coupling is tuned; a per-sample
+/// ratchet locks that residual so it can only shrink. Measured on the reflowed
+/// group-free samples the algorithm is tuned against, simplest to most complex.
+@Suite("Policy canvas fan-in channel", .serialized)
+@MainActor
+struct PolicyCanvasFanInChannelTests {
+  /// Every lab policy, simplest -> most complex. Walking the whole ladder
+  /// catches a routing change that helps one shape and regresses another -
+  /// a single sample is never enough.
+  private static let sampleIDs = PolicyCanvasLabSamples.all.map(\.id)
+
+  /// Collinear overlap of an interior segment between two different edges, longer
+  /// than this, reads as two wires stacked on one rail. Port stubs (first/last
+  /// segment) are excluded because every wire legitimately shares the short
+  /// perpendicular lead at its own port.
+  private static let overlapThreshold: CGFloat = 8
+
+  /// Added X-crossings the nudge currently trades for overlap removal, per
+  /// sample. These are the known residual from the H/V coupling on
+  /// same-direction stubs - the goal is zero. The ratchet only lets these
+  /// numbers shrink: any new crossing beyond the budget fails the gate.
+  private static let addedCrossingBudget: [String: Int] = [
+    "branching": 3,
+    "multi-group": 3,
+    "extreme": 5,
+  ]
+
+  @Test("converging rails never stack collinearly across the lab samples")
+  func convergingRailsNeverStackCollinearly() async throws {
+    let baseline = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
+      stage: .routePostProcessing,
+      with: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
+    )
+    let nudged = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
+      stage: .routePostProcessing,
+      with: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
+    )
+    var totals = ""
+    var details = ""
+    var overlapViolations: [String] = []
+    var crossingViolations: [String] = []
+    for sampleID in Self.sampleIDs {
+      let before = try await routedScene(sampleID: sampleID, selection: baseline)
+      let after = try await routedScene(sampleID: sampleID, selection: nudged)
+      let beforeOverlaps = interiorOverlapPairs(routes: before.routes, edges: before.edges)
+      let beforeCrossings = crossingPairs(routes: before.routes, edges: before.edges)
+      let afterOverlaps = interiorOverlapPairs(routes: after.routes, edges: after.edges)
+      let afterCrossings = crossingPairs(routes: after.routes, edges: after.edges)
+      totals +=
+        "\(sampleID): overlaps \(beforeOverlaps.count)->\(afterOverlaps.count)"
+        + "  crossings \(beforeCrossings.count)->\(afterCrossings.count)\n"
+      for entry in afterOverlaps.sorted() {
+        details += "  \(sampleID) overlap \(entry)\n"
+      }
+      // Only the crossings the nudge introduces or removes - the pre-existing
+      // ones are the router's, not ours, and listing the full set buries the
+      // delta that "crossings not worse" actually turns on.
+      let addedCrossings = Set(afterCrossings).subtracting(beforeCrossings).sorted()
+      let removedCrossings = Set(beforeCrossings).subtracting(afterCrossings).sorted()
+      for entry in addedCrossings {
+        details += "  \(sampleID) ADDED cross \(entry)\n"
+      }
+      for entry in removedCrossings {
+        details += "  \(sampleID) removed cross \(entry)\n"
+      }
+
+      // Primary guarantee: the nudge clears every collinear interior stack.
+      if !afterOverlaps.isEmpty {
+        overlapViolations.append("\(sampleID): \(afterOverlaps)")
+      }
+      // Secondary ratchet: added crossings stay within the documented residual.
+      let budget = Self.addedCrossingBudget[sampleID, default: 0]
+      if addedCrossings.count > budget {
+        crossingViolations.append(
+          "\(sampleID): added \(addedCrossings.count) > budget \(budget) - \(addedCrossings)"
+        )
+      }
+    }
+    // Written for the ongoing crossing work; the build-log expansions below
+    // carry the same totals when the connected-device flake eats the file.
+    writeReport("TOTALS\n\(totals)DETAILS\n\(details)", name: "fan-in-report.txt")
+
+    let overlapDetail = overlapViolations.joined(separator: "\n")
+    let crossingDetail = crossingViolations.joined(separator: "\n")
+    #expect(
+      overlapViolations.isEmpty,
+      "interior collinear stacks remain after nudging\n\(overlapDetail)\nTOTALS\n\(totals)"
+    )
+    #expect(
+      crossingViolations.isEmpty,
+      "added X-crossings exceeded the residual budget\n\(crossingDetail)\nTOTALS\n\(totals)"
+    )
+  }
+
+  @Test("dump fan group geometry for design")
+  func dumpFanGroupGeometry() async throws {
+    let baseline = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
+      stage: .routePostProcessing,
+      with: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
+    )
+    let nudged = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
+      stage: .routePostProcessing,
+      with: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
+    )
+    var report = ""
+    for sampleID in ["default", "multi-group"] {
+      let scene = try await routedScene(sampleID: sampleID, selection: nudged)
+      let before = try await routedScene(sampleID: sampleID, selection: baseline)
+      report += "===== \(sampleID) =====\n"
+      report += "NODES:\n"
+      for (nodeID, frame) in scene.nodeFrames.sorted(by: { $0.value.minY < $1.value.minY }) {
+        report += "  \(nodeID) \(rect(frame))\n"
+      }
+      let fanIn = Dictionary(grouping: scene.edges, by: \.target).filter { $0.value.count > 1 }
+      for (endpoint, members) in fanIn.sorted(by: { $0.key.nodeID < $1.key.nodeID }) {
+        let frame = scene.nodeFrames[endpoint.nodeID] ?? .null
+        report += "FAN-IN target=\(endpoint.nodeID):\(endpoint.portID) frame=\(rect(frame)) n=\(members.count)\n"
+        for edge in members.sorted(by: { $0.id < $1.id }) {
+          report += memberLine(edge: edge, scene: scene)
+        }
+      }
+      let fanOut = Dictionary(grouping: scene.edges, by: \.source).filter { $0.value.count > 1 }
+      for (endpoint, members) in fanOut.sorted(by: { $0.key.nodeID < $1.key.nodeID }) {
+        let frame = scene.nodeFrames[endpoint.nodeID] ?? .null
+        report += "FAN-OUT source=\(endpoint.nodeID):\(endpoint.portID) frame=\(rect(frame)) n=\(members.count)\n"
+        for edge in members.sorted(by: { $0.id < $1.id }) {
+          report += memberLine(edge: edge, scene: scene)
+        }
+      }
+      // Node-level fans (members leave one node via different ports) are invisible
+      // above; dump every edge - before (baseline) and after (nudged) - so the
+      // crossings the nudge actually introduces can be traced by hand.
+      report += "ALL EDGES (src node -> tgt node) [B=before, A=after]:\n"
+      for edge in scene.edges.sorted(by: { $0.id < $1.id }) {
+        report += "  \(edge.id) \(edge.source.nodeID):\(edge.source.portID)"
+          + " -> \(edge.target.nodeID):\(edge.target.portID)\n"
+        report += "   B " + routePoints(edge: edge, scene: before)
+        report += "   A " + routePoints(edge: edge, scene: scene)
+      }
+    }
+    writeReport(report, name: "fan-geometry.txt")
+    #expect(Bool(true))
+  }
+
+  private func memberLine(edge: PolicyCanvasEdge, scene: Scene) -> String {
+    guard let route = scene.routes[edge.id] else {
+      return "  \(edge.id): (no route)\n"
+    }
+    let pts = route.points.map { "(\(Int($0.x.rounded())),\(Int($0.y.rounded())))" }.joined(separator: " ")
+    return "  \(edge.id) src=\(edge.source.nodeID): \(pts)\n"
+  }
+
+  private func routePoints(edge: PolicyCanvasEdge, scene: Scene) -> String {
+    guard let route = scene.routes[edge.id] else {
+      return "(no route)\n"
+    }
+    return route.points.map { "(\(Int($0.x.rounded())),\(Int($0.y.rounded())))" }
+      .joined(separator: " ") + "\n"
+  }
+
+  private func rect(_ frame: CGRect) -> String {
+    "[\(Int(frame.minX.rounded())),\(Int(frame.minY.rounded())) \(Int(frame.width.rounded()))x\(Int(frame.height.rounded()))]"
+  }
+
+  // MARK: - Scene
+
+  private struct Scene {
+    let edges: [PolicyCanvasEdge]
+    let routes: [String: PolicyCanvasEdgeRoute]
+    let nodeFrames: [String: CGRect]
+  }
+
+  private func routedScene(
+    sampleID: String,
+    selection: PolicyCanvasAlgorithmSelection = .referenceRouting
+  ) async throws -> Scene {
+    let sample = try #require(PolicyCanvasLabSamples.sample(id: sampleID))
+    // Strip groups so the layout/routing/nudging work on plain nodes + edges.
+    // The group band layout is the structural cause of most overlaps and forced
+    // crossings; with it gone we tune the algorithm against the bare graph.
+    let document =
+      PolicyCanvasLabSnapshotSupport.document(sample.document, includesGroups: false)
+      ?? sample.document
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: document, simulation: nil, audit: nil)
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+    let edges = viewModel.edges
+    let nodeFrames = Dictionary(
+      uniqueKeysWithValues: viewModel.nodes.map { ($0.id, policyCanvasNodeFrame($0)) }
+    )
+    let input = PolicyCanvasRouteWorkerInput(
+      nodes: viewModel.nodes,
+      groups: viewModel.groups,
+      edges: edges,
+      fontScale: 1,
+      routingHints: viewModel.routingHints,
+      algorithmSelection: selection
+    )
+    let output = await PolicyCanvasRouteWorker().compute(input: input)
+    return Scene(edges: edges, routes: output.routes, nodeFrames: nodeFrames)
+  }
+
+  // MARK: - Metrics
+
+  private func interiorOverlapPairs(
+    routes: [String: PolicyCanvasEdgeRoute],
+    edges: [PolicyCanvasEdge]
+  ) -> [String] {
+    let interior = edges.compactMap { edge -> (id: String, segments: [PolicyCanvasRouteSegment])? in
+      guard let route = routes[edge.id] else {
+        return nil
+      }
+      return (edge.id, Array(policyCanvasRouteSegments(route).dropFirst().dropLast()))
+    }
+    var pairs: [String] = []
+    for left in interior.indices {
+      for right in interior.index(after: left)..<interior.endIndex {
+        let overlap = maximumOverlap(interior[left].segments, interior[right].segments)
+        if overlap > Self.overlapThreshold {
+          pairs.append("\(interior[left].id) ~ \(interior[right].id) (\(Int(overlap)))")
+        }
+      }
+    }
+    return pairs
+  }
+
+  private func maximumOverlap(
+    _ left: [PolicyCanvasRouteSegment],
+    _ right: [PolicyCanvasRouteSegment]
+  ) -> CGFloat {
+    var best: CGFloat = 0
+    for leftSegment in left {
+      // `overlap(with:)` returns the range overlap for any two same-axis
+      // segments; it only counts as a real collinear stack when they also share
+      // the same lane coordinate (same x for verticals, same y for horizontals).
+      for rightSegment in right where leftSegment.sharesAxisLane(with: rightSegment) {
+        best = max(best, leftSegment.overlap(with: rightSegment))
+      }
+    }
+    return best
+  }
+
+  private func crossingPairs(
+    routes: [String: PolicyCanvasEdgeRoute],
+    edges: [PolicyCanvasEdge]
+  ) -> [String] {
+    let realized = edges.compactMap { edge in
+      routes[edge.id].map { (id: edge.id, route: $0) }
+    }
+    var crossings: [String] = []
+    for left in realized.indices {
+      for right in realized.index(after: left)..<realized.endIndex
+      where routesProperlyCross(realized[left].route, realized[right].route) {
+        crossings.append("\(realized[left].id) x \(realized[right].id)")
+      }
+    }
+    return crossings
+  }
+
+  private func routesProperlyCross(
+    _ left: PolicyCanvasEdgeRoute,
+    _ right: PolicyCanvasEdgeRoute
+  ) -> Bool {
+    for (a0, a1) in zip(left.points, left.points.dropFirst()) {
+      for (b0, b1) in zip(right.points, right.points.dropFirst())
+      where segmentsProperlyCross(a0, a1, b0, b1) {
+        return true
+      }
+    }
+    return false
+  }
+
+  private func segmentsProperlyCross(
+    _ a0: CGPoint,
+    _ a1: CGPoint,
+    _ b0: CGPoint,
+    _ b1: CGPoint
+  ) -> Bool {
+    let tolerance: CGFloat = 0.5
+    let aHorizontal = abs(a0.y - a1.y) < tolerance
+    let aVertical = abs(a0.x - a1.x) < tolerance
+    let bHorizontal = abs(b0.y - b1.y) < tolerance
+    let bVertical = abs(b0.x - b1.x) < tolerance
+    if aHorizontal, bVertical {
+      let crossX = b0.x
+      let crossY = a0.y
+      return crossX > min(a0.x, a1.x) + tolerance
+        && crossX < max(a0.x, a1.x) - tolerance
+        && crossY > min(b0.y, b1.y) + tolerance
+        && crossY < max(b0.y, b1.y) - tolerance
+    }
+    if aVertical, bHorizontal {
+      return segmentsProperlyCross(b0, b1, a0, a1)
+    }
+    return false
+  }
+
+  // MARK: - Report
+
+  private func writeReport(_ contents: String, name: String) {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let worktreeRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let directory = worktreeRoot.appendingPathComponent("tmp/policy-canvas")
+    try? FileManager.default.createDirectory(
+      at: directory,
+      withIntermediateDirectories: true
+    )
+    try? contents.write(
+      to: directory.appendingPathComponent(name),
+      atomically: true,
+      encoding: .utf8
+    )
+  }
+}
