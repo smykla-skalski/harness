@@ -30,8 +30,6 @@ public struct SessionWindowView: View {
   var inspectorWidthStorage = 280.0
   @SceneStorage("session.sidebarWidth")
   var sidebarWidthStorage = 200.0
-  @AppStorage(HarnessMonitorTrackpadNavigationDefaults.enabledKey)
-  var trackpadNavigationEnabled = HarnessMonitorTrackpadNavigationDefaults.enabledDefault
   @SceneStorage("session.content-detail.width")
   var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth
   @AccessibilityFocusState var primaryContentAccessibilityFocused: Bool

@@ -211,14 +211,16 @@ extension SessionWindowView {
     Group {
       switch renderedRoute.layoutStyle {
       case .sidebarDetail:
-        routeDetailColumn
+        contentColumn
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       case .sidebarContentDetail:
         SessionContentDetailSplitView(
           contentWidth: contentColumnWidthBinding,
           perfOverrideContentWidth: perfContentDividerWidthBinding,
           commitContentWidth: commitContentColumnWidth
         ) {
-          trackpadHistoryContentColumn
+          contentColumn
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } detail: {
           detailColumn
         }
