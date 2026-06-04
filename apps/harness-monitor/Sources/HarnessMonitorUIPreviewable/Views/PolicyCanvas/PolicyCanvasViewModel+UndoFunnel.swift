@@ -303,13 +303,15 @@ extension PolicyCanvasViewModel {
       let toEdges
     ):
       return applySetNodeSwitchCases(
-        id: id,
-        from: from,
-        to: to,
-        fromOutputPortTitles: fromOutputPortTitles,
-        toOutputPortTitles: toOutputPortTitles,
-        fromEdges: fromEdges,
-        toEdges: toEdges
+        PolicyCanvasNodeSwitchCasesChange(
+          id: id,
+          from: from,
+          to: to,
+          fromOutputPortTitles: fromOutputPortTitles,
+          toOutputPortTitles: toOutputPortTitles,
+          fromEdges: fromEdges,
+          toEdges: toEdges
+        )
       )
     case .setNodeAutomationBinding(let id, let from, let to):
       return applySetNodeAutomationBinding(id: id, from: from, to: to)
