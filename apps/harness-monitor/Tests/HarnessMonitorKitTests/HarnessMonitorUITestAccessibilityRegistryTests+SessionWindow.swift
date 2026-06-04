@@ -209,7 +209,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let dashboardSidebarSessionsView = try sourceFile(
       named: "DashboardSidebarRecentSessionsSection.swift"
     )
-    let auditView = try sourceFile(named: "DashboardAuditRouteView.swift")
+    let auditView = try dashboardAuditSource()
     let diagnosticsView = try sourceFile(named: "DashboardDiagnosticsRouteView.swift")
     let debuggingView = try sourceFile(named: "DashboardDebuggingRouteView.swift")
     let debuggingScreenshotsView = try sourceFile(named: "DashboardDebuggingOCRScreenshots.swift")
@@ -298,6 +298,17 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(auditView.contains("HarnessMonitorJSONCodeBlock(rawJSON: payload)"))
     #expect(!auditView.contains("DashboardAuditTextBlock(title: \"Payload\", text: payload)"))
+  }
+
+  private func dashboardAuditSource() throws -> String {
+    try [
+      "DashboardAuditRouteView.swift",
+      "DashboardAuditRouteView+Timeline.swift",
+      "DashboardAuditRouteView+DisplaySupport.swift",
+      "DashboardAuditRouteView+Detail.swift",
+    ]
+    .map { try sourceFile(named: $0) }
+    .joined(separator: "\n")
   }
 
   private func expectDashboardDebuggingIdentifierUsage(
