@@ -104,10 +104,11 @@ struct DashboardReviewsTextPastePolicyTests {
     let output = ReviewScreenshotExtractedPullRequestURLList.outputText(from: references)
 
     #expect(
-      output == [
-        "https://github.com/kong/kuma/pull/16703",
-        "https://github.com/smykla-skalski/harness/pull/1234",
-      ].joined(separator: "\n")
+      output
+        == [
+          "https://github.com/kong/kuma/pull/16703",
+          "https://github.com/smykla-skalski/harness/pull/1234",
+        ].joined(separator: "\n")
     )
   }
 
