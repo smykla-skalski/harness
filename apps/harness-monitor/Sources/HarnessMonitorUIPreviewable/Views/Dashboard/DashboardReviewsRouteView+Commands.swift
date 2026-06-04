@@ -9,9 +9,9 @@ extension DashboardReviewsRouteView {
     return DashboardReviewsCommandFocus(
       selectionCount: commandItems.count,
       hasProblemChecksFilter: showsProblemChecksOnly,
-      canApprove: commandItems.contains(where: \.canAttemptManualApproval),
-      canMerge: commandItems.contains(where: \.canAttemptManualMerge),
-      canRerunChecks: commandItems.contains(where: \.canAttemptRerunChecks),
+      canApprove: commandItems.contains(where: { $0.canAttemptManualApproval }),
+      canMerge: commandItems.contains(where: { $0.canAttemptManualMerge }),
+      canRerunChecks: commandItems.contains(where: { $0.canAttemptRerunChecks }),
       canOpenPullRequest: primaryItem != nil,
       canCopyDiagnostics: primaryItem != nil,
       canTogglePinSelection: !commandItems.isEmpty,

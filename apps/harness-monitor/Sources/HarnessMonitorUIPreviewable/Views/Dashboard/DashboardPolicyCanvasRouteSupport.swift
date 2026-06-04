@@ -4,7 +4,7 @@ import HarnessMonitorPolicyCanvas
 import SwiftUI
 
 @MainActor
-private final class DashboardPolicyCanvasViewModelStore: ObservableObject {
+final class DashboardPolicyCanvasViewModelStore: ObservableObject {
   @Published var viewModel: PolicyCanvasViewModel
 
   init(
@@ -22,7 +22,7 @@ private final class DashboardPolicyCanvasViewModelStore: ObservableObject {
   }
 }
 
-private struct DashboardPolicyCanvasRefreshTaskID: Equatable {
+struct DashboardPolicyCanvasRefreshTaskID: Equatable {
   let isRouteVisible: Bool
   let connectionState: HarnessMonitorStore.ConnectionState
   let needsInitialRefresh: Bool

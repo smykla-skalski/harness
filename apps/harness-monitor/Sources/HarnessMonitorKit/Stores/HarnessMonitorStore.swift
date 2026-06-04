@@ -376,8 +376,7 @@ public final class HarnessMonitorStore {
     self.fileViewer = fileViewer
     self.voiceCapture = voiceCapture
     self.taskBoardSettingsWorker = taskBoardSettingsWorker
-    self.reviewFilePreviewStore = reviewFilePreviewStore
-    self.reviewFilePatchStore = reviewFilePatchStore
+    (self.reviewFilePreviewStore, self.reviewFilePatchStore) = (reviewFilePreviewStore, reviewFilePatchStore)
     self.modelContext = modelContainer?.mainContext
     self.userDataService = modelContainer.map {
       UserDataPersistenceService(

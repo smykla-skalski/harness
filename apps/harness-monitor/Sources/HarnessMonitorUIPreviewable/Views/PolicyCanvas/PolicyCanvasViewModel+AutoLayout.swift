@@ -1,6 +1,12 @@
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
+private struct PolicyCanvasReflowSnapshot {
+  let nodes: [PolicyCanvasNode]
+  let edges: [PolicyCanvasEdge]
+  let routingHints: PolicyCanvasLayoutRoutingHints?
+}
+
 extension PolicyCanvasViewModel {
   var canReflowLayout: Bool {
     !nodes.isEmpty
@@ -43,18 +49,7 @@ extension PolicyCanvasViewModel {
         requestRouteComputation()
       }
     }
-    let requestRoutesAndCenterIfNeeded = { [self] in
-      requestExplicitRoutesIfNeeded()
-      if requestsRouteComputation {
-        requestViewportCentering(.documentAfterRouteComputation)
-      }
-    }
-    let hasManualAnchors = nodes.contains { $0.layoutSource == .manual }
-    let hasAutoPlacedNodes = nodes.contains { $0.layoutSource == .auto }
-    let preservesManualAnchors =
-      preserveManualAnchors
-      && hasManualAnchors
-      && hasAutoPlacedNodes
+    let preservesManualAnchors = shouldPreserveManualAnchors(preserveManualAnchors)
     // Reformat re-runs the layered engine, whose depth-based output spreads a
     // hand-authored policy graph across the canvas. When the current layout is
     // already valid - no node or group overlaps and every node sits inside its
@@ -64,18 +59,62 @@ extension PolicyCanvasViewModel {
     // initial load, which only auto-arranges a layout that needs it.
     // `force` overrides this for surfaces (the Policy Canvas Lab) that always
     // want the engine's best placement rather than the persisted coordinates.
-    guard
-      force
-        || preservesManualAnchors
-        || policyCanvasNeedsDefaultArrangement(nodes: nodes, groups: groups)
-    else {
-      restoreMissingRoutingHintsForCurrentLayout()
-      requestRoutesAndCenterIfNeeded()
-      notifyStatus("Layout already tidy")
+    guard shouldReflowLayout(force: force, preservesManualAnchors: preservesManualAnchors) else {
+      finishNoOpReflow(
+        nextRoutingHints: nil,
+        requestsRouteComputation: requestsRouteComputation,
+        status: "Layout already tidy"
+      )
       return
     }
-    let centersInMinimumCanvas = !preservesManualAnchors
+    guard
+      let reflowSnapshot = makeReflowSnapshot(preservesManualAnchors: preservesManualAnchors)
+    else {
+      notifyStatus("Layout could not be reflowed")
+      return
+    }
+    applyReflowSnapshot(
+      reflowSnapshot,
+      requestsRouteComputation: requestsRouteComputation,
+      requestExplicitRoutesIfNeeded: requestExplicitRoutesIfNeeded
+    )
+  }
 
+  private func shouldPreserveManualAnchors(_ preserveManualAnchors: Bool) -> Bool {
+    let hasManualAnchors = nodes.contains { $0.layoutSource == .manual }
+    let hasAutoPlacedNodes = nodes.contains { $0.layoutSource == .auto }
+    return preserveManualAnchors && hasManualAnchors && hasAutoPlacedNodes
+  }
+
+  private func shouldReflowLayout(
+    force: Bool,
+    preservesManualAnchors: Bool
+  ) -> Bool {
+    force
+      || preservesManualAnchors
+      || policyCanvasNeedsDefaultArrangement(nodes: nodes, groups: groups)
+  }
+
+  private func finishNoOpReflow(
+    nextRoutingHints: PolicyCanvasLayoutRoutingHints?,
+    requestsRouteComputation: Bool,
+    status: String
+  ) {
+    if let nextRoutingHints, routingHints?.isEmpty != false {
+      refreshRoutingHints(to: nextRoutingHints)
+    } else {
+      restoreMissingRoutingHintsForCurrentLayout()
+    }
+    if requestsRouteComputation {
+      requestRouteComputation()
+      requestViewportCentering(.documentAfterRouteComputation)
+    }
+    notifyStatus(status)
+  }
+
+  private func makeReflowSnapshot(
+    preservesManualAnchors: Bool
+  ) -> PolicyCanvasReflowSnapshot? {
     var nextNodes = nodes
     var nextGroups = groups
     guard
@@ -91,14 +130,13 @@ extension PolicyCanvasViewModel {
         algorithmSelection: algorithmSelection
       )
     else {
-      notifyStatus("Layout could not be reflowed")
-      return
+      return nil
     }
     let nextRoutingHints = applyPolicyCanvasLayoutResult(
       result,
       nodes: &nextNodes,
       groups: &nextGroups,
-      centerInMinimumCanvas: centersInMinimumCanvas
+      centerInMinimumCanvas: !preservesManualAnchors
     )
     if policyCanvasUsesSingleFedTerminalAlignment(algorithmSelection) {
       policyCanvasAlignSingleFedTerminals(nodes: &nextNodes, groups: &nextGroups, edges: edges)
@@ -110,9 +148,52 @@ extension PolicyCanvasViewModel {
         preservesPinnedState: true
       )
     }
+    return PolicyCanvasReflowSnapshot(
+      nodes: nextNodes,
+      edges: nextEdges,
+      routingHints: nextRoutingHints
+    )
+  }
 
+  private func applyReflowSnapshot(
+    _ snapshot: PolicyCanvasReflowSnapshot,
+    requestsRouteComputation: Bool,
+    requestExplicitRoutesIfNeeded: () -> Void
+  ) {
+    let nodeChanges = reflowNodeChanges(to: snapshot.nodes)
+    let edgeChanges = reflowEdgeChanges(to: snapshot.edges)
+
+    guard !nodeChanges.isEmpty || !edgeChanges.isEmpty else {
+      finishNoOpReflow(
+        nextRoutingHints: snapshot.routingHints,
+        requestsRouteComputation: requestsRouteComputation,
+        status: "Layout already matches the current anchors"
+      )
+      return
+    }
+
+    mutate(
+      .reflowLayout(
+        nodeChanges: nodeChanges,
+        edgeChanges: edgeChanges,
+        fromRoutingHints: routingHints,
+        toRoutingHints: snapshot.routingHints
+      )
+    )
+    requestExplicitRoutesIfNeeded()
+    // A reflow relocates every node, so the scroll position the viewport held
+    // for the previous layout now frames empty canvas. Recenter on the fresh
+    // layout, exactly as a document load does.
+    requestViewportCentering(
+      requestsRouteComputation ? .documentAfterRouteComputation : .document
+    )
+  }
+
+  private func reflowNodeChanges(
+    to nextNodes: [PolicyCanvasNode]
+  ) -> [PolicyCanvasReflowNodeChange] {
     let currentNodesByID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
-    let nodeChanges = nextNodes.compactMap { node -> PolicyCanvasReflowNodeChange? in
+    return nextNodes.compactMap { node in
       guard let current = currentNodesByID[node.id] else {
         return nil
       }
@@ -130,38 +211,17 @@ extension PolicyCanvasViewModel {
         toLayoutSource: node.layoutSource
       )
     }
+  }
 
+  private func reflowEdgeChanges(
+    to nextEdges: [PolicyCanvasEdge]
+  ) -> [PolicyCanvasEdgeReflowChange] {
     let currentEdgesByID = Dictionary(uniqueKeysWithValues: edges.map { ($0.id, $0) })
-    let edgeChanges = nextEdges.compactMap { edge -> PolicyCanvasEdgeReflowChange? in
+    return nextEdges.compactMap { edge in
       guard let current = currentEdgesByID[edge.id], current != edge else {
         return nil
       }
       return PolicyCanvasEdgeReflowChange(id: edge.id, from: current, to: edge)
     }
-
-    guard !nodeChanges.isEmpty || !edgeChanges.isEmpty else {
-      if routingHints?.isEmpty != false {
-        refreshRoutingHints(to: nextRoutingHints)
-      }
-      requestRoutesAndCenterIfNeeded()
-      notifyStatus("Layout already matches the current anchors")
-      return
-    }
-
-    mutate(
-      .reflowLayout(
-        nodeChanges: nodeChanges,
-        edgeChanges: edgeChanges,
-        fromRoutingHints: routingHints,
-        toRoutingHints: nextRoutingHints
-      )
-    )
-    requestExplicitRoutesIfNeeded()
-    // A reflow relocates every node, so the scroll position the viewport held
-    // for the previous layout now frames empty canvas. Recenter on the fresh
-    // layout, exactly as a document load does.
-    requestViewportCentering(
-      requestsRouteComputation ? .documentAfterRouteComputation : .document
-    )
   }
 }

@@ -27,59 +27,7 @@ extension PolicyCanvasEditForm {
         )
 
         if let binding = node.automationBinding {
-          let usesSourceDefaults = node.kind == .source
-          if node.kind == .source {
-            automationSourcePicker(binding)
-            automationPriorityStepper(binding)
-          } else {
-            Text(automationComponentDescription)
-              .scaledFont(.caption)
-              .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
-          }
-          automationToggleGroup(
-            title: "Content",
-            values: AutomationClipboardContentKind.allCases,
-            contains: {
-              usesSourceDefaults
-                ? binding.resolvedContentKinds.contains($0)
-                : binding.selectedContentKinds.contains($0)
-            },
-            set: { commitAutomationBinding(binding.settingContentKind($0, enabled: $1)) }
-          )
-          automationToggleGroup(
-            title: "Safety",
-            values: AutomationPolicyPreprocessor.allCases,
-            contains: {
-              usesSourceDefaults
-                ? binding.resolvedPreprocessors.contains($0)
-                : binding.selectedPreprocessors.contains($0)
-            },
-            set: { commitAutomationBinding(binding.settingPreprocessor($0, enabled: $1)) }
-          )
-          automationToggleGroup(
-            title: "Actions",
-            values: AutomationPolicyAction.allCases,
-            contains: {
-              usesSourceDefaults
-                ? binding.resolvedActions.contains($0)
-                : binding.selectedActions.contains($0)
-            },
-            set: { commitAutomationBinding(binding.settingAction($0, enabled: $1)) }
-          )
-          automationToggleGroup(
-            title: "After Actions",
-            values: AutomationPolicyPostprocessor.allCases,
-            contains: {
-              usesSourceDefaults
-                ? binding.resolvedPostprocessors.contains($0)
-                : binding.selectedPostprocessors.contains($0)
-            },
-            set: { commitAutomationBinding(binding.settingPostprocessor($0, enabled: $1)) }
-          )
-          if binding.resolvedEventSource == .reviewScreenshotPaste {
-            automationReviewScreenshotControls(binding)
-          }
-          automationSourceAppControls(binding)
+          nodeAutomationBindingDetailControls(node: node, binding: binding)
         }
       }
     }
@@ -233,6 +181,75 @@ extension PolicyCanvasEditForm {
     }
   }
 
+  @ViewBuilder
+  private func nodeAutomationBindingDetailControls(
+    node: PolicyCanvasNode,
+    binding: TaskBoardPolicyPipelineAutomationBinding
+  ) -> some View {
+    let usesSourceDefaults = node.kind == .source
+    if node.kind == .source {
+      automationSourcePicker(binding)
+      automationPriorityStepper(binding)
+    } else {
+      Text(automationComponentDescription)
+        .scaledFont(.caption)
+        .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
+    }
+    automationBindingToggleGroups(binding, usesSourceDefaults: usesSourceDefaults)
+    if binding.resolvedEventSource == .reviewScreenshotPaste {
+      automationReviewScreenshotControls(binding)
+    }
+    automationSourceAppControls(binding)
+  }
+
+  private func automationBindingToggleGroups(
+    _ binding: TaskBoardPolicyPipelineAutomationBinding,
+    usesSourceDefaults: Bool
+  ) -> some View {
+    Group {
+      automationToggleGroup(
+        title: "Content",
+        values: AutomationClipboardContentKind.allCases,
+        contains: {
+          usesSourceDefaults
+            ? binding.resolvedContentKinds.contains($0)
+            : binding.selectedContentKinds.contains($0)
+        },
+        set: { commitAutomationBinding(binding.settingContentKind($0, enabled: $1)) }
+      )
+      automationToggleGroup(
+        title: "Safety",
+        values: AutomationPolicyPreprocessor.allCases,
+        contains: {
+          usesSourceDefaults
+            ? binding.resolvedPreprocessors.contains($0)
+            : binding.selectedPreprocessors.contains($0)
+        },
+        set: { commitAutomationBinding(binding.settingPreprocessor($0, enabled: $1)) }
+      )
+      automationToggleGroup(
+        title: "Actions",
+        values: AutomationPolicyAction.allCases,
+        contains: {
+          usesSourceDefaults
+            ? binding.resolvedActions.contains($0)
+            : binding.selectedActions.contains($0)
+        },
+        set: { commitAutomationBinding(binding.settingAction($0, enabled: $1)) }
+      )
+      automationToggleGroup(
+        title: "After Actions",
+        values: AutomationPolicyPostprocessor.allCases,
+        contains: {
+          usesSourceDefaults
+            ? binding.resolvedPostprocessors.contains($0)
+            : binding.selectedPostprocessors.contains($0)
+        },
+        set: { commitAutomationBinding(binding.settingPostprocessor($0, enabled: $1)) }
+      )
+    }
+  }
+
   private func automationReviewScreenshotControls(
     _ binding: TaskBoardPolicyPipelineAutomationBinding
   ) -> some View {
@@ -243,70 +260,17 @@ extension PolicyCanvasEditForm {
       Text("Screenshot PR Extraction")
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+      automationReviewOCRControls(ocr: ocr, binding: binding)
+      automationReviewExtractionFields(extraction: extraction, binding: binding)
+      automationReviewExtractionToggles(extraction: extraction, binding: binding)
+    }
+  }
 
-      automationPickerField(
-        label: "OCR",
-        title: "Recognition level",
-        values: AutomationPolicyOCRConfiguration.RecognitionLevel.allCases,
-        selection: ocr.recognitionLevel,
-        set: { commitAutomationBinding(binding.settingOCRRecognitionLevel($0)) }
-      )
-      Toggle(
-        "Detect language",
-        isOn: Binding(
-          get: { ocr.automaticallyDetectsLanguage },
-          set: { commitAutomationBinding(binding.settingOCRAutomaticallyDetectsLanguage($0)) }
-        )
-      )
-      .scaledFont(.caption)
-      Toggle(
-        "Language correction",
-        isOn: Binding(
-          get: { ocr.usesLanguageCorrection },
-          set: { commitAutomationBinding(binding.settingOCRUsesLanguageCorrection($0)) }
-        )
-      )
-      .scaledFont(.caption)
-
-      automationPickerField(
-        label: "Scope",
-        title: "Result scope",
-        values: ReviewPullRequestExtractionConfiguration.ResultScope.allCases,
-        selection: extraction.resultScope,
-        set: { commitAutomationBinding(binding.settingReviewResultScope($0)) }
-      )
-      automationPickerField(
-        label: "Failing",
-        title: "Failing signal",
-        values: ReviewPullRequestExtractionConfiguration.FailureSignalMode.allCases,
-        selection: extraction.failureSignalMode,
-        set: { commitAutomationBinding(binding.settingReviewFailureSignalMode($0)) }
-      )
-      automationPickerField(
-        label: "Repos",
-        title: "Repository resolution",
-        values: ReviewPullRequestExtractionConfiguration.RepositoryMode.allCases,
-        selection: extraction.repositoryMode,
-        set: { commitAutomationBinding(binding.settingReviewRepositoryMode($0)) }
-      )
-      PolicyCanvasInspectorCommitTextField(
-        label: "Policy repos",
-        placeholder: "owner/repo, owner/repo",
-        value: extraction.policyRepositories.joined(separator: ", "),
-        focusField: .automationReviewRepositories,
-        focusedField: $focusedField,
-        accessibilityIdentifier:
-          HarnessMonitorAccessibility.policyCanvasInspectorField("automation-review-repos"),
-        commit: { commitAutomationBinding(binding.settingReviewPolicyRepositories($0)) }
-      )
-      .disabled(extraction.repositoryMode != .policyRepositories)
-      automationPickerField(
-        label: "Output",
-        title: "Output format",
-        values: ReviewPullRequestExtractionConfiguration.OutputFormat.allCases,
-        selection: extraction.outputFormat,
-        set: { commitAutomationBinding(binding.settingReviewOutputFormat($0)) }
-      )
+  private func automationReviewExtractionToggles(
+    extraction: ReviewPullRequestExtractionConfiguration,
+    binding: TaskBoardPolicyPipelineAutomationBinding
+  ) -> some View {
+    Group {
       Toggle(
         "Auto-copy",
         isOn: Binding(
@@ -334,7 +298,7 @@ extension PolicyCanvasEditForm {
     }
   }
 
-  private func automationPickerField<Value>(
+  func automationPickerField<Value>(
     label: String,
     title: String,
     values: [Value],
@@ -358,76 +322,11 @@ extension PolicyCanvasEditForm {
     }
   }
 
-  private func commitAutomationBinding(_ binding: TaskBoardPolicyPipelineAutomationBinding) {
+  func commitAutomationBinding(_ binding: TaskBoardPolicyPipelineAutomationBinding) {
     viewModel.commitSelectedNodeAutomationBinding(binding)
   }
 
   private var automationComponentDescription: String {
     "Connect this component from an automation source to include it in the enforced policy."
-  }
-}
-
-protocol PolicyCanvasAutomationTitledValue {
-  var title: String { get }
-}
-
-extension AutomationClipboardContentKind: PolicyCanvasAutomationTitledValue {}
-extension AutomationPolicyPreprocessor: PolicyCanvasAutomationTitledValue {}
-extension AutomationPolicyAction: PolicyCanvasAutomationTitledValue {}
-extension AutomationPolicyPostprocessor: PolicyCanvasAutomationTitledValue {}
-
-extension AutomationPolicyOCRConfiguration.RecognitionLevel: PolicyCanvasAutomationTitledValue {
-  var title: String {
-    switch self {
-    case .accurate: "Accurate"
-    case .fast: "Fast"
-    }
-  }
-}
-
-extension ReviewPullRequestExtractionConfiguration.RepositoryMode:
-  PolicyCanvasAutomationTitledValue
-{
-  var title: String {
-    switch self {
-    case .allConfiguredRepos: "All configured repos"
-    case .policyRepositories: "Policy repositories"
-    case .activeReviewsRepository: "Active Reviews repo"
-    }
-  }
-}
-
-extension ReviewPullRequestExtractionConfiguration.ResultScope:
-  PolicyCanvasAutomationTitledValue
-{
-  var title: String {
-    switch self {
-    case .all: "All"
-    case .failing: "Failing"
-    }
-  }
-}
-
-extension ReviewPullRequestExtractionConfiguration.FailureSignalMode:
-  PolicyCanvasAutomationTitledValue
-{
-  var title: String {
-    switch self {
-    case .liveReviews: "Live Reviews"
-    case .visualScreenshot: "Visual screenshot"
-    case .liveOrVisual: "Live or visual"
-    }
-  }
-}
-
-extension ReviewPullRequestExtractionConfiguration.OutputFormat:
-  PolicyCanvasAutomationTitledValue
-{
-  var title: String {
-    switch self {
-    case .newlineGitHubURLs: "GitHub URLs"
-    case .ownerRepoNumber: "owner/repo#number"
-    case .markdownLinks: "Markdown links"
-    }
   }
 }

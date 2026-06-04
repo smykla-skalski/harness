@@ -181,6 +181,8 @@ private let policyCanvasSources: SourceFilesList = SourceFilesList(globs: [
     .glob("Sources/HarnessMonitorUIPreviewable/Support/AutomationPolicySourceAppModels.swift"),
     .glob("Sources/HarnessMonitorUIPreviewable/Support/AutomationPolicyEvents.swift"),
     .glob("Sources/HarnessMonitorUIPreviewable/Support/AutomationPolicyDocument+Canvas.swift"),
+    .glob("Sources/HarnessMonitorUIPreviewable/Support/AutomationPolicyDocument+Defaults.swift"),
+    .glob("Sources/HarnessMonitorUIPreviewable/Support/AutomationPolicyExecutionPlanModels.swift"),
     .glob("Sources/HarnessMonitorPolicyCanvas/**/*.swift")
 ])
 
