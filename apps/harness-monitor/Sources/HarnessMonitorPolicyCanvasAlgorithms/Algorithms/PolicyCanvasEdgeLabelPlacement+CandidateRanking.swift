@@ -71,7 +71,7 @@ func policyCanvasLabelCandidates(
   }
 }
 
-private struct PolicyCanvasLabelCandidateKey: Hashable {
+struct PolicyCanvasLabelCandidateKey: Hashable {
   let x: Int
   let y: Int
 
