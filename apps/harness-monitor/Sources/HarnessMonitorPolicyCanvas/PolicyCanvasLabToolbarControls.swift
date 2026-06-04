@@ -208,30 +208,29 @@ public struct PolicyCanvasLabGroupsToggle: View {
 }
 
 public struct PolicyCanvasLabThemePicker: View {
-  @Binding var canvasThemeMode: PolicyCanvasThemeMode
+  @Binding var windowThemeMode: PolicyCanvasLabThemeMode
 
-  public init(canvasThemeMode: Binding<PolicyCanvasThemeMode>) {
-    _canvasThemeMode = canvasThemeMode
+  public init(windowThemeMode: Binding<PolicyCanvasLabThemeMode>) {
+    _windowThemeMode = windowThemeMode
   }
 
   public var body: some View {
     Menu {
-      Picker("Canvas theme", selection: $canvasThemeMode) {
-        ForEach(PolicyCanvasThemeMode.allCases) { mode in
+      Picker("Window theme", selection: $windowThemeMode) {
+        ForEach(PolicyCanvasLabThemeMode.allCases) { mode in
           Label(mode.label, systemImage: mode.labToolbarSystemImage).tag(mode)
         }
       }
       .pickerStyle(.inline)
     } label: {
-      Image(systemName: canvasThemeMode.labToolbarSystemImage)
+      Image(systemName: windowThemeMode.labToolbarSystemImage)
         .accessibilityHidden(true)
     }
     .help(
-      "Choose whether policy canvas surfaces follow the app theme "
-        + "or use a canvas-only light or dark override."
+      "Choose the Policy Canvas Lab window theme."
     )
-    .accessibilityLabel("Canvas theme")
-    .accessibilityValue(canvasThemeMode.label)
+    .accessibilityLabel("Window theme")
+    .accessibilityValue(windowThemeMode.label)
   }
 }
 
@@ -255,10 +254,9 @@ extension PolicyCanvasAlgorithmStage {
   }
 }
 
-extension PolicyCanvasThemeMode {
+extension PolicyCanvasLabThemeMode {
   fileprivate var labToolbarSystemImage: String {
     switch self {
-    case .useAppTheme: "circle.lefthalf.filled"
     case .light: "sun.max"
     case .dark: "moon"
     }

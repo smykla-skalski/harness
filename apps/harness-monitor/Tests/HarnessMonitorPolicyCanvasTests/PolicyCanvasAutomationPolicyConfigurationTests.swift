@@ -247,16 +247,16 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
 
     #expect(
       labSource.contains(
-        "@AppStorage(PolicyCanvasThemeDefaults.modeKey)"
+        "@AppStorage(PolicyCanvasLabThemeDefaults.modeKey)"
       )
     )
     #expect(
       labSource.contains(
-        "private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue"
+        "private var windowThemeMode = PolicyCanvasLabThemeMode.defaultValue"
       )
     )
-    #expect(labToolbarSource.contains("Picker(\"Canvas theme\", selection: $canvasThemeMode)"))
-    #expect(labToolbarSource.contains("PolicyCanvasThemeMode.allCases"))
+    #expect(labToolbarSource.contains("Picker(\"Window theme\", selection: $windowThemeMode)"))
+    #expect(labToolbarSource.contains("PolicyCanvasLabThemeMode.allCases"))
     #expect(labSource.contains("ToolbarItem"))
   }
 

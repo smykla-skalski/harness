@@ -17,8 +17,8 @@ public struct PolicyCanvasLabWindowView: View {
   // crossings, so the lab renders group-free until that work lands. Flip the
   // toolbar toggle to see the grouped layout.
   @State private var includesGroupsInLayout = false
-  @AppStorage(PolicyCanvasThemeDefaults.modeKey)
-  private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
+  @AppStorage(PolicyCanvasLabThemeDefaults.modeKey)
+  private var windowThemeMode = PolicyCanvasLabThemeMode.defaultValue
 
   @MainActor
   public init(
@@ -139,7 +139,6 @@ public struct PolicyCanvasLabWindowView: View {
       audit: displayedSnapshot.audit,
       algorithmSelection: algorithmSelection
     )
-    .policyCanvasThemeScope()
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         samplePicker
@@ -152,9 +151,10 @@ public struct PolicyCanvasLabWindowView: View {
       }
       PolicyCanvasLabStageToolbar(algorithmSelection: $algorithmSelection)
       ToolbarItem(placement: .primaryAction) {
-        PolicyCanvasLabThemePicker(canvasThemeMode: $canvasThemeMode)
+        PolicyCanvasLabThemePicker(windowThemeMode: $windowThemeMode)
       }
     }
+    .preferredColorScheme(windowThemeMode.colorScheme)
     .task {
       if allowsLiveBootstrap, !usesFixtureDocument {
         await bootstrapLivePolicy()
