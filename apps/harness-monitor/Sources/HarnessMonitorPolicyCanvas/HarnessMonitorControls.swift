@@ -23,6 +23,14 @@ extension View {
       )
     )
   }
+
+  func harnessGlassButtonStyle() -> some View {
+    buttonStyle(.glass)
+  }
+
+  func harnessGlassButtonStyle(controlSize: ControlSize) -> some View {
+    buttonStyle(.glass).controlSize(controlSize)
+  }
 }
 
 private struct HarnessMonitorActionButtonStyleModifier: ViewModifier {
