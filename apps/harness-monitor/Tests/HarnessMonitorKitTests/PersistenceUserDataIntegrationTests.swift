@@ -3,7 +3,7 @@ import Testing
 @testable import HarnessMonitorKit
 
 @MainActor
-@Suite("Persistence user data integration")
+@Suite("Persistence user data integration", .serialized)
 struct PersistenceUserDataIntegrationTests {
   let harness: PersistenceIntegrationTestHarness
 
