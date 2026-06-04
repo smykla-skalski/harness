@@ -66,27 +66,33 @@ extension DashboardReviewsRouteView {
     isCollapsed: Bool,
     presentationMode: DashboardReviewsSectionHeaderPresentationMode = .sectionRow
   ) -> some View {
-    DashboardReviewsSectionHeaderChrome(presentationMode: presentationMode) {
-      if let secondaryQueue = section.secondaryQueue {
-        Button(action: { toggleSecondaryQueueCollapse(secondaryQueue) }) {
+    DashboardReviewsSectionHeaderChrome(
+      presentationMode: presentationMode,
+      content: {
+        if let secondaryQueue = section.secondaryQueue {
+          Button(
+            action: { toggleSecondaryQueueCollapse(secondaryQueue) },
+            label: {
+              smartInboxSectionHeaderLabel(
+                section: section,
+                itemCount: itemCount,
+                showsChevron: true,
+                isCollapsed: isCollapsed
+              )
+              .contentShape(.rect)
+            }
+          )
+          .buttonStyle(.borderless)
+        } else {
           smartInboxSectionHeaderLabel(
             section: section,
             itemCount: itemCount,
-            showsChevron: true,
-            isCollapsed: isCollapsed
+            showsChevron: false,
+            isCollapsed: false
           )
-          .contentShape(.rect)
         }
-        .buttonStyle(.borderless)
-      } else {
-        smartInboxSectionHeaderLabel(
-          section: section,
-          itemCount: itemCount,
-          showsChevron: false,
-          isCollapsed: false
-        )
       }
-    }
+    )
   }
 
   @ViewBuilder

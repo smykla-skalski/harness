@@ -188,7 +188,10 @@ public struct PolicyCanvasLabWindowView: View {
     .help(
       usesFixtureDocument
         ? "A fixture document override is active for this lab host."
-        : "Render a built-in sample policy using its authored layout to inspect graphs from trivial to extremely complex."
+        : """
+        Render a built-in sample policy using its authored layout to inspect \
+        graphs from trivial to extremely complex.
+        """
     )
   }
 

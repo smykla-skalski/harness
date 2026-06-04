@@ -1,6 +1,6 @@
 import Foundation
 
-private let dashboardReviewRecentActionsAuditBackfillStorageKey = "dashboard.reviews.recent-actions"
+private let reviewActionsAuditBackfillKey = "dashboard.reviews.recent-actions"
 private let applicationAuditInMemoryLimit = 1_000
 private let applicationAuditDaemonPageLimit = 500
 private let applicationAuditStartupPageLimit = 40
@@ -172,7 +172,7 @@ extension HarnessMonitorStore {
   ) -> [HarnessMonitorAuditEvent] {
     guard
       let storedValue = UserDefaults.standard.string(
-        forKey: dashboardReviewRecentActionsAuditBackfillStorageKey
+        forKey: reviewActionsAuditBackfillKey
       ),
       !storedValue.isEmpty
     else {

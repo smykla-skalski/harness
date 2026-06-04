@@ -5,12 +5,12 @@ extension DashboardReviewsRouteView {
   func consumePendingReviewScreenshotPasteRequest() {
     guard
       let request = DashboardReviewsScreenshotPasteboardRequests.takePendingRequest(
-        after: routeHandledScreenshotPasteboardRequestID
+        after: routeHandledScreenshotPasteRequestID
       )
     else {
       return
     }
-    routeHandledScreenshotPasteboardRequestID = request.id
+    routeHandledScreenshotPasteRequestID = request.id
     trackInFlight(Task { await handleReviewScreenshotPaste(request) })
   }
 

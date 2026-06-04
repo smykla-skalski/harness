@@ -165,7 +165,7 @@ struct PolicyCanvasInspectorEdgeBranchList: View {
     } label: {
       Label("Add branch", systemImage: "plus")
     }
-    .buttonStyle(.glass)
+    .harnessGlassButtonStyle()
     .controlSize(.small)
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.policyCanvasInspectorField("edge-add-branch")
@@ -211,8 +211,11 @@ struct PolicyCanvasInspectorEdgeBranchList: View {
         }
       )
     ) {
-      ForEach(viewModel.branchRetargetCandidateNodes(excludingSourceNodeID: edge.source.nodeID)) {
-        node in
+      ForEach(
+        viewModel.branchRetargetCandidateNodes(
+          excludingSourceNodeID: edge.source.nodeID
+        )
+      ) { node in
         Text(node.title).tag(node.id)
       }
     }

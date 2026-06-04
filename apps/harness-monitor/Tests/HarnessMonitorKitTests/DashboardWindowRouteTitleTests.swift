@@ -7,8 +7,8 @@ struct DashboardWindowRouteTitleTests {
   @Test("Policies route keeps its sidebar title and clears dashboard title chrome")
   func policiesRouteKeepsSidebarTitleAndClearsDashboardTitleChrome() {
     #expect(DashboardWindowRoute.policyCanvas.title == "Policies")
-    #expect(DashboardWindowRoute.policyCanvas.navigationTitle == "")
-    #expect(DashboardWindowRoute.policyCanvas.navigationSubtitle == "")
+    #expect(DashboardWindowRoute.policyCanvas.navigationTitle.isEmpty)
+    #expect(DashboardWindowRoute.policyCanvas.navigationSubtitle.isEmpty)
   }
 
   @Test("Audit route replaces the old Notifications dashboard route")

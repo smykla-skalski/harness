@@ -523,7 +523,7 @@ private struct DashboardAuditLoadMoreButton: View {
         .lineLimit(1)
         .fixedSize(horizontal: true, vertical: false)
       }
-      .buttonStyle(.plain)
+      .harnessPlainButtonStyle()
       .help("Load more audit events")
       line
     }
@@ -572,7 +572,7 @@ private struct DashboardAuditTimelineRowView: View {
       .background(isSelected ? Color.accentColor.opacity(0.16) : Color.clear)
       .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
+    .harnessPlainButtonStyle()
     .accessibilityLabel(row.accessibilityLabel)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAuditRow(row.event.id))
   }
