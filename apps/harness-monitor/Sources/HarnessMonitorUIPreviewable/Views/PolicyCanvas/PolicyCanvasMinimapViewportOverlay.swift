@@ -53,6 +53,7 @@ struct PolicyCanvasMinimapViewportOverlay: View {
   let storedPipelineStateRaw: String
   let suppressesSceneStorage: Bool
   let contentBounds: CGRect
+  let minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
   let onScrollRequest: (CGPoint) -> Void
 
   var body: some View {
@@ -69,7 +70,10 @@ struct PolicyCanvasMinimapViewportOverlay: View {
       nodeFrames: nodeFrames,
       groupFrames: viewModel.groups.map(\.frame)
     )
-    PolicyCanvasMinimapOverlay(snapshot: snapshot) { targetOrigin in
+    PolicyCanvasMinimapOverlay(
+      snapshot: snapshot,
+      minimapCenteringModeOverride: minimapCenteringModeOverride
+    ) { targetOrigin in
       onScrollRequest(targetOrigin)
     }
   }

@@ -9,6 +9,7 @@ struct PolicyCanvasViewportOverlayModifier: ViewModifier {
   let contentBounds: CGRect
   let minimapVisible: Bool
   let resolvedCanvasColorScheme: ColorScheme?
+  let minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
   let requestViewportScroll: @MainActor (CGPoint) -> Void
 
   func body(content: Content) -> some View {
@@ -32,7 +33,8 @@ struct PolicyCanvasViewportOverlayModifier: ViewModifier {
               viewportIdentity: viewModel.pipelineIdentity,
               storedPipelineStateRaw: storedPipelineStateRaw,
               suppressesSceneStorage: suppressesSceneStorage,
-              contentBounds: contentBounds
+              contentBounds: contentBounds,
+              minimapCenteringModeOverride: minimapCenteringModeOverride
             ) { targetOrigin in
               requestViewportScroll(targetOrigin)
             }

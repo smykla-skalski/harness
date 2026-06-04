@@ -4,6 +4,7 @@ import SwiftUI
 
 struct PolicyCanvasMinimapOverlay: View {
   let snapshot: PolicyCanvasMinimapSnapshot
+  let minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
   let onViewportDrag: @MainActor (CGPoint) -> Void
 
   @Environment(\.colorScheme)
@@ -11,9 +12,13 @@ struct PolicyCanvasMinimapOverlay: View {
   @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
   private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasMinimapDefaults.centeringModeKey)
-  private var minimapCenteringMode = PolicyCanvasMinimapCenteringMode.defaultValue
+  private var storedMinimapCenteringMode = PolicyCanvasMinimapCenteringMode.defaultValue
   @State private var dragStartViewportOrigin: CGPoint?
   @State private var viewportDragIsActive = false
+
+  private var minimapCenteringMode: PolicyCanvasMinimapCenteringMode {
+    minimapCenteringModeOverride ?? storedMinimapCenteringMode
+  }
 
   var body: some View {
     GeometryReader { proxy in

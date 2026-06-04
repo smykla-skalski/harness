@@ -15,6 +15,7 @@ struct PolicyCanvasViewport: View {
     { _, _ in }
   var saveDraft: @MainActor () -> Void = {}
   var canSave = false
+  var minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var layoutFocusDispatcher = PolicyCanvasLayoutFocusDispatcher()
   @State private var saveFocusDispatcher = PolicyCanvasSaveFocusDispatcher()
@@ -169,6 +170,7 @@ struct PolicyCanvasViewport: View {
           contentBounds: routeOutput.visibleBounds,
           minimapVisible: minimapVisible,
           resolvedCanvasColorScheme: resolvedCanvasColorScheme,
+          minimapCenteringModeOverride: minimapCenteringModeOverride,
           requestViewportScroll: { requestViewportScroll(to: $0) }
         )
       )
