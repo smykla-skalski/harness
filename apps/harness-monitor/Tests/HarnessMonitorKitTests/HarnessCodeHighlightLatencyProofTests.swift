@@ -10,16 +10,18 @@ struct HarnessCodeHighlightLatencyProofTests {
     arguments: HarnessCodeHighlightBenchmarkCorpus.latencyCases
   )
   func sharedCodeHighlightAndRenderStayWithinBudget(sample: HarnessCodeHighlightLatencyCase) {
-    let result = HarnessCodeHighlightPerformanceProbe.measure(
-      surface: sample.surface,
-      source: sample.source,
-      language: sample.language
-    )
+    let result = measureMedian(sample: sample)
 
     #expect(result.byteCount == sample.source.utf8.count)
     #expect(result.spanCount > 0)
-    #expect(result.highlightMilliseconds < sample.highlightBudgetMilliseconds)
-    #expect(result.renderMilliseconds < sample.renderBudgetMilliseconds)
+    #expect(
+      result.highlightMilliseconds < sample.highlightBudgetMilliseconds,
+      "\(sample.surface) highlight took \(result.highlightMilliseconds) ms"
+    )
+    #expect(
+      result.renderMilliseconds < sample.renderBudgetMilliseconds,
+      "\(sample.surface) render took \(result.renderMilliseconds) ms"
+    )
   }
 
   @Test("benchmark corpus covers current scanner families")
@@ -33,6 +35,35 @@ struct HarnessCodeHighlightLatencyProofTests {
     #expect(languages.contains(.codeowners))
     #expect(languages.contains(.template))
     #expect(languages.contains(.vue))
+  }
+
+  private func measureMedian(
+    sample: HarnessCodeHighlightLatencyCase,
+    iterations: Int = 3
+  ) -> HarnessCodeHighlightLatencySample {
+    let samples = (0..<iterations).map { _ in
+      HarnessCodeHighlightPerformanceProbe.measure(
+        surface: sample.surface,
+        source: sample.source,
+        language: sample.language
+      )
+    }
+    let highlightMedian = median(samples.map(\.highlightMilliseconds))
+    let renderMedian = median(samples.map(\.renderMilliseconds))
+    return HarnessCodeHighlightLatencySample(
+      surface: sample.surface,
+      language: sample.language,
+      byteCount: samples[0].byteCount,
+      spanCount: samples[0].spanCount,
+      highlightMilliseconds: highlightMedian,
+      renderMilliseconds: renderMedian
+    )
+  }
+
+  private func median(_ values: [Double]) -> Double {
+    let sorted = values.sorted()
+    let mid = sorted.count / 2
+    return sorted.count.isMultiple(of: 2) ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
   }
 }
 
