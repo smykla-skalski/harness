@@ -43,12 +43,14 @@ func policyCanvasBKHorizontalCompaction(
   // Alg. 3b: shift whole classes apart for separation, accumulating each higher
   // class's own offset (the term flaw A dropped).
   let shift = policyCanvasBKAccumulateShifts(
-    layers: layers,
-    positions: positions,
-    sink: sink,
-    x: x,
-    direction: direction,
-    rowStep: rowStep
+    context: PolicyCanvasBKShiftAccumulationContext(
+      layers: layers,
+      positions: positions,
+      sink: sink,
+      x: x,
+      direction: direction,
+      rowStep: rowStep
+    )
   )
 
   var finalX: [String: CGFloat] = [:]
@@ -70,16 +72,11 @@ func policyCanvasBKHorizontalCompaction(
 // class's own shift is final before a lower class reads it. A class never shifted
 // by a higher one keeps an absent (zero) offset.
 func policyCanvasBKAccumulateShifts(
-  layers: [[String]],
-  positions: [String: PolicyCanvasBKPosition],
-  sink: [String: String],
-  x: [String: CGFloat],
-  direction: PolicyCanvasBKDirection,
-  rowStep: CGFloat
+  context: PolicyCanvasBKShiftAccumulationContext
 ) -> [String: CGFloat] {
-  let prefersLeftmost = direction.prefersLeftmostNeighbor
-  var bucketedAdjacencies: [Int: [(write: String, read: String, value: CGFloat)]] = [:]
-  for layer in layers where layer.count > 1 {
+  let prefersLeftmost = context.direction.prefersLeftmostNeighbor
+  var bucketedAdjacencies: [Int: [PolicyCanvasBKClassAdjacency]] = [:]
+  for layer in context.layers where layer.count > 1 {
     for index in 0..<(layer.count - 1) {
       let leftID = layer[index]
       let rightID = layer[index + 1]
@@ -87,33 +84,37 @@ func policyCanvasBKAccumulateShifts(
       // left-biased passes, the left neighbour for right-biased passes.
       let writeID = prefersLeftmost ? leftID : rightID
       let readID = prefersLeftmost ? rightID : leftID
-      let writeSink = sink[writeID] ?? writeID
-      let readSink = sink[readID] ?? readID
+      let writeSink = context.sink[writeID] ?? writeID
+      let readSink = context.sink[readID] ?? readID
       guard writeSink != readSink else {
         continue
       }
-      let separation = prefersLeftmost ? -rowStep : rowStep
-      let value = (x[readID] ?? 0) - (x[writeID] ?? 0) + separation
-      let bucket = positions[readSink]?.layer ?? 0
+      let separation = prefersLeftmost ? -context.rowStep : context.rowStep
+      let value = (context.x[readID] ?? 0) - (context.x[writeID] ?? 0) + separation
+      let bucket = context.positions[readSink]?.layer ?? 0
       bucketedAdjacencies[bucket, default: []].append(
-        (write: writeSink, read: readSink, value: value)
+        PolicyCanvasBKClassAdjacency(
+          writeSink: writeSink,
+          readSink: readSink,
+          shiftValue: value
+        )
       )
     }
   }
 
   var shift: [String: CGFloat] = [:]
-  for bucketLayer in 0..<layers.count {
+  for bucketLayer in 0..<context.layers.count {
     for adjacency in bucketedAdjacencies[bucketLayer] ?? [] {
       // Accumulate the higher class's own offset (absent == unshifted == 0). This
       // is the term the original Alg. 3 omitted; processing buckets in ascending
       // sink-layer order guarantees it is already final here.
-      let readShift = shift[adjacency.read] ?? 0
-      let candidate = readShift + adjacency.value
-      if let existing = shift[adjacency.write] {
-        shift[adjacency.write] =
+      let readShift = shift[adjacency.readSink] ?? 0
+      let candidate = readShift + adjacency.shiftValue
+      if let existing = shift[adjacency.writeSink] {
+        shift[adjacency.writeSink] =
           prefersLeftmost ? min(existing, candidate) : max(existing, candidate)
       } else {
-        shift[adjacency.write] = candidate
+        shift[adjacency.writeSink] = candidate
       }
     }
   }
@@ -132,6 +133,21 @@ struct PolicyCanvasBKCompactionState {
   var sink: [String: String]
   var x: [String: CGFloat]
   var placed: Set<String>
+}
+
+struct PolicyCanvasBKShiftAccumulationContext {
+  let layers: [[String]]
+  let positions: [String: PolicyCanvasBKPosition]
+  let sink: [String: String]
+  let x: [String: CGFloat]
+  let direction: PolicyCanvasBKDirection
+  let rowStep: CGFloat
+}
+
+struct PolicyCanvasBKClassAdjacency {
+  let writeSink: String
+  let readSink: String
+  let shiftValue: CGFloat
 }
 
 private func policyCanvasBKPlaceBlock(

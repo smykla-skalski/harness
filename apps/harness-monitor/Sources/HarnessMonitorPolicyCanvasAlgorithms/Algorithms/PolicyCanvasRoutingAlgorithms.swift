@@ -65,22 +65,24 @@ struct PolicyCanvasRouteTerminalPortMarkerPlacement: PolicyCanvasPortMarkerPlace
         continue
       }
       addTerminal(
-        edgeID: edge.id,
-        role: .source,
-        endpoint: edge.source,
-        point: route.points.first,
-        side: policyCanvasRouteSourceSide(route),
+        input: PolicyCanvasRouteTerminalInput(
+          key: PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .source),
+          endpoint: edge.source,
+          point: route.points.first,
+          side: policyCanvasRouteSourceSide(route)
+        ),
         prepared: prepared,
         nodeIndex: nodeIndex,
         terminals: &terminals,
         endpoints: &endpoints
       )
       addTerminal(
-        edgeID: edge.id,
-        role: .target,
-        endpoint: edge.target,
-        point: route.points.last,
-        side: policyCanvasRouteTargetSide(route),
+        input: PolicyCanvasRouteTerminalInput(
+          key: PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .target),
+          endpoint: edge.target,
+          point: route.points.last,
+          side: policyCanvasRouteTargetSide(route)
+        ),
         prepared: prepared,
         nodeIndex: nodeIndex,
         terminals: &terminals,
@@ -91,20 +93,16 @@ struct PolicyCanvasRouteTerminalPortMarkerPlacement: PolicyCanvasPortMarkerPlace
   }
 
   private func addTerminal(
-    edgeID: String,
-    role: PolicyCanvasRouteEndpointRole,
-    endpoint: PolicyCanvasPortEndpoint,
-    point: CGPoint?,
-    side: PolicyCanvasPortSide?,
+    input: PolicyCanvasRouteTerminalInput,
     prepared: PolicyCanvasPreparedRouteInput,
     nodeIndex: [String: PolicyCanvasRouteNode],
     terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal],
     endpoints: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortEndpoint]
   ) {
     guard
-      let point,
-      let side,
-      let base = prepared.portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex)
+      let point = input.point,
+      let side = input.side,
+      let base = prepared.portAnchor(for: input.endpoint, side: side, nodeIndex: nodeIndex)
     else {
       return
     }
@@ -119,10 +117,16 @@ struct PolicyCanvasRouteTerminalPortMarkerPlacement: PolicyCanvasPortMarkerPlace
     case .top, .bottom:
       axisOffset = point.x - base.x
     }
-    let key = PolicyCanvasRouteTerminalKey(edgeID: edgeID, role: role)
-    terminals[key] = PolicyCanvasPortTerminal(side: side, axisOffset: axisOffset)
-    endpoints[key] = endpoint
+    terminals[input.key] = PolicyCanvasPortTerminal(side: side, axisOffset: axisOffset)
+    endpoints[input.key] = input.endpoint
   }
+}
+
+private struct PolicyCanvasRouteTerminalInput {
+  let key: PolicyCanvasRouteTerminalKey
+  let endpoint: PolicyCanvasPortEndpoint
+  let point: CGPoint?
+  let side: PolicyCanvasPortSide?
 }
 
 struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgorithm {

@@ -61,6 +61,37 @@ func policyCanvasArrangedDecisionTerminals(
   nodePositions: [String: CGPoint],
   edges: [PolicyCanvasLayoutEdge]
 ) -> [String: CGPoint] {
+  let topology = policyCanvasDecisionTerminalTopology(edges: edges)
+  let sinkIDs = topology.sinkIDs
+  let collectors = topology.collectors
+  guard !collectors.isEmpty else {
+    return nodePositions
+  }
+
+  var positions = nodePositions
+  policyCanvasPlaceBranchTerminals(
+    sinkIDs: sinkIDs,
+    collectors: Set(collectors),
+    sourcesByTarget: topology.sourcesByTarget,
+    positions: &positions
+  )
+  policyCanvasPlaceCollectors(
+    collectors: collectors,
+    sourcesByTarget: topology.sourcesByTarget,
+    positions: &positions
+  )
+  return policyCanvasSpreadOverlappingRows(positions: positions)
+}
+
+private struct PolicyCanvasDecisionTerminalTopology {
+  let sourcesByTarget: [String: [String]]
+  let sinkIDs: [String]
+  let collectors: [String]
+}
+
+private func policyCanvasDecisionTerminalTopology(
+  edges: [PolicyCanvasLayoutEdge]
+) -> PolicyCanvasDecisionTerminalTopology {
   var sourcesByTarget: [String: [String]] = [:]
   var outDegree: [String: Int] = [:]
   for edge in edges {
@@ -71,24 +102,29 @@ func policyCanvasArrangedDecisionTerminals(
   }
   let sinkIDs = sourcesByTarget.keys.filter { (outDegree[$0] ?? 0) == 0 }.sorted()
   let collectors = sinkIDs.filter { (sourcesByTarget[$0]?.count ?? 0) >= 3 }
-  guard !collectors.isEmpty else {
-    return nodePositions
-  }
+  return PolicyCanvasDecisionTerminalTopology(
+    sourcesByTarget: sourcesByTarget,
+    sinkIDs: sinkIDs,
+    collectors: collectors
+  )
+}
 
-  var positions = nodePositions
+private func policyCanvasPlaceBranchTerminals(
+  sinkIDs: [String],
+  collectors: Set<String>,
+  sourcesByTarget: [String: [String]],
+  positions: inout [String: CGPoint]
+) {
   let branchDrop = PolicyCanvasTerminalCombMetrics.branchVerticalGap
   let columnStep = PolicyCanvasTerminalCombMetrics.horizontalStep
-
-  // Branch terminals (one or two sources) drop beneath their primary (left-most)
-  // source; siblings sharing a source spread sideways so they never overlap.
   var branchSinksBySource: [String: [String]] = [:]
   for sink in sinkIDs where !collectors.contains(sink) {
     let sources = sourcesByTarget[sink] ?? []
     guard
-      let primary = sources.min(by: {
-        (positions[$0]?.x ?? 0) < (positions[$1]?.x ?? 0)
-      })
-    else { continue }
+      let primary = policyCanvasPrimaryBranchSource(sources: sources, positions: positions)
+    else {
+      continue
+    }
     branchSinksBySource[primary, default: []].append(sink)
   }
   for source in branchSinksBySource.keys.sorted() {
@@ -101,28 +137,26 @@ func policyCanvasArrangedDecisionTerminals(
       positions[sink] = CGPoint(x: sourcePoint.x + offset, y: sourcePoint.y + branchDrop)
     }
   }
+}
 
-  // Shared collectors lift straight up, centered over their sources; a wider
-  // fan-in rides higher (its own lift scales with source count) and additional
-  // collectors stack above so they keep clear lanes.
-  let orderedCollectors = collectors.sorted { leftID, rightID in
-    let leftSources = sourcesByTarget[leftID] ?? []
-    let rightSources = sourcesByTarget[rightID] ?? []
-    if leftSources.count != rightSources.count {
-      return leftSources.count > rightSources.count
-    }
-    let leftCenterX =
-      leftSources.compactMap { positions[$0]?.x }.reduce(0, +) / CGFloat(max(leftSources.count, 1))
-    let rightCenterX =
-      rightSources.compactMap { positions[$0]?.x }.reduce(0, +)
-      / CGFloat(max(rightSources.count, 1))
-    if leftCenterX != rightCenterX {
-      return leftCenterX > rightCenterX
-    }
-    return leftID < rightID
-  }
+private func policyCanvasPrimaryBranchSource(
+  sources: [String],
+  positions: [String: CGPoint]
+) -> String? {
+  sources.min { (positions[$0]?.x ?? 0) < (positions[$1]?.x ?? 0) }
+}
+
+private func policyCanvasPlaceCollectors(
+  collectors: [String],
+  sourcesByTarget: [String: [String]],
+  positions: inout [String: CGPoint]
+) {
   var stackedLift: CGFloat = 0
-  for collector in orderedCollectors {
+  for collector in policyCanvasOrderedCollectors(
+    collectors: collectors,
+    sourcesByTarget: sourcesByTarget,
+    positions: positions
+  ) {
     let sources = sourcesByTarget[collector] ?? []
     let sourcePoints = sources.compactMap { positions[$0] }
     guard !sourcePoints.isEmpty else { continue }
@@ -132,7 +166,34 @@ func policyCanvasArrangedDecisionTerminals(
     positions[collector] = CGPoint(x: centerX, y: topSourceY - lift - stackedLift)
     stackedLift += lift
   }
-  return policyCanvasSpreadOverlappingRows(positions: positions)
+}
+
+private func policyCanvasOrderedCollectors(
+  collectors: [String],
+  sourcesByTarget: [String: [String]],
+  positions: [String: CGPoint]
+) -> [String] {
+  collectors.sorted { leftID, rightID in
+    let leftSources = sourcesByTarget[leftID] ?? []
+    let rightSources = sourcesByTarget[rightID] ?? []
+    if leftSources.count != rightSources.count {
+      return leftSources.count > rightSources.count
+    }
+    let leftCenterX = policyCanvasCollectorCenterX(sources: leftSources, positions: positions)
+    let rightCenterX = policyCanvasCollectorCenterX(sources: rightSources, positions: positions)
+    if leftCenterX != rightCenterX {
+      return leftCenterX > rightCenterX
+    }
+    return leftID < rightID
+  }
+}
+
+private func policyCanvasCollectorCenterX(
+  sources: [String],
+  positions: [String: CGPoint]
+) -> CGFloat {
+  let xs = sources.compactMap { positions[$0]?.x }
+  return xs.reduce(0, +) / CGFloat(max(xs.count, 1))
 }
 
 /// Spread nodes the terminal comb dropped within a node-width of a row neighbor.
