@@ -159,7 +159,8 @@ struct DashboardReviewsRouteViewTests {
 
   @Test("route presentation input consumes toolbar search text")
   func routePresentationInputConsumesToolbarSearchText() throws {
-    let source = try dashboardReviewsRouteSource()
+    let source = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+ComputedState.swift")
 
     #expect(source.contains("searchText: searchText"))
     #expect(!source.contains("searchText: \"\""))
