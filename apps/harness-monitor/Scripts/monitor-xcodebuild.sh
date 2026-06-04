@@ -422,7 +422,18 @@ spawn_global_xcodebuild_heartbeat() {
         exit 0
       fi
     done
-  ) &
+  # Send the subshell's own stdout/stderr to /dev/null. It never prints
+  # anything a caller wants (touch/pgrep/mv all redirect already), and this
+  # redirect is what kills the spurious `Terminated: 15` on the success
+  # path: at cleanup, terminate_descendant_processes SIGTERMs the `sleep`
+  # this subshell is blocked on, and the subshell's *own* job-control
+  # machinery would otherwise announce `Terminated: 15` for that killed
+  # child onto its inherited stderr -- i.e. straight into the wrapper's
+  # captured build log. The wrapper-side `disown` below only stops the
+  # wrapper from reporting the heartbeat job; it does nothing about the
+  # subshell reporting its own child, so the noise is silenced here at the
+  # source rather than grep-filtered out downstream.
+  ) >/dev/null 2>&1 &
   global_heartbeat_pid=$!
   disown "$global_heartbeat_pid" 2>/dev/null || true
 }
@@ -576,6 +587,55 @@ build_setting_arg_present() {
   return 1
 }
 
+# Best-effort extraction of the xcodebuild action verb (build, test, clean,
+# archive, ...) from the arg list, used only to annotate the final RESULT
+# line. Actions are bare words, so anything containing `=`, starting with `-`,
+# or following a flag that consumes a value is skipped. Falls back to
+# `unknown` when no recognized verb is present (e.g. an options-only
+# invocation like `-version`).
+xcodebuild_primary_action() {
+  local index arg prev=""
+  for ((index = 0; index < ${#args[@]}; index += 1)); do
+    arg="${args[index]}"
+    # Skip a value that belongs to the preceding flag (e.g. the path after
+    # -derivedDataPath, the name after -scheme). Path-bearing flags and the
+    # common value-bearing flags both qualify.
+    if [[ "$prev" == -* ]] && xcodebuild_flag_consumes_value "$prev"; then
+      prev="$arg"
+      continue
+    fi
+    prev="$arg"
+    [[ "$arg" == -* || "$arg" == *=* ]] && continue
+    case "$arg" in
+      build|build-for-testing|test|test-without-building|clean|analyze|\
+      archive|install|installsrc|installhdrs|docbuild)
+        printf '%s\n' "$arg"
+        return 0
+        ;;
+    esac
+  done
+  printf 'unknown\n'
+}
+
+# Returns 0 if the xcodebuild flag takes a following value argument. Covers the
+# path-bearing flags plus the handful of common value flags so the action
+# scanner does not mistake a flag's value (a scheme name, configuration, etc.)
+# for the action verb.
+xcodebuild_flag_consumes_value() {
+  if xcodebuild_flag_requires_path_value "$1"; then
+    return 0
+  fi
+  case "$1" in
+    -scheme|-target|-configuration|-sdk|-destination|-arch|-toolchain|\
+    -derivedDataPath|-only-testing|-skip-testing|-test-iterations)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 xcodebuild_configuration() {
   local index arg
   for ((index = 0; index < ${#args[@]}; index += 1)); do
@@ -674,11 +734,12 @@ inject_lane_daemon_cargo_target_dir() {
 }
 
 run_xcodebuild() {
-  local status report_path log_path
+  local status report_path log_path action outcome
   local -a run_args=()
   while IFS= read -r arg; do
     run_args+=("$arg")
   done < <(build_test_action_args)
+  action="$(xcodebuild_primary_action)"
   # BSD mktemp (macOS /usr/bin/mktemp) treats anything after the X's as a
   # literal suffix and does NOT substitute. Concurrent wrappers would then
   # all try to create the same literal `harness-monitor-xcodebuild.XXXXXX.log`
@@ -687,6 +748,10 @@ run_xcodebuild() {
   # we then append .log ourselves.
   log_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-xcodebuild.XXXXXX").log"
   mv "${log_path%.log}" "$log_path"
+  # run_xcodebuild_with_formatter returns xcodebuild's OWN exit code
+  # (PIPESTATUS[0] of the captured process), not the formatter's -- so
+  # $status here is authoritative regardless of whether tuist/xcbeautify
+  # swallowed the "BUILD SUCCEEDED" banner from the piped output.
   if XCODEBUILD_RAW_LOG_PATH="$log_path" \
       run_xcodebuild_with_formatter --use-tuist "${run_args[@]}"; then
     status=0
@@ -698,6 +763,18 @@ run_xcodebuild() {
     printf 'xcodebuild-wrapper failure report: %s\n' "$report_path" >&2
   fi
   rm -f "$log_path"
+  # One unambiguous, greppable verdict on the wrapper's own stdout. Agents
+  # must read THIS line, not grep the formatter output for "BUILD SUCCEEDED"
+  # (often swallowed) or panic at a stray "Terminated: 15" from a cleanup
+  # helper. exit=0 + RESULT=SUCCEEDED is authoritative even for an
+  # up-to-date no-op build that does no relink and prints no banner.
+  if (( status == 0 )); then
+    outcome="SUCCEEDED"
+  else
+    outcome="FAILED"
+  fi
+  printf 'monitor-xcodebuild: RESULT=%s action=%s exit=%d\n' \
+    "$outcome" "$action" "$status"
   return "$status"
 }
 
