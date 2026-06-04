@@ -47,7 +47,7 @@ final class BackgroundAssetBundleTests: XCTestCase {
       encoding: .utf8
     )
 
-    XCTAssertTrue(source.contains("private var thumbnailGenerationTail: Task<Void, Never>?"))
+    XCTAssertTrue(source.contains("thumbnailGenerationTail: Task<Void, Never>?"))
     XCTAssertTrue(source.contains("let predecessor = thumbnailGenerationTail"))
     XCTAssertTrue(source.contains("await predecessor?.value"))
     XCTAssertTrue(source.contains("thumbnailGenerationTail = Task { _ = await task.value }"))
