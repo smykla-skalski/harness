@@ -1,6 +1,14 @@
 import AppKit
 import HarnessMonitorKit
 
+private struct DashboardReviewsScreenshotPolicyResultInput {
+  let request: DashboardReviewsScreenshotPasteboardRequest
+  let rows: [ReviewPullRequestExtractionRow]
+  let recognizedText: String
+  let extractedReferences: [GitHubPullRequestReference]
+  let sourceApplication: AutomationSourceApplication?
+}
+
 extension DashboardReviewsRouteView {
   func consumePendingReviewScreenshotPasteRequest() {
     guard
@@ -45,11 +53,13 @@ extension DashboardReviewsRouteView {
       from: recognition.text
     )
     let result = reviewScreenshotPolicyResult(
-      request: request,
-      rows: recognition.rows,
-      recognizedText: recognition.text,
-      extractedReferences: extractedReferences,
-      sourceApplication: sourceApplication,
+      DashboardReviewsScreenshotPolicyResultInput(
+        request: request,
+        rows: recognition.rows,
+        recognizedText: recognition.text,
+        extractedReferences: extractedReferences,
+        sourceApplication: sourceApplication
+      ),
       decision: decision
     )
     if let event = result.eventRecord {
@@ -124,11 +134,7 @@ extension DashboardReviewsRouteView {
   }
 
   private func reviewScreenshotPolicyResult(
-    request: DashboardReviewsScreenshotPasteboardRequest,
-    rows: [ReviewPullRequestExtractionRow],
-    recognizedText: String,
-    extractedReferences: [GitHubPullRequestReference],
-    sourceApplication: AutomationSourceApplication?,
+    _ input: DashboardReviewsScreenshotPolicyResultInput,
     decision: AutomationPolicyDecision
   ) -> AutomationPolicyExecutionResult {
     AutomationPolicyExecutionPipeline.execute(
@@ -136,19 +142,21 @@ extension DashboardReviewsRouteView {
         source: .reviewScreenshotPaste,
         decision: decision,
         summary: reviewScreenshotSummary(
-          rowCount: rows.count, sourceApplication: sourceApplication),
-        contentKinds: rows.isEmpty ? [.image] : [.image, .text, .url],
+          rowCount: input.rows.count,
+          sourceApplication: input.sourceApplication
+        ),
+        contentKinds: input.rows.isEmpty ? [.image] : [.image, .text, .url],
         declaredTypes: [AutomationClipboardContentKind.image.rawValue],
         detectedContentType: AutomationClipboardContentKind.image.rawValue,
-        sourceApplication: sourceApplication,
+        sourceApplication: input.sourceApplication,
         trigger: "Reviews screenshot paste",
         metadata: ClipboardAutomationMetadataPayload(
-          textPreview: String(recognizedText.prefix(1_000)),
-          filePaths: request.candidates.flatMap(\.sourceMetadata).copyableFilePaths
+          textPreview: String(input.recognizedText.prefix(1_000)),
+          filePaths: input.request.candidates.flatMap(\.sourceMetadata).copyableFilePaths
         ),
-        imageCandidates: request.candidates,
-        reviewPullRequestReferences: extractedReferences,
-        reviewPullRequestCandidateCount: rows.count
+        imageCandidates: input.request.candidates,
+        reviewPullRequestReferences: input.extractedReferences,
+        reviewPullRequestCandidateCount: input.rows.count
       )
     )
   }
