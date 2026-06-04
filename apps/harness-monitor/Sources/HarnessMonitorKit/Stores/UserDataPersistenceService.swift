@@ -3,48 +3,6 @@ import SwiftData
 import os
 
 public actor UserDataPersistenceService {
-  public struct RecordCounts: Sendable {
-    public let bookmarks: Int
-    public let notes: Int
-    public let searches: Int
-    public let filterPreferences: Int
-    public let notifications: Int
-    public let auditEvents: Int
-
-    public static let zero = RecordCounts(
-      bookmarks: 0,
-      notes: 0,
-      searches: 0,
-      filterPreferences: 0,
-      notifications: 0,
-      auditEvents: 0
-    )
-  }
-
-  public struct FilterPreference: Equatable, Sendable {
-    public let sessionFilterRaw: String
-    public let sessionFocusFilterRaw: String
-  }
-
-  public struct AuditEventCachePage: Equatable, Sendable {
-    public let events: [HarnessMonitorAuditEvent]
-    public let hasOlder: Bool
-  }
-
-  public struct UserNoteIdentity: @unchecked Sendable {
-    let persistentID: PersistentIdentifier
-
-    public init(_ note: UserNote) {
-      self.persistentID = note.persistentModelID
-    }
-  }
-
-  private static let signposter = OSSignposter(
-    subsystem: "io.harnessmonitor",
-    category: "persistence"
-  )
-  private static let maxAuditEventCacheRecords = 1_000
-
   private let modelContainer: ModelContainer
   private let maxRecentSearches: Int
   private let saveChanges: @Sendable (ModelContext) throws -> Void
@@ -331,28 +289,6 @@ public actor UserDataPersistenceService {
     }
   }
 
-  private func pruneAuditEvents(context: ModelContext, maximumCount: Int) throws {
-    let descriptor = FetchDescriptor<AuditEventRecord>(
-      sortBy: [
-        SortDescriptor(\.recordedAt, order: .reverse),
-        SortDescriptor(\.eventID, order: .forward),
-      ]
-    )
-    let records = try context.fetch(descriptor)
-    guard maximumCount > 0 else {
-      for record in records {
-        context.delete(record)
-      }
-      return
-    }
-    guard records.count > maximumCount else {
-      return
-    }
-    for record in records.dropFirst(maximumCount) {
-      context.delete(record)
-    }
-  }
-
   @discardableResult
   public func purgeNonRestorableNotificationHistory() throws -> Int {
     try withPersistenceSignpost("user_data.notifications.purge_non_restorable") {
@@ -444,45 +380,4 @@ public actor UserDataPersistenceService {
     try saveChanges(context)
   }
 
-  private func taskUserNoteDescriptor(
-    taskID: String,
-    sessionID: String
-  ) -> FetchDescriptor<UserNote> {
-    let targetKind = "task"
-    let targetID = taskID
-    let selectedSessionID = sessionID
-    return FetchDescriptor<UserNote>(
-      predicate: #Predicate<UserNote> { note in
-        note.targetKind == targetKind
-          && note.targetId == targetID
-          && note.sessionId == selectedSessionID
-      }
-    )
-  }
-
-  private func deleteAllRecords<T: PersistentModel>(
-    _ type: T.Type,
-    in context: ModelContext
-  ) throws {
-    let items = try context.fetch(FetchDescriptor<T>())
-    for item in items {
-      context.delete(item)
-    }
-  }
-
-  private func count<T: PersistentModel>(_ type: T.Type, in context: ModelContext) -> Int {
-    (try? context.fetchCount(FetchDescriptor<T>())) ?? 0
-  }
-
-  private func withPersistenceSignpost<Result>(
-    _ name: StaticString,
-    _ operation: () throws -> Result
-  ) rethrows -> Result {
-    let signpostID = Self.signposter.makeSignpostID()
-    let interval = Self.signposter.beginInterval(name, id: signpostID)
-    defer {
-      Self.signposter.endInterval(name, interval)
-    }
-    return try operation()
-  }
 }
