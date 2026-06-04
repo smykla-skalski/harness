@@ -12,7 +12,11 @@ public struct PolicyCanvasLabWindowView: View {
   @State private var allowsEmptyLiveSnapshot: Bool
   @State private var sampleSelection: PolicyCanvasLabSelection
   @State private var algorithmSelection: PolicyCanvasAlgorithmSelection
-  @State private var includesGroupsInLayout = true
+  // Off by default: the algorithm work is on the bare node + edge graph. The
+  // group band layout is the structural cause of most overlaps and forced
+  // crossings, so the lab renders group-free until that work lands. Flip the
+  // toolbar toggle to see the grouped layout.
+  @State private var includesGroupsInLayout = false
   @AppStorage(PolicyCanvasThemeDefaults.modeKey)
   private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
 
