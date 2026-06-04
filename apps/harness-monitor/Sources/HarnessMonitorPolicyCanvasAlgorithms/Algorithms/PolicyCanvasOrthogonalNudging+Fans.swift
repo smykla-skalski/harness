@@ -32,25 +32,34 @@ struct PolicyCanvasFanContext {
   let fanInByEdge: [String: PolicyCanvasFanMembership]
   let fanOutByEdge: [String: PolicyCanvasFanMembership]
 
-  static func make(from routes: [String: [CGPoint]]) -> PolicyCanvasFanContext {
-    typealias Member = (edge: String, convergence: CGPoint, other: CGPoint)
+  private struct Member {
+    let edge: String
+    let convergence: CGPoint
+    let other: CGPoint
+  }
+
+  static func make(from routes: [String: [CGPoint]]) -> Self {
     var byTarget: [PointKey: [Member]] = [:]
     var bySource: [PointKey: [Member]] = [:]
     for (edge, points) in routes {
       guard points.count >= 2, let first = points.first, let last = points.last else {
         continue
       }
-      byTarget[PointKey(last), default: []].append((edge, last, first))
-      bySource[PointKey(first), default: []].append((edge, first, last))
+      byTarget[PointKey(last), default: []].append(
+        Member(edge: edge, convergence: last, other: first)
+      )
+      bySource[PointKey(first), default: []].append(
+        Member(edge: edge, convergence: first, other: last)
+      )
     }
-    return PolicyCanvasFanContext(
-      fanInByEdge: memberships(from: byTarget),
-      fanOutByEdge: memberships(from: bySource)
+    return Self(
+      fanInByEdge: Self.memberships(from: byTarget),
+      fanOutByEdge: Self.memberships(from: bySource)
     )
   }
 
   private static func memberships(
-    from groups: [PointKey: [(edge: String, convergence: CGPoint, other: CGPoint)]]
+    from groups: [PointKey: [Member]]
   ) -> [String: PolicyCanvasFanMembership] {
     var result: [String: PolicyCanvasFanMembership] = [:]
     for (key, members) in groups where members.count > 1 {
