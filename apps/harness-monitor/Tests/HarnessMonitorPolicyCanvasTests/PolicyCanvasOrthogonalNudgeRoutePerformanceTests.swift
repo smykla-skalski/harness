@@ -5,43 +5,43 @@ import Testing
 @testable import HarnessMonitorPolicyCanvas
 @testable import HarnessMonitorPolicyCanvasAlgorithms
 
-/// Performance guard for the crossing-aware route post-process (Path A). The pass
-/// runs inside the synchronous route worker; if it is slow the canvas shows the
-/// provisional projection first and then visibly snaps to the final routing once
-/// the worker returns. The pass must stay free on small graphs and, on the fan-in
-/// heavy samples whose cold A* routing already dominates the frame, within a small
-/// multiple of the production-default (collinear) routing. The bound is relative,
-/// not an absolute millisecond budget, so it rides out the machine load and
-/// parallel-build contention that make raw wall-clock timings jump run to run.
-@Suite("Policy canvas Claude crossing-aware route performance", .serialized)
+/// Performance guard for the crossing-aware orthogonal nudge - now the production
+/// route post-process default. The pass runs inside the synchronous route worker;
+/// if it is slow the canvas shows the provisional projection first and then
+/// visibly snaps to the final routing once the worker returns. The pass must stay
+/// free on small graphs and, on the fan-in heavy samples whose cold A* routing
+/// already dominates the frame, within a small multiple of plain collinear
+/// compression (the cheaper post-process that leaves overlaps stacked). The bound
+/// is relative, not an absolute millisecond budget, so it rides out the machine
+/// load and parallel-build contention that make raw wall-clock timings jump run to
+/// run.
+@Suite("Policy canvas orthogonal nudge route performance", .serialized)
 @MainActor
-struct PolicyCanvasClaudeCrossingAwareRoutePerformanceTests {
+struct PolicyCanvasOrthogonalNudgeRoutePerformanceTests {
   /// The heaviest sample's crossing-aware route worker may take at most this
-  /// multiple of the same graph's default (collinear) route worker. The original
-  /// per-placement global rescore was ~28x the default; local scoring plus band
+  /// multiple of the same graph's collinear (overlap-leaving) route worker. The
+  /// original per-placement global rescore was ~28x; local scoring plus band
   /// pruning keeps it well under this.
   private static let maximumBaselineRatio = 3.0
-  /// Graphs whose default routing is faster than this are too quick to time
+  /// Graphs whose collinear routing is faster than this are too quick to time
   /// reliably - a ratio taken off a sub-millisecond baseline is pure scheduler
   /// noise - so they are recorded in the table but not gated.
   private static let measurableBaselineMilliseconds: Double = 5
 
-  @Test("crossing-aware routing stays within a small multiple of the default")
+  @Test("crossing-aware routing stays within a small multiple of collinear")
   func postProcessOverheadStaysModest() async throws {
     let baseline = selection(PolicyCanvasAlgorithmDefaults.collinearRouteCompression)
     let nudged = selection(PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing)
-    let claude = selection(PolicyCanvasAlgorithmDefaults.claudeCrossingAwareRouteProcessing)
-    await warmUp(selections: [baseline, nudged, claude])
-    var table = "sample: baseline / nudge / claude (ms)  x-default\n"
+    await warmUp(selections: [baseline, nudged])
+    var table = "sample: collinear / nudge (ms)  x-collinear\n"
     var worstRatio = 0.0
     var worstSample = ""
     for sampleID in PolicyCanvasLabSamples.all.map(\.id) {
       let prepared = try await preparedInput(sampleID: sampleID)
       let baselineMs = await measure { _ = await PolicyCanvasRouteWorker().compute(input: prepared(baseline)) }
       let nudgeMs = await measure { _ = await PolicyCanvasRouteWorker().compute(input: prepared(nudged)) }
-      let claudeMs = await measure { _ = await PolicyCanvasRouteWorker().compute(input: prepared(claude)) }
-      let ratio = baselineMs >= Self.measurableBaselineMilliseconds ? claudeMs / baselineMs : 1
-      table += "\(sampleID): \(ms(baselineMs)) / \(ms(nudgeMs)) / \(ms(claudeMs))  \(ratioText(ratio))\n"
+      let ratio = baselineMs >= Self.measurableBaselineMilliseconds ? nudgeMs / baselineMs : 1
+      table += "\(sampleID): \(ms(baselineMs)) / \(ms(nudgeMs))  \(ratioText(ratio))\n"
       if ratio > worstRatio {
         worstRatio = ratio
         worstSample = sampleID
@@ -49,7 +49,7 @@ struct PolicyCanvasClaudeCrossingAwareRoutePerformanceTests {
     }
     #expect(
       worstRatio < Self.maximumBaselineRatio,
-      "crossing-aware routing hit \(ratioText(worstRatio)) the default on \(worstSample)\n\(table)"
+      "crossing-aware routing hit \(ratioText(worstRatio)) collinear on \(worstSample)\n\(table)"
     )
   }
 

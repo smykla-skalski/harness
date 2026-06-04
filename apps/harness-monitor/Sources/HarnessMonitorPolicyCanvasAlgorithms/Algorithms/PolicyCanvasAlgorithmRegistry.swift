@@ -199,8 +199,6 @@ enum PolicyCanvasAlgorithmRegistry {
     for id: PolicyCanvasAlgorithmID
   ) -> any PolicyCanvasRoutePostProcessingAlgorithm {
     switch id {
-    case PolicyCanvasAlgorithmDefaults.claudeCrossingAwareRouteProcessing:
-      PolicyCanvasClaudeCrossingAwareRouteProcessing()
     case PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing:
       PolicyCanvasOrthogonalNudgingRouteProcessing()
     default:
