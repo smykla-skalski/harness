@@ -16,6 +16,7 @@ struct PolicyCanvasViewport: View {
   var saveDraft: @MainActor () -> Void = {}
   var canSave = false
   var minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
+  var canvasColorSchemeOverride: ColorScheme?
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var layoutFocusDispatcher = PolicyCanvasLayoutFocusDispatcher()
   @State private var saveFocusDispatcher = PolicyCanvasSaveFocusDispatcher()
@@ -49,7 +50,7 @@ struct PolicyCanvasViewport: View {
   private var fontScale
 
   private var resolvedCanvasColorScheme: ColorScheme? {
-    canvasThemeMode.resolvedColorScheme(appThemeMode: appThemeMode)
+    canvasColorSchemeOverride ?? canvasThemeMode.resolvedColorScheme(appThemeMode: appThemeMode)
   }
 
   var body: some View {

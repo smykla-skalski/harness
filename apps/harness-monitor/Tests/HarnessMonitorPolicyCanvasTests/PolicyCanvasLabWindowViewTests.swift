@@ -177,6 +177,12 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
 
   func testLabThemePickerIsWindowScopedAndDecoupledFromAppTheme() throws {
     let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
+    let viewportSurfaceSource = try previewablePolicyCanvasSourceFile(
+      named: "PolicyCanvasViewportSurface.swift"
+    )
+    let workspaceSource = try previewablePolicyCanvasSourceFile(
+      named: "PolicyCanvasWorkspaceViews.swift"
+    )
     let controlsSource = try policyCanvasSourceFile(named: "PolicyCanvasLabToolbarControls.swift")
 
     XCTAssertTrue(windowSource.contains("@AppStorage(PolicyCanvasLabThemeDefaults.modeKey)"))
@@ -191,6 +197,13 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
       )
     )
     XCTAssertTrue(windowSource.contains(".preferredColorScheme(windowThemeMode.colorScheme)"))
+    XCTAssertTrue(windowSource.contains("canvasColorScheme: windowThemeMode.colorScheme"))
+    XCTAssertTrue(viewportSurfaceSource.contains("let canvasColorSchemeOverride: ColorScheme?"))
+    XCTAssertTrue(
+      viewportSurfaceSource.contains("canvasColorSchemeOverride: canvasColorSchemeOverride")
+    )
+    XCTAssertTrue(workspaceSource.contains("var canvasColorSchemeOverride: ColorScheme?"))
+    XCTAssertTrue(workspaceSource.contains("canvasColorSchemeOverride ??"))
     XCTAssertFalse(windowSource.contains(".policyCanvasThemeScope()"))
     XCTAssertTrue(controlsSource.contains("Picker(\"Window theme\", selection: $windowThemeMode)"))
     XCTAssertTrue(controlsSource.contains("PolicyCanvasLabThemeMode.allCases"))
