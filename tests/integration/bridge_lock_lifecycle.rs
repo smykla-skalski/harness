@@ -92,7 +92,8 @@ impl LegacyBridgeServer {
         shutdown_behavior: LegacyShutdownBehavior,
     ) -> Self {
         std::fs::create_dir_all(daemon_root).expect("create daemon root");
-        let socket_path = daemon_root.join("legacy-bridge-test.sock");
+        // Keep the legacy fixture under the macOS AF_UNIX `sun_path` budget.
+        let socket_path = daemon_root.join("lb.sock");
         let token_path = daemon_root.join("legacy-bridge-token");
         let token = "legacy-bridge-token".to_string();
         let terminate = Arc::new(AtomicBool::new(false));

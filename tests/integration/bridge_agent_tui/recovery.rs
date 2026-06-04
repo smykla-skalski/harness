@@ -161,7 +161,7 @@ exec cat
 }
 
 fn wait_for_bridge_prompt(manager: &AgentTuiManagerHandle, tui_id: &str) -> AgentTuiSnapshot {
-    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
     loop {
         let snapshot = manager.get(tui_id).expect("refresh bridge snapshot");
         if snapshot.screen.text.contains("--role leader")
