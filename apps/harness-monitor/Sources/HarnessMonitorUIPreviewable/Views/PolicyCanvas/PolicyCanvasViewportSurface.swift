@@ -74,13 +74,22 @@ public struct PolicyCanvasViewportSurface: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
     .environment(\.policyCanvasReducedMotion, systemReduceMotion)
-    .onChange(of: snapshot, initial: false) { _, newSnapshot in
+    .onChange(of: snapshot, initial: false) { oldSnapshot, newSnapshot in
       viewModel.algorithmSelection = newSnapshot.algorithmSelection
-      viewModel.loadIfChanged(
-        document: newSnapshot.document,
-        simulation: newSnapshot.simulation,
-        audit: newSnapshot.audit
-      )
+      if oldSnapshot.document != newSnapshot.document {
+        viewModel.applyDocument(
+          document: newSnapshot.document,
+          simulation: newSnapshot.simulation,
+          audit: newSnapshot.audit,
+          forceDocumentReload: true
+        )
+      } else {
+        viewModel.loadIfChanged(
+          document: newSnapshot.document,
+          simulation: newSnapshot.simulation,
+          audit: newSnapshot.audit
+        )
+      }
     }
   }
 }
