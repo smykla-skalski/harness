@@ -125,6 +125,8 @@ enum AutomationPolicyExecutionPipeline {
         execution.handleOCRAction(request)
       case .extractGitHubPullRequests:
         execution.handleReviewExtractionAction(request)
+      case .copyExtractedGitHubPullRequestURLs:
+        execution.handleExtractedPullRequestURLCopyAction(request)
       case .resolveReviewPullRequests, .copyReviewPullRequestList, .previewReviewApprovals,
         .promptReviewApprovals, .approveReviewPullRequests, .runReviewPolicy:
         execution.handleReviewAction(action, request: request)
@@ -296,6 +298,20 @@ private struct AutomationPolicyActionExecution {
       return
     }
     executedActions.append(action)
+    reviewPullRequestReferences = request.reviewPullRequestReferences
+  }
+
+  mutating func handleExtractedPullRequestURLCopyAction(
+    _ request: AutomationPolicyExecutionRequest
+  ) {
+    guard !request.reviewPullRequestReferences.isEmpty else {
+      skippedActions.append(.copyExtractedGitHubPullRequestURLs)
+      if reason == nil {
+        reason = "No GitHub pull request links found"
+      }
+      return
+    }
+    executedActions.append(.copyExtractedGitHubPullRequestURLs)
     reviewPullRequestReferences = request.reviewPullRequestReferences
   }
 

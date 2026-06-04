@@ -137,6 +137,7 @@ extension AutomationPolicyDocument {
         .ocrImage,
         .extractGitHubPullRequests,
         .resolveReviewPullRequests,
+        .copyExtractedGitHubPullRequestURLs,
         .copyReviewPullRequestList,
         .previewReviewApprovals,
         .recordMetadata,

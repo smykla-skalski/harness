@@ -16,6 +16,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
           AutomationPolicyAction.ocrImage.rawValue,
           AutomationPolicyAction.extractGitHubPullRequests.rawValue,
           AutomationPolicyAction.resolveReviewPullRequests.rawValue,
+          AutomationPolicyAction.copyExtractedGitHubPullRequestURLs.rawValue,
           AutomationPolicyAction.copyReviewPullRequestList.rawValue,
           AutomationPolicyAction.previewReviewApprovals.rawValue,
           AutomationPolicyAction.recordMetadata.rawValue,

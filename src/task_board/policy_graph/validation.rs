@@ -182,6 +182,7 @@ fn payload_required_by_automation(node: &PolicyGraphNode) -> PayloadKind {
     }
     if actions.contains("extractGitHubPullRequests")
         || actions.contains("resolveReviewPullRequests")
+        || actions.contains("copyExtractedGitHubPullRequestURLs")
     {
         return PayloadKind::Text;
     }

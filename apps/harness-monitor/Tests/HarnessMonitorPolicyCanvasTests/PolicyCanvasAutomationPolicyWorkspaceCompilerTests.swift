@@ -209,7 +209,8 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
     #expect(policy.eventSource == .reviewScreenshotPaste)
     #expect(policy.actions.contains(.ocrImage))
     #expect(policy.actions.contains(.resolveReviewPullRequests))
-    #expect(policy.actions.contains(.copyReviewPullRequestList))
+    #expect(policy.actions.contains(.copyExtractedGitHubPullRequestURLs))
+    #expect(!policy.actions.contains(.copyReviewPullRequestList))
     #expect(policy.ocrConfiguration == AutomationPolicyOCRConfiguration())
     #expect(policy.reviewPullRequestExtraction == ReviewPullRequestExtractionConfiguration())
   }
@@ -478,11 +479,18 @@ func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipeline
       ),
       policyCanvasPipelineNode(
         id: "automation:review-screenshot:ocr",
-        title: "OCR screenshot rows",
+        title: "OCR image",
         kind: TaskBoardPolicyPipelineNodeKind(kind: "ocr_image"),
         automation: .canvasComponent(actions: [.ocrImage]),
         inputs: ["in"],
         outputs: ["text"]
+      ),
+      policyCanvasPipelineNode(
+        id: "automation:review-screenshot:hub",
+        title: "Hub",
+        kind: TaskBoardPolicyPipelineNodeKind(kind: "hub"),
+        inputs: ["in"],
+        outputs: ["out_1", "out_2"]
       ),
       policyCanvasPipelineNode(
         id: "automation:review-screenshot:resolve",
@@ -497,9 +505,12 @@ func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipeline
       ),
       policyCanvasPipelineNode(
         id: "automation:review-screenshot:copy",
-        title: "Copy PR list",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "copy_review_pull_request_list"),
-        automation: .canvasComponent(actions: [.copyReviewPullRequestList]),
+        title: "Copy extracted PR URLs",
+        kind: TaskBoardPolicyPipelineNodeKind(
+          kind: "action_step",
+          actionId: "github.copy_extracted_pull_request_urls"
+        ),
+        automation: .canvasComponent(actions: [.copyExtractedGitHubPullRequestURLs]),
         inputs: ["in"],
         outputs: []
       ),
@@ -513,16 +524,23 @@ func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipeline
         toPort: "in"
       ),
       TaskBoardPolicyPipelineEdge(
-        id: "edge:review-screenshot:resolve",
+        id: "edge:review-screenshot:hub",
         fromNodeId: "automation:review-screenshot:ocr",
         fromPort: "text",
+        toNodeId: "automation:review-screenshot:hub",
+        toPort: "in"
+      ),
+      TaskBoardPolicyPipelineEdge(
+        id: "edge:review-screenshot:resolve",
+        fromNodeId: "automation:review-screenshot:hub",
+        fromPort: "out_1",
         toNodeId: "automation:review-screenshot:resolve",
         toPort: "in"
       ),
       TaskBoardPolicyPipelineEdge(
         id: "edge:review-screenshot:copy",
-        fromNodeId: "automation:review-screenshot:resolve",
-        fromPort: "pull_requests",
+        fromNodeId: "automation:review-screenshot:hub",
+        fromPort: "out_2",
         toNodeId: "automation:review-screenshot:copy",
         toPort: "in"
       ),

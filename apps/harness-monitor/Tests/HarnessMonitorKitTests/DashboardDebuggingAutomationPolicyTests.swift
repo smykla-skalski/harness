@@ -331,7 +331,7 @@ struct DashboardDebuggingAutomationPolicyTests {
     #expect(result.eventRecord?.outcome == .skipped)
   }
 
-  fileprivate func temporaryDirectory() -> URL {
+  func temporaryDirectory() -> URL {
     FileManager.default.temporaryDirectory
       .appendingPathComponent(
         "DashboardDebuggingAutomationPolicies-\(UUID().uuidString)",
@@ -378,7 +378,7 @@ struct DashboardDebuggingAutomationPolicyTests {
     )
   }
 
-  fileprivate func imageCandidate() -> DashboardOCRImageCandidate {
+  func imageCandidate() -> DashboardOCRImageCandidate {
     let image = NSImage(size: NSSize(width: 12, height: 12))
     return DashboardOCRImageCandidate(
       image: image,

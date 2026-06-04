@@ -201,7 +201,7 @@ struct DashboardDebuggingOCRPolicyBatchTests {
     #expect(request.candidates.count == 1)
   }
 
-  fileprivate func imageCandidate(
+  func imageCandidate(
     image: NSImage,
     sourceName: String
   ) -> DashboardOCRImageCandidate {
@@ -213,13 +213,13 @@ struct DashboardDebuggingOCRPolicyBatchTests {
     )
   }
 
-  fileprivate func transferImage(name: String) throws -> DashboardOCRTransferImage {
+  func transferImage(name: String) throws -> DashboardOCRTransferImage {
     let image = syntheticImage()
     let data = try #require(image.tiffRepresentation)
     return DashboardOCRTransferImage(data: data, sourceName: name, sourceDetail: nil)
   }
 
-  fileprivate func dynamicManualOCRPastePolicy() -> AutomationPolicy {
+  func dynamicManualOCRPastePolicy() -> AutomationPolicy {
     AutomationPolicy(
       id: "canvas.manualOCRPaste.test-source",
       name: "Manual OCR Paste",
@@ -287,7 +287,7 @@ struct DashboardDebuggingOCRPolicyBatchTests {
     )
   }
 
-  fileprivate func dynamicReviewScreenshotPastePolicy() -> AutomationPolicy {
+  func dynamicReviewScreenshotPastePolicy() -> AutomationPolicy {
     AutomationPolicy(
       id: "canvas.reviewScreenshotPaste.test-source",
       name: "Review Screenshot Paste",
@@ -317,6 +317,12 @@ struct DashboardDebuggingOCRPolicyBatchTests {
             actions: [.ocrImage]
           ),
           AutomationPolicyExecutionStep(
+            nodeID: "automation:review-screenshot:hub",
+            inputPayload: .text,
+            outputPayload: .text,
+            actions: []
+          ),
+          AutomationPolicyExecutionStep(
             nodeID: "automation:review-screenshot:resolve",
             inputPayload: .text,
             outputPayload: .pullRequests,
@@ -324,16 +330,34 @@ struct DashboardDebuggingOCRPolicyBatchTests {
           ),
           AutomationPolicyExecutionStep(
             nodeID: "automation:review-screenshot:copy",
-            inputPayload: .pullRequests,
+            inputPayload: .text,
             outputPayload: .unknown,
-            actions: [.copyReviewPullRequestList]
+            actions: [.copyExtractedGitHubPullRequestURLs]
           ),
+        ],
+        fanOuts: [
+          AutomationPolicyFanOut(
+            hubNodeID: "automation:review-screenshot:hub",
+            payload: .text,
+            branches: [
+              AutomationPolicyFanOutBranch(
+                outputPortID: "out_1",
+                targetNodeID: "automation:review-screenshot:resolve",
+                actions: [.extractGitHubPullRequests, .resolveReviewPullRequests]
+              ),
+              AutomationPolicyFanOutBranch(
+                outputPortID: "out_2",
+                targetNodeID: "automation:review-screenshot:copy",
+                actions: [.copyExtractedGitHubPullRequestURLs]
+              ),
+            ]
+          )
         ]
       )
     )
   }
 
-  fileprivate func syntheticImage() -> NSImage {
+  func syntheticImage() -> NSImage {
     let image = NSImage(size: NSSize(width: 16, height: 16))
     image.lockFocus()
     NSColor.systemBlue.setFill()
@@ -342,7 +366,7 @@ struct DashboardDebuggingOCRPolicyBatchTests {
     return image
   }
 
-  fileprivate func temporaryDirectory() -> URL {
+  func temporaryDirectory() -> URL {
     FileManager.default.temporaryDirectory
       .appendingPathComponent(
         "DashboardDebuggingOCRPolicyBatch-\(UUID().uuidString)",

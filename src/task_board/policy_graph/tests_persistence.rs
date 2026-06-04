@@ -247,7 +247,7 @@ fn assert_review_screenshot_canvas_only(canvas: &PolicyCanvasRecord) {
     );
     assert_eq!(
         canvas.document.nodes.len(),
-        4,
+        5,
         "review screenshot canvas should contain only the screenshot extraction workflow"
     );
     assert!(
@@ -286,16 +286,25 @@ fn assert_review_screenshot_canvas_only(canvas: &PolicyCanvasRecord) {
             .document
             .nodes
             .iter()
-            .any(|node| matches!(node.kind, PolicyGraphNodeKind::ResolveReviewPullRequests)),
-        "review screenshot canvas should carry a dedicated resolver node"
+            .any(|node| matches!(node.kind, PolicyGraphNodeKind::Hub)),
+        "review screenshot canvas should fan OCR text through a hub"
     );
     assert!(
         canvas
             .document
             .nodes
             .iter()
-            .any(|node| matches!(node.kind, PolicyGraphNodeKind::CopyReviewPullRequestList)),
-        "review screenshot canvas should carry a dedicated copy node"
+            .any(|node| matches!(node.kind, PolicyGraphNodeKind::ResolveReviewPullRequests)),
+        "review screenshot canvas should carry a dedicated resolver node"
+    );
+    assert!(
+        canvas.document.nodes.iter().any(|node| matches!(
+            &node.kind,
+            PolicyGraphNodeKind::ActionStep(step)
+                if node.label == "Copy extracted PR URLs"
+                    && step.action_id == "github.copy_extracted_pull_request_urls"
+        )),
+        "review screenshot canvas should carry a generic extracted URL copy action"
     );
     let source = canvas
         .document

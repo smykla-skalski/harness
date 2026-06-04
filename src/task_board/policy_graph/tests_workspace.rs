@@ -133,6 +133,32 @@ fn ensure_seeded_automation_canvases_adds_missing_screenshot_canvas() {
 }
 
 #[test]
+fn ensure_screenshot_canvas_preserves_noncanonical_legacy_custom_graph() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let canvas = ws
+        .canvases
+        .iter_mut()
+        .find(|canvas| canvas.is_review_screenshot_extraction_canvas)
+        .expect("review screenshot canvas");
+    canvas.document.policy_trace_ids = vec!["review-screenshot-extraction-canvas-v2".to_string()];
+    canvas.document.nodes.push(PolicyGraphNode {
+        id: "custom-review-screenshot-note".to_string(),
+        label: "Custom note".to_string(),
+        kind: PolicyGraphNodeKind::Hub,
+        automation: None,
+        input_ports: vec![PORT_IN.to_string()],
+        output_ports: vec!["out_1".to_string()],
+        group_id: None,
+    });
+    let before = canvas.document.clone();
+
+    let repaired = ws.ensure_review_screenshot_extraction_canvas();
+
+    assert!(!repaired, "custom legacy graph should be preserved");
+    assert_eq!(review_screenshot_canvas(&ws).document, before);
+}
+
+#[test]
 fn ensure_seeded_automation_canvases_adds_missing_manual_ocr_canvas() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     let manual_ocr_id = manual_ocr_paste_canvas(&ws).id.clone();

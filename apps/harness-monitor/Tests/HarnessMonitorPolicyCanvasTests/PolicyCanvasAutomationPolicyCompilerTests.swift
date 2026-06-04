@@ -131,6 +131,51 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     )
   }
 
+  @Test("hub fans OCR text into parallel review screenshot branches")
+  func hubFansOCRTextIntoParallelReviewScreenshotBranches() throws {
+    let document = policyCanvasReviewScreenshotExtractionDocument()
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(document: document)
+    let policy = try #require(compilation.policies.first)
+    let plan = try #require(policy.executionPlan)
+    let fanOut = try #require(plan.fanOuts.first)
+
+    #expect(compilation.diagnostics.isEmpty)
+    #expect(policy.eventSource == .reviewScreenshotPaste)
+    #expect(
+      policy.actions == [
+        .ocrImage,
+        .extractGitHubPullRequests,
+        .resolveReviewPullRequests,
+        .copyExtractedGitHubPullRequestURLs,
+      ])
+    #expect(
+      plan.steps.map(\.nodeID) == [
+        "automation:review-screenshot:source",
+        "automation:review-screenshot:ocr",
+        "automation:review-screenshot:hub",
+        "automation:review-screenshot:resolve",
+        "automation:review-screenshot:copy",
+      ])
+    #expect(
+      plan.steps.first { $0.nodeID == "automation:review-screenshot:hub" }?.inputPayload == .text)
+    #expect(
+      plan.steps.first { $0.nodeID == "automation:review-screenshot:hub" }?.outputPayload == .text)
+    #expect(fanOut.hubNodeID == "automation:review-screenshot:hub")
+    #expect(fanOut.payload == .text)
+    #expect(
+      fanOut.branches.map(\.targetNodeID) == [
+        "automation:review-screenshot:resolve",
+        "automation:review-screenshot:copy",
+      ])
+    #expect(
+      fanOut.branches.flatMap(\.actions) == [
+        .extractGitHubPullRequests,
+        .resolveReviewPullRequests,
+        .copyExtractedGitHubPullRequestURLs,
+      ])
+  }
+
   @Test("policy compiler rejects incompatible dynamic payload edges")
   func policyCompilerRejectsIncompatibleDynamicPayloadEdges() {
     let document = TaskBoardPolicyPipelineDocument(
@@ -296,6 +341,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(policy.match.contentKinds == [.image])
     #expect(policy.actions.contains(.ocrImage))
     #expect(policy.actions.contains(.resolveReviewPullRequests))
+    #expect(policy.actions.contains(.copyExtractedGitHubPullRequestURLs))
     #expect(policy.actions.contains(.copyReviewPullRequestList))
     #expect(policy.ocrConfiguration?.recognitionLevel == .fast)
     #expect(policy.ocrConfiguration?.automaticallyDetectsLanguage == false)
