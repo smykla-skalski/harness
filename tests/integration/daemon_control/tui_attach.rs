@@ -44,7 +44,7 @@ fn local_agent_tui_attach_replays_existing_screen_and_keeps_streaming() {
             "Attach Replay",
             "--arg=sh",
             "--arg=-c",
-            "--arg=printf 'already-there\\n'; sleep 2; printf 'attach-live\\n'; cat",
+            "--arg=printf 'already-there\\n'; cat",
         ],
         COMMAND_WAIT_TIMEOUT,
     );
@@ -64,15 +64,13 @@ fn local_agent_tui_attach_replays_existing_screen_and_keeps_streaming() {
     );
 
     let mut attached = AttachedTuiSession::spawn(&home, &xdg, &started.tui_id);
-    attached.wait_for_output("attach-live");
+    attached.write_line("from attach");
+    attached.wait_for_output("from attach");
     assert!(
         attached.output_text().contains("already-there"),
         "attach output should replay existing screen state before live bytes; output={:?}",
         attached.output_text()
     );
-
-    attached.write_line("from attach");
-    attached.wait_for_output("from attach");
 
     let stop_output = run_harness(
         &home,
@@ -133,7 +131,7 @@ fn sandboxed_agent_tui_attach_replays_existing_screen_and_keeps_streaming() {
             "Attach Replay",
             "--arg=sh",
             "--arg=-c",
-            "--arg=printf 'already-there\\n'; sleep 2; printf 'attach-live\\n'; cat",
+            "--arg=printf 'already-there\\n'; cat",
         ],
         COMMAND_WAIT_TIMEOUT,
     );
@@ -153,15 +151,13 @@ fn sandboxed_agent_tui_attach_replays_existing_screen_and_keeps_streaming() {
     );
 
     let mut attached = AttachedTuiSession::spawn(&home, &xdg, &started.tui_id);
-    attached.wait_for_output("attach-live");
+    attached.write_line("from attach");
+    attached.wait_for_output("from attach");
     assert!(
         attached.output_text().contains("already-there"),
         "attach output should replay existing screen state before live bytes; output={:?}",
         attached.output_text()
     );
-
-    attached.write_line("from attach");
-    attached.wait_for_output("from attach");
 
     let stop_output = run_harness(
         &home,
