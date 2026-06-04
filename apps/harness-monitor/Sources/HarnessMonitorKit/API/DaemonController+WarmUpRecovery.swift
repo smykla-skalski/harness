@@ -90,6 +90,7 @@ extension DaemonController {
       HarnessMonitorPaths.manifestURL(using: environment).standardizedFileURL,
       to: &candidateManifestURLs
     )
+    appendRuntimeLaneExternalManifestCandidateURLs(to: &candidateManifestURLs)
 
     for candidateManifestURL in candidateManifestURLs
     where candidateManifestURL != currentManifestURL {
@@ -123,6 +124,47 @@ extension DaemonController {
       return
     }
     manifestURLs.append(manifestURL)
+  }
+
+  func appendRuntimeLaneExternalManifestCandidateURLs(to manifestURLs: inout [URL]) {
+    let appGroupIdentifier =
+      HarnessMonitorPaths.normalizedAppGroupIdentifier(using: environment)
+      ?? HarnessMonitorAppGroup.identifier
+    let containerRoot =
+      HarnessMonitorPaths.nativeAppGroupContainerURL(
+        identifier: appGroupIdentifier,
+        using: environment
+      )
+      ?? HarnessMonitorPaths.appGroupContainerURL(
+        identifier: appGroupIdentifier,
+        using: environment
+      )
+    let lanesRoot = containerRoot.appendingPathComponent(
+      HarnessMonitorRuntimeLane.dataHomeLanesDirectoryName,
+      isDirectory: true
+    )
+    let laneEntries =
+      (try? FileManager.default.contentsOfDirectory(
+        at: lanesRoot,
+        includingPropertiesForKeys: [.isDirectoryKey],
+        options: [.skipsHiddenFiles]
+      )) ?? []
+
+    for laneEntry in laneEntries {
+      let values = try? laneEntry.resourceValues(forKeys: [.isDirectoryKey])
+      guard values?.isDirectory == true else {
+        continue
+      }
+
+      let manifestURL =
+        laneEntry
+        .appendingPathComponent("harness", isDirectory: true)
+        .appendingPathComponent("daemon", isDirectory: true)
+        .appendingPathComponent(ownership.rawValue, isDirectory: true)
+        .appendingPathComponent("manifest.json")
+        .standardizedFileURL
+      appendExternalManifestCandidateURL(manifestURL, to: &manifestURLs)
+    }
   }
 
   func handleManagedStaleManifest(
