@@ -157,14 +157,19 @@ public struct PolicyCanvasLabStageToolbar: ToolbarContent {
   private func algorithmStageToolbarItem(
     _ stage: PolicyCanvasAlgorithmStage
   ) -> some ToolbarContent {
-    if let descriptor = PolicyCanvasAlgorithmPickerCatalog.stageDescriptors.first(
-      where: { $0.stage == stage }
-    ) {
+    let stageDescriptors = PolicyCanvasAlgorithmPickerCatalog.stageDescriptors
+    if let stageIndex = stageDescriptors.firstIndex(where: { $0.stage == stage }) {
+      let descriptor = stageDescriptors[stageIndex]
       ToolbarItem(placement: .primaryAction) {
         PolicyCanvasLabAlgorithmStagePicker(
           descriptor: descriptor,
           selectedID: algorithmBinding(for: descriptor.stage)
         )
+      }
+      .sharedBackgroundVisibility(.hidden)
+      if stageIndex < stageDescriptors.count - 1 {
+        ToolbarSpacer(.fixed, placement: .primaryAction)
+          .sharedBackgroundVisibility(.hidden)
       }
     }
   }
