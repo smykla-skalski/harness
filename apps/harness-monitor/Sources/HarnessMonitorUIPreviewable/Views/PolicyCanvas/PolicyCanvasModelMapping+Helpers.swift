@@ -127,6 +127,9 @@ func policyCanvasAssignPreferredPortSides(
       source.side = .leading
       target.side = .trailing
     }
+    policyCanvasUnblockTargetPortSide(
+      target: &target, targetNode: targetNode, sourceNode: sourceNode, nodes: nodes
+    )
     return
   }
   guard verticalDelta > horizontalDelta,
@@ -140,6 +143,92 @@ func policyCanvasAssignPreferredPortSides(
   } else {
     source.side = .top
     target.side = .bottom
+  }
+  policyCanvasUnblockTargetPortSide(
+    target: &target, targetNode: targetNode, sourceNode: sourceNode, nodes: nodes
+  )
+}
+
+/// Steer the target off a port side that another node sits flush against.
+///
+/// The router escapes a port by stepping `edgePortTurnMinimumLead` straight out
+/// before it turns. When a foreign node sits flush against the chosen side, that
+/// lead point lands inside the neighbor; the router then reads the neighbor as an
+/// endpoint, drops it from the obstacle set, and the wire cuts straight through
+/// its body. So when the geometrically preferred target side is blocked this way,
+/// switch to the perpendicular side that still faces the source - but only if
+/// that side is itself clear, so the fallback never trades one body hit for
+/// another.
+private func policyCanvasUnblockTargetPortSide(
+  target: inout PolicyCanvasPortEndpoint,
+  targetNode: PolicyCanvasNode,
+  sourceNode: PolicyCanvasNode,
+  nodes: [PolicyCanvasNode]
+) {
+  guard let side = target.side,
+    policyCanvasPortSideIsBlocked(node: targetNode, side: side, nodes: nodes),
+    let alternative = policyCanvasPerpendicularFacingSide(
+      from: side, node: targetNode, toward: sourceNode
+    ),
+    !policyCanvasPortSideIsBlocked(node: targetNode, side: alternative, nodes: nodes)
+  else {
+    return
+  }
+  target.side = alternative
+}
+
+private func policyCanvasPortSideIsBlocked(
+  node: PolicyCanvasNode,
+  side: PolicyCanvasPortSide,
+  nodes: [PolicyCanvasNode]
+) -> Bool {
+  let frame = CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
+  // One point past the lead so a neighbor sitting exactly one lead away - whose
+  // edge the lead point lands on, dropping it from the obstacle set - still
+  // counts as blocking.
+  let reach = PolicyCanvasLayout.edgePortTurnMinimumLead + 1
+  let corridor: CGRect
+  switch side {
+  case .leading:
+    corridor = CGRect(x: frame.minX - reach, y: frame.minY, width: reach, height: frame.height)
+  case .trailing:
+    corridor = CGRect(x: frame.maxX, y: frame.minY, width: reach, height: frame.height)
+  case .top:
+    corridor = CGRect(x: frame.minX, y: frame.minY - reach, width: frame.width, height: reach)
+  case .bottom:
+    corridor = CGRect(x: frame.minX, y: frame.maxY, width: frame.width, height: reach)
+  }
+  return nodes.contains { other in
+    other.id != node.id
+      && CGRect(origin: other.position, size: PolicyCanvasLayout.nodeSize).intersects(corridor)
+  }
+}
+
+/// The perpendicular side that still faces the source, or nil when the source is
+/// not offset by a full node on the perpendicular axis (no side genuinely faces
+/// it there, so a flip would only point the wire away from its origin).
+private func policyCanvasPerpendicularFacingSide(
+  from side: PolicyCanvasPortSide,
+  node: PolicyCanvasNode,
+  toward other: PolicyCanvasNode
+) -> PolicyCanvasPortSide? {
+  switch side {
+  case .leading, .trailing:
+    if other.position.y + PolicyCanvasLayout.nodeSize.height <= node.position.y {
+      return .top
+    }
+    if other.position.y >= node.position.y + PolicyCanvasLayout.nodeSize.height {
+      return .bottom
+    }
+    return nil
+  case .top, .bottom:
+    if other.position.x + PolicyCanvasLayout.nodeSize.width <= node.position.x {
+      return .leading
+    }
+    if other.position.x >= node.position.x + PolicyCanvasLayout.nodeSize.width {
+      return .trailing
+    }
+    return nil
   }
 }
 
