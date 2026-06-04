@@ -161,19 +161,33 @@ extension PolicyCanvasPreparedRouteInput {
     let portMarkerLayout: PolicyCanvasPortMarkerLayout
   }
 
+  private struct PolicyCanvasRouteStateContext {
+    let prepared: PolicyCanvasPreparedRouteInput
+    let nodeIndex: [String: PolicyCanvasRouteNode]
+    let passContext: PolicyCanvasDisplayedRoutePassContext
+    let router: any PolicyCanvasEdgeRouter
+    let algorithms: PolicyCanvasRoutingAlgorithmSet
+  }
+
   private func policyCanvasConvergedRouteState(
     prepared: PolicyCanvasPreparedRouteInput,
     nodeIndex: [String: PolicyCanvasRouteNode],
     router selectedRouter: any PolicyCanvasEdgeRouter,
     algorithms: PolicyCanvasRoutingAlgorithmSet
   ) -> PolicyCanvasRouteComputationState {
-    let passContext = prepared.displayedRoutePassContext(nodeIndex: nodeIndex)
+    let context = PolicyCanvasRouteStateContext(
+      prepared: prepared,
+      nodeIndex: nodeIndex,
+      passContext: prepared.displayedRoutePassContext(nodeIndex: nodeIndex),
+      router: selectedRouter,
+      algorithms: algorithms
+    )
     let initialRoutes = algorithms.routeSelection.selectRoutes(
       input: PolicyCanvasRouteSelectionInput(
         prepared: prepared,
         router: selectedRouter,
         portMarkerLayout: nil,
-        passContext: passContext
+        passContext: context.passContext
       )
     )
     var state = PolicyCanvasRouteComputationState(
@@ -190,11 +204,7 @@ extension PolicyCanvasPreparedRouteInput {
     for _ in 0..<3 {
       let nextState = policyCanvasNextRouteState(
         current: state,
-        prepared: prepared,
-        nodeIndex: nodeIndex,
-        passContext: passContext,
-        router: selectedRouter,
-        algorithms: algorithms
+        context: context
       )
       if nextState.portMarkerLayout == state.portMarkerLayout {
         return nextState
@@ -202,10 +212,7 @@ extension PolicyCanvasPreparedRouteInput {
       if seenLayouts.contains(nextState.portMarkerLayout) {
         return policyCanvasReroutedState(
           portMarkerLayout: nextState.portMarkerLayout,
-          prepared: prepared,
-          passContext: passContext,
-          router: selectedRouter,
-          algorithms: algorithms
+          context: context
         )
       }
       seenLayouts.append(nextState.portMarkerLayout)
@@ -213,36 +220,29 @@ extension PolicyCanvasPreparedRouteInput {
     }
     return policyCanvasReroutedState(
       portMarkerLayout: state.portMarkerLayout,
-      prepared: prepared,
-      passContext: passContext,
-      router: selectedRouter,
-      algorithms: algorithms
+      context: context
     )
   }
 
   private func policyCanvasNextRouteState(
     current: PolicyCanvasRouteComputationState,
-    prepared: PolicyCanvasPreparedRouteInput,
-    nodeIndex: [String: PolicyCanvasRouteNode],
-    passContext: PolicyCanvasDisplayedRoutePassContext,
-    router selectedRouter: any PolicyCanvasEdgeRouter,
-    algorithms: PolicyCanvasRoutingAlgorithmSet
+    context: PolicyCanvasRouteStateContext
   ) -> PolicyCanvasRouteComputationState {
-    let routes = algorithms.routeSelection.selectRoutes(
+    let routes = context.algorithms.routeSelection.selectRoutes(
       input: PolicyCanvasRouteSelectionInput(
-        prepared: prepared,
-        router: selectedRouter,
+        prepared: context.prepared,
+        router: context.router,
         portMarkerLayout: current.portMarkerLayout,
-        passContext: passContext
+        passContext: context.passContext
       )
     )
     return PolicyCanvasRouteComputationState(
       routes: routes,
-      portMarkerLayout: algorithms.portMarkerPlacement.placeMarkers(
+      portMarkerLayout: context.algorithms.portMarkerPlacement.placeMarkers(
         input: PolicyCanvasPortMarkerPlacementInput(
-          prepared: prepared,
+          prepared: context.prepared,
           routes: routes,
-          nodeIndex: nodeIndex
+          nodeIndex: context.nodeIndex
         )
       )
     )
@@ -250,18 +250,15 @@ extension PolicyCanvasPreparedRouteInput {
 
   private func policyCanvasReroutedState(
     portMarkerLayout: PolicyCanvasPortMarkerLayout,
-    prepared: PolicyCanvasPreparedRouteInput,
-    passContext: PolicyCanvasDisplayedRoutePassContext,
-    router selectedRouter: any PolicyCanvasEdgeRouter,
-    algorithms: PolicyCanvasRoutingAlgorithmSet
+    context: PolicyCanvasRouteStateContext
   ) -> PolicyCanvasRouteComputationState {
     PolicyCanvasRouteComputationState(
-      routes: algorithms.routeSelection.selectRoutes(
+      routes: context.algorithms.routeSelection.selectRoutes(
         input: PolicyCanvasRouteSelectionInput(
-          prepared: prepared,
-          router: selectedRouter,
+          prepared: context.prepared,
+          router: context.router,
           portMarkerLayout: portMarkerLayout,
-          passContext: passContext
+          passContext: context.passContext
         )
       ),
       portMarkerLayout: portMarkerLayout
