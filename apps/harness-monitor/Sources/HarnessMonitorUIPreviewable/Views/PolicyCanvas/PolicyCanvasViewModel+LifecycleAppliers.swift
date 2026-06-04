@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Funnel appliers for node/edge/group lifecycle changes (add, remove,
 /// move, restore). Split out of `PolicyCanvasViewModel+UndoFunnel.swift` to

@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 extension PolicyCanvasViewModel {
   func createAutomationNode(

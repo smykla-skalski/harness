@@ -1,6 +1,6 @@
+import HarnessMonitorPolicyCanvasAlgorithms
 import OSLog
 import SwiftUI
-import HarnessMonitorPolicyCanvasAlgorithms
 
 actor PolicyCanvasRouteWorker {
   static let signposter = OSSignposter(

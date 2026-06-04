@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 extension PolicyCanvasViewModel {
   /// Emit a human-readable status update to the host view. No-op when the host

@@ -1,8 +1,8 @@
 import AppKit
 import CoreGraphics
+import HarnessMonitorPolicyCanvasAlgorithms
 import OSLog
 import SwiftUI
-import HarnessMonitorPolicyCanvasAlgorithms
 
 private let policyCanvasBundleStylingLog = Logger(
   subsystem: "io.harnessmonitor",

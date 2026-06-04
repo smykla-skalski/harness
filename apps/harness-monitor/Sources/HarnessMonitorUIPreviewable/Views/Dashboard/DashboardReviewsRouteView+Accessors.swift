@@ -270,7 +270,9 @@ extension DashboardReviewsRouteView {
 
   var routeHandledScreenshotPasteboardRequestID: Int {
     get { routeStateStorage.actionState.handledScreenshotPasteboardRequestID }
-    nonmutating set { routeStateStorage.actionState.handledScreenshotPasteboardRequestID = newValue }
+    nonmutating set {
+      routeStateStorage.actionState.handledScreenshotPasteboardRequestID = newValue
+    }
   }
 
   var routePastedTextReviewSheetBinding: Binding<DashboardReviewsPastedTextReviewSheetState?> {

@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Native SwiftUI key-press routing for the canvas-level power-edit
 /// shortcuts (Cmd+A, Cmd+C, Cmd+V, Cmd+D, arrow nudges). Replaces the

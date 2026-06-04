@@ -1,18 +1,19 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 extension PolicyCanvasView {
   var dashboardSnapshot: DashboardCanvasSnapshot {
     if let dashboardSnapshotOverride {
       return dashboardSnapshotOverride
     }
-    return runtime?.policyCanvasSnapshot ?? DashboardCanvasSnapshot(
-      activeCanvasId: nil,
-      document: nil,
-      simulation: nil,
-      audit: nil
-    )
+    return runtime?.policyCanvasSnapshot
+      ?? DashboardCanvasSnapshot(
+        activeCanvasId: nil,
+        document: nil,
+        simulation: nil,
+        audit: nil
+      )
   }
 
   var remoteActionsEnabled: Bool {

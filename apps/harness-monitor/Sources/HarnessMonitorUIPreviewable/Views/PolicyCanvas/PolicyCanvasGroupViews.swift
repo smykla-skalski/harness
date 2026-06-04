@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Layer of group regions rendered behind the nodes. Pulled out of
 /// `PolicyCanvasWorkspaceViews.swift` so the workspace file stays under the

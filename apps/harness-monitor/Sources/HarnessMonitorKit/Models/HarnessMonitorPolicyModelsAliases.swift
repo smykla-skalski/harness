@@ -1,7 +1,8 @@
 import HarnessMonitorPolicyModels
 
 public typealias TaskBoardPolicyAction = HarnessMonitorPolicyModels.TaskBoardPolicyAction
-public typealias TaskBoardPolicyEvidenceField = HarnessMonitorPolicyModels.TaskBoardPolicyEvidenceField
+public typealias TaskBoardPolicyEvidenceField = HarnessMonitorPolicyModels
+  .TaskBoardPolicyEvidenceField
 public typealias TaskBoardPolicyPipelineAutomationBinding =
   HarnessMonitorPolicyModels.TaskBoardPolicyPipelineAutomationBinding
 public typealias TaskBoardPolicyPipelineOCRConfiguration =
@@ -15,7 +16,8 @@ public typealias TaskBoardPolicyEvidencePredicate =
 public typealias TaskBoardPolicyEvidenceCheck =
   HarnessMonitorPolicyModels.TaskBoardPolicyEvidenceCheck
 public typealias TaskBoardPolicySwitchArm = HarnessMonitorPolicyModels.TaskBoardPolicySwitchArm
-public typealias TaskBoardPolicyWaitCondition = HarnessMonitorPolicyModels.TaskBoardPolicyWaitCondition
+public typealias TaskBoardPolicyWaitCondition = HarnessMonitorPolicyModels
+  .TaskBoardPolicyWaitCondition
 public typealias TaskBoardPolicyPipelineNodeKind =
   HarnessMonitorPolicyModels.TaskBoardPolicyPipelineNodeKind
 public typealias TaskBoardPolicyPipelineNodeLayoutSource =

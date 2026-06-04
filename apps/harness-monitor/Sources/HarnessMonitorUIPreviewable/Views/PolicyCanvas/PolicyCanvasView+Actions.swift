@@ -1,7 +1,7 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 import OSLog
 import SwiftUI
-import HarnessMonitorPolicyCanvasAlgorithms
 
 private let policyCanvasSaveSignposter = OSSignposter(
   subsystem: "io.harnessmonitor",

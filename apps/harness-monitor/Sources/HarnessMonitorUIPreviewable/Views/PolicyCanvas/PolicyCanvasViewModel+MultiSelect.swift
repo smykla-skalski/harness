@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 extension PolicyCanvasViewModel {
   /// Combined view of primary + secondary selections. Order is not stable

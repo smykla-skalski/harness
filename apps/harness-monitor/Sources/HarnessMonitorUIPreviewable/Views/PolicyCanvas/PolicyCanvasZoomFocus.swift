@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Dispatcher bridge that the canvas viewport publishes through
 /// `focusedSceneValue` so a scene-level `CommandGroup` can route the menu /

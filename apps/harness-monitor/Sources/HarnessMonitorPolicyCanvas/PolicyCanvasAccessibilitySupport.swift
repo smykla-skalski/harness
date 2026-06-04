@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 enum HarnessMonitorUITestEnvironment {
   static let environmentKey = "HARNESS_MONITOR_UI_TESTS"

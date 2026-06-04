@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 struct PolicyCanvasWorkflowStatusOverlay: View {
   let cards: [PolicyCanvasWorkflowStatusCardModel]

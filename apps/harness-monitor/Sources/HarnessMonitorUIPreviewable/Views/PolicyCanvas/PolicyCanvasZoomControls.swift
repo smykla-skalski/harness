@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Bottom-leading viewport zoom HUD. The buttons stay clickable for users who
 /// prefer mouse interaction, but the keyboard chords (Cmd-=, Cmd--, Cmd-0)

@@ -1,7 +1,7 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 import Observation
 import SwiftUI
-import HarnessMonitorPolicyCanvasAlgorithms
 
 @MainActor
 @Observable

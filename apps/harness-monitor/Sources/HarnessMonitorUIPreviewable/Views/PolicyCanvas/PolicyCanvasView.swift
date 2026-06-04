@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 public struct PolicyCanvasView: View {
   static let labRemoteActionDisabledReason = "Disabled in Policy Canvas Lab"

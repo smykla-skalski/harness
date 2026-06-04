@@ -1,7 +1,7 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 import Observation
 import SwiftUI
-import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Per-node verdict derived from `TaskBoardPolicyPipelineSimulationResult`.
 /// The decisions array carries `visitedNodeIds` per simulated action, and the

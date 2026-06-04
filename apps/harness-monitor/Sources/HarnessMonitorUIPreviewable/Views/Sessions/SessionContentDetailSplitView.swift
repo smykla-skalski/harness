@@ -188,7 +188,8 @@ extension SessionContentDetailSplitView where Content == EmptyView {
     _perfOverrideContentWidth = .constant(nil)
     _liveContentWidth = State(wrappedValue: SessionContentDetailSplitLayout.defaultContentWidth)
     self.commitContentWidth = { _ in }
-    self.dividerAccessibilityIdentifier = HarnessMonitorAccessibility
+    self.dividerAccessibilityIdentifier =
+      HarnessMonitorAccessibility
       .sessionWindowContentDetailDivider
     self.showsDividerLine = false
     self.showsContentPane = false

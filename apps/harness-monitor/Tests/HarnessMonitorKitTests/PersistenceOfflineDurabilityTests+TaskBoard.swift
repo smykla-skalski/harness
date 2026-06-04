@@ -149,11 +149,12 @@ extension PersistenceOfflineDurabilityTests {
     #expect(restoredDocument.revision == 43)
     #expect(restoredDocument.layout.zoom == 1.2)
     #expect(restoredDocument.layout.offset == TaskBoardPolicyCanvasPoint(x: 240, y: 160))
-    #expect(restoredDocument.layout.nodes == [
-      TaskBoardPolicyPipelineNodeLayout(nodeId: "node-intake", x: 520, y: 220),
-      TaskBoardPolicyPipelineNodeLayout(nodeId: "node-allow", x: 840, y: 220),
-      TaskBoardPolicyPipelineNodeLayout(nodeId: "node-human", x: 1_160, y: 220),
-    ])
+    #expect(
+      restoredDocument.layout.nodes == [
+        TaskBoardPolicyPipelineNodeLayout(nodeId: "node-intake", x: 520, y: 220),
+        TaskBoardPolicyPipelineNodeLayout(nodeId: "node-allow", x: 840, y: 220),
+        TaskBoardPolicyPipelineNodeLayout(nodeId: "node-human", x: 1_160, y: 220),
+      ])
   }
 
   @Test("External bootstrap restores cached task-board items before daemon warm-up finishes")

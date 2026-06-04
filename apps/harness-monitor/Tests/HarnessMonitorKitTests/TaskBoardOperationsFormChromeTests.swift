@@ -8,7 +8,8 @@ struct TaskBoardOperationsFormChromeTests {
   @Test("Operations form metrics keep a roomier settings-like rhythm")
   func operationsFormMetricsKeepARoomierSettingsLikeRhythm() {
     #expect(TaskBoardOperationsFormMetrics.sectionPadding == HarnessMonitorTheme.spacingLG)
-    #expect(TaskBoardOperationsFormMetrics.sectionCornerRadius == HarnessMonitorTheme.cornerRadiusSM)
+    #expect(
+      TaskBoardOperationsFormMetrics.sectionCornerRadius == HarnessMonitorTheme.cornerRadiusSM)
     #expect(TaskBoardOperationsFormMetrics.rowMinHeight >= 40)
     #expect(TaskBoardOperationsFormMetrics.rowVerticalPadding == HarnessMonitorTheme.spacingSM)
     #expect(TaskBoardOperationsFormMetrics.footerTopPadding == HarnessMonitorTheme.spacingSM)
@@ -16,15 +17,20 @@ struct TaskBoardOperationsFormChromeTests {
 
   @Test("Operations sections keep stronger outer hierarchy than the inner rows")
   func operationsSectionsKeepStrongerOuterHierarchyThanTheInnerRows() throws {
-    let componentsSource = try taskBoardSourceFile(named: "TaskBoardOperationsPanel+Components.swift")
+    let componentsSource = try taskBoardSourceFile(
+      named: "TaskBoardOperationsPanel+Components.swift")
     let sectionsSource = try taskBoardSourceFile(named: "TaskBoardOperationsPanel+Sections.swift")
 
-    #expect(componentsSource.contains("static let sectionSurface = HarnessMonitorTheme.ink.opacity(0.04)"))
+    #expect(
+      componentsSource.contains("static let sectionSurface = HarnessMonitorTheme.ink.opacity(0.04)")
+    )
     #expect(componentsSource.contains(".foregroundStyle(.secondary)"))
     #expect(sectionsSource.contains(".foregroundStyle(.primary)"))
     #expect(sectionsSource.contains(".foregroundStyle(.secondary)"))
-    #expect(sectionsSource.contains(".padding(.top, TaskBoardOperationsFormMetrics.footerTopPadding)"))
-    #expect(sectionsSource.contains(".padding(.bottom, TaskBoardOperationsFormMetrics.sectionPadding)"))
+    #expect(
+      sectionsSource.contains(".padding(.top, TaskBoardOperationsFormMetrics.footerTopPadding)"))
+    #expect(
+      sectionsSource.contains(".padding(.bottom, TaskBoardOperationsFormMetrics.sectionPadding)"))
     #expect(!sectionsSource.contains(".foregroundStyle(HarnessMonitorTheme.secondaryInk)"))
   }
 

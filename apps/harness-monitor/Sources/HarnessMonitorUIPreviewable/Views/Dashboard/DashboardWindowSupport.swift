@@ -176,11 +176,11 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
     }
   }
 
-  public static func restoredRoute(rawValue: String) -> DashboardWindowRoute? {
+  public static func restoredRoute(rawValue: String) -> Self? {
     if rawValue == "notifications" {
       return .audit
     }
-    return DashboardWindowRoute(rawValue: rawValue)
+    return Self(rawValue: rawValue)
   }
 
 }

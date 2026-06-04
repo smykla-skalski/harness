@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Wraps the visible edge stroke, arrowhead, optional selection halo, and a
 /// fat invisible hit area. Solves three problems with the bare-stroke layer:

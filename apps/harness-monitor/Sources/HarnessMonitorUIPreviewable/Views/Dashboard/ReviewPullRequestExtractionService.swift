@@ -120,9 +120,10 @@ enum ReviewPullRequestExtractionService {
     let index = ReviewPullRequestItemIndex(items: items)
     return rows.map { row in
       let match = index.match(for: row.reference)
-      let selected = match.item.map {
-        shouldInclude(item: $0, row: row, configuration: configuration)
-      } ?? false
+      let selected =
+        match.item.map {
+          shouldInclude(item: $0, row: row, configuration: configuration)
+        } ?? false
       return ReviewPullRequestExtractionResolvedRow(
         row: row,
         status: match.status,
@@ -249,7 +250,10 @@ private struct ReviewPullRequestItemIndex {
 
   func match(
     for reference: ReviewPullRequestExtractionReference
-  ) -> (status: ReviewPullRequestExtractionResolvedRow.Status, item: ReviewItem?, ambiguousItems: [ReviewItem]) {
+  ) -> (
+    status: ReviewPullRequestExtractionResolvedRow.Status, item: ReviewItem?,
+    ambiguousItems: [ReviewItem]
+  ) {
     switch reference {
     case .resolved(let reference):
       guard let item = byReference[reference.id] else {
@@ -274,7 +278,9 @@ private actor ReviewPullRequestNumberMemory {
   func learn(items: [ReviewItem]) {
     for item in items {
       var repositories = repositoriesByNumber[item.number] ?? []
-      if !repositories.contains(where: { $0.caseInsensitiveCompare(item.repository) == .orderedSame }) {
+      if !repositories.contains(where: {
+        $0.caseInsensitiveCompare(item.repository) == .orderedSame
+      }) {
         repositories.append(item.repository)
       }
       repositoriesByNumber[item.number] = repositories

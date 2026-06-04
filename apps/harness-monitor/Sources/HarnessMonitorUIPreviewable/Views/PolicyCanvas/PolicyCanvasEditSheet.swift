@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 enum PolicyCanvasEditSheet: Identifiable, Equatable {
   case node(String)

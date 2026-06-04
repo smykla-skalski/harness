@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 extension PolicyCanvasEditForm {
   /// Discrete policy-kind options surfaced by the picker. Order matches the

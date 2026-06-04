@@ -1,6 +1,8 @@
 import SwiftUI
 
-public typealias PolicyCanvasPortVisibilityMap = [PolicyCanvasPortEndpoint: Set<PolicyCanvasPortSide>]
+public typealias PolicyCanvasPortVisibilityMap = [PolicyCanvasPortEndpoint: Set<
+  PolicyCanvasPortSide
+>]
 
 public func policyCanvasPortVisibility(
   edges: [PolicyCanvasEdge],

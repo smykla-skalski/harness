@@ -276,7 +276,8 @@ extension PreviewFixtures {
       label: "missing risk signal"
     ),
     failEdge("edge:evidence-fail:checks-not-green", reasonCode: "checks_not_green"),
-    failEdge("edge:evidence-fail:branch-protection-blocked", reasonCode: "branch_protection_blocked"),
+    failEdge(
+      "edge:evidence-fail:branch-protection-blocked", reasonCode: "branch_protection_blocked"),
     failEdge("edge:evidence-fail:reviewer-not-approved", reasonCode: "reviewer_not_approved"),
     failEdge(
       "edge:evidence-fail:unresolved-requested-changes", reasonCode: "unresolved_requested_changes"),

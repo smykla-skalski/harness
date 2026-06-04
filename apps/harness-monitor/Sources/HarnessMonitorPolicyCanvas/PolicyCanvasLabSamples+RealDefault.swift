@@ -18,7 +18,7 @@ extension PolicyCanvasLabSamples {
     guard let data = Data(base64Encoded: realDefaultBase64.joined()),
       let decoded = try? decoder.decode(TaskBoardPolicyPipelineDocument.self, from: data)
     else {
-      return PolicyCanvasLabSamples.document(nodes: [], edges: [], groups: [])
+      return Self.document(nodes: [], edges: [], groups: [])
     }
     return decoded
   }

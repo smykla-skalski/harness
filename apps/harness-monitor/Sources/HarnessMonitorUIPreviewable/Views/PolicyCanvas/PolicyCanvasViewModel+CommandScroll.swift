@@ -1,6 +1,6 @@
 import AppKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 extension PolicyCanvasViewModel {
   /// Command-modified scroll-wheel zoom step. Mouse-wheel users hit this

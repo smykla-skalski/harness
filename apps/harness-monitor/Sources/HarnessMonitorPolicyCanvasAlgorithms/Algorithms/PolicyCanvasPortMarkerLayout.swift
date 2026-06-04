@@ -96,7 +96,8 @@ public func policyCanvasCanonicalPortEndpoint(
   )
 }
 
-public func policyCanvasRoutablePortSides(for kind: PolicyCanvasPortKind) -> [PolicyCanvasPortSide] {
+public func policyCanvasRoutablePortSides(for kind: PolicyCanvasPortKind) -> [PolicyCanvasPortSide]
+{
   // Must mirror `PolicyCanvasViewModel.routablePortSides`: inputs default to the
   // leading edge and outputs to the trailing edge, with the in-flow vertical side
   // next (top for inputs, bottom for outputs). The opposite vertical side is
@@ -299,9 +300,10 @@ extension PolicyCanvasPreparedRouteInput {
     }
     var dominantSide: PolicyCanvasPortSide?
     var dominantCount = -1
-    for side in sides where
+    for side in sides
+    where
       preferredCounts[side, default: []].count > units.count / 2
-        && capacities[side, default: 1] >= units.count
+      && capacities[side, default: 1] >= units.count
     {
       let count = preferredCounts[side, default: []].count
       if count > dominantCount {

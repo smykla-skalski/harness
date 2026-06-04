@@ -130,7 +130,8 @@ struct DashboardReviewsDisappearedItemTrackerTests {
     #expect(!source.contains("removedIDs.compactMap"))
   }
 
-  @Test("route view records disappeared descriptors into notification history instead of inline state")
+  @Test(
+    "route view records disappeared descriptors into notification history instead of inline state")
   func routeViewRecordsDisappearedDescriptorsIntoNotificationHistory() throws {
     let source = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteView.swift")
 

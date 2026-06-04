@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Inspector kind picker for a selected edge. Lets the user override the
 /// heuristic-derived `PolicyCanvasEdgeKind.derive(from:)` result when the

@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 public struct PolicyCanvasLabStandaloneView: View {
   private let initialSelection: PolicyCanvasLabSelection
@@ -8,7 +8,8 @@ public struct PolicyCanvasLabStandaloneView: View {
 
   public init(
     initialSelection: PolicyCanvasLabSelection = .sample(PolicyCanvasLabSamples.defaultSelectionID),
-    fixtureDocument: TaskBoardPolicyPipelineDocument? = PolicyCanvasLabSnapshotSupport.fixtureDocument()
+    fixtureDocument: TaskBoardPolicyPipelineDocument? =
+      PolicyCanvasLabSnapshotSupport.fixtureDocument()
   ) {
     self.initialSelection = initialSelection
     self.fixtureDocument = fixtureDocument

@@ -60,7 +60,7 @@ struct DashboardReviewListRow: View, Equatable {
 
   let authorChipWidth: CGFloat = 20
 
-  nonisolated static func == (lhs: DashboardReviewListRow, rhs: DashboardReviewListRow) -> Bool {
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.item == rhs.item
       && lhs.showsRepository == rhs.showsRepository
       && lhs.isSelected == rhs.isSelected

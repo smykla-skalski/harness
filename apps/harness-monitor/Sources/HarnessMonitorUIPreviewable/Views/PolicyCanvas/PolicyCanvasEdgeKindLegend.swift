@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 public enum PolicyCanvasEdgeLegendDefaults {
   public static let isVisibleKey = "policyCanvas.edgeLegend.isVisible"

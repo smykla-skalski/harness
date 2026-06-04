@@ -1,7 +1,7 @@
 import Foundation
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvas
+import SwiftUI
 
 @MainActor
 private final class DashboardPolicyCanvasViewModelStore: ObservableObject {
@@ -41,7 +41,7 @@ struct DashboardPolicyCanvasRouteView: View {
   @State private var pendingDeleteRequest: DashboardPolicyCanvasDeleteRequest?
   @State private var suppressCanvasSelectionHandling = false
   @State private var isAutomationPolicySheetPresented = false
-  @State var selectedCanvasPreview: DashboardPolicyCanvasSelectionPreview?
+  @State private var selectedCanvasPreview: DashboardPolicyCanvasSelectionPreview?
 
   @MainActor
   init(

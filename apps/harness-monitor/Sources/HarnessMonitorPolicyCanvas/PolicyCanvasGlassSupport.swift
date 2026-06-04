@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 private struct HarnessMonitorControlPillGlassModifier: ViewModifier {
   let tint: Color

@@ -1,9 +1,9 @@
 import AppKit
 import Foundation
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvas
 import SwiftUI
 import UniformTypeIdentifiers
-import HarnessMonitorPolicyCanvas
 
 extension DashboardPolicyCanvasRouteView {
   // MARK: - Canvas selection preview
@@ -63,7 +63,8 @@ extension DashboardPolicyCanvasRouteView {
   @MainActor
   private func performExportCanvas() async {
     guard let canvasId = workspace?.activeCanvasId else { return }
-    let rawTitle = workspace?.canvases.first(where: { $0.canvasId == canvasId })?.title
+    let rawTitle =
+      workspace?.canvases.first(where: { $0.canvasId == canvasId })?.title
       ?? "policy-canvas"
     let filename =
       rawTitle.lowercased().replacingOccurrences(of: " ", with: "-") + ".json"

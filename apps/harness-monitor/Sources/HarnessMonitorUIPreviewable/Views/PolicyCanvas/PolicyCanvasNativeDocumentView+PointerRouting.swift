@@ -1,7 +1,7 @@
 import AppKit
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 extension PolicyCanvasNativeDocumentView {
   func routeMouseDown(_ event: NSEvent) -> Bool {

@@ -80,7 +80,8 @@ enum DashboardReviewsSecondaryQueue: String, CaseIterable, Codable, Equatable, S
 }
 
 struct DashboardReviewsCollapsedSecondaryQueues: Codable, Equatable {
-  var queues: [DashboardReviewsSecondaryQueue] = DashboardReviewsSecondaryQueue.defaultCollapsedCases
+  var queues: [DashboardReviewsSecondaryQueue] = DashboardReviewsSecondaryQueue
+    .defaultCollapsedCases
 
   var encodedString: String {
     DashboardReviewsStorageCodec.encodeToString(self)

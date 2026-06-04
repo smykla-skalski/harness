@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvas
+import SwiftUI
 
 public struct SettingsPoliciesSection: View {
   public let isActive: Bool

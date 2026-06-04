@@ -101,7 +101,8 @@ struct HarnessMonitorJSONCodeBlockTests {
   @Test("Card code blocks separate the language header from the body")
   func cardCodeBlocksSeparateTheLanguageHeaderFromTheBody() throws {
     let source = try sourceFile(
-      at: "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/Views/Shared/HarnessMonitorCodeBlock.swift"
+      at:
+        "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/Views/Shared/HarnessMonitorCodeBlock.swift"
     )
 
     #expect(source.contains("headerSeparator"))

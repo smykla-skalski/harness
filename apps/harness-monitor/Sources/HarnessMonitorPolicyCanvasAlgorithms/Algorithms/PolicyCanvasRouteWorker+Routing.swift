@@ -42,7 +42,7 @@ extension PolicyCanvasPreparedRouteInput {
     let algorithms = PolicyCanvasAlgorithmRegistry.routingAlgorithms(for: algorithmSelection)
     let selectedRouter: any PolicyCanvasEdgeRouter =
       algorithmSelection.algorithmID(for: .edgeRouting)
-      == PolicyCanvasAlgorithmDefaults.paddedOrthogonalVisibilityAStar
+        == PolicyCanvasAlgorithmDefaults.paddedOrthogonalVisibilityAStar
       ? defaultRouter
       : algorithms.edgeRouter
     let nodeIndex = nodeIndex

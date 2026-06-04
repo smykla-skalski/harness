@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 enum PolicyCanvasAutomationPaletteSection: String, CaseIterable, Identifiable {
   case sources

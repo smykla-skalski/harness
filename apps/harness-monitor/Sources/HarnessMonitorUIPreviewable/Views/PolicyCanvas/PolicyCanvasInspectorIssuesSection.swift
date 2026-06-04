@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Inspector-scoped issue listing for the currently selected component.
 /// Rendered only when at least one issue targets the selection so the

@@ -1,6 +1,6 @@
 import Foundation
-import Observation
 import HarnessMonitorPolicyCanvasAlgorithms
+import Observation
 
 public enum ClipboardAutomationRuntimeState: Equatable, Sendable {
   case off
@@ -58,7 +58,8 @@ public final class PolicyCanvasAutomationStore {
   public private(set) var recentAutomationEvents: [AutomationPolicyEventRecord]
 
   private let setAutomationEnabledHandler: ((Bool) -> PolicyCanvasAutomationStoreState)?
-  private let replaceCanvasPoliciesHandler: (([AutomationPolicy]) -> PolicyCanvasAutomationStoreState)?
+  private let replaceCanvasPoliciesHandler:
+    (([AutomationPolicy]) -> PolicyCanvasAutomationStoreState)?
 
   public init(
     state: PolicyCanvasAutomationStoreState = PolicyCanvasAutomationStoreState(),

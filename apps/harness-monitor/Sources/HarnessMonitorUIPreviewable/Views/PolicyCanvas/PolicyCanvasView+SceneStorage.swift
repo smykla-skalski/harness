@@ -1,6 +1,6 @@
 import Foundation
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Per-pipeline viewport state persisted in `policyCanvas.byPipeline`. Holds
 /// zoom, selection, and viewport origin so each pipeline carries its own slot,
@@ -10,10 +10,10 @@ import HarnessMonitorPolicyCanvasAlgorithms
 struct PolicyCanvasPipelineSceneState: Codable, Equatable {
   var zoom: Double
   var selectionRaw: String
-  var viewportOriginX: Double? = nil
-  var viewportOriginY: Double? = nil
-  var viewportWidth: Double? = nil
-  var viewportHeight: Double? = nil
+  var viewportOriginX: Double?
+  var viewportOriginY: Double?
+  var viewportWidth: Double?
+  var viewportHeight: Double?
 
   var viewportOrigin: CGPoint? {
     guard let viewportOriginX, let viewportOriginY else {

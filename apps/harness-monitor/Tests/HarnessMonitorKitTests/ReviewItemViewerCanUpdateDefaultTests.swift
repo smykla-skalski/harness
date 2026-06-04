@@ -236,17 +236,17 @@ struct ReviewItemViewerCanUpdateDefaultTests {
   }
 
   private func harnessMonitorKitSource(named fileName: String) throws -> String {
-      let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-      let repoRoot =
-        testsDirectory
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-      let sourceURL =
-        repoRoot
-        .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorKit/Models")
-        .appendingPathComponent(fileName)
-      return try String(contentsOf: sourceURL, encoding: .utf8)
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let sourceURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorKit/Models")
+      .appendingPathComponent(fileName)
+    return try String(contentsOf: sourceURL, encoding: .utf8)
   }
 }

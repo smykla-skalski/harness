@@ -241,7 +241,8 @@ private func policyCanvasCrowdedDuplicateLabelPairPositions(
         let leftAvoidedSegments = sharedSegmentAvoidance[left.id, default: []]
         let rightAvoidedSegments = sharedSegmentAvoidance[right.id, default: []]
         let leftPreferredAxis = policyCanvasPreferredLabelAxis(avoidedSegments: leftAvoidedSegments)
-        let rightPreferredAxis = policyCanvasPreferredLabelAxis(avoidedSegments: rightAvoidedSegments)
+        let rightPreferredAxis = policyCanvasPreferredLabelAxis(
+          avoidedSegments: rightAvoidedSegments)
         let leftBlockers = nodeFrames + occupied + pairRouteBlockers
         let rightBlockers = nodeFrames + occupied + pairRouteBlockers
         let leftCandidates = policyCanvasLabelCandidates(
@@ -258,8 +259,10 @@ private func policyCanvasCrowdedDuplicateLabelPairPositions(
           preferredAxis: rightPreferredAxis,
           includesAdjacentFallback: true
         )
-        let leftBase = policyCanvasClosestRoutePoint(to: left.route.labelPosition, route: left.route)
-        let rightBase = policyCanvasClosestRoutePoint(to: right.route.labelPosition, route: right.route)
+        let leftBase = policyCanvasClosestRoutePoint(
+          to: left.route.labelPosition, route: left.route)
+        let rightBase = policyCanvasClosestRoutePoint(
+          to: right.route.labelPosition, route: right.route)
         var bestPlacement: (score: CGFloat, left: CGPoint, right: CGPoint)?
         for leftCandidate in leftCandidates {
           guard isClear(center: leftCandidate, size: left.size, blockers: leftBlockers) else {
@@ -433,7 +436,8 @@ private func policyCanvasResolvedLabelPosition(
   }
   func leastBadGraphHullCandidate(_ candidates: [CGPoint]) -> CGPoint? {
     let inHullCandidates = candidates.filter { candidate in
-      fitsGraphHull(policyCanvasLabelFrame(center: candidate, size: size), obstacleFrames: obstacleFrames)
+      fitsGraphHull(
+        policyCanvasLabelFrame(center: candidate, size: size), obstacleFrames: obstacleFrames)
     }
     guard !inHullCandidates.isEmpty else {
       return nil

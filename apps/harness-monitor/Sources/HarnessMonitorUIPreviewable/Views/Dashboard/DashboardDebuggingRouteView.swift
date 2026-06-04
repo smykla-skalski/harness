@@ -72,8 +72,9 @@ struct DashboardDebuggingRouteView: View {
         restoreScreenshotFolderWatcherIfNeeded()
         consumePendingPasteboardRequest()
       }
-      .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification))
-      { _ in
+      .onReceive(
+        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+      ) { _ in
         refreshClipboardAvailability()
       }
       .onReceive(

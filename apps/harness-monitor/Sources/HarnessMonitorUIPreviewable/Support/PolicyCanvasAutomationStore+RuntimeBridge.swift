@@ -459,7 +459,7 @@ extension HarnessMonitorPolicyCanvas.AutomationPolicyOCRConfiguration {
   fileprivate init(_ configuration: AutomationPolicyOCRConfiguration) {
     self.init(
       recognitionLevel:
-        HarnessMonitorPolicyCanvas.AutomationPolicyOCRConfiguration.RecognitionLevel(
+        Self.RecognitionLevel(
           configuration.recognitionLevel
         ),
       automaticallyDetectsLanguage: configuration.automaticallyDetectsLanguage,
@@ -471,7 +471,7 @@ extension HarnessMonitorPolicyCanvas.AutomationPolicyOCRConfiguration {
 extension AutomationPolicyOCRConfiguration {
   fileprivate init(_ configuration: HarnessMonitorPolicyCanvas.AutomationPolicyOCRConfiguration) {
     self.init(
-      recognitionLevel: AutomationPolicyOCRConfiguration.RecognitionLevel(
+      recognitionLevel: Self.RecognitionLevel(
         configuration.recognitionLevel
       ),
       automaticallyDetectsLanguage: configuration.automaticallyDetectsLanguage,
@@ -594,19 +594,20 @@ extension HarnessMonitorPolicyCanvas.ReviewPullRequestExtractionConfiguration {
   fileprivate init(_ configuration: ReviewPullRequestExtractionConfiguration) {
     self.init(
       repositoryMode:
-        HarnessMonitorPolicyCanvas.ReviewPullRequestExtractionConfiguration.RepositoryMode(
+        Self.RepositoryMode(
           configuration.repositoryMode
         ),
       policyRepositories: configuration.policyRepositories,
       numberMemoryEnabled: configuration.numberMemoryEnabled,
-      resultScope: HarnessMonitorPolicyCanvas.ReviewPullRequestExtractionConfiguration.ResultScope(
+      resultScope: Self.ResultScope(
         configuration.resultScope
       ),
       failureSignalMode:
-        HarnessMonitorPolicyCanvas.ReviewPullRequestExtractionConfiguration.FailureSignalMode(
+        Self.FailureSignalMode(
           configuration.failureSignalMode
         ),
-      outputFormat: HarnessMonitorPolicyCanvas.ReviewPullRequestExtractionConfiguration
+      outputFormat:
+        Self
         .OutputFormat(
           configuration.outputFormat
         ),
@@ -621,18 +622,18 @@ extension ReviewPullRequestExtractionConfiguration {
     _ configuration: HarnessMonitorPolicyCanvas.ReviewPullRequestExtractionConfiguration
   ) {
     self.init(
-      repositoryMode: ReviewPullRequestExtractionConfiguration.RepositoryMode(
+      repositoryMode: Self.RepositoryMode(
         configuration.repositoryMode
       ),
       policyRepositories: configuration.policyRepositories,
       numberMemoryEnabled: configuration.numberMemoryEnabled,
-      resultScope: ReviewPullRequestExtractionConfiguration.ResultScope(
+      resultScope: Self.ResultScope(
         configuration.resultScope
       ),
-      failureSignalMode: ReviewPullRequestExtractionConfiguration.FailureSignalMode(
+      failureSignalMode: Self.FailureSignalMode(
         configuration.failureSignalMode
       ),
-      outputFormat: ReviewPullRequestExtractionConfiguration.OutputFormat(
+      outputFormat: Self.OutputFormat(
         configuration.outputFormat
       ),
       autoCopy: configuration.autoCopy,
