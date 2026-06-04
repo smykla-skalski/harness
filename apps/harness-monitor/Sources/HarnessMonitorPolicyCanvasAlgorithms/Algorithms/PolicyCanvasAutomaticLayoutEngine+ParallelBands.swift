@@ -107,19 +107,28 @@ private struct PolicyCanvasParallelGroupBandCompactor {
       knownCenters: context.newCenterY
     )
     let verticalGap = input.configuration.rowStep - PolicyCanvasLayout.nodeSize.height
+    // Stack the PADDED group frames (member bounds plus the group's frame padding
+    // and title chrome), not the bare member bounds. The bare-bounds stacking left
+    // only `verticalGap - 2*padding` between boxes, so a lower group's title rode up
+    // into the box above and a terminal the comb later dropped into the seam had no
+    // clear room. Reserving the full frame opens a real inter-group seam while the
+    // node ORDER is untouched, so crossings hold. Horizontal placement stays
+    // member-based.
+    let paddedFrames = rankGroups.map { policyCanvasGroupFrame(containing: $0.frame) }
     let totalHeight =
-      rankGroups.map(\.frame.height).reduce(0, +)
+      paddedFrames.map(\.height).reduce(0, +)
       + (verticalGap * CGFloat(max(0, rankGroups.count - 1)))
     var cursorY = bandCenterY - (totalHeight / 2)
     var bandWidth: CGFloat = 0
 
-    for entry in rankGroups {
+    for (index, entry) in rankGroups.enumerated() {
+      let memberTopY = cursorY + (entry.frame.minY - paddedFrames[index].minY)
       context.translation[entry.group.layoutID] = CGPoint(
         x: context.cursorX - entry.frame.minX,
-        y: cursorY - entry.frame.minY
+        y: memberTopY - entry.frame.minY
       )
-      context.newCenterY[entry.group.layoutID] = cursorY + (entry.frame.height / 2)
-      cursorY += entry.frame.height + verticalGap
+      context.newCenterY[entry.group.layoutID] = memberTopY + (entry.frame.height / 2)
+      cursorY += paddedFrames[index].height + verticalGap
       bandWidth = max(bandWidth, entry.frame.width)
     }
     context.cursorX += bandWidth + input.configuration.interGroupSpacing
