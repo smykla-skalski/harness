@@ -102,6 +102,7 @@ struct PersistenceUserDataIntegrationTests {
     await store.bootstrap()
     await store.selectSession(sessionID)
     await store.waitForSessionIndexIdle()
+    await store.flushPendingCacheWrite()
 
     let ended = await store.endSelectedSession()
     #expect(ended)

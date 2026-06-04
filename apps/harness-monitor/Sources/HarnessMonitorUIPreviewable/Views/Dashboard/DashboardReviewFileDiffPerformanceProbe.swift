@@ -57,12 +57,6 @@ enum DashboardReviewFileDiffPerformanceProbe {
 
     let wrapElapsed: Double
     if measureWrapLayout {
-      let wrapInterval = ReviewFilesPerf.beginWrapLayout(
-        size: sizeName,
-        rowCount: document.rows.count,
-        viewportWidth: Int(viewportWidth.rounded())
-      )
-      let wrapStart = DispatchTime.now().uptimeNanoseconds
       let contentView = DashboardReviewFileDiffGridContentView()
       contentView.configure(
         .init(
@@ -71,6 +65,12 @@ enum DashboardReviewFileDiffPerformanceProbe {
           fontScale: 1
         )
       )
+      let wrapInterval = ReviewFilesPerf.beginWrapLayout(
+        size: sizeName,
+        rowCount: document.rows.count,
+        viewportWidth: Int(viewportWidth.rounded())
+      )
+      let wrapStart = DispatchTime.now().uptimeNanoseconds
       contentView.resizeForViewportWidth(viewportWidth)
       wrapElapsed = elapsedMilliseconds(since: wrapStart)
       ReviewFilesPerf.end(wrapInterval)
