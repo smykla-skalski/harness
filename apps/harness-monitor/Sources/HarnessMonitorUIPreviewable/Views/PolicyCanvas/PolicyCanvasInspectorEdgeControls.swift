@@ -165,8 +165,7 @@ struct PolicyCanvasInspectorEdgeBranchList: View {
     } label: {
       Label("Add branch", systemImage: "plus")
     }
-    .harnessGlassButtonStyle()
-    .controlSize(.small)
+    .harnessGlassButtonStyle(controlSize: .small)
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.policyCanvasInspectorField("edge-add-branch")
     )
