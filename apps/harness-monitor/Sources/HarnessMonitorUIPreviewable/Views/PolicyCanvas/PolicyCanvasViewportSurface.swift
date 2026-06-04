@@ -14,6 +14,7 @@ public struct PolicyCanvasViewportSurface: View {
   let simulation: TaskBoardPolicyPipelineSimulationResult?
   let audit: TaskBoardPolicyPipelineAuditSummary?
   let algorithmSelection: PolicyCanvasAlgorithmSelection
+  let minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
 
   @State private var viewModel: PolicyCanvasViewModel
   @AccessibilityFocusState private var focusedComponentState: PolicyCanvasSelection?
@@ -25,12 +26,14 @@ public struct PolicyCanvasViewportSurface: View {
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
+    minimapCenteringMode: PolicyCanvasMinimapCenteringMode? = nil
   ) {
     self.document = document
     self.simulation = simulation
     self.audit = audit
     self.algorithmSelection = algorithmSelection
+    self.minimapCenteringModeOverride = minimapCenteringMode
     _viewModel = State(
       initialValue: PolicyCanvasViewModel.liveStartupState(
         document: document,
@@ -56,7 +59,8 @@ public struct PolicyCanvasViewportSurface: View {
       viewModel: viewModel,
       focusedComponent: $focusedComponentState,
       suppressesSceneStorage: true,
-      storedPipelineStateRaw: ""
+      storedPipelineStateRaw: "",
+      minimapCenteringModeOverride: minimapCenteringModeOverride
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)

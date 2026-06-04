@@ -137,7 +137,8 @@ public struct PolicyCanvasLabWindowView: View {
       document: renderedPolicyDocument,
       simulation: displayedSnapshot.simulation,
       audit: displayedSnapshot.audit,
-      algorithmSelection: algorithmSelection
+      algorithmSelection: algorithmSelection,
+      minimapCenteringMode: .clickViewport
     )
     .toolbar {
       ToolbarItem(placement: .primaryAction) {

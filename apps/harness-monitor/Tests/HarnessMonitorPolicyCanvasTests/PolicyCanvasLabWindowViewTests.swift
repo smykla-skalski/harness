@@ -198,6 +198,37 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertFalse(controlsSource.contains("Use App Theme"))
   }
 
+  func testLabMinimapUsesClickViewportRecenteringMode() throws {
+    let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
+    let viewportSurfaceSource = try previewablePolicyCanvasSourceFile(
+      named: "PolicyCanvasViewportSurface.swift"
+    )
+    let minimapSource = try previewablePolicyCanvasSourceFile(
+      named: "PolicyCanvasMinimapOverlay.swift"
+    )
+
+    XCTAssertTrue(
+      windowSource.contains(
+        "minimapCenteringMode: .clickViewport"
+      )
+    )
+    XCTAssertTrue(
+      viewportSurfaceSource.contains(
+        "let minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?"
+      )
+    )
+    XCTAssertTrue(
+      minimapSource.contains(
+        "let minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?"
+      )
+    )
+    XCTAssertTrue(
+      minimapSource.contains(
+        "minimapCenteringModeOverride ?? storedMinimapCenteringMode"
+      )
+    )
+  }
+
   private func policyCanvasSourceFile(named name: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
@@ -209,6 +240,23 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     let fileURL =
       repoRoot
       .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorPolicyCanvas")
+      .appendingPathComponent(name)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func previewablePolicyCanvasSourceFile(named name: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas"
+      )
       .appendingPathComponent(name)
     return try String(contentsOf: fileURL, encoding: .utf8)
   }
