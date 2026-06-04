@@ -367,16 +367,16 @@ public final class HarnessMonitorStore {
     self.selection = SelectionSlice()
     self.userData = UserDataSlice()
     self.contentUI = ContentUISlice()
-    self.sidebarUI = SidebarUISlice()
-    self.toast = ToastSlice()
+    (self.sidebarUI, self.toast) = (SidebarUISlice(), ToastSlice())
     self.supervisorToolbarSlice = SupervisorToolbarSlice()
     self.bookmarkStore = Self.makeBookmarkStore()
-    self.daemonController = daemonController
-    self.daemonOwnership = daemonOwnership
-    self.fileViewer = fileViewer
-    self.voiceCapture = voiceCapture
+    (self.daemonController, self.daemonOwnership) = (daemonController, daemonOwnership)
+    (self.fileViewer, self.voiceCapture) = (fileViewer, voiceCapture)
     self.taskBoardSettingsWorker = taskBoardSettingsWorker
-    (self.reviewFilePreviewStore, self.reviewFilePatchStore) = (reviewFilePreviewStore, reviewFilePatchStore)
+    (self.reviewFilePreviewStore, self.reviewFilePatchStore) = (
+      reviewFilePreviewStore,
+      reviewFilePatchStore
+    )
     self.modelContext = modelContainer?.mainContext
     self.userDataService = modelContainer.map {
       UserDataPersistenceService(

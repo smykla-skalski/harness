@@ -40,17 +40,15 @@ struct DashboardPolicyCanvasRouteView: View {
   }
 
   var policyCanvasViewModel: PolicyCanvasViewModel {
-    get {
-      policyCanvasViewModelStore.viewModel
-    }
-    nonmutating set {
-      policyCanvasViewModelStore.viewModel = newValue
-    }
+    get { policyCanvasViewModelStore.viewModel }
+    nonmutating set { policyCanvasViewModelStore.viewModel = newValue }
   }
 
   var workspace: TaskBoardPolicyCanvasWorkspace? { dashboardUI.taskBoardPolicyCanvasWorkspace }
 
-  var currentCanvasSelectionPreview: DashboardPolicyCanvasSelectionPreview? { selectedCanvasPreview }
+  var currentCanvasSelectionPreview: DashboardPolicyCanvasSelectionPreview? {
+    selectedCanvasPreview
+  }
 
   func setCanvasSelectionPreview(_ preview: DashboardPolicyCanvasSelectionPreview?) {
     selectedCanvasPreview = preview
