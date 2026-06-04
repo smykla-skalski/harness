@@ -14,8 +14,6 @@ public struct DashboardWindowView: View {
   var persistedColumnVisibilityRaw = SessionColumnVisibilityCodec.encode(.doubleColumn)
   @SceneStorage("dashboard.sidebarWidth")
   var persistedSidebarWidth = 220.0
-  @AppStorage(HarnessMonitorTrackpadNavigationDefaults.enabledKey)
-  var trackpadNavigationEnabled = HarnessMonitorTrackpadNavigationDefaults.enabledDefault
   @Environment(\.openWindow)
   var openWindow
   @State private var handledHistoryRestoreRequestID = 0
@@ -26,10 +24,9 @@ public struct DashboardWindowView: View {
   /// Cached navigation state so each body eval reuses the same handlers
   /// reference. The accessor derives a struct copy via `.updating(...)` from
   /// the canGoBack/canGoForward inputs — fresh allocations on every body eval
-  /// churned AttributeGraph through the three call sites (toolbar, trackpad
-  /// swipe modifier, focused-scene publisher) under the column-toggle
-  /// animation and showed up as `find1<A>` + `propagate_dirty` cost in the
-  /// live-daemon trace top-offenders.
+  /// churned AttributeGraph through the toolbar and focused-scene publisher
+  /// under the column-toggle animation and showed up as `find1<A>` +
+  /// `propagate_dirty` cost in the live-daemon trace top-offenders.
   @State private var navigationStateStorage = WindowNavigationState()
 
   public init(
@@ -174,10 +171,6 @@ public struct DashboardWindowView: View {
           )
           .equatable()
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-          .harnessTrackpadHistorySwipe(
-            navigation: windowNavigationState,
-            isEnabled: trackpadNavigationEnabled
-          )
         }
         .navigationTitle(route.navigationTitle)
         .navigationSubtitle(route.navigationSubtitle)

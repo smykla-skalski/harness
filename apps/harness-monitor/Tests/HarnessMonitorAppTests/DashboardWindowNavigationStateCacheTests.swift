@@ -2,16 +2,13 @@ import XCTest
 
 /// Round 3k stutter fix: `DashboardWindowView.windowNavigationState` was a
 /// computed property that allocated a fresh `WindowNavigationState` AND a
-/// fresh `WindowNavigationHandlers` reference on every body evaluation. With
-/// 4 body evals per column toggle (per the live-daemon audit's app-trace)
-/// and three call sites (toolbar, trackpad swipe modifier, focused-scene
-/// publisher) that churn was 12 fresh struct + 12 fresh handler allocations
-/// per uncollapse, each carrying two fresh closures capturing `history`.
-/// AttributeGraph dominates the trace top-offenders (`find1<A>` 534ms across
-/// the run), so caching this state as `@State` and reusing the handlers
-/// reference via `WindowNavigationState.updating(canGoBack:canGoForward:)`
-/// removes the per-eval churn without changing native NavigationSplitView
-/// behavior.
+/// fresh `WindowNavigationHandlers` reference on every body evaluation. The
+/// toolbar and focused-scene publisher both consumed that value during column
+/// toggles, so the repeated allocations showed up in the live-daemon trace's
+/// AttributeGraph top-offenders (`find1<A>`, `propagate_dirty`). Caching the
+/// state as `@State` and reusing the handlers reference via
+/// `WindowNavigationState.updating(canGoBack:canGoForward:)` removes the
+/// per-eval churn without changing native NavigationSplitView behavior.
 @MainActor
 final class DashboardWindowNavigationStateCacheTests: XCTestCase {
   func testWindowNavigationStateUsesCachedStorage() throws {

@@ -358,8 +358,6 @@ private struct GeneralWindowsSection: View {
   private var launchBehaviorRawValue = HarnessMonitorLaunchBehavior.defaultValue.rawValue
   @AppStorage(OpenRecentCloseAfterPickDefaults.storageKey)
   private var closeOpenRecentAfterPick = OpenRecentCloseAfterPickDefaults.defaultValue
-  @AppStorage(HarnessMonitorTrackpadNavigationDefaults.enabledKey)
-  private var trackpadNavigationEnabled = HarnessMonitorTrackpadNavigationDefaults.enabledDefault
   @AppStorage(SessionWindowTabbingPreference.storageKey)
   private var sessionWindowTabbingRawValue = SessionWindowTabbingPreference.defaultValue.rawValue
 
@@ -393,22 +391,13 @@ private struct GeneralWindowsSection: View {
       .harnessNativeFormControl()
       .accessibilityLabel("Session window tabs")
       .accessibilityHint("Controls whether session windows prefer native macOS tabs.")
-
-      Toggle("Trackpad back/forward navigation", isOn: $trackpadNavigationEnabled)
-        .accessibilityHint(
-          "Enables Safari-like two-finger back and forward gestures in dashboard "
-            + "and session content that supports navigation history"
-        )
-        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTrackpadNavigationToggle)
     } header: {
       Text("Windows")
     } footer: {
       Text(
         "\(launchBehavior.description) "
           + "\(HarnessMonitorLaunchBehavior.closingBehaviorDescription) "
-          + "\(sessionWindowTabbingPreference.description) "
-          + "Trackpad back/forward navigation adds interactive two-finger history "
-          + "swipe to supported dashboard and session content."
+          + sessionWindowTabbingPreference.description
       )
     }
   }

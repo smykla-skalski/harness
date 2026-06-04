@@ -107,18 +107,6 @@ public enum OpenRecentCloseAfterPickDefaults {
   }
 }
 
-public enum HarnessMonitorTrackpadNavigationDefaults {
-  public static let enabledKey = "harness.monitor.trackpad-navigation.enabled"
-  public static let enabledDefault = false
-
-  public static func read(userDefaults: UserDefaults = .standard) -> Bool {
-    if userDefaults.object(forKey: enabledKey) == nil {
-      return enabledDefault
-    }
-    return userDefaults.bool(forKey: enabledKey)
-  }
-}
-
 public enum SessionPendingDecisionBannerSettings {
   public static let enabledKey = "harness.monitor.decisions.pending-banner-enabled"
   public static let focusModeEnabledKey = "harness.monitor.decisions.pending-banner.focus-mode"

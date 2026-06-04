@@ -285,36 +285,6 @@ final class WindowMenuCommandsTests: XCTestCase {
     XCTAssertFalse(source.contains(".disabled(policyCanvasZoomFocus == nil)"))
   }
 
-  func testTrackpadHistorySwipeStaysContentScoped() throws {
-    let shellSource = try harnessSourceFile(named: "App/HarnessMonitorWindowSceneShell.swift")
-    let dashboardSource = try uiPreviewableSourceFile(named: "Views/Dashboard/DashboardWindowView.swift")
-    let sessionTrackpadSource = try uiPreviewableSourceFile(
-      named: "Views/Sessions/SessionWindowView+TrackpadHistory.swift")
-
-    XCTAssertFalse(shellSource.contains(".harnessTrackpadHistorySwipe("))
-    XCTAssertTrue(dashboardSource.contains(".harnessTrackpadHistorySwipe("))
-    XCTAssertTrue(sessionTrackpadSource.contains(".harnessTrackpadHistorySwipe("))
-  }
-
-  func testTrackpadHistorySettingsAreRegisteredAndExposed() throws {
-    let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")
-    let generalSettingsSource = try uiPreviewableSourceFile(
-      named: "Views/Settings/SettingsGeneralSection.swift")
-    let accessibilitySource = try uiPreviewableSourceFile(
-      named: "Support/HarnessMonitorAccessibilityIDs+Settings.swift")
-    let supportSource = try uiPreviewableSourceFile(named: "Support/SessionWindowTypes.swift")
-
-    XCTAssertTrue(appSource.contains("HarnessMonitorTrackpadNavigationDefaults.enabledKey"))
-    XCTAssertTrue(appSource.contains("HarnessMonitorTrackpadNavigationDefaults.enabledDefault"))
-    XCTAssertTrue(generalSettingsSource.contains("Toggle(\"Trackpad back/forward navigation\""))
-    XCTAssertTrue(
-      generalSettingsSource.contains("HarnessMonitorAccessibility.settingsTrackpadNavigationToggle")
-    )
-    XCTAssertTrue(accessibilitySource.contains("settingsTrackpadNavigationToggle"))
-    XCTAssertTrue(supportSource.contains("public enum HarnessMonitorTrackpadNavigationDefaults"))
-    XCTAssertTrue(supportSource.contains("public static let enabledKey"))
-  }
-
   private func harnessSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
