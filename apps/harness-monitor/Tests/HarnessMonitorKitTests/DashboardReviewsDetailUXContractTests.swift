@@ -28,8 +28,8 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsRouteView.swift"
     )
 
-    #expect(route.contains("DashboardReviewsContentDetailWidthRestoration"))
-    #expect(route.contains("@AppStorage(DashboardReviewsContentDetailWidthRestoration.storageKey)"))
+    #expect(route.contains("DashboardReviewsDetailWidthStorage"))
+    #expect(route.contains("@AppStorage(DashboardReviewsDetailWidthStorage.storageKey)"))
     #expect(!route.contains("@SceneStorage(\"dashboard.reviews.content-detail-width\")"))
   }
 

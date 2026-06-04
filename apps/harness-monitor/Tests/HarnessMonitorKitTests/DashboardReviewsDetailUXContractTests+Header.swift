@@ -147,7 +147,7 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(support.contains("DashboardReviewAttentionSummary(item: item)"))
     #expect(support.contains("} else {"))
     #expect(support.contains("DashboardReviewStatusStrip(item: item)"))
-    #expect(enumPresentation.contains("case requiresAttention: HarnessMonitorTheme.caution"))
+    #expect(enumPresentation.contains("case requiresAttention: HarnessMonitorTheme.danger"))
     #expect(!visuals.contains("Text(\"Files\")"))
     #expect(!visuals.contains("\"Policy wait\""))
   }

@@ -110,12 +110,13 @@ struct DashboardReviewsProvenanceTests {
 
   @Test("Route wires provenance into content bar and detail surfaces")
   func routeWiresProvenanceIntoContentBarAndDetailSurfaces() throws {
-    let routeSource = try dashboardSource(named: "DashboardReviewsRouteView.swift")
+    let computedStateSource = try dashboardSource(
+      named: "DashboardReviewsRouteView+ComputedState.swift")
     let contentSource = try dashboardSource(named: "DashboardReviewsRouteView+Content.swift")
     let detailSource = try dashboardSource(named: "DashboardReviewDetailView.swift")
     let provenanceSource = try dashboardSource(named: "DashboardReviewsProvenance.swift")
 
-    #expect(routeSource.contains("var normalizedPreferences: DashboardReviewsPreferences"))
+    #expect(computedStateSource.contains("var normalizedPreferences: DashboardReviewsPreferences"))
     #expect(contentSource.contains("DashboardReviewsProvenanceBar("))
     #expect(!detailSource.contains("DashboardReviewProvenanceMiniBar"))
     #expect(provenanceSource.contains("var routeProvenanceSnapshot"))

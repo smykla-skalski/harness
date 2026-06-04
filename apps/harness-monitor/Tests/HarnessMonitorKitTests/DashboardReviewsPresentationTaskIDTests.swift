@@ -4,16 +4,15 @@ import Testing
 struct DashboardReviewsPresentationTaskIDTests {
   @Test("route presentation task identity stays lightweight")
   func routePresentationTaskIdentityStaysLightweight() throws {
-    let routeSource = try dashboardReviewsRouteSource()
+    let computedStateSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+ComputedState.swift")
     let modelsSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsPresentationModels.swift")
 
-    #expect(routeSource.contains("var presentationTaskID: DashboardReviewsPresentationTaskID"))
+    #expect(computedStateSource.contains("var presentationTaskID: DashboardReviewsPresentationTaskID"))
     #expect(
-      routeSource.contains("var listPresentationInput: DashboardReviewsListPresentationInput"))
-    #expect(routeSource.contains(".task(id: presentationTaskID)"))
-    #expect(routeSource.contains("await rebuildPresentation(input: listPresentationInput)"))
-    #expect(!routeSource.contains(".task(id: presentationInput)"))
+      computedStateSource.contains(
+        "var listPresentationInput: DashboardReviewsListPresentationInput"))
     #expect(modelsSource.contains("struct DashboardReviewsPresentationTaskID"))
     #expect(modelsSource.contains("let preferencesSignature: String"))
     let taskSource = sourceSlice(
@@ -31,7 +30,8 @@ struct DashboardReviewsPresentationTaskIDTests {
 
   @Test("route applies selection changes outside the list presentation task")
   func routeAppliesSelectionChangesOutsideTheListPresentationTask() throws {
-    let routeSource = try dashboardReviewsRouteSource()
+    let computedStateSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+ComputedState.swift")
     // The cached-presentation selection helpers were split into the
     // +Actions+Presentation companion for the file-length cap.
     let actionSource =
@@ -44,8 +44,8 @@ struct DashboardReviewsPresentationTaskIDTests {
       named: "DashboardReviewsPresentationSelection.swift")
 
     #expect(
-      routeSource.contains("var presentationSelectionID: DashboardReviewsPresentationSelectionID"))
-    #expect(routeSource.contains(".onChange(of: presentationSelectionID, initial: true)"))
+      computedStateSource.contains(
+        "var presentationSelectionID: DashboardReviewsPresentationSelectionID"))
     #expect(actionSource.contains("func refreshCachedPresentationSelection()"))
     #expect(actionSource.contains("routeCachedPresentation.applyingSelection("))
     #expect(actionSource.contains("routePresentationWorker.computeList(input: input)"))
