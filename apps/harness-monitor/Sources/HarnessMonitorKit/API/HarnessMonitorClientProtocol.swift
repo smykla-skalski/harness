@@ -362,43 +362,33 @@ extension HarnessMonitorClientProtocol {
     await onBatch(entries, 0, 1)
     return entries
   }
-
   public func personas() async throws -> [AgentPersona] {
     []
   }
-
   public func runtimeModelCatalogs() async throws -> [RuntimeModelCatalog] {
     []
   }
-
   public func runtimeProbeResults() async throws -> AcpRuntimeProbeResponse {
     AcpRuntimeProbeResponse(probes: [], checkedAt: "")
   }
-
   public func acpAgentDescriptors() async throws -> [AcpAgentDescriptor] {
     []
   }
-
   public func acpInspect(sessionID _: String?) async throws -> AcpAgentInspectResponse {
     AcpAgentInspectResponse(agents: [])
   }
-
   public func acpTranscript(sessionID _: String) async throws -> AcpTranscriptResponse {
     AcpTranscriptResponse(entries: [])
   }
-
   public func codexInspect(sessionID _: String?) async throws -> CodexAgentInspectResponse {
     CodexAgentInspectResponse(agents: [])
   }
-
   public func codexTranscript(sessionID _: String) async throws -> CodexTranscriptResponse {
     CodexTranscriptResponse(entries: [])
   }
-
   public func configuration() async throws -> MonitorConfiguration {
     MonitorConfiguration(personas: [], runtimeModels: [])
   }
-
   func timelineWindowResponse(
     from entries: [TimelineEntry],
     request: TimelineWindowRequest
@@ -425,5 +415,4 @@ extension HarnessMonitorClientProtocol {
       unchanged: false
     )
   }
-
 }

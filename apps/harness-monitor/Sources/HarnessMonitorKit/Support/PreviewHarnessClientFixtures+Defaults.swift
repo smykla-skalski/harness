@@ -1,5 +1,4 @@
 import Foundation
-
 extension PreviewHarnessClient.Fixtures {
   public static let defaultTaskBoardGitIdentityDefaults = TaskBoardGitIdentityDefaults(
     gitConfig: TaskBoardGitConfigDefaults(
@@ -20,7 +19,6 @@ extension PreviewHarnessClient.Fixtures {
     ],
     envOverrides: TaskBoardEnvDefaults()
   )
-
   public static let defaultTaskBoardOrchestratorSettings = TaskBoardOrchestratorSettings(
     enabledWorkflows: [.defaultTask, .prFix, .prReview],
     dryRunDefault: false,
@@ -46,7 +44,6 @@ extension PreviewHarnessClient.Fixtures {
     ),
     policyVersion: "preview-task-board-v1"
   )
-
   public static let defaultTaskBoardGitRuntimeConfig = TaskBoardGitRuntimeConfig(
     global: TaskBoardGitRuntimeProfile(
       authorName: "Harness Monitor",
@@ -320,7 +317,6 @@ extension PreviewHarnessClient.Fixtures {
     coreDetailsBySessionID: [:],
     timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline]
   )
-
   public static let dashboardLanding = Self(
     health: HealthResponse(
       status: "ok",
@@ -340,7 +336,6 @@ extension PreviewHarnessClient.Fixtures {
     coreDetailsBySessionID: [:],
     timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline]
   )
-
   public static let taskBoardBoardOnly = Self(
     health: HealthResponse(
       status: "ok",
@@ -361,7 +356,6 @@ extension PreviewHarnessClient.Fixtures {
     timelinesBySessionID: [PreviewFixtures.summary.sessionId: PreviewFixtures.timeline],
     taskBoardItems: [boardOnlyTaskBoardItem]
   )
-
   public static let singleAgent = Self(
     health: HealthResponse(
       status: "ok",
@@ -383,7 +377,6 @@ extension PreviewHarnessClient.Fixtures {
     coreDetailsBySessionID: [:],
     timelinesBySessionID: [:]
   )
-
   public static let emptyCockpit = Self(
     health: HealthResponse(
       status: "ok",
@@ -405,7 +398,6 @@ extension PreviewHarnessClient.Fixtures {
     coreDetailsBySessionID: [:],
     timelinesBySessionID: [PreviewFixtures.emptyCockpitSummary.sessionId: []]
   )
-
   public static let empty = Self(
     health: HealthResponse(
       status: "ok",
