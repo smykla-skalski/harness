@@ -39,11 +39,17 @@ private struct PolicyCanvasAutomationExecutionPlanCompilation {
   let diagnostics: [PolicyCanvasAutomationPolicyDiagnostic]
 }
 
+private struct PolicyCanvasAutomationGraph {
+  let nodes: [PolicyCanvasNode]
+  let edges: [PolicyCanvasEdge]
+}
+
 public enum PolicyCanvasAutomationPolicyCompiler {
   static func compile(
     nodes: [PolicyCanvasNode],
     edges: [PolicyCanvasEdge]
   ) -> PolicyCanvasAutomationPolicyCompilation {
+    let graph = PolicyCanvasAutomationGraph(nodes: nodes, edges: edges)
     let sourceNodes = nodes.compactMap { node -> PolicyCanvasAutomationSource? in
       if isAutomationSourceNode(node), let binding = node.automationBinding {
         return PolicyCanvasAutomationSource(
@@ -86,7 +92,7 @@ public enum PolicyCanvasAutomationPolicyCompiler {
     var policies: [AutomationPolicy] = []
     policies.reserveCapacity(sortedSources.count)
     for (offset, source) in sortedSources.enumerated() {
-      let planCompilation = executionPlan(for: source, nodes: nodes, edges: edges)
+      let planCompilation = executionPlan(for: source, graph: graph)
       diagnostics.append(contentsOf: planCompilation.diagnostics)
       guard planCompilation.diagnostics.isEmpty else {
         continue
@@ -97,8 +103,7 @@ public enum PolicyCanvasAutomationPolicyCompiler {
         for: source,
         policyID: policyID,
         priority: offset + 1,
-        nodes: nodes,
-        edges: edges,
+        graph: graph,
         executionPlan: executionPlan
       )
       policyBySourceNodeID[source.node.id] = compiledPolicy
@@ -149,12 +154,15 @@ public enum PolicyCanvasAutomationPolicyCompiler {
     for source: PolicyCanvasAutomationSource,
     policyID: String,
     priority: Int,
-    nodes: [PolicyCanvasNode],
-    edges: [PolicyCanvasEdge],
+    graph: PolicyCanvasAutomationGraph,
     executionPlan: AutomationPolicyExecutionPlan
   ) -> AutomationPolicy {
-    let reachableNodes = reachableNodes(from: source.node.id, nodes: nodes, edges: edges)
-    let text = graphText(reachableNodes: reachableNodes, edges: edges)
+    let reachableNodes = reachableNodes(
+      from: source.node.id,
+      nodes: graph.nodes,
+      edges: graph.edges
+    )
+    let text = graphText(reachableNodes: reachableNodes, edges: graph.edges)
     let contribution = automationContribution(
       from: reachableNodes,
       sourceNodeID: source.node.id
@@ -162,7 +170,9 @@ public enum PolicyCanvasAutomationPolicyCompiler {
     let contentKinds = contentKinds(from: text)
     let actions = actions(for: source.eventSource, contentKinds: contentKinds, text: text)
     let policyName =
-      source.node.title.isEmpty ? "\(source.eventSource.title) Canvas Policy" : source.node.title
+      source.node.title.isEmpty
+      ? "\(source.eventSource.title) Canvas Policy"
+      : source.node.title
     if let binding = source.binding {
       let compiledPolicy = binding.automationPolicy(
         id: policyID,
@@ -202,13 +212,16 @@ public enum PolicyCanvasAutomationPolicyCompiler {
 
   private static func executionPlan(
     for source: PolicyCanvasAutomationSource,
-    nodes: [PolicyCanvasNode],
-    edges: [PolicyCanvasEdge]
+    graph: PolicyCanvasAutomationGraph
   ) -> PolicyCanvasAutomationExecutionPlanCompilation {
-    let orderedNodes = orderedReachableNodes(from: source.node.id, nodes: nodes, edges: edges)
-    let nodeByID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
+    let orderedNodes = orderedReachableNodes(
+      from: source.node.id,
+      nodes: graph.nodes,
+      edges: graph.edges
+    )
+    let nodeByID = Dictionary(uniqueKeysWithValues: graph.nodes.map { ($0.id, $0) })
     let reachableIDs = Set(orderedNodes.map(\.id))
-    let reachableEdges = edges.filter {
+    let reachableEdges = graph.edges.filter {
       reachableIDs.contains($0.source.nodeID) && reachableIDs.contains($0.target.nodeID)
     }
     var diagnostics: [PolicyCanvasAutomationPolicyDiagnostic] = []
@@ -258,7 +271,7 @@ public enum PolicyCanvasAutomationPolicyCompiler {
     if steps.allSatisfy(\.actions.isEmpty),
       let sourceIndex = steps.firstIndex(where: { $0.nodeID == source.node.id })
     {
-      let text = graphText(reachableNodes: orderedNodes, edges: edges)
+      let text = graphText(reachableNodes: orderedNodes, edges: graph.edges)
       let sourceActions = actions(from: source.node)
       if sourceActions.isEmpty {
         steps[sourceIndex].actions = actions(
@@ -316,575 +329,6 @@ public enum PolicyCanvasAutomationPolicyCompiler {
     }
     return String(hash, radix: 16)
   }
-
-  private static func eventSource(for node: PolicyCanvasNode) -> AutomationPolicyEventSource? {
-    if node.kind == .reviewScreenshotPaste {
-      return .reviewScreenshotPaste
-    }
-    guard node.kind == .source else {
-      return nil
-    }
-    let text = normalizedText(nodeText(node))
-    if containsAny(text, ["screenshot folder", "screenshots folder", "screenshot monitor"]) {
-      return .screenshotFolder
-    }
-    if containsAny(text, ["file picker", "choose images", "choose image", "open panel"]) {
-      return .ocrFilePicker
-    }
-    if containsAny(text, ["drag and drop", "drop images", "dropped image", "drop zone"]) {
-      return .ocrDrop
-    }
-    if containsAny(
-      text,
-      [
-        "review screenshot paste",
-        "pr screenshot",
-        "pull request screenshot",
-        "screenshot pr",
-      ])
-    {
-      return .reviewScreenshotPaste
-    }
-    if containsAny(
-      text,
-      [
-        "review text paste",
-        "paste prs",
-        "paste pull requests",
-        "github pull request",
-        "github pr",
-      ])
-    {
-      return .manualReviewTextPaste
-    }
-    if containsAny(text, ["manual paste", "focused paste", "command v", "cmd v"]) {
-      return .manualOCRPaste
-    }
-    if containsAny(text, ["clipboard", "pasteboard"]) {
-      return .clipboard
-    }
-    guard containsAny(text, ["paste"]) else {
-      return nil
-    }
-    return .manualOCRPaste
-  }
-
-  private static func reachableNodes(
-    from sourceID: String,
-    nodes: [PolicyCanvasNode],
-    edges: [PolicyCanvasEdge]
-  ) -> [PolicyCanvasNode] {
-    let outgoing = Dictionary(grouping: edges, by: \.source.nodeID)
-    var visited = Set<String>()
-    var pending = [sourceID]
-    var cursor = 0
-    while cursor < pending.count {
-      let current = pending[cursor]
-      cursor += 1
-      guard visited.insert(current).inserted else {
-        continue
-      }
-      for edge in outgoing[current] ?? [] where !visited.contains(edge.target.nodeID) {
-        pending.append(edge.target.nodeID)
-      }
-    }
-    return nodes.filter { visited.contains($0.id) }
-  }
-
-  private static func orderedReachableNodes(
-    from sourceID: String,
-    nodes: [PolicyCanvasNode],
-    edges: [PolicyCanvasEdge]
-  ) -> [PolicyCanvasNode] {
-    let nodeByID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
-    let nodeOrder = Dictionary(
-      uniqueKeysWithValues: nodes.enumerated().map { ($0.element.id, $0.offset) }
-    )
-    let outgoing = Dictionary(grouping: edges, by: \.source.nodeID).mapValues { edges in
-      edges.sorted {
-        let leftOrder = nodeOrder[$0.target.nodeID] ?? Int.max
-        let rightOrder = nodeOrder[$1.target.nodeID] ?? Int.max
-        if leftOrder == rightOrder {
-          return $0.id < $1.id
-        }
-        return leftOrder < rightOrder
-      }
-    }
-    var visited = Set<String>()
-    var pending = [sourceID]
-    var cursor = 0
-    while cursor < pending.count {
-      let current = pending[cursor]
-      cursor += 1
-      guard visited.insert(current).inserted, nodeByID[current] != nil else {
-        continue
-      }
-      for edge in outgoing[current] ?? [] where !visited.contains(edge.target.nodeID) {
-        pending.append(edge.target.nodeID)
-      }
-    }
-    var indegree = Dictionary(uniqueKeysWithValues: visited.map { ($0, 0) })
-    for edge in edges
-    where visited.contains(edge.source.nodeID)
-      && visited.contains(edge.target.nodeID)
-    {
-      indegree[edge.target.nodeID, default: 0] += 1
-    }
-    var ready =
-      visited
-      .filter { indegree[$0, default: 0] == 0 }
-      .sorted { (nodeOrder[$0] ?? Int.max) < (nodeOrder[$1] ?? Int.max) }
-    var orderedIDs: [String] = []
-    while let current = ready.first {
-      ready.removeFirst()
-      orderedIDs.append(current)
-      for edge in outgoing[current] ?? [] where visited.contains(edge.target.nodeID) {
-        indegree[edge.target.nodeID, default: 0] -= 1
-        if indegree[edge.target.nodeID, default: 0] == 0 {
-          ready.append(edge.target.nodeID)
-          ready.sort { (nodeOrder[$0] ?? Int.max) < (nodeOrder[$1] ?? Int.max) }
-        }
-      }
-    }
-    if orderedIDs.count != visited.count {
-      orderedIDs = nodes.map(\.id).filter { visited.contains($0) }
-    }
-    return orderedIDs.compactMap { nodeByID[$0] }
-  }
-
-  private static func payloadProvided(
-    by edge: PolicyCanvasEdge,
-    nodesByID: [String: PolicyCanvasNode],
-    edges: [PolicyCanvasEdge],
-    resolvingHubIDs: Set<String> = []
-  ) -> AutomationPolicyPayloadKind {
-    guard let sourceNode = nodesByID[edge.source.nodeID] else {
-      return .unknown
-    }
-    if isHub(sourceNode) {
-      return hubInputPayload(
-        for: sourceNode.id,
-        edges: edges,
-        nodesByID: nodesByID,
-        resolvingHubIDs: resolvingHubIDs
-      )
-    }
-    let explicitPayload = payloadKind(forPortID: edge.source.portID)
-    if explicitPayload != .unknown {
-      return explicitPayload
-    }
-    return outputPayload(
-      for: sourceNode,
-      edges: edges,
-      nodesByID: nodesByID,
-      resolvingHubIDs: resolvingHubIDs
-    )
-  }
-
-  private static func payloadRequired(
-    by node: PolicyCanvasNode,
-    portID: String
-  ) -> AutomationPolicyPayloadKind {
-    let explicitPayload = payloadKind(forPortID: portID)
-    if explicitPayload != .unknown, portID != "in" {
-      return explicitPayload
-    }
-    return declaredInputPayload(for: node)
-  }
-
-  private static func inputPayload(
-    for node: PolicyCanvasNode,
-    edges: [PolicyCanvasEdge],
-    nodesByID: [String: PolicyCanvasNode]
-  ) -> AutomationPolicyPayloadKind {
-    if isHub(node) {
-      return hubInputPayload(for: node.id, edges: edges, nodesByID: nodesByID)
-    }
-    if let incomingPayload = incomingPayload(for: node.id, edges: edges, nodesByID: nodesByID),
-      incomingPayload != .unknown
-    {
-      return incomingPayload
-    }
-    return declaredInputPayload(for: node)
-  }
-
-  private static func declaredInputPayload(
-    for node: PolicyCanvasNode
-  ) -> AutomationPolicyPayloadKind {
-    if node.kind == .ocrImage || node.policyKind?.kind == "ocr_image"
-      || actions(from: node).contains(.ocrImage)
-    {
-      return .image
-    }
-    if node.kind == .resolveReviewPullRequests
-      || node.policyKind?.kind == "resolve_review_pull_requests"
-      || actions(from: node).contains(.extractGitHubPullRequests)
-      || actions(from: node).contains(.resolveReviewPullRequests)
-      || actions(from: node).contains(.copyExtractedGitHubPullRequestURLs)
-    {
-      return .text
-    }
-    if node.kind == .copyReviewPullRequestList
-      || node.policyKind?.kind == "copy_review_pull_request_list"
-      || actions(from: node).contains(.copyReviewPullRequestList)
-      || actions(from: node).contains(.previewReviewApprovals)
-      || actions(from: node).contains(.promptReviewApprovals)
-      || actions(from: node).contains(.approveReviewPullRequests)
-      || actions(from: node).contains(.runReviewPolicy)
-    {
-      return .pullRequests
-    }
-    if actions(from: node).contains(.openDashboardDebugging)
-      || actions(from: node).contains(.rememberRecentScan)
-      || actions(from: node).contains(.showFeedback)
-      || postprocessors(from: node).contains(.persistResult)
-    {
-      return .text
-    }
-    return .unknown
-  }
-
-  private static func outputPayload(
-    for node: PolicyCanvasNode,
-    edges: [PolicyCanvasEdge],
-    nodesByID: [String: PolicyCanvasNode],
-    resolvingHubIDs: Set<String> = []
-  ) -> AutomationPolicyPayloadKind {
-    if isHub(node) {
-      return hubInputPayload(
-        for: node.id,
-        edges: edges,
-        nodesByID: nodesByID,
-        resolvingHubIDs: resolvingHubIDs
-      )
-    }
-    return declaredOutputPayload(for: node)
-  }
-
-  private static func declaredOutputPayload(
-    for node: PolicyCanvasNode
-  ) -> AutomationPolicyPayloadKind {
-    if node.kind == .reviewScreenshotPaste || node.policyKind?.kind == "review_screenshot_paste" {
-      return .image
-    }
-    if node.kind == .ocrImage || node.policyKind?.kind == "ocr_image" {
-      return .text
-    }
-    if node.kind == .resolveReviewPullRequests
-      || node.policyKind?.kind == "resolve_review_pull_requests"
-      || actions(from: node).contains(.extractGitHubPullRequests)
-      || actions(from: node).contains(.resolveReviewPullRequests)
-    {
-      return .pullRequests
-    }
-    if let binding = node.automationBinding {
-      if binding.selectedContentKinds.contains(.image) {
-        return .image
-      }
-      if !binding.selectedContentKinds.isDisjoint(with: [.text, .url]) {
-        return .text
-      }
-      if binding.resolvedEventSource == .manualOCRPaste {
-        return .image
-      }
-      if binding.resolvedEventSource == .manualReviewTextPaste {
-        return .text
-      }
-    }
-    return .unknown
-  }
-
-  private static func incomingPayload(
-    for nodeID: String,
-    edges: [PolicyCanvasEdge],
-    nodesByID: [String: PolicyCanvasNode],
-    resolvingHubIDs: Set<String> = []
-  ) -> AutomationPolicyPayloadKind? {
-    edges.lazy
-      .filter { $0.target.nodeID == nodeID }
-      .map {
-        payloadProvided(
-          by: $0,
-          nodesByID: nodesByID,
-          edges: edges,
-          resolvingHubIDs: resolvingHubIDs
-        )
-      }
-      .first { $0 != .unknown }
-  }
-
-  private static func hubInputPayload(
-    for hubNodeID: String,
-    edges: [PolicyCanvasEdge],
-    nodesByID: [String: PolicyCanvasNode],
-    resolvingHubIDs: Set<String> = []
-  ) -> AutomationPolicyPayloadKind {
-    guard !resolvingHubIDs.contains(hubNodeID) else {
-      return .unknown
-    }
-    return incomingPayload(
-      for: hubNodeID,
-      edges: edges,
-      nodesByID: nodesByID,
-      resolvingHubIDs: resolvingHubIDs.union([hubNodeID])
-    ) ?? .unknown
-  }
-
-  private static func edgeSourceIsHub(
-    _ edge: PolicyCanvasEdge,
-    nodesByID: [String: PolicyCanvasNode]
-  ) -> Bool {
-    guard let sourceNode = nodesByID[edge.source.nodeID] else {
-      return false
-    }
-    return isHub(sourceNode)
-  }
-
-  private static func isHub(_ node: PolicyCanvasNode) -> Bool {
-    node.kind == .hub || node.policyKind?.kind == "hub"
-  }
-
-  private static func fanOuts(
-    from nodes: [PolicyCanvasNode],
-    edges: [PolicyCanvasEdge],
-    nodesByID: [String: PolicyCanvasNode]
-  ) -> [AutomationPolicyFanOut] {
-    nodes
-      .filter(isHub)
-      .compactMap { hub in
-        let branches =
-          edges
-          .filter { $0.source.nodeID == hub.id }
-          .sorted {
-            if $0.source.portID == $1.source.portID {
-              return $0.id < $1.id
-            }
-            return $0.source.portID < $1.source.portID
-          }
-          .compactMap { edge -> AutomationPolicyFanOutBranch? in
-            guard let targetNode = nodesByID[edge.target.nodeID] else {
-              return nil
-            }
-            return AutomationPolicyFanOutBranch(
-              outputPortID: edge.source.portID,
-              targetNodeID: edge.target.nodeID,
-              actions: actions(from: targetNode)
-            )
-          }
-        guard !branches.isEmpty else {
-          return nil
-        }
-        return AutomationPolicyFanOut(
-          hubNodeID: hub.id,
-          payload: hubInputPayload(for: hub.id, edges: edges, nodesByID: nodesByID),
-          branches: branches
-        )
-      }
-  }
-
-  private static func payloadKind(forPortID portID: String) -> AutomationPolicyPayloadKind {
-    let normalized =
-      portID
-      .replacingOccurrences(of: "_", with: " ")
-      .replacingOccurrences(of: "-", with: " ")
-      .lowercased()
-    if normalized.contains("pull request") || normalized.contains("prs") {
-      return .pullRequests
-    }
-    if normalized.contains("image") || normalized.contains("screenshot") {
-      return .image
-    }
-    if normalized.contains("text") {
-      return .text
-    }
-    if normalized.contains("event") {
-      return .event
-    }
-    return .unknown
-  }
-
-  private static func isCompatible(
-    _ outputPayload: AutomationPolicyPayloadKind,
-    with requiredPayload: AutomationPolicyPayloadKind
-  ) -> Bool {
-    outputPayload == requiredPayload || outputPayload == .unknown || requiredPayload == .unknown
-  }
-
-  private static func actions(from node: PolicyCanvasNode) -> [AutomationPolicyAction] {
-    if let binding = node.automationBinding, binding.isEnabled {
-      let selectedActions = binding.selectedActions
-      if !selectedActions.isEmpty {
-        return selectedActions
-      }
-    }
-    if node.kind == .ocrImage || node.policyKind?.kind == "ocr_image" {
-      return [.ocrImage]
-    }
-    if node.kind == .resolveReviewPullRequests
-      || node.policyKind?.kind == "resolve_review_pull_requests"
-    {
-      return [.extractGitHubPullRequests, .resolveReviewPullRequests]
-    }
-    if node.kind == .copyReviewPullRequestList
-      || node.policyKind?.kind == "copy_review_pull_request_list"
-    {
-      return [.copyReviewPullRequestList]
-    }
-    return []
-  }
-
-  private static func postprocessors(
-    from node: PolicyCanvasNode
-  ) -> [AutomationPolicyPostprocessor] {
-    guard let binding = node.automationBinding, binding.isEnabled else {
-      return []
-    }
-    return binding.selectedPostprocessors
-  }
-
-  private static func graphText(
-    reachableNodes: [PolicyCanvasNode],
-    edges: [PolicyCanvasEdge]
-  ) -> String {
-    var reachableIDs = Set<String>()
-    reachableIDs.reserveCapacity(reachableNodes.count)
-    for node in reachableNodes {
-      reachableIDs.insert(node.id)
-    }
-
-    var text = String()
-    text.reserveCapacity(reachableNodes.count * 96 + edges.count * 48)
-    for node in reachableNodes {
-      appendNodeText(node, to: &text)
-    }
-    for edge in edges
-    where reachableIDs.contains(edge.source.nodeID)
-      && reachableIDs.contains(edge.target.nodeID)
-    {
-      appendGraphToken(edge.label, to: &text)
-      appendGraphToken(edge.condition, to: &text)
-      appendGraphToken(edge.source.portID, to: &text)
-      appendGraphToken(edge.target.portID, to: &text)
-    }
-    return normalizedText(text)
-  }
-
-  private static func contentKinds(from text: String) -> Set<AutomationClipboardContentKind> {
-    var kinds: Set<AutomationClipboardContentKind> = []
-    if containsWord(text, ["image", "images", "screenshot", "screenshots", "ocr", "scan"]) {
-      kinds.insert(.image)
-    }
-    if containsWord(text, ["text", "copy", "message", "messages", "string"]) {
-      kinds.insert(.text)
-    }
-    if containsWord(text, ["file", "files", "path", "paths", "document"]) {
-      kinds.insert(.file)
-    }
-    if containsWord(text, ["url", "urls", "link", "links", "web", "github", "pr", "prs"]) {
-      kinds.insert(.url)
-    }
-    if containsAny(text, ["pull request", "pull requests"]) {
-      kinds.formUnion([.text, .url])
-    }
-    if containsWord(text, ["unknown", "fallback"]) || containsAny(text, ["any content"]) {
-      kinds.insert(.unknown)
-    }
-    return kinds.isEmpty ? [.image] : kinds
-  }
-
-  private static func preprocessors(
-    for source: AutomationPolicyEventSource,
-    contentKinds: Set<AutomationClipboardContentKind>,
-    text: String
-  ) -> [AutomationPolicyPreprocessor] {
-    var preprocessors: Set<AutomationPolicyPreprocessor> = []
-    if source == .clipboard || containsAny(text, ["privacy", "pasteboard"]) {
-      preprocessors.insert(.respectPasteboardPrivacy)
-    }
-    if source == .clipboard || containsAny(text, ["sensitive", "concealed", "transient"]) {
-      preprocessors.insert(.skipSensitiveMarkers)
-    }
-    if containsAny(text, ["source app", "source application", "bundle id", "bundle identifier"]) {
-      preprocessors.insert(.filterSourceApplications)
-    }
-    if contentKinds.contains(.image) || containsAny(text, ["dedupe", "fingerprint", "duplicate"]) {
-      preprocessors.insert(.dedupeByFingerprint)
-    }
-    if source == .manualReviewTextPaste || source == .reviewScreenshotPaste
-      || containsAny(text, ["github", "pull request", "pr link"])
-    {
-      preprocessors.insert(.normalizeGitHubPullRequestLinks)
-      preprocessors.insert(.dedupePullRequests)
-    }
-    return AutomationPolicyPreprocessor.allCases.filter { preprocessors.contains($0) }
-  }
-
-  private static func actions(
-    for source: AutomationPolicyEventSource,
-    contentKinds: Set<AutomationClipboardContentKind>,
-    text: String
-  ) -> [AutomationPolicyAction] {
-    var actions: Set<AutomationPolicyAction> = [.recordMetadata]
-    if contentKinds.contains(.image) {
-      actions.insert(.ocrImage)
-      actions.insert(.rememberRecentScan)
-    }
-    if source == .manualReviewTextPaste || source == .reviewScreenshotPaste
-      || containsAny(text, ["github", "pull request", "pr link"])
-    {
-      actions.insert(.extractGitHubPullRequests)
-      if source == .reviewScreenshotPaste {
-        actions.insert(.resolveReviewPullRequests)
-        actions.insert(.copyExtractedGitHubPullRequestURLs)
-        actions.insert(.copyReviewPullRequestList)
-      }
-      if containsAny(text, ["card", "cards", "summary", "preview", "inspect"]) {
-        actions.insert(.previewReviewApprovals)
-      }
-      if containsAny(text, ["ask", "prompt", "confirm", "approval prompt"]) {
-        actions.insert(.promptReviewApprovals)
-      }
-      if containsAny(text, ["immediately approve", "approve immediately", "without prompt"]) {
-        actions.insert(.approveReviewPullRequests)
-      }
-      if containsAny(text, ["auto policy", "reviews policy", "conditions", "conditional"]) {
-        actions.insert(.runReviewPolicy)
-      }
-      if !actions.contains(.previewReviewApprovals)
-        && !actions.contains(.promptReviewApprovals)
-        && !actions.contains(.approveReviewPullRequests)
-        && !actions.contains(.runReviewPolicy)
-      {
-        actions.insert(.previewReviewApprovals)
-        actions.insert(.promptReviewApprovals)
-      }
-    }
-    if containsAny(text, ["feedback", "haptic", "toast", "notify", "notification"]) {
-      actions.insert(.showFeedback)
-    }
-    if containsAny(text, ["debugging", "debug route", "open dashboard", "show dashboard"]) {
-      actions.insert(.openDashboardDebugging)
-    }
-    if source != .clipboard && contentKinds.contains(.image) {
-      actions.insert(.showFeedback)
-    }
-    return AutomationPolicyAction.allCases.filter { actions.contains($0) }
-  }
-
-  private static func postprocessors(
-    actions: [AutomationPolicyAction],
-    text: String
-  ) -> [AutomationPolicyPostprocessor] {
-    var postprocessors: Set<AutomationPolicyPostprocessor> = [.auditEvent]
-    if actions.contains(.ocrImage) || containsAny(text, ["cleanup", "clean up"]) {
-      postprocessors.insert(.sourceSpecificTextCleanup)
-    }
-    if actions.contains(.rememberRecentScan) || containsAny(text, ["persist", "recent"]) {
-      postprocessors.insert(.persistResult)
-    }
-    return AutomationPolicyPostprocessor.allCases.filter { postprocessors.contains($0) }
-  }
-
 }
 
 extension PolicyCanvasViewModel {
