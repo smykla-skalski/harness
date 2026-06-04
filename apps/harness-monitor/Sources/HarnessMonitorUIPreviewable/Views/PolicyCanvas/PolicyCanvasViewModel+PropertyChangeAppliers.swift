@@ -2,6 +2,16 @@ import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
+struct PolicyCanvasNodeSwitchCasesChange {
+  let id: String
+  let from: TaskBoardPolicyPipelineNodeKind
+  let to: TaskBoardPolicyPipelineNodeKind
+  let fromOutputPortTitles: [String]
+  let toOutputPortTitles: [String]
+  let fromEdges: [PolicyCanvasEdge]
+  let toEdges: [PolicyCanvasEdge]
+}
+
 /// Funnel appliers for every inspector property edit routed through
 /// `mutate(_:)`. Each function lands the forward write on the editable graph
 /// and returns the inverse for `mutate(_:)` to register on the undo stack.
@@ -121,37 +131,31 @@ extension PolicyCanvasViewModel {
   }
 
   func applySetNodeSwitchCases(
-    id: String,
-    from: TaskBoardPolicyPipelineNodeKind,
-    to: TaskBoardPolicyPipelineNodeKind,
-    fromOutputPortTitles: [String],
-    toOutputPortTitles: [String],
-    fromEdges: [PolicyCanvasEdge],
-    toEdges: [PolicyCanvasEdge]
+    _ change: PolicyCanvasNodeSwitchCasesChange
   ) -> PolicyCanvasChange {
-    guard let index = nodes.firstIndex(where: { $0.id == id }) else {
+    guard let index = nodes.firstIndex(where: { $0.id == change.id }) else {
       return .setNodeSwitchCases(
-        id: id,
-        from: to,
-        to: to,
-        fromOutputPortTitles: toOutputPortTitles,
-        toOutputPortTitles: toOutputPortTitles,
-        fromEdges: toEdges,
-        toEdges: toEdges
+        id: change.id,
+        from: change.to,
+        to: change.to,
+        fromOutputPortTitles: change.toOutputPortTitles,
+        toOutputPortTitles: change.toOutputPortTitles,
+        fromEdges: change.toEdges,
+        toEdges: change.toEdges
       )
     }
-    markNodeEdited(id)
-    nodes[index].policyKind = to
-    nodes[index].outputPorts = Self.ports(for: toOutputPortTitles, kind: .output)
-    replaceOutgoingEdges(for: id, with: toEdges)
+    markNodeEdited(change.id)
+    nodes[index].policyKind = change.to
+    nodes[index].outputPorts = Self.ports(for: change.toOutputPortTitles, kind: .output)
+    replaceOutgoingEdges(for: change.id, with: change.toEdges)
     return .setNodeSwitchCases(
-      id: id,
-      from: to,
-      to: from,
-      fromOutputPortTitles: toOutputPortTitles,
-      toOutputPortTitles: fromOutputPortTitles,
-      fromEdges: toEdges,
-      toEdges: fromEdges
+      id: change.id,
+      from: change.to,
+      to: change.from,
+      fromOutputPortTitles: change.toOutputPortTitles,
+      toOutputPortTitles: change.fromOutputPortTitles,
+      fromEdges: change.toEdges,
+      toEdges: change.fromEdges
     )
   }
 
