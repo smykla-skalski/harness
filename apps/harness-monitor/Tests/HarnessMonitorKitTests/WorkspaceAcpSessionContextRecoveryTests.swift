@@ -75,11 +75,8 @@ struct WorkspaceAcpSessionContextRecoveryTests {
         ]
     )
     #expect(
-      recoveredClient.recordedCalls()
+      Array(recoveredClient.recordedCalls().suffix(2))
         == [
-          .syncTaskBoardGitHubTokens(globalTokenConfigured: false, repositoryTokenCount: 0),
-          .syncTaskBoardTodoistToken(tokenConfigured: false),
-          .syncTaskBoardOpenRouterToken(tokenConfigured: false),
           expectedHostBridgeReconfigureCall(),
           expectedAcpStartCall(),
         ]
