@@ -88,12 +88,18 @@ extension PolicyCanvasViewModel {
     }
     // The canvas drops groups: the layout is driven purely by the dataflow graph
     // and no group boxes are drawn. This is the single load chokepoint (both
-    // applyDocument and applyPersistedDocument route through it), so clearing
-    // membership and returning no groups here makes layout, rendering, and
-    // routing all ungrouped. The engine re-derives implicit groups from a node's
-    // groupID, so the membership must be cleared, not just the group list.
+    // applyDocument and applyPersistedDocument route through it).
+    //
+    // Assign every node to ONE shared implicit cluster rather than clearing the
+    // membership. A nil groupID makes the engine synthesize one singleton group
+    // per node, which the parallel-band pass then spreads apart vertically (a
+    // tall, sparse layout). One shared cluster instead packs all nodes into a
+    // single tight layered block. The cluster id matches no entry in the (empty)
+    // group list, so it stays an internal layout-only group with no actual
+    // group - nothing reaches `viewModel.groups`, so no box is ever rendered.
+    let implicitClusterID = "__policy_canvas_ungrouped__"
     for index in loadedNodes.indices {
-      loadedNodes[index].groupID = nil
+      loadedNodes[index].groupID = implicitClusterID
     }
     let mappedEdges = document.edges.compactMap { edge in
       policyCanvasEdge(edge, nodes: loadedNodes, assignPreferredPortSides: false)
