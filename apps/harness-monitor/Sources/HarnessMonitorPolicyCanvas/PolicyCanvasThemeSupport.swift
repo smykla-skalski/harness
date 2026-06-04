@@ -9,6 +9,10 @@ public enum PolicyCanvasThemeDefaults {
   public static let modeKey = "policyCanvasThemeMode"
 }
 
+public enum PolicyCanvasLabThemeDefaults {
+  public static let modeKey = "policyCanvasLabThemeMode"
+}
+
 enum PolicyCanvasHostThemeMode: String, CaseIterable, Identifiable, Sendable {
   case auto
   case light
@@ -60,6 +64,29 @@ public enum PolicyCanvasThemeMode: String, CaseIterable, Identifiable, Sendable 
 
   func resolvedColorScheme(appThemeMode: PolicyCanvasHostThemeMode) -> ColorScheme? {
     resolvedThemeMode(appThemeMode: appThemeMode).colorScheme
+  }
+}
+
+public enum PolicyCanvasLabThemeMode: String, CaseIterable, Identifiable, Sendable {
+  case light
+  case dark
+
+  public static let defaultValue: Self = .light
+
+  public var id: String { rawValue }
+
+  public var label: String {
+    switch self {
+    case .light: "Light"
+    case .dark: "Dark"
+    }
+  }
+
+  var colorScheme: ColorScheme {
+    switch self {
+    case .light: .light
+    case .dark: .dark
+    }
   }
 }
 

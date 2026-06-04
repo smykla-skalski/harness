@@ -175,6 +175,29 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertFalse(windowSource.contains("sampleMenuItem(title:"))
   }
 
+  func testLabThemePickerIsWindowScopedAndDecoupledFromAppTheme() throws {
+    let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
+    let controlsSource = try policyCanvasSourceFile(named: "PolicyCanvasLabToolbarControls.swift")
+
+    XCTAssertTrue(windowSource.contains("@AppStorage(PolicyCanvasLabThemeDefaults.modeKey)"))
+    XCTAssertTrue(
+      windowSource.contains(
+        "private var windowThemeMode = PolicyCanvasLabThemeMode.defaultValue"
+      )
+    )
+    XCTAssertTrue(
+      windowSource.contains(
+        "PolicyCanvasLabThemePicker(windowThemeMode: $windowThemeMode)"
+      )
+    )
+    XCTAssertTrue(windowSource.contains(".preferredColorScheme(windowThemeMode.colorScheme)"))
+    XCTAssertFalse(windowSource.contains(".policyCanvasThemeScope()"))
+    XCTAssertTrue(controlsSource.contains("Picker(\"Window theme\", selection: $windowThemeMode)"))
+    XCTAssertTrue(controlsSource.contains("PolicyCanvasLabThemeMode.allCases"))
+    XCTAssertFalse(controlsSource.contains("PolicyCanvasThemeMode.allCases"))
+    XCTAssertFalse(controlsSource.contains("Use App Theme"))
+  }
+
   private func policyCanvasSourceFile(named name: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
