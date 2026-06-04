@@ -204,6 +204,47 @@ struct PolicyCanvasLabRoutingQualityTests {
     )
   }
 
+  @Test("extreme layout keeps groups clear of foreign nodes and titles")
+  @MainActor
+  func extremeLayoutSeparatesGroupsFromForeignNodes() async throws {
+    let scene = try await liveRoutedLabScene(sampleID: "extreme")
+    let nodes = scene.viewModel.nodes
+    let groupByNode = Dictionary(
+      uniqueKeysWithValues: nodes.compactMap { node in node.groupID.map { (node.id, $0) } }
+    )
+    let frames = Dictionary(
+      uniqueKeysWithValues: nodes.map { ($0.id, policyCanvasNodeFrame($0)) }
+    )
+    let ids = nodes.map(\.id)
+
+    var nodeOverlaps: [String] = []
+    for leftIndex in ids.indices {
+      for rightIndex in ids.index(after: leftIndex)..<ids.endIndex {
+        let leftID = ids[leftIndex]
+        let rightID = ids[rightIndex]
+        guard groupByNode[leftID] != groupByNode[rightID] else { continue }
+        if (frames[leftID] ?? .null).intersects(frames[rightID] ?? .null) {
+          nodeOverlaps.append("\(leftID)~\(rightID)")
+        }
+      }
+    }
+
+    let titleFrames = Array(
+      zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups))
+    )
+    var titleOverlaps: [String] = []
+    for node in nodes {
+      for (group, title) in titleFrames where group.id != node.groupID {
+        if (frames[node.id] ?? .null).intersects(title) {
+          titleOverlaps.append("\(node.id)@\(group.id)")
+        }
+      }
+    }
+
+    #expect(nodeOverlaps.isEmpty, "cross-group node overlaps: \(nodeOverlaps)")
+    #expect(titleOverlaps.isEmpty, "nodes inside a foreign group title: \(titleOverlaps)")
+  }
+
   @Test("extreme sample live routes attach to semantic visible port sides")
   @MainActor
   func extremeSampleLiveRoutesAttachToSemanticVisiblePortSides() async throws {
