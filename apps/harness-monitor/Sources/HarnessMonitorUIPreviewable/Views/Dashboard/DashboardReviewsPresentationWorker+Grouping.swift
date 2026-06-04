@@ -26,12 +26,14 @@ extension DashboardReviewsPresentationWorker {
     case .smartInbox:
       smartInboxGroupedItems(
         pinnedPartition,
-        configuredRepositories: input.configuredRepositories,
-        configuredOrganizations: input.configuredOrganizations,
-        pinnedRepositoryIDs: input.pinnedRepositoryIDs,
-        viewerLogin: input.viewerLogin,
-        snoozedPullRequests: input.snoozedPullRequests,
-        showSnoozedOnly: input.showSnoozedOnly
+        context: DashboardReviewsSmartInboxGroupingContext(
+          configuredRepositories: input.configuredRepositories,
+          configuredOrganizations: input.configuredOrganizations,
+          pinnedRepositoryIDs: input.pinnedRepositoryIDs,
+          viewerLogin: input.viewerLogin,
+          snoozedPullRequests: input.snoozedPullRequests,
+          showSnoozedOnly: input.showSnoozedOnly
+        )
       )
     case .flat:
       []
@@ -191,18 +193,13 @@ extension DashboardReviewsPresentationWorker {
 
   private static func smartInboxGroupedItems(
     _ pinnedPartition: DashboardReviewsPinnedPartition,
-    configuredRepositories: [String],
-    configuredOrganizations: [String],
-    pinnedRepositoryIDs: [String],
-    viewerLogin: String?,
-    snoozedPullRequests: DashboardReviewsSnoozedPullRequests,
-    showSnoozedOnly: Bool
+    context: DashboardReviewsSmartInboxGroupingContext
   ) -> [DashboardReviewsRepositoryGroup] {
     var buckets = DashboardReviewsSmartInboxBuckets()
     let currentDate = Date.now
 
     for item in pinnedPartition.unpinnedItems {
-      let isSnoozed = snoozedPullRequests.isSnoozed(
+      let isSnoozed = context.snoozedPullRequests.isSnoozed(
         item.pullRequestID,
         currentDate: currentDate,
         currentUpdatedAt: item.updatedAt
@@ -216,17 +213,26 @@ extension DashboardReviewsPresentationWorker {
       let section =
         isSnoozed
         ? .snoozed
-        : dashboardReviewsSmartInboxSection(for: item, viewerLogin: viewerLogin)
+        : dashboardReviewsSmartInboxSection(for: item, viewerLogin: context.viewerLogin)
       buckets.append(item, to: section)
     }
 
     return buckets.groups(
-      configuredRepositories: configuredRepositories,
-      configuredOrganizations: configuredOrganizations,
-      pinnedRepositoryIDs: pinnedRepositoryIDs,
+      configuredRepositories: context.configuredRepositories,
+      configuredOrganizations: context.configuredOrganizations,
+      pinnedRepositoryIDs: context.pinnedRepositoryIDs,
       pinnedItems: pinnedPartition.pinnedItems
     )
   }
+}
+
+private struct DashboardReviewsSmartInboxGroupingContext {
+  let configuredRepositories: [String]
+  let configuredOrganizations: [String]
+  let pinnedRepositoryIDs: [String]
+  let viewerLogin: String?
+  let snoozedPullRequests: DashboardReviewsSnoozedPullRequests
+  let showSnoozedOnly: Bool
 }
 
 private func dashboardReviewsRepositoryGroups(

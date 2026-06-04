@@ -250,24 +250,29 @@ private struct ReviewPullRequestItemIndex {
 
   func match(
     for reference: ReviewPullRequestExtractionReference
-  ) -> (
-    status: ReviewPullRequestExtractionResolvedRow.Status, item: ReviewItem?,
-    ambiguousItems: [ReviewItem]
-  ) {
+  ) -> ReviewPullRequestItemMatch {
     switch reference {
     case .resolved(let reference):
       guard let item = byReference[reference.id] else {
-        return (.missing, nil, [])
+        return ReviewPullRequestItemMatch(status: .missing, item: nil, ambiguousItems: [])
       }
-      return (.matched, item, [])
+      return ReviewPullRequestItemMatch(status: .matched, item: item, ambiguousItems: [])
     case .bare(let number, _):
       let items = byNumber[number] ?? []
       if items.count == 1 {
-        return (.matched, items[0], [])
+        return ReviewPullRequestItemMatch(status: .matched, item: items[0], ambiguousItems: [])
       }
-      return items.isEmpty ? (.missing, nil, []) : (.ambiguous, nil, items)
+      return items.isEmpty
+        ? ReviewPullRequestItemMatch(status: .missing, item: nil, ambiguousItems: [])
+        : ReviewPullRequestItemMatch(status: .ambiguous, item: nil, ambiguousItems: items)
     }
   }
+}
+
+private struct ReviewPullRequestItemMatch {
+  let status: ReviewPullRequestExtractionResolvedRow.Status
+  let item: ReviewItem?
+  let ambiguousItems: [ReviewItem]
 }
 
 private actor ReviewPullRequestNumberMemory {
