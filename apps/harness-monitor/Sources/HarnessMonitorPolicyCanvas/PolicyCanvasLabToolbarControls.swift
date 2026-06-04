@@ -166,7 +166,6 @@ public struct PolicyCanvasLabStageToolbar: ToolbarContent {
           selectedID: algorithmBinding(for: descriptor.stage)
         )
       }
-      .sharedBackgroundVisibility(.hidden)
       if stageIndex < stageDescriptors.count - 1 {
         ToolbarSpacer(.fixed, placement: .primaryAction)
           .sharedBackgroundVisibility(.hidden)
