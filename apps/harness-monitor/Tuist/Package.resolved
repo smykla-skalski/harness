@@ -2,15 +2,6 @@
   "originHash" : "9ff875b1404d29f7e3226055f5440f8a34185d32a9b2ce455dc9cc12c148a135",
   "pins" : [
     {
-      "identity" : "elk-swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/lukilabs/elk-swift.git",
-      "state" : {
-        "revision" : "76b5a8f8112284a86a4f98ac472c57c66833221b",
-        "version" : "1.0.0"
-      }
-    },
-    {
       "identity" : "fuse-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/krisk/fuse-swift.git",
