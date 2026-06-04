@@ -40,11 +40,15 @@ extension DashboardReviewsRouteView {
       request.candidates,
       configuration: ocrConfiguration
     )
-    let references = resolvedReferences(from: recognition.rows)
+    let rowReferences = resolvedReferences(from: recognition.rows)
+    let extractedReferences = ReviewScreenshotExtractedPullRequestURLList.references(
+      from: recognition.text
+    )
     let result = reviewScreenshotPolicyResult(
       request: request,
       rows: recognition.rows,
       recognizedText: recognition.text,
+      extractedReferences: extractedReferences,
       sourceApplication: sourceApplication,
       decision: decision
     )
@@ -55,8 +59,21 @@ extension DashboardReviewsRouteView {
       store.toast.presentWarning(result.reason ?? "Review screenshot paste was skipped by policy")
       return
     }
+    let extractedURLs = ReviewScreenshotExtractedPullRequestURLList.canonicalURLs(
+      from: extractedReferences
+    )
+    let extractedOutputText = extractedURLs.joined(separator: "\n")
+    let didCopyExtractedURLs =
+      result.executedActions.contains(.copyExtractedGitHubPullRequestURLs)
+      && !extractedOutputText.isEmpty
+    if didCopyExtractedURLs {
+      HarnessMonitorClipboard.copy(extractedOutputText)
+      store.toast.presentSuccess("Copied \(extractedURLs.count) pull request URL(s)")
+    }
     guard !recognition.rows.isEmpty else {
-      store.toast.presentWarning("No pull request rows found in screenshot")
+      if !didCopyExtractedURLs {
+        store.toast.presentWarning("No pull request rows found in screenshot")
+      }
       return
     }
     let extraction = await resolveReviewScreenshotRows(
@@ -65,6 +82,7 @@ extension DashboardReviewsRouteView {
     )
     if configuration.autoCopy,
       result.executedActions.contains(.copyReviewPullRequestList),
+      !didCopyExtractedURLs,
       !extraction.outputText.isEmpty
     {
       HarnessMonitorClipboard.copy(extraction.outputText)
@@ -74,7 +92,7 @@ extension DashboardReviewsRouteView {
       await presentReviewScreenshotExtractionSheet(
         result: result,
         textPreview: recognition.text,
-        references: references,
+        references: rowReferences,
         extraction: extraction
       )
     } else if extraction.outputText.isEmpty {
@@ -109,6 +127,7 @@ extension DashboardReviewsRouteView {
     request: DashboardReviewsScreenshotPasteboardRequest,
     rows: [ReviewPullRequestExtractionRow],
     recognizedText: String,
+    extractedReferences: [GitHubPullRequestReference],
     sourceApplication: AutomationSourceApplication?,
     decision: AutomationPolicyDecision
   ) -> AutomationPolicyExecutionResult {
@@ -128,7 +147,7 @@ extension DashboardReviewsRouteView {
           filePaths: request.candidates.flatMap(\.sourceMetadata).copyableFilePaths
         ),
         imageCandidates: request.candidates,
-        reviewPullRequestReferences: resolvedReferences(from: rows),
+        reviewPullRequestReferences: extractedReferences,
         reviewPullRequestCandidateCount: rows.count
       )
     )
@@ -226,4 +245,22 @@ extension DashboardReviewsRouteView {
     .approveReviewPullRequests,
     .runReviewPolicy,
   ]
+}
+
+enum ReviewScreenshotExtractedPullRequestURLList {
+  static func references(from text: String) -> [GitHubPullRequestReference] {
+    GitHubPullRequestReferenceParser.references(in: text)
+  }
+
+  static func outputText(from references: [GitHubPullRequestReference]) -> String {
+    canonicalURLs(from: references).joined(separator: "\n")
+  }
+
+  static func canonicalURLs(from references: [GitHubPullRequestReference]) -> [String] {
+    var seen = Set<String>()
+    return references.compactMap { reference in
+      let url = reference.canonicalURLString
+      return seen.insert(url).inserted ? url : nil
+    }
+  }
 }

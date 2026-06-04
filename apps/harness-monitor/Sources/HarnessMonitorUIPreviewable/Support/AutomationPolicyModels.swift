@@ -87,6 +87,7 @@ public enum AutomationPolicyAction: String, CaseIterable, Codable, Identifiable,
   case ocrImage
   case extractGitHubPullRequests
   case resolveReviewPullRequests
+  case copyExtractedGitHubPullRequestURLs
   case copyReviewPullRequestList
   case previewReviewApprovals
   case promptReviewApprovals
@@ -104,6 +105,7 @@ public enum AutomationPolicyAction: String, CaseIterable, Codable, Identifiable,
     case .ocrImage: "OCR images"
     case .extractGitHubPullRequests: "Extract GitHub PRs"
     case .resolveReviewPullRequests: "Resolve Reviews PRs"
+    case .copyExtractedGitHubPullRequestURLs: "Copy extracted PR URLs"
     case .copyReviewPullRequestList: "Copy PR list"
     case .previewReviewApprovals: "Preview review approvals"
     case .promptReviewApprovals: "Prompt before approving"

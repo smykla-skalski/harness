@@ -3,7 +3,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::store::PolicyPipelineSimulationResult;
-use super::{PolicyGraph, PolicyGraphMode};
+use super::{
+    PORT_IMAGE, PORT_IN, PORT_PULL_REQUESTS, PORT_TEXT, PolicyGraph, PolicyGraphEdgeCondition,
+    PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind,
+};
 
 pub(crate) const POLICY_CANVAS_WORKSPACE_VERSION: u32 = 1;
 pub const DEFAULT_POLICY_CANVAS_TITLE: &str = "Default";
@@ -12,7 +15,12 @@ pub const REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE: &str = "Pasted PR approvals (d
 pub const REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE: &str = "PR screenshot extraction";
 const MANUAL_OCR_PASTE_TRACE_ID: &str = "manual-ocr-paste-canvas-v1";
 const REVIEW_TEXT_PASTE_DRY_RUN_TRACE_ID: &str = "review-text-paste-dry-run-canvas-v1";
-const REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID: &str = "review-screenshot-extraction-canvas-v2";
+const REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID: &str = "review-screenshot-extraction-canvas-v3";
+const LEGACY_REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID: &str = "review-screenshot-extraction-canvas-v2";
+const REVIEW_SCREENSHOT_SOURCE_ID: &str = "automation:review-screenshot:source";
+const REVIEW_SCREENSHOT_OCR_ID: &str = "automation:review-screenshot:ocr";
+const REVIEW_SCREENSHOT_RESOLVE_ID: &str = "automation:review-screenshot:resolve";
+const REVIEW_SCREENSHOT_COPY_ID: &str = "automation:review-screenshot:copy";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolicyCanvasRecord {
@@ -255,11 +263,8 @@ fn matches_review_text_paste_dry_run_canvas(canvas: &PolicyCanvasRecord) -> bool
 }
 
 fn matches_review_screenshot_extraction_canvas(canvas: &PolicyCanvasRecord) -> bool {
-    canvas
-        .document
-        .policy_trace_ids
-        .iter()
-        .any(|trace_id| trace_id == REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID)
+    document_has_trace_id(&canvas.document, REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID)
+        || is_canonical_legacy_review_screenshot_extraction_canvas(canvas)
 }
 
 fn repair_review_screenshot_extraction_canvas(canvas: &mut PolicyCanvasRecord) -> bool {
@@ -268,11 +273,126 @@ fn repair_review_screenshot_extraction_canvas(canvas: &mut PolicyCanvasRecord) -
         canvas.is_review_screenshot_extraction_canvas = true;
         changed = true;
     }
-    if !matches_review_screenshot_extraction_canvas(canvas) {
+    if !document_has_trace_id(&canvas.document, REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID)
+        && is_canonical_legacy_review_screenshot_extraction_canvas(canvas)
+    {
         canvas.document = PolicyGraph::review_screenshot_extraction_seeded_v2();
         canvas.latest_simulation = None;
         canvas.touch();
         changed = true;
     }
     changed
+}
+
+fn is_canonical_legacy_review_screenshot_extraction_canvas(canvas: &PolicyCanvasRecord) -> bool {
+    let document = &canvas.document;
+    if !document_has_trace_id(document, LEGACY_REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID)
+        || document_has_trace_id(document, REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID)
+        || document.nodes.len() != 4
+        || document.edges.len() != 3
+    {
+        return false;
+    }
+
+    let Some(source) = node(document, REVIEW_SCREENSHOT_SOURCE_ID) else {
+        return false;
+    };
+    let Some(ocr) = node(document, REVIEW_SCREENSHOT_OCR_ID) else {
+        return false;
+    };
+    let Some(resolve) = node(document, REVIEW_SCREENSHOT_RESOLVE_ID) else {
+        return false;
+    };
+    let Some(copy) = node(document, REVIEW_SCREENSHOT_COPY_ID) else {
+        return false;
+    };
+
+    matches!(source.kind, PolicyGraphNodeKind::ReviewScreenshotPaste)
+        && matches!(ocr.kind, PolicyGraphNodeKind::OcrImage)
+        && matches!(resolve.kind, PolicyGraphNodeKind::ResolveReviewPullRequests)
+        && matches!(copy.kind, PolicyGraphNodeKind::CopyReviewPullRequestList)
+        && automation_actions(
+            source,
+            &[
+                "ocrImage",
+                "extractGitHubPullRequests",
+                "resolveReviewPullRequests",
+                "copyReviewPullRequestList",
+                "previewReviewApprovals",
+                "recordMetadata",
+            ],
+        )
+        && automation_actions(ocr, &["ocrImage"])
+        && automation_actions(
+            resolve,
+            &["extractGitHubPullRequests", "resolveReviewPullRequests"],
+        )
+        && automation_actions(
+            copy,
+            &["copyReviewPullRequestList", "previewReviewApprovals"],
+        )
+        && has_edge(
+            document,
+            "edge:review-screenshot:ocr",
+            REVIEW_SCREENSHOT_SOURCE_ID,
+            PORT_IMAGE,
+            REVIEW_SCREENSHOT_OCR_ID,
+            PORT_IN,
+        )
+        && has_edge(
+            document,
+            "edge:review-screenshot:resolve",
+            REVIEW_SCREENSHOT_OCR_ID,
+            PORT_TEXT,
+            REVIEW_SCREENSHOT_RESOLVE_ID,
+            PORT_IN,
+        )
+        && has_edge(
+            document,
+            "edge:review-screenshot:copy",
+            REVIEW_SCREENSHOT_RESOLVE_ID,
+            PORT_PULL_REQUESTS,
+            REVIEW_SCREENSHOT_COPY_ID,
+            PORT_IN,
+        )
+}
+
+fn document_has_trace_id(document: &PolicyGraph, trace_id: &str) -> bool {
+    document
+        .policy_trace_ids
+        .iter()
+        .any(|candidate| candidate == trace_id)
+}
+
+fn node<'a>(document: &'a PolicyGraph, node_id: &str) -> Option<&'a PolicyGraphNode> {
+    document.nodes.iter().find(|node| node.id == node_id)
+}
+
+fn automation_actions(node: &PolicyGraphNode, actions: &[&str]) -> bool {
+    node.automation.as_ref().is_some_and(|automation| {
+        automation.actions.len() == actions.len()
+            && automation
+                .actions
+                .iter()
+                .zip(actions)
+                .all(|(left, right)| left == right)
+    })
+}
+
+fn has_edge(
+    document: &PolicyGraph,
+    edge_id: &str,
+    from_node: &str,
+    from_port: &str,
+    to_node: &str,
+    to_port: &str,
+) -> bool {
+    document.edges.iter().any(|edge| {
+        edge.id == edge_id
+            && edge.from_node == from_node
+            && edge.from_port == from_port
+            && edge.to_node == to_node
+            && edge.to_port == to_port
+            && edge.condition == PolicyGraphEdgeCondition::Always
+    })
 }

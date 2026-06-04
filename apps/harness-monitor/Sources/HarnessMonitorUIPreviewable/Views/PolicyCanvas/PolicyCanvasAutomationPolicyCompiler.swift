@@ -520,6 +520,7 @@ public enum PolicyCanvasAutomationPolicyCompiler {
       || node.policyKind?.kind == "resolve_review_pull_requests"
       || actions(from: node).contains(.extractGitHubPullRequests)
       || actions(from: node).contains(.resolveReviewPullRequests)
+      || actions(from: node).contains(.copyExtractedGitHubPullRequestURLs)
     {
       return .text
     }
@@ -834,6 +835,7 @@ public enum PolicyCanvasAutomationPolicyCompiler {
       actions.insert(.extractGitHubPullRequests)
       if source == .reviewScreenshotPaste {
         actions.insert(.resolveReviewPullRequests)
+        actions.insert(.copyExtractedGitHubPullRequestURLs)
         actions.insert(.copyReviewPullRequestList)
       }
       if containsAny(text, ["card", "cards", "summary", "preview", "inspect"]) {

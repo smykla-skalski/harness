@@ -1,16 +1,20 @@
 use super::{
     POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PORT_IMAGE, PORT_IN,
-    PORT_PULL_REQUESTS, PORT_TEXT, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
-    PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphLayout, PolicyGraphMode,
-    PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphOCRConfiguration,
-    PolicyGraphReviewPullRequestExtraction, edge, group, layout, node, rect, strings,
+    PORT_PULL_REQUESTS, PORT_TEXT, PolicyActionStep, PolicyGraph, PolicyGraphAutomationBinding,
+    PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphLayout,
+    PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
+    PolicyGraphOCRConfiguration, PolicyGraphReviewPullRequestExtraction, edge, group, layout, node,
+    rect, strings,
 };
 
 const REVIEW_SCREENSHOT_GROUP_ID: &str = "automation:review-screenshot-extraction";
 const REVIEW_SCREENSHOT_SOURCE_ID: &str = "automation:review-screenshot:source";
 const REVIEW_SCREENSHOT_OCR_ID: &str = "automation:review-screenshot:ocr";
+const REVIEW_SCREENSHOT_HUB_ID: &str = "automation:review-screenshot:hub";
 const REVIEW_SCREENSHOT_RESOLVE_ID: &str = "automation:review-screenshot:resolve";
 const REVIEW_SCREENSHOT_COPY_ID: &str = "automation:review-screenshot:copy";
+const PORT_OUT_1: &str = "out_1";
+const PORT_OUT_2: &str = "out_2";
 
 pub(crate) fn review_screenshot_extraction_document() -> PolicyGraph {
     PolicyGraph {
@@ -24,7 +28,7 @@ pub(crate) fn review_screenshot_extraction_document() -> PolicyGraph {
             nodes: review_screenshot_layout(),
             ..PolicyGraphLayout::default()
         },
-        policy_trace_ids: vec!["review-screenshot-extraction-canvas-v2".to_string()],
+        policy_trace_ids: vec!["review-screenshot-extraction-canvas-v3".to_string()],
     }
 }
 
@@ -41,13 +45,22 @@ fn review_screenshot_nodes() -> Vec<PolicyGraphNode> {
 
     let mut ocr = node(
         REVIEW_SCREENSHOT_OCR_ID,
-        "OCR screenshot rows",
+        "OCR image",
         PolicyGraphNodeKind::OcrImage,
         &[PORT_IN],
         &[PORT_TEXT],
         REVIEW_SCREENSHOT_GROUP_ID,
     );
     ocr.automation = Some(review_screenshot_component_binding(&["ocrImage"]));
+
+    let hub = node(
+        REVIEW_SCREENSHOT_HUB_ID,
+        "Hub",
+        PolicyGraphNodeKind::Hub,
+        &[PORT_IN],
+        &[PORT_OUT_1, PORT_OUT_2],
+        REVIEW_SCREENSHOT_GROUP_ID,
+    );
 
     let mut resolve = node(
         REVIEW_SCREENSHOT_RESOLVE_ID,
@@ -64,18 +77,19 @@ fn review_screenshot_nodes() -> Vec<PolicyGraphNode> {
 
     let mut copy = node(
         REVIEW_SCREENSHOT_COPY_ID,
-        "Copy PR list",
-        PolicyGraphNodeKind::CopyReviewPullRequestList,
+        "Copy extracted PR URLs",
+        PolicyGraphNodeKind::ActionStep(PolicyActionStep {
+            action_id: "github.copy_extracted_pull_request_urls".to_string(),
+        }),
         &[PORT_IN],
         &[],
         REVIEW_SCREENSHOT_GROUP_ID,
     );
     copy.automation = Some(review_screenshot_component_binding(&[
-        "copyReviewPullRequestList",
-        "previewReviewApprovals",
+        "copyExtractedGitHubPullRequestURLs",
     ]));
 
-    vec![source, ocr, resolve, copy]
+    vec![source, ocr, hub, resolve, copy]
 }
 
 fn review_screenshot_edges() -> Vec<PolicyGraphEdge> {
@@ -88,16 +102,23 @@ fn review_screenshot_edges() -> Vec<PolicyGraphEdge> {
             PolicyGraphEdgeCondition::Always,
         ),
         edge(
-            "edge:review-screenshot:resolve",
+            "edge:review-screenshot:hub",
             REVIEW_SCREENSHOT_OCR_ID,
             PORT_TEXT,
+            REVIEW_SCREENSHOT_HUB_ID,
+            PolicyGraphEdgeCondition::Always,
+        ),
+        edge(
+            "edge:review-screenshot:resolve",
+            REVIEW_SCREENSHOT_HUB_ID,
+            PORT_OUT_1,
             REVIEW_SCREENSHOT_RESOLVE_ID,
             PolicyGraphEdgeCondition::Always,
         ),
         edge(
             "edge:review-screenshot:copy",
-            REVIEW_SCREENSHOT_RESOLVE_ID,
-            PORT_PULL_REQUESTS,
+            REVIEW_SCREENSHOT_HUB_ID,
+            PORT_OUT_2,
             REVIEW_SCREENSHOT_COPY_ID,
             PolicyGraphEdgeCondition::Always,
         ),
@@ -108,10 +129,11 @@ fn review_screenshot_group() -> PolicyGraphGroup {
     group(
         REVIEW_SCREENSHOT_GROUP_ID,
         "PR screenshot extraction",
-        rect(36, 80, 1_040, 220),
+        rect(36, 80, 1_040, 320),
         vec![
             REVIEW_SCREENSHOT_SOURCE_ID,
             REVIEW_SCREENSHOT_OCR_ID,
+            REVIEW_SCREENSHOT_HUB_ID,
             REVIEW_SCREENSHOT_RESOLVE_ID,
             REVIEW_SCREENSHOT_COPY_ID,
         ],
@@ -120,10 +142,11 @@ fn review_screenshot_group() -> PolicyGraphGroup {
 
 fn review_screenshot_layout() -> Vec<PolicyGraphNodeLayout> {
     vec![
-        layout(REVIEW_SCREENSHOT_SOURCE_ID, 80, 140),
-        layout(REVIEW_SCREENSHOT_OCR_ID, 320, 140),
-        layout(REVIEW_SCREENSHOT_RESOLVE_ID, 560, 140),
-        layout(REVIEW_SCREENSHOT_COPY_ID, 800, 140),
+        layout(REVIEW_SCREENSHOT_SOURCE_ID, 80, 180),
+        layout(REVIEW_SCREENSHOT_OCR_ID, 320, 180),
+        layout(REVIEW_SCREENSHOT_HUB_ID, 560, 180),
+        layout(REVIEW_SCREENSHOT_RESOLVE_ID, 800, 120),
+        layout(REVIEW_SCREENSHOT_COPY_ID, 800, 240),
     ]
 }
 
@@ -142,8 +165,7 @@ fn review_screenshot_source_binding() -> PolicyGraphAutomationBinding {
             "ocrImage",
             "extractGitHubPullRequests",
             "resolveReviewPullRequests",
-            "copyReviewPullRequestList",
-            "previewReviewApprovals",
+            "copyExtractedGitHubPullRequestURLs",
             "recordMetadata",
         ]),
         postprocessors: strings(&["auditEvent"]),

@@ -56,6 +56,7 @@ struct DashboardReviewsTextPastePolicyTests {
     #expect(fallbackPolicy.match.contentKinds == [.image])
     #expect(fallbackPolicy.actions.contains(.ocrImage))
     #expect(fallbackPolicy.actions.contains(.resolveReviewPullRequests))
+    #expect(fallbackPolicy.actions.contains(.copyExtractedGitHubPullRequestURLs))
     #expect(fallbackPolicy.actions.contains(.copyReviewPullRequestList))
     #expect(fallbackPolicy.ocrConfiguration == AutomationPolicyOCRConfiguration())
     #expect(extraction.repositoryMode == .allConfiguredRepos)
@@ -88,6 +89,26 @@ struct DashboardReviewsTextPastePolicyTests {
       ])
     #expect(rows.map(\.visualStatus) == [.passing, .failing, .failing])
     #expect(rows[1].titleText.contains("unblock policy canvas"))
+  }
+
+  @Test("Screenshot OCR text canonicalizes raw pull request URLs for copy")
+  func screenshotOCRTextCanonicalizesRawPullRequestURLsForCopy() {
+    let text = """
+      https://github.com/kong/kuma/pull/16703/files
+      repeated https://github.com/kong/kuma/pull/16703#discussion_r1
+      https: //github. com/smykla-skalski/harness/pull/1234 /files
+      kong/kuma#16703
+      """
+
+    let references = ReviewScreenshotExtractedPullRequestURLList.references(from: text)
+    let output = ReviewScreenshotExtractedPullRequestURLList.outputText(from: references)
+
+    #expect(
+      output == [
+        "https://github.com/kong/kuma/pull/16703",
+        "https://github.com/smykla-skalski/harness/pull/1234",
+      ].joined(separator: "\n")
+    )
   }
 
   @Test("Bare number resolution queries configured repositories and dedupes copied output")

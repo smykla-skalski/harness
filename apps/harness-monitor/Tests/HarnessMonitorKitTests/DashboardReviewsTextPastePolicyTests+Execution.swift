@@ -131,6 +131,36 @@ extension DashboardReviewsTextPastePolicyTests {
     #expect(result.executedActions.contains(.copyReviewPullRequestList))
   }
 
+  @Test("Policy execution copies extracted screenshot URLs without review rows")
+  func policyExecutionCopiesExtractedScreenshotURLsWithoutReviewRows() {
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .reviewScreenshotPaste)
+    policy.actions = [.copyExtractedGitHubPullRequestURLs]
+    let references = GitHubPullRequestReferenceParser.references(
+      in: "https://github.com/kong/kuma/pull/16703/files")
+    let request = AutomationPolicyExecutionRequest(
+      source: .reviewScreenshotPaste,
+      decision: AutomationPolicyDecision(policy: policy, isAllowed: true, reason: nil),
+      summary: "1 extracted URL",
+      contentKinds: [.image, .text, .url],
+      declaredTypes: ["public.image"],
+      detectedContentType: "public.image",
+      sourceApplication: nil,
+      trigger: "test",
+      metadata: ClipboardAutomationMetadataPayload(
+        textPreview: "https://github.com/kong/kuma/pull/16703/files",
+        filePaths: []
+      ),
+      reviewPullRequestReferences: references,
+      reviewPullRequestCandidateCount: 0
+    )
+
+    let result = AutomationPolicyExecutionPipeline.execute(request)
+
+    #expect(result.outcome == .matched)
+    #expect(result.executedActions == [.copyExtractedGitHubPullRequestURLs])
+    #expect(result.reviewPullRequestReferences.map(\.displayText) == ["kong/kuma#16703"])
+  }
+
   @Test("Policy execution skips review actions when no PR links are present")
   func policyExecutionSkipsReviewActionsWhenNoPRLinksArePresent() {
     var policy = AutomationPolicyDocument.defaultPolicy(for: .manualReviewTextPaste)

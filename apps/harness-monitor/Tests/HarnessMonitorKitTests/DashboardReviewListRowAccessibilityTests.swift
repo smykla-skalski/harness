@@ -339,7 +339,7 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(first == second)
   }
 
-  fileprivate func rowSource(named fileName: String) throws -> String {
+  func rowSource(named fileName: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
       testsDirectory
