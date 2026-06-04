@@ -205,7 +205,7 @@ extension PreviewHarnessClient.Fixtures {
           conclusion: .none,
           checkSuiteID: "suite-413",
           detailsURL: "https://github.com/smykla-skalski/harness-monitor/actions/runs/413"
-        ),
+        )
       ],
       reviews: [PullRequestReview(author: "teammate", state: .approved)],
       additions: 4,

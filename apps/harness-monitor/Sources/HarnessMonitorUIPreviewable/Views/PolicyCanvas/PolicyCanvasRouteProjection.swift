@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 struct PolicyCanvasProjectedRouteInput {
   let cachedOutput: PolicyCanvasRouteWorkerOutput

@@ -104,12 +104,12 @@ public protocol PolicyCanvasEdgeRouter: Sendable {
   ) -> PolicyCanvasEdgeRoute
 }
 
-public extension PolicyCanvasEdgeRouter {
+extension PolicyCanvasEdgeRouter {
   /// Default flex-anchor implementation for routers that don't supply their
   /// own cost-aware override. Returns the route for the first candidate pair
   /// - no real ranking happens here. `PolicyCanvasVisibilityRouter` provides
   /// the real override that ranks emitted-route cost for selection.
-  func route(
+  public func route(
     sourceCandidates: [CGPoint],
     targetCandidates: [CGPoint],
     context: PolicyCanvasRouteContext
@@ -159,8 +159,8 @@ private struct PolicyCanvasEdgeRouterKey: EnvironmentKey {
     PolicyCanvasMemoizedRouter(inner: PolicyCanvasVisibilityRouter())
 }
 
-public extension EnvironmentValues {
-  var policyCanvasEdgeRouter: any PolicyCanvasEdgeRouter {
+extension EnvironmentValues {
+  public var policyCanvasEdgeRouter: any PolicyCanvasEdgeRouter {
     get { self[PolicyCanvasEdgeRouterKey.self] }
     set { self[PolicyCanvasEdgeRouterKey.self] = newValue }
   }

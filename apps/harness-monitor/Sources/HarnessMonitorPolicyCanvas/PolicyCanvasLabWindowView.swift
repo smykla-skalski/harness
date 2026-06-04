@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 public struct PolicyCanvasLabWindowView: View {
   private let liveSnapshot: PolicyCanvasHostSnapshot
@@ -22,17 +22,21 @@ public struct PolicyCanvasLabWindowView: View {
     runtime: (any PolicyCanvasLabRuntime)? = nil,
     allowsLiveBootstrap: Bool = false,
     initialSelection: PolicyCanvasLabSelection = .sample(PolicyCanvasLabSamples.defaultSelectionID),
-    fixtureDocument: TaskBoardPolicyPipelineDocument? = PolicyCanvasLabSnapshotSupport.fixtureDocument()
+    fixtureDocument: TaskBoardPolicyPipelineDocument? =
+      PolicyCanvasLabSnapshotSupport.fixtureDocument()
   ) {
-    let resolvedLiveSnapshot = liveSnapshot ?? PolicyCanvasHostSnapshot(
-      activeCanvasId: nil,
-      document: nil,
-      simulation: nil,
-      audit: nil
-    )
-    let liveGraphVisible = resolvedLiveSnapshot.document.map(
-      PolicyCanvasLabSnapshotSupport.hasVisibleGraph
-    ) ?? false
+    let resolvedLiveSnapshot =
+      liveSnapshot
+      ?? PolicyCanvasHostSnapshot(
+        activeCanvasId: nil,
+        document: nil,
+        simulation: nil,
+        audit: nil
+      )
+    let liveGraphVisible =
+      resolvedLiveSnapshot.document.map(
+        PolicyCanvasLabSnapshotSupport.hasVisibleGraph
+      ) ?? false
     let normalizedSelection = Self.normalizedInitialSelection(
       initialSelection,
       fixtureDocument: fixtureDocument,

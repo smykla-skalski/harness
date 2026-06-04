@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Bordered action button used by `PolicyCanvasTopBar` (Save, Simulate,
 /// Promote). Split out of `PolicyCanvasChromeViews.swift` on touch during

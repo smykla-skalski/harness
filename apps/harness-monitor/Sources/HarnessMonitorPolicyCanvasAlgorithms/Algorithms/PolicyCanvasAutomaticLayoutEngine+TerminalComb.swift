@@ -114,7 +114,8 @@ func policyCanvasArrangedDecisionTerminals(
     let leftCenterX =
       leftSources.compactMap { positions[$0]?.x }.reduce(0, +) / CGFloat(max(leftSources.count, 1))
     let rightCenterX =
-      rightSources.compactMap { positions[$0]?.x }.reduce(0, +) / CGFloat(max(rightSources.count, 1))
+      rightSources.compactMap { positions[$0]?.x }.reduce(0, +)
+      / CGFloat(max(rightSources.count, 1))
     if leftCenterX != rightCenterX {
       return leftCenterX > rightCenterX
     }

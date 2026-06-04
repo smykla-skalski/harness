@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 enum PolicyCanvasCanvasHitTarget: Equatable {
   case port(PolicyCanvasPortEndpoint)

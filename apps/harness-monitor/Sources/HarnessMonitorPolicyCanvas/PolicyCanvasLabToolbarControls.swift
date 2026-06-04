@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 private enum PolicyCanvasLabAlgorithmPreset: String, CaseIterable, Identifiable {
   case referenceRouting

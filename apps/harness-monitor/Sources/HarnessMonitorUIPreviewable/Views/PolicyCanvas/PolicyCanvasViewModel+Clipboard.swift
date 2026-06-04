@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Clipboard payload captured by Cmd+C and replayed by Cmd+V. Holds the
 /// minimum graph slice needed to rehydrate the copied selection: the source

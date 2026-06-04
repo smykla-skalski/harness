@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvas
+import SwiftUI
 
 public struct PolicyEnforcementKillSwitchToolbarGroup: ToolbarContent {
   private let store: HarnessMonitorStore

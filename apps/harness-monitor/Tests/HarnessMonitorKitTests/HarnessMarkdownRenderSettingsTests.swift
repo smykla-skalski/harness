@@ -200,7 +200,8 @@ struct HarnessMarkdownRenderSettingsTests {
     )
 
     #expect(sidebarSource.contains("case markdown"))
-    #expect(settingsSource.contains("SettingsMarkdownSection(isActive: section == selectedSection)"))
+    #expect(
+      settingsSource.contains("SettingsMarkdownSection(isActive: section == selectedSection)"))
     #expect(sectionSource.contains("Block Gaps"))
     #expect(sectionSource.contains("Layout Spacing"))
     #expect(sectionSource.contains("Details max height"))

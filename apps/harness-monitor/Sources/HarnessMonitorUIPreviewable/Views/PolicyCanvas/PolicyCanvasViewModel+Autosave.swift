@@ -1,7 +1,7 @@
 import Foundation
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 public enum PolicyCanvasDraftSaveReason: Sendable {
   case manualSave

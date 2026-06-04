@@ -218,7 +218,8 @@ struct DashboardReviewsPreferencesTests {
   @Test("route restores and persists the preferred group mode")
   func routeRestoresAndPersistsPreferredGroupMode() throws {
     let routeSource = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteView.swift")
-    let syncSource = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteView+StateSync.swift")
+    let syncSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+StateSync.swift")
 
     #expect(routeSource.contains(".onChange(of: groupModeRaw)"))
     #expect(routeSource.contains("nextPreferences.preferredGroupModeRaw = newValue"))

@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Cmd+F search overlay for the canvas. Lives above the workspace, takes
 /// keyboard focus on appear, and routes selection through the view model's

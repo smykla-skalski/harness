@@ -201,7 +201,8 @@ struct DashboardReviewsRouteViewTests {
     let attentionSource =
       try dashboardReviewsRouteSource(named: "DashboardReviewsAttentionActions.swift")
       + "\n"
-      + dashboardReviewsRouteSource(named: "DashboardReviewsAttentionActions+ConfirmationMessages.swift")
+      + dashboardReviewsRouteSource(
+        named: "DashboardReviewsAttentionActions+ConfirmationMessages.swift")
     let routeStateSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteViewState.swift")
     let actionStateSource = try dashboardReviewsRouteSource(
@@ -246,10 +247,13 @@ struct DashboardReviewsRouteViewTests {
     let source = try dashboardReviewsRouteSource()
     let stateSource = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteViewState.swift")
     let modesSource = try dashboardReviewsRouteSource(named: "DashboardReviewsListModes.swift")
-    let contentSource = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteView+Content.swift")
+    let contentSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Content.swift")
 
     #expect(modesSource.contains("struct DashboardReviewsCollapsedSecondaryQueues"))
-    #expect(stateSource.contains("var collapsedSecondaryQueues = DashboardReviewsCollapsedSecondaryQueues()"))
+    #expect(
+      stateSource.contains(
+        "var collapsedSecondaryQueues = DashboardReviewsCollapsedSecondaryQueues()"))
     #expect(source.contains("syncCollapsedSecondaryQueuesFromStorage(newValue)"))
     #expect(contentSource.contains("routeCollapsedSecondaryQueues.contains("))
   }

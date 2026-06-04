@@ -114,7 +114,9 @@ public struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
     Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
   }
 
-  public func fallbackRoutes(nodeIndex: [String: PolicyCanvasRouteNode]) -> [String: PolicyCanvasEdgeRoute] {
+  public func fallbackRoutes(nodeIndex: [String: PolicyCanvasRouteNode]) -> [String:
+    PolicyCanvasEdgeRoute]
+  {
     let portAnchors = portAnchors(nodeIndex: nodeIndex)
     let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
     let edgeLanes = policyCanvasSharedTargetRouteLaneAssignments(

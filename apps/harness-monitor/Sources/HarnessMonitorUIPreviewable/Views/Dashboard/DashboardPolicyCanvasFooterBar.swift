@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvas
+import SwiftUI
 
 struct DashboardPolicyCanvasFooterBar: View {
   @ScaledMetric(relativeTo: .callout)

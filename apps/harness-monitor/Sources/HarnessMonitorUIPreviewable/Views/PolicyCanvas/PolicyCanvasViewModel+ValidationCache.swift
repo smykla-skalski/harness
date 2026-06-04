@@ -1,7 +1,7 @@
 import Foundation
 import HarnessMonitorKit
-import Observation
 import HarnessMonitorPolicyCanvasAlgorithms
+import Observation
 
 // SHIM: validation presentation now builds in `PolicyCanvasValidationWorker`,
 // keyed by a coarse graph token that the view model bumps from every mutation

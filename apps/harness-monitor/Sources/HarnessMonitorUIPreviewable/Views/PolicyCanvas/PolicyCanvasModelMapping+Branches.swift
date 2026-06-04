@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Identity of a parallel-edge family: edges that share both endpoints
 /// (source node+port and target node+port) are one logical transition the
@@ -58,7 +58,8 @@ func policyCanvasMergedEdge(_ group: [PolicyCanvasEdge]) -> PolicyCanvasEdge {
   let labels = Set(branches.map(\.label))
   let mergedLabel = labels.count == 1 ? (labels.first ?? "") : ""
   let conditions = Set(branches.map(\.condition))
-  let mergedCondition = conditions.count == 1 ? (conditions.first ?? first.condition) : first.condition
+  let mergedCondition =
+    conditions.count == 1 ? (conditions.first ?? first.condition) : first.condition
   let mergedKind: PolicyCanvasEdgeKind =
     group.contains { $0.kind == .error }
     ? .error : group.contains { $0.kind == .control } ? .control : .flow

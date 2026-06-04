@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 struct HarnessMonitorSpinner: View {
   @ScaledMetric private var scaledSize: CGFloat

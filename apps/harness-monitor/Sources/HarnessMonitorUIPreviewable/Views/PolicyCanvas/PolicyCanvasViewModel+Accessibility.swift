@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 enum PolicyCanvasAccessibility {
   /// Maximum per-target Connect actions stamped onto a single node card. Six

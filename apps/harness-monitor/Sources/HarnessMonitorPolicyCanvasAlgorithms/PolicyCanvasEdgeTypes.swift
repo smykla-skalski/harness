@@ -238,7 +238,7 @@ public struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
   }
 }
 
-public extension PolicyCanvasEdgeKind {
+extension PolicyCanvasEdgeKind {
   /// Map a daemon condition string to a semantic kind. The mapping is a
   /// heuristic until the daemon ships an explicit `kind` field; until then,
   /// callers can override via the `kind:` parameter on `PolicyCanvasEdge.init`.
@@ -268,7 +268,7 @@ public extension PolicyCanvasEdgeKind {
   /// underlying ambiguity (`deny_list_member` could be a control branch or
   /// an error path depending on the document author's intent) is resolved
   /// by the explicit `kind:` override on `PolicyCanvasEdge.init`.
-  static func derive(from condition: String) -> PolicyCanvasEdgeKind {
+  public static func derive(from condition: String) -> PolicyCanvasEdgeKind {
     let lowered = condition.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
     if lowered.isEmpty || lowered == "always" {
       return .flow

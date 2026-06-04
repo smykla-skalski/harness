@@ -13,7 +13,7 @@ public struct PolicyCanvasLabSample: Identifiable, Equatable, Sendable {
   public let name: String
   public let document: TaskBoardPolicyPipelineDocument
 
-  public static func == (lhs: PolicyCanvasLabSample, rhs: PolicyCanvasLabSample) -> Bool {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.id == rhs.id
   }
 }

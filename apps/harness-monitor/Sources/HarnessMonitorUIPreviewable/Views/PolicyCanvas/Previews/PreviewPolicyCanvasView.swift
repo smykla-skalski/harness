@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 #Preview("Policy Canvas") {
   PolicyCanvasView(viewModel: .sample())

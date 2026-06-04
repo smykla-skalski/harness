@@ -1,6 +1,6 @@
 import AppKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 extension EnvironmentValues {
   /// Gates `View.harnessTrackpadSwipeOptOut()`. When `false` the retained
@@ -117,7 +117,8 @@ private final class HarnessTrackpadSwipeOptOutRegistry {
     return false
   }
 
-  private func horizontalScrollView(at pointInWindow: NSPoint, in window: NSWindow) -> NSScrollView? {
+  private func horizontalScrollView(at pointInWindow: NSPoint, in window: NSWindow) -> NSScrollView?
+  {
     guard let contentView = window.contentView else {
       return nil
     }
@@ -171,7 +172,8 @@ private final class HarnessTrackpadSwipeOptOutRegistry {
     return currentOffset < maxOffset - horizontalScrollTolerance
   }
 
-  private func isHorizontalScrollCandidate(_ scrollView: NSScrollView, in window: NSWindow) -> Bool {
+  private func isHorizontalScrollCandidate(_ scrollView: NSScrollView, in window: NSWindow) -> Bool
+  {
     scrollView.window === window
       && !scrollView.isHidden
       && !scrollView.frame.isEmpty

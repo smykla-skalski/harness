@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 /// Bottom-right canvas affordance mirroring `PolicyCanvasViewModel.saveActivity`.
 /// A small spinner + "Saving…" while a debounced or manual save is queued or in

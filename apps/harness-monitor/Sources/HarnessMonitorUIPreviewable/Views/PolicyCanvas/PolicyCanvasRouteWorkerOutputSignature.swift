@@ -1,5 +1,5 @@
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 struct PolicyCanvasRouteWorkerOutputSignature: Equatable, Sendable {
   static let empty = Self(

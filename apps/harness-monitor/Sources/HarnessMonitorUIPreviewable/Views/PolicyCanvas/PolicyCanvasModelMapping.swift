@@ -1,6 +1,6 @@
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 func policyCanvasNode(
   _ node: TaskBoardPolicyPipelineNode,

@@ -3,9 +3,11 @@ import HarnessMonitorKit
 
 extension DashboardReviewsRouteView {
   func consumePendingReviewScreenshotPasteRequest() {
-    guard let request = DashboardReviewsScreenshotPasteboardRequests.takePendingRequest(
-      after: routeHandledScreenshotPasteboardRequestID
-    ) else {
+    guard
+      let request = DashboardReviewsScreenshotPasteboardRequests.takePendingRequest(
+        after: routeHandledScreenshotPasteboardRequestID
+      )
+    else {
       return
     }
     routeHandledScreenshotPasteboardRequestID = request.id
@@ -28,9 +30,11 @@ extension DashboardReviewsRouteView {
       sourceApplication: sourceApplication,
       allowsPasteboardPrompt: true
     )
-    let configuration = decision.policy.reviewPullRequestExtraction
+    let configuration =
+      decision.policy.reviewPullRequestExtraction
       ?? ReviewPullRequestExtractionConfiguration()
-    let ocrConfiguration = decision.policy.ocrConfiguration
+    let ocrConfiguration =
+      decision.policy.ocrConfiguration
       ?? AutomationPolicyOCRConfiguration()
     let recognition = await recognizeReviewScreenshotCandidates(
       request.candidates,
@@ -112,7 +116,8 @@ extension DashboardReviewsRouteView {
       AutomationPolicyExecutionRequest(
         source: .reviewScreenshotPaste,
         decision: decision,
-        summary: reviewScreenshotSummary(rowCount: rows.count, sourceApplication: sourceApplication),
+        summary: reviewScreenshotSummary(
+          rowCount: rows.count, sourceApplication: sourceApplication),
         contentKinds: rows.isEmpty ? [.image] : [.image, .text, .url],
         declaredTypes: [AutomationClipboardContentKind.image.rawValue],
         detectedContentType: AutomationClipboardContentKind.image.rawValue,

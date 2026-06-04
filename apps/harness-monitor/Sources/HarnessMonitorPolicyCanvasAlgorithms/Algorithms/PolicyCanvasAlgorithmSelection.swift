@@ -322,10 +322,10 @@ enum PolicyCanvasAlgorithmDefaults {
         option(orthogonalVisibilityAStar, "Orthogonal Visibility Graph A*"),
       ],
       .routeSelection: [
-        option(firstFeasibleRouteSelection, "First Feasible Route Selection"),
+        option(firstFeasibleRouteSelection, "First Feasible Route Selection")
       ],
       .routePostProcessing: [
-        option(collinearRouteCompression, "Collinear Route Compression"),
+        option(collinearRouteCompression, "Collinear Route Compression")
       ],
       .labelPlacement: [
         option(obstacleAwareGreedyLabelPlacement, "Obstacle-Aware Greedy Label Placement"),

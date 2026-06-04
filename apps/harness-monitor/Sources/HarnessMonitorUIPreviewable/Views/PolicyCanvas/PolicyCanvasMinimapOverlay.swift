@@ -1,6 +1,6 @@
 import AppKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 struct PolicyCanvasMinimapOverlay: View {
   let snapshot: PolicyCanvasMinimapSnapshot
