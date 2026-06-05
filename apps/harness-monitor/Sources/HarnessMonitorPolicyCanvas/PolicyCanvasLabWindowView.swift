@@ -13,8 +13,10 @@ public struct PolicyCanvasLabWindowView: View {
   @State private var allowsEmptyLiveSnapshot: Bool
   @State private var sampleSelection: PolicyCanvasLabSelection
   @State private var algorithmSelection: PolicyCanvasAlgorithmSelection
+  @State private var reformatRequestID = 0
   @AppStorage(PolicyCanvasLabToolbarDefaults.sampleSelectionKey)
-  private var storedSampleSelectionRaw = PolicyCanvasLabToolbarDefaults.defaultSampleSelectionRawValue
+  private var storedSampleSelectionRaw =
+    PolicyCanvasLabToolbarDefaults.defaultSampleSelectionRawValue
   @AppStorage(PolicyCanvasLabToolbarDefaults.algorithmSelectionKey)
   private var storedAlgorithmSelectionRaw =
     PolicyCanvasLabToolbarDefaults.defaultAlgorithmSelectionRawValue
@@ -158,9 +160,22 @@ public struct PolicyCanvasLabWindowView: View {
       algorithmSelection: algorithmSelection,
       minimapCenteringMode: .clickViewport,
       canvasColorScheme: windowThemeMode.colorScheme,
-      showsEdgeLegend: false
+      showsEdgeLegend: false,
+      forcesEngineLayout: true,
+      reformatRequest: reformatRequestID,
+      policyDisplayName: samplePickerTitle
     )
     .toolbar {
+      ToolbarItem(placement: .navigation) {
+        Button {
+          reformatRequestID += 1
+        } label: {
+          Image(systemName: "arrow.clockwise")
+            .accessibilityHidden(true)
+        }
+        .help("Reformat the graph with the layered layout engine")
+        .accessibilityLabel("Reformat layout")
+      }
       ToolbarItem(placement: .primaryAction) {
         samplePicker
       }

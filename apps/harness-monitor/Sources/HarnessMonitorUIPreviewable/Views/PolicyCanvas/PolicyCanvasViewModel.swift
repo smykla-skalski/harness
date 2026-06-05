@@ -39,6 +39,10 @@ public final class PolicyCanvasViewModel {
   var groupAcceptanceFlashID: String?
   var highlightedInput: PolicyCanvasPortEndpoint?
   var activeCanvasId: String?
+  /// Display name for the single container group that wraps the whole graph;
+  /// set by the host (lab sample name, dashboard canvas title) before a load.
+  /// Nil falls back to a generic label.
+  var policyGroupTitle: String?
   var backingDocument: TaskBoardPolicyPipelineDocument?
   var latestSimulation: TaskBoardPolicyPipelineSimulationResult?
   public internal(set) var documentDirty: Bool
