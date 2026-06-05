@@ -17,6 +17,16 @@ public struct PolicyCanvasViewportSurface: View {
   let minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
   let canvasColorSchemeOverride: ColorScheme?
   let showsEdgeLegend: Bool
+  /// When true the surface re-runs the layered layout engine on appear and after
+  /// every document load, so it reflects the algorithms rather than the
+  /// document's authored seed coordinates. The Policy Canvas Lab sets this; the
+  /// shipping canvas (PolicyCanvasView) keeps authored layouts and never does.
+  let forcesEngineLayout: Bool
+  /// Monotonic token the host bumps to request a manual reformat (toolbar
+  /// button). Every change re-runs the layered engine.
+  let reformatRequest: Int
+  /// Display name shown on the single container group that wraps the graph.
+  let policyDisplayName: String?
 
   @State private var viewModel: PolicyCanvasViewModel
   @AccessibilityFocusState private var focusedComponentState: PolicyCanvasSelection?
@@ -31,7 +41,10 @@ public struct PolicyCanvasViewportSurface: View {
     algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
     minimapCenteringMode: PolicyCanvasMinimapCenteringMode? = nil,
     canvasColorScheme: ColorScheme? = nil,
-    showsEdgeLegend: Bool = true
+    showsEdgeLegend: Bool = true,
+    forcesEngineLayout: Bool = false,
+    reformatRequest: Int = 0,
+    policyDisplayName: String? = nil
   ) {
     self.document = document
     self.simulation = simulation
@@ -40,13 +53,17 @@ public struct PolicyCanvasViewportSurface: View {
     self.minimapCenteringModeOverride = minimapCenteringMode
     canvasColorSchemeOverride = canvasColorScheme
     self.showsEdgeLegend = showsEdgeLegend
+    self.forcesEngineLayout = forcesEngineLayout
+    self.reformatRequest = reformatRequest
+    self.policyDisplayName = policyDisplayName
     _viewModel = State(
       initialValue: PolicyCanvasViewModel.liveStartupState(
         document: document,
         simulation: simulation,
         audit: audit,
         activeCanvasId: nil,
-        algorithmSelection: algorithmSelection
+        algorithmSelection: algorithmSelection,
+        policyGroupTitle: policyDisplayName
       )
     )
   }
@@ -75,20 +92,27 @@ public struct PolicyCanvasViewportSurface: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
     .environment(\.policyCanvasReducedMotion, systemReduceMotion)
     .task {
-      // Lab capture affordance. The fixture-load path renders the document's
-      // authored positions without running the auto-arrange engine, so an agent
-      // screenshot of a fixture shows the saved seeds, not the engine output.
-      // When this env is set the surface forces an unconstrained reflow on
-      // appear so the capture reflects the layered engine. The shipping policy
-      // canvas uses PolicyCanvasView, not this surface, and never sets the env.
-      if ProcessInfo.processInfo.environment[
-        "HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW"
-      ] == "1" {
+      // The fixture/document-load path renders the document's authored positions
+      // without running the auto-arrange engine, so a load shows the saved seeds
+      // rather than the algorithm output. The lab wants the layered engine's
+      // placement, so force an unconstrained reflow on appear. The env override
+      // keeps the agent capture script working even when a caller leaves
+      // forcesEngineLayout off. The shipping canvas uses PolicyCanvasView, not
+      // this surface, and keeps its authored layout.
+      if forcesEngineLayout
+        || ProcessInfo.processInfo.environment[
+          "HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW"
+        ] == "1"
+      {
         viewModel.reflowLayout(preserveManualAnchors: false, force: true)
       }
     }
+    .onChange(of: reformatRequest, initial: false) { _, _ in
+      viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+    }
     .onChange(of: snapshot, initial: false) { oldSnapshot, newSnapshot in
       viewModel.algorithmSelection = newSnapshot.algorithmSelection
+      viewModel.policyGroupTitle = policyDisplayName
       if oldSnapshot.document != newSnapshot.document {
         viewModel.applyDocument(
           document: newSnapshot.document,
@@ -96,6 +120,9 @@ public struct PolicyCanvasViewportSurface: View {
           audit: newSnapshot.audit,
           forceDocumentReload: true
         )
+        if forcesEngineLayout {
+          viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+        }
       } else {
         viewModel.loadIfChanged(
           document: newSnapshot.document,

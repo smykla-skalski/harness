@@ -12,7 +12,8 @@ extension PolicyCanvasViewModel {
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
     activeCanvasId: String? = nil,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
+    policyGroupTitle: String? = nil
   ) -> PolicyCanvasViewModel {
     let viewModel = PolicyCanvasViewModel(
       nodes: [],
@@ -20,6 +21,7 @@ extension PolicyCanvasViewModel {
       edges: [],
       algorithmSelection: algorithmSelection
     )
+    viewModel.policyGroupTitle = policyGroupTitle
     viewModel.applyPersistedDocument(
       document: document,
       simulation: simulation,

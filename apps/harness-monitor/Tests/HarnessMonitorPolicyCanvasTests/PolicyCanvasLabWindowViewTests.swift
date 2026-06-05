@@ -318,6 +318,48 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(overlaySource.contains("PolicyCanvasEdgeKindLegend()"))
   }
 
+  @MainActor
+  func testPolicyGraphWrapsAllNodesInOneNamedContainerGroup() throws {
+    let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "extreme"))
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.policyGroupTitle = sample.name
+    viewModel.load(document: sample.document, simulation: nil, audit: nil)
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+
+    XCTAssertEqual(viewModel.groups.count, 1)
+    let container = try XCTUnwrap(viewModel.groups.first)
+    XCTAssertEqual(container.title, sample.name)
+    XCTAssertFalse(viewModel.nodes.isEmpty)
+    for node in viewModel.nodes {
+      XCTAssertTrue(
+        container.frame.contains(policyCanvasNodeFrame(node)),
+        "node \(node.id) sits outside the container group"
+      )
+    }
+  }
+
+  func testLabWindowExposesLeadingReformatToolbarButton() throws {
+    let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
+
+    XCTAssertTrue(windowSource.contains("ToolbarItem(placement: .navigation)"))
+    XCTAssertTrue(windowSource.contains("systemName: \"arrow.clockwise\""))
+    XCTAssertTrue(windowSource.contains("reformatRequestID += 1"))
+  }
+
+  func testLabViewportSurfaceForcesEngineLayoutReflow() throws {
+    let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
+    let surfaceSource = try previewablePolicyCanvasSourceFile(
+      named: "PolicyCanvasViewportSurface.swift"
+    )
+
+    XCTAssertTrue(windowSource.contains("forcesEngineLayout: true"))
+    XCTAssertTrue(windowSource.contains("reformatRequest: reformatRequestID"))
+    XCTAssertTrue(surfaceSource.contains("let forcesEngineLayout: Bool"))
+    XCTAssertTrue(
+      surfaceSource.contains("reflowLayout(preserveManualAnchors: false, force: true)")
+    )
+  }
+
   private func policyCanvasSourceFile(named name: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
