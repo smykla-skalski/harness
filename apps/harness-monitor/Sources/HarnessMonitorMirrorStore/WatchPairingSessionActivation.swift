@@ -29,3 +29,14 @@ public enum WatchPairingSessionActivation {
     }
   }
 }
+
+/// Whether a prepared iPhone-to-Watch payload can be handed to WatchConnectivity.
+public enum WatchPairingPayloadDelivery {
+  public static func canTransfer(
+    activationStateIsActivated: Bool,
+    isPaired: Bool,
+    isWatchAppInstalled: Bool
+  ) -> Bool {
+    activationStateIsActivated && isPaired && isWatchAppInstalled
+  }
+}
