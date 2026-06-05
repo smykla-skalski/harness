@@ -454,6 +454,31 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             "non-matching xctestrun artifacts must not satisfy policy-canvas reuse",
         )
 
+    def test_default_scheme_does_not_reuse_policy_canvas_xctestrun(self) -> None:
+        completed, calls, _ = self.run_script(
+            precreated_xctestruns=[
+                "HarnessMonitorPolicyCanvasTests_macosx26.5-arm64.xctestrun"
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(
+            calls[0],
+            ["build-for-testing"],
+            "default monitor:test must not reuse narrower PolicyCanvas products",
+        )
+
+    def test_default_scheme_reuses_matching_xctestrun(self) -> None:
+        completed, calls, _ = self.run_script(
+            precreated_xctestruns=["HarnessMonitor_macosx26.5-arm64.xctestrun"],
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(len(calls), 1)
+        self.assertNotEqual(calls[0], ["build-for-testing"])
+        self.assertIn("reuse-build-for-testing: skipping build", completed.stderr)
+
     def test_overridden_scheme_reuses_matching_xctestrun(self) -> None:
         completed, calls, _ = self.run_script(
             test_scheme="HarnessMonitorPolicyCanvasTests",

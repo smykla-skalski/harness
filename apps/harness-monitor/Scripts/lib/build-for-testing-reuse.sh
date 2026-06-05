@@ -15,22 +15,16 @@ existing_xctestrun_path() {
   fi
   local explicit_prefix="${HARNESS_MONITOR_TEST_XCTESTRUN_PREFIX:-}"
   local scheme="${HARNESS_MONITOR_TEST_SCHEME:-HarnessMonitor}"
-  local prefix=""
+  local prefix="$scheme"
   if [[ -n "$explicit_prefix" ]]; then
     prefix="$explicit_prefix"
-  elif [[ "$scheme" != "HarnessMonitor" ]]; then
-    prefix="$scheme"
   fi
   local newest=""
   local newest_epoch=0
   local candidate epoch
   shopt -s nullglob
   local -a candidates=()
-  if [[ -n "$prefix" ]]; then
-    candidates=("$product_dir"/"${prefix}"*.xctestrun)
-  else
-    candidates=("$product_dir"/*.xctestrun)
-  fi
+  candidates=("$product_dir"/"${prefix}"_*.xctestrun)
   if (( ${#candidates[@]} > 0 )); then
     for candidate in "${candidates[@]}"; do
       [[ -s "$candidate" ]] || continue
