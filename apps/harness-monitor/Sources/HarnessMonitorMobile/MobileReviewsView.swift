@@ -85,11 +85,21 @@ struct ReviewsView: View {
   private func attentionRow(_ item: MobileAttentionItem) -> some View {
     if let reviewID = item.navigableReviewID(in: store.snapshot.reviews) {
       NavigationLink(value: MobileReviewDetailRoute(reviewID: reviewID)) {
-        AttentionRow(item: item, onQueue: queueAttention)
+        AttentionRow(item: item)
       }
       .matchedTransitionSource(id: "detail-\(reviewID)", in: reviewZoom)
+      .mobileAttentionQueueSwipeActions(
+        for: item,
+        canQueue: canQueue(item),
+        onQueue: queueAttention
+      )
     } else {
-      AttentionRow(item: item, onQueue: queueAttention)
+      AttentionRow(item: item)
+        .mobileAttentionQueueSwipeActions(
+          for: item,
+          canQueue: canQueue(item),
+          onQueue: queueAttention
+        )
     }
   }
 
@@ -152,6 +162,10 @@ struct ReviewsView: View {
     ) {
       Task { await store.queueCommand(from: item) }
     }
+  }
+
+  private func canQueue(_ item: MobileAttentionItem) -> Bool {
+    item.commandKind != nil && store.canQueueCommand(stationID: item.stationID)
   }
 
   private func reviewConfirmationMessage(_ review: MobileReviewSummary) -> String {

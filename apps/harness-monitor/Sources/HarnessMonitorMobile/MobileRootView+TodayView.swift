@@ -98,18 +98,33 @@ struct TodayView: View {
   private func attentionRow(_ item: MobileAttentionItem) -> some View {
     if let reviewID = item.navigableReviewID(in: store.snapshot.reviews) {
       NavigationLink(value: MobileReviewDetailRoute(reviewID: reviewID)) {
-        AttentionRow(item: item, onQueue: queue)
+        AttentionRow(item: item)
       }
       .matchedTransitionSource(id: "detail-\(reviewID)", in: reviewZoom)
+      .mobileAttentionQueueSwipeActions(
+        for: item,
+        canQueue: canQueue(item),
+        onQueue: queue
+      )
     } else if let sessionID = item.navigableSessionID(in: store.snapshot.sessions) {
       NavigationLink(
         value: MobileSessionDetailRoute(sessionID: sessionID, sourceID: "session-\(item.id)")
       ) {
-        AttentionRow(item: item, onQueue: queue)
+        AttentionRow(item: item)
       }
       .matchedTransitionSource(id: "session-\(item.id)", in: sessionZoom)
+      .mobileAttentionQueueSwipeActions(
+        for: item,
+        canQueue: canQueue(item),
+        onQueue: queue
+      )
     } else {
-      AttentionRow(item: item, onQueue: queue)
+      AttentionRow(item: item)
+        .mobileAttentionQueueSwipeActions(
+          for: item,
+          canQueue: canQueue(item),
+          onQueue: queue
+        )
     }
   }
 
@@ -130,6 +145,10 @@ struct TodayView: View {
     ) {
       Task { await store.queueCommand(from: item) }
     }
+  }
+
+  private func canQueue(_ item: MobileAttentionItem) -> Bool {
+    item.commandKind != nil && store.canQueueCommand(stationID: item.stationID)
   }
 }
 
@@ -281,10 +300,7 @@ struct NeedsYouHeader: View {
 }
 
 struct AttentionRow: View {
-  @Environment(MirrorStore.self)
-  private var store
   let item: MobileAttentionItem
-  var onQueue: (MobileAttentionItem) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 7) {
@@ -308,14 +324,6 @@ struct AttentionRow: View {
         }
         .accessibilityElement(children: .combine)
         Spacer(minLength: 6)
-        if item.commandKind != nil && store.canQueueCommand(stationID: item.stationID) {
-          Button {
-            onQueue(item)
-          } label: {
-            Label("Queue", systemImage: "checkmark.seal")
-          }
-          .harnessActionButtonStyle(prominent: item.severity == .critical, tint: severityColor)
-        }
       }
     }
     .padding(.vertical, 3)
@@ -338,6 +346,28 @@ struct AttentionRow: View {
     case .critical: .red
     case .warning: .orange
     case .info: .blue
+    }
+  }
+}
+
+extension View {
+  @ViewBuilder
+  func mobileAttentionQueueSwipeActions(
+    for item: MobileAttentionItem,
+    canQueue: Bool,
+    onQueue: @escaping (MobileAttentionItem) -> Void
+  ) -> some View {
+    if canQueue {
+      swipeActions(edge: .trailing, allowsFullSwipe: true) {
+        Button {
+          onQueue(item)
+        } label: {
+          Label("Queue", systemImage: "checkmark.seal")
+        }
+        .tint(.blue)
+      }
+    } else {
+      self
     }
   }
 }
