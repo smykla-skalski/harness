@@ -180,9 +180,10 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     )
 
     #expect(viewSource.contains("@FocusState var canvasKeyboardFocusedState: Bool"))
-    #expect(viewSource.contains(".focusable()"))
-    #expect(viewSource.contains(".focusEffectDisabled()"))
-    #expect(viewSource.contains(".focused($canvasKeyboardFocusedState)"))
+    #expect(
+      viewSource.contains(
+        ".focusable()\n      .focusEffectDisabled()\n      .focused($canvasKeyboardFocusedState)")
+    )
     #expect(viewSource.contains("func requestCanvasKeyboardFocus()"))
     #expect(viewSource.contains("canvasKeyboardFocusedState = true"))
     #expect(viewSource.contains(".onChange(of: sceneFocusEnabled"))

@@ -219,7 +219,9 @@ public struct PolicyCanvasView: View {
   public var body: some View {
     let _ = HarnessMonitorPerfTrace.countBodyEval("PolicyCanvasView")
     policyCanvasSplitLayout
+      // Root focus powers canvas keyboard shortcuts; components provide visible focus.
       .focusable()
+      .focusEffectDisabled()
       .focused($canvasKeyboardFocusedState)
       .frame(minHeight: 620)
       .accessibilityElement(children: .contain)
