@@ -181,6 +181,28 @@ struct HarnessMonitorAppBundleMetadataTests {
   }
 }
 
+@Suite("Mobile native list actions")
+struct HarnessMonitorMobileNativeListActionTests {
+  @Test("Needs You queue swipes keep full-swipe on a full-width row")
+  func needsYouQueueSwipeUsesFullWidthNativeActionHost() throws {
+    let root = monitorAppRoot()
+    let todaySource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobile/MobileRootView+TodayView.swift"
+      ),
+      encoding: .utf8
+    )
+    let modifierStart = try #require(
+      todaySource.range(of: "func mobileAttentionQueueSwipeActions(")
+    )
+    let modifierSource = todaySource[modifierStart.lowerBound...]
+
+    #expect(modifierSource.contains("frame(maxWidth: .infinity, alignment: .leading)"))
+    #expect(modifierSource.contains(".contentShape(Rectangle())"))
+    #expect(modifierSource.contains("swipeActions(edge: .trailing, allowsFullSwipe: true)"))
+  }
+}
+
 private func loadDictionaryPlist(at url: URL) throws -> [String: Any] {
   let plist = try PropertyListSerialization.propertyList(
     from: try Data(contentsOf: url),

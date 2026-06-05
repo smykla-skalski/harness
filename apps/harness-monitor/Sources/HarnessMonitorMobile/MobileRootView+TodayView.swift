@@ -358,14 +358,16 @@ extension View {
     onQueue: @escaping (MobileAttentionItem) -> Void
   ) -> some View {
     if canQueue {
-      swipeActions(edge: .trailing, allowsFullSwipe: true) {
-        Button {
-          onQueue(item)
-        } label: {
-          Label("Queue", systemImage: "checkmark.seal")
+      frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+          Button {
+            onQueue(item)
+          } label: {
+            Label("Queue", systemImage: "checkmark.seal")
+          }
+          .tint(.blue)
         }
-        .tint(.blue)
-      }
     } else {
       self
     }
