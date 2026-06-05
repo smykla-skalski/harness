@@ -17,21 +17,31 @@ struct MobileRootView: View {
   var body: some View {
     TabView(selection: selectedTabBinding) {
       Tab("Today", systemImage: "dot.radiowaves.left.and.right", value: MobileRootTab.today) {
-        TodayView()
+        content(for: .today) {
+          TodayView()
+        }
       }
       .badge(store.snapshot.needsYouCount)
       Tab("Sessions", systemImage: "rectangle.stack", value: MobileRootTab.sessions) {
-        SessionsView()
+        content(for: .sessions) {
+          SessionsView()
+        }
       }
       Tab("Reviews", systemImage: "checklist", value: MobileRootTab.reviews) {
-        ReviewsView()
+        content(for: .reviews) {
+          ReviewsView()
+        }
       }
       Tab("Commands", systemImage: "terminal", value: MobileRootTab.commands) {
-        CommandsView()
+        content(for: .commands) {
+          CommandsView()
+        }
       }
       .badge(activeCommandCount)
       Tab("Settings", systemImage: "gearshape", value: MobileRootTab.settings) {
-        SettingsView()
+        content(for: .settings) {
+          SettingsView()
+        }
       }
     }
     .tabBarMinimizeBehavior(.onScrollDown)
@@ -54,6 +64,18 @@ struct MobileRootView: View {
         selectedTab = newValue
       }
     )
+  }
+
+  @ViewBuilder
+  private func content<Content: View>(
+    for tab: MobileRootTab,
+    @ViewBuilder _ content: () -> Content
+  ) -> some View {
+    if selectedTab == tab {
+      content()
+    } else {
+      Color.clear
+    }
   }
 
   private var activeCommandCount: Int {

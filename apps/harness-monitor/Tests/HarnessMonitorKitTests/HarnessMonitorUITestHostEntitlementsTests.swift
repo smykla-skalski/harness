@@ -173,6 +173,10 @@ struct HarnessMonitorAppBundleMetadataTests {
     )
     #expect(appSource.contains("try await Task.sleep(for: Self.navigationRequestFrameDelay)"))
     #expect(rootViewSource.contains("TabView(selection: selectedTabBinding)"))
+    #expect(rootViewSource.contains("content(for: .today)"))
+    #expect(rootViewSource.contains("content(for: .settings)"))
+    #expect(rootViewSource.contains("if selectedTab == tab"))
+    #expect(rootViewSource.contains("Color.clear"))
     #expect(rootViewSource.contains("guard selectedTab != newValue else"))
   }
 }
