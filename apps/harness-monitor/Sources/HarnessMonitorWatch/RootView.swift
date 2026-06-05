@@ -17,18 +17,6 @@ struct RootView: View {
     @Bindable var store = store
     NavigationStack {
       navigationList
-        .sensoryFeedback(trigger: store.syncStatus) { _, status in
-          switch status {
-          case .commandQueued:
-            .success
-          case .commandFailed:
-            .error
-          case .commandCancelled:
-            .warning
-          default:
-            nil
-          }
-        }
         .refreshable {
           await store.refresh()
         }
