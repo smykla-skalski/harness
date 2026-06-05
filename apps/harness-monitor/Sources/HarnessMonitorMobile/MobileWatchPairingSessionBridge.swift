@@ -163,8 +163,11 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
 
   private func flushPendingPayloadIfReady() {
     guard let session,
-      session.activationState == .activated,
-      session.isPaired
+      WatchPairingPayloadDelivery.canTransfer(
+        activationStateIsActivated: session.activationState == .activated,
+        isPaired: session.isPaired,
+        isWatchAppInstalled: session.isWatchAppInstalled
+      )
     else {
       return
     }

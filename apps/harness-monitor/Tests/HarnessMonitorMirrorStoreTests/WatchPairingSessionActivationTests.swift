@@ -17,4 +17,35 @@ final class WatchPairingSessionActivationTests: XCTestCase {
     // false no matter how the publish path evolves.
     XCTAssertFalse(WatchPairingSessionActivation.shouldActivate(on: .payloadPublish))
   }
+
+  func testPayloadDeliveryRequiresInstalledWatchApp() {
+    XCTAssertTrue(
+      WatchPairingPayloadDelivery.canTransfer(
+        activationStateIsActivated: true,
+        isPaired: true,
+        isWatchAppInstalled: true
+      )
+    )
+    XCTAssertFalse(
+      WatchPairingPayloadDelivery.canTransfer(
+        activationStateIsActivated: true,
+        isPaired: true,
+        isWatchAppInstalled: false
+      )
+    )
+    XCTAssertFalse(
+      WatchPairingPayloadDelivery.canTransfer(
+        activationStateIsActivated: true,
+        isPaired: false,
+        isWatchAppInstalled: true
+      )
+    )
+    XCTAssertFalse(
+      WatchPairingPayloadDelivery.canTransfer(
+        activationStateIsActivated: false,
+        isPaired: true,
+        isWatchAppInstalled: true
+      )
+    )
+  }
 }
