@@ -356,8 +356,101 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(windowSource.contains("reformatRequest: reformatRequestID"))
     XCTAssertTrue(surfaceSource.contains("let forcesEngineLayout: Bool"))
     XCTAssertTrue(
-      surfaceSource.contains("reflowLayout(preserveManualAnchors: false, force: true)")
+      surfaceSource.contains("requestAtomicReflow(preserveManualAnchors: false, force: true)")
     )
+  }
+
+  @MainActor
+  func testRequestAtomicReflowSignalsWithoutMutatingNodes() throws {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let before = viewModel.nodes.map(\.position)
+    XCTAssertNil(viewModel.atomicReflowRequest)
+
+    viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
+    let request = try XCTUnwrap(viewModel.atomicReflowRequest)
+    XCTAssertEqual(request.id, 1)
+    XCTAssertFalse(request.preserveManualAnchors)
+    XCTAssertTrue(request.force)
+    // Raising the request must never move nodes: the viewport routes the planned
+    // layout off-main and only then commits, so requesting is side-effect free.
+    XCTAssertEqual(viewModel.nodes.map(\.position), before)
+
+    viewModel.requestAtomicReflow()
+    let second = try XCTUnwrap(viewModel.atomicReflowRequest)
+    XCTAssertEqual(second.id, 2)
+    XCTAssertTrue(second.preserveManualAnchors)
+    XCTAssertFalse(second.force)
+    // The signal is monotonic and never cleared, so servicing it cannot flip the
+    // observed id and cancel the in-flight reflow before it commits.
+    XCTAssertEqual(viewModel.atomicReflowRequest?.id, 2)
+  }
+
+  @MainActor
+  func testPlannedReflowGraphPredictsReflowCommitWithoutMutating() throws {
+    let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "extreme"))
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: sample.document, simulation: nil, audit: nil)
+    let seeds = Dictionary(uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.position) })
+
+    let graph = try XCTUnwrap(
+      viewModel.plannedReflowGraph(preserveManualAnchors: false, force: true)
+    )
+    XCTAssertFalse(graph.nodes.isEmpty)
+    // Planning the layout must leave the live model untouched.
+    for node in viewModel.nodes {
+      XCTAssertEqual(node.position, seeds[node.id], "planning moved \(node.id)")
+    }
+
+    // Committing reproduces the planned layout exactly, so routes computed from
+    // the plan stay valid for the published nodes (the basis for atomic reveal).
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+    let plannedByID = Dictionary(uniqueKeysWithValues: graph.nodes.map { ($0.id, $0.position) })
+    for node in viewModel.nodes {
+      XCTAssertEqual(node.position, plannedByID[node.id], "commit diverged from plan for \(node.id)")
+    }
+  }
+
+  func testReformatTriggersUseAtomicReflow() throws {
+    let surfaceSource = try previewablePolicyCanvasSourceFile(
+      named: "PolicyCanvasViewportSurface.swift"
+    )
+    let chromeSource = try previewablePolicyCanvasSourceFile(named: "PolicyCanvasChromeViews.swift")
+    let layoutSource = try previewablePolicyCanvasSourceFile(named: "PolicyCanvasView+Layout.swift")
+    let dispatcherSource = try previewablePolicyCanvasSourceFile(
+      named: "PolicyCanvasViewport+Dispatchers.swift"
+    )
+
+    // Lab surfaces force the engine layout; production keeps the guarded reflow.
+    XCTAssertTrue(
+      surfaceSource.contains("requestAtomicReflow(preserveManualAnchors: false, force: true)")
+    )
+    XCTAssertFalse(surfaceSource.contains("viewModel.reflowLayout("))
+    XCTAssertTrue(chromeSource.contains("viewModel.requestAtomicReflow()"))
+    XCTAssertTrue(layoutSource.contains("viewModel.requestAtomicReflow()"))
+    XCTAssertTrue(dispatcherSource.contains("viewModel.requestAtomicReflow()"))
+    XCTAssertFalse(chromeSource.contains("viewModel.reflowLayout()"))
+  }
+
+  func testViewportServicesAtomicReflowAtomically() throws {
+    let workspaceSource = try previewablePolicyCanvasSourceFile(
+      named: "PolicyCanvasWorkspaceViews.swift"
+    )
+    let atomicSource = try previewablePolicyCanvasSourceFile(
+      named: "PolicyCanvasViewport+AtomicReflow.swift"
+    )
+
+    XCTAssertTrue(
+      workspaceSource.contains(
+        ".onChange(of: viewModel.atomicReflowRequest?.id, initial: false)"
+      )
+    )
+    XCTAssertTrue(atomicSource.contains("func performAtomicReflow("))
+    XCTAssertTrue(atomicSource.contains("viewModel.atomicReflowRequest"))
+    XCTAssertTrue(atomicSource.contains("plannedReflowGraph("))
+    XCTAssertTrue(atomicSource.contains("routeWorker.compute(input:"))
+    // The commit publishes positions WITHOUT an async route request so the
+    // precomputed routes reveal together with the nodes in a single frame.
+    XCTAssertTrue(atomicSource.contains("requestsRouteComputation: false"))
   }
 
   private func policyCanvasSourceFile(named name: String) throws -> String {

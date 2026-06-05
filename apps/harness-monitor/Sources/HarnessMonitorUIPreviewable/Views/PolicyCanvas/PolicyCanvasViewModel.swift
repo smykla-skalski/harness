@@ -51,6 +51,9 @@ public final class PolicyCanvasViewModel {
   var viewportCenteringGeneration: UInt64
   var routeComputationGeneration: UInt64
   var routeComputationRequestGeneration: UInt64
+  /// Raised by `requestAtomicReflow(...)` and serviced by the hosting viewport,
+  /// which routes the planned layout off-main before committing (atomic reveal).
+  var atomicReflowRequest: PolicyCanvasAtomicReflowRequest?
   var validationPresentation: PolicyCanvasValidationPresentation
   var cachedAutomationPolicyCompilation: PolicyCanvasAutomationPolicyCompilation
   var routingHints: PolicyCanvasLayoutRoutingHints?
@@ -59,7 +62,7 @@ public final class PolicyCanvasViewModel {
       guard algorithmSelection != oldValue, canReflowLayout else {
         return
       }
-      reflowLayout(preserveManualAnchors: false, force: true)
+      requestAtomicReflow(preserveManualAnchors: false, force: true)
     }
   }
 

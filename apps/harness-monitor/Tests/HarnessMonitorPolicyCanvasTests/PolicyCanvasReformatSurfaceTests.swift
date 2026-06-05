@@ -13,7 +13,7 @@ struct PolicyCanvasReformatSurfaceTests {
     )
     let commandsSource = try appSourceFile(named: "App/HarnessMonitorAppCommands.swift")
     let uiTestAccessibilitySource = try uiTestSupportSourceFile(
-      named: "HarnessMonitorUITestAccessibility.swift"
+      named: "HarnessMonitorUITestAccessibility+PolicyCanvas.swift"
     )
 
     #expect(
@@ -35,7 +35,7 @@ struct PolicyCanvasReformatSurfaceTests {
     )
   }
 
-  @Test("visible reformat actions use guarded reflow")
+  @Test("visible reformat actions use the guarded atomic reflow")
   func visibleReformatActionsUseGuardedReflow() throws {
     let layoutSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
@@ -43,16 +43,19 @@ struct PolicyCanvasReformatSurfaceTests {
     let chromeSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
     )
-    let workspaceSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
+    let dispatcherSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewport+Dispatchers.swift"
     )
 
-    #expect(layoutSource.contains("viewModel.reflowLayout()"))
-    #expect(chromeSource.contains("viewModel.reflowLayout()"))
-    #expect(workspaceSource.contains("viewModel.reflowLayout()"))
-    #expect(!layoutSource.contains("viewModel.reflowLayout(preserveManualAnchors: false, force: true)"))
-    #expect(!chromeSource.contains("viewModel.reflowLayout(preserveManualAnchors: false, force: true)"))
-    #expect(!workspaceSource.contains("viewModel.reflowLayout(preserveManualAnchors: false, force: true)"))
+    // Production reformat triggers route the new layout off-main before
+    // publishing it (atomic reveal), using the guarded default that keeps a tidy
+    // hand-authored layout in place; none call the synchronous reflow directly.
+    #expect(layoutSource.contains("viewModel.requestAtomicReflow()"))
+    #expect(chromeSource.contains("viewModel.requestAtomicReflow()"))
+    #expect(dispatcherSource.contains("viewModel.requestAtomicReflow()"))
+    #expect(!layoutSource.contains("viewModel.reflowLayout("))
+    #expect(!chromeSource.contains("viewModel.reflowLayout("))
+    #expect(!dispatcherSource.contains("viewModel.reflowLayout("))
   }
 
   private func previewableSourceFile(named relativePath: String) throws -> String {

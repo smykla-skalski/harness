@@ -3,8 +3,29 @@ import SwiftUI
 
 private struct PolicyCanvasReflowSnapshot {
   let nodes: [PolicyCanvasNode]
+  let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
   let routingHints: PolicyCanvasLayoutRoutingHints?
+}
+
+/// The layout `reflowLayout(...)` would commit, surfaced without mutating the
+/// model so the hosting viewport can route it before publishing. Carries the
+/// reconciled groups too, since routing treats the container box title as an
+/// obstacle.
+struct PolicyCanvasReflowGraph {
+  let nodes: [PolicyCanvasNode]
+  let groups: [PolicyCanvasGroup]
+  let edges: [PolicyCanvasEdge]
+  let routingHints: PolicyCanvasLayoutRoutingHints?
+}
+
+/// A pending reformat raised by `requestAtomicReflow(...)`. The viewport
+/// observes `id` changes, plans the layout, routes it off-main, and reveals the
+/// new nodes and wires together.
+struct PolicyCanvasAtomicReflowRequest: Equatable {
+  let id: UInt64
+  let preserveManualAnchors: Bool
+  let force: Bool
 }
 
 extension PolicyCanvasViewModel {
@@ -150,6 +171,7 @@ extension PolicyCanvasViewModel {
     }
     return PolicyCanvasReflowSnapshot(
       nodes: nextNodes,
+      groups: nextGroups,
       edges: nextEdges,
       routingHints: nextRoutingHints
     )
@@ -223,5 +245,52 @@ extension PolicyCanvasViewModel {
       }
       return PolicyCanvasEdgeReflowChange(id: edge.id, from: current, to: edge)
     }
+  }
+
+  /// Ask the hosting viewport to reformat atomically: route the new layout
+  /// before publishing it, so the canvas never flashes the stale projection a
+  /// synchronous `reflowLayout()` shows between the node move and the async
+  /// route refresh. Monotonic, like the other reflow generations - the bumped
+  /// `id` is the signal the viewport's `.onChange` services; it is never
+  /// cleared, so servicing it cannot retrigger or cancel itself. Only call from
+  /// a surface that embeds `PolicyCanvasViewport`; with none mounted nothing
+  /// reformats.
+  func requestAtomicReflow(preserveManualAnchors: Bool = true, force: Bool = false) {
+    let nextID = (atomicReflowRequest?.id ?? 0) &+ 1
+    atomicReflowRequest = PolicyCanvasAtomicReflowRequest(
+      id: nextID,
+      preserveManualAnchors: preserveManualAnchors,
+      force: force
+    )
+  }
+
+  /// Compute the layout `reflowLayout(...)` would commit, without mutating the
+  /// model, so the viewport can route it before publishing. Returns nil for an
+  /// empty graph or a layout that would not change; the caller then falls back
+  /// to a plain reflow whose own no-op handling covers status and centering.
+  /// Deterministic given the model state, so the committed layout reproduces
+  /// this graph exactly and the routes computed from it stay valid.
+  func plannedReflowGraph(
+    preserveManualAnchors: Bool,
+    force: Bool
+  ) -> PolicyCanvasReflowGraph? {
+    guard !nodes.isEmpty else {
+      return nil
+    }
+    let preservesManualAnchors = shouldPreserveManualAnchors(preserveManualAnchors)
+    guard shouldReflowLayout(force: force, preservesManualAnchors: preservesManualAnchors) else {
+      return nil
+    }
+    guard
+      let snapshot = makeReflowSnapshot(preservesManualAnchors: preservesManualAnchors)
+    else {
+      return nil
+    }
+    return PolicyCanvasReflowGraph(
+      nodes: snapshot.nodes,
+      groups: snapshot.groups,
+      edges: snapshot.edges,
+      routingHints: snapshot.routingHints
+    )
   }
 }

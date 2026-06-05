@@ -28,7 +28,7 @@ extension PolicyCanvasView {
         simulationOverlayVisible: simulationOverlayResolved,
         toggleSimulationOverlay: toggleSimulationOverlay,
         reflowLayout: {
-          viewModel.reflowLayout()
+          viewModel.requestAtomicReflow()
         },
         save: saveDraft,
         simulate: simulate,

@@ -104,11 +104,11 @@ public struct PolicyCanvasViewportSurface: View {
           "HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW"
         ] == "1"
       {
-        viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+        viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
       }
     }
     .onChange(of: reformatRequest, initial: false) { _, _ in
-      viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+      viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
     }
     .onChange(of: snapshot, initial: false) { oldSnapshot, newSnapshot in
       viewModel.algorithmSelection = newSnapshot.algorithmSelection
@@ -121,7 +121,7 @@ public struct PolicyCanvasViewportSurface: View {
           forceDocumentReload: true
         )
         if forcesEngineLayout {
-          viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+          viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
         }
       } else {
         viewModel.loadIfChanged(

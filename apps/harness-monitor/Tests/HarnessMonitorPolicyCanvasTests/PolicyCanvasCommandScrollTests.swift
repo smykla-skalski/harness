@@ -187,7 +187,7 @@ struct PolicyCanvasCommandScrollTests {
     let surfaceSource =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift")
 
-    #expect(source.contains("@State private var appliedRouteKey: PolicyCanvasRouteWorkerKey?"))
+    #expect(source.contains("@State var appliedRouteKey: PolicyCanvasRouteWorkerKey?"))
     #expect(
       source.contains(
         "let centeringRouteState = PolicyCanvasViewportCenteringRouteState("
