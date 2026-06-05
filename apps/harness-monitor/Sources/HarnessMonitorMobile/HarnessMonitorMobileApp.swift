@@ -18,6 +18,9 @@ struct HarnessMonitorMobileApp: App {
   @State private var pendingPairingURL: URL?
   @State private var selectedTab: MobileRootTab = .today
   @State private var tabSelectionRequestID: UInt64 = 0
+  @State private var didHandleInitialSceneActivation = false
+
+  private static let navigationRequestFrameDelay: Duration = .milliseconds(20)
 
   init() {
     let identityStore = KeychainMobileDeviceIdentityStore()
@@ -67,13 +70,7 @@ struct HarnessMonitorMobileApp: App {
           pairPendingInvitationIfActive()
         }
         .onChange(of: scenePhase) { _, newPhase in
-          guard newPhase == .active else {
-            return
-          }
-          guard !pairPendingInvitationIfActive() else {
-            return
-          }
-          refreshLiveMirrorIfActive()
+          handleScenePhaseChange(newPhase)
         }
         .onReceive(
           NotificationCenter.default.publisher(for: .mobileMirrorRemoteRefreshRequested)
@@ -114,6 +111,21 @@ struct HarnessMonitorMobileApp: App {
     }
   }
 
+  private func handleScenePhaseChange(_ newPhase: ScenePhase) {
+    guard newPhase == .active else {
+      return
+    }
+    guard didHandleInitialSceneActivation else {
+      didHandleInitialSceneActivation = true
+      _ = pairPendingInvitationIfActive()
+      return
+    }
+    guard !pairPendingInvitationIfActive() else {
+      return
+    }
+    refreshLiveMirrorIfActive()
+  }
+
   private func routeToTab(_ tab: MobileRootTab, stationID: String? = nil) {
     let normalizedStationID = stationID?
       .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -133,9 +145,13 @@ struct HarnessMonitorMobileApp: App {
     tabSelectionRequestID &+= 1
     let requestID = tabSelectionRequestID
     Task { @MainActor [tab, requestID] in
-      // Let any store-driven invalidation settle before issuing a fresh tab
-      // navigation request into SwiftUI.
-      await Task.yield()
+      // Let SwiftUI finish the current navigation observer frame before issuing
+      // a programmatic tab request.
+      do {
+        try await Task.sleep(for: Self.navigationRequestFrameDelay)
+      } catch {
+        return
+      }
       guard tabSelectionRequestID == requestID else {
         return
       }
