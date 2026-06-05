@@ -25,16 +25,20 @@ struct PolicyCanvasViewport: View {
   @State private var hasAppliedRestoredSceneZoom = false
   @State private var scrollApplicatorRequest: PolicyCanvasViewportScrollRequest?
   @State private var scrollApplicatorRequestID: UInt64 = 0
-  @State private var routeWorker = PolicyCanvasRouteWorker()
-  @State private var routeGeneration: UInt64 = 0
-  @State private var appliedRouteKey: PolicyCanvasRouteWorkerKey?
+  // The route-cache state below is module-internal (not `private`) so the
+  // cohesive `PolicyCanvasViewport+AtomicReflow.swift` companion can service a
+  // reformat without splitting the cache writes across the 420-line file cap.
+  // SwiftUI ownership is unchanged: only this view's own extensions reach it.
+  @State var routeWorker = PolicyCanvasRouteWorker()
+  @State var routeGeneration: UInt64 = 0
+  @State var appliedRouteKey: PolicyCanvasRouteWorkerKey?
   @State private var validationWorker = PolicyCanvasValidationWorker()
   @State private var validationGeneration: UInt64 = 0
-  @State private var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
-  @State private var cachedRouteOutputsByCanvasIdentity:
+  @State var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
+  @State var cachedRouteOutputsByCanvasIdentity:
     [String: (output: PolicyCanvasRouteWorkerOutput, nodePositionsByID: [String: CGPoint])] = [:]
-  @State private var cachedRouteNodePositionsByID: [String: CGPoint] = [:]
-  @State private var cachedRouteCanvasIdentity: String?
+  @State var cachedRouteNodePositionsByID: [String: CGPoint] = [:]
+  @State var cachedRouteCanvasIdentity: String?
   /// Live scroll/zoom viewport rect, stored off-view so panning only refreshes
   /// the minimap overlay instead of rebuilding the full hosted canvas tree.
   @State private var viewportObservationStore = PolicyCanvasViewportObservationStore()
@@ -229,6 +233,11 @@ struct PolicyCanvasViewport: View {
           await rebuildRoutes(for: routeKey, pipelineIdentity: routeCacheIdentity)
         }
       }
+      .onChange(of: viewModel.atomicReflowRequest?.id, initial: false) {
+        Task { @MainActor in
+          await performAtomicReflow(fontScale: fontScale)
+        }
+      }
       .harnessFocusedSceneValue(
         \.harnessPolicyCanvasCommandFocus,
         sceneFocusEnabled ? commandFocus : nil
@@ -258,14 +267,6 @@ extension PolicyCanvasViewport {
       return
     }
     commandFocus = nextFocus
-  }
-
-  @MainActor
-  private func clearCachedRouteOutput() {
-    appliedRouteKey = nil
-    cachedRouteOutput = .empty
-    cachedRouteNodePositionsByID = [:]
-    cachedRouteCanvasIdentity = viewModel.pipelineIdentity
   }
 
   @MainActor
