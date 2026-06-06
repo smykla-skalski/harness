@@ -133,7 +133,9 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
   func selectRoutes(input: PolicyCanvasRouteSelectionInput) -> [String: PolicyCanvasEdgeRoute] {
     let prepared = input.prepared
     let nodeIndex = input.passContext?.nodeIndex ?? prepared.nodeIndex
-    let portAnchors = input.passContext?.portAnchors ?? prepared.portAnchors(nodeIndex: nodeIndex)
+    let terminalSlots =
+      input.passContext?.terminalSlots
+      ?? prepared.routeEndpointSlots(edges: prepared.edges, nodeIndex: nodeIndex)
     let obstacles =
       input.passContext?.obstacles
       ?? policyCanvasCanonicalObstacles(
@@ -142,9 +144,39 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
     var routes: [String: PolicyCanvasEdgeRoute] = [:]
     routes.reserveCapacity(prepared.edges.count)
     for edge in prepared.edges {
-      guard let source = portAnchors[edge.source], let target = portAnchors[edge.target] else {
+      let slots = terminalSlots[edge.id] ?? PolicyCanvasRouteEndpointSlots(
+        source: .single,
+        target: .single
+      )
+      let sourceTerminal = input.portMarkerLayout?.terminal(edgeID: edge.id, role: .source)
+      let targetTerminal = input.portMarkerLayout?.terminal(edgeID: edge.id, role: .target)
+      let requestedSourceSide =
+        sourceTerminal?.side ?? policyCanvasResolvedPortSide(for: edge.source)
+      let requestedTargetSide =
+        targetTerminal?.side ?? policyCanvasResolvedPortSide(for: edge.target)
+      guard
+        let sourceCandidate = prepared.routeAnchorCandidate(
+          for: edge.source,
+          side: requestedSourceSide,
+          nodeIndex: nodeIndex,
+          // Output-side fan-out already routes from stable source anchors; the
+          // target slot is what prevents multiple inbound edges from landing on
+          // one input terminal.
+          terminalSlot: .single,
+          terminal: sourceTerminal
+        ),
+        let targetCandidate = prepared.routeAnchorCandidate(
+          for: edge.target,
+          side: requestedTargetSide,
+          nodeIndex: nodeIndex,
+          terminalSlot: slots.target,
+          terminal: targetTerminal
+      )
+      else {
         continue
       }
+      let source = SideCandidate(anchor: sourceCandidate)
+      let target = SideCandidate(anchor: targetCandidate)
       let sourceNode = nodeIndex[edge.source.nodeID]
       let targetNode = nodeIndex[edge.target.nodeID]
       let baseContext = PolicyCanvasRouteContext(
@@ -160,7 +192,6 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
         || !usesFlexAnchors(sourceNode: sourceNode, targetNode: targetNode)
       {
         routes[edge.id] = pinnedRoute(
-          edge: edge,
           source: source,
           target: target,
           context: baseContext,
@@ -171,16 +202,19 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       let sourceCandidates = sideCandidates(
         for: edge.source,
         nodeIndex: nodeIndex,
-        prepared: prepared
+        prepared: prepared,
+        terminalSlot: .single,
+        terminal: sourceTerminal
       )
       let targetCandidates = sideCandidates(
         for: edge.target,
         nodeIndex: nodeIndex,
-        prepared: prepared
+        prepared: prepared,
+        terminalSlot: slots.target,
+        terminal: targetTerminal
       )
       guard !sourceCandidates.isEmpty, !targetCandidates.isEmpty else {
         routes[edge.id] = pinnedRoute(
-          edge: edge,
           source: source,
           target: target,
           context: baseContext,
@@ -213,6 +247,22 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
     let side: PolicyCanvasPortSide
     let actual: CGPoint
     let lead: CGPoint
+
+    init(
+      side: PolicyCanvasPortSide,
+      actual: CGPoint,
+      lead: CGPoint
+    ) {
+      self.side = side
+      self.actual = actual
+      self.lead = lead
+    }
+
+    init(anchor: PolicyCanvasRouteAnchorCandidate) {
+      side = anchor.side
+      actual = anchor.point
+      lead = policyCanvasPortLeadPoint(anchor.point, side: anchor.side)
+    }
   }
 
   private func usesFlexAnchors(
@@ -228,30 +278,29 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
   private func sideCandidates(
     for endpoint: PolicyCanvasPortEndpoint,
     nodeIndex: [String: PolicyCanvasRouteNode],
-    prepared: PolicyCanvasPreparedRouteInput
+    prepared: PolicyCanvasPreparedRouteInput,
+    terminalSlot: PolicyCanvasRouteEndpointSlot,
+    terminal: PolicyCanvasPortTerminal?
   ) -> [SideCandidate] {
-    policyCanvasRoutablePortSides(for: endpoint.kind).compactMap { side in
-      prepared.portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex).map { actual in
-        SideCandidate(
-          side: side,
-          actual: actual,
-          lead: policyCanvasPortLeadPoint(actual, side: side)
-        )
-      }
+    let sides = terminal.map { [$0.side] } ?? policyCanvasRoutablePortSides(for: endpoint.kind)
+    return sides.compactMap { side in
+      prepared.routeAnchorCandidate(
+        for: endpoint,
+        side: side,
+        nodeIndex: nodeIndex,
+        terminalSlot: terminalSlot,
+        terminal: terminal
+      )
+      .map(SideCandidate.init(anchor:))
     }
   }
 
   private func pinnedRoute(
-    edge: PolicyCanvasEdge,
-    source: CGPoint,
-    target: CGPoint,
+    source: SideCandidate,
+    target: SideCandidate,
     context: PolicyCanvasRouteContext,
     router: any PolicyCanvasEdgeRouter
   ) -> PolicyCanvasEdgeRoute {
-    let sourceSide = policyCanvasResolvedPortSide(for: edge.source)
-    let targetSide = policyCanvasResolvedPortSide(for: edge.target)
-    let sourceLead = policyCanvasPortLeadPoint(source, side: sourceSide)
-    let targetLead = policyCanvasPortLeadPoint(target, side: targetSide)
     let pinnedContext = PolicyCanvasRouteContext(
       lane: context.lane,
       groups: context.groups,
@@ -259,25 +308,25 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       targetGroupID: context.targetGroupID,
       obstacles: context.obstacles,
       obstaclesAreCanonical: true,
-      sourceActual: sourceLead,
-      targetActual: targetLead,
+      sourceActual: source.lead,
+      targetActual: target.lead,
       lineSpacing: context.lineSpacing,
       corridorHint: context.corridorHint
     )
-    let core = router.route(source: sourceLead, target: targetLead, context: pinnedContext)
+    let core = router.route(source: source.lead, target: target.lead, context: pinnedContext)
     return policyCanvasBridgedRoute(
       baseRoute: core,
       source: PolicyCanvasEscapeCandidate(
-        side: sourceSide,
-        actual: source,
-        exit: sourceLead,
-        routed: core.points.first ?? sourceLead
+        side: source.side,
+        actual: source.actual,
+        exit: source.lead,
+        routed: core.points.first ?? source.lead
       ),
       target: PolicyCanvasEscapeCandidate(
-        side: targetSide,
-        actual: target,
-        exit: targetLead,
-        routed: core.points.last ?? targetLead
+        side: target.side,
+        actual: target.actual,
+        exit: target.lead,
+        routed: core.points.last ?? target.lead
       )
     )
   }

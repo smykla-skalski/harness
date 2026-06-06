@@ -77,6 +77,21 @@ extension PolicyCanvasPreparedRouteInput {
     )
   }
 
+  func routeEndpointSlots(
+    edges: [PolicyCanvasEdge],
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [String: PolicyCanvasRouteEndpointSlots] {
+    policyCanvasRouteEndpointSlots(
+      edges: edges,
+      sourceSortKey: {
+        edgeRouteEndpointSlotSortKey($0, role: .source, nodeIndex: nodeIndex)
+      },
+      targetSortKey: {
+        edgeRouteEndpointSlotSortKey($0, role: .target, nodeIndex: nodeIndex)
+      }
+    )
+  }
+
   private func fanoutSortKey(
     bucket: String,
     anchor: CGPoint,
@@ -89,6 +104,47 @@ extension PolicyCanvasPreparedRouteInput {
       String(policyCanvasFanoutBucketCoordinate(anchor.x)),
       nodeID,
       portID,
+    ]
+    .joined(separator: "|")
+  }
+
+  private func edgeRouteEndpointSlotSortKey(
+    _ edge: PolicyCanvasEdge,
+    role: PolicyCanvasRouteEndpointRole,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> String {
+    let endpoint: PolicyCanvasPortEndpoint
+    let farEndpoint: PolicyCanvasPortEndpoint
+    switch role {
+    case .source:
+      endpoint = edge.source
+      farEndpoint = edge.target
+    case .target:
+      endpoint = edge.target
+      farEndpoint = edge.source
+    }
+    guard let node = nodeIndex[endpoint.nodeID] else {
+      return policyCanvasPortMarkerSortKey(edge: edge, role: role)
+    }
+    let side = policyCanvasResolvedPortSide(for: endpoint)
+    let farAnchor = portAnchor(for: farEndpoint, nodeIndex: nodeIndex) ?? .zero
+    let angle = policyCanvasFanOrderKey(
+      side: side,
+      sideCenter: policyCanvasSideCenter(side: side, frame: node.frame),
+      farAnchor: farAnchor
+    )
+    let angleKey = String(
+      format: "%09d",
+      Int(((Double(angle) + Double.pi) * 1_000_000).rounded())
+    )
+    return [
+      angleKey,
+      String(policyCanvasFanoutBucketCoordinate(farAnchor.y)),
+      String(policyCanvasFanoutBucketCoordinate(farAnchor.x)),
+      farEndpoint.nodeID,
+      farEndpoint.portID,
+      edge.label,
+      edge.id,
     ]
     .joined(separator: "|")
   }
