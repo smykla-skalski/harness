@@ -9,7 +9,9 @@ struct DashboardReviewsPresentationTaskIDTests {
     let modelsSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsPresentationModels.swift")
 
-    #expect(computedStateSource.contains("var presentationTaskID: DashboardReviewsPresentationTaskID"))
+    #expect(
+      computedStateSource.contains(
+        "var presentationTaskID: DashboardReviewsPresentationTaskID"))
     #expect(
       computedStateSource.contains(
         "var listPresentationInput: DashboardReviewsListPresentationInput"))
