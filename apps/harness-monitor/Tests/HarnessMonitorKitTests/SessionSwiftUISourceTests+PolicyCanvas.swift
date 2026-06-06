@@ -25,14 +25,15 @@ extension SessionSwiftUISourceTests {
     #expect(overlaySource.contains(".focused($recenterButtonFocused)"))
     #expect(overlaySource.contains(".onHover { hovering in"))
     #expect(overlaySource.contains("recenterButtonHovered = hovering"))
-    #expect(
-      overlaySource.contains(
-        "isFocused: recenterButtonFocused || recenterButtonHovered"
-      )
-    )
+    #expect(overlaySource.contains("recenterButtonFocused || recenterButtonHovered"))
+    #expect(overlaySource.contains(".font(.title2.weight(recenterButtonActive ? .heavy : .regular))"))
+    #expect(overlaySource.contains(".padding(policyCanvasViewportOverlayEdgePadding)"))
+    #expect(overlaySource.contains(".padding(minimapVisible ? policyCanvasViewportOverlayEdgePadding : 0)"))
     #expect(overlaySource.contains("PolicyCanvasHiddenMinimapRecenterButtonStyle: ButtonStyle"))
     #expect(overlaySource.contains("configuration.isPressed ? 0.92 : 1.0"))
     #expect(overlaySource.contains("configuration.isPressed ? 0.72 : 1"))
+    #expect(!overlaySource.contains("Circle()"))
+    #expect(!overlaySource.contains(".shadow("))
     #expect(!overlaySource.contains(".harnessActionButtonStyle(variant: .bordered"))
     #expect(!overlaySource.contains("PolicyCanvasMinimapCenterButtonStyle()"))
     #expect(

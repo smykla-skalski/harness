@@ -1,6 +1,8 @@
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
+private let policyCanvasViewportOverlayEdgePadding: CGFloat = 14
+
 struct PolicyCanvasViewportOverlayModifier: ViewModifier {
   let viewModel: PolicyCanvasViewModel
   let observationStore: PolicyCanvasViewportObservationStore
@@ -19,13 +21,13 @@ struct PolicyCanvasViewportOverlayModifier: ViewModifier {
         if showsEdgeLegend {
           PolicyCanvasEdgeKindLegend()
             .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
-            .padding(14)
+            .padding(policyCanvasViewportOverlayEdgePadding)
         }
       }
       .overlay(alignment: .bottomLeading) {
         PolicyCanvasZoomControls(viewModel: viewModel)
           .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
-          .padding(14)
+          .padding(policyCanvasViewportOverlayEdgePadding)
       }
       .overlay(alignment: .bottomTrailing) {
         VStack(alignment: .trailing, spacing: 12) {
@@ -45,9 +47,10 @@ struct PolicyCanvasViewportOverlayModifier: ViewModifier {
             PolicyCanvasHiddenMinimapRecenterButton(viewModel: viewModel)
           }
           PolicyCanvasShortcutsDisclosure()
+            .padding(minimapVisible ? 0 : policyCanvasViewportOverlayEdgePadding)
         }
         .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
-        .padding(14)
+        .padding(minimapVisible ? policyCanvasViewportOverlayEdgePadding : 0)
       }
   }
 }
@@ -59,18 +62,23 @@ private struct PolicyCanvasHiddenMinimapRecenterButton: View {
   @State private var recenterButtonHovered = false
   @FocusState private var recenterButtonFocused: Bool
 
+  private var recenterButtonActive: Bool {
+    recenterButtonFocused || recenterButtonHovered
+  }
+
   var body: some View {
     Button {
       viewModel.requestViewportCentering(.document)
     } label: {
       Image(systemName: "dot.scope")
-        .imageScale(.large)
+        .font(.title2.weight(recenterButtonActive ? .heavy : .regular))
         .frame(width: 32, height: 32)
+        .padding(policyCanvasViewportOverlayEdgePadding)
         .contentShape(Rectangle())
     }
     .buttonStyle(
       PolicyCanvasHiddenMinimapRecenterButtonStyle(
-        isFocused: recenterButtonFocused || recenterButtonHovered
+        isFocused: recenterButtonActive
       )
     )
     .focusable()
@@ -97,24 +105,12 @@ private struct PolicyCanvasHiddenMinimapRecenterButton: View {
     func makeBody(configuration: Configuration) -> some View {
       configuration.label
         .foregroundStyle(
-          PolicyCanvasVisualStyle.activeTint.opacity(
-            configuration.isPressed ? 1.0 : (isFocused ? 0.96 : 0.78)
-          )
+          configuration.isPressed || isFocused
+            ? PolicyCanvasVisualStyle.activeTint
+            : PolicyCanvasVisualStyle.secondaryText
         )
         .opacity(configuration.isPressed ? 0.72 : 1)
         .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
-        .shadow(
-          color: PolicyCanvasVisualStyle.activeTint.opacity(isFocused ? 0.42 : 0),
-          radius: isFocused ? 6 : 0
-        )
-        .overlay {
-          Circle()
-            .stroke(
-              PolicyCanvasVisualStyle.activeTint.opacity(isFocused ? 0.64 : 0),
-              lineWidth: isFocused ? 1.5 : 0
-            )
-            .padding(3)
-        }
         .animation(.easeOut(duration: 0.10), value: configuration.isPressed)
         .animation(.easeOut(duration: 0.14), value: isFocused)
     }
