@@ -360,6 +360,18 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     )
   }
 
+  func testStandaloneLabHostDisablesWritingToolsEligibilityChecks() throws {
+    let appSource = try policyCanvasLabHostSourceFile(
+      named: "HarnessMonitorPolicyCanvasLabApp.swift"
+    )
+
+    XCTAssertTrue(appSource.contains(".writingToolsBehavior(.disabled)"))
+    XCTAssertTrue(appSource.contains(".restorationBehavior(.disabled)"))
+    XCTAssertTrue(appSource.contains("@NSApplicationDelegateAdaptor"))
+    XCTAssertTrue(appSource.contains("shouldRestoreApplicationState"))
+    XCTAssertTrue(appSource.contains("shouldSaveApplicationState"))
+  }
+
   @MainActor
   func testRequestAtomicReflowSignalsWithoutMutatingNodes() throws {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -522,6 +534,21 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     let fileURL =
       repoRoot
       .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorPolicyCanvas")
+      .appendingPathComponent(name)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func policyCanvasLabHostSourceFile(named name: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorPolicyCanvasLabHost")
       .appendingPathComponent(name)
     return try String(contentsOf: fileURL, encoding: .utf8)
   }
