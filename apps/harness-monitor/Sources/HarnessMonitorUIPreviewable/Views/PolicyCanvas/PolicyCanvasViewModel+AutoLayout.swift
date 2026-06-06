@@ -88,17 +88,35 @@ extension PolicyCanvasViewModel {
       )
       return
     }
+    if force, !preservesManualAnchors, isCurrentCanonicalForcedReflow() {
+      finishNoOpReflow(
+        nextRoutingHints: nil,
+        requestsRouteComputation: requestsRouteComputation,
+        status: "Layout already matches the current anchors"
+      )
+      return
+    }
     guard
-      let reflowSnapshot = makeReflowSnapshot(preservesManualAnchors: preservesManualAnchors)
+      let reflowSnapshot = makeReflowSnapshot(
+        preservesManualAnchors: preservesManualAnchors,
+        force: force
+      )
     else {
       notifyStatus("Layout could not be reflowed")
       return
     }
+    let canonicalForcedSignature =
+      force && !preservesManualAnchors
+      ? reflowSnapshotSignature(reflowSnapshot)
+      : nil
     applyReflowSnapshot(
       reflowSnapshot,
       requestsRouteComputation: requestsRouteComputation,
       requestExplicitRoutesIfNeeded: requestExplicitRoutesIfNeeded
     )
+    if let canonicalForcedSignature {
+      lastCanonicalForcedReflowSignature = canonicalForcedSignature
+    }
   }
 
   private func shouldPreserveManualAnchors(_ preserveManualAnchors: Bool) -> Bool {
@@ -134,19 +152,41 @@ extension PolicyCanvasViewModel {
   }
 
   private func makeReflowSnapshot(
+    preservesManualAnchors: Bool,
+    force: Bool
+  ) -> PolicyCanvasReflowSnapshot? {
+    if force, !preservesManualAnchors {
+      return makeSingleReflowSnapshot(
+        nodes: nodes,
+        groups: groups,
+        edges: edges,
+        preservesManualAnchors: false
+      )
+    }
+    return makeSingleReflowSnapshot(
+      nodes: nodes,
+      groups: groups,
+      edges: edges,
+      preservesManualAnchors: preservesManualAnchors
+    )
+  }
+
+  private func makeSingleReflowSnapshot(
+    nodes inputNodes: [PolicyCanvasNode],
+    groups inputGroups: [PolicyCanvasGroup],
+    edges inputEdges: [PolicyCanvasEdge],
     preservesManualAnchors: Bool
   ) -> PolicyCanvasReflowSnapshot? {
-    var nextNodes = nodes
-    var nextGroups = groups
+    var nextNodes = inputNodes
+    var nextGroups = inputGroups
     guard
       let result = policyCanvasAutomaticLayoutResult(
         nodes: nextNodes,
         groups: nextGroups,
-        edges: edges,
-        // Reformat always seeds within-layer order from the current geometry, so
-        // an already-laid-out graph reproduces itself instead of reshuffling -
-        // whether its positions came from a prior auto layout or trusted saved
-        // coordinates loaded as manual.
+        edges: inputEdges,
+        // Reflow keeps current row order because it produces the best low-crossing
+        // seed for the engine. Forced full reformat records the chosen output's
+        // signature so repeated presses become a fixed point.
         mode: .explicitReflow(preserveManualAnchors: preservesManualAnchors),
         algorithmSelection: algorithmSelection
       )
@@ -160,9 +200,13 @@ extension PolicyCanvasViewModel {
       centerInMinimumCanvas: !preservesManualAnchors
     )
     if policyCanvasUsesSingleFedTerminalAlignment(algorithmSelection) {
-      policyCanvasAlignSingleFedTerminals(nodes: &nextNodes, groups: &nextGroups, edges: edges)
+      policyCanvasAlignSingleFedTerminals(
+        nodes: &nextNodes,
+        groups: &nextGroups,
+        edges: inputEdges
+      )
     }
-    let nextEdges = edges.map { edge in
+    let nextEdges = inputEdges.map { edge in
       policyCanvasApplyingPreferredPortSides(
         edge,
         nodes: nextNodes,
@@ -175,6 +219,75 @@ extension PolicyCanvasViewModel {
       edges: nextEdges,
       routingHints: nextRoutingHints
     )
+  }
+
+  private func isCurrentCanonicalForcedReflow() -> Bool {
+    guard let lastCanonicalForcedReflowSignature else {
+      return false
+    }
+    return lastCanonicalForcedReflowSignature
+      == canonicalForcedReflowSignature(
+        nodes: nodes,
+        groups: groups,
+        edges: edges,
+        routingHints: routingHints
+      )
+  }
+
+  private func reflowSnapshotSignature(_ snapshot: PolicyCanvasReflowSnapshot) -> String {
+    canonicalForcedReflowSignature(
+      nodes: snapshot.nodes,
+      groups: snapshot.groups,
+      edges: snapshot.edges,
+      routingHints: snapshot.routingHints
+    )
+  }
+
+  private func canonicalForcedReflowSignature(
+    nodes: [PolicyCanvasNode],
+    groups: [PolicyCanvasGroup],
+    edges: [PolicyCanvasEdge],
+    routingHints: PolicyCanvasLayoutRoutingHints?
+  ) -> String {
+    var parts: [String] = []
+    parts.reserveCapacity(nodes.count + groups.count + edges.count + 1)
+    parts.append("a:\(String(describing: algorithmSelection))")
+    for node in nodes.sorted(by: { $0.id < $1.id }) {
+      let layoutSource = node.layoutSource.map { String(describing: $0) } ?? "nil"
+      parts.append(
+        "n:\(node.id):\(reflowSignatureCoordinate(node.position.x)):"
+          + "\(reflowSignatureCoordinate(node.position.y)):\(layoutSource)"
+      )
+    }
+    for group in groups.sorted(by: { $0.id < $1.id }) {
+      parts.append(
+        "g:\(group.id):\(reflowSignatureCoordinate(group.frame.minX)):"
+          + "\(reflowSignatureCoordinate(group.frame.minY)):"
+          + "\(reflowSignatureCoordinate(group.frame.width)):"
+          + "\(reflowSignatureCoordinate(group.frame.height))"
+      )
+    }
+    for edge in edges.sorted(by: { $0.id < $1.id }) {
+      let sourceSide = edge.source.side.map { String(describing: $0) } ?? "nil"
+      let targetSide = edge.target.side.map { String(describing: $0) } ?? "nil"
+      parts.append(
+        "e:\(edge.id):\(sourceSide):\(targetSide):\(edge.pinnedPortSide)"
+      )
+    }
+    for (edgeID, hint) in (routingHints?.edgeHints ?? [:]).sorted(by: { $0.key < $1.key }) {
+      parts.append(
+        "h:\(edgeID):\(hint.key.sourceScopeID):\(hint.key.targetScopeID):"
+          + "\(hint.key.targetNodeID):\(hint.key.label):\(hint.key.laneIndex):"
+          + "\(reflowSignatureCoordinate(hint.horizontalLaneY)):"
+          + "\(hint.verticalLaneX.map(reflowSignatureCoordinate) ?? "nil"):"
+          + "\(hint.bundleOrdinal):\(hint.bundleSize)"
+      )
+    }
+    return parts.joined(separator: "|")
+  }
+
+  private func reflowSignatureCoordinate(_ value: CGFloat) -> String {
+    String(Int(value.rounded()))
   }
 
   private func applyReflowSnapshot(
@@ -255,7 +368,7 @@ extension PolicyCanvasViewModel {
   /// cleared, so servicing it cannot retrigger or cancel itself. Only call from
   /// a surface that embeds `PolicyCanvasViewport`; with none mounted nothing
   /// reformats.
-  func requestAtomicReflow(preserveManualAnchors: Bool = true, force: Bool = false) {
+  func requestAtomicReflow(preserveManualAnchors: Bool = true, force: Bool = true) {
     let nextID = (atomicReflowRequest?.id ?? 0) &+ 1
     atomicReflowRequest = PolicyCanvasAtomicReflowRequest(
       id: nextID,
@@ -281,8 +394,14 @@ extension PolicyCanvasViewModel {
     guard shouldReflowLayout(force: force, preservesManualAnchors: preservesManualAnchors) else {
       return nil
     }
+    if force, !preservesManualAnchors, isCurrentCanonicalForcedReflow() {
+      return nil
+    }
     guard
-      let snapshot = makeReflowSnapshot(preservesManualAnchors: preservesManualAnchors)
+      let snapshot = makeReflowSnapshot(
+        preservesManualAnchors: preservesManualAnchors,
+        force: force
+      )
     else {
       return nil
     }
