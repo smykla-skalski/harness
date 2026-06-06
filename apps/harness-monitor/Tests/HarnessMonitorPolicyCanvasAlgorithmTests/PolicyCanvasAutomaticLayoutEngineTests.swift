@@ -166,6 +166,120 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
     #expect(sinkX.count >= 2)
   }
 
+  @Test("post-comb overlap resolver clears same-group node collisions")
+  func postCombOverlapResolverClearsSameGroupNodeCollisions() {
+    let positions: [String: CGPoint] = [
+      "upper": CGPoint(x: 100, y: 100),
+      "overlap": CGPoint(x: 100, y: 150),
+      "clear": CGPoint(x: 420, y: 150),
+    ]
+
+    let resolved = policyCanvasResolveNodeOverlaps(nodePositions: positions)
+    guard let upper = resolved["upper"], let overlap = resolved["overlap"] else {
+      Issue.record("Expected resolved positions for overlapping nodes")
+      return
+    }
+
+    #expect(
+      overlap.y >= upper.y + PolicyCanvasLayout.nodeSize.height
+    )
+    #expect(!policyCanvasNodeFramesOverlap(resolved))
+  }
+
+  @Test("grouped node overlap cleanup is a no-op without live group containers")
+  func groupedNodeOverlapCleanupSkipsGroupFreeDocuments() {
+    let originalPosition = CGPoint(x: 100, y: 150)
+    var upper = policyCanvasTestNode(id: "upper", position: CGPoint(x: 100, y: 100))
+    var overlap = policyCanvasTestNode(id: "overlap", position: originalPosition)
+    upper.groupID = "removed-group"
+    overlap.groupID = "removed-group"
+    var nodes = [upper, overlap]
+    var groups: [PolicyCanvasGroup] = []
+
+    let changed = policyCanvasResolveGroupedNodeOverlaps(nodes: &nodes, groups: &groups)
+
+    #expect(!changed)
+    #expect(nodes.first { $0.id == "overlap" }?.position == originalPosition)
+  }
+
+  @Test("grouped node overlap cleanup reencloses groups after repairing collisions")
+  func groupedNodeOverlapCleanupReenclosesGroupsAfterRepairingCollisions() {
+    var upper = policyCanvasTestNode(id: "upper", position: CGPoint(x: 100, y: 100))
+    var overlap = policyCanvasTestNode(id: "overlap", position: CGPoint(x: 100, y: 150))
+    upper.groupID = "group"
+    overlap.groupID = "group"
+    var nodes = [upper, overlap]
+    var groups = [
+      PolicyCanvasGroup(
+        id: "group",
+        title: "Group",
+        frame: CGRect(x: 80, y: 80, width: 220, height: 180),
+        tone: .evaluation
+      )
+    ]
+
+    let changed = policyCanvasResolveGroupedNodeOverlaps(nodes: &nodes, groups: &groups)
+
+    #expect(changed)
+    #expect(!policyCanvasNodesOverlap(nodes))
+    let memberBounds = nodes.reduce(CGRect.null) { partial, node in
+      partial.union(policyCanvasNodeFrame(node))
+    }
+    #expect(groups.first?.frame.contains(memberBounds) == true)
+  }
+
+  @Test("post-comb overlap resolver stays under the interaction budget")
+  func postCombOverlapResolverPerformance() {
+    let positions = Dictionary(
+      uniqueKeysWithValues: (0..<400).map { index in
+        (
+          "node-\(index)",
+          CGPoint(
+            x: CGFloat(index % 8) * (PolicyCanvasLayout.nodeSize.width / 2),
+            y: CGFloat(index / 8) * (PolicyCanvasLayout.nodeSize.height / 3)
+          )
+        )
+      }
+    )
+    let start = Date()
+
+    let resolved = policyCanvasResolveNodeOverlaps(nodePositions: positions)
+
+    let elapsed = Date().timeIntervalSince(start)
+    #expect(!policyCanvasNodeFramesOverlap(resolved))
+    #expect(
+      elapsed < 0.2,
+      "Overlap resolver took \(elapsed * 1000)ms, expected <200ms"
+    )
+  }
+
+  private func policyCanvasNodeFramesOverlap(_ positions: [String: CGPoint]) -> Bool {
+    let ids = positions.keys.sorted()
+    for leftIndex in ids.indices {
+      for rightIndex in ids.index(after: leftIndex)..<ids.endIndex {
+        guard let left = positions[ids[leftIndex]], let right = positions[ids[rightIndex]] else {
+          continue
+        }
+        let leftFrame = CGRect(origin: left, size: PolicyCanvasLayout.nodeSize)
+        let rightFrame = CGRect(origin: right, size: PolicyCanvasLayout.nodeSize)
+        if leftFrame.intersects(rightFrame) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  private func policyCanvasNodesOverlap(_ nodes: [PolicyCanvasNode]) -> Bool {
+    policyCanvasNodeFramesOverlap(
+      Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
+    )
+  }
+
+  private func policyCanvasTestNode(id: String, position: CGPoint) -> PolicyCanvasNode {
+    PolicyCanvasNode(id: id, title: id, kind: .condition, position: position)
+  }
+
   @Test("layered engine emits corridor hints for inter-group routes")
   func layeredEngineEmitsCorridorHintsForInterGroupRoutes() {
     let graph = PolicyCanvasLayoutGraph(

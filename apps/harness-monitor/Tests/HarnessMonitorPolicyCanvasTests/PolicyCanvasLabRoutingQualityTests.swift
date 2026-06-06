@@ -245,6 +245,24 @@ struct PolicyCanvasLabRoutingQualityTests {
     #expect(titleOverlaps.isEmpty, "nodes inside a foreign group title: \(titleOverlaps)")
   }
 
+  @Test("lab sample live reformats keep node bodies separated")
+  @MainActor
+  func labSampleLiveReformatsKeepNodeBodiesSeparated() throws {
+    var overlaps: [String] = []
+    for sample in PolicyCanvasLabSamples.all {
+      let viewModel = PolicyCanvasViewModel.sample()
+      viewModel.load(document: sample.document, simulation: nil, audit: nil)
+      viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+      overlaps.append(
+        contentsOf: policyCanvasNodeOverlaps(viewModel.nodes).map { pair in
+          "\(sample.id):\(pair)"
+        }
+      )
+    }
+
+    #expect(overlaps.isEmpty, "node body overlaps after live reformat: \(overlaps)")
+  }
+
   @Test("extreme sample live routes attach to semantic visible port sides")
   @MainActor
   func extremeSampleLiveRoutesAttachToSemanticVisiblePortSides() async throws {
@@ -279,6 +297,20 @@ struct PolicyCanvasLabRoutingQualityTests {
       violations=\(violations)
       """
     )
+  }
+
+  private func policyCanvasNodeOverlaps(_ nodes: [PolicyCanvasNode]) -> [String] {
+    var overlaps: [String] = []
+    for leftIndex in nodes.indices {
+      for rightIndex in nodes.index(after: leftIndex)..<nodes.endIndex {
+        let left = nodes[leftIndex]
+        let right = nodes[rightIndex]
+        if policyCanvasNodeFrame(left).intersects(policyCanvasNodeFrame(right)) {
+          overlaps.append("\(left.id)~\(right.id)")
+        }
+      }
+    }
+    return overlaps
   }
 
   @Test("extreme route-agent keeps a rightward source departure")
@@ -918,4 +950,3 @@ private func policyCanvasLabLabelOverlapPairs(
   }
   return overlaps
 }
-

@@ -193,7 +193,7 @@ extension PolicyCanvasViewModel {
     else {
       return nil
     }
-    let nextRoutingHints = applyPolicyCanvasLayoutResult(
+    var nextRoutingHints = applyPolicyCanvasLayoutResult(
       result,
       nodes: &nextNodes,
       groups: &nextGroups,
@@ -203,6 +203,13 @@ extension PolicyCanvasViewModel {
       policyCanvasAlignSingleFedTerminals(
         nodes: &nextNodes,
         groups: &nextGroups,
+        edges: inputEdges
+      )
+    }
+    if policyCanvasResolveGroupedNodeOverlaps(nodes: &nextNodes, groups: &nextGroups) {
+      nextRoutingHints = policyCanvasRoutingHintsForCurrentLayout(
+        nodes: nextNodes,
+        groups: nextGroups,
         edges: inputEdges
       )
     }
