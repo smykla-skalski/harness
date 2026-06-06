@@ -145,6 +145,10 @@ public final class PolicyCanvasViewModel {
   @ObservationIgnored var groupNodeDragOrigins: [String: [String: CGPoint]] = [:]
   @ObservationIgnored var cleanEphemeralNodeIDs: Set<String> = []
   @ObservationIgnored var cleanEphemeralEdgeIDs: Set<String> = []
+  /// Signature of the last chosen full forced reformat. Used to turn repeated
+  /// Reformat presses into a fixed point even when the current-row seed has a
+  /// short layout cycle.
+  @ObservationIgnored var lastCanonicalForcedReflowSignature: String?
   /// Diagonal cursor that advances each time the user clicks a palette button.
   /// Kept off the @Observable graph because clicks read-then-write atomically
   /// and the placement helper is the only consumer. Reset on `load(...)`.

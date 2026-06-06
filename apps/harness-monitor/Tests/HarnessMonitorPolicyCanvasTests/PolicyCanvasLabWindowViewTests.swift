@@ -379,10 +379,53 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     let second = try XCTUnwrap(viewModel.atomicReflowRequest)
     XCTAssertEqual(second.id, 2)
     XCTAssertTrue(second.preserveManualAnchors)
-    XCTAssertFalse(second.force)
+    XCTAssertTrue(second.force)
     // The signal is monotonic and never cleared, so servicing it cannot flip the
     // observed id and cancel the in-flight reflow before it commits.
     XCTAssertEqual(viewModel.atomicReflowRequest?.id, 2)
+  }
+
+  @MainActor
+  func testForcedReformatIsDeterministicForExtremePolicy() throws {
+    let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "extreme"))
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: sample.document, simulation: nil, audit: nil)
+
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+    let firstPositions = nodePositionsByID(viewModel)
+    let firstGroups = groupFramesByID(viewModel)
+    let firstRoutingHints = viewModel.routingHints
+
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+
+    XCTAssertEqual(nodePositionsByID(viewModel), firstPositions)
+    XCTAssertEqual(groupFramesByID(viewModel), firstGroups)
+    XCTAssertEqual(viewModel.routingHints, firstRoutingHints)
+  }
+
+  @MainActor
+  func testProductionAndLabForcedDefaultReformatMatch() throws {
+    let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "default"))
+    let productionViewModel = PolicyCanvasViewModel.liveStartupState(
+      document: sample.document,
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "default"
+    )
+    let labViewModel = PolicyCanvasViewModel.liveStartupState(
+      document: sample.document,
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: nil,
+      policyGroupTitle: sample.name
+    )
+
+    productionViewModel.reflowLayout(force: true)
+    labViewModel.reflowLayout(preserveManualAnchors: false, force: true)
+
+    XCTAssertEqual(nodePositionsByID(productionViewModel), nodePositionsByID(labViewModel))
+    XCTAssertEqual(groupFramesByID(productionViewModel), groupFramesByID(labViewModel))
+    XCTAssertEqual(productionViewModel.routingHints, labViewModel.routingHints)
   }
 
   @MainActor
@@ -420,7 +463,8 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
       named: "PolicyCanvasViewport+Dispatchers.swift"
     )
 
-    // Lab surfaces force the engine layout; production keeps the guarded reflow.
+    // Lab and production Reformat both force the engine layout, but lab strips
+    // manual anchors so algorithm comparisons always start from the same graph.
     XCTAssertTrue(
       surfaceSource.contains("requestAtomicReflow(preserveManualAnchors: false, force: true)")
     )
@@ -451,6 +495,20 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     // The commit publishes positions WITHOUT an async route request so the
     // precomputed routes reveal together with the nodes in a single frame.
     XCTAssertTrue(atomicSource.contains("requestsRouteComputation: false"))
+  }
+
+  @MainActor
+  private func nodePositionsByID(
+    _ viewModel: PolicyCanvasViewModel
+  ) -> [String: CGPoint] {
+    Dictionary(uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.position) })
+  }
+
+  @MainActor
+  private func groupFramesByID(
+    _ viewModel: PolicyCanvasViewModel
+  ) -> [String: CGRect] {
+    Dictionary(uniqueKeysWithValues: viewModel.groups.map { ($0.id, $0.frame) })
   }
 
   private func policyCanvasSourceFile(named name: String) throws -> String {

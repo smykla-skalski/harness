@@ -35,8 +35,8 @@ struct PolicyCanvasReformatSurfaceTests {
     )
   }
 
-  @Test("visible reformat actions use the guarded atomic reflow")
-  func visibleReformatActionsUseGuardedReflow() throws {
+  @Test("visible reformat actions use forced atomic reflow")
+  func visibleReformatActionsUseForcedAtomicReflow() throws {
     let layoutSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
     )
@@ -48,8 +48,9 @@ struct PolicyCanvasReformatSurfaceTests {
     )
 
     // Production reformat triggers route the new layout off-main before
-    // publishing it (atomic reveal), using the guarded default that keeps a tidy
-    // hand-authored layout in place; none call the synchronous reflow directly.
+    // publishing it (atomic reveal), using the forced default so saved
+    // coordinates and lab samples go through the same engine pass; none call
+    // the synchronous reflow directly.
     #expect(layoutSource.contains("viewModel.requestAtomicReflow()"))
     #expect(chromeSource.contains("viewModel.requestAtomicReflow()"))
     #expect(dispatcherSource.contains("viewModel.requestAtomicReflow()"))
