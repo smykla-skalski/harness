@@ -245,22 +245,25 @@ struct PolicyCanvasLabRoutingQualityTests {
     #expect(titleOverlaps.isEmpty, "nodes inside a foreign group title: \(titleOverlaps)")
   }
 
-  @Test("lab sample live reformats keep node bodies separated")
+  @Test("lab sample live reformats keep node bodies at the minimum spacing")
   @MainActor
-  func labSampleLiveReformatsKeepNodeBodiesSeparated() throws {
-    var overlaps: [String] = []
+  func labSampleLiveReformatsKeepNodeBodiesAtMinimumSpacing() throws {
+    var violations: [String] = []
     for sample in PolicyCanvasLabSamples.all {
       let viewModel = PolicyCanvasViewModel.sample()
       viewModel.load(document: sample.document, simulation: nil, audit: nil)
       viewModel.reflowLayout(preserveManualAnchors: false, force: true)
-      overlaps.append(
-        contentsOf: policyCanvasNodeOverlaps(viewModel.nodes).map { pair in
+      violations.append(
+        contentsOf: policyCanvasNodeSpacingViolations(viewModel.nodes).map { pair in
           "\(sample.id):\(pair)"
         }
       )
     }
 
-    #expect(overlaps.isEmpty, "node body overlaps after live reformat: \(overlaps)")
+    #expect(
+      violations.isEmpty,
+      "node bodies below minimum spacing after live reformat: \(violations)"
+    )
   }
 
   @Test("extreme sample live routes attach to semantic visible port sides")
@@ -299,18 +302,21 @@ struct PolicyCanvasLabRoutingQualityTests {
     )
   }
 
-  private func policyCanvasNodeOverlaps(_ nodes: [PolicyCanvasNode]) -> [String] {
-    var overlaps: [String] = []
+  private func policyCanvasNodeSpacingViolations(_ nodes: [PolicyCanvasNode]) -> [String] {
+    var violations: [String] = []
     for leftIndex in nodes.indices {
       for rightIndex in nodes.index(after: leftIndex)..<nodes.endIndex {
         let left = nodes[leftIndex]
         let right = nodes[rightIndex]
-        if policyCanvasNodeFrame(left).intersects(policyCanvasNodeFrame(right)) {
-          overlaps.append("\(left.id)~\(right.id)")
+        if policyCanvasNodeFramesViolateMinimumSpacing(
+          policyCanvasNodeFrame(left),
+          policyCanvasNodeFrame(right)
+        ) {
+          violations.append("\(left.id)~\(right.id)")
         }
       }
     }
-    return overlaps
+    return violations
   }
 
   @Test("extreme route-agent keeps a rightward source departure")

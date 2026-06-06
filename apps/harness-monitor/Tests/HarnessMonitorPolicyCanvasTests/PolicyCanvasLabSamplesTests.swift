@@ -42,17 +42,6 @@ struct PolicyCanvasLabSamplesTests {
 
   private static let newExtremeVariantIDs = Array(expectedCatalogIDs.suffix(5))
 
-  private static let referenceAlgorithmSampleIDs = [
-    "minimal",
-    "linear",
-    "branching",
-    "default",
-    "multi-group",
-    "extreme",
-    "extreme-braid",
-    "extreme-matrix",
-  ]
-
   @Test("Catalog is ordered simple to extreme stress and ids are unique")
   func catalogOrderAndUniqueIDs() {
     let ids = PolicyCanvasLabSamples.all.map(\.id)
@@ -214,7 +203,7 @@ struct PolicyCanvasLabSamplesTests {
 
   @Test("Reference algorithms produce coherent layouts for lab samples")
   func referenceAlgorithmsProduceCoherentLayoutsForLabSamples() throws {
-    for id in Self.referenceAlgorithmSampleIDs {
+    for id in PolicyCanvasReferenceAlgorithmSamples.ids {
       let sample = try #require(PolicyCanvasLabSamples.sample(id: id))
       var nodes = sample.document.nodes.map {
         policyCanvasNode($0, layout: sample.document.layout)
@@ -256,7 +245,7 @@ struct PolicyCanvasLabSamplesTests {
 
   @Test("Reference algorithms route lab samples around node bodies")
   func referenceAlgorithmsRouteLabSamplesAroundNodeBodies() async throws {
-    for id in Self.referenceAlgorithmSampleIDs {
+    for id in PolicyCanvasReferenceAlgorithmSamples.ids {
       let sample = try #require(PolicyCanvasLabSamples.sample(id: id))
       let graph = try referenceLaidOutGraph(for: sample)
       let output = await PolicyCanvasRouteWorker().compute(
