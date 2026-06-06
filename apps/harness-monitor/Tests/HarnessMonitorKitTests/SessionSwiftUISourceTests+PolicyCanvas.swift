@@ -20,11 +20,14 @@ extension SessionSwiftUISourceTests {
     #expect(overlaySource.contains("minimapVisible = true"))
     #expect(overlaySource.contains("Label(\"Show minimap\", systemImage: \"eye\")"))
     #expect(overlaySource.contains("@FocusState private var recenterButtonFocused"))
+    #expect(overlaySource.contains("@State private var recenterButtonHovered = false"))
     #expect(overlaySource.contains(".focusable()"))
     #expect(overlaySource.contains(".focused($recenterButtonFocused)"))
+    #expect(overlaySource.contains(".onHover { hovering in"))
+    #expect(overlaySource.contains("recenterButtonHovered = hovering"))
     #expect(
       overlaySource.contains(
-        ".buttonStyle(PolicyCanvasHiddenMinimapRecenterButtonStyle(isFocused: recenterButtonFocused))"
+        "isFocused: recenterButtonFocused || recenterButtonHovered"
       )
     )
     #expect(overlaySource.contains("PolicyCanvasHiddenMinimapRecenterButtonStyle: ButtonStyle"))
