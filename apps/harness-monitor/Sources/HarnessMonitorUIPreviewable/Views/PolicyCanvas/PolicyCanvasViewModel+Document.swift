@@ -92,6 +92,7 @@ extension PolicyCanvasViewModel {
     secondarySelections = []
     latestSimulation = simulation ?? audit?.latestSimulation
     let graph = policyCanvasGraph(from: document)
+    let savedRoutingHints = policyCanvasRoutingHints(from: document.layout)
     // Fold convergent same-endpoint families into one merged wire so the whole
     // routing/marker/selection pipeline treats a fan-in as a single edge.
     let foldedEdges = policyCanvasFoldParallelBranches(graph.mappedEdges)
@@ -112,7 +113,8 @@ extension PolicyCanvasViewModel {
       policyCanvasApplyingPreferredPortSides(edge, nodes: cleanLayout.nodes)
     }
     routingHints =
-      policyCanvasRoutingHintsForCurrentLayout(nodes: nodes, groups: groups, edges: edges)
+      savedRoutingHints
+      ?? policyCanvasRoutingHintsForCurrentLayout(nodes: nodes, groups: groups, edges: edges)
       ?? cleanLayout.routingHints
     zoom = Self.sanitizedZoom(CGFloat(document.layout.zoom), fallback: 1)
     reconcileGroupFrames()
@@ -161,6 +163,7 @@ extension PolicyCanvasViewModel {
       return
     }
     let graph = policyCanvasGraph(from: document)
+    let savedRoutingHints = policyCanvasRoutingHints(from: document.layout)
     backingDocument = document
     secondarySelections = []
     latestSimulation = simulation ?? audit?.latestSimulation
@@ -169,8 +172,9 @@ extension PolicyCanvasViewModel {
     edges = policyCanvasFoldParallelBranches(graph.mappedEdges).map { edge in
       policyCanvasApplyingPreferredPortSides(edge, nodes: nodes)
     }
-    routingHints = policyCanvasRoutingHintsForCurrentLayout(
-      nodes: nodes, groups: groups, edges: edges)
+    routingHints =
+      savedRoutingHints
+      ?? policyCanvasRoutingHintsForCurrentLayout(nodes: nodes, groups: groups, edges: edges)
     zoom = Self.sanitizedZoom(CGFloat(document.layout.zoom), fallback: 1)
     resetNextNodeNumber()
     markLoadedDocumentRevision(document.revision)
@@ -289,6 +293,7 @@ extension PolicyCanvasViewModel {
       groups: snapshot?.groups ?? groups,
       edges: snapshot?.edges ?? edges,
       zoom: zoom,
+      routingHints: snapshot?.routingHints ?? routingHints,
       backingDocument: backingDocument
     )
   }

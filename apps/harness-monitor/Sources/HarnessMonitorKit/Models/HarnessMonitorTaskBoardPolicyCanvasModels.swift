@@ -154,21 +154,25 @@ public struct TaskBoardPolicyPipelineLayout: Codable, Equatable, Sendable {
   public var zoom: Double
   public var offset: TaskBoardPolicyCanvasPoint
   public var nodes: [TaskBoardPolicyPipelineNodeLayout]
+  public var routingHints: [TaskBoardPolicyPipelineEdgeRoutingHint]
 
   public init(
     zoom: Double = 1,
     offset: TaskBoardPolicyCanvasPoint = .zero,
-    nodes: [TaskBoardPolicyPipelineNodeLayout] = []
+    nodes: [TaskBoardPolicyPipelineNodeLayout] = [],
+    routingHints: [TaskBoardPolicyPipelineEdgeRoutingHint] = []
   ) {
     self.zoom = zoom
     self.offset = offset
     self.nodes = nodes
+    self.routingHints = routingHints
   }
 
   enum CodingKeys: String, CodingKey {
     case zoom
     case offset
     case nodes
+    case routingHints
   }
 
   public init(from decoder: Decoder) throws {
@@ -179,6 +183,21 @@ public struct TaskBoardPolicyPipelineLayout: Codable, Equatable, Sendable {
       ?? .zero
     nodes =
       try container.decodeIfPresent([TaskBoardPolicyPipelineNodeLayout].self, forKey: .nodes) ?? []
+    routingHints =
+      try container.decodeIfPresent(
+        [TaskBoardPolicyPipelineEdgeRoutingHint].self,
+        forKey: .routingHints
+      ) ?? []
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(zoom, forKey: .zoom)
+    try container.encode(offset, forKey: .offset)
+    try container.encode(nodes, forKey: .nodes)
+    if !routingHints.isEmpty {
+      try container.encode(routingHints, forKey: .routingHints)
+    }
   }
 }
 
@@ -198,6 +217,43 @@ public struct TaskBoardPolicyPipelineNodeLayout: Codable, Equatable, Sendable {
     self.x = x
     self.y = y
     self.source = source
+  }
+}
+
+public struct TaskBoardPolicyPipelineEdgeRoutingHint: Codable, Equatable, Sendable {
+  public var edgeId: String
+  public var sourceScopeId: String
+  public var targetScopeId: String
+  public var targetNodeId: String
+  public var label: String
+  public var laneIndex: Int
+  public var horizontalLaneY: Double
+  public var verticalLaneX: Double?
+  public var bundleOrdinal: Int
+  public var bundleSize: Int
+
+  public init(
+    edgeId: String,
+    sourceScopeId: String,
+    targetScopeId: String,
+    targetNodeId: String,
+    label: String,
+    laneIndex: Int,
+    horizontalLaneY: Double,
+    verticalLaneX: Double? = nil,
+    bundleOrdinal: Int = 0,
+    bundleSize: Int = 1
+  ) {
+    self.edgeId = edgeId
+    self.sourceScopeId = sourceScopeId
+    self.targetScopeId = targetScopeId
+    self.targetNodeId = targetNodeId
+    self.label = label
+    self.laneIndex = laneIndex
+    self.horizontalLaneY = horizontalLaneY
+    self.verticalLaneX = verticalLaneX
+    self.bundleOrdinal = bundleOrdinal
+    self.bundleSize = bundleSize
   }
 }
 
