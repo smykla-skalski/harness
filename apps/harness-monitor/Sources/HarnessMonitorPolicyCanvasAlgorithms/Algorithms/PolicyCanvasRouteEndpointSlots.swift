@@ -25,15 +25,27 @@ public struct PolicyCanvasRouteEndpointSlots: Hashable, Sendable {
 public func policyCanvasRouteEndpointSlots(
   edges: [PolicyCanvasEdge]
 ) -> [String: PolicyCanvasRouteEndpointSlots] {
+  policyCanvasRouteEndpointSlots(
+    edges: edges,
+    sourceSortKey: policyCanvasSourceEndpointSlotSortKey,
+    targetSortKey: policyCanvasTargetEndpointSlotSortKey
+  )
+}
+
+func policyCanvasRouteEndpointSlots(
+  edges: [PolicyCanvasEdge],
+  sourceSortKey: (PolicyCanvasEdge) -> String,
+  targetSortKey: (PolicyCanvasEdge) -> String
+) -> [String: PolicyCanvasRouteEndpointSlots] {
   let sourceSlots = policyCanvasEndpointSlots(
     edges: edges,
     endpoint: \.source,
-    sortKey: policyCanvasSourceEndpointSlotSortKey
+    sortKey: sourceSortKey
   )
   let targetSlots = policyCanvasEndpointSlots(
     edges: edges,
     endpoint: \.target,
-    sortKey: policyCanvasTargetEndpointSlotSortKey
+    sortKey: targetSortKey
   )
   return Dictionary(
     uniqueKeysWithValues: edges.map { edge in
@@ -111,10 +123,7 @@ public func policyCanvasShiftedRouteAnchor(
 ) -> CGPoint {
   let offset = policyCanvasRouteEndpointSlotOffset(
     terminalSlot,
-    spacing: spacing,
-    point: point,
-    side: side,
-    frame: frame
+    spacing: spacing
   )
   guard abs(offset) > 0.001 else {
     return point
@@ -122,9 +131,11 @@ public func policyCanvasShiftedRouteAnchor(
   let inset = (PolicyCanvasLayout.portDiameter / 2) + 4
   switch side {
   case .leading, .trailing:
+    let coordinate = point.y - frame.minY
     let overflow = policyCanvasRouteEndpointSlotOverflow(
       terminalSlot,
       spacing: spacing,
+      coordinate: coordinate,
       extent: PolicyCanvasLayout.nodeSize.height
     )
     return CGPoint(
@@ -135,9 +146,11 @@ public func policyCanvasShiftedRouteAnchor(
       )
     )
   case .top, .bottom:
+    let coordinate = point.x - frame.minX
     let overflow = policyCanvasRouteEndpointSlotOverflow(
       terminalSlot,
       spacing: spacing,
+      coordinate: coordinate,
       extent: PolicyCanvasLayout.nodeSize.width
     )
     return CGPoint(
@@ -152,32 +165,24 @@ public func policyCanvasShiftedRouteAnchor(
 
 private func policyCanvasRouteEndpointSlotOffset(
   _ slot: PolicyCanvasRouteEndpointSlot,
-  spacing: CGFloat,
-  point: CGPoint,
-  side: PolicyCanvasPortSide,
-  frame: CGRect
+  spacing: CGFloat
 ) -> CGFloat {
   guard slot.count > 1 else {
     return 0
   }
-  let coordinate: CGFloat
-  let midpoint: CGFloat
-  switch side {
-  case .leading, .trailing:
-    coordinate = point.y
-    midpoint = frame.midY
-  case .top, .bottom:
-    coordinate = point.x
-    midpoint = frame.midX
-  }
-  let direction: CGFloat = coordinate < midpoint ? -1 : 1
-  return CGFloat(slot.index) * spacing * direction
+  let centeredIndex = CGFloat(slot.index) - (CGFloat(slot.count - 1) / 2)
+  return centeredIndex * spacing
 }
 
 private func policyCanvasRouteEndpointSlotOverflow(
   _ slot: PolicyCanvasRouteEndpointSlot,
   spacing: CGFloat,
+  coordinate: CGFloat,
   extent: CGFloat
 ) -> CGFloat {
-  max(0, CGFloat(slot.count - 1) * spacing - (extent / 2))
+  let inset = PolicyCanvasLayout.portDiameter / 2 + 4
+  let halfSpan = (CGFloat(slot.count - 1) * spacing) / 2
+  let before = max(0, coordinate - inset)
+  let after = max(0, extent - inset - coordinate)
+  return max(0, halfSpan - before, halfSpan - after)
 }

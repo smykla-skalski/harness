@@ -99,7 +99,7 @@ extension PolicyCanvasPreparedRouteInput {
     let obstacles = routingObstacles()
     let portAnchors = portAnchors(nodeIndex: nodeIndex)
     let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
-    let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
+    let terminalSlots = routeEndpointSlots(edges: orderedEdges, nodeIndex: nodeIndex)
     let familyPreferences = policyCanvasRouteFamilyPreferences(
       edges: edges,
       nodeFramesByID: nodeIndex.mapValues(\.frame),
@@ -277,7 +277,7 @@ extension PolicyCanvasPreparedRouteInput {
     )
   }
 
-  private func routeAnchorCandidate(
+  func routeAnchorCandidate(
     for endpoint: PolicyCanvasPortEndpoint,
     side: PolicyCanvasPortSide,
     nodeIndex: [String: PolicyCanvasRouteNode],
