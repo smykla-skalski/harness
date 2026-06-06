@@ -407,6 +407,96 @@ struct PolicyCanvasLabRoutingQualityTests {
     )
   }
 
+  @Test("lab sample live port markers stay balanced on every visible side")
+  func labSampleLivePortMarkersStayBalanced() async throws {
+    var failures: [String] = []
+    for sample in PolicyCanvasLabSamples.all {
+      let graph = try await markerBalanceGraph(sampleID: sample.id)
+      let routeInput = PolicyCanvasRouteWorkerInput(
+        nodes: graph.nodes,
+        groups: graph.groups,
+        edges: graph.edges,
+        fontScale: 1,
+        routingHints: graph.routingHints,
+        algorithmSelection: .referenceRouting
+      )
+      let prepared = PolicyCanvasPreparedRouteInput(input: routeInput)
+      let nodeIndex = prepared.nodeIndex
+      var seenMarkers: Set<PolicyCanvasLabMarkerInstanceKey> = []
+      var coordinatesBySide: [PolicyCanvasLabMarkerSideKey: [CGFloat]] = [:]
+      for endpoint in graph.edges.flatMap({ [$0.source, $0.target] }) {
+        for side in policyCanvasVisiblePortSides(
+          for: endpoint,
+          visibility: graph.output.portVisibility
+        ) {
+          guard
+            let node = nodeIndex[endpoint.nodeID],
+            let basePoint = prepared.portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex)
+          else {
+            continue
+          }
+          for marker in graph.output.portMarkerLayout.markers(
+            for: endpoint,
+            side: side,
+            isVisible: true
+          ) {
+            let instance = PolicyCanvasLabMarkerInstanceKey(
+              endpoint: policyCanvasCanonicalPortEndpoint(endpoint),
+              side: side,
+              markerID: marker.id
+            )
+            guard seenMarkers.insert(instance).inserted else {
+              continue
+            }
+            let coordinate =
+              policyCanvasLocalAxisCoordinate(basePoint, side: side, frame: node.frame)
+              + marker.axisOffset
+            let sideKey = PolicyCanvasLabMarkerSideKey(
+              sampleID: sample.id,
+              nodeID: endpoint.nodeID,
+              kind: endpoint.kind,
+              side: side
+            )
+            coordinatesBySide[sideKey, default: []].append(coordinate)
+          }
+        }
+      }
+      for (sideKey, coordinates) in coordinatesBySide {
+        failures.append(contentsOf: markerBalanceFailures(key: sideKey, coordinates: coordinates))
+      }
+    }
+
+    #expect(
+      failures.isEmpty,
+      """
+      live lab port markers are not balanced on every visible node side
+      failures=\(failures)
+      """
+    )
+  }
+
+  private func markerBalanceGraph(
+    sampleID: String
+  ) async throws -> PolicyCanvasLabMarkerBalanceGraph {
+    let laidOutGraph = try laidOutLabGraph(sampleID: sampleID)
+    let routeInput = PolicyCanvasRouteWorkerInput(
+      nodes: laidOutGraph.nodes,
+      groups: laidOutGraph.groups,
+      edges: laidOutGraph.edges,
+      fontScale: 1,
+      routingHints: laidOutGraph.routingHints,
+      algorithmSelection: .referenceRouting
+    )
+    let output = await PolicyCanvasRouteWorker().compute(input: routeInput)
+    return PolicyCanvasLabMarkerBalanceGraph(
+      nodes: laidOutGraph.nodes,
+      groups: laidOutGraph.groups,
+      edges: laidOutGraph.edges,
+      routingHints: laidOutGraph.routingHints,
+      output: output
+    )
+  }
+
   @Test("extreme sample live routes avoid real X-crossings")
   @MainActor
   func extremeSampleLiveRoutesAvoidRealXCrossings() async throws {
@@ -621,6 +711,32 @@ struct PolicyCanvasLabRoutingQualityTests {
         """
       )
     }
+  }
+
+  private func markerBalanceFailures(
+    key: PolicyCanvasLabMarkerSideKey,
+    coordinates rawCoordinates: [CGFloat]
+  ) -> [String] {
+    let coordinates = rawCoordinates.sorted()
+    let extent = policyCanvasSideExtent(side: key.side)
+    if coordinates.count == 1 {
+      return abs(coordinates[0] - (extent / 2)) <= 0.5
+        ? []
+        : ["\(key) single=\(coordinates[0]) expected=\(extent / 2)"]
+    }
+    guard coordinates.count > 1 else {
+      return []
+    }
+    let deltas = zip(coordinates, coordinates.dropFirst()).map { $1 - $0 }
+    let spacing = deltas[0]
+    let uneven = deltas.contains { abs($0 - spacing) > 0.5 }
+    let offCenter = abs((coordinates[0] + (coordinates.last ?? coordinates[0])) - extent) > 0.5
+    guard uneven || offCenter else {
+      return []
+    }
+    return [
+      "\(key) coordinates=\(coordinates) deltas=\(deltas) extent=\(extent)"
+    ]
   }
 
   private func routedLabGraph(
@@ -910,6 +1026,31 @@ private struct PolicyCanvasLabRouteDiagnostics {
   let initialRoutes: [String: PolicyCanvasEdgeRoute]
   let initialPortMarkerLayout: PolicyCanvasPortMarkerLayout
   let convergedState: PolicyCanvasLabRouteComputationState
+}
+
+private struct PolicyCanvasLabMarkerBalanceGraph {
+  let nodes: [PolicyCanvasNode]
+  let groups: [PolicyCanvasGroup]
+  let edges: [PolicyCanvasEdge]
+  let routingHints: PolicyCanvasLayoutRoutingHints?
+  let output: PolicyCanvasRouteWorkerOutput
+}
+
+private struct PolicyCanvasLabMarkerSideKey: Hashable, CustomStringConvertible {
+  let sampleID: String
+  let nodeID: String
+  let kind: PolicyCanvasPortKind
+  let side: PolicyCanvasPortSide
+
+  var description: String {
+    "\(sampleID):\(nodeID):\(kind):\(side)"
+  }
+}
+
+private struct PolicyCanvasLabMarkerInstanceKey: Hashable {
+  let endpoint: PolicyCanvasPortEndpoint
+  let side: PolicyCanvasPortSide
+  let markerID: String
 }
 
 @MainActor

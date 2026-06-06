@@ -46,87 +46,15 @@ struct PolicyCanvasNoOpPortMarkerPlacement: PolicyCanvasPortMarkerPlacementAlgor
   }
 }
 
-/// Reference-form port markers: draw one dot wherever an edge's finished route
-/// actually attaches to a node. The first-feasible selector routes from the raw
-/// port anchors and never consults a marker comb, so the only way every wire ends
-/// on a visible dot is to read each route's terminal point and place a marker
-/// there, on the side the route truly departs or arrives - which differs from the
-/// port's natural side whenever the router turns vertically right at the node.
-/// Unlike the collision-derived comb this never moves a dot away from its wire, so
-/// the terminal-on-dot contract holds by construction.
+/// Reference-form port markers: derive the visible side from each finished route,
+/// then assign side-local marker positions with the balanced marker comb. Route
+/// convergence feeds these terminals back into selection, so wires still end on
+/// visible dots while single-marker sides stay centered and multi-marker sides
+/// remain evenly spaced.
 struct PolicyCanvasRouteTerminalPortMarkerPlacement: PolicyCanvasPortMarkerPlacementAlgorithm {
   func placeMarkers(input: PolicyCanvasPortMarkerPlacementInput) -> PolicyCanvasPortMarkerLayout {
-    let prepared = input.prepared
-    let nodeIndex = input.nodeIndex
-    var terminals: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal] = [:]
-    var endpoints: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortEndpoint] = [:]
-    for edge in prepared.edges {
-      guard let route = input.routes[edge.id] else {
-        continue
-      }
-      addTerminal(
-        input: PolicyCanvasRouteTerminalInput(
-          key: PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .source),
-          endpoint: edge.source,
-          point: route.points.first,
-          side: policyCanvasRouteSourceSide(route)
-        ),
-        prepared: prepared,
-        nodeIndex: nodeIndex,
-        terminals: &terminals,
-        endpoints: &endpoints
-      )
-      addTerminal(
-        input: PolicyCanvasRouteTerminalInput(
-          key: PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .target),
-          endpoint: edge.target,
-          point: route.points.last,
-          side: policyCanvasRouteTargetSide(route)
-        ),
-        prepared: prepared,
-        nodeIndex: nodeIndex,
-        terminals: &terminals,
-        endpoints: &endpoints
-      )
-    }
-    return PolicyCanvasPortMarkerLayout(terminalsByKey: terminals, endpointsByKey: endpoints)
+    input.prepared.portMarkerLayout(routes: input.routes, nodeIndex: input.nodeIndex)
   }
-
-  private func addTerminal(
-    input: PolicyCanvasRouteTerminalInput,
-    prepared: PolicyCanvasPreparedRouteInput,
-    nodeIndex: [String: PolicyCanvasRouteNode],
-    terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal],
-    endpoints: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortEndpoint]
-  ) {
-    guard
-      let point = input.point,
-      let side = input.side,
-      let base = prepared.portAnchor(for: input.endpoint, side: side, nodeIndex: nodeIndex)
-    else {
-      return
-    }
-    // The marker offset is the route terminal's distance from the port's anchor
-    // along the side axis - y for leading/trailing, x for top/bottom - the exact
-    // inverse of `policyCanvasShiftedRouteAnchor`, so the rendered dot sits back
-    // on the terminal.
-    let axisOffset: CGFloat
-    switch side {
-    case .leading, .trailing:
-      axisOffset = point.y - base.y
-    case .top, .bottom:
-      axisOffset = point.x - base.x
-    }
-    terminals[input.key] = PolicyCanvasPortTerminal(side: side, axisOffset: axisOffset)
-    endpoints[input.key] = input.endpoint
-  }
-}
-
-private struct PolicyCanvasRouteTerminalInput {
-  let key: PolicyCanvasRouteTerminalKey
-  let endpoint: PolicyCanvasPortEndpoint
-  let point: CGPoint?
-  let side: PolicyCanvasPortSide?
 }
 
 struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgorithm {

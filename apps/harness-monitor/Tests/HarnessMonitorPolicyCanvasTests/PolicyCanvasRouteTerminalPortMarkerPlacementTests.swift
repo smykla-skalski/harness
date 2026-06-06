@@ -6,8 +6,8 @@ import Testing
 
 @Suite("Policy canvas route-terminal port markers")
 struct PolicyCanvasRouteTerminalPortMarkerPlacementTests {
-  @Test("marker follows a vertical departure off the natural side")
-  func markerFollowsVerticalDeparture() {
+  @Test("marker keeps the route-selected side but centers a lone side terminal")
+  func markerCentersLoneSideTerminal() {
     let source = policyCanvasMarkerTestNode(
       id: "source",
       position: .zero,
@@ -32,8 +32,8 @@ struct PolicyCanvasRouteTerminalPortMarkerPlacementTests {
     )
     let prepared = PolicyCanvasPreparedRouteInput(input: input)
     // The output's natural side is trailing, but this route departs straight up
-    // off the top edge, 30pt right of the top-port center, then arrives
-    // horizontally into the target's leading port.
+    // off the top edge, 30pt right of the top-port center. Marker placement
+    // keeps the route-selected side but centers the lone marker on that side.
     let topCenterX = PolicyCanvasLayout.portX(index: 0, count: 1)
     let leadingCenterY = PolicyCanvasLayout.portY(index: 0, count: 1)
     let route = PolicyCanvasEdgeRoute(
@@ -56,9 +56,10 @@ struct PolicyCanvasRouteTerminalPortMarkerPlacementTests {
 
     let sourceTerminal = layout.terminal(edgeID: edge.id, role: .source)
     #expect(sourceTerminal?.side == .top)
-    #expect(abs((sourceTerminal?.axisOffset ?? .nan) - 30) < 0.001)
+    #expect(abs(sourceTerminal?.axisOffset ?? .nan) < 0.001)
     let topMarkers = layout.markers(for: edge.source, side: .top, isVisible: true)
-    #expect(topMarkers.contains { abs($0.axisOffset - 30) < 0.5 })
+    #expect(topMarkers.count == 1)
+    #expect(abs(topMarkers[0].axisOffset) < 0.5)
 
     let targetTerminal = layout.terminal(edgeID: edge.id, role: .target)
     #expect(targetTerminal?.side == .leading)
