@@ -196,11 +196,45 @@ struct PolicyCanvasNativePointerSelectionTests {
     #expect(viewModel.marqueeSelection == nil)
   }
 
+  @Test("right-clicking a canvas node exposes an Edit menu item")
+  func rightClickingNodeExposesEditMenuItem() throws {
+    let viewModel = PolicyCanvasViewModel.sample()
+    var openedEditor: PolicyCanvasEditSheet?
+    let host = try makeHost(viewModel: viewModel) { sheet in
+      openedEditor = sheet
+    }
+
+    defer {
+      host.window.orderOut(nil)
+      host.window.contentView = nil
+    }
+
+    let event = try mouseEvent(
+      type: .rightMouseDown,
+      contentPoint: CGPoint(x: 210, y: 180),
+      host: host,
+      timestamp: 0,
+      eventNumber: 30
+    )
+    let menu = try #require(host.documentView.menu(for: event))
+    let editItem = try #require(menu.items.first { $0.title == "Edit" })
+
+    #expect(editItem.image?.isTemplate == true)
+    host.documentView.editNativeContextMenuItem(editItem)
+    #expect(viewModel.selection == .node("policy-source"))
+    #expect(openedEditor == .node("policy-source"))
+  }
+
   private func makeHost(
-    viewModel: PolicyCanvasViewModel = PolicyCanvasViewModel.sample()
+    viewModel: PolicyCanvasViewModel = PolicyCanvasViewModel.sample(),
+    openEditor: @escaping @MainActor (PolicyCanvasEditSheet) -> Void = { _ in }
   ) throws -> NativePointerHost {
     let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
-    let snapshot = hostedSnapshot(viewModel: viewModel, focusedComponent: focusedComponent)
+    let snapshot = hostedSnapshot(
+      viewModel: viewModel,
+      focusedComponent: focusedComponent,
+      openEditor: openEditor
+    )
     let state = PolicyCanvasViewportHostedState(snapshot: snapshot)
     let scrollView = PolicyCanvasNativeScrollView()
     let frame = CGRect(x: 0, y: 0, width: 900, height: 700)
@@ -256,7 +290,8 @@ struct PolicyCanvasNativePointerSelectionTests {
 
   private func hostedSnapshot(
     viewModel: PolicyCanvasViewModel = PolicyCanvasViewModel.sample(),
-    focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
+    focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding,
+    openEditor: @escaping @MainActor (PolicyCanvasEditSheet) -> Void = { _ in }
   ) -> PolicyCanvasViewportHostedSnapshot {
     let routeOutput = PolicyCanvasRouteWorkerOutput.fallback(
       for: PolicyCanvasRouteWorkerInput(
@@ -292,7 +327,7 @@ struct PolicyCanvasNativePointerSelectionTests {
       contentSize: routeOutput.contentSize,
       resolvedCanvasColorScheme: nil,
       showSimulationOverlay: false,
-      openEditor: { _ in },
+      openEditor: openEditor,
       requestKeyboardFocus: {}
     )
   }

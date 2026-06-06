@@ -4,6 +4,31 @@ import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
 extension PolicyCanvasNativeDocumentView {
+  func nativeContextMenu(for target: PointerTarget) -> NSMenu {
+    let menu = NSMenu()
+    let editItem = NSMenuItem(
+      title: "Edit",
+      action: #selector(editNativeContextMenuItem(_:)),
+      keyEquivalent: ""
+    )
+    editItem.target = self
+    editItem.image = NSImage(systemSymbolName: "pencil", accessibilityDescription: "Edit")
+    editItem.representedObject = PolicyCanvasNativeContextMenuTarget(target)
+    menu.addItem(editItem)
+    return menu
+  }
+
+  @objc
+  func editNativeContextMenuItem(_ sender: NSMenuItem) {
+    guard
+      let contextTarget = sender.representedObject as? PolicyCanvasNativeContextMenuTarget
+    else {
+      return
+    }
+    select(contextTarget.target, extending: false)
+    openEditor(for: contextTarget.target)
+  }
+
   func routeMouseDown(_ event: NSEvent) -> Bool {
     let point = convert(event.locationInWindow, from: nil)
     let contentPoint = contentPoint(fromWorkspacePoint: point)
@@ -341,5 +366,13 @@ extension PolicyCanvasNativeDocumentView {
       event: event,
       details: payload
     )
+  }
+}
+
+private final class PolicyCanvasNativeContextMenuTarget: NSObject {
+  let target: PolicyCanvasNativeDocumentView.PointerTarget
+
+  init(_ target: PolicyCanvasNativeDocumentView.PointerTarget) {
+    self.target = target
   }
 }

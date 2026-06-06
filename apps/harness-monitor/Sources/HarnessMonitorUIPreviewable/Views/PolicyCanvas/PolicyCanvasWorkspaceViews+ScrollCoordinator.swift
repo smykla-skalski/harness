@@ -342,6 +342,14 @@ final class PolicyCanvasNativeDocumentView: NSView {
     super.mouseUp(with: event)
   }
 
+  override func menu(for event: NSEvent) -> NSMenu? {
+    let point = convert(event.locationInWindow, from: nil)
+    guard let target = pointerTarget(at: point) else {
+      return super.menu(for: event)
+    }
+    return nativeContextMenu(for: target)
+  }
+
   override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
     routeDraggingEntered(sender) ?? super.draggingEntered(sender)
   }
