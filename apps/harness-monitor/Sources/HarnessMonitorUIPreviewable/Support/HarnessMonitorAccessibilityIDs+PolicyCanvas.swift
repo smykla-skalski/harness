@@ -23,6 +23,7 @@ extension HarnessMonitorAccessibility {
   public static let policyCanvasZoomInButton = "harness.policy-canvas.zoom.in"
   public static let policyCanvasZoomResetButton = "harness.policy-canvas.zoom.reset"
   public static let policyCanvasZoomValue = "harness.policy-canvas.zoom.value"
+  public static let policyCanvasCollapsedZoomValue = "harness.policy-canvas.zoom.collapsed-value"
   public static let policyCanvasMinimap = "harness.policy-canvas.minimap"
   public static let policyCanvasMinimapViewport = "harness.policy-canvas.minimap.viewport"
   public static let policyCanvasMinimapCenterButton = "harness.policy-canvas.minimap.center"
