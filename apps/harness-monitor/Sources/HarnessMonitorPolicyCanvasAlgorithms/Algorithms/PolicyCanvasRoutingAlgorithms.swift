@@ -159,7 +159,8 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
         obstacles: obstacles,
         obstaclesAreCanonical: true,
         sourceActual: sourceLead,
-        targetActual: targetLead
+        targetActual: targetLead,
+        corridorHint: prepared.routingHints?.edgeHint(for: edge.id)
       )
       // Route between the perpendicular leads, then bridge the short port->lead
       // stubs back on so each wire leaves and enters its port square to the side.

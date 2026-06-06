@@ -7,6 +7,7 @@ struct PolicyCanvasDocumentExportPayload: Sendable {
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
   let zoom: CGFloat
+  let routingHints: PolicyCanvasLayoutRoutingHints?
   let backingDocument: TaskBoardPolicyPipelineDocument?
 
   func exportDocument() -> TaskBoardPolicyPipelineDocument {
@@ -42,7 +43,8 @@ struct PolicyCanvasDocumentExportPayload: Sendable {
       layout: TaskBoardPolicyPipelineLayout(
         zoom: Double(zoom),
         offset: backingDocument?.layout.offset ?? .zero,
-        nodes: nodes.map(taskBoardPolicyNodeLayout)
+        nodes: nodes.map(taskBoardPolicyNodeLayout),
+        routingHints: taskBoardPolicyRoutingHints(routingHints)
       ),
       policyTraceIds: backingDocument?.policyTraceIds ?? []
     )

@@ -254,6 +254,62 @@ func taskBoardPolicyNodeLayout(_ node: PolicyCanvasNode) -> TaskBoardPolicyPipel
   )
 }
 
+func policyCanvasRoutingHints(
+  from layout: TaskBoardPolicyPipelineLayout
+) -> PolicyCanvasLayoutRoutingHints? {
+  guard !layout.routingHints.isEmpty else {
+    return nil
+  }
+  return PolicyCanvasLayoutRoutingHints(
+    edgeHints: Dictionary(
+      layout.routingHints.map { hint in
+        (
+          hint.edgeId,
+          PolicyCanvasEdgeCorridorHint(
+            key: PolicyCanvasRouteCorridorKey(
+              sourceScopeID: hint.sourceScopeId,
+              targetScopeID: hint.targetScopeId,
+              targetNodeID: hint.targetNodeId,
+              label: hint.label,
+              laneIndex: hint.laneIndex
+            ),
+            horizontalLaneY: CGFloat(hint.horizontalLaneY),
+            verticalLaneX: hint.verticalLaneX.map { CGFloat($0) },
+            bundleOrdinal: hint.bundleOrdinal,
+            bundleSize: hint.bundleSize
+          )
+        )
+      },
+      uniquingKeysWith: { _, latest in latest }
+    )
+  )
+}
+
+func taskBoardPolicyRoutingHints(
+  _ routingHints: PolicyCanvasLayoutRoutingHints?
+) -> [TaskBoardPolicyPipelineEdgeRoutingHint] {
+  guard let routingHints else {
+    return []
+  }
+  return routingHints.edgeHints.keys.sorted().compactMap { edgeID in
+    guard let hint = routingHints.edgeHints[edgeID] else {
+      return nil
+    }
+    return TaskBoardPolicyPipelineEdgeRoutingHint(
+      edgeId: edgeID,
+      sourceScopeId: hint.key.sourceScopeID,
+      targetScopeId: hint.key.targetScopeID,
+      targetNodeId: hint.key.targetNodeID,
+      label: hint.key.label,
+      laneIndex: hint.key.laneIndex,
+      horizontalLaneY: Double(hint.horizontalLaneY),
+      verticalLaneX: hint.verticalLaneX.map { Double($0) },
+      bundleOrdinal: hint.bundleOrdinal,
+      bundleSize: hint.bundleSize
+    )
+  }
+}
+
 func policyCanvasKind(
   for kind: TaskBoardPolicyPipelineNodeKind
 ) -> PolicyCanvasNodeKind {

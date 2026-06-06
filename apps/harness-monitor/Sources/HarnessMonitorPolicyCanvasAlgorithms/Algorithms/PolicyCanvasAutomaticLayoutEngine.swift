@@ -105,6 +105,10 @@ public struct PolicyCanvasEdgeCorridorHint: Equatable, Hashable, Sendable {
 public struct PolicyCanvasLayoutRoutingHints: Equatable, Hashable, Sendable {
   public let edgeHints: [String: PolicyCanvasEdgeCorridorHint]
 
+  public init(edgeHints: [String: PolicyCanvasEdgeCorridorHint]) {
+    self.edgeHints = edgeHints
+  }
+
   public static let empty = Self(edgeHints: [:])
 
   public var isEmpty: Bool {
@@ -124,7 +128,9 @@ public struct PolicyCanvasLayoutRoutingHints: Equatable, Hashable, Sendable {
         PolicyCanvasEdgeCorridorHint(
           key: hint.key,
           horizontalLaneY: hint.horizontalLaneY + dy,
-          verticalLaneX: hint.verticalLaneX.map { $0 + dx }
+          verticalLaneX: hint.verticalLaneX.map { $0 + dx },
+          bundleOrdinal: hint.bundleOrdinal,
+          bundleSize: hint.bundleSize
         )
       }
     )
