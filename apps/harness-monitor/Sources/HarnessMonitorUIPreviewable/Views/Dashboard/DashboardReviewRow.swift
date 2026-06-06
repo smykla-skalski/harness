@@ -94,13 +94,7 @@ struct DashboardReviewRow: View {
 
   private var rowChromeBackground: some View {
     ZStack {
-      if isHovered {
-        HarnessMonitorTheme.ink.opacity(0.05)
-      } else if isPinned {
-        HarnessMonitorTheme.accent.opacity(0.05)
-      } else {
-        Color.clear
-      }
+      rowTint
       VStack(spacing: 0) {
         Spacer(minLength: 0)
         Rectangle()
@@ -108,5 +102,14 @@ struct DashboardReviewRow: View {
           .frame(height: 1)
       }
     }
+  }
+
+  /// PR rows carry a resting `ink` tint so they read as distinct cards against
+  /// the untinted section-header rows. Pinned rows swap that for an `accent`
+  /// tint. Hover deepens whichever tint by another 5%.
+  private var rowTint: Color {
+    let opacity = isHovered ? 0.1 : 0.05
+    let base = isPinned ? HarnessMonitorTheme.accent : HarnessMonitorTheme.ink
+    return base.opacity(opacity)
   }
 }
