@@ -35,6 +35,11 @@ public enum PolicyCanvasLabSamples {
     PolicyCanvasLabSample(id: "default", name: "Default", document: realDefault),
     PolicyCanvasLabSample(id: "multi-group", name: "Multi-group", document: multiGroup),
     PolicyCanvasLabSample(id: "extreme", name: "Extreme", document: extreme),
+    PolicyCanvasLabSample(id: "extreme-braid", name: "Extreme Braid", document: extremeBraid),
+    PolicyCanvasLabSample(id: "extreme-matrix", name: "Extreme Matrix", document: extremeMatrix),
+    PolicyCanvasLabSample(id: "extreme-mesh", name: "Extreme Mesh", document: extremeMesh),
+    PolicyCanvasLabSample(id: "extreme-lattice", name: "Extreme Lattice", document: extremeLattice),
+    PolicyCanvasLabSample(id: "extreme-galaxy", name: "Extreme Galaxy", document: extremeGalaxy),
   ]
 
   /// The sample the lab selects when no live policy is present.
