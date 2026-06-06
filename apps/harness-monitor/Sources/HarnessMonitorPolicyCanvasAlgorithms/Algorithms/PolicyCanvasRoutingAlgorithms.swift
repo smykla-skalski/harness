@@ -145,43 +145,189 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       guard let source = portAnchors[edge.source], let target = portAnchors[edge.target] else {
         continue
       }
-      let sourceSide = policyCanvasResolvedPortSide(for: edge.source)
-      let targetSide = policyCanvasResolvedPortSide(for: edge.target)
-      let sourceLead = policyCanvasPortLeadPoint(source, side: sourceSide)
-      let targetLead = policyCanvasPortLeadPoint(target, side: targetSide)
       let sourceNode = nodeIndex[edge.source.nodeID]
       let targetNode = nodeIndex[edge.target.nodeID]
-      let context = PolicyCanvasRouteContext(
+      let baseContext = PolicyCanvasRouteContext(
         lane: 0,
         groups: prepared.groups,
         sourceGroupID: sourceNode?.groupID,
         targetGroupID: targetNode?.groupID,
         obstacles: obstacles,
         obstaclesAreCanonical: true,
-        sourceActual: sourceLead,
-        targetActual: targetLead,
         corridorHint: prepared.routingHints?.edgeHint(for: edge.id)
       )
-      // Route between the perpendicular leads, then bridge the short port->lead
-      // stubs back on so each wire leaves and enters its port square to the side.
-      let core = input.router.route(source: sourceLead, target: targetLead, context: context)
-      routes[edge.id] = policyCanvasBridgedRoute(
-        baseRoute: core,
-        source: PolicyCanvasEscapeCandidate(
-          side: sourceSide,
-          actual: source,
-          exit: sourceLead,
-          routed: core.points.first ?? sourceLead
-        ),
-        target: PolicyCanvasEscapeCandidate(
-          side: targetSide,
-          actual: target,
-          exit: targetLead,
-          routed: core.points.last ?? targetLead
+      if edge.effectivePinnedPortSide
+        || !usesFlexAnchors(sourceNode: sourceNode, targetNode: targetNode)
+      {
+        routes[edge.id] = pinnedRoute(
+          edge: edge,
+          source: source,
+          target: target,
+          context: baseContext,
+          router: input.router
         )
+        continue
+      }
+      let sourceCandidates = sideCandidates(
+        for: edge.source,
+        nodeIndex: nodeIndex,
+        prepared: prepared
+      )
+      let targetCandidates = sideCandidates(
+        for: edge.target,
+        nodeIndex: nodeIndex,
+        prepared: prepared
+      )
+      guard !sourceCandidates.isEmpty, !targetCandidates.isEmpty else {
+        routes[edge.id] = pinnedRoute(
+          edge: edge,
+          source: source,
+          target: target,
+          context: baseContext,
+          router: input.router
+        )
+        continue
+      }
+      routes[edge.id] = flexRoute(
+        sourceCandidates: sourceCandidates,
+        targetCandidates: targetCandidates,
+        context: PolicyCanvasRouteContext(
+          lane: baseContext.lane,
+          groups: baseContext.groups,
+          sourceGroupID: baseContext.sourceGroupID,
+          targetGroupID: baseContext.targetGroupID,
+          obstacles: baseContext.obstacles,
+          obstaclesAreCanonical: true,
+          sourceActual: sourceCandidates[0].actual,
+          targetActual: targetCandidates[0].actual,
+          lineSpacing: baseContext.lineSpacing,
+          corridorHint: baseContext.corridorHint
+        ),
+        router: input.router
       )
     }
     return routes
+  }
+
+  private struct SideCandidate {
+    let side: PolicyCanvasPortSide
+    let actual: CGPoint
+    let lead: CGPoint
+  }
+
+  private func usesFlexAnchors(
+    sourceNode: PolicyCanvasRouteNode?,
+    targetNode: PolicyCanvasRouteNode?
+  ) -> Bool {
+    guard let sourceNode, let targetNode else {
+      return false
+    }
+    return targetNode.frame.midX < sourceNode.frame.midX
+  }
+
+  private func sideCandidates(
+    for endpoint: PolicyCanvasPortEndpoint,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    prepared: PolicyCanvasPreparedRouteInput
+  ) -> [SideCandidate] {
+    policyCanvasRoutablePortSides(for: endpoint.kind).compactMap { side in
+      prepared.portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex).map { actual in
+        SideCandidate(
+          side: side,
+          actual: actual,
+          lead: policyCanvasPortLeadPoint(actual, side: side)
+        )
+      }
+    }
+  }
+
+  private func pinnedRoute(
+    edge: PolicyCanvasEdge,
+    source: CGPoint,
+    target: CGPoint,
+    context: PolicyCanvasRouteContext,
+    router: any PolicyCanvasEdgeRouter
+  ) -> PolicyCanvasEdgeRoute {
+    let sourceSide = policyCanvasResolvedPortSide(for: edge.source)
+    let targetSide = policyCanvasResolvedPortSide(for: edge.target)
+    let sourceLead = policyCanvasPortLeadPoint(source, side: sourceSide)
+    let targetLead = policyCanvasPortLeadPoint(target, side: targetSide)
+    let pinnedContext = PolicyCanvasRouteContext(
+      lane: context.lane,
+      groups: context.groups,
+      sourceGroupID: context.sourceGroupID,
+      targetGroupID: context.targetGroupID,
+      obstacles: context.obstacles,
+      obstaclesAreCanonical: true,
+      sourceActual: sourceLead,
+      targetActual: targetLead,
+      lineSpacing: context.lineSpacing,
+      corridorHint: context.corridorHint
+    )
+    let core = router.route(source: sourceLead, target: targetLead, context: pinnedContext)
+    return policyCanvasBridgedRoute(
+      baseRoute: core,
+      source: PolicyCanvasEscapeCandidate(
+        side: sourceSide,
+        actual: source,
+        exit: sourceLead,
+        routed: core.points.first ?? sourceLead
+      ),
+      target: PolicyCanvasEscapeCandidate(
+        side: targetSide,
+        actual: target,
+        exit: targetLead,
+        routed: core.points.last ?? targetLead
+      )
+    )
+  }
+
+  private func flexRoute(
+    sourceCandidates: [SideCandidate],
+    targetCandidates: [SideCandidate],
+    context: PolicyCanvasRouteContext,
+    router: any PolicyCanvasEdgeRouter
+  ) -> PolicyCanvasEdgeRoute {
+    let core = router.route(
+      sourceCandidates: sourceCandidates.map(\.lead),
+      targetCandidates: targetCandidates.map(\.lead),
+      context: context
+    )
+    let source = matchingCandidate(for: core.points.first, in: sourceCandidates)
+    let target = matchingCandidate(for: core.points.last, in: targetCandidates)
+    return policyCanvasBridgedRoute(
+      baseRoute: core,
+      source: PolicyCanvasEscapeCandidate(
+        side: source.side,
+        actual: source.actual,
+        exit: source.lead,
+        routed: core.points.first ?? source.lead
+      ),
+      target: PolicyCanvasEscapeCandidate(
+        side: target.side,
+        actual: target.actual,
+        exit: target.lead,
+        routed: core.points.last ?? target.lead
+      )
+    )
+  }
+
+  private func matchingCandidate(
+    for point: CGPoint?,
+    in candidates: [SideCandidate]
+  ) -> SideCandidate {
+    guard let point else {
+      return candidates[0]
+    }
+    return candidates.min { left, right in
+      distanceSquared(left.lead, point) < distanceSquared(right.lead, point)
+    } ?? candidates[0]
+  }
+
+  private func distanceSquared(_ left: CGPoint, _ right: CGPoint) -> CGFloat {
+    let dx = left.x - right.x
+    let dy = left.y - right.y
+    return (dx * dx) + (dy * dy)
   }
 }
 
