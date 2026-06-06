@@ -56,6 +56,7 @@ private struct PolicyCanvasHiddenMinimapRecenterButton: View {
   let viewModel: PolicyCanvasViewModel
   @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
   private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
+  @FocusState private var recenterButtonFocused: Bool
 
   var body: some View {
     Button {
@@ -66,8 +67,9 @@ private struct PolicyCanvasHiddenMinimapRecenterButton: View {
         .frame(width: 32, height: 32)
         .contentShape(Rectangle())
     }
-    .buttonStyle(.borderless)
-    .foregroundStyle(PolicyCanvasVisualStyle.activeTint)
+    .buttonStyle(PolicyCanvasHiddenMinimapRecenterButtonStyle(isFocused: recenterButtonFocused))
+    .focusable()
+    .focused($recenterButtonFocused)
     .help("Recenter policy canvas")
     .accessibilityLabel("Recenter policy")
     .accessibilityHint("Scrolls the canvas to center the policy")
@@ -78,6 +80,27 @@ private struct PolicyCanvasHiddenMinimapRecenterButton: View {
       } label: {
         Label("Show minimap", systemImage: "eye")
       }
+    }
+  }
+
+  private struct PolicyCanvasHiddenMinimapRecenterButtonStyle: ButtonStyle {
+    let isFocused: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+      configuration.label
+        .foregroundStyle(
+          PolicyCanvasVisualStyle.activeTint.opacity(
+            configuration.isPressed ? 1.0 : (isFocused ? 0.96 : 0.78)
+          )
+        )
+        .opacity(configuration.isPressed ? 0.72 : 1)
+        .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+        .shadow(
+          color: PolicyCanvasVisualStyle.activeTint.opacity(isFocused ? 0.42 : 0),
+          radius: isFocused ? 6 : 0
+        )
+        .animation(.easeOut(duration: 0.10), value: configuration.isPressed)
+        .animation(.easeOut(duration: 0.14), value: isFocused)
     }
   }
 }
