@@ -1,24 +1,45 @@
 import CoreGraphics
 import Foundation
 
-// Resolve cross-group node collisions the group-agnostic terminal comb leaves
-// behind. The comb arranges a non-coherent group's terminals by their own
-// topology (a shared collector lifts above its sources, a branch terminal drops
-// below its source). When that group's members are scattered across the DAG,
-// a lifted or dropped terminal can land directly on top of a foreign group's
-// node - the two boxes overlap and the canvas reads as broken.
+// Resolve node collisions left behind by post-placement terminal arrangement.
+// The group packer keeps initial members apart, but the terminal comb can later
+// lift collectors and drop branch terminals by topology. That can collide with
+// either a foreign group or a member in the same group.
 //
 // This pass clears those collisions with a top-to-bottom vertical push-down
 // sweep. Nodes are visited in order of their current top edge; each node is
-// pushed straight down just far enough to clear every already-placed node from
-// a different group whose horizontal span it shares. Pushing the lower node of
-// a pair keeps the order of the column intact, so the layered crossing count is
-// untouched (the same property that lets the parallel-band seam hold), and the
-// move is vertical-only so no node ever changes its rank column. Same-group
-// placement is the engine's own job and is left alone.
+// pushed straight down just far enough to clear every already-placed node whose
+// horizontal span it shares. Pushing the lower node of a pair keeps the order of
+// the column intact, and the move is vertical-only so no node changes rank
+// column.
+func policyCanvasResolveNodeOverlaps(
+  nodePositions: [String: CGPoint]
+) -> [String: CGPoint] {
+  policyCanvasResolveNodeOverlaps(
+    nodePositions: nodePositions,
+    shouldResolvePair: { _, _ in true }
+  )
+}
+
+// Resolve cross-group node collisions the group-agnostic terminal comb leaves
+// behind. Same-group placement remains the engine's own job on the base layout
+// path; final view-model alignment runs the all-pairs cleanup only for grouped
+// documents after it has made the last terminal movement.
 func policyCanvasResolveCrossGroupNodeOverlaps(
   nodePositions: [String: CGPoint],
   layoutGroupIDByNodeID: [String: String]
+) -> [String: CGPoint] {
+  policyCanvasResolveNodeOverlaps(
+    nodePositions: nodePositions,
+    shouldResolvePair: { leftID, rightID in
+      layoutGroupIDByNodeID[leftID] != layoutGroupIDByNodeID[rightID]
+    }
+  )
+}
+
+private func policyCanvasResolveNodeOverlaps(
+  nodePositions: [String: CGPoint],
+  shouldResolvePair: (String, String) -> Bool
 ) -> [String: CGPoint] {
   var positions = nodePositions
   let orderedIDs = nodePositions.keys.sorted { leftID, rightID in
@@ -33,10 +54,9 @@ func policyCanvasResolveCrossGroupNodeOverlaps(
   for nodeID in orderedIDs {
     guard let origin = positions[nodeID] else { continue }
     let frame = CGRect(origin: origin, size: PolicyCanvasLayout.nodeSize)
-    let group = layoutGroupIDByNodeID[nodeID]
     var requiredMinY = frame.minY
     for entry in placed {
-      guard layoutGroupIDByNodeID[entry.id] != group else { continue }
+      guard shouldResolvePair(nodeID, entry.id) else { continue }
       guard policyCanvasHorizontalSpansOverlap(frame, entry.frame) else { continue }
       requiredMinY = max(requiredMinY, entry.frame.maxY)
     }

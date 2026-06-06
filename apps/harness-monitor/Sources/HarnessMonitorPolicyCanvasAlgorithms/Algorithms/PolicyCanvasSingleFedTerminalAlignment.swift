@@ -33,6 +33,32 @@ public func policyCanvasAlignSingleFedTerminals(
   policyCanvasApplyTerminalAlignments(finalX, nodes: &nodes, groups: &groups)
 }
 
+@discardableResult
+public func policyCanvasResolveGroupedNodeOverlaps(
+  nodes: inout [PolicyCanvasNode],
+  groups: inout [PolicyCanvasGroup]
+) -> Bool {
+  guard !groups.isEmpty, nodes.contains(where: { $0.groupID != nil }) else {
+    return false
+  }
+  let nodePositions = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
+  let resolvedPositions = policyCanvasResolveNodeOverlaps(nodePositions: nodePositions)
+  var changed = false
+  for index in nodes.indices {
+    guard let resolved = resolvedPositions[nodes[index].id],
+      resolved != nodes[index].position
+    else {
+      continue
+    }
+    nodes[index].position = resolved
+    changed = true
+  }
+  if changed {
+    policyCanvasReencloseGroupFrames(nodes: nodes, groups: &groups)
+  }
+  return changed
+}
+
 private func policyCanvasTerminalSourceSide(
   source: PolicyCanvasNode,
   target: PolicyCanvasNode
