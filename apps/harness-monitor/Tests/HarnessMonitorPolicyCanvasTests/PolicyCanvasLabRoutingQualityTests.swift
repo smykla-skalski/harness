@@ -432,6 +432,32 @@ struct PolicyCanvasLabRoutingQualityTests {
     )
   }
 
+  @Test("extreme notified back-edge avoids default-side detour")
+  func extremeNotifiedBackEdgeAvoidsDefaultSideDetour() async throws {
+    let graph = try await routedLabGraph(sampleID: "extreme")
+    let edgeID = "xe:action2-allow"
+    let route = try #require(graph.output.routes[edgeID])
+    let sourceSide = try #require(policyCanvasRouteSourceSide(route))
+    let targetSide = try #require(policyCanvasRouteTargetSide(route))
+    let sourceFrame = try #require(
+      graph.nodes.first(where: { $0.id == "x-action2" }).map(policyCanvasNodeFrame)
+    )
+    let maxX = try #require(route.points.map(\.x).max())
+
+    #expect(
+      sourceSide != .trailing,
+      "notified should not leave through the default trailing detour; route=\(route.points)"
+    )
+    #expect(
+      targetSide != .leading,
+      "notified should not enter through the default leading detour; route=\(route.points)"
+    )
+    #expect(
+      maxX <= sourceFrame.maxX + 0.5,
+      "notified should not escape to the right of x-action2; maxX=\(maxX) route=\(route.points)"
+    )
+  }
+
   @Test("extreme x-human fan-in post-processing does not introduce body hits")
   @MainActor
   func extremeSampleLiveXHumanFanInPostProcessingDoesNotIntroduceBodyHits() async throws {
