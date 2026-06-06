@@ -56,6 +56,7 @@ private struct PolicyCanvasHiddenMinimapRecenterButton: View {
   let viewModel: PolicyCanvasViewModel
   @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
   private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
+  @State private var recenterButtonHovered = false
   @FocusState private var recenterButtonFocused: Bool
 
   var body: some View {
@@ -67,9 +68,16 @@ private struct PolicyCanvasHiddenMinimapRecenterButton: View {
         .frame(width: 32, height: 32)
         .contentShape(Rectangle())
     }
-    .buttonStyle(PolicyCanvasHiddenMinimapRecenterButtonStyle(isFocused: recenterButtonFocused))
+    .buttonStyle(
+      PolicyCanvasHiddenMinimapRecenterButtonStyle(
+        isFocused: recenterButtonFocused || recenterButtonHovered
+      )
+    )
     .focusable()
     .focused($recenterButtonFocused)
+    .onHover { hovering in
+      recenterButtonHovered = hovering
+    }
     .help("Recenter policy canvas")
     .accessibilityLabel("Recenter policy")
     .accessibilityHint("Scrolls the canvas to center the policy")
@@ -99,6 +107,14 @@ private struct PolicyCanvasHiddenMinimapRecenterButton: View {
           color: PolicyCanvasVisualStyle.activeTint.opacity(isFocused ? 0.42 : 0),
           radius: isFocused ? 6 : 0
         )
+        .overlay {
+          Circle()
+            .stroke(
+              PolicyCanvasVisualStyle.activeTint.opacity(isFocused ? 0.64 : 0),
+              lineWidth: isFocused ? 1.5 : 0
+            )
+            .padding(3)
+        }
         .animation(.easeOut(duration: 0.10), value: configuration.isPressed)
         .animation(.easeOut(duration: 0.14), value: isFocused)
     }
