@@ -26,6 +26,8 @@ extension HarnessMonitorAccessibility {
   public static let policyCanvasMinimap = "harness.policy-canvas.minimap"
   public static let policyCanvasMinimapViewport = "harness.policy-canvas.minimap.viewport"
   public static let policyCanvasMinimapCenterButton = "harness.policy-canvas.minimap.center"
+  public static let policyCanvasHiddenMinimapRecenterButton =
+    "harness.policy-canvas.minimap.hidden.recenter"
   public static let policyCanvasEdgeLegend = "harness.policy-canvas.edge-legend"
   public static let policyCanvasEdgeLegendToggle = "harness.policy-canvas.edge-legend.toggle"
   public static let policyCanvasInspector = "harness.policy-canvas.inspector"

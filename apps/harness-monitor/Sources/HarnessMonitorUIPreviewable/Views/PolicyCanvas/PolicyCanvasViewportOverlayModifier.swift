@@ -41,11 +41,43 @@ struct PolicyCanvasViewportOverlayModifier: ViewModifier {
             ) { targetOrigin in
               requestViewportScroll(targetOrigin)
             }
+          } else if !viewModel.isEmpty {
+            PolicyCanvasHiddenMinimapRecenterButton(viewModel: viewModel)
           }
           PolicyCanvasShortcutsDisclosure()
         }
         .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
         .padding(14)
       }
+  }
+}
+
+private struct PolicyCanvasHiddenMinimapRecenterButton: View {
+  let viewModel: PolicyCanvasViewModel
+  @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
+  private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
+
+  var body: some View {
+    Button {
+      viewModel.requestViewportCentering(.document)
+    } label: {
+      Image(systemName: "dot.scope")
+        .imageScale(.large)
+        .frame(width: 32, height: 32)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.borderless)
+    .foregroundStyle(PolicyCanvasVisualStyle.activeTint)
+    .help("Recenter policy canvas")
+    .accessibilityLabel("Recenter policy")
+    .accessibilityHint("Scrolls the canvas to center the policy")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasHiddenMinimapRecenterButton)
+    .contextMenu {
+      Button {
+        minimapVisible = true
+      } label: {
+        Label("Show minimap", systemImage: "eye")
+      }
+    }
   }
 }
