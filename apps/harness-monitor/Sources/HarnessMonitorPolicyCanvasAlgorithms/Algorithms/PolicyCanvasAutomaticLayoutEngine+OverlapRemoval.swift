@@ -1,6 +1,9 @@
 import CoreGraphics
 import Foundation
 
+let policyCanvasMinimumNodeSpacing: CGFloat = PolicyCanvasLayout.defaultEdgeLineSpacing
+private let policyCanvasNodeSpacingTolerance: CGFloat = 0.001
+
 // Resolve node collisions left behind by post-placement terminal arrangement.
 // The group packer keeps initial members apart, but the terminal comb can later
 // lift collectors and drop branch terminals by topology. That can collide with
@@ -9,14 +12,15 @@ import Foundation
 // This pass clears those collisions with a top-to-bottom vertical push-down
 // sweep. Nodes are visited in order of their current top edge; each node is
 // pushed straight down just far enough to clear every already-placed node whose
-// horizontal span it shares. Pushing the lower node of a pair keeps the order of
-// the column intact, and the move is vertical-only so no node changes rank
-// column.
+// horizontal span it shares, including the visual edge-line gutter between their
+// bodies. Pushing the lower node of a pair keeps the order of the column intact,
+// and the move is vertical-only so no node changes rank column.
 func policyCanvasResolveNodeOverlaps(
   nodePositions: [String: CGPoint]
 ) -> [String: CGPoint] {
   policyCanvasResolveNodeOverlaps(
     nodePositions: nodePositions,
+    minimumSpacing: policyCanvasMinimumNodeSpacing,
     shouldResolvePair: { _, _ in true }
   )
 }
@@ -31,6 +35,7 @@ func policyCanvasResolveCrossGroupNodeOverlaps(
 ) -> [String: CGPoint] {
   policyCanvasResolveNodeOverlaps(
     nodePositions: nodePositions,
+    minimumSpacing: 0,
     shouldResolvePair: { leftID, rightID in
       layoutGroupIDByNodeID[leftID] != layoutGroupIDByNodeID[rightID]
     }
@@ -39,6 +44,7 @@ func policyCanvasResolveCrossGroupNodeOverlaps(
 
 private func policyCanvasResolveNodeOverlaps(
   nodePositions: [String: CGPoint],
+  minimumSpacing: CGFloat,
   shouldResolvePair: (String, String) -> Bool
 ) -> [String: CGPoint] {
   var positions = nodePositions
@@ -57,8 +63,10 @@ private func policyCanvasResolveNodeOverlaps(
     var requiredMinY = frame.minY
     for entry in placed {
       guard shouldResolvePair(nodeID, entry.id) else { continue }
-      guard policyCanvasHorizontalSpansOverlap(frame, entry.frame) else { continue }
-      requiredMinY = max(requiredMinY, entry.frame.maxY)
+      guard policyCanvasHorizontalSpansOverlap(frame, entry.frame, spacing: minimumSpacing) else {
+        continue
+      }
+      requiredMinY = max(requiredMinY, entry.frame.maxY + minimumSpacing)
     }
     let resolvedFrame: CGRect
     if requiredMinY > frame.minY {
@@ -75,6 +83,26 @@ private func policyCanvasResolveNodeOverlaps(
   return positions
 }
 
-private func policyCanvasHorizontalSpansOverlap(_ left: CGRect, _ right: CGRect) -> Bool {
-  left.minX < right.maxX && right.minX < left.maxX
+func policyCanvasNodeFramesViolateMinimumSpacing(
+  _ left: CGRect,
+  _ right: CGRect,
+  minimumSpacing: CGFloat = policyCanvasMinimumNodeSpacing
+) -> Bool {
+  let horizontalGap = max(left.minX - right.maxX, right.minX - left.maxX, 0)
+  let verticalGap = max(left.minY - right.maxY, right.minY - left.maxY, 0)
+  if horizontalGap == 0 {
+    return verticalGap + policyCanvasNodeSpacingTolerance < minimumSpacing
+  }
+  if verticalGap == 0 {
+    return horizontalGap + policyCanvasNodeSpacingTolerance < minimumSpacing
+  }
+  return hypot(horizontalGap, verticalGap) + policyCanvasNodeSpacingTolerance < minimumSpacing
+}
+
+private func policyCanvasHorizontalSpansOverlap(
+  _ left: CGRect,
+  _ right: CGRect,
+  spacing: CGFloat
+) -> Bool {
+  left.minX < right.maxX + spacing && right.minX < left.maxX + spacing
 }

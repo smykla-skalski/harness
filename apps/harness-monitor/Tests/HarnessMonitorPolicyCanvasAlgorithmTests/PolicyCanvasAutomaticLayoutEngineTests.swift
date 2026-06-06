@@ -166,8 +166,8 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
     #expect(sinkX.count >= 2)
   }
 
-  @Test("post-comb overlap resolver clears same-group node collisions")
-  func postCombOverlapResolverClearsSameGroupNodeCollisions() {
+  @Test("post-comb overlap resolver enforces the node spacing gutter")
+  func postCombOverlapResolverEnforcesNodeSpacingGutter() {
     let positions: [String: CGPoint] = [
       "upper": CGPoint(x: 100, y: 100),
       "overlap": CGPoint(x: 100, y: 150),
@@ -181,9 +181,25 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
     }
 
     #expect(
-      overlap.y >= upper.y + PolicyCanvasLayout.nodeSize.height
+      overlap.y
+        >= upper.y + PolicyCanvasLayout.nodeSize.height + policyCanvasMinimumNodeSpacing
     )
-    #expect(!policyCanvasNodeFramesOverlap(resolved))
+    #expect(!policyCanvasNodeFramesTooClose(resolved))
+  }
+
+  @Test("post-comb overlap resolver separates non-overlapping nodes that violate the gutter")
+  func postCombOverlapResolverSeparatesNearMisses() {
+    let positions: [String: CGPoint] = [
+      "upper": CGPoint(x: 100, y: 100),
+      "near": CGPoint(
+        x: 100 + PolicyCanvasLayout.nodeSize.width + (policyCanvasMinimumNodeSpacing / 2),
+        y: 120
+      ),
+    ]
+
+    let resolved = policyCanvasResolveNodeOverlaps(nodePositions: positions)
+
+    #expect(!policyCanvasNodeFramesTooClose(resolved))
   }
 
   @Test("grouped node overlap cleanup is a no-op without live group containers")
@@ -221,7 +237,7 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
     let changed = policyCanvasResolveGroupedNodeOverlaps(nodes: &nodes, groups: &groups)
 
     #expect(changed)
-    #expect(!policyCanvasNodesOverlap(nodes))
+    #expect(!policyCanvasNodesTooClose(nodes))
     let memberBounds = nodes.reduce(CGRect.null) { partial, node in
       partial.union(policyCanvasNodeFrame(node))
     }
@@ -246,14 +262,14 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
     let resolved = policyCanvasResolveNodeOverlaps(nodePositions: positions)
 
     let elapsed = Date().timeIntervalSince(start)
-    #expect(!policyCanvasNodeFramesOverlap(resolved))
+    #expect(!policyCanvasNodeFramesTooClose(resolved))
     #expect(
       elapsed < 0.2,
       "Overlap resolver took \(elapsed * 1000)ms, expected <200ms"
     )
   }
 
-  private func policyCanvasNodeFramesOverlap(_ positions: [String: CGPoint]) -> Bool {
+  private func policyCanvasNodeFramesTooClose(_ positions: [String: CGPoint]) -> Bool {
     let ids = positions.keys.sorted()
     for leftIndex in ids.indices {
       for rightIndex in ids.index(after: leftIndex)..<ids.endIndex {
@@ -262,7 +278,7 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
         }
         let leftFrame = CGRect(origin: left, size: PolicyCanvasLayout.nodeSize)
         let rightFrame = CGRect(origin: right, size: PolicyCanvasLayout.nodeSize)
-        if leftFrame.intersects(rightFrame) {
+        if policyCanvasNodeFramesViolateMinimumSpacing(leftFrame, rightFrame) {
           return true
         }
       }
@@ -270,8 +286,8 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
     return false
   }
 
-  private func policyCanvasNodesOverlap(_ nodes: [PolicyCanvasNode]) -> Bool {
-    policyCanvasNodeFramesOverlap(
+  private func policyCanvasNodesTooClose(_ nodes: [PolicyCanvasNode]) -> Bool {
+    policyCanvasNodeFramesTooClose(
       Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
     )
   }

@@ -20,24 +20,23 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
   /// reads as two wires stacked on one rail. Matches the fan-in channel gate.
   private static let overlapThreshold: CGFloat = 8
 
-  /// The hard, monotone-safe guarantee across every sample: the pass never adds a
-  /// crossing and never adds an overlap over the no-nudge baseline. In a saturated
-  /// corridor it may decline to clear an overlap (no spread direction is
-  /// crossing-free), but it can never regress one into a crossing or stack a new
-  /// pair - so it is always safe to prefer over the raw routing.
-  @Test("never adds a crossing or an overlap on any sample")
+  /// The hard, monotone-safe guarantee across the reference routing sample ladder:
+  /// the pass never adds a crossing and never adds an overlap over the no-nudge
+  /// baseline. In a saturated corridor it may decline to clear an overlap (no
+  /// spread direction is crossing-free), but it can never regress one into a
+  /// crossing or stack a new pair - so it is always safe to prefer over the raw
+  /// routing.
+  @Test("never adds a crossing or an overlap on reference samples")
   func neverRegressesCrossingsOrOverlaps() async throws {
-    let baseline = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
-      stage: .routePostProcessing,
-      with: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
+    let baseline = Self.routeQualitySelection(
+      routePostProcessing: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
     )
-    let nudged = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
-      stage: .routePostProcessing,
-      with: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
+    let nudged = Self.routeQualitySelection(
+      routePostProcessing: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
     )
     var totals = ""
     var regressions: [String] = []
-    for sampleID in PolicyCanvasLabSamples.all.map(\.id) {
+    for sampleID in PolicyCanvasReferenceAlgorithmSamples.ids {
       let base = try await routedScene(sampleID: sampleID, selection: baseline)
       let after = try await routedScene(sampleID: sampleID, selection: nudged)
       let baseOverlaps = interiorOverlapPairs(routes: base.routes, edges: base.edges)
@@ -68,13 +67,11 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
   /// overlaps the baseline left stacked while adding none.
   @Test("clears clearable overlaps without adding a crossing")
   func clearsClearableOverlapsWithoutAddingCrossings() async throws {
-    let baseline = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
-      stage: .routePostProcessing,
-      with: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
+    let baseline = Self.routeQualitySelection(
+      routePostProcessing: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
     )
-    let nudged = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
-      stage: .routePostProcessing,
-      with: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
+    let nudged = Self.routeQualitySelection(
+      routePostProcessing: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
     )
     for sampleID in ["branching", "multi-group"] {
       let base = try await routedScene(sampleID: sampleID, selection: baseline)
@@ -101,9 +98,8 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
   /// produce byte-identical routes under the preset.
   @Test("routing under the preset is independent of edge input order")
   func deterministicAcrossEdgeOrder() async throws {
-    let nudged = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
-      stage: .routePostProcessing,
-      with: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
+    let nudged = Self.routeQualitySelection(
+      routePostProcessing: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
     )
     let sample = try #require(PolicyCanvasLabSamples.sample(id: "multi-group"))
     let document =
@@ -139,6 +135,17 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
   private struct Scene {
     let edges: [PolicyCanvasEdge]
     let routes: [String: PolicyCanvasEdgeRoute]
+  }
+
+  private static func routeQualitySelection(
+    routePostProcessing: PolicyCanvasAlgorithmID
+  ) -> PolicyCanvasAlgorithmSelection {
+    PolicyCanvasAlgorithmSelection.referenceRouting
+      .replacing(stage: .routePostProcessing, with: routePostProcessing)
+      .replacing(
+        stage: .labelPlacement,
+        with: PolicyCanvasAlgorithmDefaults.polylineMidpointLabelPlacement
+      )
   }
 
   private func routedScene(

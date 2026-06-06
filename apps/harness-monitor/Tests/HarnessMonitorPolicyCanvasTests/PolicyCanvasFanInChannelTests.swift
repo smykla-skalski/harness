@@ -15,10 +15,10 @@ import Testing
 @Suite("Policy canvas fan-in channel", .serialized)
 @MainActor
 struct PolicyCanvasFanInChannelTests {
-  /// Every lab policy, simplest -> most complex. Walking the whole ladder
-  /// catches a routing change that helps one shape and regresses another -
-  /// a single sample is never enough.
-  private static let sampleIDs = PolicyCanvasLabSamples.all.map(\.id)
+  /// Reference routing policies, simplest -> stress-scale. Walking this ladder
+  /// catches a routing change that helps one shape and regresses another without
+  /// turning the route-quality gate into the full stress-catalog benchmark.
+  private static let sampleIDs = PolicyCanvasReferenceAlgorithmSamples.ids
 
   /// Collinear overlap of an interior segment between two different edges, longer
   /// than this, reads as two wires stacked on one rail. Port stubs (first/last
@@ -32,15 +32,13 @@ struct PolicyCanvasFanInChannelTests {
   /// is zero everywhere and any added crossing fails the gate.
   private static let addedCrossingBudget: [String: Int] = [:]
 
-  @Test("converging rails never stack collinearly across the lab samples")
+  @Test("converging rails never stack collinearly across reference lab samples")
   func convergingRailsNeverStackCollinearly() async throws {
-    let baseline = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
-      stage: .routePostProcessing,
-      with: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
+    let baseline = Self.routeQualitySelection(
+      routePostProcessing: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
     )
-    let nudged = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
-      stage: .routePostProcessing,
-      with: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
+    let nudged = Self.routeQualitySelection(
+      routePostProcessing: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
     )
     var totals = ""
     var details = ""
@@ -104,13 +102,11 @@ struct PolicyCanvasFanInChannelTests {
 
   @Test("dump fan group geometry for design")
   func dumpFanGroupGeometry() async throws {
-    let baseline = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
-      stage: .routePostProcessing,
-      with: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
+    let baseline = Self.routeQualitySelection(
+      routePostProcessing: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
     )
-    let nudged = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
-      stage: .routePostProcessing,
-      with: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
+    let nudged = Self.routeQualitySelection(
+      routePostProcessing: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
     )
     var report = ""
     for sampleID in ["default", "multi-group"] {
@@ -170,6 +166,17 @@ struct PolicyCanvasFanInChannelTests {
 
   private func rect(_ frame: CGRect) -> String {
     "[\(Int(frame.minX.rounded())),\(Int(frame.minY.rounded())) \(Int(frame.width.rounded()))x\(Int(frame.height.rounded()))]"
+  }
+
+  private static func routeQualitySelection(
+    routePostProcessing: PolicyCanvasAlgorithmID
+  ) -> PolicyCanvasAlgorithmSelection {
+    PolicyCanvasAlgorithmSelection.referenceRouting
+      .replacing(stage: .routePostProcessing, with: routePostProcessing)
+      .replacing(
+        stage: .labelPlacement,
+        with: PolicyCanvasAlgorithmDefaults.polylineMidpointLabelPlacement
+      )
   }
 
   // MARK: - Scene
