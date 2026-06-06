@@ -1,6 +1,11 @@
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
+public enum PolicyCanvasZoomControlsDefaults {
+  public static let isVisibleKey = "policyCanvas.zoomControls.isVisible"
+  public static let isVisibleDefault = true
+}
+
 /// Bottom-leading viewport zoom HUD. The buttons stay clickable for users who
 /// prefer mouse interaction, but the keyboard chords (Cmd-=, Cmd--, Cmd-0)
 /// are bound exclusively at scene level via `policyCanvasZoomCommands` in
@@ -16,6 +21,8 @@ import SwiftUI
 /// per-frame magnification stays gesture-fresh.
 struct PolicyCanvasZoomControls: View {
   let viewModel: PolicyCanvasViewModel
+  @AppStorage(PolicyCanvasZoomControlsDefaults.isVisibleKey)
+  private var zoomControlsVisible = PolicyCanvasZoomControlsDefaults.isVisibleDefault
   @Environment(\.colorScheme)
   private var colorScheme
   @Environment(\.policyCanvasReducedMotion)
@@ -32,6 +39,24 @@ struct PolicyCanvasZoomControls: View {
   }
 
   var body: some View {
+    if zoomControlsVisible {
+      expandedZoomControls
+        .contextMenu {
+          Button {
+            zoomControlsVisible = false
+          } label: {
+            Label("Hide zoom controls", systemImage: "eye.slash")
+          }
+        }
+    } else {
+      PolicyCanvasCollapsedZoomPercentage(
+        zoomPercentageText: zoomPercentageText,
+        zoomControlsVisible: $zoomControlsVisible
+      )
+    }
+  }
+
+  private var expandedZoomControls: some View {
     HStack(spacing: 6) {
       Button {
         withAnimation(PolicyCanvasMotion.zoomTransition(reducedMotion: reducedMotion)) {
@@ -94,5 +119,30 @@ struct PolicyCanvasZoomControls: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomControls)
+  }
+}
+
+private struct PolicyCanvasCollapsedZoomPercentage: View {
+  let zoomPercentageText: String
+  @Binding var zoomControlsVisible: Bool
+
+  var body: some View {
+    Text(zoomPercentageText)
+      .scaledFont(.caption.monospacedDigit().weight(.semibold))
+      .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+      .padding(.horizontal, 10)
+      .padding(.vertical, 4)
+      .frame(minWidth: 46, minHeight: PolicyCanvasVisualStyle.floatingControlMinHeight)
+      .contentShape(Rectangle())
+      .accessibilityLabel(zoomPercentageText)
+      .accessibilityHint("Shows the zoom controls")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasCollapsedZoomValue)
+      .contextMenu {
+        Button {
+          zoomControlsVisible = true
+        } label: {
+          Label("Show zoom controls", systemImage: "eye")
+        }
+      }
   }
 }

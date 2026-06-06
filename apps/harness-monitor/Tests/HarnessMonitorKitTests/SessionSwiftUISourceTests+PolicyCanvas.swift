@@ -4,6 +4,55 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 extension SessionSwiftUISourceTests {
+  @Test("Policy canvas zoom HUD can collapse to a percentage with restore menus")
+  func policyCanvasZoomHUDCanCollapseToPercentageWithRestoreMenus() throws {
+    let zoomSource = try sourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasZoomControls.swift"
+    )
+    let overlaySource = try sourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasViewportOverlayModifier.swift"
+    )
+    let chromeSource = try sourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
+    )
+    let settingsSource = try sourceFile(
+      at: "Views/Settings/SettingsPoliciesSection.swift"
+    )
+    let accessibilitySource = try sourceFile(
+      at: "Support/HarnessMonitorAccessibilityIDs+PolicyCanvas.swift"
+    )
+    let settingsAccessibilitySource = try sourceFile(
+      at: "Support/HarnessMonitorAccessibilityIDs.swift"
+    )
+
+    #expect(zoomSource.contains("PolicyCanvasZoomControlsDefaults.isVisibleKey"))
+    #expect(zoomSource.contains("PolicyCanvasCollapsedZoomPercentage("))
+    #expect(zoomSource.contains("zoomControlsVisible = false"))
+    #expect(zoomSource.contains("zoomControlsVisible = true"))
+    #expect(zoomSource.contains("Label(\"Hide zoom controls\", systemImage: \"eye.slash\")"))
+    #expect(zoomSource.contains("Label(\"Show zoom controls\", systemImage: \"eye\")"))
+    #expect(zoomSource.contains(".accessibilityHint(\"Shows the zoom controls\")"))
+    #expect(zoomSource.contains("policyCanvasCollapsedZoomValue"))
+
+    #expect(overlaySource.contains("PolicyCanvasZoomControls(viewModel: viewModel)"))
+    #expect(chromeSource.contains("@AppStorage(PolicyCanvasZoomControlsDefaults.isVisibleKey)"))
+    #expect(chromeSource.contains("zoomControlsVisible.toggle()"))
+    #expect(
+      chromeSource.contains(
+        "zoomControlsVisible ? \"Hide zoom controls\" : \"Show zoom controls\""
+      )
+    )
+    #expect(settingsSource.contains("@AppStorage(PolicyCanvasZoomControlsDefaults.isVisibleKey)"))
+    #expect(settingsSource.contains("Toggle(\"Show zoom controls\", isOn: $zoomControlsVisible)"))
+    #expect(
+      settingsSource.contains(
+        "HarnessMonitorAccessibility.settingsPoliciesZoomControlsToggle"
+      )
+    )
+    #expect(accessibilitySource.contains("policyCanvasCollapsedZoomValue"))
+    #expect(settingsAccessibilitySource.contains("settingsPoliciesZoomControlsToggle"))
+  }
+
   @Test("Hidden policy minimap keeps a recenter affordance with restore menu")
   func hiddenPolicyMinimapKeepsRecenterAffordanceWithRestoreMenu() throws {
     let overlaySource = try sourceFile(

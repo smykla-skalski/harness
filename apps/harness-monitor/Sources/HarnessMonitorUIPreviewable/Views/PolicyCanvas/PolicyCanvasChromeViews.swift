@@ -244,6 +244,8 @@ private struct PolicyCanvasToolsDisplayOptionsSection: View {
   private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
   private var shortcutsVisible = PolicyCanvasShortcutsDefaults.isVisibleDefault
+  @AppStorage(PolicyCanvasZoomControlsDefaults.isVisibleKey)
+  private var zoomControlsVisible = PolicyCanvasZoomControlsDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
   private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasMinimapDefaults.centeringModeKey)
@@ -265,6 +267,15 @@ private struct PolicyCanvasToolsDisplayOptionsSection: View {
     }
     .accessibilityLabel("Canvas theme")
     .accessibilityValue(canvasThemeMode.label)
+
+    Button {
+      zoomControlsVisible.toggle()
+    } label: {
+      Label(
+        zoomControlsVisible ? "Hide zoom controls" : "Show zoom controls",
+        systemImage: zoomControlsVisible ? "eye.slash" : "eye"
+      )
+    }
 
     Button {
       minimapVisible.toggle()

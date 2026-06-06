@@ -315,6 +315,8 @@ public enum HarnessMonitorAccessibility {
     "harness.settings.policies.canvas-theme"
   public static let settingsPoliciesEdgeLegendToggle =
     "harness.settings.policies.edge-legend"
+  public static let settingsPoliciesZoomControlsToggle =
+    "harness.settings.policies.zoom-controls"
   public static let settingsPoliciesMinimapToggle =
     "harness.settings.policies.minimap"
   public static let settingsPoliciesMinimapCenteringPicker =

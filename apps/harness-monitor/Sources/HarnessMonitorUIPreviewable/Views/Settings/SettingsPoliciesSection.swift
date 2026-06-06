@@ -146,6 +146,8 @@ public struct SettingsPoliciesSection: View {
     private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
     @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
     private var shortcutsVisible = PolicyCanvasShortcutsDefaults.isVisibleDefault
+    @AppStorage(PolicyCanvasZoomControlsDefaults.isVisibleKey)
+    private var zoomControlsVisible = PolicyCanvasZoomControlsDefaults.isVisibleDefault
     @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
     private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
     @AppStorage(PolicyCanvasMinimapDefaults.centeringModeKey)
@@ -187,6 +189,14 @@ public struct SettingsPoliciesSection: View {
           )
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsPoliciesEdgeLegendToggle
+          )
+
+        Toggle("Show zoom controls", isOn: $zoomControlsVisible)
+          .accessibilityHint(
+            "Shows or hides the zoom control buttons in Policy Canvas windows"
+          )
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.settingsPoliciesZoomControlsToggle
           )
 
         Toggle("Show canvas minimap", isOn: $minimapVisible)
