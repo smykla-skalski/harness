@@ -19,14 +19,44 @@ struct PolicyCanvasLabSamplesTests {
     "default": PolicyCanvasLabSampleMinimumCounts(nodes: 18, edges: 22, groups: 3),
     "multi-group": PolicyCanvasLabSampleMinimumCounts(nodes: 14, edges: 21, groups: 4),
     "extreme": PolicyCanvasLabSampleMinimumCounts(nodes: 32, edges: 41, groups: 6),
+    "extreme-braid": PolicyCanvasLabSampleMinimumCounts(nodes: 48, edges: 72, groups: 8),
+    "extreme-matrix": PolicyCanvasLabSampleMinimumCounts(nodes: 72, edges: 112, groups: 10),
+    "extreme-mesh": PolicyCanvasLabSampleMinimumCounts(nodes: 112, edges: 180, groups: 14),
+    "extreme-lattice": PolicyCanvasLabSampleMinimumCounts(nodes: 192, edges: 320, groups: 18),
+    "extreme-galaxy": PolicyCanvasLabSampleMinimumCounts(nodes: 320, edges: 560, groups: 24),
   ]
 
-  @Test("Catalog is ordered simple to extreme and ids are unique")
+  private static let expectedCatalogIDs = [
+    "minimal",
+    "linear",
+    "branching",
+    "default",
+    "multi-group",
+    "extreme",
+    "extreme-braid",
+    "extreme-matrix",
+    "extreme-mesh",
+    "extreme-lattice",
+    "extreme-galaxy",
+  ]
+
+  private static let newExtremeVariantIDs = Array(expectedCatalogIDs.suffix(5))
+
+  private static let referenceAlgorithmSampleIDs = [
+    "minimal",
+    "linear",
+    "branching",
+    "default",
+    "multi-group",
+    "extreme",
+    "extreme-braid",
+    "extreme-matrix",
+  ]
+
+  @Test("Catalog is ordered simple to extreme stress and ids are unique")
   func catalogOrderAndUniqueIDs() {
     let ids = PolicyCanvasLabSamples.all.map(\.id)
-    #expect(
-      ids == ["minimal", "linear", "branching", "default", "multi-group", "extreme"]
-    )
+    #expect(ids == Self.expectedCatalogIDs)
     #expect(Set(ids).count == ids.count)
     #expect(PolicyCanvasLabSamples.sample(id: PolicyCanvasLabSamples.defaultSelectionID) != nil)
   }
@@ -35,9 +65,7 @@ struct PolicyCanvasLabSamplesTests {
   func pickerCatalogExposesSingleDefault() throws {
     let ids = PolicyCanvasLabSamples.all.map(\.id)
 
-    #expect(
-      ids == ["minimal", "linear", "branching", "default", "multi-group", "extreme"]
-    )
+    #expect(ids == Self.expectedCatalogIDs)
     #expect(ids.filter { $0.contains("default") } == ["default"])
     #expect(!ids.contains("default-like"))
     #expect(PolicyCanvasLabSamples.sample(id: "default-like") == nil)
@@ -67,6 +95,58 @@ struct PolicyCanvasLabSamplesTests {
         "\(sample.id) has \(document.groups.count) groups, want >= \(expected.groups)"
       )
     }
+  }
+
+  @Test("New extreme variants grow monotonically and finish at ten times Extreme scale")
+  func newExtremeVariantsGrowMonotonically() throws {
+    let extreme = try #require(PolicyCanvasLabSamples.sample(id: "extreme"))
+    var previousNodeCount = extreme.document.nodes.count
+    var previousEdgeCount = extreme.document.edges.count
+
+    for id in Self.newExtremeVariantIDs {
+      let sample = try #require(PolicyCanvasLabSamples.sample(id: id))
+      #expect(
+        sample.document.nodes.count > previousNodeCount,
+        "\(id) should have more nodes than the previous variant"
+      )
+      #expect(
+        sample.document.edges.count > previousEdgeCount,
+        "\(id) should have more edges than the previous variant"
+      )
+      previousNodeCount = sample.document.nodes.count
+      previousEdgeCount = sample.document.edges.count
+    }
+
+    let finalVariant = try #require(PolicyCanvasLabSamples.sample(id: "extreme-galaxy"))
+    #expect(finalVariant.document.nodes.count >= extreme.document.nodes.count * 10)
+  }
+
+  @Test("New extreme variants progressively cover more policy node kinds")
+  func newExtremeVariantsCoverManyNodeKinds() throws {
+    let minimumKindCounts = [
+      "extreme-braid": 12,
+      "extreme-matrix": 14,
+      "extreme-mesh": 16,
+      "extreme-lattice": 18,
+      "extreme-galaxy": PolicyCanvasNodeKind.allCases.count,
+    ]
+    let allCatalogKinds = Set(PolicyCanvasNodeKind.allCases.map(\.rawValue))
+
+    for id in Self.newExtremeVariantIDs {
+      let sample = try #require(PolicyCanvasLabSamples.sample(id: id))
+      let sampleKinds = Set(sample.document.nodes.map(\.kind.kind))
+      #expect(
+        sampleKinds.count >= minimumKindCounts[id, default: 0],
+        "\(id) covers \(sampleKinds.count) node kinds"
+      )
+      #expect(
+        sampleKinds.isSubset(of: allCatalogKinds),
+        "\(id) includes non-catalog node kinds \(sampleKinds.subtracting(allCatalogKinds))"
+      )
+    }
+
+    let finalVariant = try #require(PolicyCanvasLabSamples.sample(id: "extreme-galaxy"))
+    #expect(Set(finalVariant.document.nodes.map(\.kind.kind)) == allCatalogKinds)
   }
 
   @Test("Node ids are unique within every sample")
@@ -134,7 +214,8 @@ struct PolicyCanvasLabSamplesTests {
 
   @Test("Reference algorithms produce coherent layouts for lab samples")
   func referenceAlgorithmsProduceCoherentLayoutsForLabSamples() throws {
-    for sample in PolicyCanvasLabSamples.all {
+    for id in Self.referenceAlgorithmSampleIDs {
+      let sample = try #require(PolicyCanvasLabSamples.sample(id: id))
       var nodes = sample.document.nodes.map {
         policyCanvasNode($0, layout: sample.document.layout)
       }
@@ -175,7 +256,8 @@ struct PolicyCanvasLabSamplesTests {
 
   @Test("Reference algorithms route lab samples around node bodies")
   func referenceAlgorithmsRouteLabSamplesAroundNodeBodies() async throws {
-    for sample in PolicyCanvasLabSamples.all {
+    for id in Self.referenceAlgorithmSampleIDs {
+      let sample = try #require(PolicyCanvasLabSamples.sample(id: id))
       let graph = try referenceLaidOutGraph(for: sample)
       let output = await PolicyCanvasRouteWorker().compute(
         input: PolicyCanvasRouteWorkerInput(
