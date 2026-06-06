@@ -7,10 +7,15 @@ import SwiftUI
 /// pane.
 ///
 /// Structure (top to bottom):
-/// 1. Title row: optional avatar chip · wrapped title · trailing icon strip
+/// 1. Title row: optional avatar chip · wrapped title (dimmed for draft pull
+///    requests) · trailing icon strip
 /// 2. Metadata row: optional `#N · age` identity plus repository text on the
-///    left, with quieter draft/reviewer/change chrome trailing when present
+///    left, with quieter reviewer/change chrome trailing when present
 /// 3. Optional labels strip: muted chips for `item.labels`
+///
+/// Draft pull requests drop the old inline Draft pill and signal draft state by
+/// dimming the title (`draftTitleOpacity`); the trailing status icon still
+/// carries the explicit draft glyph for accessibility.
 ///
 /// Pinned rows render a soft `.accent` background tint so they stay visible
 /// without needing extra chrome next to the title (the pinned section header
@@ -222,6 +227,7 @@ struct DashboardReviewListRow: View, Equatable {
       .lineLimit(effectiveTitleMaximumLines)
       .truncationMode(.tail)
       .fixedSize(horizontal: false, vertical: true)
+      .opacity(draftTitleOpacity)
       .help(item.title)
       .accessibilityLabel(titleAccessibilityLabel)
       .focused($isFocused)
@@ -310,8 +316,7 @@ struct DashboardReviewListRow: View, Equatable {
   }
 
   var metadataLineHasPillChrome: Bool {
-    item.isDraft
-      || !item.reviews.isEmpty
+    !item.reviews.isEmpty
       || showsChangePill
   }
 
@@ -327,16 +332,6 @@ struct DashboardReviewListRow: View, Equatable {
 
   @ViewBuilder var metadataPillContent: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      if item.isDraft {
-        DashboardReviewStatusPill(
-          label: "Draft",
-          tint: HarnessMonitorTheme.secondaryInk,
-          systemImage: "pencil.tip.crop.circle",
-          isQuiet: true,
-          usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
-        )
-      }
-
       DashboardReviewListRowReviewerSummary(
         summary: reviewerSummary,
         usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
