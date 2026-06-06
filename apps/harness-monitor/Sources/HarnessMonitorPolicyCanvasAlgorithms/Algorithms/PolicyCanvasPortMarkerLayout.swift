@@ -168,7 +168,8 @@ extension PolicyCanvasPreparedRouteInput {
     let endpointGroups = Dictionary(grouping: units, by: \.endpointKey)
       .sorted { left, right in
         left.value.count == right.value.count
-          ? left.key.portID < right.key.portID
+          ? policyCanvasPortMarkerEndpointGroupSortKey(left)
+            < policyCanvasPortMarkerEndpointGroupSortKey(right)
           : left.value.count > right.value.count
       }
     var reservedUnitIDs: Set<String> = []
@@ -332,7 +333,7 @@ extension PolicyCanvasPreparedRouteInput {
       base: base,
       spacing: portMarkerSpacing(for: endpoint, side: side, nodeIndex: nodeIndex),
       extent: extent,
-      inset: PolicyCanvasLayout.portDiameter / 2 + 4
+      inset: policyCanvasPortMarkerInset()
     )
     for (placement, coordinate) in zip(placements, coordinates) {
       let terminal = PolicyCanvasPortTerminal(side: side, axisOffset: coordinate - placement.base)
@@ -369,7 +370,7 @@ extension PolicyCanvasPreparedRouteInput {
   }
 
   private func portMarkerCapacity(side: PolicyCanvasPortSide) -> Int {
-    let inset = PolicyCanvasLayout.portDiameter / 2 + 4
+    let inset = policyCanvasPortMarkerInset()
     let available = max(0, policyCanvasSideExtent(side: side) - (inset * 2))
     // Capacity is how many markers fit at the minimum channel spacing before
     // they would overlap, not the wider preferred port spacing. A logical port
@@ -378,6 +379,13 @@ extension PolicyCanvasPreparedRouteInput {
     let spacing =
       PolicyCanvasLayout.defaultEdgeLineSpacing + PolicyCanvasVisibilityRouter.channelStep
     return max(1, Int(floor(available / spacing)) + 1)
+  }
+
+  private func policyCanvasPortMarkerEndpointGroupSortKey(
+    _ group: (key: PolicyCanvasPortEndpoint, value: [PolicyCanvasPortMarkerAssignmentUnit])
+  ) -> String {
+    let sortKey = group.value.map(\.sortKey).min() ?? ""
+    return [sortKey, group.key.portID].joined(separator: "|")
   }
 
   private func portMarkerSpacing(

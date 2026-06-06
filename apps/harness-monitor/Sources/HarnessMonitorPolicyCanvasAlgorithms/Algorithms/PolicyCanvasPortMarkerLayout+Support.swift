@@ -101,6 +101,10 @@ func policyCanvasPortMarkerCoordinates(
   return (0..<count).map { start + (CGFloat($0) * step) }
 }
 
+func policyCanvasPortMarkerInset() -> CGFloat {
+  PolicyCanvasLayout.portDiameter / 2 + 2
+}
+
 func policyCanvasSideExtent(side: PolicyCanvasPortSide) -> CGFloat {
   switch side {
   case .leading, .trailing:
