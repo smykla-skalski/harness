@@ -204,6 +204,24 @@ public struct ReviewsPolicyPreviewResponse: Codable, Equatable, Sendable {
     self.steps = steps
     self.warnings = warnings
   }
+
+  /// The daemon omits empty `steps`/`warnings` (`skip_serializing_if =
+  /// "Vec::is_empty"`), so an ineligible PR with no applicable actions sends
+  /// neither key. Decode them as empty when absent instead of failing.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    eligible = try container.decode(Bool.self, forKey: .eligible)
+    reason = try container.decodeIfPresent(String.self, forKey: .reason)
+    steps = try container.decodeIfPresent([ReviewsPolicyPreviewStep].self, forKey: .steps) ?? []
+    warnings = try container.decodeIfPresent([String].self, forKey: .warnings) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case eligible
+    case reason
+    case steps
+    case warnings
+  }
 }
 
 public struct ReviewsPolicyRunStartRequest: Codable, Equatable, Sendable {
@@ -296,6 +314,26 @@ public struct ReviewsPolicyRunResponse: Codable, Equatable, Sendable {
     self.steps = steps
   }
 
+  /// `steps` is omitted by the daemon when empty (`skip_serializing_if =
+  /// "Vec::is_empty"`); decode it as empty when absent. The optional fields
+  /// already tolerate omission.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    runID = try container.decode(String.self, forKey: .runID)
+    workflowID =
+      try container.decodeIfPresent(String.self, forKey: .workflowID)
+      ?? ReviewsPolicyDefaults.workflowID
+    subject = try container.decode(ReviewsPolicySubject.self, forKey: .subject)
+    trigger = try container.decode(ReviewsPolicyTrigger.self, forKey: .trigger)
+    status = try container.decode(ReviewsPolicyRunStatus.self, forKey: .status)
+    startedAt = try container.decode(String.self, forKey: .startedAt)
+    updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    waitingOn = try container.decodeIfPresent(ReviewsPolicyWait.self, forKey: .waitingOn)
+    completedAt = try container.decodeIfPresent(String.self, forKey: .completedAt)
+    errorMessage = try container.decodeIfPresent(String.self, forKey: .errorMessage)
+    steps = try container.decodeIfPresent([ReviewsPolicyRunStep].self, forKey: .steps) ?? []
+  }
+
   enum CodingKeys: String, CodingKey {
     case runID = "runId"
     case workflowID = "workflowId"
@@ -355,6 +393,21 @@ public struct ReviewsPolicyStatusResponse: Codable, Equatable, Sendable {
   ) {
     self.activeRun = activeRun
     self.recentRuns = recentRuns
+  }
+
+  /// The daemon omits empty `recentRuns` (`skip_serializing_if =
+  /// "Vec::is_empty"`) and a nil `activeRun`, so a subject with no runs sends
+  /// neither key. Decode them as empty/nil when absent instead of failing.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    activeRun = try container.decodeIfPresent(ReviewsPolicyRunResponse.self, forKey: .activeRun)
+    recentRuns =
+      try container.decodeIfPresent([ReviewsPolicyRunResponse].self, forKey: .recentRuns) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case activeRun
+    case recentRuns
   }
 }
 
