@@ -53,17 +53,26 @@ enum PolicyCanvasNudgeRouteMetrics {
     /// All segments including the port stubs, cached so the interaction-envelope
     /// prune can test a route without rebuilding its polyline each time.
     let segments: [PolicyCanvasRouteSegment]
+    /// Tight axis-aligned envelope of every route segment, used to skip route
+    /// pairs that cannot cross or overlap before entering segment-level loops.
+    let bounds: CGRect
+    /// Tight envelope of interior segments only. Empty routes use `.null`, which
+    /// never intersects a real segment envelope.
+    let interiorBounds: CGRect
   }
 
   static func entry(id: String, points: [CGPoint]) -> RouteEntry {
     let segments = policyCanvasRouteSegments(
       PolicyCanvasEdgeRoute(points: points, labelPosition: .zero)
     )
+    let interior = Array(segments.dropFirst().dropLast())
     return RouteEntry(
       id: id,
       points: points,
-      interior: Array(segments.dropFirst().dropLast()),
-      segments: segments
+      interior: interior,
+      segments: segments,
+      bounds: bounds(segments),
+      interiorBounds: bounds(interior)
     )
   }
 
@@ -87,6 +96,12 @@ enum PolicyCanvasNudgeRouteMetrics {
     }
   }
 
+  static func intersectsObstacles(_ entry: RouteEntry, obstacles: [CGRect]) -> Bool {
+    obstacles.contains { obstacle in
+      entry.bounds.intersects(obstacle) && segmentsEnter(entry, obstacle)
+    }
+  }
+
   /// Build the once-per-spread baseline: every existing crossing pair and every
   /// body-hitting edge in the pre-spread routing. O(routes^2) but computed a
   /// single time, not per candidate placement.
@@ -100,12 +115,11 @@ enum PolicyCanvasNudgeRouteMetrics {
     var crossings: Set<String> = []
     var bodyHitEdges: Set<String> = []
     for left in entries.indices {
-      let route = PolicyCanvasEdgeRoute(points: entries[left].points, labelPosition: .zero)
-      if policyCanvasRouteIntersectsObstacles(route, obstacles: obstacles) {
+      if intersectsObstacles(entries[left], obstacles: obstacles) {
         bodyHitEdges.insert(entries[left].id)
       }
       for right in entries.index(after: left)..<entries.endIndex
-      where properlyCross(entries[left].points, entries[right].points) {
+      where properlyCross(entries[left], entries[right]) {
         crossings.insert(crossingKey(entries[left].id, entries[right].id))
       }
     }
@@ -136,8 +150,7 @@ enum PolicyCanvasNudgeRouteMetrics {
     }
     var addedBodyHits = 0
     for movedEntry in moved where !scoring.baseline.bodyHitEdges.contains(movedEntry.id) {
-      let route = PolicyCanvasEdgeRoute(points: movedEntry.points, labelPosition: .zero)
-      if policyCanvasRouteIntersectsObstacles(route, obstacles: scoring.obstacles) {
+      if intersectsObstacles(movedEntry, obstacles: scoring.obstacles) {
         addedBodyHits += 1
       }
     }
@@ -169,10 +182,13 @@ enum PolicyCanvasNudgeRouteMetrics {
     addedCrossings: inout Int,
     overlapPairs: inout Int
   ) {
-    if properlyCross(left.points, right.points),
+    if properlyCross(left, right),
       !scoring.baseline.crossings.contains(crossingKey(left.id, right.id))
     {
       addedCrossings += 1
+    }
+    guard left.interiorBounds.intersects(right.interiorBounds) else {
+      return
     }
     if maximumInteriorOverlap(
       left.interior,
@@ -187,6 +203,19 @@ enum PolicyCanvasNudgeRouteMetrics {
   /// inserts crossings (`lowerID|higherID`) so the local subtraction lines up.
   static func crossingKey(_ left: String, _ right: String) -> String {
     left < right ? "\(left)|\(right)" : "\(right)|\(left)"
+  }
+
+  private static func bounds(_ segments: [PolicyCanvasRouteSegment]) -> CGRect {
+    segments.reduce(into: CGRect.null) { result, segment in
+      result = result.union(
+        CGRect(
+          x: min(segment.start.x, segment.end.x),
+          y: min(segment.start.y, segment.end.y),
+          width: max(abs(segment.end.x - segment.start.x), 1),
+          height: max(abs(segment.end.y - segment.start.y), 1)
+        )
+      )
+    }
   }
 
   static func maximumInteriorOverlap(
@@ -211,6 +240,24 @@ enum PolicyCanvasNudgeRouteMetrics {
     for (a0, a1) in zip(left, left.dropFirst()) {
       for (b0, b1) in zip(right, right.dropFirst())
       where segmentsProperlyCross(a0, a1, b0, b1) {
+        return true
+      }
+    }
+    return false
+  }
+
+  static func properlyCross(_ left: RouteEntry, _ right: RouteEntry) -> Bool {
+    guard left.bounds.intersects(right.bounds) else {
+      return false
+    }
+    for leftSegment in left.segments {
+      for rightSegment in right.segments
+      where segmentsProperlyCross(
+        leftSegment.start,
+        leftSegment.end,
+        rightSegment.start,
+        rightSegment.end
+      ) {
         return true
       }
     }
