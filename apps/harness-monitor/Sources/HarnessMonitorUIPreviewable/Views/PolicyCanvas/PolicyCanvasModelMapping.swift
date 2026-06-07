@@ -389,10 +389,9 @@ private func policyCanvasImportedPortTitle(
   nodeKind: TaskBoardPolicyPipelineNodeKind,
   kind: PolicyCanvasPortKind
 ) -> String {
-  guard taskBoardPolicyUsesSwitchPortNormalization(nodeKind) else {
-    return title
-  }
-  return taskBoardPolicyPersistedPortTitle(title, kind: kind)
+  taskBoardPolicyUsesSwitchPortNormalization(nodeKind)
+    ? taskBoardPolicyPersistedPortTitle(title, kind: kind)
+    : title
 }
 
 private func taskBoardPolicyPersistedPortID(
@@ -418,32 +417,4 @@ private func taskBoardPolicyPersistedPortID(
     return portID
   }
   return title
-}
-
-private func taskBoardPolicyPersistedPortTitle(
-  _ portID: String,
-  kind: PolicyCanvasPortKind
-) -> String {
-  let prefix = "\(kind.rawValue)-"
-  guard portID.hasPrefix(prefix) else {
-    return portID
-  }
-  return String(portID.dropFirst(prefix.count))
-}
-
-private func policyCanvasPortID(
-  title: String,
-  kind: PolicyCanvasPortKind
-) -> String {
-  "\(kind.rawValue)-\(title)"
-}
-
-private func policyCanvasUsesSwitchPortNormalization(_ node: PolicyCanvasNode) -> Bool {
-  node.kind == .switch || taskBoardPolicyUsesSwitchPortNormalization(node.policyKind)
-}
-
-private func taskBoardPolicyUsesSwitchPortNormalization(
-  _ nodeKind: TaskBoardPolicyPipelineNodeKind?
-) -> Bool {
-  nodeKind?.kind == PolicyCanvasNodeKind.switch.rawValue
 }
