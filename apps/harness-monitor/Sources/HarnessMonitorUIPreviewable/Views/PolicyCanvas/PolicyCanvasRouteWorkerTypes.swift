@@ -32,7 +32,7 @@ struct PolicyCanvasRouteWorkerKey: Equatable {
 struct PolicyCanvasViewportRouteRefreshKey: Equatable {
   let routeKey: PolicyCanvasRouteWorkerKey
   let pipelineIdentity: String?
-  let isProvisional: Bool
+  let needsRefresh: Bool
 }
 
 struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {

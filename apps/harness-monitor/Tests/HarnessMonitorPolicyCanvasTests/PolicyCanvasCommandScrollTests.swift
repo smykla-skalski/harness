@@ -180,7 +180,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("_ = viewModel.consumeViewportCenteringRequest()"))
   }
 
-  @Test("canvas switching refreshes provisional fallback routes lazily")
+  @Test("canvas switching refreshes stale or provisional routes lazily")
   func viewportRefreshesProvisionalFallbackRoutes() throws {
     let source =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
@@ -190,7 +190,7 @@ struct PolicyCanvasCommandScrollTests {
     let surfaceSource =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift")
 
-    #expect(source.contains("@State var appliedRouteKey: PolicyCanvasRouteWorkerKey?"))
+    #expect(source.contains("@State private var routeCache = PolicyCanvasViewportRouteCache()"))
     #expect(
       source.contains(
         "let centeringRouteState = PolicyCanvasViewportCenteringRouteState("
@@ -198,20 +198,25 @@ struct PolicyCanvasCommandScrollTests {
     )
     #expect(source.contains(".onChange(of: centeringRouteState, initial: false)"))
     #expect(source.contains("currentRouteKey: routeKey"))
-    #expect(source.contains("appliedRouteKey: appliedRouteKey"))
+    #expect(source.contains("appliedRouteKey: routeCache.appliedRouteKey"))
     #expect(source.contains("viewportCenteringGeneration: viewModel.viewportCenteringGeneration"))
     #expect(source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
-    #expect(source.contains("cachedRouteOutputsByCanvasIdentity"))
+    #expect(source.contains("routeCache.outputsByCanvasIdentity"))
     #expect(
-      source.contains("let cachedRouteOutput = cachedRouteOutputsByCanvasIdentity[newIdentity]"))
-    #expect(routeCacheSource.contains("cachedRouteOutputsByCanvasIdentity[pipelineIdentity] ="))
+      source.contains("let cachedRouteOutput = routeCache.outputsByCanvasIdentity[newIdentity]"))
+    #expect(routeCacheSource.contains("updateCachedRoutes("))
     #expect(source.contains(".onChange(of: viewModel.routeComputationRequestGeneration"))
     #expect(source.contains("await rebuildRoutes("))
     #expect(source.contains("pipelineIdentity: routeCacheIdentity"))
     #expect(source.contains("fontScale: fontScale"))
-    #expect(source.contains(".task(id: PolicyCanvasViewportRouteRefreshKey("))
-    #expect(source.contains("isProvisional: routeOutputIsCurrentGraphProvisional"))
-    #expect(source.contains("guard routeOutputIsCurrentGraphProvisional else { return }"))
+    #expect(source.contains("PolicyCanvasViewportRouteRefreshKey("))
+    #expect(
+      source.contains(
+        "routeOutputIsCurrentGraphProvisional || routeCache.appliedRouteKey != routeKey"
+      )
+    )
+    #expect(source.contains("needsRefresh: routeOutputNeedsRefresh"))
+    #expect(source.contains("guard routeOutputNeedsRefresh else { return }"))
     #expect(!surfaceSource.contains("forcesAutoArrange"))
     #expect(!surfaceSource.contains("viewModel.reflowLayout("))
     #expect(

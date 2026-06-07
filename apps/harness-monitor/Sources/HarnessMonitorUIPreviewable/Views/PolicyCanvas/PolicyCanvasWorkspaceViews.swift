@@ -118,6 +118,8 @@ struct PolicyCanvasViewport: View {
         routeOutputIsCurrentGraphProvisional
         ? PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)
         : projectedRouteOutput
+      let routeOutputNeedsRefresh =
+        routeOutputIsCurrentGraphProvisional || routeCache.appliedRouteKey != routeKey
       let validationKey = policyCanvasValidationWorkerKey(
         viewModel: viewModel,
         nodes: nodes,
@@ -226,10 +228,10 @@ struct PolicyCanvasViewport: View {
         id: PolicyCanvasViewportRouteRefreshKey(
           routeKey: routeKey,
           pipelineIdentity: routeCacheIdentity,
-          isProvisional: routeOutputIsCurrentGraphProvisional
+          needsRefresh: routeOutputNeedsRefresh
         )
       ) {
-        guard routeOutputIsCurrentGraphProvisional else { return }
+        guard routeOutputNeedsRefresh else { return }
         await rebuildRoutes(
           for: routeKey,
           pipelineIdentity: routeCacheIdentity,
