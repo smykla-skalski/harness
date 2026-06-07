@@ -52,28 +52,22 @@ extension PolicyCanvasPreparedRouteInput {
       router: selectedRouter,
       algorithms: algorithms
     )
-    let routes = algorithms.routePostProcessing.processRoutes(
+    let processedRoutes = algorithms.routePostProcessing.processRoutes(
       input: PolicyCanvasRoutePostProcessingInput(prepared: self, routes: routeState.routes)
+    )
+    let routes = policyCanvasRoutesPreservingRouteTerminals(
+      original: routeState.routes,
+      processed: processedRoutes
     )
     let labelPositions = algorithms.labelPlacement.placeLabels(
       input: PolicyCanvasLabelPlacementInput(prepared: self, routes: routes)
     )
     let visibleBounds = visibleBounds(routes: routes, labelPositions: labelPositions)
-    // Recompute marker sides from the post-processed routes, then rebalance their
-    // side-local coordinates. The converged layout is tied to pre-post-process
-    // route sides, while post-processing can move a terminal onto a different side.
-    let portMarkerLayout = algorithms.portMarkerPlacement.placeMarkers(
-      input: PolicyCanvasPortMarkerPlacementInput(
-        prepared: self,
-        routes: routes,
-        nodeIndex: nodeIndex
-      )
-    )
     return PolicyCanvasPreparedRouteComputation(
       routes: routes,
       labelPositions: labelPositions,
       portVisibility: portVisibility(routes: routes, nodeIndex: nodeIndex),
-      portMarkerLayout: portMarkerLayout,
+      portMarkerLayout: routeState.portMarkerLayout,
       visibleBounds: visibleBounds
     )
   }
@@ -361,5 +355,56 @@ extension PolicyCanvasPreparedRouteInput {
         y: node.position.y + PolicyCanvasLayout.nodeSize.height
       )
     }
+  }
+}
+
+func policyCanvasRoutesPreservingRouteTerminals(
+  original: [String: PolicyCanvasEdgeRoute],
+  processed: [String: PolicyCanvasEdgeRoute]
+) -> [String: PolicyCanvasEdgeRoute] {
+  processed.reduce(into: [:]) { routes, entry in
+    guard let originalRoute = original[entry.key] else {
+      routes[entry.key] = entry.value
+      return
+    }
+    routes[entry.key] = policyCanvasRoutePreservingTerminalStubs(
+      original: originalRoute,
+      processed: entry.value
+    )
+  }
+}
+
+private func policyCanvasRoutePreservingTerminalStubs(
+  original: PolicyCanvasEdgeRoute,
+  processed: PolicyCanvasEdgeRoute
+) -> PolicyCanvasEdgeRoute {
+  guard original.points.count >= 2, processed.points.count >= 2 else {
+    return processed
+  }
+  var points: [CGPoint] = []
+  policyCanvasAppendOrthogonalBridge(original.points[0], to: &points)
+  policyCanvasAppendOrthogonalBridge(original.points[1], to: &points)
+  for point in processed.points.dropFirst().dropLast() {
+    policyCanvasAppendOrthogonalBridge(point, to: &points)
+  }
+  policyCanvasAppendOrthogonalBridge(original.points[original.points.count - 2], to: &points)
+  policyCanvasAppendOrthogonalBridge(original.points[original.points.count - 1], to: &points)
+  let compressed = policyCanvasCompressPreservingTerminalStubs(points)
+  return PolicyCanvasEdgeRoute(
+    points: compressed,
+    labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: compressed)
+  )
+}
+
+private func policyCanvasAppendOrthogonalBridge(_ point: CGPoint, to points: inout [CGPoint]) {
+  guard let last = points.last else {
+    points.append(point)
+    return
+  }
+  if abs(last.x - point.x) > 0.001, abs(last.y - point.y) > 0.001 {
+    points.append(CGPoint(x: point.x, y: last.y))
+  }
+  if points.last != point {
+    points.append(point)
   }
 }

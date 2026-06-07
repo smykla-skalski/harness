@@ -144,6 +144,68 @@ struct PolicyCanvasPortMarkerLayoutTests {
     assertEvenSpacing(trailingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
   }
 
+  @Test("preferred opposite horizontal sides render explicit markers")
+  func preferredOppositeHorizontalSidesRenderExplicitMarkers() {
+    let source = policyCanvasMarkerTestNode(
+      id: "source",
+      position: CGPoint(x: 360, y: 0),
+      inputPorts: [],
+      outputPorts: [PolicyCanvasPort(id: "out", title: "out", kind: .output)]
+    )
+    let target = policyCanvasMarkerTestNode(
+      id: "target",
+      position: .zero,
+      inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
+      outputPorts: []
+    )
+    let edge = PolicyCanvasEdge(
+      id: "back",
+      source: PolicyCanvasPortEndpoint(
+        nodeID: source.id,
+        portID: "out",
+        kind: .output,
+        side: .leading
+      ),
+      target: PolicyCanvasPortEndpoint(
+        nodeID: target.id,
+        portID: "in",
+        kind: .input,
+        side: .trailing
+      ),
+      label: "back",
+      pinnedPortSide: true
+    )
+    let input = PolicyCanvasRouteWorkerInput(
+      nodes: [source, target],
+      groups: [],
+      edges: [edge],
+      fontScale: 1
+    )
+    let prepared = PolicyCanvasPreparedRouteInput(input: input)
+    let sourcePoint = CGPoint(
+      x: source.position.x,
+      y: source.position.y + PolicyCanvasLayout.nodeSize.height / 2
+    )
+    let targetPoint = CGPoint(
+      x: target.position.x + PolicyCanvasLayout.nodeSize.width,
+      y: target.position.y + PolicyCanvasLayout.nodeSize.height / 2
+    )
+    let layout = prepared.portMarkerLayout(
+      routes: [
+        edge.id: PolicyCanvasEdgeRoute(
+          points: [sourcePoint, targetPoint],
+          labelPosition: CGPoint(x: 200, y: sourcePoint.y)
+        )
+      ],
+      nodeIndex: prepared.nodeIndex
+    )
+
+    #expect(layout.terminal(edgeID: edge.id, role: .source)?.side == .leading)
+    #expect(layout.terminal(edgeID: edge.id, role: .target)?.side == .trailing)
+    #expect(layout.markers(for: edge.source, side: .leading, isVisible: true).count == 1)
+    #expect(layout.markers(for: edge.target, side: .trailing, isVisible: true).count == 1)
+  }
+
   func assertBorderCoordinates(
     markers: [PolicyCanvasPortMarker],
     base: CGFloat,

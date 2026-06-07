@@ -464,12 +464,20 @@ struct PolicyCanvasLabRoutingQualityTests {
       for (sideKey, coordinates) in coordinatesBySide {
         failures.append(contentsOf: markerBalanceFailures(key: sideKey, coordinates: coordinates))
       }
+      failures.append(
+        contentsOf: routeTerminalMarkerFailures(
+          sampleID: sample.id,
+          graph: graph,
+          prepared: prepared,
+          nodeIndex: nodeIndex
+        )
+      )
     }
 
     #expect(
       failures.isEmpty,
       """
-      live lab port markers are not balanced on every visible node side
+      live lab port markers are not balanced and aligned on every visible node side
       failures=\(failures)
       """
     )
@@ -737,6 +745,90 @@ struct PolicyCanvasLabRoutingQualityTests {
     return [
       "\(key) coordinates=\(coordinates) deltas=\(deltas) extent=\(extent)"
     ]
+  }
+
+  private func routeTerminalMarkerFailures(
+    sampleID: String,
+    graph: PolicyCanvasLabMarkerBalanceGraph,
+    prepared: PolicyCanvasPreparedRouteInput,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [String] {
+    var failures: [String] = []
+    for edge in graph.edges {
+      guard let route = graph.output.routes[edge.id] else {
+        failures.append("\(sampleID):\(edge.id): missing route")
+        continue
+      }
+      failures.append(
+        contentsOf: routeTerminalMarkerFailures(
+          sampleID: sampleID,
+          edge: edge,
+          endpoint: edge.source,
+          role: "source",
+          point: route.points.first,
+          side: policyCanvasRouteSourceSide(route),
+          prepared: prepared,
+          nodeIndex: nodeIndex,
+          markerLayout: graph.output.portMarkerLayout
+        )
+      )
+      failures.append(
+        contentsOf: routeTerminalMarkerFailures(
+          sampleID: sampleID,
+          edge: edge,
+          endpoint: edge.target,
+          role: "target",
+          point: route.points.last,
+          side: policyCanvasRouteTargetSide(route),
+          prepared: prepared,
+          nodeIndex: nodeIndex,
+          markerLayout: graph.output.portMarkerLayout
+        )
+      )
+    }
+    return failures
+  }
+
+  private func routeTerminalMarkerFailures(
+    sampleID: String,
+    edge: PolicyCanvasEdge,
+    endpoint: PolicyCanvasPortEndpoint,
+    role: String,
+    point: CGPoint?,
+    side: PolicyCanvasPortSide?,
+    prepared: PolicyCanvasPreparedRouteInput,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    markerLayout: PolicyCanvasPortMarkerLayout
+  ) -> [String] {
+    guard
+      let point,
+      let side,
+      let base = prepared.portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex)
+    else {
+      return ["\(sampleID):\(edge.id):\(role) missing terminal side or base"]
+    }
+    let offset = terminalAxisOffset(from: base, to: point, side: side)
+    let markerOffsets = markerLayout.markers(for: endpoint, side: side, isVisible: true)
+      .map(\.axisOffset)
+    guard markerOffsets.contains(where: { abs($0 - offset) <= 0.5 }) else {
+      return [
+        "\(sampleID):\(edge.id):\(role) side=\(side) offset=\(offset) markers=\(markerOffsets)"
+      ]
+    }
+    return []
+  }
+
+  private func terminalAxisOffset(
+    from base: CGPoint,
+    to point: CGPoint,
+    side: PolicyCanvasPortSide
+  ) -> CGFloat {
+    switch side {
+    case .leading, .trailing:
+      point.y - base.y
+    case .top, .bottom:
+      point.x - base.x
+    }
   }
 
   private func routedLabGraph(

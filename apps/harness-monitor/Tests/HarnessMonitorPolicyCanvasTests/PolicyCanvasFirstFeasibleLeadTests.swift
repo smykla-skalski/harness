@@ -53,8 +53,8 @@ struct PolicyCanvasFirstFeasibleLeadTests {
   func backEdgeLeavesPerpendicular() {
     // The source node sits to the RIGHT of the target, so the edge runs
     // backward. Without perpendicular leads the route bolts left straight out of
-    // the trailing port and reads as a leading-side departure - which is not a
-    // routable side for an output.
+    // the trailing port and reads as a leading-side departure even though the
+    // endpoint is pinned to trailing.
     let source = policyCanvasMarkerTestNode(
       id: "src",
       position: CGPoint(x: 600, y: 0),
@@ -93,6 +93,33 @@ struct PolicyCanvasFirstFeasibleLeadTests {
     // The output leaves its trailing port square to the right, the input is met
     // square on its leading port - both routable sides for their kind.
     #expect(policyCanvasRouteSourceSide(route) == .trailing)
+    #expect(policyCanvasRouteTargetSide(route) == .leading)
+  }
+
+  @Test("collinear bridged route preserves target port lead")
+  func collinearBridgedRoutePreservesTargetPortLead() {
+    let source = PolicyCanvasEscapeCandidate(
+      side: .trailing,
+      actual: CGPoint(x: 0, y: 48),
+      exit: CGPoint(x: 36, y: 48),
+      routed: CGPoint(x: 36, y: 48)
+    )
+    let target = PolicyCanvasEscapeCandidate(
+      side: .leading,
+      actual: CGPoint(x: 240, y: 48),
+      exit: CGPoint(x: 204, y: 48),
+      routed: CGPoint(x: 204, y: 48)
+    )
+    let route = policyCanvasBridgedRoute(
+      baseRoute: PolicyCanvasEdgeRoute(
+        points: [source.exit, target.exit],
+        labelPosition: CGPoint(x: 120, y: 48)
+      ),
+      source: source,
+      target: target
+    )
+
+    #expect(route.points.contains(target.exit))
     #expect(policyCanvasRouteTargetSide(route) == .leading)
   }
 
