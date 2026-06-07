@@ -75,6 +75,53 @@ struct PolicyCanvasViewportHostedRenderSignatureTests {
     #expect(baseline.renderSignature != mutated.renderSignature)
   }
 
+  @Test("a changed port-marker layout changes the signature")
+  func differsWhenPortMarkerLayoutChanges() throws {
+    let focus = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
+    let viewModel = PolicyCanvasViewModel.sample()
+    let edge = try #require(viewModel.edges.first)
+    let baseline = PolicyCanvasRouteWorkerOutput.fallback(
+      for: PolicyCanvasRouteWorkerInput(
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        fontScale: 1
+      )
+    )
+    let compactOutput = routeOutput(
+      baseline,
+      replacingPortMarkerLayout: markerLayout(edge: edge, sourceOffset: 0, targetOffset: 0)
+    )
+    let spreadOutput = routeOutput(
+      baseline,
+      replacingPortMarkerLayout: markerLayout(edge: edge, sourceOffset: -24, targetOffset: 24)
+    )
+    let compactSnapshot = makeSnapshot(
+      viewModel: viewModel,
+      focusedComponent: focus,
+      routeOutput: compactOutput
+    )
+    let spreadSnapshot = makeSnapshot(
+      viewModel: viewModel,
+      focusedComponent: focus,
+      routeOutput: spreadOutput
+    )
+    let state = PolicyCanvasViewportHostedState(snapshot: compactSnapshot)
+    let didNotify = OSAllocatedUnfairLock(initialState: false)
+
+    withObservationTracking {
+      _ = state.snapshot
+    } onChange: {
+      didNotify.withLock { $0 = true }
+    }
+    state.update(snapshot: spreadSnapshot)
+
+    #expect(compactOutput.signature != spreadOutput.signature)
+    #expect(compactSnapshot.renderSignature != spreadSnapshot.renderSignature)
+    #expect(didNotify.withLock { $0 } == true)
+    #expect(state.snapshot.portMarkerLayout == spreadOutput.portMarkerLayout)
+  }
+
   @Test("a render-identical update does not republish the hosted snapshot")
   func equalSignatureDoesNotRepublishSnapshot() {
     let focus = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
@@ -161,6 +208,44 @@ struct PolicyCanvasViewportHostedRenderSignatureTests {
       showSimulationOverlay: showSimulationOverlay,
       openEditor: { _ in },
       requestKeyboardFocus: {}
+    )
+  }
+
+  private func routeOutput(
+    _ output: PolicyCanvasRouteWorkerOutput,
+    replacingPortMarkerLayout portMarkerLayout: PolicyCanvasPortMarkerLayout
+  ) -> PolicyCanvasRouteWorkerOutput {
+    PolicyCanvasRouteWorkerOutput(
+      routes: output.routes,
+      labelPositions: output.labelPositions,
+      portVisibility: output.portVisibility,
+      portMarkerLayout: portMarkerLayout,
+      visibleBounds: output.visibleBounds,
+      contentSize: output.contentSize,
+      accessibilityEdgeLabelsByID: output.accessibilityEdgeLabelsByID,
+      accessibilityNodeEntries: output.accessibilityNodeEntries,
+      accessibilityEdgeEntries: output.accessibilityEdgeEntries,
+      nodeAccessibilityValuesByID: output.nodeAccessibilityValuesByID,
+      connectTargetsByNodeID: output.connectTargetsByNodeID
+    )
+  }
+
+  private func markerLayout(
+    edge: PolicyCanvasEdge,
+    sourceOffset: CGFloat,
+    targetOffset: CGFloat
+  ) -> PolicyCanvasPortMarkerLayout {
+    let sourceKey = PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .source)
+    let targetKey = PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .target)
+    return PolicyCanvasPortMarkerLayout(
+      terminalsByKey: [
+        sourceKey: PolicyCanvasPortTerminal(side: .trailing, axisOffset: sourceOffset),
+        targetKey: PolicyCanvasPortTerminal(side: .leading, axisOffset: targetOffset),
+      ],
+      endpointsByKey: [
+        sourceKey: edge.source,
+        targetKey: edge.target,
+      ]
     )
   }
 }
