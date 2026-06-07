@@ -109,7 +109,7 @@ struct PolicyCanvasFanInChannelTests {
       routePostProcessing: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
     )
     var report = ""
-    for sampleID in ["default", "multi-group"] {
+    for sampleID in ["default", "multi-group", "extreme"] {
       let scene = try await routedScene(sampleID: sampleID, selection: nudged)
       let before = try await routedScene(sampleID: sampleID, selection: baseline)
       report += "===== \(sampleID) =====\n"
@@ -223,8 +223,6 @@ struct PolicyCanvasFanInChannelTests {
     let output = await PolicyCanvasRouteWorker().compute(input: input)
     return Scene(edges: edges, routes: output.routes, nodeFrames: nodeFrames)
   }
-
-  // MARK: - Metrics
 
   private func interiorOverlapPairs(
     routes: [String: PolicyCanvasEdgeRoute],

@@ -282,7 +282,11 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
   private func placements(
     from offsets: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]
   ) -> [[(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]] {
-    let slides: [CGFloat] = [0, laneGap, -laneGap, 2 * laneGap, -2 * laneGap]
+    let halfGap = laneGap / 2
+    let slides: [CGFloat] =
+      offsets.count.isMultiple(of: 2)
+      ? [halfGap, -halfGap, 0, laneGap, -laneGap]
+      : [0, laneGap, -laneGap, 2 * laneGap, -2 * laneGap]
     var result: [[(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]] = []
     for ordering in [offsets, offsets.map { ($0.segment, -$0.offset) }] {
       for slide in slides {

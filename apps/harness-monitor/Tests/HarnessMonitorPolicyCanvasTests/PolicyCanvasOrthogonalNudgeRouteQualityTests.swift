@@ -141,6 +141,36 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
     }
   }
 
+  @Test("even corridor stacks anchor one route on the original lane")
+  func evenCorridorStacksAnchorOneRouteOnOriginalLane() {
+    let prepared = PolicyCanvasPreparedRouteInput(
+      input: PolicyCanvasRouteWorkerInput(nodes: [], groups: [], edges: [], fontScale: 1)
+    )
+    let originalLane: CGFloat = 100
+    let routes = [
+      "upper": stackedCorridorRoute(
+        sourceY: -80, targetY: 180, entryX: 40, exitX: 240, corridorY: originalLane),
+      "lower": stackedCorridorRoute(
+        sourceY: 80, targetY: 340, entryX: 80, exitX: 280, corridorY: originalLane),
+    ]
+
+    let processed = PolicyCanvasOrthogonalNudgingRouteProcessing().processRoutes(
+      input: PolicyCanvasRoutePostProcessingInput(prepared: prepared, routes: routes)
+    )
+    let corridorYs = processed.keys.sorted().compactMap { edgeID in
+      processed[edgeID].flatMap(stackedCorridorY)
+    }.sorted()
+
+    #expect(corridorYs.count == routes.count)
+    #expect(
+      corridorYs.contains { abs($0 - originalLane) < 0.001 },
+      "expected one corridor to stay on the original lane, got \(corridorYs)"
+    )
+    for pair in zip(corridorYs, corridorYs.dropFirst()) {
+      #expect(pair.1 - pair.0 >= PolicyCanvasLayout.defaultEdgeLineSpacing - 0.001)
+    }
+  }
+
   /// The greedy per-channel choice reads channels from a dictionary-grouped
   /// source, so it must sort everything it touches to stay order-independent.
   /// Routing the same laid-out graph with the edges fed forward and reversed must

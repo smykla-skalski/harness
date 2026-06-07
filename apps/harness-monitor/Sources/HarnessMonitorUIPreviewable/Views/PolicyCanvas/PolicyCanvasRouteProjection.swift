@@ -29,7 +29,6 @@ func policyCanvasProjectedRouteOutput(
     return input.cachedOutput
   }
 
-  let currentNodesByID = Dictionary(uniqueKeysWithValues: input.currentNodes.map { ($0.id, $0) })
   var routes = input.cachedOutput.routes
   var labelPositions = input.cachedOutput.labelPositions
   var didProjectRoute = false
@@ -43,13 +42,8 @@ func policyCanvasProjectedRouteOutput(
     }
     let projectedRoute = policyCanvasProjectedRoute(
       route,
-      context: PolicyCanvasRouteProjectionContext(
-        edge: edge,
-        sourceDelta: sourceDelta,
-        targetDelta: targetDelta,
-        currentNodesByID: currentNodesByID,
-        groups: input.groups
-      )
+      sourceDelta: sourceDelta,
+      targetDelta: targetDelta
     )
     guard projectedRoute != route else {
       continue
@@ -122,37 +116,135 @@ private func policyCanvasProjectedRouteOutput(
   )
 }
 
-private struct PolicyCanvasRouteProjectionContext {
-  let edge: PolicyCanvasEdge
-  let sourceDelta: CGSize
-  let targetDelta: CGSize
-  let currentNodesByID: [String: PolicyCanvasNode]
-  let groups: [PolicyCanvasGroup]
-}
-
 private func policyCanvasProjectedRoute(
   _ route: PolicyCanvasEdgeRoute,
-  context: PolicyCanvasRouteProjectionContext
+  sourceDelta: CGSize,
+  targetDelta: CGSize
 ) -> PolicyCanvasEdgeRoute {
-  guard let source = route.points.first, let target = route.points.last else {
+  guard !route.points.isEmpty else {
     return route
   }
-  if context.sourceDelta == context.targetDelta {
+  if sourceDelta == targetDelta {
     return PolicyCanvasEdgeRoute(
-      points: route.points.map { policyCanvasTranslatedPoint($0, by: context.sourceDelta) },
-      labelPosition: policyCanvasTranslatedPoint(route.labelPosition, by: context.sourceDelta)
+      points: route.points.map { policyCanvasTranslatedPoint($0, by: sourceDelta) },
+      labelPosition: policyCanvasTranslatedPoint(route.labelPosition, by: sourceDelta)
     )
   }
+  let points = policyCanvasProjectedEndpointPoints(
+    route.points,
+    sourceDelta: sourceDelta,
+    targetDelta: targetDelta
+  )
   return PolicyCanvasEdgeRoute(
-    source: policyCanvasTranslatedPoint(source, by: context.sourceDelta),
-    target: policyCanvasTranslatedPoint(target, by: context.targetDelta),
-    lane: 0,
-    groups: context.groups,
-    sourceGroupID: context.currentNodesByID[context.edge.source.nodeID]?.groupID,
-    targetGroupID: context.currentNodesByID[context.edge.target.nodeID]?.groupID
+    points: points,
+    labelPosition: policyCanvasProjectedRouteLabelPosition(for: points)
   )
 }
 
 private func policyCanvasTranslatedPoint(_ point: CGPoint, by delta: CGSize) -> CGPoint {
   CGPoint(x: point.x + delta.width, y: point.y + delta.height)
+}
+
+private func policyCanvasProjectedEndpointPoints(
+  _ points: [CGPoint],
+  sourceDelta: CGSize,
+  targetDelta: CGSize
+) -> [CGPoint] {
+  guard points.count >= 2 else {
+    return points
+  }
+  var projected = points
+  if sourceDelta != .zero {
+    projected = policyCanvasProjectEndpoint(
+      points: projected,
+      endpointIndex: projected.startIndex,
+      neighborIndex: projected.index(after: projected.startIndex),
+      delta: sourceDelta
+    )
+  }
+  if targetDelta != .zero {
+    projected = policyCanvasProjectEndpoint(
+      points: projected,
+      endpointIndex: projected.index(before: projected.endIndex),
+      neighborIndex: projected.index(projected.endIndex, offsetBy: -2),
+      delta: targetDelta
+    )
+  }
+  return policyCanvasCompressProjectedRoute(projected)
+}
+
+private func policyCanvasProjectEndpoint(
+  points: [CGPoint],
+  endpointIndex: Int,
+  neighborIndex: Int,
+  delta: CGSize
+) -> [CGPoint] {
+  var projected = points
+  let movedEndpoint = policyCanvasTranslatedPoint(points[endpointIndex], by: delta)
+  let neighbor = points[neighborIndex]
+  if movedEndpoint.x == neighbor.x || movedEndpoint.y == neighbor.y {
+    projected[endpointIndex] = movedEndpoint
+    return projected
+  }
+  let originalEndpoint = points[endpointIndex]
+  let originalSegmentWasHorizontal =
+    abs(originalEndpoint.y - neighbor.y) <= abs(originalEndpoint.x - neighbor.x)
+  let bend =
+    originalSegmentWasHorizontal
+    ? CGPoint(x: neighbor.x, y: movedEndpoint.y)
+    : CGPoint(x: movedEndpoint.x, y: neighbor.y)
+  if endpointIndex < neighborIndex {
+    projected.replaceSubrange(endpointIndex...neighborIndex, with: [movedEndpoint, bend, neighbor])
+  } else {
+    projected.replaceSubrange(neighborIndex...endpointIndex, with: [neighbor, bend, movedEndpoint])
+  }
+  return projected
+}
+
+private func policyCanvasCompressProjectedRoute(_ points: [CGPoint]) -> [CGPoint] {
+  guard points.count > 2 else {
+    return points
+  }
+  var result: [CGPoint] = []
+  result.reserveCapacity(points.count)
+  for point in points {
+    if let last = result.last, last == point {
+      continue
+    }
+    result.append(point)
+    while result.count >= 3 {
+      let count = result.count
+      let first = result[count - 3]
+      let middle = result[count - 2]
+      let last = result[count - 1]
+      let isHorizontal = first.y == middle.y && middle.y == last.y
+      let isVertical = first.x == middle.x && middle.x == last.x
+      guard isHorizontal || isVertical else {
+        break
+      }
+      result.remove(at: count - 2)
+    }
+  }
+  return result
+}
+
+private func policyCanvasProjectedRouteLabelPosition(for points: [CGPoint]) -> CGPoint {
+  guard points.count >= 2 else {
+    return points.first ?? .zero
+  }
+  var bestStart = points[0]
+  var bestEnd = points[1]
+  var bestLength: CGFloat = -1
+  for (start, end) in zip(points, points.dropFirst()) {
+    let length = abs(end.x - start.x) + abs(end.y - start.y)
+    if length > bestLength {
+      bestStart = start
+      bestEnd = end
+      bestLength = length
+    }
+  }
+  return CGPoint(
+    x: (bestStart.x + bestEnd.x) / 2,
+    y: (bestStart.y + bestEnd.y) / 2
+  )
 }
