@@ -221,7 +221,6 @@ public struct PolicyCanvasView: View {
     policyCanvasSplitLayout
       // Root focus powers canvas keyboard shortcuts; components provide visible focus.
       .focusable()
-      .focusEffectDisabled()
       .focused($canvasKeyboardFocusedState)
       .frame(minHeight: 620)
       .accessibilityElement(children: .contain)
