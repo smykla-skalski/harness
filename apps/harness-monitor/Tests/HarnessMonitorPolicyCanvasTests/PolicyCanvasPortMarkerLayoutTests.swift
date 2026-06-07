@@ -81,6 +81,7 @@ struct PolicyCanvasPortMarkerLayoutTests {
     }.sorted()
     assertEvenSpacing(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
     assertMinimumSpacing(leadingCoordinates)
+    assertCornerClearance(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
   }
 
   @Test("terminal markers share capacity and spacing across logical ports")
@@ -144,6 +145,7 @@ struct PolicyCanvasPortMarkerLayoutTests {
     }.sorted()
     assertEvenSpacing(trailingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
     assertMinimumSpacing(trailingCoordinates)
+    assertCornerClearance(trailingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
   }
 
   @Test("preferred opposite horizontal sides render explicit markers")
@@ -267,6 +269,14 @@ struct PolicyCanvasPortMarkerLayoutTests {
     for pair in zip(coordinates, coordinates.dropFirst()) {
       #expect(pair.1 - pair.0 >= policyCanvasMinimumPortMarkerSpacing() - 0.001)
     }
+  }
+
+  func assertCornerClearance(_ coordinates: [CGFloat], extent: CGFloat) {
+    guard let first = coordinates.first, let last = coordinates.last else {
+      return
+    }
+    #expect(first >= PolicyCanvasLayout.portDiameter - 0.001)
+    #expect(last <= extent - PolicyCanvasLayout.portDiameter + 0.001)
   }
 }
 

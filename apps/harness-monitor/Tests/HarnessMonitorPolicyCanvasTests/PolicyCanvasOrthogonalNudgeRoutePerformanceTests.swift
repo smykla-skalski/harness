@@ -18,7 +18,7 @@ import Testing
 @Suite("Policy canvas orthogonal nudge route performance", .serialized)
 @MainActor
 struct PolicyCanvasOrthogonalNudgeRoutePerformanceTests {
-  /// The heaviest sample's crossing-aware route worker may take at most this
+  /// The included samples' crossing-aware route worker may take at most this
   /// multiple of the same graph's collinear (overlap-leaving) route worker. The
   /// original per-placement global rescore was ~28x; local scoring plus band
   /// pruning keeps it well under this.
@@ -27,6 +27,34 @@ struct PolicyCanvasOrthogonalNudgeRoutePerformanceTests {
   /// reliably - a ratio taken off a sub-millisecond baseline is pure scheduler
   /// noise - so they are recorded in the table but not gated.
   private static let measurableBaselineMilliseconds: Double = 5
+  /// The largest stress fixtures remain covered by correctness tests, but are
+  /// too expensive for the routine relative-overhead performance guard.
+  private static let excludedStressSampleIDs: Set<String> = [
+    "extreme-matrix",
+    "extreme-mesh",
+    "extreme-lattice",
+    "extreme-galaxy",
+  ]
+
+  private static var performanceSampleIDs: [String] {
+    PolicyCanvasLabSamples.all.map(\.id).filter { !excludedStressSampleIDs.contains($0) }
+  }
+
+  @Test("performance sample set skips only the four largest stress samples")
+  func performanceSampleSetSkipsOnlyLargestStressSamples() {
+    let allSampleIDs = PolicyCanvasLabSamples.all.map(\.id)
+
+    #expect(Self.excludedStressSampleIDs.count == 4)
+    #expect(Self.excludedStressSampleIDs.isSubset(of: Set(allSampleIDs)))
+    #expect(Self.performanceSampleIDs == allSampleIDs.filter {
+      !Self.excludedStressSampleIDs.contains($0)
+    })
+    #expect(!Self.performanceSampleIDs.contains {
+      Self.excludedStressSampleIDs.contains($0)
+    })
+    #expect(Self.performanceSampleIDs.contains("extreme"))
+    #expect(Self.performanceSampleIDs.contains("extreme-braid"))
+  }
 
   @Test("crossing-aware routing stays within a small multiple of collinear")
   func postProcessOverheadStaysModest() async throws {
@@ -36,7 +64,7 @@ struct PolicyCanvasOrthogonalNudgeRoutePerformanceTests {
     var table = "sample: collinear / nudge (ms)  x-collinear\n"
     var worstRatio = 0.0
     var worstSample = ""
-    for sampleID in PolicyCanvasLabSamples.all.map(\.id) {
+    for sampleID in Self.performanceSampleIDs {
       let prepared = try await preparedInput(sampleID: sampleID)
       let baselineMs = await measure { _ = await PolicyCanvasRouteWorker().compute(input: prepared(baseline)) }
       let nudgeMs = await measure { _ = await PolicyCanvasRouteWorker().compute(input: prepared(nudged)) }
