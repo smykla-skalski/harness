@@ -16,9 +16,9 @@ import CoreGraphics
 /// both spread directions against every other route and keeps the one that clears
 /// the overlap without adding an orthogonal-axis crossing or a body hit. A
 /// zero-shift floor makes the choice a ratchet: a channel can be left stacked, but
-/// is never spread into a new crossing or a node body. Port stubs (a route's first
-/// and last segment) are never shifted, so the terminal-on-dot marker contract
-/// holds by construction.
+/// is never spread into a new crossing or a node body. The route worker restores
+/// the first and last port stubs after this pass, so the terminal-on-dot marker
+/// contract survives interior lane spreading.
 struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProcessingAlgorithm {
   /// Interior collinear overlap longer than this reads as a stacked rail and must
   /// be cleared - matches the fan-in channel gate threshold.
@@ -289,8 +289,8 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
 
   /// Split every route into interior axis-aligned segments, tagged exactly as the
   /// nudge expects so the reused `channels`/`laneOffsets` behave identically. The
-  /// first and last segment of each route are port stubs and are excluded; they
-  /// still move because they share a point with the interior segment they feed.
+  /// first and last segment of each route are port stubs and are excluded here;
+  /// the worker reattaches those stubs after post-processing.
   /// Edges are walked in sorted order so the segment list is order-independent.
   private func decompose(_ pointsByEdge: [String: [CGPoint]]) -> [PolicyCanvasNudgeSegment] {
     var segments: [PolicyCanvasNudgeSegment] = []

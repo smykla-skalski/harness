@@ -26,11 +26,33 @@ func policyCanvasBridgedRoute(
   }
   policyCanvasAppendUniquePoint(target.exit, to: &points)
   policyCanvasAppendUniquePoint(target.actual, to: &points)
-  let compressed = PolicyCanvasVisibilityRouter.compressCollinear(points)
+  let compressed = policyCanvasCompressPreservingTerminalStubs(points)
   return PolicyCanvasEdgeRoute(
     points: compressed,
     labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: compressed)
   )
+}
+
+func policyCanvasCompressPreservingTerminalStubs(_ points: [CGPoint]) -> [CGPoint] {
+  guard points.count >= 4 else {
+    return PolicyCanvasVisibilityRouter.compressCollinear(points)
+  }
+  let sourceActual = points[0]
+  let sourceLead = points[1]
+  let targetLead = points[points.count - 2]
+  let targetActual = points[points.count - 1]
+  let compressedInterior = PolicyCanvasVisibilityRouter.compressCollinear(
+    Array(points.dropFirst().dropLast())
+  )
+  var result: [CGPoint] = []
+  policyCanvasAppendUniquePoint(sourceActual, to: &result)
+  policyCanvasAppendUniquePoint(sourceLead, to: &result)
+  for point in compressedInterior.dropFirst().dropLast() {
+    policyCanvasAppendUniquePoint(point, to: &result)
+  }
+  policyCanvasAppendUniquePoint(targetLead, to: &result)
+  policyCanvasAppendUniquePoint(targetActual, to: &result)
+  return result
 }
 
 func policyCanvasRouteSourceSide(_ route: PolicyCanvasEdgeRoute) -> PolicyCanvasPortSide? {
