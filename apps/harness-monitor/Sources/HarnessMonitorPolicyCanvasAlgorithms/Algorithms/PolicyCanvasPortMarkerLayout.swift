@@ -220,10 +220,13 @@ extension PolicyCanvasPreparedRouteInput {
       for unit in remainingUnits {
         let preferred = sides.contains(unit.preferredSide) ? unit.preferredSide : sides[0]
         let side = firstAvailableSide(
+          unit: unit,
           preferred: preferred,
           sides: sides,
           capacities: capacities,
-          counts: unitsBySide
+          counts: unitsBySide,
+          edgesByID: edgesByID,
+          nodeIndex: nodeIndex
         )
         unitsBySide[side, default: []].append(unit)
       }
@@ -256,17 +259,88 @@ extension PolicyCanvasPreparedRouteInput {
   }
 
   private func firstAvailableSide(
+    unit: PolicyCanvasPortMarkerAssignmentUnit,
     preferred: PolicyCanvasPortSide,
     sides: [PolicyCanvasPortSide],
     capacities: [PolicyCanvasPortSide: Int],
-    counts: [PolicyCanvasPortSide: [PolicyCanvasPortMarkerAssignmentUnit]]
+    counts: [PolicyCanvasPortSide: [PolicyCanvasPortMarkerAssignmentUnit]],
+    edgesByID: [String: PolicyCanvasEdge],
+    nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> PolicyCanvasPortSide {
     let orderedSides = [preferred] + sides.filter { $0 != preferred }
-    return orderedSides.first { side in
+    let availableSides = orderedSides.filter { side in
       counts[side, default: []].count < capacities[side, default: 1]
-    } ?? orderedSides.min { left, right in
+    }
+    if let unblocked = availableSides.first(where: { side in
+      !portMarkerSideIsBlocked(
+        unit: unit,
+        side: side,
+        edgesByID: edgesByID,
+        nodeIndex: nodeIndex
+      )
+    }) {
+      return unblocked
+    }
+    return availableSides.first ?? orderedSides.min { left, right in
       counts[left, default: []].count < counts[right, default: []].count
     } ?? preferred
+  }
+
+  private func portMarkerSideIsBlocked(
+    unit: PolicyCanvasPortMarkerAssignmentUnit,
+    side: PolicyCanvasPortSide,
+    edgesByID: [String: PolicyCanvasEdge],
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> Bool {
+    guard
+      let endpoint = unit.entries.first?.endpoint,
+      let node = nodeIndex[endpoint.nodeID]
+    else {
+      return false
+    }
+    let endpointNodeIDs = Set(
+      unit.entries.compactMap { entry -> String? in
+        guard let edge = edgesByID[entry.key.edgeID] else {
+          return nil
+        }
+        return entry.key.role == .source ? edge.target.nodeID : edge.source.nodeID
+      } + [endpoint.nodeID]
+    )
+    let reach = PolicyCanvasLayout.edgePortTurnMinimumLead + 1
+    let corridor: CGRect
+    switch side {
+    case .leading:
+      corridor = CGRect(
+        x: node.frame.minX - reach,
+        y: node.frame.minY,
+        width: reach,
+        height: node.frame.height
+      )
+    case .trailing:
+      corridor = CGRect(
+        x: node.frame.maxX,
+        y: node.frame.minY,
+        width: reach,
+        height: node.frame.height
+      )
+    case .top:
+      corridor = CGRect(
+        x: node.frame.minX,
+        y: node.frame.minY - reach,
+        width: node.frame.width,
+        height: reach
+      )
+    case .bottom:
+      corridor = CGRect(
+        x: node.frame.minX,
+        y: node.frame.maxY,
+        width: node.frame.width,
+        height: reach
+      )
+    }
+    return nodeIndex.values.contains { other in
+      !endpointNodeIDs.contains(other.id) && other.frame.intersects(corridor)
+    }
   }
 
   private func dominantSideThatFits(

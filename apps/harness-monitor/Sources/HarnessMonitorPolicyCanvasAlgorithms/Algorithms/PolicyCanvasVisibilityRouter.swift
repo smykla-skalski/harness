@@ -280,11 +280,9 @@ public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     raw: [CGRect]
   ) -> [CGRect] {
     let dropPoints = [
-      sourceActual,
-      targetActual,
-      source,
-      target,
-    ].compactMap { $0 }
+      sourceActual ?? source,
+      targetActual ?? target,
+    ]
     return raw.reduce(into: [CGRect]()) { result, rect in
       // Drop a rect only when an endpoint anchor lies on its own node frame,
       // probed by a 1pt outset - not when the anchor merely falls inside the
@@ -306,11 +304,9 @@ public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     raw: [CGRect]
   ) -> [CGRect] {
     let dropPoints = [
-      sourceActual,
-      targetActual,
-      source,
-      target,
-    ].compactMap { $0 }
+      sourceActual ?? source,
+      targetActual ?? target,
+    ]
     return raw.filter { rect in
       let ownFrame = rect.insetBy(dx: -Self.endpointDropProbe, dy: -Self.endpointDropProbe)
       return !dropPoints.contains(where: { ownFrame.contains($0) })

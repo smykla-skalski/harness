@@ -192,12 +192,21 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
 
   private func selectedFlexRoute(_ input: FlexRouteSelectionInput) -> PolicyCanvasEdgeRoute {
     guard usesFlexAnchors(sourceNode: input.sourceNode, targetNode: input.targetNode) else {
-      return pinnedRoute(
+      let route = pinnedRoute(
         source: input.source,
         target: input.target,
         context: input.baseContext,
         router: input.router
       )
+      if routeAvoidsNonEndpointObstacles(
+        route,
+        sourceActual: input.source.actual,
+        targetActual: input.target.actual,
+        context: input.baseContext
+      ) {
+        return route
+      }
+      return safeAlternateRoute(input) ?? route
     }
     let sourceCandidates = sideCandidates(
       for: input.edge.source,
@@ -221,7 +230,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
         router: input.router
       )
     }
-    return flexRoute(
+    let route = flexRoute(
       sourceCandidates: sourceCandidates,
       targetCandidates: targetCandidates,
       context: PolicyCanvasRouteContext(
@@ -238,6 +247,157 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       ),
       router: input.router
     )
+    let routedSource = matchingCandidate(for: route.points.first, in: sourceCandidates)
+    let routedTarget = matchingCandidate(for: route.points.last, in: targetCandidates)
+    if routeAvoidsNonEndpointObstacles(
+      route,
+      sourceActual: routedSource.actual,
+      targetActual: routedTarget.actual,
+      context: input.baseContext
+    ) {
+      return route
+    }
+    return safeAlternateRoute(input) ?? route
+  }
+
+  private struct AlternateRouteCandidate {
+    let route: PolicyCanvasEdgeRoute
+    let cost: CGFloat
+    let sourceSide: PolicyCanvasPortSide
+    let targetSide: PolicyCanvasPortSide
+  }
+
+  private func safeAlternateRoute(_ input: FlexRouteSelectionInput) -> PolicyCanvasEdgeRoute? {
+    let sourceCandidates = orderedSideCandidates(
+      sideCandidates(
+        for: input.edge.source,
+        nodeIndex: input.nodeIndex,
+        prepared: input.prepared,
+        terminalSlot: input.slots.source,
+        terminal: nil
+      ),
+      preferredSide: input.source.side
+    )
+    let targetCandidates = orderedSideCandidates(
+      sideCandidates(
+        for: input.edge.target,
+        nodeIndex: input.nodeIndex,
+        prepared: input.prepared,
+        terminalSlot: input.slots.target,
+        terminal: nil
+      ),
+      preferredSide: input.target.side
+    )
+    guard !sourceCandidates.isEmpty, !targetCandidates.isEmpty else {
+      return nil
+    }
+    var best: AlternateRouteCandidate?
+    for source in sourceCandidates {
+      for target in targetCandidates {
+        let context = PolicyCanvasRouteContext(
+          lane: input.baseContext.lane,
+          groups: input.baseContext.groups,
+          sourceGroupID: input.baseContext.sourceGroupID,
+          targetGroupID: input.baseContext.targetGroupID,
+          obstacles: input.baseContext.obstacles,
+          obstaclesAreCanonical: true,
+          sourceActual: source.actual,
+          targetActual: target.actual,
+          lineSpacing: input.baseContext.lineSpacing,
+          corridorHint: input.baseContext.corridorHint
+        )
+        let route = pinnedRoute(
+          source: source,
+          target: target,
+          context: context,
+          router: input.router
+        )
+        guard routeAvoidsNonEndpointObstacles(
+          route,
+          sourceActual: source.actual,
+          targetActual: target.actual,
+          context: input.baseContext
+        ) else {
+          continue
+        }
+        let sidePenalty =
+          (source.side == input.source.side ? 0 : PolicyCanvasVisibilityRouter.bendPenalty)
+          + (target.side == input.target.side ? 0 : PolicyCanvasVisibilityRouter.bendPenalty)
+        let candidate = AlternateRouteCandidate(
+          route: route,
+          cost: PolicyCanvasVisibilityRouter.routeCost(points: route.points) + sidePenalty,
+          sourceSide: source.side,
+          targetSide: target.side
+        )
+        if let current = best {
+          if alternateRoute(candidate, isBetterThan: current) {
+            best = candidate
+          }
+        } else {
+          best = candidate
+        }
+      }
+    }
+    return best?.route
+  }
+
+  private func orderedSideCandidates(
+    _ candidates: [SideCandidate],
+    preferredSide: PolicyCanvasPortSide
+  ) -> [SideCandidate] {
+    candidates.sorted { left, right in
+      let leftPreferred = left.side == preferredSide
+      let rightPreferred = right.side == preferredSide
+      if leftPreferred != rightPreferred {
+        return leftPreferred
+      }
+      if left.side.rawValue != right.side.rawValue {
+        return left.side.rawValue < right.side.rawValue
+      }
+      if left.actual.x != right.actual.x {
+        return left.actual.x < right.actual.x
+      }
+      return left.actual.y < right.actual.y
+    }
+  }
+
+  private func alternateRoute(
+    _ candidate: AlternateRouteCandidate,
+    isBetterThan current: AlternateRouteCandidate
+  ) -> Bool {
+    if abs(candidate.cost - current.cost) > 0.001 {
+      return candidate.cost < current.cost
+    }
+    if candidate.sourceSide.rawValue != current.sourceSide.rawValue {
+      return candidate.sourceSide.rawValue < current.sourceSide.rawValue
+    }
+    if candidate.targetSide.rawValue != current.targetSide.rawValue {
+      return candidate.targetSide.rawValue < current.targetSide.rawValue
+    }
+    return pointKey(candidate.route.points) < pointKey(current.route.points)
+  }
+
+  private func pointKey(_ points: [CGPoint]) -> String {
+    points
+      .map { "\(Int(($0.x * 1_000).rounded())):\(Int(($0.y * 1_000).rounded()))" }
+      .joined(separator: "|")
+  }
+
+  private func routeAvoidsNonEndpointObstacles(
+    _ route: PolicyCanvasEdgeRoute,
+    sourceActual: CGPoint,
+    targetActual: CGPoint,
+    context: PolicyCanvasRouteContext
+  ) -> Bool {
+    let endpointPoints = [sourceActual, targetActual]
+    let obstacles = context.obstacles.filter { rect in
+      let ownFrame = rect.insetBy(
+        dx: -PolicyCanvasVisibilityRouter.endpointDropProbe,
+        dy: -PolicyCanvasVisibilityRouter.endpointDropProbe
+      )
+      return !endpointPoints.contains(where: { ownFrame.contains($0) })
+    }
+    return !policyCanvasRouteIntersectsObstacles(route, obstacles: obstacles)
   }
 
   private struct SideCandidate {
@@ -305,8 +465,8 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       targetGroupID: context.targetGroupID,
       obstacles: context.obstacles,
       obstaclesAreCanonical: true,
-      sourceActual: source.lead,
-      targetActual: target.lead,
+      sourceActual: source.actual,
+      targetActual: target.actual,
       lineSpacing: context.lineSpacing,
       corridorHint: context.corridorHint
     )

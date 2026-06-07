@@ -42,13 +42,65 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
       PolicyCanvasVisibilityRouter.compressCollinear($0.points)
     }
     pointsByEdge = spread(pointsByEdge, original: originalPointsByEdge, obstacles: obstacles)
+    let edgesByID = Dictionary(uniqueKeysWithValues: input.prepared.edges.map { ($0.id, $0) })
     return pointsByEdge.reduce(into: [:]) { result, entry in
       let points = PolicyCanvasVisibilityRouter.compressCollinear(entry.value)
-      result[entry.key] = PolicyCanvasEdgeRoute(
+      let processed = PolicyCanvasEdgeRoute(
         points: points,
         labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: points)
       )
+      guard let original = input.routes[entry.key] else {
+        result[entry.key] = processed
+        return
+      }
+      guard processed.points != original.points else {
+        result[entry.key] = processed
+        return
+      }
+      let displayedProcessed = policyCanvasRoutePreservingTerminalStubs(
+        original: original,
+        processed: processed
+      )
+      guard displayedProcessed.points != original.points else {
+        result[entry.key] = processed
+        return
+      }
+      let bodyObstacles = edgesByID[entry.key].map {
+        postProcessingBodyObstacles(edge: $0, prepared: input.prepared)
+      } ?? obstacles
+      let routeEnvelope = routeBounds(original.points)
+        .union(routeBounds(displayedProcessed.points))
+        .insetBy(dx: -1, dy: -1)
+      let nearbyObstacles = bodyObstacles.filter { $0.intersects(routeEnvelope) }
+      if !nearbyObstacles.isEmpty,
+        policyCanvasRouteIntersectsObstacles(displayedProcessed, obstacles: nearbyObstacles),
+        !policyCanvasRouteIntersectsObstacles(original, obstacles: nearbyObstacles)
+      {
+        result[entry.key] = original
+      } else {
+        result[entry.key] = processed
+      }
     }
+  }
+
+  private func routeBounds(_ points: [CGPoint]) -> CGRect {
+    guard let first = points.first else {
+      return .null
+    }
+    return points.dropFirst().reduce(into: CGRect(origin: first, size: .zero)) { bounds, point in
+      bounds = bounds.union(CGRect(origin: point, size: .zero))
+    }
+  }
+
+  private func postProcessingBodyObstacles(
+    edge: PolicyCanvasEdge,
+    prepared: PolicyCanvasPreparedRouteInput
+  ) -> [CGRect] {
+    let endpointNodeIDs = Set([edge.source.nodeID, edge.target.nodeID])
+    return prepared.nodes
+      .filter { !endpointNodeIDs.contains($0.id) }
+      .map(\.frame)
+      + policyCanvasGroupTitleFrames(prepared.groups)
   }
 
   /// Iteratively spread shared lanes into parallel lanes, choosing for every

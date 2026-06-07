@@ -47,6 +47,43 @@ struct PolicyCanvasLabRoutingQualityTests {
     return []
   }
 
+  @Test("reference lab sample routes avoid node and group title bodies")
+  func referenceLabSampleRoutesAvoidNodeAndGroupTitleBodies() async throws {
+    var hits: [String] = []
+    for sampleID in PolicyCanvasReferenceAlgorithmSamples.ids {
+      let graph = try await routedLabGraph(sampleID: sampleID)
+      let nodeFrames = Dictionary(
+        uniqueKeysWithValues: graph.nodes.map { node in
+          (node.id, policyCanvasNodeFrame(node).insetBy(dx: 0.5, dy: 0.5))
+        }
+      )
+      let titleFrames = Array(zip(graph.groups, policyCanvasGroupTitleFrames(graph.groups)))
+      for edge in graph.edges {
+        guard let route = graph.output.routes[edge.id] else {
+          hits.append("\(sampleID):\(edge.id): missing route")
+          continue
+        }
+        for hit in routeBodyHits(
+          route: route,
+          edge: edge,
+          nodes: graph.nodes,
+          nodeFrames: nodeFrames,
+          titleFrames: titleFrames
+        ) {
+          hits.append("\(sampleID):\(edge.id): \(hit); route \(route.points)")
+        }
+      }
+    }
+
+    #expect(
+      hits.isEmpty,
+      """
+      lab sample routes should not pass through node or group-title bodies
+      hits=\(hits)
+      """
+    )
+  }
+
   @Test("extreme sample routes stay inside a local vertical band")
   func extremeRoutesStayInsideLocalVerticalBand() async throws {
     let laidOutGraph = try laidOutLabGraph(sampleID: "extreme")
