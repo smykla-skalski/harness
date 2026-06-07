@@ -68,14 +68,15 @@ struct PolicyCanvasPortColumn: View {
       )
       let canonicalEndpoint = policyCanvasCanonicalPortEndpoint(endpoint)
       let routedSides = visibleSides[canonicalEndpoint] ?? []
-      let isRouted = routedSides.contains(side)
+      let hasRoutedMarkers = markerLayout.hasMarkers(for: endpoint, side: side)
+      let isRouted = routedSides.contains(side) || hasRoutedMarkers
       let isVisible = policyCanvasVisiblePortSides(
         for: endpoint,
         visibility: visibleSides,
         nodeIsActive: nodeIsActive,
         hasPendingEdge: viewModel.hasPendingEdge
       )
-      .contains(side)
+      .contains(side) || hasRoutedMarkers
       let markers = markerLayout.markers(for: endpoint, side: side, isVisible: isVisible)
       for marker in markers {
         result.append(

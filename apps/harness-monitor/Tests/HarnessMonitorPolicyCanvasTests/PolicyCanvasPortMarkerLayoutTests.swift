@@ -6,8 +6,8 @@ import Testing
 
 @Suite("Policy canvas port marker layout")
 struct PolicyCanvasPortMarkerLayoutTests {
-  @Test("terminal markers fit four vertical lanes before deterministic overflow")
-  func terminalMarkersFitFourVerticalLanesBeforeDeterministicOverflow() {
+  @Test("terminal markers spill after three visible vertical lanes")
+  func terminalMarkersSpillAfterThreeVisibleVerticalLanes() {
     let target = policyCanvasMarkerTestNode(
       id: "target",
       position: CGPoint(x: 220, y: 80),
@@ -62,10 +62,10 @@ struct PolicyCanvasPortMarkerLayoutTests {
     let topTerminals = targetTerminals.filter { $0.side == .top }
 
     #expect(targetTerminals.count == edges.count)
-    #expect(leadingTerminals.count == 4)
-    #expect(topTerminals.count == 1)
-    #expect(leadingMarkers.count == 4)
-    #expect(topMarkers.count == 1)
+    #expect(leadingTerminals.count == 3)
+    #expect(topTerminals.count == 2)
+    #expect(leadingMarkers.count == 3)
+    #expect(topMarkers.count == 2)
     assertBorderCoordinates(
       markers: leadingMarkers,
       base: PolicyCanvasLayout.nodeSize.height / 2,
@@ -80,6 +80,7 @@ struct PolicyCanvasPortMarkerLayoutTests {
       PolicyCanvasLayout.nodeSize.height / 2 + $0.axisOffset
     }.sorted()
     assertEvenSpacing(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
+    assertMinimumSpacing(leadingCoordinates)
   }
 
   @Test("terminal markers share capacity and spacing across logical ports")
@@ -136,12 +137,13 @@ struct PolicyCanvasPortMarkerLayoutTests {
     let trailing = sourceTerminals.filter { $0.1.side == .trailing }
     let bottom = sourceTerminals.filter { $0.1.side == .bottom }
 
-    #expect(trailing.count == 4)
-    #expect(bottom.isEmpty)
+    #expect(trailing.count == 3)
+    #expect(bottom.count == 1)
     let trailingCoordinates = trailing.map { edge, terminal in
       sourceCoordinate(edge.source, side: .trailing) + terminal.axisOffset
     }.sorted()
     assertEvenSpacing(trailingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
+    assertMinimumSpacing(trailingCoordinates)
   }
 
   @Test("preferred opposite horizontal sides render explicit markers")
@@ -206,6 +208,23 @@ struct PolicyCanvasPortMarkerLayoutTests {
     #expect(layout.markers(for: edge.target, side: .trailing, isVisible: true).count == 1)
   }
 
+  @Test("layout reports explicit marker sides independently of visibility")
+  func layoutReportsExplicitMarkerSidesIndependentlyOfVisibility() {
+    let endpoint = PolicyCanvasPortEndpoint(nodeID: "merge-risk", portID: "in", kind: .input)
+    let key = PolicyCanvasRouteTerminalKey(edgeID: "missing-evidence", role: .target)
+    let layout = PolicyCanvasPortMarkerLayout(
+      terminalsByKey: [
+        key: PolicyCanvasPortTerminal(side: .leading, axisOffset: -12)
+      ],
+      endpointsByKey: [
+        key: endpoint
+      ]
+    )
+
+    #expect(layout.hasMarkers(for: endpoint, side: .leading))
+    #expect(!layout.hasMarkers(for: endpoint, side: .top))
+  }
+
   func assertBorderCoordinates(
     markers: [PolicyCanvasPortMarker],
     base: CGFloat,
@@ -242,6 +261,12 @@ struct PolicyCanvasPortMarkerLayoutTests {
     }
     #expect(deltas.allSatisfy { abs($0 - firstDelta) < 0.001 })
     #expect(abs((coordinates[0] + coordinates[coordinates.count - 1]) - extent) < 0.001)
+  }
+
+  func assertMinimumSpacing(_ coordinates: [CGFloat]) {
+    for pair in zip(coordinates, coordinates.dropFirst()) {
+      #expect(pair.1 - pair.0 >= policyCanvasMinimumPortMarkerSpacing() - 0.001)
+    }
   }
 }
 

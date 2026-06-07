@@ -63,6 +63,13 @@ public struct PolicyCanvasPortMarkerLayout: Equatable, Sendable {
     terminalsByKey[PolicyCanvasRouteTerminalKey(edgeID: edgeID, role: role)]
   }
 
+  public func hasMarkers(
+    for endpoint: PolicyCanvasPortEndpoint,
+    side: PolicyCanvasPortSide
+  ) -> Bool {
+    offsetsByEndpoint[policyCanvasCanonicalPortEndpoint(endpoint)]?[side]?.isEmpty == false
+  }
+
   public func markers(
     for endpoint: PolicyCanvasPortEndpoint,
     side: PolicyCanvasPortSide,
@@ -376,9 +383,7 @@ extension PolicyCanvasPreparedRouteInput {
     // they would overlap, not the wider preferred port spacing. A logical port
     // that fans into several markers compresses to this floor rather than
     // spilling onto an adjacent side.
-    let spacing =
-      PolicyCanvasLayout.defaultEdgeLineSpacing + PolicyCanvasVisibilityRouter.channelStep
-    return max(1, Int(floor(available / spacing)) + 1)
+    return max(1, Int(floor(available / policyCanvasMinimumPortMarkerSpacing())) + 1)
   }
 
   private func policyCanvasPortMarkerEndpointGroupSortKey(
@@ -395,7 +400,7 @@ extension PolicyCanvasPreparedRouteInput {
   ) -> CGFloat {
     max(
       portSpacing(for: endpoint, side: side, nodeIndex: nodeIndex),
-      PolicyCanvasLayout.defaultEdgeLineSpacing + PolicyCanvasVisibilityRouter.channelStep
+      policyCanvasMinimumPortMarkerSpacing()
     )
   }
 }

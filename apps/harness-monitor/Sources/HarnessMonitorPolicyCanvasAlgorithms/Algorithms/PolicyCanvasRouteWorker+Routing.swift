@@ -289,7 +289,7 @@ extension PolicyCanvasPreparedRouteInput {
     }
     let spacing = max(
       portSpacing(for: endpoint, side: side, nodeIndex: nodeIndex),
-      PolicyCanvasLayout.defaultEdgeLineSpacing + PolicyCanvasVisibilityRouter.channelStep
+      policyCanvasMinimumPortMarkerSpacing()
     )
     return (
       point: policyCanvasShiftedRouteAnchor(
