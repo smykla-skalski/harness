@@ -37,10 +37,11 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     let obstacles = policyCanvasCanonicalObstacles(
       input.prepared.nodes.map(\.frame) + policyCanvasGroupTitleFrames(input.prepared.groups)
     )
+    let originalPointsByEdge = input.routes.mapValues(\.points)
     var pointsByEdge = input.routes.mapValues {
       PolicyCanvasVisibilityRouter.compressCollinear($0.points)
     }
-    pointsByEdge = spread(pointsByEdge, obstacles: obstacles)
+    pointsByEdge = spread(pointsByEdge, original: originalPointsByEdge, obstacles: obstacles)
     return pointsByEdge.reduce(into: [:]) { result, entry in
       let points = PolicyCanvasVisibilityRouter.compressCollinear(entry.value)
       result[entry.key] = PolicyCanvasEdgeRoute(
@@ -56,9 +57,13 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
   /// the crossing/body-hit set the result must never exceed.
   private func spread(
     _ routes: [String: [CGPoint]],
+    original: [String: [CGPoint]],
     obstacles: [CGRect]
   ) -> [String: [CGPoint]] {
-    let baseline = PolicyCanvasNudgeRouteMetrics.baseline(of: routes, obstacles: obstacles)
+    let baseline = PolicyCanvasNudgeRouteMetrics.baseline(
+      of: displayedPoints(routes, preserving: original),
+      obstacles: obstacles
+    )
     let processor = PolicyCanvasOrthogonalNudgeProcessor(
       obstacles: obstacles,
       fans: PolicyCanvasFanContext.make(from: routes)
@@ -66,7 +71,7 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     var pointsByEdge = routes
     for _ in 0..<iterations {
       var working = pointsByEdge
-      var entries = entryCache(of: working)
+      var entries = entryCache(of: displayedPoints(working, preserving: original))
       var applied = false
       let segments = decompose(working)
       for axis in [PolicyCanvasSegmentAxis.horizontal, .vertical] {
@@ -77,12 +82,22 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
             continue
           }
           if let chosen = bestSpread(
-            offsets, working: working, entries: entries, obstacles: obstacles, baseline: baseline
+            offsets,
+            working: working,
+            original: original,
+            entries: entries,
+            obstacles: obstacles,
+            baseline: baseline
           ) {
             working = apply(chosen, to: working)
             for edgeID in Set(chosen.map { $0.segment.edgeID }) where working[edgeID] != nil {
+              let displayed = displayedPoints(
+                [edgeID: working[edgeID] ?? []],
+                preserving: original
+              )
               entries[edgeID] = PolicyCanvasNudgeRouteMetrics.entry(
-                id: edgeID, points: working[edgeID] ?? []
+                id: edgeID,
+                points: displayed[edgeID] ?? working[edgeID] ?? []
               )
             }
             applied = true
@@ -111,46 +126,72 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     }
   }
 
+  private func displayedPoints(
+    _ pointsByEdge: [String: [CGPoint]],
+    preserving original: [String: [CGPoint]]
+  ) -> [String: [CGPoint]] {
+    pointsByEdge.reduce(into: [:]) { result, entry in
+      guard let originalPoints = original[entry.key] else {
+        result[entry.key] = entry.value
+        return
+      }
+      let route = policyCanvasRoutePreservingTerminalStubs(
+        original: PolicyCanvasEdgeRoute(points: originalPoints, labelPosition: .zero),
+        processed: PolicyCanvasEdgeRoute(points: entry.value, labelPosition: .zero)
+      )
+      result[entry.key] = route.points
+    }
+  }
+
   /// Score every candidate placement for one channel and return the best, or nil
   /// to leave the channel stacked. Only the channel's own edges move, so the rest
-  /// of the scene is built once into `fixed` and each placement is scored locally
-  /// against it - identical ordering to a full-scene rescore, far cheaper. The
+  /// of the scene is built once into `fixed` and each placement is scored against
+  /// it - identical ordering to a full-scene rescore, still limited to pairs that
+  /// involve one of the channel edges. The
   /// zero-shift state is the floor, so a spread is chosen only when it does not add
   /// a body hit or a crossing over leaving the channel alone, and among
   /// non-regressing options the one that removes the most overlap wins.
   private func bestSpread(
     _ offsets: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)],
     working: [String: [CGPoint]],
+    original: [String: [CGPoint]],
     entries: [String: PolicyCanvasNudgeRouteMetrics.RouteEntry],
     obstacles: [CGRect],
     baseline: PolicyCanvasNudgeRouteMetrics.Baseline
   ) -> [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]? {
     let channelEdges = Set(offsets.map { $0.segment.edgeID })
     let sortedEdges = channelEdges.sorted()
-    let band = channelBand(offsets: offsets)
-    let fixed = relevantFixed(channelEdges: channelEdges, entries: entries, band: band)
-    // Only obstacles inside the swept band can be newly hit by a shift; an edge
-    // that hits anything outside it already did so before the shift and so sits in
-    // the baseline already, so the body-hit test need not rescan every node frame.
-    let nearbyObstacles = band.map { rect in obstacles.filter { $0.intersects(rect) } } ?? obstacles
     // Score against only the channel's own points: every placement shifts the same
     // few edges, so slicing them out of `working` avoids copying the whole route
     // dictionary per candidate while `localPenalty` reads exactly these ids.
     let channelPoints = channelEdges.reduce(into: [String: [CGPoint]]()) { slice, id in
       slice[id] = working[id]
     }
+    let candidatePlacements = placements(from: offsets)
+    let interactionBand = movedInteractionBand(
+      floor: channelPoints,
+      candidates: candidatePlacements,
+      original: original
+    )
+    let fixed = relevantFixed(channelEdges: channelEdges, entries: entries, band: interactionBand)
+    // Only obstacles inside the moved-route envelope can be newly hit by a shift;
+    // an edge that hits anything outside it already did so before the shift and so
+    // sits in the baseline already.
+    let nearbyObstacles =
+      interactionBand.map { rect in obstacles.filter { $0.intersects(rect) } } ?? obstacles
     let scoring = PolicyCanvasNudgeRouteMetrics.Scoring(
       fixed: fixed,
       obstacles: nearbyObstacles,
       baseline: baseline,
-      overlapThreshold: overlapThreshold
+      overlapThreshold: overlapThreshold,
+      minimumLaneSpacing: laneGap
     )
     func localPenalty(
       of state: [String: [CGPoint]]
     ) -> PolicyCanvasNudgeRouteMetrics.LocalPenalty {
       PolicyCanvasNudgeRouteMetrics.localPenalty(
         channelEdges: sortedEdges,
-        pointsByEdge: state,
+        pointsByEdge: displayedPoints(state, preserving: original),
         scoring: scoring
       )
     }
@@ -163,7 +204,7 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     }
     var chosen: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]?
     var bestPenalty = floor
-    for candidate in placements(from: offsets) {
+    for candidate in candidatePlacements {
       let candidatePenalty = localPenalty(of: apply(candidate, to: channelPoints))
       if candidatePenalty.isLower(than: bestPenalty) {
         bestPenalty = candidatePenalty
@@ -181,12 +222,10 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     return chosen
   }
 
-  /// Fixed (non-channel) routes that could plausibly meet this channel: those whose
-  /// bounding box falls inside the band the channel sweeps across all of its
-  /// candidate placements (its current extent grown by the largest lane shift). A
-  /// route outside that band cannot cross or overlap any placement, so it is
-  /// dropped before the per-placement segment scoring - the cost no longer scales
-  /// with the whole graph, only with the channel's neighbourhood.
+  /// Fixed (non-channel) routes that can interact with this channel: routes whose
+  /// segments enter the padded envelope swept by the displayed moved routes across
+  /// every placement. The envelope is built from terminal-preserved candidate
+  /// routes, so restored port bridges cannot hide crossings from the scorer.
   private func relevantFixed(
     channelEdges: Set<String>,
     entries: [String: PolicyCanvasNudgeRouteMetrics.RouteEntry],
@@ -199,34 +238,28 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
       return fixed
     }
     return fixed.filter { entry in
-      entry.bounds.intersects(band)
-        && PolicyCanvasNudgeRouteMetrics.segmentsEnter(entry, band)
+      PolicyCanvasNudgeRouteMetrics.segmentsEnter(entry, band)
     }
   }
 
-  /// The thin band one channel sweeps across all of its placements: the lane it
-  /// sits on grown perpendicular by the largest shift, spanning the segments'
-  /// length. Every crossing or overlap a shift can add or remove lies inside this
-  /// band, so a fixed route none of whose segments enter it scores identically
-  /// under every placement and is dropped - an exact prune, not a bbox guess.
-  private func channelBand(
-    offsets: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]
+  private func movedInteractionBand(
+    floor: [String: [CGPoint]],
+    candidates: [[(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]],
+    original: [String: [CGPoint]]
   ) -> CGRect? {
-    guard let axis = offsets.first?.segment.axis else {
-      return nil
+    var band = CGRect.null
+    let padding = laneGap + 1
+    for state in [floor] + candidates.map({ apply($0, to: floor) }) {
+      let displayed = displayedPoints(state, preserving: original)
+      for points in displayed.values {
+        for (start, end) in zip(points, points.dropFirst()) where start != end {
+          band = band.union(
+            policyCanvasRouteSegmentFrame(start: start, end: end, padding: padding)
+          )
+        }
+      }
     }
-    let reach = (offsets.map { abs($0.offset) }.max() ?? 0) + 2 * laneGap + 1
-    let positions = offsets.map { $0.segment.position }
-    let spanLow = (offsets.map { $0.segment.lowerBound }.min() ?? 0) - reach
-    let spanHigh = (offsets.map { $0.segment.upperBound }.max() ?? 0) + reach
-    let laneLow = (positions.min() ?? 0) - reach
-    let laneHigh = (positions.max() ?? 0) + reach
-    switch axis {
-    case .horizontal:
-      return CGRect(x: spanLow, y: laneLow, width: spanHigh - spanLow, height: laneHigh - laneLow)
-    case .vertical:
-      return CGRect(x: laneLow, y: spanLow, width: laneHigh - laneLow, height: spanHigh - spanLow)
-    }
+    return band.isNull ? nil : band
   }
 
   /// Spread placements to score for one channel: the fan/bus-ordered offsets and

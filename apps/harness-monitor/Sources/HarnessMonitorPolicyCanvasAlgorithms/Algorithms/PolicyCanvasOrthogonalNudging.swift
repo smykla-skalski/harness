@@ -37,9 +37,9 @@ struct PolicyCanvasOrthogonalNudgeProcessor {
   /// ordering within a channel defers to this so a fan's corridor and column are
   /// ordered by one shared member rank and stay mutually crossing-free.
   let fans: PolicyCanvasFanContext
-  /// Visual separation between adjacent lanes in a shared channel. Reused from
-  /// the router's bus spacing so a nudged fan reads like the parallel rails the
-  /// router already draws when it gets lanes right on its own.
+  /// Minimum visual separation between adjacent lanes in a shared channel.
+  /// Reused from the router's bus spacing so nudged and initially routed lanes
+  /// obey one edge-to-edge distance.
   var laneGap: CGFloat = PolicyCanvasVisibilityRouter.laneSpreadStep
   /// Collinearity tolerance - segments within this of one another on the lane
   /// axis count as sharing the lane.

@@ -6,37 +6,41 @@ extension PolicyCanvasOrthogonalNudgeProcessor {
   /// spread wires that were never really stacked.
   private var minimumChannelOverlap: CGFloat { 4 }
 
-  /// Group same-axis segments into channels: a channel is a maximal run of
-  /// segments that share a lane (same perpendicular coordinate within tolerance)
-  /// and overlap along it. Distinct lanes and non-overlapping runs stay separate.
+  /// Group same-axis segments into channels: a channel is a maximal connected
+  /// run of segments that overlap along their route span and whose parallel lanes
+  /// are closer than the required route spacing. Exact stacks and near-parallel
+  /// corridor collisions are both spread by the same lane-offset pass.
   func channels(in segments: [PolicyCanvasNudgeSegment]) -> [[PolicyCanvasNudgeSegment]] {
-    let byLane = Dictionary(grouping: segments) { segment in
-      (segment.position / max(tolerance, 0.5)).rounded()
+    let sorted = segments.sorted(by: channelSort)
+    guard sorted.count > 1 else {
+      return []
     }
-    var result: [[PolicyCanvasNudgeSegment]] = []
-    for lane in byLane.values {
-      let sorted = lane.sorted { $0.lowerBound < $1.lowerBound }
-      var current: [PolicyCanvasNudgeSegment] = []
-      var reach = -CGFloat.greatestFiniteMagnitude
-      for segment in sorted {
-        // Join when this segment overlaps the running group by more than the
-        // minimum; otherwise close the group and start a new one.
-        if !current.isEmpty, segment.lowerBound < reach - minimumChannelOverlap {
-          current.append(segment)
-          reach = max(reach, segment.upperBound)
-        } else {
-          if current.count > 1 {
-            result.append(current)
-          }
-          current = [segment]
-          reach = segment.upperBound
+    var parent = Array(sorted.indices)
+    for left in sorted.indices {
+      for right in sorted.index(after: left)..<sorted.endIndex {
+        let laneDistance = sorted[right].position - sorted[left].position
+        if laneDistance >= laneGap - 0.001 {
+          break
         }
-      }
-      if current.count > 1 {
-        result.append(current)
+        guard sorted[left].edgeID != sorted[right].edgeID else {
+          continue
+        }
+        guard spanOverlap(sorted[left], sorted[right]) > minimumChannelOverlap else {
+          continue
+        }
+        union(left, right, parent: &parent)
       }
     }
-    return result
+    var groups: [Int: [PolicyCanvasNudgeSegment]] = [:]
+    for index in sorted.indices {
+      groups[find(index, parent: &parent), default: []].append(sorted[index])
+    }
+    return groups.values
+      .filter { $0.count > 1 }
+      .map { $0.sorted(by: channelSort) }
+      .sorted { left, right in
+        channelSort(left[0], right[0])
+      }
   }
 
   /// Assign each segment in a channel its lane offset. Order comes from
@@ -79,10 +83,54 @@ extension PolicyCanvasOrthogonalNudgeProcessor {
     // Centre of the asymmetric free band relative to the channel lane: positive
     // means the band can sit below (or right of) the original line.
     let bandCenter = (downRoom - upRoom) / 2
+    let laneCenter = ordered.map(\.position).reduce(0, +) / CGFloat(count)
     let center = CGFloat(count - 1) / 2
     return ordered.enumerated().map { rank, segment in
-      (segment, bandCenter + (CGFloat(rank) - center) * gap)
+      let targetPosition = laneCenter + bandCenter + (CGFloat(rank) - center) * gap
+      return (segment, targetPosition - segment.position)
     }
+  }
+
+  private func channelSort(
+    _ left: PolicyCanvasNudgeSegment,
+    _ right: PolicyCanvasNudgeSegment
+  ) -> Bool {
+    if left.position != right.position {
+      return left.position < right.position
+    }
+    if left.lowerBound != right.lowerBound {
+      return left.lowerBound < right.lowerBound
+    }
+    if left.upperBound != right.upperBound {
+      return left.upperBound < right.upperBound
+    }
+    if left.edgeID != right.edgeID {
+      return left.edgeID < right.edgeID
+    }
+    return left.startIndex < right.startIndex
+  }
+
+  private func spanOverlap(
+    _ left: PolicyCanvasNudgeSegment,
+    _ right: PolicyCanvasNudgeSegment
+  ) -> CGFloat {
+    max(0, min(left.upperBound, right.upperBound) - max(left.lowerBound, right.lowerBound))
+  }
+
+  private func find(_ index: Int, parent: inout [Int]) -> Int {
+    if parent[index] != index {
+      parent[index] = find(parent[index], parent: &parent)
+    }
+    return parent[index]
+  }
+
+  private func union(_ left: Int, _ right: Int, parent: inout [Int]) {
+    let leftRoot = find(left, parent: &parent)
+    let rightRoot = find(right, parent: &parent)
+    guard leftRoot != rightRoot else {
+      return
+    }
+    parent[rightRoot] = leftRoot
   }
 
   /// Lane order for a channel. When every segment belongs to one fan - all

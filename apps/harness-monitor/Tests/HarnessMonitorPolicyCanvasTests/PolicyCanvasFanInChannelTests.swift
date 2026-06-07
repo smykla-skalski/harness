@@ -120,7 +120,9 @@ struct PolicyCanvasFanInChannelTests {
       let fanIn = Dictionary(grouping: scene.edges, by: \.target).filter { $0.value.count > 1 }
       for (endpoint, members) in fanIn.sorted(by: { $0.key.nodeID < $1.key.nodeID }) {
         let frame = scene.nodeFrames[endpoint.nodeID] ?? .null
-        report += "FAN-IN target=\(endpoint.nodeID):\(endpoint.portID) frame=\(rect(frame)) n=\(members.count)\n"
+        report +=
+          "FAN-IN target=\(endpoint.nodeID):\(endpoint.portID)"
+          + " frame=\(rect(frame)) n=\(members.count)\n"
         for edge in members.sorted(by: { $0.id < $1.id }) {
           report += memberLine(edge: edge, scene: scene)
         }
@@ -128,7 +130,9 @@ struct PolicyCanvasFanInChannelTests {
       let fanOut = Dictionary(grouping: scene.edges, by: \.source).filter { $0.value.count > 1 }
       for (endpoint, members) in fanOut.sorted(by: { $0.key.nodeID < $1.key.nodeID }) {
         let frame = scene.nodeFrames[endpoint.nodeID] ?? .null
-        report += "FAN-OUT source=\(endpoint.nodeID):\(endpoint.portID) frame=\(rect(frame)) n=\(members.count)\n"
+        report +=
+          "FAN-OUT source=\(endpoint.nodeID):\(endpoint.portID)"
+          + " frame=\(rect(frame)) n=\(members.count)\n"
         for edge in members.sorted(by: { $0.id < $1.id }) {
           report += memberLine(edge: edge, scene: scene)
         }
@@ -138,7 +142,8 @@ struct PolicyCanvasFanInChannelTests {
       // crossings the nudge actually introduces can be traced by hand.
       report += "ALL EDGES (src node -> tgt node) [B=before, A=after]:\n"
       for edge in scene.edges.sorted(by: { $0.id < $1.id }) {
-        report += "  \(edge.id) \(edge.source.nodeID):\(edge.source.portID)"
+        report +=
+          "  \(edge.id) \(edge.source.nodeID):\(edge.source.portID)"
           + " -> \(edge.target.nodeID):\(edge.target.portID)\n"
         report += "   B " + routePoints(edge: edge, scene: before)
         report += "   A " + routePoints(edge: edge, scene: scene)
@@ -152,7 +157,9 @@ struct PolicyCanvasFanInChannelTests {
     guard let route = scene.routes[edge.id] else {
       return "  \(edge.id): (no route)\n"
     }
-    let pts = route.points.map { "(\(Int($0.x.rounded())),\(Int($0.y.rounded())))" }.joined(separator: " ")
+    let pts = route.points
+      .map { "(\(Int($0.x.rounded())),\(Int($0.y.rounded())))" }
+      .joined(separator: " ")
     return "  \(edge.id) src=\(edge.source.nodeID): \(pts)\n"
   }
 
@@ -247,10 +254,14 @@ struct PolicyCanvasFanInChannelTests {
   ) -> CGFloat {
     var best: CGFloat = 0
     for leftSegment in left {
-      // `overlap(with:)` returns the range overlap for any two same-axis
-      // segments; it only counts as a real collinear stack when they also share
-      // the same lane coordinate (same x for verticals, same y for horizontals).
-      for rightSegment in right where leftSegment.sharesAxisLane(with: rightSegment) {
+      // `overlap(with:)` returns the range overlap for same-axis segments; it
+      // counts as a real corridor conflict when the lanes are closer than the
+      // route-level minimum spacing.
+      for rightSegment in right
+      where leftSegment.sharesParallelCorridor(
+        with: rightSegment,
+        minimumSpacing: PolicyCanvasLayout.defaultEdgeLineSpacing
+      ) {
         best = max(best, leftSegment.overlap(with: rightSegment))
       }
     }

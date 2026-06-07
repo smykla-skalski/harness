@@ -133,6 +133,21 @@ struct PolicyCanvasRouteSegment {
     return false
   }
 
+  /// True when same-axis segments overlap along their route span and their
+  /// lane coordinates are closer than the route-level minimum spacing.
+  func sharesParallelCorridor(
+    with other: Self,
+    minimumSpacing: CGFloat
+  ) -> Bool {
+    guard isSameAxis(as: other) else {
+      return false
+    }
+    guard overlap(with: other) > 0.001 else {
+      return false
+    }
+    return axisDistance(to: other) < minimumSpacing - 0.001
+  }
+
   func isSameAxis(as other: Self) -> Bool {
     (isHorizontal && other.isHorizontal) || (isVertical && other.isVertical)
   }
