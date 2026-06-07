@@ -6,10 +6,7 @@ extension PolicyCanvasViewport {
   /// canvas switch has no cached routes to restore.
   @MainActor
   func clearCachedRouteOutput() {
-    appliedRouteKey = nil
-    cachedRouteOutput = .empty
-    cachedRouteNodePositionsByID = [:]
-    cachedRouteCanvasIdentity = viewModel.pipelineIdentity
+    clearRouteCache(pipelineIdentity: viewModel.pipelineIdentity)
   }
 
   @MainActor
@@ -18,28 +15,21 @@ extension PolicyCanvasViewport {
     pipelineIdentity: String?,
     fontScale: CGFloat
   ) async {
-    routeGeneration &+= 1
-    let generation = routeGeneration
+    let generation = nextRouteGeneration()
     let result = await policyCanvasViewportRouteRebuildResult(
-      worker: routeWorker,
+      worker: routeWorkerInstance(),
       viewModel: viewModel,
       fontScale: fontScale
     )
-    guard !Task.isCancelled, routeGeneration == generation else {
+    guard !Task.isCancelled, routeGenerationMatches(generation) else {
       return
     }
-    cachedRouteCanvasIdentity = pipelineIdentity
-    cachedRouteNodePositionsByID = result.nodePositionsByID
-    if cachedRouteOutput.signature != result.output.signature {
-      cachedRouteOutput = result.output
-    }
-    if let pipelineIdentity {
-      cachedRouteOutputsByCanvasIdentity[pipelineIdentity] = (
-        result.output,
-        result.nodePositionsByID
-      )
-    }
-    appliedRouteKey = routeKey
+    updateCachedRoutes(
+      routeKey: routeKey,
+      pipelineIdentity: pipelineIdentity,
+      output: result.output,
+      nodePositionsByID: result.nodePositionsByID
+    )
   }
 
   /// Service a `requestAtomicReflow(...)`: route the planned layout off-main,
@@ -78,10 +68,9 @@ extension PolicyCanvasViewport {
       routingHints: graph.routingHints,
       algorithmSelection: viewModel.algorithmSelection
     )
-    routeGeneration &+= 1
-    let generation = routeGeneration
-    let output = await routeWorker.compute(input: routeInput)
-    guard !Task.isCancelled, routeGeneration == generation else {
+    let generation = nextRouteGeneration()
+    let output = await routeWorkerInstance().compute(input: routeInput)
+    guard !Task.isCancelled, routeGenerationMatches(generation) else {
       return
     }
     commitAtomicReflow(request: request, output: output, fontScale: fontScale)
@@ -102,21 +91,17 @@ extension PolicyCanvasViewport {
       requestsRouteComputation: false
     )
     let pipelineIdentity = viewModel.pipelineIdentity
-    cachedRouteCanvasIdentity = pipelineIdentity
-    cachedRouteNodePositionsByID = policyCanvasNodePositionsByID(viewModel.nodes)
-    cachedRouteOutput = output
-    if let pipelineIdentity {
-      cachedRouteOutputsByCanvasIdentity[pipelineIdentity] = (
-        output,
-        cachedRouteNodePositionsByID
-      )
-    }
-    appliedRouteKey = policyCanvasRouteWorkerKey(
-      viewModel: viewModel,
-      nodes: viewModel.nodes,
-      groups: viewModel.groups,
-      edges: viewModel.edges,
-      fontScale: fontScale
+    updateCachedRoutes(
+      routeKey: policyCanvasRouteWorkerKey(
+        viewModel: viewModel,
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        fontScale: fontScale
+      ),
+      pipelineIdentity: pipelineIdentity,
+      output: output,
+      nodePositionsByID: policyCanvasNodePositionsByID(viewModel.nodes)
     )
   }
 }
