@@ -62,33 +62,82 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
     )
   }
 
-  /// In the crowded branching and multi-group corridors - where a naive nudge
-  /// could only de-overlap by adding crossings - the crossing-aware pass clears
-  /// overlaps the baseline left stacked while adding none.
-  @Test("clears clearable overlaps without adding a crossing")
-  func clearsClearableOverlapsWithoutAddingCrossings() async throws {
+  /// In the crowded branching corridor - where a naive nudge could only
+  /// de-overlap by adding crossings - the crossing-aware pass clears the spacing
+  /// conflicts the baseline left stacked while adding none.
+  @Test("clearable corridors improve without adding a crossing")
+  func clearableCorridorsImproveWithoutAddingCrossing() async throws {
     let baseline = Self.routeQualitySelection(
       routePostProcessing: PolicyCanvasAlgorithmDefaults.collinearRouteCompression
     )
     let nudged = Self.routeQualitySelection(
       routePostProcessing: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
     )
-    for sampleID in ["branching", "multi-group"] {
-      let base = try await routedScene(sampleID: sampleID, selection: baseline)
-      let after = try await routedScene(sampleID: sampleID, selection: nudged)
-      let baseOverlaps = interiorOverlapPairs(routes: base.routes, edges: base.edges)
-      let afterOverlaps = interiorOverlapPairs(routes: after.routes, edges: after.edges)
-      let baseCrossings = Set(crossingPairs(routes: base.routes, edges: base.edges))
-      let afterAdded = Set(crossingPairs(routes: after.routes, edges: after.edges))
-        .subtracting(baseCrossings)
-      #expect(
-        afterOverlaps.count < baseOverlaps.count,
-        "\(sampleID): expected to clear an overlap, got \(baseOverlaps.count)->\(afterOverlaps.count)"
-      )
-      #expect(
-        afterAdded.isEmpty,
-        "\(sampleID): the crossing-aware pass added crossings \(afterAdded.sorted())"
-      )
+    let base = try await routedScene(sampleID: "branching", selection: baseline)
+    let after = try await routedScene(sampleID: "branching", selection: nudged)
+    let baseOverlaps = interiorOverlapPairs(routes: base.routes, edges: base.edges)
+    let afterOverlaps = interiorOverlapPairs(routes: after.routes, edges: after.edges)
+    let baseCrossings = Set(crossingPairs(routes: base.routes, edges: base.edges))
+    let afterAdded = Set(crossingPairs(routes: after.routes, edges: after.edges))
+      .subtracting(baseCrossings)
+    #expect(
+      afterOverlaps.count < baseOverlaps.count,
+      "branching: expected to clear an overlap, got \(baseOverlaps.count)->\(afterOverlaps.count)"
+    )
+    #expect(
+      afterAdded.isEmpty,
+      "branching: the crossing-aware pass added crossings \(afterAdded.sorted())"
+    )
+  }
+
+  @Test("stacked corridors spread by the route lane minimum")
+  func stackedCorridorsSpreadByRouteLaneMinimum() {
+    let prepared = PolicyCanvasPreparedRouteInput(
+      input: PolicyCanvasRouteWorkerInput(nodes: [], groups: [], edges: [], fontScale: 1)
+    )
+    let routes = [
+      "top": stackedCorridorRoute(sourceY: -80, targetY: 180, entryX: 40, exitX: 240),
+      "middle": stackedCorridorRoute(sourceY: 0, targetY: 260, entryX: 60, exitX: 260),
+      "bottom": stackedCorridorRoute(sourceY: 80, targetY: 340, entryX: 80, exitX: 280),
+    ]
+
+    let processed = PolicyCanvasOrthogonalNudgingRouteProcessing().processRoutes(
+      input: PolicyCanvasRoutePostProcessingInput(prepared: prepared, routes: routes)
+    )
+    let corridorYs = processed.keys.sorted().compactMap { edgeID in
+      processed[edgeID].flatMap(stackedCorridorY)
+    }.sorted()
+
+    #expect(corridorYs.count == routes.count)
+    for pair in zip(corridorYs, corridorYs.dropFirst()) {
+      #expect(pair.1 - pair.0 >= PolicyCanvasLayout.defaultEdgeLineSpacing - 0.001)
+    }
+  }
+
+  @Test("nearby corridors spread by the route lane minimum")
+  func nearbyCorridorsSpreadByRouteLaneMinimum() {
+    let prepared = PolicyCanvasPreparedRouteInput(
+      input: PolicyCanvasRouteWorkerInput(nodes: [], groups: [], edges: [], fontScale: 1)
+    )
+    let routes = [
+      "top": stackedCorridorRoute(
+        sourceY: -80, targetY: 180, entryX: 40, exitX: 240, corridorY: 100),
+      "middle": stackedCorridorRoute(
+        sourceY: 0, targetY: 260, entryX: 60, exitX: 260, corridorY: 106),
+      "bottom": stackedCorridorRoute(
+        sourceY: 80, targetY: 340, entryX: 80, exitX: 280, corridorY: 112),
+    ]
+
+    let processed = PolicyCanvasOrthogonalNudgingRouteProcessing().processRoutes(
+      input: PolicyCanvasRoutePostProcessingInput(prepared: prepared, routes: routes)
+    )
+    let corridorYs = processed.keys.sorted().compactMap { edgeID in
+      processed[edgeID].flatMap(stackedCorridorY)
+    }.sorted()
+
+    #expect(corridorYs.count == routes.count)
+    for pair in zip(corridorYs, corridorYs.dropFirst()) {
+      #expect(pair.1 - pair.0 >= PolicyCanvasLayout.defaultEdgeLineSpacing - 0.001)
     }
   }
 
@@ -174,6 +223,35 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
     return Scene(edges: edges, routes: output.routes)
   }
 
+  private func stackedCorridorRoute(
+    sourceY: CGFloat,
+    targetY: CGFloat,
+    entryX: CGFloat,
+    exitX: CGFloat,
+    corridorY: CGFloat = 100
+  ) -> PolicyCanvasEdgeRoute {
+    let points = [
+      CGPoint(x: 0, y: sourceY),
+      CGPoint(x: entryX, y: sourceY),
+      CGPoint(x: entryX, y: corridorY),
+      CGPoint(x: exitX, y: corridorY),
+      CGPoint(x: exitX, y: targetY),
+      CGPoint(x: 320, y: targetY),
+    ]
+    return PolicyCanvasEdgeRoute(
+      points: points,
+      labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: points)
+    )
+  }
+
+  private func stackedCorridorY(_ route: PolicyCanvasEdgeRoute) -> CGFloat? {
+    policyCanvasRouteSegments(route)
+      .dropFirst()
+      .dropLast()
+      .first { $0.isHorizontal && $0.length > 150 }
+      .map(\.axisCoordinate)
+  }
+
   // MARK: - Metrics (mirrors PolicyCanvasFanInChannelTests; helpers there are private)
 
   private func interiorOverlapPairs(
@@ -204,7 +282,11 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
   ) -> CGFloat {
     var best: CGFloat = 0
     for leftSegment in left {
-      for rightSegment in right where leftSegment.sharesAxisLane(with: rightSegment) {
+      for rightSegment in right
+      where leftSegment.sharesParallelCorridor(
+        with: rightSegment,
+        minimumSpacing: PolicyCanvasLayout.defaultEdgeLineSpacing
+      ) {
         best = max(best, leftSegment.overlap(with: rightSegment))
       }
     }

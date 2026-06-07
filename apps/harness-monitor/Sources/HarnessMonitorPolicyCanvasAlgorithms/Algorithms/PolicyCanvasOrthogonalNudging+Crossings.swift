@@ -11,8 +11,10 @@ import CoreGraphics
 /// gate exactly - a horizontal segment's interior cut by a vertical segment's
 /// interior at 0.5pt tolerance. Overlap counts interior collinear stacks past the
 /// gate's 8pt threshold; body hits count routes whose segments cut a node or
-/// group-title frame. The pass rejects any shift that adds a crossing or a body
-/// hit not already present in the pre-spread baseline.
+/// group-title frame. Same-axis interiors that run closer than the route lane
+/// minimum are still treated as unresolved corridor overlaps. The pass rejects
+/// any shift that adds a crossing or a body hit not already present in the
+/// pre-spread baseline.
 enum PolicyCanvasNudgeRouteMetrics {
   /// The pre-spread routing the result is measured against: the crossing pairs
   /// that already existed (keyed `lowerID|higherID`) and the edges whose route
@@ -48,26 +50,20 @@ enum PolicyCanvasNudgeRouteMetrics {
     let points: [CGPoint]
     /// Interior segments (stubs dropped) used for overlap scoring.
     let interior: [PolicyCanvasRouteSegment]
-    /// All segments including the port stubs, cached so the channel-band prune can
-    /// test a route without rebuilding its polyline each time it is consulted.
+    /// All segments including the port stubs, cached so the interaction-envelope
+    /// prune can test a route without rebuilding its polyline each time.
     let segments: [PolicyCanvasRouteSegment]
-    /// Bounding box of the whole polyline. Two routes can only cross or overlap
-    /// where their boxes meet, so this prunes far-apart pairs before the segment
-    /// test - a route outside the shifting channel's band cannot interact with it.
-    let bounds: CGRect
   }
 
   static func entry(id: String, points: [CGPoint]) -> RouteEntry {
     let segments = policyCanvasRouteSegments(
       PolicyCanvasEdgeRoute(points: points, labelPosition: .zero)
     )
-    let bounds = points.reduce(CGRect.null) { $0.union(CGRect(origin: $1, size: .zero)) }
     return RouteEntry(
       id: id,
       points: points,
       interior: Array(segments.dropFirst().dropLast()),
-      segments: segments,
-      bounds: bounds
+      segments: segments
     )
   }
 
@@ -124,6 +120,7 @@ enum PolicyCanvasNudgeRouteMetrics {
     let obstacles: [CGRect]
     let baseline: Baseline
     let overlapThreshold: CGFloat
+    let minimumLaneSpacing: CGFloat
   }
 
   /// Score a candidate placement of one channel: build the moved edges' entries
@@ -177,7 +174,11 @@ enum PolicyCanvasNudgeRouteMetrics {
     {
       addedCrossings += 1
     }
-    if maximumInteriorOverlap(left.interior, right.interior) > scoring.overlapThreshold {
+    if maximumInteriorOverlap(
+      left.interior,
+      right.interior,
+      minimumLaneSpacing: scoring.minimumLaneSpacing
+    ) > scoring.overlapThreshold {
       overlapPairs += 1
     }
   }
@@ -190,11 +191,16 @@ enum PolicyCanvasNudgeRouteMetrics {
 
   static func maximumInteriorOverlap(
     _ left: [PolicyCanvasRouteSegment],
-    _ right: [PolicyCanvasRouteSegment]
+    _ right: [PolicyCanvasRouteSegment],
+    minimumLaneSpacing: CGFloat = PolicyCanvasVisibilityRouter.laneSpreadStep
   ) -> CGFloat {
     var best: CGFloat = 0
     for leftSegment in left {
-      for rightSegment in right where leftSegment.sharesAxisLane(with: rightSegment) {
+      for rightSegment in right
+      where leftSegment.sharesParallelCorridor(
+        with: rightSegment,
+        minimumSpacing: minimumLaneSpacing
+      ) {
         best = max(best, leftSegment.overlap(with: rightSegment))
       }
     }

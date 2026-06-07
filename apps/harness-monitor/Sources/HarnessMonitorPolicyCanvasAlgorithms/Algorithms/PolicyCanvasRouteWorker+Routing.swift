@@ -374,7 +374,7 @@ func policyCanvasRoutesPreservingRouteTerminals(
   }
 }
 
-private func policyCanvasRoutePreservingTerminalStubs(
+func policyCanvasRoutePreservingTerminalStubs(
   original: PolicyCanvasEdgeRoute,
   processed: PolicyCanvasEdgeRoute
 ) -> PolicyCanvasEdgeRoute {

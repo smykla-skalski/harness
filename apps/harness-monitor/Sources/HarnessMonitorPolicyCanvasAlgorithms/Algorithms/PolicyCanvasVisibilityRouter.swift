@@ -32,15 +32,11 @@ public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   /// also dropped any unrelated node lying within the pad of an anchor, which
   /// let A* route through that node's body.
   static let endpointDropProbe: CGFloat = 1
-  /// Per-lane visual separation for parallel edges sharing a bus column.
-  /// 12pt is wide enough that 8+ parallel edges (e.g. converging on a
-  /// terminal-decisions group) read as distinct rails rather than a
-  /// single tight bundle, but narrow enough that simple 2-3-edge fans
-  /// still fit within node-clearance bounds. Lifted out of
-  /// `channelStep` because the channel snap (5pt) wants the tighter
-  /// grid to keep routes axis-aligned, while the visible spread wants
-  /// the wider step for legibility.
-  static let laneSpreadStep: CGFloat = 12
+  /// Minimum visual separation for parallel route lanes sharing a corridor.
+  /// This intentionally matches the route-worker's default line spacing so
+  /// terminal fans, nudged corridors, and router lane offsets all enforce the
+  /// same edge-to-edge distance.
+  static let laneSpreadStep: CGFloat = PolicyCanvasLayout.defaultEdgeLineSpacing
   /// Bend penalty for A*. 100pt is the dominant cost term once segment
   /// lengths drop below ~100pt, matching the recommendations' research
   /// citation (50-200 typical range).

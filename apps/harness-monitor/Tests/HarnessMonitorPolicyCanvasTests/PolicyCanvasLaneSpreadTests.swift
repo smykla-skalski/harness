@@ -49,6 +49,9 @@ struct PolicyCanvasLaneSpreadTests {
     #expect(spread[2].y != points[2].y)
     #expect(spread[3].y != points[3].y)
     #expect(spread[2].y == spread[3].y)
+    #expect(
+      abs(spread[2].y - points[2].y) >= PolicyCanvasLayout.defaultEdgeLineSpacing - 0.001
+    )
   }
 
   @Test("lane 1 and lane 2 produce different signed offsets")
@@ -80,6 +83,8 @@ struct PolicyCanvasLaneSpreadTests {
     #expect(delta1 != 0)
     #expect(delta2 != 0)
     #expect(delta1.sign != delta2.sign)
+    #expect(abs(delta1) >= PolicyCanvasLayout.defaultEdgeLineSpacing - 0.001)
+    #expect(abs(delta2) >= PolicyCanvasLayout.defaultEdgeLineSpacing - 0.001)
   }
 
   @Test("vertical dominant bus shifts on x axis")
@@ -104,5 +109,8 @@ struct PolicyCanvasLaneSpreadTests {
     #expect(spread[2].x == spread[3].x)
     #expect(spread[2].y == points[2].y)
     #expect(spread[3].y == points[3].y)
+    #expect(
+      abs(spread[2].x - points[2].x) >= PolicyCanvasLayout.defaultEdgeLineSpacing - 0.001
+    )
   }
 }
