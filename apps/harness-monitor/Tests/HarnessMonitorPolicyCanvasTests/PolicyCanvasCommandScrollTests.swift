@@ -240,10 +240,15 @@ struct PolicyCanvasCommandScrollTests {
   @Test("port columns render explicit marker sides even when visibility misses them")
   func portColumnsRenderExplicitMarkerSides() throws {
     let source = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasPortViews.swift")
+    let nodeLayerSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNodeLayer.swift"
+    )
 
     #expect(source.contains("let hasRoutedMarkers = markerLayout.hasMarkers"))
     #expect(source.contains("routedSides.contains(side) || hasRoutedMarkers"))
     #expect(source.contains(".contains(side) || hasRoutedMarkers"))
+    #expect(nodeLayerSource.contains("ports: node.inputPorts,\n        alignment: .trailing"))
+    #expect(nodeLayerSource.contains("ports: node.outputPorts,\n        alignment: .leading"))
   }
 
   @Test("canvas pane switching keeps the viewport mounted")
