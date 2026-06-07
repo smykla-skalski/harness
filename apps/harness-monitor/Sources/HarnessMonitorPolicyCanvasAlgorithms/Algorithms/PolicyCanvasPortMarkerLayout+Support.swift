@@ -105,6 +105,13 @@ func policyCanvasPortMarkerInset() -> CGFloat {
   PolicyCanvasLayout.portDiameter / 2 + 2
 }
 
+func policyCanvasMinimumPortMarkerSpacing() -> CGFloat {
+  max(
+    PolicyCanvasLayout.defaultEdgeLineSpacing + PolicyCanvasVisibilityRouter.channelStep,
+    PolicyCanvasLayout.portDiameter * 1.75
+  )
+}
+
 func policyCanvasSideExtent(side: PolicyCanvasPortSide) -> CGFloat {
   switch side {
   case .leading, .trailing:

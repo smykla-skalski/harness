@@ -29,6 +29,12 @@ struct PolicyCanvasRouteWorkerKey: Equatable {
   }
 }
 
+struct PolicyCanvasViewportRouteRefreshKey: Equatable {
+  let routeKey: PolicyCanvasRouteWorkerKey
+  let pipelineIdentity: String?
+  let isProvisional: Bool
+}
+
 struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
   let signature: PolicyCanvasRouteWorkerOutputSignature
   let routes: [String: PolicyCanvasEdgeRoute]

@@ -25,10 +25,7 @@ struct PolicyCanvasViewport: View {
   @State private var hasAppliedRestoredSceneZoom = false
   @State private var scrollApplicatorRequest: PolicyCanvasViewportScrollRequest?
   @State private var scrollApplicatorRequestID: UInt64 = 0
-  // The route-cache state below is module-internal (not `private`) so the
-  // cohesive `PolicyCanvasViewport+AtomicReflow.swift` companion can service a
-  // reformat without splitting the cache writes across the 420-line file cap.
-  // SwiftUI ownership is unchanged: only this view's own extensions reach it.
+  // Module-internal so route-cache companions can publish precomputed routes.
   @State var routeWorker = PolicyCanvasRouteWorker()
   @State var routeGeneration: UInt64 = 0
   @State var appliedRouteKey: PolicyCanvasRouteWorkerKey?
@@ -204,6 +201,18 @@ struct PolicyCanvasViewport: View {
           routeOutput: routeOutput
         )
       }
+      .task(id: PolicyCanvasViewportRouteRefreshKey(
+        routeKey: routeKey,
+        pipelineIdentity: routeCacheIdentity,
+        isProvisional: routeOutputIsCurrentGraphProvisional
+      )) {
+        guard routeOutputIsCurrentGraphProvisional else { return }
+        await rebuildRoutes(
+          for: routeKey,
+          pipelineIdentity: routeCacheIdentity,
+          fontScale: fontScale
+        )
+      }
       .onChange(of: scenePhase) { _, newPhase in
         if newPhase != ScenePhase.active {
           viewModel.clearPinchAnchor()
@@ -230,7 +239,11 @@ struct PolicyCanvasViewport: View {
           return
         }
         Task { @MainActor in
-          await rebuildRoutes(for: routeKey, pipelineIdentity: routeCacheIdentity)
+          await rebuildRoutes(
+            for: routeKey,
+            pipelineIdentity: routeCacheIdentity,
+            fontScale: fontScale
+          )
         }
       }
       .onChange(of: viewModel.atomicReflowRequest?.id, initial: false) {
@@ -267,35 +280,6 @@ extension PolicyCanvasViewport {
       return
     }
     commandFocus = nextFocus
-  }
-
-  @MainActor
-  private func rebuildRoutes(
-    for routeKey: PolicyCanvasRouteWorkerKey,
-    pipelineIdentity: String?
-  ) async {
-    routeGeneration &+= 1
-    let generation = routeGeneration
-    let result = await policyCanvasViewportRouteRebuildResult(
-      worker: routeWorker,
-      viewModel: viewModel,
-      fontScale: fontScale
-    )
-    guard !Task.isCancelled, routeGeneration == generation else {
-      return
-    }
-    cachedRouteCanvasIdentity = pipelineIdentity
-    cachedRouteNodePositionsByID = result.nodePositionsByID
-    if cachedRouteOutput.signature != result.output.signature {
-      cachedRouteOutput = result.output
-    }
-    if let pipelineIdentity {
-      cachedRouteOutputsByCanvasIdentity[pipelineIdentity] = (
-        result.output,
-        result.nodePositionsByID
-      )
-    }
-    appliedRouteKey = routeKey
   }
 
   private func centerViewportIfNeeded(

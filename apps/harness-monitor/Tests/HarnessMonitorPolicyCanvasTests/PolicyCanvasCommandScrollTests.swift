@@ -180,10 +180,13 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("_ = viewModel.consumeViewportCenteringRequest()"))
   }
 
-  @Test("canvas switching does not run the route worker automatically")
-  func viewportRoutesOnlyAfterExplicitReformatRequest() throws {
+  @Test("canvas switching refreshes provisional fallback routes lazily")
+  func viewportRefreshesProvisionalFallbackRoutes() throws {
     let source =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+    let routeCacheSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewport+AtomicReflow.swift"
+    )
     let surfaceSource =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift")
 
@@ -201,11 +204,14 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("cachedRouteOutputsByCanvasIdentity"))
     #expect(
       source.contains("let cachedRouteOutput = cachedRouteOutputsByCanvasIdentity[newIdentity]"))
-    #expect(source.contains("cachedRouteOutputsByCanvasIdentity[pipelineIdentity] ="))
+    #expect(routeCacheSource.contains("cachedRouteOutputsByCanvasIdentity[pipelineIdentity] ="))
     #expect(source.contains(".onChange(of: viewModel.routeComputationRequestGeneration"))
-    #expect(
-      source.contains("await rebuildRoutes(for: routeKey, pipelineIdentity: routeCacheIdentity)"))
-    #expect(!source.contains(".task(id: routeKey)"))
+    #expect(source.contains("await rebuildRoutes("))
+    #expect(source.contains("pipelineIdentity: routeCacheIdentity"))
+    #expect(source.contains("fontScale: fontScale"))
+    #expect(source.contains(".task(id: PolicyCanvasViewportRouteRefreshKey("))
+    #expect(source.contains("isProvisional: routeOutputIsCurrentGraphProvisional"))
+    #expect(source.contains("guard routeOutputIsCurrentGraphProvisional else { return }"))
     #expect(!surfaceSource.contains("forcesAutoArrange"))
     #expect(!surfaceSource.contains("viewModel.reflowLayout("))
     #expect(
@@ -229,6 +235,15 @@ struct PolicyCanvasCommandScrollTests {
     #expect(snapshotFunction.contains("guard !viewModel.isSavingDraft else"))
     #expect(snapshotFunction.contains("viewModel.applyPersistedDocument("))
     #expect(!snapshotFunction.contains("forceDocumentReload: true"))
+  }
+
+  @Test("port columns render explicit marker sides even when visibility misses them")
+  func portColumnsRenderExplicitMarkerSides() throws {
+    let source = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasPortViews.swift")
+
+    #expect(source.contains("let hasRoutedMarkers = markerLayout.hasMarkers"))
+    #expect(source.contains("routedSides.contains(side) || hasRoutedMarkers"))
+    #expect(source.contains(".contains(side) || hasRoutedMarkers"))
   }
 
   @Test("canvas pane switching keeps the viewport mounted")

@@ -378,6 +378,23 @@ struct PolicyCanvasLabRoutingQualityTests {
     )
   }
 
+  @Test("extreme sample shared input ports render one marker per inbound edge")
+  @MainActor
+  func extremeSampleSharedInputPortsRenderOneMarkerPerInboundEdge() async throws {
+    let scene = try await liveRoutedLabScene(sampleID: "extreme")
+
+    try assertSharedInputPortMarkers(
+      scene: scene,
+      edgeIDs: ["xe:entry-route", "xe:trigger-route"],
+      targetNodeID: "x-route"
+    )
+    try assertSharedInputPortMarkers(
+      scene: scene,
+      edgeIDs: ["xe:wait-merge", "xe:event-merge"],
+      targetNodeID: "x-merge-step"
+    )
+  }
+
   @Test("extreme sample live connected endpoints remain visible")
   @MainActor
   func extremeSampleLiveConnectedEndpointsRemainVisible() async throws {
@@ -425,9 +442,10 @@ struct PolicyCanvasLabRoutingQualityTests {
       var seenMarkers: Set<PolicyCanvasLabMarkerInstanceKey> = []
       var coordinatesBySide: [PolicyCanvasLabMarkerSideKey: [CGFloat]] = [:]
       for endpoint in graph.edges.flatMap({ [$0.source, $0.target] }) {
-        for side in policyCanvasVisiblePortSides(
-          for: endpoint,
-          visibility: graph.output.portVisibility
+        for side in policyCanvasVisibleAndExplicitMarkerSides(
+          endpoint: endpoint,
+          visibility: graph.output.portVisibility,
+          markerLayout: graph.output.portMarkerLayout
         ) {
           guard
             let node = nodeIndex[endpoint.nodeID],
@@ -745,6 +763,50 @@ struct PolicyCanvasLabRoutingQualityTests {
     return [
       "\(key) coordinates=\(coordinates) deltas=\(deltas) extent=\(extent)"
     ]
+  }
+
+  private func assertSharedInputPortMarkers(
+    scene: PolicyCanvasLiveLabScene,
+    edgeIDs: [String],
+    targetNodeID: String
+  ) throws {
+    let edgesByID = Dictionary(uniqueKeysWithValues: scene.edges.map { ($0.id, $0) })
+    let endpoint = try #require(edgesByID[edgeIDs[0]]?.target)
+    #expect(endpoint.nodeID == targetNodeID)
+    let terminals = try edgeIDs.map { edgeID in
+      try #require(scene.output.portMarkerLayout.terminal(edgeID: edgeID, role: .target))
+    }
+    #expect(terminals.allSatisfy { $0.side == .leading })
+    let offsets = terminals.map(\.axisOffset).sorted()
+    #expect(Set(offsets.map { Int(($0 * 1_000).rounded()) }).count == edgeIDs.count)
+    let markers = scene.output.portMarkerLayout.markers(
+      for: endpoint,
+      side: .leading,
+      isVisible: true
+    )
+    #expect(markers.count == edgeIDs.count)
+    let coordinates = markers.map {
+      PolicyCanvasLayout.nodeSize.height / 2 + $0.axisOffset
+    }.sorted()
+    for pair in zip(coordinates, coordinates.dropFirst()) {
+      #expect(
+        pair.1 - pair.0
+          >= policyCanvasMinimumPortMarkerSpacing() - 0.001
+      )
+    }
+  }
+
+  private func policyCanvasVisibleAndExplicitMarkerSides(
+    endpoint: PolicyCanvasPortEndpoint,
+    visibility: PolicyCanvasPortVisibilityMap,
+    markerLayout: PolicyCanvasPortMarkerLayout
+  ) -> [PolicyCanvasPortSide] {
+    var sides = policyCanvasVisiblePortSides(for: endpoint, visibility: visibility)
+    for side in PolicyCanvasPortSide.allSides
+    where markerLayout.hasMarkers(for: endpoint, side: side) {
+      sides.insert(side)
+    }
+    return sides.sorted { $0.rawValue < $1.rawValue }
   }
 
   private func routeTerminalMarkerFailures(
