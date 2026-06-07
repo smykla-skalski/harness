@@ -83,11 +83,13 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
           }
           if let chosen = bestSpread(
             offsets,
-            working: working,
-            original: original,
-            entries: entries,
-            obstacles: obstacles,
-            baseline: baseline
+            context: SpreadSelectionContext(
+              working: working,
+              original: original,
+              entries: entries,
+              obstacles: obstacles,
+              baseline: baseline
+            )
           ) {
             working = apply(chosen, to: working)
             for edgeID in Set(chosen.map { $0.segment.edgeID }) where working[edgeID] != nil {
@@ -153,11 +155,7 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
   /// non-regressing options the one that removes the most overlap wins.
   private func bestSpread(
     _ offsets: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)],
-    working: [String: [CGPoint]],
-    original: [String: [CGPoint]],
-    entries: [String: PolicyCanvasNudgeRouteMetrics.RouteEntry],
-    obstacles: [CGRect],
-    baseline: PolicyCanvasNudgeRouteMetrics.Baseline
+    context: SpreadSelectionContext
   ) -> [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]? {
     let channelEdges = Set(offsets.map { $0.segment.edgeID })
     let sortedEdges = channelEdges.sorted()
@@ -165,24 +163,29 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     // few edges, so slicing them out of `working` avoids copying the whole route
     // dictionary per candidate while `localPenalty` reads exactly these ids.
     let channelPoints = channelEdges.reduce(into: [String: [CGPoint]]()) { slice, id in
-      slice[id] = working[id]
+      slice[id] = context.working[id]
     }
     let candidatePlacements = placements(from: offsets)
     let interactionBand = movedInteractionBand(
       floor: channelPoints,
       candidates: candidatePlacements,
-      original: original
+      original: context.original
     )
-    let fixed = relevantFixed(channelEdges: channelEdges, entries: entries, band: interactionBand)
+    let fixed = relevantFixed(
+      channelEdges: channelEdges,
+      entries: context.entries,
+      band: interactionBand
+    )
     // Only obstacles inside the moved-route envelope can be newly hit by a shift;
     // an edge that hits anything outside it already did so before the shift and so
     // sits in the baseline already.
     let nearbyObstacles =
-      interactionBand.map { rect in obstacles.filter { $0.intersects(rect) } } ?? obstacles
+      interactionBand.map { rect in context.obstacles.filter { $0.intersects(rect) } }
+      ?? context.obstacles
     let scoring = PolicyCanvasNudgeRouteMetrics.Scoring(
       fixed: fixed,
       obstacles: nearbyObstacles,
-      baseline: baseline,
+      baseline: context.baseline,
       overlapThreshold: overlapThreshold,
       minimumLaneSpacing: laneGap
     )
@@ -191,7 +194,7 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     ) -> PolicyCanvasNudgeRouteMetrics.LocalPenalty {
       PolicyCanvasNudgeRouteMetrics.localPenalty(
         channelEdges: sortedEdges,
-        pointsByEdge: displayedPoints(state, preserving: original),
+        pointsByEdge: displayedPoints(state, preserving: context.original),
         scoring: scoring
       )
     }
@@ -220,6 +223,14 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
       }
     }
     return chosen
+  }
+
+  private struct SpreadSelectionContext {
+    let working: [String: [CGPoint]]
+    let original: [String: [CGPoint]]
+    let entries: [String: PolicyCanvasNudgeRouteMetrics.RouteEntry]
+    let obstacles: [CGRect]
+    let baseline: PolicyCanvasNudgeRouteMetrics.Baseline
   }
 
   /// Fixed (non-channel) routes that can interact with this channel: routes whose

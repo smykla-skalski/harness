@@ -193,15 +193,13 @@ extension PolicyCanvasPreparedRouteInput {
     }
     let remainingUnits = units.filter { !reservedUnitIDs.contains($0.id) }
     guard !remainingUnits.isEmpty else {
-      for side in sides {
-        assignPortMarkerOffsets(
-          units: unitsBySide[side, default: []],
-          side: side,
-          edgesByID: edgesByID,
-          nodeIndex: nodeIndex,
-          terminals: &terminals
-        )
-      }
+      assignPortMarkerOffsetsForSides(
+        sides,
+        unitsBySide: unitsBySide,
+        edgesByID: edgesByID,
+        nodeIndex: nodeIndex,
+        terminals: &terminals
+      )
       return
     }
     let remainingCapacities = Dictionary(
@@ -230,6 +228,22 @@ extension PolicyCanvasPreparedRouteInput {
         unitsBySide[side, default: []].append(unit)
       }
     }
+    assignPortMarkerOffsetsForSides(
+      sides,
+      unitsBySide: unitsBySide,
+      edgesByID: edgesByID,
+      nodeIndex: nodeIndex,
+      terminals: &terminals
+    )
+  }
+
+  private func assignPortMarkerOffsetsForSides(
+    _ sides: [PolicyCanvasPortSide],
+    unitsBySide: [PolicyCanvasPortSide: [PolicyCanvasPortMarkerAssignmentUnit]],
+    edgesByID: [String: PolicyCanvasEdge],
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
+  ) {
     for side in sides {
       assignPortMarkerOffsets(
         units: unitsBySide[side, default: []],
