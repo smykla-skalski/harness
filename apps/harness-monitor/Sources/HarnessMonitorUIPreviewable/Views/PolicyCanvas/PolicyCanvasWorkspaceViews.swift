@@ -19,6 +19,7 @@ struct PolicyCanvasViewport: View {
   var minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
   var canvasColorSchemeOverride: ColorScheme?
   var showsEdgeLegend = true
+  var showsQualityInspection = false
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var layoutFocusDispatcher = PolicyCanvasLayoutFocusDispatcher()
   @State private var saveFocusDispatcher = PolicyCanvasSaveFocusDispatcher()
@@ -152,6 +153,7 @@ struct PolicyCanvasViewport: View {
         observationStore: viewportObservationStore,
         contentBounds: routeOutput.visibleBounds,
         minimapVisible: minimapVisible,
+        showsQualityInspection: showsQualityInspection,
         resolvedCanvasColorScheme: resolvedCanvasColorScheme,
         minimapCenteringModeOverride: minimapCenteringModeOverride,
         showsEdgeLegend: showsEdgeLegend,

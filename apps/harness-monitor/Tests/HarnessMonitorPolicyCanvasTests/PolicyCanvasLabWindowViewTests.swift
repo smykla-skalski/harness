@@ -122,6 +122,7 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
 
     XCTAssertTrue(source.contains("PolicyCanvasViewportSurface("))
     XCTAssertTrue(source.contains("algorithmSelection: algorithmSelection"))
+    XCTAssertTrue(source.contains("showsQualityInspection: showsQualityMetrics"))
   }
 
   func testLabSamplePickerToolbarDoesNotExposeGroupsToggle() throws {
@@ -521,7 +522,7 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(atomicSource.contains("func performAtomicReflow("))
     XCTAssertTrue(atomicSource.contains("viewModel.atomicReflowRequest"))
     XCTAssertTrue(atomicSource.contains("plannedReflowGraph("))
-    XCTAssertTrue(atomicSource.contains("routeWorker.compute(input:"))
+    XCTAssertTrue(atomicSource.contains("routeWorkerInstance().compute(input: routeInput)"))
     // The commit publishes positions WITHOUT an async route request so the
     // precomputed routes reveal together with the nodes in a single frame.
     XCTAssertTrue(atomicSource.contains("requestsRouteComputation: false"))

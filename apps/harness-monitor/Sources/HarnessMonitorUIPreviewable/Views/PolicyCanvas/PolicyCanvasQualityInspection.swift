@@ -57,16 +57,15 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
   let viewModel: PolicyCanvasViewModel
   let routes: [String: PolicyCanvasEdgeRoute]
   let routeSignature: PolicyCanvasRouteWorkerOutputSignature
+  let isEnabled: Bool
   let resolvedCanvasColorScheme: ColorScheme?
 
-  @AppStorage(PolicyCanvasQualityMetricsDefaults.isVisibleKey)
-  private var showsQualityMetrics = PolicyCanvasQualityMetricsDefaults.isVisibleDefault
   @State private var worker = PolicyCanvasQualityWorker()
 
   func body(content: Content) -> some View {
     content
       .overlay(alignment: .topTrailing) {
-        if showsQualityMetrics, let report = viewModel.qualityInspectionReport {
+        if isEnabled, let report = viewModel.qualityInspectionReport {
           PolicyCanvasQualityMetricsPanel(
             report: report,
             hoveredCategories: Set(viewModel.hoveredQualityMarks.map(\.category))
@@ -76,14 +75,14 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
           .transition(.opacity)
         }
       }
-      .animation(.easeInOut(duration: 0.18), value: showsQualityMetrics)
+      .animation(.easeInOut(duration: 0.18), value: isEnabled)
       .task(
         id: PolicyCanvasQualityInspectionKey(
-          enabled: showsQualityMetrics,
+          enabled: isEnabled,
           signature: routeSignature
         )
       ) {
-        guard showsQualityMetrics else {
+        guard isEnabled else {
           viewModel.qualityInspectionReport = nil
           viewModel.qualityReportGeneration += 1
           return
@@ -113,6 +112,7 @@ extension View {
     viewModel: PolicyCanvasViewModel,
     routes: [String: PolicyCanvasEdgeRoute],
     routeSignature: PolicyCanvasRouteWorkerOutputSignature,
+    isEnabled: Bool,
     resolvedCanvasColorScheme: ColorScheme?
   ) -> some View {
     modifier(
@@ -120,6 +120,7 @@ extension View {
         viewModel: viewModel,
         routes: routes,
         routeSignature: routeSignature,
+        isEnabled: isEnabled,
         resolvedCanvasColorScheme: resolvedCanvasColorScheme
       )
     )

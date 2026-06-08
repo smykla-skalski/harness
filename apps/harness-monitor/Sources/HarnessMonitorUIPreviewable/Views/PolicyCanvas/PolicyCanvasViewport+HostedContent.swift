@@ -14,6 +14,7 @@ struct PolicyCanvasViewportHostedContent: View {
   let observationStore: PolicyCanvasViewportObservationStore
   let contentBounds: CGRect
   let minimapVisible: Bool
+  let showsQualityInspection: Bool
   let resolvedCanvasColorScheme: ColorScheme?
   let minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
   let showsEdgeLegend: Bool
@@ -61,6 +62,7 @@ struct PolicyCanvasViewportHostedContent: View {
       viewModel: viewModel,
       routes: snapshot.routes,
       routeSignature: snapshot.routeSignature,
+      isEnabled: showsQualityInspection,
       resolvedCanvasColorScheme: resolvedCanvasColorScheme
     )
   }
