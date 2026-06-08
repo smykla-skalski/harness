@@ -62,12 +62,11 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
   @AppStorage(PolicyCanvasQualityMetricsDefaults.isVisibleKey)
   private var showsQualityMetrics = PolicyCanvasQualityMetricsDefaults.isVisibleDefault
   @State private var worker = PolicyCanvasQualityWorker()
-  @State private var report: PolicyCanvasGraphQualityReport?
 
   func body(content: Content) -> some View {
     content
       .overlay(alignment: .topTrailing) {
-        if showsQualityMetrics, let report {
+        if showsQualityMetrics, let report = viewModel.qualityInspectionReport {
           PolicyCanvasQualityMetricsPanel(report: report)
             .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
             .padding(14)
@@ -82,7 +81,7 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
         )
       ) {
         guard showsQualityMetrics else {
-          report = nil
+          viewModel.qualityInspectionReport = nil
           return
         }
         let input = PolicyCanvasQualityWorkerInput(
@@ -92,11 +91,11 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
           routes: routes
         )
         let computed = await worker.compute(input: input)
-        guard !Task.isCancelled, report != computed else {
+        guard !Task.isCancelled, viewModel.qualityInspectionReport != computed else {
           return
         }
         withAnimation(.easeInOut(duration: 0.18)) {
-          report = computed
+          viewModel.qualityInspectionReport = computed
         }
       }
   }
