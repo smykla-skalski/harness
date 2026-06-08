@@ -94,6 +94,9 @@ struct PolicyCanvasViewport: View {
         edges: edges,
         fontScale: fontScale
       )
+      let routeKeyIsStale = routeCache.appliedRouteKey != routeKey
+      let hasActivePositionDrag = viewModel.hasActivePositionDrag
+      let routeProjectionSuppressed = hasActivePositionDrag || routeKeyIsStale
       let projectedRouteOutput = policyCanvasProjectedRouteOutput(
         input: PolicyCanvasProjectedRouteInput(
           cachedOutput: cachedOutput,
@@ -101,14 +104,15 @@ struct PolicyCanvasViewport: View {
           currentNodes: nodes,
           groups: groups,
           edges: edges,
-          fontScale: fontScale
+          fontScale: fontScale,
+          suppressesProjection: routeProjectionSuppressed
         )
       )
       let routeOutputIsCurrentGraphMissing =
         !viewModel.isEmpty && projectedRouteOutput.signature == .empty
       let routeOutput = projectedRouteOutput
       let routeOutputNeedsRefresh =
-        routeOutputIsCurrentGraphMissing || routeCache.appliedRouteKey != routeKey
+        !hasActivePositionDrag && (routeOutputIsCurrentGraphMissing || routeKeyIsStale)
       let validationKey = policyCanvasValidationWorkerKey(
         viewModel: viewModel,
         nodes: nodes,
@@ -250,7 +254,10 @@ struct PolicyCanvasViewport: View {
         hasAppliedRestoredSceneZoom = false
       }
       .onChange(of: viewModel.routeComputationRequestGeneration, initial: false) {
-        guard viewModel.routeComputationRequestGeneration > 0 else {
+        guard
+          viewModel.routeComputationRequestGeneration > 0,
+          !viewModel.hasActivePositionDrag
+        else {
           return
         }
         Task { @MainActor in

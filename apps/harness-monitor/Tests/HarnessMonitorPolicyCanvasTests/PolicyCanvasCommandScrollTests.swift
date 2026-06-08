@@ -210,11 +210,20 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("pipelineIdentity: routeCacheIdentity"))
     #expect(source.contains("fontScale: fontScale"))
     #expect(source.contains("PolicyCanvasViewportRouteRefreshKey("))
+    #expect(source.contains("let routeKeyIsStale = routeCache.appliedRouteKey != routeKey"))
+    #expect(source.contains("let hasActivePositionDrag = viewModel.hasActivePositionDrag"))
     #expect(
       source.contains(
-        "routeOutputIsCurrentGraphMissing || routeCache.appliedRouteKey != routeKey"
+        "let routeProjectionSuppressed = hasActivePositionDrag || routeKeyIsStale"
       )
     )
+    #expect(source.contains("suppressesProjection: routeProjectionSuppressed"))
+    #expect(
+      source.contains(
+        "!hasActivePositionDrag && (routeOutputIsCurrentGraphMissing || routeKeyIsStale)"
+      )
+    )
+    #expect(source.contains("!viewModel.hasActivePositionDrag"))
     #expect(source.contains("needsRefresh: routeOutputNeedsRefresh"))
     #expect(source.contains("guard routeOutputNeedsRefresh else { return }"))
     #expect(!surfaceSource.contains("forcesAutoArrange"))
