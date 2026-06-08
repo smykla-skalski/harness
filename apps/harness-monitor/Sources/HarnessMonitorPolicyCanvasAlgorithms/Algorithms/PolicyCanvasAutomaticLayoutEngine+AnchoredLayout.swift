@@ -254,7 +254,8 @@ extension PolicyCanvasLayeredLayoutEngine {
   func orderedGroups(
     normalizedGroups: [PolicyCanvasNormalizedLayoutGroup],
     groupRanks: [String: Int],
-    anchoredMinXByGroup: [String: CGFloat]
+    anchoredMinXByGroup: [String: CGFloat],
+    groupCenterY: [String: CGFloat] = [:]
   ) -> [PolicyCanvasNormalizedLayoutGroup] {
     normalizedGroups.sorted { left, right in
       let leftRank = groupRanks[left.layoutID] ?? 0
@@ -269,7 +270,60 @@ extension PolicyCanvasLayeredLayoutEngine {
       {
         return leftAnchor < rightAnchor
       }
+      if let leftCenterY = groupCenterY[left.layoutID],
+        let rightCenterY = groupCenterY[right.layoutID],
+        abs(leftCenterY - rightCenterY) >= (PolicyCanvasLayout.gridSize / 2)
+      {
+        return leftCenterY < rightCenterY
+      }
       return left.originalIndex < right.originalIndex
+    }
+  }
+
+  func groupCenterY(
+    normalizedGroups: [PolicyCanvasNormalizedLayoutGroup],
+    itemCenterY: [String: CGFloat]
+  ) -> [String: CGFloat] {
+    normalizedGroups.reduce(into: [:]) { partial, group in
+      let centers = group.nodeIDs.compactMap { itemCenterY[$0] }.sorted()
+      guard !centers.isEmpty else {
+        return
+      }
+      partial[group.layoutID] = centers[centers.count / 2]
+    }
+  }
+
+  func groupBarycenterY(
+    normalizedGroups: [PolicyCanvasNormalizedLayoutGroup],
+    layoutGroupIDByNodeID: [String: String],
+    edges: [PolicyCanvasLayoutEdge],
+    itemCenterY: [String: CGFloat]
+  ) -> [String: CGFloat] {
+    let fallbackCenterY = groupCenterY(
+      normalizedGroups: normalizedGroups,
+      itemCenterY: itemCenterY
+    )
+    return normalizedGroups.reduce(into: [:]) { partial, group in
+      let neighborCenters = edges.compactMap { edge -> CGFloat? in
+        let sourceGroupID = layoutGroupIDByNodeID[edge.sourceNodeID]
+        let targetGroupID = layoutGroupIDByNodeID[edge.targetNodeID]
+        guard sourceGroupID != targetGroupID else {
+          return nil
+        }
+        if targetGroupID == group.layoutID, let sourceGroupID {
+          return itemCenterY[edge.sourceNodeID] ?? fallbackCenterY[sourceGroupID]
+        }
+        if sourceGroupID == group.layoutID, let targetGroupID {
+          return itemCenterY[edge.targetNodeID] ?? fallbackCenterY[targetGroupID]
+        }
+        return nil
+      }
+      guard !neighborCenters.isEmpty else {
+        partial[group.layoutID] = fallbackCenterY[group.layoutID]
+        return
+      }
+      partial[group.layoutID] =
+        neighborCenters.reduce(CGFloat.zero, +) / CGFloat(neighborCenters.count)
     }
   }
 

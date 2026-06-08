@@ -111,7 +111,13 @@ struct PolicyCanvasLayeredClusterFramePacking: PolicyCanvasGroupPlacementAlgorit
     let groupOrder = engine.orderedGroups(
       normalizedGroups: input.rankAssignment.normalizedGroups,
       groupRanks: input.rankAssignment.scopeRanks,
-      anchoredMinXByGroup: [:]
+      anchoredMinXByGroup: [:],
+      groupCenterY: engine.groupBarycenterY(
+        normalizedGroups: input.rankAssignment.normalizedGroups,
+        layoutGroupIDByNodeID: input.rankAssignment.layoutGroupIDByNodeID,
+        edges: input.rankAssignment.acyclicEdges,
+        itemCenterY: input.itemCenterY
+      )
     )
     var accumulator = PolicyCanvasUnconstrainedPlacement()
     for group in groupOrder {

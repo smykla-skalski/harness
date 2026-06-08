@@ -213,10 +213,17 @@ extension PolicyCanvasLayeredLayoutEngine {
         orderHints[nodeID] = Double(index)
       }
     }
+    let groupCenterYByID = groupBarycenterY(
+      normalizedGroups: normalizedGroups,
+      layoutGroupIDByNodeID: layoutGroupIDByNodeID,
+      edges: acyclicNodeEdges,
+      itemCenterY: itemCenterY
+    )
     let groupOrder = orderedGroups(
       normalizedGroups: normalizedGroups,
       groupRanks: groupRanks,
-      anchoredMinXByGroup: [:]
+      anchoredMinXByGroup: [:],
+      groupCenterY: groupCenterYByID
     )
     return PolicyCanvasUnconstrainedOrdering(
       itemCenterY: itemCenterY,
