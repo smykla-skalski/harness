@@ -72,6 +72,8 @@ class MonitorXcodebuildPolicyTests(unittest.TestCase):
         )
         self.assertIn('-scheme HarnessMonitorPolicyCanvasLab', script)
         self.assertIn('Harness Monitor Policy Canvas Lab.app', script)
+        self.assertIn('open -n "$APP"', script)
+        self.assertNotIn("open -g", script)
         self.assertNotIn('HarnessMonitorIsolated', script)
         self.assertNotIn('HARNESS_MONITOR_POLICY_CANVAS_LAB=1', script)
 
