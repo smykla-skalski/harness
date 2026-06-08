@@ -8,6 +8,9 @@ import SwiftUI
 /// toolbar and off by default, so it only appears when a developer asks for it.
 struct PolicyCanvasQualityMetricsPanel: View {
   let report: PolicyCanvasGraphQualityReport
+  /// Categories the pointer is over on the canvas right now; their rows light up
+  /// so the legend and the marks emphasize together.
+  var hoveredCategories: Set<PolicyCanvasQualityCategory> = []
   @Environment(\.colorScheme)
   private var colorScheme
 
@@ -75,18 +78,27 @@ struct PolicyCanvasQualityMetricsPanel: View {
   }
 
   private func row(_ headline: PolicyCanvasGraphQualityReport.Headline) -> some View {
-    HStack(spacing: 7) {
+    let isHovered = hoveredCategories.contains(headline.category)
+    return HStack(spacing: 7) {
       PolicyCanvasQualityMarkerSwatch(category: headline.category)
         .opacity(headline.value > 0 ? 1 : 0.35)
       Text(headline.label)
-        .scaledFont(.caption2)
-        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+        .scaledFont(.caption2.weight(isHovered ? .semibold : .regular))
+        .foregroundStyle(
+          isHovered ? PolicyCanvasVisualStyle.primaryText : PolicyCanvasVisualStyle.secondaryText
+        )
         .lineLimit(1)
       Spacer(minLength: 4)
       Text("\(headline.value)")
         .scaledFont(.caption2.weight(headline.value > 0 ? .bold : .regular))
         .monospacedDigit()
         .foregroundStyle(color(for: headline))
+    }
+    .background {
+      RoundedRectangle(cornerRadius: 4, style: .continuous)
+        .fill(isHovered ? PolicyCanvasVisualStyle.activeTint.opacity(0.18) : Color.clear)
+        .padding(.horizontal, -5)
+        .padding(.vertical, -1)
     }
     .contentShape(.rect)
     .help(headline.category.detail)

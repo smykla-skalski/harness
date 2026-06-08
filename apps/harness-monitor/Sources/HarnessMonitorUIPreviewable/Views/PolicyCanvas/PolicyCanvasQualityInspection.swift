@@ -67,7 +67,8 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
     content
       .overlay(alignment: .topTrailing) {
         if showsQualityMetrics, let report = viewModel.qualityInspectionReport {
-          PolicyCanvasQualityMetricsPanel(report: report)
+          PolicyCanvasQualityMetricsPanel(
+            report: report, hoveredCategories: viewModel.hoveredQualityCategories)
             .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
             .padding(14)
             .transition(.opacity)
