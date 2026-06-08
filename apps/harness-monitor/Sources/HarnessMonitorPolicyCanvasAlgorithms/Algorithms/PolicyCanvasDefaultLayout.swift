@@ -1,4 +1,10 @@
+import OSLog
 import SwiftUI
+
+private let policyCanvasLayoutSignposter = OSSignposter(
+  subsystem: "io.harnessmonitor",
+  category: "policy-canvas.perf"
+)
 
 /// Automatic-layout helpers + overlap detection used by
 /// `policyCanvasCleanInitialLayout(nodes:groups:edges:)`. The layered engine
@@ -16,17 +22,20 @@ public struct PolicyCanvasCleanLayout {
   public let groups: [PolicyCanvasGroup]
   public let metrics: PolicyCanvasLayoutMetrics?
   public let routingHints: PolicyCanvasLayoutRoutingHints?
+  public let precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
 
   public init(
     nodes: [PolicyCanvasNode],
     groups: [PolicyCanvasGroup],
     metrics: PolicyCanvasLayoutMetrics?,
-    routingHints: PolicyCanvasLayoutRoutingHints?
+    routingHints: PolicyCanvasLayoutRoutingHints?,
+    precomputedRoutes: PolicyCanvasPrecomputedRouteSet? = nil
   ) {
     self.nodes = nodes
     self.groups = groups
     self.metrics = metrics
     self.routingHints = routingHints
+    self.precomputedRoutes = precomputedRoutes
   }
 }
 
@@ -46,6 +55,27 @@ public func policyCanvasAutomaticLayoutResult(
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
   algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
 ) -> PolicyCanvasLayoutResult? {
+  let signpostID = policyCanvasLayoutSignposter.makeSignpostID()
+  let interval = policyCanvasLayoutSignposter.beginInterval(
+    "policy_canvas.layout.compute",
+    id: signpostID,
+    "nodes=\(nodes.count, privacy: .public) edges=\(edges.count, privacy: .public) groups=\(groups.count, privacy: .public)"
+  )
+  defer {
+    policyCanvasLayoutSignposter.endInterval(
+      "policy_canvas.layout.compute",
+      interval
+    )
+  }
+  if let elkResult = policyCanvasElkLayoutResult(
+    nodes: nodes,
+    groups: groups,
+    edges: edges,
+    mode: mode,
+    algorithmSelection: algorithmSelection
+  ) {
+    return elkResult
+  }
   let graph = policyCanvasLayoutGraph(
     nodes: nodes,
     groups: groups,
@@ -106,7 +136,11 @@ public func applyDefaultPolicyCanvasLayout(
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
   algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
-) -> (metrics: PolicyCanvasLayoutMetrics?, routingHints: PolicyCanvasLayoutRoutingHints?) {
+) -> (
+  metrics: PolicyCanvasLayoutMetrics?,
+  routingHints: PolicyCanvasLayoutRoutingHints?,
+  precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
+) {
   guard
     let result = policyCanvasAutomaticLayoutResult(
       nodes: nodes,
@@ -116,7 +150,7 @@ public func applyDefaultPolicyCanvasLayout(
       algorithmSelection: algorithmSelection
     )
   else {
-    return (metrics: nil, routingHints: nil)
+    return (metrics: nil, routingHints: nil, precomputedRoutes: nil)
   }
   let routingHints = applyPolicyCanvasLayoutResult(
     result,
@@ -124,7 +158,32 @@ public func applyDefaultPolicyCanvasLayout(
     groups: &groups,
     centerInMinimumCanvas: mode.centersInMinimumCanvas
   )
-  return (metrics: result.metrics, routingHints: routingHints)
+  let precomputedRoutes = policyCanvasAppliedPrecomputedRoutes(
+    result: result,
+    nodes: nodes
+  )
+  return (
+    metrics: result.metrics,
+    routingHints: routingHints,
+    precomputedRoutes: precomputedRoutes
+  )
+}
+
+public func policyCanvasAppliedPrecomputedRoutes(
+  result: PolicyCanvasLayoutResult,
+  nodes: [PolicyCanvasNode]
+) -> PolicyCanvasPrecomputedRouteSet? {
+  guard let precomputedRoutes = result.precomputedRoutes else {
+    return nil
+  }
+  let appliedPositions = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
+  for (nodeID, position) in result.nodePositions {
+    guard let applied = appliedPositions[nodeID] else {
+      continue
+    }
+    return precomputedRoutes.offsetBy(dx: applied.x - position.x, dy: applied.y - position.y)
+  }
+  return precomputedRoutes
 }
 
 /// Derive routing metadata from the layout that is already on the canvas.

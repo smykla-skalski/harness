@@ -6,6 +6,7 @@ private struct PolicyCanvasReflowSnapshot {
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
   let routingHints: PolicyCanvasLayoutRoutingHints?
+  let precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
 }
 
 /// The layout `reflowLayout(...)` would commit, surfaced without mutating the
@@ -17,6 +18,7 @@ struct PolicyCanvasReflowGraph {
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
   let routingHints: PolicyCanvasLayoutRoutingHints?
+  let precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
 }
 
 /// A pending reformat raised by `requestAtomicReflow(...)`. The viewport
@@ -199,24 +201,33 @@ extension PolicyCanvasViewModel {
       groups: &nextGroups,
       centerInMinimumCanvas: !preservesManualAnchors
     )
-    if policyCanvasUsesSingleFedTerminalAlignment(algorithmSelection) {
+    var nextPrecomputedRoutes = policyCanvasAppliedPrecomputedRoutes(
+      result: result,
+      nodes: nextNodes
+    )
+    let hasPrecomputedRoutes = nextPrecomputedRoutes != nil
+    if !hasPrecomputedRoutes, policyCanvasUsesSingleFedTerminalAlignment(algorithmSelection) {
       policyCanvasAlignSingleFedTerminals(
         nodes: &nextNodes,
         groups: &nextGroups,
         edges: inputEdges
       )
     }
-    if policyCanvasResolveGroupedNodeOverlaps(nodes: &nextNodes, groups: &nextGroups) {
+    if !hasPrecomputedRoutes,
+      policyCanvasResolveGroupedNodeOverlaps(nodes: &nextNodes, groups: &nextGroups)
+    {
       nextRoutingHints = policyCanvasRoutingHintsForCurrentLayout(
         nodes: nextNodes,
         groups: nextGroups,
         edges: inputEdges
       )
+      nextPrecomputedRoutes = nil
     }
+    let nextNodeLookup = PolicyCanvasNodeLookup(nodes: nextNodes)
     let nextEdges = inputEdges.map { edge in
       policyCanvasApplyingPreferredPortSides(
         edge,
-        nodes: nextNodes,
+        nodeLookup: nextNodeLookup,
         preservesPinnedState: true
       )
     }
@@ -224,7 +235,8 @@ extension PolicyCanvasViewModel {
       nodes: nextNodes,
       groups: nextGroups,
       edges: nextEdges,
-      routingHints: nextRoutingHints
+      routingHints: nextRoutingHints,
+      precomputedRoutes: nextPrecomputedRoutes
     )
   }
 
@@ -306,6 +318,7 @@ extension PolicyCanvasViewModel {
     let edgeChanges = reflowEdgeChanges(to: snapshot.edges)
 
     guard !nodeChanges.isEmpty || !edgeChanges.isEmpty else {
+      precomputedRoutes = snapshot.precomputedRoutes
       finishNoOpReflow(
         nextRoutingHints: snapshot.routingHints,
         requestsRouteComputation: requestsRouteComputation,
@@ -322,6 +335,7 @@ extension PolicyCanvasViewModel {
         toRoutingHints: snapshot.routingHints
       )
     )
+    precomputedRoutes = snapshot.precomputedRoutes
     requestExplicitRoutesIfNeeded()
     // A reflow relocates every node, so the scroll position the viewport held
     // for the previous layout now frames empty canvas. Recenter on the fresh
@@ -399,7 +413,8 @@ extension PolicyCanvasViewModel {
       nodes: snapshot.nodes,
       groups: snapshot.groups,
       edges: snapshot.edges,
-      routingHints: snapshot.routingHints
+      routingHints: snapshot.routingHints,
+      precomputedRoutes: snapshot.precomputedRoutes
     )
   }
 
@@ -417,7 +432,8 @@ extension PolicyCanvasViewModel {
       nodes: graph.nodes,
       groups: graph.groups,
       edges: graph.edges,
-      routingHints: graph.routingHints
+      routingHints: graph.routingHints,
+      precomputedRoutes: graph.precomputedRoutes
     )
     let preservesManualAnchors = shouldPreserveManualAnchors(preserveManualAnchors)
     let canonicalForcedSignature =

@@ -84,6 +84,9 @@ extension PolicyCanvasViewModel {
     if policyCanvasChangeInvalidatesRoutingHints(change) {
       routingHints = nil
     }
+    if policyCanvasChangeInvalidatesRoutingHints(change) || change.isReflowLayout {
+      precomputedRoutes = nil
+    }
     let inverse = applyChange(change)
     if let manager = undoManager {
       // Delegate grouping to the AppKit runloop event group

@@ -1,6 +1,15 @@
 {
-  "originHash" : "9ff875b1404d29f7e3226055f5440f8a34185d32a9b2ce455dc9cc12c148a135",
+  "originHash" : "1de9f63c9ad264f7bffc3d6f582d36c8c239690950f61f3dd564742618f0d52e",
   "pins" : [
+    {
+      "identity" : "elk-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/lukilabs/elk-swift.git",
+      "state" : {
+        "revision" : "32f8042e3509a4819f00ff9cd46e829ec2b26da0",
+        "version" : "1.0.2"
+      }
+    },
     {
       "identity" : "fuse-swift",
       "kind" : "remoteSourceControl",

@@ -229,6 +229,11 @@ func policyCanvasFastResolvedLabelPositions(
       frames.map { PolicyCanvasIndexedLabelFrame(ownerID: id, frame: $0) }
     }
   )
+  let nodeFrameIndex = PolicyCanvasLabelFrameIndex(
+    entries: nodeFrames.enumerated().map { index, frame in
+      PolicyCanvasIndexedLabelFrame(ownerID: "node-\(index)", frame: frame)
+    }
+  )
   var occupiedFrameIndex = PolicyCanvasLabelFrameIndex(entries: [])
   var positions: [String: CGPoint] = [:]
   for entry in policyCanvasSortedLabelRoutes(routes) {
@@ -243,18 +248,19 @@ func policyCanvasFastResolvedLabelPositions(
       intersecting: candidateBounds,
       excluding: entry.id
     )
+    let nearbyNodeFrames = nodeFrameIndex.frames(intersecting: candidateBounds)
     let nearbyOccupiedFrames = occupiedFrameIndex.frames(intersecting: candidateBounds)
     let position =
       candidates.first { candidate in
         let frame = policyCanvasLabelFrame(center: candidate, size: entry.size)
-        return !nodeFrames.contains(where: { $0.intersects(frame) })
+        return !nearbyNodeFrames.contains(where: { $0.intersects(frame) })
           && !nearbyRouteFrames.contains(where: { $0.intersects(frame) })
           && !nearbyOccupiedFrames.contains(where: { $0.intersects(frame) })
       }
       ?? policyCanvasLeastBadLabelCandidate(
         candidates,
         size: entry.size,
-        nodeFrames: nodeFrames,
+        nodeFrames: nearbyNodeFrames,
         lineBlockers: nearbyRouteFrames + nearbyOccupiedFrames,
         fallback: entry.route.arcLengthMidpoint
     )

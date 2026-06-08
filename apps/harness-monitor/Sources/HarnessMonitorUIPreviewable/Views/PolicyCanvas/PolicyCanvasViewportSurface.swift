@@ -108,7 +108,7 @@ public struct PolicyCanvasViewportSurface: View {
           "HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW"
         ] == "1"
       {
-        viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
+        requestForcedEngineLayoutIfNeeded()
       }
     }
     .onChange(of: reformatRequest, initial: false) { _, _ in
@@ -125,7 +125,7 @@ public struct PolicyCanvasViewportSurface: View {
           forceDocumentReload: true
         )
         if forcesEngineLayout {
-          viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
+          requestForcedEngineLayoutIfNeeded()
         }
       } else {
         viewModel.loadIfChanged(
@@ -135,5 +135,13 @@ public struct PolicyCanvasViewportSurface: View {
         )
       }
     }
+  }
+
+  @MainActor
+  private func requestForcedEngineLayoutIfNeeded() {
+    guard viewModel.precomputedRoutes == nil else {
+      return
+    }
+    viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
   }
 }

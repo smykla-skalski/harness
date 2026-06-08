@@ -73,6 +73,7 @@ struct PolicyCanvasRouteTerminalPortMarkerPlacement: PolicyCanvasPortMarkerPlace
 
 struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgorithm {
   private let parallelEdgeThreshold = 24
+  private let lockedTerminalSideThreshold = 1_000
 
   func selectRoutes(input: PolicyCanvasRouteSelectionInput) -> [String: PolicyCanvasEdgeRoute] {
     let prepared = input.prepared
@@ -91,6 +92,8 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       terminalSlots: terminalSlots,
       obstacles: obstacles,
       portMarkerLayout: input.portMarkerLayout,
+      locksTerminalSides: input.portMarkerLayout != nil
+        && prepared.edges.count > lockedTerminalSideThreshold,
       passContext: input.passContext,
       router: input.router
     )
@@ -177,6 +180,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
     let terminalSlots: [String: PolicyCanvasRouteEndpointSlots]
     let obstacles: [CGRect]
     let portMarkerLayout: PolicyCanvasPortMarkerLayout?
+    let locksTerminalSides: Bool
     let passContext: PolicyCanvasDisplayedRoutePassContext?
     let router: any PolicyCanvasEdgeRouter
   }
@@ -193,6 +197,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
     let source: SideCandidate
     let target: SideCandidate
     let baseContext: PolicyCanvasRouteContext
+    let locksTerminalSides: Bool
     let router: any PolicyCanvasEdgeRouter
   }
 
@@ -258,6 +263,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       source: source,
       target: target,
       baseContext: baseContext,
+      locksTerminalSides: context.locksTerminalSides,
       router: context.router
     )
     if edge.effectivePinnedPortSide {
@@ -277,7 +283,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       }
       return safeAlternateRoute(
         flexInput,
-        allowsSideChanges: edge.kind != .error
+        allowsSideChanges: !context.locksTerminalSides && edge.kind != .error
       ) ?? route
     }
     return selectedFlexRoute(flexInput)
@@ -310,7 +316,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       ) {
         return route
       }
-      return safeAlternateRoute(input) ?? route
+      return safeAlternateRoute(input, allowsSideChanges: !input.locksTerminalSides) ?? route
     }
     let requestedRoute = pinnedRoute(
       source: input.source,
@@ -375,7 +381,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
     ) {
       return route
     }
-    return safeAlternateRoute(input) ?? route
+    return safeAlternateRoute(input, allowsSideChanges: !input.locksTerminalSides) ?? route
   }
 
   private struct AlternateRouteCandidate {
@@ -511,7 +517,11 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
     context: PolicyCanvasRouteContext
   ) -> Bool {
     let endpointPoints = [sourceActual, targetActual]
+    let routeEnvelope = policyCanvasRouteBounds(route).insetBy(dx: -1, dy: -1)
     let obstacles = context.obstacles.filter { rect in
+      guard routeEnvelope.isNull || rect.intersects(routeEnvelope) else {
+        return false
+      }
       let ownFrame = rect.insetBy(
         dx: -PolicyCanvasVisibilityRouter.endpointDropProbe,
         dy: -PolicyCanvasVisibilityRouter.endpointDropProbe

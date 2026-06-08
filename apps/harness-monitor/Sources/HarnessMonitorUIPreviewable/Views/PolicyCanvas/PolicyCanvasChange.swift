@@ -361,6 +361,15 @@ enum PolicyCanvasChange {
   }
 }
 
+extension PolicyCanvasChange {
+  var isReflowLayout: Bool {
+    if case .reflowLayout = self {
+      return true
+    }
+    return false
+  }
+}
+
 /// One node entry in a `.bulkMove` payload. Position writes are absolute,
 /// not deltas, so the inverse can replay the exact origin even when the
 /// model has been mutated in between by some other path (e.g. a reconcile).

@@ -137,12 +137,41 @@ public struct PolicyCanvasLayoutRoutingHints: Equatable, Hashable, Sendable {
   }
 }
 
+public struct PolicyCanvasPrecomputedRouteSet: Equatable, Sendable {
+  public let identity: String
+  public let routes: [String: PolicyCanvasEdgeRoute]
+
+  public init(identity: String, routes: [String: PolicyCanvasEdgeRoute]) {
+    self.identity = identity
+    self.routes = routes
+  }
+
+  public func offsetBy(dx: CGFloat, dy: CGFloat) -> Self {
+    guard dx != 0 || dy != 0 else {
+      return self
+    }
+    return Self(
+      identity: identity,
+      routes: routes.mapValues { route in
+        PolicyCanvasEdgeRoute(
+          points: route.points.map { CGPoint(x: $0.x + dx, y: $0.y + dy) },
+          labelPosition: CGPoint(
+            x: route.labelPosition.x + dx,
+            y: route.labelPosition.y + dy
+          )
+        )
+      }
+    )
+  }
+}
+
 public struct PolicyCanvasLayoutResult: Sendable {
   public let nodePositions: [String: CGPoint]
   public let groupFrames: [String: CGRect]
   public let autoPlacedNodeIDs: Set<String>
   public let metrics: PolicyCanvasLayoutMetrics
   public let routingHints: PolicyCanvasLayoutRoutingHints?
+  public let precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
 }
 
 public struct PolicyCanvasLayoutConfiguration: Sendable {

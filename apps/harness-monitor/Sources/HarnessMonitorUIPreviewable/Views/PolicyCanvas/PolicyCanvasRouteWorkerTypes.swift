@@ -8,6 +8,7 @@ struct PolicyCanvasRouteWorkerKey: Equatable {
   let edgeCount: Int
   let fontScale: CGFloat
   let routingHints: PolicyCanvasLayoutRoutingHints?
+  let precomputedRouteIdentity: String?
   let algorithmSelection: PolicyCanvasAlgorithmSelection
 
   init(
@@ -17,6 +18,7 @@ struct PolicyCanvasRouteWorkerKey: Equatable {
     edgeCount: Int,
     fontScale: CGFloat,
     routingHints: PolicyCanvasLayoutRoutingHints?,
+    precomputedRouteIdentity: String? = nil,
     algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
   ) {
     self.graphGeneration = graphGeneration
@@ -25,6 +27,7 @@ struct PolicyCanvasRouteWorkerKey: Equatable {
     self.edgeCount = edgeCount
     self.fontScale = fontScale
     self.routingHints = routingHints
+    self.precomputedRouteIdentity = precomputedRouteIdentity
     self.algorithmSelection = algorithmSelection
   }
 }

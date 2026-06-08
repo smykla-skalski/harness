@@ -5,6 +5,7 @@ private let policyCanvasRouteComputationSignposter = OSSignposter(
   subsystem: "io.harnessmonitor",
   category: "policy-canvas.perf"
 )
+private let policyCanvasSinglePassSeededRoutingThreshold = 1_000
 
 struct PolicyCanvasDisplayedRoutePassContext: Sendable {
   let nodeIndex: [String: PolicyCanvasRouteNode]
@@ -45,13 +46,16 @@ extension PolicyCanvasPreparedRouteInput {
     router defaultRouter: any PolicyCanvasEdgeRouter,
     algorithmSelection: PolicyCanvasAlgorithmSelection
   ) -> PolicyCanvasPreparedRouteComputation {
+    let nodeIndex = nodeIndex
+    if let precomputed = precomputedRouteComputation(nodeIndex: nodeIndex) {
+      return precomputed
+    }
     let algorithms = PolicyCanvasAlgorithmRegistry.routingAlgorithms(for: algorithmSelection)
     let selectedRouter: any PolicyCanvasEdgeRouter =
       algorithmSelection.algorithmID(for: .edgeRouting)
         == PolicyCanvasAlgorithmDefaults.paddedOrthogonalVisibilityAStar
       ? defaultRouter
       : algorithms.edgeRouter
-    let nodeIndex = nodeIndex
     let convergenceSignpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
     let convergenceInterval = policyCanvasRouteComputationSignposter.beginInterval(
       "policy_canvas.routes.phase.converge",
@@ -134,6 +138,38 @@ extension PolicyCanvasPreparedRouteInput {
       portVisibility: portVisibility(routes: routes, nodeIndex: nodeIndex),
       portMarkerLayout: routeState.portMarkerLayout,
       visibleBounds: visibleBounds
+    )
+  }
+
+  private func precomputedRouteComputation(
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> PolicyCanvasPreparedRouteComputation? {
+    guard let precomputedRoutes else {
+      return nil
+    }
+    let edgeIDs = Set(edges.map(\.id))
+    guard precomputedRoutes.routes.count == edgeIDs.count,
+      Set(precomputedRoutes.routes.keys) == edgeIDs
+    else {
+      return nil
+    }
+    let routes = precomputedRoutes.routes
+    let portMarkerLayout = PolicyCanvasRouteTerminalPortMarkerPlacement().placeMarkers(
+      input: PolicyCanvasPortMarkerPlacementInput(
+        prepared: self,
+        routes: routes,
+        nodeIndex: nodeIndex
+      )
+    )
+    let labelPositions = PolicyCanvasPolylineMidpointLabelPlacement().placeLabels(
+      input: PolicyCanvasLabelPlacementInput(prepared: self, routes: routes)
+    )
+    return PolicyCanvasPreparedRouteComputation(
+      routes: routes,
+      labelPositions: labelPositions,
+      portVisibility: portVisibility(routes: routes, nodeIndex: nodeIndex),
+      portMarkerLayout: portMarkerLayout,
+      visibleBounds: visibleBounds(routes: routes, labelPositions: labelPositions)
     )
   }
 
@@ -258,6 +294,12 @@ extension PolicyCanvasPreparedRouteInput {
         current: PolicyCanvasRouteComputationState(routes: [:], portMarkerLayout: seedLayout),
         context: context
       )
+      if prepared.edges.count > policyCanvasSinglePassSeededRoutingThreshold {
+        return PolicyCanvasRouteComputationState(
+          routes: state.routes,
+          portMarkerLayout: seedLayout
+        )
+      }
       if state.portMarkerLayout == seedLayout {
         return state
       }

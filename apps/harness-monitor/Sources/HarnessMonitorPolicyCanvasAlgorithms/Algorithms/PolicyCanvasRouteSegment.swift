@@ -41,6 +41,19 @@ func policyCanvasRouteIntersectsObstacles(
   }
 }
 
+public func policyCanvasRouteBounds(_ points: [CGPoint]) -> CGRect {
+  guard let first = points.first else {
+    return .null
+  }
+  return points.dropFirst().reduce(into: CGRect(origin: first, size: .zero)) { bounds, point in
+    bounds = bounds.union(CGRect(origin: point, size: .zero))
+  }
+}
+
+public func policyCanvasRouteBounds(_ route: PolicyCanvasEdgeRoute) -> CGRect {
+  policyCanvasRouteBounds(route.points)
+}
+
 private func policyCanvasRouteSegment(
   _ segment: PolicyCanvasRouteSegment,
   intersects rect: CGRect

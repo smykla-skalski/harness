@@ -6,7 +6,17 @@ func policyCanvasNode(
   _ node: TaskBoardPolicyPipelineNode,
   layout: TaskBoardPolicyPipelineLayout
 ) -> PolicyCanvasNode {
-  let layoutNode = layout.nodeLayout(for: node.id)
+  policyCanvasNode(
+    node,
+    layoutLookup: PolicyCanvasDocumentLayoutLookup(layout: layout)
+  )
+}
+
+func policyCanvasNode(
+  _ node: TaskBoardPolicyPipelineNode,
+  layoutLookup: PolicyCanvasDocumentLayoutLookup
+) -> PolicyCanvasNode {
+  let layoutNode = layoutLookup.nodeLayout(for: node.id)
   let position = layoutNode?.position ?? .zero
   var canvasNode = PolicyCanvasNode(
     id: node.id,
@@ -60,6 +70,7 @@ func policyCanvasCleanInitialLayout(
   var cleanGroups = groups
   var layoutMetrics: PolicyCanvasLayoutMetrics?
   var routingHints: PolicyCanvasLayoutRoutingHints?
+  var precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
   let shouldAutoArrange: Bool
   switch mode {
   case .initialLoad:
@@ -78,6 +89,7 @@ func policyCanvasCleanInitialLayout(
     if let autoLayoutMetrics = autoLayout.metrics {
       layoutMetrics = autoLayoutMetrics
       routingHints = autoLayout.routingHints
+      precomputedRoutes = autoLayout.precomputedRoutes
     } else {
       cleanNodes = policyCanvasAssignTrustedLayoutSources(cleanNodes)
     }
@@ -93,8 +105,31 @@ func policyCanvasCleanInitialLayout(
     nodes: normalized.nodes,
     groups: normalized.groups,
     metrics: layoutMetrics,
-    routingHints: normalized.routingHints
+    routingHints: normalized.routingHints,
+    precomputedRoutes: policyCanvasOffsetPrecomputedRoutes(
+      precomputedRoutes,
+      from: cleanNodes,
+      to: normalized.nodes
+    )
   )
+}
+
+private func policyCanvasOffsetPrecomputedRoutes(
+  _ routes: PolicyCanvasPrecomputedRouteSet?,
+  from originalNodes: [PolicyCanvasNode],
+  to normalizedNodes: [PolicyCanvasNode]
+) -> PolicyCanvasPrecomputedRouteSet? {
+  guard let routes else {
+    return nil
+  }
+  let originalPositions = Dictionary(uniqueKeysWithValues: originalNodes.map { ($0.id, $0.position) })
+  for node in normalizedNodes {
+    guard let original = originalPositions[node.id] else {
+      continue
+    }
+    return routes.offsetBy(dx: node.position.x - original.x, dy: node.position.y - original.y)
+  }
+  return routes
 }
 
 func policyCanvasEdge(
@@ -102,6 +137,13 @@ func policyCanvasEdge(
   nodes: [PolicyCanvasNode] = [],
   assignPreferredPortSides: Bool = true
 ) -> PolicyCanvasEdge? {
+  if !nodes.isEmpty {
+    return policyCanvasEdge(
+      edge,
+      nodeLookup: PolicyCanvasNodeLookup(nodes: nodes),
+      assignPreferredPortSides: assignPreferredPortSides
+    )
+  }
   guard policyCanvasEdgeEndpointsExist(edge, nodes: nodes) else {
     return nil
   }
@@ -133,9 +175,69 @@ func policyCanvasEdge(
   )
 }
 
+func policyCanvasEdge(
+  _ edge: TaskBoardPolicyPipelineEdge,
+  nodeLookup: PolicyCanvasNodeLookup,
+  assignPreferredPortSides: Bool = true
+) -> PolicyCanvasEdge? {
+  guard
+    let sourceNode = nodeLookup.node(id: edge.fromNodeId),
+    let targetNode = nodeLookup.node(id: edge.toNodeId)
+  else {
+    return nil
+  }
+  let sourcePortID = policyCanvasImportedPortID(edge.fromPort, node: sourceNode, kind: .output)
+  let targetPortID = policyCanvasImportedPortID(edge.toPort, node: targetNode, kind: .input)
+  guard sourceNode.outputPorts.contains(where: { $0.id == sourcePortID }),
+    targetNode.inputPorts.contains(where: { $0.id == targetPortID })
+  else {
+    return nil
+  }
+  var source = PolicyCanvasPortEndpoint(
+    nodeID: edge.fromNodeId,
+    portID: sourcePortID,
+    kind: .output
+  )
+  var target = PolicyCanvasPortEndpoint(
+    nodeID: edge.toNodeId,
+    portID: targetPortID,
+    kind: .input
+  )
+  if assignPreferredPortSides {
+    policyCanvasAssignPreferredPortSides(
+      source: &source,
+      target: &target,
+      nodeLookup: nodeLookup
+    )
+  }
+  let kind = PolicyCanvasEdgeKind.derive(from: edge.condition.condition)
+  return PolicyCanvasEdge(
+    id: edge.id,
+    source: source,
+    target: target,
+    label: policyCanvasEdgeLabel(edge),
+    condition: edge.condition.condition,
+    pinnedPortSide: source.side != nil || target.side != nil,
+    kind: kind,
+    reasonCode: edge.condition.reasonCode
+  )
+}
+
 func policyCanvasApplyingPreferredPortSides(
   _ edge: PolicyCanvasEdge,
   nodes: [PolicyCanvasNode],
+  preservesPinnedState: Bool = false
+) -> PolicyCanvasEdge {
+  policyCanvasApplyingPreferredPortSides(
+    edge,
+    nodeLookup: PolicyCanvasNodeLookup(nodes: nodes),
+    preservesPinnedState: preservesPinnedState
+  )
+}
+
+func policyCanvasApplyingPreferredPortSides(
+  _ edge: PolicyCanvasEdge,
+  nodeLookup: PolicyCanvasNodeLookup,
   preservesPinnedState: Bool = false
 ) -> PolicyCanvasEdge {
   var adjustedEdge = edge
@@ -143,7 +245,7 @@ func policyCanvasApplyingPreferredPortSides(
   var target = adjustedEdge.target
   source.side = nil
   target.side = nil
-  policyCanvasAssignPreferredPortSides(source: &source, target: &target, nodes: nodes)
+  policyCanvasAssignPreferredPortSides(source: &source, target: &target, nodeLookup: nodeLookup)
   adjustedEdge.source = source
   adjustedEdge.target = target
   adjustedEdge.pinnedPortSide =

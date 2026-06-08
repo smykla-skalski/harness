@@ -36,6 +36,11 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
   /// deterministic ordered/reversed spreads and rely on the zero-shift floor to
   /// avoid regressions.
   private let reducedPlacementRouteCount = 80
+  /// Above this size the crossing-aware scorer itself becomes the dominant cost.
+  /// Use the same deterministic channel decomposition and lane offsets, but skip
+  /// per-candidate global scoring. The per-route body-hit guard below still
+  /// rejects shifts that would pierce node bodies.
+  private let directPlacementRouteCount = 1_000
 
   func processRoutes(
     input: PolicyCanvasRoutePostProcessingInput
@@ -47,7 +52,11 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     var pointsByEdge = input.routes.mapValues {
       PolicyCanvasVisibilityRouter.compressCollinear($0.points)
     }
-    pointsByEdge = spread(pointsByEdge, original: originalPointsByEdge, obstacles: obstacles)
+    if pointsByEdge.count > directPlacementRouteCount {
+      pointsByEdge = directSpread(pointsByEdge, obstacles: obstacles)
+    } else {
+      pointsByEdge = spread(pointsByEdge, original: originalPointsByEdge, obstacles: obstacles)
+    }
     let edgesByID = Dictionary(uniqueKeysWithValues: input.prepared.edges.map { ($0.id, $0) })
     return pointsByEdge.reduce(into: [:]) { result, entry in
       let points = PolicyCanvasVisibilityRouter.compressCollinear(entry.value)
@@ -74,8 +83,8 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
       let bodyObstacles = edgesByID[entry.key].map {
         postProcessingBodyObstacles(edge: $0, prepared: input.prepared)
       } ?? obstacles
-      let routeEnvelope = routeBounds(original.points)
-        .union(routeBounds(displayedProcessed.points))
+      let routeEnvelope = policyCanvasRouteBounds(original.points)
+        .union(policyCanvasRouteBounds(displayedProcessed.points))
         .insetBy(dx: -1, dy: -1)
       let nearbyObstacles = bodyObstacles.filter { $0.intersects(routeEnvelope) }
       if !nearbyObstacles.isEmpty,
@@ -86,15 +95,6 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
       } else {
         result[entry.key] = processed
       }
-    }
-  }
-
-  private func routeBounds(_ points: [CGPoint]) -> CGRect {
-    guard let first = points.first else {
-      return .null
-    }
-    return points.dropFirst().reduce(into: CGRect(origin: first, size: .zero)) { bounds, point in
-      bounds = bounds.union(CGRect(origin: point, size: .zero))
     }
   }
 
@@ -131,6 +131,7 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     for _ in 0..<iterationLimit {
       var working = pointsByEdge
       var entries = entryCache(of: displayedPoints(working, preserving: original))
+      var orderedEntries = routeEntriesSortedByMinX(entries.values)
       var applied = false
       let segments = decompose(working)
       for axis in [PolicyCanvasSegmentAxis.horizontal, .vertical] {
@@ -146,6 +147,7 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
               working: working,
               original: original,
               entries: entries,
+              orderedEntries: orderedEntries,
               obstacles: obstacles,
               baseline: baseline
             )
@@ -161,6 +163,7 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
                 points: displayed[edgeID] ?? working[edgeID] ?? []
               )
             }
+            orderedEntries = routeEntriesSortedByMinX(entries.values)
             applied = true
           }
         }
@@ -171,6 +174,34 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
       pointsByEdge = working.mapValues { PolicyCanvasVisibilityRouter.compressCollinear($0) }
     }
     return pointsByEdge
+  }
+
+  /// Linear-ish large-graph pass: split occupied same-axis corridors into
+  /// deterministic lanes without scoring every lane candidate against every
+  /// other route. This is intentionally only a complexity fallback; smaller
+  /// graphs keep the crossing-aware scorer above.
+  private func directSpread(
+    _ routes: [String: [CGPoint]],
+    obstacles: [CGRect]
+  ) -> [String: [CGPoint]] {
+    let processor = PolicyCanvasOrthogonalNudgeProcessor(
+      obstacles: obstacles,
+      fans: PolicyCanvasFanContext.make(from: routes)
+    )
+    var working = routes
+    for axis in [PolicyCanvasSegmentAxis.horizontal, .vertical] {
+      let segments = decompose(working)
+      let channels = ordered(processor.channels(in: segments.filter { $0.axis == axis }))
+      for channel in channels where channel.count > 1 {
+        let offsets = processor.laneOffsets(for: channel)
+        guard !offsets.isEmpty else {
+          continue
+        }
+        working = apply(offsets, to: working)
+      }
+      working = working.mapValues { PolicyCanvasVisibilityRouter.compressCollinear($0) }
+    }
+    return working
   }
 
   /// Route entries for every edge, segment-decomposed once per spread iteration.
@@ -184,6 +215,18 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
       cache[element.key] = PolicyCanvasNudgeRouteMetrics.entry(
         id: element.key, points: element.value
       )
+    }
+  }
+
+  private func routeEntriesSortedByMinX<S: Sequence>(
+    _ entries: S
+  ) -> [PolicyCanvasNudgeRouteMetrics.RouteEntry]
+  where S.Element == PolicyCanvasNudgeRouteMetrics.RouteEntry {
+    entries.sorted { left, right in
+      if left.bounds.minX != right.bounds.minX {
+        return left.bounds.minX < right.bounds.minX
+      }
+      return left.id < right.id
     }
   }
 
@@ -232,7 +275,7 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     )
     let fixed = relevantFixed(
       channelEdges: channelEdges,
-      entries: context.entries,
+      entries: context.orderedEntries,
       band: interactionBand
     )
     // Only obstacles inside the moved-route envelope can be newly hit by a shift;
@@ -260,7 +303,11 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     // Zero-shift floor. If the channel already has no overlap, body hit, or added
     // crossing there is nothing a spread could improve - no placement can score
     // below an all-zero penalty - so skip the search entirely.
-    let floor = localPenalty(of: channelPoints)
+    let floorEntries = sortedEdges.compactMap { context.entries[$0] }
+    let floor = PolicyCanvasNudgeRouteMetrics.localPenalty(
+      movedEntries: floorEntries,
+      scoring: scoring
+    )
     guard floor.addedBodyHits > 0 || floor.addedCrossings > 0 || floor.overlapPairs > 0 else {
       return nil
     }
@@ -288,6 +335,7 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     let working: [String: [CGPoint]]
     let original: [String: [CGPoint]]
     let entries: [String: PolicyCanvasNudgeRouteMetrics.RouteEntry]
+    let orderedEntries: [PolicyCanvasNudgeRouteMetrics.RouteEntry]
     let obstacles: [CGRect]
     let baseline: PolicyCanvasNudgeRouteMetrics.Baseline
   }
@@ -298,18 +346,29 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
   /// routes, so restored port bridges cannot hide crossings from the scorer.
   private func relevantFixed(
     channelEdges: Set<String>,
-    entries: [String: PolicyCanvasNudgeRouteMetrics.RouteEntry],
+    entries: [PolicyCanvasNudgeRouteMetrics.RouteEntry],
     band: CGRect?
   ) -> [PolicyCanvasNudgeRouteMetrics.RouteEntry] {
-    let fixed = entries.keys.sorted()
-      .filter { !channelEdges.contains($0) }
-      .compactMap { entries[$0] }
     guard let band else {
-      return fixed
+      return entries.filter { !channelEdges.contains($0.id) }
     }
-    return fixed.filter { entry in
-      PolicyCanvasNudgeRouteMetrics.segmentsEnter(entry, band)
+    var fixed: [PolicyCanvasNudgeRouteMetrics.RouteEntry] = []
+    for entry in entries {
+      guard !entry.bounds.isNull else {
+        continue
+      }
+      if entry.bounds.minX > band.maxX {
+        break
+      }
+      guard entry.bounds.maxX >= band.minX,
+        !channelEdges.contains(entry.id),
+        PolicyCanvasNudgeRouteMetrics.segmentsEnter(entry, band)
+      else {
+        continue
+      }
+      fixed.append(entry)
     }
+    return fixed
   }
 
   private func movedInteractionBand(

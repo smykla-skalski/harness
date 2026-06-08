@@ -173,7 +173,8 @@ extension PolicyCanvasLayeredLayoutEngine {
       groupFrames: groupFrames,
       autoPlacedNodeIDs: accumulator.autoPlacedNodeIDs,
       metrics: metrics,
-      routingHints: routingHints
+      routingHints: routingHints,
+      precomputedRoutes: nil
     )
   }
 

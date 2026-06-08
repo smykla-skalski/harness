@@ -109,13 +109,19 @@ extension PolicyCanvasViewModel {
     )
     nodes = cleanLayout.nodes
     groups = cleanLayout.groups
+    let cleanNodeLookup = PolicyCanvasNodeLookup(nodes: cleanLayout.nodes)
     edges = foldedEdges.map { edge in
-      policyCanvasApplyingPreferredPortSides(edge, nodes: cleanLayout.nodes)
+      policyCanvasApplyingPreferredPortSides(edge, nodeLookup: cleanNodeLookup)
     }
     routingHints =
       savedRoutingHints
-      ?? policyCanvasRoutingHintsForCurrentLayout(nodes: nodes, groups: groups, edges: edges)
+      ?? (
+        cleanLayout.precomputedRoutes == nil
+        ? policyCanvasRoutingHintsForCurrentLayout(nodes: nodes, groups: groups, edges: edges)
+        : nil
+      )
       ?? cleanLayout.routingHints
+    precomputedRoutes = cleanLayout.precomputedRoutes
     zoom = Self.sanitizedZoom(CGFloat(document.layout.zoom), fallback: 1)
     reconcileGroupFrames()
     resetNextNodeNumber()
@@ -169,12 +175,14 @@ extension PolicyCanvasViewModel {
     latestSimulation = simulation ?? audit?.latestSimulation
     nodes = policyCanvasAssignTrustedLayoutSources(graph.nodes)
     groups = graph.groups
+    let trustedNodeLookup = PolicyCanvasNodeLookup(nodes: nodes)
     edges = policyCanvasFoldParallelBranches(graph.mappedEdges).map { edge in
-      policyCanvasApplyingPreferredPortSides(edge, nodes: nodes)
+      policyCanvasApplyingPreferredPortSides(edge, nodeLookup: trustedNodeLookup)
     }
     routingHints =
       savedRoutingHints
       ?? policyCanvasRoutingHintsForCurrentLayout(nodes: nodes, groups: groups, edges: edges)
+    precomputedRoutes = nil
     zoom = Self.sanitizedZoom(CGFloat(document.layout.zoom), fallback: 1)
     resetNextNodeNumber()
     markLoadedDocumentRevision(document.revision)
@@ -261,6 +269,7 @@ extension PolicyCanvasViewModel {
     secondarySelections = []
     latestSimulation = snapshot.latestSimulation
     routingHints = snapshot.routingHints
+    precomputedRoutes = nil
     reconcileGroupFrames()
     // Write `documentDirty` directly (NOT through `markDocumentDirty`) and
     // pre-arm the one-shot suppression so the autosave loop does not fire

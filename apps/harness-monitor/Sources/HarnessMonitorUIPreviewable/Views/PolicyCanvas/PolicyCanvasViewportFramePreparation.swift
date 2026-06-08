@@ -16,6 +16,7 @@ func policyCanvasRouteWorkerKey(
     edgeCount: edges.count,
     fontScale: fontScale,
     routingHints: viewModel.routingHints,
+    precomputedRouteIdentity: viewModel.precomputedRoutes?.identity,
     algorithmSelection: viewModel.algorithmSelection
   )
 }

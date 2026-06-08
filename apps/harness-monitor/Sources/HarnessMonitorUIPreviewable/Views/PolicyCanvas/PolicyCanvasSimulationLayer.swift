@@ -20,15 +20,21 @@ import SwiftUI
 /// territories).
 struct PolicyCanvasSimulationLayer: View {
   let viewModel: PolicyCanvasViewModel
+  let observationStore: PolicyCanvasViewportObservationStore
+  let viewportIdentity: String?
 
   var body: some View {
     let outcomeMap = viewModel.simulationOutcomeMap()
+    let cullRect = policyCanvasViewportCullRect(
+      observationStore: observationStore,
+      viewportIdentity: viewportIdentity
+    )
     if outcomeMap.isEmpty {
       EmptyView()
     } else {
       ZStack(alignment: .topLeading) {
         ForEach(viewModel.nodes) { node in
-          if let outcome = outcomeMap[node.id] {
+          if let outcome = outcomeMap[node.id], policyCanvasNodeIsVisible(node, in: cullRect) {
             PolicyCanvasSimulationNodeOverlay(
               node: node,
               outcome: outcome

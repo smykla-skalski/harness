@@ -66,6 +66,7 @@ extension PolicyCanvasViewport {
       edges: graph.edges,
       fontScale: fontScale,
       routingHints: graph.routingHints,
+      precomputedRoutes: graph.precomputedRoutes,
       algorithmSelection: viewModel.algorithmSelection
     )
     let generation = nextRouteGeneration()

@@ -2,6 +2,94 @@ import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
+struct PolicyCanvasNodeLookup {
+  private struct Cell: Hashable {
+    let x: Int
+    let y: Int
+  }
+
+  private static let cellSize: CGFloat = 256
+
+  private let nodesByID: [String: PolicyCanvasNode]
+  private let framesByID: [String: CGRect]
+  private let buckets: [Cell: [String]]
+
+  init(nodes: [PolicyCanvasNode]) {
+    nodesByID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
+    let framesByID = Dictionary(
+      uniqueKeysWithValues: nodes.map {
+        ($0.id, CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize))
+      }
+    )
+    self.framesByID = framesByID
+    var buckets: [Cell: [String]] = [:]
+    for (id, frame) in framesByID {
+      for cell in Self.cells(intersecting: frame) {
+        buckets[cell, default: []].append(id)
+      }
+    }
+    self.buckets = buckets
+  }
+
+  func node(id: String) -> PolicyCanvasNode? {
+    nodesByID[id]
+  }
+
+  func containsNode(except excludedID: String, intersecting rect: CGRect) -> Bool {
+    var visited: Set<String> = []
+    for cell in Self.cells(intersecting: rect) {
+      for id in buckets[cell] ?? [] where id != excludedID && visited.insert(id).inserted {
+        if framesByID[id]?.intersects(rect) == true {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  private static func cells(intersecting rect: CGRect) -> [Cell] {
+    guard !rect.isNull, !rect.isEmpty else {
+      return []
+    }
+    let minX = Int(floor(rect.minX / cellSize))
+    let maxX = Int(floor((rect.maxX - 1) / cellSize))
+    let minY = Int(floor(rect.minY / cellSize))
+    let maxY = Int(floor((rect.maxY - 1) / cellSize))
+    var cells: [Cell] = []
+    cells.reserveCapacity(max(1, (maxX - minX + 1) * (maxY - minY + 1)))
+    for x in minX...maxX {
+      for y in minY...maxY {
+        cells.append(Cell(x: x, y: y))
+      }
+    }
+    return cells
+  }
+}
+
+struct PolicyCanvasDocumentLayoutLookup {
+  private let nodeLayoutsByID: [String: TaskBoardPolicyPipelineNodeLayout]
+
+  init(layout: TaskBoardPolicyPipelineLayout) {
+    var nodeLayoutsByID: [String: TaskBoardPolicyPipelineNodeLayout] = [:]
+    for node in layout.nodes where nodeLayoutsByID[node.nodeId] == nil {
+      nodeLayoutsByID[node.nodeId] = node
+    }
+    self.nodeLayoutsByID = nodeLayoutsByID
+  }
+
+  func nodeLayout(
+    for nodeID: String
+  ) -> (position: TaskBoardPolicyCanvasPoint, source: TaskBoardPolicyPipelineNodeLayoutSource?)? {
+    guard let node = nodeLayoutsByID[nodeID] else {
+      return nil
+    }
+    return (
+      position: TaskBoardPolicyCanvasPoint(x: Double(node.x), y: Double(node.y)),
+      source: node.source
+    )
+  }
+}
+
 func synthesizedGroupFrame(
   offset: Int,
   group: TaskBoardPolicyPipelineGroup,
@@ -110,9 +198,21 @@ func policyCanvasAssignPreferredPortSides(
   target: inout PolicyCanvasPortEndpoint,
   nodes: [PolicyCanvasNode]
 ) {
+  policyCanvasAssignPreferredPortSides(
+    source: &source,
+    target: &target,
+    nodeLookup: PolicyCanvasNodeLookup(nodes: nodes)
+  )
+}
+
+func policyCanvasAssignPreferredPortSides(
+  source: inout PolicyCanvasPortEndpoint,
+  target: inout PolicyCanvasPortEndpoint,
+  nodeLookup: PolicyCanvasNodeLookup
+) {
   guard
-    let sourceNode = nodes.first(where: { $0.id == source.nodeID }),
-    let targetNode = nodes.first(where: { $0.id == target.nodeID }),
+    let sourceNode = nodeLookup.node(id: source.nodeID),
+    let targetNode = nodeLookup.node(id: target.nodeID),
     sourceNode.groupID == targetNode.groupID
   else {
     return
@@ -128,7 +228,10 @@ func policyCanvasAssignPreferredPortSides(
       target.side = .trailing
     }
     policyCanvasUnblockTargetPortSide(
-      target: &target, targetNode: targetNode, sourceNode: sourceNode, nodes: nodes
+      target: &target,
+      targetNode: targetNode,
+      sourceNode: sourceNode,
+      nodeLookup: nodeLookup
     )
     return
   }
@@ -145,7 +248,10 @@ func policyCanvasAssignPreferredPortSides(
     target.side = .bottom
   }
   policyCanvasUnblockTargetPortSide(
-    target: &target, targetNode: targetNode, sourceNode: sourceNode, nodes: nodes
+    target: &target,
+    targetNode: targetNode,
+    sourceNode: sourceNode,
+    nodeLookup: nodeLookup
   )
 }
 
@@ -165,12 +271,26 @@ private func policyCanvasUnblockTargetPortSide(
   sourceNode: PolicyCanvasNode,
   nodes: [PolicyCanvasNode]
 ) {
+  policyCanvasUnblockTargetPortSide(
+    target: &target,
+    targetNode: targetNode,
+    sourceNode: sourceNode,
+    nodeLookup: PolicyCanvasNodeLookup(nodes: nodes)
+  )
+}
+
+private func policyCanvasUnblockTargetPortSide(
+  target: inout PolicyCanvasPortEndpoint,
+  targetNode: PolicyCanvasNode,
+  sourceNode: PolicyCanvasNode,
+  nodeLookup: PolicyCanvasNodeLookup
+) {
   guard let side = target.side,
-    policyCanvasPortSideIsBlocked(node: targetNode, side: side, nodes: nodes),
+    policyCanvasPortSideIsBlocked(node: targetNode, side: side, nodeLookup: nodeLookup),
     let alternative = policyCanvasPerpendicularFacingSide(
       from: side, node: targetNode, toward: sourceNode
     ),
-    !policyCanvasPortSideIsBlocked(node: targetNode, side: alternative, nodes: nodes)
+    !policyCanvasPortSideIsBlocked(node: targetNode, side: alternative, nodeLookup: nodeLookup)
   else {
     return
   }
@@ -181,6 +301,18 @@ private func policyCanvasPortSideIsBlocked(
   node: PolicyCanvasNode,
   side: PolicyCanvasPortSide,
   nodes: [PolicyCanvasNode]
+) -> Bool {
+  policyCanvasPortSideIsBlocked(
+    node: node,
+    side: side,
+    nodeLookup: PolicyCanvasNodeLookup(nodes: nodes)
+  )
+}
+
+private func policyCanvasPortSideIsBlocked(
+  node: PolicyCanvasNode,
+  side: PolicyCanvasPortSide,
+  nodeLookup: PolicyCanvasNodeLookup
 ) -> Bool {
   let frame = CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
   // One point past the lead so a neighbor sitting exactly one lead away - whose
@@ -198,10 +330,7 @@ private func policyCanvasPortSideIsBlocked(
   case .bottom:
     corridor = CGRect(x: frame.minX, y: frame.maxY, width: frame.width, height: reach)
   }
-  return nodes.contains { other in
-    other.id != node.id
-      && CGRect(origin: other.position, size: PolicyCanvasLayout.nodeSize).intersects(corridor)
-  }
+  return nodeLookup.containsNode(except: node.id, intersecting: corridor)
 }
 
 /// The perpendicular side that still faces the source, or nil when the source is

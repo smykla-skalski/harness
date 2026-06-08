@@ -107,7 +107,8 @@ struct PolicyCanvasDecoupledSugiyamaLayoutEngine: PolicyCanvasLayoutEngine {
       groupFrames: processedLayout.groupFrames,
       autoPlacedNodeIDs: groupOutput.autoPlacedNodeIDs,
       metrics: metrics,
-      routingHints: routingHints
+      routingHints: routingHints,
+      precomputedRoutes: nil
     )
   }
 
