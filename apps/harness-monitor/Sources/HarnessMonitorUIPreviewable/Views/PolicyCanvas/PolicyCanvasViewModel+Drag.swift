@@ -2,6 +2,13 @@ import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
 extension PolicyCanvasViewModel {
+  /// True only while node/group positions are being written at gesture tick
+  /// rate. The viewport uses this to keep route geometry frozen until the
+  /// end-of-gesture mutation can publish a fully recomputed route.
+  var hasActivePositionDrag: Bool {
+    !nodeDragOrigins.isEmpty || !groupDragOrigins.isEmpty
+  }
+
   /// Tick-rate node drag. Writes the new position directly each frame; the
   /// `mutate(_:)` funnel only enters on `endNodeDrag(_:translation:)` so the
   /// undo stack collects one entry per drag instead of one per frame.

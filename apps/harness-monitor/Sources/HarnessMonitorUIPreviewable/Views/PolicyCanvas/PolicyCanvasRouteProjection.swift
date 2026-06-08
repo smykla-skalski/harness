@@ -8,6 +8,25 @@ struct PolicyCanvasProjectedRouteInput {
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
   let fontScale: CGFloat
+  let suppressesProjection: Bool
+
+  init(
+    cachedOutput: PolicyCanvasRouteWorkerOutput,
+    cachedNodePositionsByID: [String: CGPoint],
+    currentNodes: [PolicyCanvasNode],
+    groups: [PolicyCanvasGroup],
+    edges: [PolicyCanvasEdge],
+    fontScale: CGFloat,
+    suppressesProjection: Bool = false
+  ) {
+    self.cachedOutput = cachedOutput
+    self.cachedNodePositionsByID = cachedNodePositionsByID
+    self.currentNodes = currentNodes
+    self.groups = groups
+    self.edges = edges
+    self.fontScale = fontScale
+    self.suppressesProjection = suppressesProjection
+  }
 }
 
 func policyCanvasNodePositionsByID(_ nodes: [PolicyCanvasNode]) -> [String: CGPoint] {
@@ -17,6 +36,9 @@ func policyCanvasNodePositionsByID(_ nodes: [PolicyCanvasNode]) -> [String: CGPo
 func policyCanvasProjectedRouteOutput(
   input: PolicyCanvasProjectedRouteInput
 ) -> PolicyCanvasRouteWorkerOutput {
+  guard !input.suppressesProjection else {
+    return input.cachedOutput
+  }
   guard !input.cachedOutput.routes.isEmpty, !input.cachedNodePositionsByID.isEmpty else {
     return input.cachedOutput
   }

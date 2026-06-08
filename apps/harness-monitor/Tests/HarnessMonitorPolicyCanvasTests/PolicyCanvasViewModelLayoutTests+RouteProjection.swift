@@ -78,6 +78,63 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(projectedOutput.signature != cachedOutput.signature)
   }
 
+  @Test("suppressed stale route projection keeps cached route while dragging")
+  func suppressedStaleRouteProjectionKeepsCachedRouteWhileDragging() async throws {
+    let source = PolicyCanvasNode(
+      id: "source",
+      title: "Source",
+      kind: .workflowEntry,
+      position: CGPoint(x: 80, y: 120)
+    )
+    var target = PolicyCanvasNode(
+      id: "target",
+      title: "Target",
+      kind: .evidenceCheck,
+      position: CGPoint(x: 360, y: 120)
+    )
+    let edge = PolicyCanvasEdge(
+      id: "edge",
+      source: PolicyCanvasPortEndpoint(
+        nodeID: source.id,
+        portID: source.outputPorts[0].id,
+        kind: .output
+      ),
+      target: PolicyCanvasPortEndpoint(
+        nodeID: target.id,
+        portID: target.inputPorts[0].id,
+        kind: .input
+      ),
+      label: "flow"
+    )
+    let cachedOutput = await PolicyCanvasRouteWorker(router: PolicyCanvasVisibilityRouter())
+      .compute(
+        input: PolicyCanvasRouteWorkerInput(
+          nodes: [source, target],
+          groups: [],
+          edges: [edge],
+          fontScale: 1
+        )
+      )
+    let cachedNodePositions = policyCanvasNodePositionsByID([source, target])
+    target.position = CGPoint(x: target.position.x + 160, y: target.position.y + 96)
+
+    let frozenOutput = policyCanvasProjectedRouteOutput(
+      input: PolicyCanvasProjectedRouteInput(
+        cachedOutput: cachedOutput,
+        cachedNodePositionsByID: cachedNodePositions,
+        currentNodes: [source, target],
+        groups: [],
+        edges: [edge],
+        fontScale: 1,
+        suppressesProjection: true
+      )
+    )
+
+    #expect(frozenOutput == cachedOutput)
+    #expect(frozenOutput.routes[edge.id] == cachedOutput.routes[edge.id])
+    #expect(frozenOutput.signature == cachedOutput.signature)
+  }
+
   @Test("stale route projection preserves cached interior corridor")
   func staleRouteProjectionPreservesCachedInteriorCorridor() {
     let source = PolicyCanvasNode(

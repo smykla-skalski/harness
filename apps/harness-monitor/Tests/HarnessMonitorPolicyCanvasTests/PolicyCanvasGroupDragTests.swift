@@ -64,6 +64,32 @@ struct PolicyCanvasGroupDragTests {
     #expect(moved.y == originFrame.origin.y)
   }
 
+  @Test("node drag exposes active position drag only during gesture")
+  func nodeDragExposesActivePositionDragOnlyDuringGesture() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let nodeID = "risk-score"
+    #expect(!viewModel.hasActivePositionDrag)
+
+    viewModel.dragNode(nodeID, translation: CGSize(width: 40, height: 20))
+    #expect(viewModel.hasActivePositionDrag)
+
+    viewModel.endNodeDrag(nodeID, translation: CGSize(width: 40, height: 20))
+    #expect(!viewModel.hasActivePositionDrag)
+  }
+
+  @Test("group drag exposes active position drag only during gesture")
+  func groupDragExposesActivePositionDragOnlyDuringGesture() {
+    let viewModel = makeAlignedCanvas()
+    let groupID = "group-A"
+    #expect(!viewModel.hasActivePositionDrag)
+
+    viewModel.dragGroup(groupID, translation: CGSize(width: 40, height: 20))
+    #expect(viewModel.hasActivePositionDrag)
+
+    viewModel.endGroupDrag(groupID, translation: CGSize(width: 40, height: 20))
+    #expect(!viewModel.hasActivePositionDrag)
+  }
+
   @Test("endGroupDrag clears caches so a new drag re-seeds origin")
   func endGroupDragClearsState() {
     let viewModel = makeAlignedCanvas()
