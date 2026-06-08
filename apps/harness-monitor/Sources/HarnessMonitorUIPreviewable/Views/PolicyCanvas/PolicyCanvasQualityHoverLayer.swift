@@ -152,10 +152,10 @@ func policyCanvasQualityHoverMarks(
     )
   }
   for violation in report.bodyHits {
-    add(.bodyHits, policyCanvasHoverBand(violation.frame, width: 14))
+    add(.bodyHits, policyCanvasHoverRect(violation.frame))
   }
   for violation in report.longEdges {
-    add(.longEdges, policyCanvasHoverBand(violation.bounds, width: 14))
+    add(.longEdges, policyCanvasHoverRect(violation.bounds))
   }
   for violation in report.detours {
     add(.detours, policyCanvasHoverPolyline(violation.points, width: 16))
@@ -209,6 +209,11 @@ private func policyCanvasHoverPolyline(_ points: [CGPoint], width: CGFloat) -> P
   return line.strokedPath(StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
 }
 
-private func policyCanvasHoverBand(_ rect: CGRect, width: CGFloat) -> Path {
-  Path(rect).strokedPath(StrokeStyle(lineWidth: width))
+/// A solid, slightly-outset rounded rect over a frame mark (body hit, long-edge
+/// bounds). Solid - not a stroked-rect ring - so filling it never bowties into
+/// corner triangles when the frame is thinner than a ring stroke would be, and
+/// the whole frame is hoverable. The outset also gives a thin frame enough
+/// thickness to land a pointer on.
+private func policyCanvasHoverRect(_ rect: CGRect) -> Path {
+  Path(roundedRect: rect.insetBy(dx: -6, dy: -6), cornerRadius: 6)
 }

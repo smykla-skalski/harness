@@ -176,6 +176,23 @@ struct PolicyCanvasGraphQualityReportTests {
     #expect(report.labels.contains { $0.kind == .overlap })
   }
 
+  @Test func verticallyClearLabelsAreNotFlaggedAsOverlapping() {
+    // Two single-row labels spaced a full edge-label height apart. Their real
+    // frames (~19pt tall at scale 1) clear each other, so the overlap test must
+    // use the rendered label metrics - not a taller crude estimate that would
+    // fabricate an overlap in the gap between them.
+    let edges = [
+      edge("a", source: endpoint("s1", "o", .output), target: endpoint("t1", "i", .input), label: "agent"),
+      edge("b", source: endpoint("s2", "o", .output), target: endpoint("t2", "i", .input), label: "merge"),
+    ]
+    let routes = [
+      "a": route([CGPoint(x: 100, y: 100), CGPoint(x: 200, y: 100)], label: CGPoint(x: 150, y: 100)),
+      "b": route([CGPoint(x: 100, y: 124), CGPoint(x: 200, y: 124)], label: CGPoint(x: 150, y: 124)),
+    ]
+    let report = measure(edges: edges, routes: routes)
+    #expect(!report.labels.contains { $0.kind == .overlap })
+  }
+
   @Test func overlappingNodeBodiesAreFlagged() {
     let frames = [
       "n1": CGRect(x: 0, y: 0, width: 168, height: 96),

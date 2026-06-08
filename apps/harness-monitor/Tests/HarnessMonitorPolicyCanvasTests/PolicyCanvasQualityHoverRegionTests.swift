@@ -108,6 +108,19 @@ struct PolicyCanvasQualityHoverRegionTests {
     #expect(marks(under: CGPoint(x: 300, y: 130), in: report).isEmpty)
   }
 
+  @Test("a rect mark is solid, so a point in its interior resolves (no hollow ring)")
+  func longEdgeMarkIsSolidNotRing() {
+    var report = PolicyCanvasGraphQualityReport.empty
+    report.longEdges = [
+      PolicyCanvasLongEdgeViolation(
+        edgeID: "e", length: 600, horizontalSpan: 600, verticalSpan: 0,
+        bendCount: 0, bounds: CGRect(x: 100, y: 100, width: 200, height: 40))
+    ]
+    // The center sits in what a hollow 14pt-ring band would leave empty; a solid
+    // mark resolves it. Guards against the nonzero-fill corner-triangle artifact.
+    #expect(marks(under: CGPoint(x: 200, y: 120), in: report).count == 1)
+  }
+
   private func portOverlap(at point: CGPoint) -> PolicyCanvasPortSpacingViolation {
     PolicyCanvasPortSpacingViolation(
       kind: .overlap, nodeID: "n", side: .leading,
