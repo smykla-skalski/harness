@@ -25,24 +25,26 @@ struct PolicyCanvasQualityHoverLayer: View {
 
   var body: some View {
     let active = viewModel.hoveredQualityMarks
-    ZStack(alignment: .topLeading) {
-      Canvas { context, _ in
-        let accent = PolicyCanvasVisualStyle.activeTint
-        for mark in active {
-          context.fill(mark.path, with: .color(accent.opacity(0.28)))
-          context.stroke(
-            mark.path,
-            with: .color(accent.opacity(0.95)),
-            style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
-          )
+    if !active.isEmpty {
+      ZStack(alignment: .topLeading) {
+        Canvas { context, _ in
+          let accent = PolicyCanvasVisualStyle.activeTint
+          for mark in active {
+            context.fill(mark.path, with: .color(accent.opacity(0.28)))
+            context.stroke(
+              mark.path,
+              with: .color(accent.opacity(0.95)),
+              style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+            )
+          }
+        }
+        if let anchor = tooltipAnchor(for: active) {
+          PolicyCanvasQualityHoverTooltip(titles: tooltipTitles(for: active))
+            .position(anchor)
         }
       }
-      if let anchor = tooltipAnchor(for: active) {
-        PolicyCanvasQualityHoverTooltip(titles: tooltipTitles(for: active))
-          .position(anchor)
-      }
+      .allowsHitTesting(false)
     }
-    .allowsHitTesting(false)
   }
 
   /// Distinct category titles under the pointer, in first-seen order, so a stack
