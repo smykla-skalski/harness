@@ -1,15 +1,30 @@
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
+/// Live entry point for the quality overlay. Reads `qualityInspectionReport` off
+/// the view model in its own body - the same direct-read pattern the hover layer
+/// uses - so it re-renders whenever the report changes, even inside the hosted
+/// `NSHostingView` canvas where a value captured by the parent's `if let` would
+/// go stale across a variant switch or an overlay toggle. Renders nothing when
+/// the lab metrics overlay is off, so it is safe to mount always.
+struct PolicyCanvasQualityOverlayLayer: View {
+  let viewModel: PolicyCanvasViewModel
+
+  var body: some View {
+    if let report = viewModel.qualityInspectionReport {
+      PolicyCanvasQualityOverlayMarks(report: report)
+    }
+  }
+}
+
 /// Content-space overlay that marks every graph-quality violation directly on the
 /// canvas, in the same coordinate space as the routes, so a developer can see
 /// exactly where a port collision, a reused corridor, a crossing, or a pierced
-/// body sits. Lab-only: driven by `viewModel.qualityInspectionReport`, which the
-/// metrics toggle populates. A single `Canvas` batches all markers by color, so
-/// even the dense extreme samples stay a handful of draw calls, and it redraws
-/// only when the report changes - never per scroll frame (the scroll view
-/// transforms the rendered layer instead of re-running the renderer).
-struct PolicyCanvasQualityOverlayLayer: View {
+/// body sits. Lab-only. A single `Canvas` batches all markers by color, so even
+/// the dense extreme samples stay a handful of draw calls, and it redraws only
+/// when the report changes - never per scroll frame (the scroll view transforms
+/// the rendered layer instead of re-running the renderer).
+struct PolicyCanvasQualityOverlayMarks: View {
   let report: PolicyCanvasGraphQualityReport
 
   var body: some View {

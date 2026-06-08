@@ -225,12 +225,14 @@ struct PolicyCanvasViewportHostedRoot: View {
             viewportIdentity: state.viewportIdentity
           )
           .policyCanvasDocumentLayer(size: snapshot.contentSize)
-          if let qualityReport = snapshot.viewModel.qualityInspectionReport {
-            PolicyCanvasQualityOverlayLayer(report: qualityReport)
-              .policyCanvasDocumentLayer(size: snapshot.contentSize)
-            PolicyCanvasQualityHoverLayer(viewModel: snapshot.viewModel)
-              .policyCanvasDocumentLayer(size: snapshot.contentSize)
-          }
+          // Mounted unconditionally and reading the report live in their own
+          // bodies, so a variant switch or overlay toggle re-renders them. A
+          // parent `if let` here would capture a stale report inside the hosted
+          // canvas. Both draw nothing when the lab overlay is off.
+          PolicyCanvasQualityOverlayLayer(viewModel: snapshot.viewModel)
+            .policyCanvasDocumentLayer(size: snapshot.contentSize)
+          PolicyCanvasQualityHoverLayer(viewModel: snapshot.viewModel)
+            .policyCanvasDocumentLayer(size: snapshot.contentSize)
         }
         .policyCanvasDocumentLayer(size: snapshot.contentSize)
       }
