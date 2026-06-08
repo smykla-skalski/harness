@@ -8,8 +8,8 @@ import Testing
 
 @Suite("Policy canvas corridor bundle assignment")
 struct PolicyCanvasCorridorBundleAssignmentTests {
-  @Test("four edges sharing source and target node receive one shared bus Y")
-  func sameTargetBundleSharesBusY() {
+  @Test("four edges sharing source and target node receive spaced bus Ys")
+  func sameTargetBundleUsesSpacedBusYs() {
     let graph = PolicyCanvasLayoutGraph(
       nodes: [
         PolicyCanvasLayoutNode(
@@ -60,9 +60,12 @@ struct PolicyCanvasCorridorBundleAssignmentTests {
     }
     #expect(ys.count == 4)
     #expect(
-      Set(ys).count == 1,
-      "Four edges to one target share one bus Y, got distinct values \(Set(ys))"
+      Set(ys).count == 4,
+      "Four edges to one target should use distinct bus Ys, got \(ys)"
     )
+    for pair in zip(ys.sorted(), ys.sorted().dropFirst()) {
+      #expect(pair.1 - pair.0 >= PolicyCanvasVisibilityRouter.laneSpreadStep - 0.001)
+    }
   }
 
   @Test("bundle hints are deterministic across repeated runs")

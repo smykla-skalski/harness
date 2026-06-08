@@ -81,6 +81,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
             terminalSlots: terminalSlots,
             obstacles: obstacles,
             portMarkerLayout: input.portMarkerLayout,
+            passContext: input.passContext,
             router: input.router
           )
         )
@@ -98,6 +99,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
     let terminalSlots: [String: PolicyCanvasRouteEndpointSlots]
     let obstacles: [CGRect]
     let portMarkerLayout: PolicyCanvasPortMarkerLayout?
+    let passContext: PolicyCanvasDisplayedRoutePassContext?
     let router: any PolicyCanvasEdgeRouter
   }
 
@@ -155,8 +157,10 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
     let target = SideCandidate(anchor: targetCandidate)
     let sourceNode = context.nodeIndex[edge.source.nodeID]
     let targetNode = context.nodeIndex[edge.target.nodeID]
+    let selectedLane =
+      context.passContext.map { selectedRouteLane(for: edge, passContext: $0) } ?? 0
     let baseContext = PolicyCanvasRouteContext(
-      lane: 0,
+      lane: selectedLane,
       groups: context.prepared.groups,
       sourceGroupID: sourceNode?.groupID,
       targetGroupID: targetNode?.groupID,
@@ -187,6 +191,17 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
         baseContext: baseContext,
         router: context.router
       )
+    )
+  }
+
+  private func selectedRouteLane(
+    for edge: PolicyCanvasEdge,
+    passContext: PolicyCanvasDisplayedRoutePassContext
+  ) -> Int {
+    max(
+      passContext.edgeLanes[edge.id, default: 0],
+      passContext.sourceFanoutLanes[edge.id, default: 0],
+      passContext.targetFanoutLanes[edge.id, default: 0]
     )
   }
 

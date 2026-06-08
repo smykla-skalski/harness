@@ -188,6 +188,75 @@ struct PolicyCanvasFirstFeasibleLeadTests {
       #expect(routes[edge.id].map(policyCanvasRouteTargetSide) == .leading)
     }
   }
+
+  @Test("shared target lanes reach the visibility router")
+  func sharedTargetLanesReachVisibilityRouter() {
+    let source = policyCanvasMarkerTestNode(
+      id: "src",
+      position: CGPoint(x: 0, y: 120),
+      inputPorts: [],
+      outputPorts: [PolicyCanvasPort(id: "out", title: "out", kind: .output)]
+    )
+    let target = policyCanvasMarkerTestNode(
+      id: "tgt",
+      position: CGPoint(x: 460, y: 80),
+      inputPorts: [
+        PolicyCanvasPort(id: "in-a", title: "in-a", kind: .input),
+        PolicyCanvasPort(id: "in-b", title: "in-b", kind: .input),
+      ],
+      outputPorts: []
+    )
+    let edges = [
+      PolicyCanvasEdge(
+        id: "edge-a",
+        source: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "out", kind: .output),
+        target: PolicyCanvasPortEndpoint(nodeID: target.id, portID: "in-a", kind: .input),
+        label: "a",
+        pinnedPortSide: false
+      ),
+      PolicyCanvasEdge(
+        id: "edge-b",
+        source: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "out", kind: .output),
+        target: PolicyCanvasPortEndpoint(nodeID: target.id, portID: "in-b", kind: .input),
+        label: "b",
+        pinnedPortSide: false
+      ),
+    ]
+    let prepared = PolicyCanvasPreparedRouteInput(
+      input: PolicyCanvasRouteWorkerInput(
+        nodes: [source, target], groups: [], edges: edges, fontScale: 1
+      )
+    )
+    let nodeIndex = prepared.nodeIndex
+    let routes = PolicyCanvasFirstFeasibleRouteSelection().selectRoutes(
+      input: PolicyCanvasRouteSelectionInput(
+        prepared: prepared,
+        router: PolicyCanvasLaneEncodingRouter(),
+        portMarkerLayout: nil,
+        passContext: prepared.displayedRoutePassContext(nodeIndex: nodeIndex)
+      )
+    )
+    let laneXs: [CGFloat] = edges.compactMap { edge in
+      guard
+        let route = routes[edge.id],
+        let lanePoint = route.points.first(where: { point in
+          point.x >= PolicyCanvasLaneEncodingRouter.laneBase
+        })
+      else {
+        return nil
+      }
+      return lanePoint.x
+    }
+    let quantizedLaneXs = Set(laneXs.map { laneX in
+      Int((laneX * 1_000).rounded())
+    })
+
+    #expect(laneXs.count == edges.count)
+    #expect(
+      quantizedLaneXs.count == edges.count,
+      "expected shared-target siblings to receive distinct route lanes, got \(laneXs)"
+    )
+  }
 }
 
 private struct PolicyCanvasFlexProofRouter: PolicyCanvasEdgeRouter {
@@ -214,5 +283,27 @@ private struct PolicyCanvasFlexProofRouter: PolicyCanvasEdgeRouter {
     context _: PolicyCanvasRouteContext
   ) -> PolicyCanvasEdgeRoute {
     Self.flexRoute
+  }
+}
+
+private struct PolicyCanvasLaneEncodingRouter: PolicyCanvasEdgeRouter {
+  static let laneBase: CGFloat = 10_000
+
+  func route(
+    source: CGPoint,
+    target: CGPoint,
+    context: PolicyCanvasRouteContext
+  ) -> PolicyCanvasEdgeRoute {
+    let laneX = Self.laneBase + CGFloat(context.lane * 20)
+    let points = [
+      source,
+      CGPoint(x: laneX, y: source.y),
+      CGPoint(x: laneX, y: target.y),
+      target,
+    ]
+    return PolicyCanvasEdgeRoute(
+      points: points,
+      labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: points)
+    )
   }
 }

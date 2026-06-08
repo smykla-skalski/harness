@@ -48,15 +48,10 @@ func policyCanvasCorridorBundleTiebreak(
 
 /// Groups bundle entries by corridor key and assigns each entry a stable
 /// `bundleOrdinal` reflecting its rail position within the shared corridor.
-/// The ordinal is exposed through the returned hint so downstream label
-/// placement, hit-testing, and visual hue assignment can distinguish
-/// bundled edges without changing the underlying bus geometry.
-///
-/// Routes keep the shared `horizontalLaneY` (the bus the visibility router
-/// uses). Per-rail distinction lives on top of the bus: labels are spread
-/// along the route, fan-in stubs split at the target, and hue cycling can
-/// give each rail a distinct color. The ordinal is the deterministic key
-/// each of those mechanisms anchors to.
+/// The returned hint carries both that ordinal and a side-by-side
+/// `horizontalLaneY`, so the visibility router starts bundled rails on distinct
+/// corridors instead of stacking them and hoping post-processing can untangle the
+/// overlap later.
 func policyCanvasAssignCorridorBundleHints(
   entries: [PolicyCanvasCorridorBundleEntry]
 ) -> [String: PolicyCanvasEdgeCorridorHint] {
@@ -68,10 +63,11 @@ func policyCanvasAssignCorridorBundleHints(
       left.stableTiebreak < right.stableTiebreak
     }
     let bundleSize = sorted.count
+    let laneYs = policyCanvasBundleLaneYs(for: sorted)
     for (ordinal, entry) in sorted.enumerated() {
       result[entry.edgeID] = PolicyCanvasEdgeCorridorHint(
         key: key,
-        horizontalLaneY: entry.baseHorizontalLaneY,
+        horizontalLaneY: laneYs[ordinal],
         verticalLaneX: entry.verticalLaneX,
         bundleOrdinal: ordinal,
         bundleSize: bundleSize
@@ -79,4 +75,51 @@ func policyCanvasAssignCorridorBundleHints(
     }
   }
   return result
+}
+
+private func policyCanvasBundleLaneYs(
+  for entries: [PolicyCanvasCorridorBundleEntry]
+) -> [CGFloat] {
+  guard !entries.isEmpty else {
+    return []
+  }
+  let rawLaneYs = entries.enumerated().map { ordinal, entry in
+    entry.baseHorizontalLaneY
+      + policyCanvasCenteredBundleOffset(ordinal: ordinal, count: entries.count)
+  }
+  guard
+    let targetBand = entries.first?.targetBand,
+    let minY = rawLaneYs.min(),
+    let maxY = rawLaneYs.max()
+  else {
+    return rawLaneYs
+  }
+  let bundleSpan = maxY - minY
+  let bandSpan = targetBand.upperBound - targetBand.lowerBound
+  let shift: CGFloat
+  if bundleSpan <= bandSpan {
+    if minY < targetBand.lowerBound {
+      shift = targetBand.lowerBound - minY
+    } else if maxY > targetBand.upperBound {
+      shift = targetBand.upperBound - maxY
+    } else {
+      shift = 0
+    }
+  } else {
+    let bundleCenter = (minY + maxY) / 2
+    let bandCenter = (targetBand.lowerBound + targetBand.upperBound) / 2
+    shift = bandCenter - bundleCenter
+  }
+  return rawLaneYs.map { $0 + shift }
+}
+
+private func policyCanvasCenteredBundleOffset(
+  ordinal: Int,
+  count: Int
+) -> CGFloat {
+  guard count > 1 else {
+    return 0
+  }
+  return (CGFloat(ordinal) - (CGFloat(count - 1) / 2))
+    * PolicyCanvasVisibilityRouter.laneSpreadStep
 }

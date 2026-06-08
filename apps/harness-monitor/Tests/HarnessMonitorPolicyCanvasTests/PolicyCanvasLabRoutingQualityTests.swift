@@ -84,6 +84,40 @@ struct PolicyCanvasLabRoutingQualityTests {
     )
   }
 
+  @Test("lab corridor bundle hints keep route minimum lane spacing")
+  func labCorridorBundleHintsKeepMinimumLaneSpacing() throws {
+    var violations: [String] = []
+    for sample in PolicyCanvasLabSamples.all {
+      let graph = try laidOutLabGraph(sampleID: sample.id)
+      let hints = graph.routingHints?.edgeHints ?? [:]
+      let bundles = Dictionary(grouping: hints) { $0.value.key }
+      for bundle in bundles.values where bundle.count > 1 {
+        let sorted = bundle.sorted { left, right in
+          if left.value.horizontalLaneY != right.value.horizontalLaneY {
+            return left.value.horizontalLaneY < right.value.horizontalLaneY
+          }
+          return left.key < right.key
+        }
+        for pair in zip(sorted, sorted.dropFirst()) {
+          let distance = pair.1.value.horizontalLaneY - pair.0.value.horizontalLaneY
+          if distance < PolicyCanvasVisibilityRouter.laneSpreadStep - 0.001 {
+            violations.append(
+              "\(sample.id):\(pair.0.key)~\(pair.1.key) distance=\(distance)"
+            )
+          }
+        }
+      }
+    }
+
+    #expect(
+      violations.isEmpty,
+      """
+      lab corridor bundle hints should keep the route minimum spacing
+      violations=\(violations)
+      """
+    )
+  }
+
   @Test("extreme sample routes stay inside a local vertical band")
   func extremeRoutesStayInsideLocalVerticalBand() async throws {
     let laidOutGraph = try laidOutLabGraph(sampleID: "extreme")
