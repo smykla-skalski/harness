@@ -214,7 +214,6 @@ func policyCanvasResolvedLabelPosition(
   obstacleFrames: PolicyCanvasLabelObstacleFrames
 ) -> CGPoint {
   let base = policyCanvasClosestRoutePoint(to: route.labelPosition, route: route)
-  let lineBlockers = obstacleFrames.occupied + obstacleFrames.routes
   var allCandidates: [CGPoint] = []
   let preferredSegments = policyCanvasPreferredLabelSegments(
     route: route,
@@ -229,10 +228,15 @@ func policyCanvasResolvedLabelPosition(
       labelSize: size,
       preferredAxis: preferredAxis
     )
+    let preferredObstacleFrames = policyCanvasNearbyLabelObstacleFrames(
+      obstacleFrames,
+      candidates: candidates,
+      size: size
+    )
     if let candidate = policyCanvasFirstClearLabelCandidate(
       candidates,
       size: size,
-      obstacleFrames: obstacleFrames,
+      obstacleFrames: preferredObstacleFrames,
       requiresGraphHull: true
     ) {
       return candidate
@@ -245,21 +249,32 @@ func policyCanvasResolvedLabelPosition(
     avoidedSegments: avoidedSegments,
     preferredAxis: preferredAxis
   )
+  let candidateObstacleFrames = policyCanvasNearbyLabelObstacleFrames(
+    obstacleFrames,
+    candidates: candidates,
+    size: size
+  )
   if let candidate = policyCanvasFirstClearLabelCandidate(
     candidates,
     size: size,
-    obstacleFrames: obstacleFrames,
+    obstacleFrames: candidateObstacleFrames,
     requiresGraphHull: true
   ) {
     return candidate
   }
   allCandidates.append(contentsOf: candidates)
+  let allCandidateObstacleFrames = policyCanvasNearbyLabelObstacleFrames(
+    obstacleFrames,
+    candidates: allCandidates,
+    size: size
+  )
+  let lineBlockers = allCandidateObstacleFrames.occupied + allCandidateObstacleFrames.routes
   // Keep labels inside the graph hull even when that means grazing a sibling
   // route, instead of jumping to a perfectly clear off-canvas stub.
   if let candidate = policyCanvasLeastBadGraphHullCandidate(
     allCandidates,
     size: size,
-    obstacleFrames: obstacleFrames,
+    obstacleFrames: allCandidateObstacleFrames,
     lineBlockers: lineBlockers,
     fallback: base
   ) {
@@ -268,7 +283,7 @@ func policyCanvasResolvedLabelPosition(
   if let candidate = policyCanvasFirstClearLabelCandidate(
     allCandidates,
     size: size,
-    obstacleFrames: obstacleFrames,
+    obstacleFrames: allCandidateObstacleFrames,
     requiresGraphHull: false
   ) {
     return candidate
@@ -281,10 +296,132 @@ func policyCanvasResolvedLabelPosition(
   return policyCanvasLeastBadLabelCandidate(
     allCandidates,
     size: size,
-    nodeFrames: obstacleFrames.nodes,
+    nodeFrames: allCandidateObstacleFrames.nodes,
     lineBlockers: lineBlockers,
     fallback: base
   )
+}
+
+private func policyCanvasNearbyLabelObstacleFrames(
+  _ obstacleFrames: PolicyCanvasLabelObstacleFrames,
+  candidates: [CGPoint],
+  size: CGSize
+) -> PolicyCanvasLabelObstacleFrames {
+  let candidateBounds = policyCanvasLabelCandidateBounds(candidates, size: size)
+  guard !candidateBounds.isNull else {
+    return obstacleFrames
+  }
+  return PolicyCanvasLabelObstacleFrames(
+    occupied: obstacleFrames.occupied,
+    nodes: obstacleFrames.nodes,
+    routes: obstacleFrames.routes.filter { $0.intersects(candidateBounds) }
+  )
+}
+
+func policyCanvasLabelCandidateBounds(
+  _ candidates: [CGPoint],
+  size: CGSize
+) -> CGRect {
+  candidates.reduce(into: CGRect.null) { bounds, candidate in
+    bounds = bounds.union(policyCanvasLabelFrame(center: candidate, size: size))
+  }
+}
+
+struct PolicyCanvasIndexedLabelFrame {
+  let ownerID: String
+  let frame: CGRect
+}
+
+struct PolicyCanvasLabelFrameIndex {
+  private let cellSize: CGFloat
+  private var cells: [Cell: [PolicyCanvasIndexedLabelFrame]]
+
+  init(
+    entries: [PolicyCanvasIndexedLabelFrame],
+    cellSize: CGFloat = PolicyCanvasLayout.nodeSize.width
+  ) {
+    self.cellSize = max(cellSize, 1)
+    cells = [:]
+    for entry in entries {
+      insert(entry)
+    }
+  }
+
+  mutating func insert(_ entry: PolicyCanvasIndexedLabelFrame) {
+    guard !entry.frame.isNull else {
+      return
+    }
+    for cell in cellsIntersecting(entry.frame) {
+      cells[cell, default: []].append(entry)
+    }
+  }
+
+  func frames(
+    intersecting rect: CGRect,
+    excluding ownerID: String? = nil
+  ) -> [CGRect] {
+    guard !rect.isNull else {
+      return []
+    }
+    var seen: Set<FrameKey> = []
+    var result: [CGRect] = []
+    for cell in cellsIntersecting(rect) {
+      for entry in cells[cell, default: []] where entry.ownerID != ownerID {
+        guard entry.frame.intersects(rect) else {
+          continue
+        }
+        let key = FrameKey(ownerID: entry.ownerID, frame: entry.frame)
+        guard seen.insert(key).inserted else {
+          continue
+        }
+        result.append(entry.frame)
+      }
+    }
+    return result
+  }
+
+  private func cellsIntersecting(_ rect: CGRect) -> [Cell] {
+    guard !rect.isNull else {
+      return []
+    }
+    let minX = Int(floor(rect.minX / cellSize))
+    let maxX = Int(floor(rect.maxX / cellSize))
+    let minY = Int(floor(rect.minY / cellSize))
+    let maxY = Int(floor(rect.maxY / cellSize))
+    var result: [Cell] = []
+    result.reserveCapacity(max(0, (maxX - minX + 1) * (maxY - minY + 1)))
+    for x in minX...maxX {
+      for y in minY...maxY {
+        result.append(Cell(x: x, y: y))
+      }
+    }
+    return result
+  }
+
+  private struct Cell: Hashable {
+    let x: Int
+    let y: Int
+  }
+
+  private struct FrameKey: Hashable {
+    let ownerID: String
+    let minX: Int
+    let minY: Int
+    let maxX: Int
+    let maxY: Int
+
+    init(ownerID: String, frame: CGRect) {
+      self.ownerID = ownerID
+      minX = Self.quantize(frame.minX)
+      minY = Self.quantize(frame.minY)
+      maxX = Self.quantize(frame.maxX)
+      maxY = Self.quantize(frame.maxY)
+    }
+
+    private static func quantize(_ value: CGFloat) -> Int {
+      Int((value * 1_000).rounded())
+    }
+  }
 }
 
 private func policyCanvasFirstClearLabelCandidate(

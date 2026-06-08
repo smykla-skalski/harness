@@ -144,6 +144,18 @@ private func policyCanvasStaircasePlacement(
   guard windowHigh - windowLow >= PolicyCanvasLayout.gridSize else {
     return [:]
   }
+  let searchBounds = policyCanvasStaircaseSearchBounds(
+    members: members,
+    windowLow: windowLow,
+    windowHigh: windowHigh
+  )
+  let relevantNodeFrames = nodeFrames.filter { $0.intersects(searchBounds) }
+  let relevantEdgeFrames = edgeFrames.reduce(into: [String: [CGRect]]()) { result, element in
+    let frames = element.value.filter { $0.intersects(searchBounds) }
+    if !frames.isEmpty {
+      result[element.key] = frames
+    }
+  }
   let step = min(
     (windowHigh - windowLow) / CGFloat(members.count),
     PolicyCanvasLayout.gridSize * 4
@@ -157,8 +169,8 @@ private func policyCanvasStaircasePlacement(
   var ceiling = windowHigh
   for member in members {
     let blockers =
-      nodeFrames
-      + edgeFrames.filter { $0.key != member.id }.flatMap { $0.value }
+      relevantNodeFrames
+      + relevantEdgeFrames.filter { $0.key != member.id }.flatMap { $0.value }
       + occupied
     guard
       let x = policyCanvasClearStaircaseX(
@@ -176,6 +188,23 @@ private func policyCanvasStaircasePlacement(
     ceiling = x - step
   }
   return placed
+}
+
+private func policyCanvasStaircaseSearchBounds(
+  members: [PolicyCanvasFanInLabelMember],
+  windowLow: CGFloat,
+  windowHigh: CGFloat
+) -> CGRect {
+  let maxWidth = members.map(\.size.width).max() ?? 0
+  let maxHeight = members.map(\.size.height).max() ?? 0
+  let minY = members.map(\.runY).min() ?? 0
+  let maxY = members.map(\.runY).max() ?? 0
+  return CGRect(
+    x: windowLow - (maxWidth / 2),
+    y: minY - (maxHeight / 2),
+    width: max(0, windowHigh - windowLow) + maxWidth,
+    height: max(0, maxY - minY) + maxHeight
+  )
 }
 
 private func policyCanvasClearStaircaseX(

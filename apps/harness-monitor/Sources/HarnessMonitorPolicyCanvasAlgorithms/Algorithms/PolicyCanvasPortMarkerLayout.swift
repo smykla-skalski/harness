@@ -98,7 +98,19 @@ extension PolicyCanvasPreparedRouteInput {
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> PolicyCanvasPortMarkerLayout {
-    let entries = portMarkerEntries(routes: routes)
+    portMarkerLayout(entries: portMarkerEntries(routes: routes), nodeIndex: nodeIndex)
+  }
+
+  func seededPortMarkerLayout(
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> PolicyCanvasPortMarkerLayout {
+    portMarkerLayout(entries: seededPortMarkerEntries(), nodeIndex: nodeIndex)
+  }
+
+  private func portMarkerLayout(
+    entries: [PolicyCanvasPortMarkerEntry],
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> PolicyCanvasPortMarkerLayout {
     let groups = Dictionary(grouping: entries) { $0.nodeKey }
     let edgesByID = Dictionary(edges.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     var terminals: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal] = [:]
@@ -114,6 +126,25 @@ extension PolicyCanvasPreparedRouteInput {
       terminalsByKey: terminals,
       endpointsByKey: Dictionary(uniqueKeysWithValues: entries.map { ($0.key, $0.endpoint) })
     )
+  }
+
+  private func seededPortMarkerEntries() -> [PolicyCanvasPortMarkerEntry] {
+    edges.flatMap { edge -> [PolicyCanvasPortMarkerEntry] in
+      [
+        PolicyCanvasPortMarkerEntry(
+          key: PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .source),
+          endpoint: edge.source,
+          preferredSide: policyCanvasResolvedPortSide(for: edge.source),
+          sortKey: policyCanvasPortMarkerSortKey(edge: edge, role: .source)
+        ),
+        PolicyCanvasPortMarkerEntry(
+          key: PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .target),
+          endpoint: edge.target,
+          preferredSide: policyCanvasResolvedPortSide(for: edge.target),
+          sortKey: policyCanvasPortMarkerSortKey(edge: edge, role: .target)
+        ),
+      ]
+    }
   }
 
   private func portMarkerEntries(

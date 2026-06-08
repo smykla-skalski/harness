@@ -402,4 +402,38 @@ extension PolicyCanvasViewModel {
       routingHints: snapshot.routingHints
     )
   }
+
+  /// Commit a graph returned by `plannedReflowGraph(...)` without running the
+  /// layout engine again. Atomic reflow already routed this exact graph, so a
+  /// second `reflowLayout(...)` pass would only duplicate the expensive layout
+  /// work before publishing the same node and edge changes.
+  func commitPlannedReflowGraph(
+    _ graph: PolicyCanvasReflowGraph,
+    preserveManualAnchors: Bool,
+    force: Bool,
+    requestsRouteComputation: Bool
+  ) {
+    let snapshot = PolicyCanvasReflowSnapshot(
+      nodes: graph.nodes,
+      groups: graph.groups,
+      edges: graph.edges,
+      routingHints: graph.routingHints
+    )
+    let preservesManualAnchors = shouldPreserveManualAnchors(preserveManualAnchors)
+    let canonicalForcedSignature =
+      force && !preservesManualAnchors
+      ? reflowSnapshotSignature(snapshot)
+      : nil
+    applyReflowSnapshot(
+      snapshot,
+      requestsRouteComputation: requestsRouteComputation
+    ) { [self] in
+      if requestsRouteComputation {
+        requestRouteComputation()
+      }
+    }
+    if let canonicalForcedSignature {
+      lastCanonicalForcedReflowSignature = canonicalForcedSignature
+    }
+  }
 }

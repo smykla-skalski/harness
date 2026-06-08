@@ -1,6 +1,8 @@
 import CoreGraphics
 
 struct PolicyCanvasObstacleAwareGreedyLabelPlacement: PolicyCanvasEdgeLabelPlacementAlgorithm {
+  private let greedyRouteFrameComplexityLimit = 8_000
+
   func placeLabels(input: PolicyCanvasLabelPlacementInput) -> [String: CGPoint] {
     let prepared = input.prepared
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: prepared.fontScale)
@@ -16,6 +18,14 @@ struct PolicyCanvasObstacleAwareGreedyLabelPlacement: PolicyCanvasEdgeLabelPlace
         label: edge.label,
         route: route,
         size: metrics.size(for: edge.label)
+      )
+    }
+    let routeFrameCount = routeFrames.values.reduce(0) { $0 + $1.count }
+    if labelledRoutes.count * max(1, routeFrameCount) > greedyRouteFrameComplexityLimit {
+      return policyCanvasFastResolvedLabelPositions(
+        routes: labelledRoutes,
+        routeFrames: routeFrames,
+        nodeFrames: prepared.nodes.map(\.frame) + policyCanvasGroupTitleFrames(prepared.groups)
       )
     }
     return policyCanvasResolvedLabelPositions(

@@ -91,40 +91,14 @@ struct PolicyCanvasAlgorithmSelectionTests {
     #expect(output.labelPositions["edge-source-gate"] != nil)
   }
 
-  @Test("fallback route output renders edges without invoking route worker")
-  func fallbackRouteOutputRendersEdgesWithoutRouteWorker() {
-    let fixture = Self.linearFixture()
-    let output = PolicyCanvasRouteWorkerOutput.fallback(
-      for: PolicyCanvasRouteWorkerInput(
-        nodes: fixture.nodes,
-        groups: [],
-        edges: fixture.edges,
-        fontScale: 1
-      )
-    )
+  @Test("workspace does not render fallback routes while worker catches up")
+  func workspaceDoesNotRenderFallbackRoutesWhileWorkerCatchesUp() throws {
+    let source =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
 
-    #expect(output.routes.keys.sorted() == fixture.edges.map(\.id).sorted())
-    #expect(output.signature.routeCount == fixture.edges.count)
-  }
-
-  @Test("fallback route output stays cheap for instant canvas switches")
-  func fallbackRouteOutputStaysCheapForInstantCanvasSwitches() throws {
-    let source = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasRouteWorkerTypes.swift"
-    )
-    let fallbackFunction = try sourceFunction(
-      named: "static func fallback(for input: PolicyCanvasRouteWorkerInput) -> Self",
-      endingBefore: "\n  init(",
-      in: source
-    )
-
-    #expect(!fallbackFunction.contains("resolvedLabelPositions("))
-    #expect(!fallbackFunction.contains("portVisibility("))
-    #expect(!fallbackFunction.contains("portMarkerLayout("))
-    #expect(!fallbackFunction.contains("accessibilityEdgeEntries("))
-    #expect(!fallbackFunction.contains("nodeAccessibilityValuesByID("))
-    #expect(!fallbackFunction.contains("accessibilityNodeEntries("))
-    #expect(!fallbackFunction.contains("connectTargetsByNodeID("))
+    #expect(!source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
+    #expect(source.contains("let routeOutput = projectedRouteOutput"))
+    #expect(source.contains("let routeOutputIsCurrentGraphMissing ="))
   }
 
   @Test("greedy feedback arc reversal returns an acyclic orientation")

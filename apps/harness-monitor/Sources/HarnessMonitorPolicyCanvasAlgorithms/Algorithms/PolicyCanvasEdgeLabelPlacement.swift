@@ -1,4 +1,10 @@
+import OSLog
 import SwiftUI
+
+private let policyCanvasLabelPlacementSignposter = OSSignposter(
+  subsystem: "io.harnessmonitor",
+  category: "policy-canvas.perf"
+)
 
 public struct PolicyCanvasLabelPlacementRoute {
   public let id: String
@@ -106,7 +112,18 @@ public func policyCanvasResolvedLabelPositions(
   // avoidance below separates labels that crowd each other, including crowded
   // feeder cases where one label must slide beside its route after the normal
   // on-route search runs out of clear slots.
+  let sharedSignpostID = policyCanvasLabelPlacementSignposter.makeSignpostID()
+  let sharedInterval = policyCanvasLabelPlacementSignposter.beginInterval(
+    "policy_canvas.labels.phase.shared_avoidance",
+    id: sharedSignpostID,
+    "routes=\(routes.count, privacy: .public)"
+  )
   let sharedSegmentAvoidance = policyCanvasSharedSegmentLabelAvoidance(routes)
+  policyCanvasLabelPlacementSignposter.endInterval(
+    "policy_canvas.labels.phase.shared_avoidance",
+    sharedInterval,
+    "avoidance=\(sharedSegmentAvoidance.count, privacy: .public)"
+  )
   var occupiedFrames: [CGRect] = []
   var positions: [String: CGPoint] = [:]
   // Seat fan-in families (same-label edges stacking into one node) as a
@@ -114,14 +131,31 @@ public func policyCanvasResolvedLabelPositions(
   // before the greedy pass crowds them into the corners. Sizes are taken from
   // each route entry so the reserved frames match the labels that will draw.
   let sizeByID = Dictionary(uniqueKeysWithValues: routes.map { ($0.id, $0.size) })
+  let staircaseSignpostID = policyCanvasLabelPlacementSignposter.makeSignpostID()
+  let staircaseInterval = policyCanvasLabelPlacementSignposter.beginInterval(
+    "policy_canvas.labels.phase.staircase",
+    id: staircaseSignpostID,
+    "routes=\(routes.count, privacy: .public)"
+  )
   let staircase = policyCanvasFanInLabelStaircasePositions(
     routes: routes,
     nodeFrames: nodeFrames
+  )
+  policyCanvasLabelPlacementSignposter.endInterval(
+    "policy_canvas.labels.phase.staircase",
+    staircaseInterval,
+    "labels=\(staircase.count, privacy: .public)"
   )
   for (id, center) in staircase {
     positions[id] = center
     occupiedFrames.append(policyCanvasLabelFrame(center: center, size: sizeByID[id] ?? .zero))
   }
+  let duplicateSignpostID = policyCanvasLabelPlacementSignposter.makeSignpostID()
+  let duplicateInterval = policyCanvasLabelPlacementSignposter.beginInterval(
+    "policy_canvas.labels.phase.duplicates",
+    id: duplicateSignpostID,
+    "remaining=\(routes.count - positions.count, privacy: .public)"
+  )
   let duplicatePairs = policyCanvasCrowdedDuplicateLabelPairPositions(
     routes: routes.filter { positions[$0.id] == nil },
     nodeFrames: nodeFrames,
@@ -129,10 +163,21 @@ public func policyCanvasResolvedLabelPositions(
     sharedSegmentAvoidance: sharedSegmentAvoidance,
     routeFrames: routeFrames
   )
+  policyCanvasLabelPlacementSignposter.endInterval(
+    "policy_canvas.labels.phase.duplicates",
+    duplicateInterval,
+    "labels=\(duplicatePairs.count, privacy: .public)"
+  )
   for (id, center) in duplicatePairs {
     positions[id] = center
     occupiedFrames.append(policyCanvasLabelFrame(center: center, size: sizeByID[id] ?? .zero))
   }
+  let greedySignpostID = policyCanvasLabelPlacementSignposter.makeSignpostID()
+  let greedyInterval = policyCanvasLabelPlacementSignposter.beginInterval(
+    "policy_canvas.labels.phase.greedy",
+    id: greedySignpostID,
+    "remaining=\(routes.count - positions.count, privacy: .public)"
+  )
   for entry in policyCanvasSortedLabelRoutes(routes) where positions[entry.id] == nil {
     let blockingRouteFrames = routeFrames.reduce(into: [CGRect]()) { result, element in
       if element.key != entry.id {
@@ -154,6 +199,68 @@ public func policyCanvasResolvedLabelPositions(
     )
     positions[entry.id] = position
     occupiedFrames.append(policyCanvasLabelFrame(center: position, size: entry.size))
+  }
+  policyCanvasLabelPlacementSignposter.endInterval(
+    "policy_canvas.labels.phase.greedy",
+    greedyInterval,
+    "labels=\(positions.count, privacy: .public)"
+  )
+  return positions
+}
+
+func policyCanvasFastResolvedLabelPositions(
+  routes rawRoutes: [PolicyCanvasLabelPlacementRoute],
+  routeFrames: [String: [CGRect]],
+  nodeFrames: [CGRect]
+) -> [String: CGPoint] {
+  let routes = rawRoutes.map { entry in
+    PolicyCanvasLabelPlacementRoute(
+      id: entry.id,
+      label: entry.label,
+      route: PolicyCanvasEdgeRoute(
+        points: PolicyCanvasVisibilityRouter.compressCollinear(entry.route.points),
+        labelPosition: entry.route.labelPosition
+      ),
+      size: entry.size
+    )
+  }
+  let routeFrameIndex = PolicyCanvasLabelFrameIndex(
+    entries: routeFrames.flatMap { id, frames in
+      frames.map { PolicyCanvasIndexedLabelFrame(ownerID: id, frame: $0) }
+    }
+  )
+  var occupiedFrameIndex = PolicyCanvasLabelFrameIndex(entries: [])
+  var positions: [String: CGPoint] = [:]
+  for entry in policyCanvasSortedLabelRoutes(routes) {
+    let candidates = policyCanvasLabelCandidates(
+      route: entry.route,
+      labelSize: entry.size,
+      avoidedSegments: [],
+      preferredAxis: nil
+    ) + [entry.route.arcLengthMidpoint, entry.route.labelPosition]
+    let candidateBounds = policyCanvasLabelCandidateBounds(candidates, size: entry.size)
+    let nearbyRouteFrames = routeFrameIndex.frames(
+      intersecting: candidateBounds,
+      excluding: entry.id
+    )
+    let nearbyOccupiedFrames = occupiedFrameIndex.frames(intersecting: candidateBounds)
+    let position =
+      candidates.first { candidate in
+        let frame = policyCanvasLabelFrame(center: candidate, size: entry.size)
+        return !nodeFrames.contains(where: { $0.intersects(frame) })
+          && !nearbyRouteFrames.contains(where: { $0.intersects(frame) })
+          && !nearbyOccupiedFrames.contains(where: { $0.intersects(frame) })
+      }
+      ?? policyCanvasLeastBadLabelCandidate(
+        candidates,
+        size: entry.size,
+        nodeFrames: nodeFrames,
+        lineBlockers: nearbyRouteFrames + nearbyOccupiedFrames,
+        fallback: entry.route.arcLengthMidpoint
+    )
+    positions[entry.id] = position
+    let occupiedFrame = policyCanvasLabelFrame(center: position, size: entry.size)
+    occupiedFrameIndex.insert(PolicyCanvasIndexedLabelFrame(ownerID: entry.id, frame: occupiedFrame))
   }
   return positions
 }

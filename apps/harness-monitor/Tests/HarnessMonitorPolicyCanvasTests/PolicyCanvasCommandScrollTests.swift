@@ -200,7 +200,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("currentRouteKey: routeKey"))
     #expect(source.contains("appliedRouteKey: routeCache.appliedRouteKey"))
     #expect(source.contains("viewportCenteringGeneration: viewModel.viewportCenteringGeneration"))
-    #expect(source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
+    #expect(!source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
     #expect(source.contains("routeCache.outputsByCanvasIdentity"))
     #expect(
       source.contains("let cachedRouteOutput = routeCache.outputsByCanvasIdentity[newIdentity]"))
@@ -212,7 +212,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("PolicyCanvasViewportRouteRefreshKey("))
     #expect(
       source.contains(
-        "routeOutputIsCurrentGraphProvisional || routeCache.appliedRouteKey != routeKey"
+        "routeOutputIsCurrentGraphMissing || routeCache.appliedRouteKey != routeKey"
       )
     )
     #expect(source.contains("needsRefresh: routeOutputNeedsRefresh"))

@@ -87,15 +87,6 @@ struct PolicyCanvasViewport: View {
       let nodes = viewModel.nodes
       let groups = viewModel.groups
       let edges = viewModel.edges
-      let routeInput = PolicyCanvasRouteWorkerInput(
-        graphGeneration: viewModel.routeComputationGeneration,
-        nodes: nodes,
-        groups: groups,
-        edges: edges,
-        fontScale: fontScale,
-        routingHints: viewModel.routingHints,
-        algorithmSelection: viewModel.algorithmSelection
-      )
       let routeKey = policyCanvasRouteWorkerKey(
         viewModel: viewModel,
         nodes: nodes,
@@ -113,14 +104,11 @@ struct PolicyCanvasViewport: View {
           fontScale: fontScale
         )
       )
-      let routeOutputIsCurrentGraphProvisional =
+      let routeOutputIsCurrentGraphMissing =
         !viewModel.isEmpty && projectedRouteOutput.signature == .empty
-      let routeOutput =
-        routeOutputIsCurrentGraphProvisional
-        ? PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)
-        : projectedRouteOutput
+      let routeOutput = projectedRouteOutput
       let routeOutputNeedsRefresh =
-        routeOutputIsCurrentGraphProvisional || routeCache.appliedRouteKey != routeKey
+        routeOutputIsCurrentGraphMissing || routeCache.appliedRouteKey != routeKey
       let validationKey = policyCanvasValidationWorkerKey(
         viewModel: viewModel,
         nodes: nodes,
@@ -198,7 +186,7 @@ struct PolicyCanvasViewport: View {
           viewportSize: proxy.size,
           routeOutput: routeOutput,
           currentRouteKey: routeKey,
-          routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphProvisional
+          routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphMissing
         )
         focusSelectionIfNeeded(
           request: selectionFocusRequest,
@@ -211,7 +199,7 @@ struct PolicyCanvasViewport: View {
           viewportSize: proxy.size,
           routeOutput: routeOutput,
           currentRouteKey: routeKey,
-          routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphProvisional
+          routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphMissing
         )
       }
       .onChange(of: routeOutput.signature, initial: false) {
