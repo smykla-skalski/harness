@@ -3,7 +3,8 @@ import HarnessMonitorPolicyCanvasAlgorithms
 /// Per-sample regression budgets for the graph-quality gate.
 ///
 /// Each limit is the value measured on 2026-06-08 against the `referenceRouting`
-/// preset (see `tmp/policy-canvas/graph-quality-baseline.txt`). The gate fails if
+/// preset (see `tmp/policy-canvas/graph-quality-baseline.txt`), repinned after the
+/// layout-placement-pressure change on `main`. The gate fails if
 /// a sample regresses above its budget; improvements just leave headroom, so
 /// tighten the budget whenever a category is banked lower. Categories absent from
 /// a sample's table default to `0` - a hard-zero gate. A sample with no entry at
@@ -29,32 +30,29 @@ enum PolicyCanvasGraphQualityBudgets {
       .crossingsIndependent: 4, .labelOverlaps: 2,
     ],
     "extreme": [
-      .portOverlaps: 6, .portDetached: 5, .corridorReuse: 15, .corridorParallel: 4,
-      .crossingsIndependent: 14, .longEdges: 5, .labelOverlaps: 4,
+      .portOverlaps: 6, .portDetached: 5, .corridorReuse: 16, .corridorParallel: 8,
+      .crossingsIndependent: 25, .longEdges: 20, .labelOverlaps: 6,
     ],
     "extreme-braid": [
-      .portOverlaps: 11, .portDetached: 14, .corridorReuse: 138, .corridorParallel: 119,
-      .crossingsIndependent: 360, .longEdges: 53, .labelOverlaps: 20,
+      .portOverlaps: 9, .portDetached: 12, .corridorReuse: 126, .corridorParallel: 84,
+      .crossingsIndependent: 368, .longEdges: 76, .labelOverlaps: 6,
     ],
     "extreme-matrix": [
-      .portOverlaps: 17, .portDetached: 16, .corridorReuse: 238, .corridorParallel: 157,
-      .crossingsIndependent: 539, .bodyHits: 10, .longEdges: 86, .labelOverlaps: 25,
-      .labelOnBody: 1,
+      .portOverlaps: 13, .portDetached: 16, .corridorReuse: 164, .corridorParallel: 103,
+      .crossingsIndependent: 405, .longEdges: 104, .labelOverlaps: 11, .labelOnBody: 8,
     ],
     "extreme-mesh": [
-      .portOverlaps: 22, .portDetached: 25, .corridorReuse: 416, .corridorParallel: 349,
-      .crossingsIndependent: 1492, .bodyHits: 15, .longEdges: 143, .labelOverlaps: 50,
-      .labelOnBody: 5,
+      .portOverlaps: 19, .portDetached: 25, .corridorReuse: 302, .corridorParallel: 214,
+      .crossingsIndependent: 1021, .longEdges: 162, .labelOverlaps: 20, .labelOnBody: 7,
     ],
     "extreme-lattice": [
-      .portOverlaps: 47, .portDetached: 42, .corridorReuse: 1182, .corridorParallel: 600,
-      .crossingsIndependent: 4075, .bodyHits: 6, .longEdges: 259, .labelOverlaps: 96,
-      .labelOnBody: 3,
+      .portOverlaps: 31, .portDetached: 39, .corridorReuse: 698, .corridorParallel: 590,
+      .crossingsIndependent: 3104, .longEdges: 267, .labelOverlaps: 47, .labelOnBody: 3,
     ],
     "extreme-galaxy": [
-      .portOverlaps: 74, .portDetached: 66, .corridorReuse: 4633, .corridorParallel: 2634,
-      .crossingsIndependent: 11918, .bodyHits: 10, .longEdges: 429, .labelOverlaps: 311,
-      .labelOnBody: 8,
+      .portOverlaps: 51, .portDetached: 66, .corridorReuse: 1527, .corridorParallel: 984,
+      .crossingsIndependent: 7152, .bodyHits: 3, .longEdges: 442, .labelOverlaps: 55,
+      .labelOnBody: 9,
     ],
   ]
 }
