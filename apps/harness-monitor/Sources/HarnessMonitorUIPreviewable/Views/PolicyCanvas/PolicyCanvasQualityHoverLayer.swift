@@ -12,27 +12,20 @@ struct PolicyCanvasQualityHoverMark: Identifiable {
   let bounds: CGRect
 }
 
-/// Interactive layer over the quality overlay. Tracks the pointer in content
-/// space, finds every mark under it - across categories, however many overlap -
-/// emphasizes each with the canvas accent, and names them in a native tooltip.
-/// Lab-only. The hit area is the union of the marks, so hovering or clicking
-/// empty canvas passes straight through to the nodes and wires below; node drags
-/// are captured a level lower at the AppKit `hitTest`.
+/// Highlight + tooltip layer for the quality overlay. A pure renderer: the AppKit
+/// document view tracks the pointer (`PolicyCanvasNativeDocumentView` mouse
+/// tracking) and publishes the marks under it to `viewModel.hoveredQualityMarks`;
+/// this layer fills and strokes each of those marks in the canvas accent and
+/// floats a tooltip naming every defect covered. It never hit-tests
+/// (`allowsHitTesting(false)`). In this hosted canvas, SwiftUI pointer tracking on
+/// a content-space overlay is unreliable, but rendering from observed state is
+/// not - so interaction lives in AppKit and only drawing lives here. Lab-only.
 struct PolicyCanvasQualityHoverLayer: View {
-  let report: PolicyCanvasGraphQualityReport
   let viewModel: PolicyCanvasViewModel
 
-  @State private var hoverPoint: CGPoint?
-
   var body: some View {
-    // Built inline from the passed report so the hit area is never momentarily
-    // empty (an empty `.contentShape` would silently kill hover). `report` only
-    // changes on an off-main recompute, and the body otherwise re-runs only when
-    // `hoverPoint` moves, so this rebuild is the per-hover cost.
-    let marks = policyCanvasQualityHoverMarks(report: report)
-    let active = marks.filter(isUnderPointer)
-    let hitArea = marks.reduce(into: Path()) { $0.addPath($1.path) }
-    ZStack {
+    let active = viewModel.hoveredQualityMarks
+    ZStack(alignment: .topLeading) {
       Canvas { context, _ in
         let accent = PolicyCanvasVisualStyle.activeTint
         for mark in active {
@@ -44,49 +37,77 @@ struct PolicyCanvasQualityHoverLayer: View {
           )
         }
       }
-      .allowsHitTesting(false)
-      Color.clear
-        .contentShape(hitArea)
-        .onContinuousHover { phase in
-          switch phase {
-          case .active(let location):
-            hoverPoint = location
-          case .ended:
-            hoverPoint = nil
-          }
-        }
-        .help(helpText(for: active))
-    }
-    .onChange(of: active.map(\.id)) {
-      let categories = Set(active.map(\.category))
-      if viewModel.hoveredQualityCategories != categories {
-        viewModel.hoveredQualityCategories = categories
+      if let anchor = tooltipAnchor(for: active) {
+        PolicyCanvasQualityHoverTooltip(titles: tooltipTitles(for: active))
+          .position(anchor)
       }
     }
-    .onDisappear {
-      viewModel.hoveredQualityCategories = []
-    }
+    .allowsHitTesting(false)
   }
 
-  /// Whether a mark's geometry sits under the pointer. The bounding-box test
-  /// rejects the vast majority cheaply so `Path.contains` runs only on the few
-  /// candidates left.
-  private func isUnderPointer(_ mark: PolicyCanvasQualityHoverMark) -> Bool {
-    guard let point = hoverPoint else {
-      return false
+  /// Distinct category titles under the pointer, in first-seen order, so a stack
+  /// of overlapping marks names every defect it covers - not just one.
+  private func tooltipTitles(for active: [PolicyCanvasQualityHoverMark]) -> [String] {
+    var titles: [String] = []
+    var seen: Set<PolicyCanvasQualityCategory> = []
+    for mark in active where seen.insert(mark.category).inserted {
+      titles.append(mark.category.label)
     }
-    return mark.bounds.contains(point) && mark.path.contains(point)
+    return titles
   }
 
-  /// One block per distinct category under the pointer, first-seen order, so a
-  /// stack of overlapping marks names every defect it covers - not just one.
-  private func helpText(for active: [PolicyCanvasQualityHoverMark]) -> String {
-    var ordered: [PolicyCanvasQualityCategory] = []
-    for mark in active where !ordered.contains(mark.category) {
-      ordered.append(mark.category)
+  /// Where to float the tooltip: centered just above the combined bounds of the
+  /// hovered marks, or just below when that would clip past the top edge.
+  private func tooltipAnchor(for active: [PolicyCanvasQualityHoverMark]) -> CGPoint? {
+    guard var union = active.first?.bounds else {
+      return nil
     }
-    return ordered.map { "\($0.label): \($0.detail)" }.joined(separator: "\n\n")
+    for mark in active.dropFirst() {
+      union = union.union(mark.bounds)
+    }
+    let above = union.minY - 14
+    return CGPoint(x: union.midX, y: above < 12 ? union.maxY + 14 : above)
   }
+}
+
+/// Small floating label that names every defect under the pointer, one title per
+/// line. Rendered inside the content-space hover layer and positioned by it.
+private struct PolicyCanvasQualityHoverTooltip: View {
+  let titles: [String]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      ForEach(titles, id: \.self) { title in
+        Text(title)
+          .font(.caption2.weight(.medium))
+          .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
+      }
+    }
+    .padding(.horizontal, 8)
+    .padding(.vertical, 5)
+    .background(
+      RoundedRectangle(cornerRadius: 6, style: .continuous)
+        .fill(.regularMaterial)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 6, style: .continuous)
+        .strokeBorder(PolicyCanvasVisualStyle.activeTint.opacity(0.65), lineWidth: 1)
+    )
+    .fixedSize()
+    .allowsHitTesting(false)
+  }
+}
+
+/// The marks under a point: every mark whose bounding box and fat path both
+/// contain it. Several stacked marks all pass, so overlapping defects resolve and
+/// light up together. The bounding-box test rejects the vast majority cheaply, so
+/// `Path.contains` runs only on the few survivors. Shared by the AppKit hover
+/// tracking and the region tests so both measure the exact same hit.
+func policyCanvasQualityHoverMarks(
+  in marks: [PolicyCanvasQualityHoverMark],
+  under point: CGPoint
+) -> [PolicyCanvasQualityHoverMark] {
+  marks.filter { $0.bounds.contains(point) && $0.path.contains(point) }
 }
 
 /// Build one fat, fillable mark per violation from the report geometry, mirroring

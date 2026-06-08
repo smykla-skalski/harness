@@ -100,11 +100,11 @@ public final class PolicyCanvasViewModel {
   /// canvas (no toggle), so production never pays for it.
   var qualityInspectionReport: PolicyCanvasGraphQualityReport? = nil
 
-  /// Quality categories under the pointer right now, published by the canvas
-  /// hover layer so the floating metrics legend can light up the same defects the
-  /// pointer is over. Empty unless the lab metrics overlay is on and the pointer
-  /// sits on one or more marks.
-  var hoveredQualityCategories: Set<PolicyCanvasQualityCategory> = []
+  /// Lab quality-overlay hover state from the document view's AppKit pointer
+  /// tracking: `hoveredQualityMarks` = active marks under the pointer (highlight,
+  /// tooltip, legend); `qualityReportGeneration` bumps per report write for cache.
+  var hoveredQualityMarks: [PolicyCanvasQualityHoverMark] = []
+  @ObservationIgnored var qualityReportGeneration = 0
 
   /// Staged dashboard payload deferred while the user has unsaved local edits.
   /// `@ObservationIgnored` so updates here don't churn observers; write only
