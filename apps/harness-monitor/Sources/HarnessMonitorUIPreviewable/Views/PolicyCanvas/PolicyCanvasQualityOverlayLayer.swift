@@ -17,10 +17,12 @@ struct PolicyCanvasQualityOverlayLayer: View {
       let error = PolicyCanvasVisualStyle.blockedTint
       let warning = PolicyCanvasVisualStyle.warningTint
 
+      drawDetours(into: &context, warning: warning)
+      drawCorridors(into: &context, error: error, warning: warning)
       drawLongEdges(into: &context, warning: warning)
+      drawNodeDistance(into: &context, warning: warning)
       drawNodeOverlaps(into: &context, error: error)
       drawBodyHits(into: &context, error: error)
-      drawCorridors(into: &context, error: error, warning: warning)
       drawLabels(into: &context, error: error, warning: warning)
       drawCrossings(into: &context, warning: warning)
       drawPortSpacing(into: &context, error: error, warning: warning)
@@ -40,6 +42,48 @@ struct PolicyCanvasQualityOverlayLayer: View {
       with: .color(warning.opacity(0.4)),
       style: StrokeStyle(lineWidth: 1, dash: [4, 4])
     )
+  }
+
+  /// A wide, low-opacity halo over each detouring route. The halo overflows the
+  /// wire so the colored route stays visible through the highlight instead of
+  /// being painted over.
+  private func drawDetours(into context: inout GraphicsContext, warning: Color) {
+    var path = Path()
+    for violation in report.detours {
+      guard let first = violation.points.first else {
+        continue
+      }
+      path.move(to: first)
+      for point in violation.points.dropFirst() {
+        path.addLine(to: point)
+      }
+    }
+    context.stroke(
+      path,
+      with: .color(warning.opacity(0.22)),
+      style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round)
+    )
+  }
+
+  /// A dashed dimension line with end ticks spanning the gap between two
+  /// connected nodes the layout placed too far apart horizontally.
+  private func drawNodeDistance(into context: inout GraphicsContext, warning: Color) {
+    var line = Path()
+    var ticks = Path()
+    for violation in report.nodeDistance {
+      line.move(to: violation.gapStart)
+      line.addLine(to: violation.gapEnd)
+      for end in [violation.gapStart, violation.gapEnd] {
+        ticks.move(to: CGPoint(x: end.x, y: end.y - 6))
+        ticks.addLine(to: CGPoint(x: end.x, y: end.y + 6))
+      }
+    }
+    context.stroke(
+      line,
+      with: .color(warning.opacity(0.7)),
+      style: StrokeStyle(lineWidth: 1.5, dash: [5, 3])
+    )
+    context.stroke(ticks, with: .color(warning.opacity(0.7)), lineWidth: 1.5)
   }
 
   /// Filled intersection of any two overlapping node bodies (should never occur).
@@ -76,9 +120,9 @@ struct PolicyCanvasQualityOverlayLayer: View {
         parallel.addPath(segment)
       }
     }
-    let style = StrokeStyle(lineWidth: 4, lineCap: .round)
-    context.stroke(parallel, with: .color(warning.opacity(0.5)), style: style)
-    context.stroke(collinear, with: .color(error.opacity(0.55)), style: style)
+    let style = StrokeStyle(lineWidth: 10, lineCap: .round)
+    context.stroke(parallel, with: .color(warning.opacity(0.28)), style: style)
+    context.stroke(collinear, with: .color(error.opacity(0.32)), style: style)
   }
 
   /// Outline of each label that overlaps another, sits on a body, or drifted.

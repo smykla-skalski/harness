@@ -167,6 +167,50 @@ struct PolicyCanvasGraphQualityReportTests {
     #expect(report.nodeOverlaps.count == 1)
   }
 
+  @Test func unnecessaryDetourIsFlagged() {
+    let edges = [edge("a", source: endpoint("s1", "o", .output), target: endpoint("t1", "i", .input))]
+    // Straight path would be 300 wide; this route dips 200 down and back up,
+    // so the route length is 700 against an ideal of 300 - excess 400.
+    let routes = [
+      "a": route([
+        CGPoint(x: 0, y: 0), CGPoint(x: 0, y: 200), CGPoint(x: 300, y: 200), CGPoint(x: 300, y: 0),
+      ])
+    ]
+    let report = measure(edges: edges, routes: routes)
+    #expect(report.detours.count == 1)
+    #expect(report.detours.first?.edgeID == "a")
+    #expect((report.detours.first?.excess ?? 0) == 400)
+  }
+
+  @Test func monotoneRouteHasNoDetour() {
+    let edges = [edge("a", source: endpoint("s1", "o", .output), target: endpoint("t1", "i", .input))]
+    // L-shaped and monotone toward the target: route length equals the ideal.
+    let routes = ["a": route([CGPoint(x: 0, y: 0), CGPoint(x: 0, y: 120), CGPoint(x: 200, y: 120)])]
+    #expect(measure(edges: edges, routes: routes).detours.isEmpty)
+  }
+
+  @Test func excessiveNodeDistanceIsFlagged() {
+    let frames = [
+      "n1": CGRect(x: 0, y: 0, width: 168, height: 96),
+      "n2": CGRect(x: 700, y: 0, width: 168, height: 96),
+    ]
+    let edges = [edge("a", source: endpoint("n1", "o", .output), target: endpoint("n2", "i", .input))]
+    let report = measure(frames: frames, edges: edges)
+    #expect(report.nodeDistance.count == 1)
+    #expect(report.nodeDistance.first?.sourceID == "n1")
+    #expect(report.nodeDistance.first?.targetID == "n2")
+    #expect((report.nodeDistance.first?.distance ?? 0) == 532)
+  }
+
+  @Test func adjacentNodesAreNotTooFar() {
+    let frames = [
+      "n1": CGRect(x: 0, y: 0, width: 168, height: 96),
+      "n2": CGRect(x: 308, y: 0, width: 168, height: 96),
+    ]
+    let edges = [edge("a", source: endpoint("n1", "o", .output), target: endpoint("n2", "i", .input))]
+    #expect(measure(frames: frames, edges: edges).nodeDistance.isEmpty)
+  }
+
   @Test func reportIsDeterministic() {
     let frames = [
       "n1": CGRect(x: 0, y: 0, width: 168, height: 96),

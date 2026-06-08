@@ -23,6 +23,10 @@ struct PolicyCanvasQualityMarkerSwatch: View {
         roundedOutline(&context, rect, tint)
       case .longEdges:
         dashedRect(&context, rect, tint)
+      case .detours:
+        detourGlyph(&context, rect, tint)
+      case .nodeDistance:
+        dimensionGlyph(&context, rect, tint)
       case .labelOverlaps, .labelOnBody, .labelAdrift:
         thinOutline(&context, rect, tint)
       case .nodeOverlaps:
@@ -83,6 +87,32 @@ struct PolicyCanvasQualityMarkerSwatch: View {
     let inner = rect.insetBy(dx: 1, dy: 1)
     context.fill(Path(inner), with: .color(tint.opacity(0.3)))
     context.stroke(Path(inner), with: .color(tint), lineWidth: 1.2)
+  }
+
+  private func detourGlyph(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
+    var path = Path()
+    path.move(to: CGPoint(x: rect.minX, y: rect.midY))
+    path.addLine(to: CGPoint(x: rect.midX - 2, y: rect.midY))
+    path.addLine(to: CGPoint(x: rect.midX - 2, y: rect.maxY))
+    path.addLine(to: CGPoint(x: rect.midX + 2, y: rect.maxY))
+    path.addLine(to: CGPoint(x: rect.midX + 2, y: rect.midY))
+    path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+    context.stroke(
+      path,
+      with: .color(tint.opacity(0.55)),
+      style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+    )
+  }
+
+  private func dimensionGlyph(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
+    var path = Path()
+    path.move(to: CGPoint(x: rect.minX, y: rect.midY))
+    path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+    for x in [rect.minX, rect.maxX] {
+      path.move(to: CGPoint(x: x, y: rect.midY - 3))
+      path.addLine(to: CGPoint(x: x, y: rect.midY + 3))
+    }
+    context.stroke(path, with: .color(tint), lineWidth: 1.2)
   }
 
   private func centeredSquare(_ rect: CGRect, side: CGFloat) -> CGRect {
