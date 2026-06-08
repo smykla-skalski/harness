@@ -6,7 +6,7 @@ import SwiftUI
 struct PolicyCanvasViewportScrollRequest: Equatable {
   let id: UInt64
   let target: PolicyCanvasViewportScrollTarget
-  let consumesViewportCenteringRequest: Bool
+  let viewportCenteringGenerationToConsume: UInt64?
 }
 
 enum PolicyCanvasViewportScrollTarget: Equatable {

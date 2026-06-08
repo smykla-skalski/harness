@@ -146,7 +146,7 @@ struct PolicyCanvasViewport: View {
         viewportIdentity: viewModel.pipelineIdentity,
         isActive: sceneFocusEnabled,
         isEmpty: viewModel.isEmpty,
-        request: scrollApplicatorRequest,
+        request: activeViewportScrollRequest(scrollApplicatorRequest),
         storedPipelineStateRaw: storedPipelineStateRaw,
         suppressesSceneStorage: suppressesSceneStorage,
         observationStore: viewportObservationStore,
@@ -330,20 +330,27 @@ extension PolicyCanvasViewport {
       viewModel.setZoom(targetZoom)
     }
     hasAppliedRestoredSceneZoom = plan.appliedRestoredSceneZoom
+    let viewportCenteringGeneration = viewModel.viewportCenteringGeneration
     if plan.defersScrollUntilNextRunloop {
       Task { @MainActor in
         await Task.yield()
         await Task.yield()
+        guard
+          viewModel.viewportCenteringGeneration == viewportCenteringGeneration,
+          viewModel.hasPendingViewportCenteringRequest
+        else {
+          return
+        }
         requestViewportScroll(
           target: .centeredDocumentAnchor(plan.anchorPoint),
-          consumesViewportCenteringRequest: true
+          viewportCenteringGenerationToConsume: viewportCenteringGeneration
         )
       }
       return
     }
     requestViewportScroll(
       target: .contentOrigin(plan.anchorPoint),
-      consumesViewportCenteringRequest: true
+      viewportCenteringGenerationToConsume: viewportCenteringGeneration
     )
   }
   private func focusSelectionIfNeeded(
@@ -391,14 +398,31 @@ extension PolicyCanvasViewport {
   }
   private func requestViewportScroll(
     target: PolicyCanvasViewportScrollTarget,
-    consumesViewportCenteringRequest: Bool = false
+    viewportCenteringGenerationToConsume: UInt64? = nil
   ) {
     scrollApplicatorRequestID &+= 1
     scrollApplicatorRequest = PolicyCanvasViewportScrollRequest(
       id: scrollApplicatorRequestID,
       target: target,
-      consumesViewportCenteringRequest: consumesViewportCenteringRequest
+      viewportCenteringGenerationToConsume: viewportCenteringGenerationToConsume
     )
+  }
+  private func activeViewportScrollRequest(
+    _ request: PolicyCanvasViewportScrollRequest?
+  ) -> PolicyCanvasViewportScrollRequest? {
+    guard
+      let request,
+      let viewportCenteringGeneration = request.viewportCenteringGenerationToConsume
+    else {
+      return request
+    }
+    guard
+      viewportCenteringGeneration == viewModel.viewportCenteringGeneration,
+      viewModel.hasPendingViewportCenteringRequest
+    else {
+      return nil
+    }
+    return request
   }
   private func handleViewportScrollRequestFulfilled(
     _ request: PolicyCanvasViewportScrollRequest,
@@ -407,8 +431,8 @@ extension PolicyCanvasViewport {
     guard scrollApplicatorRequest?.id == request.id else {
       return
     }
-    if request.consumesViewportCenteringRequest {
-      _ = viewModel.consumeViewportCenteringRequest()
+    if let viewportCenteringGeneration = request.viewportCenteringGenerationToConsume {
+      _ = viewModel.consumeViewportCenteringRequest(generation: viewportCenteringGeneration)
     }
     _ = appliesScroll
   }

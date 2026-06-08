@@ -176,8 +176,11 @@ struct PolicyCanvasCommandScrollTests {
 
     #expect(source.contains("viewModel.hasPendingViewportCenteringRequest"))
     #expect(!source.contains("guard viewModel.consumeViewportCenteringRequest()"))
-    #expect(source.contains("if request.consumesViewportCenteringRequest {"))
-    #expect(source.contains("_ = viewModel.consumeViewportCenteringRequest()"))
+    #expect(source.contains("request: activeViewportScrollRequest(scrollApplicatorRequest)"))
+    #expect(source.contains("viewportCenteringGenerationToConsume: viewportCenteringGeneration"))
+    #expect(
+      source.contains(
+        "viewModel.consumeViewportCenteringRequest(generation: viewportCenteringGeneration)"))
   }
 
   @Test("canvas switching refreshes stale or provisional routes lazily")

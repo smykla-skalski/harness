@@ -169,10 +169,17 @@ extension PolicyCanvasViewModel {
   }
 
   func consumeViewportCenteringRequest() -> Bool {
+    consumeViewportCenteringRequest(generation: viewportCenteringGeneration)
+  }
+
+  func consumeViewportCenteringRequest(generation: UInt64) -> Bool {
     guard hasPendingViewportCenteringRequest else {
       return false
     }
-    centeredViewportGeneration = viewportCenteringGeneration
+    guard generation == viewportCenteringGeneration else {
+      return false
+    }
+    centeredViewportGeneration = generation
     return true
   }
 }
