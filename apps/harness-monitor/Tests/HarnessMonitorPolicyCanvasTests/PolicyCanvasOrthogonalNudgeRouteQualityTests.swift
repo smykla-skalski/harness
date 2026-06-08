@@ -333,48 +333,10 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
     var crossings: [String] = []
     for left in realized.indices {
       for right in realized.index(after: left)..<realized.endIndex
-      where routesProperlyCross(realized[left].route, realized[right].route) {
+      where policyCanvasRoutesProperlyCross(realized[left].route, realized[right].route) {
         crossings.append("\(realized[left].id) x \(realized[right].id)")
       }
     }
     return crossings
-  }
-
-  private func routesProperlyCross(
-    _ left: PolicyCanvasEdgeRoute,
-    _ right: PolicyCanvasEdgeRoute
-  ) -> Bool {
-    for (a0, a1) in zip(left.points, left.points.dropFirst()) {
-      for (b0, b1) in zip(right.points, right.points.dropFirst())
-      where segmentsProperlyCross(a0, a1, b0, b1) {
-        return true
-      }
-    }
-    return false
-  }
-
-  private func segmentsProperlyCross(
-    _ a0: CGPoint,
-    _ a1: CGPoint,
-    _ b0: CGPoint,
-    _ b1: CGPoint
-  ) -> Bool {
-    let tolerance: CGFloat = 0.5
-    let aHorizontal = abs(a0.y - a1.y) < tolerance
-    let aVertical = abs(a0.x - a1.x) < tolerance
-    let bHorizontal = abs(b0.y - b1.y) < tolerance
-    let bVertical = abs(b0.x - b1.x) < tolerance
-    if aHorizontal, bVertical {
-      let crossX = b0.x
-      let crossY = a0.y
-      return crossX > min(a0.x, a1.x) + tolerance
-        && crossX < max(a0.x, a1.x) - tolerance
-        && crossY > min(b0.y, b1.y) + tolerance
-        && crossY < max(b0.y, b1.y) - tolerance
-    }
-    if aVertical, bHorizontal {
-      return segmentsProperlyCross(b0, b1, a0, a1)
-    }
-    return false
   }
 }
