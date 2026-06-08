@@ -95,7 +95,10 @@ private func policyCanvasOrthogonalCrossPoint(
   let highX = max(horizontal.start.x, horizontal.end.x)
   let lowY = min(vertical.start.y, vertical.end.y)
   let highY = max(vertical.start.y, vertical.end.y)
-  guard x > lowX + tolerance, x < highX - tolerance, y > lowY + tolerance, y < highY - tolerance else {
+  guard
+    x > lowX + tolerance, x < highX - tolerance,
+    y > lowY + tolerance, y < highY - tolerance
+  else {
     return nil
   }
   return CGPoint(x: x, y: y)
