@@ -13,6 +13,7 @@ public struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
   public let edges: [PolicyCanvasEdge]
   public let fontScale: CGFloat
   public let routingHints: PolicyCanvasLayoutRoutingHints?
+  public let precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
   public let algorithmSelection: PolicyCanvasAlgorithmSelection
 
   public init(
@@ -22,6 +23,7 @@ public struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     edges: [PolicyCanvasEdge],
     fontScale: CGFloat,
     routingHints: PolicyCanvasLayoutRoutingHints? = nil,
+    precomputedRoutes: PolicyCanvasPrecomputedRouteSet? = nil,
     algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
   ) {
     self.graphGeneration = graphGeneration
@@ -30,6 +32,7 @@ public struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     self.edges = edges
     self.fontScale = fontScale
     self.routingHints = routingHints
+    self.precomputedRoutes = precomputedRoutes
     self.algorithmSelection = algorithmSelection
   }
 }
@@ -40,6 +43,7 @@ public struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
   public let edges: [PolicyCanvasEdge]
   public let fontScale: CGFloat
   public let routingHints: PolicyCanvasLayoutRoutingHints?
+  public let precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
 
   public init(input: PolicyCanvasRouteWorkerInput) {
     nodes = input.nodes.map(PolicyCanvasRouteNode.init(node:))
@@ -47,6 +51,7 @@ public struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
     edges = input.edges
     fontScale = input.fontScale
     routingHints = input.routingHints
+    precomputedRoutes = input.precomputedRoutes
   }
 
   public var contentBounds: CGRect {

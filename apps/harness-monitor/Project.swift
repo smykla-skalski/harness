@@ -247,13 +247,24 @@ private let policyCanvasAlgorithmsTarget: Target = .target(
     deploymentTargets: macOSDeploymentTargets,
     sources: policyCanvasAlgorithmSources,
     dependencies: [
-        .target(name: "HarnessMonitorPolicyModels")
+        .target(name: "HarnessMonitorPolicyModels"),
+        .external(name: "ElkSwift")
     ],
     settings: .settings(base: [
         "CODE_SIGN_STYLE": "Automatic",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-canvas-algorithms",
         "PRODUCT_MODULE_NAME": "HarnessMonitorPolicyCanvasAlgorithms",
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ], configurations: [
+        .debug(name: "Debug", settings: [
+            "SWIFT_COMPILATION_MODE": "wholemodule",
+            "SWIFT_OPTIMIZATION_LEVEL": "-O"
+        ]),
+        .debug(name: "Preview", settings: [
+            "SWIFT_COMPILATION_MODE": "wholemodule",
+            "SWIFT_OPTIMIZATION_LEVEL": "-O"
+        ]),
+        .release(name: "Release")
     ]),
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:feature:policy-canvas", "tag:layer:core"])
 )

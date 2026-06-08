@@ -8,6 +8,7 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
   var zoom: CGFloat
   var resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior
   var viewportIdentity: String?
+  var observationStore = PolicyCanvasViewportObservationStore()
   var isActive = true
   var isEmpty = false
   var request: PolicyCanvasViewportScrollRequest?
@@ -16,7 +17,11 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
   var onViewportChange: @MainActor (PolicyCanvasViewportObservedState, String?) -> Void
 
   func makeCoordinator() -> Coordinator {
-    Coordinator(snapshot: snapshot, viewportIdentity: viewportIdentity)
+    Coordinator(
+      snapshot: snapshot,
+      observationStore: observationStore,
+      viewportIdentity: viewportIdentity
+    )
   }
 
   func makeNSView(context: Context) -> PolicyCanvasNativeScrollView {
@@ -40,7 +45,11 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     context.coordinator.onZoomChange = onZoomChange
     context.coordinator.onViewportChange = onViewportChange
     context.coordinator.currentViewportIdentity = viewportIdentity
-    context.coordinator.hostedState.update(snapshot: snapshot)
+    context.coordinator.hostedState.update(
+      snapshot: snapshot,
+      observationStore: observationStore,
+      viewportIdentity: viewportIdentity
+    )
     scrollView.viewportResizeZoomBehavior = resizeZoomBehavior
     scrollView.magnificationDidChange = { [weak coordinator = context.coordinator] zoom in
       coordinator?.handleViewportZoomChange(zoom)
@@ -80,8 +89,16 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     private var pendingObservedState: (identity: String?, state: PolicyCanvasViewportObservedState)?
     private var hasScheduledViewportFlush = false
 
-    init(snapshot: PolicyCanvasViewportHostedSnapshot, viewportIdentity: String?) {
-      hostedState = PolicyCanvasViewportHostedState(snapshot: snapshot)
+    init(
+      snapshot: PolicyCanvasViewportHostedSnapshot,
+      observationStore: PolicyCanvasViewportObservationStore = PolicyCanvasViewportObservationStore(),
+      viewportIdentity: String?
+    ) {
+      hostedState = PolicyCanvasViewportHostedState(
+        snapshot: snapshot,
+        observationStore: observationStore,
+        viewportIdentity: viewportIdentity
+      )
       currentViewportIdentity = viewportIdentity
     }
 

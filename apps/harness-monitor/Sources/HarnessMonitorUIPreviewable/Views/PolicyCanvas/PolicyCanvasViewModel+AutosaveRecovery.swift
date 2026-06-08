@@ -48,6 +48,7 @@ extension PolicyCanvasViewModel {
     selection = recovery.selection
     latestSimulation = recovery.latestSimulation
     routingHints = recovery.routingHints
+    precomputedRoutes = nil
     reconcileGroupFrames()
     // Arm one-shot autosave suppression so the upcoming dirty flip (from the
     // restore writes) does not immediately fire an autosave with state the

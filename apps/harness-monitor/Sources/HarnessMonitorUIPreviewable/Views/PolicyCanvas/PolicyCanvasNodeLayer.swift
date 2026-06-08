@@ -21,6 +21,8 @@ struct PolicyCanvasNodeLayer: View {
   let nodeValidationIssueMessagesByID: [String: String]
   let portVisibility: PolicyCanvasPortVisibilityMap
   let portMarkerLayout: PolicyCanvasPortMarkerLayout
+  let observationStore: PolicyCanvasViewportObservationStore
+  let viewportIdentity: String?
   let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   /// P19 reduce-motion handle; mirrors the canvas-root system flag so the
   /// drop-end spring (P18) collapses to instant when the user has the
@@ -38,12 +40,17 @@ struct PolicyCanvasNodeLayer: View {
   var body: some View {
     let severityMap = viewModel.nodeSeverityMap
     let hasClipboard = viewModel.clipboard != nil
+    let cullRect = policyCanvasViewportCullRect(
+      observationStore: observationStore,
+      viewportIdentity: viewportIdentity
+    )
     // Iterate in visual focus order (top-to-bottom, then left-to-right) rather
     // than document/storage order: SwiftUI walks Tab/Shift+Tab focus in
     // view-declaration order, so emitting the cards in screen order makes the
     // keyboard ring follow what the user sees. Node identity is keyed by id, so
     // a reorder (e.g. mid-drag as positions change) preserves per-card state.
     ForEach(viewModel.nodesInFocusOrder) { node in
+      if policyCanvasNodeIsVisible(node, in: cullRect) {
       PolicyCanvasNodeCard(
         node: node,
         isSelected: viewModel.isSelected(.node(node.id)),
@@ -134,6 +141,7 @@ struct PolicyCanvasNodeLayer: View {
             viewModel.deleteNode(node.id)
           }
         }
+      }
       }
     }
   }

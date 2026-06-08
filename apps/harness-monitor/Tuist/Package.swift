@@ -50,7 +50,21 @@ let packageSettings = PackageSettings(
             ]),
             .release(name: "Release")
         ]
-    )
+    ),
+    targetSettings: [
+        "ElkSwift": .settings(
+            configurations: [
+                .debug(name: "Debug", settings: [
+                    "SWIFT_COMPILATION_MODE": "wholemodule",
+                    "SWIFT_OPTIMIZATION_LEVEL": "-O"
+                ]),
+                .debug(name: "Preview", settings: [
+                    "SWIFT_COMPILATION_MODE": "wholemodule",
+                    "SWIFT_OPTIMIZATION_LEVEL": "-O"
+                ])
+            ]
+        )
+    ]
 )
 #endif
 
@@ -61,6 +75,7 @@ let package = Package(
         .package(url: "https://github.com/open-telemetry/opentelemetry-swift", exact: "2.3.0"),
         .package(url: "https://github.com/open-telemetry/opentelemetry-swift-core", exact: "2.4.1"),
         .package(url: "https://github.com/grpc/grpc-swift", exact: "1.27.0"),
+        .package(url: "https://github.com/lukilabs/elk-swift.git", exact: "1.0.2"),
         .package(path: "../../../mcp-servers/harness-monitor-registry")
     ]
 )

@@ -19,6 +19,7 @@ func policyCanvasViewportRouteRebuildResult(
     edges: viewModel.edges,
     fontScale: fontScale,
     routingHints: viewModel.routingHints,
+    precomputedRoutes: viewModel.precomputedRoutes,
     algorithmSelection: viewModel.algorithmSelection
   )
   let output = await worker.compute(input: input)

@@ -111,6 +111,11 @@ enum PolicyCanvasNudgeRouteMetrics {
   ) -> Baseline {
     let entries = pointsByEdge.keys.sorted().compactMap { id in
       pointsByEdge[id].map { entry(id: id, points: $0) }
+    }.sorted { left, right in
+      if left.bounds.minX != right.bounds.minX {
+        return left.bounds.minX < right.bounds.minX
+      }
+      return left.id < right.id
     }
     var crossings: Set<String> = []
     var bodyHitEdges: Set<String> = []
@@ -118,8 +123,16 @@ enum PolicyCanvasNudgeRouteMetrics {
       if intersectsObstacles(entries[left], obstacles: obstacles) {
         bodyHitEdges.insert(entries[left].id)
       }
-      for right in entries.index(after: left)..<entries.endIndex
-      where properlyCross(entries[left], entries[right]) {
+      for right in entries.index(after: left)..<entries.endIndex {
+        if !entries[left].bounds.isNull,
+          !entries[right].bounds.isNull,
+          entries[right].bounds.minX > entries[left].bounds.maxX
+        {
+          break
+        }
+        guard properlyCross(entries[left], entries[right]) else {
+          continue
+        }
         crossings.insert(crossingKey(entries[left].id, entries[right].id))
       }
     }
@@ -148,6 +161,13 @@ enum PolicyCanvasNudgeRouteMetrics {
     let moved = channelEdges.compactMap { id in
       pointsByEdge[id].map { entry(id: id, points: $0) }
     }
+    return localPenalty(movedEntries: moved, scoring: scoring)
+  }
+
+  static func localPenalty(
+    movedEntries moved: [RouteEntry],
+    scoring: Scoring
+  ) -> LocalPenalty {
     var addedBodyHits = 0
     for movedEntry in moved where !scoring.baseline.bodyHitEdges.contains(movedEntry.id) {
       if intersectsObstacles(movedEntry, obstacles: scoring.obstacles) {
@@ -163,7 +183,22 @@ enum PolicyCanvasNudgeRouteMetrics {
           addedCrossings: &addedCrossings, overlapPairs: &overlapPairs
         )
       }
+      let movedBounds = moved[index].bounds
+      guard !movedBounds.isNull else {
+        continue
+      }
       for fixedEntry in scoring.fixed {
+        guard !fixedEntry.bounds.isNull else {
+          continue
+        }
+        if fixedEntry.bounds.minX > movedBounds.maxX {
+          break
+        }
+        guard fixedEntry.bounds.maxX >= movedBounds.minX,
+          movedBounds.intersects(fixedEntry.bounds)
+        else {
+          continue
+        }
         accumulate(
           moved[index], fixedEntry, scoring: scoring,
           addedCrossings: &addedCrossings, overlapPairs: &overlapPairs

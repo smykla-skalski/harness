@@ -92,13 +92,21 @@ struct PolicyCanvasViewportHostedRenderSignature: Equatable {
 final class PolicyCanvasViewportHostedState {
   var snapshot: PolicyCanvasViewportHostedSnapshot
   var workspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout
+  var observationStore: PolicyCanvasViewportObservationStore
+  var viewportIdentity: String?
   // Kept outside the render-gated snapshot so it always reflects the live
   // sceneFocusEnabled value from the parent view, even when renderSignature
   // is unchanged (same canvas content, different route visibility).
   private(set) var requestKeyboardFocus: (@MainActor () -> Void)?
 
-  init(snapshot: PolicyCanvasViewportHostedSnapshot) {
+  init(
+    snapshot: PolicyCanvasViewportHostedSnapshot,
+    observationStore: PolicyCanvasViewportObservationStore = PolicyCanvasViewportObservationStore(),
+    viewportIdentity: String? = nil
+  ) {
     self.snapshot = snapshot
+    self.observationStore = observationStore
+    self.viewportIdentity = viewportIdentity
     self.requestKeyboardFocus = snapshot.requestKeyboardFocus
     workspaceLayout = policyCanvasInitialAdaptiveWorkspaceLayout(
       contentSize: snapshot.contentSize,
@@ -106,11 +114,17 @@ final class PolicyCanvasViewportHostedState {
     )
   }
 
-  func update(snapshot: PolicyCanvasViewportHostedSnapshot) {
+  func update(
+    snapshot: PolicyCanvasViewportHostedSnapshot,
+    observationStore: PolicyCanvasViewportObservationStore,
+    viewportIdentity: String?
+  ) {
     // Always refresh the focus closure so a sceneFocusEnabled flip (false→true
     // when the user navigates to the canvas tab) is not silently swallowed by
     // the renderSignature guard below.
     requestKeyboardFocus = snapshot.requestKeyboardFocus
+    self.observationStore = observationStore
+    self.viewportIdentity = viewportIdentity
     // Defense-in-depth for the scroll hot path. A pure pan re-runs the parent
     // viewport body, which rebuilds this snapshot with fresh closures every
     // time, so `NSViewRepresentable.updateNSView` always calls back here. If
@@ -122,6 +136,14 @@ final class PolicyCanvasViewportHostedState {
       return
     }
     self.snapshot = snapshot
+  }
+
+  func update(snapshot: PolicyCanvasViewportHostedSnapshot) {
+    update(
+      snapshot: snapshot,
+      observationStore: observationStore,
+      viewportIdentity: viewportIdentity
+    )
   }
 
   func update(workspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout) {
@@ -161,6 +183,8 @@ struct PolicyCanvasViewportHostedRoot: View {
             routes: snapshot.routes,
             labelPositions: snapshot.labelPositions,
             accessibilityLabelsByEdgeID: snapshot.accessibilityLabelsByEdgeID,
+            observationStore: state.observationStore,
+            viewportIdentity: state.viewportIdentity,
             openEditor: snapshot.openEditor
           )
           .policyCanvasDocumentLayer(size: snapshot.contentSize)
@@ -178,11 +202,17 @@ struct PolicyCanvasViewportHostedRoot: View {
             nodeValidationIssueMessagesByID: snapshot.nodeValidationIssueMessagesByID,
             portVisibility: snapshot.portVisibility,
             portMarkerLayout: snapshot.portMarkerLayout,
+            observationStore: state.observationStore,
+            viewportIdentity: state.viewportIdentity,
             openEditor: snapshot.openEditor
           )
           .policyCanvasDocumentLayer(size: snapshot.contentSize)
           if snapshot.showSimulationOverlay {
-            PolicyCanvasSimulationLayer(viewModel: snapshot.viewModel)
+            PolicyCanvasSimulationLayer(
+              viewModel: snapshot.viewModel,
+              observationStore: state.observationStore,
+              viewportIdentity: state.viewportIdentity
+            )
               .policyCanvasDocumentLayer(size: snapshot.contentSize)
           }
           PolicyCanvasEdgeLabelLayer(
@@ -190,7 +220,9 @@ struct PolicyCanvasViewportHostedRoot: View {
             focusedComponent: snapshot.focusedComponent,
             edges: snapshot.edges,
             routes: snapshot.routes,
-            labelPositions: snapshot.labelPositions
+            labelPositions: snapshot.labelPositions,
+            observationStore: state.observationStore,
+            viewportIdentity: state.viewportIdentity
           )
           .policyCanvasDocumentLayer(size: snapshot.contentSize)
           if let qualityReport = snapshot.viewModel.qualityInspectionReport {

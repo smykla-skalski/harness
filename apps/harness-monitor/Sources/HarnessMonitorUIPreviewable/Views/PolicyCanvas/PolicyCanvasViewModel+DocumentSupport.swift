@@ -18,6 +18,92 @@ struct PolicyCanvasLoadedGraph {
   let mappedEdges: [PolicyCanvasEdge]
 }
 
+func policyCanvasLoadedGraph(
+  from document: TaskBoardPolicyPipelineDocument,
+  policyGroupTitle: String?
+) -> PolicyCanvasLoadedGraph {
+  let layoutLookup = PolicyCanvasDocumentLayoutLookup(layout: document.layout)
+  var loadedNodes = document.nodes.map {
+    policyCanvasNode($0, layoutLookup: layoutLookup)
+  }
+  // The canvas drops the document's own node groups: layout is driven purely by
+  // the dataflow graph. Instead every node joins ONE shared implicit cluster
+  // that wraps the whole policy in a single labelled container box. This is the
+  // single load chokepoint (both applyDocument and applyPersistedDocument route
+  // through it).
+  //
+  // A nil groupID makes the engine synthesize one singleton group per node,
+  // which the parallel-band pass then spreads apart vertically (a tall, sparse
+  // layout). One shared cluster instead packs every node into a single tight
+  // layered block, and because the parallel-band pass only stacks when two
+  // groups share a rank, a lone all-encompassing group leaves node placement
+  // untouched while still rendering one container frame.
+  let implicitClusterID = "__policy_canvas_ungrouped__"
+  for index in loadedNodes.indices {
+    loadedNodes[index].groupID = implicitClusterID
+  }
+  let nodeLookup = PolicyCanvasNodeLookup(nodes: loadedNodes)
+  let mappedEdges = document.edges.compactMap { edge in
+    policyCanvasEdge(edge, nodeLookup: nodeLookup, assignPreferredPortSides: false)
+  }
+  // The frame tracks the live node bounds; reflow and `reconcileGroupFrames()`
+  // rebuild it as the engine moves nodes.
+  let containerGroups: [PolicyCanvasGroup]
+  if let frame = policyCanvasGroupFrame(containing: loadedNodes) {
+    containerGroups = [
+      PolicyCanvasGroup(
+        id: implicitClusterID,
+        title: policyCanvasResolvedContainerGroupTitle(policyGroupTitle),
+        frame: frame,
+        tone: .intake
+      )
+    ]
+  } else {
+    containerGroups = []
+  }
+  return PolicyCanvasLoadedGraph(
+    nodes: loadedNodes,
+    groups: containerGroups,
+    mappedEdges: mappedEdges
+  )
+}
+
+func policyCanvasPrewarmLabSampleLayouts(
+  document: TaskBoardPolicyPipelineDocument,
+  policyGroupTitle: String?,
+  algorithmSelection: PolicyCanvasAlgorithmSelection
+) {
+  let graph = policyCanvasLoadedGraph(from: document, policyGroupTitle: policyGroupTitle)
+  let initialLayout = policyCanvasCleanInitialLayout(
+    nodes: graph.nodes,
+    groups: graph.groups,
+    edges: graph.mappedEdges,
+    algorithmSelection: algorithmSelection
+  )
+  let initialNodeLookup = PolicyCanvasNodeLookup(nodes: initialLayout.nodes)
+  let reflowEdges = policyCanvasFoldParallelBranches(graph.mappedEdges).map { edge in
+    policyCanvasApplyingPreferredPortSides(
+      edge,
+      nodeLookup: initialNodeLookup
+    )
+  }
+  _ = policyCanvasCleanInitialLayout(
+    nodes: initialLayout.nodes,
+    groups: initialLayout.groups,
+    edges: reflowEdges,
+    mode: .explicitReflow(preserveManualAnchors: false),
+    algorithmSelection: algorithmSelection
+  )
+}
+
+func policyCanvasResolvedContainerGroupTitle(_ policyGroupTitle: String?) -> String {
+  let trimmed = policyGroupTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+  if let trimmed, !trimmed.isEmpty {
+    return trimmed
+  }
+  return "Policy"
+}
+
 extension PolicyCanvasViewModel {
   /// Apply any pending dashboard update, overwriting local edits. The
   /// underlying persisted-document path clears `documentDirty` and the pending
@@ -83,58 +169,13 @@ extension PolicyCanvasViewModel {
   func policyCanvasGraph(
     from document: TaskBoardPolicyPipelineDocument
   ) -> PolicyCanvasLoadedGraph {
-    var loadedNodes = document.nodes.map {
-      policyCanvasNode($0, layout: document.layout)
-    }
-    // The canvas drops the document's own node groups: layout is driven purely by
-    // the dataflow graph. Instead every node joins ONE shared implicit cluster
-    // that wraps the whole policy in a single labelled container box. This is the
-    // single load chokepoint (both applyDocument and applyPersistedDocument route
-    // through it).
-    //
-    // A nil groupID makes the engine synthesize one singleton group per node,
-    // which the parallel-band pass then spreads apart vertically (a tall, sparse
-    // layout). One shared cluster instead packs every node into a single tight
-    // layered block, and because the parallel-band pass only stacks when two
-    // groups share a rank, a lone all-encompassing group leaves node placement
-    // untouched while still rendering one container frame.
-    let implicitClusterID = "__policy_canvas_ungrouped__"
-    for index in loadedNodes.indices {
-      loadedNodes[index].groupID = implicitClusterID
-    }
-    let mappedEdges = document.edges.compactMap { edge in
-      policyCanvasEdge(edge, nodes: loadedNodes, assignPreferredPortSides: false)
-    }
-    // The frame tracks the live node bounds; reflow and `reconcileGroupFrames()`
-    // rebuild it as the engine moves nodes.
-    let containerGroups: [PolicyCanvasGroup]
-    if let frame = policyCanvasGroupFrame(containing: loadedNodes) {
-      containerGroups = [
-        PolicyCanvasGroup(
-          id: implicitClusterID,
-          title: policyCanvasContainerGroupTitle,
-          frame: frame,
-          tone: .intake
-        )
-      ]
-    } else {
-      containerGroups = []
-    }
-    return PolicyCanvasLoadedGraph(
-      nodes: loadedNodes,
-      groups: containerGroups,
-      mappedEdges: mappedEdges
-    )
+    policyCanvasLoadedGraph(from: document, policyGroupTitle: policyGroupTitle)
   }
 
   /// Title for the single container group. Uses the host-provided policy name
   /// when present, otherwise a neutral label so the box still reads as a policy.
   var policyCanvasContainerGroupTitle: String {
-    let trimmed = policyGroupTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
-    if let trimmed, !trimmed.isEmpty {
-      return trimmed
-    }
-    return "Policy"
+    policyCanvasResolvedContainerGroupTitle(policyGroupTitle)
   }
 
   func incomingDocumentMatchesBacking(_ document: TaskBoardPolicyPipelineDocument) -> Bool {

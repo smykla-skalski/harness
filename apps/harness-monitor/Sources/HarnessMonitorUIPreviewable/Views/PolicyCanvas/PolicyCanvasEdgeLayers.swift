@@ -17,6 +17,8 @@ struct PolicyCanvasEdgeLayer: View {
   let routes: [String: PolicyCanvasEdgeRoute]
   let labelPositions: [String: CGPoint]
   let accessibilityLabelsByEdgeID: [String: String]
+  let observationStore: PolicyCanvasViewportObservationStore
+  let viewportIdentity: String?
   let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   @Environment(\.fontScale)
   private var fontScale
@@ -29,9 +31,13 @@ struct PolicyCanvasEdgeLayer: View {
     let severityMap = viewModel.edgeSeverityMap
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
     let routingHints = viewModel.routingHints
+    let cullRect = policyCanvasViewportCullRect(
+      observationStore: observationStore,
+      viewportIdentity: viewportIdentity
+    )
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
-        if let route = routes[edge.id] {
+        if let route = routes[edge.id], policyCanvasRouteIsVisible(route, in: cullRect) {
           let severity = severityMap[edge.id]
           let isSelected = viewModel.selection == .edge(edge.id)
           let hint = routingHints?.edgeHint(for: edge.id)
@@ -165,6 +171,8 @@ struct PolicyCanvasEdgeLabelLayer: View {
   let edges: [PolicyCanvasEdge]
   let routes: [String: PolicyCanvasEdgeRoute]
   let labelPositions: [String: CGPoint]
+  let observationStore: PolicyCanvasViewportObservationStore
+  let viewportIdentity: String?
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.colorScheme)
@@ -172,12 +180,17 @@ struct PolicyCanvasEdgeLabelLayer: View {
 
   var body: some View {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
+    let cullRect = policyCanvasViewportCullRect(
+      observationStore: observationStore,
+      viewportIdentity: viewportIdentity
+    )
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
         if !edge.label.isEmpty, let route = routes[edge.id] {
           let labelPosition = labelPositions[edge.id] ?? route.labelPosition
           let labelSize = metrics.size(for: edge.label)
-          Button {
+          if policyCanvasLabelIsVisible(center: labelPosition, size: labelSize, in: cullRect) {
+            Button {
             viewModel.select(.edge(edge.id))
           } label: {
             Text(edge.label)
@@ -209,6 +222,7 @@ struct PolicyCanvasEdgeLabelLayer: View {
             Button("Delete edge", role: .destructive) {
               viewModel.deleteEdge(edge.id)
             }
+          }
           }
         }
       }

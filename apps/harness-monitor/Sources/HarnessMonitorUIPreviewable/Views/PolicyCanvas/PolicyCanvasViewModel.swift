@@ -57,6 +57,10 @@ public final class PolicyCanvasViewModel {
   var validationPresentation: PolicyCanvasValidationPresentation
   var cachedAutomationPolicyCompilation: PolicyCanvasAutomationPolicyCompilation
   var routingHints: PolicyCanvasLayoutRoutingHints?
+  /// Render-only route geometry emitted by a layout engine for large graphs.
+  /// It is tied to exact node positions, so document export/undo/recovery never
+  /// persist it; regular edits clear it and the next reflow can rebuild it.
+  @ObservationIgnored var precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
   var algorithmSelection: PolicyCanvasAlgorithmSelection {
     didSet {
       guard algorithmSelection != oldValue, canReflowLayout else {
@@ -305,6 +309,7 @@ public final class PolicyCanvasViewModel {
     self.validationPresentation = .empty
     self.cachedAutomationPolicyCompilation = .empty
     self.routingHints = nil
+    self.precomputedRoutes = nil
     self.automationCompilationGeneration = 0
     self.algorithmSelection = algorithmSelection
     self.hasPendingDocumentUpdate = false

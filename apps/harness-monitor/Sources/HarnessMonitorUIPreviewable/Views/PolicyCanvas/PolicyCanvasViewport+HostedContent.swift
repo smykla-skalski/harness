@@ -28,6 +28,7 @@ struct PolicyCanvasViewportHostedContent: View {
       zoom: zoom,
       resizeZoomBehavior: resizeZoomBehavior,
       viewportIdentity: viewportIdentity,
+      observationStore: observationStore,
       isActive: isActive,
       isEmpty: isEmpty,
       request: request,

@@ -221,6 +221,7 @@ public struct PolicyCanvasLabWindowView: View {
     }
     .preferredColorScheme(windowThemeMode.colorScheme)
     .task {
+      scheduleSampleLayoutPrewarm()
       if allowsLiveBootstrap, !usesFixtureDocument {
         await bootstrapLivePolicy()
       }
@@ -234,6 +235,7 @@ public struct PolicyCanvasLabWindowView: View {
     }
     .onChange(of: algorithmSelection) { _, newSelection in
       storedAlgorithmSelectionRaw = PolicyCanvasLabToolbarDefaults.rawValue(for: newSelection)
+      scheduleSampleLayoutPrewarm()
     }
   }
 
@@ -332,5 +334,53 @@ public struct PolicyCanvasLabWindowView: View {
       fixtureDocument: fixtureDocument,
       liveSnapshot: liveSnapshot
     )
+  }
+
+  private func scheduleSampleLayoutPrewarm() {
+    let algorithmSelection = algorithmSelection
+    let samples = Self.prewarmSamples(prioritizing: sampleSelection)
+    guard !samples.isEmpty else {
+      return
+    }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      HarnessMonitorAsyncWorkQueue.WorkItem(title: "Precomputing policy canvas sample layouts") {
+        for sample in samples {
+          policyCanvasPrewarmLabSampleLayouts(
+            document: sample.document,
+            policyGroupTitle: sample.name,
+            algorithmSelection: algorithmSelection
+          )
+          await Task.yield()
+        }
+      }
+    )
+  }
+
+  private static func prewarmSamples(
+    prioritizing selection: PolicyCanvasLabSelection
+  ) -> [PolicyCanvasLabSample] {
+    let largeSamples = PolicyCanvasLabSamples.all.filter(shouldPrewarmSample)
+    let selectedSampleID: String?
+    switch selection {
+    case .sample(let id):
+      selectedSampleID = id
+    case .live:
+      selectedSampleID = nil
+    }
+    let priorityIDs = [selectedSampleID, "extreme-galaxy"].compactMap { $0 }
+    var emitted: Set<String> = []
+    var ordered: [PolicyCanvasLabSample] = []
+    for id in priorityIDs {
+      guard let sample = largeSamples.first(where: { $0.id == id }), emitted.insert(id).inserted
+      else {
+        continue
+      }
+      ordered.append(sample)
+    }
+    return ordered
+  }
+
+  private static func shouldPrewarmSample(_ sample: PolicyCanvasLabSample) -> Bool {
+    sample.document.nodes.count >= 300 || sample.document.edges.count >= 500
   }
 }
