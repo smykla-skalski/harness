@@ -89,7 +89,7 @@ final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Senda
     category: "policy-canvas.perf"
   )
 
-  init(inner: any PolicyCanvasEdgeRouter, capacity: Int = 1_024) {
+  init(inner: any PolicyCanvasEdgeRouter, capacity: Int = 8_192) {
     precondition(capacity > 0, "PolicyCanvasMemoizedRouter capacity must be positive")
     self.inner = inner
     self.capacity = capacity

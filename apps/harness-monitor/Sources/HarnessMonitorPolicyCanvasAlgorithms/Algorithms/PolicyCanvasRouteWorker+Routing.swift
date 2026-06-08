@@ -309,13 +309,10 @@ extension PolicyCanvasPreparedRouteInput {
   private func policyCanvasInitialRouteState(
     context: PolicyCanvasRouteStateContext
   ) -> PolicyCanvasRouteComputationState {
-    let initialRoutes = context.algorithms.routeSelection.selectRoutes(
-      input: PolicyCanvasRouteSelectionInput(
-        prepared: context.prepared,
-        router: context.router,
-        portMarkerLayout: nil,
-        passContext: context.passContext
-      )
+    let initialRoutes = policyCanvasSelectedRoutes(
+      phase: "initial",
+      portMarkerLayout: nil,
+      context: context
     )
     return PolicyCanvasRouteComputationState(
       routes: initialRoutes,
@@ -333,13 +330,10 @@ extension PolicyCanvasPreparedRouteInput {
     current: PolicyCanvasRouteComputationState,
     context: PolicyCanvasRouteStateContext
   ) -> PolicyCanvasRouteComputationState {
-    let routes = context.algorithms.routeSelection.selectRoutes(
-      input: PolicyCanvasRouteSelectionInput(
-        prepared: context.prepared,
-        router: context.router,
-        portMarkerLayout: current.portMarkerLayout,
-        passContext: context.passContext
-      )
+    let routes = policyCanvasSelectedRoutes(
+      phase: "next",
+      portMarkerLayout: current.portMarkerLayout,
+      context: context
     )
     return PolicyCanvasRouteComputationState(
       routes: routes,
@@ -358,16 +352,41 @@ extension PolicyCanvasPreparedRouteInput {
     context: PolicyCanvasRouteStateContext
   ) -> PolicyCanvasRouteComputationState {
     PolicyCanvasRouteComputationState(
-      routes: context.algorithms.routeSelection.selectRoutes(
-        input: PolicyCanvasRouteSelectionInput(
-          prepared: context.prepared,
-          router: context.router,
-          portMarkerLayout: portMarkerLayout,
-          passContext: context.passContext
-        )
+      routes: policyCanvasSelectedRoutes(
+        phase: "reroute",
+        portMarkerLayout: portMarkerLayout,
+        context: context
       ),
       portMarkerLayout: portMarkerLayout
     )
+  }
+
+  private func policyCanvasSelectedRoutes(
+    phase: String,
+    portMarkerLayout: PolicyCanvasPortMarkerLayout?,
+    context: PolicyCanvasRouteStateContext
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    let signpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
+    let markerState = portMarkerLayout == nil ? "none" : "layout"
+    let interval = policyCanvasRouteComputationSignposter.beginInterval(
+      "policy_canvas.routes.phase.route_selection",
+      id: signpostID,
+      "phase=\(phase, privacy: .public) markers=\(markerState, privacy: .public)"
+    )
+    let routes = context.algorithms.routeSelection.selectRoutes(
+      input: PolicyCanvasRouteSelectionInput(
+        prepared: context.prepared,
+        router: context.router,
+        portMarkerLayout: portMarkerLayout,
+        passContext: context.passContext
+      )
+    )
+    policyCanvasRouteComputationSignposter.endInterval(
+      "policy_canvas.routes.phase.route_selection",
+      interval,
+      "phase=\(phase, privacy: .public) routes=\(routes.count, privacy: .public)"
+    )
+    return routes
   }
 
   func routeAnchorCandidate(

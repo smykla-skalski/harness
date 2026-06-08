@@ -334,7 +334,8 @@ struct PolicyCanvasIndexedLabelFrame {
 
 struct PolicyCanvasLabelFrameIndex {
   private let cellSize: CGFloat
-  private var cells: [Cell: [PolicyCanvasIndexedLabelFrame]]
+  private var cells: [Cell: [StoredFrame]]
+  private var nextFrameID: Int
 
   init(
     entries: [PolicyCanvasIndexedLabelFrame],
@@ -342,6 +343,7 @@ struct PolicyCanvasLabelFrameIndex {
   ) {
     self.cellSize = max(cellSize, 1)
     cells = [:]
+    nextFrameID = 0
     for entry in entries {
       insert(entry)
     }
@@ -351,8 +353,14 @@ struct PolicyCanvasLabelFrameIndex {
     guard !entry.frame.isNull else {
       return
     }
+    let stored = StoredFrame(
+      id: nextFrameID,
+      ownerID: entry.ownerID,
+      frame: entry.frame
+    )
+    nextFrameID += 1
     for cell in cellsIntersecting(entry.frame) {
-      cells[cell, default: []].append(entry)
+      cells[cell, default: []].append(stored)
     }
   }
 
@@ -363,15 +371,14 @@ struct PolicyCanvasLabelFrameIndex {
     guard !rect.isNull else {
       return []
     }
-    var seen: Set<FrameKey> = []
+    var seen: Set<Int> = []
     var result: [CGRect] = []
     for cell in cellsIntersecting(rect) {
       for entry in cells[cell, default: []] where entry.ownerID != ownerID {
         guard entry.frame.intersects(rect) else {
           continue
         }
-        let key = FrameKey(ownerID: entry.ownerID, frame: entry.frame)
-        guard seen.insert(key).inserted else {
+        guard seen.insert(entry.id).inserted else {
           continue
         }
         result.append(entry.frame)
@@ -403,24 +410,10 @@ struct PolicyCanvasLabelFrameIndex {
     let y: Int
   }
 
-  private struct FrameKey: Hashable {
+  private struct StoredFrame {
+    let id: Int
     let ownerID: String
-    let minX: Int
-    let minY: Int
-    let maxX: Int
-    let maxY: Int
-
-    init(ownerID: String, frame: CGRect) {
-      self.ownerID = ownerID
-      minX = Self.quantize(frame.minX)
-      minY = Self.quantize(frame.minY)
-      maxX = Self.quantize(frame.maxX)
-      maxY = Self.quantize(frame.maxY)
-    }
-
-    private static func quantize(_ value: CGFloat) -> Int {
-      Int((value * 1_000).rounded())
-    }
+    let frame: CGRect
   }
 }
 
