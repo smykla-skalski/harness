@@ -17,6 +17,12 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
   public var longEdgeSpan: CGFloat
   /// Distance from a label to its own wire past which the label reads as adrift.
   public var labelFarDistance: CGFloat
+  /// Excess route travel (length past the straight Manhattan distance) above
+  /// which a route reads as an unnecessary detour.
+  public var detourExcess: CGFloat
+  /// Horizontal gap between two connected node bodies above which they read as
+  /// placed too far apart.
+  public var nodeDistanceGap: CGFloat
 
   public init(
     minimumPortSpacing: CGFloat,
@@ -24,7 +30,9 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     corridorOverlap: CGFloat,
     minimumCorridorSeparation: CGFloat,
     longEdgeSpan: CGFloat,
-    labelFarDistance: CGFloat
+    labelFarDistance: CGFloat,
+    detourExcess: CGFloat,
+    nodeDistanceGap: CGFloat
   ) {
     self.minimumPortSpacing = minimumPortSpacing
     self.markerOverlap = markerOverlap
@@ -32,6 +40,8 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     self.minimumCorridorSeparation = minimumCorridorSeparation
     self.longEdgeSpan = longEdgeSpan
     self.labelFarDistance = labelFarDistance
+    self.detourExcess = detourExcess
+    self.nodeDistanceGap = nodeDistanceGap
   }
 
   public static let `default` = Self(
@@ -40,7 +50,9 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     corridorOverlap: 8,
     minimumCorridorSeparation: PolicyCanvasLayout.defaultEdgeLineSpacing,
     longEdgeSpan: PolicyCanvasLayout.nodeSize.width * 3,
-    labelFarDistance: 60
+    labelFarDistance: 60,
+    detourExcess: PolicyCanvasLayout.nodeSize.height * 1.5,
+    nodeDistanceGap: PolicyCanvasLayout.nodeSize.width * 2.5
   )
 }
 
@@ -108,6 +120,8 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
   public var crossings: [PolicyCanvasCrossingViolation]
   public var bodyHits: [PolicyCanvasBodyHitViolation]
   public var longEdges: [PolicyCanvasLongEdgeViolation]
+  public var detours: [PolicyCanvasDetourViolation]
+  public var nodeDistance: [PolicyCanvasNodeDistanceViolation]
   public var labels: [PolicyCanvasLabelViolation]
   public var nodeOverlaps: [PolicyCanvasNodeOverlapViolation]
   public var edgeLengths: PolicyCanvasEdgeLengthSummary
@@ -119,6 +133,8 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
     crossings: [PolicyCanvasCrossingViolation],
     bodyHits: [PolicyCanvasBodyHitViolation],
     longEdges: [PolicyCanvasLongEdgeViolation],
+    detours: [PolicyCanvasDetourViolation],
+    nodeDistance: [PolicyCanvasNodeDistanceViolation],
     labels: [PolicyCanvasLabelViolation],
     nodeOverlaps: [PolicyCanvasNodeOverlapViolation],
     edgeLengths: PolicyCanvasEdgeLengthSummary,
@@ -129,6 +145,8 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
     self.crossings = crossings
     self.bodyHits = bodyHits
     self.longEdges = longEdges
+    self.detours = detours
+    self.nodeDistance = nodeDistance
     self.labels = labels
     self.nodeOverlaps = nodeOverlaps
     self.edgeLengths = edgeLengths
@@ -141,6 +159,8 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
     crossings: [],
     bodyHits: [],
     longEdges: [],
+    detours: [],
+    nodeDistance: [],
     labels: [],
     nodeOverlaps: [],
     edgeLengths: .empty,
@@ -229,6 +249,12 @@ public func policyCanvasMeasureGraphQuality(
       groupTitleFrames: groupTitleFrames
     ),
     longEdges: edgeLengths.longEdges,
+    detours: edgeLengths.detours,
+    nodeDistance: policyCanvasMeasureNodeDistance(
+      edges: edges,
+      nodeFramesByID: nodeFramesByID,
+      thresholds: thresholds
+    ),
     labels: policyCanvasMeasureLabels(
       routedEdges: routedEdges,
       nodeFramesByID: nodeFramesByID,

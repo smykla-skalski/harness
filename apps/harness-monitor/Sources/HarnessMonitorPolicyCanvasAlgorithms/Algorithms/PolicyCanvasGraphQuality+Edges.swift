@@ -7,10 +7,15 @@ import CoreGraphics
 func policyCanvasMeasureEdgeLengths(
   routedEdges: [PolicyCanvasRoutedEdge],
   thresholds: PolicyCanvasGraphQualityThresholds
-) -> (summary: PolicyCanvasEdgeLengthSummary, longEdges: [PolicyCanvasLongEdgeViolation]) {
+) -> (
+  summary: PolicyCanvasEdgeLengthSummary,
+  longEdges: [PolicyCanvasLongEdgeViolation],
+  detours: [PolicyCanvasDetourViolation]
+) {
   var lengths: [CGFloat] = []
   var bendCounts: [Int] = []
   var longEdges: [PolicyCanvasLongEdgeViolation] = []
+  var detours: [PolicyCanvasDetourViolation] = []
   for routed in routedEdges {
     let points = routed.route.points
     guard points.count >= 2 else {
@@ -31,6 +36,7 @@ func policyCanvasMeasureEdgeLengths(
     let verticalSpan = maxY - minY
     lengths.append(length)
     bendCounts.append(bendCount)
+    let bounds = CGRect(x: minX, y: minY, width: horizontalSpan, height: verticalSpan)
     if horizontalSpan >= thresholds.longEdgeSpan {
       longEdges.append(
         PolicyCanvasLongEdgeViolation(
@@ -39,9 +45,25 @@ func policyCanvasMeasureEdgeLengths(
           horizontalSpan: horizontalSpan,
           verticalSpan: verticalSpan,
           bendCount: bendCount,
-          bounds: CGRect(x: minX, y: minY, width: horizontalSpan, height: verticalSpan)
+          bounds: bounds
         )
       )
+    }
+    if let first = points.first, let last = points.last {
+      let ideal = abs(last.x - first.x) + abs(last.y - first.y)
+      let excess = length - ideal
+      if excess >= thresholds.detourExcess {
+        detours.append(
+          PolicyCanvasDetourViolation(
+            edgeID: routed.edge.id,
+            length: length,
+            idealLength: ideal,
+            excess: excess,
+            points: points,
+            bounds: bounds
+          )
+        )
+      }
     }
   }
   let count = lengths.count
@@ -59,7 +81,10 @@ func policyCanvasMeasureEdgeLengths(
       ? lhs.horizontalSpan > rhs.horizontalSpan
       : lhs.edgeID < rhs.edgeID
   }
-  return (summary, sortedLongEdges)
+  let sortedDetours = detours.sorted { lhs, rhs in
+    abs(lhs.excess - rhs.excess) > 0.001 ? lhs.excess > rhs.excess : lhs.edgeID < rhs.edgeID
+  }
+  return (summary, sortedLongEdges, sortedDetours)
 }
 
 /// Count direction changes in an orthogonal polyline. A vertex is a bend when

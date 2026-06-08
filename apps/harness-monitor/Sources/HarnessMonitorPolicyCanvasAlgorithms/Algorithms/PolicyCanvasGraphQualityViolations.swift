@@ -207,3 +207,64 @@ public struct PolicyCanvasNodeOverlapViolation: Equatable, Sendable {
 
   public var severity: PolicyCanvasQualitySeverity { .error }
 }
+
+/// A route that travels much farther than the straight Manhattan distance
+/// between its endpoints - it loops or backtracks instead of heading toward its
+/// target. `excess` is the wasted travel (route length minus the ideal); a
+/// monotone L- or Z-shaped route has zero excess.
+public struct PolicyCanvasDetourViolation: Equatable, Sendable {
+  public let edgeID: String
+  public let length: CGFloat
+  public let idealLength: CGFloat
+  public let excess: CGFloat
+  public let points: [CGPoint]
+  public let bounds: CGRect
+
+  public init(
+    edgeID: String,
+    length: CGFloat,
+    idealLength: CGFloat,
+    excess: CGFloat,
+    points: [CGPoint],
+    bounds: CGRect
+  ) {
+    self.edgeID = edgeID
+    self.length = length
+    self.idealLength = idealLength
+    self.excess = excess
+    self.points = points
+    self.bounds = bounds
+  }
+
+  public var severity: PolicyCanvasQualitySeverity { .warning }
+}
+
+/// Two connected node bodies separated by a wide horizontal gap - the layout
+/// placed them far apart with empty space between, forcing a long hauling edge.
+/// `distance` is the gap between their facing vertical edges.
+public struct PolicyCanvasNodeDistanceViolation: Equatable, Sendable {
+  public let edgeID: String
+  public let sourceID: String
+  public let targetID: String
+  public let distance: CGFloat
+  public let gapStart: CGPoint
+  public let gapEnd: CGPoint
+
+  public init(
+    edgeID: String,
+    sourceID: String,
+    targetID: String,
+    distance: CGFloat,
+    gapStart: CGPoint,
+    gapEnd: CGPoint
+  ) {
+    self.edgeID = edgeID
+    self.sourceID = sourceID
+    self.targetID = targetID
+    self.distance = distance
+    self.gapStart = gapStart
+    self.gapEnd = gapEnd
+  }
+
+  public var severity: PolicyCanvasQualitySeverity { .warning }
+}

@@ -11,6 +11,8 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
   case crossingsIndependent
   case bodyHits
   case longEdges
+  case detours
+  case nodeDistance
   case labelOverlaps
   case labelOnBody
   case labelAdrift
@@ -28,6 +30,8 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
     case .crossingsIndependent: "crossings independent"
     case .bodyHits: "body hits"
     case .longEdges: "long edges"
+    case .detours: "detours"
+    case .nodeDistance: "node distance"
     case .labelOverlaps: "label overlaps"
     case .labelOnBody: "label on-body"
     case .labelAdrift: "label adrift"
@@ -43,7 +47,7 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
       .labelOverlaps, .labelOnBody, .nodeOverlaps:
       .error
     case .portTooClose, .corridorParallel, .crossings, .crossingsIndependent,
-      .longEdges, .labelAdrift:
+      .longEdges, .detours, .nodeDistance, .labelAdrift:
       .warning
     }
   }
@@ -78,6 +82,10 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
       "A wire runs through a node body or group-title band that is not its own endpoint"
     case .longEdges:
       "A wire spans most of the canvas width - a cross-canvas hauler"
+    case .detours:
+      "A wire travels much farther than the straight path between its ports - it loops or backtracks"
+    case .nodeDistance:
+      "Two connected nodes sit far apart horizontally with a wide empty gap between them"
     case .labelOverlaps:
       "Two edge labels overlap each other"
     case .labelOnBody:
@@ -103,6 +111,8 @@ extension PolicyCanvasGraphQualityReport {
     case .crossingsIndependent: crossings.filter { !$0.sharesEndpointNode }.count
     case .bodyHits: bodyHits.count
     case .longEdges: longEdges.count
+    case .detours: detours.count
+    case .nodeDistance: nodeDistance.count
     case .labelOverlaps: labels.filter { $0.kind == .overlap }.count
     case .labelOnBody: labels.filter { $0.kind == .onBody }.count
     case .labelAdrift: labels.filter { $0.kind == .farFromEdge }.count
