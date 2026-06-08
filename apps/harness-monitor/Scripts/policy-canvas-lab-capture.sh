@@ -92,9 +92,9 @@ for _ in $(seq 1 12); do
   done
   sleep 1
 done
-# `-g` keeps the launch in the background: the lab renders and is screenshot by
-# window id (works across Spaces) without stealing the developer's focus.
-open -g -n "$APP" \
+# Launch as an active app. Background launches can leave SwiftUI's WindowGroup
+# deferred until the Dock icon is clicked, so the capture never sees a lab window.
+open -n "$APP" \
   ${fixture_env[@]+"${fixture_env[@]}"} \
   ${reflow_env[@]+"${reflow_env[@]}"} \
   || { echo "error: open failed" >&2; exit 1; }
