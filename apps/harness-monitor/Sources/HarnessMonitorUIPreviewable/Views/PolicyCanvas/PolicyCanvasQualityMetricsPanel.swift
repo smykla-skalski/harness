@@ -25,7 +25,7 @@ struct PolicyCanvasQualityMetricsPanel: View {
       .padding(.horizontal, 10)
       .padding(.bottom, 8)
     }
-    .frame(width: 196)
+    .frame(width: 216)
     .background(
       RoundedRectangle(cornerRadius: 8, style: .continuous)
         .fill(PolicyCanvasVisualStyle.floatingControlBackground(colorScheme))
@@ -75,7 +75,9 @@ struct PolicyCanvasQualityMetricsPanel: View {
   }
 
   private func row(_ headline: PolicyCanvasGraphQualityReport.Headline) -> some View {
-    HStack(spacing: 8) {
+    HStack(spacing: 7) {
+      PolicyCanvasQualityMarkerSwatch(category: headline.category)
+        .opacity(headline.value > 0 ? 1 : 0.35)
       Text(headline.label)
         .scaledFont(.caption2)
         .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
@@ -86,9 +88,12 @@ struct PolicyCanvasQualityMetricsPanel: View {
         .monospacedDigit()
         .foregroundStyle(color(for: headline))
     }
+    .contentShape(.rect)
+    .help(headline.category.detail)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(headline.label)
     .accessibilityValue("\(headline.value)")
+    .accessibilityHint(headline.category.detail)
   }
 
   private var footer: some View {

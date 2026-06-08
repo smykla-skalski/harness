@@ -8,11 +8,18 @@ extension PolicyCanvasGraphQualityReport {
     public let label: String
     public let value: Int
     public let severity: PolicyCanvasQualitySeverity
+    public let category: PolicyCanvasQualityCategory
 
-    public init(label: String, value: Int, severity: PolicyCanvasQualitySeverity) {
+    public init(
+      label: String,
+      value: Int,
+      severity: PolicyCanvasQualitySeverity,
+      category: PolicyCanvasQualityCategory
+    ) {
       self.label = label
       self.value = value
       self.severity = severity
+      self.category = category
     }
   }
 
@@ -23,7 +30,8 @@ extension PolicyCanvasGraphQualityReport {
       Headline(
         label: category.label,
         value: count(for: category),
-        severity: category.severity
+        severity: category.severity,
+        category: category
       )
     }
   }
