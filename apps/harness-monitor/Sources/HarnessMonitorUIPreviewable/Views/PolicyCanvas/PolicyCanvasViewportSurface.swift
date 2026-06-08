@@ -87,6 +87,7 @@ public struct PolicyCanvasViewportSurface: View {
   let canvasColorSchemeOverride: ColorScheme?
   let showsEdgeLegend: Bool
   let resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior
+  let showsQualityInspection: Bool
   /// When true the surface re-runs the layered layout engine on appear and after
   /// every document load, so it reflects the algorithms rather than the
   /// document's authored seed coordinates. The Policy Canvas Lab sets this; the
@@ -114,6 +115,7 @@ public struct PolicyCanvasViewportSurface: View {
     canvasColorScheme: ColorScheme? = nil,
     showsEdgeLegend: Bool = true,
     resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior = .preserveZoom,
+    showsQualityInspection: Bool = false,
     forcesEngineLayout: Bool = false,
     reformatRequest: Int = 0,
     policyDisplayName: String? = nil
@@ -126,6 +128,7 @@ public struct PolicyCanvasViewportSurface: View {
     canvasColorSchemeOverride = canvasColorScheme
     self.showsEdgeLegend = showsEdgeLegend
     self.resizeZoomBehavior = resizeZoomBehavior
+    self.showsQualityInspection = showsQualityInspection
     self.forcesEngineLayout = forcesEngineLayout
     self.reformatRequest = reformatRequest
     self.policyDisplayName = policyDisplayName
@@ -167,7 +170,8 @@ public struct PolicyCanvasViewportSurface: View {
       resizeZoomBehavior: resizeZoomBehavior,
       minimapCenteringModeOverride: minimapCenteringModeOverride,
       canvasColorSchemeOverride: canvasColorSchemeOverride,
-      showsEdgeLegend: showsEdgeLegend
+      showsEdgeLegend: showsEdgeLegend,
+      showsQualityInspection: showsQualityInspection
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)

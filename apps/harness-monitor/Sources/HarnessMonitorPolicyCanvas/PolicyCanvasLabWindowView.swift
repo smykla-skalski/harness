@@ -175,6 +175,7 @@ public struct PolicyCanvasLabWindowView: View {
       canvasColorScheme: windowThemeMode.colorScheme,
       showsEdgeLegend: false,
       resizeZoomBehavior: viewportResizeZoomBehavior,
+      showsQualityInspection: showsQualityMetrics,
       forcesEngineLayout: true,
       reformatRequest: reformatRequestID,
       policyDisplayName: samplePickerTitle
