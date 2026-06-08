@@ -196,7 +196,7 @@ struct PolicyCanvasViewportHostedRoot: View {
           if let qualityReport = snapshot.viewModel.qualityInspectionReport {
             PolicyCanvasQualityOverlayLayer(report: qualityReport)
               .policyCanvasDocumentLayer(size: snapshot.contentSize)
-            PolicyCanvasQualityHoverLayer(report: qualityReport, viewModel: snapshot.viewModel)
+            PolicyCanvasQualityHoverLayer(viewModel: snapshot.viewModel)
               .policyCanvasDocumentLayer(size: snapshot.contentSize)
           }
         }
@@ -276,6 +276,13 @@ final class PolicyCanvasNativeDocumentView: NSView {
   var pointerDrag: PointerDrag?
   var marqueePointerDrag: MarqueePointerDrag?
   var targetedInput: PolicyCanvasPortEndpoint?
+
+  // Lab quality-overlay hover tracking (see the +QualityHover extension). The
+  // mark cache is rebuilt only when `qualityReportGeneration` changes, so each
+  // pointer move filters a prebuilt array instead of rebuilding every mark.
+  var qualityHoverCache: [PolicyCanvasQualityHoverMark] = []
+  var qualityHoverCacheGeneration = -1
+  var qualityHoverActiveIDs: [Int] = []
 
   init(state: PolicyCanvasViewportHostedState) {
     hostedState = state

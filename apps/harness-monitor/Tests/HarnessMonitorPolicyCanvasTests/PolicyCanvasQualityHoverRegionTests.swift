@@ -12,13 +12,34 @@ import Testing
 /// spot all resolve at once.
 @Suite
 struct PolicyCanvasQualityHoverRegionTests {
-  /// Mirror of the layer's per-pointer hit test.
+  /// Mirror of the layer's per-pointer hit test, routed through the same shared
+  /// filter the AppKit document view publishes from.
   private func marks(
     under point: CGPoint,
     in report: PolicyCanvasGraphQualityReport
   ) -> [PolicyCanvasQualityHoverMark] {
-    policyCanvasQualityHoverMarks(report: report)
-      .filter { $0.bounds.contains(point) && $0.path.contains(point) }
+    policyCanvasQualityHoverMarks(
+      in: policyCanvasQualityHoverMarks(report: report), under: point)
+  }
+
+  @Test("the shared filter returns every mark stacked at one point")
+  func sharedFilterResolvesStack() {
+    var report = PolicyCanvasGraphQualityReport.empty
+    let shared = CGPoint(x: 100, y: 100)
+    report.crossings = [
+      PolicyCanvasCrossingViolation(
+        edgeA: "a", edgeB: "b", point: shared, sharesEndpointNode: false)
+    ]
+    report.corridors = [
+      PolicyCanvasCorridorViolation(
+        kind: .collinear, isHorizontal: true, edgeA: "a", edgeB: "c",
+        overlapStart: CGPoint(x: 50, y: 100), overlapEnd: CGPoint(x: 150, y: 100),
+        separation: 0)
+    ]
+    let hit = policyCanvasQualityHoverMarks(
+      in: policyCanvasQualityHoverMarks(report: report), under: shared)
+    #expect(hit.count == 2)
+    #expect(Set(hit.map(\.category)) == [.crossingsIndependent, .corridorReuse])
   }
 
   @Test("an empty report produces no marks")

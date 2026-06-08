@@ -68,10 +68,12 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
       .overlay(alignment: .topTrailing) {
         if showsQualityMetrics, let report = viewModel.qualityInspectionReport {
           PolicyCanvasQualityMetricsPanel(
-            report: report, hoveredCategories: viewModel.hoveredQualityCategories)
-            .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
-            .padding(14)
-            .transition(.opacity)
+            report: report,
+            hoveredCategories: Set(viewModel.hoveredQualityMarks.map(\.category))
+          )
+          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
+          .padding(14)
+          .transition(.opacity)
         }
       }
       .animation(.easeInOut(duration: 0.18), value: showsQualityMetrics)
@@ -83,6 +85,7 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
       ) {
         guard showsQualityMetrics else {
           viewModel.qualityInspectionReport = nil
+          viewModel.qualityReportGeneration += 1
           return
         }
         let input = PolicyCanvasQualityWorkerInput(
@@ -98,6 +101,7 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
         withAnimation(.easeInOut(duration: 0.18)) {
           viewModel.qualityInspectionReport = computed
         }
+        viewModel.qualityReportGeneration += 1
       }
   }
 }

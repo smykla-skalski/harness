@@ -275,7 +275,7 @@ extension PolicyCanvasNativeDocumentView {
     return pointerTarget(for: hitTarget)
   }
 
-  private func contentPoint(fromWorkspacePoint point: CGPoint) -> CGPoint {
+  func contentPoint(fromWorkspacePoint point: CGPoint) -> CGPoint {
     hostedState.workspaceLayout.contentPoint(forWorkspacePoint: point)
   }
 
