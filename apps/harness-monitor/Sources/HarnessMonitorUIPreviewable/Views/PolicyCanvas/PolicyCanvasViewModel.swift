@@ -93,6 +93,13 @@ public final class PolicyCanvasViewModel {
   /// space. Observed so the document-space overlay can redraw per drag tick.
   var marqueeSelection: PolicyCanvasMarqueeSelectionState?
 
+  /// Latest graph-quality report for the lab metrics debugger, computed
+  /// off-main by `PolicyCanvasQualityInspectionModifier` only while the lab
+  /// toggle is on. Observed so both the floating panel and the content-space
+  /// violation overlay redraw when it changes. Stays `nil` on the shipping
+  /// canvas (no toggle), so production never pays for it.
+  var qualityInspectionReport: PolicyCanvasGraphQualityReport? = nil
+
   /// Staged dashboard payload deferred while the user has unsaved local edits.
   /// `@ObservationIgnored` so updates here don't churn observers; write only
   /// via `setPendingUpdate(_:)` to keep the observed presence bit in sync.

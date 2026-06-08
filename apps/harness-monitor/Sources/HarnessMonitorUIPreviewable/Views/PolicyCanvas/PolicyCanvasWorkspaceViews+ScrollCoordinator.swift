@@ -193,6 +193,10 @@ struct PolicyCanvasViewportHostedRoot: View {
             labelPositions: snapshot.labelPositions
           )
           .policyCanvasDocumentLayer(size: snapshot.contentSize)
+          if let qualityReport = snapshot.viewModel.qualityInspectionReport {
+            PolicyCanvasQualityOverlayLayer(report: qualityReport)
+              .policyCanvasDocumentLayer(size: snapshot.contentSize)
+          }
         }
         .policyCanvasDocumentLayer(size: snapshot.contentSize)
       }
