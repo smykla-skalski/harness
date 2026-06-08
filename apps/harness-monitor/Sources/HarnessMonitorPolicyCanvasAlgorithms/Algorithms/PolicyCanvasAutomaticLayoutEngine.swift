@@ -198,36 +198,28 @@ public struct PolicyCanvasLayoutConfiguration: Sendable {
       .values
       .map(\.count)
       .max() ?? 1
-    var incidentDegree: [String: Int] = [:]
     var directedDegree: [String: Int] = [:]
     for edge in graph.edges {
-      incidentDegree[edge.sourceNodeID, default: 0] += 1
-      incidentDegree[edge.targetNodeID, default: 0] += 1
       directedDegree[edge.sourceNodeID, default: 0] += 1
       directedDegree[edge.targetNodeID, default: 0] += 1
     }
-    let maxIncidentDegree = incidentDegree.values.max() ?? 0
     let maxDirectedDegree = directedDegree.values.max() ?? 0
-    let edgeDensity = CGFloat(graph.edges.count) / CGFloat(max(graph.nodes.count, 1))
-    let densityPressure = max(0, Int((edgeDensity - 1.5).rounded(.up)))
     let layerPressure = max(0, maxNodesInRank - 3)
     let siblingGroupPressure = max(0, maxGroupsInRank - 1)
     let directedPressure = max(0, maxDirectedDegree - 3)
-    let incidentPressure = max(0, maxIncidentDegree - 4)
     let laneStep = PolicyCanvasVisibilityRouter.laneSpreadStep
 
     func extraSpacing(for pressure: Int, cap: Int) -> CGFloat {
       snappedLayoutDelta(CGFloat(min(max(pressure, 0), cap)) * laneStep)
     }
 
-    let rowPressure = max(layerPressure, siblingGroupPressure) + min(directedPressure, 4)
-    let columnPressure = incidentPressure + densityPressure
-    let groupPressure = siblingGroupPressure + min(directedPressure, 4) + densityPressure
+    let rowPressure = max(layerPressure, siblingGroupPressure) + min(directedPressure, 1)
+    let groupPressure = siblingGroupPressure
 
     return Self(
-      interGroupSpacing: interGroupSpacing + extraSpacing(for: groupPressure, cap: 8),
-      columnSpacing: columnSpacing + extraSpacing(for: columnPressure, cap: 6),
-      rowSpacing: rowSpacing + extraSpacing(for: rowPressure, cap: 8),
+      interGroupSpacing: interGroupSpacing + extraSpacing(for: groupPressure, cap: 2),
+      columnSpacing: columnSpacing,
+      rowSpacing: rowSpacing + extraSpacing(for: rowPressure, cap: 2),
       targetGroupAspectRatio: targetGroupAspectRatio,
       sweepPassCount: sweepPassCount
     )

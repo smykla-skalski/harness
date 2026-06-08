@@ -168,30 +168,41 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       obstaclesAreCanonical: true,
       corridorHint: context.prepared.routingHints?.edgeHint(for: edge.id)
     )
-    guard !edge.effectivePinnedPortSide else {
-      return pinnedRoute(
+    let flexInput = FlexRouteSelectionInput(
+      edge: edge,
+      prepared: context.prepared,
+      nodeIndex: context.nodeIndex,
+      slots: slots,
+      sourceTerminal: sourceTerminal,
+      targetTerminal: targetTerminal,
+      sourceNode: sourceNode,
+      targetNode: targetNode,
+      source: source,
+      target: target,
+      baseContext: baseContext,
+      router: context.router
+    )
+    if edge.effectivePinnedPortSide {
+      let route = pinnedRoute(
         source: source,
         target: target,
         context: baseContext,
         router: context.router
       )
+      if routeAvoidsNonEndpointObstacles(
+        route,
+        sourceActual: source.actual,
+        targetActual: target.actual,
+        context: baseContext
+      ) {
+        return route
+      }
+      return safeAlternateRoute(
+        flexInput,
+        allowsSideChanges: edge.kind != .error
+      ) ?? route
     }
-    return selectedFlexRoute(
-      FlexRouteSelectionInput(
-        edge: edge,
-        prepared: context.prepared,
-        nodeIndex: context.nodeIndex,
-        slots: slots,
-        sourceTerminal: sourceTerminal,
-        targetTerminal: targetTerminal,
-        sourceNode: sourceNode,
-        targetNode: targetNode,
-        source: source,
-        target: target,
-        baseContext: baseContext,
-        router: context.router
-      )
-    )
+    return selectedFlexRoute(flexInput)
   }
 
   private func selectedRouteLane(
@@ -282,7 +293,10 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
     let targetSide: PolicyCanvasPortSide
   }
 
-  private func safeAlternateRoute(_ input: FlexRouteSelectionInput) -> PolicyCanvasEdgeRoute? {
+  private func safeAlternateRoute(
+    _ input: FlexRouteSelectionInput,
+    allowsSideChanges: Bool = true
+  ) -> PolicyCanvasEdgeRoute? {
     let sourceCandidates = orderedSideCandidates(
       sideCandidates(
         for: input.edge.source,
@@ -290,7 +304,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
         prepared: input.prepared,
         terminalSlot: input.slots.source,
         terminal: nil
-      ),
+      ).filter { allowsSideChanges || $0.side == input.source.side },
       preferredSide: input.source.side
     )
     let targetCandidates = orderedSideCandidates(
@@ -300,7 +314,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
         prepared: input.prepared,
         terminalSlot: input.slots.target,
         terminal: nil
-      ),
+      ).filter { allowsSideChanges || $0.side == input.target.side },
       preferredSide: input.target.side
     )
     guard !sourceCandidates.isEmpty, !targetCandidates.isEmpty else {

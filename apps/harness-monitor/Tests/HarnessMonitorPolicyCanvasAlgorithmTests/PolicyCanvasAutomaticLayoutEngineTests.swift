@@ -229,7 +229,7 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
       denseConfiguration.rowSpacing > PolicyCanvasLayoutConfiguration.layeredDefault.rowSpacing
     )
     #expect(
-      denseConfiguration.columnSpacing > PolicyCanvasLayoutConfiguration.layeredDefault.columnSpacing
+      denseConfiguration.columnSpacing == PolicyCanvasLayoutConfiguration.layeredDefault.columnSpacing
     )
     #expect(
       denseConfiguration.interGroupSpacing
@@ -313,6 +313,40 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
       partial.union(policyCanvasNodeFrame(node))
     }
     #expect(groups.first?.frame.contains(memberBounds) == true)
+  }
+
+  @Test("grouped node overlap cleanup separates nodes from foreign group titles")
+  func groupedNodeOverlapCleanupSeparatesForeignGroupTitles() {
+    var node = policyCanvasTestNode(id: "node", position: CGPoint(x: 120, y: 100))
+    node.groupID = "source"
+    var nodes = [node]
+    var groups = [
+      PolicyCanvasGroup(
+        id: "source",
+        title: "Source",
+        frame: CGRect(x: 80, y: 80, width: 240, height: 180),
+        tone: .intake
+      ),
+      PolicyCanvasGroup(
+        id: "foreign",
+        title: "Foreign",
+        frame: CGRect(x: 100, y: 180, width: 240, height: 180),
+        tone: .release
+      ),
+    ]
+
+    let changed = policyCanvasResolveGroupedNodeOverlaps(nodes: &nodes, groups: &groups)
+
+    #expect(changed)
+    let nodeFrame = policyCanvasNodeFrame(nodes[0])
+    let foreignTitleFrame = policyCanvasGroupTitleFrames(
+      groups.filter { $0.id == "foreign" }
+    )[0]
+    #expect(!nodeFrame.intersects(foreignTitleFrame))
+    #expect(
+      nodeFrame.minY
+        >= foreignTitleFrame.maxY + policyCanvasMinimumNodeSpacing
+    )
   }
 
   @Test("post-comb overlap resolver stays under the interaction budget")

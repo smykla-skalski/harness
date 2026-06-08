@@ -240,20 +240,44 @@ struct PolicyCanvasTerminalCombAndSingleFedAlignment:
       nodePositions: input.nodePositions,
       edges: input.graph.edges
     )
-    nodePositions = policyCanvasResolveNodeOverlaps(nodePositions: nodePositions)
+    nodePositions = policyCanvasResolveNodeAndForeignTitleOverlaps(
+      nodePositions: nodePositions,
+      layoutGroupIDByNodeID: input.rankAssignment.layoutGroupIDByNodeID,
+      groupTitleFramesByID: input.groupFramesByLayoutID.mapValues(policyCanvasGroupTitleFrame)
+    )
     var groupFrames = input.groupFrames
     var groupFramesByLayoutID = policyCanvasRebuiltGroupFramesByLayoutID(
       normalizedGroups: input.rankAssignment.normalizedGroups,
       layoutGroupIDByNodeID: input.rankAssignment.layoutGroupIDByNodeID,
       nodePositions: nodePositions
     )
-    for group in input.rankAssignment.normalizedGroups {
-      guard let actualGroupID = group.actualGroupID,
-        let frame = groupFramesByLayoutID[group.layoutID]
-      else {
-        continue
+    func applyActualGroupFrames() {
+      for group in input.rankAssignment.normalizedGroups {
+        guard let actualGroupID = group.actualGroupID,
+          let frame = groupFramesByLayoutID[group.layoutID]
+        else {
+          continue
+        }
+        groupFrames[actualGroupID] = frame
       }
-      groupFrames[actualGroupID] = frame
+    }
+    applyActualGroupFrames()
+    for _ in 0..<3 {
+      let resolvedPositions = policyCanvasResolveNodeAndForeignTitleOverlaps(
+        nodePositions: nodePositions,
+        layoutGroupIDByNodeID: input.rankAssignment.layoutGroupIDByNodeID,
+        groupTitleFramesByID: groupFramesByLayoutID.mapValues(policyCanvasGroupTitleFrame)
+      )
+      guard resolvedPositions != nodePositions else {
+        break
+      }
+      nodePositions = resolvedPositions
+      groupFramesByLayoutID = policyCanvasRebuiltGroupFramesByLayoutID(
+        normalizedGroups: input.rankAssignment.normalizedGroups,
+        layoutGroupIDByNodeID: input.rankAssignment.layoutGroupIDByNodeID,
+        nodePositions: nodePositions
+      )
+      applyActualGroupFrames()
     }
     let overallMinY =
       groupFrames.values.map(\.minY).min()

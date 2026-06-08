@@ -42,7 +42,19 @@ public func policyCanvasResolveGroupedNodeOverlaps(
     return false
   }
   let nodePositions = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
-  let resolvedPositions = policyCanvasResolveNodeOverlaps(nodePositions: nodePositions)
+  let layoutGroupIDByNodeID = Dictionary(
+    uniqueKeysWithValues: nodes.compactMap { node in
+      node.groupID.map { (node.id, $0) }
+    }
+  )
+  let groupTitleFramesByID = Dictionary(
+    uniqueKeysWithValues: zip(groups.map(\.id), policyCanvasGroupTitleFrames(groups))
+  )
+  let resolvedPositions = policyCanvasResolveNodeAndForeignTitleOverlaps(
+    nodePositions: nodePositions,
+    layoutGroupIDByNodeID: layoutGroupIDByNodeID,
+    groupTitleFramesByID: groupTitleFramesByID
+  )
   var changed = false
   for index in nodes.indices {
     guard let resolved = resolvedPositions[nodes[index].id],

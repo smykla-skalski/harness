@@ -42,10 +42,29 @@ func policyCanvasResolveCrossGroupNodeOverlaps(
   )
 }
 
+func policyCanvasResolveNodeAndForeignTitleOverlaps(
+  nodePositions: [String: CGPoint],
+  layoutGroupIDByNodeID: [String: String],
+  groupTitleFramesByID: [String: CGRect]
+) -> [String: CGPoint] {
+  policyCanvasResolveNodeOverlaps(
+    nodePositions: nodePositions,
+    minimumSpacing: policyCanvasMinimumNodeSpacing,
+    shouldResolvePair: { _, _ in true },
+    blockingFrames: { nodeID in
+      let nodeGroupID = layoutGroupIDByNodeID[nodeID]
+      return groupTitleFramesByID.compactMap { groupID, frame in
+        groupID == nodeGroupID ? nil : frame
+      }
+    }
+  )
+}
+
 private func policyCanvasResolveNodeOverlaps(
   nodePositions: [String: CGPoint],
   minimumSpacing: CGFloat,
-  shouldResolvePair: (String, String) -> Bool
+  shouldResolvePair: (String, String) -> Bool,
+  blockingFrames: (String) -> [CGRect] = { _ in [] }
 ) -> [String: CGPoint] {
   var positions = nodePositions
   let orderedIDs = nodePositions.keys.sorted { leftID, rightID in
@@ -67,6 +86,24 @@ private func policyCanvasResolveNodeOverlaps(
         continue
       }
       requiredMinY = max(requiredMinY, entry.frame.maxY + minimumSpacing)
+    }
+    var candidateFrame = CGRect(
+      origin: CGPoint(x: frame.minX, y: requiredMinY),
+      size: frame.size
+    )
+    for obstacle in blockingFrames(nodeID) {
+      guard policyCanvasFramesNeedVerticalSeparation(
+        candidateFrame,
+        obstacle,
+        spacing: minimumSpacing
+      ) else {
+        continue
+      }
+      requiredMinY = max(requiredMinY, obstacle.maxY + minimumSpacing)
+      candidateFrame = CGRect(
+        origin: CGPoint(x: frame.minX, y: requiredMinY),
+        size: frame.size
+      )
     }
     let resolvedFrame: CGRect
     if requiredMinY > frame.minY {
@@ -105,4 +142,14 @@ private func policyCanvasHorizontalSpansOverlap(
   spacing: CGFloat
 ) -> Bool {
   left.minX < right.maxX + spacing && right.minX < left.maxX + spacing
+}
+
+private func policyCanvasFramesNeedVerticalSeparation(
+  _ nodeFrame: CGRect,
+  _ obstacleFrame: CGRect,
+  spacing: CGFloat
+) -> Bool {
+  policyCanvasHorizontalSpansOverlap(nodeFrame, obstacleFrame, spacing: spacing)
+    && nodeFrame.minY < obstacleFrame.maxY + spacing
+    && obstacleFrame.minY < nodeFrame.maxY + spacing
 }

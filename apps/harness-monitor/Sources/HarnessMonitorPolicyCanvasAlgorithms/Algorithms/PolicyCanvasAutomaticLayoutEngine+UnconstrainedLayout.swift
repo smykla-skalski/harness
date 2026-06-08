@@ -92,11 +92,14 @@ extension PolicyCanvasLayeredLayoutEngine {
     )
     // The comb arranges a group's terminals by topology with no awareness of
     // foreign groups, so a lifted collector or dropped branch terminal can land
-    // on top of another group's node. Clear those cross-group collisions before
-    // the frames are rebuilt from the final positions.
-    nodePositions = policyCanvasResolveCrossGroupNodeOverlaps(
+    // on top of another group's node or title strip. Clear those cross-group
+    // collisions before the frames are rebuilt from the final positions.
+    nodePositions = policyCanvasResolveNodeAndForeignTitleOverlaps(
       nodePositions: nodePositions,
-      layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID
+      layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID,
+      groupTitleFramesByID: accumulator.groupFramesByLayoutID.mapValues(
+        policyCanvasGroupTitleFrame
+      )
     )
     var groupFrames = accumulator.groupFrames
     var groupFramesByLayoutID = accumulator.groupFramesByLayoutID
@@ -104,24 +107,40 @@ extension PolicyCanvasLayeredLayoutEngine {
     // The terminal-arrangement pass scatters group members (collector up, branch
     // terminals down), so the column-era frames no longer bound them. Rebuild
     // every group frame from the rearranged positions.
-    func rebuiltGroupFrame(layoutID: String) -> CGRect? {
-      let bounds = nodePositions.keys
+    func rebuiltGroupFrame(layoutID: String, positions: [String: CGPoint]) -> CGRect? {
+      let bounds = positions.keys
         .filter { inputs.layoutGroupIDByNodeID[$0] == layoutID }
         .reduce(CGRect.null) { partial, nodeID in
-          guard let position = nodePositions[nodeID] else { return partial }
+          guard let position = positions[nodeID] else { return partial }
           return partial.union(CGRect(origin: position, size: PolicyCanvasLayout.nodeSize))
         }
       return bounds.isNull ? nil : policyCanvasGroupFrame(containing: bounds)
     }
-    for layoutID in Array(groupFramesByLayoutID.keys) {
-      if let frame = rebuiltGroupFrame(layoutID: layoutID) {
-        groupFramesByLayoutID[layoutID] = frame
+
+    func rebuildGroupFrames(positions: [String: CGPoint]) {
+      for layoutID in Array(groupFramesByLayoutID.keys) {
+        if let frame = rebuiltGroupFrame(layoutID: layoutID, positions: positions) {
+          groupFramesByLayoutID[layoutID] = frame
+        }
+      }
+      for actualGroupID in Array(groupFrames.keys) {
+        if let frame = rebuiltGroupFrame(layoutID: actualGroupID, positions: positions) {
+          groupFrames[actualGroupID] = frame
+        }
       }
     }
-    for actualGroupID in Array(groupFrames.keys) {
-      if let frame = rebuiltGroupFrame(layoutID: actualGroupID) {
-        groupFrames[actualGroupID] = frame
+    rebuildGroupFrames(positions: nodePositions)
+    for _ in 0..<3 {
+      let resolvedPositions = policyCanvasResolveNodeAndForeignTitleOverlaps(
+        nodePositions: nodePositions,
+        layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID,
+        groupTitleFramesByID: groupFramesByLayoutID.mapValues(policyCanvasGroupTitleFrame)
+      )
+      guard resolvedPositions != nodePositions else {
+        break
       }
+      nodePositions = resolvedPositions
+      rebuildGroupFrames(positions: nodePositions)
     }
 
     let overallMinY =
