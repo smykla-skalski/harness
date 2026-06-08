@@ -365,26 +365,28 @@ final class PolicyCanvasNativeDocumentView: NSView {
   }
 
   override func hitTest(_ point: NSPoint) -> NSView? {
+    hitTestTarget(at: point, allowsSwiftUIPortHitTesting: shouldResolveInteractiveMouseHitTest)
+  }
+
+  func hitTestTarget(
+    at point: NSPoint,
+    allowsSwiftUIPortHitTesting: Bool
+  ) -> NSView? {
     guard bounds.contains(point) else {
       return nil
     }
-    guard shouldResolveInteractiveMouseHitTest else {
+    guard allowsSwiftUIPortHitTesting else {
       return self
     }
     let contentPoint = contentPoint(fromWorkspacePoint: point)
-    switch hostedState.snapshot.viewModel.canvasPointerHitTarget(
+    if case .port = hostedState.snapshot.viewModel.canvasPointerHitTarget(
       at: contentPoint,
       portVisibility: hostedState.snapshot.portVisibility,
-      portMarkerLayout: hostedState.snapshot.portMarkerLayout,
-      routes: hostedState.snapshot.routes
+      portMarkerLayout: hostedState.snapshot.portMarkerLayout
     ) {
-    case .port:
-      return super.hitTest(point)
-    case .node, .group, .edge:
-      return self
-    case nil:
-      return super.hitTest(point)
+      return hostingView
     }
+    return self
   }
 
   private var shouldResolveInteractiveMouseHitTest: Bool {
