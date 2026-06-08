@@ -27,6 +27,8 @@ struct PolicyCanvasQualityMarkerSwatch: View {
         detourGlyph(&context, rect, tint)
       case .nodeDistance:
         dimensionGlyph(&context, rect, tint)
+      case .wrongTurns:
+        wrongTurnGlyph(&context, rect, tint)
       case .labelOverlaps, .labelOnBody, .labelAdrift:
         thinOutline(&context, rect, tint)
       case .nodeOverlaps:
@@ -102,6 +104,26 @@ struct PolicyCanvasQualityMarkerSwatch: View {
       with: .color(tint.opacity(0.55)),
       style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
     )
+  }
+
+  private func wrongTurnGlyph(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
+    // A path that runs out, drops, and hooks back with an arrowhead - a backtrack.
+    var path = Path()
+    path.move(to: CGPoint(x: rect.minX + 4, y: rect.minY + 1))
+    path.addLine(to: CGPoint(x: rect.maxX - 1, y: rect.minY + 1))
+    path.addLine(to: CGPoint(x: rect.maxX - 1, y: rect.maxY - 1))
+    path.addLine(to: CGPoint(x: rect.minX + 4, y: rect.maxY - 1))
+    context.stroke(
+      path,
+      with: .color(tint.opacity(0.75)),
+      style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+    )
+    var head = Path()
+    head.move(to: CGPoint(x: rect.minX, y: rect.maxY - 1))
+    head.addLine(to: CGPoint(x: rect.minX + 4, y: rect.maxY - 3.5))
+    head.addLine(to: CGPoint(x: rect.minX + 4, y: rect.maxY + 1.5))
+    head.closeSubpath()
+    context.fill(head, with: .color(tint))
   }
 
   private func dimensionGlyph(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {

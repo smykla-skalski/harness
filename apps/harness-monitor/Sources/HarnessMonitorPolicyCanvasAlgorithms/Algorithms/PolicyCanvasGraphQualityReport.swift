@@ -23,6 +23,9 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
   /// Horizontal gap between two connected node bodies above which they read as
   /// placed too far apart.
   public var nodeDistanceGap: CGFloat
+  /// Minimum length of a reversing route segment for the backtrack to read as a
+  /// wrong turn. Shorter reversals sit within a port marker and are ignored.
+  public var wrongTurnDepth: CGFloat
 
   public init(
     minimumPortSpacing: CGFloat,
@@ -32,7 +35,8 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     longEdgeSpan: CGFloat,
     labelFarDistance: CGFloat,
     detourExcess: CGFloat,
-    nodeDistanceGap: CGFloat
+    nodeDistanceGap: CGFloat,
+    wrongTurnDepth: CGFloat
   ) {
     self.minimumPortSpacing = minimumPortSpacing
     self.markerOverlap = markerOverlap
@@ -42,6 +46,7 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     self.labelFarDistance = labelFarDistance
     self.detourExcess = detourExcess
     self.nodeDistanceGap = nodeDistanceGap
+    self.wrongTurnDepth = wrongTurnDepth
   }
 
   public static let `default` = Self(
@@ -52,7 +57,9 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     longEdgeSpan: PolicyCanvasLayout.nodeSize.width * 3,
     labelFarDistance: 60,
     detourExcess: PolicyCanvasLayout.nodeSize.height * 1.5,
-    nodeDistanceGap: PolicyCanvasLayout.nodeSize.width * 2.5
+    nodeDistanceGap: PolicyCanvasLayout.nodeSize.width * 2.5,
+    // Two-thirds of a port marker: shorter backtracks sit within the dot.
+    wrongTurnDepth: PolicyCanvasLayout.portDiameter / 1.5
   )
 }
 
@@ -122,6 +129,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
   public var longEdges: [PolicyCanvasLongEdgeViolation]
   public var detours: [PolicyCanvasDetourViolation]
   public var nodeDistance: [PolicyCanvasNodeDistanceViolation]
+  public var wrongTurns: [PolicyCanvasWrongTurnViolation]
   public var labels: [PolicyCanvasLabelViolation]
   public var nodeOverlaps: [PolicyCanvasNodeOverlapViolation]
   public var edgeLengths: PolicyCanvasEdgeLengthSummary
@@ -135,6 +143,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
     longEdges: [PolicyCanvasLongEdgeViolation],
     detours: [PolicyCanvasDetourViolation],
     nodeDistance: [PolicyCanvasNodeDistanceViolation],
+    wrongTurns: [PolicyCanvasWrongTurnViolation],
     labels: [PolicyCanvasLabelViolation],
     nodeOverlaps: [PolicyCanvasNodeOverlapViolation],
     edgeLengths: PolicyCanvasEdgeLengthSummary,
@@ -147,6 +156,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
     self.longEdges = longEdges
     self.detours = detours
     self.nodeDistance = nodeDistance
+    self.wrongTurns = wrongTurns
     self.labels = labels
     self.nodeOverlaps = nodeOverlaps
     self.edgeLengths = edgeLengths
@@ -161,6 +171,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
     longEdges: [],
     detours: [],
     nodeDistance: [],
+    wrongTurns: [],
     labels: [],
     nodeOverlaps: [],
     edgeLengths: .empty,
@@ -255,6 +266,7 @@ public func policyCanvasMeasureGraphQuality(
       nodeFramesByID: nodeFramesByID,
       thresholds: thresholds
     ),
+    wrongTurns: policyCanvasMeasureWrongTurns(routedEdges: routedEdges, thresholds: thresholds),
     labels: policyCanvasMeasureLabels(
       routedEdges: routedEdges,
       nodeFramesByID: nodeFramesByID,
