@@ -187,6 +187,22 @@ struct PolicyCanvasReflowTests {
     #expect(viewModel.hasPendingViewportCenteringRequest)
   }
 
+  @Test("stale viewport centering generations cannot consume newer requests")
+  func staleViewportCenteringGenerationsCannotConsumeNewerRequests() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.requestViewportCentering(.document)
+    let staleGeneration = viewModel.viewportCenteringGeneration
+
+    viewModel.requestViewportCentering(.documentAfterRouteComputation)
+    let currentGeneration = viewModel.viewportCenteringGeneration
+
+    #expect(staleGeneration != currentGeneration)
+    #expect(!viewModel.consumeViewportCenteringRequest(generation: staleGeneration))
+    #expect(viewModel.hasPendingViewportCenteringRequest)
+    #expect(viewModel.consumeViewportCenteringRequest(generation: currentGeneration))
+    #expect(!viewModel.hasPendingViewportCenteringRequest)
+  }
+
   @Test("second reflow preserves matching layout while requesting viewport centering")
   func secondReflowPreservesMatchingLayoutWhileRequestingViewportCentering() {
     let viewModel = PolicyCanvasViewModel.sample()

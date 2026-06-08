@@ -188,6 +188,77 @@ extension PolicyCanvasCommandScrollTests {
     #expect(abs(scrollView.contentView.bounds.origin.y - requestPoint.y) < 1.5)
   }
 
+  @Test("first native zoom out keeps the initial canvas centering on the visible graph")
+  func firstNativeZoomOutKeepsInitialCanvasCenteringOnTheVisibleGraph() async throws {
+    let frame = CGRect(x: 0, y: 0, width: 1_200, height: 800)
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: policyCanvasPastedPRDryRunDocument(),
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "pasted-pr-canvas"
+    )
+    let host = NSHostingView(
+      rootView: PolicyCanvasViewportSwitchTestHost(viewModel: viewModel)
+    )
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = frame
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    let scrollView = try await waitForNativeScrollView(in: host, window: window)
+    let routeOutput = await PolicyCanvasRouteWorker().compute(
+      input: PolicyCanvasRouteWorkerInput(
+        graphGeneration: viewModel.routeComputationGeneration,
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        fontScale: 1,
+        routingHints: viewModel.routingHints,
+        algorithmSelection: viewModel.algorithmSelection
+      )
+    )
+
+    let targetZoom = max(
+      PolicyCanvasLayout.minimumZoom,
+      scrollView.magnification * 0.7
+    )
+    scrollView.setMagnification(targetZoom, centeredAt: scrollView.visibleDocumentCenter)
+    scrollView.magnificationDidChange?(scrollView.magnification)
+
+    let didCenter = await waitUntil(timeout: .seconds(2)) {
+      window.layoutIfNeeded()
+      host.layoutSubtreeIfNeeded()
+      guard let visibleRect = try? visibleContentRect(in: scrollView) else {
+        return false
+      }
+      return abs(visibleRect.midX - routeOutput.visibleBounds.midX) < 1.5
+        && abs(visibleRect.midY - routeOutput.visibleBounds.midY) < 1.5
+        && !viewModel.hasPendingViewportCenteringRequest
+    }
+    let finalRect = try visibleContentRect(in: scrollView)
+    #expect(
+      didCenter,
+      """
+      Expected first native zoom out to keep initial centering on \
+      \(routeOutput.visibleBounds), got \(finalRect); \
+      pendingCentering=\(viewModel.hasPendingViewportCenteringRequest) \
+      clipBounds=\(scrollView.contentView.bounds) zoom=\(scrollView.magnification)
+      """
+    )
+  }
+
   @MainActor
   @Test("native scroll view centers a smaller document while keeping free diagonal scrolling")
   func nativeScrollViewCentersSmallerDocument() {
@@ -1137,6 +1208,33 @@ private func waitUntil(
     try? await Task.sleep(for: interval)
   }
   return await MainActor.run(resultType: Bool.self, body: predicate)
+}
+
+@MainActor
+private func waitForNativeScrollView(
+  in host: NSView,
+  window: NSWindow,
+  timeout: Duration = .seconds(1)
+) async throws -> PolicyCanvasNativeScrollView {
+  var resolvedScrollView: PolicyCanvasNativeScrollView?
+  #expect(
+    await waitUntil(timeout: timeout) {
+      window.layoutIfNeeded()
+      host.layoutSubtreeIfNeeded()
+      guard
+        let scrollView = descendant(
+          of: host,
+          as: PolicyCanvasNativeScrollView.self
+        )
+      else {
+        return false
+      }
+      resolvedScrollView = scrollView
+      return scrollView.contentView.bounds.width > 1
+        && scrollView.contentView.bounds.height > 1
+    }
+  )
+  return try #require(resolvedScrollView)
 }
 
 @MainActor
