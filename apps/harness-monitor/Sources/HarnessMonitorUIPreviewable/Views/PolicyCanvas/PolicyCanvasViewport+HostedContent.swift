@@ -36,6 +36,7 @@ struct PolicyCanvasViewportHostedContent: View {
       onZoomChange: onZoomChange,
       onViewportChange: onViewportChange
     )
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .clipShape(Rectangle())
     .overlay {
       PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)

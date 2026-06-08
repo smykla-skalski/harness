@@ -16,6 +16,20 @@ func policyCanvasApplyOpaqueViewportBacking(to view: NSView) {
   view.layer?.backgroundColor = backgroundColor
 }
 
+@MainActor
+func policyCanvasFixedFittingSize(
+  for size: CGSize,
+  fallback: CGSize = .zero
+) -> NSSize {
+  if size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 {
+    return NSSize(width: size.width, height: size.height)
+  }
+  if fallback.width.isFinite, fallback.height.isFinite, fallback.width > 0, fallback.height > 0 {
+    return NSSize(width: fallback.width, height: fallback.height)
+  }
+  return NSSize(width: 1, height: 1)
+}
+
 let policyCanvasAcceptedTextPasteboardTypes: [NSPasteboard.PasteboardType] = {
   var seen = Set<String>()
   return [
@@ -28,8 +42,47 @@ let policyCanvasAcceptedTextPasteboardTypes: [NSPasteboard.PasteboardType] = {
 @MainActor
 final class PolicyCanvasNativeHostingView: NSHostingView<PolicyCanvasViewportHostedRoot> {
   weak var documentInteractionDelegate: PolicyCanvasNativeDocumentView?
+  private var requiresHostedLayout = true
 
   override var isOpaque: Bool { true }
+
+  override var intrinsicContentSize: NSSize {
+    NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+  }
+
+  override var fittingSize: NSSize {
+    policyCanvasFixedFittingSize(for: bounds.size)
+  }
+
+  required init(rootView: PolicyCanvasViewportHostedRoot) {
+    super.init(rootView: rootView)
+    sizingOptions = []
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func layout() {
+    guard requiresHostedLayout else {
+      return
+    }
+    requiresHostedLayout = false
+    super.layout()
+  }
+
+  func markHostedLayoutRequired() {
+    requiresHostedLayout = true
+    if !needsLayout {
+      needsLayout = true
+    }
+  }
+
+  func replaceRootView(_ rootView: PolicyCanvasViewportHostedRoot) {
+    markHostedLayoutRequired()
+    self.rootView = rootView
+  }
 
   override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
     true
@@ -130,11 +183,20 @@ final class PolicyCanvasTestingDocumentView<Content: View>: NSView {
   override var isFlipped: Bool { true }
   override var isOpaque: Bool { true }
 
+  override var intrinsicContentSize: NSSize {
+    NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+  }
+
+  override var fittingSize: NSSize {
+    policyCanvasFixedFittingSize(for: frame.size, fallback: bounds.size)
+  }
+
   private let hostingView: NSHostingView<Content>
 
   init(rootView: Content) {
     hostingView = NSHostingView(rootView: rootView)
     super.init(frame: .zero)
+    hostingView.sizingOptions = []
     policyCanvasApplyOpaqueViewportBacking(to: self)
     policyCanvasApplyOpaqueViewportBacking(to: hostingView)
     addSubview(hostingView)
@@ -147,7 +209,9 @@ final class PolicyCanvasTestingDocumentView<Content: View>: NSView {
 
   override func layout() {
     super.layout()
-    hostingView.frame = bounds
+    if hostingView.frame != bounds {
+      hostingView.frame = bounds
+    }
   }
 
   override func viewDidChangeEffectiveAppearance() {
@@ -157,8 +221,15 @@ final class PolicyCanvasTestingDocumentView<Content: View>: NSView {
   }
 
   func updateSize(_ size: CGSize) {
+    guard frame.size != size || hostingView.frame.size != size else {
+      return
+    }
     frame = CGRect(origin: .zero, size: size)
-    hostingView.frame = bounds
-    needsLayout = true
+    if hostingView.frame != bounds {
+      hostingView.frame = bounds
+    }
+    if !needsLayout {
+      needsLayout = true
+    }
   }
 }

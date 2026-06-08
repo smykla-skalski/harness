@@ -913,7 +913,7 @@ extension PolicyCanvasCommandScrollTests {
   }
 
   @MainActor
-  @Test("native host coalesces AppKit zoom model writes")
+  @Test("native host debounces AppKit zoom model writes")
   func nativeHostCoalescesAppKitZoomModelWrites() async throws {
     let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
     let coordinator = PolicyCanvasViewportNativeHost.Coordinator(
@@ -926,7 +926,12 @@ extension PolicyCanvasCommandScrollTests {
     }
 
     coordinator.handleViewportZoomChange(1.05)
+    try await Task.sleep(nanoseconds: 70_000_000)
     coordinator.handleViewportZoomChange(1.12)
+
+    #expect(deliveredZooms.isEmpty)
+
+    try await Task.sleep(nanoseconds: 80_000_000)
 
     #expect(deliveredZooms.isEmpty)
 
@@ -959,7 +964,7 @@ extension PolicyCanvasCommandScrollTests {
 
     #expect(abs(scrollView.magnification - 1.2) < 0.001)
 
-    try await Task.sleep(nanoseconds: 80_000_000)
+    try await Task.sleep(nanoseconds: 140_000_000)
 
     #expect(deliveredZoom == 1.2)
   }

@@ -54,4 +54,78 @@ struct PolicyCanvasEdgeHitTestTests {
     #expect(!path.contains(CGPoint(x: 50, y: 8)))
     #expect(!path.contains(CGPoint(x: 50, y: -8)))
   }
+
+  @Test("edge hit testing does not rebuild rendered stroke paths")
+  func edgeHitTestingDoesNotRebuildRenderedStrokePaths() throws {
+    let source = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasInteractiveEdge.swift"
+    )
+
+    #expect(
+      source.contains(
+        "strokeLayer(route: renderedRoute)\n        .allowsHitTesting(false)"
+      )
+    )
+    #expect(
+      source.contains(
+        """
+        PolicyCanvasEdgeArrowhead(route: renderedRoute)
+                .fill(arrowheadColor)
+                .allowsHitTesting(false)
+        """
+      )
+    )
+    #expect(source.contains("struct PolicyCanvasEdgeHitShape: Shape"))
+    #expect(!source.contains("PolicyCanvasEdgeShape(route: route)\n      .path(in: rect)"))
+  }
+
+  @Test("native pointer hit testing can select an edge route")
+  @MainActor
+  func nativePointerHitTestingCanSelectEdgeRoute() {
+    let edge = PolicyCanvasEdge(
+      id: "edge-a",
+      source: PolicyCanvasPortEndpoint(nodeID: "source", portID: "out", kind: .output),
+      target: PolicyCanvasPortEndpoint(nodeID: "target", portID: "in", kind: .input),
+      label: "route"
+    )
+    let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [edge])
+    let route = PolicyCanvasEdgeRoute(
+      points: [CGPoint(x: 0, y: 0), CGPoint(x: 100, y: 0), CGPoint(x: 100, y: 80)],
+      labelPosition: CGPoint(x: 100, y: 40)
+    )
+
+    #expect(
+      viewModel.canvasEdgeHitTarget(
+        at: CGPoint(x: 45, y: 5),
+        routes: [edge.id: route]
+      ) == edge.id
+    )
+    #expect(
+      viewModel.canvasEdgeHitTarget(
+        at: CGPoint(x: 50, y: 12),
+        routes: [edge.id: route]
+      ) == nil
+    )
+    #expect(
+      viewModel.canvasPointerHitTarget(
+        at: CGPoint(x: 100, y: 35),
+        routes: [edge.id: route]
+      ) == .edge(edge.id)
+    )
+  }
+
+  private func previewableSourceFile(named path: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent(path)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
 }

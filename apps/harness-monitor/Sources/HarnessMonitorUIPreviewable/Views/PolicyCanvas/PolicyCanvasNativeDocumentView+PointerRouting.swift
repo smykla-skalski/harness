@@ -38,10 +38,11 @@ extension PolicyCanvasNativeDocumentView {
       details: ["click_count": String(event.clickCount)]
     )
     guard
-      let hitTarget = hostedState.snapshot.viewModel.canvasHitTarget(
+      let hitTarget = hostedState.snapshot.viewModel.canvasPointerHitTarget(
         at: contentPoint,
         portVisibility: hostedState.snapshot.portVisibility,
-        portMarkerLayout: hostedState.snapshot.portMarkerLayout
+        portMarkerLayout: hostedState.snapshot.portMarkerLayout,
+        routes: hostedState.snapshot.routes
       )
     else {
       recordNativeTrace(event: "mouse.down.miss", point: point)
@@ -139,6 +140,8 @@ extension PolicyCanvasNativeDocumentView {
       hostedState.snapshot.viewModel.dragNode(id, translation: translation)
     case .group(let id):
       hostedState.snapshot.viewModel.dragGroup(id, translation: translation)
+    case .edge:
+      break
     }
     return true
   }
@@ -172,6 +175,8 @@ extension PolicyCanvasNativeDocumentView {
       hostedState.snapshot.viewModel.endNodeDrag(id, translation: translation)
     case .group(let id):
       hostedState.snapshot.viewModel.endGroupDrag(id, translation: translation)
+    case .edge:
+      break
     }
     return true
   }
@@ -256,6 +261,8 @@ extension PolicyCanvasNativeDocumentView {
       return .node(id)
     case .group(let id):
       return .group(id)
+    case .edge(let id):
+      return .edge(id)
     case .port:
       return nil
     }
@@ -264,10 +271,11 @@ extension PolicyCanvasNativeDocumentView {
   func pointerTarget(at point: CGPoint) -> PointerTarget? {
     let contentPoint = contentPoint(fromWorkspacePoint: point)
     guard
-      let hitTarget = hostedState.snapshot.viewModel.canvasHitTarget(
+      let hitTarget = hostedState.snapshot.viewModel.canvasPointerHitTarget(
         at: contentPoint,
         portVisibility: hostedState.snapshot.portVisibility,
-        portMarkerLayout: hostedState.snapshot.portMarkerLayout
+        portMarkerLayout: hostedState.snapshot.portMarkerLayout,
+        routes: hostedState.snapshot.routes
       )
     else {
       return nil
@@ -286,6 +294,8 @@ extension PolicyCanvasNativeDocumentView {
       selection = .node(id)
     case .group(let id):
       selection = .group(id)
+    case .edge(let id):
+      selection = .edge(id)
     }
     if extending {
       hostedState.snapshot.viewModel.extendSelection(selection)
@@ -300,6 +310,8 @@ extension PolicyCanvasNativeDocumentView {
       hostedState.snapshot.openEditor(.node(id))
     case .group(let id):
       hostedState.snapshot.openEditor(.group(id))
+    case .edge(let id):
+      hostedState.snapshot.openEditor(.edge(id))
     }
   }
 

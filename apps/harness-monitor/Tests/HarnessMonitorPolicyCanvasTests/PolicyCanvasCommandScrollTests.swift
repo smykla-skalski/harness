@@ -124,14 +124,27 @@ struct PolicyCanvasCommandScrollTests {
     let coordinatorSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
     )
+    let hostedContentSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewport+HostedContent.swift"
+    )
+    let focusPlanSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewport+FocusPlans.swift"
+    )
     let nativeHostSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewportNativeHost.swift"
     )
     let nativeScrollViewSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasNativeScrollView.swift"
     )
+    let nativeHostingViewSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNativeHostingView.swift"
+    )
+    let centeringClipSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasCenteringClipView.swift"
+    )
 
-    #expect(source.contains("PolicyCanvasViewportNativeHost("))
+    #expect(hostedContentSource.contains("PolicyCanvasViewportNativeHost("))
+    #expect(hostedContentSource.contains(".frame(maxWidth: .infinity, maxHeight: .infinity)"))
     #expect(!source.contains("ScrollView([.horizontal, .vertical])"))
     #expect(!source.contains(".scaleEffect(viewModel.zoom"))
     #expect(!source.contains("PolicyCanvasViewportScrollApplicator("))
@@ -143,7 +156,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!source.contains("ScrollViewReader {"))
     #expect(source.contains(".task(id: selectionFocusRequest?.id)"))
     #expect(source.contains("let hostedSnapshot = policyCanvasViewportHostedSnapshot("))
-    #expect(source.contains("let selectionAnchorPoint ="))
+    #expect(focusPlanSource.contains("let selectionAnchorPoint ="))
     #expect(source.contains("onZoomChange: { zoom in"))
     #expect(!source.contains("content: AnyView("))
     #expect(coordinatorSource.contains("struct PolicyCanvasViewportHostedSnapshot"))
@@ -151,13 +164,25 @@ struct PolicyCanvasCommandScrollTests {
     #expect(coordinatorSource.contains("final class PolicyCanvasViewportHostedState"))
     #expect(coordinatorSource.contains("struct PolicyCanvasViewportHostedRoot: View"))
     #expect(nativeHostSource.contains("struct PolicyCanvasViewportNativeHost: NSViewRepresentable"))
+    #expect(nativeHostSource.contains("func sizeThatFits("))
     #expect(nativeScrollViewSource.contains("final class PolicyCanvasNativeScrollView"))
-    #expect(nativeScrollViewSource.contains("final class PolicyCanvasCenteringClipView"))
+    #expect(nativeScrollViewSource.contains("override var intrinsicContentSize: NSSize"))
+    #expect(nativeScrollViewSource.contains("override var fittingSize: NSSize"))
+    #expect(nativeHostingViewSource.contains("func policyCanvasFixedFittingSize("))
+    #expect(nativeHostingViewSource.contains("sizingOptions = []"))
+    #expect(nativeHostingViewSource.contains("override func layout()"))
+    #expect(nativeHostingViewSource.contains("guard requiresHostedLayout"))
+    #expect(nativeHostingViewSource.contains("func replaceRootView("))
+    #expect(coordinatorSource.contains("guard workspaceLayout != self.workspaceLayout else"))
+    #expect(coordinatorSource.contains("guard frame.size != size || hostingView.frame.size != size"))
+    #expect(coordinatorSource.contains("if hostingView.frame != bounds"))
+    #expect(nativeScrollViewSource.contains("PolicyCanvasCenteringClipView()"))
+    #expect(centeringClipSource.contains("final class PolicyCanvasCenteringClipView"))
     #expect(nativeScrollViewSource.contains("ensureDocumentRoot("))
     #expect(nativeScrollViewSource.contains("hostedDocumentView.rebind(state: state)"))
     #expect(
       coordinatorSource.contains(
-        "hostingView.rootView = PolicyCanvasViewportHostedRoot(state: state)"))
+        "hostingView.replaceRootView(PolicyCanvasViewportHostedRoot(state: state))"))
     #expect(nativeScrollViewSource.contains("setMagnification(targetZoom, centeredAt: anchor)"))
     #expect(
       nativeScrollViewSource.contains("documentView.convert(event.locationInWindow, from: nil)"))
@@ -311,21 +336,25 @@ struct PolicyCanvasCommandScrollTests {
 
   @Test("canvas pane switching restores stored viewport before delayed first-open centering")
   func canvasPaneSwitchingRestoresStoredViewportBeforeDelayedFirstOpenCentering() throws {
-    let source =
+    let workspaceSource =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
-    let centeringFunction = try sourceFunction(
-      named: "private func centerViewportIfNeeded",
-      in: source
+    let focusPlanSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewport+FocusPlans.swift"
+    )
+    let centeringPlanFunction = try sourceFunction(
+      named: "func policyCanvasViewportCenteringPlan",
+      in: focusPlanSource
     )
     let restoreOffset =
-      centeringFunction.range(of: "requestViewportScroll(to: restoredViewportOrigin")?.lowerBound
-      ?? centeringFunction.endIndex
+      centeringPlanFunction.range(of: "anchorPoint: restoredViewportOrigin")?.lowerBound
+      ?? centeringPlanFunction.endIndex
     let delayedFallbackOffset =
-      centeringFunction.range(of: "Task { @MainActor in")?.lowerBound
-      ?? centeringFunction.startIndex
+      centeringPlanFunction.range(of: "defersScrollUntilNextRunloop: true")?.lowerBound
+      ?? centeringPlanFunction.startIndex
 
-    #expect(centeringFunction.contains("requestViewportScroll(to: restoredViewportOrigin"))
-    #expect(centeringFunction.contains("await Task.yield()"))
+    #expect(centeringPlanFunction.contains("anchorPoint: restoredViewportOrigin"))
+    #expect(workspaceSource.contains("if plan.defersScrollUntilNextRunloop"))
+    #expect(workspaceSource.contains("await Task.yield()"))
     #expect(restoreOffset < delayedFallbackOffset)
   }
 
@@ -339,9 +368,12 @@ struct PolicyCanvasCommandScrollTests {
     )
     let workspaceSource =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
-    let centeringFunction = try sourceFunction(
-      named: "private func centerViewportIfNeeded",
-      in: workspaceSource
+    let focusPlanSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewport+FocusPlans.swift"
+    )
+    let centeringPlanFunction = try sourceFunction(
+      named: "func policyCanvasViewportCenteringPlan",
+      in: focusPlanSource
     )
 
     #expect(sceneStorageSource.contains("var viewportOriginX: Double?"))
@@ -351,14 +383,14 @@ struct PolicyCanvasCommandScrollTests {
     #expect(layoutSource.contains("persistSceneStorageIfNeeded(viewportState, for: identity)"))
     #expect(workspaceSource.contains("persistViewportState(observedState, observedIdentity)"))
     #expect(
-      centeringFunction.contains(
-        "let usesRestoredViewportState = viewModel.viewportCenteringBehavior.usesRestoredViewportOrigin"
+      centeringPlanFunction.contains(
+        "let usesRestoredViewportState =\n    input.viewModel.viewportCenteringBehavior.usesRestoredViewportOrigin"
       )
     )
-    #expect(centeringFunction.contains("restoredSceneState == nil || !usesRestoredViewportState"))
-    #expect(centeringFunction.contains("if usesRestoredViewportState, let restoredViewportOrigin"))
-    #expect(centeringFunction.contains("requestViewportScroll(to: restoredViewportOrigin"))
-    #expect(centeringFunction.contains("policyCanvasInitialViewportDocumentAnchorPoint"))
+    #expect(centeringPlanFunction.contains("restoredSceneState == nil || !usesRestoredViewportState"))
+    #expect(centeringPlanFunction.contains("if usesRestoredViewportState, let restoredViewportOrigin"))
+    #expect(centeringPlanFunction.contains("anchorPoint: restoredViewportOrigin"))
+    #expect(centeringPlanFunction.contains("policyCanvasInitialViewportDocumentAnchorPoint"))
   }
 
   @Test("deferred viewport observations persist under their originating canvas")
@@ -380,7 +412,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(
       nativeHostSource.contains("pendingObservedState = (currentViewportIdentity, observedState)")
     )
-    #expect(nativeHostSource.contains("self.onViewportChange?(pending.state, pending.identity)"))
+    #expect(nativeHostSource.contains("onViewportChange?(pending.state, pending.identity)"))
   }
 
   @Test("minimap switch snapshots use identity-scoped viewport state")
@@ -457,7 +489,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!gridSource.contains("fillEllipse"))
   }
 
-  @Test("viewport delivery is deferred off the representable update pass and coalesced")
+  @Test("viewport delivery is deferred off the representable update pass and debounced")
   func viewportDeliveryIsDeferredOffTheRepresentableUpdatePass() throws {
     let nativeHostSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewportNativeHost.swift"
@@ -471,12 +503,124 @@ struct PolicyCanvasCommandScrollTests {
     // Still deferred off the AppKit scroll-layout pass via a main-actor hop.
     #expect(nativeHostSource.contains("Task { @MainActor in"))
     // Coalesced: keep only the latest state and drain it once per scheduled
-    // hop instead of spawning a Task per scroll callback.
+    // debounce instead of spawning a publish per scroll callback.
     #expect(
       nativeHostSource.contains("pendingObservedState = (currentViewportIdentity, observedState)")
     )
-    #expect(nativeHostSource.contains("guard !hasScheduledViewportFlush else"))
-    #expect(nativeHostSource.contains("self.onViewportChange?(pending.state, pending.identity)"))
+    #expect(nativeHostSource.contains("private static let viewportChangeDebounceDelayNanoseconds"))
+    #expect(nativeHostSource.contains("viewportFlushTask?.cancel()"))
+    #expect(nativeHostSource.contains("flushPendingViewportChange()"))
+    #expect(nativeHostSource.contains("onViewportChange?(pending.state, pending.identity)"))
+  }
+
+  @Test("live viewport observation stays out of core graph layers")
+  func liveViewportObservationStaysOutOfCoreGraphLayers() throws {
+    let minimapViewportSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasMinimapViewportOverlay.swift"
+    )
+    let nodeLayerSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNodeLayer.swift"
+    )
+    let edgeLayerSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEdgeLayers.swift"
+    )
+    let simulationLayerSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasSimulationLayer.swift"
+    )
+
+    #expect(minimapViewportSource.contains("observationStore.observedState(for: viewportIdentity)"))
+    #expect(!nodeLayerSource.contains("policyCanvasViewportCullRect("))
+    #expect(!edgeLayerSource.contains("policyCanvasViewportCullRect("))
+    #expect(!simulationLayerSource.contains("policyCanvasViewportCullRect("))
+    #expect(!nodeLayerSource.contains("PolicyCanvasViewportObservationStore"))
+    #expect(!edgeLayerSource.contains("PolicyCanvasViewportObservationStore"))
+    #expect(!simulationLayerSource.contains("PolicyCanvasViewportObservationStore"))
+  }
+
+  @Test("native document hit testing uses cheap pointer target lookup")
+  func nativeDocumentHitTestingUsesCheapPointerTargetLookup() throws {
+    let pointerRoutingSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNativeDocumentView+PointerRouting.swift"
+    )
+    let scrollCoordinatorSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    )
+    let hitTestingSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewModel+HitTesting.swift"
+    )
+    let pointerTargetFunction = try sourceFunction(
+      named: "func pointerTarget(at point: CGPoint)",
+      in: pointerRoutingSource
+    )
+    let cheapHitTargetFunction = try sourceFunction(
+      named: "func canvasPointerHitTarget",
+      in: hitTestingSource
+    )
+
+    #expect(pointerTargetFunction.contains("canvasPointerHitTarget("))
+    #expect(!pointerTargetFunction.contains("canvasHitTarget("))
+    #expect(scrollCoordinatorSource.contains("guard shouldAllowSwiftUIPortHitTesting else"))
+    #expect(scrollCoordinatorSource.contains("case .leftMouseDown, .leftMouseDragged"))
+    #expect(scrollCoordinatorSource.contains("if case .port = hostedState.snapshot.viewModel.canvasPointerHitTarget("))
+    #expect(scrollCoordinatorSource.contains("return self"))
+    #expect(cheapHitTargetFunction.contains("nodeFrame.insetBy("))
+    #expect(cheapHitTargetFunction.contains("canvasPortHitTarget(\n          at: point,\n          node: node,"))
+    #expect(cheapHitTargetFunction.contains("canvasEdgeHitTarget(at: point, routes: routes)"))
+  }
+
+  @Test("dense graph primitives do not install SwiftUI hover or tooltip responders")
+  func denseGraphPrimitivesDoNotInstallSwiftUIHoverOrTooltipResponders() throws {
+    let interactiveEdgeSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasInteractiveEdge.swift"
+    )
+    let nodeLayerSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNodeLayer.swift"
+    )
+    let portViewSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasPortViews.swift"
+    )
+    let simulationLayerSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasSimulationLayer.swift"
+    )
+
+    #expect(!interactiveEdgeSource.contains(".onHover"))
+    #expect(!interactiveEdgeSource.contains(".help("))
+    #expect(!nodeLayerSource.contains(".onHover"))
+    #expect(!portViewSource.contains(".help("))
+    #expect(!simulationLayerSource.contains(".help("))
+  }
+
+  @Test("dense graphs render animated edges statically")
+  func denseGraphsRenderAnimatedEdgesStatically() throws {
+    let edgeLayerSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEdgeLayers.swift"
+    )
+    let interactiveEdgeSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasInteractiveEdge.swift"
+    )
+
+    #expect(edgeLayerSource.contains("private let policyCanvasAnimatedEdgeTimelineLimit"))
+    #expect(edgeLayerSource.contains("private let policyCanvasDenseEdgeCanvasLimit"))
+    #expect(edgeLayerSource.contains("PolicyCanvasDenseEdgeCanvas("))
+    #expect(edgeLayerSource.contains("private struct PolicyCanvasDenseEdgeCanvas: View"))
+    #expect(edgeLayerSource.contains("Canvas { context, _ in"))
+    #expect(
+      edgeLayerSource.contains(
+        "let allowsAnimatedEdgeTimelines = edges.count <= policyCanvasAnimatedEdgeTimelineLimit"
+      )
+    )
+    #expect(edgeLayerSource.contains("isAnimated: edge.isAnimated && allowsAnimatedEdgeTimelines"))
+    #expect(edgeLayerSource.contains("private let policyCanvasSwiftUIEdgeContextMenuLimit"))
+    #expect(
+      edgeLayerSource.contains(
+        "let allowsSwiftUIEdgeContextMenus = edges.count <= policyCanvasSwiftUIEdgeContextMenuLimit"
+      )
+    )
+    #expect(edgeLayerSource.contains("allowsContextMenu: allowsSwiftUIEdgeContextMenus"))
+    #expect(edgeLayerSource.contains(".equatable()"))
+    #expect(interactiveEdgeSource.contains("struct PolicyCanvasInteractiveEdge: View, Equatable"))
+    #expect(interactiveEdgeSource.contains("nonisolated static func == ("))
+    #expect(interactiveEdgeSource.contains("func policyCanvasEdgeContextMenu("))
   }
 
   @Test("native host retries a pending scroll request until the viewport is ready")
@@ -522,7 +666,7 @@ struct PolicyCanvasCommandScrollTests {
       throw CocoaError(.fileReadCorruptFile)
     }
     let remaining = source[start.upperBound...]
-    let endMarkers = ["\n  func ", "\n  private func "]
+    let endMarkers = ["\nfunc ", "\n  func ", "\n  private func "]
     let end =
       endMarkers
       .compactMap { remaining.range(of: $0)?.lowerBound }

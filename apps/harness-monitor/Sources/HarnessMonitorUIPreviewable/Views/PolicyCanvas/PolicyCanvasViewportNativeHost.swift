@@ -67,9 +67,23 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     context.coordinator.applyPendingRequest(on: scrollView)
   }
 
+  func sizeThatFits(
+    _ proposal: ProposedViewSize,
+    nsView scrollView: PolicyCanvasNativeScrollView,
+    context _: Context
+  ) -> CGSize? {
+    let width = proposal.width ?? scrollView.bounds.width
+    let height = proposal.height ?? scrollView.bounds.height
+    guard width.isFinite, height.isFinite, width > 0, height > 0 else {
+      return nil
+    }
+    return CGSize(width: width, height: height)
+  }
+
   @MainActor
   final class Coordinator {
-    private static let zoomChangeCoalescingDelayNanoseconds: UInt64 = 50_000_000
+    private static let zoomChangeDebounceDelayNanoseconds: UInt64 = 120_000_000
+    private static let viewportChangeDebounceDelayNanoseconds: UInt64 = 120_000_000
 
     let hostedState: PolicyCanvasViewportHostedState
     var onFulfillRequest: ((PolicyCanvasViewportScrollRequest, Bool) -> Void)?
@@ -83,11 +97,10 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     // writes behind that path so trackpad zoom does not rebuild canvas chrome
     // once per high-frequency magnify event.
     private var pendingZoom: CGFloat?
-    private var hasScheduledZoomFlush = false
-    private var zoomFlushGeneration: UInt64 = 0
+    private var zoomFlushTask: Task<Void, Never>?
     private var isRetryScheduled = false
     private var pendingObservedState: (identity: String?, state: PolicyCanvasViewportObservedState)?
-    private var hasScheduledViewportFlush = false
+    private var viewportFlushTask: Task<Void, Never>?
 
     init(
       snapshot: PolicyCanvasViewportHostedSnapshot,
@@ -100,6 +113,11 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
         viewportIdentity: viewportIdentity
       )
       currentViewportIdentity = viewportIdentity
+    }
+
+    deinit {
+      zoomFlushTask?.cancel()
+      viewportFlushTask?.cancel()
     }
 
     func updateRequest(_ request: PolicyCanvasViewportScrollRequest?) {
@@ -121,25 +139,14 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
       guard onViewportChange != nil else {
         return
       }
-      // Coalesce. `reportViewportStateIfNeeded` fires from several AppKit
-      // callbacks per scroll frame (scrollWheel + reflectScrolledClipView),
-      // and the hop off the AppKit layout pass is still required so the
-      // observable write does not land mid-scroll-layout. Keep only the latest
-      // state and drain it with a single scheduled hop instead of spawning a
-      // Task per call, so a fast scroll cannot pile up redundant flushes.
+      // Debounce. `reportViewportStateIfNeeded` fires from several AppKit
+      // callbacks per scroll frame. AppKit already moves and magnifies the
+      // document live; publishing every observed rect back into SwiftUI wakes
+      // the minimap/scene-storage path during the gesture and can trigger
+      // full GraphHost transactions. Keep the latest state and publish the
+      // trailing value after the interaction burst.
       pendingObservedState = (currentViewportIdentity, observedState)
-      guard !hasScheduledViewportFlush else {
-        return
-      }
-      hasScheduledViewportFlush = true
-      Task { @MainActor in
-        self.hasScheduledViewportFlush = false
-        guard let pending = self.pendingObservedState else {
-          return
-        }
-        self.pendingObservedState = nil
-        self.onViewportChange?(pending.state, pending.identity)
-      }
+      scheduleViewportFlush()
     }
 
     func applyModelZoomIfNeeded(
@@ -158,20 +165,15 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     }
 
     private var hasDeferredUserZoom: Bool {
-      pendingZoom != nil || hasScheduledZoomFlush
+      pendingZoom != nil || zoomFlushTask != nil
     }
 
     private func scheduleZoomFlushIfNeeded() {
-      guard !hasScheduledZoomFlush else {
-        return
-      }
-      hasScheduledZoomFlush = true
-      zoomFlushGeneration &+= 1
-      let generation = zoomFlushGeneration
-      Task { @MainActor in
+      zoomFlushTask?.cancel()
+      zoomFlushTask = Task { @MainActor in
         try? await Task.sleep(
-          nanoseconds: Self.zoomChangeCoalescingDelayNanoseconds)
-        guard generation == self.zoomFlushGeneration else {
+          nanoseconds: Self.zoomChangeDebounceDelayNanoseconds)
+        guard !Task.isCancelled else {
           return
         }
         self.flushPendingZoomChange()
@@ -179,12 +181,33 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     }
 
     private func flushPendingZoomChange() {
-      hasScheduledZoomFlush = false
+      zoomFlushTask = nil
       guard let zoom = pendingZoom else {
         return
       }
       pendingZoom = nil
       onZoomChange?(zoom)
+    }
+
+    private func scheduleViewportFlush() {
+      viewportFlushTask?.cancel()
+      viewportFlushTask = Task { @MainActor in
+        try? await Task.sleep(
+          nanoseconds: Self.viewportChangeDebounceDelayNanoseconds)
+        guard !Task.isCancelled else {
+          return
+        }
+        self.flushPendingViewportChange()
+      }
+    }
+
+    private func flushPendingViewportChange() {
+      viewportFlushTask = nil
+      guard let pending = pendingObservedState else {
+        return
+      }
+      pendingObservedState = nil
+      onViewportChange?(pending.state, pending.identity)
     }
 
     func applyPendingRequest(on scrollView: PolicyCanvasNativeScrollView) {

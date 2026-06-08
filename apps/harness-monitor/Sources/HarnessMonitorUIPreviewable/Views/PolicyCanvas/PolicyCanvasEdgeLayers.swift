@@ -1,6 +1,10 @@
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
+private let policyCanvasAnimatedEdgeTimelineLimit = 24
+private let policyCanvasDenseEdgeCanvasLimit = 24
+private let policyCanvasSwiftUIEdgeContextMenuLimit = 24
+
 struct PolicyCanvasEdgeLayer: View {
   let viewModel: PolicyCanvasViewModel
   /// Focus binding passed from the canvas root so the stroke layer owns
@@ -17,8 +21,6 @@ struct PolicyCanvasEdgeLayer: View {
   let routes: [String: PolicyCanvasEdgeRoute]
   let labelPositions: [String: CGPoint]
   let accessibilityLabelsByEdgeID: [String: String]
-  let observationStore: PolicyCanvasViewportObservationStore
-  let viewportIdentity: String?
   let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   @Environment(\.fontScale)
   private var fontScale
@@ -31,66 +33,93 @@ struct PolicyCanvasEdgeLayer: View {
     let severityMap = viewModel.edgeSeverityMap
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
     let routingHints = viewModel.routingHints
-    let cullRect = policyCanvasViewportCullRect(
-      observationStore: observationStore,
-      viewportIdentity: viewportIdentity
-    )
+    let allowsAnimatedEdgeTimelines = edges.count <= policyCanvasAnimatedEdgeTimelineLimit
+    let allowsSwiftUIEdgeContextMenus = edges.count <= policyCanvasSwiftUIEdgeContextMenuLimit
     ZStack(alignment: .topLeading) {
-      ForEach(edges) { edge in
-        if let route = routes[edge.id], policyCanvasRouteIsVisible(route, in: cullRect) {
-          let severity = severityMap[edge.id]
-          let isSelected = viewModel.selection == .edge(edge.id)
-          let hint = routingHints?.edgeHint(for: edge.id)
-          let bundleOrdinal = hint?.bundleOrdinal ?? 0
-          let bundleSize = hint?.bundleSize ?? 1
-          let labelGapFrames = policyCanvasLabelGapFrames(
-            edge: edge,
-            position: labelPositions[edge.id],
-            metrics: metrics
-          )
-          PolicyCanvasInteractiveEdge(
-            route: route,
-            labelGapFrames: labelGapFrames,
-            color: strokeColor(
-              for: edge,
-              severity: severity,
+      if edges.count > policyCanvasDenseEdgeCanvasLimit {
+        PolicyCanvasDenseEdgeCanvas(
+          edges: edges,
+          routes: routes,
+          labelPositions: labelPositions,
+          severityMap: severityMap,
+          routingHints: routingHints,
+          selectedEdgeID: selectedEdgeID,
+          metrics: metrics,
+          colorScheme: colorScheme
+        )
+        .frame(
+          width: viewModel.canvasContentSize.width,
+          height: viewModel.canvasContentSize.height,
+          alignment: .topLeading
+        )
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+      } else {
+        ForEach(edges) { edge in
+          if let route = routes[edge.id] {
+            let severity = severityMap[edge.id]
+            let isSelected = viewModel.selection == .edge(edge.id)
+            let hint = routingHints?.edgeHint(for: edge.id)
+            let bundleOrdinal = hint?.bundleOrdinal ?? 0
+            let bundleSize = hint?.bundleSize ?? 1
+            let labelGapFrames = policyCanvasLabelGapFrames(
+              edge: edge,
+              position: labelPositions[edge.id],
+              metrics: metrics
+            )
+            PolicyCanvasInteractiveEdge(
+              route: route,
+              labelGapFrames: labelGapFrames,
+              color: strokeColor(
+                for: edge,
+                severity: severity,
+                isSelected: isSelected,
+                bundleOrdinal: bundleOrdinal,
+                bundleSize: bundleSize
+              ),
+              arrowheadColor: arrowheadColor(
+                for: edge,
+                severity: severity,
+                isSelected: isSelected,
+                bundleOrdinal: bundleOrdinal,
+                bundleSize: bundleSize
+              ),
+              strokeWidth: severity == nil ? 2.0 : 2.4,
               isSelected: isSelected,
-              bundleOrdinal: bundleOrdinal,
-              bundleSize: bundleSize
-            ),
-            arrowheadColor: arrowheadColor(
-              for: edge,
-              severity: severity,
-              isSelected: isSelected,
-              bundleOrdinal: bundleOrdinal,
-              bundleSize: bundleSize
-            ),
-            strokeWidth: severity == nil ? 2.0 : 2.4,
-            isSelected: isSelected,
-            accessibilityLabel: accessibilityLabelsByEdgeID[edge.id]
-              ?? viewModel.accessibilityLabel(for: edge),
-            accessibilityKindWord: edge.kind.accessibilityWord,
-            accessibilityDashDescription: edge.kind.dashDescription,
-            kindDashPattern: policyCanvasBundleRailDashPattern(
-              kindDashPattern: edge.kind.strokeDashPattern,
-              bundleOrdinal: bundleOrdinal,
-              bundleSize: bundleSize
-            ),
-            isAnimated: edge.isAnimated,
-            canvasZoom: viewModel.zoom,
-            accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasEdge(edge.id),
-            accessibilityFocusBinding: focusedComponent,
-            accessibilityFocusValue: .edge(edge.id),
-            onTap: { viewModel.select(.edge(edge.id)) },
-            onDoubleTap: {
-              viewModel.select(.edge(edge.id))
-              openEditor(.edge(edge.id))
-            },
-            onDelete: { viewModel.deleteEdge(edge.id) }
-          )
+              accessibilityLabel: accessibilityLabelsByEdgeID[edge.id]
+                ?? viewModel.accessibilityLabel(for: edge),
+              accessibilityKindWord: edge.kind.accessibilityWord,
+              accessibilityDashDescription: edge.kind.dashDescription,
+              kindDashPattern: policyCanvasBundleRailDashPattern(
+                kindDashPattern: edge.kind.strokeDashPattern,
+                bundleOrdinal: bundleOrdinal,
+                bundleSize: bundleSize
+              ),
+              isAnimated: edge.isAnimated && allowsAnimatedEdgeTimelines,
+              allowsContextMenu: allowsSwiftUIEdgeContextMenus,
+              canvasZoom: viewModel.zoom,
+              accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasEdge(edge.id),
+              accessibilityFocusBinding: focusedComponent,
+              accessibilityFocusValue: .edge(edge.id),
+              onTap: { viewModel.select(.edge(edge.id)) },
+              onDoubleTap: {
+                viewModel.select(.edge(edge.id))
+                openEditor(.edge(edge.id))
+              },
+              onDelete: { viewModel.deleteEdge(edge.id) }
+            )
+            .equatable()
+          }
         }
       }
     }
+  }
+
+  private var selectedEdgeID: String? {
+    guard case .edge(let id) = viewModel.selection else {
+      return nil
+    }
+    return id
   }
 
   private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
@@ -162,6 +191,140 @@ struct PolicyCanvasEdgeLayer: View {
   }
 }
 
+private struct PolicyCanvasDenseEdgeCanvas: View {
+  let edges: [PolicyCanvasEdge]
+  let routes: [String: PolicyCanvasEdgeRoute]
+  let labelPositions: [String: CGPoint]
+  let severityMap: [String: PolicyCanvasIssueSeverity]
+  let routingHints: PolicyCanvasLayoutRoutingHints?
+  let selectedEdgeID: String?
+  let metrics: PolicyCanvasEdgeLabelMetrics
+  let colorScheme: ColorScheme
+
+  var body: some View {
+    Canvas { context, _ in
+      for edge in edges {
+        guard let route = routes[edge.id] else {
+          continue
+        }
+        draw(edge: edge, route: route, into: &context)
+      }
+    }
+  }
+
+  private func draw(
+    edge: PolicyCanvasEdge,
+    route: PolicyCanvasEdgeRoute,
+    into context: inout GraphicsContext
+  ) {
+    let renderedRoute = policyCanvasEndpointTrimmedRoute(
+      route,
+      endpointInset: PolicyCanvasLayout.portDiameter / 2
+    )
+    let hint = routingHints?.edgeHint(for: edge.id)
+    let bundleOrdinal = hint?.bundleOrdinal ?? 0
+    let bundleSize = hint?.bundleSize ?? 1
+    let severity = severityMap[edge.id]
+    let isSelected = selectedEdgeID == edge.id
+    let labelGapFrames = labelGapFrames(edge: edge)
+    let path = PolicyCanvasEdgeShape(route: renderedRoute, gapFrames: labelGapFrames)
+      .path(in: .zero)
+
+    if isSelected {
+      context.stroke(
+        path,
+        with: .color(PolicyCanvasVisualStyle.activeTint.opacity(0.18)),
+        style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
+      )
+    }
+
+    context.stroke(
+      path,
+      with: .color(
+        strokeColor(
+          for: edge,
+          severity: severity,
+          isSelected: isSelected,
+          bundleOrdinal: bundleOrdinal,
+          bundleSize: bundleSize
+        )
+      ),
+      style: StrokeStyle(
+        lineWidth: severity == nil ? 2.0 : 2.4,
+        lineCap: .round,
+        lineJoin: .round,
+        dash: policyCanvasBundleRailDashPattern(
+          kindDashPattern: edge.kind.strokeDashPattern,
+          bundleOrdinal: bundleOrdinal,
+          bundleSize: bundleSize
+        )
+      )
+    )
+
+    context.fill(
+      PolicyCanvasEdgeArrowhead(route: renderedRoute).path(in: .zero),
+      with: .color(
+        arrowheadColor(
+          for: edge,
+          severity: severity,
+          isSelected: isSelected,
+          bundleOrdinal: bundleOrdinal,
+          bundleSize: bundleSize
+        )
+      )
+    )
+  }
+
+  private func labelGapFrames(edge: PolicyCanvasEdge) -> [CGRect] {
+    guard !edge.label.isEmpty, let position = labelPositions[edge.id] else {
+      return []
+    }
+    return [metrics.frame(for: edge.label, center: position)]
+  }
+
+  private func edgeColor(for edge: PolicyCanvasEdge) -> Color {
+    edge.kind.accentColor
+  }
+
+  private func strokeColor(
+    for edge: PolicyCanvasEdge,
+    severity: PolicyCanvasIssueSeverity?,
+    isSelected: Bool,
+    bundleOrdinal: Int,
+    bundleSize: Int
+  ) -> Color {
+    let opacity = PolicyCanvasVisualStyle.edgeStrokeOpacity(colorScheme, isSelected: isSelected)
+    if let severity {
+      return severity.accentColor.opacity(opacity)
+    }
+    let hueOffset = policyCanvasBundleHueOffsetDegrees(
+      bundleOrdinal: bundleOrdinal,
+      bundleSize: bundleSize
+    )
+    let shifted = policyCanvasBundleHueRotated(edgeColor(for: edge), by: hueOffset)
+    return shifted.opacity(opacity)
+  }
+
+  private func arrowheadColor(
+    for edge: PolicyCanvasEdge,
+    severity: PolicyCanvasIssueSeverity?,
+    isSelected: Bool,
+    bundleOrdinal: Int,
+    bundleSize: Int
+  ) -> Color {
+    let opacity = PolicyCanvasVisualStyle.edgeArrowOpacity(colorScheme, isSelected: isSelected)
+    if let severity {
+      return severity.accentColor.opacity(opacity)
+    }
+    let hueOffset = policyCanvasBundleHueOffsetDegrees(
+      bundleOrdinal: bundleOrdinal,
+      bundleSize: bundleSize
+    )
+    let shifted = policyCanvasBundleHueRotated(edgeColor(for: edge), by: hueOffset)
+    return shifted.opacity(opacity)
+  }
+}
+
 struct PolicyCanvasEdgeLabelLayer: View {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
@@ -171,8 +334,6 @@ struct PolicyCanvasEdgeLabelLayer: View {
   let edges: [PolicyCanvasEdge]
   let routes: [String: PolicyCanvasEdgeRoute]
   let labelPositions: [String: CGPoint]
-  let observationStore: PolicyCanvasViewportObservationStore
-  let viewportIdentity: String?
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.colorScheme)
@@ -180,17 +341,12 @@ struct PolicyCanvasEdgeLabelLayer: View {
 
   var body: some View {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
-    let cullRect = policyCanvasViewportCullRect(
-      observationStore: observationStore,
-      viewportIdentity: viewportIdentity
-    )
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
         if !edge.label.isEmpty, let route = routes[edge.id] {
           let labelPosition = labelPositions[edge.id] ?? route.labelPosition
           let labelSize = metrics.size(for: edge.label)
-          if policyCanvasLabelIsVisible(center: labelPosition, size: labelSize, in: cullRect) {
-            Button {
+          Button {
             viewModel.select(.edge(edge.id))
           } label: {
             Text(edge.label)
@@ -222,7 +378,6 @@ struct PolicyCanvasEdgeLabelLayer: View {
             Button("Delete edge", role: .destructive) {
               viewModel.deleteEdge(edge.id)
             }
-          }
           }
         }
       }

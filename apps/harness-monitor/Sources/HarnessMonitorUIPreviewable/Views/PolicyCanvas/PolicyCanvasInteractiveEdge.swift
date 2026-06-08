@@ -7,7 +7,7 @@ import SwiftUI
 ///    unlabeled edges had no mouse selection path at all.
 /// 2. Selection used a 12% opacity delta that disappeared on a busy canvas.
 /// 3. Direction was not encoded; arrowhead now carries it.
-struct PolicyCanvasInteractiveEdge: View {
+struct PolicyCanvasInteractiveEdge: View, Equatable {
   let route: PolicyCanvasEdgeRoute
   let labelGapFrames: [CGRect]
   let color: Color
@@ -29,11 +29,9 @@ struct PolicyCanvasInteractiveEdge: View {
   /// becomes both visible (pattern) and audible (value) - color is no
   /// longer the sole differentiator.
   let accessibilityKindWord: String
-  /// Plain-English name for the static dash pattern, surfaced to sighted
-  /// users in the hover tooltip and to AT users in the legend swatch
-  /// `accessibilityLabel`. Drawn from `PolicyCanvasEdgeKind.dashDescription` at the
-  /// call site so the legend and the tooltip share one vocabulary instead
-  /// of three.
+  /// Plain-English name for the static dash pattern. Drawn from
+  /// `PolicyCanvasEdgeKind.dashDescription` at the call site so any
+  /// accessibility and legend surfaces share one vocabulary.
   let accessibilityDashDescription: String
   /// Static dash pattern bound to the edge kind. Empty for `.flow` (solid
   /// stroke); wider gaps for `.control` (occasional condition); tighter
@@ -42,6 +40,7 @@ struct PolicyCanvasInteractiveEdge: View {
   /// otherwise this pattern is what the user sees.
   let kindDashPattern: [CGFloat]
   let isAnimated: Bool
+  let allowsContextMenu: Bool
   /// Canvas zoom factor read from `viewModel.zoom` at the call site. Used
   /// to clamp the dash-march apparent velocity per
   /// `PolicyCanvasEdgeAnimation.effectiveVelocity(canvasZoom:)`. Defaults
@@ -68,7 +67,27 @@ struct PolicyCanvasInteractiveEdge: View {
   let onDoubleTap: () -> Void
   let onDelete: () -> Void
 
-  @State private var isHovering = false
+  nonisolated static func == (
+    lhs: PolicyCanvasInteractiveEdge,
+    rhs: PolicyCanvasInteractiveEdge
+  ) -> Bool {
+    lhs.route == rhs.route
+      && lhs.labelGapFrames == rhs.labelGapFrames
+      && lhs.color == rhs.color
+      && lhs.arrowheadColor == rhs.arrowheadColor
+      && lhs.strokeWidth == rhs.strokeWidth
+      && lhs.isSelected == rhs.isSelected
+      && lhs.accessibilityLabel == rhs.accessibilityLabel
+      && lhs.accessibilityKindWord == rhs.accessibilityKindWord
+      && lhs.accessibilityDashDescription == rhs.accessibilityDashDescription
+      && lhs.kindDashPattern == rhs.kindDashPattern
+      && lhs.isAnimated == rhs.isAnimated
+      && lhs.allowsContextMenu == rhs.allowsContextMenu
+      && lhs.canvasZoom == rhs.canvasZoom
+      && lhs.accessibilityIdentifier == rhs.accessibilityIdentifier
+      && lhs.accessibilityFocusValue == rhs.accessibilityFocusValue
+  }
+
   @Environment(\.policyCanvasReducedMotion)
   private var canvasReducedMotion
   @Environment(\.accessibilityReduceMotion)
@@ -96,6 +115,7 @@ struct PolicyCanvasInteractiveEdge: View {
     accessibilityDashDescription: String,
     kindDashPattern: [CGFloat] = [],
     isAnimated: Bool = false,
+    allowsContextMenu: Bool = true,
     canvasZoom: CGFloat = 1,
     accessibilityIdentifier: String,
     accessibilityFocusBinding: AccessibilityFocusState<PolicyCanvasSelection?>.Binding,
@@ -115,6 +135,7 @@ struct PolicyCanvasInteractiveEdge: View {
     self.accessibilityDashDescription = accessibilityDashDescription
     self.kindDashPattern = kindDashPattern
     self.isAnimated = isAnimated
+    self.allowsContextMenu = allowsContextMenu
     self.canvasZoom = canvasZoom
     self.accessibilityIdentifier = accessibilityIdentifier
     self.accessibilityFocusBinding = accessibilityFocusBinding
@@ -140,18 +161,19 @@ struct PolicyCanvasInteractiveEdge: View {
           .blendMode(.plusLighter)
       }
       strokeLayer(route: renderedRoute)
+        .allowsHitTesting(false)
       PolicyCanvasEdgeArrowhead(route: renderedRoute)
         .fill(arrowheadColor)
+        .allowsHitTesting(false)
     }
     .contentShape(PolicyCanvasEdgeHitShape(route: route))
-    .onHover { isHovering = $0 }
     .onTapGesture(perform: onTap)
     .onTapGesture(count: 2, perform: onDoubleTap)
-    .help(hoverHelpString)
-    .contextMenu {
-      Button("Edit", action: onDoubleTap)
-      Button("Delete edge", role: .destructive, action: onDelete)
-    }
+    .policyCanvasEdgeContextMenu(
+      enabled: allowsContextMenu,
+      onDoubleTap: onDoubleTap,
+      onDelete: onDelete
+    )
     .accessibilityElement(children: .ignore)
     .accessibilityIdentifier(accessibilityIdentifier)
     .accessibilityFocused(accessibilityFocusBinding, equals: accessibilityFocusValue)
@@ -170,18 +192,6 @@ struct PolicyCanvasInteractiveEdge: View {
   /// strokes alike.
   private var selectionHaloColor: Color {
     PolicyCanvasVisualStyle.activeTint.opacity(0.18)
-  }
-
-  /// Hover tooltip surfacing the kind word + dash-pattern key so sighted
-  /// users hovering an edge see what VoiceOver hears AND can decode the
-  /// stroke style without a legend lookup. Shape is
-  /// `<source-to-target> (<kind>, <dash-key>)`. The dash key is passed in
-  /// from `PolicyCanvasEdgeKind.dashDescription` at the call site so the tooltip,
-  /// the legend swatch label, and the legend row's a11y label all draw
-  /// from the same vocabulary. Without that single source, the previous
-  /// release shipped three different words for the same stroke pattern.
-  private var hoverHelpString: String {
-    "\(accessibilityLabel) (\(accessibilityKindWord), \(accessibilityDashDescription))"
   }
 
   /// VoiceOver value combining the kind word with an "active" suffix when
@@ -255,9 +265,6 @@ struct PolicyCanvasInteractiveEdge: View {
     if isSelected {
       return strokeWidth + 0.8
     }
-    if isHovering {
-      return strokeWidth + 0.3
-    }
     return strokeWidth
   }
 
@@ -268,6 +275,24 @@ struct PolicyCanvasInteractiveEdge: View {
   @MainActor
   static func animatedDashPhase(at date: Date) -> CGFloat {
     PolicyCanvasEdgeAnimation.dashPhase(at: date)
+  }
+}
+
+private extension View {
+  @ViewBuilder
+  func policyCanvasEdgeContextMenu(
+    enabled: Bool,
+    onDoubleTap: @escaping () -> Void,
+    onDelete: @escaping () -> Void
+  ) -> some View {
+    if enabled {
+      contextMenu {
+        Button("Edit", action: onDoubleTap)
+        Button("Delete edge", role: .destructive, action: onDelete)
+      }
+    } else {
+      self
+    }
   }
 }
 
@@ -352,10 +377,16 @@ struct PolicyCanvasEdgeHitShape: Shape {
   var lineWidth: CGFloat = 12
 
   func path(in rect: CGRect) -> Path {
-    PolicyCanvasEdgeShape(route: route)
-      .path(in: rect)
-      .strokedPath(
-        StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
-      )
+    var path = Path()
+    guard let first = route.points.first else {
+      return path
+    }
+    path.move(to: first)
+    for point in route.points.dropFirst() {
+      path.addLine(to: point)
+    }
+    return path.strokedPath(
+      StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+    )
   }
 }

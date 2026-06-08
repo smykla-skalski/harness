@@ -147,6 +147,9 @@ final class PolicyCanvasViewportHostedState {
   }
 
   func update(workspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout) {
+    guard workspaceLayout != self.workspaceLayout else {
+      return
+    }
     self.workspaceLayout = workspaceLayout
   }
 }
@@ -183,8 +186,6 @@ struct PolicyCanvasViewportHostedRoot: View {
             routes: snapshot.routes,
             labelPositions: snapshot.labelPositions,
             accessibilityLabelsByEdgeID: snapshot.accessibilityLabelsByEdgeID,
-            observationStore: state.observationStore,
-            viewportIdentity: state.viewportIdentity,
             openEditor: snapshot.openEditor
           )
           .policyCanvasDocumentLayer(size: snapshot.contentSize)
@@ -202,17 +203,11 @@ struct PolicyCanvasViewportHostedRoot: View {
             nodeValidationIssueMessagesByID: snapshot.nodeValidationIssueMessagesByID,
             portVisibility: snapshot.portVisibility,
             portMarkerLayout: snapshot.portMarkerLayout,
-            observationStore: state.observationStore,
-            viewportIdentity: state.viewportIdentity,
             openEditor: snapshot.openEditor
           )
           .policyCanvasDocumentLayer(size: snapshot.contentSize)
           if snapshot.showSimulationOverlay {
-            PolicyCanvasSimulationLayer(
-              viewModel: snapshot.viewModel,
-              observationStore: state.observationStore,
-              viewportIdentity: state.viewportIdentity
-            )
+            PolicyCanvasSimulationLayer(viewModel: snapshot.viewModel)
               .policyCanvasDocumentLayer(size: snapshot.contentSize)
           }
           PolicyCanvasEdgeLabelLayer(
@@ -220,9 +215,7 @@ struct PolicyCanvasViewportHostedRoot: View {
             focusedComponent: snapshot.focusedComponent,
             edges: snapshot.edges,
             routes: snapshot.routes,
-            labelPositions: snapshot.labelPositions,
-            observationStore: state.observationStore,
-            viewportIdentity: state.viewportIdentity
+            labelPositions: snapshot.labelPositions
           )
           .policyCanvasDocumentLayer(size: snapshot.contentSize)
           // Mounted unconditionally and reading the report live in their own
@@ -278,6 +271,7 @@ final class PolicyCanvasNativeDocumentView: NSView {
   enum PointerTarget: Equatable {
     case node(String)
     case group(String)
+    case edge(String)
 
     var traceDescription: String {
       switch self {
@@ -285,6 +279,8 @@ final class PolicyCanvasNativeDocumentView: NSView {
         "node:\(id)"
       case .group(let id):
         "group:\(id)"
+      case .edge(let id):
+        "edge:\(id)"
       }
     }
   }
@@ -302,8 +298,16 @@ final class PolicyCanvasNativeDocumentView: NSView {
     var didBeginDrag = false
   }
 
-  override var isFlipped: Bool { true }
-  override var isOpaque: Bool { true }
+  nonisolated override var isFlipped: Bool { true }
+  nonisolated override var isOpaque: Bool { true }
+
+  override var intrinsicContentSize: NSSize {
+    NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+  }
+
+  override var fittingSize: NSSize {
+    policyCanvasFixedFittingSize(for: frame.size, fallback: bounds.size)
+  }
 
   private(set) var hostedState: PolicyCanvasViewportHostedState
   let hostingView: PolicyCanvasNativeHostingView
@@ -341,7 +345,9 @@ final class PolicyCanvasNativeDocumentView: NSView {
 
   override func layout() {
     super.layout()
-    hostingView.frame = bounds
+    if hostingView.frame != bounds {
+      hostingView.frame = bounds
+    }
   }
 
   override func viewDidMoveToWindow() {
@@ -362,10 +368,27 @@ final class PolicyCanvasNativeDocumentView: NSView {
     guard bounds.contains(point) else {
       return nil
     }
-    if pointerTarget(at: point) != nil {
+    guard shouldAllowSwiftUIPortHitTesting else {
       return self
     }
-    return super.hitTest(point)
+    let contentPoint = contentPoint(fromWorkspacePoint: point)
+    if case .port = hostedState.snapshot.viewModel.canvasPointerHitTarget(
+      at: contentPoint,
+      portVisibility: hostedState.snapshot.portVisibility,
+      portMarkerLayout: hostedState.snapshot.portMarkerLayout
+    ) {
+      return super.hitTest(point)
+    }
+    return self
+  }
+
+  private var shouldAllowSwiftUIPortHitTesting: Bool {
+    switch NSApp.currentEvent?.type {
+    case .leftMouseDown, .leftMouseDragged, .rightMouseDown, .otherMouseDown:
+      true
+    default:
+      false
+    }
   }
 
   override func mouseDown(with event: NSEvent) {
@@ -427,14 +450,22 @@ final class PolicyCanvasNativeDocumentView: NSView {
       return
     }
     hostedState = state
-    hostingView.rootView = PolicyCanvasViewportHostedRoot(state: state)
+    hostingView.replaceRootView(PolicyCanvasViewportHostedRoot(state: state))
     needsLayout = true
   }
 
   func updateSize(_ size: CGSize) {
+    guard frame.size != size || hostingView.frame.size != size else {
+      return
+    }
+    hostingView.markHostedLayoutRequired()
     frame = CGRect(origin: .zero, size: size)
-    hostingView.frame = bounds
-    needsLayout = true
+    if hostingView.frame != bounds {
+      hostingView.frame = bounds
+    }
+    if !needsLayout {
+      needsLayout = true
+    }
   }
 
   private func configureCanvasRenderingSurface() {

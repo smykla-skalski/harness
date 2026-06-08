@@ -5,6 +5,7 @@ enum PolicyCanvasCanvasHitTarget: Equatable {
   case port(PolicyCanvasPortEndpoint)
   case node(String)
   case group(String)
+  case edge(String)
 }
 
 extension PolicyCanvasViewModel {
