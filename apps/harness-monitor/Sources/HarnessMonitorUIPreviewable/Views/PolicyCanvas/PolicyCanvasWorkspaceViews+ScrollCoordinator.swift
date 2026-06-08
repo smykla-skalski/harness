@@ -196,7 +196,7 @@ struct PolicyCanvasViewportHostedRoot: View {
           if let qualityReport = snapshot.viewModel.qualityInspectionReport {
             PolicyCanvasQualityOverlayLayer(report: qualityReport)
               .policyCanvasDocumentLayer(size: snapshot.contentSize)
-            PolicyCanvasQualityHoverLayer(report: qualityReport)
+            PolicyCanvasQualityHoverLayer(report: qualityReport, viewModel: snapshot.viewModel)
               .policyCanvasDocumentLayer(size: snapshot.contentSize)
           }
         }
