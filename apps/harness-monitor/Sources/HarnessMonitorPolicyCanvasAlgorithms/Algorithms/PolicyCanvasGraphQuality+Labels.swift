@@ -9,14 +9,16 @@ private struct PolicyCanvasLabeledEdge {
 }
 
 /// Measure label problems: two labels overlapping, a label sitting on a foreign
-/// node body, and a label drifted far from its own wire. Label frames are
-/// estimated from text length capped at the layout's max label width, so the
-/// overlap test errs toward the rendered size rather than overstating it.
+/// node body, and a label drifted far from its own wire. Label frames come from
+/// the same `PolicyCanvasEdgeLabelMetrics` the router and renderer use, so the
+/// measured box matches the one drawn on screen instead of a taller, wider
+/// estimate that fabricates overlaps in the gaps between separated labels.
 func policyCanvasMeasureLabels(
   routedEdges: [PolicyCanvasRoutedEdge],
   nodeFramesByID: [String: CGRect],
   thresholds: PolicyCanvasGraphQualityThresholds
 ) -> [PolicyCanvasLabelViolation] {
+  let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
   let labeled =
     routedEdges
     .compactMap { routed -> PolicyCanvasLabeledEdge? in
@@ -26,7 +28,7 @@ func policyCanvasMeasureLabels(
       }
       return PolicyCanvasLabeledEdge(
         edgeID: routed.edge.id,
-        frame: policyCanvasLabelFrame(text: text, center: routed.route.labelPosition),
+        frame: metrics.frame(for: text, center: routed.route.labelPosition),
         position: routed.route.labelPosition,
         route: routed.route,
         endpoints: [routed.edge.source.nodeID, routed.edge.target.nodeID]
@@ -46,7 +48,7 @@ func policyCanvasMeasureLabels(
           kind: .overlap,
           edgeID: lhs.edgeID,
           otherID: rhs.edgeID,
-          frame: lhs.frame.intersection(rhs.frame),
+          frame: lhs.frame.union(rhs.frame),
           distance: 0
         )
       )
@@ -63,7 +65,7 @@ func policyCanvasMeasureLabels(
           kind: .onBody,
           edgeID: item.edgeID,
           otherID: nodeID,
-          frame: item.frame.intersection(frame),
+          frame: item.frame,
           distance: 0
         )
       )
@@ -82,12 +84,6 @@ func policyCanvasMeasureLabels(
     }
   }
   return violations.sorted(by: policyCanvasLabelViolationOrder)
-}
-
-private func policyCanvasLabelFrame(text: String, center: CGPoint) -> CGRect {
-  let width = min(max(24, CGFloat(text.count) * 7 + 16), PolicyCanvasLayout.edgeLabelMaxWidth)
-  let height = PolicyCanvasLayout.edgeLabelHeight
-  return CGRect(x: center.x - width / 2, y: center.y - height / 2, width: width, height: height)
 }
 
 private func policyCanvasPointToRouteDistance(
