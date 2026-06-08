@@ -239,6 +239,28 @@ public struct PolicyCanvasDetourViolation: Equatable, Sendable {
   public var severity: PolicyCanvasQualitySeverity { .warning }
 }
 
+/// A route that doubles back on itself: it travels along one axis, then reverses
+/// and travels the opposite way along that same axis. The reversing segment is
+/// the visible spur - a wire that leaves a port the wrong way and hooks back, or
+/// wraps around to reach a port on the far side. `depth` is how far it backtracks
+/// (the length of the reversing segment); `point` is where the wire turns back
+/// and `returnPoint` is the far end of the spur.
+public struct PolicyCanvasWrongTurnViolation: Equatable, Sendable {
+  public let edgeID: String
+  public let point: CGPoint
+  public let returnPoint: CGPoint
+  public let depth: CGFloat
+
+  public init(edgeID: String, point: CGPoint, returnPoint: CGPoint, depth: CGFloat) {
+    self.edgeID = edgeID
+    self.point = point
+    self.returnPoint = returnPoint
+    self.depth = depth
+  }
+
+  public var severity: PolicyCanvasQualitySeverity { .warning }
+}
+
 /// Two connected node bodies separated by a wide horizontal gap - the layout
 /// placed them far apart with empty space between, forcing a long hauling edge.
 /// `distance` is the gap between their facing vertical edges.

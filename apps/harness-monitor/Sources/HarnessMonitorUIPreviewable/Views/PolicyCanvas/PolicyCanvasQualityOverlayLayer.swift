@@ -24,6 +24,7 @@ struct PolicyCanvasQualityOverlayLayer: View {
       drawNodeOverlaps(into: &context, error: error)
       drawBodyHits(into: &context, error: error)
       drawLabels(into: &context, error: error, warning: warning)
+      drawWrongTurns(into: &context, warning: warning)
       drawCrossings(into: &context, warning: warning)
       drawPortSpacing(into: &context, error: error, warning: warning)
     }
@@ -84,6 +85,48 @@ struct PolicyCanvasQualityOverlayLayer: View {
       style: StrokeStyle(lineWidth: 1.5, dash: [5, 3])
     )
     context.stroke(ticks, with: .color(warning.opacity(0.7)), lineWidth: 1.5)
+  }
+
+  /// An arrow along each backtracking segment, pointing the way the wire wrongly
+  /// doubles back, over a faint wide halo so the reversed wire stays visible.
+  private func drawWrongTurns(into context: inout GraphicsContext, warning: Color) {
+    var halo = Path()
+    var shafts = Path()
+    var heads = Path()
+    for violation in report.wrongTurns {
+      halo.move(to: violation.point)
+      halo.addLine(to: violation.returnPoint)
+      shafts.move(to: violation.point)
+      shafts.addLine(to: violation.returnPoint)
+      heads.addPath(policyCanvasArrowHead(from: violation.point, to: violation.returnPoint, size: 6))
+    }
+    context.stroke(
+      halo,
+      with: .color(warning.opacity(0.2)),
+      style: StrokeStyle(lineWidth: 9, lineCap: .round)
+    )
+    context.stroke(shafts, with: .color(warning.opacity(0.75)), lineWidth: 1.5)
+    context.fill(heads, with: .color(warning.opacity(0.9)))
+  }
+
+  /// A small filled triangle at `end`, pointing along the `start` to `end`
+  /// direction. The segment is axis-aligned, so the arrow points purely left,
+  /// right, up, or down.
+  private func policyCanvasArrowHead(from start: CGPoint, to end: CGPoint, size: CGFloat) -> Path {
+    var path = Path()
+    if abs(end.x - start.x) >= abs(end.y - start.y) {
+      let direction: CGFloat = end.x >= start.x ? 1 : -1
+      path.move(to: end)
+      path.addLine(to: CGPoint(x: end.x - direction * size, y: end.y - size * 0.7))
+      path.addLine(to: CGPoint(x: end.x - direction * size, y: end.y + size * 0.7))
+    } else {
+      let direction: CGFloat = end.y >= start.y ? 1 : -1
+      path.move(to: end)
+      path.addLine(to: CGPoint(x: end.x - size * 0.7, y: end.y - direction * size))
+      path.addLine(to: CGPoint(x: end.x + size * 0.7, y: end.y - direction * size))
+    }
+    path.closeSubpath()
+    return path
   }
 
   /// Filled intersection of any two overlapping node bodies (should never occur).

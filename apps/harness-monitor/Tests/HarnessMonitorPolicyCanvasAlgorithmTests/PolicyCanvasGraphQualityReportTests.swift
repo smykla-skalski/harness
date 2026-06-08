@@ -229,6 +229,42 @@ struct PolicyCanvasGraphQualityReportTests {
     #expect(measure(frames: frames, edges: edges).nodeDistance.isEmpty)
   }
 
+  @Test func backtrackingRouteIsFlaggedAsWrongTurn() {
+    let edges = [edge("a", source: endpoint("s", "o", .output), target: endpoint("t", "i", .input))]
+    // Right 100, down 50, then back left 60 - the wire reverses along the x axis.
+    let routes = [
+      "a": route([
+        CGPoint(x: 0, y: 0), CGPoint(x: 100, y: 0), CGPoint(x: 100, y: 50), CGPoint(x: 40, y: 50),
+      ])
+    ]
+    let report = measure(edges: edges, routes: routes)
+    #expect(report.wrongTurns.count == 1)
+    #expect(report.wrongTurns.first?.edgeID == "a")
+    #expect((report.wrongTurns.first?.depth ?? 0) == 60)
+  }
+
+  @Test func monotoneStaircaseHasNoWrongTurn() {
+    let edges = [edge("a", source: endpoint("s", "o", .output), target: endpoint("t", "i", .input))]
+    let routes = [
+      "a": route([
+        CGPoint(x: 0, y: 0), CGPoint(x: 100, y: 0), CGPoint(x: 100, y: 50),
+        CGPoint(x: 200, y: 50), CGPoint(x: 200, y: 100),
+      ])
+    ]
+    #expect(measure(edges: edges, routes: routes).wrongTurns.isEmpty)
+  }
+
+  @Test func shallowBacktrackWithinPortMarkerIsIgnored() {
+    let edges = [edge("a", source: endpoint("s", "o", .output), target: endpoint("t", "i", .input))]
+    // Reverses by only 8 - below the wrong-turn depth, so it is not a turn.
+    let routes = [
+      "a": route([
+        CGPoint(x: 0, y: 0), CGPoint(x: 100, y: 0), CGPoint(x: 100, y: 50), CGPoint(x: 92, y: 50),
+      ])
+    ]
+    #expect(measure(edges: edges, routes: routes).wrongTurns.isEmpty)
+  }
+
   @Test func reportIsDeterministic() {
     let frames = [
       "n1": CGRect(x: 0, y: 0, width: 168, height: 96),
