@@ -22,12 +22,16 @@ struct PolicyCanvasQualityHoverLayer: View {
   let report: PolicyCanvasGraphQualityReport
   let viewModel: PolicyCanvasViewModel
 
-  @State private var marks: [PolicyCanvasQualityHoverMark] = []
-  @State private var hitArea = Path()
   @State private var hoverPoint: CGPoint?
 
   var body: some View {
-    let active = activeMarks()
+    // Built inline from the passed report so the hit area is never momentarily
+    // empty (an empty `.contentShape` would silently kill hover). `report` only
+    // changes on an off-main recompute, and the body otherwise re-runs only when
+    // `hoverPoint` moves, so this rebuild is the per-hover cost.
+    let marks = policyCanvasQualityHoverMarks(report: report)
+    let active = marks.filter(isUnderPointer)
+    let hitArea = marks.reduce(into: Path()) { $0.addPath($1.path) }
     ZStack {
       Canvas { context, _ in
         let accent = PolicyCanvasVisualStyle.activeTint
@@ -53,39 +57,25 @@ struct PolicyCanvasQualityHoverLayer: View {
         }
         .help(helpText(for: active))
     }
-    .onChange(of: hoverPoint) {
-      publishHoveredCategories()
-    }
-    .onChange(of: report, initial: true) {
-      marks = policyCanvasQualityHoverMarks(report: report)
-      hitArea = marks.reduce(into: Path()) { $0.addPath($1.path) }
-      hoverPoint = nil
-      publishHoveredCategories()
+    .onChange(of: active.map(\.id)) {
+      let categories = Set(active.map(\.category))
+      if viewModel.hoveredQualityCategories != categories {
+        viewModel.hoveredQualityCategories = categories
+      }
     }
     .onDisappear {
       viewModel.hoveredQualityCategories = []
     }
   }
 
-  /// Mirror the marks currently under the pointer into the shared view model as a
-  /// set of categories, so the floating legend lights up the same defects. Only
-  /// writes on an actual change to avoid churning observers as the pointer moves
-  /// within one mark.
-  private func publishHoveredCategories() {
-    let categories = Set(activeMarks().map(\.category))
-    if viewModel.hoveredQualityCategories != categories {
-      viewModel.hoveredQualityCategories = categories
-    }
-  }
-
-  /// Every mark whose geometry sits under the pointer. The bounding-box test
+  /// Whether a mark's geometry sits under the pointer. The bounding-box test
   /// rejects the vast majority cheaply so `Path.contains` runs only on the few
-  /// candidates left, keeping the per-move cost low even on dense graphs.
-  private func activeMarks() -> [PolicyCanvasQualityHoverMark] {
+  /// candidates left.
+  private func isUnderPointer(_ mark: PolicyCanvasQualityHoverMark) -> Bool {
     guard let point = hoverPoint else {
-      return []
+      return false
     }
-    return marks.filter { $0.bounds.contains(point) && $0.path.contains(point) }
+    return mark.bounds.contains(point) && mark.path.contains(point)
   }
 
   /// One block per distinct category under the pointer, first-seen order, so a
