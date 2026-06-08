@@ -559,13 +559,23 @@ struct PolicyCanvasCommandScrollTests {
 
     #expect(pointerTargetFunction.contains("canvasPointerHitTarget("))
     #expect(!pointerTargetFunction.contains("canvasHitTarget("))
-    #expect(scrollCoordinatorSource.contains("guard shouldResolveInteractiveMouseHitTest else"))
+    let hitTestFunction = try sourceFunction(
+      named: "func hitTestTarget(",
+      in: scrollCoordinatorSource
+    )
+    #expect(scrollCoordinatorSource.contains("shouldResolveInteractiveMouseHitTest"))
+    #expect(
+      scrollCoordinatorSource.contains(
+        "hitTestTarget(at: point, allowsSwiftUIPortHitTesting:"
+      )
+    )
     #expect(scrollCoordinatorSource.contains("case .leftMouseDown, .leftMouseDragged"))
-    #expect(scrollCoordinatorSource.contains("case .port:"))
-    #expect(scrollCoordinatorSource.contains("case .node, .group, .edge:"))
-    #expect(scrollCoordinatorSource.contains("case nil:"))
-    #expect(scrollCoordinatorSource.contains("return self"))
-    #expect(scrollCoordinatorSource.contains("return super.hitTest(point)"))
+    #expect(hitTestFunction.contains("guard allowsSwiftUIPortHitTesting else"))
+    #expect(hitTestFunction.contains("if case .port"))
+    #expect(hitTestFunction.contains("return hostingView"))
+    #expect(hitTestFunction.contains("return self"))
+    #expect(!hitTestFunction.contains("routes:"))
+    #expect(!hitTestFunction.contains("super.hitTest(point)"))
     #expect(cheapHitTargetFunction.contains("nodeFrame.insetBy("))
     #expect(cheapHitTargetFunction.contains("canvasPortHitTarget(\n          at: point,\n          node: node,"))
     #expect(cheapHitTargetFunction.contains("canvasEdgeHitTarget(at: point, routes: routes)"))

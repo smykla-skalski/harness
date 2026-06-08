@@ -36,6 +36,55 @@ struct PolicyCanvasNativePointerSelectionTests {
     #expect(marquee.rect == CGRect(x: 20, y: 20, width: 0, height: 0))
   }
 
+  @Test("native hit testing keeps canvas interactions on the document receiver")
+  func nativeHitTestingKeepsCanvasInteractionsOnDocumentReceiver() throws {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let host = try makeHost(viewModel: viewModel)
+
+    defer {
+      host.window.orderOut(nil)
+      host.window.contentView = nil
+    }
+
+    let emptyPoint = workspacePoint(contentPoint: CGPoint(x: 20, y: 20), host: host)
+    let nodePoint = workspacePoint(contentPoint: CGPoint(x: 210, y: 180), host: host)
+    let sourceNode = try #require(viewModel.node("policy-source"))
+    let sourceOutputPoint = workspacePoint(
+      contentPoint: viewModel.portAnchor(
+        for: sourceNode,
+        side: .trailing,
+        index: 0,
+        count: sourceNode.outputPorts.count
+      ),
+      host: host
+    )
+
+    #expect(
+      host.documentView.hitTestTarget(
+        at: emptyPoint,
+        allowsSwiftUIPortHitTesting: true
+      ) === host.documentView
+    )
+    #expect(
+      host.documentView.hitTestTarget(
+        at: nodePoint,
+        allowsSwiftUIPortHitTesting: true
+      ) === host.documentView
+    )
+    #expect(
+      host.documentView.hitTestTarget(
+        at: sourceOutputPoint,
+        allowsSwiftUIPortHitTesting: true
+      ) === host.documentView.hostingView
+    )
+    #expect(
+      host.documentView.hitTestTarget(
+        at: sourceOutputPoint,
+        allowsSwiftUIPortHitTesting: false
+      ) === host.documentView
+    )
+  }
+
   @Test("sub-threshold drag updates marquee before selection changes")
   func subThresholdDragUpdatesMarqueeBeforeSelectionChanges() throws {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -269,10 +318,7 @@ struct PolicyCanvasNativePointerSelectionTests {
     timestamp: TimeInterval,
     eventNumber: Int
   ) throws -> NSEvent {
-    let workspacePoint = CGPoint(
-      x: host.state.workspaceLayout.contentOrigin.x + contentPoint.x,
-      y: host.state.workspaceLayout.contentOrigin.y + contentPoint.y
-    )
+    let workspacePoint = workspacePoint(contentPoint: contentPoint, host: host)
     return try #require(
       NSEvent.mouseEvent(
         with: type,
@@ -285,6 +331,13 @@ struct PolicyCanvasNativePointerSelectionTests {
         clickCount: 1,
         pressure: type == .leftMouseUp ? 0 : 1
       )
+    )
+  }
+
+  private func workspacePoint(contentPoint: CGPoint, host: NativePointerHost) -> CGPoint {
+    CGPoint(
+      x: host.state.workspaceLayout.contentOrigin.x + contentPoint.x,
+      y: host.state.workspaceLayout.contentOrigin.y + contentPoint.y
     )
   }
 
