@@ -151,7 +151,7 @@ private struct PolicyCanvasEdgeRouterKey: EnvironmentKey {
   /// routes for unchanged geometry resolve from the cache instead of
   /// re-running A*. The cache lives for the process lifetime - keys
   /// include the full input so cross-canvas collisions are not possible.
-  /// Capacity is 1024 entries with LRU eviction in
+  /// Capacity is 8192 entries with LRU eviction in
   /// `PolicyCanvasMemoizedRouter`.
   /// Tests that want raw routing characteristics can still inject a bare
   /// `PolicyCanvasVisibilityRouter()` via `.environment(...)`.
