@@ -1,7 +1,7 @@
 /// The single enumeration of graph-quality counters. The deterministic dump, the
 /// regression gates, and the lab metrics panel all derive their numbers from this
 /// list so a category is named, ordered, and counted one way everywhere.
-public enum PolicyCanvasQualityCategory: CaseIterable, Sendable {
+public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Sendable {
   case portOverlaps
   case portTooClose
   case portDetached
@@ -54,6 +54,39 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Sendable {
   /// crossing signal, so it is the gated one.
   public var isGated: Bool {
     self != .crossings
+  }
+
+  /// Plain-language description of the defect, shown in the lab metrics legend so
+  /// a marker on the canvas can be decoded without reading the source.
+  public var detail: String {
+    switch self {
+    case .portOverlaps:
+      "Two port markers on one node side overlap - their dots sit on top of each other"
+    case .portTooClose:
+      "Two port markers on one side are closer than the minimum spacing - the dots crowd"
+    case .portDetached:
+      "A port marker floats off its node edge instead of sitting on the node border"
+    case .corridorReuse:
+      "Two wires share one lane and overlap along it - they stack on the same rail"
+    case .corridorParallel:
+      "Two wires run parallel closer than the minimum lane separation"
+    case .crossings:
+      "Any two wires crossing at a right angle - shown for context, not gated"
+    case .crossingsIndependent:
+      "Wires that share no endpoint node yet still cross - the avoidable crossings"
+    case .bodyHits:
+      "A wire runs through a node body or group-title band that is not its own endpoint"
+    case .longEdges:
+      "A wire spans most of the canvas width - a cross-canvas hauler"
+    case .labelOverlaps:
+      "Two edge labels overlap each other"
+    case .labelOnBody:
+      "An edge label sits on top of a node body"
+    case .labelAdrift:
+      "An edge label drifted far from the wire it names"
+    case .nodeOverlaps:
+      "Two node bodies overlap"
+    }
   }
 }
 
