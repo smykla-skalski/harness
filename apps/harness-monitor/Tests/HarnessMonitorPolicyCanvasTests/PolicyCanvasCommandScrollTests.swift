@@ -235,6 +235,36 @@ struct PolicyCanvasCommandScrollTests {
       !source.contains(".onChange(of: viewModel.viewportCenteringGeneration, initial: false)"))
   }
 
+  @Test("lab viewport surface keeps document import out of SwiftUI init")
+  func labViewportSurfaceDefersDocumentImportOutOfInit() throws {
+    let surfaceSource =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift")
+    let initializer = try sourceFunction(named: "public init(", in: surfaceSource)
+
+    #expect(surfaceSource.contains("@State private var appliedSnapshot:"))
+    #expect(surfaceSource.contains(".task(id: snapshot)"))
+    #expect(surfaceSource.contains("applySurfaceSnapshot(snapshot)"))
+    #expect(surfaceSource.contains("private func applySurfaceSnapshot("))
+    #expect(surfaceSource.contains("PolicyCanvasViewportSurfaceDocumentIdentity"))
+    #expect(
+      initializer.contains("document: nil,\n        simulation: nil,\n        audit: nil,")
+    )
+    #expect(
+      !surfaceSource.contains(
+        """
+        private struct PolicyCanvasViewportSurfaceSnapshot: Equatable {
+          let document: TaskBoardPolicyPipelineDocument?
+          let simulation: TaskBoardPolicyPipelineSimulationResult?
+          let audit: TaskBoardPolicyPipelineAuditSummary?
+        """
+      )
+    )
+    #expect(
+      !initializer.contains("document: document,\n        simulation: simulation,\n        audit: audit,")
+    )
+    #expect(!surfaceSource.contains("documentIdentity: document,"))
+  }
+
   @Test("canvas pane switching uses the persisted document apply path")
   func canvasPaneSwitchingUsesPersistedDocumentApplyPath() throws {
     let selectionPreviewSource = try previewableSourceFile(

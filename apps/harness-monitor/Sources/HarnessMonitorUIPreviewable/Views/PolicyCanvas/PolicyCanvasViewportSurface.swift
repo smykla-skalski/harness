@@ -2,11 +2,80 @@ import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
-private struct PolicyCanvasViewportSurfaceSnapshot: Equatable {
-  let document: TaskBoardPolicyPipelineDocument?
-  let simulation: TaskBoardPolicyPipelineSimulationResult?
-  let audit: TaskBoardPolicyPipelineAuditSummary?
+private struct PolicyCanvasViewportSurfaceSnapshot: Equatable, Sendable {
+  let documentIdentity: PolicyCanvasViewportSurfaceDocumentIdentity?
+  let simulationIdentity: PolicyCanvasViewportSurfaceSimulationIdentity?
+  let auditIdentity: PolicyCanvasViewportSurfaceAuditIdentity?
   let algorithmSelection: PolicyCanvasAlgorithmSelection
+  let policyDisplayName: String?
+}
+
+private struct PolicyCanvasViewportSurfaceDocumentIdentity: Equatable, Sendable {
+  let schemaVersion: UInt16
+  let revision: UInt64
+  let mode: TaskBoardPolicyPipelineMode
+  let nodeCount: Int
+  let edgeCount: Int
+  let groupCount: Int
+  let firstNodeID: String?
+  let lastNodeID: String?
+  let firstEdgeID: String?
+  let lastEdgeID: String?
+  let layoutNodeCount: Int
+  let routingHintCount: Int
+  let policyTraceCount: Int
+  let lastPolicyTraceID: String?
+
+  init(_ document: TaskBoardPolicyPipelineDocument) {
+    schemaVersion = document.schemaVersion
+    revision = document.revision
+    mode = document.mode
+    nodeCount = document.nodes.count
+    edgeCount = document.edges.count
+    groupCount = document.groups.count
+    firstNodeID = document.nodes.first?.id
+    lastNodeID = document.nodes.last?.id
+    firstEdgeID = document.edges.first?.id
+    lastEdgeID = document.edges.last?.id
+    layoutNodeCount = document.layout.nodes.count
+    routingHintCount = document.layout.routingHints.count
+    policyTraceCount = document.policyTraceIds.count
+    lastPolicyTraceID = document.policyTraceIds.last
+  }
+}
+
+private struct PolicyCanvasViewportSurfaceSimulationIdentity: Equatable, Sendable {
+  let revision: UInt64
+  let traceID: String
+  let simulatedAt: String
+  let succeeded: Bool
+  let decisionCount: Int
+  let policyTraceCount: Int
+  let lastPolicyTraceID: String?
+
+  init(_ simulation: TaskBoardPolicyPipelineSimulationResult) {
+    revision = simulation.revision
+    traceID = simulation.traceId
+    simulatedAt = simulation.simulatedAt
+    succeeded = simulation.succeeded
+    decisionCount = simulation.decisions.count
+    policyTraceCount = simulation.policyTraceIds.count
+    lastPolicyTraceID = simulation.policyTraceIds.last
+  }
+}
+
+private struct PolicyCanvasViewportSurfaceAuditIdentity: Equatable, Sendable {
+  let activeRevision: UInt64
+  let mode: TaskBoardPolicyPipelineMode
+  let latestTraceID: String?
+  let latestSimulationTraceID: String?
+
+  init(_ audit: TaskBoardPolicyPipelineAuditSummary) {
+    activeRevision = audit.activeRevision
+    mode = audit.mode
+    latestTraceID = audit.latestTraceId
+    latestSimulationTraceID = audit.latestSimulation?.traceId
+  }
 }
 
 public struct PolicyCanvasViewportSurface: View {
@@ -30,6 +99,7 @@ public struct PolicyCanvasViewportSurface: View {
   let policyDisplayName: String?
 
   @State private var viewModel: PolicyCanvasViewModel
+  @State private var appliedSnapshot: PolicyCanvasViewportSurfaceSnapshot?
   @AccessibilityFocusState private var focusedComponentState: PolicyCanvasSelection?
   @Environment(\.accessibilityReduceMotion)
   private var systemReduceMotion
@@ -61,9 +131,9 @@ public struct PolicyCanvasViewportSurface: View {
     self.policyDisplayName = policyDisplayName
     _viewModel = State(
       initialValue: PolicyCanvasViewModel.liveStartupState(
-        document: document,
-        simulation: simulation,
-        audit: audit,
+        document: nil,
+        simulation: nil,
+        audit: nil,
         activeCanvasId: nil,
         algorithmSelection: algorithmSelection,
         policyGroupTitle: policyDisplayName
@@ -73,11 +143,19 @@ public struct PolicyCanvasViewportSurface: View {
 
   private var snapshot: PolicyCanvasViewportSurfaceSnapshot {
     PolicyCanvasViewportSurfaceSnapshot(
-      document: document,
-      simulation: simulation,
-      audit: audit,
-      algorithmSelection: algorithmSelection
+      documentIdentity: document.map(PolicyCanvasViewportSurfaceDocumentIdentity.init),
+      simulationIdentity: simulation.map(PolicyCanvasViewportSurfaceSimulationIdentity.init),
+      auditIdentity: audit.map(PolicyCanvasViewportSurfaceAuditIdentity.init),
+      algorithmSelection: algorithmSelection,
+      policyDisplayName: policyDisplayName
     )
+  }
+
+  private var surfaceForcesEngineLayout: Bool {
+    forcesEngineLayout
+      || ProcessInfo.processInfo.environment[
+        "HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW"
+      ] == "1"
   }
 
   public var body: some View {
@@ -95,7 +173,7 @@ public struct PolicyCanvasViewportSurface: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
     .environment(\.policyCanvasReducedMotion, systemReduceMotion)
-    .task {
+    .task(id: snapshot) {
       // The fixture/document-load path renders the document's authored positions
       // without running the auto-arrange engine, so a load shows the saved seeds
       // rather than the algorithm output. The lab wants the layered engine's
@@ -103,37 +181,40 @@ public struct PolicyCanvasViewportSurface: View {
       // keeps the agent capture script working even when a caller leaves
       // forcesEngineLayout off. The shipping canvas uses PolicyCanvasView, not
       // this surface, and keeps its authored layout.
-      if forcesEngineLayout
-        || ProcessInfo.processInfo.environment[
-          "HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW"
-        ] == "1"
-      {
-        requestForcedEngineLayoutIfNeeded()
-      }
+      applySurfaceSnapshot(snapshot)
     }
     .onChange(of: reformatRequest, initial: false) { _, _ in
       viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
     }
-    .onChange(of: snapshot, initial: false) { oldSnapshot, newSnapshot in
-      viewModel.algorithmSelection = newSnapshot.algorithmSelection
-      viewModel.policyGroupTitle = policyDisplayName
-      if oldSnapshot.document != newSnapshot.document {
-        viewModel.applyDocument(
-          document: newSnapshot.document,
-          simulation: newSnapshot.simulation,
-          audit: newSnapshot.audit,
-          forceDocumentReload: true
-        )
-        if forcesEngineLayout {
-          requestForcedEngineLayoutIfNeeded()
-        }
-      } else {
-        viewModel.loadIfChanged(
-          document: newSnapshot.document,
-          simulation: newSnapshot.simulation,
-          audit: newSnapshot.audit
-        )
+  }
+
+  @MainActor
+  private func applySurfaceSnapshot(_ newSnapshot: PolicyCanvasViewportSurfaceSnapshot) {
+    let oldSnapshot = appliedSnapshot
+    guard oldSnapshot != newSnapshot else {
+      return
+    }
+    appliedSnapshot = newSnapshot
+
+    viewModel.algorithmSelection = newSnapshot.algorithmSelection
+    viewModel.policyGroupTitle = newSnapshot.policyDisplayName
+
+    if oldSnapshot?.documentIdentity != newSnapshot.documentIdentity {
+      viewModel.applyDocument(
+        document: document,
+        simulation: simulation,
+        audit: audit,
+        forceDocumentReload: true
+      )
+      if surfaceForcesEngineLayout {
+        requestForcedEngineLayoutIfNeeded()
       }
+    } else {
+      viewModel.loadIfChanged(
+        document: document,
+        simulation: simulation,
+        audit: audit
+      )
     }
   }
 
