@@ -276,7 +276,6 @@ private struct PolicyCanvasPortView: View {
         height: PolicyCanvasLayout.portDiameter
       )
       .contentShape(Circle().inset(by: -PolicyCanvasLayout.portHitTestExtension))
-      .help(port.title)
       // Role suffix ("output port" / "input port") tells the VoiceOver user
       // which side of an edge this circle sits on — without it the label is
       // ambiguous ("Policy intake source") between a draggable output and a

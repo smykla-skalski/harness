@@ -20,21 +20,15 @@ import SwiftUI
 /// territories).
 struct PolicyCanvasSimulationLayer: View {
   let viewModel: PolicyCanvasViewModel
-  let observationStore: PolicyCanvasViewportObservationStore
-  let viewportIdentity: String?
 
   var body: some View {
     let outcomeMap = viewModel.simulationOutcomeMap()
-    let cullRect = policyCanvasViewportCullRect(
-      observationStore: observationStore,
-      viewportIdentity: viewportIdentity
-    )
     if outcomeMap.isEmpty {
       EmptyView()
     } else {
       ZStack(alignment: .topLeading) {
         ForEach(viewModel.nodes) { node in
-          if let outcome = outcomeMap[node.id], policyCanvasNodeIsVisible(node, in: cullRect) {
+          if let outcome = outcomeMap[node.id] {
             PolicyCanvasSimulationNodeOverlay(
               node: node,
               outcome: outcome
@@ -169,7 +163,6 @@ private struct PolicyCanvasSimulationBadge: View {
               .stroke(kind.accentColor.opacity(0.85), lineWidth: 1)
           }
           .offset(x: 8, y: -8)
-          .help(kind.reason ?? kind.verdictLabel)
           .accessibilityLabel(kind.accessibilityLabel)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.policyCanvasSimulationBadge(node.id)

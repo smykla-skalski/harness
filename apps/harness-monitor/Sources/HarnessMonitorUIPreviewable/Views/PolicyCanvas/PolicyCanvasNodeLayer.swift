@@ -21,8 +21,6 @@ struct PolicyCanvasNodeLayer: View {
   let nodeValidationIssueMessagesByID: [String: String]
   let portVisibility: PolicyCanvasPortVisibilityMap
   let portMarkerLayout: PolicyCanvasPortMarkerLayout
-  let observationStore: PolicyCanvasViewportObservationStore
-  let viewportIdentity: String?
   let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   /// P19 reduce-motion handle; mirrors the canvas-root system flag so the
   /// drop-end spring (P18) collapses to instant when the user has the
@@ -40,17 +38,12 @@ struct PolicyCanvasNodeLayer: View {
   var body: some View {
     let severityMap = viewModel.nodeSeverityMap
     let hasClipboard = viewModel.clipboard != nil
-    let cullRect = policyCanvasViewportCullRect(
-      observationStore: observationStore,
-      viewportIdentity: viewportIdentity
-    )
     // Iterate in visual focus order (top-to-bottom, then left-to-right) rather
     // than document/storage order: SwiftUI walks Tab/Shift+Tab focus in
     // view-declaration order, so emitting the cards in screen order makes the
     // keyboard ring follow what the user sees. Node identity is keyed by id, so
     // a reorder (e.g. mid-drag as positions change) preserves per-card state.
     ForEach(viewModel.nodesInFocusOrder) { node in
-      if policyCanvasNodeIsVisible(node, in: cullRect) {
       PolicyCanvasNodeCard(
         node: node,
         isSelected: viewModel.isSelected(.node(node.id)),
@@ -142,7 +135,6 @@ struct PolicyCanvasNodeLayer: View {
           }
         }
       }
-      }
     }
   }
 }
@@ -170,7 +162,6 @@ struct PolicyCanvasNodeCard: View {
   private var systemReduceMotion
   @Environment(\.colorScheme)
   private var colorScheme
-  @State private var isHovering = false
 
   private var reducedMotion: Bool {
     canvasReducedMotion ?? systemReduceMotion
@@ -256,7 +247,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.inputPorts,
         alignment: .leading,
         viewModel: viewModel,
-        nodeIsActive: isSelected || isFocused || isHovering,
+        nodeIsActive: isSelected || isFocused,
         visibleSides: portVisibility,
         markerLayout: portMarkerLayout
       )
@@ -266,7 +257,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.outputPorts,
         alignment: .trailing,
         viewModel: viewModel,
-        nodeIsActive: isSelected || isFocused || isHovering,
+        nodeIsActive: isSelected || isFocused,
         visibleSides: portVisibility,
         markerLayout: portMarkerLayout
       )
@@ -276,7 +267,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.inputPorts,
         alignment: .top,
         viewModel: viewModel,
-        nodeIsActive: isSelected || isFocused || isHovering,
+        nodeIsActive: isSelected || isFocused,
         visibleSides: portVisibility,
         markerLayout: portMarkerLayout,
         isAuxiliary: true
@@ -287,7 +278,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.outputPorts,
         alignment: .bottom,
         viewModel: viewModel,
-        nodeIsActive: isSelected || isFocused || isHovering,
+        nodeIsActive: isSelected || isFocused,
         visibleSides: portVisibility,
         markerLayout: portMarkerLayout,
         isAuxiliary: true
@@ -301,7 +292,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.inputPorts,
         alignment: .bottom,
         viewModel: viewModel,
-        nodeIsActive: isSelected || isFocused || isHovering,
+        nodeIsActive: isSelected || isFocused,
         visibleSides: portVisibility,
         markerLayout: portMarkerLayout,
         isAuxiliary: true
@@ -312,7 +303,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.inputPorts,
         alignment: .trailing,
         viewModel: viewModel,
-        nodeIsActive: isSelected || isFocused || isHovering,
+        nodeIsActive: isSelected || isFocused,
         visibleSides: portVisibility,
         markerLayout: portMarkerLayout,
         isAuxiliary: true
@@ -323,7 +314,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.outputPorts,
         alignment: .top,
         viewModel: viewModel,
-        nodeIsActive: isSelected || isFocused || isHovering,
+        nodeIsActive: isSelected || isFocused,
         visibleSides: portVisibility,
         markerLayout: portMarkerLayout,
         isAuxiliary: true
@@ -334,7 +325,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.outputPorts,
         alignment: .leading,
         viewModel: viewModel,
-        nodeIsActive: isSelected || isFocused || isHovering,
+        nodeIsActive: isSelected || isFocused,
         visibleSides: portVisibility,
         markerLayout: portMarkerLayout,
         isAuxiliary: true
@@ -345,7 +336,6 @@ struct PolicyCanvasNodeCard: View {
       }
     }
     .frame(width: PolicyCanvasLayout.nodeSize.width, height: PolicyCanvasLayout.nodeSize.height)
-    .onHover { isHovering = $0 }
     // P57: `.ignore` (paired with composed label/value) avoids the
     // contradictory-rotor case where `.contain` would expose children
     // individually while a parent label was set. Children carry their own

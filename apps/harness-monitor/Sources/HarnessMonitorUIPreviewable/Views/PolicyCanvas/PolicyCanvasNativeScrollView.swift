@@ -51,6 +51,14 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     backgroundColor = .clear
   }
 
+  override var intrinsicContentSize: NSSize {
+    NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+  }
+
+  override var fittingSize: NSSize {
+    policyCanvasFixedFittingSize(for: bounds.size, fallback: contentView.bounds.size)
+  }
+
   @available(*, unavailable)
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
@@ -96,7 +104,9 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
       contentSize: size,
       viewportSize: contentView.bounds.size
     )
-    adaptiveWorkspaceLayout = workspaceLayout
+    if adaptiveWorkspaceLayout != workspaceLayout {
+      adaptiveWorkspaceLayout = workspaceLayout
+    }
     state.update(workspaceLayout: workspaceLayout)
     let hostedDocumentView: PolicyCanvasNativeDocumentView
     if let existingDocumentView = documentView as? PolicyCanvasNativeDocumentView {
