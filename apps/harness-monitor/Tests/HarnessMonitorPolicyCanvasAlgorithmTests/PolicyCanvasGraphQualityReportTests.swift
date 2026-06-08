@@ -97,6 +97,24 @@ struct PolicyCanvasGraphQualityReportTests {
     #expect(report.portSpacing.contains { $0.kind == .detached })
   }
 
+  @Test func portFanningAcrossTwoSidesIsNotDetached() {
+    // One logical input port fed by two wires that attach on opposite node
+    // sides. Each rendered dot sits on a real border, so the port is not
+    // detached - even though the centroid of the two dots is mid-body. The
+    // measurement must judge each dot on its own side, never the average.
+    let frames = ["n": CGRect(x: 0, y: 0, width: 168, height: 96)]
+    let edges = [
+      edge("ea", source: endpoint("s1", "o", .output), target: endpoint("n", "in", .input)),
+      edge("eb", source: endpoint("s2", "o", .output), target: endpoint("n", "in", .input)),
+    ]
+    let routes = [
+      "ea": route([CGPoint(x: -50, y: 40), CGPoint(x: 0, y: 40)]),
+      "eb": route([CGPoint(x: 220, y: 60), CGPoint(x: 168, y: 60)]),
+    ]
+    let report = measure(frames: frames, edges: edges, routes: routes)
+    #expect(report.portSpacing.allSatisfy { $0.kind != .detached })
+  }
+
   @Test func collinearCorridorReuseIsFlagged() {
     let edges = [
       edge("a", source: endpoint("s1", "o", .output), target: endpoint("t1", "i", .input)),

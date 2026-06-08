@@ -1,11 +1,5 @@
 import CoreGraphics
 
-private struct PolicyCanvasPortMarkerKey: Hashable {
-  let nodeID: String
-  let portID: String
-  let kind: PolicyCanvasPortKind
-}
-
 private struct PolicyCanvasResolvedMarker {
   let nodeID: String
   let side: PolicyCanvasPortSide
@@ -15,72 +9,62 @@ private struct PolicyCanvasResolvedMarker {
 }
 
 /// Measure port-marker spacing on every node side. Each route attaches its dot
-/// exactly at `route.points.first` (source) / `.last` (target), so grouping
-/// those attach points by node side reproduces the visible markers. A side that
-/// stacks two markers below the port diameter is an overlap; below the minimum
-/// spacing is a too-close warning; an attach point that lands off the node frame
-/// is a detached marker.
+/// exactly at `route.points.first` (source) / `.last` (target). Every dot is
+/// judged on the node side it actually lands on - a single logical port can fan
+/// its wires onto more than one side, so collapsing a port into one centroid
+/// would invent a mid-body point with no dot under it and report a phantom
+/// detached marker. Dots on one side that stack below the port diameter are an
+/// overlap; below the minimum spacing, a too-close warning; a dot that lands off
+/// every node edge is genuinely detached.
 func policyCanvasMeasurePortSpacing(
   routedEdges: [PolicyCanvasRoutedEdge],
   nodeFramesByID: [String: CGRect],
   thresholds: PolicyCanvasGraphQualityThresholds
 ) -> [PolicyCanvasPortSpacingViolation] {
-  var sums: [PolicyCanvasPortMarkerKey: (sum: CGPoint, count: Int, edges: [String])] = [:]
+  var markersByNodeSide: [String: [PolicyCanvasPortSide: [PolicyCanvasResolvedMarker]]] = [:]
+  var detachedByNode: [String: [PolicyCanvasResolvedMarker]] = [:]
+  let tolerance = PolicyCanvasLayout.portDiameter
   for routed in routedEdges {
     guard let first = routed.route.points.first, let last = routed.route.points.last else {
       continue
     }
-    policyCanvasAccumulateMarker(
-      &sums,
-      endpoint: routed.edge.source,
+    policyCanvasRegisterPortMarker(
       point: first,
-      edgeID: routed.edge.id
+      endpoint: routed.edge.source,
+      edgeID: routed.edge.id,
+      nodeFramesByID: nodeFramesByID,
+      tolerance: tolerance,
+      markersByNodeSide: &markersByNodeSide,
+      detachedByNode: &detachedByNode
     )
-    policyCanvasAccumulateMarker(
-      &sums,
-      endpoint: routed.edge.target,
+    policyCanvasRegisterPortMarker(
       point: last,
-      edgeID: routed.edge.id
+      endpoint: routed.edge.target,
+      edgeID: routed.edge.id,
+      nodeFramesByID: nodeFramesByID,
+      tolerance: tolerance,
+      markersByNodeSide: &markersByNodeSide,
+      detachedByNode: &detachedByNode
     )
   }
   var violations: [PolicyCanvasPortSpacingViolation] = []
-  var markersByNodeSide: [String: [PolicyCanvasPortSide: [PolicyCanvasResolvedMarker]]] = [:]
-  let tolerance = PolicyCanvasLayout.portDiameter
-  for (key, value) in sums {
-    let point = CGPoint(
-      x: value.sum.x / CGFloat(value.count),
-      y: value.sum.y / CGFloat(value.count)
-    )
-    guard let frame = nodeFramesByID[key.nodeID] else {
-      continue
-    }
-    guard let side = policyCanvasMarkerSide(point: point, frame: frame, tolerance: tolerance) else {
+  for markers in detachedByNode.values {
+    for marker in markers {
       violations.append(
         PolicyCanvasPortSpacingViolation(
           kind: .detached,
-          nodeID: key.nodeID,
-          side: key.kind == .input ? .leading : .trailing,
-          point: point,
+          nodeID: marker.nodeID,
+          side: marker.side,
+          point: marker.point,
           otherPoint: nil,
           gap: 0,
-          edgeIDs: value.edges.sorted()
+          edgeIDs: marker.edgeIDs
         )
       )
-      continue
     }
-    let along: CGFloat = (side == .leading || side == .trailing) ? point.y : point.x
-    markersByNodeSide[key.nodeID, default: [:]][side, default: []].append(
-      PolicyCanvasResolvedMarker(
-        nodeID: key.nodeID,
-        side: side,
-        alongAxis: along,
-        point: point,
-        edgeIDs: value.edges.sorted()
-      )
-    )
   }
-  for (_, sideMap) in markersByNodeSide {
-    for (_, markers) in sideMap {
+  for sideMap in markersByNodeSide.values {
+    for markers in sideMap.values {
       let sorted = markers.sorted { $0.alongAxis < $1.alongAxis }
       guard sorted.count >= 2 else {
         continue
@@ -100,23 +84,76 @@ func policyCanvasMeasurePortSpacing(
   return violations.sorted(by: policyCanvasPortSpacingViolationOrder)
 }
 
-private func policyCanvasAccumulateMarker(
-  _ sums: inout [PolicyCanvasPortMarkerKey: (sum: CGPoint, count: Int, edges: [String])],
+/// Resolve one route terminal to the node side it lands on and merge it into the
+/// per-side marker set, or the detached set when it lands off every edge.
+private func policyCanvasRegisterPortMarker(
+  point: CGPoint,
   endpoint: PolicyCanvasPortEndpoint,
+  edgeID: String,
+  nodeFramesByID: [String: CGRect],
+  tolerance: CGFloat,
+  markersByNodeSide: inout [String: [PolicyCanvasPortSide: [PolicyCanvasResolvedMarker]]],
+  detachedByNode: inout [String: [PolicyCanvasResolvedMarker]]
+) {
+  guard let frame = nodeFramesByID[endpoint.nodeID] else {
+    return
+  }
+  guard let side = policyCanvasMarkerSide(point: point, frame: frame, tolerance: tolerance) else {
+    let fallbackSide: PolicyCanvasPortSide = endpoint.kind == .input ? .leading : .trailing
+    policyCanvasMergePortMarker(
+      into: &detachedByNode[endpoint.nodeID, default: []],
+      nodeID: endpoint.nodeID,
+      side: fallbackSide,
+      alongAxis: point.x,
+      point: point,
+      edgeID: edgeID
+    )
+    return
+  }
+  let along: CGFloat = (side == .leading || side == .trailing) ? point.y : point.x
+  policyCanvasMergePortMarker(
+    into: &markersByNodeSide[endpoint.nodeID, default: [:]][side, default: []],
+    nodeID: endpoint.nodeID,
+    side: side,
+    alongAxis: along,
+    point: point,
+    edgeID: edgeID
+  )
+}
+
+/// Merge a terminal into an existing dot at the same position (several wires can
+/// share one visible dot) or append it as a new dot, keeping `edgeIDs` sorted so
+/// the result is reproducible.
+private func policyCanvasMergePortMarker(
+  into markers: inout [PolicyCanvasResolvedMarker],
+  nodeID: String,
+  side: PolicyCanvasPortSide,
+  alongAxis: CGFloat,
   point: CGPoint,
   edgeID: String
 ) {
-  let key = PolicyCanvasPortMarkerKey(
-    nodeID: endpoint.nodeID,
-    portID: endpoint.portID,
-    kind: endpoint.kind
+  if let index = markers.firstIndex(where: {
+    abs($0.point.x - point.x) < 0.5 && abs($0.point.y - point.y) < 0.5
+  }) {
+    let merged = (markers[index].edgeIDs + [edgeID]).sorted()
+    markers[index] = PolicyCanvasResolvedMarker(
+      nodeID: nodeID,
+      side: side,
+      alongAxis: alongAxis,
+      point: point,
+      edgeIDs: merged
+    )
+    return
+  }
+  markers.append(
+    PolicyCanvasResolvedMarker(
+      nodeID: nodeID,
+      side: side,
+      alongAxis: alongAxis,
+      point: point,
+      edgeIDs: [edgeID]
+    )
   )
-  var entry = sums[key] ?? (sum: .zero, count: 0, edges: [])
-  entry.sum.x += point.x
-  entry.sum.y += point.y
-  entry.count += 1
-  entry.edges.append(edgeID)
-  sums[key] = entry
 }
 
 /// The side of `frame` a marker sits on, or nil when the point is off the node
