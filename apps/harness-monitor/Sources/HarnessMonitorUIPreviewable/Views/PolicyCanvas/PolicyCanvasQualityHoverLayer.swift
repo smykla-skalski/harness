@@ -23,10 +23,16 @@ struct PolicyCanvasQualityHoverLayer: View {
       ForEach(policyCanvasQualityHoverRegions(report: report)) { region in
         Color.clear
           .contentShape(region.path)
+          // `.onHover` installs the tracking area `.help` rides on, and the
+          // category label keeps the now-visible element meaningful to
+          // VoiceOver. `.help` attaches through the accessibility element, so
+          // the layer must not be hidden from accessibility or the tooltip
+          // never shows - matching how edge and port views expose their help.
+          .onHover { _ in }
           .help(region.category.detail)
+          .accessibilityLabel(Text(region.category.label))
       }
     }
-    .accessibilityHidden(true)
   }
 }
 
