@@ -22,6 +22,8 @@ public struct PolicyCanvasLabWindowView: View {
     PolicyCanvasLabToolbarDefaults.defaultAlgorithmSelectionRawValue
   @AppStorage(PolicyCanvasLabThemeDefaults.modeKey)
   private var windowThemeMode = PolicyCanvasLabThemeMode.defaultValue
+  @AppStorage(PolicyCanvasQualityMetricsDefaults.isVisibleKey)
+  private var showsQualityMetrics = PolicyCanvasQualityMetricsDefaults.isVisibleDefault
 
   @MainActor
   public init(
@@ -183,6 +185,14 @@ public struct PolicyCanvasLabWindowView: View {
         PolicyCanvasLabAlgorithmPresetPicker(algorithmSelection: $algorithmSelection)
       }
       PolicyCanvasLabStageToolbar(algorithmSelection: $algorithmSelection)
+      ToolbarItem(placement: .primaryAction) {
+        Toggle(isOn: $showsQualityMetrics) {
+          Label("Graph quality metrics", systemImage: "ruler")
+        }
+        .toggleStyle(.button)
+        .help("Overlay graph-quality metrics: ports, corridors, crossings, body hits")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasQualityMetricsToggle)
+      }
       ToolbarItem(placement: .primaryAction) {
         PolicyCanvasLabThemePicker(windowThemeMode: $windowThemeMode)
       }
