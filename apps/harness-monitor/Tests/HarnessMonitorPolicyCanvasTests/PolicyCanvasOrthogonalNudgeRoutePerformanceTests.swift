@@ -7,14 +7,13 @@ import Testing
 
 /// Performance guard for the crossing-aware orthogonal nudge - now the production
 /// route post-process default. The pass runs inside the synchronous route worker;
-/// if it is slow the canvas shows the provisional projection first and then
-/// visibly snaps to the final routing once the worker returns. The pass must stay
-/// free on small graphs and, on the fan-in heavy samples whose cold A* routing
-/// already dominates the frame, within a small multiple of plain collinear
-/// compression (the cheaper post-process that leaves overlaps stacked). The bound
-/// is relative, not an absolute millisecond budget, so it rides out the machine
-/// load and parallel-build contention that make raw wall-clock timings jump run to
-/// run.
+/// if it is slow the canvas is stuck waiting for the first final route result. The
+/// pass must stay free on small graphs and, on the fan-in heavy samples whose cold
+/// A* routing already dominates the frame, within a small multiple of plain
+/// collinear compression (the cheaper post-process that leaves overlaps stacked).
+/// The bound is relative, not an absolute millisecond budget, so it rides out the
+/// machine load and parallel-build contention that make raw wall-clock timings
+/// jump run to run.
 @Suite("Policy canvas orthogonal nudge route performance", .serialized)
 @MainActor
 struct PolicyCanvasOrthogonalNudgeRoutePerformanceTests {

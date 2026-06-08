@@ -7,6 +7,11 @@ struct PolicyCanvasPortMarkerPlacementInput: Sendable {
   let nodeIndex: [String: PolicyCanvasRouteNode]
 }
 
+struct PolicyCanvasPortMarkerSeedInput: Sendable {
+  let prepared: PolicyCanvasPreparedRouteInput
+  let nodeIndex: [String: PolicyCanvasRouteNode]
+}
+
 struct PolicyCanvasRouteSelectionInput: Sendable {
   let prepared: PolicyCanvasPreparedRouteInput
   let router: any PolicyCanvasEdgeRouter
@@ -25,6 +30,7 @@ struct PolicyCanvasLabelPlacementInput: Sendable {
 }
 
 protocol PolicyCanvasPortMarkerPlacementAlgorithm: Sendable {
+  func seedMarkers(input: PolicyCanvasPortMarkerSeedInput) -> PolicyCanvasPortMarkerLayout?
   func placeMarkers(input: PolicyCanvasPortMarkerPlacementInput) -> PolicyCanvasPortMarkerLayout
 }
 
@@ -41,6 +47,10 @@ protocol PolicyCanvasEdgeLabelPlacementAlgorithm: Sendable {
 }
 
 struct PolicyCanvasNoOpPortMarkerPlacement: PolicyCanvasPortMarkerPlacementAlgorithm {
+  func seedMarkers(input: PolicyCanvasPortMarkerSeedInput) -> PolicyCanvasPortMarkerLayout? {
+    .empty
+  }
+
   func placeMarkers(input: PolicyCanvasPortMarkerPlacementInput) -> PolicyCanvasPortMarkerLayout {
     .empty
   }
@@ -52,12 +62,18 @@ struct PolicyCanvasNoOpPortMarkerPlacement: PolicyCanvasPortMarkerPlacementAlgor
 /// visible dots while single-marker sides stay centered and multi-marker sides
 /// remain evenly spaced.
 struct PolicyCanvasRouteTerminalPortMarkerPlacement: PolicyCanvasPortMarkerPlacementAlgorithm {
+  func seedMarkers(input: PolicyCanvasPortMarkerSeedInput) -> PolicyCanvasPortMarkerLayout? {
+    input.prepared.seededPortMarkerLayout(nodeIndex: input.nodeIndex)
+  }
+
   func placeMarkers(input: PolicyCanvasPortMarkerPlacementInput) -> PolicyCanvasPortMarkerLayout {
     input.prepared.portMarkerLayout(routes: input.routes, nodeIndex: input.nodeIndex)
   }
 }
 
 struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgorithm {
+  private let parallelEdgeThreshold = 24
+
   func selectRoutes(input: PolicyCanvasRouteSelectionInput) -> [String: PolicyCanvasEdgeRoute] {
     let prepared = input.prepared
     let nodeIndex = input.passContext?.nodeIndex ?? prepared.nodeIndex
@@ -69,26 +85,88 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       ?? policyCanvasCanonicalObstacles(
         prepared.nodes.map(\.frame) + policyCanvasGroupTitleFrames(prepared.groups)
       )
+    let context = RouteSelectionContext(
+      prepared: prepared,
+      nodeIndex: nodeIndex,
+      terminalSlots: terminalSlots,
+      obstacles: obstacles,
+      portMarkerLayout: input.portMarkerLayout,
+      passContext: input.passContext,
+      router: input.router
+    )
+    if prepared.edges.count >= parallelEdgeThreshold,
+      ProcessInfo.processInfo.activeProcessorCount > 1
+    {
+      return parallelRoutes(edges: prepared.edges, context: context)
+    }
+    return serialRoutes(edges: prepared.edges, context: context)
+  }
+
+  private func serialRoutes(
+    edges: [PolicyCanvasEdge],
+    context: RouteSelectionContext
+  ) -> [String: PolicyCanvasEdgeRoute] {
     var routes: [String: PolicyCanvasEdgeRoute] = [:]
-    routes.reserveCapacity(prepared.edges.count)
-    for edge in prepared.edges {
+    routes.reserveCapacity(edges.count)
+    for edge in edges {
       guard
         let route = selectedRoute(
           for: edge,
-          context: RouteSelectionContext(
-            prepared: prepared,
-            nodeIndex: nodeIndex,
-            terminalSlots: terminalSlots,
-            obstacles: obstacles,
-            portMarkerLayout: input.portMarkerLayout,
-            passContext: input.passContext,
-            router: input.router
-          )
+          context: context
         )
       else {
         continue
       }
       routes[edge.id] = route
+    }
+    return routes
+  }
+
+  private struct IndexedRoute {
+    let index: Int
+    let id: String
+    let route: PolicyCanvasEdgeRoute
+  }
+
+  private final class IndexedRouteCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entries: [IndexedRoute] = []
+
+    init(capacity: Int) {
+      entries.reserveCapacity(capacity)
+    }
+
+    func append(_ entry: IndexedRoute) {
+      lock.lock()
+      entries.append(entry)
+      lock.unlock()
+    }
+
+    func sortedEntries() -> [IndexedRoute] {
+      lock.lock()
+      let snapshot = entries
+      lock.unlock()
+      return snapshot.sorted(by: { $0.index < $1.index })
+    }
+  }
+
+  private func parallelRoutes(
+    edges: [PolicyCanvasEdge],
+    context: RouteSelectionContext
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    let collector = IndexedRouteCollector(capacity: edges.count)
+    DispatchQueue.concurrentPerform(iterations: edges.count) { index in
+      let edge = edges[index]
+      guard let route = selectedRoute(for: edge, context: context) else {
+        return
+      }
+      collector.append(IndexedRoute(index: index, id: edge.id, route: route))
+    }
+    var routes: [String: PolicyCanvasEdgeRoute] = [:]
+    let indexedRoutes = collector.sortedEntries()
+    routes.reserveCapacity(indexedRoutes.count)
+    for entry in indexedRoutes {
+      routes[entry.id] = entry.route
     }
     return routes
   }
@@ -233,6 +311,20 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
         return route
       }
       return safeAlternateRoute(input) ?? route
+    }
+    let requestedRoute = pinnedRoute(
+      source: input.source,
+      target: input.target,
+      context: input.baseContext,
+      router: input.router
+    )
+    if routeAvoidsNonEndpointObstacles(
+      requestedRoute,
+      sourceActual: input.source.actual,
+      targetActual: input.target.actual,
+      context: input.baseContext
+    ) {
+      return requestedRoute
     }
     let sourceCandidates = sideCandidates(
       for: input.edge.source,

@@ -24,12 +24,18 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
   /// be cleared - matches the fan-in channel gate threshold.
   private let overlapThreshold: CGFloat = 8
   /// Spreading one axis shifts the perpendicular extent of the other axis's
-  /// segments, so a few passes settle the residual; it converges well before this.
-  private let iterations = 4
+  /// segments, so a second pass settles residual same-axis stacks after the other
+  /// axis moved. More passes had diminishing visual return and dominated large
+  /// graphs.
+  private let iterations = 2
   /// Tolerance for classifying a segment as axis-aligned, matching the nudge.
   private let axisTolerance: CGFloat = 1
   /// Lane width used to slide a spread band into a clearer corridor position.
   private let laneGap = PolicyCanvasVisibilityRouter.laneSpreadStep
+  /// Above this route count the full slide search costs more than it buys; keep
+  /// deterministic ordered/reversed spreads and rely on the zero-shift floor to
+  /// avoid regressions.
+  private let reducedPlacementRouteCount = 80
 
   func processRoutes(
     input: PolicyCanvasRoutePostProcessingInput
@@ -121,7 +127,8 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
       fans: PolicyCanvasFanContext.make(from: routes)
     )
     var pointsByEdge = routes
-    for _ in 0..<iterations {
+    let iterationLimit = pointsByEdge.count > reducedPlacementRouteCount ? 1 : iterations
+    for _ in 0..<iterationLimit {
       var working = pointsByEdge
       var entries = entryCache(of: displayedPoints(working, preserving: original))
       var applied = false
@@ -217,7 +224,7 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     let channelPoints = channelEdges.reduce(into: [String: [CGPoint]]()) { slice, id in
       slice[id] = context.working[id]
     }
-    let candidatePlacements = placements(from: offsets)
+    let candidatePlacements = placements(from: offsets, routeCount: context.working.count)
     let interactionBand = movedInteractionBand(
       floor: channelPoints,
       candidates: candidatePlacements,
@@ -326,14 +333,19 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
   }
 
   /// Spread placements to score for one channel: the fan/bus-ordered offsets and
-  /// their reverse, each slid by a few lane widths in either direction. Sliding
-  /// the already-separated band lets a crowded corridor's spread settle where it
-  /// clears the stack without cutting a foreign stub; reversing covers the non-fan
-  /// bus whose crossing-free order is the opposite one. The zero-shift floor in
-  /// `bestSpread` still wins unless one placement strictly improves on it.
+  /// their reverse. The zero-shift floor in `bestSpread` still wins unless one
+  /// placement strictly improves on it, so saturated corridors remain unchanged
+  /// instead of being routed through a crossing/body hit. Earlier versions also
+  /// slid the separated band by several lane widths; that made large policy
+  /// samples spend most of their route budget evaluating near-duplicate
+  /// placements for marginal label-free aesthetics.
   private func placements(
-    from offsets: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]
+    from offsets: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)],
+    routeCount: Int
   ) -> [[(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]] {
+    if routeCount > reducedPlacementRouteCount {
+      return [offsets, offsets.map { ($0.segment, -$0.offset) }]
+    }
     let halfGap = laneGap / 2
     let slides: [CGFloat] =
       offsets.count.isMultiple(of: 2)

@@ -73,7 +73,7 @@ extension PolicyCanvasViewport {
     guard !Task.isCancelled, routeGenerationMatches(generation) else {
       return
     }
-    commitAtomicReflow(request: request, output: output, fontScale: fontScale)
+    commitAtomicReflow(request: request, graph: graph, output: output, fontScale: fontScale)
   }
 
   /// Publish the planned positions without an async route request, then hand the
@@ -82,10 +82,12 @@ extension PolicyCanvasViewport {
   @MainActor
   private func commitAtomicReflow(
     request: PolicyCanvasAtomicReflowRequest,
+    graph: PolicyCanvasReflowGraph,
     output: PolicyCanvasRouteWorkerOutput,
     fontScale: CGFloat
   ) {
-    viewModel.reflowLayout(
+    viewModel.commitPlannedReflowGraph(
+      graph,
       preserveManualAnchors: request.preserveManualAnchors,
       force: request.force,
       requestsRouteComputation: false

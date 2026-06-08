@@ -1,4 +1,10 @@
+import OSLog
 import SwiftUI
+
+private let policyCanvasRouteComputationSignposter = OSSignposter(
+  subsystem: "io.harnessmonitor",
+  category: "policy-canvas.perf"
+)
 
 struct PolicyCanvasDisplayedRoutePassContext: Sendable {
   let nodeIndex: [String: PolicyCanvasRouteNode]
@@ -46,23 +52,82 @@ extension PolicyCanvasPreparedRouteInput {
       ? defaultRouter
       : algorithms.edgeRouter
     let nodeIndex = nodeIndex
+    let convergenceSignpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
+    let convergenceInterval = policyCanvasRouteComputationSignposter.beginInterval(
+      "policy_canvas.routes.phase.converge",
+      id: convergenceSignpostID,
+      "nodes=\(nodes.count, privacy: .public) edges=\(edges.count, privacy: .public)"
+    )
     let routeState = policyCanvasConvergedRouteState(
       prepared: self,
       nodeIndex: nodeIndex,
       router: selectedRouter,
       algorithms: algorithms
     )
+    policyCanvasRouteComputationSignposter.endInterval(
+      "policy_canvas.routes.phase.converge",
+      convergenceInterval,
+      "routes=\(routeState.routes.count, privacy: .public)"
+    )
+
+    let postProcessSignpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
+    let postProcessInterval = policyCanvasRouteComputationSignposter.beginInterval(
+      "policy_canvas.routes.phase.post_process",
+      id: postProcessSignpostID,
+      "routes=\(routeState.routes.count, privacy: .public)"
+    )
     let processedRoutes = algorithms.routePostProcessing.processRoutes(
       input: PolicyCanvasRoutePostProcessingInput(prepared: self, routes: routeState.routes)
+    )
+    policyCanvasRouteComputationSignposter.endInterval(
+      "policy_canvas.routes.phase.post_process",
+      postProcessInterval,
+      "routes=\(processedRoutes.count, privacy: .public)"
+    )
+
+    let terminalsSignpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
+    let terminalsInterval = policyCanvasRouteComputationSignposter.beginInterval(
+      "policy_canvas.routes.phase.terminals",
+      id: terminalsSignpostID,
+      "routes=\(processedRoutes.count, privacy: .public)"
     )
     let routes = policyCanvasRoutesPreservingRouteTerminals(
       original: routeState.routes,
       processed: processedRoutes
     )
+    policyCanvasRouteComputationSignposter.endInterval(
+      "policy_canvas.routes.phase.terminals",
+      terminalsInterval,
+      "routes=\(routes.count, privacy: .public)"
+    )
+
+    let labelSignpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
+    let labelInterval = policyCanvasRouteComputationSignposter.beginInterval(
+      "policy_canvas.routes.phase.labels",
+      id: labelSignpostID,
+      "routes=\(routes.count, privacy: .public)"
+    )
     let labelPositions = algorithms.labelPlacement.placeLabels(
       input: PolicyCanvasLabelPlacementInput(prepared: self, routes: routes)
     )
+    policyCanvasRouteComputationSignposter.endInterval(
+      "policy_canvas.routes.phase.labels",
+      labelInterval,
+      "labels=\(labelPositions.count, privacy: .public)"
+    )
+
+    let boundsSignpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
+    let boundsInterval = policyCanvasRouteComputationSignposter.beginInterval(
+      "policy_canvas.routes.phase.bounds",
+      id: boundsSignpostID,
+      "routes=\(routes.count, privacy: .public) labels=\(labelPositions.count, privacy: .public)"
+    )
     let visibleBounds = visibleBounds(routes: routes, labelPositions: labelPositions)
+    policyCanvasRouteComputationSignposter.endInterval(
+      "policy_canvas.routes.phase.bounds",
+      boundsInterval,
+      "width=\(visibleBounds.width, privacy: .public) height=\(visibleBounds.height, privacy: .public)"
+    )
     return PolicyCanvasPreparedRouteComputation(
       routes: routes,
       labelPositions: labelPositions,
@@ -186,25 +251,38 @@ extension PolicyCanvasPreparedRouteInput {
       router: selectedRouter,
       algorithms: algorithms
     )
-    let initialRoutes = algorithms.routeSelection.selectRoutes(
-      input: PolicyCanvasRouteSelectionInput(
-        prepared: prepared,
-        router: selectedRouter,
-        portMarkerLayout: nil,
-        passContext: context.passContext
+    if let seedLayout = algorithms.portMarkerPlacement.seedMarkers(
+      input: PolicyCanvasPortMarkerSeedInput(prepared: prepared, nodeIndex: nodeIndex)
+    ) {
+      let state = policyCanvasNextRouteState(
+        current: PolicyCanvasRouteComputationState(routes: [:], portMarkerLayout: seedLayout),
+        context: context
       )
-    )
-    var state = PolicyCanvasRouteComputationState(
-      routes: initialRoutes,
-      portMarkerLayout: algorithms.portMarkerPlacement.placeMarkers(
-        input: PolicyCanvasPortMarkerPlacementInput(
-          prepared: prepared,
-          routes: initialRoutes,
-          nodeIndex: nodeIndex
-        )
+      if state.portMarkerLayout == seedLayout {
+        return state
+      }
+      let seenLayouts = [seedLayout, state.portMarkerLayout]
+      return policyCanvasConvergedRouteState(
+        state: state,
+        seenLayouts: seenLayouts,
+        context: context
       )
+    }
+    let state = policyCanvasInitialRouteState(context: context)
+    return policyCanvasConvergedRouteState(
+      state: state,
+      seenLayouts: [state.portMarkerLayout],
+      context: context
     )
-    var seenLayouts: [PolicyCanvasPortMarkerLayout] = [state.portMarkerLayout]
+  }
+
+  private func policyCanvasConvergedRouteState(
+    state initialState: PolicyCanvasRouteComputationState,
+    seenLayouts initialSeenLayouts: [PolicyCanvasPortMarkerLayout],
+    context: PolicyCanvasRouteStateContext
+  ) -> PolicyCanvasRouteComputationState {
+    var state = initialState
+    var seenLayouts = initialSeenLayouts
     for _ in 0..<3 {
       let nextState = policyCanvasNextRouteState(
         current: state,
@@ -225,6 +303,29 @@ extension PolicyCanvasPreparedRouteInput {
     return policyCanvasReroutedState(
       portMarkerLayout: state.portMarkerLayout,
       context: context
+    )
+  }
+
+  private func policyCanvasInitialRouteState(
+    context: PolicyCanvasRouteStateContext
+  ) -> PolicyCanvasRouteComputationState {
+    let initialRoutes = context.algorithms.routeSelection.selectRoutes(
+      input: PolicyCanvasRouteSelectionInput(
+        prepared: context.prepared,
+        router: context.router,
+        portMarkerLayout: nil,
+        passContext: context.passContext
+      )
+    )
+    return PolicyCanvasRouteComputationState(
+      routes: initialRoutes,
+      portMarkerLayout: context.algorithms.portMarkerPlacement.placeMarkers(
+        input: PolicyCanvasPortMarkerPlacementInput(
+          prepared: context.prepared,
+          routes: initialRoutes,
+          nodeIndex: context.nodeIndex
+        )
+      )
     )
   }
 
