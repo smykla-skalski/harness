@@ -22,6 +22,8 @@ public struct PolicyCanvasLabWindowView: View {
     PolicyCanvasLabToolbarDefaults.defaultAlgorithmSelectionRawValue
   @AppStorage(PolicyCanvasLabThemeDefaults.modeKey)
   private var windowThemeMode = PolicyCanvasLabThemeMode.defaultValue
+  @AppStorage(PolicyCanvasLabToolbarDefaults.scalesZoomOnResizeKey)
+  private var scalesZoomOnResize = PolicyCanvasLabToolbarDefaults.scalesZoomOnResizeDefault
   @AppStorage(PolicyCanvasQualityMetricsDefaults.isVisibleKey)
   private var showsQualityMetrics = PolicyCanvasQualityMetricsDefaults.isVisibleDefault
 
@@ -85,6 +87,11 @@ public struct PolicyCanvasLabWindowView: View {
     _windowThemeMode = AppStorage(
       wrappedValue: PolicyCanvasLabThemeMode.defaultValue,
       PolicyCanvasLabThemeDefaults.modeKey,
+      store: defaults
+    )
+    _scalesZoomOnResize = AppStorage(
+      wrappedValue: PolicyCanvasLabToolbarDefaults.scalesZoomOnResizeDefault,
+      PolicyCanvasLabToolbarDefaults.scalesZoomOnResizeKey,
       store: defaults
     )
   }
@@ -154,6 +161,10 @@ public struct PolicyCanvasLabWindowView: View {
     displayedSnapshot.document
   }
 
+  private var viewportResizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior {
+    scalesZoomOnResize ? .scaleProportionally : .preserveZoom
+  }
+
   public var body: some View {
     PolicyCanvasViewportSurface(
       document: renderedPolicyDocument,
@@ -163,6 +174,7 @@ public struct PolicyCanvasLabWindowView: View {
       minimapCenteringMode: .clickViewport,
       canvasColorScheme: windowThemeMode.colorScheme,
       showsEdgeLegend: false,
+      resizeZoomBehavior: viewportResizeZoomBehavior,
       forcesEngineLayout: true,
       reformatRequest: reformatRequestID,
       policyDisplayName: samplePickerTitle
@@ -185,6 +197,16 @@ public struct PolicyCanvasLabWindowView: View {
         PolicyCanvasLabAlgorithmPresetPicker(algorithmSelection: $algorithmSelection)
       }
       PolicyCanvasLabStageToolbar(algorithmSelection: $algorithmSelection)
+      ToolbarItem(placement: .primaryAction) {
+        Toggle(isOn: $scalesZoomOnResize) {
+          Label("Scale zoom on resize", systemImage: "arrow.up.left.and.arrow.down.right")
+        }
+        .toggleStyle(.button)
+        .help("Adjust graph zoom as the lab window resizes; turn off to preserve the current zoom.")
+        .accessibilityLabel("Scale zoom on resize")
+        .accessibilityValue(scalesZoomOnResize ? "On" : "Off")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasResizeZoomToggle)
+      }
       ToolbarItem(placement: .primaryAction) {
         Toggle(isOn: $showsQualityMetrics) {
           Label("Graph quality metrics", systemImage: "ruler")

@@ -254,12 +254,68 @@ extension PolicyCanvasCommandScrollTests {
     let initialResult = scrollView.applyScrollRequest(CGPoint(x: 900, y: 700))
     #expect(initialResult == .applied(true))
     let initialCenter = scrollView.visibleDocumentCenter
+    let initialZoom = scrollView.magnification
 
     window.setContentSize(resizedFrame.size)
     window.layoutIfNeeded()
     rootView.layoutSubtreeIfNeeded()
 
     let resizedCenter = scrollView.visibleDocumentCenter
+    #expect(abs(resizedCenter.x - initialCenter.x) < 1.5)
+    #expect(abs(resizedCenter.y - initialCenter.y) < 1.5)
+    #expect(scrollView.magnification == initialZoom)
+  }
+
+  @MainActor
+  @Test("native scroll view scales zoom with viewport resize when requested")
+  func nativeScrollViewScalesZoomWithViewportResizeWhenRequested() {
+    let initialFrame = CGRect(x: 0, y: 0, width: 640, height: 480)
+    let resizedFrame = CGRect(x: 0, y: 0, width: 960, height: 720)
+    let rootView = NSView(frame: initialFrame)
+    let scrollView = PolicyCanvasNativeScrollView()
+    scrollView.frame = initialFrame
+    scrollView.autoresizingMask = [.width, .height]
+    scrollView.viewportResizeZoomBehavior = .scaleProportionally
+    scrollView.setTestingDocumentContent(
+      Color.clear.frame(width: 2_400, height: 1_800),
+      size: CGSize(width: 2_400, height: 1_800)
+    )
+    rootView.addSubview(scrollView)
+
+    let window = NSWindow(
+      contentRect: initialFrame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    window.contentView = rootView
+    window.layoutIfNeeded()
+    rootView.layoutSubtreeIfNeeded()
+    scrollView.setMagnification(0.8, centeredAt: CGPoint(x: 320, y: 240))
+    #expect(scrollView.applyScrollRequest(CGPoint(x: 900, y: 700)) == .applied(true))
+
+    let initialCenter = scrollView.visibleDocumentCenter
+    let initialViewportSize = scrollView.contentView.frame.size
+    let initialZoom = scrollView.magnification
+
+    window.setContentSize(resizedFrame.size)
+    window.layoutIfNeeded()
+    rootView.layoutSubtreeIfNeeded()
+
+    let resizedViewportSize = scrollView.contentView.frame.size
+    let expectedZoom = initialZoom
+      * min(
+        resizedViewportSize.width / initialViewportSize.width,
+        resizedViewportSize.height / initialViewportSize.height
+      )
+    let resizedCenter = scrollView.visibleDocumentCenter
+    #expect(abs(scrollView.magnification - expectedZoom) < 0.001)
     #expect(abs(resizedCenter.x - initialCenter.x) < 1.5)
     #expect(abs(resizedCenter.y - initialCenter.y) < 1.5)
   }

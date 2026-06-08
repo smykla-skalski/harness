@@ -216,6 +216,9 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
       windowSource.contains("@AppStorage(PolicyCanvasLabToolbarDefaults.algorithmSelectionKey)")
     )
     XCTAssertTrue(
+      windowSource.contains("@AppStorage(PolicyCanvasLabToolbarDefaults.scalesZoomOnResizeKey)")
+    )
+    XCTAssertTrue(
       windowSource.contains(
         "PolicyCanvasLabToolbarDefaults.selection(in: defaults) ?? initialSelection"
       )
@@ -233,6 +236,21 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
         "storedAlgorithmSelectionRaw = PolicyCanvasLabToolbarDefaults.rawValue(for: newSelection)"
       )
     )
+  }
+
+  func testLabResizeZoomDefaultsToScalingWithWindowSize() {
+    let suiteName = "PolicyCanvasLabResizeZoomDefaults.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer {
+      defaults.removePersistentDomain(forName: suiteName)
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+
+    XCTAssertTrue(PolicyCanvasLabToolbarDefaults.scalesZoomOnResizeDefault)
+    XCTAssertTrue(PolicyCanvasLabToolbarDefaults.scalesZoomOnResize(in: defaults))
+
+    defaults.set(false, forKey: PolicyCanvasLabToolbarDefaults.scalesZoomOnResizeKey)
+    XCTAssertFalse(PolicyCanvasLabToolbarDefaults.scalesZoomOnResize(in: defaults))
   }
 
   func testLabThemePickerIsWindowScopedAndDecoupledFromAppTheme() throws {

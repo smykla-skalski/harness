@@ -6,6 +6,7 @@ import SwiftUI
 struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
   var snapshot: PolicyCanvasViewportHostedSnapshot
   var zoom: CGFloat
+  var resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior
   var viewportIdentity: String?
   var isActive = true
   var isEmpty = false
@@ -20,6 +21,7 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
 
   func makeNSView(context: Context) -> PolicyCanvasNativeScrollView {
     let scrollView = PolicyCanvasNativeScrollView()
+    scrollView.viewportResizeZoomBehavior = resizeZoomBehavior
     scrollView.magnificationDidChange = { [weak coordinator = context.coordinator] zoom in
       coordinator?.handleViewportZoomChange(zoom)
     }
@@ -39,6 +41,7 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     context.coordinator.onViewportChange = onViewportChange
     context.coordinator.currentViewportIdentity = viewportIdentity
     context.coordinator.hostedState.update(snapshot: snapshot)
+    scrollView.viewportResizeZoomBehavior = resizeZoomBehavior
     scrollView.magnificationDidChange = { [weak coordinator = context.coordinator] zoom in
       coordinator?.handleViewportZoomChange(zoom)
     }

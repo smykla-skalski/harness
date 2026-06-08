@@ -4,6 +4,7 @@ struct PolicyCanvasViewportHostedContent: View {
   let viewModel: PolicyCanvasViewModel
   let snapshot: PolicyCanvasViewportHostedSnapshot
   let zoom: CGFloat
+  let resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior
   let viewportIdentity: String?
   let isActive: Bool
   let isEmpty: Bool
@@ -25,6 +26,7 @@ struct PolicyCanvasViewportHostedContent: View {
     PolicyCanvasViewportNativeHost(
       snapshot: snapshot,
       zoom: zoom,
+      resizeZoomBehavior: resizeZoomBehavior,
       viewportIdentity: viewportIdentity,
       isActive: isActive,
       isEmpty: isEmpty,
