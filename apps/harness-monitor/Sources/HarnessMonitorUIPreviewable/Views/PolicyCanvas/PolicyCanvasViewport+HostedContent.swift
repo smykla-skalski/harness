@@ -53,5 +53,11 @@ struct PolicyCanvasViewportHostedContent: View {
         requestViewportScroll: requestViewportScroll
       )
     )
+    .policyCanvasQualityInspection(
+      viewModel: viewModel,
+      routes: snapshot.routes,
+      routeSignature: snapshot.routeSignature,
+      resolvedCanvasColorScheme: resolvedCanvasColorScheme
+    )
   }
 }

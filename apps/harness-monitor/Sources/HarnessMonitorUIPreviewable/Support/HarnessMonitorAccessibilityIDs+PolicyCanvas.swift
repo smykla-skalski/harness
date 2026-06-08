@@ -31,6 +31,9 @@ extension HarnessMonitorAccessibility {
     "harness.policy-canvas.minimap.hidden.recenter"
   public static let policyCanvasEdgeLegend = "harness.policy-canvas.edge-legend"
   public static let policyCanvasEdgeLegendToggle = "harness.policy-canvas.edge-legend.toggle"
+  public static let policyCanvasQualityMetrics = "harness.policy-canvas.quality-metrics"
+  public static let policyCanvasQualityMetricsToggle =
+    "harness.policy-canvas.quality-metrics.toggle"
   public static let policyCanvasInspector = "harness.policy-canvas.inspector"
   public static let policyCanvasValidationPanel = "harness.policy-canvas.validation"
   public static let policyCanvasValidationToggle = "harness.policy-canvas.validation.toggle"
