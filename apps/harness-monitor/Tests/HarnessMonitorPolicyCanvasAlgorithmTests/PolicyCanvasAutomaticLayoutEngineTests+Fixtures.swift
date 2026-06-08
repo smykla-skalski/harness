@@ -102,6 +102,131 @@ extension PolicyCanvasAutomaticLayoutEngineTests {
     )
   }
 
+  func sameRankGroupOrderingGraph() -> PolicyCanvasLayoutGraph {
+    PolicyCanvasLayoutGraph(
+      nodes: [
+        PolicyCanvasLayoutNode(
+          id: "source-a",
+          groupID: "source-a-group",
+          originalIndex: 0,
+          currentPosition: .zero,
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "source-b",
+          groupID: "source-b-group",
+          originalIndex: 1,
+          currentPosition: .zero,
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "target-b",
+          groupID: "target-b-group",
+          originalIndex: 2,
+          currentPosition: .zero,
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "target-a",
+          groupID: "target-a-group",
+          originalIndex: 3,
+          currentPosition: .zero,
+          anchor: nil
+        ),
+      ],
+      edges: [
+        PolicyCanvasLayoutEdge(id: "a-a", sourceNodeID: "source-a", targetNodeID: "target-a"),
+        PolicyCanvasLayoutEdge(id: "b-b", sourceNodeID: "source-b", targetNodeID: "target-b"),
+      ],
+      groups: [
+        PolicyCanvasLayoutGroup(
+          id: "source-a-group",
+          originalIndex: 0,
+          memberNodeIDs: ["source-a"]
+        ),
+        PolicyCanvasLayoutGroup(
+          id: "source-b-group",
+          originalIndex: 1,
+          memberNodeIDs: ["source-b"]
+        ),
+        PolicyCanvasLayoutGroup(
+          id: "target-b-group",
+          originalIndex: 2,
+          memberNodeIDs: ["target-b"]
+        ),
+        PolicyCanvasLayoutGroup(
+          id: "target-a-group",
+          originalIndex: 3,
+          memberNodeIDs: ["target-a"]
+        ),
+      ]
+    )
+  }
+
+  func sparsePressureGraph() -> PolicyCanvasLayoutGraph {
+    PolicyCanvasLayoutGraph(
+      nodes: [
+        PolicyCanvasLayoutNode(
+          id: "source", groupID: "entry", originalIndex: 0, currentPosition: .zero, anchor: nil),
+        PolicyCanvasLayoutNode(
+          id: "target", groupID: "terminal", originalIndex: 1, currentPosition: .zero, anchor: nil),
+      ],
+      edges: [
+        PolicyCanvasLayoutEdge(id: "source-target", sourceNodeID: "source", targetNodeID: "target")
+      ],
+      groups: [
+        PolicyCanvasLayoutGroup(id: "entry", originalIndex: 0, memberNodeIDs: ["source"]),
+        PolicyCanvasLayoutGroup(id: "terminal", originalIndex: 1, memberNodeIDs: ["target"]),
+      ]
+    )
+  }
+
+  func densePressureGraph(sinkCount: Int) -> PolicyCanvasLayoutGraph {
+    let sinks = (0..<sinkCount).map { index in
+      PolicyCanvasLayoutNode(
+        id: "sink-\(index)",
+        groupID: "terminal",
+        originalIndex: index + 1,
+        currentPosition: .zero,
+        anchor: nil
+      )
+    }
+    return PolicyCanvasLayoutGraph(
+      nodes: [
+        PolicyCanvasLayoutNode(
+          id: "source", groupID: "entry", originalIndex: 0, currentPosition: .zero, anchor: nil)
+      ] + sinks,
+      edges: sinks.map { sink in
+        PolicyCanvasLayoutEdge(
+          id: "source-\(sink.id)",
+          sourceNodeID: "source",
+          targetNodeID: sink.id
+        )
+      },
+      groups: [
+        PolicyCanvasLayoutGroup(id: "entry", originalIndex: 0, memberNodeIDs: ["source"]),
+        PolicyCanvasLayoutGroup(
+          id: "terminal",
+          originalIndex: 1,
+          memberNodeIDs: sinks.map(\.id)
+        ),
+      ]
+    )
+  }
+
+  func harnessRankAssignment(for graph: PolicyCanvasLayoutGraph) -> PolicyCanvasRankAssignmentOutput {
+    PolicyCanvasHarnessGroupAwareLongestPathLayering().assignRanks(
+      input: PolicyCanvasRankAssignmentInput(
+        graph: graph,
+        nodeIDs: graph.nodes.map(\.id),
+        originalOrder: Dictionary(
+          uniqueKeysWithValues: graph.nodes.map { ($0.id, $0.originalIndex) }),
+        edges: graph.edges,
+        mode: .initialLoad
+      )
+    )
+  }
+
   func multiGroupCollectorGraph() -> PolicyCanvasLayoutGraph {
     PolicyCanvasLayoutGraph(
       nodes: [

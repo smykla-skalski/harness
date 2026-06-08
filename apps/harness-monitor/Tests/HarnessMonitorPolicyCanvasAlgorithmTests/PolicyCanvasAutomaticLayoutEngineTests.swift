@@ -166,6 +166,77 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
     #expect(sinkX.count >= 2)
   }
 
+  @Test("harness group placement follows reduced same-rank layer ordering")
+  func harnessGroupPlacementFollowsReducedSameRankLayerOrdering() {
+    let result = PolicyCanvasDecoupledSugiyamaLayoutEngine(
+      mode: .initialLoad,
+      selection: .referenceRouting
+    ).layout(graph: sameRankGroupOrderingGraph())
+    guard
+      let result,
+      let targetA = result.nodePositions["target-a"],
+      let targetB = result.nodePositions["target-b"]
+    else {
+      Issue.record("Expected layout result for the same-rank ordering graph")
+      return
+    }
+
+    #expect(
+      targetA.y < targetB.y,
+      "target groups should follow the crossing-reduced layer order, not sample declaration order"
+    )
+    #expect(result.metrics.edgeCrossingCount == 0)
+  }
+
+  @Test("layered engine follows reduced same-rank group ordering")
+  func layeredEngineFollowsReducedSameRankGroupOrdering() {
+    let result = PolicyCanvasLayeredLayoutEngine(mode: .initialLoad).layout(
+      graph: sameRankGroupOrderingGraph()
+    )
+    guard
+      let result,
+      let targetA = result.nodePositions["target-a"],
+      let targetB = result.nodePositions["target-b"]
+    else {
+      Issue.record("Expected layout result for the same-rank ordering graph")
+      return
+    }
+
+    #expect(targetA.y < targetB.y)
+    #expect(result.metrics.edgeCrossingCount == 0)
+  }
+
+  @Test("layout spacing scales with rank and degree pressure")
+  func layoutSpacingScalesWithRankAndDegreePressure() {
+    let sparse = sparsePressureGraph()
+    let dense = densePressureGraph(sinkCount: 9)
+    let sparseRanks = harnessRankAssignment(for: sparse)
+    let denseRanks = harnessRankAssignment(for: dense)
+
+    let sparseConfiguration = PolicyCanvasLayoutConfiguration.layeredDefault.pressureAdjusted(
+      graph: sparse,
+      rankAssignment: sparseRanks
+    )
+    let denseConfiguration = PolicyCanvasLayoutConfiguration.layeredDefault.pressureAdjusted(
+      graph: dense,
+      rankAssignment: denseRanks
+    )
+
+    #expect(
+      sparseConfiguration.rowSpacing == PolicyCanvasLayoutConfiguration.layeredDefault.rowSpacing
+    )
+    #expect(
+      denseConfiguration.rowSpacing > PolicyCanvasLayoutConfiguration.layeredDefault.rowSpacing
+    )
+    #expect(
+      denseConfiguration.columnSpacing > PolicyCanvasLayoutConfiguration.layeredDefault.columnSpacing
+    )
+    #expect(
+      denseConfiguration.interGroupSpacing
+        >= PolicyCanvasLayoutConfiguration.layeredDefault.interGroupSpacing
+    )
+  }
+
   @Test("post-comb overlap resolver enforces the node spacing gutter")
   func postCombOverlapResolverEnforcesNodeSpacingGutter() {
     let positions: [String: CGPoint] = [

@@ -39,6 +39,10 @@ struct PolicyCanvasDecoupledSugiyamaLayoutEngine: PolicyCanvasLayoutEngine {
         mode: mode
       )
     )
+    let resolvedConfiguration = configuration.pressureAdjusted(
+      graph: graph,
+      rankAssignment: rankAssignment
+    )
     let orderingGraph = algorithms.longEdgeNormalization.normalize(
       input: PolicyCanvasLongEdgeNormalizationInput(
         nodeIDs: nodeIDs,
@@ -50,21 +54,21 @@ struct PolicyCanvasDecoupledSugiyamaLayoutEngine: PolicyCanvasLayoutEngine {
     let orderedLayers = algorithms.layerOrdering.orderLayers(
       input: PolicyCanvasLayerOrderingInput(
         graph: orderingGraph,
-        maxPasses: configuration.sweepPassCount
+        maxPasses: resolvedConfiguration.sweepPassCount
       )
     )
     let coordinates = algorithms.coordinateAssignment.assignCoordinates(
       input: PolicyCanvasCoordinateAssignmentInput(
         layers: orderedLayers,
         graph: orderingGraph,
-        configuration: configuration
+        configuration: resolvedConfiguration
       )
     )
     let fallbackNodePositions = positionedNodes(
       graph: graph,
       ranks: rankAssignment.nodeRanks,
       itemCenterY: coordinates.itemCenterY,
-      configuration: configuration
+      configuration: resolvedConfiguration
     )
     let orderHints = policyCanvasLayerOrderHints(layers: orderedLayers, graph: orderingGraph)
     let groupOutput = algorithms.groupPlacement.placeGroups(
@@ -75,7 +79,7 @@ struct PolicyCanvasDecoupledSugiyamaLayoutEngine: PolicyCanvasLayoutEngine {
         itemCenterY: coordinates.itemCenterY,
         orderHints: orderHints,
         fallbackNodePositions: fallbackNodePositions,
-        configuration: configuration
+        configuration: resolvedConfiguration
       )
     )
     let processedLayout = processedLayout(

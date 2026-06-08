@@ -146,7 +146,13 @@ struct PolicyCanvasHarnessGroupFramePacking: PolicyCanvasGroupPlacementAlgorithm
     let groupOrder = engine.orderedGroups(
       normalizedGroups: inputs.normalizedGroups,
       groupRanks: inputs.groupRanks,
-      anchoredMinXByGroup: [:]
+      anchoredMinXByGroup: [:],
+      groupCenterY: engine.groupBarycenterY(
+        normalizedGroups: inputs.normalizedGroups,
+        layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID,
+        edges: inputs.acyclicNodeEdges,
+        itemCenterY: itemCenterY
+      )
     )
     for group in groupOrder {
       engine.placeUnconstrainedGroup(
@@ -157,6 +163,16 @@ struct PolicyCanvasHarnessGroupFramePacking: PolicyCanvasGroupPlacementAlgorithm
         accumulator: &accumulator
       )
     }
+    policyCanvasCompactParallelGroupBands(
+      input: PolicyCanvasParallelGroupBandCompactionInput(
+        groups: groupOrder,
+        edges: inputs.graph.edges,
+        groupRanks: inputs.groupRanks,
+        layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID,
+        configuration: inputs.configuration
+      ),
+      accumulator: &accumulator
+    )
     return PolicyCanvasGroupPlacementOutput(
       nodePositions: accumulator.nodePositions,
       groupFrames: accumulator.groupFrames,
@@ -224,6 +240,7 @@ struct PolicyCanvasTerminalCombAndSingleFedAlignment:
       nodePositions: input.nodePositions,
       edges: input.graph.edges
     )
+    nodePositions = policyCanvasResolveNodeOverlaps(nodePositions: nodePositions)
     var groupFrames = input.groupFrames
     var groupFramesByLayoutID = policyCanvasRebuiltGroupFramesByLayoutID(
       normalizedGroups: input.rankAssignment.normalizedGroups,

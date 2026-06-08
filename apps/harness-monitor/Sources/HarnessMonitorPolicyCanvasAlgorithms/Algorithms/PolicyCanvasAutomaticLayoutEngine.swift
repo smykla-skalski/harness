@@ -181,6 +181,57 @@ public struct PolicyCanvasLayoutConfiguration: Sendable {
     self.targetGroupAspectRatio = targetGroupAspectRatio
     self.sweepPassCount = sweepPassCount
   }
+
+  func pressureAdjusted(
+    graph: PolicyCanvasLayoutGraph,
+    rankAssignment: PolicyCanvasRankAssignmentOutput
+  ) -> Self {
+    guard graph.nodes.count > 1 else {
+      return self
+    }
+
+    let maxNodesInRank = Dictionary(grouping: rankAssignment.nodeRanks.values) { $0 }
+      .values
+      .map(\.count)
+      .max() ?? 1
+    let maxGroupsInRank = Dictionary(grouping: rankAssignment.scopeRanks.values) { $0 }
+      .values
+      .map(\.count)
+      .max() ?? 1
+    var incidentDegree: [String: Int] = [:]
+    var directedDegree: [String: Int] = [:]
+    for edge in graph.edges {
+      incidentDegree[edge.sourceNodeID, default: 0] += 1
+      incidentDegree[edge.targetNodeID, default: 0] += 1
+      directedDegree[edge.sourceNodeID, default: 0] += 1
+      directedDegree[edge.targetNodeID, default: 0] += 1
+    }
+    let maxIncidentDegree = incidentDegree.values.max() ?? 0
+    let maxDirectedDegree = directedDegree.values.max() ?? 0
+    let edgeDensity = CGFloat(graph.edges.count) / CGFloat(max(graph.nodes.count, 1))
+    let densityPressure = max(0, Int((edgeDensity - 1.5).rounded(.up)))
+    let layerPressure = max(0, maxNodesInRank - 3)
+    let siblingGroupPressure = max(0, maxGroupsInRank - 1)
+    let directedPressure = max(0, maxDirectedDegree - 3)
+    let incidentPressure = max(0, maxIncidentDegree - 4)
+    let laneStep = PolicyCanvasVisibilityRouter.laneSpreadStep
+
+    func extraSpacing(for pressure: Int, cap: Int) -> CGFloat {
+      snappedLayoutDelta(CGFloat(min(max(pressure, 0), cap)) * laneStep)
+    }
+
+    let rowPressure = max(layerPressure, siblingGroupPressure) + min(directedPressure, 4)
+    let columnPressure = incidentPressure + densityPressure
+    let groupPressure = siblingGroupPressure + min(directedPressure, 4) + densityPressure
+
+    return Self(
+      interGroupSpacing: interGroupSpacing + extraSpacing(for: groupPressure, cap: 8),
+      columnSpacing: columnSpacing + extraSpacing(for: columnPressure, cap: 6),
+      rowSpacing: rowSpacing + extraSpacing(for: rowPressure, cap: 8),
+      targetGroupAspectRatio: targetGroupAspectRatio,
+      sweepPassCount: sweepPassCount
+    )
+  }
 }
 
 protocol PolicyCanvasLayoutEngine {
@@ -222,13 +273,7 @@ struct PolicyCanvasLayeredLayoutEngine: PolicyCanvasLayoutEngine {
       return nil
     }
 
-    let normalizedGroups = normalizedGroups(for: graph)
     let nodesByID = Dictionary(uniqueKeysWithValues: graph.nodes.map { ($0.id, $0) })
-    let layoutGroupIDByNodeID = Dictionary(
-      uniqueKeysWithValues: normalizedGroups.flatMap { group in
-        group.nodeIDs.map { ($0, group.layoutID) }
-      }
-    )
     let anchoredNodeIDs = Set(
       graph.nodes.compactMap { node in
         node.anchor == nil ? nil : node.id
@@ -239,22 +284,28 @@ struct PolicyCanvasLayeredLayoutEngine: PolicyCanvasLayoutEngine {
         uniqueKeysWithValues: graph.nodes.map { ($0.id, $0.originalIndex) }),
       edges: graph.edges
     )
+    let rankAssignment = PolicyCanvasHarnessGroupAwareLongestPathLayering().assignRanks(
+      input: PolicyCanvasRankAssignmentInput(
+        graph: graph,
+        nodeIDs: graph.nodes.map(\.id),
+        originalOrder: Dictionary(
+          uniqueKeysWithValues: graph.nodes.map { ($0.id, $0.originalIndex) }),
+        edges: acyclicNodeEdges,
+        mode: mode
+      )
+    )
+    let resolvedConfiguration = configuration.pressureAdjusted(
+      graph: graph,
+      rankAssignment: rankAssignment
+    )
     let inputs = PolicyCanvasLayeredLayoutInputs(
       graph: graph,
-      normalizedGroups: normalizedGroups,
-      layoutGroupIDByNodeID: layoutGroupIDByNodeID,
-      groupRanks: groupRanks(
-        for: normalizedGroups,
-        edges: acyclicNodeEdges,
-        layoutGroupIDByNodeID: layoutGroupIDByNodeID
-      ),
-      internalRanks: internalRanks(
-        for: normalizedGroups,
-        edges: acyclicNodeEdges,
-        layoutGroupIDByNodeID: layoutGroupIDByNodeID
-      ),
-      acyclicNodeEdges: acyclicNodeEdges,
-      configuration: configuration
+      normalizedGroups: rankAssignment.normalizedGroups,
+      layoutGroupIDByNodeID: rankAssignment.layoutGroupIDByNodeID,
+      groupRanks: rankAssignment.scopeRanks,
+      internalRanks: rankAssignment.internalRanks,
+      acyclicNodeEdges: rankAssignment.acyclicEdges,
+      configuration: resolvedConfiguration
     )
 
     if anchoredNodeIDs.isEmpty {
