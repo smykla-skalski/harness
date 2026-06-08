@@ -68,11 +68,8 @@ func policyCanvasMeasureCorridors(
         horizontal: lhs.segment.isHorizontal,
         collinear: collinear
       )
-      if let existing = best[key] {
-        if policyCanvasCorridorExtentLength(violation) > policyCanvasCorridorExtentLength(existing) {
-          best[key] = violation
-        }
-      } else {
+      let existingExtent = best[key].map(policyCanvasCorridorExtentLength) ?? -1
+      if policyCanvasCorridorExtentLength(violation) > existingExtent {
         best[key] = violation
       }
     }
@@ -94,7 +91,9 @@ private func policyCanvasCorridorOverlapExtent(
   return (CGPoint(x: lhs.start.x, y: low), CGPoint(x: lhs.start.x, y: high))
 }
 
-private func policyCanvasCorridorExtentLength(_ violation: PolicyCanvasCorridorViolation) -> CGFloat {
+private func policyCanvasCorridorExtentLength(
+  _ violation: PolicyCanvasCorridorViolation
+) -> CGFloat {
   abs(violation.overlapEnd.x - violation.overlapStart.x)
     + abs(violation.overlapEnd.y - violation.overlapStart.y)
 }

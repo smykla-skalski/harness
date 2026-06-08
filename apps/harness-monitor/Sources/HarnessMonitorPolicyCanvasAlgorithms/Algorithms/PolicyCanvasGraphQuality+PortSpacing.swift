@@ -30,8 +30,18 @@ func policyCanvasMeasurePortSpacing(
     guard let first = routed.route.points.first, let last = routed.route.points.last else {
       continue
     }
-    policyCanvasAccumulateMarker(&sums, endpoint: routed.edge.source, point: first, edgeID: routed.edge.id)
-    policyCanvasAccumulateMarker(&sums, endpoint: routed.edge.target, point: last, edgeID: routed.edge.id)
+    policyCanvasAccumulateMarker(
+      &sums,
+      endpoint: routed.edge.source,
+      point: first,
+      edgeID: routed.edge.id
+    )
+    policyCanvasAccumulateMarker(
+      &sums,
+      endpoint: routed.edge.target,
+      point: last,
+      edgeID: routed.edge.id
+    )
   }
   var violations: [PolicyCanvasPortSpacingViolation] = []
   var markersByNodeSide: [String: [PolicyCanvasPortSide: [PolicyCanvasResolvedMarker]]] = [:]
@@ -124,9 +134,10 @@ private func policyCanvasMarkerSide(
     guard valid, distance <= tolerance else {
       return
     }
-    if best == nil || distance < best!.distance {
-      best = (side, distance)
+    if let current = best, distance >= current.distance {
+      return
     }
+    best = (side, distance)
   }
   consider(.leading, abs(point.x - frame.minX), withinVertical)
   consider(.trailing, abs(point.x - frame.maxX), withinVertical)
