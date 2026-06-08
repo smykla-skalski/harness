@@ -27,6 +27,7 @@ final class PolicyCanvasCenteringClipView: NSClipView {
   }
 
   override func setFrameSize(_ newSize: NSSize) {
+    let previousFrameSize = frame.size
     let preservedCenter: CGPoint?
     if bounds.width > 1, bounds.height > 1, documentView != nil {
       preservedCenter = CGPoint(x: bounds.midX, y: bounds.midY)
@@ -43,6 +44,13 @@ final class PolicyCanvasCenteringClipView: NSClipView {
     super.setFrameSize(newSize)
 
     guard let preservedCenter else {
+      return
+    }
+    if scrollView?.applyViewportFrameResizeZoomIfNeeded(
+      from: previousFrameSize,
+      to: newSize,
+      centeredAt: preservedCenter
+    ) == true {
       return
     }
 

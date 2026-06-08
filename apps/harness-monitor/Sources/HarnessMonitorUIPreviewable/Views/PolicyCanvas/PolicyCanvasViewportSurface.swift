@@ -17,6 +17,7 @@ public struct PolicyCanvasViewportSurface: View {
   let minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
   let canvasColorSchemeOverride: ColorScheme?
   let showsEdgeLegend: Bool
+  let resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior
   /// When true the surface re-runs the layered layout engine on appear and after
   /// every document load, so it reflects the algorithms rather than the
   /// document's authored seed coordinates. The Policy Canvas Lab sets this; the
@@ -42,6 +43,7 @@ public struct PolicyCanvasViewportSurface: View {
     minimapCenteringMode: PolicyCanvasMinimapCenteringMode? = nil,
     canvasColorScheme: ColorScheme? = nil,
     showsEdgeLegend: Bool = true,
+    resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior = .preserveZoom,
     forcesEngineLayout: Bool = false,
     reformatRequest: Int = 0,
     policyDisplayName: String? = nil
@@ -53,6 +55,7 @@ public struct PolicyCanvasViewportSurface: View {
     self.minimapCenteringModeOverride = minimapCenteringMode
     canvasColorSchemeOverride = canvasColorScheme
     self.showsEdgeLegend = showsEdgeLegend
+    self.resizeZoomBehavior = resizeZoomBehavior
     self.forcesEngineLayout = forcesEngineLayout
     self.reformatRequest = reformatRequest
     self.policyDisplayName = policyDisplayName
@@ -83,6 +86,7 @@ public struct PolicyCanvasViewportSurface: View {
       focusedComponent: $focusedComponentState,
       suppressesSceneStorage: true,
       storedPipelineStateRaw: "",
+      resizeZoomBehavior: resizeZoomBehavior,
       minimapCenteringModeOverride: minimapCenteringModeOverride,
       canvasColorSchemeOverride: canvasColorSchemeOverride,
       showsEdgeLegend: showsEdgeLegend

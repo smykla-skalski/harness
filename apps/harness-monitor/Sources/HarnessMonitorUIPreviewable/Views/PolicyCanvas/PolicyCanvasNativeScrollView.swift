@@ -3,6 +3,11 @@ import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
+public enum PolicyCanvasViewportResizeZoomBehavior: Equatable {
+  case preserveZoom
+  case scaleProportionally
+}
+
 @MainActor
 final class PolicyCanvasNativeScrollView: NSScrollView {
   enum ScrollRequestResult: Equatable {
@@ -12,6 +17,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
 
   var magnificationDidChange: ((CGFloat) -> Void)?
   var viewportDidChange: ((PolicyCanvasViewportObservedState) -> Void)?
+  var viewportResizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior = .preserveZoom
 
   private let centeringClipView = PolicyCanvasCenteringClipView()
   private var interactionEnabled = true
@@ -238,6 +244,49 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     isPreservingViewportFrameResize = false
   }
 
+  func applyViewportFrameResizeZoomIfNeeded(
+    from previousFrameSize: CGSize,
+    to newFrameSize: CGSize,
+    centeredAt preservedCenter: CGPoint
+  ) -> Bool {
+    guard viewportResizeZoomBehavior == .scaleProportionally else {
+      return false
+    }
+    guard
+      previousFrameSize.width > 1,
+      previousFrameSize.height > 1,
+      newFrameSize.width > 1,
+      newFrameSize.height > 1
+    else {
+      return false
+    }
+    let resizeScale = min(
+      newFrameSize.width / previousFrameSize.width,
+      newFrameSize.height / previousFrameSize.height
+    )
+    guard resizeScale.isFinite, resizeScale > 0 else {
+      return false
+    }
+    let targetZoom = policyCanvasClampedViewportResizeZoom(
+      magnification * resizeScale,
+      fallback: magnification
+    )
+    guard abs(targetZoom - magnification) > 0.001 else {
+      return false
+    }
+    setMagnification(targetZoom, centeredAt: preservedCenter)
+    contentView.scroll(
+      to: CGPoint(
+        x: preservedCenter.x - (contentView.bounds.width / 2),
+        y: preservedCenter.y - (contentView.bounds.height / 2)
+      )
+    )
+    super.reflectScrolledClipView(contentView)
+    magnificationDidChange?(magnification)
+    reportViewportStateIfNeeded()
+    return true
+  }
+
   private var currentDocumentOffset: CGPoint {
     let origin = visibleWorkspaceRect.origin
     return CGPoint(x: max(0, origin.x), y: max(0, origin.y))
@@ -398,4 +447,17 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   var visibleWorkspaceRect: CGRect {
     contentView.bounds
   }
+}
+
+private func policyCanvasClampedViewportResizeZoom(
+  _ candidate: CGFloat,
+  fallback: CGFloat
+) -> CGFloat {
+  guard candidate.isFinite else {
+    return fallback
+  }
+  return min(
+    PolicyCanvasLayout.maximumZoom,
+    max(PolicyCanvasLayout.minimumZoom, candidate)
+  )
 }

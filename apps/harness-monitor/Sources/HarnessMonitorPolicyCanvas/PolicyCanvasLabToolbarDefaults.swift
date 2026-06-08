@@ -4,9 +4,11 @@ import HarnessMonitorPolicyCanvasAlgorithms
 public enum PolicyCanvasLabToolbarDefaults {
   public static let sampleSelectionKey = "policyCanvasLabSampleSelection"
   public static let algorithmSelectionKey = "policyCanvasLabAlgorithmSelection"
+  public static let scalesZoomOnResizeKey = "policyCanvasLabScalesZoomOnResize"
   public static let defaultSampleSelectionRawValue = PolicyCanvasLabSamples.defaultSelectionID
   public static let defaultAlgorithmSelectionRawValue =
     PolicyCanvasAlgorithmSelection.referenceRouting.cacheIdentity
+  public static let scalesZoomOnResizeDefault = true
 
   public static func selection(
     in defaults: UserDefaults = .standard
@@ -19,6 +21,15 @@ public enum PolicyCanvasLabToolbarDefaults {
   ) -> PolicyCanvasAlgorithmSelection {
     algorithmSelection(rawValue: defaults.string(forKey: algorithmSelectionKey))
       ?? .referenceRouting
+  }
+
+  public static func scalesZoomOnResize(
+    in defaults: UserDefaults = .standard
+  ) -> Bool {
+    guard defaults.object(forKey: scalesZoomOnResizeKey) != nil else {
+      return scalesZoomOnResizeDefault
+    }
+    return defaults.bool(forKey: scalesZoomOnResizeKey)
   }
 
   public static func rawValue(for selection: PolicyCanvasLabSelection) -> String {

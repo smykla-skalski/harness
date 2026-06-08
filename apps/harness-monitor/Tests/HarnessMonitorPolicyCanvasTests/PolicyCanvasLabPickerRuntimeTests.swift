@@ -283,6 +283,26 @@ struct PolicyCanvasLabPickerRuntimeTests {
       }
     )
   }
+
+  @MainActor
+  @Test("the lab window defaults to proportional resize zoom")
+  func labWindowDefaultsToProportionalResizeZoom() async throws {
+    let suiteName = "PolicyCanvasLabPickerRuntimeTests.resizeZoom.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+
+    defer {
+      defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    let scrollView = try await labWindowScrollView(defaults: defaults)
+    #expect(scrollView.viewportResizeZoomBehavior == .scaleProportionally)
+
+    defaults.set(false, forKey: PolicyCanvasLabToolbarDefaults.scalesZoomOnResizeKey)
+
+    let optedOutScrollView = try await labWindowScrollView(defaults: defaults)
+    #expect(optedOutScrollView.viewportResizeZoomBehavior == .preserveZoom)
+  }
 }
 
 private struct PolicyCanvasLabPickerRenderedSnapshot: Equatable {
@@ -344,6 +364,42 @@ private struct RenderedCanvasGroupingSnapshot: Equatable {
   let nodeIDs: Set<String>
   let nodeGroupIDs: [String?]
   let groupIDs: [String]
+}
+
+@MainActor
+private func labWindowScrollView(
+  defaults: UserDefaults
+) async throws -> PolicyCanvasNativeScrollView {
+  let frame = CGRect(x: 0, y: 0, width: 1_400, height: 900)
+  let host = NSHostingView(
+    rootView: PolicyCanvasLabWindowView(
+      fixtureDocument: nil,
+      defaults: defaults
+    )
+  )
+  let window = NSWindow(
+    contentRect: frame,
+    styleMask: [.titled, .closable],
+    backing: .buffered,
+    defer: false
+  )
+
+  host.frame = frame
+  window.contentView = host
+  window.layoutIfNeeded()
+  host.layoutSubtreeIfNeeded()
+
+  let didMountScrollView = await waitUntil(timeout: .seconds(3)) {
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+    return descendant(of: host, as: PolicyCanvasNativeScrollView.self) != nil
+  }
+  let scrollView = try #require(descendant(of: host, as: PolicyCanvasNativeScrollView.self))
+  #expect(didMountScrollView)
+
+  window.orderOut(nil)
+  window.contentView = nil
+  return scrollView
 }
 
 @MainActor

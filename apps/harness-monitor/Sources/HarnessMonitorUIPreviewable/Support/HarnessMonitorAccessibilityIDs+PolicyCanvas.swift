@@ -34,6 +34,7 @@ extension HarnessMonitorAccessibility {
   public static let policyCanvasQualityMetrics = "harness.policy-canvas.quality-metrics"
   public static let policyCanvasQualityMetricsToggle =
     "harness.policy-canvas.quality-metrics.toggle"
+  public static let policyCanvasResizeZoomToggle = "harness.policy-canvas.resize-zoom.toggle"
   public static let policyCanvasInspector = "harness.policy-canvas.inspector"
   public static let policyCanvasValidationPanel = "harness.policy-canvas.validation"
   public static let policyCanvasValidationToggle = "harness.policy-canvas.validation.toggle"

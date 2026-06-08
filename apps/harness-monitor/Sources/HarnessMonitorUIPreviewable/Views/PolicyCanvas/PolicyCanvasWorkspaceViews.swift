@@ -15,6 +15,7 @@ struct PolicyCanvasViewport: View {
     { _, _ in }
   var saveDraft: @MainActor () -> Void = {}
   var canSave = false
+  var resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior = .preserveZoom
   var minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
   var canvasColorSchemeOverride: ColorScheme?
   var showsEdgeLegend = true
@@ -149,6 +150,7 @@ struct PolicyCanvasViewport: View {
         viewModel: viewModel,
         snapshot: hostedSnapshot,
         zoom: viewModel.zoom,
+        resizeZoomBehavior: resizeZoomBehavior,
         viewportIdentity: viewModel.pipelineIdentity,
         isActive: sceneFocusEnabled,
         isEmpty: viewModel.isEmpty,
