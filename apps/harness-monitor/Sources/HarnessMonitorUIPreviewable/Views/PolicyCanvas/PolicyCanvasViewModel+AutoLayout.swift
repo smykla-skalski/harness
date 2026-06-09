@@ -203,7 +203,8 @@ extension PolicyCanvasViewModel {
     )
     var nextPrecomputedRoutes = policyCanvasAppliedPrecomputedRoutes(
       result: result,
-      nodes: nextNodes
+      nodes: nextNodes,
+      edges: inputEdges
     )
     let hasPrecomputedRoutes = nextPrecomputedRoutes != nil
     if !hasPrecomputedRoutes, policyCanvasUsesSingleFedTerminalAlignment(algorithmSelection) {

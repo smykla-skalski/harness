@@ -435,6 +435,17 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
   }
 
   @MainActor
+  func testExtremeGalaxyRejectsDetachedPrecomputedRouteFastPath() throws {
+    let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "extreme-galaxy"))
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: sample.document, simulation: nil, audit: nil)
+
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+
+    XCTAssertNil(viewModel.precomputedRoutes)
+  }
+
+  @MainActor
   func testProductionAndLabForcedDefaultReformatMatch() throws {
     let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "default"))
     let productionViewModel = PolicyCanvasViewModel.liveStartupState(

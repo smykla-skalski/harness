@@ -208,7 +208,8 @@ struct PolicyCanvasGraphQualityGateTests {
       )
       var probePrecomputed = policyCanvasAppliedPrecomputedRoutes(
         result: elkProbe,
-        nodes: probeNodes
+        nodes: probeNodes,
+        edges: viewModel.edges
       )
       if policyCanvasUsesSingleFedTerminalAlignment(viewModel.algorithmSelection) {
         elkProbeSingleFedAlignment = true
