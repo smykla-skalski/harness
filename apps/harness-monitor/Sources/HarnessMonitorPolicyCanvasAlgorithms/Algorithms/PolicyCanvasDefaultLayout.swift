@@ -160,7 +160,8 @@ public func applyDefaultPolicyCanvasLayout(
   )
   let precomputedRoutes = policyCanvasAppliedPrecomputedRoutes(
     result: result,
-    nodes: nodes
+    nodes: nodes,
+    edges: edges
   )
   return (
     metrics: result.metrics,
@@ -171,19 +172,81 @@ public func applyDefaultPolicyCanvasLayout(
 
 public func policyCanvasAppliedPrecomputedRoutes(
   result: PolicyCanvasLayoutResult,
-  nodes: [PolicyCanvasNode]
+  nodes: [PolicyCanvasNode],
+  edges: [PolicyCanvasEdge]
 ) -> PolicyCanvasPrecomputedRouteSet? {
   guard let precomputedRoutes = result.precomputedRoutes else {
     return nil
   }
   let appliedPositions = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
-  for (nodeID, position) in result.nodePositions {
-    guard let applied = appliedPositions[nodeID] else {
-      continue
-    }
-    return precomputedRoutes.offsetBy(dx: applied.x - position.x, dy: applied.y - position.y)
+  let offsetRoutes: PolicyCanvasPrecomputedRouteSet
+  if let nodeID = result.nodePositions.keys.sorted().first,
+    let position = result.nodePositions[nodeID],
+    let applied = appliedPositions[nodeID]
+  {
+    offsetRoutes = precomputedRoutes.offsetBy(
+      dx: applied.x - position.x,
+      dy: applied.y - position.y
+    )
+  } else {
+    offsetRoutes = precomputedRoutes
   }
-  return precomputedRoutes
+  guard
+    policyCanvasPrecomputedRouteTerminalsAttach(
+      precomputedRoutes: offsetRoutes,
+      nodes: nodes,
+      edges: edges
+    )
+  else {
+    return nil
+  }
+  return offsetRoutes
+}
+
+private func policyCanvasPrecomputedRouteTerminalsAttach(
+  precomputedRoutes: PolicyCanvasPrecomputedRouteSet,
+  nodes: [PolicyCanvasNode],
+  edges: [PolicyCanvasEdge]
+) -> Bool {
+  let edgeIDs = Set(edges.map(\.id))
+  guard precomputedRoutes.routes.count == edgeIDs.count,
+    Set(precomputedRoutes.routes.keys) == edgeIDs
+  else {
+    return false
+  }
+  let nodeFrames = Dictionary(
+    uniqueKeysWithValues: nodes.map {
+      ($0.id, CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize))
+    }
+  )
+  for edge in edges {
+    guard
+      let route = precomputedRoutes.routes[edge.id],
+      let first = route.points.first,
+      let last = route.points.last,
+      let sourceFrame = nodeFrames[edge.source.nodeID],
+      let targetFrame = nodeFrames[edge.target.nodeID],
+      policyCanvasPrecomputedRouteTerminal(first, attachesTo: sourceFrame),
+      policyCanvasPrecomputedRouteTerminal(last, attachesTo: targetFrame)
+    else {
+      return false
+    }
+  }
+  return true
+}
+
+private func policyCanvasPrecomputedRouteTerminal(
+  _ point: CGPoint,
+  attachesTo frame: CGRect
+) -> Bool {
+  let tolerance = PolicyCanvasLayout.portDiameter
+  let withinVertical = point.y >= frame.minY - tolerance && point.y <= frame.maxY + tolerance
+  let withinHorizontal = point.x >= frame.minX - tolerance && point.x <= frame.maxX + tolerance
+  let onLeading = withinVertical && abs(point.x - frame.minX) <= tolerance
+  let onTrailing = withinVertical && abs(point.x - frame.maxX) <= tolerance
+  let onTop = withinHorizontal && abs(point.y - frame.minY) <= tolerance
+  let onBottom = withinHorizontal && abs(point.y - frame.maxY) <= tolerance
+  return onLeading || onTrailing || onTop || onBottom
 }
 
 /// Derive routing metadata from the layout that is already on the canvas.
