@@ -30,6 +30,10 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
   /// reads as detached from its port. Below a full port diameter the wire end
   /// still meets the dot.
   public var portDetachDistance: CGFloat
+  /// Distance from a route bend to a label box within which the label reads as
+  /// crowding the turn. A turn inside the box (gap 0) or within this margin of
+  /// its edge counts.
+  public var labelTurnClearance: CGFloat
 
   public init(
     minimumPortSpacing: CGFloat,
@@ -41,7 +45,8 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     detourExcess: CGFloat,
     nodeDistanceGap: CGFloat,
     wrongTurnDepth: CGFloat,
-    portDetachDistance: CGFloat
+    portDetachDistance: CGFloat,
+    labelTurnClearance: CGFloat
   ) {
     self.minimumPortSpacing = minimumPortSpacing
     self.markerOverlap = markerOverlap
@@ -53,6 +58,7 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     self.nodeDistanceGap = nodeDistanceGap
     self.wrongTurnDepth = wrongTurnDepth
     self.portDetachDistance = portDetachDistance
+    self.labelTurnClearance = labelTurnClearance
   }
 
   public static let `default` = Self(
@@ -67,7 +73,9 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     // Two-thirds of a port marker: shorter backtracks sit within the dot.
     wrongTurnDepth: PolicyCanvasLayout.portDiameter / 1.5,
     // A full port diameter: the wire end is a dot-width clear of the dot.
-    portDetachDistance: PolicyCanvasLayout.portDiameter
+    portDetachDistance: PolicyCanvasLayout.portDiameter,
+    // Half a port marker: a bend within this of the label box crowds the corner.
+    labelTurnClearance: PolicyCanvasLayout.portDiameter / 2
   )
 }
 

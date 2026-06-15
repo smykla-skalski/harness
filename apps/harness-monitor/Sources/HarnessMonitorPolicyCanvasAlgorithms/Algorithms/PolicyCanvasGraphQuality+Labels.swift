@@ -55,6 +55,11 @@ func policyCanvasMeasureLabels(
     }
   }
   let sortedNodes = nodeFramesByID.sorted { $0.key < $1.key }
+  // Turn points per edge, computed once: the label-near-turn pass compares every
+  // label box against every wire's bends, its own included.
+  let turnsByEdge =
+    routedEdges
+    .map { (edgeID: $0.edge.id, turns: policyCanvasRouteTurnPoints($0.route)) }
   for item in labeled {
     for (nodeID, frame) in sortedNodes where !item.endpoints.contains(nodeID) {
       guard item.frame.intersects(frame) else {
@@ -82,8 +87,75 @@ func policyCanvasMeasureLabels(
         )
       )
     }
+    // The label box laid over a wire that is not the one it names. The label's
+    // own route runs through its box by design, so only foreign routes count.
+    for routed in routedEdges where routed.edge.id != item.edgeID {
+      guard policyCanvasRouteIntersectsObstacles(routed.route, obstacles: [item.frame]) else {
+        continue
+      }
+      violations.append(
+        PolicyCanvasLabelViolation(
+          kind: .crossesEdge,
+          edgeID: item.edgeID,
+          otherID: routed.edge.id,
+          frame: item.frame,
+          distance: 0
+        )
+      )
+    }
+    // The label box overlapping or crowding a bend - one hit per crowding edge,
+    // at its nearest qualifying turn.
+    for entry in turnsByEdge {
+      let nearest = entry.turns.reduce(CGFloat.greatestFiniteMagnitude) { best, turn in
+        min(best, policyCanvasPointToRectGap(turn, item.frame))
+      }
+      guard nearest <= thresholds.labelTurnClearance else {
+        continue
+      }
+      violations.append(
+        PolicyCanvasLabelViolation(
+          kind: .nearTurn,
+          edgeID: item.edgeID,
+          otherID: entry.edgeID,
+          frame: item.frame,
+          distance: nearest
+        )
+      )
+    }
   }
   return violations.sorted(by: policyCanvasLabelViolationOrder)
+}
+
+/// Interior vertices where a route changes direction - the visible corners. A
+/// vertex counts when the step direction of the segment arriving at it differs
+/// from the segment leaving it (a 90-degree bend or a reversal). Collinear runs
+/// produce no turn.
+private func policyCanvasRouteTurnPoints(_ route: PolicyCanvasEdgeRoute) -> [CGPoint] {
+  let segments = policyCanvasRouteSegments(route)
+  guard segments.count >= 2 else {
+    return []
+  }
+  var turns: [CGPoint] = []
+  for index in 1..<segments.count where policyCanvasSegmentDirection(segments[index - 1])
+    != policyCanvasSegmentDirection(segments[index])
+  {
+    turns.append(segments[index - 1].end)
+  }
+  return turns
+}
+
+private func policyCanvasSegmentDirection(_ segment: PolicyCanvasRouteSegment) -> (Int, Int) {
+  func unit(_ value: CGFloat) -> Int {
+    value > 0.001 ? 1 : (value < -0.001 ? -1 : 0)
+  }
+  return (unit(segment.end.x - segment.start.x), unit(segment.end.y - segment.start.y))
+}
+
+/// Shortest distance from a point to a rectangle, zero when the point is inside.
+private func policyCanvasPointToRectGap(_ point: CGPoint, _ rect: CGRect) -> CGFloat {
+  let dx = max(rect.minX - point.x, 0, point.x - rect.maxX)
+  let dy = max(rect.minY - point.y, 0, point.y - rect.maxY)
+  return hypot(dx, dy)
 }
 
 private func policyCanvasPointToRouteDistance(

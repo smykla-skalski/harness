@@ -33,7 +33,7 @@ struct PolicyCanvasQualityMarkerSwatch: View {
         wrongTurnGlyph(&context, rect, tint)
       case .crossedPorts:
         crossedPortsGlyph(&context, rect, tint)
-      case .labelOverlaps, .labelOnBody, .labelAdrift:
+      case .labelOverlaps, .labelOnBody, .labelAdrift, .labelOnEdge, .labelNearTurn:
         thinOutline(&context, rect, tint)
       case .nodeOverlaps:
         filledRect(&context, rect, tint)
