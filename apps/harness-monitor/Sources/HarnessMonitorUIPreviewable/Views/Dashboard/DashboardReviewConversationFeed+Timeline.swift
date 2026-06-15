@@ -46,9 +46,10 @@ extension DashboardReviewConversationFeed {
     let zone = dateTimeConfiguration.customTimeZoneIdentifier
     let cursor = viewModel.startCursor ?? ""
     let showsActivity = preferences.showActivityTimeline.description
+    let showsInlineComments = preferences.showActivityInlineComments.description
     let collapsesHeavyThreads = preferences.timelineAutoCollapseHeavyReviewThreads.description
     return "\(viewModel.revision):\(cursor):\(zone):\(preferences.timelineHiddenKindsRaw):"
-      + "\(showsActivity):\(collapsesHeavyThreads)"
+      + "\(showsActivity):\(showsInlineComments):\(collapsesHeavyThreads)"
   }
 
   func loadKey(_ preferences: DashboardReviewsPreferences) -> ReviewTimelineTaskKey {

@@ -253,6 +253,9 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(reviewsSection.contains("SettingsReviewsTimelinePane("))
     let timelinePane = try sourceFile(named: "SettingsReviewsTimelinePane.swift")
     #expect(timelinePane.contains("Text(\"Hidden Event Types\")"))
+    #expect(timelinePane.contains("Toggle(\"Show activity timeline\""))
+    #expect(timelinePane.contains("\"Show inline comments in activity timeline\""))
+    #expect(timelinePane.contains("$draft.showActivityInlineComments"))
     #expect(timelinePane.contains("TextField(\"Search\", text: $hiddenKindsSearchText)"))
     #expect(timelinePane.contains("ForEach(filteredHiddenKinds, id: \\.rawValue)"))
   }

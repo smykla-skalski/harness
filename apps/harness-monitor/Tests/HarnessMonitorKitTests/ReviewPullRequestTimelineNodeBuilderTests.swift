@@ -152,6 +152,23 @@ final class ReviewPullRequestTimelineNodeBuilderTests: XCTestCase {
       ])
   }
 
+  func testInlineConversationRowsCanBeDisabled() {
+    let nodes = ReviewPullRequestTimelineNodeBuilder().buildNodes(
+      for: Self.fullContentSheetEntries(),
+      pullRequestID: "PR_1",
+      showInlineComments: false,
+      configuration: .default
+    )
+
+    XCTAssertEqual(nodes.map(\.identity), [
+      .entry("issue-1"),
+      .entry("issue-hidden"),
+      .entry("review-1"),
+      .entry("commit-1"),
+    ])
+    XCTAssertTrue(nodes.allSatisfy { $0.reviewInlineConversation == nil })
+  }
+
   func testInlineConversationRowsRenderInlineInsteadOfUsingFullContentSheet() throws {
     let entries = Self.fullContentSheetEntries()
 
