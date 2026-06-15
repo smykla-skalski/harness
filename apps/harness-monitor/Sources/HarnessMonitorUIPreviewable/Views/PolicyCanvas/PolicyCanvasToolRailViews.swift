@@ -10,6 +10,7 @@ struct PolicyCanvasComponentLibraryPane: View {
 
   var body: some View {
     let metrics = PolicyCanvasToolRailMetrics(fontScale: fontScale)
+    let paneWidth = Self.libraryPaneWidth(metrics: metrics)
     VStack(alignment: .leading, spacing: 0) {
       ScrollView {
         // The palette is a library of draggable command buttons, not selectable
@@ -24,12 +25,13 @@ struct PolicyCanvasComponentLibraryPane: View {
       }
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasToolRail)
     }
-    // Native `List` does not report a useful horizontal intrinsic size inside
-    // this two-pane HStack, so the pane owns a measured content width instead.
-    .frame(
-      width: Self.libraryPaneWidth(metrics: metrics),
-      alignment: .topLeading
-    )
+    // The tool rail wraps a vertical ScrollView, which reports no useful
+    // horizontal intrinsic size inside this two-pane HStack, so the pane carries
+    // its own measured content width. That width is a *suggested* size (ideal and
+    // max), not a hard pin: when the detail column narrows below it the pane
+    // yields instead of overflowing the HStack and sliding the canvas left under
+    // the navigation sidebar.
+    .frame(idealWidth: paneWidth, maxWidth: paneWidth, alignment: .topLeading)
     .frame(
       maxHeight: .infinity,
       alignment: .topLeading
