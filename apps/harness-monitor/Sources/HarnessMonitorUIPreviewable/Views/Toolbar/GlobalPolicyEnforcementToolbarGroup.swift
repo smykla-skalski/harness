@@ -23,6 +23,10 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
     policyWorkspace?.globalPolicyEnforcementEnabled ?? true
   }
 
+  private var globalEnforcementButtonDisabled: Bool {
+    store.connectionState != .online || store.isDaemonActionInFlight
+  }
+
   private var globalEnforcementButton: some View {
     // Keep this plain so AppKit supplies the native toolbar platter.
     Button {
@@ -44,7 +48,7 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
           )
       }
     }
-    .disabled(store.isDaemonActionInFlight)
+    .disabled(globalEnforcementButtonDisabled)
     .foregroundStyle(globalPolicyEnforcementEnabled ? Color.green : Color.red)
     .animation(.snappy(duration: 0.18), value: globalPolicyEnforcementEnabled)
     .help(globalEnforcementHelpText)
@@ -62,6 +66,9 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
   }
 
   private var globalEnforcementHelpText: String {
+    guard store.connectionState == .online else {
+      return "Global policy enforcement requires a connected daemon"
+    }
     if globalPolicyEnforcementEnabled {
       return "Global policy enforcement is enabled"
     }
@@ -70,7 +77,7 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
 
   @MainActor
   private func setGlobalPolicyEnforcementEnabled(_ enabled: Bool) {
-    guard !store.isDaemonActionInFlight else {
+    guard !globalEnforcementButtonDisabled else {
       return
     }
     Task { @MainActor in
