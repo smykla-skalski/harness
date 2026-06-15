@@ -176,6 +176,7 @@ public struct PolicyCanvasLabWindowView: View {
       showsEdgeLegend: false,
       resizeZoomBehavior: viewportResizeZoomBehavior,
       showsQualityInspection: showsQualityMetrics,
+      usesElkLayoutForSmallGraphs: true,
       forcesEngineLayout: true,
       reformatRequest: reformatRequestID,
       policyDisplayName: samplePickerTitle
@@ -349,7 +350,8 @@ public struct PolicyCanvasLabWindowView: View {
           policyCanvasPrewarmLabSampleLayouts(
             document: sample.document,
             policyGroupTitle: sample.name,
-            algorithmSelection: algorithmSelection
+            algorithmSelection: algorithmSelection,
+            usesElkLayoutForSmallGraphs: true
           )
           await Task.yield()
         }

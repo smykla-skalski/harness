@@ -71,14 +71,16 @@ func policyCanvasLoadedGraph(
 func policyCanvasPrewarmLabSampleLayouts(
   document: TaskBoardPolicyPipelineDocument,
   policyGroupTitle: String?,
-  algorithmSelection: PolicyCanvasAlgorithmSelection
+  algorithmSelection: PolicyCanvasAlgorithmSelection,
+  usesElkLayoutForSmallGraphs: Bool = false
 ) {
   let graph = policyCanvasLoadedGraph(from: document, policyGroupTitle: policyGroupTitle)
   let initialLayout = policyCanvasCleanInitialLayout(
     nodes: graph.nodes,
     groups: graph.groups,
     edges: graph.mappedEdges,
-    algorithmSelection: algorithmSelection
+    algorithmSelection: algorithmSelection,
+    usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
   )
   let initialNodeLookup = PolicyCanvasNodeLookup(nodes: initialLayout.nodes)
   let reflowEdges = policyCanvasFoldParallelBranches(graph.mappedEdges).map { edge in
@@ -92,7 +94,8 @@ func policyCanvasPrewarmLabSampleLayouts(
     groups: initialLayout.groups,
     edges: reflowEdges,
     mode: .explicitReflow(preserveManualAnchors: false),
-    algorithmSelection: algorithmSelection
+    algorithmSelection: algorithmSelection,
+    usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
   )
 }
 

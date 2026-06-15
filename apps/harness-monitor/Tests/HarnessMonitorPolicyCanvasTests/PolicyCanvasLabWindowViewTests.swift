@@ -123,6 +123,24 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(source.contains("PolicyCanvasViewportSurface("))
     XCTAssertTrue(source.contains("algorithmSelection: algorithmSelection"))
     XCTAssertTrue(source.contains("showsQualityInspection: showsQualityMetrics"))
+    XCTAssertTrue(source.contains("usesElkLayoutForSmallGraphs: true"))
+  }
+
+  @MainActor
+  func testLabElkDefaultAppliesToSmallSamples() throws {
+    let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "default"))
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: sample.document,
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: nil,
+      policyGroupTitle: sample.name,
+      usesElkLayoutForSmallGraphs: true
+    )
+
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+
+    XCTAssertEqual(viewModel.precomputedRoutes?.routes.count, viewModel.edges.count)
   }
 
   func testLabSamplePickerToolbarDoesNotExposeGroupsToggle() throws {

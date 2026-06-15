@@ -190,7 +190,8 @@ extension PolicyCanvasViewModel {
         // seed for the engine. Forced full reformat records the chosen output's
         // signature so repeated presses become a fixed point.
         mode: .explicitReflow(preserveManualAnchors: preservesManualAnchors),
-        algorithmSelection: algorithmSelection
+        algorithmSelection: algorithmSelection,
+        usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
       )
     else {
       return nil
