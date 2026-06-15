@@ -85,6 +85,18 @@ enum DashboardReviewConversationFullContentResolver {
 struct DashboardReviewConversationFullContentSheet: View {
   let content: DashboardReviewConversationFullContent
   let fontScale: CGFloat
+  @State private var sheetMetrics = DashboardReviewConversationFullContentSheetMetrics.fallback
+
+  private let preferredBodyWidth: CGFloat
+
+  init(content: DashboardReviewConversationFullContent, fontScale: CGFloat) {
+    self.content = content
+    self.fontScale = fontScale
+    preferredBodyWidth = DashboardReviewConversationFullContentSheetMetrics.preferredBodyWidth(
+      for: content,
+      fontScale: fontScale
+    )
+  }
 
   var body: some View {
     ScrollView {
@@ -101,21 +113,22 @@ struct DashboardReviewConversationFullContentSheet: View {
         Divider()
         HarnessMonitorMarkdownText(content.markdown, textSelection: .enabled)
       }
+      .frame(width: sheetMetrics.bodyWidth(for: preferredBodyWidth), alignment: .leading)
       .padding(.top, HarnessMonitorTheme.spacingLG)
       .padding(.horizontal, HarnessMonitorTheme.spacingLG)
       .padding(.bottom, HarnessMonitorTheme.spacingLG)
     }
+    .frame(width: sheetMetrics.contentWidth(for: preferredBodyWidth))
+    .frame(maxHeight: sheetMetrics.maxHeight)
     .background(Color(nsColor: .windowBackgroundColor))
-    .background(DashboardReviewConversationFullContentSheetMetricsReader())
+    .background(DashboardReviewConversationFullContentSheetMetricsReader(metrics: $sheetMetrics))
   }
 }
 
 struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
   static let fallbackToolbarHeight: CGFloat = 52
-  private static let defaultMinimumWidth: CGFloat = 360
-  private static let defaultIdealWidth: CGFloat = 760
-  private static let defaultMinimumHeight: CGFloat = 420
-  private static let defaultIdealHeight: CGFloat = 520
+  private static let minimumBodyWidth: CGFloat = 320
+  private static let maximumMeasuredBodyWidth: CGFloat = 1_200
 
   static let fallback = Self(
     maxWidth: 760,
@@ -127,69 +140,43 @@ struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
   let maxHeight: CGFloat
   let toolbarHeight: CGFloat
 
-  var minimumWidth: CGFloat {
-    min(Self.defaultMinimumWidth, maxWidth)
+  var maximumContentSize: CGSize {
+    CGSize(width: maxWidth, height: maxHeight)
   }
 
-  var idealWidth: CGFloat {
-    min(Self.defaultIdealWidth, maxWidth)
+  func contentWidth(for preferredBodyWidth: CGFloat) -> CGFloat {
+    let paddedWidth = bodyWidth(for: preferredBodyWidth) + Self.horizontalPadding
+    guard maxWidth > 0 else { return paddedWidth }
+    return min(maxWidth, paddedWidth)
   }
 
-  var minimumHeight: CGFloat {
-    min(Self.defaultMinimumHeight, maxHeight)
+  func bodyWidth(for preferredBodyWidth: CGFloat) -> CGFloat {
+    let fittedWidth = max(Self.minimumBodyWidth, preferredBodyWidth)
+    let availableBodyWidth = max(0, maxWidth - Self.horizontalPadding)
+    guard availableBodyWidth > 0 else { return fittedWidth }
+    return min(fittedWidth, availableBodyWidth)
   }
 
-  var idealHeight: CGFloat {
-    min(Self.defaultIdealHeight, maxHeight)
-  }
-
-  var minimumContentSize: CGSize {
-    CGSize(width: minimumWidth, height: minimumHeight)
-  }
-
-  func maximumContentSize(chromeSize: CGSize) -> CGSize {
-    CGSize(
-      width: max(0, maxWidth - chromeSize.width),
-      height: max(0, maxHeight - chromeSize.height)
-    )
-  }
-
-  func cappedContentSize(
-    for preferredSize: CGSize,
-    scrollDocumentSize: CGSize?,
-    chromeSize: CGSize,
-    expandsWidth: Bool
-  ) -> CGSize {
-    let maximumSize = maximumContentSize(chromeSize: chromeSize)
-    let preferredHeight = max(preferredSize.height, scrollDocumentSize?.height ?? 0)
-    return CGSize(
-      width: cappedWidth(for: preferredSize, maximumSize: maximumSize, expandsWidth: expandsWidth),
-      height: min(preferredHeight, maximumSize.height)
-    )
-  }
-
-  func overflowsAllowedViewport(scrollDocumentSize: CGSize?, chromeSize: CGSize) -> Bool {
-    guard let scrollDocumentSize else { return false }
-    let maximumSize = maximumContentSize(chromeSize: chromeSize)
-    return scrollDocumentSize.width > maximumSize.width
-      || scrollDocumentSize.height > maximumSize.height
-  }
-
-  private func cappedWidth(
-    for preferredSize: CGSize,
-    maximumSize: CGSize,
-    expandsWidth: Bool
+  static func preferredBodyWidth(
+    for content: DashboardReviewConversationFullContent,
+    fontScale: CGFloat
   ) -> CGFloat {
-    guard maximumSize.width > 0 else { return 0 }
-    if expandsWidth || preferredSize.width > maximumSize.width {
-      return maximumSize.width
-    }
-    return min(preferredSize.width, maximumSize.width)
+    let titleWidth = measuredLineWidth(
+      content.title,
+      font: .systemFont(ofSize: 20 * fontScale, weight: .semibold)
+    )
+    let sourceWidth = measuredLineWidth(
+      content.sourceLabel,
+      font: .systemFont(ofSize: 13 * fontScale)
+    )
+    let markdownWidth = preferredMarkdownWidth(content.markdown, fontScale: fontScale)
+    return min(max(titleWidth, sourceWidth, markdownWidth), maximumMeasuredBodyWidth)
   }
 
   static func resolved(
     parentFrame: CGRect?,
-    parentContentLayoutRect: CGRect?
+    parentContentLayoutRect: CGRect?,
+    sheetChromeSize: CGSize
   ) -> Self {
     guard let parentFrame else { return fallback }
     let toolbarHeight = resolvedToolbarHeight(
@@ -197,10 +184,14 @@ struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
       parentContentLayoutRect: parentContentLayoutRect
     )
     return Self(
-      maxWidth: max(0, parentFrame.width - (toolbarHeight * 2)),
-      maxHeight: max(0, parentFrame.height - (toolbarHeight * 2)),
+      maxWidth: max(0, parentFrame.width - (toolbarHeight * 2) - sheetChromeSize.width),
+      maxHeight: max(0, parentFrame.height - (toolbarHeight * 2) - sheetChromeSize.height),
       toolbarHeight: toolbarHeight
     )
+  }
+
+  private static var horizontalPadding: CGFloat {
+    HarnessMonitorTheme.spacingLG * 2
   }
 
   private static func resolvedToolbarHeight(
@@ -212,22 +203,58 @@ struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
     guard measured.isFinite, measured > 0 else { return fallbackToolbarHeight }
     return measured
   }
+
+  private static func preferredMarkdownWidth(_ markdown: String, fontScale: CGFloat) -> CGFloat {
+    let bodyFont = NSFont.systemFont(ofSize: 15 * fontScale)
+    let codeFont = NSFont.monospacedSystemFont(ofSize: 14 * fontScale, weight: .regular)
+    var maxWidth: CGFloat = 0
+    for line in markdown.components(separatedBy: .newlines) {
+      let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+      guard !trimmedLine.isEmpty else { continue }
+      let font = trimmedLine.hasPrefix("```") || trimmedLine.hasPrefix("    ") ? codeFont : bodyFont
+      maxWidth = max(maxWidth, measuredLineWidth(trimmedLine, font: font))
+    }
+    return maxWidth
+  }
+
+  private static func measuredLineWidth(_ line: String, font: NSFont) -> CGFloat {
+    let attributes: [NSAttributedString.Key: Any] = [.font: font]
+    let size = (line as NSString).boundingRect(
+      with: CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
+      options: [.usesLineFragmentOrigin, .usesFontLeading],
+      attributes: attributes
+    ).size
+    guard size.width.isFinite else { return 0 }
+    return ceil(size.width)
+  }
 }
 
 private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewRepresentable {
+  @Binding var metrics: DashboardReviewConversationFullContentSheetMetrics
+
   func makeNSView(context: Context) -> MetricsView {
-    MetricsView()
+    let view = MetricsView()
+    view.onMetricsChange = updateMetrics(_:)
+    return view
   }
 
   func updateNSView(_ nsView: MetricsView, context: Context) {
+    nsView.onMetricsChange = updateMetrics(_:)
     nsView.scheduleRefresh()
+  }
+
+  private func updateMetrics(_ nextMetrics: DashboardReviewConversationFullContentSheetMetrics) {
+    DispatchQueue.main.async {
+      guard metrics != nextMetrics else { return }
+      metrics = nextMetrics
+    }
   }
 
   final class MetricsView: NSView {
     private var appliedSizing: AppliedSizing?
     private var refreshScheduled = false
     private var parentWindowRetryCount = 0
-    private var expandsWidth = false
+    var onMetricsChange: ((DashboardReviewConversationFullContentSheetMetrics) -> Void)?
 
     override func viewDidMoveToWindow() {
       super.viewDidMoveToWindow()
@@ -252,7 +279,8 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
       parentWindowRetryCount = 0
       let metrics = DashboardReviewConversationFullContentSheetMetrics.resolved(
         parentFrame: parentWindow.frame,
-        parentContentLayoutRect: parentWindow.contentLayoutRect
+        parentContentLayoutRect: parentWindow.contentLayoutRect,
+        sheetChromeSize: frameChromeSize(for: sheetWindow)
       )
       apply(metrics, to: sheetWindow)
     }
@@ -262,81 +290,12 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
       to sheetWindow: NSWindow?
     ) {
       guard let sheetWindow else { return }
-      let chromeSize = frameChromeSize(for: sheetWindow)
-      let maximumContentSize = metrics.maximumContentSize(chromeSize: chromeSize)
-      guard maximumContentSize.width > 0, maximumContentSize.height > 0 else { return }
-      sheetWindow.contentMaxSize = maximumContentSize
-      sheetWindow.contentView?.layoutSubtreeIfNeeded()
-      let currentSize = sheetWindow.contentLayoutRect.size
-      let preferredSize = preferredContentSize(in: sheetWindow)
-      let scrollDocumentSize = scrollDocumentSize(in: sheetWindow)
-      if metrics.overflowsAllowedViewport(
-        scrollDocumentSize: scrollDocumentSize,
-        chromeSize: chromeSize
-      ) {
-        expandsWidth = true
-      }
-      let cappedSize = metrics.cappedContentSize(
-        for: preferredSize,
-        scrollDocumentSize: scrollDocumentSize,
-        chromeSize: chromeSize,
-        expandsWidth: expandsWidth
-      )
-      let sizing = AppliedSizing(maximumContentSize: maximumContentSize, targetContentSize: cappedSize)
+      guard metrics.maxWidth > 0, metrics.maxHeight > 0 else { return }
+      sheetWindow.contentMaxSize = metrics.maximumContentSize
+      onMetricsChange?(metrics)
+      let sizing = AppliedSizing(maximumContentSize: metrics.maximumContentSize)
       guard appliedSizing != sizing else { return }
       appliedSizing = sizing
-      guard
-        abs(currentSize.width - cappedSize.width) > 0.5
-          || abs(currentSize.height - cappedSize.height) > 0.5
-      else {
-        return
-      }
-      sheetWindow.setContentSize(cappedSize)
-      if abs(currentSize.width - cappedSize.width) > 0.5 {
-        scheduleRefresh()
-      }
-    }
-
-    private func preferredContentSize(in sheetWindow: NSWindow) -> CGSize {
-      let fittingSize = sheetWindow.contentView?.fittingSize ?? .zero
-      guard
-        fittingSize.width.isFinite,
-        fittingSize.height.isFinite,
-        fittingSize.width > 0,
-        fittingSize.height > 0
-      else {
-        return sheetWindow.contentLayoutRect.size
-      }
-      return fittingSize
-    }
-
-    private func scrollDocumentSize(in sheetWindow: NSWindow) -> CGSize? {
-      guard let scrollView = firstScrollView(in: sheetWindow.contentView) else { return nil }
-      scrollView.layoutSubtreeIfNeeded()
-      guard let documentView = scrollView.documentView else { return nil }
-      let fittingSize = documentView.fittingSize
-      let boundsSize = documentView.bounds.size
-      let size = CGSize(
-        width: max(fittingSize.width, boundsSize.width),
-        height: max(fittingSize.height, boundsSize.height)
-      )
-      guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else {
-        return nil
-      }
-      return size
-    }
-
-    private func firstScrollView(in view: NSView?) -> NSScrollView? {
-      guard let view else { return nil }
-      if let scrollView = view as? NSScrollView {
-        return scrollView
-      }
-      for subview in view.subviews {
-        if let scrollView = firstScrollView(in: subview) {
-          return scrollView
-        }
-      }
-      return nil
     }
 
     private func parentWindow(for sheetWindow: NSWindow) -> NSWindow? {
@@ -387,7 +346,6 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
 
     private struct AppliedSizing: Equatable {
       let maximumContentSize: CGSize
-      let targetContentSize: CGSize
     }
   }
 }
