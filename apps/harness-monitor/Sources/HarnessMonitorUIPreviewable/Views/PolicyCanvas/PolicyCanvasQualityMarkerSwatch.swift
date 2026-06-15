@@ -33,8 +33,16 @@ struct PolicyCanvasQualityMarkerSwatch: View {
         wrongTurnGlyph(&context, rect, tint)
       case .crossedPorts:
         crossedPortsGlyph(&context, rect, tint)
-      case .labelOverlaps, .labelOnBody, .labelAdrift, .labelOnEdge, .labelNearTurn:
-        thinOutline(&context, rect, tint)
+      case .labelOverlaps:
+        labelOverlapsGlyph(&context, rect, tint)
+      case .labelOnBody:
+        labelOnBodyGlyph(&context, rect, tint)
+      case .labelAdrift:
+        labelAdriftGlyph(&context, rect, tint)
+      case .labelOnEdge:
+        labelOnEdgeGlyph(&context, rect, tint)
+      case .labelNearTurn:
+        labelNearTurnGlyph(&context, rect, tint)
       case .nodeOverlaps:
         filledRect(&context, rect, tint)
       }
@@ -85,8 +93,55 @@ struct PolicyCanvasQualityMarkerSwatch: View {
     )
   }
 
-  private func thinOutline(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
-    context.stroke(Path(rect.insetBy(dx: 0, dy: 1)), with: .color(tint.opacity(0.85)), lineWidth: 1)
+  /// A small label-box rect centered in the swatch, the shared base every label
+  /// glyph decorates so the family still reads as "a label" while each kind's
+  /// decoration tells them apart.
+  private func labelBox(_ rect: CGRect) -> CGRect {
+    CGRect(x: rect.midX - 6, y: rect.midY - 3.5, width: 12, height: 7)
+  }
+
+  private func labelOverlapsGlyph(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
+    let box = labelBox(rect)
+    context.stroke(Path(box.offsetBy(dx: -1.5, dy: -1.5)), with: .color(tint), lineWidth: 1)
+    context.stroke(Path(box.offsetBy(dx: 1.5, dy: 1.5)), with: .color(tint), lineWidth: 1)
+  }
+
+  private func labelOnBodyGlyph(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
+    let box = labelBox(rect)
+    context.fill(Path(box), with: .color(tint.opacity(0.3)))
+    context.stroke(Path(box), with: .color(tint), lineWidth: 1.2)
+  }
+
+  private func labelAdriftGlyph(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
+    context.stroke(
+      Path(labelBox(rect)),
+      with: .color(tint.opacity(0.85)),
+      style: StrokeStyle(lineWidth: 1, dash: [2.5, 1.5])
+    )
+  }
+
+  private func labelOnEdgeGlyph(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
+    let box = labelBox(rect)
+    context.stroke(Path(box), with: .color(tint), lineWidth: 1)
+    var strike = Path()
+    strike.move(to: CGPoint(x: rect.minX, y: box.midY))
+    strike.addLine(to: CGPoint(x: rect.maxX, y: box.midY))
+    context.stroke(strike, with: .color(tint), lineWidth: 1.5)
+  }
+
+  private func labelNearTurnGlyph(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
+    let box = labelBox(rect)
+    context.stroke(Path(box), with: .color(tint), lineWidth: 1)
+    let arm: CGFloat = 4
+    var corner = Path()
+    corner.move(to: CGPoint(x: box.maxX - arm, y: box.minY))
+    corner.addLine(to: CGPoint(x: box.maxX, y: box.minY))
+    corner.addLine(to: CGPoint(x: box.maxX, y: box.minY + arm))
+    context.stroke(
+      corner,
+      with: .color(tint),
+      style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+    )
   }
 
   private func filledRect(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {

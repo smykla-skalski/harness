@@ -184,19 +184,60 @@ struct PolicyCanvasQualityOverlayMarks: View {
     context.stroke(collinear, with: .color(error.opacity(0.32)), style: style)
   }
 
-  /// Outline of each label that overlaps another, sits on a body, or drifted.
+  /// Each label defect marks its box, but with a distinct decoration per kind so
+  /// the five label categories read apart at a glance instead of being five
+  /// identical outlines: overlap is a doubled outline (stacked boxes), on-body a
+  /// filled box (covering something), adrift a dashed outline (loose), on-edge a
+  /// box struck through by a line (a wire runs across it), near-turn a box with an
+  /// L bracket (a crowded corner). The swatch legend mirrors each treatment.
   private func drawLabels(into context: inout GraphicsContext, error: Color, warning: Color) {
-    var errorPath = Path()
-    var warningPath = Path()
+    var overlapOuter = Path()
+    var overlapInner = Path()
+    var onBody = Path()
+    var adrift = Path()
+    var onEdgeBox = Path()
+    var onEdgeStrike = Path()
+    var nearTurnBox = Path()
+    var nearTurnCorner = Path()
     for violation in report.labels {
-      if violation.severity == .error {
-        errorPath.addRect(violation.frame)
-      } else {
-        warningPath.addRect(violation.frame)
+      let frame = violation.frame
+      switch violation.kind {
+      case .overlap:
+        overlapOuter.addRect(frame)
+        overlapInner.addRect(frame.insetBy(dx: 2.5, dy: 2.5))
+      case .onBody:
+        onBody.addRect(frame)
+      case .farFromEdge:
+        adrift.addRect(frame)
+      case .crossesEdge:
+        onEdgeBox.addRect(frame)
+        onEdgeStrike.move(to: CGPoint(x: frame.minX - 4, y: frame.midY))
+        onEdgeStrike.addLine(to: CGPoint(x: frame.maxX + 4, y: frame.midY))
+      case .nearTurn:
+        nearTurnBox.addRect(frame)
+        let arm: CGFloat = 6
+        nearTurnCorner.move(to: CGPoint(x: frame.maxX - arm, y: frame.minY))
+        nearTurnCorner.addLine(to: CGPoint(x: frame.maxX, y: frame.minY))
+        nearTurnCorner.addLine(to: CGPoint(x: frame.maxX, y: frame.minY + arm))
       }
     }
-    context.stroke(warningPath, with: .color(warning.opacity(0.7)), lineWidth: 1)
-    context.stroke(errorPath, with: .color(error.opacity(0.7)), lineWidth: 1)
+    context.fill(onBody, with: .color(error.opacity(0.22)))
+    context.stroke(onBody, with: .color(error.opacity(0.8)), lineWidth: 1)
+    context.stroke(overlapOuter, with: .color(error.opacity(0.8)), lineWidth: 1)
+    context.stroke(overlapInner, with: .color(error.opacity(0.8)), lineWidth: 1)
+    context.stroke(
+      adrift,
+      with: .color(warning.opacity(0.8)),
+      style: StrokeStyle(lineWidth: 1, dash: [3, 2])
+    )
+    context.stroke(onEdgeBox, with: .color(warning.opacity(0.8)), lineWidth: 1)
+    context.stroke(onEdgeStrike, with: .color(warning.opacity(0.9)), lineWidth: 1.5)
+    context.stroke(nearTurnBox, with: .color(warning.opacity(0.8)), lineWidth: 1)
+    context.stroke(
+      nearTurnCorner,
+      with: .color(warning.opacity(0.95)),
+      style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+    )
   }
 
   /// A dot at each proper crossing. Independent crossings (no shared endpoint)
