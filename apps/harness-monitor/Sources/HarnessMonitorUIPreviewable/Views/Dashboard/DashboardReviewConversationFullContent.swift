@@ -154,17 +154,34 @@ struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
     )
   }
 
-  func cappedContentSize(for preferredSize: CGSize, chromeSize: CGSize) -> CGSize {
+  func cappedContentSize(
+    for preferredSize: CGSize,
+    scrollDocumentSize: CGSize?,
+    chromeSize: CGSize,
+    expandsWidth: Bool
+  ) -> CGSize {
     let maximumSize = maximumContentSize(chromeSize: chromeSize)
+    let preferredHeight = max(preferredSize.height, scrollDocumentSize?.height ?? 0)
     return CGSize(
-      width: cappedWidth(for: preferredSize, maximumSize: maximumSize),
-      height: min(preferredSize.height, maximumSize.height)
+      width: cappedWidth(for: preferredSize, maximumSize: maximumSize, expandsWidth: expandsWidth),
+      height: min(preferredHeight, maximumSize.height)
     )
   }
 
-  private func cappedWidth(for preferredSize: CGSize, maximumSize: CGSize) -> CGFloat {
+  func overflowsAllowedViewport(scrollDocumentSize: CGSize?, chromeSize: CGSize) -> Bool {
+    guard let scrollDocumentSize else { return false }
+    let maximumSize = maximumContentSize(chromeSize: chromeSize)
+    return scrollDocumentSize.width > maximumSize.width
+      || scrollDocumentSize.height > maximumSize.height
+  }
+
+  private func cappedWidth(
+    for preferredSize: CGSize,
+    maximumSize: CGSize,
+    expandsWidth: Bool
+  ) -> CGFloat {
     guard maximumSize.width > 0 else { return 0 }
-    if preferredSize.width > maximumSize.width || preferredSize.height > maximumSize.height {
+    if expandsWidth || preferredSize.width > maximumSize.width {
       return maximumSize.width
     }
     return min(preferredSize.width, maximumSize.width)
@@ -210,6 +227,7 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
     private var appliedSizing: AppliedSizing?
     private var refreshScheduled = false
     private var parentWindowRetryCount = 0
+    private var expandsWidth = false
 
     override func viewDidMoveToWindow() {
       super.viewDidMoveToWindow()
@@ -251,7 +269,19 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
       sheetWindow.contentView?.layoutSubtreeIfNeeded()
       let currentSize = sheetWindow.contentLayoutRect.size
       let preferredSize = preferredContentSize(in: sheetWindow)
-      let cappedSize = metrics.cappedContentSize(for: preferredSize, chromeSize: chromeSize)
+      let scrollDocumentSize = scrollDocumentSize(in: sheetWindow)
+      if metrics.overflowsAllowedViewport(
+        scrollDocumentSize: scrollDocumentSize,
+        chromeSize: chromeSize
+      ) {
+        expandsWidth = true
+      }
+      let cappedSize = metrics.cappedContentSize(
+        for: preferredSize,
+        scrollDocumentSize: scrollDocumentSize,
+        chromeSize: chromeSize,
+        expandsWidth: expandsWidth
+      )
       let sizing = AppliedSizing(maximumContentSize: maximumContentSize, targetContentSize: cappedSize)
       guard appliedSizing != sizing else { return }
       appliedSizing = sizing
@@ -278,6 +308,35 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
         return sheetWindow.contentLayoutRect.size
       }
       return fittingSize
+    }
+
+    private func scrollDocumentSize(in sheetWindow: NSWindow) -> CGSize? {
+      guard let scrollView = firstScrollView(in: sheetWindow.contentView) else { return nil }
+      scrollView.layoutSubtreeIfNeeded()
+      guard let documentView = scrollView.documentView else { return nil }
+      let fittingSize = documentView.fittingSize
+      let boundsSize = documentView.bounds.size
+      let size = CGSize(
+        width: max(fittingSize.width, boundsSize.width),
+        height: max(fittingSize.height, boundsSize.height)
+      )
+      guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else {
+        return nil
+      }
+      return size
+    }
+
+    private func firstScrollView(in view: NSView?) -> NSScrollView? {
+      guard let view else { return nil }
+      if let scrollView = view as? NSScrollView {
+        return scrollView
+      }
+      for subview in view.subviews {
+        if let scrollView = firstScrollView(in: subview) {
+          return scrollView
+        }
+      }
+      return nil
     }
 
     private func parentWindow(for sheetWindow: NSWindow) -> NSWindow? {

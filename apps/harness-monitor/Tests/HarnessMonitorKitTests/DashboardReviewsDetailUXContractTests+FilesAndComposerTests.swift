@@ -125,6 +125,7 @@ extension DashboardReviewsDetailUXContractTests {
       )
     )
     #expect(conversation.contains("private var refreshScheduled = false"))
+    #expect(conversation.contains("private var expandsWidth = false"))
     #expect(!conversation.contains("sheetWindow.contentMinSize"))
     #expect(
       conversation.contains("let maximumContentSize = metrics.maximumContentSize(chromeSize: chromeSize)")
@@ -132,12 +133,16 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(conversation.contains("sheetWindow.contentMaxSize = maximumContentSize"))
     #expect(conversation.contains("sheetWindow.contentView?.layoutSubtreeIfNeeded()"))
     #expect(conversation.contains("let preferredSize = preferredContentSize(in: sheetWindow)"))
+    #expect(conversation.contains("let scrollDocumentSize = scrollDocumentSize(in: sheetWindow)"))
+    #expect(conversation.contains("metrics.overflowsAllowedViewport("))
+    #expect(conversation.contains("expandsWidth = true"))
+    #expect(conversation.contains("private func firstScrollView(in view: NSView?) -> NSScrollView?"))
     #expect(
       conversation.contains(
-        "let cappedSize = metrics.cappedContentSize(for: preferredSize, chromeSize: chromeSize)"
+        "scrollDocumentSize: scrollDocumentSize,"
       )
     )
-    #expect(conversation.contains("preferredSize.height > maximumSize.height"))
+    #expect(conversation.contains("expandsWidth: expandsWidth"))
     #expect(conversation.contains("return maximumSize.width"))
     #expect(conversation.contains("let sizing = AppliedSizing("))
     #expect(conversation.contains("guard appliedSizing != sizing else { return }"))
@@ -184,20 +189,32 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(
       metrics.cappedContentSize(
         for: CGSize(width: 600, height: 500),
-        chromeSize: CGSize(width: 8, height: 28)
+        scrollDocumentSize: nil,
+        chromeSize: CGSize(width: 8, height: 28),
+        expandsWidth: false
       ) == CGSize(width: 600, height: 500)
     )
     #expect(
       metrics.cappedContentSize(
         for: CGSize(width: 600, height: 900),
-        chromeSize: CGSize(width: 8, height: 28)
+        scrollDocumentSize: CGSize(width: 600, height: 900),
+        chromeSize: CGSize(width: 8, height: 28),
+        expandsWidth: true
       ) == CGSize(width: 1_072, height: 752)
     )
     #expect(
       metrics.cappedContentSize(
         for: CGSize(width: 1_600, height: 900),
-        chromeSize: CGSize(width: 8, height: 28)
+        scrollDocumentSize: CGSize(width: 1_600, height: 900),
+        chromeSize: CGSize(width: 8, height: 28),
+        expandsWidth: true
       ) == CGSize(width: 1_072, height: 752)
+    )
+    #expect(
+      metrics.overflowsAllowedViewport(
+        scrollDocumentSize: CGSize(width: 600, height: 900),
+        chromeSize: CGSize(width: 8, height: 28)
+      )
     )
   }
 
