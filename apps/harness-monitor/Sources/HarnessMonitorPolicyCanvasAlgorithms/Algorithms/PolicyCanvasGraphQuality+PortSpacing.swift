@@ -12,17 +12,18 @@ private struct PolicyCanvasResolvedMarker {
 /// exactly at `route.points.first` (source) / `.last` (target). Every dot is
 /// judged on the node side it actually lands on - a single logical port can fan
 /// its wires onto more than one side, so collapsing a port into one centroid
-/// would invent a mid-body point with no dot under it and report a phantom
-/// detached marker. Dots on one side that stack below the port diameter are an
-/// overlap; below the minimum spacing, a too-close warning; a dot that lands off
-/// every node edge is genuinely detached.
+/// would invent a mid-body point with no dot under it. Dots on one side that
+/// stack below the port diameter are an overlap; below the minimum spacing, a
+/// too-close warning. The detached case (a wire that does not reach its dot) is
+/// measured separately in `policyCanvasMeasurePortDetachment`, which compares the
+/// wire end against the rendered marker layout - a terminal landing off the node
+/// here is simply not bucketed onto any side.
 func policyCanvasMeasurePortSpacing(
   routedEdges: [PolicyCanvasRoutedEdge],
   nodeFramesByID: [String: CGRect],
   thresholds: PolicyCanvasGraphQualityThresholds
 ) -> [PolicyCanvasPortSpacingViolation] {
   var markersByNodeSide: [String: [PolicyCanvasPortSide: [PolicyCanvasResolvedMarker]]] = [:]
-  var detachedByNode: [String: [PolicyCanvasResolvedMarker]] = [:]
   let tolerance = PolicyCanvasLayout.portDiameter
   for routed in routedEdges {
     guard let first = routed.route.points.first, let last = routed.route.points.last else {
@@ -34,8 +35,7 @@ func policyCanvasMeasurePortSpacing(
       edgeID: routed.edge.id,
       nodeFramesByID: nodeFramesByID,
       tolerance: tolerance,
-      markersByNodeSide: &markersByNodeSide,
-      detachedByNode: &detachedByNode
+      markersByNodeSide: &markersByNodeSide
     )
     policyCanvasRegisterPortMarker(
       point: last,
@@ -43,26 +43,10 @@ func policyCanvasMeasurePortSpacing(
       edgeID: routed.edge.id,
       nodeFramesByID: nodeFramesByID,
       tolerance: tolerance,
-      markersByNodeSide: &markersByNodeSide,
-      detachedByNode: &detachedByNode
+      markersByNodeSide: &markersByNodeSide
     )
   }
   var violations: [PolicyCanvasPortSpacingViolation] = []
-  for markers in detachedByNode.values {
-    for marker in markers {
-      violations.append(
-        PolicyCanvasPortSpacingViolation(
-          kind: .detached,
-          nodeID: marker.nodeID,
-          side: marker.side,
-          point: marker.point,
-          otherPoint: nil,
-          gap: 0,
-          edgeIDs: marker.edgeIDs
-        )
-      )
-    }
-  }
   for sideMap in markersByNodeSide.values {
     for markers in sideMap.values {
       let sorted = markers.sorted { $0.alongAxis < $1.alongAxis }
@@ -85,29 +69,20 @@ func policyCanvasMeasurePortSpacing(
 }
 
 /// Resolve one route terminal to the node side it lands on and merge it into the
-/// per-side marker set, or the detached set when it lands off every edge.
+/// per-side marker set. A terminal that lands off every edge is dropped here -
+/// the detached signal is measured against the rendered marker layout instead.
 private func policyCanvasRegisterPortMarker(
   point: CGPoint,
   endpoint: PolicyCanvasPortEndpoint,
   edgeID: String,
   nodeFramesByID: [String: CGRect],
   tolerance: CGFloat,
-  markersByNodeSide: inout [String: [PolicyCanvasPortSide: [PolicyCanvasResolvedMarker]]],
-  detachedByNode: inout [String: [PolicyCanvasResolvedMarker]]
+  markersByNodeSide: inout [String: [PolicyCanvasPortSide: [PolicyCanvasResolvedMarker]]]
 ) {
   guard let frame = nodeFramesByID[endpoint.nodeID] else {
     return
   }
   guard let side = policyCanvasMarkerSide(point: point, frame: frame, tolerance: tolerance) else {
-    let fallbackSide: PolicyCanvasPortSide = endpoint.kind == .input ? .leading : .trailing
-    policyCanvasMergePortMarker(
-      into: &detachedByNode[endpoint.nodeID, default: []],
-      nodeID: endpoint.nodeID,
-      side: fallbackSide,
-      alongAxis: point.x,
-      point: point,
-      edgeID: edgeID
-    )
     return
   }
   let along: CGFloat = (side == .leading || side == .trailing) ? point.y : point.x
@@ -200,7 +175,7 @@ private func policyCanvasPortSpacingPairViolation(
   )
 }
 
-private func policyCanvasPortSpacingViolationOrder(
+func policyCanvasPortSpacingViolationOrder(
   _ lhs: PolicyCanvasPortSpacingViolation,
   _ rhs: PolicyCanvasPortSpacingViolation
 ) -> Bool {
