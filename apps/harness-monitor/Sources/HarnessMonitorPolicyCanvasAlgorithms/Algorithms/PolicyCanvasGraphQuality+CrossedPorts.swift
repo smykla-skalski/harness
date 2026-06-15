@@ -10,14 +10,17 @@ private struct PolicyCanvasSideTerminal {
   let point: CGPoint
 }
 
-/// Measure wires that picked the wrong port: two edges on one node side whose
-/// attach order along that side is inverted relative to where they come from, so
-/// the wires cross between the node and their far ends. The crossing-free order
-/// is the order of the far endpoints along the side axis (the same far-endpoint
-/// ordering the port-marker layout aims for); an adjacent pair that disagrees is
-/// a swap the layout should have made. These are crossings between edges that
-/// share the node, which the independent-crossing metric deliberately ignores,
-/// so they need their own signal.
+/// Measure wires that picked the wrong port: two edges on one node side - inputs
+/// on a leading/top side, outputs on a trailing/bottom side - whose attach order
+/// along that side is inverted relative to where they come from, so the wires
+/// cross between the node and their far ends. The crossing-free order is the order
+/// of the far endpoints along the side axis (the same far-endpoint ordering the
+/// port-marker layout aims for). Every inverted pair is a crossing, so all pairs
+/// on a side are compared, not just adjacent ones: a fan where two ports share an
+/// attach offset (overlapping markers) would otherwise break the adjacency chain
+/// and hide the real crossings on either side of it. These are crossings between
+/// edges that share the node, which the independent-crossing metric deliberately
+/// ignores, so they need their own signal.
 func policyCanvasMeasureCrossedPorts(
   routedEdges: [PolicyCanvasRoutedEdge],
   nodeFramesByID: [String: CGRect]
@@ -53,28 +56,30 @@ func policyCanvasMeasureCrossedPorts(
       let sorted = terminals.sorted {
         abs($0.offset - $1.offset) > 0.5 ? $0.offset < $1.offset : $0.edgeID < $1.edgeID
       }
-      for index in 1..<sorted.count {
-        let lower = sorted[index - 1]
-        let upper = sorted[index]
-        // Distinct attach points coming from distinct far positions, inverted:
-        // the earlier port is fed from farther along the axis than the later one.
-        guard
-          abs(lower.offset - upper.offset) > 0.5,
-          abs(lower.far - upper.far) > 0.5,
-          lower.far > upper.far
-        else {
-          continue
-        }
-        violations.append(
-          PolicyCanvasCrossedPortsViolation(
-            nodeID: nodeID,
-            side: side,
-            edgeA: lower.edgeID,
-            edgeB: upper.edgeID,
-            pointA: lower.point,
-            pointB: upper.point
+      for index in 0..<sorted.count {
+        for jndex in (index + 1)..<sorted.count {
+          let lower = sorted[index]
+          let upper = sorted[jndex]
+          // Distinct attach points coming from distinct far positions, inverted:
+          // the earlier port is fed from farther along the axis than the later one.
+          guard
+            abs(lower.offset - upper.offset) > 0.5,
+            abs(lower.far - upper.far) > 0.5,
+            lower.far > upper.far
+          else {
+            continue
+          }
+          violations.append(
+            PolicyCanvasCrossedPortsViolation(
+              nodeID: nodeID,
+              side: side,
+              edgeA: lower.edgeID,
+              edgeB: upper.edgeID,
+              pointA: lower.point,
+              pointB: upper.point
+            )
           )
-        )
+        }
       }
     }
   }

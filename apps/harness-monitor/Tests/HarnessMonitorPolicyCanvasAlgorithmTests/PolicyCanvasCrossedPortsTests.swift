@@ -60,6 +60,18 @@ struct PolicyCanvasCrossedPortsTests {
     #expect(report(routes: ["e1": route(far: 10, attach: 48)]).count(for: .crossedPorts) == 0)
   }
 
+  @Test func nonAdjacentInversionsAreAllCounted() {
+    // Three ports: top->100, middle->200, bottom->50. The bottom port crosses
+    // both the others (it is fed from above both), so two crossings - one of
+    // them non-adjacent. All pairs are compared, not just neighbors.
+    let result = report(routes: [
+      "e1": route(far: 100, attach: 30),
+      "e2": route(far: 200, attach: 60),
+      "e3": route(far: 50, attach: 90),
+    ])
+    #expect(result.count(for: .crossedPorts) == 2)
+  }
+
   @Test func sameFarPositionIsNotACross() {
     // Two wires from the same approach coordinate cannot cross each other.
     let result = report(routes: [
