@@ -108,22 +108,7 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(
       conversation.contains("HarnessMonitorMarkdownText(content.markdown, textSelection: .enabled)")
     )
-    #expect(conversation.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
-    #expect(
-      conversation.contains(
-        ".padding(.bottom, DashboardReviewConversationFullContentSheetMetrics.fallbackToolbarHeight)"
-      )
-    )
-    #expect(
-      conversation.contains(
-        "minWidth: DashboardReviewConversationFullContentSheetMetrics.fallback.minimumWidth"
-      )
-    )
-    #expect(
-      conversation.contains(
-        "idealWidth: DashboardReviewConversationFullContentSheetMetrics.fallback.idealWidth"
-      )
-    )
+    #expect(conversation.contains(".padding(.bottom, HarnessMonitorTheme.spacingLG)"))
     #expect(conversation.contains("DashboardReviewConversationFullContentSheetMetricsReader()"))
     #expect(!conversation.contains("@State private var sheetMetrics"))
     #expect(!conversation.contains("@Binding var metrics"))
@@ -133,11 +118,12 @@ extension DashboardReviewsDetailUXContractTests {
         "private var appliedMetrics: DashboardReviewConversationFullContentSheetMetrics?"
       )
     )
-    #expect(conversation.contains("sheetWindow.contentMinSize = metrics.minimumContentSize"))
-    #expect(conversation.contains("sheetWindow.contentMaxSize = metrics.targetContentSize"))
-    #expect(conversation.contains("sheetWindow.setContentSize(targetSize)"))
+    #expect(!conversation.contains("sheetWindow.contentMinSize"))
+    #expect(conversation.contains("sheetWindow.contentMaxSize = metrics.maximumContentSize"))
+    #expect(conversation.contains("let cappedSize = metrics.cappedContentSize(for: currentSize)"))
+    #expect(conversation.contains("sheetWindow.setContentSize(cappedSize)"))
     #expect(conversation.contains("parentFrame.width - (toolbarHeight * 2)"))
-    #expect(conversation.contains("parentFrame.height - toolbarHeight"))
+    #expect(conversation.contains("parentFrame.height - (toolbarHeight * 2)"))
     #expect(timeline.contains("let onOpenFullContent: ((SessionTimelineNode) -> Void)?"))
     #expect(timeline.contains("let fullContentRevision: UInt64?"))
     #expect(
@@ -163,13 +149,15 @@ extension DashboardReviewsDetailUXContractTests {
 
     #expect(metrics.toolbarHeight == 60)
     #expect(metrics.maxWidth == 1_080)
-    #expect(metrics.maxHeight == 840)
+    #expect(metrics.maxHeight == 780)
     #expect(metrics.minimumWidth == 360)
     #expect(metrics.idealWidth == 760)
     #expect(metrics.minimumHeight == 420)
     #expect(metrics.idealHeight == 520)
     #expect(metrics.minimumContentSize == CGSize(width: 360, height: 420))
-    #expect(metrics.targetContentSize == CGSize(width: 1_080, height: 840))
+    #expect(metrics.maximumContentSize == CGSize(width: 1_080, height: 780))
+    #expect(metrics.cappedContentSize(for: CGSize(width: 600, height: 500)) == CGSize(width: 600, height: 500))
+    #expect(metrics.cappedContentSize(for: CGSize(width: 1_600, height: 900)) == CGSize(width: 1_080, height: 780))
   }
 
   @Test("Activity inline conversations render through a dedicated GitHub style card path")

@@ -101,17 +101,10 @@ struct DashboardReviewConversationFullContentSheet: View {
         Divider()
         HarnessMonitorMarkdownText(content.markdown, textSelection: .enabled)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.top, HarnessMonitorTheme.spacingLG)
       .padding(.horizontal, HarnessMonitorTheme.spacingLG)
-      .padding(.bottom, DashboardReviewConversationFullContentSheetMetrics.fallbackToolbarHeight)
+      .padding(.bottom, HarnessMonitorTheme.spacingLG)
     }
-    .frame(
-      minWidth: DashboardReviewConversationFullContentSheetMetrics.fallback.minimumWidth,
-      idealWidth: DashboardReviewConversationFullContentSheetMetrics.fallback.idealWidth,
-      minHeight: DashboardReviewConversationFullContentSheetMetrics.fallback.minimumHeight,
-      idealHeight: DashboardReviewConversationFullContentSheetMetrics.fallback.idealHeight
-    )
     .background(Color(nsColor: .windowBackgroundColor))
     .background(DashboardReviewConversationFullContentSheetMetricsReader())
   }
@@ -154,8 +147,15 @@ struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
     CGSize(width: minimumWidth, height: minimumHeight)
   }
 
-  var targetContentSize: CGSize {
+  var maximumContentSize: CGSize {
     CGSize(width: maxWidth, height: maxHeight)
+  }
+
+  func cappedContentSize(for currentSize: CGSize) -> CGSize {
+    CGSize(
+      width: min(currentSize.width, maxWidth),
+      height: min(currentSize.height, maxHeight)
+    )
   }
 
   static func resolved(
@@ -169,7 +169,7 @@ struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
     )
     return Self(
       maxWidth: max(0, parentFrame.width - (toolbarHeight * 2)),
-      maxHeight: max(0, parentFrame.height - toolbarHeight),
+      maxHeight: max(0, parentFrame.height - (toolbarHeight * 2)),
       toolbarHeight: toolbarHeight
     )
   }
@@ -220,17 +220,16 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
       guard let sheetWindow else { return }
       guard appliedMetrics != metrics else { return }
       appliedMetrics = metrics
-      sheetWindow.contentMinSize = metrics.minimumContentSize
-      sheetWindow.contentMaxSize = metrics.targetContentSize
+      sheetWindow.contentMaxSize = metrics.maximumContentSize
       let currentSize = sheetWindow.contentLayoutRect.size
-      let targetSize = metrics.targetContentSize
+      let cappedSize = metrics.cappedContentSize(for: currentSize)
       guard
-        abs(currentSize.width - targetSize.width) > 0.5
-          || abs(currentSize.height - targetSize.height) > 0.5
+        abs(currentSize.width - cappedSize.width) > 0.5
+          || abs(currentSize.height - cappedSize.height) > 0.5
       else {
         return
       }
-      sheetWindow.setContentSize(targetSize)
+      sheetWindow.setContentSize(cappedSize)
     }
   }
 }
