@@ -111,7 +111,9 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
 
     #expect(globalEnforcementToolbar.contains("ToolbarItemGroup(placement: .primaryAction)"))
     #expect(globalEnforcementToolbar.contains("store.connectionState != .online"))
+    #expect(globalEnforcementToolbar.contains("globalEnforcementActionBlocked"))
     #expect(globalEnforcementToolbar.contains(".disabled(globalEnforcementButtonDisabled)"))
+    #expect(!globalEnforcementToolbar.contains(".bounce.up.wholeSymbol"))
     #expect(!globalEnforcementToolbar.contains(".buttonStyle(.glass)"))
     #expect(!globalEnforcementToolbar.contains(".sharedBackgroundVisibility(.hidden)"))
     #expect(
