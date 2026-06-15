@@ -115,13 +115,26 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(conversation.contains("sheetWindow?.sheetParent ?? sheetWindow"))
     #expect(
       conversation.contains(
-        "private var appliedMetrics: DashboardReviewConversationFullContentSheetMetrics?"
+        "private var appliedSizing: AppliedSizing?"
       )
     )
+    #expect(conversation.contains("private var refreshScheduled = false"))
     #expect(!conversation.contains("sheetWindow.contentMinSize"))
-    #expect(conversation.contains("sheetWindow.contentMaxSize = metrics.maximumContentSize"))
-    #expect(conversation.contains("let cappedSize = metrics.cappedContentSize(for: currentSize)"))
+    #expect(
+      conversation.contains("let maximumContentSize = metrics.maximumContentSize(chromeSize: chromeSize)")
+    )
+    #expect(conversation.contains("sheetWindow.contentMaxSize = maximumContentSize"))
+    #expect(conversation.contains("sheetWindow.contentView?.layoutSubtreeIfNeeded()"))
+    #expect(conversation.contains("let preferredSize = preferredContentSize(in: sheetWindow)"))
+    #expect(
+      conversation.contains(
+        "let cappedSize = metrics.cappedContentSize(for: preferredSize, chromeSize: chromeSize)"
+      )
+    )
+    #expect(conversation.contains("let sizing = AppliedSizing("))
+    #expect(conversation.contains("guard appliedSizing != sizing else { return }"))
     #expect(conversation.contains("sheetWindow.setContentSize(cappedSize)"))
+    #expect(conversation.contains("sheetWindow.frameRect(forContentRect: contentRect)"))
     #expect(conversation.contains("parentFrame.width - (toolbarHeight * 2)"))
     #expect(conversation.contains("parentFrame.height - (toolbarHeight * 2)"))
     #expect(timeline.contains("let onOpenFullContent: ((SessionTimelineNode) -> Void)?"))
@@ -155,9 +168,22 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(metrics.minimumHeight == 420)
     #expect(metrics.idealHeight == 520)
     #expect(metrics.minimumContentSize == CGSize(width: 360, height: 420))
-    #expect(metrics.maximumContentSize == CGSize(width: 1_080, height: 780))
-    #expect(metrics.cappedContentSize(for: CGSize(width: 600, height: 500)) == CGSize(width: 600, height: 500))
-    #expect(metrics.cappedContentSize(for: CGSize(width: 1_600, height: 900)) == CGSize(width: 1_080, height: 780))
+    #expect(
+      metrics.maximumContentSize(chromeSize: CGSize(width: 8, height: 28))
+        == CGSize(width: 1_072, height: 752)
+    )
+    #expect(
+      metrics.cappedContentSize(
+        for: CGSize(width: 600, height: 500),
+        chromeSize: CGSize(width: 8, height: 28)
+      ) == CGSize(width: 600, height: 500)
+    )
+    #expect(
+      metrics.cappedContentSize(
+        for: CGSize(width: 1_600, height: 900),
+        chromeSize: CGSize(width: 8, height: 28)
+      ) == CGSize(width: 1_072, height: 752)
+    )
   }
 
   @Test("Activity inline conversations render through a dedicated GitHub style card path")

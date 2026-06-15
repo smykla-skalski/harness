@@ -147,14 +147,18 @@ struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
     CGSize(width: minimumWidth, height: minimumHeight)
   }
 
-  var maximumContentSize: CGSize {
-    CGSize(width: maxWidth, height: maxHeight)
+  func maximumContentSize(chromeSize: CGSize) -> CGSize {
+    CGSize(
+      width: max(0, maxWidth - chromeSize.width),
+      height: max(0, maxHeight - chromeSize.height)
+    )
   }
 
-  func cappedContentSize(for currentSize: CGSize) -> CGSize {
-    CGSize(
-      width: min(currentSize.width, maxWidth),
-      height: min(currentSize.height, maxHeight)
+  func cappedContentSize(for preferredSize: CGSize, chromeSize: CGSize) -> CGSize {
+    let maximumSize = maximumContentSize(chromeSize: chromeSize)
+    return CGSize(
+      width: min(preferredSize.width, maximumSize.width),
+      height: min(preferredSize.height, maximumSize.height)
     )
   }
 
@@ -191,14 +195,23 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
   }
 
   func updateNSView(_ nsView: MetricsView, context: Context) {
+    nsView.scheduleRefresh()
   }
 
   final class MetricsView: NSView {
-    private var appliedMetrics: DashboardReviewConversationFullContentSheetMetrics?
+    private var appliedSizing: AppliedSizing?
+    private var refreshScheduled = false
 
     override func viewDidMoveToWindow() {
       super.viewDidMoveToWindow()
+      scheduleRefresh()
+    }
+
+    func scheduleRefresh() {
+      guard !refreshScheduled else { return }
+      refreshScheduled = true
       Task { @MainActor [weak self] in
+        self?.refreshScheduled = false
         self?.refreshMetrics()
       }
     }
@@ -218,11 +231,17 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
       to sheetWindow: NSWindow?
     ) {
       guard let sheetWindow else { return }
-      guard appliedMetrics != metrics else { return }
-      appliedMetrics = metrics
-      sheetWindow.contentMaxSize = metrics.maximumContentSize
+      let chromeSize = frameChromeSize(for: sheetWindow)
+      let maximumContentSize = metrics.maximumContentSize(chromeSize: chromeSize)
+      guard maximumContentSize.width > 0, maximumContentSize.height > 0 else { return }
+      sheetWindow.contentMaxSize = maximumContentSize
+      sheetWindow.contentView?.layoutSubtreeIfNeeded()
       let currentSize = sheetWindow.contentLayoutRect.size
-      let cappedSize = metrics.cappedContentSize(for: currentSize)
+      let preferredSize = preferredContentSize(in: sheetWindow)
+      let cappedSize = metrics.cappedContentSize(for: preferredSize, chromeSize: chromeSize)
+      let sizing = AppliedSizing(maximumContentSize: maximumContentSize, targetContentSize: cappedSize)
+      guard appliedSizing != sizing else { return }
+      appliedSizing = sizing
       guard
         abs(currentSize.width - cappedSize.width) > 0.5
           || abs(currentSize.height - cappedSize.height) > 0.5
@@ -230,6 +249,33 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
         return
       }
       sheetWindow.setContentSize(cappedSize)
+    }
+
+    private func preferredContentSize(in sheetWindow: NSWindow) -> CGSize {
+      let fittingSize = sheetWindow.contentView?.fittingSize ?? .zero
+      guard
+        fittingSize.width.isFinite,
+        fittingSize.height.isFinite,
+        fittingSize.width > 0,
+        fittingSize.height > 0
+      else {
+        return sheetWindow.contentLayoutRect.size
+      }
+      return fittingSize
+    }
+
+    private func frameChromeSize(for sheetWindow: NSWindow) -> CGSize {
+      let contentRect = NSRect(x: 0, y: 0, width: 100, height: 100)
+      let frameRect = sheetWindow.frameRect(forContentRect: contentRect)
+      return CGSize(
+        width: max(0, frameRect.width - contentRect.width),
+        height: max(0, frameRect.height - contentRect.height)
+      )
+    }
+
+    private struct AppliedSizing: Equatable {
+      let maximumContentSize: CGSize
+      let targetContentSize: CGSize
     }
   }
 }
