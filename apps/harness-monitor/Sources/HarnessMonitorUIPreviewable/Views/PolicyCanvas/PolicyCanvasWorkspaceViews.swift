@@ -188,20 +188,14 @@ struct PolicyCanvasViewport: View {
         requestViewportScroll: { requestViewportScroll(target: .contentOrigin($0)) }
       )
       .onAppear {
-        centerViewportIfNeeded(
-          viewportSize: proxy.size,
-          routeOutput: routeOutput,
-          currentRouteKey: routeKey,
-          routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphMissing
-        )
         focusSelectionIfNeeded(
           request: selectionFocusRequest,
           routeOutput: routeOutput
         )
         bindCommandFocus()
       }
-      .onChange(of: centeringRouteState, initial: false) {
-        centerViewportIfNeeded(
+      .task(id: centeringRouteState) {
+        await centerViewportAfterRouteStateSettles(
           viewportSize: proxy.size,
           routeOutput: routeOutput,
           currentRouteKey: routeKey,
@@ -304,6 +298,24 @@ extension PolicyCanvasViewport {
       return
     }
     commandFocus = nextFocus
+  }
+  @MainActor
+  private func centerViewportAfterRouteStateSettles(
+    viewportSize: CGSize,
+    routeOutput: PolicyCanvasRouteWorkerOutput,
+    currentRouteKey: PolicyCanvasRouteWorkerKey,
+    routeOutputIsCurrentGraphProvisional: Bool
+  ) async {
+    await Task.yield()
+    guard !Task.isCancelled else {
+      return
+    }
+    centerViewportIfNeeded(
+      viewportSize: viewportSize,
+      routeOutput: routeOutput,
+      currentRouteKey: currentRouteKey,
+      routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphProvisional
+    )
   }
   private func centerViewportIfNeeded(
     viewportSize: CGSize,

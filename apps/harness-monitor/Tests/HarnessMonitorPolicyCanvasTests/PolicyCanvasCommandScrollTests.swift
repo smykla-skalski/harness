@@ -229,7 +229,10 @@ struct PolicyCanvasCommandScrollTests {
         "let centeringRouteState = PolicyCanvasViewportCenteringRouteState("
       )
     )
-    #expect(source.contains(".onChange(of: centeringRouteState, initial: false)"))
+    #expect(source.contains(".task(id: centeringRouteState)"))
+    #expect(source.contains("await centerViewportAfterRouteStateSettles("))
+    #expect(source.contains("await Task.yield()"))
+    #expect(source.contains("guard !Task.isCancelled else"))
     #expect(source.contains("currentRouteKey: routeKey"))
     #expect(source.contains("appliedRouteKey: routeCache.appliedRouteKey"))
     #expect(source.contains("viewportCenteringGeneration: viewModel.viewportCenteringGeneration"))
