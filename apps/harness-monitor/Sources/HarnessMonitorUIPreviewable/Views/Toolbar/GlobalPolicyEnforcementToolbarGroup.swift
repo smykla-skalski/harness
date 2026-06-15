@@ -24,7 +24,11 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
   }
 
   private var globalEnforcementButtonDisabled: Bool {
-    store.connectionState != .online || store.isDaemonActionInFlight
+    store.connectionState != .online
+  }
+
+  private var globalEnforcementActionBlocked: Bool {
+    globalEnforcementButtonDisabled || store.isDaemonActionInFlight
   }
 
   private var globalEnforcementButton: some View {
@@ -41,11 +45,6 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
       } icon: {
         Image(systemName: globalPolicyEnforcementEnabled ? "checkmark.shield" : "xmark.shield")
           .contentTransition(.symbolEffect(.replace))
-          .symbolEffect(
-            .bounce.up.wholeSymbol,
-            options: .speed(1.15),
-            value: globalPolicyEnforcementEnabled
-          )
       }
     }
     .disabled(globalEnforcementButtonDisabled)
@@ -77,7 +76,7 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
 
   @MainActor
   private func setGlobalPolicyEnforcementEnabled(_ enabled: Bool) {
-    guard !globalEnforcementButtonDisabled else {
+    guard !globalEnforcementActionBlocked else {
       return
     }
     Task { @MainActor in
