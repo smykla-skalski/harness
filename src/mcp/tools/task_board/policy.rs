@@ -3,7 +3,7 @@ use serde_json::{Value, json};
 use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
-    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasToggleEnforcementRequest,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
     TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
     TaskBoardPolicyPipelineSimulateRequest, ws_methods,
@@ -55,10 +55,10 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 normalize: validate_params::<TaskBoardPolicyCanvasDeleteRequest>,
             },
             TaskBoardToolDescriptor {
-                name: ws_methods::TASK_BOARD_POLICY_CANVAS_TOGGLE_ENFORCEMENT,
-                description: "Toggle global policy enforcement.",
-                input_schema: empty_schema,
-                normalize: validate_params::<TaskBoardPolicyCanvasToggleEnforcementRequest>,
+                name: ws_methods::TASK_BOARD_POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT,
+                description: "Set global policy enforcement.",
+                input_schema: global_enforcement_schema,
+                normalize: validate_params::<TaskBoardPolicyCanvasSetGlobalEnforcementRequest>,
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
@@ -179,6 +179,17 @@ fn canvas_id_schema() -> Value {
             "canvas_id": { "type": "string" }
         },
         "required": ["canvas_id"],
+        "additionalProperties": false
+    })
+}
+
+fn global_enforcement_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "enabled": { "type": "boolean" }
+        },
+        "required": ["enabled"],
         "additionalProperties": false
     })
 }

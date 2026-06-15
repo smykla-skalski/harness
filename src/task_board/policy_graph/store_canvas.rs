@@ -93,10 +93,9 @@ pub fn apply_set_active(ws: &mut PolicyCanvasWorkspace, canvas_id: &str) -> Resu
     Ok(())
 }
 
-/// Toggle global policy enforcement without changing any canvas document.
-pub fn apply_toggle_enforcement(ws: &mut PolicyCanvasWorkspace) -> bool {
-    ws.enforcement_snapshot = None;
-    ws.global_policy_enforcement_enabled = !ws.global_policy_enforcement_enabled;
+/// Set global policy enforcement without changing any canvas document.
+pub fn apply_set_global_enforcement(ws: &mut PolicyCanvasWorkspace, enabled: bool) -> bool {
+    ws.global_policy_enforcement_enabled = enabled;
     ws.global_policy_enforcement_enabled
 }
 

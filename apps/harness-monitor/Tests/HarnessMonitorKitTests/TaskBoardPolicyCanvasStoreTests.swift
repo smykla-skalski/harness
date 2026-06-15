@@ -152,7 +152,7 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
     XCTAssertGreaterThanOrEqual(client.readCallCount(.taskBoardPolicyPipeline), 2)
   }
 
-  func testGlobalPolicyEnforcementToggleDoesNotMutateCanvasModes() async throws {
+  func testGlobalPolicyEnforcementSetDoesNotMutateCanvasModes() async throws {
     let client = RecordingHarnessClient()
     let activeDocument = client.sampleTaskBoardPolicyPipeline(
       canvasId: "canvas-active",
@@ -212,19 +212,21 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
     let before = try XCTUnwrap(store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace)
     let beforePolicyState = PolicyCanvasWorkspaceState(workspace: before)
 
-    let disabledResult = await store.toggleTaskBoardPolicyCanvasEnforcement()
+    store.toast.dismissAll()
+
+    let disabledResult = await store.setTaskBoardPolicyCanvasGlobalEnforcement(enabled: false)
     XCTAssertTrue(disabledResult)
     let disabled = try XCTUnwrap(store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace)
     XCTAssertFalse(disabled.globalPolicyEnforcementEnabled)
-    XCTAssertTrue(disabled.policyEnforcementKillSwitchActive)
     XCTAssertEqual(PolicyCanvasWorkspaceState(workspace: disabled), beforePolicyState)
+    XCTAssertTrue(store.toast.activeFeedback.isEmpty)
 
-    let restoredResult = await store.toggleTaskBoardPolicyCanvasEnforcement()
+    let restoredResult = await store.setTaskBoardPolicyCanvasGlobalEnforcement(enabled: true)
     XCTAssertTrue(restoredResult)
     let restored = try XCTUnwrap(store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace)
     XCTAssertTrue(restored.globalPolicyEnforcementEnabled)
-    XCTAssertFalse(restored.policyEnforcementKillSwitchActive)
     XCTAssertEqual(PolicyCanvasWorkspaceState(workspace: restored), beforePolicyState)
+    XCTAssertTrue(store.toast.activeFeedback.isEmpty)
   }
 
   func testSupervisorOverridesStayMergedAcrossCanvasActivation() async throws {

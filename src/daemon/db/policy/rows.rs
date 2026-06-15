@@ -12,7 +12,6 @@ pub(crate) struct WorkspaceRow {
     pub manual_ocr_paste_canvas_deleted: bool,
     pub review_text_paste_dry_run_canvas_deleted: bool,
     pub review_screenshot_extraction_canvas_deleted: bool,
-    pub enforcement_snapshot_json: Option<String>,
     pub global_policy_enforcement_enabled: bool,
 }
 

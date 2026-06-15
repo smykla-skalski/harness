@@ -3,7 +3,7 @@ use crate::daemon::http::{DaemonHttpState, require_async_db};
 use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
-    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasToggleEnforcementRequest,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
     TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest,
     TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
@@ -68,8 +68,8 @@ async fn dispatch_policy_canvas_mutate_method(
         ws_methods::TASK_BOARD_POLICY_CANVAS_DELETE => {
             Some(dispatch_task_board_policy_canvas_delete(request, state).await)
         }
-        ws_methods::TASK_BOARD_POLICY_CANVAS_TOGGLE_ENFORCEMENT => {
-            Some(dispatch_task_board_policy_canvas_toggle_enforcement(request, state).await)
+        ws_methods::TASK_BOARD_POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT => {
+            Some(dispatch_task_board_policy_canvas_set_global_enforcement(request, state).await)
         }
         _ => None,
     }
@@ -257,26 +257,24 @@ pub(super) async fn dispatch_task_board_policy_canvas_delete(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_canvas_toggle_enforcement(
+pub(super) async fn dispatch_task_board_policy_canvas_set_global_enforcement(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) =
-        parse_params_or_default::<TaskBoardPolicyCanvasToggleEnforcementRequest>(request)
-    else {
+    let Ok(body) = parse_params::<TaskBoardPolicyCanvasSetGlobalEnforcementRequest>(request) else {
         return invalid_params(request);
     };
-    let db = match require_async_db(state, "policy canvas toggle enforcement") {
+    let db = match require_async_db(state, "policy canvas global enforcement") {
         Ok(db) => db,
         Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
     };
-    let result = task_board_route_executor::toggle_policy_canvas_enforcement(db, &body).await;
+    let result = task_board_route_executor::set_policy_canvas_global_enforcement(db, &body).await;
     super::record_task_board_audit_result(
         state,
-        "task_board.policy_canvas_toggle_enforcement",
-        "Toggle policy canvas enforcement",
+        "task_board.policy_canvas_set_global_enforcement",
+        "Set global policy enforcement",
         None,
-        serde_json::json!({}),
+        serde_json::json!({ "enabled": body.enabled }),
         &result,
     )
     .await;

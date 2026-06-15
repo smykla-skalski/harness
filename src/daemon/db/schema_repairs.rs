@@ -14,7 +14,6 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
         "policy_workspace",
         "review_screenshot_extraction_canvas_deleted",
     ),
-    ("policy_workspace", "enforcement_snapshot_json"),
     ("policy_workspace", "global_policy_enforcement_enabled"),
     ("policy_canvases", "is_manual_ocr_paste_canvas"),
     ("policy_canvases", "is_review_text_paste_dry_run_canvas"),

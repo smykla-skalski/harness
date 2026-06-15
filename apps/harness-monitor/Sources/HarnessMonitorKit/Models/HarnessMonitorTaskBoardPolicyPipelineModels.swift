@@ -50,29 +50,24 @@ public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
   public var activeCanvasId: String
   public var canvases: [TaskBoardPolicyCanvasSummary]
   public var globalPolicyEnforcementEnabled: Bool
-  public var policyEnforcementKillSwitchActive: Bool
 
   private enum CodingKeys: String, CodingKey {
     case schemaVersion
     case activeCanvasId
     case canvases
     case globalPolicyEnforcementEnabled
-    case policyEnforcementKillSwitchActive
   }
 
   public init(
     schemaVersion: UInt64,
     activeCanvasId: String,
     canvases: [TaskBoardPolicyCanvasSummary],
-    globalPolicyEnforcementEnabled: Bool? = nil,
-    policyEnforcementKillSwitchActive: Bool = false
+    globalPolicyEnforcementEnabled: Bool = true
   ) {
     self.schemaVersion = schemaVersion
     self.activeCanvasId = activeCanvasId
     self.canvases = canvases
-    self.globalPolicyEnforcementEnabled =
-      globalPolicyEnforcementEnabled ?? !policyEnforcementKillSwitchActive
-    self.policyEnforcementKillSwitchActive = !self.globalPolicyEnforcementEnabled
+    self.globalPolicyEnforcementEnabled = globalPolicyEnforcementEnabled
   }
 
   public init(from decoder: Decoder) throws {
@@ -80,12 +75,9 @@ public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
     self.schemaVersion = try container.decode(UInt64.self, forKey: .schemaVersion)
     self.activeCanvasId = try container.decode(String.self, forKey: .activeCanvasId)
     self.canvases = try container.decode([TaskBoardPolicyCanvasSummary].self, forKey: .canvases)
-    let legacyKillSwitchActive =
-      try container.decodeIfPresent(Bool.self, forKey: .policyEnforcementKillSwitchActive) ?? false
     self.globalPolicyEnforcementEnabled =
       try container.decodeIfPresent(Bool.self, forKey: .globalPolicyEnforcementEnabled)
-      ?? !legacyKillSwitchActive
-    self.policyEnforcementKillSwitchActive = !self.globalPolicyEnforcementEnabled
+      ?? true
   }
 }
 
@@ -129,8 +121,12 @@ public struct TaskBoardPolicyCanvasDeleteRequest: Codable, Equatable, Sendable {
   public init(canvasId: String) { self.canvasId = canvasId }
 }
 
-public struct TaskBoardPolicyCanvasToggleEnforcementRequest: Codable, Equatable, Sendable {
-  public init() {}
+public struct TaskBoardPolicyCanvasSetGlobalEnforcementRequest: Codable, Equatable, Sendable {
+  public var enabled: Bool
+
+  public init(enabled: Bool) {
+    self.enabled = enabled
+  }
 }
 
 public struct TaskBoardPolicyPipelineSaveDraftRequest: Codable, Equatable, Sendable {

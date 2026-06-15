@@ -61,8 +61,7 @@ impl DaemonDb {
                     manual_ocr_paste_canvas_deleted: row.get(2)?,
                     review_text_paste_dry_run_canvas_deleted: row.get(3)?,
                     review_screenshot_extraction_canvas_deleted: row.get(4)?,
-                    enforcement_snapshot_json: row.get(5)?,
-                    global_policy_enforcement_enabled: row.get(6)?,
+                    global_policy_enforcement_enabled: row.get(5)?,
                 })
             })
             .optional()

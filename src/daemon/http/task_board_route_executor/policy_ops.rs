@@ -2,7 +2,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
-    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasToggleEnforcementRequest,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
     TaskBoardPolicyCanvasWorkspaceResponse, TaskBoardPolicyExportRequest,
     TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest, TaskBoardPolicyImportResponse,
     TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineAuditResponse,
@@ -55,11 +55,11 @@ pub(crate) async fn delete_policy_canvas(
     service::delete_task_board_policy_canvas(db, request).await
 }
 
-pub(crate) async fn toggle_policy_canvas_enforcement(
+pub(crate) async fn set_policy_canvas_global_enforcement(
     db: &AsyncDaemonDb,
-    request: &TaskBoardPolicyCanvasToggleEnforcementRequest,
+    request: &TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
 ) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
-    service::toggle_task_board_policy_canvas_enforcement(db, request).await
+    service::set_task_board_policy_canvas_global_enforcement(db, request).await
 }
 
 pub(crate) async fn policy_pipeline(

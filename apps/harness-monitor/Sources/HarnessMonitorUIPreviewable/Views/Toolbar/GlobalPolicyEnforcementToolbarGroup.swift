@@ -26,17 +26,27 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
   private var globalEnforcementButton: some View {
     // Keep this plain so AppKit supplies the native toolbar platter.
     Button {
-      toggleGlobalPolicyEnforcement()
+      setGlobalPolicyEnforcementEnabled(!globalPolicyEnforcementEnabled)
     } label: {
-      Label(
-        globalPolicyEnforcementEnabled
-          ? "Disable Global Enforcement"
-          : "Enable Global Enforcement",
-        systemImage: globalPolicyEnforcementEnabled ? "checkmark.shield" : "xmark.shield"
-      )
+      Label {
+        Text(
+          globalPolicyEnforcementEnabled
+            ? "Disable Global Enforcement"
+            : "Enable Global Enforcement"
+        )
+      } icon: {
+        Image(systemName: globalPolicyEnforcementEnabled ? "checkmark.shield" : "xmark.shield")
+          .contentTransition(.symbolEffect(.replace))
+          .symbolEffect(
+            .bounce.up.wholeSymbol,
+            options: .speed(1.15),
+            value: globalPolicyEnforcementEnabled
+          )
+      }
     }
     .disabled(store.isDaemonActionInFlight)
     .foregroundStyle(globalPolicyEnforcementEnabled ? Color.green : Color.red)
+    .animation(.snappy(duration: 0.18), value: globalPolicyEnforcementEnabled)
     .help(globalEnforcementHelpText)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasGlobalEnforcementButton)
     .harnessMCPButton(
@@ -45,7 +55,9 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
         ? "Disable Global Enforcement"
         : "Enable Global Enforcement",
       hint: globalEnforcementHelpText,
-      pressAction: toggleGlobalPolicyEnforcement
+      pressAction: {
+        setGlobalPolicyEnforcementEnabled(!globalPolicyEnforcementEnabled)
+      }
     )
   }
 
@@ -57,12 +69,12 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
   }
 
   @MainActor
-  private func toggleGlobalPolicyEnforcement() {
+  private func setGlobalPolicyEnforcementEnabled(_ enabled: Bool) {
     guard !store.isDaemonActionInFlight else {
       return
     }
     Task { @MainActor in
-      guard await store.toggleTaskBoardPolicyCanvasEnforcement() else {
+      guard await store.setTaskBoardPolicyCanvasGlobalEnforcement(enabled: enabled) else {
         return
       }
       syncCanvasAutomationPolicies()

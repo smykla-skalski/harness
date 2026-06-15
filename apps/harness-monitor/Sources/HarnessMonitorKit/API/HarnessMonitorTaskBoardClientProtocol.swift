@@ -78,8 +78,8 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func deleteTaskBoardPolicyCanvas(
     request: TaskBoardPolicyCanvasDeleteRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace
-  func toggleTaskBoardPolicyCanvasEnforcement(
-    request: TaskBoardPolicyCanvasToggleEnforcementRequest
+  func setTaskBoardPolicyCanvasGlobalEnforcement(
+    request: TaskBoardPolicyCanvasSetGlobalEnforcementRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace
   func taskBoardPolicyPipeline(canvasId: String?) async throws -> TaskBoardPolicyPipelineDocument
   func saveTaskBoardPolicyPipelineDraft(
@@ -334,8 +334,8 @@ extension HarnessMonitorTaskBoardClientProtocol {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
   }
 
-  public func toggleTaskBoardPolicyCanvasEnforcement(
-    request _: TaskBoardPolicyCanvasToggleEnforcementRequest
+  public func setTaskBoardPolicyCanvasGlobalEnforcement(
+    request _: TaskBoardPolicyCanvasSetGlobalEnforcementRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
   }

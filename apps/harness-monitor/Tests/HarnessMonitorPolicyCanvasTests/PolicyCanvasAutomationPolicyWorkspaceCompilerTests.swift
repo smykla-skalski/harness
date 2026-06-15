@@ -15,7 +15,7 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
       {
         "schemaVersion": 1,
         "activeCanvasId": "default-canvas",
-        "policyEnforcementKillSwitchActive": false,
+        "globalPolicyEnforcementEnabled": true,
         "canvases": [
           {
             "canvasId": "default-canvas",
