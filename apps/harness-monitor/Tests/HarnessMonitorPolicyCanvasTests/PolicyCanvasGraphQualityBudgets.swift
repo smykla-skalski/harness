@@ -24,7 +24,7 @@ enum PolicyCanvasGraphQualityBudgets {
   static let bySampleID: [String: [PolicyCanvasQualityCategory: Int]] = [
     "minimal": [:],
     "linear": [
-      .labelNearTurn: 1,
+      .labelNearTurn: 1
     ],
     "branching": [
       .corridorReuse: 1, .corridorParallel: 1, .detours: 1, .nodeDistance: 1, .wrongTurns: 3,
@@ -35,20 +35,20 @@ enum PolicyCanvasGraphQualityBudgets {
       .labelNearTurn: 6,
     ],
     "multi-group": [
-      .portOverlaps: 2, .corridorReuse: 5, .corridorParallel: 6,
-      .crossingsIndependent: 9, .detours: 2, .nodeDistance: 1, .wrongTurns: 9, .crossedPorts: 2,
-      .labelOverlaps: 2, .labelOnEdge: 6, .labelNearTurn: 14,
+      .portOverlaps: 2, .corridorReuse: 6, .corridorParallel: 6,
+      .crossingsIndependent: 9, .detours: 2, .nodeDistance: 1, .wrongTurns: 10, .crossedPorts: 0,
+      .labelOverlaps: 2, .labelOnEdge: 6, .labelNearTurn: 15,
     ],
     "extreme": [
       .portOverlaps: 4, .corridorReuse: 17, .corridorParallel: 11,
       .crossingsIndependent: 12, .longEdges: 6, .detours: 8, .nodeDistance: 8,
-      .wrongTurns: 25, .crossedPorts: 5, .labelOverlaps: 2, .labelOnBody: 1,
-      .labelOnEdge: 14, .labelNearTurn: 16,
+      .wrongTurns: 25, .crossedPorts: 0, .labelOverlaps: 2, .labelOnBody: 1,
+      .labelOnEdge: 15, .labelNearTurn: 16,
     ],
     "extreme-braid": [
-      .portOverlaps: 18, .corridorReuse: 208, .corridorParallel: 65,
+      .portOverlaps: 18, .corridorReuse: 208, .corridorParallel: 66,
       .crossingsIndependent: 327, .longEdges: 63, .detours: 11, .nodeDistance: 71,
-      .wrongTurns: 67, .crossedPorts: 7, .labelOverlaps: 11,
+      .wrongTurns: 70, .crossedPorts: 0, .labelOverlaps: 11,
       .labelOnEdge: 161, .labelNearTurn: 36,
     ],
   ]

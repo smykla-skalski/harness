@@ -98,18 +98,31 @@ extension PolicyCanvasPreparedRouteInput {
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> PolicyCanvasPortMarkerLayout {
-    portMarkerLayout(entries: portMarkerEntries(routes: routes), nodeIndex: nodeIndex)
+    portMarkerLayout(routes: routes, nodeIndex: nodeIndex, ordering: .fanAngle)
+  }
+
+  func portMarkerLayout(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    ordering: PolicyCanvasPortMarkerOrdering
+  ) -> PolicyCanvasPortMarkerLayout {
+    portMarkerLayout(
+      entries: portMarkerEntries(routes: routes),
+      nodeIndex: nodeIndex,
+      ordering: ordering
+    )
   }
 
   func seededPortMarkerLayout(
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> PolicyCanvasPortMarkerLayout {
-    portMarkerLayout(entries: seededPortMarkerEntries(), nodeIndex: nodeIndex)
+    portMarkerLayout(entries: seededPortMarkerEntries(), nodeIndex: nodeIndex, ordering: .fanAngle)
   }
 
   private func portMarkerLayout(
     entries: [PolicyCanvasPortMarkerEntry],
-    nodeIndex: [String: PolicyCanvasRouteNode]
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    ordering: PolicyCanvasPortMarkerOrdering
   ) -> PolicyCanvasPortMarkerLayout {
     let groups = Dictionary(grouping: entries) { $0.nodeKey }
     let edgesByID = Dictionary(edges.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -119,6 +132,7 @@ extension PolicyCanvasPreparedRouteInput {
         entries: groupEntries.sorted(),
         edgesByID: edgesByID,
         nodeIndex: nodeIndex,
+        ordering: ordering,
         terminals: &terminals
       )
     }
@@ -177,6 +191,7 @@ extension PolicyCanvasPreparedRouteInput {
     entries: [PolicyCanvasPortMarkerEntry],
     edgesByID: [String: PolicyCanvasEdge],
     nodeIndex: [String: PolicyCanvasRouteNode],
+    ordering: PolicyCanvasPortMarkerOrdering,
     terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
   ) {
     guard let endpoint = entries.first?.endpoint else {
@@ -229,6 +244,7 @@ extension PolicyCanvasPreparedRouteInput {
         unitsBySide: unitsBySide,
         edgesByID: edgesByID,
         nodeIndex: nodeIndex,
+        ordering: ordering,
         terminals: &terminals
       )
       return
@@ -267,6 +283,7 @@ extension PolicyCanvasPreparedRouteInput {
       unitsBySide: unitsBySide,
       edgesByID: edgesByID,
       nodeIndex: nodeIndex,
+      ordering: ordering,
       terminals: &terminals
     )
   }
@@ -276,6 +293,7 @@ extension PolicyCanvasPreparedRouteInput {
     unitsBySide: [PolicyCanvasPortSide: [PolicyCanvasPortMarkerAssignmentUnit]],
     edgesByID: [String: PolicyCanvasEdge],
     nodeIndex: [String: PolicyCanvasRouteNode],
+    ordering: PolicyCanvasPortMarkerOrdering,
     terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
   ) {
     for side in sides {
@@ -284,6 +302,7 @@ extension PolicyCanvasPreparedRouteInput {
         side: side,
         edgesByID: edgesByID,
         nodeIndex: nodeIndex,
+        ordering: ordering,
         terminals: &terminals
       )
     }
@@ -406,6 +425,7 @@ extension PolicyCanvasPreparedRouteInput {
     side: PolicyCanvasPortSide,
     edgesByID: [String: PolicyCanvasEdge],
     nodeIndex: [String: PolicyCanvasRouteNode],
+    ordering: PolicyCanvasPortMarkerOrdering,
     terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
   ) {
     guard
@@ -423,15 +443,14 @@ extension PolicyCanvasPreparedRouteInput {
           return nil
         }
         let base = policyCanvasLocalAxisCoordinate(basePoint, side: side, frame: node.frame)
-        // Order ports along the side by the angle each edge takes as it leaves
-        // the node, not by the natural port index. The departure angle is the
-        // crossing-free order around the node even when two far endpoints share
-        // a column or row - a single-axis projection ties there and falls back
-        // to the index, letting the fan twist and cross right at the node.
+        // Order ports along the side by the selected comb order, not by natural
+        // port index. The production order preserves existing sample budgets;
+        // targeted repair passes may request metric-aligned far-axis ordering.
         let order =
           policyCanvasFarEndpointAnchor(unit: unit, edgesByID: edgesByID, nodeIndex: nodeIndex)
           .map { farAnchor in
-            policyCanvasFanOrderKey(
+            policyCanvasPortMarkerOrderKey(
+              ordering: ordering,
               side: side,
               sideCenter: policyCanvasSideCenter(side: side, frame: node.frame),
               farAnchor: farAnchor

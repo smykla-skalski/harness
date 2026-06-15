@@ -99,10 +99,20 @@ extension PolicyCanvasPreparedRouteInput {
       id: terminalsSignpostID,
       "routes=\(processedRoutes.count, privacy: .public)"
     )
-    let routes = policyCanvasRoutesPreservingRouteTerminals(
+    let terminalRoutes = policyCanvasRoutesPreservingRouteTerminals(
       original: routeState.routes,
       processed: processedRoutes
     )
+    let routes = routesRepairingCrossedPorts(
+      routes: terminalRoutes,
+      nodeIndex: nodeIndex,
+      router: selectedRouter,
+      algorithms: algorithms
+    )
+    let portMarkerLayout =
+      routes == terminalRoutes
+      ? routeState.portMarkerLayout
+      : precomputedRouteTerminalPortMarkerLayout(routes: routes, nodeIndex: nodeIndex)
     policyCanvasRouteComputationSignposter.endInterval(
       "policy_canvas.routes.phase.terminals",
       terminalsInterval,
@@ -140,7 +150,7 @@ extension PolicyCanvasPreparedRouteInput {
       routes: routes,
       labelPositions: labelPositions,
       portVisibility: portVisibility(routes: routes, nodeIndex: nodeIndex),
-      portMarkerLayout: routeState.portMarkerLayout,
+      portMarkerLayout: portMarkerLayout,
       visibleBounds: visibleBounds
     )
   }
@@ -159,8 +169,14 @@ extension PolicyCanvasPreparedRouteInput {
     else {
       return nil
     }
-    let routes = precomputedRoutesRepairingBodyHits(
+    let bodySafeRoutes = precomputedRoutesRepairingBodyHits(
       routes: precomputedRoutes.routes,
+      nodeIndex: nodeIndex,
+      router: selectedRouter,
+      algorithms: algorithms
+    )
+    let routes = routesRepairingCrossedPorts(
+      routes: bodySafeRoutes,
       nodeIndex: nodeIndex,
       router: selectedRouter,
       algorithms: algorithms
@@ -219,6 +235,99 @@ extension PolicyCanvasPreparedRouteInput {
     return repaired
   }
 
+  private func routesRepairingCrossedPorts(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    var currentRoutes = routes
+    var currentViolations = precomputedCrossedPortViolations(
+      routes: currentRoutes,
+      nodeIndex: nodeIndex
+    )
+    for _ in 0..<6 {
+      guard !currentViolations.isEmpty else {
+        return currentRoutes
+      }
+      let untangled = routesSwappingCrossedPortPairs(
+        routes: currentRoutes,
+        violations: currentViolations
+      )
+      let untangledViolations = precomputedCrossedPortViolations(
+        routes: untangled,
+        nodeIndex: nodeIndex
+      )
+      guard precomputedBodyHits(routes: untangled, nodeIndex: nodeIndex).isEmpty,
+        untangledViolations.count < currentViolations.count
+      else {
+        break
+      }
+      currentRoutes = untangled
+      currentViolations = untangledViolations
+    }
+    for _ in 0..<3 {
+      guard !currentViolations.isEmpty else {
+        return currentRoutes
+      }
+      let repaired = routesRepairingCrossedPorts(
+        routes: currentRoutes,
+        violations: currentViolations,
+        nodeIndex: nodeIndex,
+        router: selectedRouter,
+        algorithms: algorithms
+      )
+      let repairedViolations = precomputedCrossedPortViolations(
+        routes: repaired,
+        nodeIndex: nodeIndex
+      )
+      guard repairedViolations.count < currentViolations.count else {
+        break
+      }
+      currentRoutes = repaired
+      currentViolations = repairedViolations
+    }
+    return currentRoutes
+  }
+
+  private func routesRepairingCrossedPorts(
+    routes: [String: PolicyCanvasEdgeRoute],
+    violations originalViolations: [PolicyCanvasCrossedPortsViolation],
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    let markerLayout = portMarkerLayout(
+      routes: routes,
+      nodeIndex: nodeIndex,
+      ordering: .farAxis
+    )
+    let context = PolicyCanvasRouteStateContext(
+      prepared: self,
+      nodeIndex: nodeIndex,
+      passContext: displayedRoutePassContext(nodeIndex: nodeIndex),
+      router: selectedRouter,
+      algorithms: algorithms
+    )
+    let selectedRoutes = policyCanvasSelectedRoutes(
+      phase: "precomputed-crossed-port-repair",
+      portMarkerLayout: markerLayout,
+      context: context
+    )
+    let crossedEdgeIDs = Set(originalViolations.flatMap { [$0.edgeA, $0.edgeB] })
+    var repaired = routes
+    for edge in edges where crossedEdgeIDs.contains(edge.id) {
+      guard let route = selectedRoutes[edge.id] else {
+        continue
+      }
+      repaired[edge.id] = route
+    }
+    guard precomputedBodyHits(routes: repaired, nodeIndex: nodeIndex).isEmpty else {
+      return routes
+    }
+    return repaired
+  }
+
   private func precomputedBodyHitEdgeIDs(
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode]
@@ -233,14 +342,8 @@ extension PolicyCanvasPreparedRouteInput {
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> [PolicyCanvasBodyHitViolation] {
-    let routedEdges = edges.compactMap { edge -> PolicyCanvasRoutedEdge? in
-      guard let route = routes[edge.id], route.points.count >= 2 else {
-        return nil
-      }
-      return PolicyCanvasRoutedEdge(edge: edge, route: route)
-    }
     return policyCanvasMeasureBodyHits(
-      routedEdges: routedEdges,
+      routedEdges: precomputedRoutedEdges(routes: routes),
       nodeFramesByID: nodeIndex.mapValues(\.frame),
       groupTitleFrames: policyCanvasGroupTitleFramesByID(groups)
     )
@@ -255,6 +358,105 @@ extension PolicyCanvasPreparedRouteInput {
       routedEdges: [PolicyCanvasRoutedEdge(edge: edge, route: route)],
       nodeFramesByID: nodeIndex.mapValues(\.frame),
       groupTitleFrames: policyCanvasGroupTitleFramesByID(groups)
+    )
+  }
+
+  private func precomputedCrossedPortViolations(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [PolicyCanvasCrossedPortsViolation] {
+    policyCanvasMeasureCrossedPorts(
+      routedEdges: precomputedRoutedEdges(routes: routes),
+      nodeFramesByID: nodeIndex.mapValues(\.frame)
+    )
+  }
+
+  private func precomputedRoutedEdges(
+    routes: [String: PolicyCanvasEdgeRoute]
+  ) -> [PolicyCanvasRoutedEdge] {
+    edges.compactMap { edge -> PolicyCanvasRoutedEdge? in
+      guard let route = routes[edge.id], route.points.count >= 2 else {
+        return nil
+      }
+      return PolicyCanvasRoutedEdge(edge: edge, route: route)
+    }
+  }
+
+  private func routesSwappingCrossedPortPairs(
+    routes: [String: PolicyCanvasEdgeRoute],
+    violations: [PolicyCanvasCrossedPortsViolation]
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    let edgesByID = Dictionary(edges.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    var repaired = routes
+    for violation in violations {
+      guard
+        let edgeA = edgesByID[violation.edgeA],
+        let edgeB = edgesByID[violation.edgeB],
+        let roleA = crossedPortRole(edge: edgeA, nodeID: violation.nodeID),
+        let roleB = crossedPortRole(edge: edgeB, nodeID: violation.nodeID),
+        let routeA = repaired[violation.edgeA],
+        let routeB = repaired[violation.edgeB]
+      else {
+        continue
+      }
+      repaired[violation.edgeA] = routeMovingTerminal(
+        routeA,
+        role: roleA,
+        side: violation.side,
+        point: violation.pointB
+      )
+      repaired[violation.edgeB] = routeMovingTerminal(
+        routeB,
+        role: roleB,
+        side: violation.side,
+        point: violation.pointA
+      )
+    }
+    return repaired
+  }
+
+  private func crossedPortRole(
+    edge: PolicyCanvasEdge,
+    nodeID: String
+  ) -> PolicyCanvasRouteEndpointRole? {
+    if edge.source.nodeID == nodeID {
+      return .source
+    }
+    if edge.target.nodeID == nodeID {
+      return .target
+    }
+    return nil
+  }
+
+  private func routeMovingTerminal(
+    _ route: PolicyCanvasEdgeRoute,
+    role: PolicyCanvasRouteEndpointRole,
+    side: PolicyCanvasPortSide,
+    point: CGPoint
+  ) -> PolicyCanvasEdgeRoute {
+    guard route.points.count >= 2 else {
+      return route
+    }
+    let lead = policyCanvasPortLeadPoint(point, side: side)
+    var points: [CGPoint] = []
+    switch role {
+    case .source:
+      policyCanvasAppendOrthogonalBridge(point, to: &points)
+      policyCanvasAppendOrthogonalBridge(lead, to: &points)
+      for oldPoint in route.points.dropFirst(2) {
+        policyCanvasAppendOrthogonalBridge(oldPoint, to: &points)
+      }
+    case .target:
+      for oldPoint in route.points.dropLast(2) {
+        policyCanvasAppendOrthogonalBridge(oldPoint, to: &points)
+      }
+      policyCanvasAppendOrthogonalBridge(lead, to: &points)
+      policyCanvasAppendOrthogonalBridge(point, to: &points)
+    }
+    let compressed = policyCanvasCompressPreservingTerminalStubs(points)
+    return PolicyCanvasEdgeRoute(
+      points: compressed,
+      labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: compressed)
     )
   }
 
