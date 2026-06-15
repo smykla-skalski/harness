@@ -110,6 +110,7 @@ struct DashboardReviewConversationFeed: View {
       await rowSource.refresh(
         entries: viewModel.entries,
         hiddenKinds: preferences.timelineHiddenKinds,
+        showActivityInlineComments: preferences.showActivityInlineComments,
         autoCollapseHeavyReviewThreads: preferences.timelineAutoCollapseHeavyReviewThreads,
         configuration: dateTimeConfiguration
       )

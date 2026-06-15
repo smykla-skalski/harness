@@ -39,6 +39,7 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
     for entries: [ReviewTimelineEntry],
     pullRequestID _: String,
     hiddenKinds: Set<ReviewTimelineKind> = [],
+    showInlineComments: Bool = true,
     autoCollapseHeavyReviewThreads: Bool = false,
     configuration _: HarnessMonitorDateTimeConfiguration
   ) -> [SessionTimelineNode] {
@@ -63,10 +64,12 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
           contentsOf: reviewNodes(
             payload,
             visibleReviewThreadSignatures: visibleReviewThreadSignatures,
+            showInlineComments: showInlineComments,
             autoCollapseHeavyReviewThreads: autoCollapseHeavyReviewThreads
           )
         )
       case .reviewThread(let payload):
+        guard showInlineComments else { continue }
         output.append(
           contentsOf: reviewThreadNodes(
             payload,
@@ -117,6 +120,7 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
   private func reviewNodes(
     _ payload: ReviewPayload,
     visibleReviewThreadSignatures: Set<ReviewInlineConversationSignature>,
+    showInlineComments: Bool,
     autoCollapseHeavyReviewThreads: Bool
   ) -> [SessionTimelineNode] {
     var nodes: [SessionTimelineNode] = []
@@ -141,6 +145,7 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
       + Self.reviewActionPhrase(payload.state)
       + " at \(payload.createdAt)"
     nodes.append(parent)
+    guard showInlineComments else { return nodes }
     for group in Self.inlineConversationGroups(payload.inlineComments) {
       if let signature = Self.inlineConversationSignature(for: group),
         visibleReviewThreadSignatures.contains(signature)

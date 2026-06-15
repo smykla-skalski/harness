@@ -20,6 +20,7 @@ struct DashboardReviewsPreferencesTests {
     #expect(prefs.filesSoftWrapEnabled)
     #expect(prefs.filesTabWidth == 8)
     #expect(prefs.filesTabWidth == DashboardReviewsPreferences.defaultFilesTabWidth)
+    #expect(!prefs.showActivityInlineComments)
   }
 
   @Test("legacy stored preferences migrate the polling interval into the per-repo field")
@@ -197,6 +198,7 @@ struct DashboardReviewsPreferencesTests {
     prefs.preferredGroupModeRaw = DashboardReviewsGroupMode.smartInbox.rawValue
     prefs.filesDefaultViewModeRaw = FilesViewMode.split.rawValue
     prefs.filesSoftWrapEnabled = false
+    prefs.showActivityInlineComments = true
 
     let encoded = prefs.encodedString
     let decoded = DashboardReviewsPreferences.decode(from: encoded)
@@ -206,7 +208,14 @@ struct DashboardReviewsPreferencesTests {
     #expect(decoded.preferredGroupModeRaw == DashboardReviewsGroupMode.smartInbox.rawValue)
     #expect(decoded.filesDefaultViewMode == .split)
     #expect(!decoded.filesSoftWrapEnabled)
+    #expect(decoded.showActivityInlineComments)
     #expect(decoded.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns)
+  }
+
+  @Test("legacy preferences default activity inline comments to hidden")
+  func activityInlineCommentsLegacyDecodeToHidden() {
+    let prefs = DashboardReviewsPreferences.decode(from: "{}")
+    #expect(!prefs.showActivityInlineComments)
   }
 
   @Test("legacy preferences without a preferred group mode default to repository")

@@ -42,6 +42,7 @@ final class ReviewConversationRowSource {
   func refresh(
     entries: [ReviewTimelineEntry],
     hiddenKinds: Set<ReviewTimelineKind>,
+    showActivityInlineComments: Bool,
     autoCollapseHeavyReviewThreads: Bool,
     configuration: HarnessMonitorDateTimeConfiguration
   ) async {
@@ -57,6 +58,7 @@ final class ReviewConversationRowSource {
         for: entries,
         pullRequestID: "",
         hiddenKinds: hiddenKinds,
+        showInlineComments: showActivityInlineComments,
         autoCollapseHeavyReviewThreads: autoCollapseHeavyReviewThreads,
         configuration: configuration
       )

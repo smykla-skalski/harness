@@ -94,6 +94,10 @@ struct SettingsReviewsTimelinePane: View {
   private var timelineSection: some View {
     Section {
       Toggle("Show activity timeline", isOn: $draft.showActivityTimeline)
+      Toggle(
+        "Show inline comments in activity timeline",
+        isOn: $draft.showActivityInlineComments
+      )
       Stepper(
         "Initial page size: \(draft.timelineInitialPageSize)",
         value: $draft.timelineInitialPageSize,

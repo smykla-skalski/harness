@@ -79,6 +79,7 @@ extension DashboardReviewsPreferences {
     into container: inout KeyedEncodingContainer<CodingKeys>
   ) throws {
     try container.encode(showActivityTimeline, forKey: .showActivityTimeline)
+    try container.encode(showActivityInlineComments, forKey: .showActivityInlineComments)
     try container.encode(timelineHiddenKindsRaw, forKey: .timelineHiddenKindsRaw)
     try container.encode(timelineInitialPageSize, forKey: .timelineInitialPageSize)
     try container.encode(timelineLoadOlderBatchSize, forKey: .timelineLoadOlderBatchSize)
@@ -253,6 +254,9 @@ extension DashboardReviewsPreferences {
     showActivityTimeline =
       try container.decodeIfPresent(Bool.self, forKey: .showActivityTimeline)
       ?? defaults.showActivityTimeline
+    showActivityInlineComments =
+      try container.decodeIfPresent(Bool.self, forKey: .showActivityInlineComments)
+      ?? defaults.showActivityInlineComments
     timelineHiddenKindsRaw =
       try container.decodeIfPresent(String.self, forKey: .timelineHiddenKindsRaw)
       ?? defaults.timelineHiddenKindsRaw

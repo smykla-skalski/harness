@@ -64,6 +64,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var filesLocalCloneMaxAgeDays: Int = 30
   var filesAccessibilityPerLineMode: Bool = false
   var showActivityTimeline: Bool = true
+  var showActivityInlineComments: Bool = false
   var timelineHiddenKindsRaw: String = defaultTimelineHiddenKindsRaw
   var timelineInitialPageSize: Int = defaultTimelinePageSize
   var timelineLoadOlderBatchSize: Int = defaultTimelinePageSize
@@ -115,6 +116,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case filesLocalCloneMaxAgeDays
     case filesAccessibilityPerLineMode
     case showActivityTimeline
+    case showActivityInlineComments
     case timelineHiddenKindsRaw
     case timelineInitialPageSize
     case timelineLoadOlderBatchSize
