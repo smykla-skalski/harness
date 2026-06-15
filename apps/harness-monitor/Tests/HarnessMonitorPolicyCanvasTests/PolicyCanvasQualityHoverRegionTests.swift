@@ -108,17 +108,21 @@ struct PolicyCanvasQualityHoverRegionTests {
     #expect(marks(under: CGPoint(x: 300, y: 130), in: report).isEmpty)
   }
 
-  @Test("a rect mark is solid, so a point in its interior resolves (no hollow ring)")
-  func longEdgeMarkIsSolidNotRing() {
+  @Test("a long-edge mark is a perimeter band: the border resolves, the empty interior does not")
+  func longEdgeMarkIsPerimeterBand() {
     var report = PolicyCanvasGraphQualityReport.empty
     report.longEdges = [
       PolicyCanvasLongEdgeViolation(
-        edgeID: "e", length: 600, horizontalSpan: 600, verticalSpan: 0,
-        bendCount: 0, bounds: CGRect(x: 100, y: 100, width: 200, height: 40))
+        edgeID: "e", length: 600, horizontalSpan: 200, verticalSpan: 120,
+        bendCount: 1, bounds: CGRect(x: 100, y: 100, width: 200, height: 120))
     ]
-    // The center sits in what a hollow 14pt-ring band would leave empty; a solid
-    // mark resolves it. Guards against the nonzero-fill corner-triangle artifact.
-    #expect(marks(under: CGPoint(x: 200, y: 120), in: report).count == 1)
+    // The wire runs along the box border, so the band traces it: a point on the
+    // border resolves, the empty middle does not, and a corner is covered (no
+    // nonzero-fill bowtie hole).
+    #expect(marks(under: CGPoint(x: 100, y: 160), in: report).count == 1)
+    #expect(marks(under: CGPoint(x: 200, y: 100), in: report).count == 1)
+    #expect(marks(under: CGPoint(x: 100, y: 100), in: report).count == 1)
+    #expect(marks(under: CGPoint(x: 200, y: 160), in: report).isEmpty)
   }
 
   private func portOverlap(at point: CGPoint) -> PolicyCanvasPortSpacingViolation {

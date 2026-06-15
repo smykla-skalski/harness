@@ -157,7 +157,11 @@ func policyCanvasQualityHoverMarks(
     add(.bodyHits, policyCanvasHoverRect(violation.frame))
   }
   for violation in report.longEdges {
-    add(.longEdges, policyCanvasHoverRect(violation.bounds))
+    // A long edge marks its bounding box, but the wire only runs along the box
+    // border - the interior is empty. Hover the border band, not the whole body,
+    // so the highlight traces the frame the overlay draws and the empty middle
+    // stays pass-through.
+    add(.longEdges, policyCanvasHoverPerimeterBand(violation.bounds, band: 14))
   }
   for violation in report.detours {
     add(.detours, policyCanvasHoverPolyline(violation.points, width: 16))
@@ -221,4 +225,32 @@ private func policyCanvasHoverPolyline(_ points: [CGPoint], width: CGFloat) -> P
 /// thickness to land a pointer on.
 private func policyCanvasHoverRect(_ rect: CGRect) -> Path {
   Path(roundedRect: rect.insetBy(dx: -6, dy: -6), cornerRadius: 6)
+}
+
+/// A band that traces the rect perimeter rather than filling it - the hover region
+/// for a frame mark (a long-edge bounding box) whose interior is empty space the
+/// wire never enters. Built as an outer rectangle wound clockwise and an inner
+/// rectangle wound counter-clockwise, so under nonzero winding (what both the
+/// `fill` renderer and `Path.contains` use) the interior cancels to a hole and
+/// only the band is inside - no even-odd, and no `strokedPath` corner bowtie. A
+/// box too thin for an inner hole stays a solid block, the right read for a thin
+/// long edge.
+private func policyCanvasHoverPerimeterBand(_ rect: CGRect, band: CGFloat) -> Path {
+  let outer = rect.insetBy(dx: -band / 2, dy: -band / 2)
+  let inner = rect.insetBy(dx: band / 2, dy: band / 2)
+  var path = Path()
+  path.move(to: CGPoint(x: outer.minX, y: outer.minY))
+  path.addLine(to: CGPoint(x: outer.maxX, y: outer.minY))
+  path.addLine(to: CGPoint(x: outer.maxX, y: outer.maxY))
+  path.addLine(to: CGPoint(x: outer.minX, y: outer.maxY))
+  path.closeSubpath()
+  guard inner.width > 0, inner.height > 0 else {
+    return path
+  }
+  path.move(to: CGPoint(x: inner.minX, y: inner.minY))
+  path.addLine(to: CGPoint(x: inner.minX, y: inner.maxY))
+  path.addLine(to: CGPoint(x: inner.maxX, y: inner.maxY))
+  path.addLine(to: CGPoint(x: inner.maxX, y: inner.minY))
+  path.closeSubpath()
+  return path
 }
