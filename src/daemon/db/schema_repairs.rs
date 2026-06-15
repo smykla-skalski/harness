@@ -24,6 +24,9 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
     ("policy_nodes", "layout_source"),
 ];
 
+const DEPRECATED_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] =
+    &[("policy_workspace", "enforcement_snapshot_json")];
+
 pub(super) fn current_schema_shape_needs_repair(
     conn: &super::Connection,
 ) -> Result<bool, CliError> {
@@ -45,6 +48,11 @@ pub(super) fn current_schema_shape_needs_repair(
             return Ok(true);
         }
     }
+    for (table, column) in DEPRECATED_SCHEMA_POLICY_COLUMNS {
+        if column_exists(conn, table, column)? {
+            return Ok(true);
+        }
+    }
     Ok(false)
 }
 
@@ -62,6 +70,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v20::run(&db.conn)?;
     super::schema_v21::run(&db.conn)?;
     super::schema_v22::run(&db.conn)?;
+    super::schema_v23::run(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

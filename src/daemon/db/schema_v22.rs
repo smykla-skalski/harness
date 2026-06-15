@@ -10,6 +10,15 @@ pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
          ADD COLUMN global_policy_enforcement_enabled INTEGER NOT NULL DEFAULT 1
              CHECK (global_policy_enforcement_enabled IN (0, 1))",
     )?;
+    if column_exists(conn, "policy_workspace", "enforcement_snapshot_json")? {
+        conn.execute(
+            "UPDATE policy_workspace
+             SET global_policy_enforcement_enabled = 0
+             WHERE enforcement_snapshot_json IS NOT NULL",
+            [],
+        )
+        .map_err(|error| db_error(format!("backfill global policy enforcement flag: {error}")))?;
+    }
     stamp_schema_version(conn)
 }
 
