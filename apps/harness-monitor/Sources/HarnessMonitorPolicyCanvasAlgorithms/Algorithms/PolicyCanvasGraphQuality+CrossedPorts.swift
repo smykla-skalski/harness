@@ -34,6 +34,7 @@ func policyCanvasMeasureCrossedPorts(
     policyCanvasRegisterSideTerminal(
       point: first,
       far: last,
+      route: routed.route,
       nodeID: routed.edge.source.nodeID,
       edgeID: routed.edge.id,
       nodeFramesByID: nodeFramesByID,
@@ -43,6 +44,7 @@ func policyCanvasMeasureCrossedPorts(
     policyCanvasRegisterSideTerminal(
       point: last,
       far: first,
+      route: routed.route,
       nodeID: routed.edge.target.nodeID,
       edgeID: routed.edge.id,
       nodeFramesByID: nodeFramesByID,
@@ -89,6 +91,7 @@ func policyCanvasMeasureCrossedPorts(
 private func policyCanvasRegisterSideTerminal(
   point: CGPoint,
   far: CGPoint,
+  route: PolicyCanvasEdgeRoute,
   nodeID: String,
   edgeID: String,
   nodeFramesByID: [String: CGRect],
@@ -102,6 +105,15 @@ private func policyCanvasRegisterSideTerminal(
     return
   }
   let horizontalSide = side == .leading || side == .trailing
+  // The far-position inversion test assumes a direct approach: the wire moves
+  // monotonically across the side axis from its port to its far end. A wire that
+  // reverses (dives past then climbs back, or routes around) sits in the channel
+  // somewhere its far position does not predict, so its inclusion would invent a
+  // crossing that is really a routing detour - flagged elsewhere as a wrong turn,
+  // not a wrong port. Skip it here.
+  guard policyCanvasRoutePerpendicularlyMonotonic(route, horizontalSide: horizontalSide) else {
+    return
+  }
   let terminal = PolicyCanvasSideTerminal(
     edgeID: edgeID,
     offset: horizontalSide ? point.y : point.x,
@@ -109,6 +121,34 @@ private func policyCanvasRegisterSideTerminal(
     point: point
   )
   byNodeSide[nodeID, default: [:]][side, default: []].append(terminal)
+}
+
+/// True when the route never reverses along the side's perpendicular axis (y for
+/// a leading/trailing side, x for top/bottom). A monotone run - flat steps
+/// allowed - is a direct approach the far-position test can reason about; a sign
+/// flip is a backtracking detour.
+private func policyCanvasRoutePerpendicularlyMonotonic(
+  _ route: PolicyCanvasEdgeRoute,
+  horizontalSide: Bool
+) -> Bool {
+  let coordinates = route.points.map { horizontalSide ? $0.y : $0.x }
+  guard coordinates.count >= 3 else {
+    return true
+  }
+  var direction = 0
+  for index in 1..<coordinates.count {
+    let delta = coordinates[index] - coordinates[index - 1]
+    guard abs(delta) > 0.5 else {
+      continue
+    }
+    let sign = delta > 0 ? 1 : -1
+    if direction == 0 {
+      direction = sign
+    } else if direction != sign {
+      return false
+    }
+  }
+  return true
 }
 
 private func policyCanvasCrossedPortsOrder(
