@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import HarnessMonitorKit
 import SwiftUI
@@ -84,6 +85,7 @@ enum DashboardReviewConversationFullContentResolver {
 struct DashboardReviewConversationFullContentSheet: View {
   let content: DashboardReviewConversationFullContent
   let fontScale: CGFloat
+  @State private var sheetMetrics = DashboardReviewConversationFullContentSheetMetrics.fallback
 
   var body: some View {
     ScrollView {
@@ -100,11 +102,89 @@ struct DashboardReviewConversationFullContentSheet: View {
         Divider()
         HarnessMonitorMarkdownText(content.markdown, textSelection: .enabled)
       }
-      .frame(maxWidth: 760, alignment: .leading)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(24)
+      .frame(maxWidth: sheetMetrics.maxWidth, alignment: .leading)
+      .padding(.top, HarnessMonitorTheme.spacingLG)
+      .padding(.horizontal, HarnessMonitorTheme.spacingLG)
+      .padding(.bottom, sheetMetrics.toolbarHeight)
     }
-    .frame(minWidth: 620, minHeight: 420)
+    .frame(maxWidth: sheetMetrics.maxWidth, maxHeight: sheetMetrics.maxHeight)
     .background(Color(nsColor: .windowBackgroundColor))
+    .background(
+      DashboardReviewConversationFullContentSheetMetricsReader(metrics: $sheetMetrics)
+    )
+  }
+}
+
+struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
+  static let fallbackToolbarHeight: CGFloat = 52
+  static let minimumHeight: CGFloat = 420
+
+  static let fallback = Self(
+    maxWidth: 760,
+    maxHeight: 520,
+    toolbarHeight: fallbackToolbarHeight
+  )
+
+  let maxWidth: CGFloat
+  let maxHeight: CGFloat
+  let toolbarHeight: CGFloat
+
+  static func resolved(
+    parentFrame: CGRect?,
+    parentContentLayoutRect: CGRect?
+  ) -> Self {
+    guard let parentFrame else { return fallback }
+    let toolbarHeight = resolvedToolbarHeight(
+      parentFrame: parentFrame,
+      parentContentLayoutRect: parentContentLayoutRect
+    )
+    return Self(
+      maxWidth: max(0, parentFrame.width - (toolbarHeight * 2)),
+      maxHeight: max(minimumHeight, parentFrame.height - toolbarHeight),
+      toolbarHeight: toolbarHeight
+    )
+  }
+
+  private static func resolvedToolbarHeight(
+    parentFrame: CGRect,
+    parentContentLayoutRect: CGRect?
+  ) -> CGFloat {
+    guard let parentContentLayoutRect else { return fallbackToolbarHeight }
+    let measured = parentFrame.height - parentContentLayoutRect.height
+    guard measured.isFinite, measured > 0 else { return fallbackToolbarHeight }
+    return measured
+  }
+}
+
+private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewRepresentable {
+  @Binding var metrics: DashboardReviewConversationFullContentSheetMetrics
+
+  func makeNSView(context: Context) -> MetricsView {
+    let view = MetricsView()
+    view.onMetricsChange = { metrics = $0 }
+    return view
+  }
+
+  func updateNSView(_ nsView: MetricsView, context: Context) {
+    nsView.onMetricsChange = { metrics = $0 }
+    nsView.refreshMetrics()
+  }
+
+  final class MetricsView: NSView {
+    var onMetricsChange: ((DashboardReviewConversationFullContentSheetMetrics) -> Void)?
+
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      refreshMetrics()
+    }
+
+    func refreshMetrics() {
+      let parentWindow = window?.sheetParent ?? window
+      let metrics = DashboardReviewConversationFullContentSheetMetrics.resolved(
+        parentFrame: parentWindow?.frame,
+        parentContentLayoutRect: parentWindow?.contentLayoutRect
+      )
+      onMetricsChange?(metrics)
+    }
   }
 }

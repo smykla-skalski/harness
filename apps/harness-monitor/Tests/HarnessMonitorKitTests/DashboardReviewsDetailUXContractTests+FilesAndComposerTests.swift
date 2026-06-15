@@ -1,6 +1,8 @@
 import Foundation
 import Testing
 
+@testable import HarnessMonitorUIPreviewable
+
 extension DashboardReviewsDetailUXContractTests {
   @Test("Large review detail collections render in bounded batches")
   func largeReviewDetailCollectionsRenderInBoundedBatches() throws {
@@ -106,6 +108,16 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(
       conversation.contains("HarnessMonitorMarkdownText(content.markdown, textSelection: .enabled)")
     )
+    #expect(conversation.contains(".frame(maxWidth: sheetMetrics.maxWidth, alignment: .leading)"))
+    #expect(conversation.contains(".padding(.bottom, sheetMetrics.toolbarHeight)"))
+    #expect(
+      conversation.contains(
+        ".frame(maxWidth: sheetMetrics.maxWidth, maxHeight: sheetMetrics.maxHeight)"
+      )
+    )
+    #expect(conversation.contains("window?.sheetParent ?? window"))
+    #expect(conversation.contains("parentFrame.width - (toolbarHeight * 2)"))
+    #expect(conversation.contains("parentFrame.height - toolbarHeight"))
     #expect(timeline.contains("let onOpenFullContent: ((SessionTimelineNode) -> Void)?"))
     #expect(timeline.contains("let fullContentRevision: UInt64?"))
     #expect(
@@ -120,6 +132,18 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(timeline.contains("transaction.animation = nil"))
     #expect(timeline.contains("onOpenFullContent?(node)"))
     #expect(timeline.contains(".pointerStyle(.link)"))
+  }
+
+  @Test("Activity full content sheet metrics keep toolbar-sized window margins")
+  func activityFullContentSheetMetricsKeepToolbarSizedWindowMargins() {
+    let metrics = DashboardReviewConversationFullContentSheetMetrics.resolved(
+      parentFrame: CGRect(x: 0, y: 0, width: 1_200, height: 900),
+      parentContentLayoutRect: CGRect(x: 0, y: 0, width: 1_200, height: 840)
+    )
+
+    #expect(metrics.toolbarHeight == 60)
+    #expect(metrics.maxWidth == 1_080)
+    #expect(metrics.maxHeight == 840)
   }
 
   @Test("Activity inline conversations render through a dedicated GitHub style card path")
