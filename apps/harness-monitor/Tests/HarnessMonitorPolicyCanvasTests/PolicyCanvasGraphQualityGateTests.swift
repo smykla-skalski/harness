@@ -197,6 +197,7 @@ struct PolicyCanvasGraphQualityGateTests {
     var elkProbeAppliedRoutes = -1
     var elkProbeOverlapCleanup = false
     var elkProbeSingleFedAlignment = false
+    var elkProbeAttachFailure = "none"
     if let elkProbe {
       var probeNodes = viewModel.nodes
       var probeGroups = viewModel.groups
@@ -211,6 +212,13 @@ struct PolicyCanvasGraphQualityGateTests {
         nodes: probeNodes,
         edges: viewModel.edges
       )
+      if probePrecomputed == nil {
+        elkProbeAttachFailure = Self.precomputedAttachFailure(
+          result: elkProbe,
+          nodes: probeNodes,
+          edges: viewModel.edges
+        )
+      }
       if policyCanvasUsesSingleFedTerminalAlignment(viewModel.algorithmSelection) {
         elkProbeSingleFedAlignment = true
         policyCanvasAlignSingleFedTerminals(
@@ -269,6 +277,7 @@ struct PolicyCanvasGraphQualityGateTests {
       String(format: "elk_probe_ms: %.3f", elkProbeMs),
       "elk_probe_routes: \(elkProbe?.precomputedRoutes?.routes.count ?? -1)",
       "elk_probe_applied_routes: \(elkProbeAppliedRoutes)",
+      "elk_probe_attach_failure: \(elkProbeAttachFailure)",
       "elk_probe_single_fed_alignment: \(elkProbeSingleFedAlignment)",
       "elk_probe_overlap_cleanup: \(elkProbeOverlapCleanup)",
       "view_model_precomputed_routes: \(viewModel.precomputedRoutes?.routes.count ?? -1)",
@@ -285,12 +294,205 @@ struct PolicyCanvasGraphQualityGateTests {
       "route_selection_passes: \(timedRoute.selectionPasses)",
       "route_fast_path: \(timedRoute.fastPath)",
       String(format: "quality_report_ms: %.3f", qualityMs),
+      "port_overlaps: \(report.count(for: .portOverlaps))",
+      "port_too_close: \(report.count(for: .portTooClose))",
+      "port_detached: \(report.count(for: .portDetached))",
       "label_overlaps: \(report.count(for: .labelOverlaps))",
       "corridor_parallel: \(report.count(for: .corridorParallel))",
       "corridor_reuse: \(report.count(for: .corridorReuse))",
+      "port_hotspots: \(Self.portSpacingHotspots(report))",
+      "port_detail: \(Self.portSpacingDetail(report, matching: "xg-m10-action-gate"))",
+      "elk_endpoint_sides: \(Self.elkEndpointSides(input.edges, edgePrefix: "xge:m10-gate-"))",
+      "elk_route_detail: \(Self.routeDetail(elkProbe?.precomputedRoutes?.routes ?? [:], edgePrefix: "xge:m10-gate-"))",
+      "route_detail: \(Self.routeDetail(timedRoute.output.routes, edgePrefix: "xge:m10-gate-"))",
     ].joined(separator: "\n")
     writeReport(contents, name: "extreme-galaxy-performance.txt")
     #expect(timedRoute.output.routes.count == viewModel.edges.count)
+    #expect(plannedGraph?.precomputedRoutes?.routes.count == viewModel.edges.count)
+    #expect(viewModel.precomputedRoutes?.routes.count == viewModel.edges.count)
+    #expect(timedRoute.fastPath)
+  }
+
+  private static func portSpacingHotspots(
+    _ report: PolicyCanvasGraphQualityReport
+  ) -> String {
+    let counts = Dictionary(
+      grouping: report.portSpacing,
+      by: { "\($0.nodeID)|\($0.side.rawValue)|\($0.kind.rawValue)" }
+    )
+    return counts
+      .map { key, violations in "\(key)=\(violations.count)" }
+      .sorted()
+      .joined(separator: ",")
+  }
+
+  private static func portSpacingDetail(
+    _ report: PolicyCanvasGraphQualityReport,
+    matching nodeID: String
+  ) -> String {
+    report.portSpacing
+      .filter { $0.nodeID == nodeID }
+      .map {
+        [
+          $0.kind.rawValue,
+          $0.side.rawValue,
+          String(format: "%.1f", $0.gap),
+          $0.edgeIDs.joined(separator: "+"),
+        ].joined(separator: ":")
+      }
+      .joined(separator: ",")
+  }
+
+  private static func elkEndpointSides(
+    _ edges: [PolicyCanvasEdge],
+    edgePrefix: String
+  ) -> String {
+    edges
+      .filter { $0.id.hasPrefix(edgePrefix) }
+      .sorted { $0.id < $1.id }
+      .map {
+        "\($0.id)=source:\(PolicyCanvasPortSide.trailing.rawValue),target:\(PolicyCanvasPortSide.leading.rawValue)"
+      }
+      .joined(separator: ",")
+  }
+
+  private static func routeDetail(
+    _ routes: [String: PolicyCanvasEdgeRoute],
+    edgePrefix: String
+  ) -> String {
+    routes
+      .filter { $0.key.hasPrefix(edgePrefix) }
+      .sorted { $0.key < $1.key }
+      .map { key, route in "\(key)=\(route.points)" }
+      .joined(separator: ";")
+  }
+
+  private static func precomputedAttachFailure(
+    result: PolicyCanvasLayoutResult,
+    nodes: [PolicyCanvasNode],
+    edges: [PolicyCanvasEdge]
+  ) -> String {
+    guard let precomputedRoutes = result.precomputedRoutes else {
+      return "missing-precomputed-routes"
+    }
+    let edgeIDs = Set(edges.map(\.id))
+    guard precomputedRoutes.routes.count == edgeIDs.count,
+      Set(precomputedRoutes.routes.keys) == edgeIDs
+    else {
+      return "route-count=\(precomputedRoutes.routes.count) edge-count=\(edgeIDs.count)"
+    }
+    let nodePositions = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
+    let offsetRoutes: PolicyCanvasPrecomputedRouteSet
+    if let nodeID = result.nodePositions.keys.sorted().first,
+      let resultPosition = result.nodePositions[nodeID],
+      let appliedPosition = nodePositions[nodeID]
+    {
+      offsetRoutes = precomputedRoutes.offsetBy(
+        dx: appliedPosition.x - resultPosition.x,
+        dy: appliedPosition.y - resultPosition.y
+      )
+    } else {
+      offsetRoutes = precomputedRoutes
+    }
+    let nodeFrames = Dictionary(
+      uniqueKeysWithValues: nodes.map {
+        ($0.id, CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize))
+      }
+    )
+    for edge in edges.sorted(by: { $0.id < $1.id }) {
+      guard let route = offsetRoutes.routes[edge.id] else {
+        return "\(edge.id):missing-route"
+      }
+      guard let first = route.points.first,
+        let last = route.points.last,
+        let sourceFrame = nodeFrames[edge.source.nodeID],
+        let targetFrame = nodeFrames[edge.target.nodeID]
+      else {
+        return "\(edge.id):missing-terminal"
+      }
+      if !precomputedRouteTerminalAttaches(first, to: sourceFrame) {
+        return "\(edge.id):source point=\(first) frame=\(sourceFrame)"
+      }
+      if !precomputedRouteTerminalAttaches(last, to: targetFrame) {
+        return "\(edge.id):target point=\(last) frame=\(targetFrame)"
+      }
+    }
+    return "none"
+  }
+
+  private static func precomputedRouteTerminalAttaches(
+    _ point: CGPoint,
+    to frame: CGRect
+  ) -> Bool {
+    let tolerance = PolicyCanvasLayout.portDiameter + 4
+    let withinVertical = point.y >= frame.minY - tolerance && point.y <= frame.maxY + tolerance
+    let withinHorizontal = point.x >= frame.minX - tolerance && point.x <= frame.maxX + tolerance
+    let onLeading = withinVertical && abs(point.x - frame.minX) <= tolerance
+    let onTrailing = withinVertical && abs(point.x - frame.maxX) <= tolerance
+    let onTop = withinHorizontal && abs(point.y - frame.minY) <= tolerance
+    let onBottom = withinHorizontal && abs(point.y - frame.maxY) <= tolerance
+    return onLeading || onTrailing || onTop || onBottom
+  }
+
+  @Test func dumpExtremeGalaxyModule10Routes() async throws {
+    let sample = try #require(PolicyCanvasLabSamples.sample(id: "extreme-galaxy"))
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: sample.document, simulation: nil, audit: nil)
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+    let input = PolicyCanvasRouteWorkerInput(
+      nodes: viewModel.nodes,
+      groups: viewModel.groups,
+      edges: viewModel.edges,
+      fontScale: 1,
+      routingHints: viewModel.routingHints,
+      precomputedRoutes: viewModel.precomputedRoutes,
+      algorithmSelection: .referenceRouting
+    )
+    let output = await PolicyCanvasRouteWorker().compute(input: input)
+    let nodeIDs = [
+      "xg-m10-action-gate",
+      "xg-m10-evidence",
+      "xg-m10-ifelse",
+      "xg-m10-switch",
+      "xg-m10-hub",
+      "xg-m10-risk",
+      "xg-m10-human",
+      "xg-m10-consensus",
+      "xg-m10-dry-run",
+      "xg-m10-handoff",
+    ]
+    let edgeIDs = [
+      "xge:m10-gate-evidence",
+      "xge:m10-gate-switch",
+      "xge:m10-gate-dry",
+      "xge:m10-gate-hub",
+      "xge:m10-gate-human",
+      "xge:m10-gate-handoff",
+      "xge:m10-switch-wait",
+      "xge:m10-switch-human",
+      "xge:m10-switch-deny",
+      "xge:m10-switch-event",
+      "xge:m10-switch-risk",
+    ]
+    var lines: [String] = []
+    lines.append("precomputedRoutes: \(viewModel.precomputedRoutes?.routes.count ?? -1)")
+    for nodeID in nodeIDs {
+      guard let node = viewModel.nodes.first(where: { $0.id == nodeID }) else {
+        continue
+      }
+      lines.append(
+        "node \(nodeID) frame=\(CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize))"
+      )
+    }
+    for edgeID in edgeIDs {
+      guard let route = output.routes[edgeID] else {
+        lines.append("edge \(edgeID) missing")
+        continue
+      }
+      lines.append("edge \(edgeID) points=\(route.points)")
+    }
+    writeReport(lines.joined(separator: "\n"), name: "extreme-galaxy-module10-routes.txt")
+    #expect(output.routes.count == viewModel.edges.count)
   }
 
   private func measuredRouteComputation(
@@ -523,7 +725,7 @@ struct PolicyCanvasGraphQualityGateTests {
         "height": Double(PolicyCanvasLayout.nodeSize.height)
       ]
       if let ports = portModel?.portsByNode[node.id], !ports.isEmpty {
-        child["layoutOptions"] = ["elk.portConstraints": "FIXED_SIDE"]
+        child["layoutOptions"] = ["org.eclipse.elk.portConstraints": "FIXED_POS"]
         child["ports"] = ports
       }
       return child
@@ -576,49 +778,98 @@ struct PolicyCanvasGraphQualityGateTests {
     var portsByNode: [String: [[String: Any]]] = [:]
     var sourcePortByEdge: [String: String] = [:]
     var targetPortByEdge: [String: String] = [:]
-    var sideCounts: [String: Int] = [:]
 
-    func appendPort(
-      id: String,
-      nodeID: String,
-      side: PolicyCanvasPortSide
-    ) {
-      let sideName = elkPortSideName(side)
-      let countKey = "\(nodeID)|\(sideName)"
-      let index = sideCounts[countKey, default: 0]
-      sideCounts[countKey] = index + 1
-      portsByNode[nodeID, default: []].append([
-        "id": id,
-        "width": Double(PolicyCanvasLayout.portDiameter),
-        "height": Double(PolicyCanvasLayout.portDiameter),
-        "layoutOptions": [
-          "elk.port.side": sideName,
-          "elk.port.index": index
-        ]
-      ])
+    struct PartialPort {
+      let id: String
+      let edgeID: String
+      let roleRank: Int
+      let nodeID: String
+      let side: PolicyCanvasPortSide
     }
 
+    var partials: [PartialPort] = []
+    partials.reserveCapacity(edges.count * 2)
     for edge in edges.sorted(by: { $0.id < $1.id }) {
       let sourceID = "\(edge.id)__source"
       let targetID = "\(edge.id)__target"
       sourcePortByEdge[edge.id] = sourceID
       targetPortByEdge[edge.id] = targetID
-      appendPort(
-        id: sourceID,
-        nodeID: edge.source.nodeID,
-        side: edge.source.side ?? .trailing
+      partials.append(
+        PartialPort(
+          id: sourceID,
+          edgeID: edge.id,
+          roleRank: 0,
+          nodeID: edge.source.nodeID,
+          side: .trailing
+        )
       )
-      appendPort(
-        id: targetID,
-        nodeID: edge.target.nodeID,
-        side: edge.target.side ?? .leading
+      partials.append(
+        PartialPort(
+          id: targetID,
+          edgeID: edge.id,
+          roleRank: 1,
+          nodeID: edge.target.nodeID,
+          side: .leading
+        )
       )
+    }
+
+    let groups = Dictionary(grouping: partials) { "\($0.nodeID)|\($0.side.rawValue)" }
+    for key in groups.keys.sorted() {
+      let values = groups[key, default: []].sorted {
+        if $0.edgeID == $1.edgeID {
+          return $0.roleRank < $1.roleRank
+        }
+        return $0.edgeID < $1.edgeID
+      }
+      guard let side = values.first?.side else {
+        continue
+      }
+      let coordinates = policyCanvasPortMarkerCoordinates(
+        count: values.count,
+        base: policyCanvasSideExtent(side: side) / 2,
+        spacing: policyCanvasMinimumPortMarkerSpacing(),
+        extent: policyCanvasSideExtent(side: side),
+        inset: policyCanvasPortMarkerInset()
+      )
+      let sideName = elkPortSideName(side)
+      for (index, value) in values.enumerated() {
+        let origin = elkPortOrigin(side: value.side, coordinate: coordinates[index])
+        portsByNode[value.nodeID, default: []].append([
+          "id": value.id,
+          "width": Double(PolicyCanvasLayout.portDiameter),
+          "height": Double(PolicyCanvasLayout.portDiameter),
+          "x": Double(origin.x),
+          "y": Double(origin.y),
+          "layoutOptions": [
+            "org.eclipse.elk.port.side": sideName,
+            "org.eclipse.elk.port.index": index
+          ]
+        ])
+      }
     }
     return ELKEndpointPortModel(
       portsByNode: portsByNode,
       sourcePortByEdge: sourcePortByEdge,
       targetPortByEdge: targetPortByEdge
     )
+  }
+
+  private func elkPortOrigin(
+    side: PolicyCanvasPortSide,
+    coordinate: CGFloat
+  ) -> CGPoint {
+    let radius = PolicyCanvasLayout.portDiameter / 2
+    switch side {
+    case .leading:
+      return CGPoint(x: 0, y: coordinate - radius)
+    case .trailing:
+      return CGPoint(x: PolicyCanvasLayout.nodeSize.width - radius, y: coordinate - radius)
+    case .top:
+      return CGPoint(x: coordinate - radius, y: -radius)
+    case .bottom:
+      return CGPoint(x: coordinate - radius, y: PolicyCanvasLayout.nodeSize.height - radius)
+    }
   }
 
   private func elkPortSideName(_ side: PolicyCanvasPortSide) -> String {
