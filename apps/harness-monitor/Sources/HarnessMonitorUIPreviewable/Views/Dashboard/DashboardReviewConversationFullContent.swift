@@ -107,7 +107,14 @@ struct DashboardReviewConversationFullContentSheet: View {
       .padding(.horizontal, HarnessMonitorTheme.spacingLG)
       .padding(.bottom, sheetMetrics.toolbarHeight)
     }
-    .frame(maxWidth: sheetMetrics.maxWidth, maxHeight: sheetMetrics.maxHeight)
+    .frame(
+      minWidth: sheetMetrics.minimumWidth,
+      idealWidth: sheetMetrics.idealWidth,
+      maxWidth: sheetMetrics.maxWidth,
+      minHeight: sheetMetrics.minimumHeight,
+      idealHeight: sheetMetrics.idealHeight,
+      maxHeight: sheetMetrics.maxHeight
+    )
     .background(Color(nsColor: .windowBackgroundColor))
     .background(
       DashboardReviewConversationFullContentSheetMetricsReader(metrics: $sheetMetrics)
@@ -117,7 +124,10 @@ struct DashboardReviewConversationFullContentSheet: View {
 
 struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
   static let fallbackToolbarHeight: CGFloat = 52
-  static let minimumHeight: CGFloat = 420
+  private static let defaultMinimumWidth: CGFloat = 360
+  private static let defaultIdealWidth: CGFloat = 760
+  private static let defaultMinimumHeight: CGFloat = 420
+  private static let defaultIdealHeight: CGFloat = 520
 
   static let fallback = Self(
     maxWidth: 760,
@@ -128,6 +138,22 @@ struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
   let maxWidth: CGFloat
   let maxHeight: CGFloat
   let toolbarHeight: CGFloat
+
+  var minimumWidth: CGFloat {
+    min(Self.defaultMinimumWidth, maxWidth)
+  }
+
+  var idealWidth: CGFloat {
+    min(Self.defaultIdealWidth, maxWidth)
+  }
+
+  var minimumHeight: CGFloat {
+    min(Self.defaultMinimumHeight, maxHeight)
+  }
+
+  var idealHeight: CGFloat {
+    min(Self.defaultIdealHeight, maxHeight)
+  }
 
   static func resolved(
     parentFrame: CGRect?,
@@ -140,7 +166,7 @@ struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
     )
     return Self(
       maxWidth: max(0, parentFrame.width - (toolbarHeight * 2)),
-      maxHeight: max(minimumHeight, parentFrame.height - toolbarHeight),
+      maxHeight: max(0, parentFrame.height - toolbarHeight),
       toolbarHeight: toolbarHeight
     )
   }
@@ -161,13 +187,19 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
 
   func makeNSView(context: Context) -> MetricsView {
     let view = MetricsView()
-    view.onMetricsChange = { metrics = $0 }
+    view.onMetricsChange = updateMetrics(_:)
     return view
   }
 
   func updateNSView(_ nsView: MetricsView, context: Context) {
-    nsView.onMetricsChange = { metrics = $0 }
-    nsView.refreshMetrics()
+    nsView.onMetricsChange = updateMetrics(_:)
+  }
+
+  private func updateMetrics(_ nextMetrics: DashboardReviewConversationFullContentSheetMetrics) {
+    Task { @MainActor in
+      guard metrics != nextMetrics else { return }
+      metrics = nextMetrics
+    }
   }
 
   final class MetricsView: NSView {
@@ -175,7 +207,9 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
 
     override func viewDidMoveToWindow() {
       super.viewDidMoveToWindow()
-      refreshMetrics()
+      Task { @MainActor [weak self] in
+        self?.refreshMetrics()
+      }
     }
 
     func refreshMetrics() {
