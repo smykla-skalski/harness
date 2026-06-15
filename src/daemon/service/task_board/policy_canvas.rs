@@ -2,8 +2,8 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
-    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSummary,
-    TaskBoardPolicyCanvasToggleEnforcementRequest, TaskBoardPolicyCanvasWorkspaceResponse,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
+    TaskBoardPolicyCanvasSummary, TaskBoardPolicyCanvasWorkspaceResponse,
     TaskBoardPolicyExportRequest, TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest,
     TaskBoardPolicyImportResponse, TaskBoardPolicyPipelineAuditRequest,
     TaskBoardPolicyPipelineAuditResponse, TaskBoardPolicyPipelineGetRequest,
@@ -175,18 +175,21 @@ pub(crate) async fn delete_task_board_policy_canvas(
     Ok(policy_canvas_workspace_response(&workspace))
 }
 
-/// Toggle the global policy enforcement gate without mutating policy canvases.
+/// Set the global policy enforcement gate without mutating policy canvases.
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
-pub(crate) async fn toggle_task_board_policy_canvas_enforcement(
+pub(crate) async fn set_task_board_policy_canvas_global_enforcement(
     db: &AsyncDaemonDb,
-    _request: &TaskBoardPolicyCanvasToggleEnforcementRequest,
+    request: &TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
 ) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
-    let (workspace, _disabled) = db
+    let enabled = request.enabled;
+    let (workspace, _enabled) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
-            Ok(policy_graph::apply_toggle_enforcement(workspace))
+            Ok(policy_graph::apply_set_global_enforcement(
+                workspace, enabled,
+            ))
         })
         .await?;
     feed_gate_cache(&workspace);
@@ -349,7 +352,6 @@ fn policy_canvas_workspace_response(
         schema_version: workspace.schema_version,
         active_canvas_id: workspace.active_canvas_id.clone(),
         global_policy_enforcement_enabled: workspace.global_policy_enforcement_enabled,
-        policy_enforcement_kill_switch_active: !workspace.global_policy_enforcement_enabled,
         canvases: workspace
             .canvases
             .iter()

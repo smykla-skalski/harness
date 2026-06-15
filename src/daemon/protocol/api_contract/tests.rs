@@ -319,8 +319,8 @@ fn task_board_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Post,
-                http_paths::TASK_BOARD_POLICY_CANVASES_TOGGLE_ENFORCEMENT,
-                ws_methods::TASK_BOARD_POLICY_CANVAS_TOGGLE_ENFORCEMENT,
+                http_paths::TASK_BOARD_POLICY_CANVASES_GLOBAL_ENFORCEMENT,
+                ws_methods::TASK_BOARD_POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT,
                 true,
             ),
             (

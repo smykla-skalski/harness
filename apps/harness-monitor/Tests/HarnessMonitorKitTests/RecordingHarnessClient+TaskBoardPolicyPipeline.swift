@@ -130,13 +130,12 @@ extension RecordingHarnessClient {
     }
   }
 
-  func toggleTaskBoardPolicyCanvasEnforcement(
-    request _: TaskBoardPolicyCanvasToggleEnforcementRequest
+  func setTaskBoardPolicyCanvasGlobalEnforcement(
+    request: TaskBoardPolicyCanvasSetGlobalEnforcementRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace {
     return lock.withLock {
       var workspace = ensureTaskBoardPolicyWorkspaceStateLocked()
-      workspace.globalPolicyEnforcementEnabled.toggle()
-      workspace.policyEnforcementKillSwitchActive = !workspace.globalPolicyEnforcementEnabled
+      workspace.globalPolicyEnforcementEnabled = request.enabled
       taskBoardPolicyCanvasWorkspaceStorage = workspace
       return workspace
     }

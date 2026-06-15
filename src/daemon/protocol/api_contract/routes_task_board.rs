@@ -307,9 +307,9 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_CANVASES_TOGGLE_ENFORCEMENT,
+        path: http_paths::TASK_BOARD_POLICY_CANVASES_GLOBAL_ENFORCEMENT,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_TOGGLE_ENFORCEMENT,
+            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT,
         },
         swift_client_exposed: true,
     },

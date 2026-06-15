@@ -13,9 +13,9 @@ use super::super::db_error;
 use super::rows::{CanvasRow, EdgeRow, GroupNodeRow, GroupRow, NodeRow, WorkspaceRow};
 use crate::errors::CliError;
 use crate::task_board::policy_graph::{
-    PolicyCanvasEnforcementSnapshot, PolicyCanvasPoint, PolicyCanvasRecord, PolicyCanvasRect,
-    PolicyCanvasWorkspace, PolicyGraph, PolicyGraphEdge, PolicyGraphGroup, PolicyGraphLayout,
-    PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeLayout, PolicyGraphNodeLayoutSource,
+    PolicyCanvasPoint, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace, PolicyGraph,
+    PolicyGraphEdge, PolicyGraphGroup, PolicyGraphLayout, PolicyGraphMode, PolicyGraphNode,
+    PolicyGraphNodeLayout, PolicyGraphNodeLayoutSource,
 };
 
 /// All rows that make up a single persisted canvas.
@@ -149,11 +149,6 @@ pub(crate) fn workspace_row(workspace: &PolicyCanvasWorkspace) -> Result<Workspa
             .review_text_paste_dry_run_canvas_deleted,
         review_screenshot_extraction_canvas_deleted: workspace
             .review_screenshot_extraction_canvas_deleted,
-        enforcement_snapshot_json: workspace
-            .enforcement_snapshot
-            .as_ref()
-            .map(to_json)
-            .transpose()?,
         global_policy_enforcement_enabled: workspace.global_policy_enforcement_enabled,
     })
 }
@@ -163,31 +158,15 @@ pub(crate) fn assemble_workspace(
     row: WorkspaceRow,
     canvases: Vec<PolicyCanvasRecord>,
 ) -> Result<PolicyCanvasWorkspace, CliError> {
-    let legacy_snapshot = row
-        .enforcement_snapshot_json
-        .as_deref()
-        .map(|raw| from_json::<PolicyCanvasEnforcementSnapshot>(raw, "policy enforcement snapshot"))
-        .transpose()?;
-    let (active_canvas_id, canvases, global_policy_enforcement_enabled) =
-        if let Some(snapshot) = legacy_snapshot {
-            (snapshot.active_canvas_id, snapshot.canvases, false)
-        } else {
-            (
-                row.active_canvas_id,
-                canvases,
-                row.global_policy_enforcement_enabled,
-            )
-        };
     Ok(PolicyCanvasWorkspace {
         schema_version: u32::try_from(row.workspace_schema_version).unwrap_or_default(),
-        active_canvas_id,
+        active_canvas_id: row.active_canvas_id,
         canvases,
-        global_policy_enforcement_enabled,
+        global_policy_enforcement_enabled: row.global_policy_enforcement_enabled,
         manual_ocr_paste_canvas_deleted: row.manual_ocr_paste_canvas_deleted,
         review_text_paste_dry_run_canvas_deleted: row.review_text_paste_dry_run_canvas_deleted,
         review_screenshot_extraction_canvas_deleted: row
             .review_screenshot_extraction_canvas_deleted,
-        enforcement_snapshot: None,
     })
 }
 

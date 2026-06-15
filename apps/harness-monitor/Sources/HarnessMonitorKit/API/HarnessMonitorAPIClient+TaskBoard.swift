@@ -225,10 +225,10 @@ extension HarnessMonitorAPIClient {
     try await post("/v1/task-board/policy/canvases/delete", body: request)
   }
 
-  public func toggleTaskBoardPolicyCanvasEnforcement(
-    request: TaskBoardPolicyCanvasToggleEnforcementRequest
+  public func setTaskBoardPolicyCanvasGlobalEnforcement(
+    request: TaskBoardPolicyCanvasSetGlobalEnforcementRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace {
-    try await post("/v1/task-board/policy/canvases/toggle-enforcement", body: request)
+    try await post("/v1/task-board/policy/canvases/global-enforcement", body: request)
   }
 
   public func taskBoardPolicyPipeline(

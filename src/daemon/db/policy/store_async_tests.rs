@@ -1,8 +1,6 @@
 use super::*;
 use crate::errors::CliErrorKind;
-use crate::task_board::policy_graph::{
-    PolicyCanvasEnforcementSnapshot, PolicyGraphMode, apply_duplicate,
-};
+use crate::task_board::policy_graph::apply_duplicate;
 use tempfile::{TempDir, tempdir};
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {
@@ -32,47 +30,6 @@ async fn workspace_round_trips_through_database() {
         .expect("load")
         .expect("present");
     assert_eq!(loaded, workspace);
-}
-
-#[tokio::test]
-async fn legacy_enforcement_snapshot_loads_as_disabled_global_gate() {
-    let (_dir, db) = connect().await;
-    let mut workspace = PolicyCanvasWorkspace::seeded();
-    workspace.canvases[0].document.mode = PolicyGraphMode::Enforced;
-    workspace.canvases[1].document.mode = PolicyGraphMode::DryRun;
-    db.replace_policy_workspace(&workspace)
-        .await
-        .expect("replace");
-
-    let snapshot = PolicyCanvasEnforcementSnapshot {
-        active_canvas_id: workspace.active_canvas_id.clone(),
-        canvases: workspace.canvases.clone(),
-    };
-    let snapshot_json = serde_json::to_string(&snapshot).expect("serialize snapshot");
-    query("UPDATE policy_canvases SET mode = 'draft'")
-        .execute(db.pool())
-        .await
-        .expect("simulate legacy disabled canvases");
-    query(
-        "UPDATE policy_workspace
-         SET enforcement_snapshot_json = ?1,
-             global_policy_enforcement_enabled = 1",
-    )
-    .bind(snapshot_json)
-    .execute(db.pool())
-    .await
-    .expect("simulate legacy snapshot state");
-
-    let loaded = db
-        .load_policy_workspace()
-        .await
-        .expect("load")
-        .expect("present");
-
-    assert!(!loaded.global_policy_enforcement_enabled);
-    assert_eq!(loaded.active_canvas_id, workspace.active_canvas_id);
-    assert_eq!(loaded.canvases, workspace.canvases);
-    assert!(loaded.enforcement_snapshot.is_none());
 }
 
 #[tokio::test]

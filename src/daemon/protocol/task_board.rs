@@ -275,8 +275,6 @@ pub struct TaskBoardPolicyCanvasWorkspaceResponse {
     pub canvases: Vec<TaskBoardPolicyCanvasSummary>,
     #[serde(default = "default_global_policy_enforcement_enabled")]
     pub global_policy_enforcement_enabled: bool,
-    #[serde(default)]
-    pub policy_enforcement_kill_switch_active: bool,
 }
 
 const fn default_global_policy_enforcement_enabled() -> bool {
@@ -312,8 +310,10 @@ pub struct TaskBoardPolicyCanvasDeleteRequest {
     pub canvas_id: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TaskBoardPolicyCanvasToggleEnforcementRequest {}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPolicyCanvasSetGlobalEnforcementRequest {
+    pub enabled: bool,
+}
 
 pub type TaskBoardSyncResponse = TaskBoardSyncSummary;
 pub type TaskBoardProjectsResponse = Vec<TaskBoardProjectSummary>;

@@ -379,7 +379,7 @@ extension HarnessMonitorStore {
     }
   }
   @discardableResult
-  public func toggleTaskBoardPolicyCanvasEnforcement() async -> Bool {
+  public func setTaskBoardPolicyCanvasGlobalEnforcement(enabled: Bool) async -> Bool {
     guard let client else {
       return false
     }
@@ -387,19 +387,14 @@ extension HarnessMonitorStore {
     defer { isDaemonActionInFlight = false }
 
     do {
-      let workspace = try await client.toggleTaskBoardPolicyCanvasEnforcement(
-        request: TaskBoardPolicyCanvasToggleEnforcementRequest()
+      let workspace = try await client.setTaskBoardPolicyCanvasGlobalEnforcement(
+        request: TaskBoardPolicyCanvasSetGlobalEnforcementRequest(enabled: enabled)
       )
       recordRequestSuccess()
       await syncTaskBoardPolicyCanvasWorkspace(
         workspace,
         using: client,
         forceReloadActiveCanvas: true
-      )
-      presentSuccessFeedback(
-        workspace.globalPolicyEnforcementEnabled
-          ? "Enabled global policy enforcement"
-          : "Disabled global policy enforcement"
       )
       return true
     } catch {

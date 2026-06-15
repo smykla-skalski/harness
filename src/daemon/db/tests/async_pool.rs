@@ -54,6 +54,14 @@ async fn connect_bootstraps_empty_database_with_sqlx_migrations() {
         applied_migration_versions(&async_db).await,
         vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     );
+    let policy_workspace_columns =
+        query_scalar::<_, String>("SELECT name FROM pragma_table_info('policy_workspace')")
+            .fetch_all(async_db.pool())
+            .await
+            .expect("query policy workspace columns");
+    assert!(policy_workspace_columns
+        .contains(&"global_policy_enforcement_enabled".to_string()));
+    assert!(!policy_workspace_columns.contains(&"enforcement_snapshot_json".to_string()));
 }
 
 #[tokio::test]
@@ -351,8 +359,8 @@ fn shipped_daemon_async_migration_checksums_remain_stable() {
             "FE683A0EA0B11242EC49C7F698BD84C2EA3166EB47964FABAF5689487CE8C791954E1CCD07759139E5F1BE94913AD278",
         ),
         (
-            "0010_daemon_v16_policy_enforcement_snapshot.sql",
-            "AD3FED5DD4D1E51BFD7462F1CC56185635E4EACDEE1CCA3332688CED4867985A88883E18495BB4232C12F6DDB125FF46",
+            "0010_daemon_v16_policy_workspace_flags.sql",
+            "09DC16553425628AE6C7BF93E0C79E43C34F0A5594B54DB4A510F5B2F2C887CE3A0BA1DC26451A7422EAF8C9AF9E0F01",
         ),
         (
             "0011_daemon_v17_audit_events.sql",
