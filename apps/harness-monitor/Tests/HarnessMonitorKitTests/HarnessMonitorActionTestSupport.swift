@@ -292,7 +292,6 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardPolicySimulationOverride: Bool?
   var taskBoardPolicyCanvasWorkspaceError: (any Error)?
   var taskBoardPolicyCanvasWorkspaceStorage: TaskBoardPolicyCanvasWorkspace?
-  var taskBoardPolicyCanvasKillSwitchSnapshot: TaskBoardPolicyCanvasWorkspace?
   var taskBoardPolicyPipelinesByCanvasID: [String: TaskBoardPolicyPipelineDocument] = [:]
   var taskBoardPolicyAuditByCanvasID: [String: TaskBoardPolicyPipelineAuditSummary] = [:]
   var taskBoardPolicyCanvasIDCounter = 1

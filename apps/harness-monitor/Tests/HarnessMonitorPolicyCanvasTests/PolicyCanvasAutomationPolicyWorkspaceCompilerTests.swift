@@ -308,6 +308,36 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
     #expect(Set(compilation.policies.map(\.id)).count == 2)
   }
 
+  @Test("workspace compilation stops when global enforcement is disabled")
+  func workspaceCompilationStopsWhenGlobalEnforcementIsDisabled() throws {
+    let defaultDocument = TaskBoardPolicyPipelineDocument(
+      revision: 1,
+      mode: .draft,
+      nodes: [],
+      edges: [],
+      groups: []
+    )
+    let workspace = TaskBoardPolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: "default-canvas",
+      canvases: [
+        policyCanvasSummary(
+          canvasId: "manual-ocr-canvas",
+          title: "Manual OCR Paste",
+          document: policyCanvasManualOCRPasteDocument()
+        )
+      ],
+      globalPolicyEnforcementEnabled: false
+    )
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
+      workspace: workspace,
+      activeDocument: defaultDocument
+    )
+
+    #expect(compilation == .empty)
+  }
+
   @Test("workspace compilation does not request the active document")
   func workspaceCompilationDoesNotRequestTheActiveDocument() {
     var activeDocumentWasRequested = false

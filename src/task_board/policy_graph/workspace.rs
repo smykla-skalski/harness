@@ -71,6 +71,8 @@ pub struct PolicyCanvasWorkspace {
     pub active_canvas_id: String,
     #[serde(default)]
     pub canvases: Vec<PolicyCanvasRecord>,
+    #[serde(default = "default_global_policy_enforcement_enabled")]
+    pub global_policy_enforcement_enabled: bool,
     #[serde(default)]
     pub manual_ocr_paste_canvas_deleted: bool,
     #[serde(default)]
@@ -104,6 +106,7 @@ impl PolicyCanvasWorkspace {
                 review_text_paste,
                 review_screenshot,
             ],
+            global_policy_enforcement_enabled: true,
             manual_ocr_paste_canvas_deleted: false,
             review_text_paste_dry_run_canvas_deleted: false,
             review_screenshot_extraction_canvas_deleted: false,
@@ -120,6 +123,9 @@ impl PolicyCanvasWorkspace {
 
     #[must_use]
     pub fn active_enforced_canvas(&self) -> Option<&PolicyCanvasRecord> {
+        if !self.global_policy_enforcement_enabled {
+            return None;
+        }
         self.active_canvas()
             .filter(|canvas| canvas.document.mode == PolicyGraphMode::Enforced)
     }
@@ -214,6 +220,10 @@ impl PolicyCanvasWorkspace {
         let repaired_screenshot = self.ensure_review_screenshot_extraction_canvas();
         repaired_manual_ocr || repaired_text_paste || repaired_screenshot
     }
+}
+
+const fn default_global_policy_enforcement_enabled() -> bool {
+    true
 }
 
 fn manual_ocr_paste_canvas() -> PolicyCanvasRecord {

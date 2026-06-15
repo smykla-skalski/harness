@@ -35,7 +35,7 @@ struct DashboardWindowToolbar: ToolbarContent {
     ToolbarSpacer(.fixed, placement: .primaryAction)
       .sharedBackgroundVisibility(.hidden)
 
-    PolicyEnforcementKillSwitchToolbarGroup(store: store)
+    GlobalPolicyEnforcementToolbarGroup(store: store)
   }
 }
 

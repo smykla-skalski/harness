@@ -99,19 +99,19 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(!dashboardToolbar.contains("Divider()"))
   }
 
-  @Test("Policy kill switch keeps native toolbar glass and stays out of the lab")
-  func policyKillSwitchKeepsNativeToolbarGlassAndStaysOutOfLab() throws {
-    let killSwitchToolbar = try sourceFile(
-      named: "Toolbar/PolicyEnforcementKillSwitchToolbarGroup.swift"
+  @Test("Global enforcement button keeps native toolbar glass and stays out of the lab")
+  func globalEnforcementButtonKeepsNativeToolbarGlassAndStaysOutOfLab() throws {
+    let globalEnforcementToolbar = try sourceFile(
+      named: "Toolbar/GlobalPolicyEnforcementToolbarGroup.swift"
     )
     let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
     let sessionToolbar = try sourceFile(named: "SessionWindowToolbar.swift")
     let settingsView = try sourceFile(named: "SettingsView.swift")
     let policyCanvasLabSources = try sourceFiles(pathContaining: "PolicyCanvasLab")
 
-    #expect(killSwitchToolbar.contains("ToolbarItemGroup(placement: .primaryAction)"))
-    #expect(!killSwitchToolbar.contains(".buttonStyle(.glass)"))
-    #expect(!killSwitchToolbar.contains(".sharedBackgroundVisibility(.hidden)"))
+    #expect(globalEnforcementToolbar.contains("ToolbarItemGroup(placement: .primaryAction)"))
+    #expect(!globalEnforcementToolbar.contains(".buttonStyle(.glass)"))
+    #expect(!globalEnforcementToolbar.contains(".sharedBackgroundVisibility(.hidden)"))
     #expect(
       dashboardToolbar.contains(
         """
@@ -123,7 +123,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
             ToolbarSpacer(.fixed, placement: .primaryAction)
               .sharedBackgroundVisibility(.hidden)
 
-            PolicyEnforcementKillSwitchToolbarGroup(store: store)
+            GlobalPolicyEnforcementToolbarGroup(store: store)
         """
       )
     )
@@ -138,14 +138,14 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
               ToolbarSpacer(.fixed, placement: .primaryAction)
                 .sharedBackgroundVisibility(.hidden)
 
-              PolicyEnforcementKillSwitchToolbarGroup(store: store)
+              GlobalPolicyEnforcementToolbarGroup(store: store)
         """
       )
     )
     #expect(
       settingsView.contains(
         """
-        PolicyEnforcementKillSwitchToolbarGroup(store: store)
+        GlobalPolicyEnforcementToolbarGroup(store: store)
 
             if selectedSection == .supervisor {
               ToolbarSpacer(.fixed, placement: .primaryAction)
@@ -164,7 +164,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     )
     #expect(
       policyCanvasLabSources.allSatisfy {
-        !$0.contains("PolicyEnforcementKillSwitchToolbarGroup(store: store)")
+        !$0.contains("GlobalPolicyEnforcementToolbarGroup(store: store)")
       }
     )
   }

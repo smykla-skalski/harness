@@ -273,8 +273,14 @@ pub struct TaskBoardPolicyCanvasWorkspaceResponse {
     pub active_canvas_id: String,
     #[serde(default)]
     pub canvases: Vec<TaskBoardPolicyCanvasSummary>,
+    #[serde(default = "default_global_policy_enforcement_enabled")]
+    pub global_policy_enforcement_enabled: bool,
     #[serde(default)]
     pub policy_enforcement_kill_switch_active: bool,
+}
+
+const fn default_global_policy_enforcement_enabled() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

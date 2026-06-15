@@ -20,6 +20,7 @@ pub(crate) struct PolicyCanvasDraftSaveResult {
     pub(crate) response: PolicyPipelineSaveResponse,
     pub(crate) saved_canvas: PolicyCanvasRecord,
     pub(crate) active_canvas_id: String,
+    pub(crate) global_policy_enforcement_enabled: bool,
 }
 
 impl PolicyCanvasDraftSaveResult {
@@ -75,6 +76,7 @@ impl AsyncDaemonDb {
             response,
             saved_canvas: canvas,
             active_canvas_id: workspace_row.active_canvas_id,
+            global_policy_enforcement_enabled: workspace_row.global_policy_enforcement_enabled,
         })
     }
 }
