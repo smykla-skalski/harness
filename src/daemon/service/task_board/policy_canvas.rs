@@ -14,9 +14,7 @@ use crate::daemon::protocol::{
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::default_board_root;
-use crate::task_board::policy_graph::{
-    self, PolicyCanvasRecord, PolicyCanvasWorkspace, PolicyGraph,
-};
+use crate::task_board::policy_graph::{self, PolicyCanvasRecord, PolicyCanvasWorkspace};
 
 const POLICY_PIPELINE_CHANGE_CHANNEL: &str = "policy_pipeline";
 
@@ -51,10 +49,6 @@ fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
             .active_enforced_canvas()
             .map(|canvas| canvas.document.clone()),
     );
-}
-
-fn feed_gate_cache_document(document: PolicyGraph) {
-    policy_graph::store_gate_policy(&default_board_root(), Some(document));
 }
 
 /// Emit the `policy_pipeline` change event so websocket subscribers re-query.
@@ -181,7 +175,7 @@ pub(crate) async fn delete_task_board_policy_canvas(
     Ok(policy_canvas_workspace_response(&workspace))
 }
 
-/// Toggle the policy enforcement kill switch for every policy canvas.
+/// Toggle the global policy enforcement gate without mutating policy canvases.
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
@@ -230,7 +224,10 @@ pub(crate) async fn save_task_board_policy_pipeline_draft(
         .await?;
     if saved.response.persisted {
         if saved.saved_active_canvas() {
-            feed_gate_cache_document(saved.response.document.clone());
+            let document = saved
+                .global_policy_enforcement_enabled
+                .then(|| saved.response.document.clone());
+            policy_graph::store_gate_policy(&default_board_root(), document);
         }
         bump_change_policy(db).await;
     }
@@ -351,7 +348,8 @@ fn policy_canvas_workspace_response(
     TaskBoardPolicyCanvasWorkspaceResponse {
         schema_version: workspace.schema_version,
         active_canvas_id: workspace.active_canvas_id.clone(),
-        policy_enforcement_kill_switch_active: workspace.enforcement_snapshot.is_some(),
+        global_policy_enforcement_enabled: workspace.global_policy_enforcement_enabled,
+        policy_enforcement_kill_switch_active: !workspace.global_policy_enforcement_enabled,
         canvases: workspace
             .canvases
             .iter()

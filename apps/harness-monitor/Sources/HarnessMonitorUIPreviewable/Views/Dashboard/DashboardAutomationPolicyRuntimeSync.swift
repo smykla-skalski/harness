@@ -67,6 +67,7 @@ private struct DashboardAutomationPolicyRuntimeSyncModifier: ViewModifier {
 
 private struct DashboardAutomationPolicyRuntimeSyncID: Equatable {
   let activeCanvasId: String?
+  let globalPolicyEnforcementEnabled: Bool
   let canvasFingerprints: [CanvasFingerprint]
   let activeDocumentFingerprint: DocumentFingerprint?
 
@@ -75,6 +76,7 @@ private struct DashboardAutomationPolicyRuntimeSyncID: Equatable {
     activeDocument: TaskBoardPolicyPipelineDocument?
   ) {
     activeCanvasId = workspace?.activeCanvasId
+    globalPolicyEnforcementEnabled = workspace?.globalPolicyEnforcementEnabled ?? true
     canvasFingerprints =
       workspace?.canvases.map {
         CanvasFingerprint(summary: $0)

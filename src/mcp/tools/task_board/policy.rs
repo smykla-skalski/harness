@@ -56,7 +56,7 @@ pub(super) fn register(registry: &mut ToolRegistry) {
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_POLICY_CANVAS_TOGGLE_ENFORCEMENT,
-                description: "Toggle the policy-canvas enforcement kill switch.",
+                description: "Toggle global policy enforcement.",
                 input_schema: empty_schema,
                 normalize: validate_params::<TaskBoardPolicyCanvasToggleEnforcementRequest>,
             },

@@ -86,7 +86,7 @@ public struct SettingsView: View {
   }
 
   @ToolbarContentBuilder private var settingsToolbarItems: some ToolbarContent {
-    PolicyEnforcementKillSwitchToolbarGroup(store: store)
+    GlobalPolicyEnforcementToolbarGroup(store: store)
 
     if selectedSection == .supervisor {
       ToolbarSpacer(.fixed, placement: .primaryAction)

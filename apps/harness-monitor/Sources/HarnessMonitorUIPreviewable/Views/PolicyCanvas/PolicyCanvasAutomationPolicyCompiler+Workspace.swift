@@ -12,6 +12,9 @@ extension PolicyCanvasAutomationPolicyCompiler {
       }
       return compile(document: activeDocument)
     }
+    guard workspace.globalPolicyEnforcementEnabled else {
+      return .empty
+    }
 
     var merged = PolicyCanvasAutomationPolicyCompilation.empty
     var usedPolicyIDs = Set<String>()

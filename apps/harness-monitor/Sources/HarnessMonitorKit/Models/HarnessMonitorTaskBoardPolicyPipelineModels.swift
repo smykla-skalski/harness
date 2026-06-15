@@ -49,12 +49,14 @@ public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
   public var schemaVersion: UInt64
   public var activeCanvasId: String
   public var canvases: [TaskBoardPolicyCanvasSummary]
+  public var globalPolicyEnforcementEnabled: Bool
   public var policyEnforcementKillSwitchActive: Bool
 
   private enum CodingKeys: String, CodingKey {
     case schemaVersion
     case activeCanvasId
     case canvases
+    case globalPolicyEnforcementEnabled
     case policyEnforcementKillSwitchActive
   }
 
@@ -62,12 +64,15 @@ public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
     schemaVersion: UInt64,
     activeCanvasId: String,
     canvases: [TaskBoardPolicyCanvasSummary],
+    globalPolicyEnforcementEnabled: Bool? = nil,
     policyEnforcementKillSwitchActive: Bool = false
   ) {
     self.schemaVersion = schemaVersion
     self.activeCanvasId = activeCanvasId
     self.canvases = canvases
-    self.policyEnforcementKillSwitchActive = policyEnforcementKillSwitchActive
+    self.globalPolicyEnforcementEnabled =
+      globalPolicyEnforcementEnabled ?? !policyEnforcementKillSwitchActive
+    self.policyEnforcementKillSwitchActive = !self.globalPolicyEnforcementEnabled
   }
 
   public init(from decoder: Decoder) throws {
@@ -75,8 +80,12 @@ public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
     self.schemaVersion = try container.decode(UInt64.self, forKey: .schemaVersion)
     self.activeCanvasId = try container.decode(String.self, forKey: .activeCanvasId)
     self.canvases = try container.decode([TaskBoardPolicyCanvasSummary].self, forKey: .canvases)
-    self.policyEnforcementKillSwitchActive =
+    let legacyKillSwitchActive =
       try container.decodeIfPresent(Bool.self, forKey: .policyEnforcementKillSwitchActive) ?? false
+    self.globalPolicyEnforcementEnabled =
+      try container.decodeIfPresent(Bool.self, forKey: .globalPolicyEnforcementEnabled)
+      ?? !legacyKillSwitchActive
+    self.policyEnforcementKillSwitchActive = !self.globalPolicyEnforcementEnabled
   }
 }
 

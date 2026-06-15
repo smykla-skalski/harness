@@ -397,9 +397,9 @@ extension HarnessMonitorStore {
         forceReloadActiveCanvas: true
       )
       presentSuccessFeedback(
-        workspace.policyEnforcementKillSwitchActive
-          ? "Disabled policy enforcement"
-          : "Restored policy enforcement"
+        workspace.globalPolicyEnforcementEnabled
+          ? "Enabled global policy enforcement"
+          : "Disabled global policy enforcement"
       )
       return true
     } catch {

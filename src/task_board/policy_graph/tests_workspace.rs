@@ -208,25 +208,24 @@ fn rename_canvas_updates_title_without_replacing_active_document() {
 }
 
 #[test]
-fn toggle_enforcement_restores_exact_previous_canvas_state() {
+fn toggle_enforcement_flips_global_gate_without_mutating_canvases() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     ws.canvases[0].document.mode = PolicyGraphMode::Enforced;
     ws.canvases[1].document.mode = PolicyGraphMode::DryRun;
     let before = ws.clone();
 
-    let disabled = apply_toggle_enforcement(&mut ws);
+    let enabled = apply_toggle_enforcement(&mut ws);
 
-    assert!(disabled);
-    assert!(ws.enforcement_snapshot.is_some());
-    assert!(
-        ws.canvases
-            .iter()
-            .all(|canvas| canvas.document.mode == PolicyGraphMode::Draft)
-    );
+    assert!(!enabled);
+    assert!(!ws.global_policy_enforcement_enabled);
+    assert_eq!(ws.active_canvas_id, before.active_canvas_id);
+    assert_eq!(ws.canvases, before.canvases);
+    assert!(ws.enforcement_snapshot.is_none());
+    assert!(ws.active_enforced_canvas().is_none());
 
-    let restored = apply_toggle_enforcement(&mut ws);
+    let enabled = apply_toggle_enforcement(&mut ws);
 
-    assert!(!restored);
+    assert!(enabled);
     assert_eq!(ws, before);
 }
 
