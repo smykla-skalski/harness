@@ -80,4 +80,44 @@ struct PolicyCanvasCrossedPortsTests {
     ])
     #expect(result.count(for: .crossedPorts) == 0)
   }
+
+  @Test func detouringWireIsNotCounted() {
+    // e1 would invert against e2 by far position, but its route dives below the
+    // node (y 900) then climbs back up to the top port (y 30) - a perpendicular
+    // backtrack. That crossing is a routing detour, not a wrong-port pick, so the
+    // far-position test (which assumes a direct approach) must not flag it.
+    let detour = PolicyCanvasEdgeRoute(
+      points: [
+        CGPoint(x: 0, y: 700), CGPoint(x: 40, y: 700), CGPoint(x: 40, y: 900),
+        CGPoint(x: 200, y: 900), CGPoint(x: 200, y: 30), CGPoint(x: 400, y: 30),
+      ],
+      labelPosition: .zero
+    )
+    let result = report(routes: [
+      "e1": detour,
+      "e2": route(far: 10, attach: 70),
+    ])
+    #expect(result.count(for: .crossedPorts) == 0)
+  }
+
+  @Test func directInvertedPairStillCountsAlongsideADetour() {
+    // A third, direct wire pair that genuinely swaps still counts even when an
+    // unrelated detouring wire shares the side - the detour is skipped, the real
+    // swap is kept.
+    let detour = PolicyCanvasEdgeRoute(
+      points: [
+        CGPoint(x: 0, y: 700), CGPoint(x: 40, y: 700), CGPoint(x: 40, y: 900),
+        CGPoint(x: 200, y: 900), CGPoint(x: 200, y: 48), CGPoint(x: 400, y: 48),
+      ],
+      labelPosition: .zero
+    )
+    let result = report(routes: [
+      "detour": detour,
+      "e1": route(far: 700, attach: 20),
+      "e2": route(far: 10, attach: 76),
+    ])
+    #expect(result.count(for: .crossedPorts) == 1)
+    let violation = try! #require(result.crossedPorts.first)
+    #expect(Set([violation.edgeA, violation.edgeB]) == Set(["e1", "e2"]))
+  }
 }
