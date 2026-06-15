@@ -108,10 +108,15 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(
       conversation.contains("HarnessMonitorMarkdownText(content.markdown, textSelection: .enabled)")
     )
+    #expect(conversation.contains("@State private var sheetMetrics"))
+    #expect(conversation.contains("preferredBodyWidth = DashboardReviewConversationFullContentSheetMetrics.preferredBodyWidth"))
+    #expect(conversation.contains(".frame(width: sheetMetrics.bodyWidth(for: preferredBodyWidth)"))
+    #expect(conversation.contains("width: sheetMetrics.contentWidth(for: preferredBodyWidth)"))
+    #expect(conversation.contains("maxHeight: sheetMetrics.maxHeight"))
     #expect(conversation.contains(".padding(.bottom, HarnessMonitorTheme.spacingLG)"))
-    #expect(conversation.contains("DashboardReviewConversationFullContentSheetMetricsReader()"))
-    #expect(!conversation.contains("@State private var sheetMetrics"))
-    #expect(!conversation.contains("@Binding var metrics"))
+    #expect(conversation.contains("DashboardReviewConversationFullContentSheetMetricsReader(metrics: $sheetMetrics)"))
+    #expect(conversation.contains("@Binding var metrics"))
+    #expect(conversation.contains("DispatchQueue.main.async"))
     #expect(!conversation.contains("sheetWindow?.sheetParent ?? sheetWindow"))
     #expect(conversation.contains("guard let parentWindow = parentWindow(for: sheetWindow) else"))
     #expect(conversation.contains("private var parentWindowRetryCount = 0"))
@@ -125,32 +130,17 @@ extension DashboardReviewsDetailUXContractTests {
       )
     )
     #expect(conversation.contains("private var refreshScheduled = false"))
-    #expect(conversation.contains("private var expandsWidth = false"))
     #expect(!conversation.contains("sheetWindow.contentMinSize"))
-    #expect(
-      conversation.contains("let maximumContentSize = metrics.maximumContentSize(chromeSize: chromeSize)")
-    )
-    #expect(conversation.contains("sheetWindow.contentMaxSize = maximumContentSize"))
-    #expect(conversation.contains("sheetWindow.contentView?.layoutSubtreeIfNeeded()"))
-    #expect(conversation.contains("let preferredSize = preferredContentSize(in: sheetWindow)"))
-    #expect(conversation.contains("let scrollDocumentSize = scrollDocumentSize(in: sheetWindow)"))
-    #expect(conversation.contains("metrics.overflowsAllowedViewport("))
-    #expect(conversation.contains("expandsWidth = true"))
-    #expect(conversation.contains("private func firstScrollView(in view: NSView?) -> NSScrollView?"))
-    #expect(
-      conversation.contains(
-        "scrollDocumentSize: scrollDocumentSize,"
-      )
-    )
-    #expect(conversation.contains("expandsWidth: expandsWidth"))
-    #expect(conversation.contains("return maximumSize.width"))
+    #expect(conversation.contains("sheetWindow.contentMaxSize = metrics.maximumContentSize"))
+    #expect(conversation.contains("onMetricsChange?(metrics)"))
+    #expect(conversation.contains("sheetChromeSize: frameChromeSize(for: sheetWindow)"))
+    #expect(!conversation.contains("sheetWindow.setContentSize"))
     #expect(conversation.contains("let sizing = AppliedSizing("))
     #expect(conversation.contains("guard appliedSizing != sizing else { return }"))
-    #expect(conversation.contains("sheetWindow.setContentSize(cappedSize)"))
     #expect(conversation.contains("scheduleRefresh()"))
     #expect(conversation.contains("sheetWindow.frameRect(forContentRect: contentRect)"))
-    #expect(conversation.contains("parentFrame.width - (toolbarHeight * 2)"))
-    #expect(conversation.contains("parentFrame.height - (toolbarHeight * 2)"))
+    #expect(conversation.contains("parentFrame.width - (toolbarHeight * 2) - sheetChromeSize.width"))
+    #expect(conversation.contains("parentFrame.height - (toolbarHeight * 2) - sheetChromeSize.height"))
     #expect(timeline.contains("let onOpenFullContent: ((SessionTimelineNode) -> Void)?"))
     #expect(timeline.contains("let fullContentRevision: UInt64?"))
     #expect(
@@ -171,51 +161,18 @@ extension DashboardReviewsDetailUXContractTests {
   func activityFullContentSheetMetricsKeepToolbarSizedWindowMargins() {
     let metrics = DashboardReviewConversationFullContentSheetMetrics.resolved(
       parentFrame: CGRect(x: 0, y: 0, width: 1_200, height: 900),
-      parentContentLayoutRect: CGRect(x: 0, y: 0, width: 1_200, height: 840)
+      parentContentLayoutRect: CGRect(x: 0, y: 0, width: 1_200, height: 840),
+      sheetChromeSize: CGSize(width: 8, height: 28)
     )
 
     #expect(metrics.toolbarHeight == 60)
-    #expect(metrics.maxWidth == 1_080)
-    #expect(metrics.maxHeight == 780)
-    #expect(metrics.minimumWidth == 360)
-    #expect(metrics.idealWidth == 760)
-    #expect(metrics.minimumHeight == 420)
-    #expect(metrics.idealHeight == 520)
-    #expect(metrics.minimumContentSize == CGSize(width: 360, height: 420))
-    #expect(
-      metrics.maximumContentSize(chromeSize: CGSize(width: 8, height: 28))
-        == CGSize(width: 1_072, height: 752)
-    )
-    #expect(
-      metrics.cappedContentSize(
-        for: CGSize(width: 600, height: 500),
-        scrollDocumentSize: nil,
-        chromeSize: CGSize(width: 8, height: 28),
-        expandsWidth: false
-      ) == CGSize(width: 600, height: 500)
-    )
-    #expect(
-      metrics.cappedContentSize(
-        for: CGSize(width: 600, height: 900),
-        scrollDocumentSize: CGSize(width: 600, height: 900),
-        chromeSize: CGSize(width: 8, height: 28),
-        expandsWidth: true
-      ) == CGSize(width: 1_072, height: 752)
-    )
-    #expect(
-      metrics.cappedContentSize(
-        for: CGSize(width: 1_600, height: 900),
-        scrollDocumentSize: CGSize(width: 1_600, height: 900),
-        chromeSize: CGSize(width: 8, height: 28),
-        expandsWidth: true
-      ) == CGSize(width: 1_072, height: 752)
-    )
-    #expect(
-      metrics.overflowsAllowedViewport(
-        scrollDocumentSize: CGSize(width: 600, height: 900),
-        chromeSize: CGSize(width: 8, height: 28)
-      )
-    )
+    #expect(metrics.maxWidth == 1_072)
+    #expect(metrics.maxHeight == 752)
+    #expect(metrics.maximumContentSize == CGSize(width: 1_072, height: 752))
+    #expect(metrics.bodyWidth(for: 420) == 420)
+    #expect(metrics.contentWidth(for: 420) == 452)
+    #expect(metrics.bodyWidth(for: 1_600) == 1_040)
+    #expect(metrics.contentWidth(for: 1_600) == 1_072)
   }
 
   @Test("Activity inline conversations render through a dedicated GitHub style card path")
