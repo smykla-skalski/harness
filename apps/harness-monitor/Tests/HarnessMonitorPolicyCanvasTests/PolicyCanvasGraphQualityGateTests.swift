@@ -106,6 +106,17 @@ struct PolicyCanvasGraphQualityGateTests {
     #expect(!budgetedSampleIDs.contains("extreme-galaxy"))
   }
 
+  @Test func extremeGalaxyPrecomputedRoutesAvoidBodyHits() async throws {
+    let report = try await routedReport(sampleID: "extreme-galaxy")
+    #expect(
+      report.bodyHits.isEmpty,
+      """
+      extreme-galaxy precomputed routes should not pass through node or group-title bodies
+      bodyHits=\(Self.bodyHitDetail(report))
+      """
+    )
+  }
+
   /// Deterministic dump of every sample's report to
   /// `tmp/policy-canvas/graph-quality-baseline.txt` (resolved from `#filePath`,
   /// matching the fan-in dump convention). Captures the baseline used to set the
@@ -302,6 +313,9 @@ struct PolicyCanvasGraphQualityGateTests {
       "label_overlaps: \(report.count(for: .labelOverlaps))",
       "corridor_parallel: \(report.count(for: .corridorParallel))",
       "corridor_reuse: \(report.count(for: .corridorReuse))",
+      "body_hits: \(report.count(for: .bodyHits))",
+      "body_hit_detail: \(Self.bodyHitDetail(report))",
+      "body_hit_route_detail: \(Self.bodyHitRouteDetail(report, routes: timedRoute.output.routes))",
       "port_hotspots: \(Self.portSpacingHotspots(report))",
       "port_detail: \(Self.portSpacingDetail(report, matching: "xg-m10-action-gate"))",
       "elk_endpoint_sides: \(Self.elkEndpointSides(input.edges, edgePrefix: "xge:m10-gate-"))",
@@ -355,6 +369,24 @@ struct PolicyCanvasGraphQualityGateTests {
       .map { key, violations in "\(key)=\(violations.count)" }
       .sorted()
       .joined(separator: ",")
+  }
+
+  private static func bodyHitDetail(_ report: PolicyCanvasGraphQualityReport) -> String {
+    report.bodyHits
+      .map { "\($0.edgeID):\($0.obstacle.rawValue):\($0.obstacleID)" }
+      .joined(separator: ",")
+  }
+
+  private static func bodyHitRouteDetail(
+    _ report: PolicyCanvasGraphQualityReport,
+    routes: [String: PolicyCanvasEdgeRoute]
+  ) -> String {
+    report.bodyHits
+      .map { hit in
+        let points = routes[hit.edgeID]?.points ?? []
+        return "\(hit.edgeID):\(hit.obstacleID):frame=\(hit.frame):points=\(points)"
+      }
+      .joined(separator: ";")
   }
 
   private static func portSpacingDetail(

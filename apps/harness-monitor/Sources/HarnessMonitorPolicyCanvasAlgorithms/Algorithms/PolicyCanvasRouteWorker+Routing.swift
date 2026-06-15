@@ -47,15 +47,19 @@ extension PolicyCanvasPreparedRouteInput {
     algorithmSelection: PolicyCanvasAlgorithmSelection
   ) -> PolicyCanvasPreparedRouteComputation {
     let nodeIndex = nodeIndex
-    if let precomputed = precomputedRouteComputation(nodeIndex: nodeIndex) {
-      return precomputed
-    }
     let algorithms = PolicyCanvasAlgorithmRegistry.routingAlgorithms(for: algorithmSelection)
     let selectedRouter: any PolicyCanvasEdgeRouter =
       algorithmSelection.algorithmID(for: .edgeRouting)
         == PolicyCanvasAlgorithmDefaults.paddedOrthogonalVisibilityAStar
       ? defaultRouter
       : algorithms.edgeRouter
+    if let precomputed = precomputedRouteComputation(
+      nodeIndex: nodeIndex,
+      router: selectedRouter,
+      algorithms: algorithms
+    ) {
+      return precomputed
+    }
     let convergenceSignpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
     let convergenceInterval = policyCanvasRouteComputationSignposter.beginInterval(
       "policy_canvas.routes.phase.converge",
@@ -142,7 +146,9 @@ extension PolicyCanvasPreparedRouteInput {
   }
 
   private func precomputedRouteComputation(
-    nodeIndex: [String: PolicyCanvasRouteNode]
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
   ) -> PolicyCanvasPreparedRouteComputation? {
     guard let precomputedRoutes else {
       return nil
@@ -153,7 +159,12 @@ extension PolicyCanvasPreparedRouteInput {
     else {
       return nil
     }
-    let routes = precomputedRoutes.routes
+    let routes = precomputedRoutesRepairingBodyHits(
+      routes: precomputedRoutes.routes,
+      nodeIndex: nodeIndex,
+      router: selectedRouter,
+      algorithms: algorithms
+    )
     let portMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
       routes: routes,
       nodeIndex: nodeIndex
@@ -167,6 +178,83 @@ extension PolicyCanvasPreparedRouteInput {
       portVisibility: portVisibility(routes: routes, nodeIndex: nodeIndex),
       portMarkerLayout: portMarkerLayout,
       visibleBounds: visibleBounds(routes: routes, labelPositions: labelPositions)
+    )
+  }
+
+  private func precomputedRoutesRepairingBodyHits(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    let hitEdgeIDs = precomputedBodyHitEdgeIDs(routes: routes, nodeIndex: nodeIndex)
+    guard !hitEdgeIDs.isEmpty else {
+      return routes
+    }
+    let precomputedMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
+      routes: routes,
+      nodeIndex: nodeIndex
+    )
+    let context = PolicyCanvasRouteStateContext(
+      prepared: self,
+      nodeIndex: nodeIndex,
+      passContext: displayedRoutePassContext(nodeIndex: nodeIndex),
+      router: selectedRouter,
+      algorithms: algorithms
+    )
+    let selectedRoutes = policyCanvasSelectedRoutes(
+      phase: "precomputed-repair",
+      portMarkerLayout: precomputedMarkerLayout,
+      context: context
+    )
+    var repaired = routes
+    for edge in edges where hitEdgeIDs.contains(edge.id) {
+      guard let route = selectedRoutes[edge.id],
+        precomputedBodyHits(edge: edge, route: route, nodeIndex: nodeIndex).isEmpty
+      else {
+        continue
+      }
+      repaired[edge.id] = route
+    }
+    return repaired
+  }
+
+  private func precomputedBodyHitEdgeIDs(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> Set<String> {
+    Set(
+      precomputedBodyHits(routes: routes, nodeIndex: nodeIndex)
+        .map(\.edgeID)
+    )
+  }
+
+  private func precomputedBodyHits(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [PolicyCanvasBodyHitViolation] {
+    let routedEdges = edges.compactMap { edge -> PolicyCanvasRoutedEdge? in
+      guard let route = routes[edge.id], route.points.count >= 2 else {
+        return nil
+      }
+      return PolicyCanvasRoutedEdge(edge: edge, route: route)
+    }
+    return policyCanvasMeasureBodyHits(
+      routedEdges: routedEdges,
+      nodeFramesByID: nodeIndex.mapValues(\.frame),
+      groupTitleFrames: policyCanvasGroupTitleFramesByID(groups)
+    )
+  }
+
+  private func precomputedBodyHits(
+    edge: PolicyCanvasEdge,
+    route: PolicyCanvasEdgeRoute,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [PolicyCanvasBodyHitViolation] {
+    policyCanvasMeasureBodyHits(
+      routedEdges: [PolicyCanvasRoutedEdge(edge: edge, route: route)],
+      nodeFramesByID: nodeIndex.mapValues(\.frame),
+      groupTitleFrames: policyCanvasGroupTitleFramesByID(groups)
     )
   }
 
