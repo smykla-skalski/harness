@@ -16,6 +16,7 @@ struct PolicyCanvasQualityWorkerInput: Equatable, Sendable {
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
   let routes: [String: PolicyCanvasEdgeRoute]
+  let portMarkerLayout: PolicyCanvasPortMarkerLayout
 }
 
 /// Computes the deterministic graph-quality report off the main actor and caches
@@ -34,7 +35,8 @@ actor PolicyCanvasQualityWorker {
       nodes: input.nodes,
       groups: input.groups,
       edges: input.edges,
-      routes: input.routes
+      routes: input.routes,
+      portMarkerLayout: input.portMarkerLayout
     )
     cachedInput = input
     cachedOutput = output
@@ -56,6 +58,7 @@ private struct PolicyCanvasQualityInspectionKey: Equatable {
 struct PolicyCanvasQualityInspectionModifier: ViewModifier {
   let viewModel: PolicyCanvasViewModel
   let routes: [String: PolicyCanvasEdgeRoute]
+  let portMarkerLayout: PolicyCanvasPortMarkerLayout
   let routeSignature: PolicyCanvasRouteWorkerOutputSignature
   let isEnabled: Bool
   let resolvedCanvasColorScheme: ColorScheme?
@@ -91,7 +94,8 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
           nodes: viewModel.nodes,
           groups: viewModel.groups,
           edges: viewModel.edges,
-          routes: routes
+          routes: routes,
+          portMarkerLayout: portMarkerLayout
         )
         let computed = await worker.compute(input: input)
         guard !Task.isCancelled, viewModel.qualityInspectionReport != computed else {
@@ -111,6 +115,7 @@ extension View {
   func policyCanvasQualityInspection(
     viewModel: PolicyCanvasViewModel,
     routes: [String: PolicyCanvasEdgeRoute],
+    portMarkerLayout: PolicyCanvasPortMarkerLayout,
     routeSignature: PolicyCanvasRouteWorkerOutputSignature,
     isEnabled: Bool,
     resolvedCanvasColorScheme: ColorScheme?
@@ -119,6 +124,7 @@ extension View {
       PolicyCanvasQualityInspectionModifier(
         viewModel: viewModel,
         routes: routes,
+        portMarkerLayout: portMarkerLayout,
         routeSignature: routeSignature,
         isEnabled: isEnabled,
         resolvedCanvasColorScheme: resolvedCanvasColorScheme

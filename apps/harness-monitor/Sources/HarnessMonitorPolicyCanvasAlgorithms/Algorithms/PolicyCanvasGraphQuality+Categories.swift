@@ -71,7 +71,7 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
     case .portTooClose:
       "Two port markers on one side are closer than the minimum spacing - the dots crowd"
     case .portDetached:
-      "A port marker floats off its node edge instead of sitting on the node border"
+      "A wire ends away from its port dot - the edge does not reach the marker it should attach to"
     case .corridorReuse:
       "Two wires share one lane and overlap along it - they stack on the same rail"
     case .corridorParallel:

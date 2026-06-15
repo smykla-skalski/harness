@@ -89,13 +89,10 @@ struct PolicyCanvasGraphQualityReportTests {
     #expect(report.portSpacing.allSatisfy { $0.kind != .overlap })
   }
 
-  @Test func detachedPortMarkerIsFlagged() {
-    let frames = ["n1": CGRect(x: 0, y: 0, width: 168, height: 96)]
-    let edges = [edge("ea", source: endpoint("n1", "output-a", .output), target: endpoint("n2", "input-a", .input))]
-    let routes = ["ea": route([CGPoint(x: 500, y: 500), CGPoint(x: 600, y: 500)])]
-    let report = measure(frames: frames, edges: edges, routes: routes)
-    #expect(report.portSpacing.contains { $0.kind == .detached })
-  }
+  // The detached signal (a wire that does not reach its port dot) is measured
+  // against the rendered marker layout, not the node frame, so it lives in
+  // `PolicyCanvasPortDetachmentTests`. The frame-based core measures only
+  // overlap and too-close spacing.
 
   @Test func portFanningAcrossTwoSidesIsNotDetached() {
     // One logical input port fed by two wires that attach on opposite node

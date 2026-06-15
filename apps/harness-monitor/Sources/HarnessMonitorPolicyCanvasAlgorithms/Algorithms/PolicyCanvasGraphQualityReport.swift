@@ -26,6 +26,10 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
   /// Minimum length of a reversing route segment for the backtrack to read as a
   /// wrong turn. Shorter reversals sit within a port marker and are ignored.
   public var wrongTurnDepth: CGFloat
+  /// Distance between a wire end and its rendered port dot past which the wire
+  /// reads as detached from its port. Below a full port diameter the wire end
+  /// still meets the dot.
+  public var portDetachDistance: CGFloat
 
   public init(
     minimumPortSpacing: CGFloat,
@@ -36,7 +40,8 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     labelFarDistance: CGFloat,
     detourExcess: CGFloat,
     nodeDistanceGap: CGFloat,
-    wrongTurnDepth: CGFloat
+    wrongTurnDepth: CGFloat,
+    portDetachDistance: CGFloat
   ) {
     self.minimumPortSpacing = minimumPortSpacing
     self.markerOverlap = markerOverlap
@@ -47,6 +52,7 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     self.detourExcess = detourExcess
     self.nodeDistanceGap = nodeDistanceGap
     self.wrongTurnDepth = wrongTurnDepth
+    self.portDetachDistance = portDetachDistance
   }
 
   public static let `default` = Self(
@@ -59,7 +65,9 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     detourExcess: PolicyCanvasLayout.nodeSize.height * 1.5,
     nodeDistanceGap: PolicyCanvasLayout.nodeSize.width * 2.5,
     // Two-thirds of a port marker: shorter backtracks sit within the dot.
-    wrongTurnDepth: PolicyCanvasLayout.portDiameter / 1.5
+    wrongTurnDepth: PolicyCanvasLayout.portDiameter / 1.5,
+    // A full port diameter: the wire end is a dot-width clear of the dot.
+    portDetachDistance: PolicyCanvasLayout.portDiameter
   )
 }
 
@@ -197,14 +205,20 @@ struct PolicyCanvasRoutedEdge {
 /// Measure deterministic graph-quality metrics from a laid-out, routed graph.
 /// Convenience entry that derives node frames and group-title bands from the
 /// model types, then delegates to the frame-based core.
+///
+/// Pass `portMarkerLayout` (the same layout the canvas renders its dots from) to
+/// also measure wires detached from their port dot. The frame-based core cannot
+/// see the marker layout, so that signal is folded in here, where the node port
+/// geometry is available.
 public func policyCanvasMeasureGraphQuality(
   nodes: [PolicyCanvasNode],
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   routes: [String: PolicyCanvasEdgeRoute],
+  portMarkerLayout: PolicyCanvasPortMarkerLayout? = nil,
   thresholds: PolicyCanvasGraphQualityThresholds = .default
 ) -> PolicyCanvasGraphQualityReport {
-  policyCanvasMeasureGraphQuality(
+  var report = policyCanvasMeasureGraphQuality(
     nodeFramesByID: Dictionary(
       uniqueKeysWithValues: nodes.map { ($0.id, policyCanvasNodeFrame($0)) }
     ),
@@ -213,6 +227,27 @@ public func policyCanvasMeasureGraphQuality(
     routes: routes,
     thresholds: thresholds
   )
+  guard let portMarkerLayout else {
+    return report
+  }
+  let routedEdges =
+    edges
+    .compactMap { edge -> PolicyCanvasRoutedEdge? in
+      guard let route = routes[edge.id], route.points.count >= 2 else {
+        return nil
+      }
+      return PolicyCanvasRoutedEdge(edge: edge, route: route)
+    }
+    .sorted { $0.edge.id < $1.edge.id }
+  let detached = policyCanvasMeasurePortDetachment(
+    routedEdges: routedEdges,
+    nodesByID: Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) }),
+    portMarkerLayout: portMarkerLayout,
+    thresholds: thresholds
+  )
+  report.portSpacing =
+    (report.portSpacing + detached).sorted(by: policyCanvasPortSpacingViolationOrder)
+  return report
 }
 
 /// Frame-based core. Pure: same inputs always yield the same report. The

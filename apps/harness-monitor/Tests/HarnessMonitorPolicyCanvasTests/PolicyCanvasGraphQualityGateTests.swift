@@ -60,7 +60,8 @@ struct PolicyCanvasGraphQualityGateTests {
       nodes: viewModel.nodes,
       groups: viewModel.groups,
       edges: viewModel.edges,
-      routes: output.routes
+      routes: output.routes,
+      portMarkerLayout: output.portMarkerLayout
     )
   }
 
@@ -253,7 +254,8 @@ struct PolicyCanvasGraphQualityGateTests {
       nodes: viewModel.nodes,
       groups: viewModel.groups,
       edges: viewModel.edges,
-      routes: timedRoute.output.routes
+      routes: timedRoute.output.routes,
+      portMarkerLayout: timedRoute.output.portMarkerLayout
     )
     let qualityMs = Date().timeIntervalSince(qualityStart) * 1_000
 
