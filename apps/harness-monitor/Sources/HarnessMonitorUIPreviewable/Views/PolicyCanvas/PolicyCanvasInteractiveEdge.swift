@@ -148,7 +148,7 @@ struct PolicyCanvasInteractiveEdge: View, Equatable {
   var body: some View {
     let renderedRoute = policyCanvasEndpointTrimmedRoute(
       route,
-      endpointInset: PolicyCanvasLayout.portDiameter / 2
+      endpointInset: policyCanvasRenderedRouteEndpointInset()
     )
     ZStack {
       if isSelected {

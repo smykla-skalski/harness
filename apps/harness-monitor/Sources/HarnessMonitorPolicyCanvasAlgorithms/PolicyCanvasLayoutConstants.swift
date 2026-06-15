@@ -8,6 +8,8 @@ public enum PolicyCanvasLayout {
   public static let nodeSize = CGSize(width: 168, height: 96)
   public static let portDiameter: CGFloat = 18
   public static let portHitTestExtension: CGFloat = 10
+  public static let portMarkerInset: CGFloat = portDiameter / 2 + 2
+  public static let verticalPortMarkerSpacing: CGFloat = portDiameter * 1.5
   public static let groupCornerRadius: CGFloat = 8
   public static let edgeLabelHeight: CGFloat = 28
   public static let edgeLabelMaxWidth: CGFloat = 220
@@ -39,8 +41,13 @@ public enum PolicyCanvasLayout {
     guard count > 1 else {
       return nodeSize.height / 2
     }
-    let step = min(CGFloat(24), nodeSize.height / CGFloat(count + 1))
-    let top = (nodeSize.height - (step * CGFloat(count - 1))) / 2
+    let available = max(0, nodeSize.height - (portMarkerInset * 2))
+    let step = min(verticalPortMarkerSpacing, available / CGFloat(count - 1))
+    let span = step * CGFloat(count - 1)
+    let top = min(
+      max((nodeSize.height - span) / 2, portMarkerInset),
+      nodeSize.height - portMarkerInset - span
+    )
     return top + (CGFloat(index) * step)
   }
 

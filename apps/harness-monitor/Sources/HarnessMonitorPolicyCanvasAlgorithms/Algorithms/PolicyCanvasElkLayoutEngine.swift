@@ -82,7 +82,7 @@ private struct PolicyCanvasElkLayoutEngine {
     }
     guard
       let nodePositions = elkNodePositions(result),
-      let routes = elkRoutes(result),
+      let routes = elkRoutes(result, nodePositions: nodePositions, endpointPorts: endpointPorts),
       nodePositions.count == nodes.count,
       routes.count == edges.count
     else {
@@ -187,21 +187,44 @@ private struct PolicyCanvasElkLayoutEngine {
     return positions
   }
 
-  private func elkRoutes(_ result: [String: Any]) -> [String: PolicyCanvasEdgeRoute]? {
+  private func elkRoutes(
+    _ result: [String: Any],
+    nodePositions: [String: CGPoint],
+    endpointPorts: [PolicyCanvasElkEndpointPort]
+  ) -> [String: PolicyCanvasEdgeRoute]? {
     guard let edgeResults = result["edges"] as? [[String: Any]] else {
       return nil
     }
+    let portsByKey = Dictionary(
+      uniqueKeysWithValues: endpointPorts.map { port in
+        (
+          PolicyCanvasRouteTerminalKey(edgeID: port.edgeID, role: elkRouteEndpointRole(port.role)),
+          port
+        )
+      }
+    )
     var routes: [String: PolicyCanvasEdgeRoute] = [:]
     routes.reserveCapacity(edgeResults.count)
     for edgeResult in edgeResults {
       guard let id = edgeResult["id"] as? String,
         let sections = edgeResult["sections"] as? [[String: Any]],
         let firstSection = sections.first,
-        let points = elkRoutePoints(section: firstSection)
+        let points = elkRoutePoints(section: firstSection),
+        let sourcePort = portsByKey[PolicyCanvasRouteTerminalKey(edgeID: id, role: .source)],
+        let targetPort = portsByKey[PolicyCanvasRouteTerminalKey(edgeID: id, role: .target)],
+        let sourcePosition = nodePositions[sourcePort.nodeID],
+        let targetPosition = nodePositions[targetPort.nodeID]
       else {
         return nil
       }
-      let compressed = PolicyCanvasVisibilityRouter.compressCollinear(points)
+      let aligned = elkRoutePointsAligningTerminals(
+        points,
+        sourceTerminal: elkAbsolutePortCenter(sourcePort, nodePosition: sourcePosition),
+        sourceSide: sourcePort.side,
+        targetTerminal: elkAbsolutePortCenter(targetPort, nodePosition: targetPosition),
+        targetSide: targetPort.side
+      )
+      let compressed = policyCanvasCompressPreservingTerminalStubs(aligned)
       let route = PolicyCanvasEdgeRoute(
         points: compressed,
         labelPosition: PolicyCanvasEdgeRoute(
@@ -225,6 +248,75 @@ private struct PolicyCanvasElkLayoutEngine {
       return nil
     }
     return [start] + bends + [end]
+  }
+
+  private func elkRoutePointsAligningTerminals(
+    _ points: [CGPoint],
+    sourceTerminal: CGPoint,
+    sourceSide: PolicyCanvasPortSide,
+    targetTerminal: CGPoint,
+    targetSide: PolicyCanvasPortSide
+  ) -> [CGPoint] {
+    guard !points.isEmpty else {
+      return points
+    }
+    guard points.count > 2 else {
+      return elkTwoPointRoute(
+        sourceTerminal: sourceTerminal,
+        sourceSide: sourceSide,
+        targetTerminal: targetTerminal,
+        targetSide: targetSide
+      )
+    }
+    var snapped = points
+    snapped[snapped.startIndex] = sourceTerminal
+    let sourceLeadIndex = snapped.index(after: snapped.startIndex)
+    snapped[sourceLeadIndex] = elkRoutePoint(
+      snapped[sourceLeadIndex],
+      alignedTo: sourceTerminal,
+      side: sourceSide
+    )
+    let lastIndex = snapped.index(before: snapped.endIndex)
+    let targetLeadIndex = snapped.index(before: lastIndex)
+    snapped[targetLeadIndex] = elkRoutePoint(
+      snapped[targetLeadIndex],
+      alignedTo: targetTerminal,
+      side: targetSide
+    )
+    snapped[lastIndex] = targetTerminal
+    return snapped
+  }
+
+  private func elkTwoPointRoute(
+    sourceTerminal: CGPoint,
+    sourceSide: PolicyCanvasPortSide,
+    targetTerminal: CGPoint,
+    targetSide: PolicyCanvasPortSide
+  ) -> [CGPoint] {
+    let sourceLead = policyCanvasPortLeadPoint(sourceTerminal, side: sourceSide)
+    let targetLead = policyCanvasPortLeadPoint(targetTerminal, side: targetSide)
+    var points = [sourceTerminal, sourceLead]
+    if abs(sourceLead.x - targetLead.x) > 0.001,
+      abs(sourceLead.y - targetLead.y) > 0.001
+    {
+      points.append(CGPoint(x: targetLead.x, y: sourceLead.y))
+    }
+    points.append(targetLead)
+    points.append(targetTerminal)
+    return points
+  }
+
+  private func elkRoutePoint(
+    _ point: CGPoint,
+    alignedTo terminal: CGPoint,
+    side: PolicyCanvasPortSide
+  ) -> CGPoint {
+    switch side {
+    case .leading, .trailing:
+      CGPoint(x: point.x, y: terminal.y)
+    case .top, .bottom:
+      CGPoint(x: terminal.x, y: point.y)
+    }
   }
 
   private func actualGroupFrames(
@@ -274,7 +366,7 @@ private struct PolicyCanvasElkLayoutEngine {
       hash &*= 1_099_511_628_211
     }
 
-    elkCombine("elk-swift-source-right-fixed-ports-2")
+    elkCombine("elk-swift-source-right-fixed-ports-3")
     elkCombine(algorithmSelection.layoutCacheIdentity)
     for node in nodes {
       elkCombine(node.id)
@@ -454,10 +546,41 @@ private func elkPortOrigin(
   }
 }
 
+private func elkPortCenter(_ port: PolicyCanvasElkEndpointPort) -> CGPoint {
+  let radius = PolicyCanvasLayout.portDiameter / 2
+  switch port.side {
+  case .leading:
+    return CGPoint(x: 0, y: port.origin.y + radius)
+  case .trailing:
+    return CGPoint(x: PolicyCanvasLayout.nodeSize.width, y: port.origin.y + radius)
+  case .top:
+    return CGPoint(x: port.origin.x + radius, y: 0)
+  case .bottom:
+    return CGPoint(x: port.origin.x + radius, y: PolicyCanvasLayout.nodeSize.height)
+  }
+}
+
+private func elkAbsolutePortCenter(
+  _ port: PolicyCanvasElkEndpointPort,
+  nodePosition: CGPoint
+) -> CGPoint {
+  let center = elkPortCenter(port)
+  return CGPoint(x: nodePosition.x + center.x, y: nodePosition.y + center.y)
+}
+
 private func elkEndpointRoleRank(_ role: PolicyCanvasElkEndpointRole) -> Int {
   switch role {
   case .source: 0
   case .target: 1
+  }
+}
+
+private func elkRouteEndpointRole(_ role: PolicyCanvasElkEndpointRole)
+  -> PolicyCanvasRouteEndpointRole
+{
+  switch role {
+  case .source: .source
+  case .target: .target
   }
 }
 
