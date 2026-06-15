@@ -186,6 +186,8 @@ func policyCanvasQualityHoverMarks(
       case .overlap: .labelOverlaps
       case .onBody: .labelOnBody
       case .farFromEdge: .labelAdrift
+      case .crossesEdge: .labelOnEdge
+      case .nearTurn: .labelNearTurn
       }
     add(category, Path(violation.frame.insetBy(dx: -4, dy: -4)))
   }

@@ -165,13 +165,19 @@ public struct PolicyCanvasLongEdgeViolation: Equatable, Sendable {
   public var severity: PolicyCanvasQualitySeverity { .warning }
 }
 
-/// A label that collides with another label, sits on a foreign node body, or
-/// drifted far from its own wire.
+/// A label that collides with another label, sits on a foreign node body,
+/// drifted far from its own wire, lies on top of a foreign wire, or crowds a
+/// route bend.
 public struct PolicyCanvasLabelViolation: Equatable, Sendable {
   public enum Kind: String, Equatable, Sendable {
     case overlap
     case onBody
     case farFromEdge
+    /// The label box sits on top of a wire other than the one it names.
+    case crossesEdge
+    /// The label box overlaps or sits too close to a route bend (its own or a
+    /// neighbor's), crowding the corner.
+    case nearTurn
   }
 
   public let kind: Kind
@@ -189,7 +195,10 @@ public struct PolicyCanvasLabelViolation: Equatable, Sendable {
   }
 
   public var severity: PolicyCanvasQualitySeverity {
-    kind == .farFromEdge ? .warning : .error
+    switch kind {
+    case .overlap, .onBody: .error
+    case .farFromEdge, .crossesEdge, .nearTurn: .warning
+    }
   }
 }
 

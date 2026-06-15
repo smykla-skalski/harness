@@ -18,6 +18,8 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
   case labelOverlaps
   case labelOnBody
   case labelAdrift
+  case labelOnEdge
+  case labelNearTurn
   case nodeOverlaps
 
   /// Human-readable counter name, also used as the dump/panel row label.
@@ -39,6 +41,8 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
     case .labelOverlaps: "label overlaps"
     case .labelOnBody: "label on-body"
     case .labelAdrift: "label adrift"
+    case .labelOnEdge: "label on-edge"
+    case .labelNearTurn: "label near-turn"
     case .nodeOverlaps: "node overlaps"
     }
   }
@@ -51,7 +55,8 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
       .labelOverlaps, .labelOnBody, .nodeOverlaps:
       .error
     case .portTooClose, .corridorParallel, .crossings, .crossingsIndependent,
-      .longEdges, .detours, .nodeDistance, .wrongTurns, .crossedPorts, .labelAdrift:
+      .longEdges, .detours, .nodeDistance, .wrongTurns, .crossedPorts, .labelAdrift,
+      .labelOnEdge, .labelNearTurn:
       .warning
     }
   }
@@ -100,6 +105,10 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
       "An edge label sits on top of a node body"
     case .labelAdrift:
       "An edge label drifted far from the wire it names"
+    case .labelOnEdge:
+      "An edge label sits on top of a wire other than the one it names"
+    case .labelNearTurn:
+      "An edge label overlaps or sits too close to a wire's turn - it crowds the corner"
     case .nodeOverlaps:
       "Two node bodies overlap"
     }
@@ -126,6 +135,8 @@ extension PolicyCanvasGraphQualityReport {
     case .labelOverlaps: labels.filter { $0.kind == .overlap }.count
     case .labelOnBody: labels.filter { $0.kind == .onBody }.count
     case .labelAdrift: labels.filter { $0.kind == .farFromEdge }.count
+    case .labelOnEdge: labels.filter { $0.kind == .crossesEdge }.count
+    case .labelNearTurn: labels.filter { $0.kind == .nearTurn }.count
     case .nodeOverlaps: nodeOverlaps.count
     }
   }
