@@ -17,7 +17,9 @@ struct PolicyCanvasQualityMarkerSwatch: View {
         ring(&context, rect, tint)
       case .corridorReuse, .corridorParallel:
         thickLine(&context, rect, tint)
-      case .crossings, .crossingsIndependent:
+      case .crossings:
+        ring(&context, rect, tint)
+      case .crossingsIndependent:
         dot(&context, rect, tint)
       case .bodyHits:
         roundedOutline(&context, rect, tint)

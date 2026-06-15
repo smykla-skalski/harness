@@ -199,13 +199,15 @@ struct PolicyCanvasQualityOverlayMarks: View {
     context.stroke(errorPath, with: .color(error.opacity(0.7)), lineWidth: 1)
   }
 
-  /// A dot at each proper crossing: independent crossings (no shared endpoint)
-  /// pop; endpoint-sharing crossings stay faint since they are often unavoidable.
+  /// A dot at each proper crossing. Independent crossings (no shared endpoint)
+  /// are the avoidable ones, so they pop as a solid dot; endpoint-sharing
+  /// crossings are often unavoidable, so they read as a hollow ring - visible and
+  /// distinct from the solid dot, not nearly-invisible.
   private func drawCrossings(into context: inout GraphicsContext, warning: Color) {
     var independent = Path()
     var shared = Path()
     for violation in report.crossings {
-      let radius: CGFloat = violation.sharesEndpointNode ? 2 : 3.5
+      let radius: CGFloat = 3
       let rect = CGRect(
         x: violation.point.x - radius,
         y: violation.point.y - radius,
@@ -218,8 +220,8 @@ struct PolicyCanvasQualityOverlayMarks: View {
         independent.addEllipse(in: rect)
       }
     }
-    context.fill(shared, with: .color(warning.opacity(0.3)))
-    context.fill(independent, with: .color(warning.opacity(0.85)))
+    context.stroke(shared, with: .color(warning.opacity(0.85)), lineWidth: 1.5)
+    context.fill(independent, with: .color(warning.opacity(0.95)))
   }
 
   /// The two ports of each crossed pair, ringed and joined by a dashed connector,
