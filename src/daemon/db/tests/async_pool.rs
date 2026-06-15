@@ -27,7 +27,7 @@ async fn connect_reads_current_schema_version() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     );
 }
 
@@ -52,15 +52,14 @@ async fn connect_bootstraps_empty_database_with_sqlx_migrations() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     );
     let policy_workspace_columns =
         query_scalar::<_, String>("SELECT name FROM pragma_table_info('policy_workspace')")
             .fetch_all(async_db.pool())
             .await
             .expect("query policy workspace columns");
-    assert!(policy_workspace_columns
-        .contains(&"global_policy_enforcement_enabled".to_string()));
+    assert!(policy_workspace_columns.contains(&"global_policy_enforcement_enabled".to_string()));
     assert!(!policy_workspace_columns.contains(&"enforcement_snapshot_json".to_string()));
 }
 
@@ -145,7 +144,7 @@ async fn connect_migrates_legacy_schema_before_opening_pool() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     );
 }
 
@@ -189,8 +188,73 @@ async fn connect_preserves_existing_db_when_baseline_checksum_drifted() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     );
+}
+
+#[tokio::test]
+async fn connect_accepts_v22_db_with_recorded_policy_snapshot_migration() {
+    let tmp = tempdir().expect("tempdir");
+    let db_path = tmp.path().join("harness.db");
+    let sync_db = DaemonDb::open(&db_path).expect("open sync daemon db");
+    drop(sync_db);
+
+    let conn = Connection::open(&db_path).expect("open sqlite");
+    conn.execute(
+        "ALTER TABLE policy_workspace ADD COLUMN enforcement_snapshot_json TEXT",
+        [],
+    )
+    .expect("restore historical policy snapshot column");
+    conn.execute(
+        "UPDATE schema_meta SET value = '22' WHERE key = 'version'",
+        [],
+    )
+    .expect("stamp v22 schema");
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS _sqlx_migrations (
+                version BIGINT PRIMARY KEY,
+                description TEXT NOT NULL,
+                installed_on TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                success BOOLEAN NOT NULL,
+                checksum BLOB NOT NULL,
+                execution_time BIGINT NOT NULL
+            );",
+    )
+    .expect("create sqlx ledger");
+    conn.execute(
+        "INSERT INTO _sqlx_migrations (
+                version, description, success, checksum, execution_time
+            ) VALUES (?1, ?2, 1, ?3, 0)",
+        rusqlite::params![
+            10_i64,
+            "daemon v16 policy enforcement snapshot",
+            hex::decode("AD3FED5DD4D1E51BFD7462F1CC56185635E4EACDEE1CCA3332688CED4867985A88883E18495BB4232C12F6DDB125FF46")
+                .expect("decode v16 checksum")
+        ],
+    )
+    .expect("seed historical v16 sqlx ledger row");
+    drop(conn);
+
+    let async_db = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open async daemon db with recorded policy snapshot migration");
+    assert_eq!(
+        async_db
+            .schema_version()
+            .await
+            .expect("async schema version"),
+        SCHEMA_VERSION
+    );
+    assert_eq!(
+        applied_migration_versions(&async_db).await,
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+    );
+    let policy_workspace_columns =
+        query_scalar::<_, String>("SELECT name FROM pragma_table_info('policy_workspace')")
+            .fetch_all(async_db.pool())
+            .await
+            .expect("query policy workspace columns");
+    assert!(!policy_workspace_columns.contains(&"enforcement_snapshot_json".to_string()));
 }
 
 #[tokio::test]
@@ -216,7 +280,7 @@ async fn connect_seeds_v18_sqlx_ledger_when_sync_schema_already_applied() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     );
 }
 
@@ -306,7 +370,7 @@ async fn connect_repairs_v8_active_sessions_without_leader_before_opening_pool()
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     );
     drop(async_db);
 
@@ -359,8 +423,8 @@ fn shipped_daemon_async_migration_checksums_remain_stable() {
             "FE683A0EA0B11242EC49C7F698BD84C2EA3166EB47964FABAF5689487CE8C791954E1CCD07759139E5F1BE94913AD278",
         ),
         (
-            "0010_daemon_v16_policy_workspace_flags.sql",
-            "09DC16553425628AE6C7BF93E0C79E43C34F0A5594B54DB4A510F5B2F2C887CE3A0BA1DC26451A7422EAF8C9AF9E0F01",
+            "0010_daemon_v16_policy_enforcement_snapshot.sql",
+            "AD3FED5DD4D1E51BFD7462F1CC56185635E4EACDEE1CCA3332688CED4867985A88883E18495BB4232C12F6DDB125FF46",
         ),
         (
             "0011_daemon_v17_audit_events.sql",
@@ -377,6 +441,18 @@ fn shipped_daemon_async_migration_checksums_remain_stable() {
         (
             "0014_daemon_v20_policy_canvas_viewport.sql",
             "ED606394E81442888E63169C91B434A759BBB5C4955C7280224E67E4CC80924F5CB0125C34D31F6165AE852394F7EE1A",
+        ),
+        (
+            "0015_daemon_v21_policy_node_layout_source.sql",
+            "9414A044B453ADB1390BC5F0A77F57E6A8C180083FD79947F05093E9D8E4E0D87845B020D944CA296C0CCE7A40C88CA2",
+        ),
+        (
+            "0016_daemon_v22_global_policy_enforcement.sql",
+            "39A20F260F1D497B9EB1AD201B858EB7A8F821813ADD490653F7E78FD779CD68B19DD163BADE63F61E9C180F5E864C22",
+        ),
+        (
+            "0017_daemon_v23_drop_policy_enforcement_snapshot.sql",
+            "51CC1C253ED07B4482E6B7B2E91405CECDBE151AD36F87F86EA3698A581FA8A01456C1602659CE3E8B44422235B6B847",
         ),
     ];
     let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/daemon/db/migrations");

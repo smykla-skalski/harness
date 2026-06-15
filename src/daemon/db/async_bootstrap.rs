@@ -73,6 +73,7 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         14 => 20,
         15 => 21,
         16 => 22,
+        17 => 23,
         _ => u64::MAX,
     }
 }
