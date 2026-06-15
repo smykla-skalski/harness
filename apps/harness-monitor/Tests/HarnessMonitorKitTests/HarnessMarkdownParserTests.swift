@@ -238,6 +238,13 @@ struct HarnessMarkdownParserTests {
     #expect(inlines.contains(.autolink("https://harness.local")))
   }
 
+  @Test("Inline parser renders GitHub emoji aliases")
+  func inlineParserRendersGitHubEmojiAliases() {
+    let inlines = HarnessMarkdownInlineParser.parse(":mag: Check :warning: and :unknown_alias:")
+
+    #expect(inlines == [.text("🔍 Check ⚠️ and :unknown_alias:")])
+  }
+
   @Test("Inline parser distinguishes references and soft breaks")
   func inlineParserHandlesReferencesAndBreaks() {
     let references = [
