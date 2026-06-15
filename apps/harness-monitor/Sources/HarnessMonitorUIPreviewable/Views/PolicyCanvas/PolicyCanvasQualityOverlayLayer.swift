@@ -41,6 +41,7 @@ struct PolicyCanvasQualityOverlayMarks: View {
       drawLabels(into: &context, error: error, warning: warning)
       drawWrongTurns(into: &context, warning: warning)
       drawCrossings(into: &context, warning: warning)
+      drawCrossedPorts(into: &context, warning: warning)
       drawPortSpacing(into: &context, error: error, warning: warning)
     }
     .allowsHitTesting(false)
@@ -219,6 +220,45 @@ struct PolicyCanvasQualityOverlayMarks: View {
     }
     context.fill(shared, with: .color(warning.opacity(0.3)))
     context.fill(independent, with: .color(warning.opacity(0.85)))
+  }
+
+  /// The two ports of each crossed pair, ringed and joined by a dashed connector,
+  /// with an X at the midpoint - the wires attach in the wrong order and would
+  /// untangle if the ports were swapped.
+  private func drawCrossedPorts(into context: inout GraphicsContext, warning: Color) {
+    var connectors = Path()
+    var rings = Path()
+    var crosses = Path()
+    let radius: CGFloat = 5
+    for violation in report.crossedPorts {
+      connectors.move(to: violation.pointA)
+      connectors.addLine(to: violation.pointB)
+      for point in [violation.pointA, violation.pointB] {
+        rings.addEllipse(
+          in: CGRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)
+        )
+      }
+      let mid = CGPoint(
+        x: (violation.pointA.x + violation.pointB.x) / 2,
+        y: (violation.pointA.y + violation.pointB.y) / 2
+      )
+      let arm: CGFloat = 5
+      crosses.move(to: CGPoint(x: mid.x - arm, y: mid.y - arm))
+      crosses.addLine(to: CGPoint(x: mid.x + arm, y: mid.y + arm))
+      crosses.move(to: CGPoint(x: mid.x - arm, y: mid.y + arm))
+      crosses.addLine(to: CGPoint(x: mid.x + arm, y: mid.y - arm))
+    }
+    context.stroke(
+      connectors,
+      with: .color(warning.opacity(0.45)),
+      style: StrokeStyle(lineWidth: 1, dash: [3, 3])
+    )
+    context.stroke(rings, with: .color(warning), lineWidth: 1.5)
+    context.stroke(
+      crosses,
+      with: .color(warning),
+      style: StrokeStyle(lineWidth: 2, lineCap: .round)
+    )
   }
 
   /// A ring at each mis-spaced port marker, plus a connector to its crowding

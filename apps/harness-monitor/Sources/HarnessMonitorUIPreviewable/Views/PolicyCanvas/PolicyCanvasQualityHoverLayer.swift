@@ -173,6 +173,9 @@ func policyCanvasQualityHoverMarks(
     // spur tip.
     add(.wrongTurns, policyCanvasHoverLine(violation.point, violation.returnPoint, width: 16))
   }
+  for violation in report.crossedPorts {
+    add(.crossedPorts, policyCanvasHoverLine(violation.pointA, violation.pointB, width: 18))
+  }
   for violation in report.labels {
     let category: PolicyCanvasQualityCategory =
       switch violation.kind {

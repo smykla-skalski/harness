@@ -1,0 +1,71 @@
+import CoreGraphics
+import Testing
+
+@testable import HarnessMonitorPolicyCanvasAlgorithms
+
+/// Crossed-ports detection: two wires landing on one node side in an order that
+/// is inverted relative to where they come from must cross between the node and
+/// their far ends. The measure flags that swap; a fan whose attach order matches
+/// its source order stays clean.
+struct PolicyCanvasCrossedPortsTests {
+  private let target = CGRect(x: 400, y: 0, width: 168, height: 96)
+
+  private func edge(_ id: String) -> PolicyCanvasEdge {
+    PolicyCanvasEdge(
+      id: id,
+      source: PolicyCanvasPortEndpoint(nodeID: "s-\(id)", portID: "out", kind: .output),
+      target: PolicyCanvasPortEndpoint(nodeID: "t", portID: "in", kind: .input),
+      label: ""
+    )
+  }
+
+  private func route(far: CGFloat, attach: CGFloat) -> PolicyCanvasEdgeRoute {
+    // Far endpoint to the left at `far`, attaching to the target leading side at `attach`.
+    PolicyCanvasEdgeRoute(points: [CGPoint(x: 0, y: far), CGPoint(x: 400, y: attach)], labelPosition: .zero)
+  }
+
+  private func report(routes: [String: PolicyCanvasEdgeRoute]) -> PolicyCanvasGraphQualityReport {
+    policyCanvasMeasureGraphQuality(
+      nodeFramesByID: ["t": target],
+      groupTitleFrames: [],
+      edges: routes.keys.sorted().map(edge),
+      routes: routes
+    )
+  }
+
+  @Test func invertedPortOrderIsFlagged() {
+    // e1 attaches high (y=30) but comes from low (y=700); e2 attaches low (y=70)
+    // but comes from high (y=10) - the wires cross.
+    let result = report(routes: [
+      "e1": route(far: 700, attach: 30),
+      "e2": route(far: 10, attach: 70),
+    ])
+    #expect(result.count(for: .crossedPorts) == 1)
+    let violation = try! #require(result.crossedPorts.first)
+    #expect(violation.nodeID == "t")
+    #expect(violation.side == .leading)
+    #expect(Set([violation.edgeA, violation.edgeB]) == Set(["e1", "e2"]))
+  }
+
+  @Test func matchingPortOrderIsClean() {
+    // e1 attaches high and comes from high; e2 attaches low and comes from low.
+    let result = report(routes: [
+      "e1": route(far: 10, attach: 30),
+      "e2": route(far: 700, attach: 70),
+    ])
+    #expect(result.count(for: .crossedPorts) == 0)
+  }
+
+  @Test func singleEdgeNeverCrosses() {
+    #expect(report(routes: ["e1": route(far: 10, attach: 48)]).count(for: .crossedPorts) == 0)
+  }
+
+  @Test func sameFarPositionIsNotACross() {
+    // Two wires from the same approach coordinate cannot cross each other.
+    let result = report(routes: [
+      "e1": route(far: 50, attach: 30),
+      "e2": route(far: 50, attach: 70),
+    ])
+    #expect(result.count(for: .crossedPorts) == 0)
+  }
+}
