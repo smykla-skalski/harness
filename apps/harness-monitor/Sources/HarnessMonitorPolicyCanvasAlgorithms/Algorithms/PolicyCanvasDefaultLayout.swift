@@ -239,7 +239,9 @@ private func policyCanvasPrecomputedRouteTerminal(
   _ point: CGPoint,
   attachesTo frame: CGRect
 ) -> Bool {
-  let tolerance = PolicyCanvasLayout.portDiameter
+  // ELK fixed WEST ports can report the route endpoint a couple points outside
+  // the port rectangle after rounding; keep the attach guard tight but tolerant.
+  let tolerance = PolicyCanvasLayout.portDiameter + 4
   let withinVertical = point.y >= frame.minY - tolerance && point.y <= frame.maxY + tolerance
   let withinHorizontal = point.x >= frame.minX - tolerance && point.x <= frame.maxX + tolerance
   let onLeading = withinVertical && abs(point.x - frame.minX) <= tolerance
