@@ -170,8 +170,13 @@ struct PolicyCanvasCommandScrollTests {
     #expect(nativeScrollViewSource.contains("override var fittingSize: NSSize"))
     #expect(nativeHostingViewSource.contains("func policyCanvasFixedFittingSize("))
     #expect(nativeHostingViewSource.contains("sizingOptions = []"))
-    #expect(nativeHostingViewSource.contains("override func layout()"))
-    #expect(nativeHostingViewSource.contains("guard requiresHostedLayout"))
+    // Regression guard: the one-shot `requiresHostedLayout` layout gate must not
+    // come back. It skipped `super.layout()` for live-observed interaction state
+    // (selection, hover, marquee, rubber band) that is excluded from the render
+    // signature, freezing those repaints - clicking a node showed no selection
+    // and the hover overlay never updated. NSHostingView's own invalidation
+    // drives hosted layout instead.
+    #expect(!nativeHostingViewSource.contains("requiresHostedLayout"))
     #expect(nativeHostingViewSource.contains("func replaceRootView("))
     #expect(coordinatorSource.contains("guard workspaceLayout != self.workspaceLayout else"))
     #expect(coordinatorSource.contains("guard frame.size != size || hostingView.frame.size != size"))

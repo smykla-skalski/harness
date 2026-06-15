@@ -42,7 +42,6 @@ let policyCanvasAcceptedTextPasteboardTypes: [NSPasteboard.PasteboardType] = {
 @MainActor
 final class PolicyCanvasNativeHostingView: NSHostingView<PolicyCanvasViewportHostedRoot> {
   weak var documentInteractionDelegate: PolicyCanvasNativeDocumentView?
-  private var requiresHostedLayout = true
 
   override var isOpaque: Bool { true }
 
@@ -64,16 +63,19 @@ final class PolicyCanvasNativeHostingView: NSHostingView<PolicyCanvasViewportHos
     fatalError("init(coder:) has not been implemented")
   }
 
-  override func layout() {
-    guard requiresHostedLayout else {
-      return
-    }
-    requiresHostedLayout = false
-    super.layout()
-  }
+  // Intentionally no `layout()` override / one-shot layout gate. NSHostingView
+  // already marks itself `needsLayout` only when the hosted root's observed
+  // state changes, and the child layers render live viewModel state - selection,
+  // hover marks, marquee, the pending-edge rubber band - that is deliberately
+  // kept out of the snapshot `renderSignature` (so a pure scroll/pan does not
+  // republish the whole tree). A gate that skipped `super.layout()` for anything
+  // not routed through `replaceRootView`/`updateSize` froze those interaction
+  // repaints: clicking a node showed no selection border and the quality hover
+  // overlay never updated. Let the framework's own invalidation drive layout.
+  // The interaction-churn wins come from the renderSignature snapshot gate and
+  // the zoom/viewport debounce, which both remain.
 
   func markHostedLayoutRequired() {
-    requiresHostedLayout = true
     if !needsLayout {
       needsLayout = true
     }
