@@ -88,15 +88,18 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(!source.contains("GridRow"))
   }
 
-  @Test("Markdown links expose hover and pointer affordances")
-  func markdownLinksExposeHoverAndPointerAffordances() throws {
+  @Test("Markdown text links use native rendered text wrapping")
+  func markdownTextLinksUseNativeRenderedTextWrapping() throws {
     let source = try readRepositoryFile(
       "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
         + "/Views/Shared/HarnessMarkdownInlineFlowView.swift"
     )
 
+    #expect(source.contains("private var usesFragmentLayout: Bool"))
+    #expect(source.contains("inlines.containsMarkdownImage"))
+    #expect(!source.contains("inlines.containsMarkdownLink"))
+    #expect(source.contains("Text(HarnessMarkdownInlineRenderer.attributedString(from: inlines"))
     #expect(source.contains("HarnessMarkdownLinkHoverModifier"))
-    #expect(source.contains("NSCursor.pointingHand.push()"))
     #expect(source.contains("HarnessMarkdownInlineWrapLayout(horizontalSpacing: 0"))
     #expect(source.contains("row.height - item.size.height"))
     #expect(!source.contains(".padding(.horizontal"))

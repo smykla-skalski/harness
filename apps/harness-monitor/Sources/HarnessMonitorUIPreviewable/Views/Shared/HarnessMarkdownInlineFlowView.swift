@@ -38,7 +38,7 @@ struct HarnessMarkdownInlineFlowView: View {
   }
 
   private var usesFragmentLayout: Bool {
-    inlines.containsMarkdownImage || inlines.containsMarkdownLink
+    inlines.containsMarkdownImage
   }
 }
 
@@ -328,25 +328,6 @@ private actor HarnessMarkdownImageDataCache {
       values.removeValue(forKey: removed)
     }
     return data
-  }
-}
-
-extension HarnessMarkdownInline {
-  fileprivate var containsMarkdownLink: Bool {
-    switch self {
-    case .autolink, .link:
-      true
-    case .emphasis(let children), .strikethrough(let children), .strong(let children):
-      children.containsMarkdownLink
-    case .code, .image, .lineBreak, .softBreak, .text:
-      false
-    }
-  }
-}
-
-extension [HarnessMarkdownInline] {
-  fileprivate var containsMarkdownLink: Bool {
-    contains { $0.containsMarkdownLink }
   }
 }
 

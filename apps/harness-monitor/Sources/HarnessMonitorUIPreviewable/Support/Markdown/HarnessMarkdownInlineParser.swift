@@ -14,7 +14,7 @@ struct HarnessMarkdownInlineParseState {
 
   mutating func flushBuffer() {
     guard !buffer.isEmpty else { return }
-    parts.append(.text(buffer))
+    parts.append(.text(HarnessMarkdownEmojiAliases.replacingAliases(in: buffer)))
     buffer.removeAll(keepingCapacity: true)
   }
 }
