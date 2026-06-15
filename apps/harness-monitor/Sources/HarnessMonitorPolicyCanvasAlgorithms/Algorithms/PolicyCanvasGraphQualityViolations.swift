@@ -261,6 +261,39 @@ public struct PolicyCanvasWrongTurnViolation: Equatable, Sendable {
   public var severity: PolicyCanvasQualitySeverity { .warning }
 }
 
+/// Two wires that attach to one node side in an order that crosses them: the
+/// wire reaching the earlier port along the side comes from farther along the
+/// perpendicular axis than the wire reaching the later port, so the two must
+/// cross between the node and where they come from. Swapping the two ports would
+/// untangle them - the edge picked the wrong port. `pointA` is the earlier port
+/// (smaller offset along the side), `pointB` the later one.
+public struct PolicyCanvasCrossedPortsViolation: Equatable, Sendable {
+  public let nodeID: String
+  public let side: PolicyCanvasPortSide
+  public let edgeA: String
+  public let edgeB: String
+  public let pointA: CGPoint
+  public let pointB: CGPoint
+
+  public init(
+    nodeID: String,
+    side: PolicyCanvasPortSide,
+    edgeA: String,
+    edgeB: String,
+    pointA: CGPoint,
+    pointB: CGPoint
+  ) {
+    self.nodeID = nodeID
+    self.side = side
+    self.edgeA = edgeA
+    self.edgeB = edgeB
+    self.pointA = pointA
+    self.pointB = pointB
+  }
+
+  public var severity: PolicyCanvasQualitySeverity { .warning }
+}
+
 /// Two connected node bodies separated by a wide horizontal gap - the layout
 /// placed them far apart with empty space between, forcing a long hauling edge.
 /// `distance` is the gap between their facing vertical edges.

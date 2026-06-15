@@ -14,6 +14,7 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
   case detours
   case nodeDistance
   case wrongTurns
+  case crossedPorts
   case labelOverlaps
   case labelOnBody
   case labelAdrift
@@ -34,6 +35,7 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
     case .detours: "detours"
     case .nodeDistance: "node distance"
     case .wrongTurns: "wrong turns"
+    case .crossedPorts: "crossed ports"
     case .labelOverlaps: "label overlaps"
     case .labelOnBody: "label on-body"
     case .labelAdrift: "label adrift"
@@ -49,7 +51,7 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
       .labelOverlaps, .labelOnBody, .nodeOverlaps:
       .error
     case .portTooClose, .corridorParallel, .crossings, .crossingsIndependent,
-      .longEdges, .detours, .nodeDistance, .wrongTurns, .labelAdrift:
+      .longEdges, .detours, .nodeDistance, .wrongTurns, .crossedPorts, .labelAdrift:
       .warning
     }
   }
@@ -90,6 +92,8 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
       "Two connected nodes sit far apart horizontally with a wide empty gap between them"
     case .wrongTurns:
       "A wire doubles back on itself - it heads one way then reverses along the same axis, leaving a spur"
+    case .crossedPorts:
+      "Two wires attach to one node side in a crossed order - swapping the ports would untangle them"
     case .labelOverlaps:
       "Two edge labels overlap each other"
     case .labelOnBody:
@@ -118,6 +122,7 @@ extension PolicyCanvasGraphQualityReport {
     case .detours: detours.count
     case .nodeDistance: nodeDistance.count
     case .wrongTurns: wrongTurns.count
+    case .crossedPorts: crossedPorts.count
     case .labelOverlaps: labels.filter { $0.kind == .overlap }.count
     case .labelOnBody: labels.filter { $0.kind == .onBody }.count
     case .labelAdrift: labels.filter { $0.kind == .farFromEdge }.count

@@ -29,6 +29,8 @@ struct PolicyCanvasQualityMarkerSwatch: View {
         dimensionGlyph(&context, rect, tint)
       case .wrongTurns:
         wrongTurnGlyph(&context, rect, tint)
+      case .crossedPorts:
+        crossedPortsGlyph(&context, rect, tint)
       case .labelOverlaps, .labelOnBody, .labelAdrift:
         thinOutline(&context, rect, tint)
       case .nodeOverlaps:
@@ -124,6 +126,17 @@ struct PolicyCanvasQualityMarkerSwatch: View {
     head.addLine(to: CGPoint(x: rect.minX + 4, y: rect.maxY + 1.5))
     head.closeSubpath()
     context.fill(head, with: .color(tint))
+  }
+
+  private func crossedPortsGlyph(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
+    // Two dots joined by an X: a crossed pair of ports.
+    let inner = rect.insetBy(dx: 4, dy: 1)
+    var crosses = Path()
+    crosses.move(to: CGPoint(x: inner.minX, y: inner.minY))
+    crosses.addLine(to: CGPoint(x: inner.maxX, y: inner.maxY))
+    crosses.move(to: CGPoint(x: inner.minX, y: inner.maxY))
+    crosses.addLine(to: CGPoint(x: inner.maxX, y: inner.minY))
+    context.stroke(crosses, with: .color(tint), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
   }
 
   private func dimensionGlyph(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {

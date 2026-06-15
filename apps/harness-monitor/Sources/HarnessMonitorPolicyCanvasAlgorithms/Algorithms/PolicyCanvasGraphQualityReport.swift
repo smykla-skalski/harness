@@ -138,6 +138,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
   public var detours: [PolicyCanvasDetourViolation]
   public var nodeDistance: [PolicyCanvasNodeDistanceViolation]
   public var wrongTurns: [PolicyCanvasWrongTurnViolation]
+  public var crossedPorts: [PolicyCanvasCrossedPortsViolation]
   public var labels: [PolicyCanvasLabelViolation]
   public var nodeOverlaps: [PolicyCanvasNodeOverlapViolation]
   public var edgeLengths: PolicyCanvasEdgeLengthSummary
@@ -152,6 +153,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
     detours: [PolicyCanvasDetourViolation],
     nodeDistance: [PolicyCanvasNodeDistanceViolation],
     wrongTurns: [PolicyCanvasWrongTurnViolation],
+    crossedPorts: [PolicyCanvasCrossedPortsViolation],
     labels: [PolicyCanvasLabelViolation],
     nodeOverlaps: [PolicyCanvasNodeOverlapViolation],
     edgeLengths: PolicyCanvasEdgeLengthSummary,
@@ -165,6 +167,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
     self.detours = detours
     self.nodeDistance = nodeDistance
     self.wrongTurns = wrongTurns
+    self.crossedPorts = crossedPorts
     self.labels = labels
     self.nodeOverlaps = nodeOverlaps
     self.edgeLengths = edgeLengths
@@ -180,6 +183,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
     detours: [],
     nodeDistance: [],
     wrongTurns: [],
+    crossedPorts: [],
     labels: [],
     nodeOverlaps: [],
     edgeLengths: .empty,
@@ -302,6 +306,10 @@ public func policyCanvasMeasureGraphQuality(
       thresholds: thresholds
     ),
     wrongTurns: policyCanvasMeasureWrongTurns(routedEdges: routedEdges, thresholds: thresholds),
+    crossedPorts: policyCanvasMeasureCrossedPorts(
+      routedEdges: routedEdges,
+      nodeFramesByID: nodeFramesByID
+    ),
     labels: policyCanvasMeasureLabels(
       routedEdges: routedEdges,
       nodeFramesByID: nodeFramesByID,

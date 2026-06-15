@@ -134,7 +134,7 @@ private func policyCanvasMergePortMarker(
 /// The side of `frame` a marker sits on, or nil when the point is off the node
 /// (a detached marker). A point counts as on a side when it is within
 /// `tolerance` of that edge and inside the perpendicular extent.
-private func policyCanvasMarkerSide(
+func policyCanvasMarkerSide(
   point: CGPoint,
   frame: CGRect,
   tolerance: CGFloat

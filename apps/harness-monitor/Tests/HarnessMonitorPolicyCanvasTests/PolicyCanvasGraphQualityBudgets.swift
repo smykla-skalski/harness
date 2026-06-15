@@ -32,17 +32,18 @@ enum PolicyCanvasGraphQualityBudgets {
     ],
     "multi-group": [
       .portOverlaps: 2, .corridorReuse: 5, .corridorParallel: 6,
-      .crossingsIndependent: 9, .detours: 2, .nodeDistance: 1, .wrongTurns: 9, .labelOverlaps: 2,
+      .crossingsIndependent: 9, .detours: 2, .nodeDistance: 1, .wrongTurns: 9, .crossedPorts: 2,
+      .labelOverlaps: 2,
     ],
     "extreme": [
       .portOverlaps: 4, .corridorReuse: 17, .corridorParallel: 11,
       .crossingsIndependent: 12, .longEdges: 6, .detours: 8, .nodeDistance: 8,
-      .wrongTurns: 25, .labelOverlaps: 2, .labelOnBody: 1,
+      .wrongTurns: 25, .crossedPorts: 5, .labelOverlaps: 2, .labelOnBody: 1,
     ],
     "extreme-braid": [
       .portOverlaps: 18, .corridorReuse: 208, .corridorParallel: 65,
       .crossingsIndependent: 327, .longEdges: 63, .detours: 11, .nodeDistance: 71,
-      .wrongTurns: 67, .labelOverlaps: 11,
+      .wrongTurns: 67, .crossedPorts: 14, .labelOverlaps: 11,
     ],
   ]
 }
