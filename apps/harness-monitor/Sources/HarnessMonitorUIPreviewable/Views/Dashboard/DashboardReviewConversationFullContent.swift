@@ -157,9 +157,17 @@ struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
   func cappedContentSize(for preferredSize: CGSize, chromeSize: CGSize) -> CGSize {
     let maximumSize = maximumContentSize(chromeSize: chromeSize)
     return CGSize(
-      width: min(preferredSize.width, maximumSize.width),
+      width: cappedWidth(for: preferredSize, maximumSize: maximumSize),
       height: min(preferredSize.height, maximumSize.height)
     )
+  }
+
+  private func cappedWidth(for preferredSize: CGSize, maximumSize: CGSize) -> CGFloat {
+    guard maximumSize.width > 0 else { return 0 }
+    if preferredSize.width > maximumSize.width || preferredSize.height > maximumSize.height {
+      return maximumSize.width
+    }
+    return min(preferredSize.width, maximumSize.width)
   }
 
   static func resolved(
@@ -201,6 +209,7 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
   final class MetricsView: NSView {
     private var appliedSizing: AppliedSizing?
     private var refreshScheduled = false
+    private var parentWindowRetryCount = 0
 
     override func viewDidMoveToWindow() {
       super.viewDidMoveToWindow()
@@ -217,11 +226,15 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
     }
 
     func refreshMetrics() {
-      let sheetWindow = window
-      let parentWindow = sheetWindow?.sheetParent ?? sheetWindow
+      guard let sheetWindow = window else { return }
+      guard let parentWindow = parentWindow(for: sheetWindow) else {
+        scheduleParentWindowRetry()
+        return
+      }
+      parentWindowRetryCount = 0
       let metrics = DashboardReviewConversationFullContentSheetMetrics.resolved(
-        parentFrame: parentWindow?.frame,
-        parentContentLayoutRect: parentWindow?.contentLayoutRect
+        parentFrame: parentWindow.frame,
+        parentContentLayoutRect: parentWindow.contentLayoutRect
       )
       apply(metrics, to: sheetWindow)
     }
@@ -249,6 +262,9 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
         return
       }
       sheetWindow.setContentSize(cappedSize)
+      if abs(currentSize.width - cappedSize.width) > 0.5 {
+        scheduleRefresh()
+      }
     }
 
     private func preferredContentSize(in sheetWindow: NSWindow) -> CGSize {
@@ -262,6 +278,43 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
         return sheetWindow.contentLayoutRect.size
       }
       return fittingSize
+    }
+
+    private func parentWindow(for sheetWindow: NSWindow) -> NSWindow? {
+      if let sheetParent = sheetWindow.sheetParent {
+        return sheetParent
+      }
+      let candidates = NSApp.windows.filter { candidate in
+        candidate !== sheetWindow
+          && candidate.isVisible
+          && !candidate.isMiniaturized
+          && candidate.styleMask.contains(.titled)
+          && !candidate.isExcludedFromWindowsMenu
+      }
+      if let overlapping = candidates.max(by: {
+        intersectionArea($0.frame, sheetWindow.frame) < intersectionArea($1.frame, sheetWindow.frame)
+      }), intersectionArea(overlapping.frame, sheetWindow.frame) > 0 {
+        return overlapping
+      }
+      if let keyWindow = NSApp.keyWindow, candidates.contains(where: { $0 === keyWindow }) {
+        return keyWindow
+      }
+      if let mainWindow = NSApp.mainWindow, candidates.contains(where: { $0 === mainWindow }) {
+        return mainWindow
+      }
+      return candidates.first
+    }
+
+    private func scheduleParentWindowRetry() {
+      guard parentWindowRetryCount < 3 else { return }
+      parentWindowRetryCount += 1
+      scheduleRefresh()
+    }
+
+    private func intersectionArea(_ lhs: CGRect, _ rhs: CGRect) -> CGFloat {
+      let intersection = lhs.intersection(rhs)
+      guard !intersection.isNull else { return 0 }
+      return max(0, intersection.width) * max(0, intersection.height)
     }
 
     private func frameChromeSize(for sheetWindow: NSWindow) -> CGSize {

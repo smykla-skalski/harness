@@ -112,7 +112,13 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(conversation.contains("DashboardReviewConversationFullContentSheetMetricsReader()"))
     #expect(!conversation.contains("@State private var sheetMetrics"))
     #expect(!conversation.contains("@Binding var metrics"))
-    #expect(conversation.contains("sheetWindow?.sheetParent ?? sheetWindow"))
+    #expect(!conversation.contains("sheetWindow?.sheetParent ?? sheetWindow"))
+    #expect(conversation.contains("guard let parentWindow = parentWindow(for: sheetWindow) else"))
+    #expect(conversation.contains("private var parentWindowRetryCount = 0"))
+    #expect(conversation.contains("scheduleParentWindowRetry()"))
+    #expect(conversation.contains("candidate !== sheetWindow"))
+    #expect(conversation.contains("intersectionArea($0.frame, sheetWindow.frame)"))
+    #expect(conversation.contains("if let sheetParent = sheetWindow.sheetParent"))
     #expect(
       conversation.contains(
         "private var appliedSizing: AppliedSizing?"
@@ -131,9 +137,12 @@ extension DashboardReviewsDetailUXContractTests {
         "let cappedSize = metrics.cappedContentSize(for: preferredSize, chromeSize: chromeSize)"
       )
     )
+    #expect(conversation.contains("preferredSize.height > maximumSize.height"))
+    #expect(conversation.contains("return maximumSize.width"))
     #expect(conversation.contains("let sizing = AppliedSizing("))
     #expect(conversation.contains("guard appliedSizing != sizing else { return }"))
     #expect(conversation.contains("sheetWindow.setContentSize(cappedSize)"))
+    #expect(conversation.contains("scheduleRefresh()"))
     #expect(conversation.contains("sheetWindow.frameRect(forContentRect: contentRect)"))
     #expect(conversation.contains("parentFrame.width - (toolbarHeight * 2)"))
     #expect(conversation.contains("parentFrame.height - (toolbarHeight * 2)"))
@@ -177,6 +186,12 @@ extension DashboardReviewsDetailUXContractTests {
         for: CGSize(width: 600, height: 500),
         chromeSize: CGSize(width: 8, height: 28)
       ) == CGSize(width: 600, height: 500)
+    )
+    #expect(
+      metrics.cappedContentSize(
+        for: CGSize(width: 600, height: 900),
+        chromeSize: CGSize(width: 8, height: 28)
+      ) == CGSize(width: 1_072, height: 752)
     )
     #expect(
       metrics.cappedContentSize(
