@@ -110,6 +110,8 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     let policyCanvasLabSources = try sourceFiles(pathContaining: "PolicyCanvasLab")
 
     #expect(globalEnforcementToolbar.contains("ToolbarItemGroup(placement: .primaryAction)"))
+    #expect(globalEnforcementToolbar.contains("store.connectionState != .online"))
+    #expect(globalEnforcementToolbar.contains(".disabled(globalEnforcementButtonDisabled)"))
     #expect(!globalEnforcementToolbar.contains(".buttonStyle(.glass)"))
     #expect(!globalEnforcementToolbar.contains(".sharedBackgroundVisibility(.hidden)"))
     #expect(
