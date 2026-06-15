@@ -219,8 +219,13 @@ public struct PolicyCanvasView: View {
   public var body: some View {
     let _ = HarnessMonitorPerfTrace.countBodyEval("PolicyCanvasView")
     policyCanvasSplitLayout
-      // Root focus powers canvas keyboard shortcuts; components provide visible focus.
+      // Root focus powers canvas keyboard shortcuts; components draw their own
+      // visible focus (selected node borders, etc.), so the system focus ring on
+      // the root is pure noise - and it traced the detail frame underlapping the
+      // translucent sidebar. Suppress it; `.focusEffectDisabled()` propagates to
+      // descendants, which is desired here (custom component styling stays).
       .focusable()
+      .focusEffectDisabled()
       .focused($canvasKeyboardFocusedState)
       .frame(minHeight: 620)
       .accessibilityElement(children: .contain)
