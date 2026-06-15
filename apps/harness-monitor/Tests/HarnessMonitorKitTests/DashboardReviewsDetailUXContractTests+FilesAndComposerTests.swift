@@ -112,9 +112,12 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(conversation.contains(".padding(.bottom, sheetMetrics.toolbarHeight)"))
     #expect(
       conversation.contains(
-        ".frame(maxWidth: sheetMetrics.maxWidth, maxHeight: sheetMetrics.maxHeight)"
+        "minWidth: sheetMetrics.minimumWidth"
       )
     )
+    #expect(conversation.contains("idealWidth: sheetMetrics.idealWidth"))
+    #expect(conversation.contains("maxWidth: sheetMetrics.maxWidth"))
+    #expect(conversation.contains("maxHeight: sheetMetrics.maxHeight"))
     #expect(conversation.contains("window?.sheetParent ?? window"))
     #expect(conversation.contains("parentFrame.width - (toolbarHeight * 2)"))
     #expect(conversation.contains("parentFrame.height - toolbarHeight"))
@@ -144,6 +147,10 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(metrics.toolbarHeight == 60)
     #expect(metrics.maxWidth == 1_080)
     #expect(metrics.maxHeight == 840)
+    #expect(metrics.minimumWidth == 360)
+    #expect(metrics.idealWidth == 760)
+    #expect(metrics.minimumHeight == 420)
+    #expect(metrics.idealHeight == 520)
   }
 
   @Test("Activity inline conversations render through a dedicated GitHub style card path")
