@@ -188,11 +188,12 @@ func policyCanvasEdge(
   }
   let sourcePortID = policyCanvasImportedPortID(edge.fromPort, node: sourceNode, kind: .output)
   let targetPortID = policyCanvasImportedPortID(edge.toPort, node: targetNode, kind: .input)
-  guard sourceNode.outputPorts.contains(where: { $0.id == sourcePortID }),
-    targetNode.inputPorts.contains(where: { $0.id == targetPortID })
-  else {
-    return nil
-  }
+  // An edge maps whenever both endpoint nodes exist - it does not require the
+  // resolved port id to be present in the node's declared ports. Terminal port
+  // markers are seeded from the edges themselves (see `seededPortMarkerEntries`),
+  // so a wire still routes and renders when the document carried no ports (e.g. a
+  // casing-stripped decode where `input_ports`/`output_ports` arrived empty).
+  // Guarding on port existence here silently dropped those edges.
   var source = PolicyCanvasPortEndpoint(
     nodeID: edge.fromNodeId,
     portID: sourcePortID,

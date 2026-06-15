@@ -424,6 +424,58 @@ struct PolicyCanvasViewModelTests {
     #expect(policyCanvasEdge(edge)?.label.isEmpty == true)
   }
 
+  @Test("edges map through the load chokepoint when nodes declare no ports")
+  func edgesMapWhenNodesDeclareNoPorts() {
+    // Regression: the ELK guard dropped edges whose endpoints did not match a
+    // declared node port. Terminal port markers are seeded from the edges
+    // themselves, so an edge between two existing nodes must always map even
+    // when the wire carried no ports (e.g. a casing-stripped decode).
+    let document = TaskBoardPolicyPipelineDocument(
+      revision: 1,
+      mode: .draft,
+      nodes: [
+        TaskBoardPolicyPipelineNode(
+          id: "source",
+          label: "Source",
+          kind: TaskBoardPolicyPipelineNodeKind(
+            kind: "workflow_entry",
+            workflowId: "reviews_auto"
+          ),
+          inputPorts: [],
+          outputPorts: []
+        ),
+        TaskBoardPolicyPipelineNode(
+          id: "target",
+          label: "Target",
+          kind: TaskBoardPolicyPipelineNodeKind(
+            kind: "finish",
+            reasonCode: "default_allow",
+            decision: "allow"
+          ),
+          inputPorts: [],
+          outputPorts: []
+        ),
+      ],
+      edges: [
+        TaskBoardPolicyPipelineEdge(
+          id: "edge-source-target",
+          fromNodeId: "source",
+          fromPort: "out",
+          toNodeId: "target",
+          toPort: "in"
+        ),
+      ],
+      groups: [],
+      layout: TaskBoardPolicyPipelineLayout(nodes: []),
+      policyTraceIds: []
+    )
+
+    let graph = policyCanvasLoadedGraph(from: document, policyGroupTitle: nil)
+
+    #expect(graph.mappedEdges.count == 1)
+    #expect(graph.mappedEdges.first?.id == "edge-source-target")
+  }
+
   @Test("if then else branch labels prefer the source port over condition tokens")
   func ifThenElseBranchLabelsPreferPorts() {
     let thenEdge = TaskBoardPolicyPipelineEdge(
