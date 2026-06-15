@@ -667,6 +667,24 @@ struct PolicyCanvasCommandScrollTests {
     #expect(viewModel.zoom == 1)
   }
 
+  @Test("component library pane suggests its width instead of pinning a hard one")
+  func componentLibraryPaneSuggestsWidth() throws {
+    let source = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasToolRailViews.swift"
+    )
+
+    // Regression guard: the tool rail wraps a vertical ScrollView that reports no
+    // useful horizontal intrinsic width, so the pane carries its own measured
+    // content width. That width must be a *suggested* size the pane yields when
+    // space is tight, never a hard `.frame(width:)`. A hard width refused to
+    // compress, so narrowing the window below it overflowed the two-pane HStack
+    // and the default center alignment slid the canvas left under the sidebar.
+    #expect(source.contains("let paneWidth = Self.libraryPaneWidth(metrics: metrics)"))
+    #expect(source.contains("idealWidth: paneWidth"))
+    #expect(source.contains("maxWidth: paneWidth"))
+    #expect(!source.contains("width: Self.libraryPaneWidth(metrics: metrics)"))
+  }
+
   func previewableSourceFile(named path: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
