@@ -61,6 +61,16 @@ public final class PolicyCanvasViewModel {
   /// It is tied to exact node positions, so document export/undo/recovery never
   /// persist it; regular edits clear it and the next reflow can rebuild it.
   @ObservationIgnored var precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
+  /// Lab-only switch that lets small samples use ELK without lowering the
+  /// production size gate.
+  var usesElkLayoutForSmallGraphs: Bool {
+    didSet {
+      guard usesElkLayoutForSmallGraphs != oldValue, canReflowLayout else {
+        return
+      }
+      requestAtomicReflow(preserveManualAnchors: false, force: true)
+    }
+  }
   var algorithmSelection: PolicyCanvasAlgorithmSelection {
     didSet {
       guard algorithmSelection != oldValue, canReflowLayout else {
@@ -285,7 +295,8 @@ public final class PolicyCanvasViewModel {
     selection: PolicyCanvasSelection? = nil,
     zoom: CGFloat = PolicyCanvasLayout.defaultZoom,
     nextNodeNumber: Int = 10,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
+    usesElkLayoutForSmallGraphs: Bool = false
   ) {
     self.selectedTab = selectedTab
     self.nodes = nodes
@@ -312,6 +323,7 @@ public final class PolicyCanvasViewModel {
     self.precomputedRoutes = nil
     self.automationCompilationGeneration = 0
     self.algorithmSelection = algorithmSelection
+    self.usesElkLayoutForSmallGraphs = usesElkLayoutForSmallGraphs
     self.hasPendingDocumentUpdate = false
     self.pendingDocumentUpdate = nil
     self.pendingEdgePreview = nil

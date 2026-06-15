@@ -105,7 +105,8 @@ extension PolicyCanvasViewModel {
       nodes: graph.nodes,
       groups: graph.groups,
       edges: graph.mappedEdges,
-      algorithmSelection: algorithmSelection
+      algorithmSelection: algorithmSelection,
+      usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
     )
     nodes = cleanLayout.nodes
     groups = cleanLayout.groups

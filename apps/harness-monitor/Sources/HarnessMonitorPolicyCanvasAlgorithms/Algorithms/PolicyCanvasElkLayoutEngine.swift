@@ -14,14 +14,16 @@ func policyCanvasElkLayoutResult(
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode,
-  algorithmSelection: PolicyCanvasAlgorithmSelection
+  algorithmSelection: PolicyCanvasAlgorithmSelection,
+  usesElkLayoutForSmallGraphs: Bool = false
 ) -> PolicyCanvasLayoutResult? {
   guard
     policyCanvasShouldUseElkLayout(
       nodes: nodes,
       edges: edges,
       mode: mode,
-      algorithmSelection: algorithmSelection
+      algorithmSelection: algorithmSelection,
+      usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
     )
   else {
     return nil
@@ -39,10 +41,15 @@ private func policyCanvasShouldUseElkLayout(
   nodes: [PolicyCanvasNode],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode,
-  algorithmSelection: PolicyCanvasAlgorithmSelection
+  algorithmSelection: PolicyCanvasAlgorithmSelection,
+  usesElkLayoutForSmallGraphs: Bool
 ) -> Bool {
-  guard PolicyCanvasLayoutAlgorithmRegistry.isHarnessCurrentLayout(algorithmSelection),
-    nodes.count >= policyCanvasElkMinimumNodeCount || edges.count >= policyCanvasElkMinimumEdgeCount
+  guard PolicyCanvasLayoutAlgorithmRegistry.isHarnessCurrentLayout(algorithmSelection) else {
+    return false
+  }
+  guard usesElkLayoutForSmallGraphs
+    || nodes.count >= policyCanvasElkMinimumNodeCount
+    || edges.count >= policyCanvasElkMinimumEdgeCount
   else {
     return false
   }

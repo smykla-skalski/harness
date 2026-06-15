@@ -53,7 +53,8 @@ public func policyCanvasAutomaticLayoutResult(
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
-  algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
+  algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
+  usesElkLayoutForSmallGraphs: Bool = false
 ) -> PolicyCanvasLayoutResult? {
   let signpostID = policyCanvasLayoutSignposter.makeSignpostID()
   let interval = policyCanvasLayoutSignposter.beginInterval(
@@ -72,7 +73,8 @@ public func policyCanvasAutomaticLayoutResult(
     groups: groups,
     edges: edges,
     mode: mode,
-    algorithmSelection: algorithmSelection
+    algorithmSelection: algorithmSelection,
+    usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
   ) {
     return elkResult
   }
@@ -135,7 +137,8 @@ public func applyDefaultPolicyCanvasLayout(
   groups: inout [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
-  algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
+  algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
+  usesElkLayoutForSmallGraphs: Bool = false
 ) -> (
   metrics: PolicyCanvasLayoutMetrics?,
   routingHints: PolicyCanvasLayoutRoutingHints?,
@@ -147,7 +150,8 @@ public func applyDefaultPolicyCanvasLayout(
       groups: groups,
       edges: edges,
       mode: mode,
-      algorithmSelection: algorithmSelection
+      algorithmSelection: algorithmSelection,
+      usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
     )
   else {
     return (metrics: nil, routingHints: nil, precomputedRoutes: nil)

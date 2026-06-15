@@ -7,6 +7,7 @@ private struct PolicyCanvasViewportSurfaceSnapshot: Equatable, Sendable {
   let simulationIdentity: PolicyCanvasViewportSurfaceSimulationIdentity?
   let auditIdentity: PolicyCanvasViewportSurfaceAuditIdentity?
   let algorithmSelection: PolicyCanvasAlgorithmSelection
+  let usesElkLayoutForSmallGraphs: Bool
   let policyDisplayName: String?
 }
 
@@ -88,6 +89,7 @@ public struct PolicyCanvasViewportSurface: View {
   let showsEdgeLegend: Bool
   let resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior
   let showsQualityInspection: Bool
+  let usesElkLayoutForSmallGraphs: Bool
   /// When true the surface re-runs the layered layout engine on appear and after
   /// every document load, so it reflects the algorithms rather than the
   /// document's authored seed coordinates. The Policy Canvas Lab sets this; the
@@ -116,6 +118,7 @@ public struct PolicyCanvasViewportSurface: View {
     showsEdgeLegend: Bool = true,
     resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior = .preserveZoom,
     showsQualityInspection: Bool = false,
+    usesElkLayoutForSmallGraphs: Bool = false,
     forcesEngineLayout: Bool = false,
     reformatRequest: Int = 0,
     policyDisplayName: String? = nil
@@ -129,6 +132,7 @@ public struct PolicyCanvasViewportSurface: View {
     self.showsEdgeLegend = showsEdgeLegend
     self.resizeZoomBehavior = resizeZoomBehavior
     self.showsQualityInspection = showsQualityInspection
+    self.usesElkLayoutForSmallGraphs = usesElkLayoutForSmallGraphs
     self.forcesEngineLayout = forcesEngineLayout
     self.reformatRequest = reformatRequest
     self.policyDisplayName = policyDisplayName
@@ -139,7 +143,8 @@ public struct PolicyCanvasViewportSurface: View {
         audit: nil,
         activeCanvasId: nil,
         algorithmSelection: algorithmSelection,
-        policyGroupTitle: policyDisplayName
+        policyGroupTitle: policyDisplayName,
+        usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
       )
     )
   }
@@ -150,6 +155,7 @@ public struct PolicyCanvasViewportSurface: View {
       simulationIdentity: simulation.map(PolicyCanvasViewportSurfaceSimulationIdentity.init),
       auditIdentity: audit.map(PolicyCanvasViewportSurfaceAuditIdentity.init),
       algorithmSelection: algorithmSelection,
+      usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs,
       policyDisplayName: policyDisplayName
     )
   }
@@ -201,6 +207,7 @@ public struct PolicyCanvasViewportSurface: View {
     appliedSnapshot = newSnapshot
 
     viewModel.algorithmSelection = newSnapshot.algorithmSelection
+    viewModel.usesElkLayoutForSmallGraphs = newSnapshot.usesElkLayoutForSmallGraphs
     viewModel.policyGroupTitle = newSnapshot.policyDisplayName
 
     if oldSnapshot?.documentIdentity != newSnapshot.documentIdentity {

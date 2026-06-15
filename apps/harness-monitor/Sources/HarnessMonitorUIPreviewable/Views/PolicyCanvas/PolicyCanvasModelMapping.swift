@@ -64,7 +64,8 @@ func policyCanvasCleanInitialLayout(
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
-  algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
+  algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
+  usesElkLayoutForSmallGraphs: Bool = false
 ) -> PolicyCanvasCleanLayout {
   var cleanNodes = nodes
   var cleanGroups = groups
@@ -84,7 +85,8 @@ func policyCanvasCleanInitialLayout(
       groups: &cleanGroups,
       edges: edges,
       mode: mode,
-      algorithmSelection: algorithmSelection
+      algorithmSelection: algorithmSelection,
+      usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
     )
     if let autoLayoutMetrics = autoLayout.metrics {
       layoutMetrics = autoLayoutMetrics
