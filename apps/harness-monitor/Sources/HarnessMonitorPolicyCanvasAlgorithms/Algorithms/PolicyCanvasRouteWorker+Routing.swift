@@ -154,12 +154,9 @@ extension PolicyCanvasPreparedRouteInput {
       return nil
     }
     let routes = precomputedRoutes.routes
-    let portMarkerLayout = PolicyCanvasRouteTerminalPortMarkerPlacement().placeMarkers(
-      input: PolicyCanvasPortMarkerPlacementInput(
-        prepared: self,
-        routes: routes,
-        nodeIndex: nodeIndex
-      )
+    let portMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
+      routes: routes,
+      nodeIndex: nodeIndex
     )
     let labelPositions = PolicyCanvasPolylineMidpointLabelPlacement().placeLabels(
       input: PolicyCanvasLabelPlacementInput(prepared: self, routes: routes)
@@ -171,6 +168,80 @@ extension PolicyCanvasPreparedRouteInput {
       portMarkerLayout: portMarkerLayout,
       visibleBounds: visibleBounds(routes: routes, labelPositions: labelPositions)
     )
+  }
+
+  private func precomputedRouteTerminalPortMarkerLayout(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> PolicyCanvasPortMarkerLayout {
+    var terminals: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal] = [:]
+    var endpoints: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortEndpoint] = [:]
+    terminals.reserveCapacity(routes.count * 2)
+    endpoints.reserveCapacity(routes.count * 2)
+    for edge in edges {
+      guard let route = routes[edge.id] else {
+        continue
+      }
+      precomputedRouteTerminal(
+        edgeID: edge.id,
+        role: .source,
+        endpoint: edge.source,
+        point: route.points.first,
+        side: policyCanvasRouteSourceSide(route),
+        nodeIndex: nodeIndex,
+        terminals: &terminals,
+        endpoints: &endpoints
+      )
+      precomputedRouteTerminal(
+        edgeID: edge.id,
+        role: .target,
+        endpoint: edge.target,
+        point: route.points.last,
+        side: policyCanvasRouteTargetSide(route),
+        nodeIndex: nodeIndex,
+        terminals: &terminals,
+        endpoints: &endpoints
+      )
+    }
+    return PolicyCanvasPortMarkerLayout(terminalsByKey: terminals, endpointsByKey: endpoints)
+  }
+
+  private func precomputedRouteTerminal(
+    edgeID: String,
+    role: PolicyCanvasRouteEndpointRole,
+    endpoint: PolicyCanvasPortEndpoint,
+    point: CGPoint?,
+    side: PolicyCanvasPortSide?,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal],
+    endpoints: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortEndpoint]
+  ) {
+    guard
+      let point,
+      let side,
+      let base = portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex)
+    else {
+      return
+    }
+    let key = PolicyCanvasRouteTerminalKey(edgeID: edgeID, role: role)
+    terminals[key] = PolicyCanvasPortTerminal(
+      side: side,
+      axisOffset: precomputedRouteTerminalAxisOffset(from: base, to: point, side: side)
+    )
+    endpoints[key] = endpoint
+  }
+
+  private func precomputedRouteTerminalAxisOffset(
+    from base: CGPoint,
+    to point: CGPoint,
+    side: PolicyCanvasPortSide
+  ) -> CGFloat {
+    switch side {
+    case .leading, .trailing:
+      point.y - base.y
+    case .top, .bottom:
+      point.x - base.x
+    }
   }
 
   func portVisibility(

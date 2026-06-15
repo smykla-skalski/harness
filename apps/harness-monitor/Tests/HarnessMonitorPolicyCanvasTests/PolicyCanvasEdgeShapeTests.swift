@@ -105,8 +105,8 @@ struct PolicyCanvasEdgeShapeTests {
       ])
   }
 
-  @Test("Endpoint trim stops rendered edge before port centers")
-  func endpointTrimStopsRenderedEdgeBeforePortCenters() {
+  @Test("Endpoint trim tucks rendered edge under port markers")
+  func endpointTrimTucksRenderedEdgeUnderPortMarkers() {
     let route = PolicyCanvasEdgeRoute(
       points: [
         CGPoint(x: 0, y: 0),
@@ -116,10 +116,13 @@ struct PolicyCanvasEdgeShapeTests {
       labelPosition: CGPoint(x: 100, y: 50)
     )
 
-    let trimmed = policyCanvasEndpointTrimmedRoute(route, endpointInset: 9)
+    let trimmed = policyCanvasEndpointTrimmedRoute(
+      route,
+      endpointInset: policyCanvasRenderedRouteEndpointInset()
+    )
 
-    #expect(trimmed.points.first == CGPoint(x: 9, y: 0))
-    #expect(trimmed.points.last == CGPoint(x: 100, y: 91))
+    #expect(trimmed.points.first == CGPoint(x: 7, y: 0))
+    #expect(trimmed.points.last == CGPoint(x: 100, y: 93))
   }
 
   @Test("Arrowhead defaults render at readable canvas scale")

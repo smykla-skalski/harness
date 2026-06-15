@@ -1,9 +1,8 @@
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
-/// Solid triangle at the route's last point, oriented along the final
-/// segment. 12pt long × 9pt wide so the direction stays readable at
-/// 0.5x-2x zoom while the trimmed route keeps the tip outside the port bubble.
+/// Solid triangle at the route's rendered last point, oriented along the final
+/// segment. 12pt long x 9pt wide keeps direction readable at 0.5x-2x zoom.
 struct PolicyCanvasEdgeArrowhead: Shape {
   let route: PolicyCanvasEdgeRoute
   var length: CGFloat = 12
@@ -30,6 +29,12 @@ struct PolicyCanvasEdgeArrowhead: Shape {
     path.closeSubpath()
     return path
   }
+}
+
+func policyCanvasRenderedRouteEndpointInset() -> CGFloat {
+  // Tuck the rendered stroke/arrowhead slightly under the marker so the edge
+  // reads as connected to the port without burying the whole arrowhead.
+  max(0, (PolicyCanvasLayout.portDiameter / 2) - 2)
 }
 
 func policyCanvasEndpointTrimmedRoute(

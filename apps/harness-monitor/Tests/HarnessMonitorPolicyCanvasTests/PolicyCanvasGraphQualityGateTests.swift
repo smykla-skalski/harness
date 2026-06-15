@@ -311,6 +311,35 @@ struct PolicyCanvasGraphQualityGateTests {
     #expect(plannedGraph?.precomputedRoutes?.routes.count == viewModel.edges.count)
     #expect(viewModel.precomputedRoutes?.routes.count == viewModel.edges.count)
     #expect(timedRoute.fastPath)
+
+    let scenario = PolicyCanvasTerminalScenario(
+      viewModel: viewModel,
+      edges: viewModel.edges,
+      routes: timedRoute.output.routes
+    )
+    let assertions = PolicyCanvasTerminalAssertions()
+    assertions.assertMarkerOffsets(
+      scenario: scenario,
+      markerLayout: timedRoute.output.portMarkerLayout,
+      assertion: PolicyCanvasTerminalAssertion(
+        role: .source,
+        endpoint: \.source,
+        routePoint: { $0.points.first },
+        routeSide: policyCanvasRouteSourceSide,
+        label: "precomputed source"
+      )
+    )
+    assertions.assertMarkerOffsets(
+      scenario: scenario,
+      markerLayout: timedRoute.output.portMarkerLayout,
+      assertion: PolicyCanvasTerminalAssertion(
+        role: .target,
+        endpoint: \.target,
+        routePoint: { $0.points.last },
+        routeSide: policyCanvasRouteTargetSide,
+        label: "precomputed target"
+      )
+    )
   }
 
   private static func portSpacingHotspots(

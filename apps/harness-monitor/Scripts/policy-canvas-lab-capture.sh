@@ -9,6 +9,7 @@ set -uo pipefail
 #   HARNESS_MONITOR_POLICY_LAB_FIXTURE  pipeline-document JSON to render in the lab
 #   HARNESS_MONITOR_POLICY_LAB_OUT      output PNG (default tmp/policy-canvas-lab/<lane>.png)
 #   HARNESS_MONITOR_POLICY_LAB_GENERATE 1 = regenerate the Xcode project first
+#   HARNESS_MONITOR_POLICY_CANVAS_LAB_SAMPLE_ID built-in sample id to select
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 APP_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
@@ -81,6 +82,14 @@ reflow_env=()
 if [[ "${HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW:-}" == "1" ]]; then
   reflow_env=(--env "HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW=1")
 fi
+sample_args=()
+if [[ -n "${HARNESS_MONITOR_POLICY_CANVAS_LAB_SAMPLE_ID:-}" ]]; then
+  sample_args=(
+    --args
+    -policyCanvasLabSampleSelection
+    "$HARNESS_MONITOR_POLICY_CANVAS_LAB_SAMPLE_ID"
+  )
+fi
 
 # 4. Relaunch: close any prior standalone lab host from this lane's build
 #    products, then force a fresh instance so the fixture env applies.
@@ -97,6 +106,7 @@ done
 open -n "$APP" \
   ${fixture_env[@]+"${fixture_env[@]}"} \
   ${reflow_env[@]+"${reflow_env[@]}"} \
+  ${sample_args[@]+"${sample_args[@]}"} \
   || { echo "error: open failed" >&2; exit 1; }
 
 # 5. Window finder (CGWindowList), emitted as: windowID \t area \t title. Uses

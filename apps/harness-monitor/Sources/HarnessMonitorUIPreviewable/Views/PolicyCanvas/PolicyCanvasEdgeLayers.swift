@@ -219,7 +219,7 @@ private struct PolicyCanvasDenseEdgeCanvas: View {
   ) {
     let renderedRoute = policyCanvasEndpointTrimmedRoute(
       route,
-      endpointInset: PolicyCanvasLayout.portDiameter / 2
+      endpointInset: policyCanvasRenderedRouteEndpointInset()
     )
     let hint = routingHints?.edgeHint(for: edge.id)
     let bundleOrdinal = hint?.bundleOrdinal ?? 0
