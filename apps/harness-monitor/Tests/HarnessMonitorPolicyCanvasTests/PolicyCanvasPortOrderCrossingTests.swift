@@ -168,6 +168,128 @@ struct PolicyCanvasPortOrderCrossingTests {
     #expect(renderedB < renderedA)
   }
 
+  @MainActor
+  @Test("exported policies persist optimized port order")
+  func exportedPolicyPersistsOptimizedPortOrder() throws {
+    let source = policyCanvasPortOrderTestNode(
+      id: "source",
+      position: CGPoint(x: 200, y: 200),
+      inputPorts: [],
+      outputPorts: [
+        PolicyCanvasPort(id: "a", title: "a", kind: .output),
+        PolicyCanvasPort(id: "b", title: "b", kind: .output),
+      ]
+    )
+    let highTarget = policyCanvasPortOrderTestNode(
+      id: "high",
+      position: CGPoint(x: 600, y: 0),
+      inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
+      outputPorts: []
+    )
+    let lowTarget = policyCanvasPortOrderTestNode(
+      id: "low",
+      position: CGPoint(x: 600, y: 500),
+      inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
+      outputPorts: []
+    )
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.nodes = [source, highTarget, lowTarget]
+    viewModel.groups = []
+    viewModel.edges = [
+      PolicyCanvasEdge(
+        id: "edge-a-low",
+        source: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "a", kind: .output),
+        target: PolicyCanvasPortEndpoint(nodeID: lowTarget.id, portID: "in", kind: .input),
+        label: "a",
+        pinnedPortSide: false
+      ),
+      PolicyCanvasEdge(
+        id: "edge-b-high",
+        source: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "b", kind: .output),
+        target: PolicyCanvasPortEndpoint(nodeID: highTarget.id, portID: "in", kind: .input),
+        label: "b",
+        pinnedPortSide: false
+      ),
+    ]
+
+    let document = viewModel.exportDocument()
+    let exportedSource = try #require(document.nodes.first { $0.id == source.id })
+
+    #expect(exportedSource.outputs.map(\.id) == ["b", "a"])
+  }
+
+  @MainActor
+  @Test("exported policies minimize cyclic port order preferences")
+  func exportedPolicyMinimizesCyclicPortOrderPreferences() throws {
+    let source = policyCanvasPortOrderTestNode(
+      id: "source",
+      position: CGPoint(x: 200, y: 200),
+      inputPorts: [],
+      outputPorts: [
+        PolicyCanvasPort(id: "c", title: "c", kind: .output),
+        PolicyCanvasPort(id: "b", title: "b", kind: .output),
+        PolicyCanvasPort(id: "a", title: "a", kind: .output),
+      ]
+    )
+    let highTarget = policyCanvasPortOrderTestNode(
+      id: "high",
+      position: CGPoint(x: 600, y: 0),
+      inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
+      outputPorts: []
+    )
+    let midTarget = policyCanvasPortOrderTestNode(
+      id: "mid",
+      position: CGPoint(x: 600, y: 250),
+      inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
+      outputPorts: []
+    )
+    let lowTarget = policyCanvasPortOrderTestNode(
+      id: "low",
+      position: CGPoint(x: 600, y: 500),
+      inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
+      outputPorts: []
+    )
+    let leftTarget = policyCanvasPortOrderTestNode(
+      id: "left",
+      position: CGPoint(x: 0, y: 600),
+      inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
+      outputPorts: []
+    )
+    let rightTarget = policyCanvasPortOrderTestNode(
+      id: "right",
+      position: CGPoint(x: 500, y: 600),
+      inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
+      outputPorts: []
+    )
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.nodes = [source, highTarget, midTarget, lowTarget, leftTarget, rightTarget]
+    viewModel.groups = []
+    viewModel.edges = [
+      policyCanvasPortOrderTestEdge("edge-a-high", from: source, port: "a", to: highTarget),
+      policyCanvasPortOrderTestEdge("edge-b-mid", from: source, port: "b", to: midTarget),
+      policyCanvasPortOrderTestEdge("edge-c-low", from: source, port: "c", to: lowTarget),
+      policyCanvasPortOrderTestEdge(
+        "edge-c-left",
+        from: source,
+        port: "c",
+        side: .bottom,
+        to: leftTarget
+      ),
+      policyCanvasPortOrderTestEdge(
+        "edge-a-right",
+        from: source,
+        port: "a",
+        side: .bottom,
+        to: rightTarget
+      ),
+    ]
+
+    let document = viewModel.exportDocument()
+    let exportedSource = try #require(document.nodes.first { $0.id == source.id })
+
+    #expect(exportedSource.outputs.map(\.id) == ["a", "b", "c"])
+  }
+
   // The merge-deny fail family folds into one merged wire, so there is no longer
   // a four-edge fan that could tangle on load or reflow - the merged wire's clean
   // single approach is covered by PolicyCanvasMergedFanInTests and the MergeDeny
@@ -184,4 +306,25 @@ private func policyCanvasPortOrderTestNode(
   node.inputPorts = inputPorts
   node.outputPorts = outputPorts
   return node
+}
+
+private func policyCanvasPortOrderTestEdge(
+  _ id: String,
+  from source: PolicyCanvasNode,
+  port: String,
+  side: PolicyCanvasPortSide = .trailing,
+  to target: PolicyCanvasNode
+) -> PolicyCanvasEdge {
+  PolicyCanvasEdge(
+    id: id,
+    source: PolicyCanvasPortEndpoint(
+      nodeID: source.id,
+      portID: port,
+      kind: .output,
+      side: side
+    ),
+    target: PolicyCanvasPortEndpoint(nodeID: target.id, portID: "in", kind: .input),
+    label: port,
+    pinnedPortSide: false
+  )
 }

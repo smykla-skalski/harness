@@ -147,11 +147,29 @@ func policyCanvasSideCenter(side: PolicyCanvasPortSide, frame: CGRect) -> CGPoin
   }
 }
 
+enum PolicyCanvasPortMarkerOrdering {
+  case fanAngle
+  case farAxis
+}
+
+func policyCanvasPortMarkerOrderKey(
+  ordering: PolicyCanvasPortMarkerOrdering,
+  side: PolicyCanvasPortSide,
+  sideCenter: CGPoint,
+  farAnchor: CGPoint
+) -> CGFloat {
+  switch ordering {
+  case .fanAngle:
+    policyCanvasFanOrderKey(side: side, sideCenter: sideCenter, farAnchor: farAnchor)
+  case .farAxis:
+    policyCanvasFarAxisOrderKey(side: side, farAnchor: farAnchor)
+  }
+}
+
 /// Fan-ordering key: the angle of an edge leaving `sideCenter` toward its far
 /// endpoint, signed so ascending keys run left-to-right on horizontal sides and
-/// top-to-bottom on vertical sides. Ordering a side's port markers by this angle
-/// gives the crossing-free order around the node even when two far endpoints
-/// share a column or row, where a single-axis projection would tie.
+/// top-to-bottom on vertical sides. This is the production comb order because it
+/// keeps routine samples within their overall graph-quality budgets.
 func policyCanvasFanOrderKey(
   side: PolicyCanvasPortSide,
   sideCenter: CGPoint,
@@ -168,6 +186,18 @@ func policyCanvasFanOrderKey(
     return atan2(dy, dx)
   case .leading:
     return atan2(dy, -dx)
+  }
+}
+
+private func policyCanvasFarAxisOrderKey(
+  side: PolicyCanvasPortSide,
+  farAnchor: CGPoint
+) -> CGFloat {
+  switch side {
+  case .top, .bottom:
+    farAnchor.x
+  case .leading, .trailing:
+    farAnchor.y
   }
 }
 

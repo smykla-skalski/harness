@@ -39,9 +39,18 @@ struct PolicyCanvasGraphQualityGateTests {
     let fastPath: Bool
   }
 
+  private struct RoutedSample {
+    let report: PolicyCanvasGraphQualityReport
+    let routes: [String: PolicyCanvasEdgeRoute]
+  }
+
   /// Route a lab sample exactly the way the lab renders it (load -> reflow ->
   /// route worker) and measure the resulting graph.
   func routedReport(sampleID: String) async throws -> PolicyCanvasGraphQualityReport {
+    try await routedSample(sampleID: sampleID).report
+  }
+
+  private func routedSample(sampleID: String) async throws -> RoutedSample {
     let sample = try #require(PolicyCanvasLabSamples.sample(id: sampleID))
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(document: sample.document, simulation: nil, audit: nil)
@@ -56,13 +65,14 @@ struct PolicyCanvasGraphQualityGateTests {
       algorithmSelection: .referenceRouting
     )
     let output = await PolicyCanvasRouteWorker().compute(input: input)
-    return policyCanvasMeasureGraphQuality(
+    let report = policyCanvasMeasureGraphQuality(
       nodes: viewModel.nodes,
       groups: viewModel.groups,
       edges: viewModel.edges,
       routes: output.routes,
       portMarkerLayout: output.portMarkerLayout
     )
+    return RoutedSample(report: report, routes: output.routes)
   }
 
   /// Per-sample regression gate across the routine lab samples: each gated
@@ -97,9 +107,11 @@ struct PolicyCanvasGraphQualityGateTests {
 
     #expect(Self.debugOnlyStressSampleIDs.count == 4)
     #expect(Self.debugOnlyStressSampleIDs.isSubset(of: Set(allSampleIDs)))
-    #expect(budgetedSampleIDs == allSampleIDs.filter {
-      !Self.debugOnlyStressSampleIDs.contains($0)
-    })
+    #expect(
+      budgetedSampleIDs
+        == allSampleIDs.filter {
+          !Self.debugOnlyStressSampleIDs.contains($0)
+        })
     #expect(budgetedSampleIDs.contains("extreme"))
     #expect(budgetedSampleIDs.contains("extreme-braid"))
     #expect(!budgetedSampleIDs.contains("extreme-matrix"))
@@ -113,6 +125,30 @@ struct PolicyCanvasGraphQualityGateTests {
       """
       extreme-galaxy precomputed routes should not pass through node or group-title bodies
       bodyHits=\(Self.bodyHitDetail(report))
+      """
+    )
+  }
+
+  @Test func allSamplesAvoidCrossedPorts() async throws {
+    var violations: [String] = []
+    for sample in PolicyCanvasLabSamples.all {
+      let routed = try await routedSample(sampleID: sample.id)
+      guard !routed.report.crossedPorts.isEmpty else {
+        continue
+      }
+      violations.append(
+        [
+          "\(sample.id): \(routed.report.count(for: .crossedPorts)) crossed ports",
+          Self.crossedPortDetail(routed.report),
+          Self.crossedPortRouteDetail(routed.report, routes: routed.routes),
+        ].joined(separator: " - ")
+      )
+    }
+    #expect(
+      violations.isEmpty,
+      """
+      lab sample routes should not attach ports in crossed order
+      violations=\(violations.joined(separator: "\n"))
       """
     )
   }
@@ -316,6 +352,9 @@ struct PolicyCanvasGraphQualityGateTests {
       "body_hits: \(report.count(for: .bodyHits))",
       "body_hit_detail: \(Self.bodyHitDetail(report))",
       "body_hit_route_detail: \(Self.bodyHitRouteDetail(report, routes: timedRoute.output.routes))",
+      "crossed_ports: \(report.count(for: .crossedPorts))",
+      "crossed_port_detail: \(Self.crossedPortDetail(report))",
+      "crossed_port_route_detail: \(Self.crossedPortRouteDetail(report, routes: timedRoute.output.routes))",
       "port_hotspots: \(Self.portSpacingHotspots(report))",
       "port_detail: \(Self.portSpacingDetail(report, matching: "xg-m10-action-gate"))",
       "elk_endpoint_sides: \(Self.elkEndpointSides(input.edges, edgePrefix: "xge:m10-gate-"))",
@@ -365,7 +404,8 @@ struct PolicyCanvasGraphQualityGateTests {
       grouping: report.portSpacing,
       by: { "\($0.nodeID)|\($0.side.rawValue)|\($0.kind.rawValue)" }
     )
-    return counts
+    return
+      counts
       .map { key, violations in "\(key)=\(violations.count)" }
       .sorted()
       .joined(separator: ",")
@@ -385,6 +425,31 @@ struct PolicyCanvasGraphQualityGateTests {
       .map { hit in
         let points = routes[hit.edgeID]?.points ?? []
         return "\(hit.edgeID):\(hit.obstacleID):frame=\(hit.frame):points=\(points)"
+      }
+      .joined(separator: ";")
+  }
+
+  private static func crossedPortDetail(_ report: PolicyCanvasGraphQualityReport) -> String {
+    report.crossedPorts
+      .prefix(120)
+      .map { "\($0.nodeID):\($0.side.rawValue):\($0.edgeA)>\($0.edgeB)" }
+      .joined(separator: ",")
+  }
+
+  private static func crossedPortRouteDetail(
+    _ report: PolicyCanvasGraphQualityReport,
+    routes: [String: PolicyCanvasEdgeRoute]
+  ) -> String {
+    report.crossedPorts
+      .prefix(24)
+      .map { violation in
+        let pointsA = routes[violation.edgeA]?.points ?? []
+        let pointsB = routes[violation.edgeB]?.points ?? []
+        return [
+          "\(violation.nodeID):\(violation.side.rawValue)",
+          "\(violation.edgeA)=\(pointsA)",
+          "\(violation.edgeB)=\(pointsB)",
+        ].joined(separator: ":")
       }
       .joined(separator: ";")
   }
@@ -785,7 +850,7 @@ struct PolicyCanvasGraphQualityGateTests {
       var child: [String: Any] = [
         "id": node.id,
         "width": Double(PolicyCanvasLayout.nodeSize.width),
-        "height": Double(PolicyCanvasLayout.nodeSize.height)
+        "height": Double(PolicyCanvasLayout.nodeSize.height),
       ]
       if let ports = portModel?.portsByNode[node.id], !ports.isEmpty {
         child["layoutOptions"] = ["org.eclipse.elk.portConstraints": "FIXED_POS"]
@@ -798,7 +863,7 @@ struct PolicyCanvasGraphQualityGateTests {
       var elkEdge: [String: Any] = [
         "id": edge.id,
         "sources": [portModel?.sourcePortByEdge[edge.id] ?? edge.source.nodeID],
-        "targets": [portModel?.targetPortByEdge[edge.id] ?? edge.target.nodeID]
+        "targets": [portModel?.targetPortByEdge[edge.id] ?? edge.target.nodeID],
       ]
       if !edge.label.isEmpty {
         let size = labelMetrics.size(for: edge.label)
@@ -807,7 +872,7 @@ struct PolicyCanvasGraphQualityGateTests {
             "id": "\(edge.id)__label",
             "text": edge.label,
             "width": Double(size.width),
-            "height": Double(size.height)
+            "height": Double(size.height),
           ]
         ]
       }
@@ -822,10 +887,10 @@ struct PolicyCanvasGraphQualityGateTests {
         "elk.spacing.nodeNode": "80",
         "elk.spacing.edgeEdge": "38",
         "elk.spacing.edgeNode": "40",
-        "elk.layered.spacing.nodeNodeBetweenLayers": "120"
+        "elk.layered.spacing.nodeNodeBetweenLayers": "120",
       ],
       "children": children,
-      "edges": elkEdges
+      "edges": elkEdges,
     ]
     let data = try JSONSerialization.data(withJSONObject: graph, options: [.prettyPrinted])
     return String(decoding: data, as: UTF8.self)
@@ -906,8 +971,8 @@ struct PolicyCanvasGraphQualityGateTests {
           "y": Double(origin.y),
           "layoutOptions": [
             "org.eclipse.elk.port.side": sideName,
-            "org.eclipse.elk.port.index": index
-          ]
+            "org.eclipse.elk.port.index": index,
+          ],
         ])
       }
     }

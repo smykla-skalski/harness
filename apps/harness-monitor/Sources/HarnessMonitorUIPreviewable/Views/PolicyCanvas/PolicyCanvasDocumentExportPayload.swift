@@ -11,7 +11,8 @@ struct PolicyCanvasDocumentExportPayload: Sendable {
   let backingDocument: TaskBoardPolicyPipelineDocument?
 
   func exportDocument() -> TaskBoardPolicyPipelineDocument {
-    let reconciledGroups = reconciledGroups()
+    let exportNodes = policyCanvasOptimizedPortOrder(nodes: nodes, edges: edges)
+    let reconciledGroups = reconciledGroups(nodes: exportNodes)
     let originalNodeKinds =
       backingDocument.map { document in
         Dictionary(uniqueKeysWithValues: document.nodes.map { ($0.id, $0.kind) })
@@ -20,30 +21,30 @@ struct PolicyCanvasDocumentExportPayload: Sendable {
       backingDocument.map { document in
         Dictionary(uniqueKeysWithValues: document.edges.map { ($0.id, $0.condition) })
       } ?? [:]
-    let liveNodeIDs = Set(nodes.map(\.id))
+    let liveNodeIDs = Set(exportNodes.map(\.id))
     return TaskBoardPolicyPipelineDocument(
       schemaVersion: backingDocument?.schemaVersion ?? 2,
       revision: backingDocument?.revision ?? 1,
       mode: .draft,
-      nodes: nodes.map { node in
+      nodes: exportNodes.map { node in
         taskBoardPolicyNode(node, originalKind: originalNodeKinds[node.id])
       },
       edges: edges.flatMap { edge -> [TaskBoardPolicyPipelineEdge] in
         guard liveNodeIDs.contains(edge.source.nodeID) else { return [] }
         return policyCanvasDaemonEdges(
           for: edge,
-          nodes: nodes,
+          nodes: exportNodes,
           originalConditions: originalEdgeConditions
         )
         .filter { liveNodeIDs.contains($0.toNodeId) }
       },
       groups: reconciledGroups.map { group in
-        taskBoardPolicyGroup(group, nodes: nodes)
+        taskBoardPolicyGroup(group, nodes: exportNodes)
       },
       layout: TaskBoardPolicyPipelineLayout(
         zoom: Double(zoom),
         offset: backingDocument?.layout.offset ?? .zero,
-        nodes: nodes.map(taskBoardPolicyNodeLayout),
+        nodes: exportNodes.map(taskBoardPolicyNodeLayout),
         routingHints: taskBoardPolicyRoutingHints(routingHints)
       ),
       policyTraceIds: backingDocument?.policyTraceIds ?? []
@@ -53,7 +54,7 @@ struct PolicyCanvasDocumentExportPayload: Sendable {
   func runLocalPreflight() async -> Int {
     let validationPresentation = await PolicyCanvasValidationWorker().compute(
       input: PolicyCanvasValidationWorkerInput(
-        nodes: nodes,
+        nodes: policyCanvasOptimizedPortOrder(nodes: nodes, edges: edges),
         edges: edges,
         daemonIssues: []
       )
@@ -64,9 +65,9 @@ struct PolicyCanvasDocumentExportPayload: Sendable {
     .count
   }
 
-  private func reconciledGroups() -> [PolicyCanvasGroup] {
+  private func reconciledGroups(nodes exportNodes: [PolicyCanvasNode]) -> [PolicyCanvasGroup] {
     let nodesByGroupID = Dictionary(
-      grouping: nodes.compactMap { node -> (String, PolicyCanvasNode)? in
+      grouping: exportNodes.compactMap { node -> (String, PolicyCanvasNode)? in
         guard let groupID = node.groupID else {
           return nil
         }
