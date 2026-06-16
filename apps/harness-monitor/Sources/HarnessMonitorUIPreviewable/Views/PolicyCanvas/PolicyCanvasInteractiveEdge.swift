@@ -262,10 +262,11 @@ struct PolicyCanvasInteractiveEdge: View, Equatable {
   }
 
   private var effectiveStrokeWidth: CGFloat {
-    if isSelected {
-      return strokeWidth + 0.8
-    }
-    return strokeWidth
+    PolicyCanvasEdgeStrokeMetrics.visibleStrokeWidth(
+      baseWidth: strokeWidth,
+      isSelected: isSelected,
+      canvasZoom: canvasZoom
+    )
   }
 
   static var animatedDashPattern: [CGFloat] {
@@ -278,9 +279,9 @@ struct PolicyCanvasInteractiveEdge: View, Equatable {
   }
 }
 
-private extension View {
+extension View {
   @ViewBuilder
-  func policyCanvasEdgeContextMenu(
+  fileprivate func policyCanvasEdgeContextMenu(
     enabled: Bool,
     onDoubleTap: @escaping () -> Void,
     onDelete: @escaping () -> Void
@@ -293,6 +294,22 @@ private extension View {
     } else {
       self
     }
+  }
+}
+
+enum PolicyCanvasEdgeStrokeMetrics {
+  static let minimumScreenStrokeWidth: CGFloat = 1.35
+
+  static func visibleStrokeWidth(
+    baseWidth: CGFloat,
+    isSelected: Bool,
+    canvasZoom: CGFloat
+  ) -> CGFloat {
+    let emphasizedBaseWidth = isSelected ? baseWidth + 0.8 : baseWidth
+    guard canvasZoom.isFinite, canvasZoom > 0 else {
+      return emphasizedBaseWidth
+    }
+    return max(emphasizedBaseWidth, minimumScreenStrokeWidth / canvasZoom)
   }
 }
 

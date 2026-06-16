@@ -26,17 +26,16 @@ struct PolicyCanvasQualityHoverLayer: View {
   var body: some View {
     let active = viewModel.hoveredQualityMarks
     if !active.isEmpty {
+      let accent = PolicyCanvasVisualStyle.activeTint
       ZStack(alignment: .topLeading) {
-        Canvas { context, _ in
-          let accent = PolicyCanvasVisualStyle.activeTint
-          for mark in active {
-            context.fill(mark.path, with: .color(accent.opacity(0.12)))
-            context.stroke(
-              mark.path,
-              with: .color(accent.opacity(0.5)),
+        ForEach(active) { mark in
+          mark.path
+            .fill(accent.opacity(0.12))
+          mark.path
+            .stroke(
+              accent.opacity(0.5),
               style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
             )
-          }
         }
         if let anchor = tooltipAnchor(for: active) {
           PolicyCanvasQualityHoverTooltip(titles: tooltipTitles(for: active))
