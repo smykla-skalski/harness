@@ -6,6 +6,48 @@ import Testing
 
 @Suite("Policy canvas port marker layout")
 struct PolicyCanvasPortMarkerLayoutTests {
+  @Test("node height grows only when side terminals exceed compact capacity")
+  func nodeHeightGrowsOnlyWhenSideTerminalsExceedCompactCapacity() {
+    let target = policyCanvasMarkerTestNode(
+      id: "target",
+      position: CGPoint(x: 220, y: 80),
+      inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
+      outputPorts: []
+    )
+    let compactEdges = (0..<4).map { index in
+      PolicyCanvasEdge(
+        id: "compact-\(index)",
+        source: PolicyCanvasPortEndpoint(nodeID: "source-\(index)", portID: "out", kind: .output),
+        target: PolicyCanvasPortEndpoint(nodeID: target.id, portID: "in", kind: .input),
+        label: "route",
+        pinnedPortSide: false
+      )
+    }
+    let crowdedEdges = (0..<6).map { index in
+      PolicyCanvasEdge(
+        id: "crowded-\(index)",
+        source: PolicyCanvasPortEndpoint(nodeID: "source-\(index)", portID: "out", kind: .output),
+        target: PolicyCanvasPortEndpoint(nodeID: target.id, portID: "in", kind: .input),
+        label: "route",
+        pinnedPortSide: false
+      )
+    }
+
+    #expect(PolicyCanvasLayout.nodeSize(for: target).height == PolicyCanvasLayout.nodeMinimumHeight)
+    #expect(
+      PolicyCanvasLayout.nodeSize(for: target, edges: compactEdges).height
+        == PolicyCanvasLayout.nodeMinimumHeight
+    )
+    #expect(
+      PolicyCanvasLayout.nodeSize(for: target, edges: crowdedEdges).height
+        == PolicyCanvasLayout.nodeHeight(requiredVerticalPortSlots: 6)
+    )
+    #expect(
+      PolicyCanvasLayout.nodeSize(for: target, edges: crowdedEdges).height
+        > PolicyCanvasLayout.nodeMinimumHeight
+    )
+  }
+
   @Test("crowded input terminals stay on the leading side")
   func crowdedInputTerminalsStayOnLeadingSide() {
     let target = policyCanvasMarkerTestNode(

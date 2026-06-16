@@ -16,10 +16,12 @@ private let policyCanvasNodeSpacingTolerance: CGFloat = 0.001
 // bodies. Pushing the lower node of a pair keeps the order of the column intact,
 // and the move is vertical-only so no node changes rank column.
 func policyCanvasResolveNodeOverlaps(
-  nodePositions: [String: CGPoint]
+  nodePositions: [String: CGPoint],
+  nodeSizes: [String: CGSize] = [:]
 ) -> [String: CGPoint] {
   policyCanvasResolveNodeOverlaps(
     nodePositions: nodePositions,
+    nodeSizes: nodeSizes,
     minimumSpacing: policyCanvasMinimumNodeSpacing,
     shouldResolvePair: { _, _ in true }
   )
@@ -31,10 +33,12 @@ func policyCanvasResolveNodeOverlaps(
 // documents after it has made the last terminal movement.
 func policyCanvasResolveCrossGroupNodeOverlaps(
   nodePositions: [String: CGPoint],
-  layoutGroupIDByNodeID: [String: String]
+  layoutGroupIDByNodeID: [String: String],
+  nodeSizes: [String: CGSize] = [:]
 ) -> [String: CGPoint] {
   policyCanvasResolveNodeOverlaps(
     nodePositions: nodePositions,
+    nodeSizes: nodeSizes,
     minimumSpacing: 0,
     shouldResolvePair: { leftID, rightID in
       layoutGroupIDByNodeID[leftID] != layoutGroupIDByNodeID[rightID]
@@ -45,10 +49,12 @@ func policyCanvasResolveCrossGroupNodeOverlaps(
 func policyCanvasResolveNodeAndForeignTitleOverlaps(
   nodePositions: [String: CGPoint],
   layoutGroupIDByNodeID: [String: String],
-  groupTitleFramesByID: [String: CGRect]
+  groupTitleFramesByID: [String: CGRect],
+  nodeSizes: [String: CGSize] = [:]
 ) -> [String: CGPoint] {
   policyCanvasResolveNodeOverlaps(
     nodePositions: nodePositions,
+    nodeSizes: nodeSizes,
     minimumSpacing: policyCanvasMinimumNodeSpacing,
     shouldResolvePair: { _, _ in true },
     blockingFrames: { nodeID in
@@ -62,6 +68,7 @@ func policyCanvasResolveNodeAndForeignTitleOverlaps(
 
 private func policyCanvasResolveNodeOverlaps(
   nodePositions: [String: CGPoint],
+  nodeSizes: [String: CGSize],
   minimumSpacing: CGFloat,
   shouldResolvePair: (String, String) -> Bool,
   blockingFrames: (String) -> [CGRect] = { _ in [] }
@@ -78,7 +85,8 @@ private func policyCanvasResolveNodeOverlaps(
   var placed: [(id: String, frame: CGRect)] = []
   for nodeID in orderedIDs {
     guard let origin = positions[nodeID] else { continue }
-    let frame = CGRect(origin: origin, size: PolicyCanvasLayout.nodeSize)
+    let nodeSize = nodeSizes[nodeID] ?? PolicyCanvasLayout.nodeSize
+    let frame = CGRect(origin: origin, size: nodeSize)
     var requiredMinY = frame.minY
     for entry in placed {
       guard shouldResolvePair(nodeID, entry.id) else { continue }
@@ -92,11 +100,13 @@ private func policyCanvasResolveNodeOverlaps(
       size: frame.size
     )
     for obstacle in blockingFrames(nodeID) {
-      guard policyCanvasFramesNeedVerticalSeparation(
-        candidateFrame,
-        obstacle,
-        spacing: minimumSpacing
-      ) else {
+      guard
+        policyCanvasFramesNeedVerticalSeparation(
+          candidateFrame,
+          obstacle,
+          spacing: minimumSpacing
+        )
+      else {
         continue
       }
       requiredMinY = max(requiredMinY, obstacle.maxY + minimumSpacing)
@@ -110,7 +120,7 @@ private func policyCanvasResolveNodeOverlaps(
       positions[nodeID] = CGPoint(x: origin.x, y: requiredMinY)
       resolvedFrame = CGRect(
         origin: CGPoint(x: origin.x, y: requiredMinY),
-        size: PolicyCanvasLayout.nodeSize
+        size: frame.size
       )
     } else {
       resolvedFrame = frame

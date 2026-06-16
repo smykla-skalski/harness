@@ -26,16 +26,19 @@ struct PolicyCanvasSimulationLayer: View {
     if outcomeMap.isEmpty {
       EmptyView()
     } else {
+      let nodeSizes = PolicyCanvasLayout.nodeSizes(for: viewModel.nodes, edges: viewModel.edges)
       ZStack(alignment: .topLeading) {
         ForEach(viewModel.nodes) { node in
           if let outcome = outcomeMap[node.id] {
+            let nodeSize = nodeSizes[node.id] ?? PolicyCanvasLayout.nodeSize(for: node)
             PolicyCanvasSimulationNodeOverlay(
               node: node,
-              outcome: outcome
+              outcome: outcome,
+              nodeSize: nodeSize
             )
             .position(
-              x: node.position.x + PolicyCanvasLayout.nodeSize.width / 2,
-              y: node.position.y + PolicyCanvasLayout.nodeSize.height / 2
+              x: node.position.x + nodeSize.width / 2,
+              y: node.position.y + nodeSize.height / 2
             )
           }
         }
@@ -51,6 +54,7 @@ struct PolicyCanvasSimulationLayer: View {
 private struct PolicyCanvasSimulationNodeOverlay: View {
   let node: PolicyCanvasNode
   let outcome: PolicyCanvasSimulationOutcome
+  let nodeSize: CGSize
 
   var body: some View {
     ZStack {
@@ -63,7 +67,7 @@ private struct PolicyCanvasSimulationNodeOverlay: View {
         PolicyCanvasSimulationBadge(node: node, kind: badge)
       }
     }
-    .frame(width: PolicyCanvasLayout.nodeSize.width, height: PolicyCanvasLayout.nodeSize.height)
+    .frame(width: nodeSize.width, height: nodeSize.height)
   }
 
   private var badgeKind: PolicyCanvasSimulationBadgeKind? {

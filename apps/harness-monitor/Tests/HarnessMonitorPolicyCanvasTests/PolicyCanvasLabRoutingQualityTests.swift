@@ -235,7 +235,8 @@ struct PolicyCanvasLabRoutingQualityTests {
         (node.id, policyCanvasNodeFrame(node).insetBy(dx: 0.5, dy: 0.5))
       }
     )
-    let titleFrames = Array(zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups)))
+    let titleFrames = Array(
+      zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups)))
     var hits: [String] = []
 
     for edge in scene.edges {
@@ -245,7 +246,8 @@ struct PolicyCanvasLabRoutingQualityTests {
       }
       let endpointIDs = Set([edge.source.nodeID, edge.target.nodeID])
       if let nodeHit = scene.viewModel.nodes.first(where: { node in
-        !endpointIDs.contains(node.id) && route.segmentsIntersect(rect: nodeFrames[node.id] ?? .null)
+        !endpointIDs.contains(node.id)
+          && route.segmentsIntersect(rect: nodeFrames[node.id] ?? .null)
       }) {
         hits.append("\(edge.id) crosses node \(nodeHit.id); route \(route.points)")
         continue
@@ -316,7 +318,10 @@ struct PolicyCanvasLabRoutingQualityTests {
       viewModel.load(document: sample.document, simulation: nil, audit: nil)
       viewModel.reflowLayout(preserveManualAnchors: false, force: true)
       violations.append(
-        contentsOf: policyCanvasNodeSpacingViolations(viewModel.nodes).map { pair in
+        contentsOf: policyCanvasNodeSpacingViolations(
+          nodes: viewModel.nodes,
+          edges: viewModel.edges
+        ).map { pair in
           "\(sample.id):\(pair)"
         }
       )
@@ -343,14 +348,22 @@ struct PolicyCanvasLabRoutingQualityTests {
       let sourceCandidates = scene.viewModel.portAnchorCandidates(for: edge.source)
       if !sourceCandidates.contains(where: { $0.side == sourceSide }) {
         violations.append(
-          "\(edge.id) source side \(String(describing: sourceSide)) not in \(sourceCandidates); route \(route.points)"
+          [
+            "\(edge.id) source side \(String(describing: sourceSide))",
+            "not in \(sourceCandidates);",
+            "route \(route.points)",
+          ].joined(separator: " ")
         )
       }
       let targetSide = policyCanvasRouteTargetSide(route)
       let targetCandidates = scene.viewModel.portAnchorCandidates(for: edge.target)
       if !targetCandidates.contains(where: { $0.side == targetSide }) {
         violations.append(
-          "\(edge.id) target side \(String(describing: targetSide)) not in \(targetCandidates); route \(route.points)"
+          [
+            "\(edge.id) target side \(String(describing: targetSide))",
+            "not in \(targetCandidates);",
+            "route \(route.points)",
+          ].joined(separator: " ")
         )
       }
     }
@@ -364,17 +377,36 @@ struct PolicyCanvasLabRoutingQualityTests {
     )
   }
 
-  private func policyCanvasNodeSpacingViolations(_ nodes: [PolicyCanvasNode]) -> [String] {
+  private func policyCanvasNodeSpacingViolations(
+    nodes: [PolicyCanvasNode],
+    edges: [PolicyCanvasEdge]
+  ) -> [String] {
     var violations: [String] = []
+    let frames = policyCanvasNodeFramesByID(nodes: nodes, edges: edges)
     for leftIndex in nodes.indices {
       for rightIndex in nodes.index(after: leftIndex)..<nodes.endIndex {
         let left = nodes[leftIndex]
         let right = nodes[rightIndex]
+        guard let leftFrame = frames[left.id], let rightFrame = frames[right.id] else {
+          continue
+        }
         if policyCanvasNodeFramesViolateMinimumSpacing(
-          policyCanvasNodeFrame(left),
-          policyCanvasNodeFrame(right)
+          leftFrame,
+          rightFrame
         ) {
-          violations.append("\(left.id)~\(right.id)")
+          let horizontalGap = max(
+            leftFrame.minX - rightFrame.maxX, rightFrame.minX - leftFrame.maxX, 0)
+          let verticalGap = max(
+            leftFrame.minY - rightFrame.maxY, rightFrame.minY - leftFrame.maxY, 0)
+          violations.append(
+            [
+              "\(left.id)~\(right.id)",
+              "h=\(String(format: "%.1f", horizontalGap))",
+              "v=\(String(format: "%.1f", verticalGap))",
+              "left=\(leftFrame)",
+              "right=\(rightFrame)",
+            ].joined(separator: " ")
+          )
         }
       }
     }
@@ -534,7 +566,8 @@ struct PolicyCanvasLabRoutingQualityTests {
             let sideKey = PolicyCanvasLabMarkerSideKey(
               sampleID: sample.id,
               nodeID: endpoint.nodeID,
-              side: side
+              side: side,
+              extent: policyCanvasSideExtent(side: side, frame: node.frame)
             )
             coordinatesBySide[sideKey, default: []].append(coordinate)
           }
@@ -651,7 +684,8 @@ struct PolicyCanvasLabRoutingQualityTests {
         (node.id, policyCanvasNodeFrame(node).insetBy(dx: 0.5, dy: 0.5))
       }
     )
-    let titleFrames = Array(zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups)))
+    let titleFrames = Array(
+      zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups)))
     let regressions = edgeIDs.compactMap { edgeID -> String? in
       guard
         let edge = scene.edges.first(where: { $0.id == edgeID }),
@@ -699,7 +733,8 @@ struct PolicyCanvasLabRoutingQualityTests {
         (node.id, policyCanvasNodeFrame(node).insetBy(dx: 0.5, dy: 0.5))
       }
     )
-    let titleFrames = Array(zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups)))
+    let titleFrames = Array(
+      zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups)))
     let regressions = edgeIDs.compactMap { edgeID -> String? in
       guard
         let edge = scene.edges.first(where: { $0.id == edgeID }),
@@ -747,7 +782,8 @@ struct PolicyCanvasLabRoutingQualityTests {
         (node.id, policyCanvasNodeFrame(node).insetBy(dx: 0.5, dy: 0.5))
       }
     )
-    let titleFrames = Array(zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups)))
+    let titleFrames = Array(
+      zip(scene.viewModel.groups, policyCanvasGroupTitleFrames(scene.viewModel.groups)))
     let hits = edgeIDs.compactMap { edgeID -> String? in
       guard
         let edge = scene.edges.first(where: { $0.id == edgeID }),
@@ -790,7 +826,8 @@ struct PolicyCanvasLabRoutingQualityTests {
       reversed=\(reversed.orderedEdgeIDs)
       """
     )
-    let edgeIDs = Array(Set(forward.output.routes.keys).intersection(reversed.output.routes.keys)).sorted()
+    let edgeIDs = Array(Set(forward.output.routes.keys).intersection(reversed.output.routes.keys))
+      .sorted()
 
     for edgeID in edgeIDs {
       let forwardRoute = try #require(forward.output.routes[edgeID])
@@ -811,7 +848,7 @@ struct PolicyCanvasLabRoutingQualityTests {
     coordinates rawCoordinates: [CGFloat]
   ) -> [String] {
     let coordinates = rawCoordinates.sorted()
-    let extent = policyCanvasSideExtent(side: key.side)
+    let extent = key.extent
     if coordinates.count == 1 {
       return abs(coordinates[0] - (extent / 2)) <= 0.5
         ? []
@@ -930,7 +967,8 @@ struct PolicyCanvasLabRoutingQualityTests {
         ("target", .target, edge.target),
       ]
       for (label, role, endpoint) in endpoints {
-        guard let terminal = graph.output.portMarkerLayout.terminal(edgeID: edge.id, role: role) else {
+        guard let terminal = graph.output.portMarkerLayout.terminal(edgeID: edge.id, role: role)
+        else {
           failures.append("\(sampleID):\(edge.id):\(label) missing terminal marker")
           continue
         }
@@ -946,7 +984,8 @@ struct PolicyCanvasLabRoutingQualityTests {
           )
         }
         let semanticSides: [PolicyCanvasPortSide] = [.leading, .trailing]
-        for side in semanticSides where side != expectedSide
+        for side in semanticSides
+        where side != expectedSide
           && graph.output.portMarkerLayout.hasMarkers(for: endpoint, side: side)
         {
           failures.append(
@@ -1131,7 +1170,7 @@ struct PolicyCanvasLabRoutingQualityTests {
     let algorithms = PolicyCanvasAlgorithmRegistry.routingAlgorithms(for: input.algorithmSelection)
     let selectedRouter: any PolicyCanvasEdgeRouter =
       input.algorithmSelection.algorithmID(for: .edgeRouting)
-      == PolicyCanvasAlgorithmDefaults.paddedOrthogonalVisibilityAStar
+        == PolicyCanvasAlgorithmDefaults.paddedOrthogonalVisibilityAStar
       ? PolicyCanvasMemoizedRouter(inner: PolicyCanvasVisibilityRouter())
       : algorithms.edgeRouter
     let nodeIndex = prepared.nodeIndex
@@ -1350,6 +1389,7 @@ private struct PolicyCanvasLabMarkerSideKey: Hashable, CustomStringConvertible {
   let sampleID: String
   let nodeID: String
   let side: PolicyCanvasPortSide
+  let extent: CGFloat
 
   var description: String {
     "\(sampleID):\(nodeID):\(side)"

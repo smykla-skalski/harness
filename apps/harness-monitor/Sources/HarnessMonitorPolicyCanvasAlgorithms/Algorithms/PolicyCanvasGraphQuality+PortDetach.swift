@@ -14,6 +14,7 @@ import CoreGraphics
 func policyCanvasMeasurePortDetachment(
   routedEdges: [PolicyCanvasRoutedEdge],
   nodesByID: [String: PolicyCanvasNode],
+  nodeSizes: [String: CGSize] = [:],
   portMarkerLayout: PolicyCanvasPortMarkerLayout,
   thresholds: PolicyCanvasGraphQualityThresholds
 ) -> [PolicyCanvasPortSpacingViolation] {
@@ -31,7 +32,8 @@ func policyCanvasMeasurePortDetachment(
         let center = policyCanvasPortMarkerCenter(
           endpoint: terminal.endpoint,
           terminal: placed,
-          nodesByID: nodesByID
+          nodesByID: nodesByID,
+          nodeSizes: nodeSizes
         )
       else {
         continue
@@ -63,7 +65,8 @@ func policyCanvasMeasurePortDetachment(
 func policyCanvasPortMarkerCenter(
   endpoint: PolicyCanvasPortEndpoint,
   terminal: PolicyCanvasPortTerminal,
-  nodesByID: [String: PolicyCanvasNode]
+  nodesByID: [String: PolicyCanvasNode],
+  nodeSizes: [String: CGSize] = [:]
 ) -> CGPoint? {
   guard let node = nodesByID[endpoint.nodeID] else {
     return nil
@@ -76,7 +79,8 @@ func policyCanvasPortMarkerCenter(
     position: node.position,
     side: terminal.side,
     index: index,
-    count: ports.count
+    count: ports.count,
+    nodeSize: nodeSizes[node.id] ?? PolicyCanvasLayout.nodeSize(for: node)
   )
   return policyCanvasShiftedRouteAnchor(base, side: terminal.side, terminal: terminal)
 }
@@ -87,22 +91,49 @@ private func policyCanvasPortAnchorBase(
   position: CGPoint,
   side: PolicyCanvasPortSide,
   index: Int,
-  count: Int
+  count: Int,
+  nodeSize: CGSize
 ) -> CGPoint {
   switch side {
   case .leading:
-    CGPoint(x: position.x, y: position.y + PolicyCanvasLayout.portY(index: index, count: count))
+    CGPoint(
+      x: position.x,
+      y: position.y
+        + PolicyCanvasLayout.portY(
+          index: index,
+          count: count,
+          nodeHeight: nodeSize.height
+        )
+    )
   case .trailing:
     CGPoint(
-      x: position.x + PolicyCanvasLayout.nodeSize.width,
-      y: position.y + PolicyCanvasLayout.portY(index: index, count: count)
+      x: position.x + nodeSize.width,
+      y: position.y
+        + PolicyCanvasLayout.portY(
+          index: index,
+          count: count,
+          nodeHeight: nodeSize.height
+        )
     )
   case .top:
-    CGPoint(x: position.x + PolicyCanvasLayout.portX(index: index, count: count), y: position.y)
+    CGPoint(
+      x: position.x
+        + PolicyCanvasLayout.portX(
+          index: index,
+          count: count,
+          nodeWidth: nodeSize.width
+        ),
+      y: position.y
+    )
   case .bottom:
     CGPoint(
-      x: position.x + PolicyCanvasLayout.portX(index: index, count: count),
-      y: position.y + PolicyCanvasLayout.nodeSize.height
+      x: position.x
+        + PolicyCanvasLayout.portX(
+          index: index,
+          count: count,
+          nodeWidth: nodeSize.width
+        ),
+      y: position.y + nodeSize.height
     )
   }
 }

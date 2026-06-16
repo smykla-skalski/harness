@@ -245,7 +245,8 @@ private func policyCanvasPureBarycenterScore(
 func policyCanvasRebuiltGroupFramesByLayoutID(
   normalizedGroups: [PolicyCanvasNormalizedLayoutGroup],
   layoutGroupIDByNodeID: [String: String],
-  nodePositions: [String: CGPoint]
+  nodePositions: [String: CGPoint],
+  nodeSizes: [String: CGSize] = [:]
 ) -> [String: CGRect] {
   var frames: [String: CGRect] = [:]
   for group in normalizedGroups {
@@ -255,7 +256,9 @@ func policyCanvasRebuiltGroupFramesByLayoutID(
         guard let position = nodePositions[nodeID] else {
           return partial
         }
-        return partial.union(CGRect(origin: position, size: PolicyCanvasLayout.nodeSize))
+        return partial.union(
+          CGRect(origin: position, size: nodeSizes[nodeID] ?? PolicyCanvasLayout.nodeSize)
+        )
       }
     guard !bounds.isNull else {
       continue
@@ -267,4 +270,31 @@ func policyCanvasRebuiltGroupFramesByLayoutID(
     }
   }
   return frames
+}
+
+func policyCanvasLayoutNodeSizes(
+  nodes: [PolicyCanvasLayoutNode],
+  edges: [PolicyCanvasLayoutEdge]
+) -> [String: CGSize] {
+  guard !nodes.isEmpty else {
+    return [:]
+  }
+  var incoming: [String: Int] = [:]
+  var outgoing: [String: Int] = [:]
+  for edge in edges {
+    outgoing[edge.sourceNodeID, default: 0] += 1
+    incoming[edge.targetNodeID, default: 0] += 1
+  }
+  return Dictionary(
+    uniqueKeysWithValues: nodes.map { node in
+      let slots = max(1, incoming[node.id, default: 0], outgoing[node.id, default: 0])
+      return (
+        node.id,
+        CGSize(
+          width: PolicyCanvasLayout.nodeWidth,
+          height: PolicyCanvasLayout.nodeHeight(requiredVerticalPortSlots: slots)
+        )
+      )
+    }
+  )
 }

@@ -515,7 +515,8 @@ extension PolicyCanvasPreparedRouteInput {
         algorithms: algorithms
       )
     }
-    return PolicyCanvasRouteComputationState(routes: snappedRoutes, portMarkerLayout: balancedLayout)
+    return PolicyCanvasRouteComputationState(
+      routes: snappedRoutes, portMarkerLayout: balancedLayout)
   }
 
   private func precomputedRoutesHavePortSpacingViolations(
@@ -993,20 +994,41 @@ extension PolicyCanvasPreparedRouteInput {
     case .leading:
       CGPoint(
         x: node.position.x,
-        y: node.position.y + PolicyCanvasLayout.portY(index: index, count: count))
+        y: node.position.y
+          + PolicyCanvasLayout.portY(
+            index: index,
+            count: count,
+            nodeHeight: node.size.height
+          )
+      )
     case .trailing:
       CGPoint(
-        x: node.position.x + PolicyCanvasLayout.nodeSize.width,
-        y: node.position.y + PolicyCanvasLayout.portY(index: index, count: count)
+        x: node.position.x + node.size.width,
+        y: node.position.y
+          + PolicyCanvasLayout.portY(
+            index: index,
+            count: count,
+            nodeHeight: node.size.height
+          )
       )
     case .top:
       CGPoint(
-        x: node.position.x + PolicyCanvasLayout.portX(index: index, count: count),
+        x: node.position.x
+          + PolicyCanvasLayout.portX(
+            index: index,
+            count: count,
+            nodeWidth: node.size.width
+          ),
         y: node.position.y)
     case .bottom:
       CGPoint(
-        x: node.position.x + PolicyCanvasLayout.portX(index: index, count: count),
-        y: node.position.y + PolicyCanvasLayout.nodeSize.height
+        x: node.position.x
+          + PolicyCanvasLayout.portX(
+            index: index,
+            count: count,
+            nodeWidth: node.size.width
+          ),
+        y: node.position.y + node.size.height
       )
     }
   }

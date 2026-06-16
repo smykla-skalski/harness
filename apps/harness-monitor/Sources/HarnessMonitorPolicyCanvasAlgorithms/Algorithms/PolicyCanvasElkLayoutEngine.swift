@@ -47,9 +47,10 @@ private func policyCanvasShouldUseElkLayout(
   guard PolicyCanvasLayoutAlgorithmRegistry.isHarnessCurrentLayout(algorithmSelection) else {
     return false
   }
-  guard usesElkLayoutForSmallGraphs
-    || nodes.count >= policyCanvasElkMinimumNodeCount
-    || edges.count >= policyCanvasElkMinimumEdgeCount
+  guard
+    usesElkLayoutForSmallGraphs
+      || nodes.count >= policyCanvasElkMinimumNodeCount
+      || edges.count >= policyCanvasElkMinimumEdgeCount
   else {
     return false
   }
@@ -73,9 +74,10 @@ private struct PolicyCanvasElkLayoutEngine {
     if let cached = policyCanvasElkLayoutCache.value(for: identity) {
       return cached
     }
+    let nodeSizes = PolicyCanvasLayout.nodeSizes(for: nodes, edges: edges)
     let graph = policyCanvasLayoutGraph(nodes: nodes, groups: groups, edges: edges, mode: mode)
-    let endpointPorts = elkEndpointPorts(edges: edges)
-    let elkGraph = elkGraphJSON(endpointPorts: endpointPorts)
+    let endpointPorts = elkEndpointPorts(edges: edges, nodeSizes: nodeSizes)
+    let elkGraph = elkGraphJSON(endpointPorts: endpointPorts, nodeSizes: nodeSizes)
     policyCanvasElkLayoutComputationLock.lock()
     defer { policyCanvasElkLayoutComputationLock.unlock() }
     if let cached = policyCanvasElkLayoutCache.value(for: identity) {
@@ -87,10 +89,16 @@ private struct PolicyCanvasElkLayoutEngine {
     } catch {
       return nil
     }
+    guard let rawNodePositions = elkNodePositions(result), rawNodePositions.count == nodes.count
+    else {
+      return nil
+    }
+    let nodePositions = policyCanvasResolveNodeOverlaps(
+      nodePositions: rawNodePositions,
+      nodeSizes: nodeSizes
+    )
     guard
-      let nodePositions = elkNodePositions(result),
       let routes = elkRoutes(result, nodePositions: nodePositions, endpointPorts: endpointPorts),
-      nodePositions.count == nodes.count,
       routes.count == edges.count
     else {
       return nil
@@ -104,7 +112,8 @@ private struct PolicyCanvasElkLayoutEngine {
     let groupFramesByLayoutID = policyCanvasRebuiltGroupFramesByLayoutID(
       normalizedGroups: normalizedGroups,
       layoutGroupIDByNodeID: layoutGroupIDByNodeID,
-      nodePositions: nodePositions
+      nodePositions: nodePositions,
+      nodeSizes: nodeSizes
     )
     let groupFrames = actualGroupFrames(
       normalizedGroups: normalizedGroups,
@@ -117,6 +126,7 @@ private struct PolicyCanvasElkLayoutEngine {
     let metrics = policyCanvasElkLayoutMetrics(
       graph: graph,
       nodePositions: nodePositions,
+      nodeSizes: nodeSizes,
       groupRanks: groupRanks,
       layoutGroupIDByNodeID: layoutGroupIDByNodeID
     )
@@ -134,20 +144,24 @@ private struct PolicyCanvasElkLayoutEngine {
     .cachingElkLayoutResult(identity: identity)
   }
 
-  private func elkGraphJSON(endpointPorts: [PolicyCanvasElkEndpointPort]) -> [String: Any] {
+  private func elkGraphJSON(
+    endpointPorts: [PolicyCanvasElkEndpointPort],
+    nodeSizes: [String: CGSize]
+  ) -> [String: Any] {
     let portsByNodeID = Dictionary(grouping: endpointPorts, by: \.nodeID)
     return [
       "id": "policy-canvas",
       "layoutOptions": policyCanvasElkLayoutOptions(),
       "children": nodes.map { node in
-        [
+        let nodeSize = nodeSizes[node.id] ?? PolicyCanvasLayout.nodeSize(for: node)
+        return [
           "id": node.id,
-          "width": Double(PolicyCanvasLayout.nodeSize.width),
-          "height": Double(PolicyCanvasLayout.nodeSize.height),
+          "width": Double(nodeSize.width),
+          "height": Double(nodeSize.height),
           "layoutOptions": [
             "org.eclipse.elk.portConstraints": "FIXED_POS"
           ],
-          "ports": (portsByNodeID[node.id] ?? []).map(elkPortJSON)
+          "ports": (portsByNodeID[node.id] ?? []).map(elkPortJSON),
         ] as [String: Any]
       },
       "edges": edges.map { edge in
@@ -156,9 +170,9 @@ private struct PolicyCanvasElkLayoutEngine {
           "sources": [endpointPorts.first { $0.edgeID == edge.id && $0.role == .source }?.portID]
             .compactMap(\.self),
           "targets": [endpointPorts.first { $0.edgeID == edge.id && $0.role == .target }?.portID]
-            .compactMap(\.self)
+            .compactMap(\.self),
         ] as [String: Any]
-      }
+      },
     ]
   }
 
@@ -171,8 +185,8 @@ private struct PolicyCanvasElkLayoutEngine {
       "y": Double(port.origin.y),
       "layoutOptions": [
         "org.eclipse.elk.port.side": elkPortSideName(port.side),
-        "org.eclipse.elk.port.index": port.index
-      ]
+        "org.eclipse.elk.port.index": port.index,
+      ],
     ]
   }
 
@@ -373,11 +387,13 @@ private struct PolicyCanvasElkLayoutEngine {
       hash &*= 1_099_511_628_211
     }
 
-    elkCombine("elk-swift-source-right-fixed-ports-3")
+    elkCombine("elk-swift-source-right-fixed-ports-4")
     elkCombine(algorithmSelection.layoutCacheIdentity)
     for node in nodes {
       elkCombine(node.id)
       elkCombine(node.groupID ?? "")
+      let nodeSize = PolicyCanvasLayout.nodeSize(for: node, edges: edges)
+      elkCombine("\(Int(nodeSize.width.rounded()))x\(Int(nodeSize.height.rounded()))")
     }
     for edge in edges {
       elkCombine(edge.id)
@@ -418,8 +434,8 @@ private final class PolicyCanvasElkLayoutCache {
   }
 }
 
-private extension PolicyCanvasLayoutResult {
-  func cachingElkLayoutResult(identity: String) -> Self {
+extension PolicyCanvasLayoutResult {
+  fileprivate func cachingElkLayoutResult(identity: String) -> Self {
     policyCanvasElkLayoutCache.store(self, for: identity)
     return self
   }
@@ -448,7 +464,7 @@ private func policyCanvasElkLayoutOptions() -> [String: Any] {
     "elk.spacing.nodeNode": "80",
     "elk.layered.spacing.nodeNodeBetweenLayers": "120",
     "elk.spacing.edgeNode": "40",
-    "elk.spacing.edgeEdge": "38"
+    "elk.spacing.edgeEdge": "38",
   ]
 }
 
@@ -461,13 +477,17 @@ private struct PolicyCanvasElkEndpointPort {
   let edgeID: String
   let role: PolicyCanvasElkEndpointRole
   let nodeID: String
+  let nodeSize: CGSize
   let side: PolicyCanvasPortSide
   let index: Int
   let origin: CGPoint
   let portID: String
 }
 
-private func elkEndpointPorts(edges: [PolicyCanvasEdge]) -> [PolicyCanvasElkEndpointPort] {
+private func elkEndpointPorts(
+  edges: [PolicyCanvasEdge],
+  nodeSizes: [String: CGSize]
+) -> [PolicyCanvasElkEndpointPort] {
   struct PartialPort {
     let edgeID: String
     let role: PolicyCanvasElkEndpointRole
@@ -512,11 +532,12 @@ private func elkEndpointPorts(edges: [PolicyCanvasEdge]) -> [PolicyCanvasElkEndp
     guard let side = values.first?.side else {
       continue
     }
+    let nodeSize = values.first.flatMap { nodeSizes[$0.nodeID] } ?? PolicyCanvasLayout.nodeSize
     let coordinates = policyCanvasPortMarkerCoordinates(
       count: values.count,
-      base: policyCanvasSideExtent(side: side) / 2,
+      base: policyCanvasSideExtent(side: side, size: nodeSize) / 2,
       spacing: policyCanvasMinimumPortMarkerSpacing(),
-      extent: policyCanvasSideExtent(side: side),
+      extent: policyCanvasSideExtent(side: side, size: nodeSize),
       inset: policyCanvasPortMarkerInset()
     )
     for (index, value) in values.enumerated() {
@@ -525,9 +546,14 @@ private func elkEndpointPorts(edges: [PolicyCanvasEdge]) -> [PolicyCanvasElkEndp
           edgeID: value.edgeID,
           role: value.role,
           nodeID: value.nodeID,
+          nodeSize: nodeSize,
           side: value.side,
           index: index,
-          origin: elkPortOrigin(side: value.side, coordinate: coordinates[index]),
+          origin: elkPortOrigin(
+            side: value.side,
+            coordinate: coordinates[index],
+            nodeSize: nodeSize
+          ),
           portID: value.portID
         )
       )
@@ -538,18 +564,19 @@ private func elkEndpointPorts(edges: [PolicyCanvasEdge]) -> [PolicyCanvasElkEndp
 
 private func elkPortOrigin(
   side: PolicyCanvasPortSide,
-  coordinate: CGFloat
+  coordinate: CGFloat,
+  nodeSize: CGSize
 ) -> CGPoint {
   let radius = PolicyCanvasLayout.portDiameter / 2
   switch side {
   case .leading:
     return CGPoint(x: 0, y: coordinate - radius)
   case .trailing:
-    return CGPoint(x: PolicyCanvasLayout.nodeSize.width - radius, y: coordinate - radius)
+    return CGPoint(x: nodeSize.width - radius, y: coordinate - radius)
   case .top:
     return CGPoint(x: coordinate - radius, y: -radius)
   case .bottom:
-    return CGPoint(x: coordinate - radius, y: PolicyCanvasLayout.nodeSize.height - radius)
+    return CGPoint(x: coordinate - radius, y: nodeSize.height - radius)
   }
 }
 
@@ -559,11 +586,11 @@ private func elkPortCenter(_ port: PolicyCanvasElkEndpointPort) -> CGPoint {
   case .leading:
     return CGPoint(x: 0, y: port.origin.y + radius)
   case .trailing:
-    return CGPoint(x: PolicyCanvasLayout.nodeSize.width, y: port.origin.y + radius)
+    return CGPoint(x: port.nodeSize.width, y: port.origin.y + radius)
   case .top:
     return CGPoint(x: port.origin.x + radius, y: 0)
   case .bottom:
-    return CGPoint(x: port.origin.x + radius, y: PolicyCanvasLayout.nodeSize.height)
+    return CGPoint(x: port.origin.x + radius, y: port.nodeSize.height)
   }
 }
 
@@ -629,6 +656,7 @@ private func elkPoint(_ value: Any?) -> CGPoint? {
 private func policyCanvasElkLayoutMetrics(
   graph: PolicyCanvasLayoutGraph,
   nodePositions: [String: CGPoint],
+  nodeSizes: [String: CGSize],
   groupRanks: [String: Int],
   layoutGroupIDByNodeID: [String: String]
 ) -> PolicyCanvasLayoutMetrics {
@@ -637,7 +665,7 @@ private func policyCanvasElkLayoutMetrics(
       guard let position = nodePositions[node.id] else {
         return nil
       }
-      let frame = CGRect(origin: position, size: PolicyCanvasLayout.nodeSize)
+      let frame = CGRect(origin: position, size: nodeSizes[node.id] ?? PolicyCanvasLayout.nodeSize)
       return (node.id, CGPoint(x: frame.midX, y: frame.midY))
     }
   )

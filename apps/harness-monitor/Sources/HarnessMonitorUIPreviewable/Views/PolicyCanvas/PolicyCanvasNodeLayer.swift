@@ -43,9 +43,12 @@ struct PolicyCanvasNodeLayer: View {
     // view-declaration order, so emitting the cards in screen order makes the
     // keyboard ring follow what the user sees. Node identity is keyed by id, so
     // a reorder (e.g. mid-drag as positions change) preserves per-card state.
+    let nodeSizes = PolicyCanvasLayout.nodeSizes(for: viewModel.nodes, edges: viewModel.edges)
     ForEach(viewModel.nodesInFocusOrder) { node in
+      let nodeSize = nodeSizes[node.id] ?? PolicyCanvasLayout.nodeSize(for: node)
       PolicyCanvasNodeCard(
         node: node,
+        nodeSize: nodeSize,
         isSelected: viewModel.isSelected(.node(node.id)),
         isFocused: focusedNodeID == node.id || accessibilityFocusedNodeID == node.id,
         severity: severityMap[node.id],
@@ -59,8 +62,8 @@ struct PolicyCanvasNodeLayer: View {
         openEditor: openEditor
       )
       .position(
-        x: node.position.x + PolicyCanvasLayout.nodeSize.width / 2,
-        y: node.position.y + PolicyCanvasLayout.nodeSize.height / 2
+        x: node.position.x + nodeSize.width / 2,
+        y: node.position.y + nodeSize.height / 2
       )
       .focusable()
       .focused($focusedNodeID, equals: node.id)
@@ -141,6 +144,7 @@ struct PolicyCanvasNodeLayer: View {
 
 struct PolicyCanvasNodeCard: View {
   let node: PolicyCanvasNode
+  let nodeSize: CGSize
   let isSelected: Bool
   let isFocused: Bool
   let severity: PolicyCanvasIssueSeverity?
@@ -244,6 +248,7 @@ struct PolicyCanvasNodeCard: View {
 
       PolicyCanvasPortColumn(
         node: node,
+        nodeSize: nodeSize,
         ports: node.inputPorts,
         alignment: .leading,
         viewModel: viewModel,
@@ -254,6 +259,7 @@ struct PolicyCanvasNodeCard: View {
 
       PolicyCanvasPortColumn(
         node: node,
+        nodeSize: nodeSize,
         ports: node.outputPorts,
         alignment: .trailing,
         viewModel: viewModel,
@@ -264,6 +270,7 @@ struct PolicyCanvasNodeCard: View {
 
       PolicyCanvasPortColumn(
         node: node,
+        nodeSize: nodeSize,
         ports: node.inputPorts,
         alignment: .top,
         viewModel: viewModel,
@@ -275,6 +282,7 @@ struct PolicyCanvasNodeCard: View {
 
       PolicyCanvasPortColumn(
         node: node,
+        nodeSize: nodeSize,
         ports: node.outputPorts,
         alignment: .bottom,
         viewModel: viewModel,
@@ -289,6 +297,7 @@ struct PolicyCanvasNodeCard: View {
       // sides so back-edges and side-entering branches still land on a dot.
       PolicyCanvasPortColumn(
         node: node,
+        nodeSize: nodeSize,
         ports: node.inputPorts,
         alignment: .bottom,
         viewModel: viewModel,
@@ -300,6 +309,7 @@ struct PolicyCanvasNodeCard: View {
 
       PolicyCanvasPortColumn(
         node: node,
+        nodeSize: nodeSize,
         ports: node.inputPorts,
         alignment: .trailing,
         viewModel: viewModel,
@@ -311,6 +321,7 @@ struct PolicyCanvasNodeCard: View {
 
       PolicyCanvasPortColumn(
         node: node,
+        nodeSize: nodeSize,
         ports: node.outputPorts,
         alignment: .top,
         viewModel: viewModel,
@@ -322,6 +333,7 @@ struct PolicyCanvasNodeCard: View {
 
       PolicyCanvasPortColumn(
         node: node,
+        nodeSize: nodeSize,
         ports: node.outputPorts,
         alignment: .leading,
         viewModel: viewModel,
@@ -335,7 +347,7 @@ struct PolicyCanvasNodeCard: View {
         severityBadge(for: severity)
       }
     }
-    .frame(width: PolicyCanvasLayout.nodeSize.width, height: PolicyCanvasLayout.nodeSize.height)
+    .frame(width: nodeSize.width, height: nodeSize.height)
     // P57: `.ignore` (paired with composed label/value) avoids the
     // contradictory-rotor case where `.contain` would expose children
     // individually while a parent label was set. Children carry their own

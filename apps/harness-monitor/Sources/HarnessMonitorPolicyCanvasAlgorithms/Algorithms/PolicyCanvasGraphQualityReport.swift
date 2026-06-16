@@ -238,10 +238,9 @@ public func policyCanvasMeasureGraphQuality(
   portMarkerLayout: PolicyCanvasPortMarkerLayout? = nil,
   thresholds: PolicyCanvasGraphQualityThresholds = .default
 ) -> PolicyCanvasGraphQualityReport {
+  let nodeSizes = PolicyCanvasLayout.nodeSizes(for: nodes, edges: edges)
   var report = policyCanvasMeasureGraphQuality(
-    nodeFramesByID: Dictionary(
-      uniqueKeysWithValues: nodes.map { ($0.id, policyCanvasNodeFrame($0)) }
-    ),
+    nodeFramesByID: policyCanvasNodeFramesByID(nodes: nodes, edges: edges),
     groupTitleFrames: policyCanvasGroupTitleFramesByID(groups),
     edges: edges,
     routes: routes,
@@ -263,6 +262,7 @@ public func policyCanvasMeasureGraphQuality(
   let detached = policyCanvasMeasurePortDetachment(
     routedEdges: routedEdges,
     nodesByID: Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) }),
+    nodeSizes: nodeSizes,
     portMarkerLayout: portMarkerLayout,
     thresholds: thresholds
   )

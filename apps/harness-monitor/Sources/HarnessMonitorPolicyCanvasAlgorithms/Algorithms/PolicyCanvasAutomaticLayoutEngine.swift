@@ -186,7 +186,8 @@ public struct PolicyCanvasLayoutConfiguration: Sendable {
   }
 
   public var rowStep: CGFloat {
-    PolicyCanvasLayout.nodeSize.height + rowSpacing
+    max(PolicyCanvasLayout.nodeSize.height, PolicyCanvasLayout.automaticLayoutNodeStepHeight)
+      + rowSpacing
   }
 
   public static let layeredDefault = Self(
@@ -219,11 +220,13 @@ public struct PolicyCanvasLayoutConfiguration: Sendable {
       return self
     }
 
-    let maxNodesInRank = Dictionary(grouping: rankAssignment.nodeRanks.values) { $0 }
+    let maxNodesInRank =
+      Dictionary(grouping: rankAssignment.nodeRanks.values) { $0 }
       .values
       .map(\.count)
       .max() ?? 1
-    let maxGroupsInRank = Dictionary(grouping: rankAssignment.scopeRanks.values) { $0 }
+    let maxGroupsInRank =
+      Dictionary(grouping: rankAssignment.scopeRanks.values) { $0 }
       .values
       .map(\.count)
       .max() ?? 1

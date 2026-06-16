@@ -53,7 +53,10 @@ public func policyCanvasResolveGroupedNodeOverlaps(
   let resolvedPositions = policyCanvasResolveNodeAndForeignTitleOverlaps(
     nodePositions: nodePositions,
     layoutGroupIDByNodeID: layoutGroupIDByNodeID,
-    groupTitleFramesByID: groupTitleFramesByID
+    groupTitleFramesByID: groupTitleFramesByID,
+    nodeSizes: Dictionary(
+      uniqueKeysWithValues: nodes.map { ($0.id, PolicyCanvasLayout.nodeSize(for: $0)) }
+    )
   )
   var changed = false
   for index in nodes.indices {

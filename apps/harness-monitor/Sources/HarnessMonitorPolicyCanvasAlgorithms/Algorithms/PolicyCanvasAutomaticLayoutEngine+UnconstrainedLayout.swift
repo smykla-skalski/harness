@@ -90,6 +90,8 @@ extension PolicyCanvasLayeredLayoutEngine {
       nodePositions: accumulator.nodePositions,
       edges: inputs.graph.edges
     )
+    let nodeSizes = policyCanvasLayoutNodeSizes(
+      nodes: inputs.graph.nodes, edges: inputs.graph.edges)
     // The comb arranges a group's terminals by topology with no awareness of
     // foreign groups, so a lifted collector or dropped branch terminal can land
     // on top of another group's node or title strip. Clear those cross-group
@@ -99,7 +101,8 @@ extension PolicyCanvasLayeredLayoutEngine {
       layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID,
       groupTitleFramesByID: accumulator.groupFramesByLayoutID.mapValues(
         policyCanvasGroupTitleFrame
-      )
+      ),
+      nodeSizes: nodeSizes
     )
     var groupFrames = accumulator.groupFrames
     var groupFramesByLayoutID = accumulator.groupFramesByLayoutID
@@ -112,7 +115,9 @@ extension PolicyCanvasLayeredLayoutEngine {
         .filter { inputs.layoutGroupIDByNodeID[$0] == layoutID }
         .reduce(CGRect.null) { partial, nodeID in
           guard let position = positions[nodeID] else { return partial }
-          return partial.union(CGRect(origin: position, size: PolicyCanvasLayout.nodeSize))
+          return partial.union(
+            CGRect(origin: position, size: nodeSizes[nodeID] ?? PolicyCanvasLayout.nodeSize)
+          )
         }
       return bounds.isNull ? nil : policyCanvasGroupFrame(containing: bounds)
     }
@@ -134,7 +139,8 @@ extension PolicyCanvasLayeredLayoutEngine {
       let resolvedPositions = policyCanvasResolveNodeAndForeignTitleOverlaps(
         nodePositions: nodePositions,
         layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID,
-        groupTitleFramesByID: groupFramesByLayoutID.mapValues(policyCanvasGroupTitleFrame)
+        groupTitleFramesByID: groupFramesByLayoutID.mapValues(policyCanvasGroupTitleFrame),
+        nodeSizes: nodeSizes
       )
       guard resolvedPositions != nodePositions else {
         break
