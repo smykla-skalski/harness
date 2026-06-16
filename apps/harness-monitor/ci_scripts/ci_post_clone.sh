@@ -5,7 +5,7 @@ set -euo pipefail
 # the archive action resolves the HarnessMonitor scheme.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
-ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
+ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd)"
 MISE_BIN="${MISE_BIN:-mise}"
 MISE_INSTALLER_PATH=""
 
