@@ -378,7 +378,7 @@ private func makeSupervisorPolicyDocument(
     mode: .enforced,
     nodes: [
       TaskBoardPolicyPipelineNode(
-        id: "supervisor-\(ruleID)",
+        id: PolicyGraphNodeId("supervisor-\(ruleID)"),
         title: "Supervisor \(ruleID)",
         kind: .supervisorRule(decision: decision, reasonCodes: [])
       )

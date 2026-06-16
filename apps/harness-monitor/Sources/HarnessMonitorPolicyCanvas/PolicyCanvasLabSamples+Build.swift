@@ -17,12 +17,12 @@ enum PolicyCanvasLabBuild {
     outputs: [String] = []
   ) -> TaskBoardPolicyPipelineNode {
     TaskBoardPolicyPipelineNode(
-      id: id,
+      id: PolicyGraphNodeId(id),
       title: title,
       kind: kind,
-      groupId: group,
-      inputs: inputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) },
-      outputs: outputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) }
+      groupId: PolicyGraphGroupId(group),
+      inputs: inputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) },
+      outputs: outputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
     )
   }
 
@@ -36,11 +36,11 @@ enum PolicyCanvasLabBuild {
     condition: TaskBoardPolicyPipelineEdgeCondition = .always
   ) -> TaskBoardPolicyPipelineEdge {
     TaskBoardPolicyPipelineEdge(
-      id: id,
-      fromNodeId: fromNode,
-      fromPort: fromPort,
-      toNodeId: toNode,
-      toPort: toPort,
+      id: PolicyGraphEdgeId(id),
+      fromNodeId: PolicyGraphNodeId(fromNode),
+      fromPort: PolicyGraphPortId(fromPort),
+      toNodeId: PolicyGraphNodeId(toNode),
+      toPort: PolicyGraphPortId(toPort),
       label: label,
       condition: condition
     )
@@ -52,7 +52,12 @@ enum PolicyCanvasLabBuild {
     _ color: String,
     _ nodeIds: [String]
   ) -> TaskBoardPolicyPipelineGroup {
-    TaskBoardPolicyPipelineGroup(id: id, title: title, color: color, nodeIds: nodeIds)
+    TaskBoardPolicyPipelineGroup(
+      id: PolicyGraphGroupId(id),
+      title: title,
+      color: color,
+      nodeIds: nodeIds.map { PolicyGraphNodeId($0) }
+    )
   }
 
   /// Builds the document and seeds a left-to-right layout. Each node's seed
@@ -82,11 +87,11 @@ enum PolicyCanvasLabBuild {
     groups: [TaskBoardPolicyPipelineGroup]
   ) -> [TaskBoardPolicyPipelineNodeLayout] {
     let columnByGroup = Dictionary(
-      uniqueKeysWithValues: groups.enumerated().map { ($0.element.id, $0.offset) }
+      uniqueKeysWithValues: groups.enumerated().map { ($0.element.id.rawValue, $0.offset) }
     )
     var rowByGroup: [String: Int] = [:]
     return nodes.map { node in
-      let group = node.groupId ?? ""
+      let group = node.groupId?.rawValue ?? ""
       let column = columnByGroup[group] ?? 0
       let row = rowByGroup[group, default: 0]
       rowByGroup[group] = row + 1

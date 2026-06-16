@@ -15,11 +15,11 @@ struct PolicyCanvasDocumentExportPayload: Sendable {
     let reconciledGroups = reconciledGroups(nodes: exportNodes)
     let originalNodeKinds =
       backingDocument.map { document in
-        Dictionary(uniqueKeysWithValues: document.nodes.map { ($0.id, $0.kind) })
+        Dictionary(uniqueKeysWithValues: document.nodes.map { ($0.id.rawValue, $0.kind) })
       } ?? [:]
     let originalEdgeConditions =
       backingDocument.map { document in
-        Dictionary(uniqueKeysWithValues: document.edges.map { ($0.id, $0.condition) })
+        Dictionary(uniqueKeysWithValues: document.edges.map { ($0.id.rawValue, $0.condition) })
       } ?? [:]
     let liveNodeIDs = Set(exportNodes.map(\.id))
     return TaskBoardPolicyPipelineDocument(
@@ -36,7 +36,7 @@ struct PolicyCanvasDocumentExportPayload: Sendable {
           nodes: exportNodes,
           originalConditions: originalEdgeConditions
         )
-        .filter { liveNodeIDs.contains($0.toNodeId) }
+        .filter { liveNodeIDs.contains($0.toNodeId.rawValue) }
       },
       groups: reconciledGroups.map { group in
         taskBoardPolicyGroup(group, nodes: exportNodes)

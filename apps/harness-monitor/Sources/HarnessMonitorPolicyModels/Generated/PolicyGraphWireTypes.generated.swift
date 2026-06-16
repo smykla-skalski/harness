@@ -3,6 +3,110 @@
 
 import Foundation
 
+public struct PolicyGraphNodeId: RawRepresentable, Codable, Hashable, Sendable, Comparable, ExpressibleByStringLiteral, CustomStringConvertible {
+  public let rawValue: String
+  public init(rawValue: String) {
+    self.rawValue = rawValue
+  }
+  public init(_ rawValue: String) {
+    self.rawValue = rawValue
+  }
+  public init(stringLiteral value: String) {
+    self.rawValue = value
+  }
+  public init(from decoder: Decoder) throws {
+    rawValue = try decoder.singleValueContainer().decode(String.self)
+  }
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
+  public var description: String {
+    rawValue
+  }
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.rawValue < rhs.rawValue
+  }
+}
+
+public struct PolicyGraphEdgeId: RawRepresentable, Codable, Hashable, Sendable, Comparable, ExpressibleByStringLiteral, CustomStringConvertible {
+  public let rawValue: String
+  public init(rawValue: String) {
+    self.rawValue = rawValue
+  }
+  public init(_ rawValue: String) {
+    self.rawValue = rawValue
+  }
+  public init(stringLiteral value: String) {
+    self.rawValue = value
+  }
+  public init(from decoder: Decoder) throws {
+    rawValue = try decoder.singleValueContainer().decode(String.self)
+  }
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
+  public var description: String {
+    rawValue
+  }
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.rawValue < rhs.rawValue
+  }
+}
+
+public struct PolicyGraphGroupId: RawRepresentable, Codable, Hashable, Sendable, Comparable, ExpressibleByStringLiteral, CustomStringConvertible {
+  public let rawValue: String
+  public init(rawValue: String) {
+    self.rawValue = rawValue
+  }
+  public init(_ rawValue: String) {
+    self.rawValue = rawValue
+  }
+  public init(stringLiteral value: String) {
+    self.rawValue = value
+  }
+  public init(from decoder: Decoder) throws {
+    rawValue = try decoder.singleValueContainer().decode(String.self)
+  }
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
+  public var description: String {
+    rawValue
+  }
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.rawValue < rhs.rawValue
+  }
+}
+
+public struct PolicyGraphPortId: RawRepresentable, Codable, Hashable, Sendable, Comparable, ExpressibleByStringLiteral, CustomStringConvertible {
+  public let rawValue: String
+  public init(rawValue: String) {
+    self.rawValue = rawValue
+  }
+  public init(_ rawValue: String) {
+    self.rawValue = rawValue
+  }
+  public init(stringLiteral value: String) {
+    self.rawValue = value
+  }
+  public init(from decoder: Decoder) throws {
+    rawValue = try decoder.singleValueContainer().decode(String.self)
+  }
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
+  public var description: String {
+    rawValue
+  }
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.rawValue < rhs.rawValue
+  }
+}
+
 public enum PolicyAction: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
   case sync = "sync"
   case triage = "triage"
@@ -268,15 +372,15 @@ public enum PolicyGraphMode: String, Codable, Equatable, Sendable, CaseIterable,
 }
 
 public struct PolicyGraphNode: Codable, Equatable, Sendable {
-  public var id: String
+  public var id: PolicyGraphNodeId
   public var label: String
   public var kind: PolicyGraphNodeKind
   public var automation: PolicyGraphAutomationBinding?
-  public var inputPorts: [String]
-  public var outputPorts: [String]
-  public var groupId: String?
+  public var inputPorts: [PolicyGraphPortId]
+  public var outputPorts: [PolicyGraphPortId]
+  public var groupId: PolicyGraphGroupId?
 
-  public init(id: String, label: String, kind: PolicyGraphNodeKind, automation: PolicyGraphAutomationBinding? = nil, inputPorts: [String] = [], outputPorts: [String] = [], groupId: String? = nil) {
+  public init(id: PolicyGraphNodeId, label: String, kind: PolicyGraphNodeKind, automation: PolicyGraphAutomationBinding? = nil, inputPorts: [PolicyGraphPortId] = [], outputPorts: [PolicyGraphPortId] = [], groupId: PolicyGraphGroupId? = nil) {
     self.id = id
     self.label = label
     self.kind = kind
@@ -288,13 +392,13 @@ public struct PolicyGraphNode: Codable, Equatable, Sendable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    id = try container.decode(String.self, forKey: .id)
+    id = try container.decode(PolicyGraphNodeId.self, forKey: .id)
     label = try container.decode(String.self, forKey: .label)
     kind = try container.decode(PolicyGraphNodeKind.self, forKey: .kind)
     automation = try container.decodeIfPresent(PolicyGraphAutomationBinding.self, forKey: .automation)
-    inputPorts = try container.decodeIfPresent([String].self, forKey: .inputPorts) ?? []
-    outputPorts = try container.decodeIfPresent([String].self, forKey: .outputPorts) ?? []
-    groupId = try container.decodeIfPresent(String.self, forKey: .groupId)
+    inputPorts = try container.decodeIfPresent([PolicyGraphPortId].self, forKey: .inputPorts) ?? []
+    outputPorts = try container.decodeIfPresent([PolicyGraphPortId].self, forKey: .outputPorts) ?? []
+    groupId = try container.decodeIfPresent(PolicyGraphGroupId.self, forKey: .groupId)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -591,11 +695,11 @@ public struct PolicySwitchNode: Codable, Equatable, Sendable {
 }
 
 public struct PolicySwitchArm: Codable, Equatable, Sendable {
-  public var port: String
+  public var port: PolicyGraphPortId
   public var field: PolicyEvidenceField
   public var predicate: PolicyEvidencePredicate
 
-  public init(port: String, field: PolicyEvidenceField, predicate: PolicyEvidencePredicate) {
+  public init(port: PolicyGraphPortId, field: PolicyEvidenceField, predicate: PolicyEvidencePredicate) {
     self.port = port
     self.field = field
     self.predicate = predicate
@@ -609,15 +713,15 @@ public struct PolicySwitchArm: Codable, Equatable, Sendable {
 }
 
 public struct PolicyGraphEdge: Codable, Equatable, Sendable {
-  public var id: String
-  public var fromNode: String
-  public var fromPort: String
-  public var toNode: String
-  public var toPort: String
+  public var id: PolicyGraphEdgeId
+  public var fromNode: PolicyGraphNodeId
+  public var fromPort: PolicyGraphPortId
+  public var toNode: PolicyGraphNodeId
+  public var toPort: PolicyGraphPortId
   public var label: String?
   public var condition: PolicyGraphEdgeCondition
 
-  public init(id: String, fromNode: String, fromPort: String, toNode: String, toPort: String, label: String? = nil, condition: PolicyGraphEdgeCondition = .always) {
+  public init(id: PolicyGraphEdgeId, fromNode: PolicyGraphNodeId, fromPort: PolicyGraphPortId, toNode: PolicyGraphNodeId, toPort: PolicyGraphPortId, label: String? = nil, condition: PolicyGraphEdgeCondition = .always) {
     self.id = id
     self.fromNode = fromNode
     self.fromPort = fromPort
@@ -629,11 +733,11 @@ public struct PolicyGraphEdge: Codable, Equatable, Sendable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    id = try container.decode(String.self, forKey: .id)
-    fromNode = try container.decode(String.self, forKey: .fromNode)
-    fromPort = try container.decode(String.self, forKey: .fromPort)
-    toNode = try container.decode(String.self, forKey: .toNode)
-    toPort = try container.decode(String.self, forKey: .toPort)
+    id = try container.decode(PolicyGraphEdgeId.self, forKey: .id)
+    fromNode = try container.decode(PolicyGraphNodeId.self, forKey: .fromNode)
+    fromPort = try container.decode(PolicyGraphPortId.self, forKey: .fromPort)
+    toNode = try container.decode(PolicyGraphNodeId.self, forKey: .toNode)
+    toPort = try container.decode(PolicyGraphPortId.self, forKey: .toPort)
     label = try container.decodeIfPresent(String.self, forKey: .label)
     condition = try container.decodeIfPresent(PolicyGraphEdgeCondition.self, forKey: .condition) ?? .always
   }
@@ -732,13 +836,13 @@ public enum PolicyGraphEdgeCondition: Codable, Equatable, Sendable {
 }
 
 public struct PolicyGraphGroup: Codable, Equatable, Sendable {
-  public var id: String
+  public var id: PolicyGraphGroupId
   public var label: String
   public var color: String?
   public var frame: PolicyCanvasRect
-  public var nodeIds: [String]
+  public var nodeIds: [PolicyGraphNodeId]
 
-  public init(id: String, label: String, color: String? = nil, frame: PolicyCanvasRect = PolicyCanvasRect(), nodeIds: [String] = []) {
+  public init(id: PolicyGraphGroupId, label: String, color: String? = nil, frame: PolicyCanvasRect = PolicyCanvasRect(), nodeIds: [PolicyGraphNodeId] = []) {
     self.id = id
     self.label = label
     self.color = color
@@ -748,11 +852,11 @@ public struct PolicyGraphGroup: Codable, Equatable, Sendable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    id = try container.decode(String.self, forKey: .id)
+    id = try container.decode(PolicyGraphGroupId.self, forKey: .id)
     label = try container.decode(String.self, forKey: .label)
     color = try container.decodeIfPresent(String.self, forKey: .color)
     frame = try container.decodeIfPresent(PolicyCanvasRect.self, forKey: .frame) ?? PolicyCanvasRect()
-    nodeIds = try container.decodeIfPresent([String].self, forKey: .nodeIds) ?? []
+    nodeIds = try container.decodeIfPresent([PolicyGraphNodeId].self, forKey: .nodeIds) ?? []
   }
 
   enum CodingKeys: String, CodingKey {
@@ -790,12 +894,12 @@ public struct PolicyGraphLayout: Codable, Equatable, Sendable {
 }
 
 public struct PolicyGraphNodeLayout: Codable, Equatable, Sendable {
-  public var nodeId: String
+  public var nodeId: PolicyGraphNodeId
   public var x: Int32
   public var y: Int32
   public var source: PolicyGraphNodeLayoutSource?
 
-  public init(nodeId: String, x: Int32, y: Int32, source: PolicyGraphNodeLayoutSource? = nil) {
+  public init(nodeId: PolicyGraphNodeId, x: Int32, y: Int32, source: PolicyGraphNodeLayoutSource? = nil) {
     self.nodeId = nodeId
     self.x = x
     self.y = y
@@ -984,10 +1088,10 @@ public struct PolicySimulationTrace: Codable, Equatable, Sendable {
 }
 
 public struct PolicyPipelinePort: Codable, Equatable, Sendable {
-  public var id: String
+  public var id: PolicyGraphPortId
   public var label: String
 
-  public init(id: String, label: String) {
+  public init(id: PolicyGraphPortId, label: String) {
     self.id = id
     self.label = label
   }

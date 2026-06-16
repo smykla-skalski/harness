@@ -72,8 +72,8 @@ struct PolicyCanvasDocumentLayoutLookup {
 
   init(layout: TaskBoardPolicyPipelineLayout) {
     var nodeLayoutsByID: [String: TaskBoardPolicyPipelineNodeLayout] = [:]
-    for node in layout.nodes where nodeLayoutsByID[node.nodeId] == nil {
-      nodeLayoutsByID[node.nodeId] = node
+    for node in layout.nodes where nodeLayoutsByID[node.nodeId.rawValue] == nil {
+      nodeLayoutsByID[node.nodeId.rawValue] = node
     }
     self.nodeLayoutsByID = nodeLayoutsByID
   }
@@ -96,9 +96,9 @@ func synthesizedGroupFrame(
   group: TaskBoardPolicyPipelineGroup,
   nodes: [PolicyCanvasNode]
 ) -> CGRect {
-  let memberIDs = Set(group.nodeIds)
+  let memberIDs = Set(group.nodeIds.map(\.rawValue))
   let members = nodes.filter { node in
-    node.groupID == group.id || memberIDs.contains(node.id)
+    node.groupID == group.id.rawValue || memberIDs.contains(node.id)
   }
   guard !members.isEmpty else {
     return CGRect(x: 72 + CGFloat(offset * 280), y: 72, width: 248, height: 220)
@@ -113,7 +113,7 @@ extension TaskBoardPolicyPipelineLayout {
   func nodeLayout(
     for nodeID: String
   ) -> (position: TaskBoardPolicyCanvasPoint, source: PolicyGraphNodeLayoutSource?)? {
-    guard let node = nodes.first(where: { $0.nodeId == nodeID }) else {
+    guard let node = nodes.first(where: { $0.nodeId.rawValue == nodeID }) else {
       return nil
     }
     return (
@@ -145,7 +145,7 @@ func policyCanvasEdgeLabel(_ edge: TaskBoardPolicyPipelineEdge) -> String {
     }
   }
   if let branchLabel = policyCanvasConditionalBranchLabel(
-    fromPort: edge.fromPort,
+    fromPort: edge.fromPort.rawValue,
     condition: edge.condition.condition
   ) {
     return branchLabel
@@ -153,7 +153,7 @@ func policyCanvasEdgeLabel(_ edge: TaskBoardPolicyPipelineEdge) -> String {
   if edge.condition.condition != "always" {
     return edge.condition.condition.replacingOccurrences(of: "_", with: " ")
   }
-  let fallback = policyCanvasNormalizedEdgeLabel(edge.fromPort)
+  let fallback = policyCanvasNormalizedEdgeLabel(edge.fromPort.rawValue)
   return policyCanvasIsGenericEdgeLabel(fallback) ? "" : fallback
 }
 

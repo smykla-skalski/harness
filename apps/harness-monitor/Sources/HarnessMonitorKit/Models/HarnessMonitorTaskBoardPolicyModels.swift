@@ -57,11 +57,11 @@ public struct TaskBoardPolicyPipelineDocument: Codable, Equatable, Sendable {
         return nil
       }
       return PolicyConfigOverride(
-        ruleID: node.id,
+        ruleID: node.id.rawValue,
         enabled: decision != .deny,
         defaultBehavior: .cautious,
         parameters: [
-          "policy_canvas_node_id": node.id,
+          "policy_canvas_node_id": node.id.rawValue,
           "policy_canvas_revision": String(revision),
           "policy_canvas_decision": decision.rawValue,
         ]
@@ -71,13 +71,13 @@ public struct TaskBoardPolicyPipelineDocument: Codable, Equatable, Sendable {
 }
 
 public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sendable {
-  public var id: String
+  public var id: PolicyGraphNodeId
   public var label: String
   public var kind: PolicyGraphNodeKind
   public var automation: PolicyGraphAutomationBinding?
-  public var inputPorts: [String]
-  public var outputPorts: [String]
-  public var groupId: String?
+  public var inputPorts: [PolicyGraphPortId]
+  public var outputPorts: [PolicyGraphPortId]
+  public var groupId: PolicyGraphGroupId?
   public var position: TaskBoardPolicyCanvasPoint
 
   public var title: String {
@@ -86,20 +86,20 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
   }
 
   public var inputs: [TaskBoardPolicyPipelinePort] {
-    inputPorts.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) }
+    inputPorts.map { TaskBoardPolicyPipelinePort(id: $0, title: $0.rawValue) }
   }
 
   public var outputs: [TaskBoardPolicyPipelinePort] {
-    outputPorts.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) }
+    outputPorts.map { TaskBoardPolicyPipelinePort(id: $0, title: $0.rawValue) }
   }
 
   public init(
-    id: String,
+    id: PolicyGraphNodeId,
     title: String,
     kind: PolicyGraphNodeKind,
     automation: PolicyGraphAutomationBinding? = nil,
     position: TaskBoardPolicyCanvasPoint = .zero,
-    groupId: String? = nil,
+    groupId: PolicyGraphGroupId? = nil,
     inputs: [TaskBoardPolicyPipelinePort] = [],
     outputs: [TaskBoardPolicyPipelinePort] = []
   ) {
@@ -114,13 +114,13 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
   }
 
   public init(
-    id: String,
+    id: PolicyGraphNodeId,
     label: String,
     kind: PolicyGraphNodeKind,
     automation: PolicyGraphAutomationBinding? = nil,
-    inputPorts: [String] = [],
-    outputPorts: [String] = [],
-    groupId: String? = nil
+    inputPorts: [PolicyGraphPortId] = [],
+    outputPorts: [PolicyGraphPortId] = [],
+    groupId: PolicyGraphGroupId? = nil
   ) {
     self.id = id
     self.label = label
@@ -144,16 +144,16 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    id = try container.decode(String.self, forKey: .id)
+    id = try container.decode(PolicyGraphNodeId.self, forKey: .id)
     label = try container.decode(String.self, forKey: .label)
     kind = try container.decode(PolicyGraphNodeKind.self, forKey: .kind)
     automation = try container.decodeIfPresent(
       PolicyGraphAutomationBinding.self,
       forKey: .automation
     )
-    inputPorts = try container.decodeIfPresent([String].self, forKey: .inputPorts) ?? []
-    outputPorts = try container.decodeIfPresent([String].self, forKey: .outputPorts) ?? []
-    groupId = try container.decodeIfPresent(String.self, forKey: .groupId)
+    inputPorts = try container.decodeIfPresent([PolicyGraphPortId].self, forKey: .inputPorts) ?? []
+    outputPorts = try container.decodeIfPresent([PolicyGraphPortId].self, forKey: .outputPorts) ?? []
+    groupId = try container.decodeIfPresent(PolicyGraphGroupId.self, forKey: .groupId)
     position = .zero
   }
 }

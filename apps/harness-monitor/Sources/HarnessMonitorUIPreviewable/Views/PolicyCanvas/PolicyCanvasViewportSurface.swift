@@ -34,10 +34,10 @@ private struct PolicyCanvasViewportSurfaceDocumentIdentity: Equatable, Sendable 
     nodeCount = document.nodes.count
     edgeCount = document.edges.count
     groupCount = document.groups.count
-    firstNodeID = document.nodes.first?.id
-    lastNodeID = document.nodes.last?.id
-    firstEdgeID = document.edges.first?.id
-    lastEdgeID = document.edges.last?.id
+    firstNodeID = document.nodes.first?.id.rawValue
+    lastNodeID = document.nodes.last?.id.rawValue
+    firstEdgeID = document.edges.first?.id.rawValue
+    lastEdgeID = document.edges.last?.id.rawValue
     layoutNodeCount = document.layout.nodes.count
     routingHintCount = document.layout.routingHints.count
     policyTraceCount = document.policyTraceIds.count

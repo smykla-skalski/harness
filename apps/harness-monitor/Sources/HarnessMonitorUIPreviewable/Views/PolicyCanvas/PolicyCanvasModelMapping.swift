@@ -17,16 +17,16 @@ func policyCanvasNode(
   _ node: TaskBoardPolicyPipelineNode,
   layoutLookup: PolicyCanvasDocumentLayoutLookup
 ) -> PolicyCanvasNode {
-  let layoutNode = layoutLookup.nodeLayout(for: node.id)
+  let layoutNode = layoutLookup.nodeLayout(for: node.id.rawValue)
   let position = layoutNode?.position ?? .zero
   var canvasNode = PolicyCanvasNode(
-    id: node.id,
+    id: node.id.rawValue,
     title: node.title,
     kind: policyCanvasKind(for: node.kind),
     position: CGPoint(x: CGFloat(position.x), y: CGFloat(position.y))
   )
   canvasNode.layoutSource = layoutNode?.source
-  canvasNode.groupID = node.groupId
+  canvasNode.groupID = node.groupId?.rawValue
   canvasNode.policyKind = node.kind
   canvasNode.automationBinding = node.automation
   canvasNode.inputPorts = node.inputs.map { port in
@@ -53,7 +53,7 @@ func policyCanvasGroup(
       height: CGFloat(element.frame.height)
     )
   return PolicyCanvasGroup(
-    id: element.id,
+    id: element.id.rawValue,
     title: element.title,
     frame: frame,
     tone: PolicyCanvasGroupTone.allCases[offset % PolicyCanvasGroupTone.allCases.count]
@@ -150,16 +150,16 @@ func policyCanvasEdge(
   guard policyCanvasEdgeEndpointsExist(edge, nodes: nodes) else {
     return nil
   }
-  let sourceNode = nodes.first(where: { $0.id == edge.fromNodeId })
-  let targetNode = nodes.first(where: { $0.id == edge.toNodeId })
+  let sourceNode = nodes.first(where: { $0.id == edge.fromNodeId.rawValue })
+  let targetNode = nodes.first(where: { $0.id == edge.toNodeId.rawValue })
   var source = PolicyCanvasPortEndpoint(
-    nodeID: edge.fromNodeId,
-    portID: policyCanvasImportedPortID(edge.fromPort, node: sourceNode, kind: .output),
+    nodeID: edge.fromNodeId.rawValue,
+    portID: policyCanvasImportedPortID(edge.fromPort.rawValue, node: sourceNode, kind: .output),
     kind: .output
   )
   var target = PolicyCanvasPortEndpoint(
-    nodeID: edge.toNodeId,
-    portID: policyCanvasImportedPortID(edge.toPort, node: targetNode, kind: .input),
+    nodeID: edge.toNodeId.rawValue,
+    portID: policyCanvasImportedPortID(edge.toPort.rawValue, node: targetNode, kind: .input),
     kind: .input
   )
   if assignPreferredPortSides {
@@ -167,7 +167,7 @@ func policyCanvasEdge(
   }
   let kind = PolicyCanvasEdgeKind.derive(from: edge.condition.condition)
   return PolicyCanvasEdge(
-    id: edge.id,
+    id: edge.id.rawValue,
     source: source,
     target: target,
     label: policyCanvasEdgeLabel(edge),
@@ -184,13 +184,13 @@ func policyCanvasEdge(
   assignPreferredPortSides: Bool = true
 ) -> PolicyCanvasEdge? {
   guard
-    let sourceNode = nodeLookup.node(id: edge.fromNodeId),
-    let targetNode = nodeLookup.node(id: edge.toNodeId)
+    let sourceNode = nodeLookup.node(id: edge.fromNodeId.rawValue),
+    let targetNode = nodeLookup.node(id: edge.toNodeId.rawValue)
   else {
     return nil
   }
-  let sourcePortID = policyCanvasImportedPortID(edge.fromPort, node: sourceNode, kind: .output)
-  let targetPortID = policyCanvasImportedPortID(edge.toPort, node: targetNode, kind: .input)
+  let sourcePortID = policyCanvasImportedPortID(edge.fromPort.rawValue, node: sourceNode, kind: .output)
+  let targetPortID = policyCanvasImportedPortID(edge.toPort.rawValue, node: targetNode, kind: .input)
   // An edge maps whenever both endpoint nodes exist - it does not require the
   // resolved port id to be present in the node's declared ports. Terminal port
   // markers are seeded from the edges themselves (see `seededPortMarkerEntries`),
@@ -198,12 +198,12 @@ func policyCanvasEdge(
   // casing-stripped decode where `input_ports`/`output_ports` arrived empty).
   // Guarding on port existence here silently dropped those edges.
   var source = PolicyCanvasPortEndpoint(
-    nodeID: edge.fromNodeId,
+    nodeID: edge.fromNodeId.rawValue,
     portID: sourcePortID,
     kind: .output
   )
   var target = PolicyCanvasPortEndpoint(
-    nodeID: edge.toNodeId,
+    nodeID: edge.toNodeId.rawValue,
     portID: targetPortID,
     kind: .input
   )
@@ -216,7 +216,7 @@ func policyCanvasEdge(
   }
   let kind = PolicyCanvasEdgeKind.derive(from: edge.condition.condition)
   return PolicyCanvasEdge(
-    id: edge.id,
+    id: edge.id.rawValue,
     source: source,
     target: target,
     label: policyCanvasEdgeLabel(edge),
@@ -264,13 +264,13 @@ func policyCanvasEdgeEndpointsExist(
   nodes: [PolicyCanvasNode]
 ) -> Bool {
   guard !nodes.isEmpty else { return true }
-  guard let sourceNode = nodes.first(where: { $0.id == edge.fromNodeId }),
-    let targetNode = nodes.first(where: { $0.id == edge.toNodeId })
+  guard let sourceNode = nodes.first(where: { $0.id == edge.fromNodeId.rawValue }),
+    let targetNode = nodes.first(where: { $0.id == edge.toNodeId.rawValue })
   else {
     return false
   }
-  let sourcePortID = policyCanvasImportedPortID(edge.fromPort, node: sourceNode, kind: .output)
-  let targetPortID = policyCanvasImportedPortID(edge.toPort, node: targetNode, kind: .input)
+  let sourcePortID = policyCanvasImportedPortID(edge.fromPort.rawValue, node: sourceNode, kind: .output)
+  let targetPortID = policyCanvasImportedPortID(edge.toPort.rawValue, node: targetNode, kind: .input)
   return sourceNode.outputPorts.contains { $0.id == sourcePortID }
     && targetNode.inputPorts.contains { $0.id == targetPortID }
 }
@@ -281,7 +281,7 @@ func taskBoardPolicyNode(
 ) -> TaskBoardPolicyPipelineNode {
   let exportedKind = node.policyKind ?? originalKind ?? taskBoardPolicyNodeKind(for: node.kind)
   return TaskBoardPolicyPipelineNode(
-    id: node.id,
+    id: PolicyGraphNodeId(node.id),
     title: node.title,
     kind: exportedKind,
     automation: node.automationBinding,
@@ -289,7 +289,7 @@ func taskBoardPolicyNode(
       x: Double(node.position.x),
       y: Double(node.position.y)
     ),
-    groupId: node.groupID,
+    groupId: node.groupID.map { PolicyGraphGroupId($0) },
     inputs: node.inputPorts.map { port in
       taskBoardPolicyPort(port, nodeKind: exportedKind, kind: .input)
     },
@@ -315,19 +315,19 @@ func taskBoardPolicyEdge(
     originalCondition: originalCondition
   )
   return TaskBoardPolicyPipelineEdge(
-    id: edge.id,
-    fromNodeId: edge.source.nodeID,
-    fromPort: taskBoardPolicyPersistedPortID(
+    id: PolicyGraphEdgeId(edge.id),
+    fromNodeId: PolicyGraphNodeId(edge.source.nodeID),
+    fromPort: PolicyGraphPortId(taskBoardPolicyPersistedPortID(
       edge.source.portID,
       node: sourceNode,
       kind: .output
-    ),
-    toNodeId: edge.target.nodeID,
-    toPort: taskBoardPolicyPersistedPortID(
+    )),
+    toNodeId: PolicyGraphNodeId(edge.target.nodeID),
+    toPort: PolicyGraphPortId(taskBoardPolicyPersistedPortID(
       edge.target.portID,
       node: targetNode,
       kind: .input
-    ),
+    )),
     label: edge.label,
     condition: condition
   )
@@ -338,7 +338,7 @@ func taskBoardPolicyGroup(
   nodes: [PolicyCanvasNode]
 ) -> TaskBoardPolicyPipelineGroup {
   TaskBoardPolicyPipelineGroup(
-    id: group.id,
+    id: PolicyGraphGroupId(group.id),
     title: group.title,
     color: group.tone.hexColor,
     frame: TaskBoardPolicyCanvasRect(
@@ -347,13 +347,13 @@ func taskBoardPolicyGroup(
       width: Double(group.frame.width),
       height: Double(group.frame.height)
     ),
-    nodeIds: nodes.filter { $0.groupID == group.id }.map(\.id)
+    nodeIds: nodes.filter { $0.groupID == group.id }.map { PolicyGraphNodeId($0.id) }
   )
 }
 
 func taskBoardPolicyNodeLayout(_ node: PolicyCanvasNode) -> TaskBoardPolicyPipelineNodeLayout {
   TaskBoardPolicyPipelineNodeLayout(
-    nodeId: node.id,
+    nodeId: PolicyGraphNodeId(node.id),
     x: Int(node.position.x.rounded()),
     y: Int(node.position.y.rounded()),
     source: node.layoutSource
@@ -443,7 +443,7 @@ private func policyCanvasPort(
 ) -> PolicyCanvasPort {
   let title = policyCanvasImportedPortTitle(port.title, nodeKind: nodeKind, kind: kind)
   return PolicyCanvasPort(
-    id: policyCanvasImportedPortID(port.id, title: title, nodeKind: nodeKind, kind: kind),
+    id: policyCanvasImportedPortID(port.id.rawValue, title: title, nodeKind: nodeKind, kind: kind),
     title: title,
     kind: kind
   )
@@ -455,7 +455,9 @@ private func taskBoardPolicyPort(
   kind: PolicyCanvasPortKind
 ) -> TaskBoardPolicyPipelinePort {
   return TaskBoardPolicyPipelinePort(
-    id: taskBoardPolicyPersistedPortID(port.id, title: port.title, nodeKind: nodeKind, kind: kind),
+    id: PolicyGraphPortId(
+      taskBoardPolicyPersistedPortID(port.id, title: port.title, nodeKind: nodeKind, kind: kind)
+    ),
     title: port.title
   )
 }

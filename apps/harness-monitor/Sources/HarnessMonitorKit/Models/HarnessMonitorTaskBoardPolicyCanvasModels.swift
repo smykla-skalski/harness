@@ -2,33 +2,33 @@ import Foundation
 import HarnessMonitorPolicyModels
 
 public struct TaskBoardPolicyPipelinePort: Codable, Equatable, Identifiable, Sendable {
-  public var id: String
+  public var id: PolicyGraphPortId
   public var title: String
 
-  public init(id: String, title: String) {
+  public init(id: PolicyGraphPortId, title: String) {
     self.id = id
     self.title = title
   }
 }
 
 public struct TaskBoardPolicyPipelineEdge: Codable, Equatable, Identifiable, Sendable {
-  public var id: String
-  public var fromNode: String
-  public var fromPort: String
-  public var toNode: String
-  public var toPort: String
+  public var id: PolicyGraphEdgeId
+  public var fromNode: PolicyGraphNodeId
+  public var fromPort: PolicyGraphPortId
+  public var toNode: PolicyGraphNodeId
+  public var toPort: PolicyGraphPortId
   public var condition: TaskBoardPolicyPipelineEdgeCondition
   public var label: String?
 
-  public var fromNodeId: String { fromNode }
-  public var toNodeId: String { toNode }
+  public var fromNodeId: PolicyGraphNodeId { fromNode }
+  public var toNodeId: PolicyGraphNodeId { toNode }
 
   public init(
-    id: String,
-    fromNodeId: String,
-    fromPort: String,
-    toNodeId: String,
-    toPort: String,
+    id: PolicyGraphEdgeId,
+    fromNodeId: PolicyGraphNodeId,
+    fromPort: PolicyGraphPortId,
+    toNodeId: PolicyGraphNodeId,
+    toPort: PolicyGraphPortId,
     label: String? = nil,
     condition: TaskBoardPolicyPipelineEdgeCondition = .always
   ) {
@@ -53,11 +53,11 @@ public struct TaskBoardPolicyPipelineEdge: Codable, Equatable, Identifiable, Sen
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    id = try container.decode(String.self, forKey: .id)
-    fromNode = try container.decode(String.self, forKey: .fromNode)
-    fromPort = try container.decode(String.self, forKey: .fromPort)
-    toNode = try container.decode(String.self, forKey: .toNode)
-    toPort = try container.decode(String.self, forKey: .toPort)
+    id = try container.decode(PolicyGraphEdgeId.self, forKey: .id)
+    fromNode = try container.decode(PolicyGraphNodeId.self, forKey: .fromNode)
+    fromPort = try container.decode(PolicyGraphPortId.self, forKey: .fromPort)
+    toNode = try container.decode(PolicyGraphNodeId.self, forKey: .toNode)
+    toPort = try container.decode(PolicyGraphPortId.self, forKey: .toPort)
     condition =
       try container.decodeIfPresent(TaskBoardPolicyPipelineEdgeCondition.self, forKey: .condition)
       ?? .always
@@ -106,9 +106,9 @@ public struct TaskBoardPolicyPipelineEdgeCondition: Codable, Equatable, Sendable
 }
 
 public struct TaskBoardPolicyPipelineGroup: Codable, Equatable, Identifiable, Sendable {
-  public var id: String
+  public var id: PolicyGraphGroupId
   public var label: String
-  public var nodeIds: [String]
+  public var nodeIds: [PolicyGraphNodeId]
   public var color: String
   public var frame: TaskBoardPolicyCanvasRect
 
@@ -118,11 +118,11 @@ public struct TaskBoardPolicyPipelineGroup: Codable, Equatable, Identifiable, Se
   }
 
   public init(
-    id: String,
+    id: PolicyGraphGroupId,
     title: String,
     color: String = "#6aa8ff",
     frame: TaskBoardPolicyCanvasRect = .zero,
-    nodeIds: [String] = []
+    nodeIds: [PolicyGraphNodeId] = []
   ) {
     self.id = id
     self.label = title
@@ -141,13 +141,13 @@ public struct TaskBoardPolicyPipelineGroup: Codable, Equatable, Identifiable, Se
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    id = try container.decode(String.self, forKey: .id)
+    id = try container.decode(PolicyGraphGroupId.self, forKey: .id)
     label = try container.decode(String.self, forKey: .label)
     color = try container.decodeIfPresent(String.self, forKey: .color) ?? "#6aa8ff"
     frame =
       try container.decodeIfPresent(TaskBoardPolicyCanvasRect.self, forKey: .frame)
       ?? .zero
-    nodeIds = try container.decodeIfPresent([String].self, forKey: .nodeIds) ?? []
+    nodeIds = try container.decodeIfPresent([PolicyGraphNodeId].self, forKey: .nodeIds) ?? []
   }
 }
 
@@ -203,13 +203,13 @@ public struct TaskBoardPolicyPipelineLayout: Codable, Equatable, Sendable {
 }
 
 public struct TaskBoardPolicyPipelineNodeLayout: Codable, Equatable, Sendable {
-  public var nodeId: String
+  public var nodeId: PolicyGraphNodeId
   public var x: Int
   public var y: Int
   public var source: PolicyGraphNodeLayoutSource?
 
   public init(
-    nodeId: String,
+    nodeId: PolicyGraphNodeId,
     x: Int,
     y: Int,
     source: PolicyGraphNodeLayoutSource? = nil
