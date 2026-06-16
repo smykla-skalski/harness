@@ -8,8 +8,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let topBarSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
     )
-    let footerSource = try previewableSourceFile(
-      named: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    let footerComponentsSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardPolicyCanvasFooterComponents.swift"
     )
     let routeSource = try previewableSourceFile(
       named: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
@@ -55,14 +55,14 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(!topBarSource.contains("hasEnforcedCanvasPolicies"))
     #expect(!topBarSource.contains("enforceCanvasPolicies"))
     #expect(!topBarSource.contains("Label(\"Policy tools\", systemImage: \"ellipsis.circle\")"))
-    #expect(footerSource.contains("policyCanvasToolsButton"))
-    #expect(footerSource.contains("PolicyCanvasToolsMenuContent("))
-    #expect(footerSource.contains("Image(systemName: \"gearshape\")"))
-    #expect(footerSource.contains("Menu {"))
-    #expect(footerSource.contains(".menuStyle(.button)"))
-    #expect(footerSource.contains(".harnessNativeFormControl()"))
+    #expect(footerComponentsSource.contains("policyCanvasToolsButton"))
+    #expect(footerComponentsSource.contains("PolicyCanvasToolsMenuContent("))
+    #expect(footerComponentsSource.contains("Image(systemName: \"gearshape\")"))
+    #expect(footerComponentsSource.contains("Menu {"))
+    #expect(footerComponentsSource.contains(".menuStyle(.button)"))
+    #expect(footerComponentsSource.contains(".harnessNativeFormControl()"))
     #expect(
-      footerSource.contains(
+      footerComponentsSource.contains(
         "HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)"
       )
     )
