@@ -223,10 +223,10 @@ extension PolicyCanvasViewModel {
   ) {
     for group in groups {
       for nodeID in group.nodeIds {
-        guard let index = nodes.firstIndex(where: { $0.id == nodeID }) else {
+        guard let index = nodes.firstIndex(where: { $0.id == nodeID.rawValue }) else {
           continue
         }
-        nodes[index].groupID = nodes[index].groupID ?? group.id
+        nodes[index].groupID = nodes[index].groupID ?? group.id.rawValue
       }
     }
   }

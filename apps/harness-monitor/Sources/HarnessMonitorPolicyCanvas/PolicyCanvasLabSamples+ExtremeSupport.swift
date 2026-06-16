@@ -79,7 +79,7 @@ extension PolicyCanvasLabSamples {
     offset: Int
   ) -> PolicySwitchArm {
     PolicySwitchArm(
-      port: port,
+      port: PolicyGraphPortId(port),
       field: evidenceField(index: index, offset: offset),
       predicate: evidencePredicate(index: index, offset: offset)
     )

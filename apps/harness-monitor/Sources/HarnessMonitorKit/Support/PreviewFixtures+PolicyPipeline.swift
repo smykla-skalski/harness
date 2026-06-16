@@ -300,12 +300,12 @@ extension PreviewFixtures {
     outputs: [String] = []
   ) -> TaskBoardPolicyPipelineNode {
     TaskBoardPolicyPipelineNode(
-      id: id,
+      id: PolicyGraphNodeId(id),
       title: title,
       kind: kind,
-      groupId: groupID,
-      inputs: inputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) },
-      outputs: outputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) }
+      groupId: PolicyGraphGroupId(groupID),
+      inputs: inputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) },
+      outputs: outputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
     )
   }
 
@@ -317,10 +317,10 @@ extension PreviewFixtures {
     label: String? = nil
   ) -> TaskBoardPolicyPipelineEdge {
     TaskBoardPolicyPipelineEdge(
-      id: id,
-      fromNodeId: sourceNodeID,
-      fromPort: sourcePortID,
-      toNodeId: targetNodeID,
+      id: PolicyGraphEdgeId(id),
+      fromNodeId: PolicyGraphNodeId(sourceNodeID),
+      fromPort: PolicyGraphPortId(sourcePortID),
+      toNodeId: PolicyGraphNodeId(targetNodeID),
       toPort: "in",
       label: label ?? sourcePortID.replacingOccurrences(of: "_", with: " ")
     )
@@ -334,7 +334,7 @@ extension PreviewFixtures {
   /// codes a failure-type policy can route on.
   private static func failEdge(_ id: String, reasonCode: String) -> TaskBoardPolicyPipelineEdge {
     TaskBoardPolicyPipelineEdge(
-      id: id,
+      id: PolicyGraphEdgeId(id),
       fromNodeId: "evidence:merge",
       fromPort: "fail",
       toNodeId: "supervisor:merge-deny",

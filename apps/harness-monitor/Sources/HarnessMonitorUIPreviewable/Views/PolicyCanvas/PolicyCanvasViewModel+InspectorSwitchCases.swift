@@ -25,7 +25,7 @@ extension PolicyCanvasViewModel {
     var nextArms = context.policyKind.arms
     nextArms.append(
       PolicySwitchArm(
-        port: switchCasePortTitle(nextArms.count + 1),
+        port: PolicyGraphPortId(switchCasePortTitle(nextArms.count + 1)),
         field: .checksGreen,
         predicate: .isTrue
       )
@@ -130,7 +130,7 @@ extension PolicyCanvasViewModel {
   ) -> [PolicySwitchArm] {
     arms.enumerated().map { index, arm in
       PolicySwitchArm(
-        port: switchCasePortTitle(index + 1),
+        port: PolicyGraphPortId(switchCasePortTitle(index + 1)),
         field: arm.field,
         predicate: arm.predicate
       )
@@ -140,7 +140,7 @@ extension PolicyCanvasViewModel {
   func switchOutputPortTitles(
     for arms: [PolicySwitchArm]
   ) -> [String] {
-    arms.map(\.port) + ["default"]
+    arms.map { $0.port.rawValue } + ["default"]
   }
 
   func migratedSwitchEdges(
