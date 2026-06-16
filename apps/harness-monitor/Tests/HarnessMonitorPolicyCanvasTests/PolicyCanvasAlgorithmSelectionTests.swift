@@ -97,7 +97,7 @@ struct PolicyCanvasAlgorithmSelectionTests {
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
 
     #expect(!source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
-    #expect(source.contains("let routeOutput = projectedRouteOutput"))
+    #expect(source.contains("let routeOutput = projectedRouteResult.output"))
     #expect(source.contains("let routeOutputIsCurrentGraphMissing ="))
   }
 
