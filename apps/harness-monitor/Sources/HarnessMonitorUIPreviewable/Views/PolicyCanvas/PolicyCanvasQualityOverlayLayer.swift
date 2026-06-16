@@ -189,8 +189,11 @@ struct PolicyCanvasQualityOverlayMarks: View {
   /// identical outlines: overlap is a doubled outline (stacked boxes), on-body a
   /// filled box (covering something), adrift a dashed outline (loose), on-edge a
   /// box struck through by a line (a wire runs across it), near-turn a box with an
-  /// L bracket (a crowded corner). The swatch legend mirrors each treatment.
+  /// L bracket (a crowded corner). The swatch legend mirrors each treatment. The
+  /// boxes are rounded to the same 5pt radius the label pill uses, so the mark
+  /// traces the pill outline instead of poking past its rounded corners.
   private func drawLabels(into context: inout GraphicsContext, error: Color, warning: Color) {
+    let radius = PolicyCanvasVisualStyle.edgeLabelCornerRadius
     var overlapOuter = Path()
     var overlapInner = Path()
     var onBody = Path()
@@ -203,18 +206,26 @@ struct PolicyCanvasQualityOverlayMarks: View {
       let frame = violation.frame
       switch violation.kind {
       case .overlap:
-        overlapOuter.addRect(frame)
-        overlapInner.addRect(frame.insetBy(dx: 2.5, dy: 2.5))
+        overlapOuter.addRoundedRect(
+          in: frame, cornerSize: CGSize(width: radius, height: radius), style: .continuous)
+        let inner = frame.insetBy(dx: 2.5, dy: 2.5)
+        let innerRadius = max(radius - 2.5, 1)
+        overlapInner.addRoundedRect(
+          in: inner, cornerSize: CGSize(width: innerRadius, height: innerRadius), style: .continuous)
       case .onBody:
-        onBody.addRect(frame)
+        onBody.addRoundedRect(
+          in: frame, cornerSize: CGSize(width: radius, height: radius), style: .continuous)
       case .farFromEdge:
-        adrift.addRect(frame)
+        adrift.addRoundedRect(
+          in: frame, cornerSize: CGSize(width: radius, height: radius), style: .continuous)
       case .crossesEdge:
-        onEdgeBox.addRect(frame)
+        onEdgeBox.addRoundedRect(
+          in: frame, cornerSize: CGSize(width: radius, height: radius), style: .continuous)
         onEdgeStrike.move(to: CGPoint(x: frame.minX - 4, y: frame.midY))
         onEdgeStrike.addLine(to: CGPoint(x: frame.maxX + 4, y: frame.midY))
       case .nearTurn:
-        nearTurnBox.addRect(frame)
+        nearTurnBox.addRoundedRect(
+          in: frame, cornerSize: CGSize(width: radius, height: radius), style: .continuous)
         let arm: CGFloat = 6
         nearTurnCorner.move(to: CGPoint(x: frame.maxX - arm, y: frame.minY))
         nearTurnCorner.addLine(to: CGPoint(x: frame.maxX, y: frame.minY))

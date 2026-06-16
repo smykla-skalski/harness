@@ -362,11 +362,14 @@ struct PolicyCanvasEdgeLabelLayer: View {
               .contentShape(Rectangle())
               .background(
                 PolicyCanvasVisualStyle.edgeLabelBackground(edge.kind, colorScheme: colorScheme),
-                in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+                in: RoundedRectangle(
+                  cornerRadius: PolicyCanvasVisualStyle.edgeLabelCornerRadius, style: .continuous)
               )
               .overlay {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                  .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
+                RoundedRectangle(
+                  cornerRadius: PolicyCanvasVisualStyle.edgeLabelCornerRadius, style: .continuous
+                )
+                .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
               }
           }
           .harnessPlainButtonStyle()
