@@ -3,7 +3,7 @@ import CoreGraphics
 public enum PolicyCanvasLayout {
   public static let gridSize: CGFloat = 20
   public static let minimumZoom: CGFloat = 0.1
-  public static let maximumZoom: CGFloat = 1.4
+  public static let maximumZoom: CGFloat = 2.0
   public static let defaultZoom: CGFloat = 0.92
   public static let nodeSize = CGSize(width: 168, height: 160)
   public static let portDiameter: CGFloat = 18

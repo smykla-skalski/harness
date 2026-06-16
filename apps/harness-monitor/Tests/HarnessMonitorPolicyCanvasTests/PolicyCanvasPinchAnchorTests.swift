@@ -47,13 +47,13 @@ struct PolicyCanvasPinchAnchorTests {
     #expect(viewModel.pinchAnchorUnit == nil)
   }
 
-  @Test("setZoom with anchor still clamps zoom into [0.1, 1.4]")
+  @Test("setZoom with anchor still clamps zoom into [0.1, 2.0]")
   func setZoomWithAnchorClampsRange() {
     let viewModel = PolicyCanvasViewModel.sample()
     let anchor = UnitPoint(x: 0.25, y: 0.75)
 
     viewModel.setZoom(5.0, anchor: anchor)
-    #expect(viewModel.zoom == 1.4)
+    #expect(viewModel.zoom == PolicyCanvasLayout.maximumZoom)
     #expect(viewModel.pinchAnchorUnit == anchor)
 
     viewModel.setZoom(0.01, anchor: anchor)

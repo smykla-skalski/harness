@@ -28,18 +28,18 @@ struct PolicyCanvasZoomEqualityDampingTests {
   @Test("setZoom does nothing on repeated clamp at the upper bound")
   func repeatedUpperClampIsNoopAfterFirstWrite() {
     let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.setZoom(2.0)
-    #expect(viewModel.zoom == 1.4)
+    viewModel.setZoom(5.0)
+    #expect(viewModel.zoom == PolicyCanvasLayout.maximumZoom)
     viewModel.viewportDirty = false
 
-    // Subsequent over-the-top writes flow through the clamp to 1.4, which
+    // Subsequent over-the-top writes flow through the clamp to maximumZoom, which
     // already matches `zoom`, so the equality guard short-circuits and
     // viewportDirty stays clean. A naive `zoom = clamped; viewportDirty =
     // true` would fire on every call.
     for _ in 0..<10 {
       viewModel.setZoom(3.5)
     }
-    #expect(viewModel.zoom == 1.4)
+    #expect(viewModel.zoom == PolicyCanvasLayout.maximumZoom)
     #expect(viewModel.viewportDirty == false)
   }
 
