@@ -8,6 +8,9 @@ excluded:
   - DerivedData-shell
   - DerivedData-toolbar
   - tmp
+  # Machine-generated wire types (Rust -> Swift codegen): exempt from file_length
+  # and the other hand-code style rules they are not meant to satisfy.
+  - Sources/**/Generated
 
 opt_in_rules:
   - attributes
