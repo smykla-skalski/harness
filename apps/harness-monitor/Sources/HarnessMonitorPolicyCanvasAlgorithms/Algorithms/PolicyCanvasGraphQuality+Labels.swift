@@ -12,10 +12,15 @@ private struct PolicyCanvasLabeledEdge {
 /// node body, and a label drifted far from its own wire. Label frames come from
 /// the same `PolicyCanvasEdgeLabelMetrics` the router and renderer use, so the
 /// measured box matches the one drawn on screen instead of a taller, wider
-/// estimate that fabricates overlaps in the gaps between separated labels.
+/// estimate that fabricates overlaps in the gaps between separated labels. The
+/// label center is resolved the same way the renderer resolves it -
+/// `labelPositions[edgeID]` when the placement pass moved the label off its route
+/// midpoint, else the route midpoint - so the measured box sits over the label as
+/// drawn, not at a stale midpoint.
 func policyCanvasMeasureLabels(
   routedEdges: [PolicyCanvasRoutedEdge],
   nodeFramesByID: [String: CGRect],
+  labelPositions: [String: CGPoint],
   thresholds: PolicyCanvasGraphQualityThresholds
 ) -> [PolicyCanvasLabelViolation] {
   let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
@@ -26,10 +31,11 @@ func policyCanvasMeasureLabels(
       guard !text.isEmpty else {
         return nil
       }
+      let center = labelPositions[routed.edge.id] ?? routed.route.labelPosition
       return PolicyCanvasLabeledEdge(
         edgeID: routed.edge.id,
-        frame: metrics.frame(for: text, center: routed.route.labelPosition),
-        position: routed.route.labelPosition,
+        frame: metrics.frame(for: text, center: center),
+        position: center,
         route: routed.route,
         endpoints: [routed.edge.source.nodeID, routed.edge.target.nodeID]
       )

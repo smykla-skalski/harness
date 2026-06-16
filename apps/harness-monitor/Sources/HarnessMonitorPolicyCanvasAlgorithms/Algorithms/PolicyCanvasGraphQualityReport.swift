@@ -227,6 +227,7 @@ public func policyCanvasMeasureGraphQuality(
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   routes: [String: PolicyCanvasEdgeRoute],
+  labelPositions: [String: CGPoint] = [:],
   portMarkerLayout: PolicyCanvasPortMarkerLayout? = nil,
   thresholds: PolicyCanvasGraphQualityThresholds = .default
 ) -> PolicyCanvasGraphQualityReport {
@@ -237,6 +238,7 @@ public func policyCanvasMeasureGraphQuality(
     groupTitleFrames: policyCanvasGroupTitleFramesByID(groups),
     edges: edges,
     routes: routes,
+    labelPositions: labelPositions,
     thresholds: thresholds
   )
   guard let portMarkerLayout else {
@@ -271,6 +273,7 @@ public func policyCanvasMeasureGraphQuality(
   groupTitleFrames: [(id: String, frame: CGRect)],
   edges: [PolicyCanvasEdge],
   routes: [String: PolicyCanvasEdgeRoute],
+  labelPositions: [String: CGPoint] = [:],
   thresholds: PolicyCanvasGraphQualityThresholds = .default
 ) -> PolicyCanvasGraphQualityReport {
   let routedEdges =
@@ -321,6 +324,7 @@ public func policyCanvasMeasureGraphQuality(
     labels: policyCanvasMeasureLabels(
       routedEdges: routedEdges,
       nodeFramesByID: nodeFramesByID,
+      labelPositions: labelPositions,
       thresholds: thresholds
     ),
     nodeOverlaps: boundsResult.overlaps,
