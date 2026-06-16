@@ -159,7 +159,8 @@ struct PolicyCanvasPortOrderCrossingTests {
     let terminalA = try #require(layout.terminal(edgeID: "edge-a-right", role: .source))
     let terminalB = try #require(layout.terminal(edgeID: "edge-b-left", role: .source))
 
-    #expect(Set([terminalA.side, terminalB.side]).isSubset(of: [.leading, .trailing]))
+    #expect(terminalA.side == .trailing)
+    #expect(terminalB.side == .trailing)
     let renderedA = PolicyCanvasLayout.portY(index: 0, count: 2) + terminalA.axisOffset
     let renderedB = PolicyCanvasLayout.portY(index: 1, count: 2) + terminalB.axisOffset
     #expect(abs(renderedA + renderedB - PolicyCanvasLayout.nodeSize.height) < 0.001)

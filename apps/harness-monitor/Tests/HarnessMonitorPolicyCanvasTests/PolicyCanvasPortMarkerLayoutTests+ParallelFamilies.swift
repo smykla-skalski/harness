@@ -60,14 +60,16 @@ extension PolicyCanvasPortMarkerLayoutTests {
       isVisible: true
     )
 
-    #expect(trailingPassMarkers.count + leadingPassMarkers.count == 1)
+    #expect(trailingPassMarkers.count == 1)
+    #expect(leadingPassMarkers.isEmpty)
     // Parallel fail edges are distinctly labelled transitions; each gets its own
-    // horizontal dot rather than collapsing onto a single shared marker.
-    #expect(trailingFailMarkers.count + leadingFailMarkers.count == 4)
+    // trailing-side dot rather than collapsing onto a single shared marker.
+    #expect(trailingFailMarkers.count == 4)
+    #expect(leadingFailMarkers.isEmpty)
     let failTerminals = ["edge-fail-a", "edge-fail-b", "edge-fail-c", "edge-fail-d"]
       .compactMap { layout.terminal(edgeID: $0, role: .source) }
     #expect(failTerminals.count == 4)
-    #expect(Set(failTerminals.map(\.side)).isSubset(of: [.leading, .trailing]))
+    #expect(Set(failTerminals.map(\.side)) == [.trailing])
     let failCoordinates = Set(
       failTerminals.map { terminal in
         let rendered = sourceCoordinate(

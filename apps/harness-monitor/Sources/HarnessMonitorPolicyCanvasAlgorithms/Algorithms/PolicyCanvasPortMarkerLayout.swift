@@ -206,10 +206,10 @@ extension PolicyCanvasPreparedRouteInput {
     ordering: PolicyCanvasPortMarkerOrdering,
     terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
   ) {
-    guard !entries.isEmpty else {
+    guard let kind = entries.first?.endpoint.kind else {
       return
     }
-    let sides: [PolicyCanvasPortSide] = [.leading, .trailing]
+    let sides = policyCanvasRoutablePortSides(for: kind)
     let units = policyCanvasPortMarkerAssignmentUnits(entries, sides: sides)
     var unitsBySide = Dictionary(
       uniqueKeysWithValues: sides.map { ($0, [PolicyCanvasPortMarkerAssignmentUnit]()) }
