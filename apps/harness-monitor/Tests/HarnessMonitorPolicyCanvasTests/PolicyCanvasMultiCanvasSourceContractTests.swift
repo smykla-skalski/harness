@@ -63,9 +63,15 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
       at: "Views/Dashboard/DashboardPolicyCanvasFooterTabChrome.swift"
     )
 
+    let dashboardFooterComponentsSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterComponents.swift"
+    )
+
     XCTAssertTrue(dashboardFooterSource.contains(".scrollIndicators(.hidden)"))
-    XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterTabButtonStyle("))
-    XCTAssertTrue(dashboardFooterSource.contains(".frame(maxHeight: .infinity)"))
+    XCTAssertTrue(
+      dashboardFooterComponentsSource.contains("DashboardPolicyCanvasFooterTabButtonStyle(")
+    )
+    XCTAssertTrue(dashboardFooterComponentsSource.contains(".frame(maxHeight: .infinity)"))
     XCTAssertTrue(dashboardFooterChromeSource.contains(".overlay(alignment: .trailing)"))
     XCTAssertFalse(dashboardFooterSource.contains("NSCursor.pointingHand"))
     XCTAssertFalse(dashboardFooterSource.contains("NSCursor.pop()"))
@@ -136,7 +142,11 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
       at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
     )
 
-    XCTAssertTrue(dashboardFooterSource.contains(".font(.callout.weight(.medium))"))
+    let dashboardFooterComponentsSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterComponents.swift"
+    )
+
+    XCTAssertTrue(dashboardFooterComponentsSource.contains(".font(.callout.weight(.medium))"))
     XCTAssertFalse(dashboardFooterSource.contains("Circle()"))
     XCTAssertFalse(dashboardFooterSource.contains("tabIndicatorSize"))
     XCTAssertFalse(
@@ -151,10 +161,14 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
       at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
     )
 
+    let dashboardFooterComponentsSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterComponents.swift"
+    )
+
     XCTAssertTrue(dashboardFooterSource.contains("private var createCanvasTab: some View"))
     XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterCreateTab("))
-    XCTAssertTrue(dashboardFooterSource.contains("showsTrailingSeparator: false"))
-    XCTAssertTrue(dashboardFooterSource.contains("Image(systemName: \"plus\")"))
+    XCTAssertTrue(dashboardFooterComponentsSource.contains("showsTrailingSeparator: false"))
+    XCTAssertTrue(dashboardFooterComponentsSource.contains("Image(systemName: \"plus\")"))
     XCTAssertTrue(
       dashboardFooterSource.contains(".padding(.leading, HarnessMonitorTheme.spacingMD)")
     )
@@ -171,13 +185,17 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
       at: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
     )
 
-    XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterToolsMenuButton("))
-    XCTAssertTrue(dashboardFooterSource.contains("PolicyCanvasToolsMenuContent("))
-    XCTAssertTrue(dashboardFooterSource.contains("Image(systemName: \"gearshape\")"))
-    XCTAssertTrue(
-      dashboardFooterSource.contains("HarnessMonitorAccessibility.policyCanvasToolsButton")
+    let dashboardFooterComponentsSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterComponents.swift"
     )
-    XCTAssertTrue(dashboardFooterSource.contains(".menuIndicator(.hidden)"))
+
+    XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterToolsMenuButton("))
+    XCTAssertTrue(dashboardFooterComponentsSource.contains("PolicyCanvasToolsMenuContent("))
+    XCTAssertTrue(dashboardFooterComponentsSource.contains("Image(systemName: \"gearshape\")"))
+    XCTAssertTrue(
+      dashboardFooterComponentsSource.contains("HarnessMonitorAccessibility.policyCanvasToolsButton")
+    )
+    XCTAssertTrue(dashboardFooterComponentsSource.contains(".menuIndicator(.hidden)"))
     XCTAssertTrue(
       dashboardPolicySource.contains(
         "PolicyCanvasAutomationPolicySheet("
@@ -198,10 +216,14 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
       at: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
     )
 
+    let dashboardFooterComponentsSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterComponents.swift"
+    )
+
     XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterSaveStatus("))
     XCTAssertTrue(dashboardFooterSource.contains("activity: policyCanvasViewModel.saveActivity"))
     XCTAssertTrue(
-      dashboardFooterSource.contains("HarnessMonitorAccessibility.dashboardPolicyCanvasFooterSaveStatus")
+      dashboardFooterComponentsSource.contains("HarnessMonitorAccessibility.dashboardPolicyCanvasFooterSaveStatus")
     )
     XCTAssertTrue(
       dashboardFooterSource.contains(
@@ -266,17 +288,18 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
   }
 
   func testDashboardPolicyRouteUsesSelectedTintForAdjacentTabSeparators() throws {
-    let dashboardFooterSource = try previewableSourceFile(
-      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
-    )
     let dashboardFooterChromeSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasFooterTabChrome.swift"
     )
 
-    XCTAssertTrue(dashboardFooterSource.contains("var showsLeadingSeparator = false"))
+    let dashboardFooterComponentsSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterComponents.swift"
+    )
+
+    XCTAssertTrue(dashboardFooterComponentsSource.contains("var showsLeadingSeparator = false"))
     XCTAssertTrue(dashboardFooterChromeSource.contains(".overlay(alignment: .leading)"))
     XCTAssertTrue(
-      dashboardFooterSource.contains("dashboardPolicyCanvasFooterTabChrome(")
+      dashboardFooterComponentsSource.contains("dashboardPolicyCanvasFooterTabChrome(")
     )
     XCTAssertTrue(dashboardFooterChromeSource.contains("showsLeadingSeparator ? borderWidth : 0"))
     XCTAssertFalse(
@@ -351,6 +374,9 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     let dashboardFooterSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
     )
+    let dashboardFooterComponentsSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterComponents.swift"
+    )
     let tabEditorSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasFooterTabTitleEditor.swift"
     )
@@ -363,15 +389,17 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
 
     XCTAssertTrue(dashboardRouteSource.contains("@State private var editingCanvasId: String?"))
     XCTAssertTrue(dashboardFooterSource.contains("isEditing: canvas.canvasId == editingCanvasId"))
-    XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterTabClickTarget("))
-    XCTAssertTrue(dashboardFooterSource.contains("beginRename()"))
-    XCTAssertTrue(dashboardFooterSource.contains("select()"))
+    XCTAssertTrue(
+      dashboardFooterComponentsSource.contains("DashboardPolicyCanvasFooterTabClickTarget(")
+    )
+    XCTAssertTrue(dashboardFooterComponentsSource.contains("beginRename()"))
+    XCTAssertTrue(dashboardFooterComponentsSource.contains("select()"))
     XCTAssertTrue(tabClickTargetSource.contains("event.clickCount"))
     XCTAssertTrue(tabClickTargetSource.contains("coordinator?.handleClick(count: event.clickCount)"))
     XCTAssertTrue(tabClickTargetSource.contains("if count >= 2 {"))
     XCTAssertFalse(dashboardFooterSource.contains("TapGesture(count: 2)"))
     XCTAssertFalse(dashboardFooterSource.contains("Button(action: select)"))
-    XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterTabTitleEditor("))
+    XCTAssertTrue(dashboardFooterComponentsSource.contains("DashboardPolicyCanvasFooterTabTitleEditor("))
     XCTAssertTrue(tabEditorSource.contains("TextField(\"Canvas title\", text: $draftTitle)"))
     XCTAssertTrue(tabEditorSource.contains(".onSubmit(submitDraft)"))
     XCTAssertTrue(tabEditorSource.contains(".onKeyPress(.escape)"))
