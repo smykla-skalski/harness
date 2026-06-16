@@ -597,7 +597,12 @@ fn vec_element(arguments: &PathArguments) -> String {
 /// `HarnessMonitorAuditEvent` -> `HarnessMonitorAuditEventWire`) and the app
 /// decodes the wire type then maps it to the model. Empty until a rich-model
 /// subsystem migrates; with it empty, every module stays byte-identical.
-const WIRE_SUFFIXED_TYPES: &[&str] = &[];
+const WIRE_SUFFIXED_TYPES: &[&str] = &[
+    "HarnessMonitorAuditDateRange",
+    "HarnessMonitorAuditEventsRequest",
+    "HarnessMonitorAuditEvent",
+    "HarnessMonitorAuditEventsResponse",
+];
 
 /// The Swift name for a Rust wire type: the bare name, or `{name}Wire` when the
 /// app owns the bare name for a rich model. Applied to both type definitions
@@ -1093,6 +1098,7 @@ const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
     include_str!("../src/task_board/git_identity_defaults.rs");
 const OPENROUTER_SOURCE: &str = include_str!("../src/daemon/protocol/openrouter_models.rs");
 const VOICE_SOURCE: &str = include_str!("../src/daemon/protocol/voice.rs");
+const AUDIT_SOURCE: &str = include_str!("../src/daemon/protocol/audit.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, an optional defaults source informing decode defaults, a short
@@ -1142,6 +1148,13 @@ fn modules() -> Vec<GeneratedModule> {
             description: "the Rust voice session protocol",
             defaults: Some(VOICE_SOURCE),
             sources: &[VOICE_SOURCE],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AuditWireTypes.generated.swift",
+            description: "the Rust audit events protocol",
+            defaults: Some(AUDIT_SOURCE),
+            sources: &[AUDIT_SOURCE],
         },
     ]
 }
