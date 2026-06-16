@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 struct PolicyCanvasNodeKindChange: Equatable {
   let id: String
@@ -7,8 +8,8 @@ struct PolicyCanvasNodeKindChange: Equatable {
   let to: PolicyCanvasNodeKind
   let fromSubtitle: String
   let toSubtitle: String
-  let fromPolicyKind: TaskBoardPolicyPipelineNodeKind?
-  let toPolicyKind: TaskBoardPolicyPipelineNodeKind?
+  let fromPolicyKind: PolicyGraphNodeKind?
+  let toPolicyKind: PolicyGraphNodeKind?
   let removedEdges: [PolicyCanvasEdge]
 
   var missingNodeInverse: PolicyCanvasChange {

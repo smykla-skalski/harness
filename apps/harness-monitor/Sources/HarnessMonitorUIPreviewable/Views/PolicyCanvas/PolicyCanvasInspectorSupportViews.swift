@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 struct PolicyCanvasInspectorSection<Content: View>: View {
@@ -79,21 +80,28 @@ struct PolicyCanvasInspectorRow: View {
   }
 }
 
-extension TaskBoardPolicyAction {
+extension PolicyAction {
   var policyCanvasTitle: String {
     rawValue.replacingOccurrences(of: "_", with: " ")
   }
 }
 
-extension TaskBoardPolicyEvidenceField {
+extension PolicyEvidenceField {
   var policyCanvasTitle: String {
     rawValue.replacingOccurrences(of: "_", with: " ")
   }
 }
 
-extension TaskBoardPolicyEvidencePredicateValue {
+extension PolicyEvidencePredicate {
   var policyCanvasTitle: String {
-    rawValue.replacingOccurrences(of: "_", with: " ")
+    switch self {
+    case .isTrue: "is true"
+    case .isFalse: "is false"
+    case .isZero: "is zero"
+    case .isPositive: "is positive"
+    case .isPresent: "is present"
+    case .isMissing: "is missing"
+    }
   }
 }
 

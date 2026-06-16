@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 /// A named, compiled-in sample policy for the Policy Canvas Lab picker.
 ///
@@ -57,14 +58,12 @@ extension PolicyCanvasLabSamples {
     let nodes = [
       node(
         "entry", "Workflow entry",
-        TaskBoardPolicyPipelineNodeKind(kind: "workflow_entry", workflowId: "default-task"),
+        .workflowEntry(PolicyWorkflowEntry(workflowId: "default-task")),
         group: "flow", outputs: ["out"]
       ),
       node(
         "finish", "Finish",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "finish", reasonCode: "policy_finished", decision: "allow"
-        ),
+        .finish(PolicyFinishNode(decision: .allow, reasonCode: .autoMergeAllowed)),
         group: "flow", inputs: ["in"]
       ),
     ]
@@ -85,46 +84,32 @@ extension PolicyCanvasLabSamples {
     let nodes = [
       node(
         "trigger", "Trigger",
-        TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task"),
+        .trigger(workflow: "default-task"),
         group: "intake", outputs: ["event"]
       ),
       node(
         "checks", "Checks green?",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "if_then_else",
-          field: .checksGreen,
-          predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
-        ),
+        .ifThenElse(PolicyIfThenElseCondition(field: .checksGreen, predicate: .isTrue)),
         group: "intake", inputs: ["in"], outputs: ["then", "else"]
       ),
       node(
         "risk", "Risk acceptable?",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "if_then_else",
-          field: .riskScore,
-          predicate: TaskBoardPolicyEvidencePredicate(predicate: .isZero)
-        ),
+        .ifThenElse(PolicyIfThenElseCondition(field: .riskScore, predicate: .isZero)),
         group: "run", inputs: ["in"], outputs: ["then", "else"]
       ),
       node(
         "allow", "Allow",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "supervisor_rule", ruleId: "auto-allow",
-          reasonCodes: ["auto_merge_allowed"], decision: "allow"
-        ),
+        .supervisorRule(decision: .allow, reasonCodes: [.autoMergeAllowed]),
         group: "outcome", inputs: ["in"]
       ),
       node(
         "hold", "Hold for review",
-        TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
+        .humanGate(reasonCode: .humanRequired),
         group: "outcome", inputs: ["in"]
       ),
       node(
         "deny", "Deny",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "supervisor_rule", ruleId: "checks-deny",
-          reasonCodes: ["checks_not_green"], decision: "deny"
-        ),
+        .supervisorRule(decision: .deny, reasonCodes: [.checksNotGreen]),
         group: "outcome", inputs: ["in"]
       ),
     ]
@@ -151,67 +136,55 @@ extension PolicyCanvasLabSamples {
     let nodes = [
       node(
         "router", "Action gate",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "action_gate",
-          actions: [.mergePr, .submitReview, .mutateRepo, .spawnAgent]
-        ),
+        .actionGate(actions: [.mergePr, .submitReview, .mutateRepo, .spawnAgent]),
         group: "entry", inputs: ["in"], outputs: ["merge", "review", "mutate", "default"]
       ),
       node(
         "merge-step", "Merge action",
-        TaskBoardPolicyPipelineNodeKind(kind: "action_step", actionId: "reviews.merge"),
+        .actionStep(PolicyActionStep(actionId: "reviews.merge")),
         group: "lanes", inputs: ["in"], outputs: ["out"]
       ),
       node(
         "review-step", "Review action",
-        TaskBoardPolicyPipelineNodeKind(kind: "action_step", actionId: "reviews.submit"),
+        .actionStep(PolicyActionStep(actionId: "reviews.submit")),
         group: "lanes", inputs: ["in"], outputs: ["out"]
       ),
       node(
         "mutate-step", "Mutate repo",
-        TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate"),
+        .dryRunGate(reasonCode: .dryRunRequired),
         group: "lanes", inputs: ["in"]
       ),
       node(
         "default-step", "Default handler",
-        TaskBoardPolicyPipelineNodeKind(kind: "handoff", handoffKey: "default-handler"),
+        .handoff(PolicyHandoffStep(handoffKey: "default-handler")),
         group: "lanes", inputs: ["in"], outputs: ["out"]
       ),
       // Shared fan-in collector: three lanes converge here, then it branches to
       // the three terminals.
       node(
         "collector", "Outcome evidence",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "evidence_check",
-          checks: [
-            TaskBoardPolicyEvidenceCheck(
-              field: .reviewerVerdictApproved,
-              pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-              failReasonCode: "reviewer_not_approved", missingReasonCode: "checks_missing"
-            )
-          ]
-        ),
+        .evidenceCheck(checks: [
+          PolicyEvidenceCheck(
+            field: .reviewerVerdictApproved,
+            pass: .isTrue,
+            failReasonCode: .reviewerNotApproved, missingReasonCode: .missingMergeEvidence
+          )
+        ]),
         group: "collect", inputs: ["in"], outputs: ["pass", "fail", "missing"]
       ),
       node(
         "human", "Human review",
-        TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
+        .humanGate(reasonCode: .humanRequired),
         group: "collect", inputs: ["in"]
       ),
       node(
         "allow", "Allow",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "supervisor_rule", ruleId: "branch-allow",
-          reasonCodes: ["auto_merge_allowed"], decision: "allow"
-        ),
+        .supervisorRule(decision: .allow, reasonCodes: [.autoMergeAllowed]),
         group: "collect", inputs: ["in"]
       ),
       node(
         "deny", "Deny",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "supervisor_rule", ruleId: "branch-deny",
-          reasonCodes: ["merge_denied"], decision: "deny"
-        ),
+        .supervisorRule(decision: .deny, reasonCodes: [.checksNotGreen]),
         group: "collect", inputs: ["in"]
       ),
     ]

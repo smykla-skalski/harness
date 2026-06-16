@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 /// Commit entry points for the `evidence_check` checks-array editor. An
 /// evidence node holds an ordered list of checks; the engine fails on the
@@ -16,15 +17,16 @@ extension PolicyCanvasViewModel {
   /// author can refine it rather than start from an invalid daemon token.
   func addSelectedEvidenceCheck() {
     commitPolicyKindMutation { kind in
-      guard kind.kind == "evidence_check" else { return }
-      kind.checks.append(
-        TaskBoardPolicyEvidenceCheck(
+      guard case .evidenceCheck(var checks) = kind else { return }
+      checks.append(
+        PolicyEvidenceCheck(
           field: .checksGreen,
-          pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-          failReasonCode: PolicyCanvasReasonCode.checksNotGreen,
-          missingReasonCode: PolicyCanvasReasonCode.missingMergeEvidence
+          pass: .isTrue,
+          failReasonCode: .checksNotGreen,
+          missingReasonCode: .missingMergeEvidence
         )
       )
+      kind = .evidenceCheck(checks: checks)
     }
   }
 
@@ -32,13 +34,14 @@ extension PolicyCanvasViewModel {
   /// with no checks passes everything, which would silently neuter the node.
   func removeSelectedEvidenceCheck(at index: Int) {
     commitPolicyKindMutation { kind in
-      guard kind.kind == "evidence_check",
-        kind.checks.indices.contains(index),
-        kind.checks.count > 1
+      guard case .evidenceCheck(var checks) = kind,
+        checks.indices.contains(index),
+        checks.count > 1
       else {
         return
       }
-      kind.checks.remove(at: index)
+      checks.remove(at: index)
+      kind = .evidenceCheck(checks: checks)
     }
   }
 
@@ -47,38 +50,41 @@ extension PolicyCanvasViewModel {
   /// the reason code over checks below it.
   func moveSelectedEvidenceCheck(from source: Int, to destination: Int) {
     commitPolicyKindMutation { kind in
-      guard kind.kind == "evidence_check",
+      guard case .evidenceCheck(var checks) = kind,
         source != destination,
-        kind.checks.indices.contains(source),
-        kind.checks.indices.contains(destination)
+        checks.indices.contains(source),
+        checks.indices.contains(destination)
       else {
         return
       }
-      let check = kind.checks.remove(at: source)
-      kind.checks.insert(check, at: destination)
+      let check = checks.remove(at: source)
+      checks.insert(check, at: destination)
+      kind = .evidenceCheck(checks: checks)
     }
   }
 
   /// Commit an evidence field pick for the check at `index`.
   func commitSelectedEvidenceCheckField(
-    _ field: TaskBoardPolicyEvidenceField,
+    _ field: PolicyEvidenceField,
     at index: Int
   ) {
     commitPolicyKindMutation { kind in
-      guard kind.kind == "evidence_check", kind.checks.indices.contains(index) else { return }
-      kind.checks[index].field = field
+      guard case .evidenceCheck(var checks) = kind, checks.indices.contains(index) else { return }
+      checks[index].field = field
+      kind = .evidenceCheck(checks: checks)
     }
   }
 
   /// Commit the pass predicate for the check at `index`. The check passes when
   /// the field satisfies this predicate; otherwise the fail reason code fires.
   func commitSelectedEvidenceCheckPredicate(
-    _ predicate: TaskBoardPolicyEvidencePredicateValue,
+    _ predicate: PolicyEvidencePredicate,
     at index: Int
   ) {
     commitPolicyKindMutation { kind in
-      guard kind.kind == "evidence_check", kind.checks.indices.contains(index) else { return }
-      kind.checks[index].pass = TaskBoardPolicyEvidencePredicate(predicate: predicate)
+      guard case .evidenceCheck(var checks) = kind, checks.indices.contains(index) else { return }
+      checks[index].pass = predicate
+      kind = .evidenceCheck(checks: checks)
     }
   }
 
@@ -86,12 +92,13 @@ extension PolicyCanvasViewModel {
   /// engine emits when the check fails, and the failure type a fan-in branch
   /// can be routed on.
   func commitSelectedEvidenceCheckFailReasonCode(
-    _ reasonCode: String,
+    _ reasonCode: PolicyReasonCode,
     at index: Int
   ) {
     commitPolicyKindMutation { kind in
-      guard kind.kind == "evidence_check", kind.checks.indices.contains(index) else { return }
-      kind.checks[index].failReasonCode = reasonCode
+      guard case .evidenceCheck(var checks) = kind, checks.indices.contains(index) else { return }
+      checks[index].failReasonCode = reasonCode
+      kind = .evidenceCheck(checks: checks)
     }
   }
 }

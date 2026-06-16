@@ -1,27 +1,11 @@
 import HarnessMonitorPolicyModels
 
-public typealias TaskBoardPolicyAction = HarnessMonitorPolicyModels.TaskBoardPolicyAction
-public typealias TaskBoardPolicyEvidenceField = HarnessMonitorPolicyModels
-  .TaskBoardPolicyEvidenceField
-public typealias TaskBoardPolicyPipelineAutomationBinding =
-  HarnessMonitorPolicyModels.TaskBoardPolicyPipelineAutomationBinding
-public typealias TaskBoardPolicyPipelineOCRConfiguration =
-  HarnessMonitorPolicyModels.TaskBoardPolicyPipelineOCRConfiguration
-public typealias TaskBoardPolicyPipelineReviewPullRequestExtraction =
-  HarnessMonitorPolicyModels.TaskBoardPolicyPipelineReviewPullRequestExtraction
-public typealias TaskBoardPolicyEvidencePredicateValue =
-  HarnessMonitorPolicyModels.TaskBoardPolicyEvidencePredicateValue
-public typealias TaskBoardPolicyEvidencePredicate =
-  HarnessMonitorPolicyModels.TaskBoardPolicyEvidencePredicate
-public typealias TaskBoardPolicyEvidenceCheck =
-  HarnessMonitorPolicyModels.TaskBoardPolicyEvidenceCheck
-public typealias TaskBoardPolicySwitchArm = HarnessMonitorPolicyModels.TaskBoardPolicySwitchArm
-public typealias TaskBoardPolicyWaitCondition = HarnessMonitorPolicyModels
-  .TaskBoardPolicyWaitCondition
-public typealias TaskBoardPolicyPipelineNodeKind =
-  HarnessMonitorPolicyModels.TaskBoardPolicyPipelineNodeKind
-public typealias TaskBoardPolicyPipelineNodeLayoutSource =
-  HarnessMonitorPolicyModels.TaskBoardPolicyPipelineNodeLayoutSource
+// The pipeline simulate-response cluster stays hand-authored in
+// HarnessMonitorPolicyModels: these types carry app-only shape the generated
+// Rust wire types do not model (synthesized `isValid`, a lenient
+// `ValidationIssue` that also represents client-local preflight codes, and the
+// simulate response envelope). They are surfaced into the Kit namespace here so
+// callers reach them without importing the models module directly.
 public typealias TaskBoardPolicyPipelineValidation =
   HarnessMonitorPolicyModels.TaskBoardPolicyPipelineValidation
 public typealias TaskBoardPolicyPipelineValidationIssue =

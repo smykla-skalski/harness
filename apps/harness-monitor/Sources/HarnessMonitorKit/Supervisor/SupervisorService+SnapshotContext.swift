@@ -68,7 +68,7 @@ extension SupervisorService {
   }
 
   func shouldSuppress(
-    _ action: PolicyAction,
+    _ action: SupervisorAction,
     behavior: RuleDefaultBehavior,
     at now: Date
   ) -> Bool {
@@ -124,7 +124,7 @@ extension SupervisorService {
 
   func recordSuppressedAction(
     forRuleID ruleID: String,
-    action: PolicyAction,
+    action: SupervisorAction,
     suppressedAt: Date
   ) {
     ruleRecentSuppressedActionKeys[ruleID, default: [:]][action.actionKey] = suppressedAt
@@ -132,7 +132,7 @@ extension SupervisorService {
 
   func recordFiredActions(
     forRuleID ruleID: String,
-    actions: [PolicyAction],
+    actions: [SupervisorAction],
     firedAt: Date
   ) {
     guard !actions.isEmpty else {

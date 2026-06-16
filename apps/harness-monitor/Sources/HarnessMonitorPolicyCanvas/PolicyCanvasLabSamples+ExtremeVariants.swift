@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 // MARK: - Extreme stress variants
 
@@ -95,35 +96,32 @@ extension PolicyCanvasLabSamples {
     [
       node(
         id.node("trigger"), "Trigger \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "stress-\(id.index)"),
+        .trigger(workflow: "stress-\(id.index)"),
         group: group, outputs: ["event"]
       ),
       node(
         id.node("entry"), "Workflow entry \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "workflow_entry",
-          workflowId: "reviews_auto_stress_\(id.index)"
-        ),
+        .workflowEntry(PolicyWorkflowEntry(workflowId: "reviews_auto_stress_\(id.index)")),
         group: group, outputs: ["out"]
       ),
       node(
         id.node("screenshot"), "Review screenshot \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(kind: "review_screenshot_paste"),
+        .reviewScreenshotPaste,
         group: group, outputs: ["image"]
       ),
       node(
         id.node("ocr"), "OCR screenshot \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(kind: "ocr_image"),
+        .ocrImage,
         group: group, inputs: ["in"], outputs: ["text"]
       ),
       node(
         id.node("resolve-prs"), "Resolve PRs \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(kind: "resolve_review_pull_requests"),
+        .resolveReviewPullRequests,
         group: group, inputs: ["in"], outputs: ["pull_requests"]
       ),
       node(
         id.node("copy-prs"), "Copy PR list \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(kind: "copy_review_pull_request_list"),
+        .copyReviewPullRequestList,
         group: group, inputs: ["in"]
       ),
     ]
@@ -138,61 +136,49 @@ extension PolicyCanvasLabSamples {
       extremeStressEvidenceNode(id: id, group: group),
       node(
         id.node("ifelse"), "Boolean split \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "if_then_else",
+        .ifThenElse(PolicyIfThenElseCondition(
           field: evidenceField(index: id.index, offset: 3),
           predicate: evidencePredicate(index: id.index, offset: 3)
-        ),
+        )),
         group: group, inputs: ["in"], outputs: ["then", "else"]
       ),
       extremeStressSwitchNode(id: id, group: group),
       node(
         id.node("risk"), "Risk classifier \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "risk_classifier",
+        .riskClassifier(
           field: .riskScore,
           threshold: UInt8(20 + (id.index * 7 % 70)),
-          highRiskReasonCode: "stress_risk_high_\(id.index)",
-          missingReasonCode: "stress_risk_missing_\(id.index)"
+          highRiskReasonCode: .riskAboveThreshold,
+          missingReasonCode: .humanRequired
         ),
         group: group, inputs: ["in"], outputs: ["low_or_equal", "high", "missing"]
       ),
       node(
         id.node("hub"), "Payload hub \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(kind: "hub"),
+        .hub,
         group: group, inputs: ["in"], outputs: ["out_1", "out_2", "out_3", "out_4"]
       ),
       node(
         id.node("wait"), "Timer wait \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "wait_step",
-          wait: .timer(UInt64(60 + id.index * 15)),
+        .waitStep(PolicyWaitStep(
+          wait: .timer(durationSeconds: UInt64(60 + id.index * 15)),
           resumeKey: "stress-timer-\(id.index)"
-        ),
+        )),
         group: group, inputs: ["in"], outputs: ["out"]
       ),
       node(
         id.node("event-wait"), "Event wait \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "event_wait",
-          eventKey: "reviews.stress.\(id.index)"
-        ),
+        .eventWait(PolicyEventWait(eventKey: "reviews.stress.\(id.index)")),
         group: group, inputs: ["in"], outputs: ["out"]
       ),
       node(
         id.node("action"), "Action step \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "action_step",
-          actionId: "reviews.stress.action.\(id.index)"
-        ),
+        .actionStep(PolicyActionStep(actionId: "reviews.stress.action.\(id.index)")),
         group: group, inputs: ["in"], outputs: ["out"]
       ),
       node(
         id.node("handoff"), "Handoff \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "handoff",
-          handoffKey: "stress-handler-\(id.index)"
-        ),
+        .handoff(PolicyHandoffStep(handoffKey: "stress-handler-\(id.index)")),
         group: group, inputs: ["in"], outputs: ["out"]
       ),
     ]
@@ -205,46 +191,32 @@ extension PolicyCanvasLabSamples {
     [
       node(
         id.node("human"), "Human gate \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
+        .humanGate(reasonCode: .humanRequired),
         group: group, inputs: ["in"]
       ),
       node(
         id.node("consensus"), "Consensus \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(kind: "consensus_gate"),
+        .consensusGate(reasonCode: .protectedPathTouched),
         group: group, inputs: ["in"], outputs: ["out"]
       ),
       node(
         id.node("dry-run"), "Dry-run \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate"),
+        .dryRunGate(reasonCode: .dryRunRequired),
         group: group, inputs: ["in"]
       ),
       node(
         id.node("allow"), "Allow \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "supervisor_rule",
-          ruleId: "stress-allow-\(id.index)",
-          reasonCodes: ["stress_auto_allow_\(id.index)"],
-          decision: "allow"
-        ),
+        .supervisorRule(decision: .allow, reasonCodes: [.autoMergeAllowed]),
         group: group, inputs: ["in"]
       ),
       node(
         id.node("deny"), "Deny \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "supervisor_rule",
-          ruleId: "stress-deny-\(id.index)",
-          reasonCodes: ["stress_denied_\(id.index)"],
-          decision: "deny"
-        ),
+        .supervisorRule(decision: .deny, reasonCodes: [.checksNotGreen]),
         group: group, inputs: ["in"]
       ),
       node(
         id.node("finish"), "Finish \(id.index)",
-        TaskBoardPolicyPipelineNodeKind(
-          kind: "finish",
-          reasonCode: "stress_finished_\(id.index)",
-          decision: "allow"
-        ),
+        .finish(PolicyFinishNode(decision: .allow, reasonCode: .autoMergeAllowed)),
         group: group, inputs: ["in"]
       ),
     ]

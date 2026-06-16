@@ -93,7 +93,7 @@ public struct PolicyGapRule: PolicyRule {
   public func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     unknownCodes(in: snapshot).flatMap { unknownCode in
       actions(
         for: unknownCode,
@@ -124,7 +124,7 @@ public struct PolicyGapRule: PolicyRule {
     for unknownCode: String,
     snapshotID: String,
     sessionID: String?
-  ) -> [PolicyAction] {
+  ) -> [SupervisorAction] {
     let logID = "policy-gap-log-\(unknownCode)"
     let decisionID = "policy-gap-decision-\(unknownCode)"
     let message = "Unknown classifier code detected: \(unknownCode)"

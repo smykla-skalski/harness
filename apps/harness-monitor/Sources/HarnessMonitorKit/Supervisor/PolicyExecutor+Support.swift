@@ -34,7 +34,7 @@ private struct NoOpSupervisorAPIClient: SupervisorAPIClient {
   }
 }
 
-extension PolicyAction {
+extension SupervisorAction {
   var auditTickID: String {
     switch self {
     case .nudgeAgent(let payload):

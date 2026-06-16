@@ -1,10 +1,11 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 extension PolicyCanvasEditForm {
   func automationReviewOCRControls(
     ocr: AutomationPolicyOCRConfiguration,
-    binding: TaskBoardPolicyPipelineAutomationBinding
+    binding: PolicyGraphAutomationBinding
   ) -> some View {
     Group {
       automationPickerField(
@@ -35,7 +36,7 @@ extension PolicyCanvasEditForm {
 
   func automationReviewExtractionFields(
     extraction: ReviewPullRequestExtractionConfiguration,
-    binding: TaskBoardPolicyPipelineAutomationBinding
+    binding: PolicyGraphAutomationBinding
   ) -> some View {
     Group {
       automationPickerField(

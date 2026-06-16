@@ -139,7 +139,7 @@ private struct StubRule: PolicyRule {
   func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] { [] }
+  ) async -> [SupervisorAction] { [] }
 }
 
 private struct StubObserver: PolicyObserver {

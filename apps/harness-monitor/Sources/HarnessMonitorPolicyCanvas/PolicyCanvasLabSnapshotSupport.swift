@@ -98,21 +98,15 @@ public enum PolicyCanvasLabSnapshotSupport {
       writeFixtureDecodeLog("FAIL no fixture data (bad base64 or unreadable path)")
       return nil
     }
-    let snake = JSONDecoder()
-    snake.keyDecodingStrategy = .convertFromSnakeCase
     do {
-      let document = try snake.decode(TaskBoardPolicyPipelineDocument.self, from: data)
-      writeFixtureDecodeLog("OK convertFromSnakeCase nodes=\(document.nodes.count)")
-      return document
-    } catch {
-      if let document = try? JSONDecoder().decode(
+      let document = try PolicyWireCoding.decoder.decode(
         TaskBoardPolicyPipelineDocument.self,
         from: data
-      ) {
-        writeFixtureDecodeLog("OK plain nodes=\(document.nodes.count)")
-        return document
-      }
-      writeFixtureDecodeLog("FAIL convertFromSnakeCase: \(error)")
+      )
+      writeFixtureDecodeLog("OK plain nodes=\(document.nodes.count)")
+      return document
+    } catch {
+      writeFixtureDecodeLog("FAIL plain decode: \(error)")
       return nil
     }
   }

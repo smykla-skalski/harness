@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 /// Inspector controls for the selected policy node, composed from the fields
@@ -17,7 +18,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
     let policyKind = node.policyKind ?? taskBoardPolicyNodeKind(for: node.kind)
     let fields = PolicyCanvasInspectorFieldSchema.fields(for: policyKind)
     if fields.isEmpty {
-      PolicyCanvasInspectorRow(label: "Binding", value: policyKind.kind)
+      PolicyCanvasInspectorRow(label: "Binding", value: policyKind.discriminator)
     } else {
       VStack(alignment: .leading, spacing: 8) {
         ForEach(fields) { field in
@@ -32,7 +33,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
   @ViewBuilder
   private func control(
     for field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> some View {
     switch field {
     case .actionBinding:
@@ -59,7 +60,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
   @ViewBuilder
   private func textControl(
     for field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> some View {
     if let descriptor = textDescriptor(for: field, policyKind) {
       commitText(field, descriptor)
@@ -68,7 +69,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   private func textDescriptor(
     for field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> CommitTextDescriptor? {
     workflowTextDescriptor(for: field, policyKind)
       ?? waitTextDescriptor(for: field, policyKind)
@@ -77,7 +78,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   private func workflowTextDescriptor(
     for field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> CommitTextDescriptor? {
     switch field {
     case .workflow:
@@ -111,7 +112,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   private func waitTextDescriptor(
     for field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> CommitTextDescriptor? {
     switch field {
     case .waitDuration:
@@ -153,7 +154,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   private func routingTextDescriptor(
     for field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> CommitTextDescriptor? {
     switch field {
     case .handoffKey:
@@ -167,18 +168,10 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
     case .reasonCode:
       CommitTextDescriptor(
         label: "Reason code",
-        value: policyKind.reasonCode ?? policyKind.reasonCodes.first ?? "",
+        value: policyKind.reasonCode ?? policyKind.reasonCodes.first?.rawValue ?? "",
         focus: .reasonCode,
         placeholder: "Reason code",
         commit: { viewModel.commitSelectedReasonCode($0) }
-      )
-    case .ruleID:
-      CommitTextDescriptor(
-        label: "Supervisor rule id",
-        value: policyKind.ruleId ?? "",
-        focus: .ruleID,
-        placeholder: "Rule id",
-        commit: { viewModel.commitSelectedRuleID($0) }
       )
     default:
       nil
@@ -211,10 +204,10 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   private func actionBindingControl(
     _ field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> some View {
     Picker("Action binding", selection: selectedPolicyActionBinding(policyKind)) {
-      ForEach(TaskBoardPolicyAction.allCases) { action in
+      ForEach(PolicyAction.allCases) { action in
         Text(action.policyCanvasTitle).tag(action)
       }
     }
@@ -227,10 +220,10 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   private func evidenceControl(
     _ field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> some View {
     Picker("Evidence field", selection: selectedEvidenceFieldBinding(policyKind)) {
-      ForEach(TaskBoardPolicyEvidenceField.allCases, id: \.self) { evidence in
+      ForEach(PolicyEvidenceField.allCases, id: \.self) { evidence in
         Text(evidence.policyCanvasTitle).tag(evidence)
       }
     }
@@ -243,7 +236,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   private func evidenceChecksControl(
     _ field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> some View {
     PolicyCanvasInspectorEvidenceChecksControl(
       viewModel: viewModel,
@@ -256,7 +249,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   private func riskThresholdControl(
     _ field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> some View {
     Stepper(value: selectedRiskThresholdBinding(policyKind), in: 0...100) {
       Text("\(policyKind.threshold.map(Int.init) ?? 0)")
@@ -270,10 +263,10 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   private func predicateControl(
     _ field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> some View {
     Picker("Condition predicate", selection: selectedConditionPredicateBinding(policyKind)) {
-      ForEach(TaskBoardPolicyEvidencePredicateValue.allCases, id: \.self) { predicate in
+      ForEach(PolicyEvidencePredicate.allCases, id: \.self) { predicate in
         Text(predicate.policyCanvasTitle).tag(predicate)
       }
     }
@@ -286,11 +279,11 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   private func waitKindControl(
     _ field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> some View {
     Picker("Wait kind", selection: selectedWaitConditionKindBinding(policyKind)) {
-      Text("Timer").tag(TaskBoardPolicyWaitCondition.Kind.timer)
-      Text("Event").tag(TaskBoardPolicyWaitCondition.Kind.event)
+      Text("Timer").tag(PolicyWaitCondition.Kind.timer)
+      Text("Event").tag(PolicyWaitCondition.Kind.event)
     }
     .labelsHidden()
     .pickerStyle(.segmented)
@@ -301,7 +294,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   private func decisionControl(
     _ field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> some View {
     Picker(
       field == .finishDecision ? "Finish behavior" : "Gate behavior",
@@ -319,7 +312,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   private func switchCasesControl(
     _ field: PolicyInspectorField,
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> some View {
     PolicyCanvasInspectorSwitchCasesControl(
       viewModel: viewModel,
@@ -329,17 +322,17 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
   }
 
   private func selectedPolicyActionBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<TaskBoardPolicyAction> {
+    _ policyKind: PolicyGraphNodeKind
+  ) -> Binding<PolicyAction> {
     Binding(
-      get: { policyKind.actions.first ?? policyKind.action ?? .spawnAgent },
+      get: { policyKind.actions.first ?? .spawnAgent },
       set: { viewModel.commitSelectedPolicyAction($0) }
     )
   }
 
   private func selectedEvidenceFieldBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<TaskBoardPolicyEvidenceField> {
+    _ policyKind: PolicyGraphNodeKind
+  ) -> Binding<PolicyEvidenceField> {
     Binding(
       get: { policyKind.checks.first?.field ?? policyKind.field ?? .checksGreen },
       set: { viewModel.commitSelectedEvidenceField($0) }
@@ -347,7 +340,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
   }
 
   private func selectedRiskThresholdBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> Binding<Int> {
     Binding(
       get: { Int(policyKind.threshold ?? 0) },
@@ -356,17 +349,17 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
   }
 
   private func selectedConditionPredicateBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<TaskBoardPolicyEvidencePredicateValue> {
+    _ policyKind: PolicyGraphNodeKind
+  ) -> Binding<PolicyEvidencePredicate> {
     Binding(
-      get: { policyKind.predicate?.predicate ?? .isTrue },
+      get: { policyKind.predicate ?? .isTrue },
       set: { viewModel.commitSelectedConditionPredicate($0) }
     )
   }
 
   private func selectedWaitConditionKindBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<TaskBoardPolicyWaitCondition.Kind> {
+    _ policyKind: PolicyGraphNodeKind
+  ) -> Binding<PolicyWaitCondition.Kind> {
     Binding(
       get: { policyKind.wait?.kind ?? .event },
       set: { viewModel.commitSelectedWaitConditionKind($0) }
@@ -374,7 +367,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
   }
 
   private func selectedDecisionBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> Binding<String> {
     Binding(
       get: { policyKind.decision ?? "allow" },

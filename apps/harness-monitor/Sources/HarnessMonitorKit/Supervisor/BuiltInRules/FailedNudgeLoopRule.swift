@@ -37,7 +37,7 @@ public struct FailedNudgeLoopRule: PolicyRule {
   public func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     let threshold = max(
       1,
       context.parameters.int(Self.thresholdKey, default: Self.defaultFailureThreshold)
@@ -105,8 +105,8 @@ public struct FailedNudgeLoopRule: PolicyRule {
     for streak: FailureStreak,
     snapshotID: String,
     context: PolicyContext
-  ) -> PolicyAction? {
-    let payload = PolicyAction.DecisionPayload(
+  ) -> SupervisorAction? {
+    let payload = SupervisorAction.DecisionPayload(
       id: "\(id):\(streak.agentID)",
       severity: .needsUser,
       ruleID: id,
@@ -119,7 +119,7 @@ public struct FailedNudgeLoopRule: PolicyRule {
       contextJSON: encode(ContextPayload(snapshotID: snapshotID, streak: streak)),
       suggestedActionsJSON: encode(suggestedActions(for: streak.agentID))
     )
-    let action = PolicyAction.queueDecision(payload)
+    let action = SupervisorAction.queueDecision(payload)
     guard !context.recentActionKeys.contains(action.actionKey) else {
       return nil
     }

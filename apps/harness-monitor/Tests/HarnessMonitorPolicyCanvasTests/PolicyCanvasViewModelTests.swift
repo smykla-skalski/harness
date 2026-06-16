@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorPolicyModels
 import SwiftUI
 import Testing
 
@@ -299,14 +300,18 @@ struct PolicyCanvasViewModelTests {
     let evidenceKind = exported.nodes.first { $0.id == "node-evidence" }?.kind
     let failureCondition = exported.edges.first { $0.id == "edge-evidence-risk-fail" }?.condition
 
-    #expect(riskKind?.kind == "risk_classifier")
+    #expect(riskKind?.discriminator == "risk_classifier")
     #expect(riskKind?.field == .riskScore)
     #expect(riskKind?.threshold == 74)
-    #expect(riskKind?.highRiskReasonCode == "merge_risk_high")
-    #expect(riskKind?.missingReasonCode == "merge_risk_missing")
-    #expect(evidenceKind?.kind == "evidence_check")
+    if case let .riskClassifier(_, _, highRiskReasonCode, missingReasonCode) = riskKind {
+      #expect(highRiskReasonCode == .riskAboveThreshold)
+      #expect(missingReasonCode == .humanRequired)
+    } else {
+      Issue.record("riskKind is not riskClassifier")
+    }
+    #expect(evidenceKind?.discriminator == "evidence_check")
     #expect(evidenceKind?.checks.first?.field == .checksGreen)
-    #expect(evidenceKind?.checks.first?.failReasonCode == "checks_not_green")
+    #expect(evidenceKind?.checks.first?.failReasonCode == .checksNotGreen)
     #expect(failureCondition?.condition == "evidence_failure")
     #expect(failureCondition?.reasonCode == "checks_not_green")
   }
@@ -320,42 +325,27 @@ struct PolicyCanvasViewModelTests {
         TaskBoardPolicyPipelineNode(
           id: "node-entry",
           label: "Entry",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "workflow_entry",
-            workflowId: "reviews_auto"
-          ),
+          kind: .workflowEntry(PolicyWorkflowEntry(workflowId: "reviews_auto")),
           inputPorts: [],
           outputPorts: ["out"]
         ),
         TaskBoardPolicyPipelineNode(
           id: "node-if",
           label: "Checks green?",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "if_then_else",
-            field: .checksGreen,
-            predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
-          ),
+          kind: .ifThenElse(PolicyIfThenElseCondition(field: .checksGreen, predicate: .isTrue)),
           inputPorts: ["in"],
           outputPorts: ["then", "else"]
         ),
         TaskBoardPolicyPipelineNode(
           id: "node-allow",
           label: "Allow",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "finish",
-            reasonCode: "default_allow",
-            decision: "allow"
-          ),
+          kind: .finish(PolicyFinishNode(decision: .allow, reasonCode: .defaultAllow)),
           inputPorts: ["in"]
         ),
         TaskBoardPolicyPipelineNode(
           id: "node-deny",
           label: "Deny",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "finish",
-            reasonCode: "checks_not_green",
-            decision: "deny"
-          ),
+          kind: .finish(PolicyFinishNode(decision: .deny, reasonCode: .checksNotGreen)),
           inputPorts: ["in"]
         ),
       ],
@@ -437,21 +427,14 @@ struct PolicyCanvasViewModelTests {
         TaskBoardPolicyPipelineNode(
           id: "source",
           label: "Source",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "workflow_entry",
-            workflowId: "reviews_auto"
-          ),
+          kind: .workflowEntry(PolicyWorkflowEntry(workflowId: "reviews_auto")),
           inputPorts: [],
           outputPorts: []
         ),
         TaskBoardPolicyPipelineNode(
           id: "target",
           label: "Target",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "finish",
-            reasonCode: "default_allow",
-            decision: "allow"
-          ),
+          kind: .finish(PolicyFinishNode(decision: .allow, reasonCode: .defaultAllow)),
           inputPorts: [],
           outputPorts: []
         ),

@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 // MARK: - Extreme depth nodes
 
@@ -12,104 +13,78 @@ extension PolicyCanvasLabSamples {
   static let extremeDepthNodes: [TaskBoardPolicyPipelineNode] = [
     node(
       "x-evidence2", "Verify evidence",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "evidence_check",
-        checks: [
-          TaskBoardPolicyEvidenceCheck(
-            field: .unresolvedRequestedChanges,
-            pass: TaskBoardPolicyEvidencePredicate(predicate: .isZero),
-            failReasonCode: "unresolved_requested_changes", missingReasonCode: "checks_missing"
-          ),
-          TaskBoardPolicyEvidenceCheck(
-            field: .protectedPathTouched,
-            pass: TaskBoardPolicyEvidencePredicate(predicate: .isFalse),
-            failReasonCode: "protected_path_touched", missingReasonCode: "checks_missing"
-          ),
-        ]
-      ),
+      .evidenceCheck(checks: [
+        PolicyEvidenceCheck(
+          field: .unresolvedRequestedChanges,
+          pass: .isZero,
+          failReasonCode: .unresolvedRequestedChanges, missingReasonCode: .missingMergeEvidence
+        ),
+        PolicyEvidenceCheck(
+          field: .protectedPathTouched,
+          pass: .isFalse,
+          failReasonCode: .protectedPathTouched, missingReasonCode: .missingMergeEvidence
+        ),
+      ]),
       group: "x-checks", inputs: ["in"], outputs: ["pass", "fail", "missing"]
     ),
     node(
       "x-switch2", "Verify switch",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "switch",
-        arms: [
-          TaskBoardPolicySwitchArm(
-            port: "case_a", field: .reviewReviewRequired,
-            predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
-          ),
-          TaskBoardPolicySwitchArm(
-            port: "case_b", field: .reviewViewerCanUpdate,
-            predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
-          ),
-          TaskBoardPolicySwitchArm(
-            port: "case_c", field: .reviewPolicyBlocked,
-            predicate: TaskBoardPolicyEvidencePredicate(predicate: .isFalse)
-          ),
-        ]
-      ),
+      .switch(PolicySwitchNode(arms: [
+        PolicySwitchArm(port: "case_a", field: .reviewReviewRequired, predicate: .isTrue),
+        PolicySwitchArm(port: "case_b", field: .reviewViewerCanUpdate, predicate: .isTrue),
+        PolicySwitchArm(port: "case_c", field: .reviewPolicyBlocked, predicate: .isFalse),
+      ])),
       group: "x-checks", inputs: ["in"], outputs: ["case_a", "case_b", "case_c", "default"]
     ),
     node(
       "x-wait2", "Cooldown timer",
-      TaskBoardPolicyPipelineNodeKind(kind: "wait_step", wait: .timer(300), resumeKey: "cooldown"),
+      .waitStep(PolicyWaitStep(wait: .timer(durationSeconds: 300), resumeKey: "cooldown")),
       group: "x-orchestration", inputs: ["in"], outputs: ["out"]
     ),
     node(
       "x-action2", "Post-merge action",
-      TaskBoardPolicyPipelineNodeKind(kind: "action_step", actionId: "reviews.notify"),
+      .actionStep(PolicyActionStep(actionId: "reviews.notify")),
       group: "x-orchestration", inputs: ["in"], outputs: ["out"]
     ),
     node(
       "x-action3", "Finalize action",
-      TaskBoardPolicyPipelineNodeKind(kind: "action_step", actionId: "reviews.finalize"),
+      .actionStep(PolicyActionStep(actionId: "reviews.finalize")),
       group: "x-orchestration", inputs: ["in"], outputs: ["out"]
     ),
     node(
       "x-agent-evidence", "Agent evidence",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "evidence_check",
-        checks: [
-          TaskBoardPolicyEvidenceCheck(
-            field: .reviewHasNoDecision,
-            pass: TaskBoardPolicyEvidencePredicate(predicate: .isFalse),
-            failReasonCode: "agent_blocked", missingReasonCode: "checks_missing"
-          )
-        ]
-      ),
+      .evidenceCheck(checks: [
+        PolicyEvidenceCheck(
+          field: .reviewHasNoDecision,
+          pass: .isFalse,
+          failReasonCode: .protectedPathTouched, missingReasonCode: .missingMergeEvidence
+        ),
+      ]),
       group: "x-agent", inputs: ["in"], outputs: ["pass", "fail", "missing"]
     ),
     node(
       "x-agent-consensus", "Agent consensus",
-      TaskBoardPolicyPipelineNodeKind(kind: "consensus_gate"),
+      .consensusGate(reasonCode: .protectedPathTouched),
       group: "x-agent", inputs: ["in"]
     ),
     node(
       "x-human2", "Escalation gate",
-      TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
+      .humanGate(reasonCode: .humanRequired),
       group: "x-gates", inputs: ["in"]
     ),
     node(
       "x-deny2", "Block: verify",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "supervisor_rule", ruleId: "x-verify-deny",
-        reasonCodes: ["protected_path_touched"], decision: "deny"
-      ),
+      .supervisorRule(decision: .deny, reasonCodes: [.protectedPathTouched]),
       group: "x-terminals", inputs: ["in"]
     ),
     node(
       "x-allow2", "Allow: verify",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "supervisor_rule", ruleId: "x-verify-allow",
-        reasonCodes: ["auto_merge_allowed"], decision: "allow"
-      ),
+      .supervisorRule(decision: .allow, reasonCodes: [.autoMergeAllowed]),
       group: "x-terminals", inputs: ["in"]
     ),
     node(
       "x-finish2", "Finalize",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "finish", reasonCode: "policy_finished", decision: "allow"
-      ),
+      .finish(PolicyFinishNode(decision: .allow, reasonCode: .autoMergeAllowed)),
       group: "x-terminals", inputs: ["in"]
     ),
   ]

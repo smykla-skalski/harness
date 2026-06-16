@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorPolicyModels
 
 extension PreviewFixtures {
   public static func policyCanvasPipelineDocument(
@@ -73,10 +74,7 @@ extension PreviewFixtures {
     policyNode(
       id: "action:router",
       title: "Action gate",
-      kind: TaskBoardPolicyPipelineNodeKind(
-        kind: "action_gate",
-        actions: TaskBoardPolicyAction.allCases
-      ),
+      kind: .actionGate(actions: PolicyAction.allCases),
       groupID: "entry",
       inputs: ["in"],
       outputs: ["default", "mutate", "merge", "unsafe"]
@@ -84,41 +82,38 @@ extension PreviewFixtures {
     policyNode(
       id: "evidence:merge",
       title: "Merge evidence",
-      kind: TaskBoardPolicyPipelineNodeKind(
-        kind: "evidence_check",
-        checks: [
-          TaskBoardPolicyEvidenceCheck(
-            field: .checksGreen,
-            pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-            failReasonCode: "checks_not_green",
-            missingReasonCode: "checks_missing"
-          ),
-          TaskBoardPolicyEvidenceCheck(
-            field: .branchProtectionAllowsMerge,
-            pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-            failReasonCode: "branch_protection_blocked",
-            missingReasonCode: "checks_missing"
-          ),
-          TaskBoardPolicyEvidenceCheck(
-            field: .reviewerVerdictApproved,
-            pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-            failReasonCode: "reviewer_not_approved",
-            missingReasonCode: "checks_missing"
-          ),
-          TaskBoardPolicyEvidenceCheck(
-            field: .unresolvedRequestedChanges,
-            pass: TaskBoardPolicyEvidencePredicate(predicate: .isZero),
-            failReasonCode: "unresolved_requested_changes",
-            missingReasonCode: "checks_missing"
-          ),
-          TaskBoardPolicyEvidenceCheck(
-            field: .protectedPathTouched,
-            pass: TaskBoardPolicyEvidencePredicate(predicate: .isFalse),
-            failReasonCode: "protected_path_touched",
-            missingReasonCode: "checks_missing"
-          ),
-        ]
-      ),
+      kind: .evidenceCheck(checks: [
+        PolicyEvidenceCheck(
+          field: .checksGreen,
+          pass: .isTrue,
+          failReasonCode: .checksNotGreen,
+          missingReasonCode: .missingMergeEvidence
+        ),
+        PolicyEvidenceCheck(
+          field: .branchProtectionAllowsMerge,
+          pass: .isTrue,
+          failReasonCode: .branchProtectionBlocked,
+          missingReasonCode: .missingMergeEvidence
+        ),
+        PolicyEvidenceCheck(
+          field: .reviewerVerdictApproved,
+          pass: .isTrue,
+          failReasonCode: .reviewerNotApproved,
+          missingReasonCode: .missingMergeEvidence
+        ),
+        PolicyEvidenceCheck(
+          field: .unresolvedRequestedChanges,
+          pass: .isZero,
+          failReasonCode: .unresolvedRequestedChanges,
+          missingReasonCode: .missingMergeEvidence
+        ),
+        PolicyEvidenceCheck(
+          field: .protectedPathTouched,
+          pass: .isFalse,
+          failReasonCode: .protectedPathTouched,
+          missingReasonCode: .missingMergeEvidence
+        ),
+      ]),
       groupID: "merge",
       inputs: ["in"],
       outputs: ["pass", "fail", "consensus", "missing"]
@@ -126,12 +121,11 @@ extension PreviewFixtures {
     policyNode(
       id: "risk:merge",
       title: "Merge risk",
-      kind: TaskBoardPolicyPipelineNodeKind(
-        kind: "risk_classifier",
+      kind: .riskClassifier(
         field: .riskScore,
         threshold: 74,
-        highRiskReasonCode: "merge_risk_high",
-        missingReasonCode: "merge_risk_missing"
+        highRiskReasonCode: .riskAboveThreshold,
+        missingReasonCode: .missingMergeEvidence
       ),
       groupID: "merge",
       inputs: ["in"],
@@ -140,58 +134,56 @@ extension PreviewFixtures {
     policyNode(
       id: "supervisor:default-allow",
       title: "Default approval",
-      kind: TaskBoardPolicyPipelineNodeKind(
-        kind: "supervisor_rule",
-        ruleId: "default-allow",
-        reasonCodes: ["default_allow"],
-        decision: "allow"
-      ),
+      kind: .supervisorRule(decision: .allow, reasonCodes: [.defaultAllow]),
       groupID: "terminal",
       inputs: ["in"]
     ),
     policyNode(
       id: "dry_run:mutate_repo",
       title: "Preview repo changes",
-      kind: TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate"),
+      kind: .dryRunGate(reasonCode: .dryRunRequired),
       groupID: "terminal",
       inputs: ["in"]
     ),
     policyNode(
       id: "human:unsafe-action",
       title: "Manual review for unsafe action",
-      kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
+      kind: .humanGate(reasonCode: .humanRequired),
       groupID: "terminal",
       inputs: ["in"]
     ),
     policyNode(
       id: "human:missing-merge-evidence",
       title: "Manual review for missing evidence",
-      kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
+      kind: .humanGate(reasonCode: .missingMergeEvidence),
       groupID: "terminal",
       inputs: ["in"]
     ),
     policyNode(
       id: "consensus:protected-path",
       title: "Protected path review",
-      kind: TaskBoardPolicyPipelineNodeKind(kind: "consensus_gate"),
+      kind: .consensusGate(reasonCode: .protectedPathTouched),
       groupID: "terminal",
       inputs: ["in"]
     ),
     policyNode(
       id: "dry_run:high-risk-merge",
       title: "Preview high-risk merge",
-      kind: TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate"),
+      kind: .dryRunGate(reasonCode: .riskAboveThreshold),
       groupID: "terminal",
       inputs: ["in"]
     ),
     policyNode(
       id: "supervisor:merge-deny",
       title: "Block merge",
-      kind: TaskBoardPolicyPipelineNodeKind(
-        kind: "supervisor_rule",
-        ruleId: "merge-deny",
-        reasonCodes: ["merge_denied"],
-        decision: "deny"
+      kind: .supervisorRule(
+        decision: .deny,
+        reasonCodes: [
+          .checksNotGreen,
+          .branchProtectionBlocked,
+          .reviewerNotApproved,
+          .unresolvedRequestedChanges,
+        ]
       ),
       groupID: "terminal",
       inputs: ["in"]
@@ -199,12 +191,7 @@ extension PreviewFixtures {
     policyNode(
       id: "supervisor:auto-merge",
       title: "Approve merge",
-      kind: TaskBoardPolicyPipelineNodeKind(
-        kind: "supervisor_rule",
-        ruleId: "auto-merge",
-        reasonCodes: ["auto_merge_allowed"],
-        decision: "allow"
-      ),
+      kind: .supervisorRule(decision: .allow, reasonCodes: [.autoMergeAllowed]),
       groupID: "terminal",
       inputs: ["in"]
     ),
@@ -307,7 +294,7 @@ extension PreviewFixtures {
   private static func policyNode(
     id: String,
     title: String,
-    kind: TaskBoardPolicyPipelineNodeKind,
+    kind: PolicyGraphNodeKind,
     groupID: String,
     inputs: [String] = [],
     outputs: [String] = []

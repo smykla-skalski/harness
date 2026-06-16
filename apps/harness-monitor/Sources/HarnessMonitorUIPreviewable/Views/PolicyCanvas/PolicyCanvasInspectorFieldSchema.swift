@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 /// The vocabulary of editable inspector fields a policy node can expose. Each
 /// case is a reusable, typed control; node kinds compose them via
@@ -22,7 +23,6 @@ enum PolicyInspectorField: String, CaseIterable, Identifiable {
   case eventKey
   case handoffKey
   case reasonCode
-  case ruleID
   case gateDecision
   case finishDecision
 
@@ -47,7 +47,6 @@ enum PolicyInspectorField: String, CaseIterable, Identifiable {
     case .eventKey: "Event key"
     case .handoffKey: "Handoff key"
     case .reasonCode: "Reason"
-    case .ruleID: "Rule"
     case .gateDecision: "Decision"
     case .finishDecision: "Decision"
     }
@@ -73,7 +72,6 @@ enum PolicyInspectorField: String, CaseIterable, Identifiable {
     case .eventKey: "event-key"
     case .handoffKey: "handoff-key"
     case .reasonCode: "reason-code"
-    case .ruleID: "rule-id"
     case .gateDecision: "gate-behavior"
     case .finishDecision: "finish-decision"
     }
@@ -85,7 +83,7 @@ enum PolicyInspectorField: String, CaseIterable, Identifiable {
 /// iterates the returned fields and dispatches each to its typed control, so a
 /// new node kind is added here rather than as a bespoke per-kind form builder.
 enum PolicyCanvasInspectorFieldSchema {
-  static func fields(for policyKind: TaskBoardPolicyPipelineNodeKind) -> [PolicyInspectorField] {
+  static func fields(for policyKind: PolicyGraphNodeKind) -> [PolicyInspectorField] {
     sourceFields(for: policyKind)
       ?? orchestrationFields(for: policyKind)
       ?? outcomeFields(for: policyKind)
@@ -93,9 +91,9 @@ enum PolicyCanvasInspectorFieldSchema {
   }
 
   private static func sourceFields(
-    for policyKind: TaskBoardPolicyPipelineNodeKind
+    for policyKind: PolicyGraphNodeKind
   ) -> [PolicyInspectorField]? {
-    switch policyKind.kind {
+    switch policyKind.discriminator {
     case "trigger": [.workflow]
     case "workflow_entry": [.workflowID]
     case "action_gate": [.actionBinding]
@@ -109,9 +107,9 @@ enum PolicyCanvasInspectorFieldSchema {
   }
 
   private static func orchestrationFields(
-    for policyKind: TaskBoardPolicyPipelineNodeKind
+    for policyKind: PolicyGraphNodeKind
   ) -> [PolicyInspectorField]? {
-    switch policyKind.kind {
+    switch policyKind.discriminator {
     case "wait_step": waitStepFields(for: policyKind)
     case "event_wait": [.eventKey]
     case "handoff": [.handoffKey]
@@ -120,11 +118,11 @@ enum PolicyCanvasInspectorFieldSchema {
   }
 
   private static func outcomeFields(
-    for policyKind: TaskBoardPolicyPipelineNodeKind
+    for policyKind: PolicyGraphNodeKind
   ) -> [PolicyInspectorField]? {
-    switch policyKind.kind {
+    switch policyKind.discriminator {
     case "human_gate", "consensus_gate", "dry_run_gate": [.reasonCode]
-    case "supervisor_rule": [.ruleID, .gateDecision]
+    case "supervisor_rule": [.gateDecision]
     case "finish": [.finishDecision, .reasonCode]
     default: nil
     }
@@ -135,7 +133,7 @@ enum PolicyCanvasInspectorFieldSchema {
   /// key). A nil wait defaults to the event branch, matching the inspector's
   /// prior `(wait?.kind ?? .event)` behavior.
   private static func waitStepFields(
-    for policyKind: TaskBoardPolicyPipelineNodeKind
+    for policyKind: PolicyGraphNodeKind
   ) -> [PolicyInspectorField] {
     let isTimer = (policyKind.wait?.kind ?? .event) == .timer
     return [.waitKind, isTimer ? .waitDuration : .waitEventKey, .resumeKey]

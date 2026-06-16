@@ -1,6 +1,6 @@
 import Foundation
 
-/// Result of handing a `PolicyAction` to the `PolicyExecutor`. Public cases are part of the
+/// Result of handing a `SupervisorAction` to the `PolicyExecutor`. Public cases are part of the
 /// Phase 1 signature freeze.
 public enum PolicyOutcome: Sendable, Hashable {
   case dispatched(actionKey: String)

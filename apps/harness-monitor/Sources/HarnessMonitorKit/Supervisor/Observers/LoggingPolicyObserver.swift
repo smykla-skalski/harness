@@ -28,7 +28,7 @@ public struct OSLogSupervisorLogSink: SupervisorLogSink {
 ///
 /// AI-observer extension point:
 /// External code can register an `AIPolicyObserver` that conforms to `PolicyObserver` and calls
-/// an AI runtime to produce `[PolicyAction.ConfigSuggestion]` from
+/// an AI runtime to produce `[SupervisorAction.ConfigSuggestion]` from
 /// `proposeConfigSuggestion(history:)`.
 /// This external observer integration is documented as the v1 extension seam, but it is not
 /// shipped in the product by default.
@@ -49,7 +49,7 @@ public final class LoggingPolicyObserver: PolicyObserver {
     )
   }
 
-  public func didEvaluate(rule: any PolicyRule, actions: [PolicyAction]) async {
+  public func didEvaluate(rule: any PolicyRule, actions: [SupervisorAction]) async {
     sink.record(
       event: "didEvaluate",
       fields: [
@@ -59,7 +59,7 @@ public final class LoggingPolicyObserver: PolicyObserver {
     )
   }
 
-  public func didExecute(action: PolicyAction, outcome: PolicyOutcome) async {
+  public func didExecute(action: SupervisorAction, outcome: PolicyOutcome) async {
     var fields = action.logFields
     for (key, value) in outcome.logFields {
       fields[key] = value
@@ -69,13 +69,13 @@ public final class LoggingPolicyObserver: PolicyObserver {
 
   public func proposeConfigSuggestion(
     history: PolicyHistoryWindow
-  ) async -> [PolicyAction.ConfigSuggestion] {
+  ) async -> [SupervisorAction.ConfigSuggestion] {
     _ = history
     return []
   }
 }
 
-extension PolicyAction {
+extension SupervisorAction {
   fileprivate var logFields: [String: String] {
     var fields = baseLogFields
     if let snapshotID {

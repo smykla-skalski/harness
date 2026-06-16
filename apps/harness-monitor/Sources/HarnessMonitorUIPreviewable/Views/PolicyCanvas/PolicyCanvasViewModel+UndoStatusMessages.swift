@@ -206,7 +206,7 @@ extension PolicyCanvasViewModel {
     case .setNodeSubtitle(_, _, let to):
       return "Subtitle set to \(to)"
     case .setNodePolicyKind(_, _, let to):
-      return to.map { "Node binding set to \($0.kind)" } ?? "Node binding cleared"
+      return to.map { "Node binding set to \($0.discriminator)" } ?? "Node binding cleared"
     case .setNodeSwitchCases(_, _, let to, _, _, _, _):
       return "Switch cases set to \(to.arms.count)"
     case .setNodeAutomationBinding(_, _, let to):

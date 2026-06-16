@@ -198,7 +198,7 @@ final class PolicyExecutorTests: XCTestCase {
     let store = try DecisionStore.makeInMemory()
     let audit = InMemoryAuditWriter()
     let exec = PolicyExecutor(api: api, decisions: store, audit: audit)
-    let action = PolicyAction.nudgeAgent(
+    let action = SupervisorAction.nudgeAgent(
       .init(
         agentID: "a1",
         prompt: "x",

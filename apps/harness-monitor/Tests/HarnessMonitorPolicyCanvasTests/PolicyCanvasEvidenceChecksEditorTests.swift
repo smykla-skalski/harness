@@ -5,6 +5,7 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
 @testable import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 /// Phase 8: an `evidence_check` node exposes a full checks-array editor, not a
 /// single field picker. Check order is the engine's failure priority (the first
@@ -89,15 +90,15 @@ struct PolicyCanvasEvidenceChecksEditorTests {
     viewModel.commitSelectedEvidenceCheckField(.protectedPathTouched, at: 0)
     viewModel.commitSelectedEvidenceCheckPredicate(.isFalse, at: 0)
     viewModel.commitSelectedEvidenceCheckFailReasonCode(
-      PolicyCanvasReasonCode.protectedPathTouched,
+      .protectedPathTouched,
       at: 0
     )
 
     let exported = viewModel.exportDocument()
     let check = try #require(exported.nodes.first { $0.id == nodeID }?.kind.checks.first)
     #expect(check.field == .protectedPathTouched)
-    #expect(check.pass.predicate == .isFalse)
-    #expect(check.failReasonCode == PolicyCanvasReasonCode.protectedPathTouched)
+    #expect(check.pass == .isFalse)
+    #expect(check.failReasonCode == .protectedPathTouched)
   }
 
   @Test("a fail reason code edit no-ops when the value is unchanged")

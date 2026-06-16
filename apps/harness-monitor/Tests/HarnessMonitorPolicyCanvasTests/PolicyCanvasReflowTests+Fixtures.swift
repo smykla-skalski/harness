@@ -53,7 +53,7 @@ extension PolicyCanvasReflowTests {
         TaskBoardPolicyPipelineNode(
           id: "source-node",
           title: "Source",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+          kind: .actionGate(actions: [.spawnAgent]),
           groupId: "group-source",
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
           outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
@@ -61,7 +61,7 @@ extension PolicyCanvasReflowTests {
         TaskBoardPolicyPipelineNode(
           id: "target-node",
           title: "Target",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+          kind: .actionGate(actions: [.spawnAgent]),
           groupId: "group-target",
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
         ),
@@ -122,7 +122,7 @@ extension PolicyCanvasReflowTests {
       TaskBoardPolicyPipelineNode(
         id: "source-a",
         title: "Source A",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+        kind: .actionGate(actions: [.spawnAgent]),
         groupId: "group-source",
         inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
         outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
@@ -130,7 +130,7 @@ extension PolicyCanvasReflowTests {
       TaskBoardPolicyPipelineNode(
         id: "source-b",
         title: "Source B",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+        kind: .actionGate(actions: [.spawnAgent]),
         groupId: "group-source",
         inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
         outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
@@ -138,14 +138,14 @@ extension PolicyCanvasReflowTests {
       TaskBoardPolicyPipelineNode(
         id: "sink-a",
         title: "Sink A",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate", actions: [.spawnAgent]),
+        kind: .humanGate(reasonCode: .humanRequired),
         groupId: "group-target",
         inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
       ),
       TaskBoardPolicyPipelineNode(
         id: "sink-b",
         title: "Sink B",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate", actions: [.spawnAgent]),
+        kind: .humanGate(reasonCode: .humanRequired),
         groupId: "group-target",
         inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
       ),

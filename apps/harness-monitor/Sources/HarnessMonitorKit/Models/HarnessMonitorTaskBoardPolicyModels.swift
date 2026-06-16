@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorPolicyModels
 
 public enum TaskBoardPolicyPipelineMode: String, Codable, CaseIterable, Sendable {
   case draft
@@ -36,19 +37,33 @@ public struct TaskBoardPolicyPipelineDocument: Codable, Equatable, Sendable {
     self.policyTraceIds = policyTraceIds
   }
 
+  enum CodingKeys: String, CodingKey {
+    case schemaVersion = "schema_version"
+    case revision
+    case mode
+    case nodes
+    case edges
+    case groups
+    case layout
+    case policyTraceIds = "policy_trace_ids"
+  }
+
   public func supervisorPolicyOverrides() -> [PolicyConfigOverride] {
     nodes.compactMap { node in
-      guard node.kind.kind == "supervisor_rule", let ruleID = node.kind.ruleId else {
+      // The wire model identifies a supervisor rule by the node id (the seed
+      // builds supervisor nodes as `node(id, id, ...)`), so the node id is the
+      // rule identity the registry overrides are keyed on.
+      guard case let .supervisorRule(decision, _) = node.kind else {
         return nil
       }
       return PolicyConfigOverride(
-        ruleID: ruleID,
-        enabled: node.kind.decision != "deny",
+        ruleID: node.id,
+        enabled: decision != .deny,
         defaultBehavior: .cautious,
         parameters: [
           "policy_canvas_node_id": node.id,
           "policy_canvas_revision": String(revision),
-          "policy_canvas_decision": node.kind.decision ?? "allow",
+          "policy_canvas_decision": decision.rawValue,
         ]
       )
     }
@@ -58,8 +73,8 @@ public struct TaskBoardPolicyPipelineDocument: Codable, Equatable, Sendable {
 public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sendable {
   public var id: String
   public var label: String
-  public var kind: TaskBoardPolicyPipelineNodeKind
-  public var automation: TaskBoardPolicyPipelineAutomationBinding?
+  public var kind: PolicyGraphNodeKind
+  public var automation: PolicyGraphAutomationBinding?
   public var inputPorts: [String]
   public var outputPorts: [String]
   public var groupId: String?
@@ -81,8 +96,8 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
   public init(
     id: String,
     title: String,
-    kind: TaskBoardPolicyPipelineNodeKind,
-    automation: TaskBoardPolicyPipelineAutomationBinding? = nil,
+    kind: PolicyGraphNodeKind,
+    automation: PolicyGraphAutomationBinding? = nil,
     position: TaskBoardPolicyCanvasPoint = .zero,
     groupId: String? = nil,
     inputs: [TaskBoardPolicyPipelinePort] = [],
@@ -101,8 +116,8 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
   public init(
     id: String,
     label: String,
-    kind: TaskBoardPolicyPipelineNodeKind,
-    automation: TaskBoardPolicyPipelineAutomationBinding? = nil,
+    kind: PolicyGraphNodeKind,
+    automation: PolicyGraphAutomationBinding? = nil,
     inputPorts: [String] = [],
     outputPorts: [String] = [],
     groupId: String? = nil
@@ -122,18 +137,18 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
     case label
     case kind
     case automation
-    case inputPorts
-    case outputPorts
-    case groupId
+    case inputPorts = "input_ports"
+    case outputPorts = "output_ports"
+    case groupId = "group_id"
   }
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     id = try container.decode(String.self, forKey: .id)
     label = try container.decode(String.self, forKey: .label)
-    kind = try container.decode(TaskBoardPolicyPipelineNodeKind.self, forKey: .kind)
+    kind = try container.decode(PolicyGraphNodeKind.self, forKey: .kind)
     automation = try container.decodeIfPresent(
-      TaskBoardPolicyPipelineAutomationBinding.self,
+      PolicyGraphAutomationBinding.self,
       forKey: .automation
     )
     inputPorts = try container.decodeIfPresent([String].self, forKey: .inputPorts) ?? []

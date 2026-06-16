@@ -143,13 +143,13 @@ extension PolicyCanvasAutomationPolicyCompiler {
   static func declaredInputPayload(
     for node: PolicyCanvasNode
   ) -> AutomationPolicyPayloadKind {
-    if node.kind == .ocrImage || node.policyKind?.kind == "ocr_image"
+    if node.kind == .ocrImage || node.policyKind?.isOCRImage == true
       || actions(from: node).contains(.ocrImage)
     {
       return .image
     }
     if node.kind == .resolveReviewPullRequests
-      || node.policyKind?.kind == "resolve_review_pull_requests"
+      || node.policyKind?.isResolveReviewPullRequests == true
       || actions(from: node).contains(.extractGitHubPullRequests)
       || actions(from: node).contains(.resolveReviewPullRequests)
       || actions(from: node).contains(.copyExtractedGitHubPullRequestURLs)
@@ -157,7 +157,7 @@ extension PolicyCanvasAutomationPolicyCompiler {
       return .text
     }
     if node.kind == .copyReviewPullRequestList
-      || node.policyKind?.kind == "copy_review_pull_request_list"
+      || node.policyKind?.isCopyReviewPullRequestList == true
       || actions(from: node).contains(.copyReviewPullRequestList)
       || actions(from: node).contains(.previewReviewApprovals)
       || actions(from: node).contains(.promptReviewApprovals)
@@ -196,14 +196,14 @@ extension PolicyCanvasAutomationPolicyCompiler {
   static func declaredOutputPayload(
     for node: PolicyCanvasNode
   ) -> AutomationPolicyPayloadKind {
-    if node.kind == .reviewScreenshotPaste || node.policyKind?.kind == "review_screenshot_paste" {
+    if node.kind == .reviewScreenshotPaste || node.policyKind?.isReviewScreenshotPaste == true {
       return .image
     }
-    if node.kind == .ocrImage || node.policyKind?.kind == "ocr_image" {
+    if node.kind == .ocrImage || node.policyKind?.isOCRImage == true {
       return .text
     }
     if node.kind == .resolveReviewPullRequests
-      || node.policyKind?.kind == "resolve_review_pull_requests"
+      || node.policyKind?.isResolveReviewPullRequests == true
       || actions(from: node).contains(.extractGitHubPullRequests)
       || actions(from: node).contains(.resolveReviewPullRequests)
     {
@@ -273,7 +273,7 @@ extension PolicyCanvasAutomationPolicyCompiler {
   }
 
   static func isHub(_ node: PolicyCanvasNode) -> Bool {
-    node.kind == .hub || node.policyKind?.kind == "hub"
+    node.kind == .hub || node.policyKind?.isHub == true
   }
 
   static func fanOuts(
@@ -349,16 +349,16 @@ extension PolicyCanvasAutomationPolicyCompiler {
         return selectedActions
       }
     }
-    if node.kind == .ocrImage || node.policyKind?.kind == "ocr_image" {
+    if node.kind == .ocrImage || node.policyKind?.isOCRImage == true {
       return [.ocrImage]
     }
     if node.kind == .resolveReviewPullRequests
-      || node.policyKind?.kind == "resolve_review_pull_requests"
+      || node.policyKind?.isResolveReviewPullRequests == true
     {
       return [.extractGitHubPullRequests, .resolveReviewPullRequests]
     }
     if node.kind == .copyReviewPullRequestList
-      || node.policyKind?.kind == "copy_review_pull_request_list"
+      || node.policyKind?.isCopyReviewPullRequestList == true
     {
       return [.copyReviewPullRequestList]
     }

@@ -4,32 +4,38 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
 @testable import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
-/// Guards that every reason-code string the inspector can commit is a valid
-/// Rust `PolicyReasonCode` variant. A drift here breaks save/simulate on the
-/// daemon, which rejects unknown reason codes.
+/// Guards that every reason code the inspector can commit is a valid Rust
+/// `PolicyReasonCode` variant. With the typed enum this is now a near-tautology,
+/// but it still pins the node-template defaults to the daemon's accepted set so
+/// a future template edit cannot reintroduce an out-of-band code.
 @Suite("Policy canvas reason-code validity")
 @MainActor
 struct PolicyCanvasReasonCodeValidityTests {
   private func reasonCodes(
-    in kind: TaskBoardPolicyPipelineNodeKind
+    in kind: PolicyGraphNodeKind
   ) -> [String] {
-    var codes: [String] = []
-    if let reasonCode = kind.reasonCode {
-      codes.append(reasonCode)
-    }
-    codes.append(contentsOf: kind.reasonCodes)
-    if let highRisk = kind.highRiskReasonCode {
+    var codes: [PolicyReasonCode] = []
+    switch kind {
+    case .humanGate(let code), .consensusGate(let code), .dryRunGate(let code):
+      codes.append(code)
+    case .supervisorRule(_, let reasonCodes):
+      codes.append(contentsOf: reasonCodes)
+    case .finish(let node):
+      codes.append(node.reasonCode)
+    case .riskClassifier(_, _, let highRisk, let missing):
       codes.append(highRisk)
-    }
-    if let missing = kind.missingReasonCode {
       codes.append(missing)
+    case .evidenceCheck(let checks):
+      for check in checks {
+        codes.append(check.failReasonCode)
+        codes.append(check.missingReasonCode)
+      }
+    default:
+      break
     }
-    for check in kind.checks {
-      codes.append(check.failReasonCode)
-      codes.append(check.missingReasonCode)
-    }
-    return codes
+    return codes.map(\.rawValue)
   }
 
   @Test("node-template reason codes are valid Rust variants")
@@ -49,13 +55,13 @@ struct PolicyCanvasReasonCodeValidityTests {
     viewModel.select(.node("risk-score"))
 
     viewModel.commitSelectedRiskThreshold(60)
-    let riskKind = viewModel.node("risk-score")?.policyKind ?? .init(kind: "")
+    let riskKind = viewModel.node("risk-score")?.policyKind ?? .hub
     let riskCodes = reasonCodes(in: riskKind)
     let riskInvalid = Set(riskCodes).subtracting(PolicyCanvasReasonCode.allValid)
     #expect(riskInvalid.isEmpty, "risk drift: \(riskInvalid)")
 
     viewModel.commitSelectedEvidenceField(.checksGreen)
-    let evidenceKind = viewModel.node("risk-score")?.policyKind ?? .init(kind: "")
+    let evidenceKind = viewModel.node("risk-score")?.policyKind ?? .hub
     let evidenceCodes = reasonCodes(in: evidenceKind)
     let evidenceInvalid = Set(evidenceCodes).subtracting(PolicyCanvasReasonCode.allValid)
     #expect(evidenceInvalid.isEmpty, "evidence drift: \(evidenceInvalid)")

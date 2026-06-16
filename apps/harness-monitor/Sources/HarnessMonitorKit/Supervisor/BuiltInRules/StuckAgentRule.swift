@@ -54,7 +54,7 @@ public struct StuckAgentRule: PolicyRule {
   public func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     let config = RuleConfig(
       thresholdSeconds: max(
         0,
@@ -88,7 +88,7 @@ public struct StuckAgentRule: PolicyRule {
     snapshot: SessionsSnapshot,
     context: PolicyContext,
     config: RuleConfig
-  ) -> [PolicyAction] {
+  ) -> [SupervisorAction] {
     matchingAgents(in: session, thresholdSeconds: config.thresholdSeconds).compactMap { match in
       action(
         for: match,
@@ -106,7 +106,7 @@ public struct StuckAgentRule: PolicyRule {
     snapshot: SessionsSnapshot,
     context: PolicyContext,
     config: RuleConfig
-  ) -> PolicyAction? {
+  ) -> SupervisorAction? {
     let retries = retryState(
       for: match.agent.id,
       events: context.history.recentEvents,
@@ -188,7 +188,7 @@ public struct StuckAgentRule: PolicyRule {
   private func nudge(
     match: MatchedAgentTask,
     snapshot: SessionsSnapshot
-  ) -> PolicyAction {
+  ) -> SupervisorAction {
     .nudgeAgent(
       .init(
         agentID: match.agent.id,
@@ -208,7 +208,7 @@ public struct StuckAgentRule: PolicyRule {
     sessionID: String,
     thresholdSeconds: Int,
     maxRetries: Int
-  ) -> PolicyAction {
+  ) -> SupervisorAction {
     .queueDecision(
       .init(
         id: "\(id):\(sessionID):\(match.agent.id):\(match.task.id)",

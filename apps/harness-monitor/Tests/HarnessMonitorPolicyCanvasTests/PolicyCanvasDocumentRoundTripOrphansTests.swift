@@ -125,7 +125,7 @@ struct PolicyCanvasDocumentRoundTripOrphansTests {
         TaskBoardPolicyPipelineNode(
           id: "node-alpha",
           title: "Alpha",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task"),
+          kind: .trigger(workflow: "default-task"),
           groupId: "group-clean",
           inputs: [],
           outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
@@ -133,7 +133,7 @@ struct PolicyCanvasDocumentRoundTripOrphansTests {
         TaskBoardPolicyPipelineNode(
           id: "node-beta",
           title: "Beta",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+          kind: .actionGate(actions: [.spawnAgent]),
           groupId: "group-clean",
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
           outputs: [TaskBoardPolicyPipelinePort(id: "default", title: "default")]
@@ -176,7 +176,7 @@ struct PolicyCanvasDocumentRoundTripOrphansTests {
         TaskBoardPolicyPipelineNode(
           id: "node-real",
           title: "Real",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+          kind: .actionGate(actions: [.spawnAgent]),
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
           outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
         )
@@ -206,7 +206,7 @@ struct PolicyCanvasDocumentRoundTripOrphansTests {
         TaskBoardPolicyPipelineNode(
           id: "node-real",
           title: "Real",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task"),
+          kind: .trigger(workflow: "default-task"),
           inputs: [],
           outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
         )
@@ -239,7 +239,7 @@ struct PolicyCanvasDocumentRoundTripOrphansTests {
         TaskBoardPolicyPipelineNode(
           id: "node-grouped",
           title: "Grouped",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task"),
+          kind: .trigger(workflow: "default-task"),
           groupId: "group-anchor",
           inputs: [],
           outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
@@ -247,7 +247,7 @@ struct PolicyCanvasDocumentRoundTripOrphansTests {
         TaskBoardPolicyPipelineNode(
           id: "node-loose",
           title: "Loose",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+          kind: .actionGate(actions: [.spawnAgent]),
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
           outputs: []
         ),

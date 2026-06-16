@@ -1,19 +1,20 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 extension PolicyCanvasViewModel {
-  func commitSelectedSwitchArmField(_ field: TaskBoardPolicyEvidenceField, at index: Int) {
+  func commitSelectedSwitchArmField(_ field: PolicyEvidenceField, at index: Int) {
     commitSelectedSwitchArmMutation(at: index) { arm in
       arm.field = field
     }
   }
 
   func commitSelectedSwitchArmPredicate(
-    _ predicate: TaskBoardPolicyEvidencePredicateValue,
+    _ predicate: PolicyEvidencePredicate,
     at index: Int
   ) {
     commitSelectedSwitchArmMutation(at: index) { arm in
-      arm.predicate = TaskBoardPolicyEvidencePredicate(predicate: predicate)
+      arm.predicate = predicate
     }
   }
 
@@ -23,10 +24,10 @@ extension PolicyCanvasViewModel {
     }
     var nextArms = context.policyKind.arms
     nextArms.append(
-      TaskBoardPolicySwitchArm(
+      PolicySwitchArm(
         port: switchCasePortTitle(nextArms.count + 1),
         field: .checksGreen,
-        predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
+        predicate: .isTrue
       )
     )
     commitSelectedSwitchCases(
@@ -54,7 +55,7 @@ extension PolicyCanvasViewModel {
 
   func commitSelectedSwitchArmMutation(
     at index: Int,
-    _ mutator: (inout TaskBoardPolicySwitchArm) -> Void
+    _ mutator: (inout PolicySwitchArm) -> Void
   ) {
     guard let context = selectedSwitchNodeContext(),
       context.policyKind.arms.indices.contains(index)
@@ -72,15 +73,14 @@ extension PolicyCanvasViewModel {
 
   func commitSelectedSwitchCases(
     context: SelectedSwitchNodeContext,
-    nextArms: [TaskBoardPolicySwitchArm],
+    nextArms: [PolicySwitchArm],
     removalIndex: Int?
   ) {
-    var nextPolicyKind = context.policyKind
-    nextPolicyKind.kind = PolicyCanvasNodeKind.switch.rawValue
-    nextPolicyKind.arms = normalizedSwitchArms(nextArms)
+    let normalizedArms = normalizedSwitchArms(nextArms)
+    let nextPolicyKind = PolicyGraphNodeKind.switch(PolicySwitchNode(arms: normalizedArms))
 
     let fromOutputPortTitles = context.node.outputPorts.map(\.title)
-    let toOutputPortTitles = switchOutputPortTitles(for: nextPolicyKind.arms)
+    let toOutputPortTitles = switchOutputPortTitles(for: normalizedArms)
     let fromEdges = edges.filter { $0.source.nodeID == context.id }
     let toEdges = migratedSwitchEdges(
       for: context.id,
@@ -116,7 +116,7 @@ extension PolicyCanvasViewModel {
       return nil
     }
     var policyKind = node.policyKind ?? taskBoardPolicyNodeKind(for: node.kind)
-    guard policyKind.kind == PolicyCanvasNodeKind.switch.rawValue else {
+    guard policyKind.discriminator == PolicyCanvasNodeKind.switch.rawValue else {
       return nil
     }
     if policyKind.arms.isEmpty {
@@ -126,10 +126,10 @@ extension PolicyCanvasViewModel {
   }
 
   func normalizedSwitchArms(
-    _ arms: [TaskBoardPolicySwitchArm]
-  ) -> [TaskBoardPolicySwitchArm] {
+    _ arms: [PolicySwitchArm]
+  ) -> [PolicySwitchArm] {
     arms.enumerated().map { index, arm in
-      TaskBoardPolicySwitchArm(
+      PolicySwitchArm(
         port: switchCasePortTitle(index + 1),
         field: arm.field,
         predicate: arm.predicate
@@ -138,7 +138,7 @@ extension PolicyCanvasViewModel {
   }
 
   func switchOutputPortTitles(
-    for arms: [TaskBoardPolicySwitchArm]
+    for arms: [PolicySwitchArm]
   ) -> [String] {
     arms.map(\.port) + ["default"]
   }
@@ -196,5 +196,5 @@ extension PolicyCanvasViewModel {
 struct SelectedSwitchNodeContext {
   let id: String
   let node: PolicyCanvasNode
-  let policyKind: TaskBoardPolicyPipelineNodeKind
+  let policyKind: PolicyGraphNodeKind
 }

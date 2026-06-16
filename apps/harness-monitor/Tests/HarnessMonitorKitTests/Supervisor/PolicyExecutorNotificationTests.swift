@@ -17,7 +17,7 @@ final class PolicyExecutorNotificationTests: XCTestCase {
       clock: clock,
       cooldown: 1
     )
-    let action = PolicyAction.queueDecision(
+    let action = SupervisorAction.queueDecision(
       .init(
         id: "d1",
         severity: .warn,

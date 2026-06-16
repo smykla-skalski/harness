@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 // MARK: - Extreme
 
@@ -19,19 +20,17 @@ extension PolicyCanvasLabSamples {
   private static let extremeIntakeNodes = [
     node(
       "x-entry", "Workflow entry",
-      TaskBoardPolicyPipelineNodeKind(kind: "workflow_entry", workflowId: "reviews_auto"),
+      .workflowEntry(PolicyWorkflowEntry(workflowId: "reviews_auto")),
       group: "x-intake", outputs: ["out"]
     ),
     node(
       "x-trigger", "Trigger",
-      TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task"),
+      .trigger(workflow: "default-task"),
       group: "x-intake", outputs: ["event"]
     ),
     node(
       "x-route", "Action gate",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "action_gate", actions: [.mergePr, .submitReview, .mutateRepo, .spawnAgent]
-      ),
+      .actionGate(actions: [.mergePr, .submitReview, .mutateRepo, .spawnAgent]),
       group: "x-intake", inputs: ["in"],
       outputs: ["merge", "review", "mutate", "agent", "verify"]
     ),
@@ -40,53 +39,38 @@ extension PolicyCanvasLabSamples {
   private static let extremeChecksNodes = [
     node(
       "x-evidence", "Merge evidence",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "evidence_check",
-        checks: [
-          TaskBoardPolicyEvidenceCheck(
-            field: .checksGreen,
-            pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-            failReasonCode: "checks_not_green", missingReasonCode: "checks_missing"
-          ),
-          TaskBoardPolicyEvidenceCheck(
-            field: .branchProtectionAllowsMerge,
-            pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-            failReasonCode: "branch_protection_blocked", missingReasonCode: "checks_missing"
-          ),
-        ]
-      ),
+      .evidenceCheck(checks: [
+        PolicyEvidenceCheck(
+          field: .checksGreen,
+          pass: .isTrue,
+          failReasonCode: .checksNotGreen, missingReasonCode: .missingMergeEvidence
+        ),
+        PolicyEvidenceCheck(
+          field: .branchProtectionAllowsMerge,
+          pass: .isTrue,
+          failReasonCode: .branchProtectionBlocked, missingReasonCode: .missingMergeEvidence
+        ),
+      ]),
       group: "x-checks", inputs: ["in"], outputs: ["pass", "fail", "missing"]
     ),
     node(
       "x-switch", "Review switch",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "switch",
-        arms: [
-          TaskBoardPolicySwitchArm(
-            port: "case_open", field: .reviewIsOpen,
-            predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
-          ),
-          TaskBoardPolicySwitchArm(
-            port: "case_draft", field: .reviewIsDraft,
-            predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
-          ),
-        ]
-      ),
+      .switch(PolicySwitchNode(arms: [
+        PolicySwitchArm(port: "case_open", field: .reviewIsOpen, predicate: .isTrue),
+        PolicySwitchArm(port: "case_draft", field: .reviewIsDraft, predicate: .isTrue),
+      ])),
       group: "x-checks", inputs: ["in"], outputs: ["case_open", "case_draft", "default"]
     ),
     node(
       "x-ifelse", "Conflicts?",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "if_then_else", field: .reviewHasMergeConflicts,
-        predicate: TaskBoardPolicyEvidencePredicate(predicate: .isFalse)
-      ),
+      .ifThenElse(PolicyIfThenElseCondition(field: .reviewHasMergeConflicts, predicate: .isFalse)),
       group: "x-checks", inputs: ["in"], outputs: ["then", "else"]
     ),
     node(
       "x-risk-merge", "Merge risk",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "risk_classifier", field: .riskScore, threshold: 70,
-        highRiskReasonCode: "merge_risk_high", missingReasonCode: "merge_risk_missing"
+      .riskClassifier(
+        field: .riskScore, threshold: 70,
+        highRiskReasonCode: .riskAboveThreshold, missingReasonCode: .humanRequired
       ),
       group: "x-checks", inputs: ["in"], outputs: ["low_or_equal", "high", "missing"]
     ),
@@ -95,24 +79,22 @@ extension PolicyCanvasLabSamples {
   private static let extremeOrchestrationNodes = [
     node(
       "x-wait", "Wait for checks",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "wait_step", wait: .event("reviews.checks_passed"), resumeKey: "checks-ready"
-      ),
+      .waitStep(PolicyWaitStep(wait: .event(eventKey: "reviews.checks_passed"), resumeKey: "checks-ready")),
       group: "x-orchestration", inputs: ["in"], outputs: ["out"]
     ),
     node(
       "x-event", "Event wait",
-      TaskBoardPolicyPipelineNodeKind(kind: "event_wait", eventKey: "reviews.deploy_ready"),
+      .eventWait(PolicyEventWait(eventKey: "reviews.deploy_ready")),
       group: "x-orchestration", inputs: ["in"], outputs: ["out"]
     ),
     node(
       "x-merge-step", "Merge action",
-      TaskBoardPolicyPipelineNodeKind(kind: "action_step", actionId: "reviews.merge"),
+      .actionStep(PolicyActionStep(actionId: "reviews.merge")),
       group: "x-orchestration", inputs: ["in"], outputs: ["out"]
     ),
     node(
       "x-handoff", "Handoff to deploy",
-      TaskBoardPolicyPipelineNodeKind(kind: "handoff", handoffKey: "deploy-handler"),
+      .handoff(PolicyHandoffStep(handoffKey: "deploy-handler")),
       group: "x-orchestration", inputs: ["in"], outputs: ["out"]
     ),
   ]
@@ -120,20 +102,20 @@ extension PolicyCanvasLabSamples {
   private static let extremeAgentNodes = [
     node(
       "x-agent-risk", "Agent risk",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "risk_classifier", field: .riskScore, threshold: 40,
-        highRiskReasonCode: "agent_risk_high", missingReasonCode: "agent_risk_missing"
+      .riskClassifier(
+        field: .riskScore, threshold: 40,
+        highRiskReasonCode: .riskAboveThreshold, missingReasonCode: .humanRequired
       ),
       group: "x-agent", inputs: ["in"], outputs: ["low_or_equal", "high", "missing"]
     ),
     node(
       "x-agent-step", "Spawn agent",
-      TaskBoardPolicyPipelineNodeKind(kind: "action_step", actionId: "agents.spawn"),
+      .actionStep(PolicyActionStep(actionId: "agents.spawn")),
       group: "x-agent", inputs: ["in"], outputs: ["out"]
     ),
     node(
       "x-agent-handoff", "Agent handoff",
-      TaskBoardPolicyPipelineNodeKind(kind: "handoff", handoffKey: "agent-supervisor"),
+      .handoff(PolicyHandoffStep(handoffKey: "agent-supervisor")),
       group: "x-agent", inputs: ["in"], outputs: ["out"]
     ),
   ]
@@ -141,17 +123,17 @@ extension PolicyCanvasLabSamples {
   private static let extremeGateNodes = [
     node(
       "x-human", "Human gate",
-      TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
+      .humanGate(reasonCode: .humanRequired),
       group: "x-gates", inputs: ["in"]
     ),
     node(
       "x-consensus", "Consensus gate",
-      TaskBoardPolicyPipelineNodeKind(kind: "consensus_gate"),
+      .consensusGate(reasonCode: .protectedPathTouched),
       group: "x-gates", inputs: ["in"]
     ),
     node(
       "x-dryrun", "Dry-run gate",
-      TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate"),
+      .dryRunGate(reasonCode: .dryRunRequired),
       group: "x-gates", inputs: ["in"]
     ),
   ]
@@ -159,33 +141,22 @@ extension PolicyCanvasLabSamples {
   private static let extremeTerminalNodes = [
     node(
       "x-allow", "Allow merge",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "supervisor_rule", ruleId: "x-auto-merge",
-        reasonCodes: ["auto_merge_allowed"], decision: "allow"
-      ),
+      .supervisorRule(decision: .allow, reasonCodes: [.autoMergeAllowed]),
       group: "x-terminals", inputs: ["in"]
     ),
     node(
       "x-deny", "Deny merge",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "supervisor_rule", ruleId: "x-merge-deny",
-        reasonCodes: ["merge_denied"], decision: "deny"
-      ),
+      .supervisorRule(decision: .deny, reasonCodes: [.checksNotGreen]),
       group: "x-terminals", inputs: ["in"]
     ),
     node(
       "x-deploy", "Deploy",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "supervisor_rule", ruleId: "x-deploy",
-        reasonCodes: ["deploy_allowed"], decision: "allow"
-      ),
+      .supervisorRule(decision: .allow, reasonCodes: [.autoMergeAllowed]),
       group: "x-terminals", inputs: ["in"]
     ),
     node(
       "x-finish", "Finish",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "finish", reasonCode: "policy_finished", decision: "allow"
-      ),
+      .finish(PolicyFinishNode(decision: .allow, reasonCode: .autoMergeAllowed)),
       group: "x-terminals", inputs: ["in"]
     ),
   ]

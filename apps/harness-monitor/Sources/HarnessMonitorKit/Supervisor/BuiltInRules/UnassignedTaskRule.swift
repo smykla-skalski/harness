@@ -35,7 +35,7 @@ public struct UnassignedTaskRule: PolicyRule {
   public func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     let threshold = max(
       0,
       context.parameters.seconds(Self.thresholdKey, default: Self.defaultThresholdSeconds)
@@ -50,7 +50,7 @@ public struct UnassignedTaskRule: PolicyRule {
     snapshot: SessionsSnapshot,
     context: PolicyContext,
     thresholdSeconds: Int
-  ) -> [PolicyAction] {
+  ) -> [SupervisorAction] {
     let activeAgents = session.agents
       .filter { $0.statusRaw == "active" }
       .sorted { $0.id < $1.id }
@@ -71,12 +71,12 @@ public struct UnassignedTaskRule: PolicyRule {
     sessionID: String,
     context: PolicyContext,
     input: ActionInput
-  ) -> PolicyAction? {
+  ) -> SupervisorAction? {
     guard task.statusRaw == "open", task.assignedAgentID == nil else { return nil }
     let ageSeconds = context.now.timeIntervalSince(task.createdAt)
     guard ageSeconds > Double(input.thresholdSeconds) else { return nil }
 
-    let payload = PolicyAction.DecisionPayload(
+    let payload = SupervisorAction.DecisionPayload(
       id: "\(id):\(sessionID):\(task.id)",
       severity: .needsUser,
       ruleID: id,
@@ -96,7 +96,7 @@ public struct UnassignedTaskRule: PolicyRule {
         agents: input.activeAgents
       )
     )
-    let action = PolicyAction.queueDecision(payload)
+    let action = SupervisorAction.queueDecision(payload)
     guard !context.recentActionKeys.contains(action.actionKey) else { return nil }
     return action
   }

@@ -1,7 +1,7 @@
 import Foundation
 
 /// A single user-facing action attached to a Monitor supervisor `Decision`. The payload is
-/// stored as a JSON string so the SwiftData row stays schema-stable when new `PolicyAction`
+/// stored as a JSON string so the SwiftData row stays schema-stable when new `SupervisorAction`
 /// variants land.
 public struct SuggestedAction: Codable, Sendable, Identifiable, Hashable {
   public let id: String

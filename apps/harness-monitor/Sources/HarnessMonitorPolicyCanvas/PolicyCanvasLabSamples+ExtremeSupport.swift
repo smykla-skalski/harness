@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyModels
 
 extension PolicyCanvasLabSamples {
   static func extremeStressActionGateNode(
@@ -7,10 +8,7 @@ extension PolicyCanvasLabSamples {
   ) -> TaskBoardPolicyPipelineNode {
     node(
       id.node("action-gate"), "Action gate \(id.index)",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "action_gate",
-        actions: TaskBoardPolicyAction.allCases
-      ),
+      .actionGate(actions: PolicyAction.allCases),
       group: group, inputs: ["in"],
       outputs: ["merge", "review", "mutate", "agent", "secret", "default"]
     )
@@ -22,14 +20,11 @@ extension PolicyCanvasLabSamples {
   ) -> TaskBoardPolicyPipelineNode {
     node(
       id.node("evidence"), "Evidence braid \(id.index)",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "evidence_check",
-        checks: [
-          evidenceCheck(index: id.index, offset: 0),
-          evidenceCheck(index: id.index, offset: 1),
-          evidenceCheck(index: id.index, offset: 2),
-        ]
-      ),
+      .evidenceCheck(checks: [
+        evidenceCheck(index: id.index, offset: 0),
+        evidenceCheck(index: id.index, offset: 1),
+        evidenceCheck(index: id.index, offset: 2),
+      ]),
       group: group, inputs: ["in"], outputs: ["pass", "fail", "missing"]
     )
   }
@@ -40,14 +35,11 @@ extension PolicyCanvasLabSamples {
   ) -> TaskBoardPolicyPipelineNode {
     node(
       id.node("switch"), "Ordered switch \(id.index)",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "switch",
-        arms: [
-          switchArm("case_open", index: id.index, offset: 4),
-          switchArm("case_draft", index: id.index, offset: 5),
-          switchArm("case_blocked", index: id.index, offset: 6),
-        ]
-      ),
+      .switch(PolicySwitchNode(arms: [
+        switchArm("case_open", index: id.index, offset: 4),
+        switchArm("case_draft", index: id.index, offset: 5),
+        switchArm("case_blocked", index: id.index, offset: 6),
+      ])),
       group: group, inputs: ["in"],
       outputs: ["case_open", "case_draft", "case_blocked", "default"]
     )
@@ -72,12 +64,12 @@ extension PolicyCanvasLabSamples {
   static func evidenceCheck(
     index: Int,
     offset: Int
-  ) -> TaskBoardPolicyEvidenceCheck {
-    TaskBoardPolicyEvidenceCheck(
+  ) -> PolicyEvidenceCheck {
+    PolicyEvidenceCheck(
       field: evidenceField(index: index, offset: offset),
       pass: evidencePredicate(index: index, offset: offset),
-      failReasonCode: "stress_fail_\(index)_\(offset)",
-      missingReasonCode: "stress_missing_\(index)_\(offset)"
+      failReasonCode: .checksNotGreen,
+      missingReasonCode: .missingMergeEvidence
     )
   }
 
@@ -85,8 +77,8 @@ extension PolicyCanvasLabSamples {
     _ port: String,
     index: Int,
     offset: Int
-  ) -> TaskBoardPolicySwitchArm {
-    TaskBoardPolicySwitchArm(
+  ) -> PolicySwitchArm {
+    PolicySwitchArm(
       port: port,
       field: evidenceField(index: index, offset: offset),
       predicate: evidencePredicate(index: index, offset: offset)
@@ -96,20 +88,18 @@ extension PolicyCanvasLabSamples {
   static func evidenceField(
     index: Int,
     offset: Int
-  ) -> TaskBoardPolicyEvidenceField {
+  ) -> PolicyEvidenceField {
     stressEvidenceFields[(index + offset) % stressEvidenceFields.count]
   }
 
   static func evidencePredicate(
     index: Int,
     offset: Int
-  ) -> TaskBoardPolicyEvidencePredicate {
-    TaskBoardPolicyEvidencePredicate(
-      predicate: stressPredicateValues[(index + offset) % stressPredicateValues.count]
-    )
+  ) -> PolicyEvidencePredicate {
+    stressPredicateValues[(index + offset) % stressPredicateValues.count]
   }
 
-  static let stressEvidenceFields: [TaskBoardPolicyEvidenceField] = [
+  static let stressEvidenceFields: [PolicyEvidenceField] = [
     .checksGreen,
     .branchProtectionAllowsMerge,
     .reviewerVerdictApproved,
@@ -125,7 +115,7 @@ extension PolicyCanvasLabSamples {
     .reviewViewerCanUpdate,
   ]
 
-  static let stressPredicateValues: [TaskBoardPolicyEvidencePredicateValue] = [
+  static let stressPredicateValues: [PolicyEvidencePredicate] = [
     .isTrue,
     .isFalse,
     .isZero,

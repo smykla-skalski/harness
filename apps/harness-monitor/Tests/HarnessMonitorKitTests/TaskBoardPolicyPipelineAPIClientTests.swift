@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
+import HarnessMonitorPolicyModels
 
 @Suite("Task-board policy pipeline daemon API client", .serialized)
 struct TaskBoardPolicyPipelineAPIClientTests {
@@ -346,11 +347,8 @@ struct TaskBoardPolicyPipelineAPIClientTests {
         TaskBoardPolicyPipelineNode(
           id: "node-intake",
           title: "Ready for dispatch",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "action_gate",
-            actions: [.spawnAgent]
-          ),
-          automation: TaskBoardPolicyPipelineAutomationBinding(
+          kind: .actionGate(actions: [.spawnAgent]),
+          automation: PolicyGraphAutomationBinding(
             eventSource: "clipboard",
             contentKinds: ["image"],
             actions: ["ocrImage"]
@@ -363,11 +361,7 @@ struct TaskBoardPolicyPipelineAPIClientTests {
         TaskBoardPolicyPipelineNode(
           id: "node-allow",
           title: "Allow spawn",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "supervisor_rule",
-            reasonCodes: ["default_allow"],
-            decision: "allow"
-          ),
+          kind: .supervisorRule(decision: .allow, reasonCodes: [.defaultAllow]),
           position: TaskBoardPolicyCanvasPoint(x: 280, y: 40),
           groupId: "group-dispatch",
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]

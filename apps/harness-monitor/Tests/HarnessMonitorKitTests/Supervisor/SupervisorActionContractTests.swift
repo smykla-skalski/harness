@@ -2,7 +2,7 @@ import XCTest
 
 @testable import HarnessMonitorKit
 
-final class PolicyActionContractTests: XCTestCase {
+final class SupervisorActionContractTests: XCTestCase {
   func test_actionKeyContractIsStableForEveryCase() {
     XCTAssertEqual(
       makeActions().map(\.actionKey),
@@ -21,11 +21,11 @@ final class PolicyActionContractTests: XCTestCase {
   func test_policyActionCodableRoundTripsEveryCase() throws {
     let actions = makeActions()
     let data = try JSONEncoder().encode(actions)
-    let decoded = try JSONDecoder().decode([PolicyAction].self, from: data)
+    let decoded = try JSONDecoder().decode([SupervisorAction].self, from: data)
     XCTAssertEqual(decoded, actions)
   }
 
-  private func makeActions() -> [PolicyAction] {
+  private func makeActions() -> [SupervisorAction] {
     [
       .nudgeAgent(
         .init(

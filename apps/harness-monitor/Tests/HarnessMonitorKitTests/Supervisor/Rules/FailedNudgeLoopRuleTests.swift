@@ -182,8 +182,8 @@ final class FailedNudgeLoopRuleTests: XCTestCase {
     {
       XCTAssertEqual(lhs.id, rhs.id)
       XCTAssertEqual(
-        PolicyAction.queueDecision(lhs).actionKey,
-        PolicyAction.queueDecision(rhs).actionKey
+        SupervisorAction.queueDecision(lhs).actionKey,
+        SupervisorAction.queueDecision(rhs).actionKey
       )
     } else {
       XCTFail("expected two .queueDecision actions")

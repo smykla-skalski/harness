@@ -5,6 +5,7 @@ import Testing
 
 @testable import HarnessMonitorPolicyCanvas
 @testable import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 @Suite("Policy canvas automation policy compiler")
 @MainActor
@@ -105,7 +106,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     let badSink = pipelineNode(
       id: "automation:manual-ocr-paste:bad-review-sink",
       title: "Copy PR list",
-      kind: TaskBoardPolicyPipelineNodeKind(kind: "copy_review_pull_request_list"),
+      kind: .copyReviewPullRequestList,
       automation: .canvasComponent(actions: [.copyReviewPullRequestList]),
       inputs: ["in"],
       outputs: []
@@ -185,7 +186,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
         pipelineNode(
           id: "automation:review-screenshot:source",
           title: "Review Screenshot Paste",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "review_screenshot_paste"),
+          kind: .reviewScreenshotPaste,
           automation: .canvasDefault(source: .reviewScreenshotPaste),
           inputs: [],
           outputs: ["image"]
@@ -193,7 +194,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
         pipelineNode(
           id: "automation:review-screenshot:copy",
           title: "Copy PR list",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "copy_review_pull_request_list"),
+          kind: .copyReviewPullRequestList,
           automation: .canvasComponent(actions: [.copyReviewPullRequestList]),
           inputs: ["in"],
           outputs: []
@@ -285,7 +286,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
       kind: .source,
       position: CGPoint(x: 20, y: 20)
     )
-    var binding = TaskBoardPolicyPipelineAutomationBinding.canvasDefault(source: .clipboard)
+    var binding = PolicyGraphAutomationBinding.canvasDefault(source: .clipboard)
     binding.priority = 7
     binding.actions.append(AutomationPolicyAction.openDashboardDebugging.rawValue)
     binding.sourceAppMode = AutomationSourceAppMode.allowedOnly.rawValue
@@ -314,15 +315,15 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
       kind: .reviewScreenshotPaste,
       position: CGPoint(x: 20, y: 20)
     )
-    var binding = TaskBoardPolicyPipelineAutomationBinding.canvasDefault(
+    var binding = PolicyGraphAutomationBinding.canvasDefault(
       source: .reviewScreenshotPaste
     )
-    binding.ocrConfiguration = TaskBoardPolicyPipelineOCRConfiguration(
+    binding.ocrConfiguration = PolicyGraphOCRConfiguration(
       recognitionLevel: "fast",
       automaticallyDetectsLanguage: false,
       usesLanguageCorrection: false
     )
-    binding.reviewPullRequestExtraction = TaskBoardPolicyPipelineReviewPullRequestExtraction(
+    binding.reviewPullRequestExtraction = PolicyGraphReviewPullRequestExtraction(
       repositoryMode: "policyRepositories",
       policyRepositories: ["kong/kuma"],
       numberMemoryEnabled: false,
@@ -493,10 +494,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
         pipelineNode(
           id: "automation:review-text-paste:source",
           title: "Review Text Paste",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "action_step",
-            actionId: "automation.review_text_paste"
-          ),
+          kind: .actionStep(PolicyActionStep(actionId: "automation.review_text_paste")),
           automation: .canvasDefault(source: .manualReviewTextPaste),
           inputs: [],
           outputs: ["default"]
@@ -504,7 +502,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
         pipelineNode(
           id: "automation:review-text-paste:dry-run",
           title: "Dry-run gate",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate"),
+          kind: .dryRunGate(reasonCode: .dryRunRequired),
           inputs: ["in"],
           outputs: []
         ),

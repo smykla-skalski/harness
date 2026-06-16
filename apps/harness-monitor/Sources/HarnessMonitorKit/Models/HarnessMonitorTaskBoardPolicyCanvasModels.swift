@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorPolicyModels
 
 public struct TaskBoardPolicyPipelinePort: Codable, Equatable, Identifiable, Sendable {
   public var id: String
@@ -42,10 +43,10 @@ public struct TaskBoardPolicyPipelineEdge: Codable, Equatable, Identifiable, Sen
 
   enum CodingKeys: String, CodingKey {
     case id
-    case fromNode
-    case fromPort
-    case toNode
-    case toPort
+    case fromNode = "from_node"
+    case fromPort = "from_port"
+    case toNode = "to_node"
+    case toPort = "to_port"
     case condition
     case label
   }
@@ -68,12 +69,12 @@ public struct TaskBoardPolicyPipelineEdgeCondition: Codable, Equatable, Sendable
   public static let always = Self(condition: "always")
 
   public var condition: String
-  public var actions: [TaskBoardPolicyAction]
+  public var actions: [PolicyAction]
   public var reasonCode: String?
 
   public init(
     condition: String,
-    actions: [TaskBoardPolicyAction] = [],
+    actions: [PolicyAction] = [],
     reasonCode: String? = nil
   ) {
     self.condition = condition
@@ -84,13 +85,13 @@ public struct TaskBoardPolicyPipelineEdgeCondition: Codable, Equatable, Sendable
   enum CodingKeys: String, CodingKey {
     case condition
     case actions
-    case reasonCode
+    case reasonCode = "reason_code"
   }
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     condition = try container.decode(String.self, forKey: .condition)
-    actions = try container.decodeIfPresent([TaskBoardPolicyAction].self, forKey: .actions) ?? []
+    actions = try container.decodeIfPresent([PolicyAction].self, forKey: .actions) ?? []
     reasonCode = try container.decodeIfPresent(String.self, forKey: .reasonCode)
   }
 
@@ -135,7 +136,7 @@ public struct TaskBoardPolicyPipelineGroup: Codable, Equatable, Identifiable, Se
     case label
     case color
     case frame
-    case nodeIds
+    case nodeIds = "node_ids"
   }
 
   public init(from decoder: Decoder) throws {
@@ -172,7 +173,7 @@ public struct TaskBoardPolicyPipelineLayout: Codable, Equatable, Sendable {
     case zoom
     case offset
     case nodes
-    case routingHints
+    case routingHints = "routing_hints"
   }
 
   public init(from decoder: Decoder) throws {
@@ -205,18 +206,25 @@ public struct TaskBoardPolicyPipelineNodeLayout: Codable, Equatable, Sendable {
   public var nodeId: String
   public var x: Int
   public var y: Int
-  public var source: TaskBoardPolicyPipelineNodeLayoutSource?
+  public var source: PolicyGraphNodeLayoutSource?
 
   public init(
     nodeId: String,
     x: Int,
     y: Int,
-    source: TaskBoardPolicyPipelineNodeLayoutSource? = nil
+    source: PolicyGraphNodeLayoutSource? = nil
   ) {
     self.nodeId = nodeId
     self.x = x
     self.y = y
     self.source = source
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case nodeId = "node_id"
+    case x
+    case y
+    case source
   }
 }
 
@@ -255,6 +263,19 @@ public struct TaskBoardPolicyPipelineEdgeRoutingHint: Codable, Equatable, Sendab
     self.bundleOrdinal = bundleOrdinal
     self.bundleSize = bundleSize
   }
+
+  enum CodingKeys: String, CodingKey {
+    case edgeId = "edge_id"
+    case sourceScopeId = "source_scope_id"
+    case targetScopeId = "target_scope_id"
+    case targetNodeId = "target_node_id"
+    case label
+    case laneIndex = "lane_index"
+    case horizontalLaneY = "horizontal_lane_y"
+    case verticalLaneX = "vertical_lane_x"
+    case bundleOrdinal = "bundle_ordinal"
+    case bundleSize = "bundle_size"
+  }
 }
 
 public struct TaskBoardPolicyExportRequest: Codable, Equatable, Sendable {
@@ -274,6 +295,12 @@ public struct TaskBoardPolicyExportResponse: Codable, Equatable, Sendable {
     self.canvasId = canvasId
     self.title = title
     self.document = document
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case canvasId = "canvas_id"
+    case title
+    case document
   }
 }
 

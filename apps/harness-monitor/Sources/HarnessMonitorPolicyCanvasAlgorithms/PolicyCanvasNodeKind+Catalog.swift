@@ -12,7 +12,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["event"],
     libraryTitle: "Workflow trigger",
     librarySubtitle: "Start from a default workflow trigger",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task")
+    defaultPolicyKind: .trigger(workflow: "default-task")
   )
 
   public static let workflowEntry = Self(
@@ -26,10 +26,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["out"],
     libraryTitle: "Workflow entry",
     librarySubtitle: "Start a named policy workflow",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "workflow_entry",
-      workflowId: "reviews_auto"
-    )
+    defaultPolicyKind: .workflowEntry(PolicyWorkflowEntry(workflowId: "reviews_auto"))
   )
 
   public static let reviewScreenshotPaste = Self(
@@ -43,7 +40,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["image"],
     libraryTitle: "Reviews screenshot source",
     librarySubtitle: "Start from a Reviews screenshot paste",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "review_screenshot_paste")
+    defaultPolicyKind: .reviewScreenshotPaste
   )
 
   public static let actionGate = Self(
@@ -57,10 +54,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["match", "default"],
     libraryTitle: "Action gate",
     librarySubtitle: "Branch by requested action",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "action_gate",
-      actions: [.submitReview]
-    )
+    defaultPolicyKind: .actionGate(actions: [.submitReview])
   )
 
   public static let evidenceCheck = Self(
@@ -74,17 +68,14 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["pass", "fail", "missing"],
     libraryTitle: "Evidence check",
     librarySubtitle: "Branch on policy evidence",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "evidence_check",
-      checks: [
-        TaskBoardPolicyEvidenceCheck(
-          field: .reviewIsOpen,
-          pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-          failReasonCode: PolicyCanvasReasonCode.missingMergeEvidence,
-          missingReasonCode: PolicyCanvasReasonCode.missingMergeEvidence
-        )
-      ]
-    )
+    defaultPolicyKind: .evidenceCheck(checks: [
+      PolicyEvidenceCheck(
+        field: .reviewIsOpen,
+        pass: .isTrue,
+        failReasonCode: .missingMergeEvidence,
+        missingReasonCode: .missingMergeEvidence
+      )
+    ])
   )
 
   public static let ifThenElse = Self(
@@ -99,10 +90,8 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["then", "else"],
     libraryTitle: "If / then / else",
     librarySubtitle: "Branch on a boolean policy condition",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "if_then_else",
-      field: .checksGreen,
-      predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
+    defaultPolicyKind: .ifThenElse(
+      PolicyIfThenElseCondition(field: .checksGreen, predicate: .isTrue)
     )
   )
 
@@ -118,15 +107,10 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["case_1", "default"],
     libraryTitle: "Switch",
     librarySubtitle: "Route through ordered policy cases",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "switch",
-      arms: [
-        TaskBoardPolicySwitchArm(
-          port: "case_1",
-          field: .checksGreen,
-          predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
-        )
-      ]
+    defaultPolicyKind: .`switch`(
+      PolicySwitchNode(arms: [
+        PolicySwitchArm(port: "case_1", field: .checksGreen, predicate: .isTrue)
+      ])
     )
   )
 
@@ -141,12 +125,11 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["low_or_equal", "high", "missing"],
     libraryTitle: "Risk classifier",
     librarySubtitle: "Branch on a risk threshold",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "risk_classifier",
+    defaultPolicyKind: .riskClassifier(
       field: .riskScore,
       threshold: 50,
-      highRiskReasonCode: PolicyCanvasReasonCode.riskAboveThreshold,
-      missingReasonCode: PolicyCanvasReasonCode.humanRequired
+      highRiskReasonCode: .riskAboveThreshold,
+      missingReasonCode: .humanRequired
     )
   )
 
@@ -161,7 +144,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: [],
     libraryTitle: "Human gate",
     librarySubtitle: "Require a manual review decision",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate")
+    defaultPolicyKind: .humanGate(reasonCode: .humanRequired)
   )
 
   public static let consensusGate = Self(
@@ -175,7 +158,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: [],
     libraryTitle: "Consensus gate",
     librarySubtitle: "Require extra reviewer consensus",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "consensus_gate")
+    defaultPolicyKind: .consensusGate(reasonCode: .protectedPathTouched)
   )
 
   public static let actionStep = Self(
@@ -189,10 +172,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["out"],
     libraryTitle: "Action step",
     librarySubtitle: "Run a provider action",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "action_step",
-      actionId: "reviews.approve"
-    )
+    defaultPolicyKind: .actionStep(PolicyActionStep(actionId: "reviews.approve"))
   )
 
   public static let ocrImage = Self(
@@ -206,7 +186,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["text"],
     libraryTitle: "Screenshot OCR",
     librarySubtitle: "Recognize text in a pasted screenshot",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "ocr_image")
+    defaultPolicyKind: .ocrImage
   )
 
   public static let resolveReviewPullRequests = Self(
@@ -220,7 +200,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["pull_requests"],
     libraryTitle: "Reviews PR resolver",
     librarySubtitle: "Resolve screenshot PR rows against Reviews",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "resolve_review_pull_requests")
+    defaultPolicyKind: .resolveReviewPullRequests
   )
 
   public static let copyReviewPullRequestList = Self(
@@ -234,7 +214,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: [],
     libraryTitle: "PR list copier",
     librarySubtitle: "Copy resolved pull request references",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "copy_review_pull_request_list")
+    defaultPolicyKind: .copyReviewPullRequestList
   )
 
   public static let waitStep = Self(
@@ -248,10 +228,8 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["out"],
     libraryTitle: "Wait step",
     librarySubtitle: "Pause until a timer or event resumes the workflow",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "wait_step",
-      wait: .event("reviews.checks_passed"),
-      resumeKey: "checks-ready"
+    defaultPolicyKind: .waitStep(
+      PolicyWaitStep(wait: .event(eventKey: "reviews.checks_passed"), resumeKey: "checks-ready")
     )
   )
 
@@ -266,10 +244,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["out"],
     libraryTitle: "Event wait",
     librarySubtitle: "Listen for an event in the workflow graph",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "event_wait",
-      eventKey: "reviews.checks_passed"
-    )
+    defaultPolicyKind: .eventWait(PolicyEventWait(eventKey: "reviews.checks_passed"))
   )
 
   public static let handoff = Self(
@@ -283,10 +258,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["out"],
     libraryTitle: "Handoff",
     librarySubtitle: "Pass control to another workflow handler",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "handoff",
-      handoffKey: "next-handler"
-    )
+    defaultPolicyKind: .handoff(PolicyHandoffStep(handoffKey: "next-handler"))
   )
 
   public static let hub = Self(
@@ -300,7 +272,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: ["out_1", "out_2"],
     libraryTitle: "Hub",
     librarySubtitle: "Forward one payload to parallel branches",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "hub")
+    defaultPolicyKind: .hub
   )
 
   public static let dryRunGate = Self(
@@ -314,7 +286,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: [],
     libraryTitle: "Dry-run gate",
     librarySubtitle: "End the workflow in dry run",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate")
+    defaultPolicyKind: .dryRunGate(reasonCode: .dryRunRequired)
   )
 
   public static let supervisorRule = Self(
@@ -328,10 +300,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: [],
     libraryTitle: "Supervisor rule",
     librarySubtitle: "Finish with a supervisor decision",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "supervisor_rule",
-      ruleId: "stuck-agent"
-    )
+    defaultPolicyKind: .supervisorRule(decision: .allow, reasonCodes: [.defaultAllow])
   )
 
   public static let finish = Self(
@@ -345,11 +314,7 @@ extension PolicyCanvasNodeKind {
     outputPortTitles: [],
     libraryTitle: "Finish",
     librarySubtitle: "End the workflow with a final decision",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "finish",
-      reasonCode: PolicyCanvasReasonCode.autoMergeAllowed,
-      decision: "allow"
-    )
+    defaultPolicyKind: .finish(PolicyFinishNode(decision: .allow, reasonCode: .autoMergeAllowed))
   )
 
   public static let allCases: [Self] = [

@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 extension PolicyCanvasEditForm {
@@ -7,7 +8,7 @@ extension PolicyCanvasEditForm {
   /// daemon's enum walk: trigger -> action gate -> evidence -> risk -> human
   /// -> consensus -> dry-run -> supervisor. Tag identity is the kind string
   /// so `Picker` does not require `Hashable` on the full
-  /// `TaskBoardPolicyPipelineNodeKind` struct (it carries non-Hashable
+  /// `PolicyGraphNodeKind` struct (it carries non-Hashable
   /// payloads). `defaultPolicyKind(for:)` rebuilds the full struct with
   /// sensible defaults when the user picks a kind.
   static let policyKindOptions: [String] = PolicyCanvasNodeKind.allCases.map(\.rawValue)
@@ -17,20 +18,20 @@ extension PolicyCanvasEditForm {
       ?? kind.replacingOccurrences(of: "_", with: " ").capitalized
   }
 
-  /// Build a `TaskBoardPolicyPipelineNodeKind` for the given kind string,
+  /// Build a `PolicyGraphNodeKind` for the given kind string,
   /// preserving as much existing payload as possible. When the user picks
   /// the same kind back, the result is byte-equal to the source; otherwise
   /// the result carries the minimal sensible defaults for the new kind so
   /// the daemon round-trip succeeds without a follow-up edit.
   static func defaultPolicyKind(
     for kindString: String,
-    existing: TaskBoardPolicyPipelineNodeKind?
-  ) -> TaskBoardPolicyPipelineNodeKind {
-    if let existing, existing.kind == kindString {
+    existing: PolicyGraphNodeKind?
+  ) -> PolicyGraphNodeKind {
+    if let existing, existing.discriminator == kindString {
       return existing
     }
     return PolicyCanvasNodeKind(rawValue: kindString)?.defaultPolicyKind
-      ?? TaskBoardPolicyPipelineNodeKind(kind: kindString)
+      ?? PolicyCanvasNodeKind.humanGate.defaultPolicyKind
   }
 
   func selectedNodePolicyKindStringBinding(
@@ -38,7 +39,7 @@ extension PolicyCanvasEditForm {
   ) -> Binding<String> {
     Binding(
       get: {
-        node.policyKind?.kind ?? taskBoardPolicyNodeKind(for: node.kind).kind
+        node.policyKind?.discriminator ?? node.kind.rawValue
       },
       set: { newKindString in
         let newKind = Self.defaultPolicyKind(

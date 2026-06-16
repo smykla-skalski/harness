@@ -1,12 +1,13 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
-extension TaskBoardPolicyPipelineAutomationBinding {
+extension PolicyGraphAutomationBinding {
   static func canvasDefault(
     source: AutomationPolicyEventSource = .clipboard
-  ) -> TaskBoardPolicyPipelineAutomationBinding {
+  ) -> PolicyGraphAutomationBinding {
     if source == .reviewScreenshotPaste {
-      return TaskBoardPolicyPipelineAutomationBinding(
+      return PolicyGraphAutomationBinding(
         isEnabled: true,
         eventSource: source.rawValue,
         priority: nil,
@@ -23,12 +24,12 @@ extension TaskBoardPolicyPipelineAutomationBinding {
         ],
         postprocessors: [AutomationPolicyPostprocessor.auditEvent.rawValue],
         sourceAppMode: AutomationSourceAppMode.allExceptDenied.rawValue,
-        ocrConfiguration: TaskBoardPolicyPipelineOCRConfiguration(),
-        reviewPullRequestExtraction: TaskBoardPolicyPipelineReviewPullRequestExtraction()
+        ocrConfiguration: PolicyGraphOCRConfiguration(),
+        reviewPullRequestExtraction: PolicyGraphReviewPullRequestExtraction()
       )
     }
     if source == .manualReviewTextPaste {
-      return TaskBoardPolicyPipelineAutomationBinding(
+      return PolicyGraphAutomationBinding(
         isEnabled: true,
         eventSource: source.rawValue,
         priority: nil,
@@ -47,7 +48,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
         sourceAppMode: AutomationSourceAppMode.allExceptDenied.rawValue
       )
     }
-    return TaskBoardPolicyPipelineAutomationBinding(
+    return PolicyGraphAutomationBinding(
       isEnabled: true,
       eventSource: source.rawValue,
       priority: nil,
@@ -76,8 +77,8 @@ extension TaskBoardPolicyPipelineAutomationBinding {
     sourceAppMode: AutomationSourceAppMode = .allExceptDenied,
     allowedBundleIdentifiers: [String] = [],
     deniedBundleIdentifiers: [String] = []
-  ) -> TaskBoardPolicyPipelineAutomationBinding {
-    TaskBoardPolicyPipelineAutomationBinding(
+  ) -> PolicyGraphAutomationBinding {
+    PolicyGraphAutomationBinding(
       isEnabled: true,
       eventSource: AutomationPolicyEventSource.clipboard.rawValue,
       contentKinds: contentKinds.map(\.rawValue),
@@ -201,7 +202,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
       name: name,
       eventSource: resolvedEventSource,
       isEnabled: isEnabled,
-      priority: priority ?? defaultPriority,
+      priority: priority.map(Int.init) ?? defaultPriority,
       match: AutomationPolicyMatch(
         contentKinds: resolvedContentKinds,
         sourceAppFilter: resolvedSourceAppFilter
@@ -221,10 +222,10 @@ extension TaskBoardPolicyPipelineAutomationBinding {
       next.preprocessors = Self.defaultPreprocessors(for: source).map(\.rawValue)
     }
     if source == .reviewScreenshotPaste {
-      next.ocrConfiguration = next.ocrConfiguration ?? TaskBoardPolicyPipelineOCRConfiguration()
+      next.ocrConfiguration = next.ocrConfiguration ?? PolicyGraphOCRConfiguration()
       next.reviewPullRequestExtraction =
         next.reviewPullRequestExtraction
-        ?? TaskBoardPolicyPipelineReviewPullRequestExtraction()
+        ?? PolicyGraphReviewPullRequestExtraction()
     }
     return next
   }
@@ -287,7 +288,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
     _ level: AutomationPolicyOCRConfiguration.RecognitionLevel
   ) -> Self {
     var next = self
-    var configuration = next.ocrConfiguration ?? TaskBoardPolicyPipelineOCRConfiguration()
+    var configuration = next.ocrConfiguration ?? PolicyGraphOCRConfiguration()
     configuration.recognitionLevel = level.rawValue
     next.ocrConfiguration = configuration
     return next
@@ -295,7 +296,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
 
   func settingOCRAutomaticallyDetectsLanguage(_ enabled: Bool) -> Self {
     var next = self
-    var configuration = next.ocrConfiguration ?? TaskBoardPolicyPipelineOCRConfiguration()
+    var configuration = next.ocrConfiguration ?? PolicyGraphOCRConfiguration()
     configuration.automaticallyDetectsLanguage = enabled
     next.ocrConfiguration = configuration
     return next
@@ -303,7 +304,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
 
   func settingOCRUsesLanguageCorrection(_ enabled: Bool) -> Self {
     var next = self
-    var configuration = next.ocrConfiguration ?? TaskBoardPolicyPipelineOCRConfiguration()
+    var configuration = next.ocrConfiguration ?? PolicyGraphOCRConfiguration()
     configuration.usesLanguageCorrection = enabled
     next.ocrConfiguration = configuration
     return next
@@ -314,7 +315,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
   ) -> Self {
     var next = self
     var configuration =
-      next.reviewPullRequestExtraction ?? TaskBoardPolicyPipelineReviewPullRequestExtraction()
+      next.reviewPullRequestExtraction ?? PolicyGraphReviewPullRequestExtraction()
     configuration.repositoryMode = mode.rawValue
     next.reviewPullRequestExtraction = configuration
     return next
@@ -323,7 +324,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
   func settingReviewPolicyRepositories(_ repositories: String) -> Self {
     var next = self
     var configuration =
-      next.reviewPullRequestExtraction ?? TaskBoardPolicyPipelineReviewPullRequestExtraction()
+      next.reviewPullRequestExtraction ?? PolicyGraphReviewPullRequestExtraction()
     configuration.policyRepositories = AutomationSourceAppFilter.normalizedIdentifiers([
       repositories
     ])
@@ -334,7 +335,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
   func settingReviewNumberMemoryEnabled(_ enabled: Bool) -> Self {
     var next = self
     var configuration =
-      next.reviewPullRequestExtraction ?? TaskBoardPolicyPipelineReviewPullRequestExtraction()
+      next.reviewPullRequestExtraction ?? PolicyGraphReviewPullRequestExtraction()
     configuration.numberMemoryEnabled = enabled
     next.reviewPullRequestExtraction = configuration
     return next
@@ -345,7 +346,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
   ) -> Self {
     var next = self
     var configuration =
-      next.reviewPullRequestExtraction ?? TaskBoardPolicyPipelineReviewPullRequestExtraction()
+      next.reviewPullRequestExtraction ?? PolicyGraphReviewPullRequestExtraction()
     configuration.resultScope = scope.rawValue
     next.reviewPullRequestExtraction = configuration
     return next
@@ -356,7 +357,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
   ) -> Self {
     var next = self
     var configuration =
-      next.reviewPullRequestExtraction ?? TaskBoardPolicyPipelineReviewPullRequestExtraction()
+      next.reviewPullRequestExtraction ?? PolicyGraphReviewPullRequestExtraction()
     configuration.failureSignalMode = mode.rawValue
     next.reviewPullRequestExtraction = configuration
     return next
@@ -367,7 +368,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
   ) -> Self {
     var next = self
     var configuration =
-      next.reviewPullRequestExtraction ?? TaskBoardPolicyPipelineReviewPullRequestExtraction()
+      next.reviewPullRequestExtraction ?? PolicyGraphReviewPullRequestExtraction()
     configuration.outputFormat = format.rawValue
     next.reviewPullRequestExtraction = configuration
     return next
@@ -376,7 +377,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
   func settingReviewAutoCopy(_ enabled: Bool) -> Self {
     var next = self
     var configuration =
-      next.reviewPullRequestExtraction ?? TaskBoardPolicyPipelineReviewPullRequestExtraction()
+      next.reviewPullRequestExtraction ?? PolicyGraphReviewPullRequestExtraction()
     configuration.autoCopy = enabled
     next.reviewPullRequestExtraction = configuration
     return next
@@ -385,7 +386,7 @@ extension TaskBoardPolicyPipelineAutomationBinding {
   func settingReviewShowSheet(_ enabled: Bool) -> Self {
     var next = self
     var configuration =
-      next.reviewPullRequestExtraction ?? TaskBoardPolicyPipelineReviewPullRequestExtraction()
+      next.reviewPullRequestExtraction ?? PolicyGraphReviewPullRequestExtraction()
     configuration.showSheet = enabled
     next.reviewPullRequestExtraction = configuration
     return next
