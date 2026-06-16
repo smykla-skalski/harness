@@ -173,7 +173,7 @@ extension HarnessMonitorAPIClient {
   }
 
   public func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults {
-    try await get("/v1/task-board/git/identity-defaults")
+    try await get("/v1/task-board/git/identity-defaults", decoder: PolicyWireCoding.decoder)
   }
 
   public func verifyTaskBoardGitSigning(

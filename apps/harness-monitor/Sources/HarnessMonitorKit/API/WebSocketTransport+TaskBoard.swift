@@ -219,7 +219,7 @@ extension WebSocketTransport {
 
   public func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults {
     let value = try await rpc(method: .taskBoardGitIdentityDefaults)
-    return try decode(value)
+    return try decodePolicyWire(value)
   }
 
   public func verifyTaskBoardGitSigning(
