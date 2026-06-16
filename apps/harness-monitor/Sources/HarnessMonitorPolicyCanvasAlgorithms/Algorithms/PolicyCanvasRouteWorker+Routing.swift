@@ -188,11 +188,14 @@ extension PolicyCanvasPreparedRouteInput {
       router: selectedRouter,
       algorithms: algorithms
     )
-    let routes = repairedRoutes
-    let portMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
-      routes: routes,
-      nodeIndex: nodeIndex
+    let terminalState = routesBalancingPrecomputedPortMarkers(
+      routes: repairedRoutes,
+      nodeIndex: nodeIndex,
+      router: selectedRouter,
+      algorithms: algorithms
     )
+    let routes = terminalState.routes
+    let portMarkerLayout = terminalState.portMarkerLayout
     let labelPositions = PolicyCanvasPolylineMidpointLabelPlacement().placeLabels(
       input: PolicyCanvasLabelPlacementInput(prepared: self, routes: routes)
     )
@@ -483,6 +486,109 @@ extension PolicyCanvasPreparedRouteInput {
       algorithms: algorithms
     )
     return policyCanvasReroutedState(portMarkerLayout: portMarkerLayout, context: context)
+  }
+
+  private func routesBalancingPrecomputedPortMarkers(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> PolicyCanvasRouteComputationState {
+    let precomputedLayout = precomputedRouteTerminalPortMarkerLayout(
+      routes: routes,
+      nodeIndex: nodeIndex
+    )
+    guard precomputedRoutesHavePortSpacingViolations(routes: routes, nodeIndex: nodeIndex) else {
+      return PolicyCanvasRouteComputationState(routes: routes, portMarkerLayout: precomputedLayout)
+    }
+    let balancedLayout = portMarkerLayout(routes: routes, nodeIndex: nodeIndex)
+    let snappedRoutes = routesSnappingTerminals(
+      routes: routes,
+      portMarkerLayout: balancedLayout,
+      nodeIndex: nodeIndex
+    )
+    guard precomputedBodyHits(routes: snappedRoutes, nodeIndex: nodeIndex).isEmpty else {
+      return routesReroutingBalancedPortMarkers(
+        routes: routes,
+        nodeIndex: nodeIndex,
+        router: selectedRouter,
+        algorithms: algorithms
+      )
+    }
+    return PolicyCanvasRouteComputationState(routes: snappedRoutes, portMarkerLayout: balancedLayout)
+  }
+
+  private func precomputedRoutesHavePortSpacingViolations(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> Bool {
+    !policyCanvasMeasurePortSpacing(
+      routedEdges: precomputedRoutedEdges(routes: routes),
+      nodeFramesByID: nodeIndex.mapValues(\.frame),
+      thresholds: .default
+    ).isEmpty
+  }
+
+  private func routesSnappingTerminals(
+    routes: [String: PolicyCanvasEdgeRoute],
+    portMarkerLayout: PolicyCanvasPortMarkerLayout,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    var snapped = routes
+    for edge in edges {
+      guard var route = snapped[edge.id] else {
+        continue
+      }
+      if let sourcePoint = portMarkerPoint(
+        edgeID: edge.id,
+        role: .source,
+        endpoint: edge.source,
+        portMarkerLayout: portMarkerLayout,
+        nodeIndex: nodeIndex
+      ) {
+        route = routeMovingTerminal(
+          route,
+          role: .source,
+          side: sourcePoint.side,
+          point: sourcePoint.point
+        )
+      }
+      if let targetPoint = portMarkerPoint(
+        edgeID: edge.id,
+        role: .target,
+        endpoint: edge.target,
+        portMarkerLayout: portMarkerLayout,
+        nodeIndex: nodeIndex
+      ) {
+        route = routeMovingTerminal(
+          route,
+          role: .target,
+          side: targetPoint.side,
+          point: targetPoint.point
+        )
+      }
+      snapped[edge.id] = route
+    }
+    return snapped
+  }
+
+  private func portMarkerPoint(
+    edgeID: String,
+    role: PolicyCanvasRouteEndpointRole,
+    endpoint: PolicyCanvasPortEndpoint,
+    portMarkerLayout: PolicyCanvasPortMarkerLayout,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> (point: CGPoint, side: PolicyCanvasPortSide)? {
+    guard
+      let terminal = portMarkerLayout.terminal(edgeID: edgeID, role: role),
+      let base = portAnchor(for: endpoint, side: terminal.side, nodeIndex: nodeIndex)
+    else {
+      return nil
+    }
+    return (
+      policyCanvasShiftedRouteAnchor(base, side: terminal.side, terminal: terminal),
+      terminal.side
+    )
   }
 
   private func precomputedRouteTerminalPortMarkerLayout(

@@ -44,6 +44,11 @@ extension PolicyCanvasPortMarkerLayoutTests {
       side: .trailing,
       isVisible: true
     )
+    let leadingPassMarkers = layout.markers(
+      for: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "pass", kind: .output),
+      side: .leading,
+      isVisible: true
+    )
     let trailingFailMarkers = layout.markers(
       for: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "fail", kind: .output),
       side: .trailing,
@@ -55,7 +60,7 @@ extension PolicyCanvasPortMarkerLayoutTests {
       isVisible: true
     )
 
-    #expect(trailingPassMarkers.count == 1)
+    #expect(trailingPassMarkers.count + leadingPassMarkers.count == 1)
     // Parallel fail edges are distinctly labelled transitions; each gets its own
     // horizontal dot rather than collapsing onto a single shared marker.
     #expect(trailingFailMarkers.count + leadingFailMarkers.count == 4)

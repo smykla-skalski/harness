@@ -25,6 +25,7 @@ func policyCanvasMeasurePortSpacing(
 ) -> [PolicyCanvasPortSpacingViolation] {
   var markersByNodeSide: [String: [PolicyCanvasPortSide: [PolicyCanvasResolvedMarker]]] = [:]
   let tolerance = PolicyCanvasLayout.portDiameter
+  let thresholdTolerance: CGFloat = 0.001
   for routed in routedEdges {
     guard let first = routed.route.points.first, let last = routed.route.points.last else {
       continue
@@ -57,9 +58,9 @@ func policyCanvasMeasurePortSpacing(
         let lower = sorted[index - 1]
         let upper = sorted[index]
         let gap = upper.alongAxis - lower.alongAxis
-        if gap < thresholds.markerOverlap {
+        if gap + thresholdTolerance < thresholds.markerOverlap {
           violations.append(policyCanvasPortSpacingPairViolation(.overlap, lower, upper, gap: gap))
-        } else if gap < thresholds.minimumPortSpacing {
+        } else if gap + thresholdTolerance < thresholds.minimumPortSpacing {
           violations.append(policyCanvasPortSpacingPairViolation(.tooClose, lower, upper, gap: gap))
         }
       }
