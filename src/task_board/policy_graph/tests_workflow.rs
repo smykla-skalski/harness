@@ -67,15 +67,15 @@ fn handoff_graph() -> PolicyGraph {
     graph.nodes.insert(
         2,
         PolicyGraphNode {
-            id: "handoff-next".to_owned(),
+            id: "handoff-next".into(),
             label: "Hand off".to_owned(),
             kind: PolicyGraphNodeKind::Handoff(PolicyHandoffStep {
                 handoff_key: "next-handler".to_owned(),
             }),
             automation: None,
-            input_ports: vec![PORT_IN.to_owned()],
-            output_ports: vec!["out".to_owned()],
-            group_id: Some("workflow-entry".to_owned()),
+            input_ports: vec![PORT_IN.into()],
+            output_ports: vec!["out".into()],
+            group_id: Some("workflow-entry".into()),
         },
     );
     let edge = graph
@@ -83,13 +83,13 @@ fn handoff_graph() -> PolicyGraph {
         .iter_mut()
         .find(|edge| edge.from_node == "entry-reviews-auto" && edge.to_node == "action:router")
         .expect("reviews auto entry edge");
-    edge.to_node = "handoff-next".to_owned();
+    edge.to_node = "handoff-next".into();
     graph.edges.push(PolicyGraphEdge {
-        id: "edge:handoff-to-router".to_owned(),
-        from_node: "handoff-next".to_owned(),
-        from_port: "out".to_owned(),
-        to_node: "action:router".to_owned(),
-        to_port: PORT_IN.to_owned(),
+        id: "edge:handoff-to-router".into(),
+        from_node: "handoff-next".into(),
+        from_port: "out".into(),
+        to_node: "action:router".into(),
+        to_port: PORT_IN.into(),
         label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });
@@ -98,9 +98,9 @@ fn handoff_graph() -> PolicyGraph {
         .iter_mut()
         .find(|group| group.id == "workflow-entry")
         .expect("workflow entry group");
-    group.node_ids.push("handoff-next".to_owned());
+    group.node_ids.push("handoff-next".into());
     graph.layout.nodes.push(PolicyGraphNodeLayout {
-        node_id: "handoff-next".to_owned(),
+        node_id: "handoff-next".into(),
         x: 24,
         y: 240,
         source: None,

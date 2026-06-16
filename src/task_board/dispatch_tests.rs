@@ -140,11 +140,11 @@ fn dispatch_policy_uses_supplied_board_root_pipeline() {
         }
     });
     document.edges.push(PolicyGraphEdge {
-        id: "edge:spawn-needs-human".to_string(),
-        from_node: "action:router".to_string(),
-        from_port: "default".to_string(),
-        to_node: "human:unsafe-action".to_string(),
-        to_port: "in".to_string(),
+        id: "edge:spawn-needs-human".into(),
+        from_node: "action:router".into(),
+        from_port: "default".into(),
+        to_node: "human:unsafe-action".into(),
+        to_port: "in".into(),
         label: None,
         condition: PolicyGraphEdgeCondition::ActionIn {
             actions: vec![PolicyAction::SpawnAgent],
@@ -196,11 +196,11 @@ fn dispatch_policy_prefers_cached_gate_policy_over_disk() {
         }
     });
     document.edges.push(PolicyGraphEdge {
-        id: "edge:spawn-needs-human".to_string(),
-        from_node: "action:router".to_string(),
-        from_port: "default".to_string(),
-        to_node: "human:unsafe-action".to_string(),
-        to_port: "in".to_string(),
+        id: "edge:spawn-needs-human".into(),
+        from_node: "action:router".into(),
+        from_port: "default".into(),
+        to_node: "human:unsafe-action".into(),
+        to_port: "in".into(),
         label: None,
         condition: PolicyGraphEdgeCondition::ActionIn {
             actions: vec![PolicyAction::SpawnAgent],

@@ -142,12 +142,12 @@ fn ensure_screenshot_canvas_preserves_noncanonical_legacy_custom_graph() {
         .expect("review screenshot canvas");
     canvas.document.policy_trace_ids = vec!["review-screenshot-extraction-canvas-v2".to_string()];
     canvas.document.nodes.push(PolicyGraphNode {
-        id: "custom-review-screenshot-note".to_string(),
+        id: "custom-review-screenshot-note".into(),
         label: "Custom note".to_string(),
         kind: PolicyGraphNodeKind::Hub,
         automation: None,
-        input_ports: vec![PORT_IN.to_string()],
-        output_ports: vec!["out_1".to_string()],
+        input_ports: vec![PORT_IN.into()],
+        output_ports: vec!["out_1".into()],
         group_id: None,
     });
     let before = canvas.document.clone();
@@ -373,11 +373,11 @@ fn import_canvas_rejects_invalid_graph() {
     let initial_len = ws.canvases.len();
     let mut invalid = PolicyGraph::seeded_v2();
     invalid.edges.push(PolicyGraphEdge {
-        id: "edge:dangling".to_string(),
-        from_node: "no-such-node".to_string(),
-        from_port: "out".to_string(),
-        to_node: "no-such-node".to_string(),
-        to_port: PORT_IN.to_string(),
+        id: "edge:dangling".into(),
+        from_node: "no-such-node".into(),
+        from_port: "out".into(),
+        to_node: "no-such-node".into(),
+        to_port: PORT_IN.into(),
         label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });

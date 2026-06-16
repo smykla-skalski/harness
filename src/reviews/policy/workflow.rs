@@ -51,12 +51,12 @@ fn node(
     output_ports: &[&str],
 ) -> PolicyGraphNode {
     PolicyGraphNode {
-        id: id.to_owned(),
+        id: id.into(),
         label: label.to_owned(),
         kind,
         automation: None,
-        input_ports: input_ports.iter().map(|port| (*port).to_owned()).collect(),
-        output_ports: output_ports.iter().map(|port| (*port).to_owned()).collect(),
+        input_ports: input_ports.iter().map(|port| (*port).into()).collect(),
+        output_ports: output_ports.iter().map(|port| (*port).into()).collect(),
         group_id: None,
     }
 }
@@ -154,11 +154,11 @@ fn edge(
     condition: PolicyGraphEdgeCondition,
 ) -> PolicyGraphEdge {
     PolicyGraphEdge {
-        id: id.to_owned(),
-        from_node: from_node.to_owned(),
-        from_port: from_port.to_owned(),
-        to_node: to_node.to_owned(),
-        to_port: PORT_IN.to_owned(),
+        id: id.into(),
+        from_node: from_node.into(),
+        from_port: from_port.into(),
+        to_node: to_node.into(),
+        to_port: PORT_IN.into(),
         label: None,
         condition,
     }
@@ -229,7 +229,7 @@ fn reviews_auto_layout() -> Vec<PolicyGraphNodeLayout> {
     .iter()
     .enumerate()
     .map(|(index, id)| PolicyGraphNodeLayout {
-        node_id: (*id).to_owned(),
+        node_id: (*id).into(),
         x: 80 + i32::try_from(index).unwrap_or(0) * 220,
         y: 1400,
         source: None,

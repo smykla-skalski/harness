@@ -15,6 +15,7 @@ mod defaults;
 mod evaluation;
 mod gate_cache;
 mod graph_impls;
+mod ids;
 mod models;
 mod node_kinds;
 mod seed;
@@ -30,6 +31,7 @@ pub const POLICY_GRAPH_SCHEMA_VERSION: u16 = 2;
 pub const POLICY_GRAPH_INITIAL_REVISION: u64 = 1;
 
 pub use compiler::{CompiledWorkflowPlan, CompiledWorkflowStep};
+pub use ids::{PolicyGraphEdgeId, PolicyGraphGroupId, PolicyGraphNodeId, PolicyGraphPortId};
 pub(crate) use gate_cache::{
     cached_gate_policy, install_gate_coldfill, resolve_gate_policy, store_gate_policy,
 };
@@ -104,17 +106,17 @@ pub enum PolicyGraphMode {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyGraphNode {
-    pub id: String,
+    pub id: PolicyGraphNodeId,
     pub label: String,
     pub kind: PolicyGraphNodeKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automation: Option<PolicyGraphAutomationBinding>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub input_ports: Vec<String>,
+    pub input_ports: Vec<PolicyGraphPortId>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub output_ports: Vec<String>,
+    pub output_ports: Vec<PolicyGraphPortId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub group_id: Option<String>,
+    pub group_id: Option<PolicyGraphGroupId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -220,18 +222,18 @@ pub struct PolicySwitchNode {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicySwitchArm {
-    pub port: String,
+    pub port: PolicyGraphPortId,
     pub field: PolicyEvidenceField,
     pub predicate: PolicyEvidencePredicate,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyGraphEdge {
-    pub id: String,
-    pub from_node: String,
-    pub from_port: String,
-    pub to_node: String,
-    pub to_port: String,
+    pub id: PolicyGraphEdgeId,
+    pub from_node: PolicyGraphNodeId,
+    pub from_port: PolicyGraphPortId,
+    pub to_node: PolicyGraphNodeId,
+    pub to_port: PolicyGraphPortId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     #[serde(default)]
@@ -263,14 +265,14 @@ pub enum PolicyGraphEdgeCondition {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyGraphGroup {
-    pub id: String,
+    pub id: PolicyGraphGroupId,
     pub label: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
     #[serde(default)]
     pub frame: PolicyCanvasRect,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub node_ids: Vec<String>,
+    pub node_ids: Vec<PolicyGraphNodeId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -301,7 +303,7 @@ impl Default for PolicyGraphLayout {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyGraphNodeLayout {
-    pub node_id: String,
+    pub node_id: PolicyGraphNodeId,
     pub x: i32,
     pub y: i32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -397,7 +399,7 @@ pub type PolicyPipelineValidationCode = PolicyGraphValidationIssue;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyPipelinePort {
-    pub id: String,
+    pub id: PolicyGraphPortId,
     pub label: String,
 }
 

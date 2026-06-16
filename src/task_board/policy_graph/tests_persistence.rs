@@ -33,11 +33,11 @@ fn save_draft_rejects_invalid_graph() {
     let baseline = ws.active_canvas().unwrap().document.clone();
     let mut invalid = baseline.clone();
     invalid.edges.push(PolicyGraphEdge {
-        id: "edge:dangling".to_string(),
-        from_node: "no-such-node".to_string(),
-        from_port: "out".to_string(),
-        to_node: "no-such-node".to_string(),
-        to_port: PORT_IN.to_string(),
+        id: "edge:dangling".into(),
+        from_node: "no-such-node".into(),
+        from_port: "out".into(),
+        to_node: "no-such-node".into(),
+        to_port: PORT_IN.into(),
         label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });
@@ -75,7 +75,7 @@ fn evaluate_graph_uses_visited_set_not_counter() {
         .expect("supervisor node");
     for index in 0..32 {
         let mut cloned = template.clone();
-        cloned.id = format!("supervisor:padding-{index}");
+        cloned.id = format!("supervisor:padding-{index}").into();
         graph.nodes.push(cloned);
     }
     assert!(graph.validate().is_valid(), "padded graph stays valid");
@@ -167,7 +167,7 @@ fn assert_manual_ocr_paste_canvas_only(canvas: &PolicyCanvasRecord) {
             .document
             .nodes
             .iter()
-            .all(|node| !node.id.starts_with("action:")),
+            .all(|node| !node.id.as_str().starts_with("action:")),
         "manual OCR paste canvas must not embed the default task-board graph"
     );
     assert!(
@@ -211,7 +211,7 @@ fn assert_review_text_paste_canvas_only(canvas: &PolicyCanvasRecord) {
             .document
             .nodes
             .iter()
-            .all(|node| !node.id.starts_with("action:")),
+            .all(|node| !node.id.as_str().starts_with("action:")),
         "review text paste canvas must not embed the default task-board graph"
     );
     assert!(
@@ -255,7 +255,7 @@ fn assert_review_screenshot_canvas_only(canvas: &PolicyCanvasRecord) {
             .document
             .nodes
             .iter()
-            .all(|node| !node.id.starts_with("action:")),
+            .all(|node| !node.id.as_str().starts_with("action:")),
         "review screenshot canvas must not embed the default task-board graph"
     );
     assert!(

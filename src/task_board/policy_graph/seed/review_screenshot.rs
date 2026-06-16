@@ -1,10 +1,10 @@
+use super::builders::{edge, group, layout, node, rect, strings};
 use super::{
     POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PORT_IMAGE, PORT_IN,
     PORT_PULL_REQUESTS, PORT_TEXT, PolicyActionStep, PolicyGraph, PolicyGraphAutomationBinding,
     PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphLayout,
     PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
-    PolicyGraphOCRConfiguration, PolicyGraphReviewPullRequestExtraction, edge, group, layout, node,
-    rect, strings,
+    PolicyGraphOCRConfiguration, PolicyGraphReviewPullRequestExtraction,
 };
 
 const REVIEW_SCREENSHOT_GROUP_ID: &str = "automation:review-screenshot-extraction";

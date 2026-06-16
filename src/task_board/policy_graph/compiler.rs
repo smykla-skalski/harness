@@ -43,7 +43,7 @@ impl PolicyGraph {
         let simulation = self.simulate(input);
         let mut steps = Vec::new();
         for node_id in &simulation.visited_node_ids {
-            let Some(node) = self.nodes.iter().find(|node| node.id == *node_id) else {
+            let Some(node) = self.nodes.iter().find(|node| node.id == node_id.as_str()) else {
                 continue;
             };
             match &node.kind {

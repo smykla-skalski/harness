@@ -165,29 +165,29 @@ fn node_automation_binding_round_trips_as_policy_graph_metadata() {
 fn validation_reports_dangling_edges_invalid_ports_and_cycles() {
     let mut graph = PolicyGraph::seeded_v2();
     graph.edges.push(PolicyGraphEdge {
-        id: "edge:bad-node".to_string(),
-        from_node: "missing".to_string(),
-        from_port: "out".to_string(),
-        to_node: "action:router".to_string(),
-        to_port: PORT_IN.to_string(),
+        id: "edge:bad-node".into(),
+        from_node: "missing".into(),
+        from_port: "out".into(),
+        to_node: "action:router".into(),
+        to_port: PORT_IN.into(),
         label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });
     graph.edges.push(PolicyGraphEdge {
-        id: "edge:bad-port".to_string(),
-        from_node: "action:router".to_string(),
-        from_port: "nope".to_string(),
-        to_node: "supervisor:default-allow".to_string(),
-        to_port: PORT_IN.to_string(),
+        id: "edge:bad-port".into(),
+        from_node: "action:router".into(),
+        from_port: "nope".into(),
+        to_node: "supervisor:default-allow".into(),
+        to_port: PORT_IN.into(),
         label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });
     graph.edges.push(PolicyGraphEdge {
-        id: "edge:cycle".to_string(),
-        from_node: "supervisor:default-allow".to_string(),
-        from_port: "out".to_string(),
-        to_node: "action:router".to_string(),
-        to_port: PORT_IN.to_string(),
+        id: "edge:cycle".into(),
+        from_node: "supervisor:default-allow".into(),
+        from_port: "out".into(),
+        to_node: "action:router".into(),
+        to_port: PORT_IN.into(),
         label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });
@@ -348,51 +348,51 @@ fn reviews_auto_test_graph() -> PolicyGraph {
     graph.nodes.insert(
         0,
         PolicyGraphNode {
-            id: "entry-reviews-auto".to_owned(),
+            id: "entry-reviews-auto".into(),
             label: "Reviews Auto".to_owned(),
             kind: PolicyGraphNodeKind::WorkflowEntry(PolicyWorkflowEntry {
                 workflow_id: "reviews_auto".to_owned(),
             }),
             automation: None,
-            input_ports: vec![PORT_IN.to_owned()],
-            output_ports: vec!["out".to_owned()],
-            group_id: Some("workflow-entry".to_owned()),
+            input_ports: vec![PORT_IN.into()],
+            output_ports: vec!["out".into()],
+            group_id: Some("workflow-entry".into()),
         },
     );
     graph.nodes.insert(
         1,
         PolicyGraphNode {
-            id: "entry-reviews-manual".to_owned(),
+            id: "entry-reviews-manual".into(),
             label: "Reviews Manual".to_owned(),
             kind: PolicyGraphNodeKind::WorkflowEntry(PolicyWorkflowEntry {
                 workflow_id: "reviews_manual".to_owned(),
             }),
             automation: None,
-            input_ports: vec![PORT_IN.to_owned()],
-            output_ports: vec!["out".to_owned()],
-            group_id: Some("workflow-entry".to_owned()),
+            input_ports: vec![PORT_IN.into()],
+            output_ports: vec!["out".into()],
+            group_id: Some("workflow-entry".into()),
         },
     );
     graph.edges.push(PolicyGraphEdge {
-        id: "edge:entry-reviews-auto".to_owned(),
-        from_node: "entry-reviews-auto".to_owned(),
-        from_port: "out".to_owned(),
-        to_node: "action:router".to_owned(),
-        to_port: PORT_IN.to_owned(),
+        id: "edge:entry-reviews-auto".into(),
+        from_node: "entry-reviews-auto".into(),
+        from_port: "out".into(),
+        to_node: "action:router".into(),
+        to_port: PORT_IN.into(),
         label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });
     graph.edges.push(PolicyGraphEdge {
-        id: "edge:entry-reviews-manual".to_owned(),
-        from_node: "entry-reviews-manual".to_owned(),
-        from_port: "out".to_owned(),
-        to_node: "action:router".to_owned(),
-        to_port: PORT_IN.to_owned(),
+        id: "edge:entry-reviews-manual".into(),
+        from_node: "entry-reviews-manual".into(),
+        from_port: "out".into(),
+        to_node: "action:router".into(),
+        to_port: PORT_IN.into(),
         label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });
     graph.groups.push(PolicyGraphGroup {
-        id: "workflow-entry".to_owned(),
+        id: "workflow-entry".into(),
         label: "Workflow entry".to_owned(),
         color: None,
         frame: PolicyCanvasRect {
@@ -402,19 +402,19 @@ fn reviews_auto_test_graph() -> PolicyGraph {
             height: 240,
         },
         node_ids: vec![
-            "entry-reviews-auto".to_owned(),
-            "entry-reviews-manual".to_owned(),
+            "entry-reviews-auto".into(),
+            "entry-reviews-manual".into(),
         ],
     });
     graph.layout.nodes.extend([
         PolicyGraphNodeLayout {
-            node_id: "entry-reviews-auto".to_owned(),
+            node_id: "entry-reviews-auto".into(),
             x: 24,
             y: 24,
             source: None,
         },
         PolicyGraphNodeLayout {
-            node_id: "entry-reviews-manual".to_owned(),
+            node_id: "entry-reviews-manual".into(),
             x: 24,
             y: 132,
             source: None,
@@ -442,7 +442,7 @@ fn wait_for_checks_graph() -> PolicyGraph {
     graph.nodes.insert(
         2,
         PolicyGraphNode {
-            id: "wait-checks".to_owned(),
+            id: "wait-checks".into(),
             label: "Wait for checks".to_owned(),
             kind: PolicyGraphNodeKind::WaitStep(PolicyWaitStep {
                 wait: PolicyWaitCondition::Event {
@@ -451,9 +451,9 @@ fn wait_for_checks_graph() -> PolicyGraph {
                 resume_key: "checks-ready".to_owned(),
             }),
             automation: None,
-            input_ports: vec![PORT_IN.to_owned()],
-            output_ports: vec!["out".to_owned()],
-            group_id: Some("workflow-entry".to_owned()),
+            input_ports: vec![PORT_IN.into()],
+            output_ports: vec!["out".into()],
+            group_id: Some("workflow-entry".into()),
         },
     );
     let edge = graph
@@ -461,13 +461,13 @@ fn wait_for_checks_graph() -> PolicyGraph {
         .iter_mut()
         .find(|edge| edge.from_node == "entry-reviews-auto" && edge.to_node == "action:router")
         .expect("reviews auto entry edge");
-    edge.to_node = "wait-checks".to_owned();
+    edge.to_node = "wait-checks".into();
     graph.edges.push(PolicyGraphEdge {
-        id: "edge:wait-checks-to-router".to_owned(),
-        from_node: "wait-checks".to_owned(),
-        from_port: "out".to_owned(),
-        to_node: "action:router".to_owned(),
-        to_port: PORT_IN.to_owned(),
+        id: "edge:wait-checks-to-router".into(),
+        from_node: "wait-checks".into(),
+        from_port: "out".into(),
+        to_node: "action:router".into(),
+        to_port: PORT_IN.into(),
         label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });
@@ -476,10 +476,10 @@ fn wait_for_checks_graph() -> PolicyGraph {
         .iter_mut()
         .find(|group| group.id == "workflow-entry")
         .expect("workflow entry group");
-    group.node_ids.push("wait-checks".to_owned());
+    group.node_ids.push("wait-checks".into());
     group.frame.height = 360;
     graph.layout.nodes.push(PolicyGraphNodeLayout {
-        node_id: "wait-checks".to_owned(),
+        node_id: "wait-checks".into(),
         x: 24,
         y: 240,
         source: None,
