@@ -29,6 +29,11 @@ struct PolicyCanvasProjectedRouteInput {
   }
 }
 
+struct PolicyCanvasProjectedRouteResult {
+  let output: PolicyCanvasRouteWorkerOutput
+  let canCommitAsCurrentGraph: Bool
+}
+
 func policyCanvasNodePositionsByID(_ nodes: [PolicyCanvasNode]) -> [String: CGPoint] {
   Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
 }
@@ -36,11 +41,29 @@ func policyCanvasNodePositionsByID(_ nodes: [PolicyCanvasNode]) -> [String: CGPo
 func policyCanvasProjectedRouteOutput(
   input: PolicyCanvasProjectedRouteInput
 ) -> PolicyCanvasRouteWorkerOutput {
+  policyCanvasProjectedRouteResult(input: input).output
+}
+
+func policyCanvasProjectedRouteResult(
+  input: PolicyCanvasProjectedRouteInput
+) -> PolicyCanvasProjectedRouteResult {
   guard !input.suppressesProjection else {
-    return input.cachedOutput
+    return PolicyCanvasProjectedRouteResult(
+      output: input.cachedOutput,
+      canCommitAsCurrentGraph: false
+    )
   }
   guard !input.cachedOutput.routes.isEmpty, !input.cachedNodePositionsByID.isEmpty else {
-    return input.cachedOutput
+    return PolicyCanvasProjectedRouteResult(
+      output: input.cachedOutput,
+      canCommitAsCurrentGraph: false
+    )
+  }
+  guard policyCanvasProjectionMatchesCurrentGraphShape(input) else {
+    return PolicyCanvasProjectedRouteResult(
+      output: input.cachedOutput,
+      canCommitAsCurrentGraph: false
+    )
   }
 
   let movedNodeDeltas = policyCanvasMovedNodeDeltas(
@@ -48,12 +71,14 @@ func policyCanvasProjectedRouteOutput(
     cachedNodePositionsByID: input.cachedNodePositionsByID
   )
   guard !movedNodeDeltas.isEmpty else {
-    return input.cachedOutput
+    return PolicyCanvasProjectedRouteResult(
+      output: input.cachedOutput,
+      canCommitAsCurrentGraph: false
+    )
   }
 
   var routes = input.cachedOutput.routes
   var labelPositions = input.cachedOutput.labelPositions
-  var didProjectRoute = false
   for edge in input.edges {
     let sourceDelta = movedNodeDeltas[edge.source.nodeID] ?? .zero
     let targetDelta = movedNodeDeltas[edge.target.nodeID] ?? .zero
@@ -74,17 +99,23 @@ func policyCanvasProjectedRouteOutput(
     if labelPositions[edge.id] != nil {
       labelPositions[edge.id] = projectedRoute.labelPosition
     }
-    didProjectRoute = true
-  }
-  guard didProjectRoute else {
-    return input.cachedOutput
   }
 
-  return policyCanvasProjectedRouteOutput(
-    input: input,
-    routes: routes,
-    labelPositions: labelPositions
+  return PolicyCanvasProjectedRouteResult(
+    output: policyCanvasProjectedRouteOutput(
+      input: input,
+      routes: routes,
+      labelPositions: labelPositions
+    ),
+    canCommitAsCurrentGraph: true
   )
+}
+
+private func policyCanvasProjectionMatchesCurrentGraphShape(
+  _ input: PolicyCanvasProjectedRouteInput
+) -> Bool {
+  Set(input.currentNodes.map(\.id)) == Set(input.cachedNodePositionsByID.keys)
+    && Set(input.edges.map(\.id)) == Set(input.cachedOutput.routes.keys)
 }
 
 private func policyCanvasMovedNodeDeltas(

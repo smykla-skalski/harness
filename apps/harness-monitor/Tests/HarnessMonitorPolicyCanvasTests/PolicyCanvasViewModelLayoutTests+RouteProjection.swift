@@ -215,6 +215,117 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(polylineBounds(projectedRoute.points).maxX <= cachedBounds.maxX + targetDelta.width)
   }
 
+  @Test("position-only route projection leaves unrelated routes unchanged")
+  func positionOnlyRouteProjectionLeavesUnrelatedRoutesUnchanged() throws {
+    let movedSource = PolicyCanvasNode(
+      id: "moved-source",
+      title: "Moved Source",
+      kind: .workflowEntry,
+      position: CGPoint(x: 80, y: 120)
+    )
+    var movedTarget = PolicyCanvasNode(
+      id: "moved-target",
+      title: "Moved Target",
+      kind: .evidenceCheck,
+      position: CGPoint(x: 520, y: 240)
+    )
+    let stableSource = PolicyCanvasNode(
+      id: "stable-source",
+      title: "Stable Source",
+      kind: .workflowEntry,
+      position: CGPoint(x: 80, y: 520)
+    )
+    let stableTarget = PolicyCanvasNode(
+      id: "stable-target",
+      title: "Stable Target",
+      kind: .evidenceCheck,
+      position: CGPoint(x: 520, y: 520)
+    )
+    let movedEdge = PolicyCanvasEdge(
+      id: "moved-edge",
+      source: PolicyCanvasPortEndpoint(
+        nodeID: movedSource.id,
+        portID: movedSource.outputPorts[0].id,
+        kind: .output
+      ),
+      target: PolicyCanvasPortEndpoint(
+        nodeID: movedTarget.id,
+        portID: movedTarget.inputPorts[0].id,
+        kind: .input
+      ),
+      label: "moved"
+    )
+    let stableEdge = PolicyCanvasEdge(
+      id: "stable-edge",
+      source: PolicyCanvasPortEndpoint(
+        nodeID: stableSource.id,
+        portID: stableSource.outputPorts[0].id,
+        kind: .output
+      ),
+      target: PolicyCanvasPortEndpoint(
+        nodeID: stableTarget.id,
+        portID: stableTarget.inputPorts[0].id,
+        kind: .input
+      ),
+      label: "stable"
+    )
+    let movedRoute = PolicyCanvasEdgeRoute(
+      points: [
+        CGPoint(x: 164, y: 168),
+        CGPoint(x: 260, y: 168),
+        CGPoint(x: 260, y: 288),
+        CGPoint(x: 520, y: 288),
+      ],
+      labelPosition: CGPoint(x: 260, y: 228)
+    )
+    let stableRoute = PolicyCanvasEdgeRoute(
+      points: [
+        CGPoint(x: 164, y: 568),
+        CGPoint(x: 320, y: 568),
+        CGPoint(x: 520, y: 568),
+      ],
+      labelPosition: CGPoint(x: 320, y: 568)
+    )
+    let bounds = polylineBounds(movedRoute.points).union(polylineBounds(stableRoute.points))
+    let cachedOutput = PolicyCanvasRouteWorkerOutput(
+      routes: [
+        movedEdge.id: movedRoute,
+        stableEdge.id: stableRoute,
+      ],
+      labelPositions: [:],
+      portVisibility: [:],
+      portMarkerLayout: .empty,
+      visibleBounds: bounds,
+      contentSize: bounds.size,
+      accessibilityEdgeLabelsByID: [:],
+      accessibilityNodeEntries: [],
+      accessibilityEdgeEntries: [],
+      nodeAccessibilityValuesByID: [:],
+      connectTargetsByNodeID: [:]
+    )
+    let cachedNodes = [movedSource, movedTarget, stableSource, stableTarget]
+    let cachedNodePositions = policyCanvasNodePositionsByID(cachedNodes)
+    movedTarget.position.x += 120
+    movedTarget.position.y += 40
+
+    let result = policyCanvasProjectedRouteResult(
+      input: PolicyCanvasProjectedRouteInput(
+        cachedOutput: cachedOutput,
+        cachedNodePositionsByID: cachedNodePositions,
+        currentNodes: [movedSource, movedTarget, stableSource, stableTarget],
+        groups: [],
+        edges: [movedEdge, stableEdge],
+        fontScale: 1
+      )
+    )
+    let projectedMovedRoute = try #require(result.output.routes[movedEdge.id])
+
+    #expect(result.canCommitAsCurrentGraph)
+    #expect(result.output.routes[stableEdge.id] == stableRoute)
+    #expect(projectedMovedRoute != movedRoute)
+    #expect(projectedMovedRoute.points.last == CGPoint(x: 640, y: 328))
+  }
+
   @Test("grouped endpoint routes keep group titles but not group bodies as obstacles")
   func groupedEndpointRoutesKeepGroupTitlesAsObstacles() {
     let viewModel = PolicyCanvasViewModel.sample()
