@@ -22,7 +22,12 @@ struct PolicyCanvasBootstrapTests {
     #expect(viewModel.latestSimulation?.revision == 23)
     #expect(viewModel.nodes.contains { $0.id == "action:router" })
     #expect(!viewModel.nodes.contains { $0.id == "policy-source" })
-    #expect(viewModel.groups.contains { $0.id == "entry" })
+    let groupIDs = Set(viewModel.groups.map(\.id))
+    #expect(groupIDs.count == 1)
+    #expect(
+      viewModel.nodes.allSatisfy { node in
+        node.groupID.map(groupIDs.contains) == true
+      })
     #expect(viewModel.viewportCenteringGeneration == 1)
   }
 
@@ -40,5 +45,16 @@ struct PolicyCanvasBootstrapTests {
     #expect(viewModel.edges.isEmpty)
     #expect(viewModel.isEmpty)
     #expect(viewModel.viewportCenteringGeneration == 0)
+  }
+
+  @Test("live startup state enables ELK for production-sized default graphs")
+  func liveStartupStateEnablesElkForDefaultGraphs() {
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: nil,
+      simulation: nil,
+      audit: nil
+    )
+
+    #expect(viewModel.usesElkLayoutForSmallGraphs)
   }
 }

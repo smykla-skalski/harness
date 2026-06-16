@@ -61,8 +61,8 @@ public final class PolicyCanvasViewModel {
   /// It is tied to exact node positions, so document export/undo/recovery never
   /// persist it; regular edits clear it and the next reflow can rebuild it.
   @ObservationIgnored var precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
-  /// Lab-only switch that lets small samples use ELK without lowering the
-  /// production size gate.
+  /// Allows live/default surfaces to use ELK for graphs below the stress-size
+  /// gate. Specialized tests and algorithm probes can still opt out explicitly.
   var usesElkLayoutForSmallGraphs: Bool {
     didSet {
       guard usesElkLayoutForSmallGraphs != oldValue, canReflowLayout else {

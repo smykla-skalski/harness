@@ -14,7 +14,7 @@ extension PolicyCanvasViewModel {
     activeCanvasId: String? = nil,
     algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
     policyGroupTitle: String? = nil,
-    usesElkLayoutForSmallGraphs: Bool = false
+    usesElkLayoutForSmallGraphs: Bool = true
   ) -> PolicyCanvasViewModel {
     let viewModel = PolicyCanvasViewModel(
       nodes: [],
