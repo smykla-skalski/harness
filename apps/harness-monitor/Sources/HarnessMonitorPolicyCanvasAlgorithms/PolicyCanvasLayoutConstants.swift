@@ -5,7 +5,7 @@ public enum PolicyCanvasLayout {
   public static let minimumZoom: CGFloat = 0.1
   public static let maximumZoom: CGFloat = 1.4
   public static let defaultZoom: CGFloat = 0.92
-  public static let nodeSize = CGSize(width: 168, height: 96)
+  public static let nodeSize = CGSize(width: 168, height: 112)
   public static let portDiameter: CGFloat = 18
   public static let portHitTestExtension: CGFloat = 10
   public static let portMarkerInset: CGFloat = portDiameter / 2 + 2

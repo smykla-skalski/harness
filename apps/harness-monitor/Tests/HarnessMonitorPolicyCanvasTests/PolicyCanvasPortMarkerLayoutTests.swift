@@ -62,10 +62,10 @@ struct PolicyCanvasPortMarkerLayoutTests {
     let trailingTerminals = targetTerminals.filter { $0.side == .trailing }
 
     #expect(targetTerminals.count == edges.count)
-    #expect(leadingTerminals.count == 3)
-    #expect(trailingTerminals.count == 2)
-    #expect(leadingMarkers.count == 3)
-    #expect(trailingMarkers.count == 2)
+    #expect(leadingTerminals.count == 4)
+    #expect(trailingTerminals.count == 1)
+    #expect(leadingMarkers.count == 4)
+    #expect(trailingMarkers.count == 1)
     assertBorderCoordinates(
       markers: leadingMarkers,
       base: PolicyCanvasLayout.nodeSize.height / 2,
@@ -144,8 +144,8 @@ struct PolicyCanvasPortMarkerLayoutTests {
     let trailing = sourceTerminals.filter { $0.1.side == .trailing }
     let leading = sourceTerminals.filter { $0.1.side == .leading }
 
-    #expect(trailing.count == 3)
-    #expect(leading.count == 1)
+    #expect(trailing.count == 4)
+    #expect(leading.isEmpty)
     let trailingCoordinates = trailing.map { edge, terminal in
       sourceCoordinate(edge.source, side: .trailing) + terminal.axisOffset
     }.sorted()
@@ -287,8 +287,9 @@ struct PolicyCanvasPortMarkerLayoutTests {
     guard let first = coordinates.first, let last = coordinates.last else {
       return
     }
-    #expect(first >= PolicyCanvasLayout.portDiameter - 0.001)
-    #expect(last <= extent - PolicyCanvasLayout.portDiameter + 0.001)
+    let inset = policyCanvasPortMarkerInset()
+    #expect(first >= inset - 0.001)
+    #expect(last <= extent - inset + 0.001)
   }
 }
 

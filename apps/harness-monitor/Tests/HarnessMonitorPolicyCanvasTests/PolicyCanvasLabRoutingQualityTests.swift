@@ -534,7 +534,6 @@ struct PolicyCanvasLabRoutingQualityTests {
             let sideKey = PolicyCanvasLabMarkerSideKey(
               sampleID: sample.id,
               nodeID: endpoint.nodeID,
-              kind: endpoint.kind,
               side: side
             )
             coordinatesBySide[sideKey, default: []].append(coordinate)
@@ -1336,11 +1335,10 @@ private struct PolicyCanvasLabMarkerBalanceGraph {
 private struct PolicyCanvasLabMarkerSideKey: Hashable, CustomStringConvertible {
   let sampleID: String
   let nodeID: String
-  let kind: PolicyCanvasPortKind
   let side: PolicyCanvasPortSide
 
   var description: String {
-    "\(sampleID):\(nodeID):\(kind):\(side)"
+    "\(sampleID):\(nodeID):\(side)"
   }
 }
 
