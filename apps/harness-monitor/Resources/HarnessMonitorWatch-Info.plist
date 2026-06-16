@@ -28,7 +28,7 @@
     <key>WKApplication</key>
     <true/>
     <key>WKCompanionAppBundleIdentifier</key>
-    <string>io.harnessmonitor.app.ios</string>
+    <string>io.harnessmonitor.app</string>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
         <string>watch-companion</string>
