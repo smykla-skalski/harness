@@ -25,7 +25,7 @@ public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   static let obstaclePadding: CGFloat = 15
   /// Channel snap grid. 5pt gives parallel-edge separation without visibly
   /// shifting routes off straight axes when only one edge runs the channel.
-  public static let channelStep: CGFloat = 5
+  public static let channelStep: CGFloat = PolicyCanvasLayout.routeChannelStep
   /// Containment probe for endpoint-node detection in `preparedObstacles`. An
   /// edge's own source/target anchor sits on its node's border, so a 1pt
   /// outset of the raw frame catches it. Testing the full obstacle pad instead
@@ -289,7 +289,8 @@ public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
 
     func append(_ points: [CGPoint]) {
       let compressed = Self.compressCollinear(points)
-      let key = compressed
+      let key =
+        compressed
         .map { "\(Self.quantizedCoordinate($0.x)):\(Self.quantizedCoordinate($0.y))" }
         .joined(separator: "|")
       guard seen.insert(key).inserted else {

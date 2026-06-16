@@ -31,8 +31,12 @@ extension PolicyCanvasViewModel {
   }
 
   var canvasContentBounds: CGRect {
+    let nodeFrames = policyCanvasNodeFramesByID(nodes: nodes, edges: edges)
     let nodeBounds = nodes.reduce(CGRect.null) { partial, node in
-      partial.union(policyCanvasNodeFrame(node))
+      guard let frame = nodeFrames[node.id] else {
+        return partial
+      }
+      return partial.union(frame)
     }
     return groups.reduce(nodeBounds) { partial, group in
       partial.union(group.frame)
@@ -81,9 +85,8 @@ extension PolicyCanvasViewModel {
   /// they are visual containers, not shapes, and treating them as walls forces
   /// long loop-like detours around whole sections of the canvas.
   var nodeRoutingObstacles: [CGRect] {
-    nodes.map { node in
-      CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
-    }
+    let nodeFrames = policyCanvasNodeFramesByID(nodes: nodes, edges: edges)
+    return nodes.compactMap { nodeFrames[$0.id] }
   }
 
   /// Per-edge obstacle list. Includes nodes and compact group-title strips as
@@ -180,13 +183,14 @@ extension PolicyCanvasViewModel {
     for node in nodes {
       nodeIndex[node.id] = node
     }
+    let nodeSizes = PolicyCanvasLayout.nodeSizes(for: nodes, edges: self.edges)
     var anchors: [PolicyCanvasPortEndpoint: CGPoint] = [:]
     anchors.reserveCapacity(edges.count * 2)
     for edge in edges {
-      if let point = portAnchor(for: edge.source, nodeIndex: nodeIndex) {
+      if let point = portAnchor(for: edge.source, nodeIndex: nodeIndex, nodeSizes: nodeSizes) {
         anchors[edge.source] = point
       }
-      if let point = portAnchor(for: edge.target, nodeIndex: nodeIndex) {
+      if let point = portAnchor(for: edge.target, nodeIndex: nodeIndex, nodeSizes: nodeSizes) {
         anchors[edge.target] = point
       }
     }
@@ -195,7 +199,8 @@ extension PolicyCanvasViewModel {
 
   private func portAnchor(
     for endpoint: PolicyCanvasPortEndpoint,
-    nodeIndex: [String: PolicyCanvasNode]
+    nodeIndex: [String: PolicyCanvasNode],
+    nodeSizes: [String: CGSize]
   ) -> CGPoint? {
     guard let node = nodeIndex[endpoint.nodeID] else {
       return nil
@@ -205,7 +210,13 @@ extension PolicyCanvasViewModel {
       return nil
     }
     let side = endpoint.side ?? defaultPortSide(for: endpoint.kind)
-    return portAnchor(for: node, side: side, index: index, count: ports.count)
+    return portAnchor(
+      for: node,
+      side: side,
+      index: index,
+      count: ports.count,
+      nodeSize: nodeSizes[node.id] ?? PolicyCanvasLayout.nodeSize(for: node)
+    )
   }
 
   func node(_ id: String) -> PolicyCanvasNode? {
@@ -221,10 +232,19 @@ extension PolicyCanvasViewModel {
   }
 
   func nodeCenter(_ node: PolicyCanvasNode) -> CGPoint {
-    CGPoint(
-      x: node.position.x + PolicyCanvasLayout.nodeSize.width / 2,
-      y: node.position.y + PolicyCanvasLayout.nodeSize.height / 2
+    let size = nodeSize(for: node)
+    return CGPoint(
+      x: node.position.x + size.width / 2,
+      y: node.position.y + size.height / 2
     )
+  }
+
+  func nodeSize(for node: PolicyCanvasNode) -> CGSize {
+    PolicyCanvasLayout.nodeSize(for: node, edges: edges)
+  }
+
+  func nodeFrame(for node: PolicyCanvasNode) -> CGRect {
+    CGRect(origin: node.position, size: nodeSize(for: node))
   }
 
   private func defaultPortSide(for kind: PolicyCanvasPortKind) -> PolicyCanvasPortSide {
@@ -241,28 +261,50 @@ extension PolicyCanvasViewModel {
     for node: PolicyCanvasNode,
     side: PolicyCanvasPortSide,
     index: Int,
-    count: Int
+    count: Int,
+    nodeSize: CGSize? = nil
   ) -> CGPoint {
+    let size = nodeSize ?? self.nodeSize(for: node)
     switch side {
     case .leading:
-      CGPoint(
+      return CGPoint(
         x: node.position.x,
-        y: node.position.y + PolicyCanvasLayout.portY(index: index, count: count)
+        y: node.position.y
+          + PolicyCanvasLayout.portY(
+            index: index,
+            count: count,
+            nodeHeight: size.height
+          )
       )
     case .trailing:
-      CGPoint(
-        x: node.position.x + PolicyCanvasLayout.nodeSize.width,
-        y: node.position.y + PolicyCanvasLayout.portY(index: index, count: count)
+      return CGPoint(
+        x: node.position.x + size.width,
+        y: node.position.y
+          + PolicyCanvasLayout.portY(
+            index: index,
+            count: count,
+            nodeHeight: size.height
+          )
       )
     case .top:
-      CGPoint(
-        x: node.position.x + PolicyCanvasLayout.portX(index: index, count: count),
+      return CGPoint(
+        x: node.position.x
+          + PolicyCanvasLayout.portX(
+            index: index,
+            count: count,
+            nodeWidth: size.width
+          ),
         y: node.position.y
       )
     case .bottom:
-      CGPoint(
-        x: node.position.x + PolicyCanvasLayout.portX(index: index, count: count),
-        y: node.position.y + PolicyCanvasLayout.nodeSize.height
+      return CGPoint(
+        x: node.position.x
+          + PolicyCanvasLayout.portX(
+            index: index,
+            count: count,
+            nodeWidth: size.width
+          ),
+        y: node.position.y + size.height
       )
     }
   }
@@ -279,16 +321,17 @@ extension PolicyCanvasViewModel {
       return PolicyCanvasLayout.defaultEdgeLineSpacing
     }
     let side = overrideSide ?? resolvedPortSide(for: endpoint)
+    let size = nodeSize(for: node)
     switch side {
     case .leading, .trailing:
       return abs(
-        PolicyCanvasLayout.portY(index: 1, count: ports.count)
-          - PolicyCanvasLayout.portY(index: 0, count: ports.count)
+        PolicyCanvasLayout.portY(index: 1, count: ports.count, nodeHeight: size.height)
+          - PolicyCanvasLayout.portY(index: 0, count: ports.count, nodeHeight: size.height)
       )
     case .top, .bottom:
       return abs(
-        PolicyCanvasLayout.portX(index: 1, count: ports.count)
-          - PolicyCanvasLayout.portX(index: 0, count: ports.count)
+        PolicyCanvasLayout.portX(index: 1, count: ports.count, nodeWidth: size.width)
+          - PolicyCanvasLayout.portX(index: 0, count: ports.count, nodeWidth: size.width)
       )
     }
   }

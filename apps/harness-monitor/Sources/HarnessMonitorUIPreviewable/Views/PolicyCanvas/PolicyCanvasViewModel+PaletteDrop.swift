@@ -33,14 +33,15 @@ extension PolicyCanvasViewModel {
   }
 
   private func occupied(at center: CGPoint) -> Bool {
+    let nodeSize = PolicyCanvasLayout.nodeSize
     let frame = CGRect(
-      x: center.x - PolicyCanvasLayout.nodeSize.width / 2,
-      y: center.y - PolicyCanvasLayout.nodeSize.height / 2,
-      width: PolicyCanvasLayout.nodeSize.width,
-      height: PolicyCanvasLayout.nodeSize.height
+      x: center.x - nodeSize.width / 2,
+      y: center.y - nodeSize.height / 2,
+      width: nodeSize.width,
+      height: nodeSize.height
     )
     return nodes.contains { node in
-      CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize).intersects(frame)
+      nodeFrame(for: node).intersects(frame)
     }
   }
 

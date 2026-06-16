@@ -46,7 +46,13 @@ public struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
   public let precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
 
   public init(input: PolicyCanvasRouteWorkerInput) {
-    nodes = input.nodes.map(PolicyCanvasRouteNode.init(node:))
+    let nodeSizes = PolicyCanvasLayout.nodeSizes(for: input.nodes, edges: input.edges)
+    nodes = input.nodes.map { node in
+      PolicyCanvasRouteNode(
+        node: node,
+        size: nodeSizes[node.id] ?? PolicyCanvasLayout.nodeSize(for: node)
+      )
+    }
     groups = input.groups
     edges = input.edges
     fontScale = input.fontScale
@@ -156,8 +162,9 @@ public struct PolicyCanvasRouteNode: Equatable, Sendable {
   public let groupID: String?
   public let inputPorts: [PolicyCanvasPort]
   public let outputPorts: [PolicyCanvasPort]
+  public let size: CGSize
 
-  public init(node: PolicyCanvasNode) {
+  public init(node: PolicyCanvasNode, size: CGSize = PolicyCanvasLayout.nodeSize) {
     id = node.id
     title = node.title
     accessibilityLabel = "\(node.kind.title) \(node.title)"
@@ -165,9 +172,10 @@ public struct PolicyCanvasRouteNode: Equatable, Sendable {
     groupID = node.groupID
     inputPorts = node.inputPorts
     outputPorts = node.outputPorts
+    self.size = size
   }
 
   public var frame: CGRect {
-    CGRect(origin: position, size: PolicyCanvasLayout.nodeSize)
+    CGRect(origin: position, size: size)
   }
 }

@@ -61,9 +61,8 @@ struct PolicyCanvasMinimapViewportOverlay: View {
       observationStore.observedState(for: viewportIdentity)?.visibleContentRect
       ?? restoredViewportRect
       ?? contentBounds
-    let nodeFrames = viewModel.nodes.map {
-      CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
-    }
+    let nodeFramesByID = policyCanvasNodeFramesByID(nodes: viewModel.nodes, edges: viewModel.edges)
+    let nodeFrames = viewModel.nodes.compactMap { nodeFramesByID[$0.id] }
     let snapshot = policyCanvasMinimapSnapshot(
       contentBounds: contentBounds,
       viewportRect: viewportRect,

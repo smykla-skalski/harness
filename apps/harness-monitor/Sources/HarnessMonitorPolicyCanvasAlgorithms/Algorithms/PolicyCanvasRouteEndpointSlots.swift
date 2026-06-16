@@ -136,7 +136,7 @@ public func policyCanvasShiftedRouteAnchor(
       terminalSlot,
       spacing: spacing,
       coordinate: coordinate,
-      extent: PolicyCanvasLayout.nodeSize.height
+      extent: frame.height
     )
     return CGPoint(
       x: point.x,
@@ -151,7 +151,7 @@ public func policyCanvasShiftedRouteAnchor(
       terminalSlot,
       spacing: spacing,
       coordinate: coordinate,
-      extent: PolicyCanvasLayout.nodeSize.width
+      extent: frame.width
     )
     return CGPoint(
       x: min(

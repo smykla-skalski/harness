@@ -236,6 +236,7 @@ struct PolicyCanvasTerminalCombAndSingleFedAlignment:
   func processLayout(
     input: PolicyCanvasLayoutPostProcessingInput
   ) -> PolicyCanvasLayoutPostProcessingOutput {
+    let nodeSizes = policyCanvasLayoutNodeSizes(nodes: input.graph.nodes, edges: input.graph.edges)
     var nodePositions = policyCanvasArrangedDecisionTerminals(
       nodePositions: input.nodePositions,
       edges: input.graph.edges
@@ -243,13 +244,15 @@ struct PolicyCanvasTerminalCombAndSingleFedAlignment:
     nodePositions = policyCanvasResolveNodeAndForeignTitleOverlaps(
       nodePositions: nodePositions,
       layoutGroupIDByNodeID: input.rankAssignment.layoutGroupIDByNodeID,
-      groupTitleFramesByID: input.groupFramesByLayoutID.mapValues(policyCanvasGroupTitleFrame)
+      groupTitleFramesByID: input.groupFramesByLayoutID.mapValues(policyCanvasGroupTitleFrame),
+      nodeSizes: nodeSizes
     )
     var groupFrames = input.groupFrames
     var groupFramesByLayoutID = policyCanvasRebuiltGroupFramesByLayoutID(
       normalizedGroups: input.rankAssignment.normalizedGroups,
       layoutGroupIDByNodeID: input.rankAssignment.layoutGroupIDByNodeID,
-      nodePositions: nodePositions
+      nodePositions: nodePositions,
+      nodeSizes: nodeSizes
     )
     func applyActualGroupFrames() {
       for group in input.rankAssignment.normalizedGroups {
@@ -266,7 +269,8 @@ struct PolicyCanvasTerminalCombAndSingleFedAlignment:
       let resolvedPositions = policyCanvasResolveNodeAndForeignTitleOverlaps(
         nodePositions: nodePositions,
         layoutGroupIDByNodeID: input.rankAssignment.layoutGroupIDByNodeID,
-        groupTitleFramesByID: groupFramesByLayoutID.mapValues(policyCanvasGroupTitleFrame)
+        groupTitleFramesByID: groupFramesByLayoutID.mapValues(policyCanvasGroupTitleFrame),
+        nodeSizes: nodeSizes
       )
       guard resolvedPositions != nodePositions else {
         break
@@ -275,7 +279,8 @@ struct PolicyCanvasTerminalCombAndSingleFedAlignment:
       groupFramesByLayoutID = policyCanvasRebuiltGroupFramesByLayoutID(
         normalizedGroups: input.rankAssignment.normalizedGroups,
         layoutGroupIDByNodeID: input.rankAssignment.layoutGroupIDByNodeID,
-        nodePositions: nodePositions
+        nodePositions: nodePositions,
+        nodeSizes: nodeSizes
       )
       applyActualGroupFrames()
     }

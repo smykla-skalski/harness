@@ -21,11 +21,7 @@ public func policyCanvasOptimizedPortOrder(
   guard !nodes.isEmpty, !edges.isEmpty else {
     return nodes
   }
-  let framesByID = Dictionary(
-    uniqueKeysWithValues: nodes.map { node in
-      (node.id, CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize))
-    }
-  )
+  let framesByID = policyCanvasNodeFramesByID(nodes: nodes, edges: edges)
   var signals: [PolicyCanvasPortOrderNodeKindKey: [String: [PolicyCanvasPortSide: [CGFloat]]]] =
     [:]
   signals.reserveCapacity(nodes.count * 2)

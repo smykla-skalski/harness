@@ -185,13 +185,13 @@ extension PolicyCanvasPreparedRouteInput {
     switch side {
     case .leading, .trailing:
       return abs(
-        PolicyCanvasLayout.portY(index: 1, count: ports.count)
-          - PolicyCanvasLayout.portY(index: 0, count: ports.count)
+        PolicyCanvasLayout.portY(index: 1, count: ports.count, nodeHeight: node.size.height)
+          - PolicyCanvasLayout.portY(index: 0, count: ports.count, nodeHeight: node.size.height)
       )
     case .top, .bottom:
       return abs(
-        PolicyCanvasLayout.portX(index: 1, count: ports.count)
-          - PolicyCanvasLayout.portX(index: 0, count: ports.count)
+        PolicyCanvasLayout.portX(index: 1, count: ports.count, nodeWidth: node.size.width)
+          - PolicyCanvasLayout.portX(index: 0, count: ports.count, nodeWidth: node.size.width)
       )
     }
   }

@@ -25,11 +25,13 @@ extension PolicyCanvasViewModel {
       id: "\(kind.rawValue)-\(number)",
       title: "\(kind.title) \(number)",
       kind: kind,
-      position: snapped(
-        CGPoint(
-          x: point.x - PolicyCanvasLayout.nodeSize.width / 2,
-          y: point.y - PolicyCanvasLayout.nodeSize.height / 2
-        )
+      position: .zero
+    )
+    let nodeSize = PolicyCanvasLayout.nodeSize(for: node)
+    node.position = snapped(
+      CGPoint(
+        x: point.x - nodeSize.width / 2,
+        y: point.y - nodeSize.height / 2
       )
     )
     node.groupID = containingGroupID(for: nodeCenter(node))

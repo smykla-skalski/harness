@@ -219,8 +219,8 @@ private func policyCanvasPrecomputedRouteTerminalsAttach(
     return false
   }
   let nodeFrames = Dictionary(
-    uniqueKeysWithValues: nodes.map {
-      ($0.id, CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize))
+    uniqueKeysWithValues: nodes.map { node in
+      (node.id, policyCanvasNodeFrame(node, edges: edges))
     }
   )
   for edge in edges {
@@ -372,7 +372,32 @@ func policyCanvasAnyNodeOutsideAssignedGroup(
 }
 
 public func policyCanvasNodeFrame(_ node: PolicyCanvasNode) -> CGRect {
-  CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
+  CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize(for: node))
+}
+
+public func policyCanvasNodeFrame(
+  _ node: PolicyCanvasNode,
+  edges: [PolicyCanvasEdge]
+) -> CGRect {
+  CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize(for: node, edges: edges))
+}
+
+public func policyCanvasNodeFramesByID(
+  nodes: [PolicyCanvasNode],
+  edges: [PolicyCanvasEdge]
+) -> [String: CGRect] {
+  let sizes = PolicyCanvasLayout.nodeSizes(for: nodes, edges: edges)
+  return Dictionary(
+    uniqueKeysWithValues: nodes.map { node in
+      (
+        node.id,
+        CGRect(
+          origin: node.position,
+          size: sizes[node.id] ?? PolicyCanvasLayout.nodeSize(for: node)
+        )
+      )
+    }
+  )
 }
 
 public func policyCanvasGroupFrame(containing bounds: CGRect) -> CGRect {

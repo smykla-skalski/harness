@@ -17,7 +17,7 @@ extension PolicyCanvasViewModel {
     ) {
       return .port(port)
     }
-    if let node = nodes.reversed().first(where: { policyCanvasNodeFrame($0).contains(point) }) {
+    if let node = nodes.reversed().first(where: { nodeFrame(for: $0).contains(point) }) {
       return .node(node.id)
     }
     if let group = groups.reversed().first(where: { $0.frame.contains(point) }) {
@@ -56,7 +56,7 @@ extension PolicyCanvasViewModel {
     let portRadius =
       (PolicyCanvasLayout.portDiameter / 2) + PolicyCanvasLayout.portHitTestExtension
     for node in nodes.reversed() {
-      let nodeFrame = policyCanvasNodeFrame(node)
+      let nodeFrame = nodeFrame(for: node)
       if nodeFrame.insetBy(dx: -portRadius, dy: -portRadius).contains(point),
         let port = canvasPortHitTarget(
           at: point,

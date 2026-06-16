@@ -10,6 +10,7 @@ enum PolicyCanvasPortColumnAlignment {
 
 struct PolicyCanvasPortColumn: View {
   let node: PolicyCanvasNode
+  let nodeSize: CGSize
   let ports: [PolicyCanvasPort]
   let alignment: PolicyCanvasPortColumnAlignment
   let viewModel: PolicyCanvasViewModel
@@ -43,8 +44,8 @@ struct PolicyCanvasPortColumn: View {
       }
     }
     .frame(
-      width: PolicyCanvasLayout.nodeSize.width,
-      height: PolicyCanvasLayout.nodeSize.height,
+      width: nodeSize.width,
+      height: nodeSize.height,
       alignment: stackAlignment
     )
     .offset(
@@ -142,13 +143,13 @@ struct PolicyCanvasPortColumn: View {
     case .leading, .trailing:
       CGSize(
         width: 0,
-        height: PolicyCanvasLayout.portY(index: index, count: count)
+        height: PolicyCanvasLayout.portY(index: index, count: count, nodeHeight: nodeSize.height)
           - PolicyCanvasLayout.portDiameter / 2
           + marker.axisOffset
       )
     case .top, .bottom:
       CGSize(
-        width: PolicyCanvasLayout.portX(index: index, count: count)
+        width: PolicyCanvasLayout.portX(index: index, count: count, nodeWidth: nodeSize.width)
           - PolicyCanvasLayout.portDiameter / 2
           + marker.axisOffset,
         height: 0

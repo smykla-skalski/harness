@@ -261,7 +261,7 @@ func policyCanvasSelectionViewportScrollPoint(
     guard let node = viewModel.node(nodeID) else {
       return nil
     }
-    let frame = policyCanvasNodeFrame(node)
+    let frame = viewModel.nodeFrame(for: node)
     anchorPoint = CGPoint(
       x: (frame.midX * zoom) + contentOrigin.x,
       y: (frame.midY * zoom) + contentOrigin.y
@@ -332,7 +332,7 @@ func policyCanvasSelectionViewportDocumentAnchorPoint(
     guard let node = viewModel.node(nodeID) else {
       return nil
     }
-    let frame = policyCanvasNodeFrame(node)
+    let frame = viewModel.nodeFrame(for: node)
     anchorPoint = CGPoint(x: frame.midX, y: frame.midY)
   case .group(let groupID):
     guard let group = viewModel.group(groupID) else {

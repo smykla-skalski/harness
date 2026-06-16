@@ -209,6 +209,7 @@ extension PolicyCanvasPreparedRouteInput {
     guard let kind = entries.first?.endpoint.kind else {
       return
     }
+    let node = entries.first.flatMap { nodeIndex[$0.endpoint.nodeID] }
     let sides = policyCanvasRoutablePortSides(for: kind)
     let units = policyCanvasPortMarkerAssignmentUnits(entries, sides: sides)
     var unitsBySide = Dictionary(
@@ -216,7 +217,7 @@ extension PolicyCanvasPreparedRouteInput {
     )
     let capacities = Dictionary(
       uniqueKeysWithValues: sides.map { side in
-        (side, portMarkerCapacity(side: side))
+        (side, portMarkerCapacity(side: side, node: node))
       })
     let preferredSidesByEndpoint = Dictionary(
       grouping: units,
@@ -479,7 +480,10 @@ extension PolicyCanvasPreparedRouteInput {
     guard !placements.isEmpty else {
       return
     }
-    let extent = policyCanvasSideExtent(side: side)
+    let extent =
+      nodeIndex[endpoint.nodeID].map {
+        policyCanvasSideExtent(side: side, frame: $0.frame)
+      } ?? policyCanvasSideExtent(side: side)
     // Side-local port layout should not inherit the global port index from
     // sibling ports that render on the alternate side. A lone marker on a side
     // stays centered on that side even when other ports of the same kind fan
@@ -526,9 +530,15 @@ extension PolicyCanvasPreparedRouteInput {
     return CGPoint(x: sumX / CGFloat(count), y: sumY / CGFloat(count))
   }
 
-  private func portMarkerCapacity(side: PolicyCanvasPortSide) -> Int {
+  private func portMarkerCapacity(
+    side: PolicyCanvasPortSide,
+    node: PolicyCanvasRouteNode?
+  ) -> Int {
     let inset = policyCanvasPortMarkerInset()
-    let available = max(0, policyCanvasSideExtent(side: side) - (inset * 2))
+    let extent =
+      node.map { policyCanvasSideExtent(side: side, frame: $0.frame) }
+      ?? policyCanvasSideExtent(side: side)
+    let available = max(0, extent - (inset * 2))
     // Capacity is how many markers fit at the minimum channel spacing before
     // they would overlap, not the wider preferred port spacing. A logical port
     // that fans into several markers compresses to this floor rather than

@@ -39,10 +39,13 @@ enum PolicyCanvasMarqueeSelectionHitResolver {
     routes: [String: PolicyCanvasEdgeRoute]
   ) -> Set<PolicyCanvasSelection> {
     var captured = Set<PolicyCanvasSelection>()
+    let nodeFrames = policyCanvasNodeFramesByID(nodes: nodes, edges: edges)
 
     // Capture nodes whose frames intersect the marquee
     for node in nodes {
-      let nodeFrame = policyCanvasNodeFrame(node)
+      guard let nodeFrame = nodeFrames[node.id] else {
+        continue
+      }
       if marqueeRect.intersects(nodeFrame) {
         captured.insert(.node(node.id))
       }
