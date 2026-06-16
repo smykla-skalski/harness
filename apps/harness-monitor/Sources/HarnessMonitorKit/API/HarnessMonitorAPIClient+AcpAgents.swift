@@ -34,7 +34,7 @@ extension HarnessMonitorAPIClient {
     )
   }
 
-  public func openRouterModelCatalog() async throws -> OpenRouterModelCatalog {
-    try await get("/v1/openrouter/models")
+  public func openRouterModelCatalog() async throws -> OpenRouterModelCatalogResponse {
+    try await get("/v1/openrouter/models", decoder: PolicyWireCoding.decoder)
   }
 }
