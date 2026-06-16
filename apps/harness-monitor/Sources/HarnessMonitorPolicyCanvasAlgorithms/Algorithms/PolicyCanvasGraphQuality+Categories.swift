@@ -5,6 +5,7 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
   case portOverlaps
   case portTooClose
   case portDetached
+  case portUneven
   case corridorReuse
   case corridorParallel
   case crossings
@@ -28,6 +29,7 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
     case .portOverlaps: "port overlaps"
     case .portTooClose: "port too-close"
     case .portDetached: "port detached"
+    case .portUneven: "port uneven"
     case .corridorReuse: "corridor reuse"
     case .corridorParallel: "corridor parallel"
     case .crossings: "crossings"
@@ -54,7 +56,7 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
     case .portOverlaps, .portDetached, .corridorReuse, .bodyHits,
       .labelOverlaps, .labelOnBody, .nodeOverlaps:
       .error
-    case .portTooClose, .corridorParallel, .crossings, .crossingsIndependent,
+    case .portTooClose, .portUneven, .corridorParallel, .crossings, .crossingsIndependent,
       .longEdges, .detours, .nodeDistance, .wrongTurns, .crossedPorts, .labelAdrift,
       .labelOnEdge, .labelNearTurn:
       .warning
@@ -79,6 +81,8 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
       "Two port markers on one side are closer than the minimum spacing - the dots crowd"
     case .portDetached:
       "A wire ends away from its port dot - the edge does not reach the marker it should attach to"
+    case .portUneven:
+      "A port dot sits far from where an even spread would place it - dots clustered or crammed, not evenly distributed on the side"
     case .corridorReuse:
       "Two wires share one lane and overlap along it - they stack on the same rail"
     case .corridorParallel:
@@ -122,6 +126,7 @@ extension PolicyCanvasGraphQualityReport {
     case .portOverlaps: portSpacing.filter { $0.kind == .overlap }.count
     case .portTooClose: portSpacing.filter { $0.kind == .tooClose }.count
     case .portDetached: portSpacing.filter { $0.kind == .detached }.count
+    case .portUneven: portSpacing.filter { $0.kind == .uneven }.count
     case .corridorReuse: corridors.filter { $0.kind == .collinear }.count
     case .corridorParallel: corridors.filter { $0.kind == .parallelTooClose }.count
     case .crossings: crossings.count

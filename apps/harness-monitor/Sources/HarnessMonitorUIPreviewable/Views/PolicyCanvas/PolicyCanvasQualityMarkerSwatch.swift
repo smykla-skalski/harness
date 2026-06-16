@@ -15,6 +15,8 @@ struct PolicyCanvasQualityMarkerSwatch: View {
       switch category {
       case .portOverlaps, .portTooClose, .portDetached:
         ring(&context, rect, tint)
+      case .portUneven:
+        portUnevenGlyph(&context, rect, tint)
       case .corridorReuse, .corridorParallel:
         thickLine(&context, rect, tint)
       case .crossings:
@@ -64,6 +66,27 @@ struct PolicyCanvasQualityMarkerSwatch: View {
 
   private func dot(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
     context.fill(Path(ellipseIn: centeredSquare(rect, side: 6)), with: .color(tint))
+  }
+
+  /// A solid ring on the left, a dashed arrow, and a hollow ghost ring on the
+  /// right - a dot nudged toward the even slot it should occupy.
+  private func portUnevenGlyph(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
+    let solid = CGRect(x: rect.minX, y: rect.midY - 3, width: 6, height: 6)
+    let ghost = CGRect(x: rect.maxX - 6, y: rect.midY - 3, width: 6, height: 6)
+    context.stroke(Path(ellipseIn: solid), with: .color(tint), lineWidth: 1.2)
+    context.stroke(
+      Path(ellipseIn: ghost),
+      with: .color(tint.opacity(0.6)),
+      style: StrokeStyle(lineWidth: 1, dash: [2, 1.5])
+    )
+    var arrow = Path()
+    arrow.move(to: CGPoint(x: solid.maxX, y: rect.midY))
+    arrow.addLine(to: CGPoint(x: ghost.minX, y: rect.midY))
+    context.stroke(
+      arrow,
+      with: .color(tint.opacity(0.7)),
+      style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [2, 1.5])
+    )
   }
 
   private func thickLine(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {

@@ -304,32 +304,70 @@ struct PolicyCanvasQualityOverlayMarks: View {
     )
   }
 
-  /// A ring at each mis-spaced port marker, plus a connector to its crowding
-  /// neighbor when there is one.
+  /// A ring at each mis-spaced port marker. For an overlap or too-close pair both
+  /// dots are ringed (not just the lower one) so a stack of three crammed dots
+  /// shows three rings, not two. A detached marker rings its dot and connects to
+  /// the stranded wire end. An uneven dot rings in place, then a dashed arrow
+  /// points to a hollow ghost ring at the evenly-spread slot it should occupy.
   private func drawPortSpacing(into context: inout GraphicsContext, error: Color, warning: Color) {
     var errorRings = Path()
     var warningRings = Path()
-    var connectors = Path()
+    var detachedConnectors = Path()
+    var unevenArrows = Path()
+    var unevenGhosts = Path()
     for violation in report.portSpacing {
-      let radius: CGFloat = 6
-      let rect = CGRect(
-        x: violation.point.x - radius,
-        y: violation.point.y - radius,
-        width: radius * 2,
-        height: radius * 2
-      )
-      if violation.severity == .error {
-        errorRings.addEllipse(in: rect)
-      } else {
-        warningRings.addEllipse(in: rect)
-      }
-      if let other = violation.otherPoint {
-        connectors.move(to: violation.point)
-        connectors.addLine(to: other)
+      switch violation.kind {
+      case .overlap:
+        errorRings.addPath(policyCanvasPortRing(violation.point))
+        violation.otherPoint.map { errorRings.addPath(policyCanvasPortRing($0)) }
+      case .tooClose:
+        warningRings.addPath(policyCanvasPortRing(violation.point))
+        violation.otherPoint.map { warningRings.addPath(policyCanvasPortRing($0)) }
+      case .detached:
+        errorRings.addPath(policyCanvasPortRing(violation.point))
+        if let other = violation.otherPoint {
+          detachedConnectors.move(to: violation.point)
+          detachedConnectors.addLine(to: other)
+        }
+      case .uneven:
+        warningRings.addPath(policyCanvasPortRing(violation.point))
+        if let ideal = violation.otherPoint {
+          unevenArrows.addPath(policyCanvasPortNudge(from: violation.point, to: ideal))
+          unevenGhosts.addEllipse(in: policyCanvasPortRingRect(ideal))
+        }
       }
     }
-    context.stroke(connectors, with: .color(error.opacity(0.5)), lineWidth: 1)
+    context.stroke(detachedConnectors, with: .color(error.opacity(0.5)), lineWidth: 1)
+    context.stroke(
+      unevenArrows,
+      with: .color(warning.opacity(0.7)),
+      style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round, dash: [3, 2])
+    )
+    context.stroke(
+      unevenGhosts,
+      with: .color(warning.opacity(0.6)),
+      style: StrokeStyle(lineWidth: 1, dash: [2, 2])
+    )
     context.stroke(warningRings, with: .color(warning), lineWidth: 1.5)
     context.stroke(errorRings, with: .color(error), lineWidth: 1.5)
+  }
+
+  private func policyCanvasPortRingRect(_ point: CGPoint, radius: CGFloat = 6) -> CGRect {
+    CGRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)
+  }
+
+  private func policyCanvasPortRing(_ point: CGPoint) -> Path {
+    Path(ellipseIn: policyCanvasPortRingRect(point))
+  }
+
+  /// A short shaft from the dot toward its ideal slot, tipped with an arrowhead
+  /// that stops at the ghost ring. Axis-aligned: ports nudge straight along the
+  /// side, so the head points purely up or down (leading/trailing) or left/right.
+  private func policyCanvasPortNudge(from start: CGPoint, to end: CGPoint) -> Path {
+    var path = Path()
+    path.move(to: start)
+    path.addLine(to: end)
+    path.addPath(policyCanvasArrowHead(from: start, to: end, size: 4))
+    return path
   }
 }

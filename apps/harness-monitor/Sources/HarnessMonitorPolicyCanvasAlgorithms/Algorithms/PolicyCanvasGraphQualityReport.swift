@@ -34,6 +34,9 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
   /// crowding the turn. A turn inside the box (gap 0) or within this margin of
   /// its edge counts.
   public var labelTurnClearance: CGFloat
+  /// Distance a port dot may sit from the canonical evenly-spread slot for its
+  /// position on the side before it reads as unevenly distributed.
+  public var portEvenDistributionTolerance: CGFloat
 
   public init(
     minimumPortSpacing: CGFloat,
@@ -46,7 +49,8 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     nodeDistanceGap: CGFloat,
     wrongTurnDepth: CGFloat,
     portDetachDistance: CGFloat,
-    labelTurnClearance: CGFloat
+    labelTurnClearance: CGFloat,
+    portEvenDistributionTolerance: CGFloat
   ) {
     self.minimumPortSpacing = minimumPortSpacing
     self.markerOverlap = markerOverlap
@@ -59,6 +63,7 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     self.wrongTurnDepth = wrongTurnDepth
     self.portDetachDistance = portDetachDistance
     self.labelTurnClearance = labelTurnClearance
+    self.portEvenDistributionTolerance = portEvenDistributionTolerance
   }
 
   public static let `default` = Self(
@@ -75,7 +80,9 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     // A full port diameter: the wire end is a dot-width clear of the dot.
     portDetachDistance: PolicyCanvasLayout.portDiameter,
     // Half a port marker: a bend within this of the label box crowds the corner.
-    labelTurnClearance: PolicyCanvasLayout.portDiameter / 2
+    labelTurnClearance: PolicyCanvasLayout.portDiameter / 2,
+    // Half a port marker off the even slot reads as a mis-placed dot.
+    portEvenDistributionTolerance: PolicyCanvasLayout.portDiameter / 2
   )
 }
 

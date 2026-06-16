@@ -63,9 +63,65 @@ func policyCanvasMeasurePortSpacing(
           violations.append(policyCanvasPortSpacingPairViolation(.tooClose, lower, upper, gap: gap))
         }
       }
+      violations.append(
+        contentsOf: policyCanvasPortDistributionViolations(
+          sorted: sorted,
+          nodeFramesByID: nodeFramesByID,
+          tolerance: thresholds.portEvenDistributionTolerance
+        )
+      )
     }
   }
   return violations.sorted(by: policyCanvasPortSpacingViolationOrder)
+}
+
+/// Flag the dots on one node side that sit far from the canonical evenly-spread
+/// slot for their position. The k dots on a side should land at
+/// `PolicyCanvasLayout.portY`/`portX(index:count:)` for `count = k` - the same
+/// centered, equal-step distribution the node uses for its declared ports. A dot
+/// more than `tolerance` off its slot (dots clustered at one end, crammed toward
+/// the center, or unevenly gapped) is reported, carrying the ideal slot as
+/// `otherPoint` so the overlay can show where it should have gone.
+private func policyCanvasPortDistributionViolations(
+  sorted: [PolicyCanvasResolvedMarker],
+  nodeFramesByID: [String: CGRect],
+  tolerance: CGFloat
+) -> [PolicyCanvasPortSpacingViolation] {
+  let count = sorted.count
+  guard count >= 2, let first = sorted.first, let frame = nodeFramesByID[first.nodeID] else {
+    return []
+  }
+  let horizontalSide = first.side == .leading || first.side == .trailing
+  let base = horizontalSide ? frame.minY : frame.minX
+  var violations: [PolicyCanvasPortSpacingViolation] = []
+  for index in sorted.indices {
+    let marker = sorted[index]
+    let idealAlong =
+      base
+      + (horizontalSide
+        ? PolicyCanvasLayout.portY(index: index, count: count)
+        : PolicyCanvasLayout.portX(index: index, count: count))
+    let deviation = abs(marker.alongAxis - idealAlong)
+    guard deviation > tolerance else {
+      continue
+    }
+    let idealPoint =
+      horizontalSide
+      ? CGPoint(x: marker.point.x, y: idealAlong)
+      : CGPoint(x: idealAlong, y: marker.point.y)
+    violations.append(
+      PolicyCanvasPortSpacingViolation(
+        kind: .uneven,
+        nodeID: marker.nodeID,
+        side: marker.side,
+        point: marker.point,
+        otherPoint: idealPoint,
+        gap: deviation,
+        edgeIDs: marker.edgeIDs
+      )
+    )
+  }
+  return violations
 }
 
 /// Resolve one route terminal to the node side it lands on and merge it into the
