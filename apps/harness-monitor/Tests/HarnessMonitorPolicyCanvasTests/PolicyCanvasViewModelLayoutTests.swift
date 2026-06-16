@@ -52,7 +52,7 @@ struct PolicyCanvasViewModelLayoutTests {
     let document = overlappingDefaultPolicyDocument(revision: 15)
     let rawPositions = Dictionary(
       uniqueKeysWithValues: document.layout.nodes.map { layout in
-        (layout.nodeId, CGPoint(x: CGFloat(layout.x), y: CGFloat(layout.y)))
+        (layout.nodeId.rawValue, CGPoint(x: CGFloat(layout.x), y: CGFloat(layout.y)))
       }
     )
 

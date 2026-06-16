@@ -120,12 +120,12 @@ func overlappingDefaultPolicyDocument(
 ) -> TaskBoardPolicyPipelineDocument {
   let nodes = defaultPolicyNodeSpecs.map { spec in
     TaskBoardPolicyPipelineNode(
-      id: spec.id,
+      id: PolicyGraphNodeId(spec.id),
       title: spec.title,
       kind: spec.kind,
-      groupId: spec.groupID,
+      groupId: PolicyGraphGroupId(spec.groupID),
       inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-      outputs: spec.outputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) }
+      outputs: spec.outputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
     )
   }
   return TaskBoardPolicyPipelineDocument(
@@ -148,7 +148,7 @@ func overlappingDefaultPolicyDocument(
       TaskBoardPolicyPipelineGroup(
         id: "terminal",
         title: "Terminal decisions",
-        nodeIds: defaultPolicyNodeSpecs.filter { $0.groupID == "terminal" }.map(\.id)
+        nodeIds: defaultPolicyNodeSpecs.filter { $0.groupID == "terminal" }.map { PolicyGraphNodeId($0.id) }
       ),
     ],
     layout: TaskBoardPolicyPipelineLayout(
@@ -173,12 +173,12 @@ func overlappingDefaultPolicyDocument(
 func seededDefaultPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
   let nodes = defaultPolicyNodeSpecs.map { spec in
     TaskBoardPolicyPipelineNode(
-      id: spec.id,
+      id: PolicyGraphNodeId(spec.id),
       title: spec.title,
       kind: spec.kind,
-      groupId: spec.groupID,
+      groupId: PolicyGraphGroupId(spec.groupID),
       inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-      outputs: spec.outputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) }
+      outputs: spec.outputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
     )
   }
   return TaskBoardPolicyPipelineDocument(
@@ -204,12 +204,12 @@ func seededDefaultPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDoc
         id: "terminal",
         title: "Terminal decisions",
         frame: TaskBoardPolicyCanvasRect(x: 676, y: 72, width: 476, height: 620),
-        nodeIds: defaultPolicyNodeSpecs.filter { $0.groupID == "terminal" }.map(\.id)
+        nodeIds: defaultPolicyNodeSpecs.filter { $0.groupID == "terminal" }.map { PolicyGraphNodeId($0.id) }
       ),
     ],
     layout: TaskBoardPolicyPipelineLayout(
       nodes: nodes.map { node in
-        let position = seededDefaultPolicyPositions[node.id] ?? (0, 0)
+        let position = seededDefaultPolicyPositions[node.id.rawValue] ?? (0, 0)
         return TaskBoardPolicyPipelineNodeLayout(nodeId: node.id, x: position.0, y: position.1)
       }
     ),
@@ -231,12 +231,12 @@ func seededDefaultPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDoc
 func liveSavedDefaultPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
   let nodes = defaultPolicyNodeSpecs.map { spec in
     TaskBoardPolicyPipelineNode(
-      id: spec.id,
+      id: PolicyGraphNodeId(spec.id),
       title: spec.title,
       kind: spec.kind,
-      groupId: spec.groupID,
+      groupId: PolicyGraphGroupId(spec.groupID),
       inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-      outputs: spec.outputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) }
+      outputs: spec.outputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
     )
   }
   return TaskBoardPolicyPipelineDocument(
@@ -262,12 +262,12 @@ func liveSavedDefaultPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipeline
         id: "terminal",
         title: "Terminal decisions",
         frame: TaskBoardPolicyCanvasRect(x: 2260, y: 1560, width: 556, height: 900),
-        nodeIds: defaultPolicyNodeSpecs.filter { $0.groupID == "terminal" }.map(\.id)
+        nodeIds: defaultPolicyNodeSpecs.filter { $0.groupID == "terminal" }.map { PolicyGraphNodeId($0.id) }
       ),
     ],
     layout: TaskBoardPolicyPipelineLayout(
       nodes: nodes.map { node in
-        let position = liveSavedPolicyPositions[node.id] ?? (0, 0)
+        let position = liveSavedPolicyPositions[node.id.rawValue] ?? (0, 0)
         return TaskBoardPolicyPipelineNodeLayout(nodeId: node.id, x: position.0, y: position.1)
       }
     ),
@@ -290,7 +290,7 @@ private let liveSavedDefaultPolicyEdges: [TaskBoardPolicyPipelineEdge] = {
   let nonFailEdges = seededDefaultPolicyEdges.filter { $0.toNodeId != "supervisor:merge-deny" }
   let failEdges = failReasons.map { entry in
     TaskBoardPolicyPipelineEdge(
-      id: entry.id,
+      id: PolicyGraphEdgeId(entry.id),
       fromNodeId: "evidence:merge",
       fromPort: "fail",
       toNodeId: "supervisor:merge-deny",
@@ -368,10 +368,10 @@ private func seededEdge(
   _ toNode: String
 ) -> TaskBoardPolicyPipelineEdge {
   TaskBoardPolicyPipelineEdge(
-    id: id,
-    fromNodeId: fromNode,
-    fromPort: fromPort,
-    toNodeId: toNode,
+    id: PolicyGraphEdgeId(id),
+    fromNodeId: PolicyGraphNodeId(fromNode),
+    fromPort: PolicyGraphPortId(fromPort),
+    toNodeId: PolicyGraphNodeId(toNode),
     toPort: "in"
   )
 }

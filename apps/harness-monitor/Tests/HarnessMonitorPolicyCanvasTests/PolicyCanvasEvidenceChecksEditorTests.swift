@@ -95,7 +95,7 @@ struct PolicyCanvasEvidenceChecksEditorTests {
     )
 
     let exported = viewModel.exportDocument()
-    let check = try #require(exported.nodes.first { $0.id == nodeID }?.kind.checks.first)
+    let check = try #require(exported.nodes.first { $0.id.rawValue == nodeID }?.kind.checks.first)
     #expect(check.field == .protectedPathTouched)
     #expect(check.pass == .isFalse)
     #expect(check.failReasonCode == .protectedPathTouched)

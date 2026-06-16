@@ -526,14 +526,14 @@ struct PolicyCanvasInspectorEditingTests {
     )
 
     let exported = viewModel.exportDocument()
-    let exportedSwitch = try #require(exported.nodes.first(where: { $0.id == switchID }))
+    let exportedSwitch = try #require(exported.nodes.first(where: { $0.id.rawValue == switchID }))
     #expect(exportedSwitch.inputs.map(\.id) == ["in"])
     #expect(exportedSwitch.outputs.map(\.id) == ["case_1", "default"])
 
-    let exportedEntryEdge = try #require(exported.edges.first(where: { $0.toNodeId == switchID }))
+    let exportedEntryEdge = try #require(exported.edges.first(where: { $0.toNodeId.rawValue == switchID }))
     #expect(exportedEntryEdge.toPort == "in")
 
-    let exportedBranchEdge = try #require(exported.edges.first(where: { $0.fromNodeId == switchID }))
+    let exportedBranchEdge = try #require(exported.edges.first(where: { $0.fromNodeId.rawValue == switchID }))
     #expect(exportedBranchEdge.fromPort == "case_1")
 
     let reloaded = makeEmptyCanvas()
@@ -576,14 +576,14 @@ struct PolicyCanvasInspectorEditingTests {
     )
 
     var legacyDocument = viewModel.exportDocument()
-    let switchIndex = try #require(legacyDocument.nodes.firstIndex(where: { $0.id == switchID }))
+    let switchIndex = try #require(legacyDocument.nodes.firstIndex(where: { $0.id.rawValue == switchID }))
     legacyDocument.nodes[switchIndex].inputPorts = ["input-in"]
     legacyDocument.nodes[switchIndex].outputPorts = ["output-case_1", "output-default"]
     for index in legacyDocument.edges.indices {
-      if legacyDocument.edges[index].toNodeId == switchID {
+      if legacyDocument.edges[index].toNodeId.rawValue == switchID {
         legacyDocument.edges[index].toPort = "input-in"
       }
-      if legacyDocument.edges[index].fromNodeId == switchID {
+      if legacyDocument.edges[index].fromNodeId.rawValue == switchID {
         legacyDocument.edges[index].fromPort = "output-case_1"
       }
     }

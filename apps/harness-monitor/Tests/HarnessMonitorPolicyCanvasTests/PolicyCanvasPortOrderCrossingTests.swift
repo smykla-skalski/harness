@@ -213,7 +213,7 @@ struct PolicyCanvasPortOrderCrossingTests {
     ]
 
     let document = viewModel.exportDocument()
-    let exportedSource = try #require(document.nodes.first { $0.id == source.id })
+    let exportedSource = try #require(document.nodes.first { $0.id.rawValue == source.id })
 
     #expect(exportedSource.outputs.map(\.id) == ["b", "a"])
   }
@@ -285,7 +285,7 @@ struct PolicyCanvasPortOrderCrossingTests {
     ]
 
     let document = viewModel.exportDocument()
-    let exportedSource = try #require(document.nodes.first { $0.id == source.id })
+    let exportedSource = try #require(document.nodes.first { $0.id.rawValue == source.id })
 
     #expect(exportedSource.outputs.map(\.id) == ["a", "b", "c"])
   }
