@@ -5,8 +5,8 @@ import Testing
 @testable import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasPortMarkerLayoutTests {
-  @Test("single side marker stays centered when sibling outputs use the alternate side")
-  func singleSideMarkerStaysCenteredWhenSiblingOutputsUseTheAlternateSide() {
+  @Test("vertical route requests stay balanced on horizontal output sides")
+  func verticalRouteRequestsStayBalancedOnHorizontalOutputSides() {
     let source = policyCanvasMarkerTestNode(
       id: "source",
       position: .zero,
@@ -44,18 +44,25 @@ extension PolicyCanvasPortMarkerLayoutTests {
 
     let prepared = PolicyCanvasPreparedRouteInput(input: input)
     let layout = prepared.portMarkerLayout(routes: routes, nodeIndex: prepared.nodeIndex)
-    let trailingEndpoint = PolicyCanvasPortEndpoint(
-      nodeID: source.id,
-      portID: "consensus",
-      kind: .output
-    )
-    let trailingMarkers = layout.markers(for: trailingEndpoint, side: .trailing, isVisible: true)
+    var coordinatesBySide: [PolicyCanvasPortSide: [CGFloat]] = [:]
+    for port in source.outputPorts {
+      let endpoint = PolicyCanvasPortEndpoint(nodeID: source.id, portID: port.id, kind: .output)
+      #expect(layout.markers(for: endpoint, side: .top, isVisible: true).isEmpty)
+      #expect(layout.markers(for: endpoint, side: .bottom, isVisible: true).isEmpty)
+      let portIndex = source.outputPorts.firstIndex(where: { $0.id == port.id }) ?? 0
+      let base = PolicyCanvasLayout.portY(index: portIndex, count: source.outputPorts.count)
+      for side in [PolicyCanvasPortSide.leading, .trailing] {
+        for marker in layout.markers(for: endpoint, side: side, isVisible: true) {
+          coordinatesBySide[side, default: []].append(base + marker.axisOffset)
+        }
+      }
+    }
 
-    #expect(trailingMarkers.count == 1)
-    let renderedY =
-      PolicyCanvasLayout.portY(index: 2, count: source.outputPorts.count)
-      + trailingMarkers[0].axisOffset
-    #expect(abs(renderedY - (PolicyCanvasLayout.nodeSize.height / 2)) < 0.001)
+    #expect(coordinatesBySide.values.reduce(0) { $0 + $1.count } == edges.count)
+    for coordinates in coordinatesBySide.values {
+      assertEvenSpacing(coordinates.sorted(), extent: PolicyCanvasLayout.nodeSize.height)
+      assertCornerClearance(coordinates.sorted(), extent: PolicyCanvasLayout.nodeSize.height)
+    }
   }
 
   private func siblingSideEdges(

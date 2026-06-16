@@ -88,8 +88,8 @@ struct PolicyCanvasPortOrderCrossingTests {
     #expect(renderedB < renderedA)
   }
 
-  @Test("bottom output ports order left-to-right by target X to avoid crossing")
-  func bottomPortsOrderByTargetX() throws {
+  @Test("vertical output route requests are coerced to horizontal sides")
+  func verticalOutputRouteRequestsAreCoercedToHorizontalSides() throws {
     let source = policyCanvasPortOrderTestNode(
       id: "source",
       position: CGPoint(x: 200, y: 200),
@@ -111,9 +111,8 @@ struct PolicyCanvasPortOrderCrossingTests {
       inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
       outputPorts: []
     )
-    // Port "a" (index 0, naturally LEFT) routes to the RIGHT target and "b"
-    // (index 1, naturally RIGHT) routes to the LEFT target: a twist that
-    // crosses at the node unless the bottom markers reorder by target X.
+    // The route geometry asks for bottom exits, but automatic canvas terminals
+    // stay on horizontal sides.
     let edges = [
       PolicyCanvasEdge(
         id: "edge-a-right",
@@ -160,12 +159,10 @@ struct PolicyCanvasPortOrderCrossingTests {
     let terminalA = try #require(layout.terminal(edgeID: "edge-a-right", role: .source))
     let terminalB = try #require(layout.terminal(edgeID: "edge-b-left", role: .source))
 
-    #expect(terminalA.side == .bottom)
-    #expect(terminalB.side == .bottom)
-    let renderedA = PolicyCanvasLayout.portX(index: 0, count: 2) + terminalA.axisOffset
-    let renderedB = PolicyCanvasLayout.portX(index: 1, count: 2) + terminalB.axisOffset
-    // "b" routes to the left target, so its marker must sit left of "a".
-    #expect(renderedB < renderedA)
+    #expect(Set([terminalA.side, terminalB.side]).isSubset(of: [.leading, .trailing]))
+    let renderedA = PolicyCanvasLayout.portY(index: 0, count: 2) + terminalA.axisOffset
+    let renderedB = PolicyCanvasLayout.portY(index: 1, count: 2) + terminalB.axisOffset
+    #expect(abs(renderedA + renderedB - PolicyCanvasLayout.nodeSize.height) < 0.001)
   }
 
   @MainActor
@@ -287,7 +284,7 @@ struct PolicyCanvasPortOrderCrossingTests {
     let document = viewModel.exportDocument()
     let exportedSource = try #require(document.nodes.first { $0.id.rawValue == source.id })
 
-    #expect(exportedSource.outputs.map(\.id) == ["a", "b", "c"])
+    #expect(exportedSource.outputs.map(\.id) == ["b", "a", "c"])
   }
 
   // The merge-deny fail family folds into one merged wire, so there is no longer

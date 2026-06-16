@@ -103,16 +103,23 @@ extension PolicyCanvasPreparedRouteInput {
       original: routeState.routes,
       processed: processedRoutes
     )
-    let routes = routesRepairingCrossedPorts(
+    let repairedRoutes = routesRepairingCrossedPorts(
       routes: terminalRoutes,
       nodeIndex: nodeIndex,
       router: selectedRouter,
       algorithms: algorithms
     )
-    let portMarkerLayout =
-      routes == terminalRoutes
-      ? routeState.portMarkerLayout
-      : precomputedRouteTerminalPortMarkerLayout(routes: routes, nodeIndex: nodeIndex)
+    let terminalState =
+      repairedRoutes == terminalRoutes
+      ? routeState
+      : routesReroutingBalancedPortMarkers(
+        routes: repairedRoutes,
+        nodeIndex: nodeIndex,
+        router: selectedRouter,
+        algorithms: algorithms
+      )
+    let routes = terminalState.routes
+    let portMarkerLayout = terminalState.portMarkerLayout
     policyCanvasRouteComputationSignposter.endInterval(
       "policy_canvas.routes.phase.terminals",
       terminalsInterval,
@@ -175,12 +182,13 @@ extension PolicyCanvasPreparedRouteInput {
       router: selectedRouter,
       algorithms: algorithms
     )
-    let routes = routesRepairingCrossedPorts(
+    let repairedRoutes = routesRepairingCrossedPorts(
       routes: bodySafeRoutes,
       nodeIndex: nodeIndex,
       router: selectedRouter,
       algorithms: algorithms
     )
+    let routes = repairedRoutes
     let portMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
       routes: routes,
       nodeIndex: nodeIndex
@@ -460,6 +468,23 @@ extension PolicyCanvasPreparedRouteInput {
     )
   }
 
+  private func routesReroutingBalancedPortMarkers(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> PolicyCanvasRouteComputationState {
+    let portMarkerLayout = portMarkerLayout(routes: routes, nodeIndex: nodeIndex)
+    let context = PolicyCanvasRouteStateContext(
+      prepared: self,
+      nodeIndex: nodeIndex,
+      passContext: displayedRoutePassContext(nodeIndex: nodeIndex),
+      router: selectedRouter,
+      algorithms: algorithms
+    )
+    return policyCanvasReroutedState(portMarkerLayout: portMarkerLayout, context: context)
+  }
+
   private func precomputedRouteTerminalPortMarkerLayout(
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode]
@@ -506,9 +531,9 @@ extension PolicyCanvasPreparedRouteInput {
     terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal],
     endpoints: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortEndpoint]
   ) {
+    let side = policyCanvasResolvedRoutablePortSide(for: endpoint, preferredSide: side)
     guard
       let point,
-      let side,
       let base = portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex)
     else {
       return

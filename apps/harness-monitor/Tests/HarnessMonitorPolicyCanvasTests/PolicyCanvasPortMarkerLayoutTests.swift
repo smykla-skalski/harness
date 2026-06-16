@@ -6,8 +6,8 @@ import Testing
 
 @Suite("Policy canvas port marker layout")
 struct PolicyCanvasPortMarkerLayoutTests {
-  @Test("terminal markers spill after three visible vertical lanes")
-  func terminalMarkersSpillAfterThreeVisibleVerticalLanes() {
+  @Test("terminal marker overflow stays on horizontal sides")
+  func terminalMarkerOverflowStaysOnHorizontalSides() {
     let target = policyCanvasMarkerTestNode(
       id: "target",
       position: CGPoint(x: 220, y: 80),
@@ -54,34 +54,40 @@ struct PolicyCanvasPortMarkerLayoutTests {
     let layout = prepared.portMarkerLayout(routes: routes, nodeIndex: prepared.nodeIndex)
     let endpoint = edges[0].target
     let leadingMarkers = layout.markers(for: endpoint, side: .leading, isVisible: true)
-    let topMarkers = layout.markers(for: endpoint, side: .top, isVisible: true)
+    let trailingMarkers = layout.markers(for: endpoint, side: .trailing, isVisible: true)
     let targetTerminals = edges.compactMap { edge in
       layout.terminal(edgeID: edge.id, role: .target)
     }
     let leadingTerminals = targetTerminals.filter { $0.side == .leading }
-    let topTerminals = targetTerminals.filter { $0.side == .top }
+    let trailingTerminals = targetTerminals.filter { $0.side == .trailing }
 
     #expect(targetTerminals.count == edges.count)
     #expect(leadingTerminals.count == 3)
-    #expect(topTerminals.count == 2)
+    #expect(trailingTerminals.count == 2)
     #expect(leadingMarkers.count == 3)
-    #expect(topMarkers.count == 2)
+    #expect(trailingMarkers.count == 2)
     assertBorderCoordinates(
       markers: leadingMarkers,
       base: PolicyCanvasLayout.nodeSize.height / 2,
       extent: PolicyCanvasLayout.nodeSize.height
     )
     assertBorderCoordinates(
-      markers: topMarkers,
-      base: PolicyCanvasLayout.nodeSize.width / 2,
-      extent: PolicyCanvasLayout.nodeSize.width
+      markers: trailingMarkers,
+      base: PolicyCanvasLayout.nodeSize.height / 2,
+      extent: PolicyCanvasLayout.nodeSize.height
     )
     let leadingCoordinates = leadingMarkers.map {
       PolicyCanvasLayout.nodeSize.height / 2 + $0.axisOffset
     }.sorted()
+    let trailingCoordinates = trailingMarkers.map {
+      PolicyCanvasLayout.nodeSize.height / 2 + $0.axisOffset
+    }.sorted()
     assertEvenSpacing(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
+    assertEvenSpacing(trailingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
     assertMinimumSpacing(leadingCoordinates)
+    assertMinimumSpacing(trailingCoordinates)
     assertCornerClearance(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
+    assertCornerClearance(trailingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
   }
 
   @Test("terminal markers share capacity and spacing across logical ports")
@@ -136,16 +142,22 @@ struct PolicyCanvasPortMarkerLayoutTests {
       layout.terminal(edgeID: edge.id, role: .source).map { (edge, $0) }
     }
     let trailing = sourceTerminals.filter { $0.1.side == .trailing }
-    let bottom = sourceTerminals.filter { $0.1.side == .bottom }
+    let leading = sourceTerminals.filter { $0.1.side == .leading }
 
     #expect(trailing.count == 3)
-    #expect(bottom.count == 1)
+    #expect(leading.count == 1)
     let trailingCoordinates = trailing.map { edge, terminal in
       sourceCoordinate(edge.source, side: .trailing) + terminal.axisOffset
     }.sorted()
+    let leadingCoordinates = leading.map { edge, terminal in
+      sourceCoordinate(edge.source, side: .leading) + terminal.axisOffset
+    }.sorted()
     assertEvenSpacing(trailingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
+    assertEvenSpacing(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
     assertMinimumSpacing(trailingCoordinates)
+    assertMinimumSpacing(leadingCoordinates)
     assertCornerClearance(trailingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
+    assertCornerClearance(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
   }
 
   @Test("preferred opposite horizontal sides render explicit markers")
