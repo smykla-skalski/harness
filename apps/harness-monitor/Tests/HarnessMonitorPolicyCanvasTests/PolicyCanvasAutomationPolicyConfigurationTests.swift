@@ -161,7 +161,7 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(!layoutSource.contains("componentLibraryWidth"))
     #expect(!viewSource.contains("componentLibraryWidth"))
 
-    #expect(toolRailSource.contains("width: Self.libraryPaneWidth(metrics: metrics)"))
+    #expect(toolRailSource.contains("let paneWidth = Self.libraryPaneWidth(metrics: metrics)"))
     #expect(toolRailSource.contains("PolicyCanvasLibraryPaneWidth"))
     #expect(toolRailSource.contains("PolicyCanvasLibraryPaneTextWidths(rows: libraryRows)"))
     #expect(!toolRailSource.contains(".fixedSize(horizontal: true"))
@@ -187,8 +187,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
       named: "Views/Settings/SettingsPoliciesSection.swift"
     )
     let menuBarSource = try appSourceFile(named: "HarnessMonitorMenuBarExtra.swift")
-    let workspaceSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
+    let hostedContentSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewport+HostedContent.swift"
     )
     let viewportOverlaySource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewportOverlayModifier.swift"
@@ -206,10 +206,10 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
       settingsPoliciesSource.contains("HarnessMonitorAccessibility.settingsPoliciesMinimapToggle"))
     #expect(settingsPoliciesSource.contains("Show shortcuts reference"))
     #expect(!settingsPoliciesSource.contains("Capture Current Clipboard"))
-    // The workspace wires the minimap through the dedicated viewport overlay,
-    // which reads the live viewport rect from its own observable so a scroll
-    // does not re-evaluate the whole viewport body.
-    #expect(workspaceSource.contains("PolicyCanvasViewportOverlayModifier("))
+    // The viewport hosted content wires the minimap through the dedicated
+    // viewport overlay, which reads the live viewport rect from its own
+    // observable so a scroll does not re-evaluate the whole viewport body.
+    #expect(hostedContentSource.contains("PolicyCanvasViewportOverlayModifier("))
     #expect(viewportOverlaySource.contains("PolicyCanvasMinimapViewportOverlay("))
     #expect(minimapOverlaySource.contains("snapshot.worldBounds"))
     #expect(minimapOverlaySource.contains("PolicyCanvasVisualStyle.canvasBackground"))

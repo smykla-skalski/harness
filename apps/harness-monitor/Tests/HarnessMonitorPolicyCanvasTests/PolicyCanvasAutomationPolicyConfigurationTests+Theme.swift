@@ -192,7 +192,7 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(
       overlaySource.contains(
         "PolicyCanvasEdgeKindLegend()\n"
-          + "          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"
+          + "            .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"
       )
     )
     #expect(
@@ -291,6 +291,9 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     let compilerSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasAutomationPolicyCompiler.swift"
     )
+    let compilerTextSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasAutomationPolicyCompiler+Text.swift"
+    )
     let viewModelSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewModel.swift"
     )
@@ -323,7 +326,7 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
         """
       )
     )
-    #expect(compilerSource.contains("appendNodeText(node, to: &text)"))
+    #expect(compilerTextSource.contains("appendNodeText(node, to: &text)"))
     #expect(!compilerSource.contains("reachableNodes.map(nodeText).joined"))
     #expect(!compilerSource.contains("edges\n      .filter"))
     #expect(!compilerSource.contains(".map { \"\\($0.label) \\($0.condition)"))
