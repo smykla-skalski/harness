@@ -81,7 +81,6 @@ fi
 shopt -s nullglob
 
 shell_scripts=(
-  "$ROOT"/ci_scripts/*.sh
   "$ROOT"/scripts/*.sh
   "$ROOT"/scripts/e2e/*.sh
   "$ROOT"/scripts/e2e/recording-triage/*.sh
@@ -93,6 +92,7 @@ shell_scripts=(
 )
 python_scripts=("$ROOT"/scripts/*.py)
 monitor_shell_scripts=(
+  "$ROOT"/apps/harness-monitor/ci_scripts/*.sh
   "$ROOT"/apps/harness-monitor/Scripts/*.sh
   "$ROOT"/apps/harness-monitor/Scripts/lib/*.sh
 )
