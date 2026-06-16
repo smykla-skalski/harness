@@ -397,16 +397,19 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     )
   }
 
-  func testStandaloneLabHostDisablesWritingToolsEligibilityChecks() throws {
+  func testStandaloneLabHostPersistsWindowFrame() throws {
     let appSource = try policyCanvasLabHostSourceFile(
       named: "HarnessMonitorPolicyCanvasLabApp.swift"
     )
 
     XCTAssertTrue(appSource.contains(".writingToolsBehavior(.disabled)"))
-    XCTAssertTrue(appSource.contains(".restorationBehavior(.disabled)"))
-    XCTAssertTrue(appSource.contains("@NSApplicationDelegateAdaptor"))
-    XCTAssertTrue(appSource.contains("shouldRestoreApplicationState"))
-    XCTAssertTrue(appSource.contains("shouldSaveApplicationState"))
+    XCTAssertTrue(appSource.contains(".restorationBehavior(.automatic)"))
+    XCTAssertTrue(appSource.contains("PolicyCanvasLabWindowFrameAutosaveInstaller"))
+    XCTAssertTrue(appSource.contains("PolicyCanvasLabWindowMetrics.autosaveName"))
+    XCTAssertTrue(appSource.contains("window.setFrameAutosaveName(autosaveName)"))
+    XCTAssertFalse(appSource.contains(".restorationBehavior(.disabled)"))
+    XCTAssertFalse(appSource.contains("shouldRestoreApplicationState"))
+    XCTAssertFalse(appSource.contains("shouldSaveApplicationState"))
   }
 
   @MainActor
