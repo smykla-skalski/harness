@@ -4,7 +4,12 @@ extension HarnessMonitorAPIClient {
   public func auditEvents(
     request: HarnessMonitorAuditEventsRequest
   ) async throws -> HarnessMonitorAuditEventsResponse {
-    try await get("/v1/audit/events", queryItems: auditEventQueryItems(for: request))
+    let wire: HarnessMonitorAuditEventsResponseWire = try await get(
+      "/v1/audit/events",
+      queryItems: auditEventQueryItems(for: request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return HarnessMonitorAuditEventsResponse(wire: wire)
   }
 
   private func auditEventQueryItems(
