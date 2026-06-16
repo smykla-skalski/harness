@@ -153,14 +153,14 @@ description = "Run ignored slow tests (fake toolchain, ENV_LOCK)"
 run = "./scripts/cargo-local.sh test --quiet --test integration -- --ignored --test-threads=1 --format terse"
 
 [tasks.codegen]
-description = "Regenerate the Rust -> Swift wire types from the policy-graph Rust sources"
-run = "./scripts/cargo-local.sh run --quiet --example policy-codegen > apps/harness-monitor/Sources/HarnessMonitorPolicyModels/Generated/PolicyGraphWireTypes.generated.swift"
+description = "Regenerate every Rust -> Swift wire-type module from the Rust sources"
+run = "./scripts/cargo-local.sh run --quiet --example policy-codegen"
 
 [tasks."codegen:check"]
-description = "Fail if the generated Swift wire types drift from the Rust sources or the emitter tests fail"
+description = "Fail if any generated Swift wire-type module drifts from the Rust sources or the emitter tests fail"
 run = [
   "./scripts/cargo-local.sh test --quiet --example policy-codegen",
-  "./scripts/cargo-local.sh run --quiet --example policy-codegen | diff -u apps/harness-monitor/Sources/HarnessMonitorPolicyModels/Generated/PolicyGraphWireTypes.generated.swift -",
+  "./scripts/cargo-local.sh run --quiet --example policy-codegen -- --check",
 ]
 
 [tasks.test]
