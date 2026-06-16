@@ -72,8 +72,9 @@ struct PolicyCanvasViewModelTests {
   func zoomActionsClampAndResetScale() {
     let viewModel = PolicyCanvasViewModel.sample()
 
-    viewModel.setZoom(2)
-    #expect(viewModel.zoom == 1.4)
+    #expect(PolicyCanvasLayout.maximumZoom == 2.0)
+    viewModel.setZoom(5)
+    #expect(viewModel.zoom == PolicyCanvasLayout.maximumZoom)
     viewModel.setZoom(0.1)
     #expect(viewModel.zoom == PolicyCanvasLayout.minimumZoom)
     viewModel.resetZoom()

@@ -80,7 +80,7 @@ struct PolicyCanvasCommandScrollTests {
     for _ in 0..<200 {
       _ = viewModel.zoomByCommandScroll(deltaY: 10_000)
     }
-    #expect(viewModel.zoom <= 1.4)
+    #expect(viewModel.zoom <= PolicyCanvasLayout.maximumZoom)
 
     viewModel.setZoom(1)
     for _ in 0..<200 {
@@ -108,7 +108,12 @@ struct PolicyCanvasCommandScrollTests {
   @Test("target zoom helper returns nil when zoom stays clamped")
   func targetZoomHelperReturnsNilAtClamp() {
     #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 1, deltaY: 0) == nil)
-    #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 1.4, deltaY: 80) == nil)
+    #expect(
+      policyCanvasCommandScrollTargetZoom(
+        currentZoom: PolicyCanvasLayout.maximumZoom,
+        deltaY: 80
+      ) == nil
+    )
     #expect(
       policyCanvasCommandScrollTargetZoom(
         currentZoom: PolicyCanvasLayout.minimumZoom,
