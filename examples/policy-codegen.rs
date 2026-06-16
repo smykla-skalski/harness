@@ -88,6 +88,48 @@ fn emit_string_enum(out: &mut String, spec: &SwiftStringEnum) {
     out.push_str("}\n");
 }
 
+/// Wire enums the app keeps forward-compatible: an unrecognized daemon value
+/// decodes to `.unknown(String)` instead of throwing. Listed by Swift type
+/// name; every other fieldless enum emits as a closed `String`-backed enum. The
+/// app owns this list because the Rust enums are closed - the openness is a
+/// Swift-side resilience choice.
+const OPEN_STRING_ENUMS: &[&str] = &[];
+
+/// Emit an open Swift enum conforming to `TaskBoardOpenEnum` (which supplies the
+/// single-value `Codable` over `rawValue`). Known variants plus a
+/// `.unknown(String)` fallback, with `allCases` listing only the known cases.
+fn emit_open_enum(out: &mut String, spec: &SwiftStringEnum) {
+    writeln!(
+        out,
+        "public enum {}: TaskBoardOpenEnum, CaseIterable, Identifiable {{",
+        spec.name
+    )
+    .unwrap();
+    for (case, _) in &spec.cases {
+        writeln!(out, "  case {case}").unwrap();
+    }
+    out.push_str("  case unknown(String)\n\n");
+    let known = spec
+        .cases
+        .iter()
+        .map(|(case, _)| format!(".{case}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    writeln!(out, "  public static let allCases: [Self] = [{known}]\n").unwrap();
+    out.push_str("  public var rawValue: String {\n    switch self {\n");
+    for (case, raw) in &spec.cases {
+        writeln!(out, "    case .{case}: \"{raw}\"").unwrap();
+    }
+    out.push_str("    case .unknown(let raw): raw\n    }\n  }\n\n");
+    out.push_str("  public init(rawValue: String) {\n    switch rawValue {\n");
+    for (case, raw) in &spec.cases {
+        writeln!(out, "    case \"{raw}\": self = .{case}").unwrap();
+    }
+    out.push_str("    default: self = .unknown(rawValue)\n    }\n  }\n\n");
+    out.push_str("  public var id: String { rawValue }\n");
+    out.push_str("}\n");
+}
+
 /// Emit a Codable Swift struct with a memberwise initializer, a decoder that
 /// applies wire defaults, and `CodingKeys` mapping camelCase to snake_case wire
 /// names. Everything appends into `out`.
@@ -1006,7 +1048,14 @@ fn emit_enum_item(
 ) {
     match serde_container(&item.attrs).tag {
         Some(tag) => emit_tagged_enum(out, &build_tagged_enum(item, &tag, defaults, symbols)),
-        None => emit_string_enum(out, &build_string_enum(item)),
+        None => {
+            let spec = build_string_enum(item);
+            if OPEN_STRING_ENUMS.contains(&spec.name.as_str()) {
+                emit_open_enum(out, &spec);
+            } else {
+                emit_string_enum(out, &spec);
+            }
+        }
     }
 }
 
@@ -1142,6 +1191,51 @@ mod tests {
         let expected = "public enum PolicyGraphMode: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {\n  case draft = \"draft\"\n  case dryRun = \"dry_run\"\n  case enforced = \"enforced\"\n\n  public var id: String { rawValue }\n}\n";
         let mut out = String::new();
         emit_string_enum(&mut out, &spec);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn emits_open_enum_with_unknown_fallback() {
+        let spec = SwiftStringEnum {
+            name: "TaskBoardGitSigningMode".to_string(),
+            cases: vec![
+                ("none".to_string(), "none".to_string()),
+                ("ssh".to_string(), "ssh".to_string()),
+                ("gpg".to_string(), "gpg".to_string()),
+            ],
+        };
+
+        let expected = r#"public enum TaskBoardGitSigningMode: TaskBoardOpenEnum, CaseIterable, Identifiable {
+  case none
+  case ssh
+  case gpg
+  case unknown(String)
+
+  public static let allCases: [Self] = [.none, .ssh, .gpg]
+
+  public var rawValue: String {
+    switch self {
+    case .none: "none"
+    case .ssh: "ssh"
+    case .gpg: "gpg"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "none": self = .none
+    case "ssh": self = .ssh
+    case "gpg": self = .gpg
+    default: self = .unknown(rawValue)
+    }
+  }
+
+  public var id: String { rawValue }
+}
+"#;
+        let mut out = String::new();
+        emit_open_enum(&mut out, &spec);
         assert_eq!(out, expected);
     }
 
