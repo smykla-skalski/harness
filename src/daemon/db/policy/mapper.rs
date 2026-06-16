@@ -81,8 +81,8 @@ pub(crate) fn disassemble_canvas(
                 .enumerate()
                 .map(|(index, node_id)| GroupNodeRow {
                     canvas_id: record.id.clone(),
-                    group_id: group.id.clone(),
-                    node_id: node_id.clone(),
+                    group_id: group.id.as_str().to_owned(),
+                    node_id: node_id.as_str().to_owned(),
                     position: idx(index),
                 })
         })
@@ -188,7 +188,7 @@ fn node_row(
     };
     Ok(NodeRow {
         canvas_id: canvas_id.to_string(),
-        node_id: node.id.clone(),
+        node_id: node.id.as_str().to_owned(),
         position: idx(position),
         label: node.label.clone(),
         kind_tag,
@@ -196,7 +196,7 @@ fn node_row(
         automation_json: node.automation.as_ref().map(to_json).transpose()?,
         input_ports_json: to_json(&node.input_ports)?,
         output_ports_json: to_json(&node.output_ports)?,
-        group_id: node.group_id.clone(),
+        group_id: node.group_id.as_ref().map(|id| id.as_str().to_owned()),
         layout_x,
         layout_y,
         layout_source,
@@ -205,7 +205,7 @@ fn node_row(
 
 fn node_from_row(row: &NodeRow) -> Result<PolicyGraphNode, CliError> {
     Ok(PolicyGraphNode {
-        id: row.node_id.clone(),
+        id: row.node_id.clone().into(),
         label: row.label.clone(),
         kind: from_json(&row.kind_config_json, "node kind")?,
         automation: row
@@ -215,7 +215,7 @@ fn node_from_row(row: &NodeRow) -> Result<PolicyGraphNode, CliError> {
             .transpose()?,
         input_ports: from_json(&row.input_ports_json, "node input ports")?,
         output_ports: from_json(&row.output_ports_json, "node output ports")?,
-        group_id: row.group_id.clone(),
+        group_id: row.group_id.clone().map(Into::into),
     })
 }
 
@@ -223,12 +223,12 @@ fn edge_row(canvas_id: &str, position: usize, edge: &PolicyGraphEdge) -> Result<
     let condition_value = to_value(&edge.condition, "edge condition")?;
     Ok(EdgeRow {
         canvas_id: canvas_id.to_string(),
-        edge_id: edge.id.clone(),
+        edge_id: edge.id.as_str().to_owned(),
         position: idx(position),
-        from_node: edge.from_node.clone(),
-        from_port: edge.from_port.clone(),
-        to_node: edge.to_node.clone(),
-        to_port: edge.to_port.clone(),
+        from_node: edge.from_node.as_str().to_owned(),
+        from_port: edge.from_port.as_str().to_owned(),
+        to_node: edge.to_node.as_str().to_owned(),
+        to_port: edge.to_port.as_str().to_owned(),
         label: edge.label.clone(),
         condition_tag: tag_of(&condition_value, "condition"),
         condition_config_json: stringify(&condition_value, "edge condition")?,
@@ -237,11 +237,11 @@ fn edge_row(canvas_id: &str, position: usize, edge: &PolicyGraphEdge) -> Result<
 
 fn edge_from_row(row: &EdgeRow) -> Result<PolicyGraphEdge, CliError> {
     Ok(PolicyGraphEdge {
-        id: row.edge_id.clone(),
-        from_node: row.from_node.clone(),
-        from_port: row.from_port.clone(),
-        to_node: row.to_node.clone(),
-        to_port: row.to_port.clone(),
+        id: row.edge_id.clone().into(),
+        from_node: row.from_node.clone().into(),
+        from_port: row.from_port.clone().into(),
+        to_node: row.to_node.clone().into(),
+        to_port: row.to_port.clone().into(),
         label: row.label.clone(),
         condition: from_json(&row.condition_config_json, "edge condition")?,
     })
@@ -250,7 +250,7 @@ fn edge_from_row(row: &EdgeRow) -> Result<PolicyGraphEdge, CliError> {
 fn group_row(canvas_id: &str, position: usize, group: &PolicyGraphGroup) -> GroupRow {
     GroupRow {
         canvas_id: canvas_id.to_string(),
-        group_id: group.id.clone(),
+        group_id: group.id.as_str().to_owned(),
         position: idx(position),
         label: group.label.clone(),
         color: group.color.clone(),
@@ -275,7 +275,7 @@ fn assemble_groups(
                 .collect();
             members.sort_by_key(|member| member.position);
             PolicyGraphGroup {
-                id: group.group_id,
+                id: group.group_id.into(),
                 label: group.label,
                 color: group.color,
                 frame: PolicyCanvasRect {
@@ -286,7 +286,7 @@ fn assemble_groups(
                 },
                 node_ids: members
                     .into_iter()
-                    .map(|member| member.node_id.clone())
+                    .map(|member| member.node_id.clone().into())
                     .collect(),
             }
         })
@@ -300,7 +300,7 @@ fn assemble_layout(canvas: &CanvasRow, nodes: &[NodeRow]) -> Result<PolicyGraphL
             (Some(x), Some(y)) => Some(
                 layout_source_from_str(&row.node_id, row.layout_source.as_deref()).map(|source| {
                     PolicyGraphNodeLayout {
-                        node_id: row.node_id.clone(),
+                        node_id: row.node_id.clone().into(),
                         x: narrow(x),
                         y: narrow(y),
                         source,

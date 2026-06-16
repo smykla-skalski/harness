@@ -1,9 +1,9 @@
+use super::builders::{edge, group, layout, node, rect, strings};
 use super::{
     POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PORT_IMAGE, PORT_IN, PORT_TEXT,
     PolicyActionStep, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
     PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphLayout, PolicyGraphMode,
-    PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout, edge, group, layout, node, rect,
-    strings,
+    PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
 };
 
 const MANUAL_OCR_GROUP_ID: &str = "automation:manual-ocr-paste";

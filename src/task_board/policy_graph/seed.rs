@@ -2,7 +2,7 @@ use super::{
     DEFAULT_AUTO_MERGE_RISK_THRESHOLD, POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION,
     PORT_CONSENSUS, PORT_DEFAULT, PORT_FAIL, PORT_HIGH, PORT_IMAGE, PORT_IN, PORT_LOW_OR_EQUAL,
     PORT_MERGE, PORT_MISSING, PORT_MUTATE, PORT_PASS, PORT_PULL_REQUESTS, PORT_TEXT, PORT_UNSAFE,
-    PolicyAction, PolicyActionStep, PolicyCanvasRect, PolicyDecision, PolicyEvidenceCheck,
+    PolicyAction, PolicyActionStep, PolicyDecision, PolicyEvidenceCheck,
     PolicyEvidenceField, PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding,
     PolicyGraphDecision, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup,
     PolicyGraphLayout, PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind,
@@ -10,10 +10,12 @@ use super::{
     PolicyReasonCode, UNSAFE_HIGH_RISK_ACTIONS,
 };
 
+mod builders;
 mod manual_ocr_paste;
 mod review_screenshot;
 mod review_text_paste;
 
+use builders::{action_in, edge, group, node, rect};
 pub(crate) use manual_ocr_paste::manual_ocr_paste_document;
 pub(crate) use review_screenshot::review_screenshot_extraction_document;
 pub(crate) use review_text_paste::review_text_paste_dry_run_document;
@@ -203,8 +205,8 @@ pub(super) fn layout_for(nodes: &[PolicyGraphNode]) -> PolicyGraphLayout {
             .enumerate()
             .map(|(index, node)| PolicyGraphNodeLayout {
                 node_id: node.id.clone(),
-                x: layout_position(&node.id, index).0,
-                y: layout_position(&node.id, index).1,
+                x: layout_position(node.id.as_str(), index).0,
+                y: layout_position(node.id.as_str(), index).1,
                 source: None,
             })
             .collect(),
@@ -222,25 +224,6 @@ pub(super) fn trace_for(
         .filter(|id| graph.nodes.iter().any(|node| node.id == *id))
         .map(str::to_string)
         .collect()
-}
-
-pub(super) fn edge(
-    id: &str,
-    from_node: &str,
-    from_port: &str,
-    to_node: &str,
-    condition: PolicyGraphEdgeCondition,
-) -> PolicyGraphEdge {
-    let label = edge_label(from_port, &condition);
-    PolicyGraphEdge {
-        id: id.to_string(),
-        from_node: from_node.to_string(),
-        from_port: from_port.to_string(),
-        to_node: to_node.to_string(),
-        to_port: PORT_IN.to_string(),
-        label: Some(label),
-        condition,
-    }
 }
 
 fn action_kind() -> PolicyGraphNodeKind {
@@ -303,25 +286,6 @@ fn check(
     }
 }
 
-fn node(
-    id: &str,
-    label: &str,
-    kind: PolicyGraphNodeKind,
-    input_ports: &[&str],
-    output_ports: &[&str],
-    group_id: &str,
-) -> PolicyGraphNode {
-    PolicyGraphNode {
-        id: id.to_string(),
-        label: label.to_string(),
-        kind,
-        automation: None,
-        input_ports: strings(input_ports),
-        output_ports: strings(output_ports),
-        group_id: Some(group_id.to_string()),
-    }
-}
-
 fn supervisor(
     id: &str,
     decision: PolicyGraphDecision,
@@ -373,54 +337,6 @@ fn dry_run(id: &str, reason_code: PolicyReasonCode) -> PolicyGraphNode {
     )
 }
 
-fn group(id: &str, label: &str, frame: PolicyCanvasRect, node_ids: Vec<&str>) -> PolicyGraphGroup {
-    PolicyGraphGroup {
-        id: id.to_string(),
-        label: label.to_string(),
-        color: None,
-        frame,
-        node_ids: node_ids.into_iter().map(str::to_string).collect(),
-    }
-}
-
-fn rect(x: i32, y: i32, width: i32, height: i32) -> PolicyCanvasRect {
-    PolicyCanvasRect {
-        x,
-        y,
-        width,
-        height,
-    }
-}
-
-fn layout(node_id: &str, x: i32, y: i32) -> PolicyGraphNodeLayout {
-    PolicyGraphNodeLayout {
-        node_id: node_id.to_string(),
-        x,
-        y,
-        source: None,
-    }
-}
-
-fn edge_label(from_port: &str, condition: &PolicyGraphEdgeCondition) -> String {
-    match condition {
-        PolicyGraphEdgeCondition::ActionIn { .. }
-        | PolicyGraphEdgeCondition::Always
-        | PolicyGraphEdgeCondition::ConditionTrue
-        | PolicyGraphEdgeCondition::ConditionFalse => from_port.replace('_', " "),
-        PolicyGraphEdgeCondition::EvidencePass => "checks pass".to_string(),
-        PolicyGraphEdgeCondition::EvidenceFailure { reason_code } => {
-            format!("fail: {reason_code:?}").to_lowercase()
-        }
-        PolicyGraphEdgeCondition::EvidenceConsensus { reason_code } => {
-            format!("consensus: {reason_code:?}").to_lowercase()
-        }
-        PolicyGraphEdgeCondition::EvidenceMissing => "missing evidence".to_string(),
-        PolicyGraphEdgeCondition::RiskHigh => "high risk".to_string(),
-        PolicyGraphEdgeCondition::RiskLowOrEqual => "low risk".to_string(),
-        PolicyGraphEdgeCondition::RiskMissing => "missing risk".to_string(),
-    }
-}
-
 fn layout_position(node_id: &str, fallback_index: usize) -> (i32, i32) {
     match node_id {
         "action:router" => (80, 124),
@@ -440,14 +356,6 @@ fn layout_position(node_id: &str, fallback_index: usize) -> (i32, i32) {
             (60 + column * 220, 120 + row * 140)
         }
     }
-}
-
-fn strings(values: &[&str]) -> Vec<String> {
-    values.iter().map(ToString::to_string).collect()
-}
-
-fn action_in(actions: Vec<PolicyAction>) -> PolicyGraphEdgeCondition {
-    PolicyGraphEdgeCondition::ActionIn { actions }
 }
 
 fn merge_deny_reasons() -> Vec<PolicyReasonCode> {

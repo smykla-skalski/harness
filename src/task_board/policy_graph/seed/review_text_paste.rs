@@ -1,9 +1,9 @@
+use super::builders::{edge, group, layout, node, rect, strings};
 use super::{
     POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PORT_DEFAULT, PORT_IN,
     PolicyActionStep, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
     PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphLayout, PolicyGraphMode,
-    PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyReasonCode, edge, group,
-    layout, node, rect, strings,
+    PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyReasonCode,
 };
 
 const REVIEW_TEXT_PASTE_GROUP_ID: &str = "automation:review-text-paste";

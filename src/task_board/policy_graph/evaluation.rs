@@ -5,8 +5,10 @@ use tracing::warn;
 use super::{
     PORT_DEFAULT, PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField,
     PolicyEvidencePredicate, PolicyGraph, PolicyGraphDecision, PolicyGraphEdgeCondition,
-    PolicyGraphNode, PolicyGraphNodeKind, PolicyIfThenElseCondition, PolicyReasonCode,
-    PolicyRuntimeBoundary, PolicySwitchArm, PolicySwitchNode,
+    PolicyGraphNode, PolicyGraphNodeId, PolicyGraphNodeKind, PolicyIfThenElseCondition,
+    PolicyReasonCode,
+    PolicyRuntimeBoundary, PolicySwitchArm,
+    PolicySwitchNode,
 };
 use crate::task_board::policy::{PolicyAction, PolicyInput, TASK_BOARD_POLICY_VERSION};
 
@@ -33,7 +35,7 @@ impl PolicyGraph {
         let mut boundaries = Vec::new();
         let safety_cap = self.nodes.len().saturating_mul(4).max(4);
         while let Some(node_id) = pending.pop_front() {
-            if visited_ids.contains(&node_id) {
+            if visited_ids.contains(node_id.as_str()) {
                 continue;
             }
             if let Some(bailout) =
@@ -45,9 +47,11 @@ impl PolicyGraph {
                 .nodes
                 .iter()
                 .find(|candidate| candidate.id == node_id)?;
-            visited.push(node.id.clone());
+            visited.push(node.id.as_str().to_owned());
             match self.evaluation_step(node, input, &mut boundaries) {
-                EvaluationStep::Continue(next_node_ids) => pending.extend(next_node_ids),
+                EvaluationStep::Continue(next_node_ids) => {
+                    pending.extend(next_node_ids.into_iter().map(PolicyGraphNodeId::from));
+                }
                 EvaluationStep::Terminal(decision) => return Some((decision, visited, boundaries)),
             }
         }
@@ -96,7 +100,7 @@ impl PolicyGraph {
             | PolicyGraphNodeKind::ResolveReviewPullRequests
             | PolicyGraphNodeKind::EventWait(_)
             | PolicyGraphNodeKind::Handoff(_) => EvaluationStep::Continue(
-                self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)
+                self.next_node(node.id.as_str(), &PolicyGraphEdgeCondition::Always)
                     .into_iter()
                     .collect(),
             ),
@@ -105,31 +109,31 @@ impl PolicyGraph {
             }
             PolicyGraphNodeKind::WaitStep(step) => {
                 boundaries.push(PolicyRuntimeBoundary {
-                    node_id: node.id.clone(),
+                    node_id: node.id.as_str().to_owned(),
                     resume_key: step.resume_key.clone(),
                     wait: step.wait.clone(),
                 });
                 EvaluationStep::Continue(
-                    self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)
+                    self.next_node(node.id.as_str(), &PolicyGraphEdgeCondition::Always)
                         .into_iter()
                         .collect(),
                 )
             }
             PolicyGraphNodeKind::ActionGate { .. } => EvaluationStep::Continue(
-                self.next_node_for_action(&node.id, input.action)
+                self.next_node_for_action(node.id.as_str(), input.action)
                     .into_iter()
                     .collect(),
             ),
             PolicyGraphNodeKind::EvidenceCheck { checks } => {
                 let condition = evidence_condition(checks, input);
-                EvaluationStep::Continue(self.next_node(&node.id, &condition).into_iter().collect())
+                EvaluationStep::Continue(self.next_node(node.id.as_str(), &condition).into_iter().collect())
             }
             PolicyGraphNodeKind::IfThenElse(condition) => {
                 let branch = if_then_else_condition(*condition, input);
-                EvaluationStep::Continue(self.next_node(&node.id, &branch).into_iter().collect())
+                EvaluationStep::Continue(self.next_node(node.id.as_str(), &branch).into_iter().collect())
             }
             PolicyGraphNodeKind::Switch(switch) => EvaluationStep::Continue(
-                self.next_node_for_port(&node.id, switch_port(switch, input))
+                self.next_node_for_port(node.id.as_str(), switch_port(switch, input))
                     .into_iter()
                     .collect(),
             ),
@@ -137,9 +141,9 @@ impl PolicyGraph {
                 field, threshold, ..
             } => {
                 let condition = risk_condition(*field, *threshold, input);
-                EvaluationStep::Continue(self.next_node(&node.id, &condition).into_iter().collect())
+                EvaluationStep::Continue(self.next_node(node.id.as_str(), &condition).into_iter().collect())
             }
-            PolicyGraphNodeKind::Hub => EvaluationStep::Continue(self.next_nodes(&node.id)),
+            PolicyGraphNodeKind::Hub => EvaluationStep::Continue(self.next_nodes(node.id.as_str())),
             PolicyGraphNodeKind::HumanGate { reason_code } => {
                 EvaluationStep::Terminal(require_human(*reason_code))
             }
@@ -183,14 +187,14 @@ impl PolicyGraph {
                         && matches!(edge.condition, PolicyGraphEdgeCondition::Always)
                 })
             })
-            .map(|edge| edge.to_node.clone())
+            .map(|edge| edge.to_node.as_str().to_owned())
     }
 
     fn next_node_for_port(&self, node_id: &str, port: &str) -> Option<String> {
         self.edges
             .iter()
             .find(|edge| edge.from_node == node_id && edge.from_port == port)
-            .map(|edge| edge.to_node.clone())
+            .map(|edge| edge.to_node.as_str().to_owned())
     }
 
     fn next_nodes(&self, node_id: &str) -> Vec<String> {
@@ -204,7 +208,7 @@ impl PolicyGraph {
                 .cmp(&right.from_port)
                 .then_with(|| left.id.cmp(&right.id))
         });
-        edges.into_iter().map(|edge| edge.to_node.clone()).collect()
+        edges.into_iter().map(|edge| edge.to_node.as_str().to_owned()).collect()
     }
 
     fn matching_entry_node<'a>(
@@ -252,7 +256,7 @@ impl PolicyGraph {
                         && matches!(edge.condition, PolicyGraphEdgeCondition::Always)
                 })
             })
-            .map(|edge| edge.to_node.clone())
+            .map(|edge| edge.to_node.as_str().to_owned())
     }
 }
 

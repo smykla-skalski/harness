@@ -14,7 +14,8 @@ use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy::PolicyReasonCode;
 use crate::task_board::policy_graph::{
     PORT_IN, PolicyActionStep, PolicyFinishNode, PolicyGraph, PolicyGraphDecision, PolicyGraphEdge,
-    PolicyGraphEdgeCondition, PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind,
+    PolicyGraphEdgeCondition, PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeId,
+    PolicyGraphNodeKind,
     PolicyGraphNodeLayout, PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
     store_gate_policy,
 };
@@ -122,24 +123,24 @@ fn workflow_graph(mut workflow_nodes: Vec<PolicyGraphNode>) -> PolicyGraph {
     graph.layout.nodes.clear();
 
     graph.nodes.push(PolicyGraphNode {
-        id: "entry-reviews-auto".to_owned(),
+        id: "entry-reviews-auto".into(),
         label: "Reviews Auto".to_owned(),
         kind: PolicyGraphNodeKind::WorkflowEntry(PolicyWorkflowEntry {
             workflow_id: "reviews_auto".to_owned(),
         }),
         automation: None,
-        input_ports: vec![PORT_IN.to_owned()],
-        output_ports: vec!["out".to_owned()],
+        input_ports: vec![PORT_IN.into()],
+        output_ports: vec!["out".into()],
         group_id: None,
     });
     graph.layout.nodes.push(PolicyGraphNodeLayout {
-        node_id: "entry-reviews-auto".to_owned(),
+        node_id: "entry-reviews-auto".into(),
         x: 24,
         y: 24,
         source: None,
     });
 
-    let mut previous_id = "entry-reviews-auto".to_owned();
+    let mut previous_id = PolicyGraphNodeId::from("entry-reviews-auto");
     for node in workflow_nodes.drain(..) {
         let node_id = node.id.clone();
         graph.layout.nodes.push(PolicyGraphNodeLayout {
@@ -149,11 +150,11 @@ fn workflow_graph(mut workflow_nodes: Vec<PolicyGraphNode>) -> PolicyGraph {
             source: None,
         });
         graph.edges.push(PolicyGraphEdge {
-            id: format!("edge:{previous_id}:{node_id}"),
+            id: format!("edge:{previous_id}:{node_id}").into(),
             from_node: previous_id.clone(),
-            from_port: "out".to_owned(),
+            from_port: "out".into(),
             to_node: node_id.clone(),
-            to_port: PORT_IN.to_owned(),
+            to_port: PORT_IN.into(),
             label: None,
             condition: PolicyGraphEdgeCondition::Always,
         });
@@ -162,29 +163,29 @@ fn workflow_graph(mut workflow_nodes: Vec<PolicyGraphNode>) -> PolicyGraph {
     }
 
     graph.nodes.push(PolicyGraphNode {
-        id: "finish-allow".to_owned(),
+        id: "finish-allow".into(),
         label: "Finish".to_owned(),
         kind: PolicyGraphNodeKind::Finish(PolicyFinishNode {
             decision: PolicyGraphDecision::Allow,
             reason_code: PolicyReasonCode::DefaultAllow,
         }),
         automation: None,
-        input_ports: vec![PORT_IN.to_owned()],
+        input_ports: vec![PORT_IN.into()],
         output_ports: Vec::new(),
         group_id: None,
     });
     graph.layout.nodes.push(PolicyGraphNodeLayout {
-        node_id: "finish-allow".to_owned(),
+        node_id: "finish-allow".into(),
         x: graph.layout.nodes.len() as i32 * 160 + 24,
         y: 24,
         source: None,
     });
     graph.edges.push(PolicyGraphEdge {
-        id: format!("edge:{previous_id}:finish-allow"),
+        id: format!("edge:{previous_id}:finish-allow").into(),
         from_node: previous_id,
-        from_port: "out".to_owned(),
-        to_node: "finish-allow".to_owned(),
-        to_port: PORT_IN.to_owned(),
+        from_port: "out".into(),
+        to_node: "finish-allow".into(),
+        to_port: PORT_IN.into(),
         label: None,
         condition: PolicyGraphEdgeCondition::Always,
     });
@@ -195,14 +196,14 @@ fn workflow_graph(mut workflow_nodes: Vec<PolicyGraphNode>) -> PolicyGraph {
 fn workflow_action_node(id: &str, label: &str, action_id: &str, x: i32) -> PolicyGraphNode {
     let _ = x;
     PolicyGraphNode {
-        id: id.to_owned(),
+        id: id.into(),
         label: label.to_owned(),
         kind: PolicyGraphNodeKind::ActionStep(PolicyActionStep {
             action_id: action_id.to_owned(),
         }),
         automation: None,
-        input_ports: vec![PORT_IN.to_owned()],
-        output_ports: vec!["out".to_owned()],
+        input_ports: vec![PORT_IN.into()],
+        output_ports: vec!["out".into()],
         group_id: None,
     }
 }
@@ -216,15 +217,15 @@ fn workflow_wait_node(
 ) -> PolicyGraphNode {
     let _ = x;
     PolicyGraphNode {
-        id: id.to_owned(),
+        id: id.into(),
         label: label.to_owned(),
         kind: PolicyGraphNodeKind::WaitStep(PolicyWaitStep {
             wait,
             resume_key: resume_key.to_owned(),
         }),
         automation: None,
-        input_ports: vec![PORT_IN.to_owned()],
-        output_ports: vec!["out".to_owned()],
+        input_ports: vec![PORT_IN.into()],
+        output_ports: vec!["out".into()],
         group_id: None,
     }
 }

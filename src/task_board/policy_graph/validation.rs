@@ -3,7 +3,8 @@ use std::collections::{HashMap, HashSet};
 use super::{
     POLICY_GRAPH_SCHEMA_VERSION, PORT_IMAGE, PORT_IN, PORT_PULL_REQUESTS, PORT_TEXT, PolicyAction,
     PolicyGraph, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeKind,
-    PolicyGraphPortDirection, PolicyGraphValidationIssue, PolicyGraphValidationReport,
+    PolicyGraphPortDirection, PolicyGraphPortId, PolicyGraphValidationIssue,
+    PolicyGraphValidationReport,
     UNSAFE_HIGH_RISK_ACTIONS,
 };
 
@@ -72,7 +73,7 @@ fn payload_compatibility_issues(
         let required = payload_required_by_node(target_node);
         if !provided.is_compatible_with(required) {
             issues.push(PolicyGraphValidationIssue::IncompatiblePayloadEdge {
-                edge_id: edge.id.clone(),
+                edge_id: edge.id.as_str().to_owned(),
                 provided: provided.id().to_string(),
                 required: required.id().to_string(),
             });
@@ -106,7 +107,7 @@ fn hub_input_payload_issues(
             let payload = payload_provided_by_edge(graph, nodes_by_id, edge, &mut HashSet::new());
             (!payload.is_compatible_with(first_payload)).then(|| {
                 PolicyGraphValidationIssue::IncompatiblePayloadEdge {
-                    edge_id: edge.id.clone(),
+                    edge_id: edge.id.as_str().to_owned(),
                     provided: payload.id().to_string(),
                     required: first_payload.id().to_string(),
                 }
@@ -127,7 +128,8 @@ fn payload_provided_by_edge(
     if matches!(source_node.kind, PolicyGraphNodeKind::Hub) {
         return hub_input_payload(graph, nodes_by_id, source_node, visited_hubs);
     }
-    payload_from_port(&edge.from_port).unwrap_or_else(|| payload_produced_by_node(source_node))
+    payload_from_port(edge.from_port.as_str())
+        .unwrap_or_else(|| payload_produced_by_node(source_node))
 }
 
 fn hub_input_payload(
@@ -136,7 +138,7 @@ fn hub_input_payload(
     hub: &PolicyGraphNode,
     visited_hubs: &mut HashSet<String>,
 ) -> PayloadKind {
-    if !visited_hubs.insert(hub.id.clone()) {
+    if !visited_hubs.insert(hub.id.as_str().to_owned()) {
         return PayloadKind::Unknown;
     }
     graph
@@ -235,7 +237,7 @@ fn duplicate_ids(graph: &PolicyGraph) -> Vec<PolicyGraphValidationIssue> {
     for node in &graph.nodes {
         if !seen.insert(format!("node:{}", node.id)) {
             issues.push(PolicyGraphValidationIssue::DuplicateId {
-                id: node.id.clone(),
+                id: node.id.as_str().to_owned(),
                 location: "nodes".to_string(),
             });
         }
@@ -243,7 +245,7 @@ fn duplicate_ids(graph: &PolicyGraph) -> Vec<PolicyGraphValidationIssue> {
     for edge in &graph.edges {
         if !seen.insert(format!("edge:{}", edge.id)) {
             issues.push(PolicyGraphValidationIssue::DuplicateId {
-                id: edge.id.clone(),
+                id: edge.id.as_str().to_owned(),
                 location: "edges".to_string(),
             });
         }
@@ -251,7 +253,7 @@ fn duplicate_ids(graph: &PolicyGraph) -> Vec<PolicyGraphValidationIssue> {
     for group in &graph.groups {
         if !seen.insert(format!("group:{}", group.id)) {
             issues.push(PolicyGraphValidationIssue::DuplicateId {
-                id: group.id.clone(),
+                id: group.id.as_str().to_owned(),
                 location: "groups".to_string(),
             });
         }
@@ -267,31 +269,31 @@ fn edge_reference_issues(
     for edge in &graph.edges {
         let Some(from_node) = nodes_by_id.get(edge.from_node.as_str()) else {
             issues.push(PolicyGraphValidationIssue::DanglingEdge {
-                edge_id: edge.id.clone(),
-                node_id: edge.from_node.clone(),
+                edge_id: edge.id.as_str().to_owned(),
+                node_id: edge.from_node.as_str().to_owned(),
             });
             continue;
         };
         let Some(to_node) = nodes_by_id.get(edge.to_node.as_str()) else {
             issues.push(PolicyGraphValidationIssue::DanglingEdge {
-                edge_id: edge.id.clone(),
-                node_id: edge.to_node.clone(),
+                edge_id: edge.id.as_str().to_owned(),
+                node_id: edge.to_node.as_str().to_owned(),
             });
             continue;
         };
-        if !port_exists(&from_node.output_ports, &edge.from_port) {
+        if !port_exists(&from_node.output_ports, edge.from_port.as_str()) {
             issues.push(PolicyGraphValidationIssue::InvalidPort {
-                edge_id: edge.id.clone(),
-                node_id: edge.from_node.clone(),
-                port: edge.from_port.clone(),
+                edge_id: edge.id.as_str().to_owned(),
+                node_id: edge.from_node.as_str().to_owned(),
+                port: edge.from_port.as_str().to_owned(),
                 direction: PolicyGraphPortDirection::Output,
             });
         }
-        if !port_exists(&to_node.input_ports, &edge.to_port) {
+        if !port_exists(&to_node.input_ports, edge.to_port.as_str()) {
             issues.push(PolicyGraphValidationIssue::InvalidPort {
-                edge_id: edge.id.clone(),
-                node_id: edge.to_node.clone(),
-                port: edge.to_port.clone(),
+                edge_id: edge.id.as_str().to_owned(),
+                node_id: edge.to_node.as_str().to_owned(),
+                port: edge.to_port.as_str().to_owned(),
                 direction: PolicyGraphPortDirection::Input,
             });
         }
@@ -299,8 +301,8 @@ fn edge_reference_issues(
     issues
 }
 
-fn port_exists(ports: &[String], port: &str) -> bool {
-    ports.iter().any(|candidate| candidate == port)
+fn port_exists(ports: &[PolicyGraphPortId], port: &str) -> bool {
+    ports.iter().any(|candidate| candidate.as_str() == port)
 }
 
 fn cycle_issues(
@@ -334,7 +336,7 @@ fn find_cycle(
     }
     stack.push(node_id.to_string());
     for edge in graph.edges.iter().filter(|edge| edge.from_node == node_id) {
-        if find_cycle(&edge.to_node, graph, visiting, visited, stack) {
+        if find_cycle(edge.to_node.as_str(), graph, visiting, visited, stack) {
             return true;
         }
     }
@@ -355,7 +357,12 @@ fn unsafe_action_issues(
         };
         for action in actions {
             if UNSAFE_HIGH_RISK_ACTIONS.contains(action)
-                && !action_route_reaches_human_or_consensus(graph, nodes_by_id, &node.id, *action)
+                && !action_route_reaches_human_or_consensus(
+                    graph,
+                    nodes_by_id,
+                    node.id.as_str(),
+                    *action,
+                )
             {
                 issues.push(PolicyGraphValidationIssue::UnsafeHighRiskAction { action: *action });
             }
@@ -376,7 +383,7 @@ fn action_route_reaches_human_or_consensus(
         .filter(|edge| {
             edge.from_node == action_node_id && edge_condition_contains_action(edge, action)
         })
-        .any(|edge| can_reach_human_or_consensus(graph, nodes_by_id, &edge.to_node))
+        .any(|edge| can_reach_human_or_consensus(graph, nodes_by_id, edge.to_node.as_str()))
 }
 
 fn edge_condition_contains_action(edge: &super::PolicyGraphEdge, action: PolicyAction) -> bool {
@@ -409,8 +416,8 @@ fn can_reach_human_or_consensus(
             graph
                 .edges
                 .iter()
-                .filter(|edge| edge.from_node == node_id)
-                .map(|edge| edge.to_node.clone()),
+                .filter(|edge| edge.from_node == node_id.as_str())
+                .map(|edge| edge.to_node.as_str().to_owned()),
         );
     }
     false
