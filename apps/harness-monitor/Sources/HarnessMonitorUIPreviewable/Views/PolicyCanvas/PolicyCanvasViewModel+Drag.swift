@@ -3,8 +3,8 @@ import SwiftUI
 
 extension PolicyCanvasViewModel {
   /// True only while node/group positions are being written at gesture tick
-  /// rate. The viewport uses this to keep route geometry frozen until the
-  /// end-of-gesture mutation can publish a fully recomputed route.
+  /// rate. The viewport uses this to avoid full route-worker recomputation
+  /// while still projecting incident routes from the cached output.
   var hasActivePositionDrag: Bool {
     !nodeDragOrigins.isEmpty || !groupDragOrigins.isEmpty
   }
