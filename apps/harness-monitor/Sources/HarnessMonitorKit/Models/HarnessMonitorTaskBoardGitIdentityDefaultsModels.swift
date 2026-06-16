@@ -17,13 +17,6 @@ public struct TaskBoardGitIdentityDefaults: Codable, Equatable, Sendable {
     self.discoveredSshKeys = discoveredSshKeys
     self.envOverrides = envOverrides
   }
-
-  enum CodingKeys: String, CodingKey {
-    case gitConfig = "git_config"
-    case ghCli = "gh_cli"
-    case discoveredSshKeys = "discovered_ssh_keys"
-    case envOverrides = "env_overrides"
-  }
 }
 
 public struct TaskBoardGitConfigDefaults: Codable, Equatable, Sendable {
@@ -49,15 +42,6 @@ public struct TaskBoardGitConfigDefaults: Codable, Equatable, Sendable {
     self.commitGpgsign = commitGpgsign
     self.coreSshCommand = coreSshCommand
   }
-
-  enum CodingKeys: String, CodingKey {
-    case userName = "user_name"
-    case userEmail = "user_email"
-    case userSigningkey = "user_signingkey"
-    case gpgFormat = "gpg_format"
-    case commitGpgsign = "commit_gpgsign"
-    case coreSshCommand = "core_ssh_command"
-  }
 }
 
 public struct TaskBoardGhCliDefaults: Codable, Equatable, Sendable {
@@ -67,11 +51,6 @@ public struct TaskBoardGhCliDefaults: Codable, Equatable, Sendable {
   public init(githubTokenPresent: Bool = false, username: String? = nil) {
     self.githubTokenPresent = githubTokenPresent
     self.username = username
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case githubTokenPresent = "github_token_present"
-    case username
   }
 }
 
@@ -110,10 +89,5 @@ public struct TaskBoardEnvDefaults: Codable, Equatable, Sendable {
   ) {
     self.harnessGithubTokenPresent = harnessGithubTokenPresent
     self.harnessTodoistTokenPresent = harnessTodoistTokenPresent
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case harnessGithubTokenPresent = "harness_github_token_present"
-    case harnessTodoistTokenPresent = "harness_todoist_token_present"
   }
 }
