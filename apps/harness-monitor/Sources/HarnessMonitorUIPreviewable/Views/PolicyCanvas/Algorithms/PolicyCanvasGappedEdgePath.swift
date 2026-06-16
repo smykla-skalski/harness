@@ -22,7 +22,7 @@ func policyCanvasGappedEdgePath(
   return path
 }
 
-private func policyCanvasVisibleEdgeSubroutes(
+func policyCanvasVisibleEdgeSubroutes(
   points: [CGPoint],
   gapFrames: [CGRect]
 ) -> [[CGPoint]] {

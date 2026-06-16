@@ -642,7 +642,10 @@ struct PolicyCanvasCommandScrollTests {
     #expect(edgeLayerSource.contains("private let policyCanvasDenseEdgeCanvasLimit"))
     #expect(edgeLayerSource.contains("PolicyCanvasDenseEdgeCanvas("))
     #expect(edgeLayerSource.contains("private struct PolicyCanvasDenseEdgeCanvas: View"))
-    #expect(edgeLayerSource.contains("Canvas { context, _ in"))
+    #expect(edgeLayerSource.contains("PolicyCanvasDenseEdgeDrawingSurface(items: drawingItems)"))
+    #expect(edgeLayerSource.contains("private struct PolicyCanvasDenseEdgeDrawingSurface: NSViewRepresentable"))
+    #expect(edgeLayerSource.contains("private final class PolicyCanvasDenseEdgeDrawingView: NSView"))
+    #expect(edgeLayerSource.contains("override func draw(_ dirtyRect: NSRect)"))
     #expect(
       edgeLayerSource.contains(
         "let allowsAnimatedEdgeTimelines = edges.count <= policyCanvasAnimatedEdgeTimelineLimit"
@@ -660,6 +663,69 @@ struct PolicyCanvasCommandScrollTests {
     #expect(interactiveEdgeSource.contains("struct PolicyCanvasInteractiveEdge: View, Equatable"))
     #expect(interactiveEdgeSource.contains("nonisolated static func == ("))
     #expect(interactiveEdgeSource.contains("func policyCanvasEdgeContextMenu("))
+  }
+
+  @Test("dense edge canvas uses routed content size")
+  func denseEdgeCanvasUsesRoutedContentSize() throws {
+    let edgeLayerSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEdgeLayers.swift"
+    )
+    let scrollCoordinatorSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    )
+
+    #expect(edgeLayerSource.contains("let contentSize: CGSize"))
+    #expect(edgeLayerSource.contains("width: contentSize.width"))
+    #expect(edgeLayerSource.contains("height: contentSize.height"))
+    #expect(!edgeLayerSource.contains("width: viewModel.canvasContentSize.width"))
+    #expect(!edgeLayerSource.contains("height: viewModel.canvasContentSize.height"))
+    #expect(scrollCoordinatorSource.contains("contentSize: snapshot.contentSize"))
+  }
+
+  @Test("edge strokes keep a readable screen width at far zoom")
+  func edgeStrokesKeepReadableScreenWidthAtFarZoom() {
+    let farZoom = CGFloat(0.17)
+    let width = PolicyCanvasEdgeStrokeMetrics.visibleStrokeWidth(
+      baseWidth: 2,
+      isSelected: false,
+      canvasZoom: farZoom
+    )
+
+    #expect(width > 2)
+    #expect(abs((width * farZoom) - PolicyCanvasEdgeStrokeMetrics.minimumScreenStrokeWidth) < 0.001)
+    #expect(
+      PolicyCanvasEdgeStrokeMetrics.visibleStrokeWidth(
+        baseWidth: 2,
+        isSelected: false,
+        canvasZoom: 1
+      ) == 2
+    )
+  }
+
+  @Test("dense document overlays avoid full-size SwiftUI canvas layers")
+  func denseDocumentOverlaysAvoidFullSizeSwiftUICanvasLayers() throws {
+    let edgeLayerSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEdgeLayers.swift"
+    )
+    let qualityOverlaySource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasQualityOverlayLayer.swift"
+    )
+    let qualityHoverSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasQualityHoverLayer.swift"
+    )
+    let drawingSupportSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasAppKitDrawingSupport.swift"
+    )
+
+    #expect(edgeLayerSource.contains("PolicyCanvasDenseEdgeDrawingSurface(items: drawingItems)"))
+    #expect(qualityOverlaySource.contains("PolicyCanvasQualityOverlaySurface(report: report)"))
+    #expect(qualityOverlaySource.contains("private struct PolicyCanvasQualityOverlaySurface: NSViewRepresentable"))
+    #expect(qualityOverlaySource.contains("private final class PolicyCanvasQualityOverlayView: NSView"))
+    #expect(qualityHoverSource.contains("ForEach(active)"))
+    #expect(!edgeLayerSource.contains("Canvas { context"))
+    #expect(!qualityOverlaySource.contains("Canvas { context"))
+    #expect(!qualityHoverSource.contains("Canvas { context"))
+    #expect(drawingSupportSource.contains("policyCanvasApplyTransparentDrawingBacking"))
   }
 
   @Test("native host retries a pending scroll request until the viewport is ready")

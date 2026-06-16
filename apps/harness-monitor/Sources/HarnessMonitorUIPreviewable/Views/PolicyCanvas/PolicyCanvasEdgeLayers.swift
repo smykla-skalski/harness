@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
@@ -20,6 +21,7 @@ struct PolicyCanvasEdgeLayer: View {
   let edges: [PolicyCanvasEdge]
   let routes: [String: PolicyCanvasEdgeRoute]
   let labelPositions: [String: CGPoint]
+  let contentSize: CGSize
   let accessibilityLabelsByEdgeID: [String: String]
   let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   @Environment(\.fontScale)
@@ -45,11 +47,12 @@ struct PolicyCanvasEdgeLayer: View {
           routingHints: routingHints,
           selectedEdgeID: selectedEdgeID,
           metrics: metrics,
-          colorScheme: colorScheme
+          colorScheme: colorScheme,
+          canvasZoom: viewModel.zoom
         )
         .frame(
-          width: viewModel.canvasContentSize.width,
-          height: viewModel.canvasContentSize.height,
+          width: contentSize.width,
+          height: contentSize.height,
           alignment: .topLeading
         )
         .allowsHitTesting(false)
@@ -200,79 +203,56 @@ private struct PolicyCanvasDenseEdgeCanvas: View {
   let selectedEdgeID: String?
   let metrics: PolicyCanvasEdgeLabelMetrics
   let colorScheme: ColorScheme
+  let canvasZoom: CGFloat
 
   var body: some View {
-    Canvas { context, _ in
-      for edge in edges {
-        guard let route = routes[edge.id] else {
-          continue
-        }
-        draw(edge: edge, route: route, into: &context)
-      }
-    }
+    PolicyCanvasDenseEdgeDrawingSurface(items: drawingItems)
   }
 
-  private func draw(
-    edge: PolicyCanvasEdge,
-    route: PolicyCanvasEdgeRoute,
-    into context: inout GraphicsContext
-  ) {
-    let renderedRoute = policyCanvasEndpointTrimmedRoute(
-      route,
-      endpointInset: policyCanvasRenderedRouteEndpointInset()
-    )
-    let hint = routingHints?.edgeHint(for: edge.id)
-    let bundleOrdinal = hint?.bundleOrdinal ?? 0
-    let bundleSize = hint?.bundleSize ?? 1
-    let severity = severityMap[edge.id]
-    let isSelected = selectedEdgeID == edge.id
-    let labelGapFrames = labelGapFrames(edge: edge)
-    let path = PolicyCanvasEdgeShape(route: renderedRoute, gapFrames: labelGapFrames)
-      .path(in: .zero)
-
-    if isSelected {
-      context.stroke(
-        path,
-        with: .color(PolicyCanvasVisualStyle.activeTint.opacity(0.18)),
-        style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
+  private var drawingItems: [PolicyCanvasDenseEdgeDrawingItem] {
+    edges.compactMap { edge in
+      guard let route = routes[edge.id] else {
+        return nil
+      }
+      let hint = routingHints?.edgeHint(for: edge.id)
+      let bundleOrdinal = hint?.bundleOrdinal ?? 0
+      let bundleSize = hint?.bundleSize ?? 1
+      let severity = severityMap[edge.id]
+      let isSelected = selectedEdgeID == edge.id
+      let renderedRoute = policyCanvasEndpointTrimmedRoute(
+        route,
+        endpointInset: policyCanvasRenderedRouteEndpointInset()
       )
-    }
-
-    context.stroke(
-      path,
-      with: .color(
-        strokeColor(
+      return PolicyCanvasDenseEdgeDrawingItem(
+        route: renderedRoute,
+        labelGapFrames: labelGapFrames(edge: edge),
+        strokeColor: strokeColor(
           for: edge,
           severity: severity,
           isSelected: isSelected,
           bundleOrdinal: bundleOrdinal,
           bundleSize: bundleSize
-        )
-      ),
-      style: StrokeStyle(
-        lineWidth: severity == nil ? 2.0 : 2.4,
-        lineCap: .round,
-        lineJoin: .round,
-        dash: policyCanvasBundleRailDashPattern(
+        ),
+        arrowheadColor: arrowheadColor(
+          for: edge,
+          severity: severity,
+          isSelected: isSelected,
+          bundleOrdinal: bundleOrdinal,
+          bundleSize: bundleSize
+        ),
+        strokeWidth: PolicyCanvasEdgeStrokeMetrics.visibleStrokeWidth(
+          baseWidth: severity == nil ? 2.0 : 2.4,
+          isSelected: isSelected,
+          canvasZoom: canvasZoom
+        ),
+        dashPattern: policyCanvasBundleRailDashPattern(
           kindDashPattern: edge.kind.strokeDashPattern,
           bundleOrdinal: bundleOrdinal,
           bundleSize: bundleSize
-        )
+        ),
+        isSelected: isSelected
       )
-    )
-
-    context.fill(
-      PolicyCanvasEdgeArrowhead(route: renderedRoute).path(in: .zero),
-      with: .color(
-        arrowheadColor(
-          for: edge,
-          severity: severity,
-          isSelected: isSelected,
-          bundleOrdinal: bundleOrdinal,
-          bundleSize: bundleSize
-        )
-      )
-    )
+    }
   }
 
   private func labelGapFrames(edge: PolicyCanvasEdge) -> [CGRect] {
@@ -323,6 +303,121 @@ private struct PolicyCanvasDenseEdgeCanvas: View {
     let shifted = policyCanvasBundleHueRotated(edgeColor(for: edge), by: hueOffset)
     return shifted.opacity(opacity)
   }
+}
+
+private struct PolicyCanvasDenseEdgeDrawingSurface: NSViewRepresentable {
+  let items: [PolicyCanvasDenseEdgeDrawingItem]
+
+  func makeNSView(context: Context) -> PolicyCanvasDenseEdgeDrawingView {
+    PolicyCanvasDenseEdgeDrawingView()
+  }
+
+  func updateNSView(_ nsView: PolicyCanvasDenseEdgeDrawingView, context: Context) {
+    nsView.items = items
+  }
+}
+
+private struct PolicyCanvasDenseEdgeDrawingItem: Equatable {
+  let route: PolicyCanvasEdgeRoute
+  let labelGapFrames: [CGRect]
+  let strokeColor: Color
+  let arrowheadColor: Color
+  let strokeWidth: CGFloat
+  let dashPattern: [CGFloat]
+  let isSelected: Bool
+}
+
+@MainActor
+private final class PolicyCanvasDenseEdgeDrawingView: NSView {
+  var items: [PolicyCanvasDenseEdgeDrawingItem] = [] {
+    didSet {
+      guard items != oldValue else {
+        return
+      }
+      needsDisplay = true
+    }
+  }
+
+  override var isFlipped: Bool { true }
+  override var isOpaque: Bool { false }
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    policyCanvasApplyTransparentDrawingBacking(to: self)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    nil
+  }
+
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    needsDisplay = true
+  }
+
+  override func draw(_ dirtyRect: NSRect) {
+    effectiveAppearance.performAsCurrentDrawingAppearance {
+      for item in items {
+        draw(item)
+      }
+    }
+  }
+
+  private func draw(_ item: PolicyCanvasDenseEdgeDrawingItem) {
+    for points in policyCanvasVisibleEdgeSubroutes(
+      points: item.route.points,
+      gapFrames: item.labelGapFrames
+    ) {
+      guard let path = policyCanvasAppKitEdgePath(points: points) else {
+        continue
+      }
+      if item.isSelected {
+        policyCanvasStroke(
+          path,
+          color: PolicyCanvasVisualStyle.activeTint,
+          alpha: 0.18,
+          lineWidth: 5
+        )
+      }
+      policyCanvasStroke(
+        path,
+        color: item.strokeColor,
+        lineWidth: item.strokeWidth,
+        dash: item.dashPattern
+      )
+    }
+
+    if let arrowhead = policyCanvasDenseEdgeArrowheadPath(route: item.route) {
+      policyCanvasFill(arrowhead, color: item.arrowheadColor)
+    }
+  }
+}
+
+private func policyCanvasDenseEdgeArrowheadPath(route: PolicyCanvasEdgeRoute) -> NSBezierPath? {
+  let points = route.points
+  guard points.count >= 2, let tip = points.last else {
+    return nil
+  }
+  let previous = points[points.count - 2]
+  let direction = (tip - previous).normalized
+  guard direction.length > 0 else {
+    return nil
+  }
+  let length: CGFloat = 12
+  let halfWidth: CGFloat = 4.5
+  let perpendicular = CGPoint(x: -direction.y, y: direction.x)
+  let base = tip - direction * length
+  let path = NSBezierPath()
+  path.move(to: tip)
+  path.line(to: base + perpendicular * halfWidth)
+  path.line(to: base - perpendicular * halfWidth)
+  path.close()
+  return path
 }
 
 struct PolicyCanvasEdgeLabelLayer: View {

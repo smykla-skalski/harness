@@ -185,6 +185,7 @@ struct PolicyCanvasViewportHostedRoot: View {
             edges: snapshot.edges,
             routes: snapshot.routes,
             labelPositions: snapshot.labelPositions,
+            contentSize: snapshot.contentSize,
             accessibilityLabelsByEdgeID: snapshot.accessibilityLabelsByEdgeID,
             openEditor: snapshot.openEditor
           )
