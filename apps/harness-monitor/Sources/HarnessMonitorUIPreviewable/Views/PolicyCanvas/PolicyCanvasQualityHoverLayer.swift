@@ -30,11 +30,11 @@ struct PolicyCanvasQualityHoverLayer: View {
         Canvas { context, _ in
           let accent = PolicyCanvasVisualStyle.activeTint
           for mark in active {
-            context.fill(mark.path, with: .color(accent.opacity(0.28)))
+            context.fill(mark.path, with: .color(accent.opacity(0.12)))
             context.stroke(
               mark.path,
-              with: .color(accent.opacity(0.95)),
-              style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+              with: .color(accent.opacity(0.5)),
+              style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
             )
           }
         }
