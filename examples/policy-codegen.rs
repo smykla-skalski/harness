@@ -568,6 +568,9 @@ fn map_scalar(ident: &str) -> String {
         "f64" => "Double",
         "bool" => "Bool",
         "String" | "str" => "String",
+        // serde_json::Value maps to the app's open JSON value type, which
+        // round-trips an arbitrary payload exactly like serde_json::Value.
+        "Value" => "JSONValue",
         other => other,
     }
     .to_string()
@@ -1253,6 +1256,14 @@ ExpressibleByStringLiteral, CustomStringConvertible {
             swift_type_string("Option<PolicyGraphAutomationBinding>"),
             "PolicyGraphAutomationBinding?"
         );
+    }
+
+    #[test]
+    fn maps_serde_json_value_to_json_value() {
+        assert_eq!(swift_type_string("serde_json::Value"), "JSONValue");
+        assert_eq!(swift_type_string("Value"), "JSONValue");
+        assert_eq!(swift_type_string("Option<serde_json::Value>"), "JSONValue?");
+        assert_eq!(swift_type_string("Vec<serde_json::Value>"), "[JSONValue]");
     }
 
     #[test]
