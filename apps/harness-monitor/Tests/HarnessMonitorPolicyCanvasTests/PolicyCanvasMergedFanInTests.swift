@@ -51,7 +51,7 @@ struct PolicyCanvasMergedFanInTests {
         PolicyCanvasReasonCode.unresolvedRequestedChanges,
       ]
     )
-    #expect(Set(exported.map(\.id)) == Set(mergeDenyFailureEdgeIDs))
+    #expect(Set(exported.map { $0.id.rawValue }) == Set(mergeDenyFailureEdgeIDs))
   }
 
   @Test("a sim issue on any folded branch tints the one merged wire")
@@ -119,7 +119,7 @@ struct PolicyCanvasMergedFanInTests {
     )
     undo.endUndoGrouping()
 
-    let exported = viewModel.exportDocument().edges.first { $0.id == branch.daemonEdgeID }
+    let exported = viewModel.exportDocument().edges.first { $0.id.rawValue == branch.daemonEdgeID }
     #expect(exported?.condition.reasonCode == PolicyCanvasReasonCode.protectedPathTouched)
 
     undo.undo()
@@ -160,7 +160,7 @@ struct PolicyCanvasMergedFanInTests {
     #expect(viewModel.edges.first { $0.id == mergedID }?.branches.count == 3)
 
     let exported = viewModel.exportDocument().edges
-    let split = exported.first { $0.id == branchID }
+    let split = exported.first { $0.id.rawValue == branchID }
     #expect(split?.toNodeId == "human:unsafe-action")
     #expect(split?.condition.reasonCode == PolicyCanvasReasonCode.reviewerNotApproved)
     #expect(exported.filter { $0.toNodeId == "supervisor:merge-deny" }.count == 3)
@@ -188,7 +188,7 @@ struct PolicyCanvasMergedFanInTests {
     #expect(merged.branches.count == 2)
     // The appended branch gets its own daemon id so export emits two edges.
     #expect(Set(merged.branches.map(\.daemonEdgeID)).count == 2)
-    #expect(viewModel.exportDocument().edges.filter { $0.toNodeId == targetID }.count == 2)
+    #expect(viewModel.exportDocument().edges.filter { $0.toNodeId.rawValue == targetID }.count == 2)
 
     undo.undo()
     let reverted = try #require(viewModel.edges.first { $0.target.nodeID == targetID })
@@ -213,7 +213,7 @@ struct PolicyCanvasMergedFanInTests {
     let demoted = try #require(viewModel.edges.first { $0.target.nodeID == targetID })
     #expect(demoted.isMerged == false)
     #expect(demoted.branches.count == 1)
-    #expect(viewModel.exportDocument().edges.filter { $0.toNodeId == targetID }.count == 1)
+    #expect(viewModel.exportDocument().edges.filter { $0.toNodeId.rawValue == targetID }.count == 1)
 
     undo.undo()
     #expect(viewModel.edges.first { $0.target.nodeID == targetID }?.branches.count == 2)

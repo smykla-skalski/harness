@@ -133,12 +133,12 @@ extension PolicyCanvasViewModelTests {
   func overlappingDefaultPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
     let nodes = defaultPolicyNodeSpecs.map { spec in
       TaskBoardPolicyPipelineNode(
-        id: spec.id,
+        id: PolicyGraphNodeId(spec.id),
         title: spec.title,
         kind: spec.kind,
-        groupId: spec.groupID,
+        groupId: PolicyGraphGroupId(spec.groupID),
         inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-        outputs: spec.outputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) }
+        outputs: spec.outputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
       )
     }
     return TaskBoardPolicyPipelineDocument(
@@ -161,7 +161,7 @@ extension PolicyCanvasViewModelTests {
         TaskBoardPolicyPipelineGroup(
           id: "terminal",
           title: "Terminal decisions",
-          nodeIds: defaultPolicyNodeSpecs.filter { $0.groupID == "terminal" }.map(\.id)
+          nodeIds: defaultPolicyNodeSpecs.filter { $0.groupID == "terminal" }.map { PolicyGraphNodeId($0.id) }
         ),
       ],
       layout: TaskBoardPolicyPipelineLayout(

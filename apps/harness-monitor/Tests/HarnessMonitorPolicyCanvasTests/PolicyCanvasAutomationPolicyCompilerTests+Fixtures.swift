@@ -86,12 +86,12 @@ extension PolicyCanvasAutomationPolicyCompilerTests {
     outputs: [String]
   ) -> TaskBoardPolicyPipelineNode {
     TaskBoardPolicyPipelineNode(
-      id: id,
+      id: PolicyGraphNodeId(id),
       title: title,
       kind: kind,
       automation: automation,
-      inputs: inputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) },
-      outputs: outputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) }
+      inputs: inputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) },
+      outputs: outputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
     )
   }
 

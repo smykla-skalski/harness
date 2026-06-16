@@ -26,7 +26,7 @@ struct PolicyCanvasViewModelTests {
     #expect(viewModel.documentDirty)
 
     let exported = viewModel.exportDocument()
-    let layout = exported.layout.nodes.first { $0.nodeId == nodeID }
+    let layout = exported.layout.nodes.first { $0.nodeId.rawValue == nodeID }
     #expect(layout?.x == Int((node?.position.x ?? 0).rounded()))
     #expect(layout?.y == Int((node?.position.y ?? 0).rounded()))
   }
