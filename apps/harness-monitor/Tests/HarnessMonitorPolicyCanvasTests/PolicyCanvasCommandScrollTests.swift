@@ -179,7 +179,8 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!nativeHostingViewSource.contains("requiresHostedLayout"))
     #expect(nativeHostingViewSource.contains("func replaceRootView("))
     #expect(coordinatorSource.contains("guard workspaceLayout != self.workspaceLayout else"))
-    #expect(coordinatorSource.contains("guard frame.size != size || hostingView.frame.size != size"))
+    #expect(
+      coordinatorSource.contains("guard frame.size != size || hostingView.frame.size != size"))
     #expect(coordinatorSource.contains("if hostingView.frame != bounds"))
     #expect(nativeScrollViewSource.contains("PolicyCanvasCenteringClipView()"))
     #expect(centeringClipSource.contains("final class PolicyCanvasCenteringClipView"))
@@ -248,17 +249,23 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("PolicyCanvasViewportRouteRefreshKey("))
     #expect(source.contains("let routeKeyIsStale = routeCache.appliedRouteKey != routeKey"))
     #expect(source.contains("let hasActivePositionDrag = viewModel.hasActivePositionDrag"))
+    #expect(source.contains("let projectedRouteResult = policyCanvasProjectedRouteResult("))
+    #expect(source.contains("suppressesProjection: hasActivePositionDrag"))
     #expect(
       source.contains(
-        "let routeProjectionSuppressed = hasActivePositionDrag || routeKeyIsStale"
+        "let routeProjectionCanCommit ="
       )
     )
-    #expect(source.contains("suppressesProjection: routeProjectionSuppressed"))
+    #expect(source.contains("routeKeyIsStale && projectedRouteResult.canCommitAsCurrentGraph"))
     #expect(
       source.contains(
-        "!hasActivePositionDrag && (routeOutputIsCurrentGraphMissing || routeKeyIsStale)"
+        "!hasActivePositionDrag"
+          + "\n        && (routeOutputIsCurrentGraphMissing || (routeKeyIsStale && !routeProjectionCanCommit))"
       )
     )
+    #expect(source.contains("PolicyCanvasViewportRouteProjectionCommitKey("))
+    #expect(source.contains("guard routeProjectionCanCommit else { return }"))
+    #expect(source.contains("nodePositionsByID: policyCanvasNodePositionsByID(nodes)"))
     #expect(source.contains("!viewModel.hasActivePositionDrag"))
     #expect(source.contains("needsRefresh: routeOutputNeedsRefresh"))
     #expect(source.contains("guard routeOutputNeedsRefresh else { return }"))
@@ -293,7 +300,8 @@ struct PolicyCanvasCommandScrollTests {
       )
     )
     #expect(
-      !initializer.contains("document: document,\n        simulation: simulation,\n        audit: audit,")
+      !initializer.contains(
+        "document: document,\n        simulation: simulation,\n        audit: audit,")
     )
     #expect(!surfaceSource.contains("documentIdentity: document,"))
   }
@@ -395,8 +403,10 @@ struct PolicyCanvasCommandScrollTests {
         "let usesRestoredViewportState =\n    input.viewModel.viewportCenteringBehavior.usesRestoredViewportOrigin"
       )
     )
-    #expect(centeringPlanFunction.contains("restoredSceneState == nil || !usesRestoredViewportState"))
-    #expect(centeringPlanFunction.contains("if usesRestoredViewportState, let restoredViewportOrigin"))
+    #expect(
+      centeringPlanFunction.contains("restoredSceneState == nil || !usesRestoredViewportState"))
+    #expect(
+      centeringPlanFunction.contains("if usesRestoredViewportState, let restoredViewportOrigin"))
     #expect(centeringPlanFunction.contains("anchorPoint: restoredViewportOrigin"))
     #expect(centeringPlanFunction.contains("policyCanvasInitialViewportDocumentAnchorPoint"))
   }
@@ -585,7 +595,9 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!hitTestFunction.contains("routes:"))
     #expect(!hitTestFunction.contains("super.hitTest(point)"))
     #expect(cheapHitTargetFunction.contains("nodeFrame.insetBy("))
-    #expect(cheapHitTargetFunction.contains("canvasPortHitTarget(\n          at: point,\n          node: node,"))
+    #expect(
+      cheapHitTargetFunction.contains(
+        "canvasPortHitTarget(\n          at: point,\n          node: node,"))
     #expect(cheapHitTargetFunction.contains("canvasEdgeHitTarget(at: point, routes: routes)"))
   }
 

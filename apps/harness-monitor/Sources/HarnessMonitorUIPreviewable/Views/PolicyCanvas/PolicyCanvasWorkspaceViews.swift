@@ -97,8 +97,7 @@ struct PolicyCanvasViewport: View {
       )
       let routeKeyIsStale = routeCache.appliedRouteKey != routeKey
       let hasActivePositionDrag = viewModel.hasActivePositionDrag
-      let routeProjectionSuppressed = hasActivePositionDrag || routeKeyIsStale
-      let projectedRouteOutput = policyCanvasProjectedRouteOutput(
+      let projectedRouteResult = policyCanvasProjectedRouteResult(
         input: PolicyCanvasProjectedRouteInput(
           cachedOutput: cachedOutput,
           cachedNodePositionsByID: cachedNodePositionsByID,
@@ -106,14 +105,17 @@ struct PolicyCanvasViewport: View {
           groups: groups,
           edges: edges,
           fontScale: fontScale,
-          suppressesProjection: routeProjectionSuppressed
+          suppressesProjection: hasActivePositionDrag
         )
       )
+      let routeProjectionCanCommit =
+        routeKeyIsStale && projectedRouteResult.canCommitAsCurrentGraph
       let routeOutputIsCurrentGraphMissing =
-        !viewModel.isEmpty && projectedRouteOutput.signature == .empty
-      let routeOutput = projectedRouteOutput
+        !viewModel.isEmpty && projectedRouteResult.output.signature == .empty
+      let routeOutput = projectedRouteResult.output
       let routeOutputNeedsRefresh =
-        !hasActivePositionDrag && (routeOutputIsCurrentGraphMissing || routeKeyIsStale)
+        !hasActivePositionDrag
+        && (routeOutputIsCurrentGraphMissing || (routeKeyIsStale && !routeProjectionCanCommit))
       let validationKey = policyCanvasValidationWorkerKey(
         viewModel: viewModel,
         nodes: nodes,
@@ -226,6 +228,22 @@ struct PolicyCanvasViewport: View {
           for: routeKey,
           pipelineIdentity: routeCacheIdentity,
           fontScale: fontScale
+        )
+      }
+      .task(
+        id: PolicyCanvasViewportRouteProjectionCommitKey(
+          routeKey: routeKey,
+          pipelineIdentity: routeCacheIdentity,
+          outputSignature: routeOutput.signature,
+          canCommit: routeProjectionCanCommit
+        )
+      ) {
+        guard routeProjectionCanCommit else { return }
+        updateCachedRoutes(
+          routeKey: routeKey,
+          pipelineIdentity: routeCacheIdentity,
+          output: routeOutput,
+          nodePositionsByID: policyCanvasNodePositionsByID(nodes)
         )
       }
       .onChange(of: scenePhase) { _, newPhase in

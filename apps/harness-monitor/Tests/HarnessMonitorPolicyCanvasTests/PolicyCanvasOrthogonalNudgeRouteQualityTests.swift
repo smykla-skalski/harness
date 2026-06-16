@@ -209,6 +209,33 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
     }
   }
 
+  /// A drag-end may bump the route generation, but routing identical graph input
+  /// through fresh workers must still produce the same output. This catches
+  /// accidental dictionary-order dependence without relying on the worker cache.
+  @Test("routing under the preset is deterministic for identical input")
+  func deterministicForIdenticalInput() async throws {
+    let nudged = Self.routeQualitySelection(
+      routePostProcessing: PolicyCanvasAlgorithmDefaults.orthogonalNudgedRouteProcessing
+    )
+    let sample = try #require(PolicyCanvasLabSamples.sample(id: "branching"))
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: sample.document, simulation: nil, audit: nil)
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+    let input = PolicyCanvasRouteWorkerInput(
+      nodes: viewModel.nodes,
+      groups: viewModel.groups,
+      edges: viewModel.edges,
+      fontScale: 1,
+      routingHints: viewModel.routingHints,
+      algorithmSelection: nudged
+    )
+
+    let first = await PolicyCanvasRouteWorker().compute(input: input)
+    let second = await PolicyCanvasRouteWorker().compute(input: input)
+
+    #expect(first == second)
+  }
+
   // MARK: - Scene
 
   private struct Scene {
