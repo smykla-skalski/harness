@@ -469,7 +469,7 @@ private let mobileAppTarget: Target = .target(
     name: "HarnessMonitorMobile",
     destinations: iOSDestinations,
     product: .app,
-    bundleId: "io.harnessmonitor.app.ios",
+    bundleId: "io.harnessmonitor.app",
     deploymentTargets: iOSDeploymentTargets,
     infoPlist: .file(path: "Resources/HarnessMonitorMobile-Info.plist"),
     sources: ["Sources/HarnessMonitorMobile/**/*.swift"],
@@ -500,7 +500,7 @@ private let mobileAppTarget: Target = .target(
         "CODE_SIGNING_ALLOWED": "YES",
         "GENERATE_INFOPLIST_FILE": "NO",
         "INFOPLIST_FILE": "Resources/HarnessMonitorMobile-Info.plist",
-        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app.ios",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
         "PRODUCT_MODULE_NAME": "HarnessMonitorMobile",
         "PRODUCT_NAME": "Harness Monitor",
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
