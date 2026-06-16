@@ -65,11 +65,15 @@ struct SwiftTaggedVariant {
     payload: VariantPayload,
 }
 
-/// A generated Swift enum mirroring a Rust internally-tagged enum: associated
-/// values inline (no `indirect` boxing) with a discriminator-switched Codable.
+/// A generated Swift enum mirroring a Rust tagged enum: associated values inline
+/// (no `indirect` boxing) with a discriminator-switched Codable. `content` is
+/// `None` for an internally-tagged enum (`#[serde(tag = ...)]`, payload fields
+/// flattened beside the tag) and `Some(key)` for an adjacently-tagged enum
+/// (`#[serde(tag = ..., content = ...)]`, payload nested under that key).
 struct SwiftTaggedEnum {
     name: String,
     tag: String,
+    content: Option<String>,
     variants: Vec<SwiftTaggedVariant>,
 }
 
@@ -353,6 +357,9 @@ fn emit_variant_case(out: &mut String, variant: &SwiftTaggedVariant) {
 fn emit_tagged_coding_keys(out: &mut String, spec: &SwiftTaggedEnum) {
     out.push_str("  enum CodingKeys: String, CodingKey {\n");
     writeln!(out, "    case {}", spec.tag).unwrap();
+    if let Some(content) = &spec.content {
+        writeln!(out, "    case {content}").unwrap();
+    }
     let mut seen: Vec<&str> = Vec::new();
     for variant in &spec.variants {
         let VariantPayload::Fields(fields) = &variant.payload else {
@@ -380,7 +387,7 @@ fn emit_tagged_decoder(out: &mut String, spec: &SwiftTaggedEnum) {
     writeln!(out, "    switch {} {{", spec.tag).unwrap();
     for variant in &spec.variants {
         writeln!(out, "    case \"{}\":", variant.raw_tag).unwrap();
-        emit_variant_decode(out, variant);
+        emit_variant_decode(out, variant, spec.content.as_deref());
     }
     out.push_str("    default:\n");
     writeln!(
@@ -393,10 +400,16 @@ fn emit_tagged_decoder(out: &mut String, spec: &SwiftTaggedEnum) {
     out.push_str("  }\n");
 }
 
-fn emit_variant_decode(out: &mut String, variant: &SwiftTaggedVariant) {
+fn emit_variant_decode(out: &mut String, variant: &SwiftTaggedVariant, content: Option<&str>) {
     match &variant.payload {
         VariantPayload::Unit => {
             writeln!(out, "      self = .{}", variant.case_name).unwrap();
+        }
+        VariantPayload::Fields(_) if content.is_some() => {
+            panic!(
+                "adjacently-tagged struct variant `{}` is out of scope; only newtype/unit variants are supported",
+                variant.case_name
+            );
         }
         VariantPayload::Fields(fields) => {
             out.push_str("      self = .");
@@ -412,9 +425,20 @@ fn emit_variant_decode(out: &mut String, variant: &SwiftTaggedVariant) {
             }
             out.push_str(")\n");
         }
-        VariantPayload::Newtype(inner) => {
-            writeln!(out, "      self = .{}(try {}(from: decoder))", variant.case_name, inner).unwrap();
-        }
+        VariantPayload::Newtype(inner) => match content {
+            Some(content) => writeln!(
+                out,
+                "      self = .{}(try container.decode({}.self, forKey: .{}))",
+                variant.case_name, inner, content
+            )
+            .unwrap(),
+            None => writeln!(
+                out,
+                "      self = .{}(try {}(from: decoder))",
+                variant.case_name, inner
+            )
+            .unwrap(),
+        },
     }
 }
 
@@ -435,17 +459,28 @@ fn emit_tagged_encoder(out: &mut String, spec: &SwiftTaggedEnum) {
     out.push_str("    var container = encoder.container(keyedBy: CodingKeys.self)\n");
     out.push_str("    switch self {\n");
     for variant in &spec.variants {
-        emit_variant_encode(out, variant, &spec.tag);
+        emit_variant_encode(out, variant, &spec.tag, spec.content.as_deref());
     }
     out.push_str("    }\n");
     out.push_str("  }\n");
 }
 
-fn emit_variant_encode(out: &mut String, variant: &SwiftTaggedVariant, tag: &str) {
+fn emit_variant_encode(
+    out: &mut String,
+    variant: &SwiftTaggedVariant,
+    tag: &str,
+    content: Option<&str>,
+) {
     match &variant.payload {
         VariantPayload::Unit => {
             writeln!(out, "    case .{}:", variant.case_name).unwrap();
             writeln!(out, "      try container.encode(\"{}\", forKey: .{})", variant.raw_tag, tag).unwrap();
+        }
+        VariantPayload::Fields(_) if content.is_some() => {
+            panic!(
+                "adjacently-tagged struct variant `{}` is out of scope; only newtype/unit variants are supported",
+                variant.case_name
+            );
         }
         VariantPayload::Fields(fields) => {
             out.push_str("    case .");
@@ -467,7 +502,12 @@ fn emit_variant_encode(out: &mut String, variant: &SwiftTaggedVariant, tag: &str
         VariantPayload::Newtype(_inner) => {
             writeln!(out, "    case .{}(let value):", variant.case_name).unwrap();
             writeln!(out, "      try container.encode(\"{}\", forKey: .{})", variant.raw_tag, tag).unwrap();
-            out.push_str("      try value.encode(to: encoder)\n");
+            match content {
+                Some(content) => {
+                    writeln!(out, "      try container.encode(value, forKey: .{content})").unwrap();
+                }
+                None => out.push_str("      try value.encode(to: encoder)\n"),
+            }
         }
     }
 }
@@ -687,6 +727,7 @@ struct SymbolTable {
 /// The serde container config read from a type's attributes.
 struct SerdeContainer {
     tag: Option<String>,
+    content: Option<String>,
     rename_all: Option<String>,
 }
 
@@ -731,9 +772,11 @@ fn has_default_attr(attrs: &[Attribute]) -> bool {
     attrs.iter().any(|attr| attr.path().is_ident("default"))
 }
 
-/// Read `#[serde(tag = "...")]` from a type's attributes.
+/// Read `#[serde(tag = "...", content = "...", rename_all = "...")]` from a
+/// type's attributes.
 fn serde_container(attrs: &[Attribute]) -> SerdeContainer {
     let mut tag = None;
+    let mut content = None;
     let mut rename_all = None;
     for attr in attrs {
         if !attr.path().is_ident("serde") {
@@ -741,12 +784,15 @@ fn serde_container(attrs: &[Attribute]) -> SerdeContainer {
         }
         let _ = attr.parse_nested_meta(|meta| {
             let is_tag = meta.path.is_ident("tag");
+            let is_content = meta.path.is_ident("content");
             let is_rename_all = meta.path.is_ident("rename_all");
             if let Ok(value) = meta.value() {
                 let lit: Lit = value.parse()?;
                 if let Lit::Str(text) = lit {
                     if is_tag {
                         tag = Some(text.value());
+                    } else if is_content {
+                        content = Some(text.value());
                     } else if is_rename_all {
                         rename_all = Some(text.value());
                     }
@@ -755,7 +801,11 @@ fn serde_container(attrs: &[Attribute]) -> SerdeContainer {
             Ok(())
         });
     }
-    SerdeContainer { tag, rename_all }
+    SerdeContainer {
+        tag,
+        content,
+        rename_all,
+    }
 }
 
 /// Read `#[serde(rename = ..., default[ = "..."])]` from a field's attributes.
@@ -990,10 +1040,12 @@ fn build_string_enum(item: &ItemEnum) -> SwiftStringEnum {
     SwiftStringEnum { name: swift_type_name(&item.ident.to_string(), WIRE_SUFFIXED_TYPES), cases }
 }
 
-/// Build an internally-tagged enum descriptor from a `#[serde(tag = ...)]` enum.
+/// Build a tagged enum descriptor from a `#[serde(tag = ...)]` (internally
+/// tagged) or `#[serde(tag = ..., content = ...)]` (adjacently tagged) enum.
 fn build_tagged_enum(
     item: &ItemEnum,
     tag: &str,
+    content: Option<&str>,
     defaults: &DefaultLiterals,
     symbols: &SymbolTable,
 ) -> SwiftTaggedEnum {
@@ -1006,6 +1058,7 @@ fn build_tagged_enum(
     SwiftTaggedEnum {
         name: swift_type_name(&item.ident.to_string(), WIRE_SUFFIXED_TYPES),
         tag: tag.to_string(),
+        content: content.map(str::to_string),
         variants,
     }
 }
@@ -1076,8 +1129,12 @@ fn emit_enum_item(
     defaults: &DefaultLiterals,
     symbols: &SymbolTable,
 ) {
-    match serde_container(&item.attrs).tag {
-        Some(tag) => emit_tagged_enum(out, &build_tagged_enum(item, &tag, defaults, symbols)),
+    let container = serde_container(&item.attrs);
+    match container.tag {
+        Some(tag) => emit_tagged_enum(
+            out,
+            &build_tagged_enum(item, &tag, container.content.as_deref(), defaults, symbols),
+        ),
         None => {
             let spec = build_string_enum(item);
             if OPEN_STRING_ENUMS.contains(&spec.name.as_str()) {
@@ -1484,6 +1541,7 @@ public struct Sample: Codable, Equatable, Sendable {
         let spec = SwiftTaggedEnum {
             name: "Sample".to_string(),
             tag: "kind".to_string(),
+            content: None,
             variants: vec![
                 SwiftTaggedVariant {
                     case_name: "hub".to_string(),
@@ -1547,6 +1605,67 @@ public enum Sample: Codable, Equatable, Sendable {
     case .entry(let value):
       try container.encode(\"entry\", forKey: .kind)
       try value.encode(to: encoder)
+    }
+  }
+}
+";
+        let mut out = String::new();
+        emit_tagged_enum(&mut out, &spec);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn emits_adjacently_tagged_enum_nesting_payload_under_content_key() {
+        let spec = SwiftTaggedEnum {
+            name: "ManagedAgentSnapshotWire".to_string(),
+            tag: "kind".to_string(),
+            content: Some("snapshot".to_string()),
+            variants: vec![
+                SwiftTaggedVariant {
+                    case_name: "terminal".to_string(),
+                    raw_tag: "terminal".to_string(),
+                    payload: VariantPayload::Newtype("AgentTuiSnapshotWire".to_string()),
+                },
+                SwiftTaggedVariant {
+                    case_name: "codex".to_string(),
+                    raw_tag: "codex".to_string(),
+                    payload: VariantPayload::Newtype("CodexRunSnapshotWire".to_string()),
+                },
+            ],
+        };
+
+        let expected = "\
+public enum ManagedAgentSnapshotWire: Codable, Equatable, Sendable {
+  case terminal(AgentTuiSnapshotWire)
+  case codex(CodexRunSnapshotWire)
+
+  enum CodingKeys: String, CodingKey {
+    case kind
+    case snapshot
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let kind = try container.decode(String.self, forKey: .kind)
+    switch kind {
+    case \"terminal\":
+      self = .terminal(try container.decode(AgentTuiSnapshotWire.self, forKey: .snapshot))
+    case \"codex\":
+      self = .codex(try container.decode(CodexRunSnapshotWire.self, forKey: .snapshot))
+    default:
+      throw DecodingError.dataCorruptedError(forKey: .kind, in: container, debugDescription: \"unknown ManagedAgentSnapshotWire kind \\(kind)\")
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    switch self {
+    case .terminal(let value):
+      try container.encode(\"terminal\", forKey: .kind)
+      try container.encode(value, forKey: .snapshot)
+    case .codex(let value):
+      try container.encode(\"codex\", forKey: .kind)
+      try container.encode(value, forKey: .snapshot)
     }
   }
 }
