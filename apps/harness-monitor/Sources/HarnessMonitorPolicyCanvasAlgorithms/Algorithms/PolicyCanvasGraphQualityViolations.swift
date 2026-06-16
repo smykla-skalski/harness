@@ -21,6 +21,9 @@ public struct PolicyCanvasPortSpacingViolation: Equatable, Sendable {
     case tooClose
     /// A marker that does not sit on any edge of its node frame.
     case detached
+    /// A marker sitting far from the canonical evenly-spread slot for its
+    /// position on the side - dots clustered or crammed rather than distributed.
+    case uneven
   }
 
   public let kind: Kind
@@ -50,7 +53,10 @@ public struct PolicyCanvasPortSpacingViolation: Equatable, Sendable {
   }
 
   public var severity: PolicyCanvasQualitySeverity {
-    kind == .tooClose ? .warning : .error
+    switch kind {
+    case .overlap, .detached: .error
+    case .tooClose, .uneven: .warning
+    }
   }
 }
 
