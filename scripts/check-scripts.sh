@@ -81,6 +81,7 @@ fi
 shopt -s nullglob
 
 shell_scripts=(
+  "$ROOT"/ci_scripts/*.sh
   "$ROOT"/scripts/*.sh
   "$ROOT"/scripts/e2e/*.sh
   "$ROOT"/scripts/e2e/recording-triage/*.sh

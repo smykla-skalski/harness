@@ -58,9 +58,12 @@ class MonitorXcodebuildPolicyTests(unittest.TestCase):
         self.assertIsNotNone(task_match)
         assert task_match is not None
         task_body = task_match.group("body")
-        self.assertIn("HARNESS_MONITOR_BUILD_LANE=user", task_body)
-        self.assertIn("HARNESS_MONITOR_RUNTIME_LANE=user", task_body)
-        self.assertIn("HARNESS_MONITOR_POLICY_LAB_GENERATE=1", task_body)
+        self.assertIn('${HARNESS_MONITOR_BUILD_LANE:=user}', task_body)
+        self.assertIn('${HARNESS_MONITOR_RUNTIME_LANE:=user}', task_body)
+        self.assertIn('${HARNESS_MONITOR_POLICY_LAB_GENERATE:=1}', task_body)
+        self.assertIn("export HARNESS_MONITOR_BUILD_LANE", task_body)
+        self.assertIn("export HARNESS_MONITOR_RUNTIME_LANE", task_body)
+        self.assertIn("export HARNESS_MONITOR_POLICY_LAB_GENERATE", task_body)
         self.assertIn(
             "apps/harness-monitor/Scripts/policy-canvas-lab-capture.sh",
             task_body,
