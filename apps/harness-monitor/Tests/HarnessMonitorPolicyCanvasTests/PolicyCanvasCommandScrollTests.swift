@@ -250,7 +250,8 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("let routeKeyIsStale = routeCache.appliedRouteKey != routeKey"))
     #expect(source.contains("let hasActivePositionDrag = viewModel.hasActivePositionDrag"))
     #expect(source.contains("let projectedRouteResult = policyCanvasProjectedRouteResult("))
-    #expect(source.contains("suppressesProjection: hasActivePositionDrag"))
+    #expect(!source.contains("suppressesProjection: hasActivePositionDrag"))
+    #expect(!source.contains("let routeProjectionSuppressed"))
     #expect(
       source.contains(
         "let routeProjectionCanCommit ="

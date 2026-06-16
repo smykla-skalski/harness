@@ -104,8 +104,7 @@ struct PolicyCanvasViewport: View {
           currentNodes: nodes,
           groups: groups,
           edges: edges,
-          fontScale: fontScale,
-          suppressesProjection: hasActivePositionDrag
+          fontScale: fontScale
         )
       )
       let routeProjectionCanCommit =

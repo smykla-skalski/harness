@@ -78,8 +78,8 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(projectedOutput.signature != cachedOutput.signature)
   }
 
-  @Test("suppressed stale route projection keeps cached route while dragging")
-  func suppressedStaleRouteProjectionKeepsCachedRouteWhileDragging() async throws {
+  @Test("live route projection updates cached route while dragging")
+  func liveRouteProjectionUpdatesCachedRouteWhileDragging() async throws {
     let source = PolicyCanvasNode(
       id: "source",
       title: "Source",
@@ -115,24 +115,36 @@ extension PolicyCanvasViewModelLayoutTests {
           fontScale: 1
         )
       )
+    let cachedRoute = try #require(cachedOutput.routes[edge.id])
+    let cachedTarget = try #require(cachedRoute.points.last)
     let cachedNodePositions = policyCanvasNodePositionsByID([source, target])
-    target.position = CGPoint(x: target.position.x + 160, y: target.position.y + 96)
+    let targetDelta = CGSize(width: 160, height: 96)
+    target.position = CGPoint(
+      x: target.position.x + targetDelta.width,
+      y: target.position.y + targetDelta.height
+    )
 
-    let frozenOutput = policyCanvasProjectedRouteOutput(
+    let projectedOutput = policyCanvasProjectedRouteOutput(
       input: PolicyCanvasProjectedRouteInput(
         cachedOutput: cachedOutput,
         cachedNodePositionsByID: cachedNodePositions,
         currentNodes: [source, target],
         groups: [],
         edges: [edge],
-        fontScale: 1,
-        suppressesProjection: true
+        fontScale: 1
       )
     )
+    let projectedRoute = try #require(projectedOutput.routes[edge.id])
+    let projectedTarget = try #require(projectedRoute.points.last)
 
-    #expect(frozenOutput == cachedOutput)
-    #expect(frozenOutput.routes[edge.id] == cachedOutput.routes[edge.id])
-    #expect(frozenOutput.signature == cachedOutput.signature)
+    #expect(projectedRoute != cachedRoute)
+    #expect(
+      projectedTarget
+        == CGPoint(
+          x: cachedTarget.x + targetDelta.width,
+          y: cachedTarget.y + targetDelta.height
+        ))
+    #expect(projectedOutput.signature != cachedOutput.signature)
   }
 
   @Test("stale route projection preserves cached interior corridor")
