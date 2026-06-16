@@ -152,9 +152,20 @@ run = "./scripts/cargo-local.sh test --quiet --test integration -- --test-thread
 description = "Run ignored slow tests (fake toolchain, ENV_LOCK)"
 run = "./scripts/cargo-local.sh test --quiet --test integration -- --ignored --test-threads=1 --format terse"
 
+[tasks.codegen]
+description = "Regenerate the Rust -> Swift wire types from the policy-graph Rust sources"
+run = "./scripts/cargo-local.sh run --quiet --example policy-codegen > apps/harness-monitor/Sources/HarnessMonitorPolicyModels/Generated/PolicyGraphWireTypes.generated.swift"
+
+[tasks."codegen:check"]
+description = "Fail if the generated Swift wire types drift from the Rust sources or the emitter tests fail"
+run = [
+  "./scripts/cargo-local.sh test --quiet --example policy-codegen",
+  "./scripts/cargo-local.sh run --quiet --example policy-codegen | diff -u apps/harness-monitor/Sources/HarnessMonitorPolicyModels/Generated/PolicyGraphWireTypes.generated.swift -",
+]
+
 [tasks.test]
 description = "Run all fast tests"
-depends = ["test:unit", "test:integration"]
+depends = ["test:unit", "test:integration", "codegen:check"]
 
 [tasks."setup:bootstrap"]
 description = "Write runtime bootstrap configs and install the repo-aware wrapper (pass harness setup args after --)"
