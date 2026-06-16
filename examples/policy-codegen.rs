@@ -108,6 +108,36 @@ fn emit_struct(out: &mut String, spec: &SwiftStruct) {
     out.push_str("}\n");
 }
 
+/// Emit a Swift wrapper for a serde-transparent `String` newtype: a
+/// `RawRepresentable` value type that round-trips as the bare string and is
+/// usable as a dictionary key, a sortable value, and a string literal. The
+/// non-failable `init(rawValue:)` satisfies `RawRepresentable`, and the explicit
+/// single-value `Codable` keeps the wire form identical to a plain `String`.
+fn emit_newtype(out: &mut String, name: &str) {
+    writeln!(
+        out,
+        "public struct {name}: RawRepresentable, Codable, Hashable, Sendable, Comparable, \
+         ExpressibleByStringLiteral, CustomStringConvertible {{"
+    )
+    .unwrap();
+    out.push_str("  public let rawValue: String\n");
+    out.push_str("  public init(rawValue: String) {\n    self.rawValue = rawValue\n  }\n");
+    out.push_str("  public init(_ rawValue: String) {\n    self.rawValue = rawValue\n  }\n");
+    out.push_str("  public init(stringLiteral value: String) {\n    self.rawValue = value\n  }\n");
+    out.push_str("  public init(from decoder: Decoder) throws {\n");
+    out.push_str("    rawValue = try decoder.singleValueContainer().decode(String.self)\n");
+    out.push_str("  }\n");
+    out.push_str("  public func encode(to encoder: Encoder) throws {\n");
+    out.push_str("    var container = encoder.singleValueContainer()\n");
+    out.push_str("    try container.encode(rawValue)\n");
+    out.push_str("  }\n");
+    out.push_str("  public var description: String {\n    rawValue\n  }\n");
+    out.push_str("  public static func < (lhs: Self, rhs: Self) -> Bool {\n");
+    out.push_str("    lhs.rawValue < rhs.rawValue\n");
+    out.push_str("  }\n");
+    out.push_str("}\n");
+}
+
 /// Append a field's Swift type, including the trailing `?` for optionals.
 fn push_type(out: &mut String, field: &SwiftField) {
     out.push_str(&field.type_name);
@@ -808,6 +838,20 @@ fn build_struct(
     })
 }
 
+/// Whether a struct is a serde-transparent `String` newtype - a single-field
+/// tuple struct wrapping `String`, the shape the policy id wrappers use. These
+/// emit as Swift `RawRepresentable` wrappers rather than Codable structs.
+fn is_string_newtype(item: &ItemStruct) -> bool {
+    let Fields::Unnamed(fields) = &item.fields else {
+        return false;
+    };
+    let mut iter = fields.unnamed.iter();
+    let (Some(field), None) = (iter.next(), iter.next()) else {
+        return false;
+    };
+    rust_type_to_swift(&field.ty).name == "String"
+}
+
 /// Build a `String`-backed enum descriptor from a fieldless Rust enum.
 fn build_string_enum(item: &ItemEnum) -> SwiftStringEnum {
     let cases = item
@@ -881,6 +925,9 @@ fn emit_source_decls(
                 if let Some(spec) = build_struct(&item, defaults, symbols) {
                     out.push('\n');
                     emit_struct(out, &spec);
+                } else if is_string_newtype(&item) {
+                    out.push('\n');
+                    emit_newtype(out, &item.ident.to_string());
                 }
             }
             Item::Enum(item) if has_serde(&item.attrs) => {
@@ -916,6 +963,7 @@ import Foundation
 const POLICY_SOURCE: &str = include_str!("../src/task_board/policy.rs");
 const POLICY_GRAPH_SOURCE: &str = include_str!("../src/task_board/policy_graph.rs");
 const POLICY_MODELS_SOURCE: &str = include_str!("../src/task_board/policy_graph/models.rs");
+const POLICY_IDS_SOURCE: &str = include_str!("../src/task_board/policy_graph/ids.rs");
 const POLICY_DEFAULTS_SOURCE: &str = include_str!("../src/task_board/policy_graph/defaults.rs");
 
 /// Generate the full Swift wire-type module from the policy-graph Rust sources.
@@ -924,7 +972,12 @@ const POLICY_DEFAULTS_SOURCE: &str = include_str!("../src/task_board/policy_grap
 /// only the current file's syntax tree and one descriptor are live at once.
 fn generate_policy_swift() -> String {
     let defaults = parse_defaults(POLICY_DEFAULTS_SOURCE);
-    let sources = [POLICY_SOURCE, POLICY_GRAPH_SOURCE, POLICY_MODELS_SOURCE];
+    let sources = [
+        POLICY_IDS_SOURCE,
+        POLICY_SOURCE,
+        POLICY_GRAPH_SOURCE,
+        POLICY_MODELS_SOURCE,
+    ];
     let symbols = build_symbol_table(&sources);
     let mut out = String::from(GENERATED_HEADER);
     for source in sources {
@@ -955,6 +1008,41 @@ mod tests {
         let expected = "public enum PolicyGraphMode: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {\n  case draft = \"draft\"\n  case dryRun = \"dry_run\"\n  case enforced = \"enforced\"\n\n  public var id: String { rawValue }\n}\n";
         let mut out = String::new();
         emit_string_enum(&mut out, &spec);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn emits_string_newtype_wrapper() {
+        let expected = "\
+public struct SampleId: RawRepresentable, Codable, Hashable, Sendable, Comparable, \
+ExpressibleByStringLiteral, CustomStringConvertible {
+  public let rawValue: String
+  public init(rawValue: String) {
+    self.rawValue = rawValue
+  }
+  public init(_ rawValue: String) {
+    self.rawValue = rawValue
+  }
+  public init(stringLiteral value: String) {
+    self.rawValue = value
+  }
+  public init(from decoder: Decoder) throws {
+    rawValue = try decoder.singleValueContainer().decode(String.self)
+  }
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
+  public var description: String {
+    rawValue
+  }
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.rawValue < rhs.rawValue
+  }
+}
+";
+        let mut out = String::new();
+        emit_newtype(&mut out, "SampleId");
         assert_eq!(out, expected);
     }
 
@@ -1187,6 +1275,16 @@ public enum Sample: Codable, Equatable, Sendable {
 
         // Struct field coding keys map camelCase property to snake_case wire key.
         assert!(swift.contains("case fromNode = \"from_node\""));
+
+        // Serde-transparent id newtypes emit as RawRepresentable String wrappers,
+        // and the graph structs adopt them in place of bare String ids.
+        assert!(swift.contains(
+            "public struct PolicyGraphNodeId: RawRepresentable, Codable, Hashable, Sendable, \
+             Comparable, ExpressibleByStringLiteral, CustomStringConvertible {"
+        ));
+        assert!(swift.contains("  public var id: PolicyGraphNodeId\n"));
+        assert!(swift.contains("  public var fromNode: PolicyGraphNodeId\n"));
+        assert!(swift.contains("  public var inputPorts: [PolicyGraphPortId]\n"));
 
         // Defaults resolved from defaults.rs: skipped zoom and always-present strings.
         assert!(swift.contains("?? 1.0"));
