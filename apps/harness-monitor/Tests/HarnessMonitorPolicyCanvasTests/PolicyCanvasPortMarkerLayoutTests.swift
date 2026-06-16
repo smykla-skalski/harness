@@ -6,15 +6,15 @@ import Testing
 
 @Suite("Policy canvas port marker layout")
 struct PolicyCanvasPortMarkerLayoutTests {
-  @Test("terminal marker overflow stays on horizontal sides")
-  func terminalMarkerOverflowStaysOnHorizontalSides() {
+  @Test("crowded input terminals stay on the leading side")
+  func crowdedInputTerminalsStayOnLeadingSide() {
     let target = policyCanvasMarkerTestNode(
       id: "target",
       position: CGPoint(x: 220, y: 80),
       inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
       outputPorts: []
     )
-    let sources = (0..<5).map { index in
+    let sources = (0..<4).map { index in
       policyCanvasMarkerTestNode(
         id: "source-\(index)",
         position: CGPoint(x: 0, y: CGFloat(index * 80)),
@@ -62,10 +62,10 @@ struct PolicyCanvasPortMarkerLayoutTests {
     let trailingTerminals = targetTerminals.filter { $0.side == .trailing }
 
     #expect(targetTerminals.count == edges.count)
-    #expect(leadingTerminals.count == 4)
-    #expect(trailingTerminals.count == 1)
-    #expect(leadingMarkers.count == 4)
-    #expect(trailingMarkers.count == 1)
+    #expect(leadingTerminals.count == edges.count)
+    #expect(trailingTerminals.isEmpty)
+    #expect(leadingMarkers.count == edges.count)
+    #expect(trailingMarkers.isEmpty)
     assertBorderCoordinates(
       markers: leadingMarkers,
       base: PolicyCanvasLayout.nodeSize.height / 2,
@@ -79,15 +79,9 @@ struct PolicyCanvasPortMarkerLayoutTests {
     let leadingCoordinates = leadingMarkers.map {
       PolicyCanvasLayout.nodeSize.height / 2 + $0.axisOffset
     }.sorted()
-    let trailingCoordinates = trailingMarkers.map {
-      PolicyCanvasLayout.nodeSize.height / 2 + $0.axisOffset
-    }.sorted()
     assertEvenSpacing(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
-    assertEvenSpacing(trailingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
     assertMinimumSpacing(leadingCoordinates)
-    assertMinimumSpacing(trailingCoordinates)
     assertCornerClearance(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
-    assertCornerClearance(trailingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
   }
 
   @Test("terminal markers share capacity and spacing across logical ports")
@@ -160,8 +154,8 @@ struct PolicyCanvasPortMarkerLayoutTests {
     assertCornerClearance(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
   }
 
-  @Test("preferred opposite horizontal sides render explicit markers")
-  func preferredOppositeHorizontalSidesRenderExplicitMarkers() {
+  @Test("semantic sides override opposite explicit marker sides")
+  func semanticSidesOverrideOppositeExplicitMarkerSides() {
     let source = policyCanvasMarkerTestNode(
       id: "source",
       position: CGPoint(x: 360, y: 0),
@@ -216,10 +210,12 @@ struct PolicyCanvasPortMarkerLayoutTests {
       nodeIndex: prepared.nodeIndex
     )
 
-    #expect(layout.terminal(edgeID: edge.id, role: .source)?.side == .leading)
-    #expect(layout.terminal(edgeID: edge.id, role: .target)?.side == .trailing)
-    #expect(layout.markers(for: edge.source, side: .leading, isVisible: true).count == 1)
-    #expect(layout.markers(for: edge.target, side: .trailing, isVisible: true).count == 1)
+    #expect(layout.terminal(edgeID: edge.id, role: .source)?.side == .trailing)
+    #expect(layout.terminal(edgeID: edge.id, role: .target)?.side == .leading)
+    #expect(layout.markers(for: edge.source, side: .trailing, isVisible: true).count == 1)
+    #expect(layout.markers(for: edge.source, side: .leading, isVisible: true).isEmpty)
+    #expect(layout.markers(for: edge.target, side: .leading, isVisible: true).count == 1)
+    #expect(layout.markers(for: edge.target, side: .trailing, isVisible: true).isEmpty)
   }
 
   @Test("layout reports explicit marker sides independently of visibility")

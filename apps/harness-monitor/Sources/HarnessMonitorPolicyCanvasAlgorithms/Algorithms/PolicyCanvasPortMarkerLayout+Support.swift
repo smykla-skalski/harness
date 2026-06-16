@@ -11,7 +11,7 @@ struct PolicyCanvasPortMarkerEntry: Comparable {
   }
 
   var nodeKey: PolicyCanvasPortMarkerNodeKey {
-    PolicyCanvasPortMarkerNodeKey(nodeID: endpoint.nodeID)
+    PolicyCanvasPortMarkerNodeKey(nodeID: endpoint.nodeID, kind: endpoint.kind)
   }
 
   static func < (lhs: Self, rhs: Self) -> Bool {
@@ -69,6 +69,7 @@ func policyCanvasPortMarkerAssignmentUnits(
 
 struct PolicyCanvasPortMarkerNodeKey: Hashable {
   let nodeID: String
+  let kind: PolicyCanvasPortKind
 }
 
 func policyCanvasPortMarkerSortKey(

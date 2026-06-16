@@ -562,7 +562,7 @@ struct PolicyCanvasLabRoutingQualityTests {
     #expect(
       failures.isEmpty,
       """
-      live lab port markers are not horizontal, balanced, and aligned on every visible node side
+      live lab port markers are not semantic-side, balanced, and aligned on every visible node side
       failures=\(failures)
       """
     )
@@ -934,9 +934,23 @@ struct PolicyCanvasLabRoutingQualityTests {
           failures.append("\(sampleID):\(edge.id):\(label) missing terminal marker")
           continue
         }
+        let expectedSide: PolicyCanvasPortSide = endpoint.kind == .input ? .leading : .trailing
+        if terminal.side != expectedSide {
+          failures.append(
+            "\(sampleID):\(edge.id):\(label) terminal side=\(terminal.side) expected=\(expectedSide)"
+          )
+        }
         if verticalSides.contains(terminal.side) {
           failures.append(
             "\(sampleID):\(edge.id):\(label) terminal side=\(terminal.side)"
+          )
+        }
+        let semanticSides: [PolicyCanvasPortSide] = [.leading, .trailing]
+        for side in semanticSides where side != expectedSide
+          && graph.output.portMarkerLayout.hasMarkers(for: endpoint, side: side)
+        {
+          failures.append(
+            "\(sampleID):\(edge.id):\(label) has semantic-opposite \(side) markers for \(endpoint)"
           )
         }
         for side in verticalSides

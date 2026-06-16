@@ -5,7 +5,7 @@ public enum PolicyCanvasLayout {
   public static let minimumZoom: CGFloat = 0.1
   public static let maximumZoom: CGFloat = 1.4
   public static let defaultZoom: CGFloat = 0.92
-  public static let nodeSize = CGSize(width: 168, height: 112)
+  public static let nodeSize = CGSize(width: 168, height: 160)
   public static let portDiameter: CGFloat = 18
   public static let portHitTestExtension: CGFloat = 10
   public static let portMarkerInset: CGFloat = portDiameter / 2 + 2
@@ -18,7 +18,7 @@ public enum PolicyCanvasLayout {
   public static let edgeLabelNodeClearance: CGFloat = 24
   public static let edgeLabelHorizontalMargin: CGFloat = 14
   public static let edgePortTurnMinimumLead: CGFloat = 36
-  public static let defaultEdgeLineSpacing: CGFloat = nodeSize.height / 5
+  public static let defaultEdgeLineSpacing: CGFloat = 22.4
   public static let initialContentOrigin = CGPoint(x: 520, y: 480)
   public static let initialViewportInset: CGFloat = 220
   public static let initialViewportTopBias: CGFloat = 64

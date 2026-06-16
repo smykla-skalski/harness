@@ -12,14 +12,11 @@ public func policyCanvasCanonicalPortEndpoint(
 
 public func policyCanvasRoutablePortSides(for kind: PolicyCanvasPortKind) -> [PolicyCanvasPortSide]
 {
-  // Keep automatic terminals on horizontal edges. Vertical sides are still
-  // addressable by explicit anchor helpers, but routed canvas markers should not
-  // spill to the top or bottom of a node when a side is crowded.
   switch kind {
   case .input:
-    [.leading, .trailing]
+    [.leading]
   case .output:
-    [.trailing, .leading]
+    [.trailing]
   }
 }
 
