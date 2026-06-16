@@ -4,22 +4,16 @@ import Testing
 @testable import HarnessMonitorKit
 
 /// Wire-contract regression for the `/v1/task-board/git/identity-defaults`
-/// response. The daemon serializes `TaskBoardGitIdentityDefaults`
-/// (src/task_board/git_identity_defaults.rs) with plain serde snake_case, and
-/// the shared client decodes every response with
-/// `keyDecodingStrategy = .convertFromSnakeCase`. A hand-written model that
-/// also spells explicit snake_case `CodingKeys` raw values is mutually
-/// exclusive with that strategy: the strategy rewrites the JSON key
-/// `git_config` to `gitConfig` before matching, so a coding key whose literal
-/// value is `git_config` never matches and the field drops out (or, for a
-/// non-optional field, the decode throws `keyNotFound`).
+/// response. `TaskBoardGitIdentityDefaults` is generated from the Rust wire
+/// types (src/task_board/git_identity_defaults.rs) by examples/policy-codegen.rs,
+/// so it spells explicit snake_case `CodingKeys` and is decoded with
+/// `PolicyWireCoding.decoder` (no key strategy), exactly like every other
+/// generated wire type. That pairing is what the client uses on both the HTTP
+/// and WebSocket transports; this test feeds the daemon's byte-for-byte
+/// snake_case payload through that decoder and asserts every field survives.
 @Suite("Task board git identity defaults decoding")
 struct TaskBoardGitIdentityDefaultsDecodingTests {
-  private let decoder: JSONDecoder = {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    return decoder
-  }()
+  private let decoder = PolicyWireCoding.decoder
 
   /// Byte-for-byte daemon payload (snake_case wire keys, `null` for absent
   /// optionals because the Rust fields carry no `skip_serializing_if`).

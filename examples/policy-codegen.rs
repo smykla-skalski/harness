@@ -29,22 +29,26 @@ struct SwiftStringEnum {
     cases: Vec<(String, String)>,
 }
 
-/// A generated Swift struct field with its wire `CodingKey` and decode default.
+/// A generated Swift struct field with its wire `CodingKey`, the decoder
+/// fallback (`decode_default`, kept strict so it never tolerates a field serde
+/// itself requires), and the memberwise-initializer default (`init_default`,
+/// which can additionally default to a nested `Default` struct's zero value).
 struct SwiftField {
     property: String,
     coding_key: String,
     type_name: String,
     optional: bool,
     decode_default: Option<String>,
+    init_default: Option<String>,
 }
 
-/// A generated Swift `Codable` struct mirroring a Rust wire struct. When the
-/// Rust struct derives `Default`, the memberwise initializer defaults every
-/// field so the Swift type stays callable with no arguments.
+/// A generated Swift `Codable` struct mirroring a Rust wire struct. Per-field
+/// memberwise-initializer defaults are resolved during the build phase (see
+/// `SwiftField::init_default`), so the Swift type stays callable with no
+/// arguments exactly when its Rust counterpart derives `Default`.
 struct SwiftStruct {
     name: String,
     fields: Vec<SwiftField>,
-    derives_default: bool,
 }
 
 /// The payload shape of an internally-tagged enum variant.
@@ -159,9 +163,9 @@ fn emit_memberwise_init(out: &mut String, spec: &SwiftStruct) {
         out.push_str(&field.property);
         out.push_str(": ");
         push_type(out, field);
-        if let Some(default) = init_default(field, spec.derives_default) {
+        if let Some(default) = &field.init_default {
             out.push_str(" = ");
-            out.push_str(&default);
+            out.push_str(default);
         }
     }
     out.push_str(") {\n");
@@ -172,17 +176,34 @@ fn emit_memberwise_init(out: &mut String, spec: &SwiftStruct) {
 }
 
 /// The default value for a field in the memberwise initializer: `nil` for
-/// optionals, the decode default when present, or the type's zero value when
-/// the owning struct derives `Default` (mirroring Rust's zero-argument default).
-fn init_default(field: &SwiftField, derives_default: bool) -> Option<String> {
-    if field.optional {
+/// optionals, the decode default when present, or - when the owning struct
+/// derives `Default` - the field type's zero value. The zero value is a
+/// primitive/array literal, or `TypeName()` when the field's own type is a
+/// `Default`-deriving struct, so the Swift type stays callable with no
+/// arguments exactly when its Rust counterpart is. This is resolved at build
+/// time because only there is the `Default`-deriving struct set in scope; it
+/// never feeds the decoder, which stays strict about fields serde requires.
+fn field_init_default(
+    optional: bool,
+    decode_default: &Option<String>,
+    type_name: &str,
+    derives_default: bool,
+    symbols: &SymbolTable,
+) -> Option<String> {
+    if optional {
         return Some("nil".to_string());
     }
-    if let Some(default) = &field.decode_default {
+    if let Some(default) = decode_default {
         return Some(default.clone());
     }
-    if derives_default {
-        return zero_value(&field.type_name);
+    if !derives_default {
+        return None;
+    }
+    if let Some(zero) = zero_value(type_name) {
+        return Some(zero);
+    }
+    if symbols.structs_with_default.contains(type_name) {
+        return Some(format!("{type_name}()"));
     }
     None
 }
@@ -770,6 +791,7 @@ fn build_fields(
     fields: &FieldsNamed,
     defaults: &DefaultLiterals,
     symbols: &SymbolTable,
+    derives_default: bool,
 ) -> Vec<SwiftField> {
     fields
         .named
@@ -780,12 +802,20 @@ fn build_fields(
             let coding_key = serde.rename.clone().unwrap_or_else(|| name.clone());
             let swift_type = rust_type_to_swift(&field.ty);
             let decode_default = field_decode_default(&swift_type, &serde, defaults, symbols);
+            let init_default = field_init_default(
+                swift_type.optional,
+                &decode_default,
+                &swift_type.name,
+                derives_default,
+                symbols,
+            );
             SwiftField {
                 property: escape_keyword(snake_to_camel(&name)),
                 coding_key,
                 type_name: swift_type.name,
                 optional: swift_type.optional,
                 decode_default,
+                init_default,
             }
         })
         .collect()
@@ -833,10 +863,10 @@ fn build_struct(
     let Fields::Named(fields) = &item.fields else {
         return None;
     };
+    let derives = derives_default(&item.attrs);
     Some(SwiftStruct {
         name: item.ident.to_string(),
-        fields: build_fields(fields, defaults, symbols),
-        derives_default: derives_default(&item.attrs),
+        fields: build_fields(fields, defaults, symbols, derives),
     })
 }
 
@@ -897,7 +927,9 @@ fn build_tagged_variant(
     let name = variant.ident.to_string();
     let payload = match &variant.fields {
         Fields::Unit => VariantPayload::Unit,
-        Fields::Named(fields) => VariantPayload::Fields(build_fields(fields, defaults, symbols)),
+        Fields::Named(fields) => {
+            VariantPayload::Fields(build_fields(fields, defaults, symbols, false))
+        }
         Fields::Unnamed(fields) => {
             let mut iter = fields.unnamed.iter();
             let (Some(field), None) = (iter.next(), iter.next()) else {
@@ -962,11 +994,20 @@ const GENERATED_HEADER: &str = "\
 import Foundation
 ";
 
+const GIT_HEADER: &str = "\
+// Generated by examples/policy-codegen.rs from the Rust task-board git identity sources
+// Do not edit by hand - rerun: mise run codegen
+
+import Foundation
+";
+
 const POLICY_SOURCE: &str = include_str!("../src/task_board/policy.rs");
 const POLICY_GRAPH_SOURCE: &str = include_str!("../src/task_board/policy_graph.rs");
 const POLICY_MODELS_SOURCE: &str = include_str!("../src/task_board/policy_graph/models.rs");
 const POLICY_IDS_SOURCE: &str = include_str!("../src/task_board/policy_graph/ids.rs");
 const POLICY_DEFAULTS_SOURCE: &str = include_str!("../src/task_board/policy_graph/defaults.rs");
+const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
+    include_str!("../src/task_board/git_identity_defaults.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, an optional defaults source informing decode defaults, the Swift
@@ -982,18 +1023,27 @@ struct GeneratedModule {
 /// daemon subsystem under generation; `codegen` writes each file and
 /// `codegen:check` fails when any drifts from its Rust sources.
 fn modules() -> Vec<GeneratedModule> {
-    vec![GeneratedModule {
-        output:
-            "apps/harness-monitor/Sources/HarnessMonitorPolicyModels/Generated/PolicyGraphWireTypes.generated.swift",
-        header: GENERATED_HEADER,
-        defaults: Some(POLICY_DEFAULTS_SOURCE),
-        sources: &[
-            POLICY_IDS_SOURCE,
-            POLICY_SOURCE,
-            POLICY_GRAPH_SOURCE,
-            POLICY_MODELS_SOURCE,
-        ],
-    }]
+    vec![
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorPolicyModels/Generated/PolicyGraphWireTypes.generated.swift",
+            header: GENERATED_HEADER,
+            defaults: Some(POLICY_DEFAULTS_SOURCE),
+            sources: &[
+                POLICY_IDS_SOURCE,
+                POLICY_SOURCE,
+                POLICY_GRAPH_SOURCE,
+                POLICY_MODELS_SOURCE,
+            ],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitWireTypes.generated.swift",
+            header: GIT_HEADER,
+            defaults: Some(GIT_IDENTITY_DEFAULTS_SOURCE),
+            sources: &[GIT_IDENTITY_DEFAULTS_SOURCE],
+        },
+    ]
 }
 
 /// Generate the Swift wire-type source for one module.
@@ -1029,6 +1079,9 @@ fn main() {
                 drifted.push(module.output);
             }
         } else {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).expect("create generated module directory");
+            }
             fs::write(&path, generated).expect("write generated Swift module");
         }
     }
@@ -1166,6 +1219,7 @@ ExpressibleByStringLiteral, CustomStringConvertible {
                     type_name: "String".to_string(),
                     optional: false,
                     decode_default: None,
+                    init_default: None,
                 },
                 SwiftField {
                     property: "groupId".to_string(),
@@ -1173,6 +1227,7 @@ ExpressibleByStringLiteral, CustomStringConvertible {
                     type_name: "String".to_string(),
                     optional: true,
                     decode_default: None,
+                    init_default: Some("nil".to_string()),
                 },
                 SwiftField {
                     property: "inputPorts".to_string(),
@@ -1180,9 +1235,9 @@ ExpressibleByStringLiteral, CustomStringConvertible {
                     type_name: "[String]".to_string(),
                     optional: false,
                     decode_default: Some("[]".to_string()),
+                    init_default: Some("[]".to_string()),
                 },
             ],
-            derives_default: false,
         };
 
         let expected = "\
@@ -1236,6 +1291,7 @@ public struct Sample: Codable, Equatable, Sendable {
                         type_name: "UInt64".to_string(),
                         optional: false,
                         decode_default: None,
+                        init_default: None,
                     }]),
                 },
                 SwiftTaggedVariant {
