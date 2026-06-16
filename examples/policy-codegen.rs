@@ -592,8 +592,26 @@ fn vec_element(arguments: &PathArguments) -> String {
     }
 }
 
+/// Rust wire types whose bare Swift name is owned by a hand-written rich app
+/// model, so the generated thin type is emitted with a `Wire` suffix (e.g.
+/// `HarnessMonitorAuditEvent` -> `HarnessMonitorAuditEventWire`) and the app
+/// decodes the wire type then maps it to the model. Empty until a rich-model
+/// subsystem migrates; with it empty, every module stays byte-identical.
+const WIRE_SUFFIXED_TYPES: &[&str] = &[];
+
+/// The Swift name for a Rust wire type: the bare name, or `{name}Wire` when the
+/// app owns the bare name for a rich model. Applied to both type definitions
+/// and every reference so a `Vec<T>` field tracks the suffixed element name.
+fn swift_type_name(rust_name: &str, suffixed: &[&str]) -> String {
+    if suffixed.contains(&rust_name) {
+        format!("{rust_name}Wire")
+    } else {
+        rust_name.to_string()
+    }
+}
+
 /// Map a Rust scalar to its smallest faithful Swift type; pass named types
-/// (other generated wire types) through unchanged.
+/// (other generated wire types) through, suffixing wire/model-split names.
 fn map_scalar(ident: &str) -> String {
     match ident {
         "u8" => "UInt8",
@@ -613,7 +631,7 @@ fn map_scalar(ident: &str) -> String {
         // serde_json::Value maps to the app's open JSON value type, which
         // round-trips an arbitrary payload exactly like serde_json::Value.
         "Value" => "JSONValue",
-        other => other,
+        other => return swift_type_name(other, WIRE_SUFFIXED_TYPES),
     }
     .to_string()
 }
@@ -925,7 +943,7 @@ fn build_struct(
     };
     let derives = derives_default(&item.attrs);
     Some(SwiftStruct {
-        name: item.ident.to_string(),
+        name: swift_type_name(&item.ident.to_string(), WIRE_SUFFIXED_TYPES),
         fields: build_fields(fields, defaults, symbols, derives),
     })
 }
@@ -964,7 +982,7 @@ fn build_string_enum(item: &ItemEnum) -> SwiftStringEnum {
             )
         })
         .collect();
-    SwiftStringEnum { name: item.ident.to_string(), cases }
+    SwiftStringEnum { name: swift_type_name(&item.ident.to_string(), WIRE_SUFFIXED_TYPES), cases }
 }
 
 /// Build an internally-tagged enum descriptor from a `#[serde(tag = ...)]` enum.
@@ -980,7 +998,11 @@ fn build_tagged_enum(
         .iter()
         .map(|variant| build_tagged_variant(variant, rename_all.as_deref(), defaults, symbols))
         .collect();
-    SwiftTaggedEnum { name: item.ident.to_string(), tag: tag.to_string(), variants }
+    SwiftTaggedEnum {
+        name: swift_type_name(&item.ident.to_string(), WIRE_SUFFIXED_TYPES),
+        tag: tag.to_string(),
+        variants,
+    }
 }
 
 /// Build one tagged-enum variant descriptor, inlining the payload shape.
@@ -1027,7 +1049,10 @@ fn emit_source_decls(
                     emit_struct(out, &spec);
                 } else if is_string_newtype(&item) {
                     out.push('\n');
-                    emit_newtype(out, &item.ident.to_string());
+                    emit_newtype(
+                        out,
+                        &swift_type_name(&item.ident.to_string(), WIRE_SUFFIXED_TYPES),
+                    );
                 }
             }
             Item::Enum(item) if has_serde(&item.attrs) => {
@@ -1358,6 +1383,19 @@ ExpressibleByStringLiteral, CustomStringConvertible {
         assert_eq!(swift_type_string("Value"), "JSONValue");
         assert_eq!(swift_type_string("Option<serde_json::Value>"), "JSONValue?");
         assert_eq!(swift_type_string("Vec<serde_json::Value>"), "[JSONValue]");
+    }
+
+    #[test]
+    fn suffixes_only_listed_wire_types() {
+        assert_eq!(
+            swift_type_name("HarnessMonitorAuditEvent", &["HarnessMonitorAuditEvent"]),
+            "HarnessMonitorAuditEventWire"
+        );
+        assert_eq!(
+            swift_type_name("PolicyGraphNode", &["HarnessMonitorAuditEvent"]),
+            "PolicyGraphNode"
+        );
+        assert_eq!(swift_type_name("Foo", &[]), "Foo");
     }
 
     #[test]
