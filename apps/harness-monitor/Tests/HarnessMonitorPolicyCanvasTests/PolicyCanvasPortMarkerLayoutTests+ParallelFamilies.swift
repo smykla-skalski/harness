@@ -5,8 +5,8 @@ import Testing
 @testable import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasPortMarkerLayoutTests {
-  @Test("parallel families use a separate bottom marker per edge")
-  func parallelFamiliesUseSeparateBottomMarkersPerEdge() {
+  @Test("parallel families use a separate horizontal marker per edge")
+  func parallelFamiliesUseSeparateHorizontalMarkersPerEdge() {
     let source = policyCanvasMarkerTestNode(
       id: "source",
       position: .zero,
@@ -39,25 +39,40 @@ extension PolicyCanvasPortMarkerLayoutTests {
 
     let prepared = PolicyCanvasPreparedRouteInput(input: input)
     let layout = prepared.portMarkerLayout(routes: routes, nodeIndex: prepared.nodeIndex)
-    let bottomPassMarkers = layout.markers(
+    let trailingPassMarkers = layout.markers(
       for: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "pass", kind: .output),
-      side: .bottom,
+      side: .trailing,
       isVisible: true
     )
-    let bottomFailMarkers = layout.markers(
+    let trailingFailMarkers = layout.markers(
       for: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "fail", kind: .output),
-      side: .bottom,
+      side: .trailing,
+      isVisible: true
+    )
+    let leadingFailMarkers = layout.markers(
+      for: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "fail", kind: .output),
+      side: .leading,
       isVisible: true
     )
 
-    #expect(bottomPassMarkers.count == 1)
+    #expect(trailingPassMarkers.count == 1)
     // Parallel fail edges are distinctly labelled transitions; each gets its own
-    // bottom dot rather than collapsing onto a single shared marker.
-    #expect(bottomFailMarkers.count == 4)
+    // horizontal dot rather than collapsing onto a single shared marker.
+    #expect(trailingFailMarkers.count + leadingFailMarkers.count == 4)
     let failTerminals = ["edge-fail-a", "edge-fail-b", "edge-fail-c", "edge-fail-d"]
       .compactMap { layout.terminal(edgeID: $0, role: .source) }
-    #expect(Set(failTerminals.map(\.side)) == [.bottom])
-    #expect(Set(failTerminals.map { Int(($0.axisOffset * 1_000).rounded()) }).count == 4)
+    #expect(failTerminals.count == 4)
+    #expect(Set(failTerminals.map(\.side)).isSubset(of: [.leading, .trailing]))
+    let failCoordinates = Set(
+      failTerminals.map { terminal in
+        let rendered = sourceCoordinate(
+          PolicyCanvasPortEndpoint(nodeID: source.id, portID: "fail", kind: .output),
+          side: terminal.side
+        ) + terminal.axisOffset
+        return "\(terminal.side.rawValue):\(Int((rendered * 1_000).rounded()))"
+      }
+    )
+    #expect(failCoordinates.count == 4)
   }
 
   private func parallelFamilyEdges(

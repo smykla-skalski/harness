@@ -552,12 +552,18 @@ struct PolicyCanvasLabRoutingQualityTests {
           nodeIndex: nodeIndex
         )
       )
+      failures.append(
+        contentsOf: horizontalPortMarkerSideFailures(
+          sampleID: sample.id,
+          graph: graph
+        )
+      )
     }
 
     #expect(
       failures.isEmpty,
       """
-      live lab port markers are not balanced and aligned on every visible node side
+      live lab port markers are not horizontal, balanced, and aligned on every visible node side
       failures=\(failures)
       """
     )
@@ -909,6 +915,38 @@ struct PolicyCanvasLabRoutingQualityTests {
           markerLayout: graph.output.portMarkerLayout
         )
       )
+    }
+    return failures
+  }
+
+  private func horizontalPortMarkerSideFailures(
+    sampleID: String,
+    graph: PolicyCanvasLabMarkerBalanceGraph
+  ) -> [String] {
+    let verticalSides: [PolicyCanvasPortSide] = [.top, .bottom]
+    var failures: [String] = []
+    for edge in graph.edges {
+      let endpoints: [(String, PolicyCanvasRouteEndpointRole, PolicyCanvasPortEndpoint)] = [
+        ("source", .source, edge.source),
+        ("target", .target, edge.target),
+      ]
+      for (label, role, endpoint) in endpoints {
+        guard let terminal = graph.output.portMarkerLayout.terminal(edgeID: edge.id, role: role) else {
+          failures.append("\(sampleID):\(edge.id):\(label) missing terminal marker")
+          continue
+        }
+        if verticalSides.contains(terminal.side) {
+          failures.append(
+            "\(sampleID):\(edge.id):\(label) terminal side=\(terminal.side)"
+          )
+        }
+        for side in verticalSides
+        where graph.output.portMarkerLayout.hasMarkers(for: endpoint, side: side) {
+          failures.append(
+            "\(sampleID):\(edge.id):\(label) has \(side) markers for \(endpoint)"
+          )
+        }
+      }
     }
     return failures
   }

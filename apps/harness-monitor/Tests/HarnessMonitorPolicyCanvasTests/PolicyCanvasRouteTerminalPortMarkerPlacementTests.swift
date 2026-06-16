@@ -6,8 +6,8 @@ import Testing
 
 @Suite("Policy canvas route-terminal port markers")
 struct PolicyCanvasRouteTerminalPortMarkerPlacementTests {
-  @Test("marker keeps the route-selected side but centers a lone side terminal")
-  func markerCentersLoneSideTerminal() {
+  @Test("marker coerces vertical route-selected sides to horizontal terminals")
+  func markerCoercesVerticalRouteSelectedSidesToHorizontalTerminals() {
     let source = policyCanvasMarkerTestNode(
       id: "source",
       position: .zero,
@@ -31,9 +31,9 @@ struct PolicyCanvasRouteTerminalPortMarkerPlacementTests {
       nodes: [source, target], groups: [], edges: [edge], fontScale: 1
     )
     let prepared = PolicyCanvasPreparedRouteInput(input: input)
-    // The output's natural side is trailing, but this route departs straight up
-    // off the top edge, 30pt right of the top-port center. Marker placement
-    // keeps the route-selected side but centers the lone marker on that side.
+    // The route departs straight up off the top edge, 30pt right of the top-port
+    // center. Marker placement keeps automatic terminals on the output's
+    // horizontal edge and centers the lone marker there.
     let topCenterX = PolicyCanvasLayout.portX(index: 0, count: 1)
     let leadingCenterY = PolicyCanvasLayout.portY(index: 0, count: 1)
     let route = PolicyCanvasEdgeRoute(
@@ -55,11 +55,11 @@ struct PolicyCanvasRouteTerminalPortMarkerPlacementTests {
     )
 
     let sourceTerminal = layout.terminal(edgeID: edge.id, role: .source)
-    #expect(sourceTerminal?.side == .top)
+    #expect(sourceTerminal?.side == .trailing)
     #expect(abs(sourceTerminal?.axisOffset ?? .nan) < 0.001)
-    let topMarkers = layout.markers(for: edge.source, side: .top, isVisible: true)
-    #expect(topMarkers.count == 1)
-    #expect(abs(topMarkers[0].axisOffset) < 0.5)
+    let trailingMarkers = layout.markers(for: edge.source, side: .trailing, isVisible: true)
+    #expect(trailingMarkers.count == 1)
+    #expect(abs(trailingMarkers[0].axisOffset) < 0.5)
 
     let targetTerminal = layout.terminal(edgeID: edge.id, role: .target)
     #expect(targetTerminal?.side == .leading)

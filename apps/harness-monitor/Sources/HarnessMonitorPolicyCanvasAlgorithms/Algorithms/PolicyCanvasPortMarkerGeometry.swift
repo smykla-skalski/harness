@@ -12,16 +12,14 @@ public func policyCanvasCanonicalPortEndpoint(
 
 public func policyCanvasRoutablePortSides(for kind: PolicyCanvasPortKind) -> [PolicyCanvasPortSide]
 {
-  // Must mirror `PolicyCanvasViewModel.routablePortSides`: inputs default to the
-  // leading edge and outputs to the trailing edge, with in-flow vertical sides
-  // ahead of overflow fallbacks. The opposite horizontal side is last, but still
-  // admitted: same-group preferred-side assignment deliberately uses trailing
-  // inputs and leading outputs for back edges.
+  // Keep automatic terminals on horizontal edges. Vertical sides are still
+  // addressable by explicit anchor helpers, but routed canvas markers should not
+  // spill to the top or bottom of a node when a side is crowded.
   switch kind {
   case .input:
-    [.leading, .top, .bottom, .trailing]
+    [.leading, .trailing]
   case .output:
-    [.trailing, .bottom, .top, .leading]
+    [.trailing, .leading]
   }
 }
 

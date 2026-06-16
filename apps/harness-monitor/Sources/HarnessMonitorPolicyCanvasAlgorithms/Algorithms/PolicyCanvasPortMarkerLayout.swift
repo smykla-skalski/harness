@@ -78,7 +78,15 @@ public struct PolicyCanvasPortMarkerLayout: Equatable, Sendable {
     guard isVisible else {
       return []
     }
-    let offsets = offsetsByEndpoint[policyCanvasCanonicalPortEndpoint(endpoint)]?[side] ?? [0]
+    let offsets: [CGFloat]
+    if let sideOffsets = offsetsByEndpoint[policyCanvasCanonicalPortEndpoint(endpoint)] {
+      guard let explicitOffsets = sideOffsets[side] else {
+        return []
+      }
+      offsets = explicitOffsets
+    } else {
+      offsets = [0]
+    }
     let primaryIndex =
       offsets.indices.min { left, right in
         abs(offsets[left]) < abs(offsets[right])
@@ -172,15 +180,19 @@ extension PolicyCanvasPreparedRouteInput {
         PolicyCanvasPortMarkerEntry(
           key: PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .source),
           endpoint: edge.source,
-          preferredSide: policyCanvasRouteSourceSide(route)
-            ?? policyCanvasResolvedPortSide(for: edge.source),
+          preferredSide: policyCanvasResolvedRoutablePortSide(
+            for: edge.source,
+            preferredSide: policyCanvasRouteSourceSide(route)
+          ),
           sortKey: policyCanvasPortMarkerSortKey(edge: edge, role: .source)
         ),
         PolicyCanvasPortMarkerEntry(
           key: PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .target),
           endpoint: edge.target,
-          preferredSide: policyCanvasRouteTargetSide(route)
-            ?? policyCanvasResolvedPortSide(for: edge.target),
+          preferredSide: policyCanvasResolvedRoutablePortSide(
+            for: edge.target,
+            preferredSide: policyCanvasRouteTargetSide(route)
+          ),
           sortKey: policyCanvasPortMarkerSortKey(edge: edge, role: .target)
         ),
       ]
