@@ -463,15 +463,95 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertEqual(viewModel.routingHints, firstRoutingHints)
   }
 
-  @MainActor
-  func testExtremeGalaxyRejectsDetachedPrecomputedRouteFastPath() throws {
-    let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "extreme-galaxy"))
-    let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.load(document: sample.document, simulation: nil, audit: nil)
+  // The fast-path reveal reuses precomputed routes only while their terminals
+  // still attach to the published node frames. Routes detached from a different
+  // layout must be rejected so the canvas recomputes them instead of revealing
+  // misaligned wires. extreme-galaxy used to be the detached fixture here, but
+  // enabling ELK lab layouts made its routes attach (now asserted positively by
+  // PolicyCanvasGraphQualityGateTests), so the guard is exercised directly with
+  // a fixture that does not depend on any one sample's layout staying detached.
+  func testDetachedPrecomputedRoutesAreRejected() {
+    let nodeSize = PolicyCanvasLayout.nodeSize
+    let targetX = nodeSize.width + 220
+    let source = PolicyCanvasNode(id: "source", title: "Source", kind: .source, position: .zero)
+    let target = PolicyCanvasNode(
+      id: "target",
+      title: "Target",
+      kind: .decision,
+      position: CGPoint(x: targetX, y: 0)
+    )
+    let edge = PolicyCanvasEdge(
+      id: "edge-source-target",
+      source: PolicyCanvasPortEndpoint(
+        nodeID: source.id,
+        portID: source.outputPorts[0].id,
+        kind: .output
+      ),
+      target: PolicyCanvasPortEndpoint(
+        nodeID: target.id,
+        portID: target.inputPorts[0].id,
+        kind: .input
+      ),
+      label: "review"
+    )
+    let nodes = [source, target]
+    let edges = [edge]
 
-    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+    func layoutResult(routes: [String: PolicyCanvasEdgeRoute]) -> PolicyCanvasLayoutResult {
+      PolicyCanvasLayoutResult(
+        nodePositions: [source.id: source.position, target.id: target.position],
+        groupFrames: [:],
+        autoPlacedNodeIDs: [],
+        metrics: PolicyCanvasLayoutMetrics(
+          macroLayerCount: 0,
+          crossGroupOrderViolations: 0,
+          anchoredNodeCount: 0,
+          edgeCrossingCount: 0,
+          flowDirectionViolationCount: 0,
+          averageEdgeLength: 0,
+          edgeLengthVariance: 0,
+          readabilityScore: 0
+        ),
+        routingHints: nil,
+        precomputedRoutes: PolicyCanvasPrecomputedRouteSet(identity: "test", routes: routes)
+      )
+    }
 
-    XCTAssertNil(viewModel.precomputedRoutes)
+    let midY = nodeSize.height / 2
+    let attached = PolicyCanvasEdgeRoute(
+      points: [CGPoint(x: nodeSize.width, y: midY), CGPoint(x: targetX, y: midY)],
+      labelPosition: CGPoint(x: targetX / 2, y: midY)
+    )
+    XCTAssertNotNil(
+      policyCanvasAppliedPrecomputedRoutes(
+        result: layoutResult(routes: [edge.id: attached]),
+        nodes: nodes,
+        edges: edges
+      ),
+      "routes whose terminals sit on the node frames must be accepted"
+    )
+
+    let detached = PolicyCanvasEdgeRoute(
+      points: [CGPoint(x: nodeSize.width, y: midY), CGPoint(x: 5000, y: 5000)],
+      labelPosition: CGPoint(x: targetX / 2, y: midY)
+    )
+    XCTAssertNil(
+      policyCanvasAppliedPrecomputedRoutes(
+        result: layoutResult(routes: [edge.id: detached]),
+        nodes: nodes,
+        edges: edges
+      ),
+      "a route terminal that floats off its target frame must reject the fast path"
+    )
+
+    XCTAssertNil(
+      policyCanvasAppliedPrecomputedRoutes(
+        result: layoutResult(routes: [:]),
+        nodes: nodes,
+        edges: edges
+      ),
+      "a route set that does not cover every edge must reject the fast path"
+    )
   }
 
   @MainActor
