@@ -4,6 +4,9 @@ import SwiftUI
 
 enum PolicyCanvasVisualStyle {
   static let floatingControlMinHeight: CGFloat = 32
+  /// Corner radius of the edge-label pill. Shared by the renderer and the
+  /// quality overlay so a label's quality mark traces the pill outline exactly.
+  static let edgeLabelCornerRadius: CGFloat = 5
   static let rootBackground = Color(nsColor: .windowBackgroundColor)
   static let dashboardHostBackground = Color.clear
   static let chromeBackground = Color(nsColor: .windowBackgroundColor)
