@@ -154,59 +154,9 @@ extension OpenRouterRunSnapshot {
   }
 }
 
-public struct OpenRouterModelEntry: Codable, Equatable, Identifiable, Sendable {
-  public let id: String
-  public let name: String?
-  public let contextLength: UInt64?
-  public let supportedParameters: [String]
-
-  public init(
-    id: String,
-    name: String? = nil,
-    contextLength: UInt64? = nil,
-    supportedParameters: [String] = []
-  ) {
-    self.id = id
-    self.name = name
-    self.contextLength = contextLength
-    self.supportedParameters = supportedParameters
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    id = try container.decode(String.self, forKey: .id)
-    name = try container.decodeIfPresent(String.self, forKey: .name)
-    contextLength = try container.decodeIfPresent(UInt64.self, forKey: .contextLength)
-    supportedParameters =
-      try container.decodeIfPresent([String].self, forKey: .supportedParameters) ?? []
-  }
-
-  private enum CodingKeys: String, CodingKey {
-    case id
-    case name
-    case contextLength
-    case supportedParameters
-  }
-}
-
-public enum OpenRouterModelCatalogSource: String, Codable, Sendable {
-  case live
-  case cache
-  case fallback
-}
-
-public struct OpenRouterModelCatalog: Codable, Equatable, Sendable {
-  public let models: [OpenRouterModelEntry]
-  public let fetchedAt: String
-  public let source: OpenRouterModelCatalogSource
-
-  public init(
-    models: [OpenRouterModelEntry],
-    fetchedAt: String,
-    source: OpenRouterModelCatalogSource
-  ) {
-    self.models = models
-    self.fetchedAt = fetchedAt
-    self.source = source
-  }
-}
+// OpenRouterModelEntry, OpenRouterModelCatalogResponse, and
+// OpenRouterModelCatalogSource are generated from the Rust wire types in
+// Models/Generated/OpenRouterWireTypes.generated.swift. The browser and picker
+// surfaces drive their SwiftUI lists off the entry id, so the generated struct
+// keeps its Identifiable conformance here.
+extension OpenRouterModelEntry: Identifiable {}

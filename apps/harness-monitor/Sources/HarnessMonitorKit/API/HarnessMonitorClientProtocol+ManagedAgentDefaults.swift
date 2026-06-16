@@ -68,7 +68,7 @@ extension HarnessMonitorClientProtocol {
     throw HarnessMonitorAPIError.server(code: 501, message: "Managed agent unavailable")
   }
 
-  public func openRouterModelCatalog() async throws -> OpenRouterModelCatalog {
+  public func openRouterModelCatalog() async throws -> OpenRouterModelCatalogResponse {
     throw HarnessMonitorAPIError.server(code: 501, message: "OpenRouter catalog unavailable")
   }
 

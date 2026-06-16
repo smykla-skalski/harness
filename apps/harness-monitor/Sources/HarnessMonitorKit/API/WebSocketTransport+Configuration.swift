@@ -52,9 +52,9 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
-  public func openRouterModelCatalog() async throws -> OpenRouterModelCatalog {
+  public func openRouterModelCatalog() async throws -> OpenRouterModelCatalogResponse {
     let value = try await rpc(method: .openRouterListModels)
-    return try decode(value)
+    return try decodePolicyWire(value)
   }
 
   public func configuration() async throws -> MonitorConfiguration {
