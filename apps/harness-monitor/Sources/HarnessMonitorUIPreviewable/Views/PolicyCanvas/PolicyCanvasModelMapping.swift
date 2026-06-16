@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 func policyCanvasNode(
@@ -276,7 +277,7 @@ func policyCanvasEdgeEndpointsExist(
 
 func taskBoardPolicyNode(
   _ node: PolicyCanvasNode,
-  originalKind: TaskBoardPolicyPipelineNodeKind? = nil
+  originalKind: PolicyGraphNodeKind? = nil
 ) -> TaskBoardPolicyPipelineNode {
   let exportedKind = node.policyKind ?? originalKind ?? taskBoardPolicyNodeKind(for: node.kind)
   return TaskBoardPolicyPipelineNode(
@@ -416,11 +417,11 @@ func taskBoardPolicyRoutingHints(
 }
 
 func policyCanvasKind(
-  for kind: TaskBoardPolicyPipelineNodeKind
+  for kind: PolicyGraphNodeKind
 ) -> PolicyCanvasNodeKind {
-  PolicyCanvasNodeKind(rawValue: kind.kind)
+  PolicyCanvasNodeKind(rawValue: kind.discriminator)
     ?? {
-      switch kind.kind {
+      switch kind.discriminator {
       case "human_gate", "consensus_gate":
         .humanGate
       case "supervisor_rule":
@@ -437,7 +438,7 @@ func policyCanvasKind(
 
 private func policyCanvasPort(
   _ port: TaskBoardPolicyPipelinePort,
-  nodeKind: TaskBoardPolicyPipelineNodeKind,
+  nodeKind: PolicyGraphNodeKind,
   kind: PolicyCanvasPortKind
 ) -> PolicyCanvasPort {
   let title = policyCanvasImportedPortTitle(port.title, nodeKind: nodeKind, kind: kind)
@@ -450,7 +451,7 @@ private func policyCanvasPort(
 
 private func taskBoardPolicyPort(
   _ port: PolicyCanvasPort,
-  nodeKind: TaskBoardPolicyPipelineNodeKind,
+  nodeKind: PolicyGraphNodeKind,
   kind: PolicyCanvasPortKind
 ) -> TaskBoardPolicyPipelinePort {
   return TaskBoardPolicyPipelinePort(
@@ -480,7 +481,7 @@ private func policyCanvasImportedPortID(
 private func policyCanvasImportedPortID(
   _ portID: String,
   title: String,
-  nodeKind: TaskBoardPolicyPipelineNodeKind,
+  nodeKind: PolicyGraphNodeKind,
   kind: PolicyCanvasPortKind
 ) -> String {
   guard taskBoardPolicyUsesSwitchPortNormalization(nodeKind) else {
@@ -491,7 +492,7 @@ private func policyCanvasImportedPortID(
 
 private func policyCanvasImportedPortTitle(
   _ title: String,
-  nodeKind: TaskBoardPolicyPipelineNodeKind,
+  nodeKind: PolicyGraphNodeKind,
   kind: PolicyCanvasPortKind
 ) -> String {
   taskBoardPolicyUsesSwitchPortNormalization(nodeKind)
@@ -515,7 +516,7 @@ private func taskBoardPolicyPersistedPortID(
 private func taskBoardPolicyPersistedPortID(
   _ portID: String,
   title: String,
-  nodeKind: TaskBoardPolicyPipelineNodeKind,
+  nodeKind: PolicyGraphNodeKind,
   kind: PolicyCanvasPortKind
 ) -> String {
   guard taskBoardPolicyUsesSwitchPortNormalization(nodeKind) else {

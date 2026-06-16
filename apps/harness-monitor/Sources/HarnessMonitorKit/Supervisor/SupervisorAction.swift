@@ -3,7 +3,7 @@ import Foundation
 /// Exhaustive set of actions a Monitor supervisor rule can emit. The `actionKey` prefixes stay
 /// stable while tick-bound actions key on `snapshotHash` so equivalent snapshots dedupe across
 /// ticks. Payloads still carry `snapshotID` for audit/log correlation.
-public enum PolicyAction: Sendable, Codable, Hashable {
+public enum SupervisorAction: Sendable, Codable, Hashable {
   case nudgeAgent(NudgePayload)
   case assignTask(AssignPayload)
   case dropTask(DropPayload)

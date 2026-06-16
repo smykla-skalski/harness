@@ -1,11 +1,12 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 struct PolicyCanvasNodeSwitchCasesChange {
   let id: String
-  let from: TaskBoardPolicyPipelineNodeKind
-  let to: TaskBoardPolicyPipelineNodeKind
+  let from: PolicyGraphNodeKind
+  let to: PolicyGraphNodeKind
   let fromOutputPortTitles: [String]
   let toOutputPortTitles: [String]
   let fromEdges: [PolicyCanvasEdge]
@@ -119,8 +120,8 @@ extension PolicyCanvasViewModel {
 
   func applySetNodePolicyKind(
     id: String,
-    from: TaskBoardPolicyPipelineNodeKind?,
-    to: TaskBoardPolicyPipelineNodeKind?
+    from: PolicyGraphNodeKind?,
+    to: PolicyGraphNodeKind?
   ) -> PolicyCanvasChange {
     guard let index = nodes.firstIndex(where: { $0.id == id }) else {
       return .setNodePolicyKind(id: id, from: to, to: to)
@@ -161,8 +162,8 @@ extension PolicyCanvasViewModel {
 
   func applySetNodeAutomationBinding(
     id: String,
-    from: TaskBoardPolicyPipelineAutomationBinding?,
-    to: TaskBoardPolicyPipelineAutomationBinding?
+    from: PolicyGraphAutomationBinding?,
+    to: PolicyGraphAutomationBinding?
   ) -> PolicyCanvasChange {
     guard let index = nodes.firstIndex(where: { $0.id == id }) else {
       return .setNodeAutomationBinding(id: id, from: to, to: to)

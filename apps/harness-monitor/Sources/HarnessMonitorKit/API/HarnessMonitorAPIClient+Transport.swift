@@ -19,41 +19,47 @@ struct AnyEncodable: Encodable {
 }
 
 extension HarnessMonitorAPIClient {
-  func get<Response: Decodable>(_ path: String) async throws -> Response {
+  func get<Response: Decodable>(
+    _ path: String,
+    decoder: JSONDecoder? = nil
+  ) async throws -> Response {
     var request = try makeRequest(path: path)
     request.httpMethod = "GET"
-    return try await send(request)
+    return try await send(request, decoder: decoder)
   }
 
   func get<Response: Decodable>(
     _ path: String,
-    queryItems: [URLQueryItem]
+    queryItems: [URLQueryItem],
+    decoder: JSONDecoder? = nil
   ) async throws -> Response {
     var request = try makeRequest(path: path, queryItems: queryItems)
     request.httpMethod = "GET"
-    return try await send(request)
+    return try await send(request, decoder: decoder)
   }
 
   func post<RequestBody: Encodable, Response: Decodable>(
     _ path: String,
-    body: RequestBody
+    body: RequestBody,
+    decoder: JSONDecoder? = nil
   ) async throws -> Response {
     var request = try makeRequest(path: path)
     request.httpMethod = "POST"
     request.httpBody = try encoder.encode(AnyEncodable(body))
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    return try await send(request)
+    return try await send(request, decoder: decoder)
   }
 
   func put<RequestBody: Encodable, Response: Decodable>(
     _ path: String,
-    body: RequestBody
+    body: RequestBody,
+    decoder: JSONDecoder? = nil
   ) async throws -> Response {
     var request = try makeRequest(path: path)
     request.httpMethod = "PUT"
     request.httpBody = try encoder.encode(AnyEncodable(body))
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    return try await send(request)
+    return try await send(request, decoder: decoder)
   }
 
   func delete<Response: Decodable>(_ path: String) async throws -> Response {
@@ -62,7 +68,10 @@ extension HarnessMonitorAPIClient {
     return try await send(request)
   }
 
-  func send<Response: Decodable>(_ request: URLRequest) async throws -> Response {
+  func send<Response: Decodable>(
+    _ request: URLRequest,
+    decoder customDecoder: JSONDecoder? = nil
+  ) async throws -> Response {
     let method = request.httpMethod ?? "?"
     let path = request.url?.path ?? "?"
     var request = request
@@ -139,7 +148,7 @@ extension HarnessMonitorAPIClient {
       )
     #endif
     do {
-      return try decoder.decode(Response.self, from: data)
+      return try (customDecoder ?? decoder).decode(Response.self, from: data)
     } catch {
       #if HARNESS_FEATURE_OTEL
         recordHTTPDecodingFailure(error: error, path: path, span: span)

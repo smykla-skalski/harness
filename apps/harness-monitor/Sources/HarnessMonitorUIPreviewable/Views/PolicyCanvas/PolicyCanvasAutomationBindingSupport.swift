@@ -1,7 +1,8 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
-extension TaskBoardPolicyPipelineAutomationBinding {
+extension PolicyGraphAutomationBinding {
   static func defaultPreprocessors(
     for source: AutomationPolicyEventSource
   ) -> [AutomationPolicyPreprocessor] {

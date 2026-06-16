@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 // MARK: - Multi-group
 
@@ -18,15 +19,12 @@ extension PolicyCanvasLabSamples {
   private static let multiGroupIntakeNodes = [
     node(
       "mg-pre", "Pre-check",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "if_then_else", field: .reviewIsOpen,
-        predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
-      ),
+      .ifThenElse(PolicyIfThenElseCondition(field: .reviewIsOpen, predicate: .isTrue)),
       group: "intake", inputs: ["in"], outputs: ["then", "else"]
     ),
     node(
       "intake", "Intake gate",
-      TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.submitReview, .mergePr]),
+      .actionGate(actions: [.submitReview, .mergePr]),
       group: "intake", inputs: ["in"], outputs: ["review", "deploy"]
     ),
   ]
@@ -34,42 +32,30 @@ extension PolicyCanvasLabSamples {
   private static let multiGroupReviewNodes = [
     node(
       "rv-switch", "Review switch",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "switch",
-        arms: [
-          TaskBoardPolicySwitchArm(
-            port: "pass", field: .reviewReviewRequired,
-            predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
-          )
-        ]
-      ),
+      .switch(PolicySwitchNode(arms: [
+        PolicySwitchArm(port: "pass", field: .reviewReviewRequired, predicate: .isTrue)
+      ])),
       group: "review", inputs: ["in"], outputs: ["pass", "escalate", "default"]
     ),
     node(
       "rv-evidence", "Review evidence",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "evidence_check",
-        checks: [
-          TaskBoardPolicyEvidenceCheck(
-            field: .reviewerVerdictApproved,
-            pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-            failReasonCode: "reviewer_not_approved", missingReasonCode: "checks_missing"
-          )
-        ]
-      ),
+      .evidenceCheck(checks: [
+        PolicyEvidenceCheck(
+          field: .reviewerVerdictApproved,
+          pass: .isTrue,
+          failReasonCode: .reviewerNotApproved, missingReasonCode: .missingMergeEvidence
+        )
+      ]),
       group: "review", inputs: ["in"], outputs: ["pass", "fail", "missing"]
     ),
     node(
       "rv-ifelse", "Conflicts clear?",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "if_then_else", field: .reviewHasMergeConflicts,
-        predicate: TaskBoardPolicyEvidencePredicate(predicate: .isFalse)
-      ),
+      .ifThenElse(PolicyIfThenElseCondition(field: .reviewHasMergeConflicts, predicate: .isFalse)),
       group: "review", inputs: ["in"], outputs: ["then", "else"]
     ),
     node(
       "rv-consensus", "Consensus",
-      TaskBoardPolicyPipelineNodeKind(kind: "consensus_gate"),
+      .consensusGate(reasonCode: .protectedPathTouched),
       group: "review", inputs: ["in"], outputs: ["out"]
     ),
   ]
@@ -77,36 +63,31 @@ extension PolicyCanvasLabSamples {
   private static let multiGroupDeployNodes = [
     node(
       "dp-risk", "Deploy risk",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "risk_classifier", field: .riskScore, threshold: 60,
-        highRiskReasonCode: "merge_risk_high", missingReasonCode: "merge_risk_missing"
+      .riskClassifier(
+        field: .riskScore, threshold: 60,
+        highRiskReasonCode: .riskAboveThreshold, missingReasonCode: .humanRequired
       ),
       group: "deploy", inputs: ["in"], outputs: ["low_or_equal", "high", "missing"]
     ),
     node(
       "dp-wait", "Wait for checks",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "wait_step", wait: .event("reviews.checks_passed"), resumeKey: "checks-ready"
-      ),
+      .waitStep(PolicyWaitStep(wait: .event(eventKey: "reviews.checks_passed"), resumeKey: "checks-ready")),
       group: "deploy", inputs: ["in"], outputs: ["out"]
     ),
     node(
       "dp-evidence", "Deploy evidence",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "evidence_check",
-        checks: [
-          TaskBoardPolicyEvidenceCheck(
-            field: .branchProtectionAllowsMerge,
-            pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-            failReasonCode: "branch_protection_blocked", missingReasonCode: "checks_missing"
-          )
-        ]
-      ),
+      .evidenceCheck(checks: [
+        PolicyEvidenceCheck(
+          field: .branchProtectionAllowsMerge,
+          pass: .isTrue,
+          failReasonCode: .branchProtectionBlocked, missingReasonCode: .missingMergeEvidence
+        )
+      ]),
       group: "deploy", inputs: ["in"], outputs: ["pass", "fail", "missing"]
     ),
     node(
       "dp-action", "Deploy action",
-      TaskBoardPolicyPipelineNodeKind(kind: "action_step", actionId: "reviews.deploy"),
+      .actionStep(PolicyActionStep(actionId: "reviews.deploy")),
       group: "deploy", inputs: ["in"], outputs: ["out"]
     ),
   ]
@@ -114,30 +95,22 @@ extension PolicyCanvasLabSamples {
   private static let multiGroupOutcomeNodes = [
     node(
       "out-human", "Human gate",
-      TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
+      .humanGate(reasonCode: .humanRequired),
       group: "outcomes", inputs: ["in"]
     ),
     node(
       "out-allow", "Allow",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "supervisor_rule", ruleId: "mg-allow",
-        reasonCodes: ["auto_merge_allowed"], decision: "allow"
-      ),
+      .supervisorRule(decision: .allow, reasonCodes: [.autoMergeAllowed]),
       group: "outcomes", inputs: ["in"]
     ),
     node(
       "out-deny", "Deny",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "supervisor_rule", ruleId: "mg-deny",
-        reasonCodes: ["merge_denied"], decision: "deny"
-      ),
+      .supervisorRule(decision: .deny, reasonCodes: [.checksNotGreen]),
       group: "outcomes", inputs: ["in"]
     ),
     node(
       "out-finish", "Finish",
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "finish", reasonCode: "policy_finished", decision: "allow"
-      ),
+      .finish(PolicyFinishNode(decision: .allow, reasonCode: .autoMergeAllowed)),
       group: "outcomes", inputs: ["in"]
     ),
   ]

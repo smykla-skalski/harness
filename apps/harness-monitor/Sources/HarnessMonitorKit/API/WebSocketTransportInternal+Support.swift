@@ -192,6 +192,14 @@ extension WebSocketTransport {
     return try decoder.decode(T.self, from: data)
   }
 
+  /// Decodes a policy-graph wire value with `PolicyWireCoding.decoder` (no key
+  /// strategy) instead of the transport's `.convertFromSnakeCase` decoder, which
+  /// is incompatible with the generated node-kind payloads' explicit snake keys.
+  nonisolated func decodePolicyWire<T: Decodable>(_ value: JSONValue) throws -> T {
+    let data = try Self.reencodeEncoder.encode(value)
+    return try PolicyWireCoding.decoder.decode(T.self, from: data)
+  }
+
   nonisolated func encodeParams<T: Encodable>(
     _ body: T,
     extra: [String: JSONValue]

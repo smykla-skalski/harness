@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 struct PolicyCanvasValidationWorkerInput: Equatable, Sendable {
   let nodes: [PolicyCanvasNode]
@@ -30,7 +31,7 @@ struct PolicyCanvasValidationNode: Equatable, Sendable {
   let id: String
   let title: String
   let groupID: String?
-  let policyKind: TaskBoardPolicyPipelineNodeKind?
+  let policyKind: PolicyGraphNodeKind?
 
   init(node: PolicyCanvasNode) {
     id = node.id

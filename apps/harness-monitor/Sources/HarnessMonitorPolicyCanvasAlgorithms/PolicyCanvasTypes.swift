@@ -74,7 +74,7 @@ public struct PolicyCanvasNodeKind: RawRepresentable, Identifiable, Hashable, Se
   public let outputPortTitles: [String]
   public let libraryTitle: String
   public let librarySubtitle: String
-  public let defaultPolicyKind: TaskBoardPolicyPipelineNodeKind
+  public let defaultPolicyKind: PolicyGraphNodeKind
 
   public var id: String { rawValue }
 
@@ -105,7 +105,7 @@ public struct PolicyCanvasNodeKind: RawRepresentable, Identifiable, Hashable, Se
     outputPortTitles: [String],
     libraryTitle: String,
     librarySubtitle: String,
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind
+    defaultPolicyKind: PolicyGraphNodeKind
   ) {
     self.rawValue = rawValue
     self.title = title
@@ -154,10 +154,10 @@ public struct PolicyCanvasNode: Equatable, Identifiable, Sendable {
   public var subtitle: String
   public var kind: PolicyCanvasNodeKind
   public var position: CGPoint
-  public var layoutSource: TaskBoardPolicyPipelineNodeLayoutSource?
+  public var layoutSource: PolicyGraphNodeLayoutSource?
   public var groupID: String?
-  public var policyKind: TaskBoardPolicyPipelineNodeKind?
-  public var automationBinding: TaskBoardPolicyPipelineAutomationBinding?
+  public var policyKind: PolicyGraphNodeKind?
+  public var automationBinding: PolicyGraphAutomationBinding?
   public var inputPorts: [PolicyCanvasPort]
   public var outputPorts: [PolicyCanvasPort]
 
@@ -303,7 +303,6 @@ public enum PolicyCanvasFocusedField: Hashable {
   case edgeLabel
   case edgeCondition
   case reasonCode
-  case ruleID
   case waitDuration
   case waitEventKey
   case resumeKey

@@ -20,7 +20,7 @@ extension PolicyCanvasArchitectureFoundationTests {
         TaskBoardPolicyPipelineNode(
           id: "arch-node-intake",
           title: "Intake",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+          kind: .actionGate(actions: [.spawnAgent]),
           groupId: "arch-group-dispatch",
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
           outputs: [TaskBoardPolicyPipelinePort(id: "default", title: "default")]
@@ -28,7 +28,7 @@ extension PolicyCanvasArchitectureFoundationTests {
         TaskBoardPolicyPipelineNode(
           id: "arch-node-decision",
           title: decisionTitle,
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+          kind: .actionGate(actions: [.spawnAgent]),
           groupId: "arch-group-dispatch",
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
         ),
@@ -68,7 +68,7 @@ extension PolicyCanvasArchitectureFoundationTests {
         TaskBoardPolicyPipelineNode(
           id: "custom-source",
           title: "Source",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task"),
+          kind: .trigger(workflow: "default-task"),
           groupId: "custom-intake",
           inputs: [],
           outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
@@ -76,7 +76,7 @@ extension PolicyCanvasArchitectureFoundationTests {
         TaskBoardPolicyPipelineNode(
           id: "custom-sink",
           title: "Sink",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+          kind: .actionGate(actions: [.spawnAgent]),
           groupId: "custom-sink",
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
         ),

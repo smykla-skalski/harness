@@ -139,7 +139,7 @@ struct PolicyCanvasPaletteDropTests {
       viewModel.createAutomationNode(item: item, at: viewModel.nextPaletteDropCenter())
       let node = try #require(viewModel.nodes.last)
       #expect(node.kind == .ifThenElse, "\(item.rawValue) should author as if_then_else")
-      #expect(node.policyKind?.kind == "if_then_else")
+      #expect(node.policyKind?.discriminator == "if_then_else")
     }
   }
 
@@ -160,7 +160,7 @@ struct PolicyCanvasPaletteDropTests {
         node.kind == expectedKind,
         "\(item.rawValue) should author as \(expectedKind.rawValue)"
       )
-      #expect(node.policyKind?.kind == expectedKind.rawValue)
+      #expect(node.policyKind?.discriminator == expectedKind.rawValue)
     }
   }
 

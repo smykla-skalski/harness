@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 /// Construction helpers shared by every lab sample. They mirror the canonical
 /// `PreviewFixtures.policyCanvasPipelineDocument()` idiom: ports are built from
@@ -10,7 +11,7 @@ enum PolicyCanvasLabBuild {
   static func node(
     _ id: String,
     _ title: String,
-    _ kind: TaskBoardPolicyPipelineNodeKind,
+    _ kind: PolicyGraphNodeKind,
     group: String,
     inputs: [String] = [],
     outputs: [String] = []
@@ -105,7 +106,7 @@ extension PolicyCanvasLabSamples {
   static func node(
     _ id: String,
     _ title: String,
-    _ kind: TaskBoardPolicyPipelineNodeKind,
+    _ kind: PolicyGraphNodeKind,
     group: String,
     inputs: [String] = [],
     outputs: [String] = []

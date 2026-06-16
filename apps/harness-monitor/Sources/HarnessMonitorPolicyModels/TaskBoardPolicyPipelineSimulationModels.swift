@@ -34,7 +34,7 @@ public struct TaskBoardPolicyPipelineValidationIssue: Codable, Equatable, Sendab
   public var actual: UInt16?
   public var port: String?
   public var direction: String?
-  public var action: TaskBoardPolicyAction?
+  public var action: PolicyAction?
   public var location: String?
 
   public init(
@@ -48,7 +48,7 @@ public struct TaskBoardPolicyPipelineValidationIssue: Codable, Equatable, Sendab
     actual: UInt16? = nil,
     port: String? = nil,
     direction: String? = nil,
-    action: TaskBoardPolicyAction? = nil,
+    action: PolicyAction? = nil,
     location: String? = nil
   ) {
     self.code = code
@@ -95,7 +95,7 @@ public struct TaskBoardPolicyPipelineValidationIssue: Codable, Equatable, Sendab
     actual = try container.decodeIfPresent(UInt16.self, forKey: .actual)
     port = try container.decodeIfPresent(String.self, forKey: .port)
     direction = try container.decodeIfPresent(String.self, forKey: .direction)
-    action = try container.decodeIfPresent(TaskBoardPolicyAction.self, forKey: .action)
+    action = try container.decodeIfPresent(PolicyAction.self, forKey: .action)
     location = try container.decodeIfPresent(String.self, forKey: .location)
     message = try container.decodeIfPresent(String.self, forKey: .message) ?? code
     if message == code {
@@ -164,13 +164,13 @@ public struct TaskBoardPolicyDecision: Codable, Equatable, Sendable {
 }
 
 public struct TaskBoardPolicyPipelineSimulatedDecision: Codable, Equatable, Sendable {
-  public var action: TaskBoardPolicyAction
+  public var action: PolicyAction
   public var decision: TaskBoardPolicyDecision
   public var visitedNodeIds: [String]
   public var policyTraceIds: [String]
 
   public init(
-    action: TaskBoardPolicyAction,
+    action: PolicyAction,
     decision: TaskBoardPolicyDecision,
     visitedNodeIds: [String] = [],
     policyTraceIds: [String] = []
@@ -190,7 +190,7 @@ public struct TaskBoardPolicyPipelineSimulatedDecision: Codable, Equatable, Send
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    action = try container.decode(TaskBoardPolicyAction.self, forKey: .action)
+    action = try container.decode(PolicyAction.self, forKey: .action)
     decision = try container.decode(TaskBoardPolicyDecision.self, forKey: .decision)
     visitedNodeIds = try container.decodeIfPresent([String].self, forKey: .visitedNodeIds) ?? []
     policyTraceIds = try container.decodeIfPresent([String].self, forKey: .policyTraceIds) ?? []

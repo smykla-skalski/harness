@@ -8,18 +8,18 @@ import Foundation
 /// `PolicyRegistry.registerObserver(_:)`.
 public protocol PolicyObserver: Sendable {
   func willTick(_ snapshot: SessionsSnapshot) async
-  func didEvaluate(rule: any PolicyRule, actions: [PolicyAction]) async
-  func didExecute(action: PolicyAction, outcome: PolicyOutcome) async
+  func didEvaluate(rule: any PolicyRule, actions: [SupervisorAction]) async
+  func didExecute(action: SupervisorAction, outcome: PolicyOutcome) async
   func proposeConfigSuggestion(
     history: PolicyHistoryWindow
-  ) async -> [PolicyAction.ConfigSuggestion]
+  ) async -> [SupervisorAction.ConfigSuggestion]
 }
 
 extension PolicyObserver {
   public func willTick(_ snapshot: SessionsSnapshot) async {}
-  public func didEvaluate(rule: any PolicyRule, actions: [PolicyAction]) async {}
-  public func didExecute(action: PolicyAction, outcome: PolicyOutcome) async {}
+  public func didEvaluate(rule: any PolicyRule, actions: [SupervisorAction]) async {}
+  public func didExecute(action: SupervisorAction, outcome: PolicyOutcome) async {}
   public func proposeConfigSuggestion(
     history: PolicyHistoryWindow
-  ) async -> [PolicyAction.ConfigSuggestion] { [] }
+  ) async -> [SupervisorAction.ConfigSuggestion] { [] }
 }

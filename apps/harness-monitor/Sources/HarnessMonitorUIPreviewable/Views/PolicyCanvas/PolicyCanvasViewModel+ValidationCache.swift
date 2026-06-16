@@ -273,9 +273,8 @@ actor PolicyCanvasValidationWorker {
       guard edge.kind == .error,
         let target = input.nodeIndex[edge.target.nodeID],
         let policyKind = target.policyKind,
-        Self.allowingPolicyKinds.contains(policyKind.kind),
-        let ruleId = policyKind.ruleId?.lowercased(),
-        Self.allowingRuleSuffixes.contains(where: { ruleId.contains($0) })
+        case .supervisorRule(let decision, _) = policyKind,
+        decision == .allow
       else {
         return nil
       }
@@ -400,11 +399,6 @@ actor PolicyCanvasValidationWorker {
     }
     return messagesByNodeID.mapValues { $0.joined(separator: "; ") }
   }
-
-  private static let allowingPolicyKinds: Set<String> = ["supervisor_rule"]
-  private static let allowingRuleSuffixes: [String] = [
-    "default-allow", "allow", "permit",
-  ]
 }
 
 private struct PolicyCanvasDuplicateTitleGroup {

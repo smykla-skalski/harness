@@ -54,19 +54,13 @@ extension PolicyCanvasViewModel {
     let targetLabel: String
   }
 
-  private static let allowingPolicyKinds: Set<String> = ["supervisor_rule"]
-  private static let allowingRuleSuffixes: [String] = [
-    "default-allow", "allow", "permit",
-  ]
-
   func detectErrorIntoAllowEdges() -> [ErrorIntoAllowMatch] {
     edges.compactMap { edge -> ErrorIntoAllowMatch? in
       guard edge.kind == .error,
         let target = node(edge.target.nodeID),
         let policyKind = target.policyKind,
-        Self.allowingPolicyKinds.contains(policyKind.kind),
-        let ruleId = policyKind.ruleId?.lowercased(),
-        Self.allowingRuleSuffixes.contains(where: { ruleId.contains($0) })
+        case .supervisorRule(let decision, _) = policyKind,
+        decision == .allow
       else {
         return nil
       }

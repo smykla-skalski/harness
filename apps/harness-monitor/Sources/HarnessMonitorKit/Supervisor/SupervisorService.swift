@@ -158,7 +158,7 @@ public actor SupervisorService {
   }
 
   struct TickResults {
-    var actionsByRule: [(rule: any PolicyRule, actions: [PolicyAction])] = []
+    var actionsByRule: [(rule: any PolicyRule, actions: [SupervisorAction])] = []
     var failedRuleIDs: Set<String> = []
   }
 
@@ -284,13 +284,13 @@ public actor SupervisorService {
   }
 
   func dispatchActions(
-    _ actionsByRule: [(rule: any PolicyRule, actions: [PolicyAction])],
+    _ actionsByRule: [(rule: any PolicyRule, actions: [SupervisorAction])],
     tickID: String,
     firedAt: Date,
     observers: [any PolicyObserver]
   ) async {
     for entry in actionsByRule {
-      var dispatchedActions: [PolicyAction] = []
+      var dispatchedActions: [SupervisorAction] = []
       for action in entry.actions {
         let behavior = await registry.defaultBehavior(
           for: entry.rule,
@@ -339,7 +339,7 @@ public actor SupervisorService {
   }
 
   func dispatch(
-    _ action: PolicyAction,
+    _ action: SupervisorAction,
     tickID: String,
     observers: [any PolicyObserver]
   ) async -> PolicyOutcome {

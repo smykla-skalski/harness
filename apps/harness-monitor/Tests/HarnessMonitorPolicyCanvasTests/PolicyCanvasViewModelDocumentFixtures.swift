@@ -1,4 +1,5 @@
 @testable import HarnessMonitorKit
+import HarnessMonitorPolicyModels
 
 func policyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
   TaskBoardPolicyPipelineDocument(
@@ -9,20 +10,15 @@ func policyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
       TaskBoardPolicyPipelineNode(
         id: "node-intake",
         title: "Ready for dispatch",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+        kind: .actionGate(actions: [.spawnAgent]),
         groupId: "group-dispatch",
         inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
         outputs: [TaskBoardPolicyPipelinePort(id: "default", title: "default")]
       ),
       TaskBoardPolicyPipelineNode(
-        id: "node-supervisor",
+        id: "stuck-agent",
         title: "Stuck agent rule",
-        kind: TaskBoardPolicyPipelineNodeKind(
-          kind: "supervisor_rule",
-          ruleId: "stuck-agent",
-          reasonCodes: ["default_allow"],
-          decision: "allow"
-        ),
+        kind: .supervisorRule(decision: .allow, reasonCodes: [.defaultAllow]),
         groupId: "group-dispatch",
         inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
       ),
@@ -32,7 +28,7 @@ func policyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
         id: "edge-intake-supervisor",
         fromNodeId: "node-intake",
         fromPort: "default",
-        toNodeId: "node-supervisor",
+        toNodeId: "stuck-agent",
         toPort: "in"
       )
     ],
@@ -40,13 +36,13 @@ func policyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
       TaskBoardPolicyPipelineGroup(
         id: "group-dispatch",
         title: "Dispatch",
-        nodeIds: ["node-intake", "node-supervisor"]
+        nodeIds: ["node-intake", "stuck-agent"]
       )
     ],
     layout: TaskBoardPolicyPipelineLayout(
       nodes: [
         TaskBoardPolicyPipelineNodeLayout(nodeId: "node-intake", x: 20, y: 40),
-        TaskBoardPolicyPipelineNodeLayout(nodeId: "node-supervisor", x: 280, y: 40),
+        TaskBoardPolicyPipelineNodeLayout(nodeId: "stuck-agent", x: 280, y: 40),
       ]
     ),
     policyTraceIds: ["trace-policy-11"]
@@ -62,17 +58,14 @@ func richPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
       TaskBoardPolicyPipelineNode(
         id: "node-evidence",
         title: "Check evidence",
-        kind: TaskBoardPolicyPipelineNodeKind(
-          kind: "evidence_check",
-          checks: [
-            TaskBoardPolicyEvidenceCheck(
-              field: .checksGreen,
-              pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-              failReasonCode: "checks_not_green",
-              missingReasonCode: "checks_missing"
-            )
-          ]
-        ),
+        kind: .evidenceCheck(checks: [
+          PolicyEvidenceCheck(
+            field: .checksGreen,
+            pass: .isTrue,
+            failReasonCode: .checksNotGreen,
+            missingReasonCode: .missingMergeEvidence
+          )
+        ]),
         groupId: "group-rich",
         inputs: [TaskBoardPolicyPipelinePort(id: "input-event", title: "event")],
         outputs: [
@@ -83,13 +76,7 @@ func richPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
       TaskBoardPolicyPipelineNode(
         id: "node-risk",
         title: "Risk score",
-        kind: TaskBoardPolicyPipelineNodeKind(
-          kind: "risk_classifier",
-          field: .riskScore,
-          threshold: 74,
-          highRiskReasonCode: "merge_risk_high",
-          missingReasonCode: "merge_risk_missing"
-        ),
+        kind: .riskClassifier(field: .riskScore, threshold: 74, highRiskReasonCode: .riskAboveThreshold, missingReasonCode: .humanRequired),
         groupId: "group-rich",
         inputs: [TaskBoardPolicyPipelinePort(id: "input-event", title: "event")],
         outputs: [
@@ -392,7 +379,7 @@ private func seededEdge(
 private struct DefaultPolicyNodeSpec {
   let id: String
   let title: String
-  let kind: TaskBoardPolicyPipelineNodeKind
+  let kind: PolicyGraphNodeKind
   let groupID: String
   let outputs: [String]
 }
@@ -401,77 +388,77 @@ private let defaultPolicyNodeSpecs: [DefaultPolicyNodeSpec] = [
   DefaultPolicyNodeSpec(
     id: "action:router",
     title: "Action gate",
-    kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+    kind: .actionGate(actions: [.spawnAgent]),
     groupID: "entry",
     outputs: ["default", "mutate", "merge", "unsafe"]
   ),
   DefaultPolicyNodeSpec(
     id: "evidence:merge",
     title: "Merge evidence",
-    kind: TaskBoardPolicyPipelineNodeKind(kind: "evidence_check"),
+    kind: .evidenceCheck(checks: []),
     groupID: "merge",
     outputs: ["pass", "fail", "consensus", "missing"]
   ),
   DefaultPolicyNodeSpec(
     id: "risk:merge",
     title: "Merge risk",
-    kind: TaskBoardPolicyPipelineNodeKind(kind: "risk_classifier"),
+    kind: .riskClassifier(field: .riskScore, threshold: 0, highRiskReasonCode: .riskAboveThreshold, missingReasonCode: .humanRequired),
     groupID: "merge",
     outputs: ["low_or_equal", "high", "missing"]
   ),
   DefaultPolicyNodeSpec(
     id: "supervisor:default-allow",
     title: "supervisor:default-allow",
-    kind: TaskBoardPolicyPipelineNodeKind(kind: "supervisor_rule"),
+    kind: .supervisorRule(decision: .allow, reasonCodes: [.defaultAllow]),
     groupID: "terminal",
     outputs: []
   ),
   DefaultPolicyNodeSpec(
     id: "dry_run:mutate_repo",
     title: "dry_run:mutate_repo",
-    kind: TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate"),
+    kind: .dryRunGate(reasonCode: .dryRunRequired),
     groupID: "terminal",
     outputs: []
   ),
   DefaultPolicyNodeSpec(
     id: "human:unsafe-action",
     title: "human:unsafe-action",
-    kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
+    kind: .humanGate(reasonCode: .humanRequired),
     groupID: "terminal",
     outputs: []
   ),
   DefaultPolicyNodeSpec(
     id: "human:missing-merge-evidence",
     title: "human:missing-merge-evidence",
-    kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
+    kind: .humanGate(reasonCode: .humanRequired),
     groupID: "terminal",
     outputs: []
   ),
   DefaultPolicyNodeSpec(
     id: "consensus:protected-path",
     title: "consensus:protected-path",
-    kind: TaskBoardPolicyPipelineNodeKind(kind: "consensus_gate"),
+    kind: .consensusGate(reasonCode: .protectedPathTouched),
     groupID: "terminal",
     outputs: []
   ),
   DefaultPolicyNodeSpec(
     id: "dry_run:high-risk-merge",
     title: "dry_run:high-risk-merge",
-    kind: TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate"),
+    kind: .dryRunGate(reasonCode: .dryRunRequired),
     groupID: "terminal",
     outputs: []
   ),
   DefaultPolicyNodeSpec(
     id: "supervisor:merge-deny",
     title: "supervisor:merge-deny",
-    kind: TaskBoardPolicyPipelineNodeKind(kind: "supervisor_rule"),
+    kind: .supervisorRule(decision: .deny, reasonCodes: [.checksNotGreen]),
     groupID: "terminal",
     outputs: []
   ),
   DefaultPolicyNodeSpec(
     id: "supervisor:auto-merge",
     title: "supervisor:auto-merge",
-    kind: TaskBoardPolicyPipelineNodeKind(kind: "supervisor_rule"),
+    kind: .supervisorRule(decision: .allow, reasonCodes: [.autoMergeAllowed]),
     groupID: "terminal",
     outputs: []
   ),

@@ -123,7 +123,7 @@ struct PolicyCanvasLabSamplesTests {
 
     for id in Self.newExtremeVariantIDs {
       let sample = try #require(PolicyCanvasLabSamples.sample(id: id))
-      let sampleKinds = Set(sample.document.nodes.map(\.kind.kind))
+      let sampleKinds = Set(sample.document.nodes.map(\.kind.discriminator))
       #expect(
         sampleKinds.count >= minimumKindCounts[id, default: 0],
         "\(id) covers \(sampleKinds.count) node kinds"
@@ -135,7 +135,7 @@ struct PolicyCanvasLabSamplesTests {
     }
 
     let finalVariant = try #require(PolicyCanvasLabSamples.sample(id: "extreme-galaxy"))
-    #expect(Set(finalVariant.document.nodes.map(\.kind.kind)) == allCatalogKinds)
+    #expect(Set(finalVariant.document.nodes.map(\.kind.discriminator)) == allCatalogKinds)
   }
 
   @Test("Node ids are unique within every sample")

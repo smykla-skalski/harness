@@ -192,43 +192,67 @@ extension HarnessMonitorAPIClient {
   }
 
   public func taskBoardPolicyCanvasWorkspace() async throws -> TaskBoardPolicyCanvasWorkspace {
-    try await get("/v1/task-board/policy/canvases")
+    try await get("/v1/task-board/policy/canvases", decoder: PolicyWireCoding.decoder)
   }
 
   public func createTaskBoardPolicyCanvas(
     request: TaskBoardPolicyCanvasCreateRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace {
-    try await post("/v1/task-board/policy/canvases/create", body: request)
+    try await post(
+      "/v1/task-board/policy/canvases/create",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
   }
 
   public func duplicateTaskBoardPolicyCanvas(
     request: TaskBoardPolicyCanvasDuplicateRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace {
-    try await post("/v1/task-board/policy/canvases/duplicate", body: request)
+    try await post(
+      "/v1/task-board/policy/canvases/duplicate",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
   }
 
   public func renameTaskBoardPolicyCanvas(
     request: TaskBoardPolicyCanvasRenameRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace {
-    try await post("/v1/task-board/policy/canvases/rename", body: request)
+    try await post(
+      "/v1/task-board/policy/canvases/rename",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
   }
 
   public func activateTaskBoardPolicyCanvas(
     request: TaskBoardPolicyCanvasActivateRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace {
-    try await post("/v1/task-board/policy/canvases/active", body: request)
+    try await post(
+      "/v1/task-board/policy/canvases/active",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
   }
 
   public func deleteTaskBoardPolicyCanvas(
     request: TaskBoardPolicyCanvasDeleteRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace {
-    try await post("/v1/task-board/policy/canvases/delete", body: request)
+    try await post(
+      "/v1/task-board/policy/canvases/delete",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
   }
 
   public func setTaskBoardPolicyCanvasGlobalEnforcement(
     request: TaskBoardPolicyCanvasSetGlobalEnforcementRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace {
-    try await post("/v1/task-board/policy/canvases/global-enforcement", body: request)
+    try await post(
+      "/v1/task-board/policy/canvases/global-enforcement",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
   }
 
   public func taskBoardPolicyPipeline(
@@ -236,14 +260,19 @@ extension HarnessMonitorAPIClient {
   ) async throws -> TaskBoardPolicyPipelineDocument {
     try await get(
       "/v1/task-board/policy/pipeline",
-      queryItems: taskBoardPolicyCanvasQueryItems(canvasId: canvasId)
+      queryItems: taskBoardPolicyCanvasQueryItems(canvasId: canvasId),
+      decoder: PolicyWireCoding.decoder
     )
   }
 
   public func saveTaskBoardPolicyPipelineDraft(
     request: TaskBoardPolicyPipelineSaveDraftRequest
   ) async throws -> TaskBoardPolicyPipelineSaveDraftResponse {
-    try await put("/v1/task-board/policy/pipeline", body: request)
+    try await put(
+      "/v1/task-board/policy/pipeline",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
   }
 
   public func simulateTaskBoardPolicyPipeline(
@@ -255,7 +284,11 @@ extension HarnessMonitorAPIClient {
   public func promoteTaskBoardPolicyPipeline(
     request: TaskBoardPolicyPipelinePromoteRequest
   ) async throws -> TaskBoardPolicyPipelinePromoteResponse {
-    try await post("/v1/task-board/policy/promote", body: request)
+    try await post(
+      "/v1/task-board/policy/promote",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
   }
 
   public func taskBoardPolicyPipelineAudit(
@@ -277,13 +310,21 @@ extension HarnessMonitorAPIClient {
   public func exportTaskBoardPolicy(
     request: TaskBoardPolicyExportRequest
   ) async throws -> TaskBoardPolicyExportResponse {
-    try await post("/v1/task-board/policy/export", body: request)
+    try await post(
+      "/v1/task-board/policy/export",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
   }
 
   public func importTaskBoardPolicy(
     request: TaskBoardPolicyImportRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace {
-    try await post("/v1/task-board/policy/import", body: request)
+    try await post(
+      "/v1/task-board/policy/import",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
   }
 
   private func taskBoardPolicyCanvasQueryItems(canvasId: String?) -> [URLQueryItem] {

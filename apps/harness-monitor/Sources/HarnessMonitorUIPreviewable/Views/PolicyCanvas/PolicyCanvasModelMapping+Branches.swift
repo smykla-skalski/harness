@@ -161,6 +161,6 @@ func policyCanvasExportedEdgeCondition(
 }
 
 func policyCanvasNodeExportsBooleanBranches(_ node: PolicyCanvasNode) -> Bool {
-  (node.policyKind ?? taskBoardPolicyNodeKind(for: node.kind)).kind
+  (node.policyKind ?? taskBoardPolicyNodeKind(for: node.kind)).discriminator
     == PolicyCanvasNodeKind.ifThenElse.rawValue
 }

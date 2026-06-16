@@ -5,6 +5,7 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
 @testable import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 extension PolicyCanvasLocalValidationTests {
   struct OrphanNodeSpec {
@@ -88,9 +89,10 @@ extension PolicyCanvasLocalValidationTests {
   }
 
   /// Build a canvas with one source node and one supervisor-rule
-  /// terminal, joined by a single edge. The terminal carries the given
-  /// `ruleId` so the error-into-allow validator has structured ground
-  /// truth to match against, and the edge's `condition` decides its
+  /// terminal, joined by a single edge. The terminal's decision is derived
+  /// from `ruleId` (a name containing "deny" denies, otherwise allows) so the
+  /// error-into-allow validator - which now keys on the supervisor decision -
+  /// has ground truth to match against; the edge's `condition` decides its
   /// kind via the heuristic (e.g. `"evidence_failure"` -> `.error`).
   func makeAllowMismatchCanvas(
     ruleId: String,
@@ -114,9 +116,10 @@ extension PolicyCanvasLocalValidationTests {
     allow.inputPorts = [
       PolicyCanvasPort(id: "in", title: "in", kind: .input)
     ]
-    allow.policyKind = TaskBoardPolicyPipelineNodeKind(
-      kind: "supervisor_rule",
-      ruleId: ruleId
+    let denies = ruleId.contains("deny")
+    allow.policyKind = .supervisorRule(
+      decision: denies ? .deny : .allow,
+      reasonCodes: [denies ? .checksNotGreen : .defaultAllow]
     )
     let edge = PolicyCanvasEdge(
       id: "e",

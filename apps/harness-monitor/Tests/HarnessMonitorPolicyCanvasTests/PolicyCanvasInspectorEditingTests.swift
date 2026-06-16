@@ -5,6 +5,7 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
 @testable import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 /// Wave 4K P08: inspector commit-on-Enter property edits route through the
 /// undo funnel. Each commit lands one undo step on the manager; per-
@@ -54,14 +55,13 @@ struct PolicyCanvasInspectorEditingTests {
     viewModel.select(.node("risk-score"))
     let originalKind = viewModel.node("risk-score")?.policyKind
 
-    let newKind = TaskBoardPolicyPipelineNodeKind(
-      kind: "evidence_check",
+    let newKind: PolicyGraphNodeKind = .evidenceCheck(
       checks: [
-        TaskBoardPolicyEvidenceCheck(
+        PolicyEvidenceCheck(
           field: .checksGreen,
-          pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-          failReasonCode: "checks_not_green",
-          missingReasonCode: "checks_missing"
+          pass: .isTrue,
+          failReasonCode: .checksNotGreen,
+          missingReasonCode: .missingMergeEvidence
         )
       ]
     )
@@ -337,12 +337,11 @@ struct PolicyCanvasInspectorEditingTests {
     // customized risk_classifier binding (threshold 75), so the policy kind
     // string already matches the risk_classifier visual kind the user is
     // about to pick.
-    let customRisk = TaskBoardPolicyPipelineNodeKind(
-      kind: "risk_classifier",
+    let customRisk: PolicyGraphNodeKind = .riskClassifier(
       field: .riskScore,
       threshold: 75,
-      highRiskReasonCode: "risk_above_threshold",
-      missingReasonCode: "human_required"
+      highRiskReasonCode: .riskAboveThreshold,
+      missingReasonCode: .humanRequired
     )
     viewModel.commitSelectedNodePolicyKind(customRisk)
     #expect(viewModel.node(nodeID)?.policyKind == customRisk)
@@ -362,10 +361,11 @@ struct PolicyCanvasInspectorEditingTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.select(.node("risk-score"))
 
-    let customRisk = TaskBoardPolicyPipelineNodeKind(
-      kind: "risk_classifier",
+    let customRisk: PolicyGraphNodeKind = .riskClassifier(
       field: .riskScore,
-      threshold: 75
+      threshold: 75,
+      highRiskReasonCode: .riskAboveThreshold,
+      missingReasonCode: .humanRequired
     )
     viewModel.commitSelectedNodePolicyKind(customRisk)
 
@@ -385,18 +385,15 @@ struct PolicyCanvasInspectorEditingTests {
     let nodeID = try #require(viewModel.nodes.last?.id)
     viewModel.select(.node(nodeID))
     viewModel.commitSelectedNodePolicyKind(
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "if_then_else",
-        checks: [legacyEvidenceCheck(field: .checksGreen)]
-      )
+      .ifThenElse(PolicyIfThenElseCondition(field: .checksGreen, predicate: .isTrue))
     )
 
     viewModel.commitSelectedEvidenceField(.protectedPathTouched)
 
     let kind = try #require(viewModel.node(nodeID)?.policyKind)
-    #expect(kind.kind == "if_then_else")
+    #expect(kind.discriminator == "if_then_else")
     #expect(kind.field == .protectedPathTouched)
-    #expect(kind.predicate?.predicate == .isTrue)
+    #expect(kind.predicate == .isTrue)
     #expect(kind.checks.isEmpty)
   }
 
@@ -407,18 +404,17 @@ struct PolicyCanvasInspectorEditingTests {
     let nodeID = try #require(viewModel.nodes.last?.id)
     viewModel.select(.node(nodeID))
     viewModel.commitSelectedNodePolicyKind(
-      TaskBoardPolicyPipelineNodeKind(
-        kind: "if_then_else",
-        checks: [legacyEvidenceCheck(field: .unresolvedRequestedChanges)]
+      .ifThenElse(
+        PolicyIfThenElseCondition(field: .unresolvedRequestedChanges, predicate: .isTrue)
       )
     )
 
     viewModel.commitSelectedConditionPredicate(.isZero)
 
     let kind = try #require(viewModel.node(nodeID)?.policyKind)
-    #expect(kind.kind == "if_then_else")
+    #expect(kind.discriminator == "if_then_else")
     #expect(kind.field == .unresolvedRequestedChanges)
-    #expect(kind.predicate?.predicate == .isZero)
+    #expect(kind.predicate == .isZero)
     #expect(kind.checks.isEmpty)
   }
 
@@ -434,11 +430,11 @@ struct PolicyCanvasInspectorEditingTests {
 
     let kind = try #require(viewModel.node(nodeID)?.policyKind)
     let arm = try #require(kind.arms.first)
-    #expect(kind.kind == "switch")
+    #expect(kind.discriminator == "switch")
     #expect(kind.arms.count == 1)
     #expect(arm.port == "case_1")
     #expect(arm.field == .protectedPathTouched)
-    #expect(arm.predicate.predicate == .isPresent)
+    #expect(arm.predicate == .isPresent)
     #expect(viewModel.node(nodeID)?.outputPorts.map(\.title) == ["case_1", "default"])
   }
 
@@ -634,17 +630,6 @@ struct PolicyCanvasInspectorEditingTests {
       edges: [],
       selection: nil,
       zoom: 1
-    )
-  }
-
-  private func legacyEvidenceCheck(
-    field: TaskBoardPolicyEvidenceField
-  ) -> TaskBoardPolicyEvidenceCheck {
-    TaskBoardPolicyEvidenceCheck(
-      field: field,
-      pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-      failReasonCode: "checks_not_green",
-      missingReasonCode: "checks_missing"
     )
   }
 }

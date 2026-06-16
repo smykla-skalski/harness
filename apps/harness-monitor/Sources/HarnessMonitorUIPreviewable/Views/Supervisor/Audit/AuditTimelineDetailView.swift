@@ -111,7 +111,7 @@ public struct AuditTimelineDetailView: View {
     }
   }
 
-  /// Inspect the encoded `PolicyAction` payload looking for a `queueDecision`
+  /// Inspect the encoded `SupervisorAction` payload looking for a `queueDecision`
   /// variant. The Codable representation puts the case name as the outer key
   /// with its payload as the value, so `{"queueDecision":{"id":...}}` is the
   /// shape we test against. Returns `nil` for non-dispatched events or when

@@ -43,6 +43,21 @@ public struct TaskBoardPolicyCanvasSummary: Codable, Equatable, Identifiable, Se
     self.latestSimulationAt = latestSimulationAt
     self.updatedAt = updatedAt
   }
+
+  enum CodingKeys: String, CodingKey {
+    case canvasId = "canvas_id"
+    case title
+    case revision
+    case mode
+    case document
+    case nodeCount = "node_count"
+    case edgeCount = "edge_count"
+    case groupCount = "group_count"
+    case latestSimulationTraceId = "latest_simulation_trace_id"
+    case latestSimulationSucceeded = "latest_simulation_succeeded"
+    case latestSimulationAt = "latest_simulation_at"
+    case updatedAt = "updated_at"
+  }
 }
 
 public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
@@ -52,10 +67,10 @@ public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
   public var globalPolicyEnforcementEnabled: Bool
 
   private enum CodingKeys: String, CodingKey {
-    case schemaVersion
-    case activeCanvasId
+    case schemaVersion = "schema_version"
+    case activeCanvasId = "active_canvas_id"
     case canvases
-    case globalPolicyEnforcementEnabled
+    case globalPolicyEnforcementEnabled = "global_policy_enforcement_enabled"
   }
 
   public init(
@@ -182,6 +197,11 @@ public struct TaskBoardPolicyPipelinePromoteResponse: Codable, Equatable, Sendab
   public init(document: TaskBoardPolicyPipelineDocument, traceId: String) {
     self.document = document
     self.traceId = traceId
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case document
+    case traceId = "trace_id"
   }
 }
 

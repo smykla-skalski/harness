@@ -43,7 +43,7 @@ public struct IdleSessionRule: PolicyRule {
   public func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     let threshold = max(
       0,
       context.parameters.seconds(Self.thresholdKey, default: Self.defaultThresholdSeconds)
@@ -66,7 +66,7 @@ public struct IdleSessionRule: PolicyRule {
     now: Date,
     thresholdSeconds: Int,
     recentActionKeys: Set<String>
-  ) -> PolicyAction? {
+  ) -> SupervisorAction? {
     guard session.statusRaw == "active",
       session.timelineDensityLastMinute == 0,
       !session.agents.isEmpty
@@ -76,7 +76,7 @@ public struct IdleSessionRule: PolicyRule {
     guard isIdle(session: session, now: now, thresholdSeconds: thresholdSeconds) else {
       return nil
     }
-    let action = PolicyAction.queueDecision(
+    let action = SupervisorAction.queueDecision(
       decisionPayload(for: session, idleSeconds: thresholdSeconds)
     )
     guard !recentActionKeys.contains(action.actionKey) else {
@@ -98,10 +98,10 @@ public struct IdleSessionRule: PolicyRule {
   private func decisionPayload(
     for session: SessionSnapshot,
     idleSeconds: Int
-  ) -> PolicyAction.DecisionPayload {
+  ) -> SupervisorAction.DecisionPayload {
     let summary = "Session \(session.id) has had no activity for over \(idleSeconds)s."
     let nudgeAgentID = session.agents.min { $0.id < $1.id }?.id
-    return PolicyAction.DecisionPayload(
+    return SupervisorAction.DecisionPayload(
       id: "\(id):\(session.id)",
       severity: .warn,
       ruleID: id,

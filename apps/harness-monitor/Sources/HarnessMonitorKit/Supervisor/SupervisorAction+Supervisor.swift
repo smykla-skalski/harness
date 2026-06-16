@@ -1,4 +1,4 @@
-extension PolicyAction {
+extension SupervisorAction {
   var isAutomaticSideEffect: Bool {
     switch self {
     case .nudgeAgent, .assignTask, .dropTask, .notifyOnly:

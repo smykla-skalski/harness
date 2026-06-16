@@ -27,7 +27,7 @@ public struct CodexApprovalRule: PolicyRule {
   public func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     snapshot.sessions.flatMap { session in
       session.pendingCodexApprovals.compactMap { approval in
         action(for: approval, sessionID: session.id, snapshotID: snapshot.id, context: context)
@@ -40,9 +40,9 @@ public struct CodexApprovalRule: PolicyRule {
     sessionID: String,
     snapshotID: String,
     context: PolicyContext
-  ) -> PolicyAction? {
+  ) -> SupervisorAction? {
     let decisionID = "codex-approval:\(sessionID):\(approval.id)"
-    let payload = PolicyAction.DecisionPayload(
+    let payload = SupervisorAction.DecisionPayload(
       id: decisionID,
       severity: .needsUser,
       ruleID: id,
@@ -55,7 +55,7 @@ public struct CodexApprovalRule: PolicyRule {
         makeSuggestedActions(agentID: approval.agentID, approvalID: approval.id)
       )
     )
-    let action = PolicyAction.queueDecision(payload)
+    let action = SupervisorAction.queueDecision(payload)
     guard !context.recentActionKeys.contains(action.actionKey) else {
       return nil
     }

@@ -1,5 +1,6 @@
 import Foundation
 import HarnessMonitorKit
+import HarnessMonitorPolicyModels
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
@@ -13,72 +14,72 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
     let data =
       """
       {
-        "schemaVersion": 1,
-        "activeCanvasId": "default-canvas",
-        "globalPolicyEnforcementEnabled": true,
+        "schema_version": 1,
+        "active_canvas_id": "default-canvas",
+        "global_policy_enforcement_enabled": true,
         "canvases": [
           {
-            "canvasId": "default-canvas",
+            "canvas_id": "default-canvas",
             "title": "Default",
             "revision": 1,
             "mode": "draft",
-            "nodeCount": 0,
-            "edgeCount": 0,
-            "groupCount": 0,
-            "updatedAt": "2026-06-02T12:00:00Z",
+            "node_count": 0,
+            "edge_count": 0,
+            "group_count": 0,
+            "updated_at": "2026-06-02T12:00:00Z",
             "document": {
-              "schemaVersion": 2,
+              "schema_version": 2,
               "revision": 1,
               "mode": "draft",
               "nodes": [],
               "edges": [],
               "groups": [],
               "layout": { "nodes": [] },
-              "policyTraceIds": []
+              "policy_trace_ids": []
             }
           },
           {
-            "canvasId": "pasted-pr-approvals",
+            "canvas_id": "pasted-pr-approvals",
             "title": "Pasted PR approvals",
             "revision": 7,
             "mode": "draft",
-            "nodeCount": 0,
-            "edgeCount": 0,
-            "groupCount": 0,
-            "updatedAt": "2026-06-02T12:00:00Z",
+            "node_count": 0,
+            "edge_count": 0,
+            "group_count": 0,
+            "updated_at": "2026-06-02T12:00:00Z",
             "document": {
-              "schemaVersion": 2,
+              "schema_version": 2,
               "revision": 7,
               "mode": "draft",
               "nodes": [],
               "edges": [],
               "groups": [],
               "layout": { "nodes": [] },
-              "policyTraceIds": []
+              "policy_trace_ids": []
             }
           },
           {
-            "canvasId": "pr-screenshot-extraction",
+            "canvas_id": "pr-screenshot-extraction",
             "title": "PR screenshot extraction",
             "revision": 1,
             "mode": "enforced",
-            "nodeCount": 1,
-            "edgeCount": 0,
-            "groupCount": 0,
-            "updatedAt": "2026-06-02T12:00:00Z",
+            "node_count": 1,
+            "edge_count": 0,
+            "group_count": 0,
+            "updated_at": "2026-06-02T12:00:00Z",
             "document": {
-              "schemaVersion": 2,
+              "schema_version": 2,
               "revision": 1,
               "mode": "enforced",
               "nodes": [
                 {
                   "id": "automation:review-screenshot:source",
                   "label": "Review Screenshot Paste",
-                  "kind": { "kind": "action_step" },
+                  "kind": { "kind": "action_step", "action_id": "review_screenshot_paste" },
                   "automation": {
-                    "isEnabled": true,
-                    "eventSource": "reviewScreenshotPaste",
-                    "contentKinds": ["image"],
+                    "is_enabled": true,
+                    "event_source": "reviewScreenshotPaste",
+                    "content_kinds": ["image"],
                     "preprocessors": [
                       "dedupeByFingerprint",
                       "normalizeGitHubPullRequestLinks",
@@ -92,25 +93,25 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
                       "previewReviewApprovals"
                     ],
                     "postprocessors": ["auditEvent"],
-                    "sourceAppMode": "allExceptDenied",
-                    "reviewPullRequestExtraction": {
-                      "repositoryMode": "allConfiguredRepos",
-                      "numberMemoryEnabled": true,
-                      "resultScope": "all",
-                      "failureSignalMode": "liveOrVisual",
-                      "outputFormat": "newlineGitHubURLs",
-                      "autoCopy": true,
-                      "showSheet": true
+                    "source_app_mode": "allExceptDenied",
+                    "review_pull_request_extraction": {
+                      "repository_mode": "allConfiguredRepos",
+                      "number_memory_enabled": true,
+                      "result_scope": "all",
+                      "failure_signal_mode": "liveOrVisual",
+                      "output_format": "newlineGitHubURLs",
+                      "auto_copy": true,
+                      "show_sheet": true
                     }
                   },
-                  "inputPorts": [],
-                  "outputPorts": ["default"]
+                  "input_ports": [],
+                  "output_ports": ["default"]
                 }
               ],
               "edges": [],
               "groups": [],
               "layout": { "nodes": [] },
-              "policyTraceIds": []
+              "policy_trace_ids": []
             }
           }
         ]
@@ -374,10 +375,7 @@ func policyCanvasPastedPRDryRunDocument() -> TaskBoardPolicyPipelineDocument {
       policyCanvasPipelineNode(
         id: "automation:review-text-paste:source",
         title: "Review Text Paste",
-        kind: TaskBoardPolicyPipelineNodeKind(
-          kind: "action_step",
-          actionId: "automation.review_text_paste"
-        ),
+        kind: .actionStep(PolicyActionStep(actionId: "automation.review_text_paste")),
         automation: .canvasDefault(source: .manualReviewTextPaste),
         inputs: [],
         outputs: ["default"]
@@ -385,7 +383,7 @@ func policyCanvasPastedPRDryRunDocument() -> TaskBoardPolicyPipelineDocument {
       policyCanvasPipelineNode(
         id: "automation:review-text-paste:dry-run",
         title: "Dry-run gate",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate"),
+        kind: .dryRunGate(reasonCode: .dryRunRequired),
         inputs: ["in"],
         outputs: []
       ),
@@ -411,10 +409,7 @@ func policyCanvasManualOCRPasteDocument() -> TaskBoardPolicyPipelineDocument {
       policyCanvasPipelineNode(
         id: "automation:manual-ocr-paste:source",
         title: "Manual OCR Paste",
-        kind: TaskBoardPolicyPipelineNodeKind(
-          kind: "action_step",
-          actionId: "automation.manual_ocr_paste"
-        ),
+        kind: .actionStep(PolicyActionStep(actionId: "automation.manual_ocr_paste")),
         automation: .canvasDefault(source: .manualOCRPaste),
         inputs: [],
         outputs: ["image"]
@@ -422,7 +417,7 @@ func policyCanvasManualOCRPasteDocument() -> TaskBoardPolicyPipelineDocument {
       policyCanvasPipelineNode(
         id: "automation:manual-ocr-paste:ocr",
         title: "OCR image",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "ocr_image"),
+        kind: .ocrImage,
         automation: .canvasComponent(actions: [.ocrImage]),
         inputs: ["in"],
         outputs: ["text"]
@@ -430,17 +425,14 @@ func policyCanvasManualOCRPasteDocument() -> TaskBoardPolicyPipelineDocument {
       policyCanvasPipelineNode(
         id: "automation:manual-ocr-paste:hub",
         title: "Hub",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "hub"),
+        kind: .hub,
         inputs: ["in"],
         outputs: ["out_1", "out_2"]
       ),
       policyCanvasPipelineNode(
         id: "automation:manual-ocr-paste:debug",
         title: "Open Debugging",
-        kind: TaskBoardPolicyPipelineNodeKind(
-          kind: "action_step",
-          actionId: "dashboard.open_debugging"
-        ),
+        kind: .actionStep(PolicyActionStep(actionId: "dashboard.open_debugging")),
         automation: .canvasComponent(actions: [.openDashboardDebugging]),
         inputs: ["in"],
         outputs: []
@@ -448,10 +440,7 @@ func policyCanvasManualOCRPasteDocument() -> TaskBoardPolicyPipelineDocument {
       policyCanvasPipelineNode(
         id: "automation:manual-ocr-paste:persist",
         title: "Persist OCR result",
-        kind: TaskBoardPolicyPipelineNodeKind(
-          kind: "action_step",
-          actionId: "ocr.persist_result"
-        ),
+        kind: .actionStep(PolicyActionStep(actionId: "ocr.persist_result")),
         automation: .canvasComponent(
           actions: [.rememberRecentScan, .showFeedback, .recordMetadata],
           postprocessors: [.sourceSpecificTextCleanup, .persistResult, .auditEvent]
@@ -502,7 +491,7 @@ func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipeline
       policyCanvasPipelineNode(
         id: "automation:review-screenshot:source",
         title: "Review Screenshot Paste",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "review_screenshot_paste"),
+        kind: .reviewScreenshotPaste,
         automation: .canvasDefault(source: .reviewScreenshotPaste),
         inputs: [],
         outputs: ["image"]
@@ -510,7 +499,7 @@ func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipeline
       policyCanvasPipelineNode(
         id: "automation:review-screenshot:ocr",
         title: "OCR image",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "ocr_image"),
+        kind: .ocrImage,
         automation: .canvasComponent(actions: [.ocrImage]),
         inputs: ["in"],
         outputs: ["text"]
@@ -518,14 +507,14 @@ func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipeline
       policyCanvasPipelineNode(
         id: "automation:review-screenshot:hub",
         title: "Hub",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "hub"),
+        kind: .hub,
         inputs: ["in"],
         outputs: ["out_1", "out_2"]
       ),
       policyCanvasPipelineNode(
         id: "automation:review-screenshot:resolve",
         title: "Resolve Reviews PRs",
-        kind: TaskBoardPolicyPipelineNodeKind(kind: "resolve_review_pull_requests"),
+        kind: .resolveReviewPullRequests,
         automation: .canvasComponent(actions: [
           .extractGitHubPullRequests,
           .resolveReviewPullRequests,
@@ -536,10 +525,7 @@ func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipeline
       policyCanvasPipelineNode(
         id: "automation:review-screenshot:copy",
         title: "Copy extracted PR URLs",
-        kind: TaskBoardPolicyPipelineNodeKind(
-          kind: "action_step",
-          actionId: "github.copy_extracted_pull_request_urls"
-        ),
+        kind: .actionStep(PolicyActionStep(actionId: "github.copy_extracted_pull_request_urls")),
         automation: .canvasComponent(actions: [.copyExtractedGitHubPullRequestURLs]),
         inputs: ["in"],
         outputs: []
@@ -600,8 +586,8 @@ private func policyCanvasSummary(
 private func policyCanvasPipelineNode(
   id: String,
   title: String,
-  kind: TaskBoardPolicyPipelineNodeKind,
-  automation: TaskBoardPolicyPipelineAutomationBinding? = nil,
+  kind: PolicyGraphNodeKind,
+  automation: PolicyGraphAutomationBinding? = nil,
   inputs: [String],
   outputs: [String]
 ) -> TaskBoardPolicyPipelineNode {

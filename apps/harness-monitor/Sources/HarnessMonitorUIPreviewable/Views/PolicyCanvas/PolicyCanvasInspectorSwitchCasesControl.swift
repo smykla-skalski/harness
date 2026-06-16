@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 /// Ordered-cases editor for a `switch` node. Each arm is one output port that
@@ -12,7 +13,7 @@ import SwiftUI
 struct PolicyCanvasInspectorSwitchCasesControl: View {
   let viewModel: PolicyCanvasViewModel
   let field: PolicyInspectorField
-  let arms: [TaskBoardPolicySwitchArm]
+  let arms: [PolicySwitchArm]
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -48,7 +49,7 @@ struct PolicyCanvasInspectorSwitchCasesControl: View {
 
 struct PolicyCanvasInspectorSwitchCaseRow: View {
   let viewModel: PolicyCanvasViewModel
-  let arm: TaskBoardPolicySwitchArm
+  let arm: PolicySwitchArm
   let index: Int
   let canRemove: Bool
 
@@ -81,7 +82,7 @@ struct PolicyCanvasInspectorSwitchCaseRow: View {
             set: { viewModel.commitSelectedSwitchArmField($0, at: index) }
           )
         ) {
-          ForEach(TaskBoardPolicyEvidenceField.allCases, id: \.self) { evidenceField in
+          ForEach(PolicyEvidenceField.allCases, id: \.self) { evidenceField in
             Text(evidenceField.policyCanvasTitle).tag(evidenceField)
           }
         }
@@ -91,11 +92,11 @@ struct PolicyCanvasInspectorSwitchCaseRow: View {
         Picker(
           "Case \(index + 1) condition",
           selection: Binding(
-            get: { arm.predicate.predicate },
+            get: { arm.predicate },
             set: { viewModel.commitSelectedSwitchArmPredicate($0, at: index) }
           )
         ) {
-          ForEach(TaskBoardPolicyEvidencePredicateValue.allCases, id: \.self) { predicate in
+          ForEach(PolicyEvidencePredicate.allCases, id: \.self) { predicate in
             Text(predicate.policyCanvasTitle).tag(predicate)
           }
         }

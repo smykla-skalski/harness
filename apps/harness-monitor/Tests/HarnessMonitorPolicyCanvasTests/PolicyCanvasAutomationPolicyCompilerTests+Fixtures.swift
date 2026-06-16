@@ -1,5 +1,6 @@
 import Foundation
 import HarnessMonitorKit
+import HarnessMonitorPolicyModels
 import SwiftUI
 import Testing
 
@@ -79,8 +80,8 @@ extension PolicyCanvasAutomationPolicyCompilerTests {
   func pipelineNode(
     id: String,
     title: String,
-    kind: TaskBoardPolicyPipelineNodeKind,
-    automation: TaskBoardPolicyPipelineAutomationBinding? = nil,
+    kind: PolicyGraphNodeKind,
+    automation: PolicyGraphAutomationBinding? = nil,
     inputs: [String],
     outputs: [String]
   ) -> TaskBoardPolicyPipelineNode {
@@ -102,10 +103,7 @@ extension PolicyCanvasAutomationPolicyCompilerTests {
         pipelineNode(
           id: "automation:manual-ocr-paste:source",
           title: "Manual OCR Paste",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "action_step",
-            actionId: "automation.manual_ocr_paste"
-          ),
+          kind: .actionStep(PolicyActionStep(actionId: "automation.manual_ocr_paste")),
           automation: .canvasDefault(source: .manualOCRPaste),
           inputs: [],
           outputs: ["image"]
@@ -113,7 +111,7 @@ extension PolicyCanvasAutomationPolicyCompilerTests {
         pipelineNode(
           id: "automation:manual-ocr-paste:ocr",
           title: "OCR image",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "ocr_image"),
+          kind: .ocrImage,
           automation: .canvasComponent(actions: [.ocrImage]),
           inputs: ["in"],
           outputs: ["text"]
@@ -121,17 +119,14 @@ extension PolicyCanvasAutomationPolicyCompilerTests {
         pipelineNode(
           id: "automation:manual-ocr-paste:hub",
           title: "Hub",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "hub"),
+          kind: .hub,
           inputs: ["in"],
           outputs: ["out_1", "out_2", "out_3"]
         ),
         pipelineNode(
           id: "automation:manual-ocr-paste:debug",
           title: "Open Debugging",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "action_step",
-            actionId: "dashboard.open_debugging"
-          ),
+          kind: .actionStep(PolicyActionStep(actionId: "dashboard.open_debugging")),
           automation: .canvasComponent(actions: [.openDashboardDebugging]),
           inputs: ["in"],
           outputs: []
@@ -139,10 +134,7 @@ extension PolicyCanvasAutomationPolicyCompilerTests {
         pipelineNode(
           id: "automation:manual-ocr-paste:persist",
           title: "Persist OCR Result",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "action_step",
-            actionId: "ocr.persist_result"
-          ),
+          kind: .actionStep(PolicyActionStep(actionId: "ocr.persist_result")),
           automation: .canvasComponent(
             actions: [.rememberRecentScan, .showFeedback, .recordMetadata],
             postprocessors: [.sourceSpecificTextCleanup, .persistResult, .auditEvent]

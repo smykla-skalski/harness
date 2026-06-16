@@ -48,7 +48,7 @@ public struct DaemonDisconnectRule: PolicyRule {
   public func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     guard snapshot.connection.kind == "disconnected" else { return [] }
 
     let grace = max(0, context.parameters.seconds(Self.graceKey, default: Self.defaultGraceSeconds))
@@ -87,17 +87,17 @@ public struct DaemonDisconnectRule: PolicyRule {
     snapshot: SessionsSnapshot,
     elapsed: TimeInterval,
     context: PolicyContext
-  ) -> PolicyAction? {
+  ) -> SupervisorAction? {
     let seconds = Int(elapsed.rounded())
     let summary = "Daemon disconnected for \(seconds)s — waiting for reconnect"
-    let payload = PolicyAction.NotifyPayload(
+    let payload = SupervisorAction.NotifyPayload(
       ruleID: id,
       snapshotID: snapshot.id,
       snapshotHash: snapshot.hash,
       severity: .warn,
       summary: summary
     )
-    let action = PolicyAction.notifyOnly(payload)
+    let action = SupervisorAction.notifyOnly(payload)
     guard !context.recentActionKeys.contains(action.actionKey) else {
       return nil
     }
@@ -108,10 +108,10 @@ public struct DaemonDisconnectRule: PolicyRule {
     snapshot: SessionsSnapshot,
     anchor: Date,
     context: PolicyContext
-  ) -> PolicyAction? {
+  ) -> SupervisorAction? {
     let elapsedSeconds = Int(context.now.timeIntervalSince(anchor).rounded())
     let summary = "Daemon has been disconnected for over \(elapsedSeconds)s"
-    let payload = PolicyAction.DecisionPayload(
+    let payload = SupervisorAction.DecisionPayload(
       id: Self.activeDecisionID,
       severity: .critical,
       ruleID: id,
@@ -122,7 +122,7 @@ public struct DaemonDisconnectRule: PolicyRule {
       contextJSON: contextJSON(snapshot: snapshot, anchor: anchor),
       suggestedActionsJSON: suggestedActionsJSON
     )
-    let action = PolicyAction.queueDecision(payload)
+    let action = SupervisorAction.queueDecision(payload)
     guard !context.recentActionKeys.contains(action.actionKey) else {
       return nil
     }

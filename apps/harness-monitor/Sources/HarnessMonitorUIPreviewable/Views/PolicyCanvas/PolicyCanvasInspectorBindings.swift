@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 /// Per-row binding helpers and the bottom "Policy" metrics block for
@@ -39,17 +40,17 @@ extension PolicyCanvasEditForm {
   }
 
   func selectedPolicyActionBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<TaskBoardPolicyAction> {
+    _ policyKind: PolicyGraphNodeKind
+  ) -> Binding<PolicyAction> {
     Binding(
-      get: { policyKind.actions.first ?? policyKind.action ?? .spawnAgent },
+      get: { policyKind.actions.first ?? .spawnAgent },
       set: { viewModel.commitSelectedPolicyAction($0) }
     )
   }
 
   func selectedEvidenceFieldBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<TaskBoardPolicyEvidenceField> {
+    _ policyKind: PolicyGraphNodeKind
+  ) -> Binding<PolicyEvidenceField> {
     Binding(
       get: { policyKind.checks.first?.field ?? policyKind.field ?? .checksGreen },
       set: { viewModel.commitSelectedEvidenceField($0) }
@@ -57,7 +58,7 @@ extension PolicyCanvasEditForm {
   }
 
   func selectedRiskThresholdBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> Binding<Int> {
     Binding(
       get: { Int(policyKind.threshold ?? 0) },
@@ -66,25 +67,16 @@ extension PolicyCanvasEditForm {
   }
 
   func selectedReasonCodeBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> Binding<String> {
     Binding(
-      get: { policyKind.reasonCode ?? policyKind.reasonCodes.first ?? "" },
+      get: { policyKind.reasonCode ?? policyKind.reasonCodes.first?.rawValue ?? "" },
       set: { viewModel.commitSelectedReasonCode($0) }
     )
   }
 
-  func selectedRuleIDBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> Binding<String> {
-    Binding(
-      get: { policyKind.ruleId ?? "" },
-      set: { viewModel.commitSelectedRuleID($0) }
-    )
-  }
-
   func selectedDecisionBinding(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+    _ policyKind: PolicyGraphNodeKind
   ) -> Binding<String> {
     Binding(
       get: { policyKind.decision ?? "allow" },

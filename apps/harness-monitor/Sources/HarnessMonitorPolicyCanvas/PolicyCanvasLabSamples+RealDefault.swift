@@ -13,10 +13,11 @@ extension PolicyCanvasLabSamples {
   static let realDefault: TaskBoardPolicyPipelineDocument = decodeRealDefault()
 
   private static func decodeRealDefault() -> TaskBoardPolicyPipelineDocument {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
     guard let data = Data(base64Encoded: realDefaultBase64.joined()),
-      let decoded = try? decoder.decode(TaskBoardPolicyPipelineDocument.self, from: data)
+      let decoded = try? PolicyWireCoding.decoder.decode(
+        TaskBoardPolicyPipelineDocument.self,
+        from: data
+      )
     else {
       return Self.document(nodes: [], edges: [], groups: [])
     }

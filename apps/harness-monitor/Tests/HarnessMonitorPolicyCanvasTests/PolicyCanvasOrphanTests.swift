@@ -73,7 +73,7 @@ struct PolicyCanvasOrphanTests {
         TaskBoardPolicyPipelineNode(
           id: "node-real",
           title: "Real",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+          kind: .actionGate(actions: [.spawnAgent]),
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
           outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
         )
@@ -103,7 +103,7 @@ struct PolicyCanvasOrphanTests {
         TaskBoardPolicyPipelineNode(
           id: "node-real",
           title: "Real",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task"),
+          kind: .trigger(workflow: "default-task"),
           inputs: [],
           outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
         )

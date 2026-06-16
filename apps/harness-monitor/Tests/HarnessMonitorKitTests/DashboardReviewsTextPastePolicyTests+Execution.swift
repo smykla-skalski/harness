@@ -3,20 +3,21 @@ import Foundation
 import HarnessMonitorKit
 import Testing
 
+import HarnessMonitorPolicyModels
 @testable import HarnessMonitorUIPreviewable
 
 extension DashboardReviewsTextPastePolicyTests {
   @Test("Policy binding config round trips through Swift graph JSON")
   func policyBindingConfigRoundTripsThroughSwiftGraphJSON() throws {
-    var binding = TaskBoardPolicyPipelineAutomationBinding(
+    var binding = PolicyGraphAutomationBinding(
       eventSource: AutomationPolicyEventSource.reviewScreenshotPaste.rawValue
     )
-    binding.ocrConfiguration = TaskBoardPolicyPipelineOCRConfiguration(
+    binding.ocrConfiguration = PolicyGraphOCRConfiguration(
       recognitionLevel: "fast",
       automaticallyDetectsLanguage: false,
       usesLanguageCorrection: false
     )
-    binding.reviewPullRequestExtraction = TaskBoardPolicyPipelineReviewPullRequestExtraction(
+    binding.reviewPullRequestExtraction = PolicyGraphReviewPullRequestExtraction(
       repositoryMode: "policyRepositories",
       policyRepositories: ["kong/kuma"],
       numberMemoryEnabled: false,
@@ -29,7 +30,7 @@ extension DashboardReviewsTextPastePolicyTests {
 
     let data = try JSONEncoder().encode(binding)
     let decoded = try JSONDecoder().decode(
-      TaskBoardPolicyPipelineAutomationBinding.self,
+      PolicyGraphAutomationBinding.self,
       from: data
     )
 

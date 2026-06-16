@@ -1,8 +1,8 @@
 import Foundation
 
 extension SupervisorService {
-  static func makeQuarantineDecision(for ruleID: String) -> PolicyAction.DecisionPayload {
-    PolicyAction.DecisionPayload(
+  static func makeQuarantineDecision(for ruleID: String) -> SupervisorAction.DecisionPayload {
+    SupervisorAction.DecisionPayload(
       id: "quarantine:\(ruleID)",
       severity: .critical,
       ruleID: ruleID,
@@ -17,7 +17,7 @@ extension SupervisorService {
 
   static func actionKey(from payloadJSON: String) -> String? {
     guard let data = payloadJSON.data(using: .utf8),
-      let action = try? JSONDecoder().decode(PolicyAction.self, from: data)
+      let action = try? JSONDecoder().decode(SupervisorAction.self, from: data)
     else {
       return nil
     }

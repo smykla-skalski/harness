@@ -88,18 +88,15 @@ extension PolicyCanvasAutomationPolicyCompiler {
     appendGraphToken(node.subtitle, to: &text)
     appendGraphToken(node.kind.title, to: &text)
     if let policyKind = node.policyKind {
-      appendGraphToken(policyKind.kind, to: &text)
+      appendGraphToken(policyKind.discriminator, to: &text)
       if let workflow = policyKind.workflow {
         appendGraphToken(workflow, to: &text)
-      }
-      if let ruleID = policyKind.ruleId {
-        appendGraphToken(ruleID, to: &text)
       }
       if let reasonCode = policyKind.reasonCode {
         appendGraphToken(reasonCode, to: &text)
       }
       for reasonCode in policyKind.reasonCodes {
-        appendGraphToken(reasonCode, to: &text)
+        appendGraphToken(reasonCode.rawValue, to: &text)
       }
     }
   }

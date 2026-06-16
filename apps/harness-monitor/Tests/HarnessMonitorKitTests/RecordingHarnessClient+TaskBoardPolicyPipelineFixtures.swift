@@ -17,14 +17,14 @@ extension RecordingHarnessClient {
         TaskBoardPolicyPipelineNode(
           id: "node-intake",
           title: title,
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task"),
+          kind: .trigger(workflow: "default-task"),
           position: TaskBoardPolicyCanvasPoint(x: 20, y: 40),
           outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
         ),
         TaskBoardPolicyPipelineNode(
           id: "node-allow",
           title: "Allow spawn",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", action: .spawnAgent),
+          kind: .actionGate(actions: [.spawnAgent]),
           position: TaskBoardPolicyCanvasPoint(x: 280, y: 40),
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
           outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
@@ -32,7 +32,7 @@ extension RecordingHarnessClient {
         TaskBoardPolicyPipelineNode(
           id: "node-human",
           title: "Allow",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
+          kind: .humanGate(reasonCode: .humanRequired),
           position: TaskBoardPolicyCanvasPoint(x: 520, y: 40),
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
         ),

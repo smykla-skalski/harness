@@ -29,7 +29,7 @@ public struct ObserverIssueRule: PolicyRule {
   public func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     snapshot.sessions.compactMap { session in
       action(for: session, snapshot: snapshot, context: context)
     }
@@ -39,11 +39,11 @@ public struct ObserverIssueRule: PolicyRule {
     for session: SessionSnapshot,
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) -> PolicyAction? {
+  ) -> SupervisorAction? {
     let issues = qualifyingIssues(in: session, context: context)
     guard issues.count >= minCount(in: context) else { return nil }
 
-    let payload = PolicyAction.DecisionPayload(
+    let payload = SupervisorAction.DecisionPayload(
       id: "\(id):\(session.id)",
       severity: maxSeverity(in: issues),
       ruleID: id,
@@ -54,7 +54,7 @@ public struct ObserverIssueRule: PolicyRule {
       contextJSON: bundleJSON(sessionID: session.id, issues: issues),
       suggestedActionsJSON: "[]"
     )
-    let action = PolicyAction.queueDecision(payload)
+    let action = SupervisorAction.queueDecision(payload)
     guard !context.recentActionKeys.contains(action.actionKey) else { return nil }
     return action
   }

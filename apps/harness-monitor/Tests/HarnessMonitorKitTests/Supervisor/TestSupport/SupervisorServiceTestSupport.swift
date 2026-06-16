@@ -14,7 +14,7 @@ struct EmitOnceRule: PolicyRule {
   func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     [
       .logEvent(
         .init(
@@ -38,7 +38,7 @@ struct NoopRule: PolicyRule {
   func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     []
   }
 }
@@ -60,7 +60,7 @@ struct ContextRecordingRule: PolicyRule {
   func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     await recorder.record(context)
     guard let emittedActionID else {
       return []
@@ -92,9 +92,9 @@ struct DuplicateActionKeyRule: PolicyRule {
   func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     _ = context
-    let action = PolicyAction.logEvent(
+    let action = SupervisorAction.logEvent(
       .init(
         id: "duplicate-action",
         ruleID: id,
@@ -132,7 +132,7 @@ struct SlowRule: PolicyRule {
   func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     await gate.wait()
     return []
   }
@@ -152,7 +152,7 @@ struct SlowEmitRule: PolicyRule {
   func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     _ = context
     await gate.wait()
     return [
@@ -176,7 +176,7 @@ struct AutoActionRule: PolicyRule {
   func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
+  ) async -> [SupervisorAction] {
     [
       .nudgeAgent(
         .init(
@@ -218,8 +218,8 @@ struct AutoOnlyRule: PolicyRule {
   func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction] {
-    let action = PolicyAction.nudgeAgent(
+  ) async -> [SupervisorAction] {
+    let action = SupervisorAction.nudgeAgent(
       .init(
         agentID: "agent-1",
         prompt: "wake up",
@@ -238,7 +238,7 @@ struct AutoOnlyRule: PolicyRule {
 struct SuggestionObserver: PolicyObserver {
   func proposeConfigSuggestion(
     history: PolicyHistoryWindow
-  ) async -> [PolicyAction.ConfigSuggestion] {
+  ) async -> [SupervisorAction.ConfigSuggestion] {
     _ = history
     return [
       .init(
@@ -276,11 +276,11 @@ actor RuleGate {
 actor SpyObserver: PolicyObserver {
   struct Evaluation: Sendable {
     let ruleID: String
-    let actions: [PolicyAction]
+    let actions: [SupervisorAction]
   }
 
   struct Execution: Sendable {
-    let action: PolicyAction
+    let action: SupervisorAction
     let outcome: PolicyOutcome
   }
 
@@ -292,17 +292,17 @@ actor SpyObserver: PolicyObserver {
     snapshots.append(snapshot)
   }
 
-  func didEvaluate(rule: any PolicyRule, actions: [PolicyAction]) async {
+  func didEvaluate(rule: any PolicyRule, actions: [SupervisorAction]) async {
     evaluations.append(Evaluation(ruleID: rule.id, actions: actions))
   }
 
-  func didExecute(action: PolicyAction, outcome: PolicyOutcome) async {
+  func didExecute(action: SupervisorAction, outcome: PolicyOutcome) async {
     executions.append(Execution(action: action, outcome: outcome))
   }
 
   func proposeConfigSuggestion(
     history: PolicyHistoryWindow
-  ) async -> [PolicyAction.ConfigSuggestion] {
+  ) async -> [SupervisorAction.ConfigSuggestion] {
     _ = history
     return []
   }

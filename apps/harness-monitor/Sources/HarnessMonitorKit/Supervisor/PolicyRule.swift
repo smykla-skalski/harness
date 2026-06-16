@@ -58,5 +58,5 @@ public protocol PolicyRule: Sendable {
   func evaluate(
     snapshot: SessionsSnapshot,
     context: PolicyContext
-  ) async -> [PolicyAction]
+  ) async -> [SupervisorAction]
 }

@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 /// Ordered checks editor for an `evidence_check` node. The engine evaluates
@@ -13,7 +14,7 @@ import SwiftUI
 struct PolicyCanvasInspectorEvidenceChecksControl: View {
   let viewModel: PolicyCanvasViewModel
   let field: PolicyInspectorField
-  let checks: [TaskBoardPolicyEvidenceCheck]
+  let checks: [PolicyEvidenceCheck]
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -49,7 +50,7 @@ struct PolicyCanvasInspectorEvidenceChecksControl: View {
 
 struct PolicyCanvasInspectorEvidenceCheckRow: View {
   let viewModel: PolicyCanvasViewModel
-  let check: TaskBoardPolicyEvidenceCheck
+  let check: PolicyEvidenceCheck
   let index: Int
   let checkCount: Int
 
@@ -135,7 +136,7 @@ struct PolicyCanvasInspectorEvidenceCheckRow: View {
         set: { viewModel.commitSelectedEvidenceCheckField($0, at: index) }
       )
     ) {
-      ForEach(TaskBoardPolicyEvidenceField.allCases, id: \.self) { evidenceField in
+      ForEach(PolicyEvidenceField.allCases, id: \.self) { evidenceField in
         Text(evidenceField.policyCanvasTitle).tag(evidenceField)
       }
     }
@@ -150,11 +151,11 @@ struct PolicyCanvasInspectorEvidenceCheckRow: View {
     Picker(
       "Check \(index + 1) predicate",
       selection: Binding(
-        get: { check.pass.predicate },
+        get: { check.pass },
         set: { viewModel.commitSelectedEvidenceCheckPredicate($0, at: index) }
       )
     ) {
-      ForEach(TaskBoardPolicyEvidencePredicateValue.allCases, id: \.self) { predicate in
+      ForEach(PolicyEvidencePredicate.allCases, id: \.self) { predicate in
         Text(predicate.policyCanvasTitle).tag(predicate)
       }
     }
@@ -173,8 +174,8 @@ struct PolicyCanvasInspectorEvidenceCheckRow: View {
         set: { viewModel.commitSelectedEvidenceCheckFailReasonCode($0, at: index) }
       )
     ) {
-      ForEach(PolicyCanvasReasonCode.ordered, id: \.self) { code in
-        Text(PolicyCanvasReasonCode.displayName(code)).tag(code)
+      ForEach(PolicyReasonCode.allCases, id: \.self) { code in
+        Text(PolicyCanvasReasonCode.displayName(code.rawValue)).tag(code)
       }
     }
     .labelsHidden()

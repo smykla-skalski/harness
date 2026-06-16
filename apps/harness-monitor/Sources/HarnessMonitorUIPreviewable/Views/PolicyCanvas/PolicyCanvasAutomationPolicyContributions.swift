@@ -1,10 +1,11 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 
 struct PolicyCanvasAutomationSource {
   let node: PolicyCanvasNode
   let eventSource: AutomationPolicyEventSource
-  let binding: TaskBoardPolicyPipelineAutomationBinding?
+  let binding: PolicyGraphAutomationBinding?
 }
 
 struct PolicyCanvasAutomationPolicyContribution: Equatable {
@@ -43,7 +44,7 @@ struct PolicyCanvasAutomationPolicyContribution: Equatable {
 }
 
 extension PolicyCanvasAutomationPolicyContribution {
-  init(binding: TaskBoardPolicyPipelineAutomationBinding) {
+  init(binding: PolicyGraphAutomationBinding) {
     contentKinds = binding.selectedContentKinds
     preprocessors = binding.selectedPreprocessors
     actions = binding.selectedActions
@@ -118,7 +119,7 @@ extension PolicyCanvasAutomationPolicyCompiler {
   ) -> PolicyCanvasAutomationPolicyContribution {
     var contribution = PolicyCanvasAutomationPolicyContribution()
     for node in reachableNodes where node.id != sourceNodeID {
-      if node.kind == .dryRunGate || node.policyKind?.kind == "dry_run_gate" {
+      if node.kind == .dryRunGate || node.policyKind?.isDryRunGate == true {
         contribution.dryRun = true
       }
       guard let binding = node.automationBinding, binding.isEnabled else {

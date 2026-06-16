@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 enum PolicyCanvasAutomationPaletteSection: String, CaseIterable, Identifiable {
@@ -214,7 +215,7 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
     }
   }
 
-  var automationBinding: TaskBoardPolicyPipelineAutomationBinding {
+  var automationBinding: PolicyGraphAutomationBinding {
     switch self {
     case .clipboardMonitor:
       .canvasDefault(source: .clipboard)

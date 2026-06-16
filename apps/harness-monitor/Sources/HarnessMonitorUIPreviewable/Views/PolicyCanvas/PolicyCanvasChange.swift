@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 /// Value-typed description of a single persistable canvas mutation, plus
@@ -183,8 +184,8 @@ enum PolicyCanvasChange {
     to: PolicyCanvasNodeKind,
     fromSubtitle: String,
     toSubtitle: String,
-    fromPolicyKind: TaskBoardPolicyPipelineNodeKind?,
-    toPolicyKind: TaskBoardPolicyPipelineNodeKind?,
+    fromPolicyKind: PolicyGraphNodeKind?,
+    toPolicyKind: PolicyGraphNodeKind?,
     removedEdges: [PolicyCanvasEdge]
   )
 
@@ -199,14 +200,14 @@ enum PolicyCanvasChange {
   /// committed edit, not one per character.
   case setNodeSubtitle(id: String, from: String, to: String)
 
-  /// Commit a node's `policyKind` (daemon-side `TaskBoardPolicyPipelineNodeKind`)
+  /// Commit a node's `policyKind` (daemon-side `PolicyGraphNodeKind`)
   /// replacement. Inverse swaps `from` and `to`. Inspector picker writes go
   /// through this so the user can Cmd-Z a kind switch without re-typing the
   /// surrounding policy fields.
   case setNodePolicyKind(
     id: String,
-    from: TaskBoardPolicyPipelineNodeKind?,
-    to: TaskBoardPolicyPipelineNodeKind?
+    from: PolicyGraphNodeKind?,
+    to: PolicyGraphNodeKind?
   )
 
   /// Commit a switch node's ordered cases together with the derived output
@@ -216,8 +217,8 @@ enum PolicyCanvasChange {
   /// connection affected by a case add/remove.
   case setNodeSwitchCases(
     id: String,
-    from: TaskBoardPolicyPipelineNodeKind,
-    to: TaskBoardPolicyPipelineNodeKind,
+    from: PolicyGraphNodeKind,
+    to: PolicyGraphNodeKind,
     fromOutputPortTitles: [String],
     toOutputPortTitles: [String],
     fromEdges: [PolicyCanvasEdge],
@@ -230,8 +231,8 @@ enum PolicyCanvasChange {
   /// participate in automation policy compilation.
   case setNodeAutomationBinding(
     id: String,
-    from: TaskBoardPolicyPipelineAutomationBinding?,
-    to: TaskBoardPolicyPipelineAutomationBinding?
+    from: PolicyGraphAutomationBinding?,
+    to: PolicyGraphAutomationBinding?
   )
 
   /// Commit an edge's free-form condition string edit. Registered on
@@ -383,8 +384,8 @@ struct PolicyCanvasReflowNodeChange {
   let id: String
   let fromPosition: CGPoint
   let toPosition: CGPoint
-  let fromLayoutSource: TaskBoardPolicyPipelineNodeLayoutSource?
-  let toLayoutSource: TaskBoardPolicyPipelineNodeLayoutSource?
+  let fromLayoutSource: PolicyGraphNodeLayoutSource?
+  let toLayoutSource: PolicyGraphNodeLayoutSource?
 }
 
 struct PolicyCanvasEdgeReflowChange {

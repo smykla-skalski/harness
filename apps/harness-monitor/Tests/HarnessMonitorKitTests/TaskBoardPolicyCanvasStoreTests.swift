@@ -1,4 +1,5 @@
 import HarnessMonitorPolicyCanvas
+import HarnessMonitorPolicyModels
 import XCTest
 
 @testable import HarnessMonitorKit
@@ -240,12 +241,12 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
     let firstEffectiveDocument = makeSupervisorPolicyDocument(
       revision: 2,
       ruleID: "rule-one",
-      decision: "deny"
+      decision: .deny
     )
     let secondEffectiveDocument = makeSupervisorPolicyDocument(
       revision: 3,
       ruleID: "rule-two",
-      decision: "allow"
+      decision: .allow
     )
     client.taskBoardPolicyPipelinesByCanvasID = [
       "canvas-draft": draftDocument,
@@ -370,7 +371,7 @@ private func makeTaskBoardPolicyCanvasSummary(
 private func makeSupervisorPolicyDocument(
   revision: UInt64,
   ruleID: String,
-  decision: String
+  decision: PolicyGraphDecision
 ) -> TaskBoardPolicyPipelineDocument {
   TaskBoardPolicyPipelineDocument(
     revision: revision,
@@ -379,11 +380,7 @@ private func makeSupervisorPolicyDocument(
       TaskBoardPolicyPipelineNode(
         id: "supervisor-\(ruleID)",
         title: "Supervisor \(ruleID)",
-        kind: TaskBoardPolicyPipelineNodeKind(
-          kind: "supervisor_rule",
-          ruleId: ruleID,
-          decision: decision
-        )
+        kind: .supervisorRule(decision: decision, reasonCodes: [])
       )
     ],
     edges: [],

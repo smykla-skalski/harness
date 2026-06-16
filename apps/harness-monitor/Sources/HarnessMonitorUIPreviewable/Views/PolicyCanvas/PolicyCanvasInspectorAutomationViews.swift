@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 extension PolicyCanvasEditForm {
@@ -14,7 +15,7 @@ extension PolicyCanvasEditForm {
           isOn: Binding(
             get: { node.automationBinding != nil },
             set: { isEnabled in
-              let defaultBinding: TaskBoardPolicyPipelineAutomationBinding =
+              let defaultBinding: PolicyGraphAutomationBinding =
                 node.kind == .source ? .canvasDefault() : .canvasComponent()
               viewModel.commitSelectedNodeAutomationBinding(
                 isEnabled ? (node.automationBinding ?? defaultBinding) : nil
@@ -66,7 +67,7 @@ extension PolicyCanvasEditForm {
   }
 
   private func automationSourcePicker(
-    _ binding: TaskBoardPolicyPipelineAutomationBinding
+    _ binding: PolicyGraphAutomationBinding
   ) -> some View {
     PolicyCanvasInspectorField(label: "Event") {
       Picker(
@@ -89,7 +90,7 @@ extension PolicyCanvasEditForm {
   }
 
   private func automationPriorityStepper(
-    _ binding: TaskBoardPolicyPipelineAutomationBinding
+    _ binding: PolicyGraphAutomationBinding
   ) -> some View {
     PolicyCanvasInspectorField(label: "Priority") {
       Stepper(
@@ -134,7 +135,7 @@ extension PolicyCanvasEditForm {
   }
 
   private func automationSourceAppControls(
-    _ binding: TaskBoardPolicyPipelineAutomationBinding
+    _ binding: PolicyGraphAutomationBinding
   ) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       PolicyCanvasInspectorField(label: "Apps") {
@@ -184,7 +185,7 @@ extension PolicyCanvasEditForm {
   @ViewBuilder
   private func nodeAutomationBindingDetailControls(
     node: PolicyCanvasNode,
-    binding: TaskBoardPolicyPipelineAutomationBinding
+    binding: PolicyGraphAutomationBinding
   ) -> some View {
     let usesSourceDefaults = node.kind == .source
     if node.kind == .source {
@@ -203,7 +204,7 @@ extension PolicyCanvasEditForm {
   }
 
   private func automationBindingToggleGroups(
-    _ binding: TaskBoardPolicyPipelineAutomationBinding,
+    _ binding: PolicyGraphAutomationBinding,
     usesSourceDefaults: Bool
   ) -> some View {
     Group {
@@ -251,7 +252,7 @@ extension PolicyCanvasEditForm {
   }
 
   private func automationReviewScreenshotControls(
-    _ binding: TaskBoardPolicyPipelineAutomationBinding
+    _ binding: PolicyGraphAutomationBinding
   ) -> some View {
     let ocr = binding.resolvedOCRConfiguration ?? AutomationPolicyOCRConfiguration()
     let extraction =
@@ -268,7 +269,7 @@ extension PolicyCanvasEditForm {
 
   private func automationReviewExtractionToggles(
     extraction: ReviewPullRequestExtractionConfiguration,
-    binding: TaskBoardPolicyPipelineAutomationBinding
+    binding: PolicyGraphAutomationBinding
   ) -> some View {
     Group {
       Toggle(
@@ -322,7 +323,7 @@ extension PolicyCanvasEditForm {
     }
   }
 
-  func commitAutomationBinding(_ binding: TaskBoardPolicyPipelineAutomationBinding) {
+  func commitAutomationBinding(_ binding: PolicyGraphAutomationBinding) {
     viewModel.commitSelectedNodeAutomationBinding(binding)
   }
 

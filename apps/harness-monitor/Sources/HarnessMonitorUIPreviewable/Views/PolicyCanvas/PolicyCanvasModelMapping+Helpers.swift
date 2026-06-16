@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
+import HarnessMonitorPolicyModels
 import SwiftUI
 
 struct PolicyCanvasNodeLookup {
@@ -79,7 +80,7 @@ struct PolicyCanvasDocumentLayoutLookup {
 
   func nodeLayout(
     for nodeID: String
-  ) -> (position: TaskBoardPolicyCanvasPoint, source: TaskBoardPolicyPipelineNodeLayoutSource?)? {
+  ) -> (position: TaskBoardPolicyCanvasPoint, source: PolicyGraphNodeLayoutSource?)? {
     guard let node = nodeLayoutsByID[nodeID] else {
       return nil
     }
@@ -111,7 +112,7 @@ func synthesizedGroupFrame(
 extension TaskBoardPolicyPipelineLayout {
   func nodeLayout(
     for nodeID: String
-  ) -> (position: TaskBoardPolicyCanvasPoint, source: TaskBoardPolicyPipelineNodeLayoutSource?)? {
+  ) -> (position: TaskBoardPolicyCanvasPoint, source: PolicyGraphNodeLayoutSource?)? {
     guard let node = nodes.first(where: { $0.nodeId == nodeID }) else {
       return nil
     }
@@ -130,7 +131,7 @@ extension TaskBoardPolicyCanvasRect {
 
 func taskBoardPolicyNodeKind(
   for kind: PolicyCanvasNodeKind
-) -> TaskBoardPolicyPipelineNodeKind {
+) -> PolicyGraphNodeKind {
   kind.defaultPolicyKind
 }
 
