@@ -55,7 +55,8 @@ extension WebSocketProtocolParityTests {
         actor: "leader-1",
         localeIdentifier: "en_US",
         requestedSinks: [.localDaemon],
-        routeTarget: .codexPrompt
+        routeTarget: .codexPrompt,
+        requiresConfirmation: true
       )
     )
     _ = try await transport.appendVoiceAudioChunk(
