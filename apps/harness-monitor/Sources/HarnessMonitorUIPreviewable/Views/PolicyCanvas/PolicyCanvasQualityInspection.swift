@@ -16,6 +16,7 @@ struct PolicyCanvasQualityWorkerInput: Equatable, Sendable {
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
   let routes: [String: PolicyCanvasEdgeRoute]
+  let labelPositions: [String: CGPoint]
   let portMarkerLayout: PolicyCanvasPortMarkerLayout
 }
 
@@ -36,6 +37,7 @@ actor PolicyCanvasQualityWorker {
       groups: input.groups,
       edges: input.edges,
       routes: input.routes,
+      labelPositions: input.labelPositions,
       portMarkerLayout: input.portMarkerLayout
     )
     cachedInput = input
@@ -58,6 +60,7 @@ private struct PolicyCanvasQualityInspectionKey: Equatable {
 struct PolicyCanvasQualityInspectionModifier: ViewModifier {
   let viewModel: PolicyCanvasViewModel
   let routes: [String: PolicyCanvasEdgeRoute]
+  let labelPositions: [String: CGPoint]
   let portMarkerLayout: PolicyCanvasPortMarkerLayout
   let routeSignature: PolicyCanvasRouteWorkerOutputSignature
   let isEnabled: Bool
@@ -95,6 +98,7 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
           groups: viewModel.groups,
           edges: viewModel.edges,
           routes: routes,
+          labelPositions: labelPositions,
           portMarkerLayout: portMarkerLayout
         )
         let computed = await worker.compute(input: input)
@@ -115,6 +119,7 @@ extension View {
   func policyCanvasQualityInspection(
     viewModel: PolicyCanvasViewModel,
     routes: [String: PolicyCanvasEdgeRoute],
+    labelPositions: [String: CGPoint],
     portMarkerLayout: PolicyCanvasPortMarkerLayout,
     routeSignature: PolicyCanvasRouteWorkerOutputSignature,
     isEnabled: Bool,
@@ -124,6 +129,7 @@ extension View {
       PolicyCanvasQualityInspectionModifier(
         viewModel: viewModel,
         routes: routes,
+        labelPositions: labelPositions,
         portMarkerLayout: portMarkerLayout,
         routeSignature: routeSignature,
         isEnabled: isEnabled,
