@@ -717,11 +717,14 @@ fn zero_value(swift_type: &str) -> Option<String> {
 type DefaultLiterals = HashMap<String, String>;
 
 /// Cross-type facts needed to fill bare `#[serde(default)]` fields: each enum's
-/// `#[default]` variant (as a Swift case) and the structs that derive `Default`
-/// (so a zero-argument initializer exists to call).
+/// `#[default]` variant (as a Swift case), the structs that derive `Default`
+/// (so a zero-argument initializer exists to call), and every literal `const`
+/// (as a Swift literal) so a `#[serde(default = "fn")]` whose body returns a
+/// named constant resolves to that constant's value.
 struct SymbolTable {
     enum_default_variant: HashMap<String, String>,
     structs_with_default: HashSet<String>,
+    const_literals: HashMap<String, String>,
 }
 
 /// The serde container config read from a type's attributes.
@@ -842,7 +845,7 @@ fn serde_field(attrs: &[Attribute]) -> SerdeField {
 /// Parse `defaults.rs`, mapping each zero-argument default function to the Swift
 /// literal it returns. The `is_default_*` predicate helpers take a parameter and
 /// are skipped.
-fn parse_defaults(source: &str) -> DefaultLiterals {
+fn parse_defaults(source: &str, symbols: &SymbolTable) -> DefaultLiterals {
     let file = syn::parse_file(source).expect("defaults.rs parses");
     let mut literals = DefaultLiterals::new();
     for item in file.items {
@@ -852,7 +855,7 @@ fn parse_defaults(source: &str) -> DefaultLiterals {
         if !function.sig.inputs.is_empty() {
             continue;
         }
-        if let Some(literal) = block_literal(&function.block) {
+        if let Some(literal) = block_literal(&function.block, symbols) {
             literals.insert(function.sig.ident.to_string(), literal);
         }
     }
@@ -860,19 +863,32 @@ fn parse_defaults(source: &str) -> DefaultLiterals {
 }
 
 /// The Swift literal returned by a single-expression function body.
-fn block_literal(block: &syn::Block) -> Option<String> {
+fn block_literal(block: &syn::Block, symbols: &SymbolTable) -> Option<String> {
     let [Stmt::Expr(expr, _)] = block.stmts.as_slice() else {
         return None;
     };
-    expr_literal(expr)
+    expr_literal(expr, symbols)
 }
 
-/// Render a literal expression (including `"...".to_string()`) as Swift.
-fn expr_literal(expr: &Expr) -> Option<String> {
+/// Render a default-fn body expression as a Swift literal: a Rust literal
+/// (including `"...".to_string()`), an enum-variant path (`SessionRole::Worker`
+/// -> `.worker`), or a named constant (`DEFAULT_ROWS` -> its collected literal).
+fn expr_literal(expr: &Expr, symbols: &SymbolTable) -> Option<String> {
     match expr {
         Expr::Lit(literal) => lit_to_swift(&literal.lit),
         Expr::MethodCall(call) if call.method == "to_string" && call.args.is_empty() => {
-            expr_literal(&call.receiver)
+            expr_literal(&call.receiver, symbols)
+        }
+        Expr::Path(path) => {
+            let segments = &path.path.segments;
+            let last = segments.last()?.ident.to_string();
+            if segments.len() >= 2 {
+                // `Type::Variant` -> the Swift enum case `.variant`.
+                Some(format!(".{}", escape_keyword(pascal_to_camel(&last))))
+            } else {
+                // A bare identifier names a constant collected by the symbol table.
+                symbols.const_literals.get(&last).cloned()
+            }
         }
         _ => None,
     }
@@ -893,6 +909,7 @@ fn lit_to_swift(lit: &Lit) -> Option<String> {
 fn build_symbol_table(sources: &[&str]) -> SymbolTable {
     let mut enum_default_variant = HashMap::new();
     let mut structs_with_default = HashSet::new();
+    let mut const_literals = HashMap::new();
     for source in sources {
         let file = syn::parse_file(source).expect("policy source parses");
         for item in file.items {
@@ -912,11 +929,24 @@ fn build_symbol_table(sources: &[&str]) -> SymbolTable {
                         );
                     }
                 }
+                Item::Const(item) => {
+                    // Literal constants only (`const ROWS: u16 = 30;`); a const
+                    // whose value is itself an expression is out of scope.
+                    if let Expr::Lit(literal) = item.expr.as_ref() {
+                        if let Some(swift) = lit_to_swift(&literal.lit) {
+                            const_literals.insert(item.ident.to_string(), swift);
+                        }
+                    }
+                }
                 _ => {}
             }
         }
     }
-    SymbolTable { enum_default_variant, structs_with_default }
+    SymbolTable {
+        enum_default_variant,
+        structs_with_default,
+        const_literals,
+    }
 }
 
 /// Build Swift field descriptors from named Rust fields.
@@ -1221,8 +1251,8 @@ fn modules() -> Vec<GeneratedModule> {
 /// The driver parses one source at a time, dropping each AST before the next, so
 /// only the current file's syntax tree and one descriptor are live at once.
 fn generate_module(module: &GeneratedModule) -> String {
-    let defaults = parse_defaults(module.defaults.unwrap_or(""));
     let symbols = build_symbol_table(module.sources);
+    let defaults = parse_defaults(module.defaults.unwrap_or(""), &symbols);
     let mut out = format!(
         "// Generated by examples/policy-codegen.rs from {}\n\
          // Do not edit by hand - rerun: mise run codegen\n\n\
@@ -1673,6 +1703,25 @@ public enum ManagedAgentSnapshotWire: Codable, Equatable, Sendable {
         let mut out = String::new();
         emit_tagged_enum(&mut out, &spec);
         assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn resolves_enum_variant_and_const_default_fns() {
+        let source = "\
+const DEFAULT_ROWS: u16 = 30;
+fn default_role() -> SessionRole { SessionRole::Worker }
+fn default_rows() -> u16 { DEFAULT_ROWS }
+fn default_label() -> String { \"draft\".to_string() }
+";
+        let symbols = build_symbol_table(&[source]);
+        let defaults = parse_defaults(source, &symbols);
+
+        // Enum-variant body -> the Swift enum case.
+        assert_eq!(defaults.get("default_role"), Some(&".worker".to_string()));
+        // Named-constant body -> the constant's collected literal.
+        assert_eq!(defaults.get("default_rows"), Some(&"30".to_string()));
+        // Plain literal bodies keep resolving as before.
+        assert_eq!(defaults.get("default_label"), Some(&"\"draft\"".to_string()));
     }
 
     #[test]
