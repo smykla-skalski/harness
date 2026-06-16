@@ -187,7 +187,7 @@ extension VoiceAudioFormatDescriptor {
   init(format: AVAudioFormat) {
     self.init(
       sampleRate: format.sampleRate,
-      channelCount: Int(format.channelCount),
+      channelCount: UInt(format.channelCount),
       commonFormat: format.commonFormat.voiceDescription,
       interleaved: format.isInterleaved
     )

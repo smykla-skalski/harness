@@ -459,6 +459,16 @@ fn pascal_to_snake(name: &str) -> String {
     out
 }
 
+/// The serde wire string for a PascalCase enum variant under the container's
+/// `rename_all`: snake_case by default, camelCase when the enum sets
+/// `rename_all = "camelCase"` (`SpeechToText` -> `speechToText`).
+fn variant_wire_value(variant: &str, rename_all: Option<&str>) -> String {
+    match rename_all {
+        Some("camelCase") => pascal_to_camel(variant),
+        _ => pascal_to_snake(variant),
+    }
+}
+
 /// A snake_case Rust field name to a Swift camelCase property
 /// (`input_ports` -> `inputPorts`).
 fn snake_to_camel(name: &str) -> String {
@@ -609,6 +619,7 @@ struct SymbolTable {
 /// The serde container config read from a type's attributes.
 struct SerdeContainer {
     tag: Option<String>,
+    rename_all: Option<String>,
 }
 
 /// The serde field config read from a field's attributes.
@@ -655,24 +666,28 @@ fn has_default_attr(attrs: &[Attribute]) -> bool {
 /// Read `#[serde(tag = "...")]` from a type's attributes.
 fn serde_container(attrs: &[Attribute]) -> SerdeContainer {
     let mut tag = None;
+    let mut rename_all = None;
     for attr in attrs {
         if !attr.path().is_ident("serde") {
             continue;
         }
         let _ = attr.parse_nested_meta(|meta| {
             let is_tag = meta.path.is_ident("tag");
+            let is_rename_all = meta.path.is_ident("rename_all");
             if let Ok(value) = meta.value() {
                 let lit: Lit = value.parse()?;
-                if is_tag {
-                    if let Lit::Str(text) = lit {
+                if let Lit::Str(text) = lit {
+                    if is_tag {
                         tag = Some(text.value());
+                    } else if is_rename_all {
+                        rename_all = Some(text.value());
                     }
                 }
             }
             Ok(())
         });
     }
-    SerdeContainer { tag }
+    SerdeContainer { tag, rename_all }
 }
 
 /// Read `#[serde(rename = ..., default[ = "..."])]` from a field's attributes.
@@ -886,6 +901,7 @@ fn is_string_newtype(item: &ItemStruct) -> bool {
 
 /// Build a `String`-backed enum descriptor from a fieldless Rust enum.
 fn build_string_enum(item: &ItemEnum) -> SwiftStringEnum {
+    let rename_all = serde_container(&item.attrs).rename_all;
     let cases = item
         .variants
         .iter()
@@ -897,7 +913,10 @@ fn build_string_enum(item: &ItemEnum) -> SwiftStringEnum {
                 variant.ident
             );
             let name = variant.ident.to_string();
-            (escape_keyword(pascal_to_camel(&name)), pascal_to_snake(&name))
+            (
+                escape_keyword(pascal_to_camel(&name)),
+                variant_wire_value(&name, rename_all.as_deref()),
+            )
         })
         .collect();
     SwiftStringEnum { name: item.ident.to_string(), cases }
@@ -910,10 +929,11 @@ fn build_tagged_enum(
     defaults: &DefaultLiterals,
     symbols: &SymbolTable,
 ) -> SwiftTaggedEnum {
+    let rename_all = serde_container(&item.attrs).rename_all;
     let variants = item
         .variants
         .iter()
-        .map(|variant| build_tagged_variant(variant, defaults, symbols))
+        .map(|variant| build_tagged_variant(variant, rename_all.as_deref(), defaults, symbols))
         .collect();
     SwiftTaggedEnum { name: item.ident.to_string(), tag: tag.to_string(), variants }
 }
@@ -921,6 +941,7 @@ fn build_tagged_enum(
 /// Build one tagged-enum variant descriptor, inlining the payload shape.
 fn build_tagged_variant(
     variant: &Variant,
+    rename_all: Option<&str>,
     defaults: &DefaultLiterals,
     symbols: &SymbolTable,
 ) -> SwiftTaggedVariant {
@@ -940,7 +961,7 @@ fn build_tagged_variant(
     };
     SwiftTaggedVariant {
         case_name: escape_keyword(pascal_to_camel(&name)),
-        raw_tag: pascal_to_snake(&name),
+        raw_tag: variant_wire_value(&name, rename_all),
         payload,
     }
 }
@@ -994,6 +1015,7 @@ const POLICY_DEFAULTS_SOURCE: &str = include_str!("../src/task_board/policy_grap
 const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
     include_str!("../src/task_board/git_identity_defaults.rs");
 const OPENROUTER_SOURCE: &str = include_str!("../src/daemon/protocol/openrouter_models.rs");
+const VOICE_SOURCE: &str = include_str!("../src/daemon/protocol/voice.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, an optional defaults source informing decode defaults, a short
@@ -1036,6 +1058,13 @@ fn modules() -> Vec<GeneratedModule> {
             description: "the Rust OpenRouter model catalog",
             defaults: None,
             sources: &[OPENROUTER_SOURCE],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/VoiceWireTypes.generated.swift",
+            description: "the Rust voice session protocol",
+            defaults: Some(VOICE_SOURCE),
+            sources: &[VOICE_SOURCE],
         },
     ]
 }
@@ -1153,6 +1182,30 @@ ExpressibleByStringLiteral, CustomStringConvertible {
         assert_eq!(pascal_to_camel("DryRun"), "dryRun");
         assert_eq!(pascal_to_camel("OcrImage"), "ocrImage");
         assert_eq!(pascal_to_camel("Hub"), "hub");
+    }
+
+    #[test]
+    fn variant_wire_value_respects_rename_all() {
+        assert_eq!(variant_wire_value("SpeechToText", Some("camelCase")), "speechToText");
+        assert_eq!(variant_wire_value("SpeechToText", Some("snake_case")), "speech_to_text");
+        assert_eq!(variant_wire_value("SpeechToText", None), "speech_to_text");
+        assert_eq!(variant_wire_value("Live", Some("camelCase")), "live");
+    }
+
+    #[test]
+    fn builds_camel_case_string_enum_from_rename_all() {
+        let item: ItemEnum = syn::parse_str(
+            "#[serde(rename_all = \"camelCase\")] enum VoiceSink { SpeechToText, Raw }",
+        )
+        .expect("enum parses");
+        let spec = build_string_enum(&item);
+        assert_eq!(
+            spec.cases,
+            vec![
+                ("speechToText".to_string(), "speechToText".to_string()),
+                ("raw".to_string(), "raw".to_string()),
+            ]
+        );
     }
 
     #[test]
