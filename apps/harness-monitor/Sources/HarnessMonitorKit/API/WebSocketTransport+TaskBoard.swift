@@ -129,12 +129,14 @@ extension WebSocketTransport {
 
   public func taskBoardHostLocal() async throws -> TaskBoardHostMachine {
     let value = try await rpc(method: .taskBoardHostLocal)
-    return try decode(value)
+    let wire: MachineWire = try decodePolicyWire(value)
+    return TaskBoardHostMachine(wire: wire)
   }
 
   public func taskBoardHostList() async throws -> [TaskBoardHostMachine] {
     let value = try await rpc(method: .taskBoardHostList)
-    return try decode(value)
+    let wire: [MachineWire] = try decodePolicyWire(value)
+    return wire.map(TaskBoardHostMachine.init(wire:))
   }
 
   public func setTaskBoardHostProjectTypes(
@@ -142,7 +144,8 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardHostMachine {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardHostSetProjectTypes, params: params)
-    return try decode(value)
+    let wire: MachineWire = try decodePolicyWire(value)
+    return TaskBoardHostMachine(wire: wire)
   }
 
   public func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {

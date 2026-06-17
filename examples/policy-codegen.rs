@@ -1126,6 +1126,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardWorkflowState",
     "TaskBoardWorkflowStatus",
     "TaskUsage",
+    // task_board machines.rs host machine: Swift hand is TaskBoardHostMachine
+    // (renamed); agent_modes references the adopted TaskBoardAgentMode bare.
+    "Machine",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -2052,6 +2055,11 @@ const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskBoardWorkflowStatus",
     "TaskUsage",
 ];
+const TASK_BOARD_MACHINES_SOURCE: &str = include_str!("../src/task_board/machines.rs");
+const TASK_BOARD_MACHINES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardMachineWireTypes.generated.swift";
+// The host Machine struct (Swift hand TaskBoardHostMachine); references the adopted
+// TaskBoardAgentMode bare. MachineRegistry is excluded by the allow-list.
+const TASK_BOARD_MACHINES_EMIT_ONLY: &[&str] = &["Machine"];
 const TASK_BOARD_CANVAS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardPolicyCanvasWireTypes.generated.swift";
 // The policy-canvas read types in the task_board.rs facade. The rest of that file
 // (flatten, alias and struct-variant-tagged types) is excluded by the allow-list,
@@ -2232,6 +2240,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[TASK_BOARD_TYPES_SOURCE],
         },
+        GeneratedModule {
+            output: TASK_BOARD_MACHINES_OUTPUT,
+            description: "the Rust task-board host machine type",
+            defaults: &[],
+            sources: &[TASK_BOARD_MACHINES_SOURCE],
+        },
     ]
 }
 
@@ -2256,6 +2270,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_ENUMS_OUTPUT => TASK_BOARD_ENUMS_EMIT_ONLY,
         TASK_BOARD_SUMMARY_OUTPUT => TASK_BOARD_SUMMARY_EMIT_ONLY,
         TASK_BOARD_ITEM_OUTPUT => TASK_BOARD_ITEM_EMIT_ONLY,
+        TASK_BOARD_MACHINES_OUTPUT => TASK_BOARD_MACHINES_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
