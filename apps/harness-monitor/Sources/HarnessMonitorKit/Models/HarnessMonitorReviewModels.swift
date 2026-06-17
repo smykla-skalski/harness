@@ -113,12 +113,7 @@ public enum ReviewVerdict: String, Codable, CaseIterable, Sendable {
   }
 }
 
-public enum ReviewPointState: String, Codable, CaseIterable, Sendable {
-  case open
-  case agreed
-  case disputed
-  case resolved
-
+extension ReviewPointState {
   public var title: String {
     switch self {
     case .open:

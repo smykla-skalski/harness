@@ -896,8 +896,10 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "WsPushEvent",
     "WsChunkFrame",
     // session tasks (session/types/tasks.rs): 10 review-flow structs, generate-only.
-    // WorkItem is the task-board core; the rest are its nested review state. The 6
-    // enums + ReviewPoint they reference are SKIP'd (bare Swift hand) - see SKIP_TYPES.
+    // WorkItem is the task-board core; the rest are its nested review state. The 3
+    // plain enums (TaskSeverity/TaskSource/ReviewPointState) are adopted generated
+    // bare; the 3 legacy-decode enums + ReviewPoint stay bare Swift hand - see
+    // SKIP_TYPES.
     "WorkItem",
     "TaskNote",
     "TaskCheckpoint",
@@ -940,17 +942,16 @@ const SKIP_TYPES: &[&str] = &[
     "WsConfigPayload",
     "WsRuntimeProbeUpdate",
     "WsAcpInspect",
-    // session tasks enums: closed snake_case, but each carries app divergence the
-    // generated form would regress - TaskStatus has a legacy-tolerant custom decode
-    // (accepts in_progress AND legacy inProgress), TaskSeverity has .title, etc. The
-    // structs reference these as the existing bare Swift hand enums; adopting them
-    // (preserving the app behavior) is separate per-enum work.
-    "TaskSeverity",
+    // session tasks enums kept hand-authored: each has a legacy-tolerant custom
+    // init(from:) a generated plain enum would regress - TaskStatus accepts legacy
+    // camelCase inProgress/inReview/awaitingReview, TaskQueuePolicy accepts legacy
+    // reassignWhenFree, ReviewVerdict accepts request-changes/requestChanges. The
+    // three plain enums (TaskSeverity/TaskSource/ReviewPointState) carry only a
+    // .title and no custom decode, so they are adopted generated (bare, closed) -
+    // their .title moves to a Swift extension and the structs reference them bare.
     "TaskStatus",
     "TaskQueuePolicy",
-    "TaskSource",
     "ReviewVerdict",
-    "ReviewPointState",
     // ReviewPoint (struct) is referenced bare by the already-generated
     // SessionRequestsWireTypes (TaskSubmitReviewRequestWire.points) whose +Wire
     // mapping passes model.points straight through; suffixing it would ripple that

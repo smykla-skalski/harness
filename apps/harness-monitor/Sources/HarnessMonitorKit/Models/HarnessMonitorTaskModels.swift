@@ -1,11 +1,6 @@
 import Foundation
 
-public enum TaskSeverity: String, Codable, CaseIterable, Sendable {
-  case low
-  case medium
-  case high
-  case critical
-
+extension TaskSeverity {
   public var title: String {
     switch self {
     case .low:
@@ -171,13 +166,7 @@ public enum TaskQueuePolicy: String, Codable, CaseIterable, Sendable {
   }
 }
 
-public enum TaskSource: String, Codable, CaseIterable, Sendable {
-  case manual
-  case observe
-  case signal
-  case system
-  case improver
-
+extension TaskSource {
   public var title: String {
     switch self {
     case .manual:
