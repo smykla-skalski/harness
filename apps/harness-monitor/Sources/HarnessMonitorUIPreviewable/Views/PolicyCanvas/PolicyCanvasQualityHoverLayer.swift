@@ -172,7 +172,16 @@ func policyCanvasQualityHoverMarks(
     add(.detours, policyCanvasHoverPolyline(violation.points, width: 16))
   }
   for violation in report.nodeDistance {
-    add(.nodeDistance, policyCanvasHoverLine(violation.gapStart, violation.gapEnd, width: 14))
+    // Trace the whole mark - both end caps reaching to the nodes plus the bar
+    // between them - so the caps are hoverable too. Butt cap and miter join keep
+    // the band square: it stops flush at the nodes instead of a round overhang.
+    add(
+      .nodeDistance,
+      policyCanvasHoverPolyline(
+        [violation.gapStartCap, violation.gapStart, violation.gapEnd, violation.gapEndCap],
+        width: 14, cap: .butt, join: .miter
+      )
+    )
   }
   for violation in report.wrongTurns {
     // Round-capped fat line only: the width-16 cap (radius 8) already covers the
@@ -213,7 +222,12 @@ private func policyCanvasHoverLine(_ start: CGPoint, _ end: CGPoint, width: CGFl
   return line.strokedPath(StrokeStyle(lineWidth: width, lineCap: .round))
 }
 
-private func policyCanvasHoverPolyline(_ points: [CGPoint], width: CGFloat) -> Path {
+private func policyCanvasHoverPolyline(
+  _ points: [CGPoint],
+  width: CGFloat,
+  cap: CGLineCap = .round,
+  join: CGLineJoin = .round
+) -> Path {
   var line = Path()
   guard let first = points.first else {
     return line
@@ -222,7 +236,7 @@ private func policyCanvasHoverPolyline(_ points: [CGPoint], width: CGFloat) -> P
   for point in points.dropFirst() {
     line.addLine(to: point)
   }
-  return line.strokedPath(StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
+  return line.strokedPath(StrokeStyle(lineWidth: width, lineCap: cap, lineJoin: join))
 }
 
 /// A solid, slightly-outset rounded rect over a frame mark (body hit, long-edge

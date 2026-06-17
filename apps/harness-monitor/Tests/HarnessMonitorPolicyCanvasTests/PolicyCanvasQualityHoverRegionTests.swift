@@ -125,6 +125,24 @@ struct PolicyCanvasQualityHoverRegionTests {
     #expect(marks(under: CGPoint(x: 200, y: 160), in: report).isEmpty)
   }
 
+  @Test("a node-distance mark covers the bar and both end caps reaching its nodes")
+  func nodeDistanceMarkCoversCaps() {
+    var report = PolicyCanvasGraphQualityReport.empty
+    report.nodeDistance = [
+      PolicyCanvasNodeDistanceViolation(
+        edgeID: "e", sourceID: "s", targetID: "t", distance: 500,
+        gapStart: CGPoint(x: 100, y: 100), gapEnd: CGPoint(x: 600, y: 100),
+        gapStartCap: CGPoint(x: 100, y: 180), gapEndCap: CGPoint(x: 600, y: 40))
+    ]
+    // The horizontal bar resolves, and so does a point partway up each end cap -
+    // the cap reaching down to the source and up to the target are both hoverable.
+    #expect(marks(under: CGPoint(x: 350, y: 100), in: report).count == 1)
+    #expect(marks(under: CGPoint(x: 100, y: 150), in: report).count == 1)
+    #expect(marks(under: CGPoint(x: 600, y: 70), in: report).count == 1)
+    // Empty space off the mark stays pass-through.
+    #expect(marks(under: CGPoint(x: 350, y: 300), in: report).isEmpty)
+  }
+
   private func portOverlap(at point: CGPoint) -> PolicyCanvasPortSpacingViolation {
     PolicyCanvasPortSpacingViolation(
       kind: .overlap, nodeID: "n", side: .leading,
