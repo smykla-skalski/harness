@@ -802,6 +802,27 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "ReviewFileViewedOutcome",
     "ReviewFilesViewedResult",
     "ReviewsFilesViewedResponse",
+    // reviews timeline (timeline/types.rs + mod.rs): wire/model split, generated
+    // generate-only (decode contract test, no hand mapping). Actor -> ActorWire
+    // dodges the Swift `actor` keyword; ReviewTimelineEntry is an internally
+    // tagged newtype enum.
+    "Actor",
+    "ReviewTimelineEntry",
+    "IssueCommentEntry",
+    "ReviewEntry",
+    "ReviewState",
+    "ReviewInlineCommentEntry",
+    "ReviewThreadEntry",
+    "ReviewThreadCommentEntry",
+    "CommitEntry",
+    "HeadRefForcePushedEntry",
+    "SimpleActorEventEntry",
+    "SimpleActorEventKind",
+    "UnknownEntry",
+    "ReviewsTimelineRequest",
+    "TimelinePageDirection",
+    "ReviewsTimelineResponse",
+    "TimelinePageInfo",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -888,7 +909,8 @@ fn map_scalar(ident: &str) -> String {
         "DateTime" => "String",
         // serde_json::Value maps to the app's open JSON value type, which
         // round-trips an arbitrary payload exactly like serde_json::Value.
-        "Value" => "JSONValue",
+        // `JsonValue` is the common `use serde_json::Value as JsonValue` alias.
+        "Value" | "JsonValue" => "JSONValue",
         other => return swift_type_name(other, WIRE_SUFFIXED_TYPES),
     }
     .to_string()
@@ -916,6 +938,9 @@ fn zero_value(swift_type: &str) -> Option<String> {
         "String" => "\"\"",
         "Float" | "Double" | "Int" | "Int8" | "Int16" | "Int32" | "Int64" | "UInt" | "UInt8"
         | "UInt16" | "UInt32" | "UInt64" => "0",
+        // An open JSON value defaults to its null case, matching serde's
+        // `#[serde(default)]` on a `serde_json::Value` (which is `Value::Null`).
+        "JSONValue" => "JSONValue.null",
         _ => return None,
     };
     Some(value.to_string())
@@ -1463,6 +1488,12 @@ const REVIEWS_THREAD_RESOLVE_SOURCE: &str =
 const REVIEWS_FILES_MOD_SOURCE: &str = include_str!("../src/reviews/files/mod.rs");
 const REVIEWS_FILES_BLOB_SOURCE: &str = include_str!("../src/reviews/files/blob.rs");
 const REVIEWS_FILES_VIEWED_SOURCE: &str = include_str!("../src/reviews/files/viewed.rs");
+// reviews timeline: the PR timeline entries. ReviewTimelineEntry is internally
+// tagged (tag="kind") wrapping newtype entry structs (the generator re-inlines
+// the payload alongside the tag); the entries carry chrono DateTime, a boxed
+// SimpleActorEventEntry, and a JsonValue raw payload - all handled.
+const REVIEWS_TIMELINE_TYPES_SOURCE: &str = include_str!("../src/reviews/timeline/types.rs");
+const REVIEWS_TIMELINE_MOD_SOURCE: &str = include_str!("../src/reviews/timeline/mod.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, an optional defaults source informing decode defaults, a short
@@ -1574,6 +1605,13 @@ fn modules() -> Vec<GeneratedModule> {
                 REVIEWS_FILES_BLOB_SOURCE,
                 REVIEWS_FILES_VIEWED_SOURCE,
             ],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsTimelineWireTypes.generated.swift",
+            description: "the Rust reviews pull request timeline types",
+            defaults: None,
+            sources: &[REVIEWS_TIMELINE_TYPES_SOURCE, REVIEWS_TIMELINE_MOD_SOURCE],
         },
     ]
 }
@@ -1855,6 +1893,7 @@ ExpressibleByStringLiteral, CustomStringConvertible {
     fn maps_serde_json_value_to_json_value() {
         assert_eq!(swift_type_string("serde_json::Value"), "JSONValue");
         assert_eq!(swift_type_string("Value"), "JSONValue");
+        assert_eq!(swift_type_string("JsonValue"), "JSONValue");
         assert_eq!(swift_type_string("Option<serde_json::Value>"), "JSONValue?");
         assert_eq!(swift_type_string("Vec<serde_json::Value>"), "[JSONValue]");
     }
@@ -1882,10 +1921,12 @@ ExpressibleByStringLiteral, CustomStringConvertible {
 
     #[test]
     fn unwraps_box_to_the_inner_type() {
-        assert_eq!(swift_type_string("Box<SimpleActorEventEntry>"), "SimpleActorEventEntry");
+        // Use sample names absent from WIRE_SUFFIXED_TYPES so the Box unwrap is
+        // tested in isolation from the suffix logic.
+        assert_eq!(swift_type_string("Box<BoxedSample>"), "BoxedSample");
         assert_eq!(swift_type_string("Box<String>"), "String");
-        assert_eq!(swift_type_string("Option<Box<ReviewEntry>>"), "ReviewEntry?");
-        assert_eq!(swift_type_string("Vec<Box<ReviewEntry>>"), "[ReviewEntry]");
+        assert_eq!(swift_type_string("Option<Box<BoxedSample>>"), "BoxedSample?");
+        assert_eq!(swift_type_string("Vec<Box<BoxedSample>>"), "[BoxedSample]");
     }
 
     #[test]
