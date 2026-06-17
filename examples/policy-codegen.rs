@@ -122,6 +122,12 @@ const OPEN_STRING_ENUMS: &[&str] = &[
     "IssueCategory",
     "IssueCode",
     "FixSafety",
+    // task_board types.rs foundation enums adopted as the app's open TaskBoardOpenEnum
+    // conformers (listed by Swift name: AgentMode is renamed to TaskBoardAgentMode).
+    // Both already model an unknown(String) catch-all app-side; TaskBoardPriority stays
+    // closed (default emit). Their .title moves to a hand extension.
+    "TaskBoardStatus",
+    "TaskBoardAgentMode",
 ];
 
 /// Emit an open Swift enum conforming to `TaskBoardOpenEnum` (which supplies the
@@ -1181,6 +1187,11 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // plain-decoder-safe), so the canvas wire fields point at that hand name. The
     // token only appears in task_board.rs fields, never the generated PolicyGraph.
     ("PolicyPipelineDocument", "TaskBoardPolicyPipelineDocument"),
+    // task_board types.rs: the Rust AgentMode enum is adopted under the Swift hand
+    // name TaskBoardAgentMode (the app owns the bare name), so the generated open
+    // enum replaces the hand one in place. No generated module references AgentMode
+    // as a field type yet, so the rename is scoped to the enums module.
+    ("AgentMode", "TaskBoardAgentMode"),
 ];
 
 /// The Swift name for a Rust wire type: a hand rename when one applies, else the
@@ -1988,6 +1999,12 @@ const WEBSOCKET_SOURCE: &str = include_str!("../src/daemon/protocol/websocket.rs
 // SKIP'd (bare hand) to avoid rippling its bare use in SessionRequestsWireTypes.
 const SESSION_TASKS_SOURCE: &str = include_str!("../src/session/types/tasks.rs");
 const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/daemon/protocol/task_board.rs");
+const TASK_BOARD_TYPES_SOURCE: &str = include_str!("../src/task_board/types.rs");
+const TASK_BOARD_ENUMS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardEnums.generated.swift";
+// The three task-board foundation enums in types.rs that every item/summary/request
+// references. The rich TaskBoardItem and the other types.rs structs are excluded by
+// the allow-list. TaskBoardStatus/AgentMode emit open, TaskBoardPriority closed.
+const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &["TaskBoardStatus", "TaskBoardPriority", "AgentMode"];
 const TASK_BOARD_CANVAS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardPolicyCanvasWireTypes.generated.swift";
 // The policy-canvas read types in the task_board.rs facade. The rest of that file
 // (flatten, alias and struct-variant-tagged types) is excluded by the allow-list,
@@ -2150,6 +2167,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[TASK_BOARD_PROTOCOL_SOURCE],
             sources: &[TASK_BOARD_PROTOCOL_SOURCE],
         },
+        GeneratedModule {
+            output: TASK_BOARD_ENUMS_OUTPUT,
+            description: "the Rust task-board status, priority and agent-mode enums",
+            defaults: &[],
+            sources: &[TASK_BOARD_TYPES_SOURCE],
+        },
     ]
 }
 
@@ -2171,6 +2194,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         OBSERVE_OUTPUT => OBSERVE_EMIT_ONLY,
         SESSION_STATE_OUTPUT => SESSION_STATE_EMIT_ONLY,
         TASK_BOARD_CANVAS_OUTPUT => TASK_BOARD_CANVAS_EMIT_ONLY,
+        TASK_BOARD_ENUMS_OUTPUT => TASK_BOARD_ENUMS_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {

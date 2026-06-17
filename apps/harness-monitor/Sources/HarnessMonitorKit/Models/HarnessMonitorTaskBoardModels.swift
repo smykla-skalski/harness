@@ -1,61 +1,6 @@
 import Foundation
 
-public enum TaskBoardStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
-  case new
-  case planning
-  case planReview
-  case needsYou
-  case todo
-  case inProgress
-  case inReview
-  case done
-  case blocked
-  case unknown(String)
-
-  public static let allCases: [Self] = [
-    .new,
-    .planning,
-    .planReview,
-    .needsYou,
-    .todo,
-    .inProgress,
-    .inReview,
-    .done,
-    .blocked,
-  ]
-
-  public var rawValue: String {
-    switch self {
-    case .new: "new"
-    case .planning: "planning"
-    case .planReview: "plan_review"
-    case .needsYou: "needs_you"
-    case .todo: "todo"
-    case .inProgress: "in_progress"
-    case .inReview: "in_review"
-    case .done: "done"
-    case .blocked: "blocked"
-    case .unknown(let raw): raw
-    }
-  }
-
-  public init(rawValue: String) {
-    switch rawValue {
-    case "new": self = .new
-    case "planning": self = .planning
-    case "plan_review": self = .planReview
-    case "needs_you": self = .needsYou
-    case "todo": self = .todo
-    case "in_progress": self = .inProgress
-    case "in_review": self = .inReview
-    case "done": self = .done
-    case "blocked": self = .blocked
-    default: self = .unknown(rawValue)
-    }
-  }
-
-  public var id: String { rawValue }
-
+extension TaskBoardStatus {
   public var title: String {
     switch self {
     case .new:
@@ -82,14 +27,7 @@ public enum TaskBoardStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
   }
 }
 
-public enum TaskBoardPriority: String, Codable, CaseIterable, Identifiable, Sendable {
-  case low
-  case medium
-  case high
-  case critical
-
-  public var id: String { rawValue }
-
+extension TaskBoardPriority {
   public var title: String {
     switch self {
     case .low:
@@ -104,42 +42,7 @@ public enum TaskBoardPriority: String, Codable, CaseIterable, Identifiable, Send
   }
 }
 
-public enum TaskBoardAgentMode: TaskBoardOpenEnum, CaseIterable, Identifiable {
-  case headless
-  case interactive
-  case planning
-  case evaluate
-  case unknown(String)
-
-  public static let allCases: [Self] = [
-    .headless,
-    .interactive,
-    .planning,
-    .evaluate,
-  ]
-
-  public var rawValue: String {
-    switch self {
-    case .headless: "headless"
-    case .interactive: "interactive"
-    case .planning: "planning"
-    case .evaluate: "evaluate"
-    case .unknown(let raw): raw
-    }
-  }
-
-  public init(rawValue: String) {
-    switch rawValue {
-    case "headless": self = .headless
-    case "interactive": self = .interactive
-    case "planning": self = .planning
-    case "evaluate": self = .evaluate
-    default: self = .unknown(rawValue)
-    }
-  }
-
-  public var id: String { rawValue }
-
+extension TaskBoardAgentMode {
   public var title: String {
     switch self {
     case .headless:
