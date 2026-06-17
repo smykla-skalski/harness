@@ -286,6 +286,41 @@ public enum ReviewActionKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
   public var id: String { rawValue }
 }
 
+public enum ReviewActionPreviewKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
+  case approve
+  case merge
+  case rerunChecks
+  case addLabel
+  case auto
+  case unknown(String)
+
+  public static let allCases: [Self] = [.approve, .merge, .rerunChecks, .addLabel, .auto]
+
+  public var rawValue: String {
+    switch self {
+    case .approve: "approve"
+    case .merge: "merge"
+    case .rerunChecks: "rerun_checks"
+    case .addLabel: "add_label"
+    case .auto: "auto"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "approve": self = .approve
+    case "merge": self = .merge
+    case "rerun_checks": self = .rerunChecks
+    case "add_label": self = .addLabel
+    case "auto": self = .auto
+    default: self = .unknown(rawValue)
+    }
+  }
+
+  public var id: String { rawValue }
+}
+
 public enum ReviewActionOutcome: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case applied
   case skipped

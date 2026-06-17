@@ -100,10 +100,9 @@ fn emit_string_enum(out: &mut String, spec: &SwiftStringEnum) {
 const OPEN_STRING_ENUMS: &[&str] = &[
     // reviews/enums.rs: the GitHub review wire enums the app adopts directly
     // (generated, bare-named), every one forward-compatible against an
-    // unrecognized GitHub value. ReviewAuthorAssociation and
-    // ReviewActionPreviewKind are SKIP_TYPES here (the first has a bespoke
-    // `.other(String)` catch-all, the second's hand model lives in a mixed
-    // file), so they are not in this list.
+    // unrecognized GitHub value. ReviewAuthorAssociation is the lone exception
+    // (adopted closed, since its consumers switch over a real `other` variant
+    // with no unknown arm), so it is not in this list.
     "ReviewPullRequestState",
     "ReviewMergeableState",
     "ReviewReviewStatus",
@@ -113,6 +112,7 @@ const OPEN_STRING_ENUMS: &[&str] = &[
     "ReviewReviewEventState",
     "ReviewActionKind",
     "ReviewActionOutcome",
+    "ReviewActionPreviewKind",
     // reviews leaves: split (suffixed) open enum, so the Wire name is listed.
     "ReviewsBodyUpdateOutcomeWire",
 ];
@@ -902,12 +902,10 @@ const SKIP_TYPES: &[&str] = &[
     "SessionMutationResponse",
     "AgentRuntimeSessionRegistrationRequest",
     "AgentRuntimeSessionRegistrationResponse",
-    // reviews/enums.rs: deferred from the enums cluster. ReviewAuthorAssociation
-    // has a bespoke `.other(String)` catch-all (not the generic `.unknown` open
-    // enum), and ReviewActionPreviewKind's hand model lives in a mixed Swift
-    // file handled with the action-preview cluster.
+    // reviews/enums.rs: ReviewAuthorAssociation is held back from the open-enum
+    // cluster because its consumers switch over a real `other` variant with no
+    // unknown arm; it is adopted as a closed enum in a follow-up.
     "ReviewAuthorAssociation",
-    "ReviewActionPreviewKind",
     // reviews files service.rs/local_clone.rs: daemon-internal serde types behind
     // the FilesLargeDiffStrategy / LocalCloneListEntry facade. StrategyConfig is
     // daemon config; RepoKey/RegistryEntry/LocalCloneRegistry are the on-disk
@@ -1564,8 +1562,8 @@ const SESSION_REQUESTS_SOURCE: &str =
 // reviews/enums.rs: the GitHub review wire enums. Adopted directly (bare-named
 // open enums in OPEN_STRING_ENUMS, replacing the hand HarnessMonitorReviewsEnums
 // file) rather than wire/model split, since a string enum's generated form is a
-// drop-in for the hand one. ReviewAuthorAssociation and ReviewActionPreviewKind
-// are SKIP_TYPES here.
+// drop-in for the hand one. ReviewAuthorAssociation is SKIP'd here (adopted as a
+// closed enum in a follow-up).
 const REVIEWS_ENUMS_SOURCE: &str = include_str!("../src/reviews/enums.rs");
 // reviews leaves: small clean request/response structs (plus two enums). Split
 // into suffixed *Wire types; the hand models live in scattered/mixed Swift
