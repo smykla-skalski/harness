@@ -133,8 +133,11 @@ fn emit_open_enum(out: &mut String, spec: &SwiftStringEnum) {
     // Emitting both a `case unknown` and the `case unknown(String)` catch-all
     // is an invalid redeclaration, so drop the known case and let the catch-all
     // own it - matching the hand-written open enums.
-    let cases: Vec<&(String, String)> =
-        spec.cases.iter().filter(|(case, _)| case != "unknown").collect();
+    let cases: Vec<&(String, String)> = spec
+        .cases
+        .iter()
+        .filter(|(case, _)| case != "unknown")
+        .collect();
     writeln!(
         out,
         "public enum {}: TaskBoardOpenEnum, CaseIterable, Identifiable {{",
@@ -169,7 +172,12 @@ fn emit_open_enum(out: &mut String, spec: &SwiftStringEnum) {
 /// applies wire defaults, and `CodingKeys` mapping camelCase to snake_case wire
 /// names. Everything appends into `out`.
 fn emit_struct(out: &mut String, spec: &SwiftStruct) {
-    writeln!(out, "public struct {}: Codable, Equatable, Sendable {{", spec.name).unwrap();
+    writeln!(
+        out,
+        "public struct {}: Codable, Equatable, Sendable {{",
+        spec.name
+    )
+    .unwrap();
     for field in &spec.fields {
         out.push_str("  public var ");
         out.push_str(&field.property);
@@ -181,7 +189,11 @@ fn emit_struct(out: &mut String, spec: &SwiftStruct) {
     out.push('\n');
     emit_memberwise_init(out, spec);
 
-    if spec.fields.iter().any(|field| field.decode_default.is_some()) {
+    if spec
+        .fields
+        .iter()
+        .any(|field| field.decode_default.is_some())
+    {
         out.push('\n');
         emit_decoder(out, spec);
     }
@@ -325,7 +337,12 @@ fn emit_coding_keys(out: &mut String, spec: &SwiftStruct) {
         if field.property == field.coding_key {
             writeln!(out, "    case {}", field.property).unwrap();
         } else {
-            writeln!(out, "    case {} = \"{}\"", field.property, field.coding_key).unwrap();
+            writeln!(
+                out,
+                "    case {} = \"{}\"",
+                field.property, field.coding_key
+            )
+            .unwrap();
         }
     }
     out.push_str("  }\n");
@@ -406,7 +423,12 @@ fn emit_tagged_coding_keys(out: &mut String, spec: &SwiftTaggedEnum) {
             if field.property == field.coding_key {
                 writeln!(out, "    case {}", field.property).unwrap();
             } else {
-                writeln!(out, "    case {} = \"{}\"", field.property, field.coding_key).unwrap();
+                writeln!(
+                    out,
+                    "    case {} = \"{}\"",
+                    field.property, field.coding_key
+                )
+                .unwrap();
             }
         }
     }
@@ -416,7 +438,12 @@ fn emit_tagged_coding_keys(out: &mut String, spec: &SwiftTaggedEnum) {
 fn emit_tagged_decoder(out: &mut String, spec: &SwiftTaggedEnum) {
     out.push_str("  public init(from decoder: Decoder) throws {\n");
     out.push_str("    let container = try decoder.container(keyedBy: CodingKeys.self)\n");
-    writeln!(out, "    let {0} = try container.decode(String.self, forKey: .{0})", spec.tag).unwrap();
+    writeln!(
+        out,
+        "    let {0} = try container.decode(String.self, forKey: .{0})",
+        spec.tag
+    )
+    .unwrap();
     writeln!(out, "    switch {} {{", spec.tag).unwrap();
     for variant in &spec.variants {
         writeln!(out, "    case \"{}\":", variant.raw_tag).unwrap();
@@ -479,11 +506,26 @@ fn emit_variant_decode(out: &mut String, variant: &SwiftTaggedVariant, content: 
 /// defaulted collections.
 fn push_decode_rhs(out: &mut String, field: &SwiftField) {
     if field.optional {
-        write!(out, "try container.decodeIfPresent({}.self, forKey: .{})", field.type_name, field.property).unwrap();
+        write!(
+            out,
+            "try container.decodeIfPresent({}.self, forKey: .{})",
+            field.type_name, field.property
+        )
+        .unwrap();
     } else if let Some(default) = &field.decode_default {
-        write!(out, "try container.decodeIfPresent({}.self, forKey: .{}) ?? {}", field.type_name, field.property, default).unwrap();
+        write!(
+            out,
+            "try container.decodeIfPresent({}.self, forKey: .{}) ?? {}",
+            field.type_name, field.property, default
+        )
+        .unwrap();
     } else {
-        write!(out, "try container.decode({}.self, forKey: .{})", field.type_name, field.property).unwrap();
+        write!(
+            out,
+            "try container.decode({}.self, forKey: .{})",
+            field.type_name, field.property
+        )
+        .unwrap();
     }
 }
 
@@ -507,7 +549,12 @@ fn emit_variant_encode(
     match &variant.payload {
         VariantPayload::Unit => {
             writeln!(out, "    case .{}:", variant.case_name).unwrap();
-            writeln!(out, "      try container.encode(\"{}\", forKey: .{})", variant.raw_tag, tag).unwrap();
+            writeln!(
+                out,
+                "      try container.encode(\"{}\", forKey: .{})",
+                variant.raw_tag, tag
+            )
+            .unwrap();
         }
         VariantPayload::Fields(_) if content.is_some() => {
             panic!(
@@ -527,14 +574,29 @@ fn emit_variant_encode(
                 out.push_str(&field.property);
             }
             out.push_str("):\n");
-            writeln!(out, "      try container.encode(\"{}\", forKey: .{})", variant.raw_tag, tag).unwrap();
+            writeln!(
+                out,
+                "      try container.encode(\"{}\", forKey: .{})",
+                variant.raw_tag, tag
+            )
+            .unwrap();
             for field in fields {
-                writeln!(out, "      try container.encode({0}, forKey: .{0})", field.property).unwrap();
+                writeln!(
+                    out,
+                    "      try container.encode({0}, forKey: .{0})",
+                    field.property
+                )
+                .unwrap();
             }
         }
         VariantPayload::Newtype(_inner) => {
             writeln!(out, "    case .{}(let value):", variant.case_name).unwrap();
-            writeln!(out, "      try container.encode(\"{}\", forKey: .{})", variant.raw_tag, tag).unwrap();
+            writeln!(
+                out,
+                "      try container.encode(\"{}\", forKey: .{})",
+                variant.raw_tag, tag
+            )
+            .unwrap();
             match content {
                 Some(content) => {
                     writeln!(out, "      try container.encode(value, forKey: .{content})").unwrap();
@@ -604,12 +666,60 @@ fn snake_to_camel(name: &str) -> String {
 
 /// Swift reserved words that must be backtick-escaped to serve as identifiers.
 const SWIFT_KEYWORDS: &[&str] = &[
-    "associatedtype", "class", "deinit", "enum", "extension", "fileprivate", "func", "import",
-    "init", "inout", "internal", "let", "open", "operator", "private", "protocol", "public",
-    "rethrows", "static", "struct", "subscript", "typealias", "var", "break", "case", "continue",
-    "default", "defer", "do", "else", "fallthrough", "for", "guard", "if", "in", "repeat", "return",
-    "switch", "where", "while", "as", "catch", "false", "is", "nil", "super", "self", "Self",
-    "throw", "throws", "true", "try", "Any", "_",
+    "associatedtype",
+    "class",
+    "deinit",
+    "enum",
+    "extension",
+    "fileprivate",
+    "func",
+    "import",
+    "init",
+    "inout",
+    "internal",
+    "let",
+    "open",
+    "operator",
+    "private",
+    "protocol",
+    "public",
+    "rethrows",
+    "static",
+    "struct",
+    "subscript",
+    "typealias",
+    "var",
+    "break",
+    "case",
+    "continue",
+    "default",
+    "defer",
+    "do",
+    "else",
+    "fallthrough",
+    "for",
+    "guard",
+    "if",
+    "in",
+    "repeat",
+    "return",
+    "switch",
+    "where",
+    "while",
+    "as",
+    "catch",
+    "false",
+    "is",
+    "nil",
+    "super",
+    "self",
+    "Self",
+    "throw",
+    "throws",
+    "true",
+    "try",
+    "Any",
+    "_",
 ];
 
 /// Wrap a Swift reserved word in backticks so it is usable as an identifier;
@@ -632,10 +742,16 @@ struct SwiftType {
 
 fn rust_type_to_swift(ty: &Type) -> SwiftType {
     let Type::Path(type_path) = ty else {
-        return SwiftType { name: "AnyCodable".to_string(), optional: false };
+        return SwiftType {
+            name: "AnyCodable".to_string(),
+            optional: false,
+        };
     };
     let Some(segment) = type_path.path.segments.last() else {
-        return SwiftType { name: "AnyCodable".to_string(), optional: false };
+        return SwiftType {
+            name: "AnyCodable".to_string(),
+            optional: false,
+        };
     };
     let ident = segment.ident.to_string();
     match ident.as_str() {
@@ -658,7 +774,10 @@ fn rust_type_to_swift(ty: &Type) -> SwiftType {
         // variants like ReviewTimelineEntry::SimpleActorEvent(Box<...>).
         "Box" => first_generic_arg(&segment.arguments)
             .map(rust_type_to_swift)
-            .unwrap_or_else(|| SwiftType { name: "AnyCodable".to_string(), optional: false }),
+            .unwrap_or_else(|| SwiftType {
+                name: "AnyCodable".to_string(),
+                optional: false,
+            }),
         scalar => SwiftType {
             name: map_scalar(scalar),
             optional: false,
@@ -1168,7 +1287,9 @@ fn has_serde(attrs: &[Attribute]) -> bool {
 
 /// Whether an item derives `Default`.
 fn derives_default(attrs: &[Attribute]) -> bool {
-    derive_idents(attrs).iter().any(|derive| derive == "Default")
+    derive_idents(attrs)
+        .iter()
+        .any(|derive| derive == "Default")
 }
 
 /// Whether a variant carries the `#[default]` attribute.
@@ -1244,7 +1365,12 @@ fn serde_field(attrs: &[Attribute]) -> SerdeField {
             Ok(())
         });
     }
-    SerdeField { rename, default_fn, has_default, flatten }
+    SerdeField {
+        rename,
+        default_fn,
+        has_default,
+        flatten,
+    }
 }
 
 /// Parse the defaults sources, mapping each zero-argument default function to the
@@ -1286,7 +1412,8 @@ fn expr_literal(expr: &Expr, symbols: &SymbolTable) -> Option<String> {
     match expr {
         Expr::Lit(literal) => lit_to_swift(&literal.lit),
         Expr::MethodCall(call)
-            if (call.method == "to_string" || call.method == "to_owned") && call.args.is_empty() =>
+            if (call.method == "to_string" || call.method == "to_owned")
+                && call.args.is_empty() =>
         {
             expr_literal(&call.receiver, symbols)
         }
@@ -1382,7 +1509,9 @@ fn build_fields(
             // `#[serde(flatten)]` merges the referenced struct's fields into the
             // parent JSON object; Swift Codable has no flatten, so inline the
             // flattened struct's fields directly into the parent type.
-            if let Some(inner) = type_ident(&field.ty).and_then(|ident| symbols.struct_fields.get(&ident)) {
+            if let Some(inner) =
+                type_ident(&field.ty).and_then(|ident| symbols.struct_fields.get(&ident))
+            {
                 out.extend(build_fields(inner, defaults, symbols, derives_default));
             }
             continue;
@@ -1390,8 +1519,13 @@ fn build_fields(
         let coding_key = serde.rename.clone().unwrap_or_else(|| name.clone());
         let swift_type = rust_type_to_swift(&field.ty);
         let rust_ident = type_ident(&field.ty);
-        let decode_default =
-            field_decode_default(&swift_type, rust_ident.as_deref(), &serde, defaults, symbols);
+        let decode_default = field_decode_default(
+            &swift_type,
+            rust_ident.as_deref(),
+            &serde,
+            defaults,
+            symbols,
+        );
         let init_default = field_init_default(
             swift_type.optional,
             &decode_default,
@@ -1501,7 +1635,10 @@ fn build_string_enum(item: &ItemEnum) -> SwiftStringEnum {
             )
         })
         .collect();
-    SwiftStringEnum { name: swift_type_name(&item.ident.to_string(), WIRE_SUFFIXED_TYPES), cases }
+    SwiftStringEnum {
+        name: swift_type_name(&item.ident.to_string(), WIRE_SUFFIXED_TYPES),
+        cases,
+    }
 }
 
 /// Build a tagged enum descriptor from a `#[serde(tag = ...)]` (internally
@@ -1635,8 +1772,7 @@ const POLICY_IDS_SOURCE: &str = include_str!("../src/task_board/policy_graph/ids
 const POLICY_DEFAULTS_SOURCE: &str = include_str!("../src/task_board/policy_graph/defaults.rs");
 const POLICY_STORE_SOURCE: &str = include_str!("../src/task_board/policy_graph/store.rs");
 const SUMMARIES_SOURCE: &str = include_str!("../src/daemon/protocol/summaries.rs");
-const SUMMARIES_OUTPUT: &str =
-    "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SummariesWireTypes.generated.swift";
+const SUMMARIES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SummariesWireTypes.generated.swift";
 /// summaries.rs is a 51-type mega-file whose session/observe/timeline/github
 /// types are foundation-entangled (reference unmigrated daemon-state and
 /// observe types). This allow-list surfaces only the self-contained
@@ -1688,8 +1824,7 @@ const CODEX_SOURCE: &str = include_str!("../src/daemon/protocol/codex.rs");
 // session_requests: clean serde request/response structs. Seven types are
 // SKIP_TYPES (no Swift mirror); the rest reference session::types enums that
 // already exist hand-written in Swift, so they stay unsuffixed references.
-const SESSION_REQUESTS_SOURCE: &str =
-    include_str!("../src/daemon/protocol/session_requests.rs");
+const SESSION_REQUESTS_SOURCE: &str = include_str!("../src/daemon/protocol/session_requests.rs");
 // reviews/enums.rs: the GitHub review wire enums. Adopted directly (bare-named,
 // replacing the hand HarnessMonitorReviewsEnums file) rather than wire/model
 // split, since a string enum's generated form is a drop-in for the hand one.
@@ -1703,8 +1838,7 @@ const REVIEWS_ENUMS_SOURCE: &str = include_str!("../src/reviews/enums.rs");
 const REVIEWS_AVATAR_SOURCE: &str = include_str!("../src/reviews/avatar.rs");
 const REVIEWS_BODY_UPDATE_SOURCE: &str = include_str!("../src/reviews/body_update.rs");
 const REVIEWS_FILE_COMMENT_SOURCE: &str = include_str!("../src/reviews/file_comment.rs");
-const REVIEWS_THREAD_RESOLVE_SOURCE: &str =
-    include_str!("../src/reviews/review_thread_resolve.rs");
+const REVIEWS_THREAD_RESOLVE_SOURCE: &str = include_str!("../src/reviews/review_thread_resolve.rs");
 // reviews files-core: the file list/patch/preview/blob/viewed surface plus the
 // two cross-wire facade types from service.rs/local_clone.rs. preview.rs carries
 // no types (the preview structs live in mod.rs) but supplies the
@@ -1716,8 +1850,7 @@ const REVIEWS_FILES_BLOB_SOURCE: &str = include_str!("../src/reviews/files/blob.
 const REVIEWS_FILES_VIEWED_SOURCE: &str = include_str!("../src/reviews/files/viewed.rs");
 const REVIEWS_FILES_PREVIEW_SOURCE: &str = include_str!("../src/reviews/files/preview.rs");
 const REVIEWS_FILES_SERVICE_SOURCE: &str = include_str!("../src/reviews/files/service.rs");
-const REVIEWS_FILES_LOCAL_CLONE_SOURCE: &str =
-    include_str!("../src/reviews/files/local_clone.rs");
+const REVIEWS_FILES_LOCAL_CLONE_SOURCE: &str = include_str!("../src/reviews/files/local_clone.rs");
 // reviews timeline: the PR timeline entries. ReviewTimelineEntry is internally
 // tagged (tag="kind") wrapping newtype entry structs (the generator re-inlines
 // the payload alongside the tag); the entries carry chrono DateTime, a boxed
@@ -1762,8 +1895,7 @@ struct GeneratedModule {
 fn modules() -> Vec<GeneratedModule> {
     vec![
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorPolicyModels/Generated/PolicyGraphWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorPolicyModels/Generated/PolicyGraphWireTypes.generated.swift",
             description: "the Rust policy-graph wire types",
             defaults: &[POLICY_DEFAULTS_SOURCE],
             sources: &[
@@ -1781,36 +1913,31 @@ fn modules() -> Vec<GeneratedModule> {
             sources: &[SUMMARIES_SOURCE],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitWireTypes.generated.swift",
             description: "the Rust task-board git identity sources",
             defaults: &[GIT_IDENTITY_DEFAULTS_SOURCE],
             sources: &[GIT_IDENTITY_DEFAULTS_SOURCE],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/OpenRouterWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/OpenRouterWireTypes.generated.swift",
             description: "the Rust OpenRouter model catalog",
             defaults: &[],
             sources: &[OPENROUTER_SOURCE],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/VoiceWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/VoiceWireTypes.generated.swift",
             description: "the Rust voice session protocol",
             defaults: &[VOICE_SOURCE],
             sources: &[VOICE_SOURCE],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AuditWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AuditWireTypes.generated.swift",
             description: "the Rust audit events protocol",
             defaults: &[AUDIT_SOURCE],
             sources: &[AUDIT_SOURCE],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentTuiWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentTuiWireTypes.generated.swift",
             description: "the Rust managed terminal agent protocol",
             defaults: &[AGENT_TUI_MODEL_SOURCE],
             sources: &[
@@ -1820,29 +1947,25 @@ fn modules() -> Vec<GeneratedModule> {
             ],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/CodexWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/CodexWireTypes.generated.swift",
             description: "the Rust codex run protocol",
             defaults: &[CODEX_SOURCE],
             sources: &[CODEX_SOURCE],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionRequestsWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionRequestsWireTypes.generated.swift",
             description: "the Rust session request protocol",
             defaults: &[SESSION_REQUESTS_SOURCE],
             sources: &[SESSION_REQUESTS_SOURCE],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsEnums.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsEnums.generated.swift",
             description: "the Rust reviews wire enums",
             defaults: &[],
             sources: &[REVIEWS_ENUMS_SOURCE],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsLeavesWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsLeavesWireTypes.generated.swift",
             description: "the Rust reviews leaf request/response types",
             defaults: &[],
             sources: &[
@@ -1853,10 +1976,8 @@ fn modules() -> Vec<GeneratedModule> {
             ],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsFilesWireTypes.generated.swift",
-            description:
-                "the Rust reviews file list, patch, preview, blob, viewed and local-clone types",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsFilesWireTypes.generated.swift",
+            description: "the Rust reviews file list, patch, preview, blob, viewed and local-clone types",
             defaults: &[REVIEWS_FILES_MOD_SOURCE, REVIEWS_FILES_PREVIEW_SOURCE],
             sources: &[
                 REVIEWS_FILES_MOD_SOURCE,
@@ -1868,29 +1989,25 @@ fn modules() -> Vec<GeneratedModule> {
             ],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsTimelineWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsTimelineWireTypes.generated.swift",
             description: "the Rust reviews pull request timeline types",
             defaults: &[],
             sources: &[REVIEWS_TIMELINE_TYPES_SOURCE, REVIEWS_TIMELINE_MOD_SOURCE],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsTypesWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsTypesWireTypes.generated.swift",
             description: "the Rust reviews query, item, check, action and policy types",
             defaults: &[REVIEWS_LOGIC_SOURCE],
             sources: &[REVIEWS_TYPES_SOURCE],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/WebSocketWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/WebSocketWireTypes.generated.swift",
             description: "the Rust websocket transport frame types",
             defaults: &[],
             sources: &[WEBSOCKET_SOURCE],
         },
         GeneratedModule {
-            output:
-                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionTasksWireTypes.generated.swift",
+            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionTasksWireTypes.generated.swift",
             description: "the Rust session work-item and review-flow types",
             defaults: &[SESSION_TASKS_SOURCE],
             sources: &[SESSION_TASKS_SOURCE],
@@ -2137,8 +2254,14 @@ pub struct Drop { pub other: String }
 
     #[test]
     fn variant_wire_value_respects_rename_all() {
-        assert_eq!(variant_wire_value("SpeechToText", Some("camelCase")), "speechToText");
-        assert_eq!(variant_wire_value("SpeechToText", Some("snake_case")), "speech_to_text");
+        assert_eq!(
+            variant_wire_value("SpeechToText", Some("camelCase")),
+            "speechToText"
+        );
+        assert_eq!(
+            variant_wire_value("SpeechToText", Some("snake_case")),
+            "speech_to_text"
+        );
         assert_eq!(variant_wire_value("SpeechToText", None), "speech_to_text");
         assert_eq!(variant_wire_value("Live", Some("camelCase")), "live");
     }
@@ -2162,7 +2285,10 @@ pub struct Drop { pub other: String }
     #[test]
     fn pascal_to_snake_matches_serde_rename_all() {
         assert_eq!(pascal_to_snake("DryRun"), "dry_run");
-        assert_eq!(pascal_to_snake("ReviewScreenshotPaste"), "review_screenshot_paste");
+        assert_eq!(
+            pascal_to_snake("ReviewScreenshotPaste"),
+            "review_screenshot_paste"
+        );
         assert_eq!(pascal_to_snake("OcrImage"), "ocr_image");
     }
 
@@ -2224,8 +2350,14 @@ pub struct Drop { pub other: String }
 
     #[test]
     fn maps_hash_and_btree_maps_to_dictionaries() {
-        assert_eq!(swift_type_string("BTreeMap<String, usize>"), "[String: UInt]");
-        assert_eq!(swift_type_string("HashMap<String, String>"), "[String: String]");
+        assert_eq!(
+            swift_type_string("BTreeMap<String, usize>"),
+            "[String: UInt]"
+        );
+        assert_eq!(
+            swift_type_string("HashMap<String, String>"),
+            "[String: String]"
+        );
         assert_eq!(
             swift_type_string("BTreeMap<String, Vec<PolicyAction>>"),
             "[String: [PolicyAction]]"
@@ -2241,7 +2373,10 @@ pub struct Drop { pub other: String }
         assert_eq!(empty_collection_literal("[String]"), "[]");
         assert_eq!(empty_collection_literal("[[String]]"), "[]");
         assert_eq!(empty_collection_literal("[String: UInt]"), "[:]");
-        assert_eq!(empty_collection_literal("[String: [ReviewRepositoryLabelWire]]"), "[:]");
+        assert_eq!(
+            empty_collection_literal("[String: [ReviewRepositoryLabelWire]]"),
+            "[:]"
+        );
         assert_eq!(empty_collection_literal("[[String: UInt]]"), "[]");
     }
 
@@ -2251,7 +2386,10 @@ pub struct Drop { pub other: String }
         // tested in isolation from the suffix logic.
         assert_eq!(swift_type_string("Box<BoxedSample>"), "BoxedSample");
         assert_eq!(swift_type_string("Box<String>"), "String");
-        assert_eq!(swift_type_string("Option<Box<BoxedSample>>"), "BoxedSample?");
+        assert_eq!(
+            swift_type_string("Option<Box<BoxedSample>>"),
+            "BoxedSample?"
+        );
         assert_eq!(swift_type_string("Vec<Box<BoxedSample>>"), "[BoxedSample]");
     }
 
@@ -2285,9 +2423,17 @@ pub struct Drop { pub other: String }
             .expect("Parent struct present");
         let spec = build_struct(&parent, &defaults, &symbols).expect("struct builds");
 
-        let properties: Vec<_> = spec.fields.iter().map(|field| field.property.as_str()).collect();
+        let properties: Vec<_> = spec
+            .fields
+            .iter()
+            .map(|field| field.property.as_str())
+            .collect();
         assert_eq!(properties, vec!["id", "starred", "draft", "trailing"]);
-        let coding_keys: Vec<_> = spec.fields.iter().map(|field| field.coding_key.as_str()).collect();
+        let coding_keys: Vec<_> = spec
+            .fields
+            .iter()
+            .map(|field| field.coding_key.as_str())
+            .collect();
         assert_eq!(coding_keys, vec!["id", "starred", "is_draft", "trailing"]);
     }
 
@@ -2310,12 +2456,18 @@ pub struct Drop { pub other: String }
             swift_type_name("HarnessCodeLanguage", &["HarnessCodeLanguage"]),
             "HarnessReviewFileLanguage"
         );
-        assert_eq!(swift_type_name("HarnessCodeLanguage", &[]), "HarnessReviewFileLanguage");
+        assert_eq!(
+            swift_type_name("HarnessCodeLanguage", &[]),
+            "HarnessReviewFileLanguage"
+        );
     }
 
     #[test]
     fn maps_named_types_unchanged() {
-        assert_eq!(swift_type_string("PolicyEvidenceField"), "PolicyEvidenceField");
+        assert_eq!(
+            swift_type_string("PolicyEvidenceField"),
+            "PolicyEvidenceField"
+        );
     }
 
     #[test]
@@ -2536,7 +2688,10 @@ fn default_label() -> String { \"draft\".to_string() }
         // Named-constant body -> the constant's collected literal.
         assert_eq!(defaults.get("default_rows"), Some(&"30".to_string()));
         // Plain literal bodies keep resolving as before.
-        assert_eq!(defaults.get("default_label"), Some(&"\"draft\"".to_string()));
+        assert_eq!(
+            defaults.get("default_label"),
+            Some(&"\"draft\"".to_string())
+        );
     }
 
     #[test]
