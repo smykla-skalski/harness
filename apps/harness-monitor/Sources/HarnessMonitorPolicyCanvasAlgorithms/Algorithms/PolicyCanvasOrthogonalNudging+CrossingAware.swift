@@ -28,10 +28,23 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
   /// axis moved. More passes had diminishing visual return and dominated large
   /// graphs.
   private let iterations = 2
+  /// The exact splitter only runs after terminal preservation, where splitting
+  /// one stacked rail changes route point indices and can expose a second-order
+  /// bridge overlap. Recompute after each accepted split, but cap applications so
+  /// stress samples cannot turn cleanup into an unbounded routing pass.
+  private let exactSplitApplicationLimit = 512
+  /// Large samples use only the micro splitter and apply every exact-channel
+  /// shift from one decomposition. A few passes handle bridge segments exposed by
+  /// the previous pass without falling back to per-channel candidate search.
+  private let exactMicroSplitPasses = 2
   /// Tolerance for classifying a segment as axis-aligned, matching the nudge.
   private let axisTolerance: CGFloat = 1
   /// Lane width used to slide a spread band into a clearer corridor position.
   private let laneGap = PolicyCanvasVisibilityRouter.laneSpreadStep
+  /// Last-resort exact-lane de-aliasing band. This intentionally stays much
+  /// smaller than the visual lane spacing: it is only used when full spacing
+  /// would introduce a body hit, and only to eliminate exact corridor reuse.
+  private let exactMicroSplitBand = PolicyCanvasVisibilityRouter.channelStep
   /// Above this route count the full slide search costs more than it buys; keep
   /// deterministic ordered/reversed spreads and rely on the zero-shift floor to
   /// avoid regressions.
@@ -58,7 +71,8 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
       pointsByEdge = spread(pointsByEdge, original: originalPointsByEdge, obstacles: obstacles)
     }
     let edgesByID = Dictionary(uniqueKeysWithValues: input.prepared.edges.map { ($0.id, $0) })
-    return pointsByEdge.reduce(into: [:]) { result, entry in
+    let guardedRoutes: [String: PolicyCanvasEdgeRoute] = pointsByEdge.reduce(into: [:]) {
+      result, entry in
       let points = PolicyCanvasVisibilityRouter.compressCollinear(entry.value)
       let processed = PolicyCanvasEdgeRoute(
         points: points,
@@ -80,9 +94,10 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
         result[entry.key] = processed
         return
       }
-      let bodyObstacles = edgesByID[entry.key].map {
-        postProcessingBodyObstacles(edge: $0, prepared: input.prepared)
-      } ?? obstacles
+      let bodyObstacles =
+        edgesByID[entry.key].map {
+          postProcessingBodyObstacles(edge: $0, prepared: input.prepared)
+        } ?? obstacles
       let routeEnvelope = policyCanvasRouteBounds(original.points)
         .union(policyCanvasRouteBounds(displayedProcessed.points))
         .insetBy(dx: -1, dy: -1)
@@ -96,6 +111,7 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
         result[entry.key] = processed
       }
     }
+    return guardedRoutes
   }
 
   private func postProcessingBodyObstacles(
@@ -202,6 +218,359 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
       working = working.mapValues { PolicyCanvasVisibilityRouter.compressCollinear($0) }
     }
     return working
+  }
+
+  /// Final deterministic splitter for exact same-lane reuse. The
+  /// crossing-aware spread above intentionally leaves saturated channels stacked
+  /// when every candidate would add a crossing/body hit. Those stacks are still
+  /// hard graph-quality errors, so this pass only separates exact collinear
+  /// channels by the full route lane spacing. It is bounded and uses the same
+  /// stable channel ordering primitives as the scorer, keeping runtime
+  /// predictable on stress samples.
+  private func clearRemainingCollinearReuse(
+    _ routes: [String: [CGPoint]],
+    obstacles: [CGRect],
+    accepts: ((String, PolicyCanvasEdgeRoute, PolicyCanvasEdgeRoute) -> Bool)? = nil
+  ) -> [String: [CGPoint]] {
+    var working = routes
+    let processor = PolicyCanvasOrthogonalNudgeProcessor(
+      obstacles: obstacles,
+      fans: PolicyCanvasFanContext.make(from: routes)
+    )
+    if routes.count > reducedPlacementRouteCount {
+      return clearRemainingCollinearReuseFast(routes, processor: processor)
+    }
+    var remainingApplications = exactSplitApplicationLimit
+    while remainingApplications > 0 {
+      var appliedInRound = false
+      for axis in [PolicyCanvasSegmentAxis.horizontal, .vertical] {
+        while remainingApplications > 0 {
+          let channels = ordered(
+            exactCollinearChannels(in: decompose(working).filter { $0.axis == axis })
+          )
+          var acceptedShifts: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)] = []
+          var touchedEdgeIDs: Set<String> = []
+          var acceptedChannelCount = 0
+          for channel in channels where channel.count > 1 {
+            let channelEdgeIDs = Set(channel.map(\.edgeID))
+            guard touchedEdgeIDs.isDisjoint(with: channelEdgeIDs) else {
+              continue
+            }
+            let offsets = fullLaneOffsets(for: channel, processor: processor)
+            guard !offsets.isEmpty else {
+              continue
+            }
+            for candidate in exactSplitPlacements(from: offsets, routeCount: working.count) {
+              let next = applyExactSplit(candidate, to: working)
+              guard next != working,
+                exactSplit(next, isAcceptedFrom: working, shifts: candidate, accepts: accepts)
+              else {
+                continue
+              }
+              acceptedShifts.append(contentsOf: candidate)
+              touchedEdgeIDs.formUnion(channelEdgeIDs)
+              acceptedChannelCount += 1
+              break
+            }
+          }
+          guard !acceptedShifts.isEmpty else {
+            break
+          }
+          let next = applyExactSplit(acceptedShifts, to: working)
+          guard next != working else {
+            break
+          }
+          working = next.mapValues { PolicyCanvasVisibilityRouter.compressCollinear($0) }
+          remainingApplications -= acceptedChannelCount
+          appliedInRound = true
+        }
+      }
+      guard appliedInRound else {
+        break
+      }
+    }
+    return working
+  }
+
+  private func clearRemainingCollinearReuseFast(
+    _ routes: [String: [CGPoint]],
+    processor: PolicyCanvasOrthogonalNudgeProcessor
+  ) -> [String: [CGPoint]] {
+    var working = routes
+    for _ in 0..<exactMicroSplitPasses {
+      var shifts: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)] = []
+      for axis in [PolicyCanvasSegmentAxis.horizontal, .vertical] {
+        let channels = ordered(
+          exactCollinearChannels(in: decompose(working).filter { $0.axis == axis })
+        )
+        for channel in channels where channel.count > 1 {
+          let offsets = fullLaneOffsets(for: channel, processor: processor)
+          shifts.append(contentsOf: exactMicroSplitOffsets(from: offsets))
+        }
+      }
+      guard !shifts.isEmpty else {
+        break
+      }
+      let next = applyExactSplit(shifts, to: working)
+        .mapValues { PolicyCanvasVisibilityRouter.compressCollinear($0) }
+      guard next != working else {
+        break
+      }
+      working = next
+    }
+    return working
+  }
+
+  func routesClearingRemainingCollinearReuse(
+    _ routes: [String: PolicyCanvasEdgeRoute],
+    obstacles: [CGRect],
+    accepts: ((String, PolicyCanvasEdgeRoute, PolicyCanvasEdgeRoute) -> Bool)? = nil
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    let splitPoints = clearRemainingCollinearReuse(
+      routes.mapValues { PolicyCanvasVisibilityRouter.compressCollinear($0.points) },
+      obstacles: obstacles,
+      accepts: accepts
+    )
+    return routes.reduce(into: [:]) { result, entry in
+      guard let points = splitPoints[entry.key] else {
+        result[entry.key] = entry.value
+        return
+      }
+      let compressed = PolicyCanvasVisibilityRouter.compressCollinear(points)
+      result[entry.key] = PolicyCanvasEdgeRoute(
+        points: compressed,
+        labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: compressed)
+      )
+    }
+  }
+
+  private func exactSplitPlacements(
+    from offsets: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)],
+    routeCount: Int
+  ) -> [[(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]] {
+    let micro = exactMicroSplitOffsets(from: offsets)
+    if routeCount > reducedPlacementRouteCount, !micro.isEmpty {
+      return exactFullSplitPlacements(
+        from: offsets, routeCount: routeCount,
+        seed: [
+          micro, micro.map { ($0.segment, -$0.offset) },
+        ])
+    }
+    return exactFullSplitPlacements(from: offsets, routeCount: routeCount, seed: [])
+      + (micro.isEmpty ? [] : [micro, micro.map { ($0.segment, -$0.offset) }])
+  }
+
+  private func exactFullSplitPlacements(
+    from offsets: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)],
+    routeCount: Int,
+    seed: [[(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]]
+  ) -> [[(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]] {
+    let slides: [CGFloat] =
+      routeCount > reducedPlacementRouteCount
+      ? [0, laneGap, -laneGap]
+      : [0, laneGap, -laneGap, 2 * laneGap, -2 * laneGap]
+    var result = seed
+    for ordering in [offsets, offsets.map({ ($0.segment, -$0.offset) })] {
+      for slide in slides {
+        result.append(ordering.map { ($0.segment, $0.offset + slide) })
+      }
+    }
+    return result
+  }
+
+  private func exactMicroSplitOffsets(
+    from offsets: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)]
+  ) -> [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)] {
+    guard offsets.count > 1 else {
+      return []
+    }
+    let center = CGFloat(offsets.count - 1) / 2
+    let step = exactMicroSplitBand / CGFloat(max(1, offsets.count - 1))
+    return offsets.enumerated().map { rank, entry in
+      (entry.segment, (CGFloat(rank) - center) * step)
+    }
+  }
+
+  private func exactSplit(
+    _ candidate: [String: [CGPoint]],
+    isAcceptedFrom current: [String: [CGPoint]],
+    shifts: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)],
+    accepts: ((String, PolicyCanvasEdgeRoute, PolicyCanvasEdgeRoute) -> Bool)?
+  ) -> Bool {
+    guard let accepts else {
+      return true
+    }
+    for edgeID in Set(shifts.map(\.segment.edgeID)).sorted() {
+      guard let oldPoints = current[edgeID], let newPoints = candidate[edgeID],
+        oldPoints != newPoints
+      else {
+        continue
+      }
+      let oldRoute = PolicyCanvasEdgeRoute(points: oldPoints, labelPosition: .zero)
+      let newRoute = PolicyCanvasEdgeRoute(points: newPoints, labelPosition: .zero)
+      guard accepts(edgeID, oldRoute, newRoute) else {
+        return false
+      }
+    }
+    return true
+  }
+
+  private func applyExactSplit(
+    _ shifts: [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)],
+    to pointsByEdge: [String: [CGPoint]]
+  ) -> [String: [CGPoint]] {
+    let shiftsByEdge = Dictionary(grouping: shifts, by: { $0.segment.edgeID })
+    var result = pointsByEdge
+    for (edgeID, edgeShifts) in shiftsByEdge {
+      guard let points = pointsByEdge[edgeID], points.count >= 2 else {
+        continue
+      }
+      let shiftsByStartIndex = Dictionary(
+        edgeShifts.map { ($0.segment.startIndex, (axis: $0.segment.axis, offset: $0.offset)) },
+        uniquingKeysWith: { _, replacement in replacement }
+      )
+      var rebuilt: [CGPoint] = []
+      appendOrthogonalBridge(points[0], to: &rebuilt)
+      for index in 0..<(points.count - 1) {
+        let start = points[index]
+        let end = points[index + 1]
+        if let shift = shiftsByStartIndex[index], abs(shift.offset) > 0.001 {
+          appendOrthogonalBridge(
+            shifted(start, axis: shift.axis, offset: shift.offset),
+            to: &rebuilt
+          )
+          appendOrthogonalBridge(
+            shifted(end, axis: shift.axis, offset: shift.offset),
+            to: &rebuilt
+          )
+        }
+        appendOrthogonalBridge(end, to: &rebuilt)
+      }
+      result[edgeID] = policyCanvasCompressPreservingTerminalStubs(rebuilt)
+    }
+    return result
+  }
+
+  private func shifted(
+    _ point: CGPoint,
+    axis: PolicyCanvasSegmentAxis,
+    offset: CGFloat
+  ) -> CGPoint {
+    switch axis {
+    case .horizontal:
+      CGPoint(x: point.x, y: point.y + offset)
+    case .vertical:
+      CGPoint(x: point.x + offset, y: point.y)
+    }
+  }
+
+  private func appendOrthogonalBridge(_ point: CGPoint, to points: inout [CGPoint]) {
+    guard let last = points.last else {
+      points.append(point)
+      return
+    }
+    if abs(last.x - point.x) > 0.001, abs(last.y - point.y) > 0.001 {
+      points.append(CGPoint(x: point.x, y: last.y))
+    }
+    if points.last != point {
+      points.append(point)
+    }
+  }
+
+  private func exactCollinearChannels(
+    in segments: [PolicyCanvasNudgeSegment]
+  ) -> [[PolicyCanvasNudgeSegment]] {
+    let lanes = Dictionary(grouping: segments) { segment in
+      Int((segment.position * 1_000).rounded())
+    }
+    var channels: [[PolicyCanvasNudgeSegment]] = []
+    for laneSegments in lanes.values where laneSegments.count > 1 {
+      let sorted = laneSegments.sorted(by: exactChannelSort)
+      var parent = Array(sorted.indices)
+      for left in sorted.indices {
+        for right in sorted.index(after: left)..<sorted.endIndex {
+          if sorted[right].lowerBound > sorted[left].upperBound - overlapThreshold {
+            break
+          }
+          guard sorted[left].edgeID != sorted[right].edgeID,
+            spanOverlap(sorted[left], sorted[right]) >= overlapThreshold
+          else {
+            continue
+          }
+          union(left, right, parent: &parent)
+        }
+      }
+      var groups: [Int: [PolicyCanvasNudgeSegment]] = [:]
+      for index in sorted.indices {
+        groups[find(index, parent: &parent), default: []].append(sorted[index])
+      }
+      channels.append(
+        contentsOf: groups.values
+          .filter { $0.count > 1 }
+          .map { $0.sorted(by: exactChannelSort) }
+      )
+    }
+    return channels.sorted { left, right in
+      key(for: left) < key(for: right)
+    }
+  }
+
+  private func fullLaneOffsets(
+    for channel: [PolicyCanvasNudgeSegment],
+    processor: PolicyCanvasOrthogonalNudgeProcessor
+  ) -> [(segment: PolicyCanvasNudgeSegment, offset: CGFloat)] {
+    let ordered = processor.orderedChannel(channel)
+    guard ordered.count > 1 else {
+      return []
+    }
+    let laneCenter = ordered.map(\.position).reduce(0, +) / CGFloat(ordered.count)
+    let center = CGFloat(ordered.count - 1) / 2
+    return ordered.enumerated().map { rank, segment in
+      let targetPosition = laneCenter + (CGFloat(rank) - center) * laneGap
+      return (segment, targetPosition - segment.position)
+    }
+  }
+
+  private func exactChannelSort(
+    _ left: PolicyCanvasNudgeSegment,
+    _ right: PolicyCanvasNudgeSegment
+  ) -> Bool {
+    if left.position != right.position {
+      return left.position < right.position
+    }
+    if left.lowerBound != right.lowerBound {
+      return left.lowerBound < right.lowerBound
+    }
+    if left.upperBound != right.upperBound {
+      return left.upperBound < right.upperBound
+    }
+    if left.edgeID != right.edgeID {
+      return left.edgeID < right.edgeID
+    }
+    return left.startIndex < right.startIndex
+  }
+
+  private func spanOverlap(
+    _ left: PolicyCanvasNudgeSegment,
+    _ right: PolicyCanvasNudgeSegment
+  ) -> CGFloat {
+    max(0, min(left.upperBound, right.upperBound) - max(left.lowerBound, right.lowerBound))
+  }
+
+  private func find(_ index: Int, parent: inout [Int]) -> Int {
+    if parent[index] != index {
+      parent[index] = find(parent[index], parent: &parent)
+    }
+    return parent[index]
+  }
+
+  private func union(_ left: Int, _ right: Int, parent: inout [Int]) {
+    let leftRoot = find(left, parent: &parent)
+    let rightRoot = find(right, parent: &parent)
+    guard leftRoot != rightRoot else {
+      return
+    }
+    parent[rightRoot] = leftRoot
   }
 
   /// Route entries for every edge, segment-decomposed once per spread iteration.

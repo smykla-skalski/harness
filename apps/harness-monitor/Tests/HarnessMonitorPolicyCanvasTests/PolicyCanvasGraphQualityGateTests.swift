@@ -154,6 +154,27 @@ struct PolicyCanvasGraphQualityGateTests {
     )
   }
 
+  @Test func allSamplesAvoidReusedCorridors() async throws {
+    var violations: [String] = []
+    for sample in PolicyCanvasLabSamples.all {
+      let report = try await routedReport(sampleID: sample.id)
+      let count = report.count(for: .corridorReuse)
+      guard count > 0 else {
+        continue
+      }
+      violations.append(
+        "\(sample.id): \(count) reused corridors - \(Self.corridorReuseDetail(report))"
+      )
+    }
+    #expect(
+      violations.isEmpty,
+      """
+      lab sample routes should not reuse exact same-axis corridors
+      violations=\(violations.joined(separator: "\n"))
+      """
+    )
+  }
+
   /// Deterministic dump of every sample's report to
   /// `tmp/policy-canvas/graph-quality-baseline.txt` (resolved from `#filePath`,
   /// matching the fan-in dump convention). Captures the baseline used to set the
@@ -351,6 +372,7 @@ struct PolicyCanvasGraphQualityGateTests {
       "label_overlaps: \(report.count(for: .labelOverlaps))",
       "corridor_parallel: \(report.count(for: .corridorParallel))",
       "corridor_reuse: \(report.count(for: .corridorReuse))",
+      "corridor_reuse_route_detail: \(Self.corridorReuseRouteDetail(report, routes: timedRoute.output.routes))",
       "body_hits: \(report.count(for: .bodyHits))",
       "body_hit_detail: \(Self.bodyHitDetail(report))",
       "body_hit_route_detail: \(Self.bodyHitRouteDetail(report, routes: timedRoute.output.routes))",
@@ -453,6 +475,39 @@ struct PolicyCanvasGraphQualityGateTests {
           "\(violation.edgeB)=\(pointsB)",
         ].joined(separator: ":")
       }
+      .joined(separator: ";")
+  }
+
+  private static func corridorReuseDetail(_ report: PolicyCanvasGraphQualityReport) -> String {
+    report.corridors
+      .filter { $0.kind == .collinear }
+      .prefix(80)
+      .map { violation in
+        let axis = violation.isHorizontal ? "h" : "v"
+        return [
+          "\(violation.edgeA)~\(violation.edgeB)",
+          axis,
+          "\(violation.overlapStart)->\(violation.overlapEnd)",
+        ].joined(separator: ":")
+      }
+      .joined(separator: ",")
+  }
+
+  private static func corridorReuseRouteDetail(
+    _ report: PolicyCanvasGraphQualityReport,
+    routes: [String: PolicyCanvasEdgeRoute]
+  ) -> String {
+    let routeIDs = Set(
+      report.corridors.filter { $0.kind == .collinear }.flatMap {
+        [$0.edgeA, $0.edgeB]
+      }
+    )
+
+    return
+      routes
+      .filter { routeIDs.contains($0.key) }
+      .sorted { $0.key < $1.key }
+      .map { key, route in "\(key)=\(route.points)" }
       .joined(separator: ";")
   }
 
@@ -663,7 +718,12 @@ struct PolicyCanvasGraphQualityGateTests {
     for indexA in 1..<a.count {
       for indexB in 1..<b.count {
         guard
-          let point = policyCanvasSegmentIntersection(a[indexA - 1], a[indexA], b[indexB - 1], b[indexB])
+          let point = policyCanvasSegmentIntersection(
+            a[indexA - 1],
+            a[indexA],
+            b[indexB - 1],
+            b[indexB]
+          )
         else { continue }
         if endpoints.contains(where: {
           hypot($0.x - point.x, $0.y - point.y) < PolicyCanvasLayout.portDiameter
@@ -691,11 +751,15 @@ struct PolicyCanvasGraphQualityGateTests {
         let aHorizontal = abs(a1.y - a2.y) <= 0.5
         let bHorizontal = abs(b1.y - b2.y) <= 0.5
         if aVertical, bVertical, abs(a1.x - b1.x) <= 0.5,
-          policyCanvasOverlap(a1.y, a2.y, b1.y, b2.y) > PolicyCanvasLayout.portDiameter {
+          policyCanvasOverlap(a1.y, a2.y, b1.y, b2.y)
+            > PolicyCanvasLayout.portDiameter
+        {
           return true
         }
         if aHorizontal, bHorizontal, abs(a1.y - b1.y) <= 0.5,
-          policyCanvasOverlap(a1.x, a2.x, b1.x, b2.x) > PolicyCanvasLayout.portDiameter {
+          policyCanvasOverlap(a1.x, a2.x, b1.x, b2.x)
+            > PolicyCanvasLayout.portDiameter
+        {
           return true
         }
       }

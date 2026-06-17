@@ -111,14 +111,22 @@ extension PolicyCanvasPreparedRouteInput {
     )
     let terminalState =
       repairedRoutes == terminalRoutes
-      ? routeState
+      ? PolicyCanvasRouteComputationState(
+        routes: terminalRoutes,
+        portMarkerLayout: routeState.portMarkerLayout
+      )
       : routesReroutingBalancedPortMarkers(
         routes: repairedRoutes,
         nodeIndex: nodeIndex,
         router: selectedRouter,
         algorithms: algorithms
       )
-    let routes = terminalState.routes
+    let routes = routesClearingCorridorReuse(
+      routes: terminalState.routes,
+      nodeIndex: nodeIndex,
+      router: selectedRouter,
+      algorithms: algorithms
+    )
     let portMarkerLayout = terminalState.portMarkerLayout
     policyCanvasRouteComputationSignposter.endInterval(
       "policy_canvas.routes.phase.terminals",
@@ -194,7 +202,12 @@ extension PolicyCanvasPreparedRouteInput {
       router: selectedRouter,
       algorithms: algorithms
     )
-    let routes = terminalState.routes
+    let routes = routesClearingCorridorReuse(
+      routes: terminalState.routes,
+      nodeIndex: nodeIndex,
+      router: selectedRouter,
+      algorithms: algorithms
+    )
     let portMarkerLayout = terminalState.portMarkerLayout
     let labelPositions = PolicyCanvasPolylineMidpointLabelPlacement().placeLabels(
       input: PolicyCanvasLabelPlacementInput(prepared: self, routes: routes)
@@ -244,6 +257,47 @@ extension PolicyCanvasPreparedRouteInput {
       repaired[edge.id] = route
     }
     return repaired
+  }
+
+  private func routesClearingCorridorReuse(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    let splitter = PolicyCanvasOrthogonalNudgingRouteProcessing()
+    let obstacles = routingObstacles()
+    let originalBodyHits = precomputedBodyHits(routes: routes, nodeIndex: nodeIndex).count
+    var current = routes
+    var best = routes
+    for _ in 0..<3 {
+      let split = splitter.routesClearingRemainingCollinearReuse(
+        current,
+        obstacles: obstacles
+      )
+      if precomputedBodyHits(routes: split, nodeIndex: nodeIndex).count <= originalBodyHits {
+        best = split
+        guard split != current else {
+          break
+        }
+        current = split
+        continue
+      }
+      let repaired = precomputedRoutesRepairingBodyHits(
+        routes: split,
+        nodeIndex: nodeIndex,
+        router: selectedRouter,
+        algorithms: algorithms
+      )
+      guard precomputedBodyHits(routes: repaired, nodeIndex: nodeIndex).count <= originalBodyHits,
+        repaired != current
+      else {
+        break
+      }
+      best = repaired
+      current = repaired
+    }
+    return best
   }
 
   private func routesRepairingCrossedPorts(

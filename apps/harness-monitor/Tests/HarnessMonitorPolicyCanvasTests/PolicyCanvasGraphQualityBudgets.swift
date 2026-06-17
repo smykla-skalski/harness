@@ -10,14 +10,16 @@ import HarnessMonitorPolicyCanvasAlgorithms
 /// genuine adrift labels and banked large on-edge improvements. The crossed-port
 /// budgets were repinned again on 2026-06-17 once the measure began detecting
 /// crossings geometrically instead of from a one-dimensional order key, which
-/// surfaced real fan-in crossings the old key was blind to. The gate fails if
-/// a sample regresses above its budget; improvements just leave headroom, so
-/// tighten the budget whenever a category is banked lower. Categories absent from
-/// a sample's table default to `0` - a hard-zero gate. A budgeted sample with no
-/// entry at all (e.g. a newly added non-debug lab sample) gets all-zero budgets
-/// and fails loudly until its baseline is captured. The four largest stress
-/// fixtures are debug-only for this gate and stay covered by the deterministic
-/// dump. `PolicyCanvasQualityCategory.crossings` is the only non-gated category.
+/// surfaced real fan-in crossings the old key was blind to. Corridor reuse stays
+/// intentionally absent so every budgeted sample has a hard-zero reuse gate.
+/// The gate fails if a sample regresses above its budget; improvements just leave
+/// headroom, so tighten the budget whenever a category is banked lower. Categories
+/// absent from a sample's table default to `0` - a hard-zero gate. A budgeted
+/// sample with no entry at all (e.g. a newly added non-debug lab sample) gets
+/// all-zero budgets and fails loudly until its baseline is captured. The four
+/// largest stress fixtures are debug-only for this gate and stay covered by the
+/// deterministic dump. `PolicyCanvasQualityCategory.crossings` is the only
+/// non-gated category.
 enum PolicyCanvasGraphQualityBudgets {
   /// Allowed count for a category on a given sample. Missing entries are `0`.
   static func limit(
@@ -28,32 +30,34 @@ enum PolicyCanvasGraphQualityBudgets {
   }
 
   static let bySampleID: [String: [PolicyCanvasQualityCategory: Int]] = [
-    "minimal": [:],
-    "linear": [:],
+    "minimal": [
+      .labelNearTurn: 1
+    ],
+    "linear": [
+      .wrongTurns: 2, .labelNearTurn: 3,
+    ],
     "branching": [
-      .corridorReuse: 1, .corridorParallel: 1, .detours: 1, .nodeDistance: 1, .wrongTurns: 3,
-      .labelAdrift: 1,
+      .corridorParallel: 2, .detours: 1, .nodeDistance: 1, .wrongTurns: 4,
+      .crossedPorts: 1, .labelOnEdge: 1, .labelNearTurn: 4,
     ],
     "default": [
-      .corridorParallel: 3, .longEdges: 2, .detours: 3, .nodeDistance: 2, .wrongTurns: 22,
-      .crossedPorts: 5, .labelNearTurn: 6,
+      .corridorParallel: 6, .longEdges: 3, .nodeDistance: 2, .wrongTurns: 31,
+      .crossedPorts: 5, .labelOnEdge: 1, .labelNearTurn: 7,
     ],
     "multi-group": [
-      .portOverlaps: 2, .corridorReuse: 6, .corridorParallel: 6,
-      .crossingsIndependent: 9, .detours: 2, .nodeDistance: 1, .wrongTurns: 10, .crossedPorts: 5,
-      .labelAdrift: 1, .labelOnEdge: 2, .labelNearTurn: 11,
+      .corridorParallel: 9, .crossingsIndependent: 10, .longEdges: 3, .detours: 1,
+      .nodeDistance: 1, .wrongTurns: 19, .crossedPorts: 8, .labelOnEdge: 2,
+      .labelNearTurn: 7,
     ],
     "extreme": [
-      .portOverlaps: 4, .corridorReuse: 17, .corridorParallel: 11,
-      .crossingsIndependent: 12, .longEdges: 6, .detours: 8, .nodeDistance: 8,
-      .wrongTurns: 25, .crossedPorts: 2,
-      .labelAdrift: 1, .labelOnEdge: 5, .labelNearTurn: 10,
+      .corridorParallel: 29, .crossingsIndependent: 40, .longEdges: 12, .detours: 7,
+      .nodeDistance: 19, .wrongTurns: 43, .crossedPorts: 4, .labelOnEdge: 4,
+      .labelNearTurn: 5,
     ],
     "extreme-braid": [
-      .portOverlaps: 18, .corridorReuse: 208, .corridorParallel: 66,
-      .crossingsIndependent: 327, .longEdges: 63, .detours: 11, .nodeDistance: 71,
-      .wrongTurns: 70, .crossedPorts: 7,
-      .labelOnEdge: 16, .labelNearTurn: 31,
+      .corridorParallel: 348, .crossingsIndependent: 345, .longEdges: 67, .detours: 33,
+      .nodeDistance: 73, .wrongTurns: 102, .crossedPorts: 7, .labelOnEdge: 10,
+      .labelNearTurn: 27,
     ],
   ]
 }

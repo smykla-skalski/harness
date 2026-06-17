@@ -600,7 +600,11 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     viewModel.reflowLayout(preserveManualAnchors: false, force: true)
     let plannedByID = Dictionary(uniqueKeysWithValues: graph.nodes.map { ($0.id, $0.position) })
     for node in viewModel.nodes {
-      XCTAssertEqual(node.position, plannedByID[node.id], "commit diverged from plan for \(node.id)")
+      XCTAssertEqual(
+        node.position,
+        plannedByID[node.id],
+        "commit diverged from plan for \(node.id)"
+      )
     }
   }
 
