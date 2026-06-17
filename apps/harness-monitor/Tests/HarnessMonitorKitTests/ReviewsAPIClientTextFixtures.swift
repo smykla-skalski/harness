@@ -375,12 +375,93 @@ let sampleReviewsTimelineResponseText =
         "kind": "issue_comment",
         "id": "IC_001",
         "created_at": "2026-05-22T10:00:00Z",
+        "updated_at": "2026-05-22T10:01:00Z",
+        "actor": { "login": "alice", "avatar_url": "https://avatars.example/alice.png" },
         "body": "ship it",
+        "body_text": "ship it",
         "is_minimized": false,
-        "reactions_total": 0,
+        "reactions_total": 3,
         "viewer_did_author": false,
-        "viewer_can_edit": false,
-        "author": { "login": "alice", "avatarUrl": null }
+        "viewer_can_edit": true,
+        "url": "https://github.com/example/harness/pull/42#issuecomment-1"
+      },
+      {
+        "kind": "review",
+        "id": "RV_002",
+        "created_at": "2026-05-22T10:05:00Z",
+        "actor": { "login": "bob", "avatar_url": null },
+        "state": "changes_requested",
+        "body": "needs work",
+        "inline_comments": [
+          {
+            "id": "RC_002a",
+            "path": "src/main.rs",
+            "line": 12,
+            "diff_hunk": "@@ -1 +1 @@",
+            "body": "rename this",
+            "created_at": "2026-05-22T10:05:01Z",
+            "actor": { "login": "bob", "avatar_url": null },
+            "outdated": false
+          }
+        ],
+        "comments_truncated": false
+      },
+      {
+        "kind": "review_thread",
+        "id": "RT_003",
+        "created_at": "2026-05-22T10:10:00Z",
+        "actor": { "login": "carol", "avatar_url": null },
+        "is_resolved": true,
+        "is_collapsed": false,
+        "outdated": false,
+        "path": "src/lib.rs",
+        "line": 7,
+        "comments": [
+          {
+            "id": "RTC_003a",
+            "body": "good catch",
+            "created_at": "2026-05-22T10:10:01Z",
+            "actor": { "login": "carol", "avatar_url": null }
+          }
+        ],
+        "comments_truncated": false
+      },
+      {
+        "kind": "commit",
+        "id": "CM_004",
+        "created_at": "2026-05-22T10:15:00Z",
+        "oid": "deadbeefdeadbeef",
+        "abbreviated_oid": "deadbee",
+        "message_headline": "fix the thing",
+        "committed_date": "2026-05-22T10:14:00Z",
+        "author_login": "alice"
+      },
+      {
+        "kind": "head_ref_force_pushed",
+        "id": "HF_005",
+        "created_at": "2026-05-22T10:20:00Z",
+        "actor": { "login": "alice", "avatar_url": null },
+        "before_oid": "1111111aaaa",
+        "before_abbreviated_oid": "1111111",
+        "after_oid": "2222222bbbb",
+        "after_abbreviated_oid": "2222222",
+        "ref_name": "feature/x"
+      },
+      {
+        "kind": "simple_actor_event",
+        "id": "SE_006",
+        "created_at": "2026-05-22T10:25:00Z",
+        "actor": { "login": "bob", "avatar_url": null },
+        "event_kind": "labeled",
+        "label": "enhancement",
+        "label_color": "84b6eb"
+      },
+      {
+        "kind": "unknown",
+        "id": "UK_007",
+        "created_at": "2026-05-22T10:30:00Z",
+        "typename": "MysteryEvent",
+        "raw_payload": { "foo": "bar" }
       }
     ],
     "page_info": {

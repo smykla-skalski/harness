@@ -193,7 +193,12 @@ extension HarnessMonitorAPIClient {
   public func fetchReviewTimeline(
     request: ReviewsTimelineRequest
   ) async throws -> ReviewsTimelineResponse {
-    try await post("/v1/reviews/timeline", body: request)
+    let wire: ReviewsTimelineResponseWire = try await post(
+      "/v1/reviews/timeline",
+      body: ReviewsTimelineRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsTimelineResponse(wire: wire)
   }
 
   public func fetchReviewAvatar(

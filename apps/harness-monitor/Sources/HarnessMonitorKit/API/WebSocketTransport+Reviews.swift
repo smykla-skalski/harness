@@ -202,9 +202,10 @@ extension WebSocketTransport {
   public func fetchReviewTimeline(
     request: ReviewsTimelineRequest
   ) async throws -> ReviewsTimelineResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsTimelineRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsTimeline, params: params)
-    return try decode(value)
+    let wire: ReviewsTimelineResponseWire = try decodePolicyWire(value)
+    return ReviewsTimelineResponse(wire: wire)
   }
 
   public func fetchReviewAvatar(
