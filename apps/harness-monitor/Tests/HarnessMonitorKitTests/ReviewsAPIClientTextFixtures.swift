@@ -434,3 +434,38 @@ let sampleReviewsReviewThreadResolveResponseText =
     "resolved": true
   }
   """
+
+let sampleReviewsFilesListResponseText =
+  """
+  {
+    "pull_request_id": "PR_kwReview1",
+    "number": 42,
+    "head_ref_oid": "abc123",
+    "head_ref_name": "feature/x",
+    "base_ref_oid": "def456",
+    "base_ref_name": "main",
+    "repository_full_name": "example/harness",
+    "viewer_can_mark_viewed": true,
+    "files": [
+      {
+        "path": "src/main.rs",
+        "previous_path": null,
+        "change_type": "modified",
+        "additions": 10,
+        "deletions": 2,
+        "viewer_viewed_state": "viewed",
+        "is_binary": false,
+        "language_hint": "rust",
+        "mode_change": null
+      }
+    ],
+    "fetched_at": "2026-05-22T10:00:00Z",
+    "pagination_complete": true,
+    "rate_limit_snapshot": {
+      "remaining": 4900,
+      "limit": 5000,
+      "reset_at": "2026-05-22T11:00:00Z",
+      "cost": 1
+    }
+  }
+  """
