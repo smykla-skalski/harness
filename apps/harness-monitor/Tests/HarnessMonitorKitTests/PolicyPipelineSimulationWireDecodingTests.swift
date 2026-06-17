@@ -1,0 +1,85 @@
+import Foundation
+import HarnessMonitorPolicyModels
+import Testing
+
+@testable import HarnessMonitorKit
+
+/// Wire-contract regression for the policy simulate/audit cluster generated from
+/// src/task_board/policy_graph/store.rs. These *Wire types own the daemon's
+/// snake_case shape (explicit CodingKeys, plain decoder) and their validation
+/// report nests the generated PolicyGraphValidationIssue. This pins the fix for
+/// the real bug where node_id/edge_id/node_ids silently vanished: simulate+audit
+/// decoded through the default convertFromSnakeCase decoder, which rewrote the
+/// daemon's node_id to nodeId before matching the literal node_id CodingKey, so
+/// those fields dropped. Decoded through PolicyWireCoding.decoder (no key
+/// strategy) the tagged-enum issues carry their identifiers faithfully.
+@Suite("Policy pipeline simulation wire decoding")
+struct PolicyPipelineSimulationWireDecodingTests {
+  private let decoder = PolicyWireCoding.decoder
+
+  @Test("simulation result decodes validation issues keeping node/edge ids")
+  func decodesSimulationValidationIssues() throws {
+    let json = #"""
+    {"revision":3,"trace_id":"trace-1","simulated_at":"2026-06-17T00:00:00Z","succeeded":false,"validation":{"issues":[{"issue":"dangling_edge","edge_id":"e-1","node_id":"n-1"},{"issue":"cycle","node_ids":["n-2","n-3"]},{"issue":"invalid_port","edge_id":"e-2","node_id":"n-4","port":"in","direction":"input"}]},"policy_trace_ids":["t-1"],"has_runtime_boundaries":true}
+    """#
+    let result = try decoder.decode(
+      PolicyPipelineSimulationResultWire.self,
+      from: Data(json.utf8)
+    )
+
+    #expect(result.traceId == "trace-1")
+    #expect(result.hasRuntimeBoundaries == true)
+    #expect(result.decisions.isEmpty)
+    #expect(result.validation.issues.count == 3)
+
+    guard case let .danglingEdge(edgeId, nodeId) = result.validation.issues[0] else {
+      Issue.record("expected dangling_edge, got \(result.validation.issues[0])")
+      return
+    }
+    #expect(edgeId == "e-1")
+    #expect(nodeId == "n-1")
+
+    guard case let .cycle(nodeIds) = result.validation.issues[1] else {
+      Issue.record("expected cycle, got \(result.validation.issues[1])")
+      return
+    }
+    #expect(nodeIds == ["n-2", "n-3"])
+
+    guard case let .invalidPort(portEdgeId, portNodeId, port, direction) =
+      result.validation.issues[2]
+    else {
+      Issue.record("expected invalid_port, got \(result.validation.issues[2])")
+      return
+    }
+    #expect(portEdgeId == "e-2")
+    #expect(portNodeId == "n-4")
+    #expect(port == "in")
+    #expect(direction == .input)
+  }
+
+  @Test("audit summary decodes its nested validation and latest simulation")
+  func decodesAuditSummary() throws {
+    let json = #"""
+    {"active_revision":7,"mode":"enforced","latest_trace_id":"trace-9","latest_simulation":{"revision":7,"trace_id":"trace-9","simulated_at":"2026-06-17T00:00:00Z","succeeded":true,"validation":{"issues":[]}},"validation":{"issues":[{"issue":"incompatible_payload_edge","edge_id":"e-3","provided":"json","required":"text"}]}}
+    """#
+    let summary = try decoder.decode(
+      PolicyPipelineAuditSummaryWire.self,
+      from: Data(json.utf8)
+    )
+
+    #expect(summary.activeRevision == 7)
+    #expect(summary.latestTraceId == "trace-9")
+    #expect(summary.latestSimulation?.traceId == "trace-9")
+    #expect(summary.validation.issues.count == 1)
+
+    guard case let .incompatiblePayloadEdge(edgeId, provided, required) =
+      summary.validation.issues[0]
+    else {
+      Issue.record("expected incompatible_payload_edge, got \(summary.validation.issues[0])")
+      return
+    }
+    #expect(edgeId == "e-3")
+    #expect(provided == "json")
+    #expect(required == "text")
+  }
+}
