@@ -918,6 +918,14 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "PolicyPipelineSimulatedDecision",
     "PolicyPipelineSimulationResult",
     "PolicyPipelineAuditSummary",
+    // summaries.rs health/readiness cluster (allow-listed via SUMMARIES_EMIT_ONLY):
+    // self-contained structs over primitives; the rich hand models stay, these
+    // own the daemon snake_case decode. generate-only for now.
+    "HealthResponse",
+    "DaemonControlResponse",
+    "LogLevelResponse",
+    "SetLogLevelRequest",
+    "HostBridgeReconfigureRequest",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1535,17 +1543,29 @@ fn build_tagged_variant(
 }
 
 /// Parse one source file and emit Swift for every serde wire type it declares.
+/// Whether a type should be emitted given a module's allow-list. An empty
+/// `emit_only` means "emit every non-skipped serde type" (the default for most
+/// modules); a non-empty list restricts emission to exactly those Rust type
+/// names, so a big mixed source file (e.g. summaries.rs, 51 types) can surface a
+/// clean self-contained subset without skip-listing the other forty-odd.
+fn is_allowed_type(rust_name: &str, emit_only: &[&str]) -> bool {
+    emit_only.is_empty() || emit_only.contains(&rust_name)
+}
+
 fn emit_source_decls(
     out: &mut String,
     source: &str,
     defaults: &DefaultLiterals,
     symbols: &SymbolTable,
+    emit_only: &[&str],
 ) {
     let file = syn::parse_file(source).expect("policy source parses");
     for item in file.items {
         match item {
             Item::Struct(item)
-                if has_serde(&item.attrs) && !is_skipped_type(&item.ident.to_string()) =>
+                if has_serde(&item.attrs)
+                    && !is_skipped_type(&item.ident.to_string())
+                    && is_allowed_type(&item.ident.to_string(), emit_only) =>
             {
                 if let Some(spec) = build_struct(&item, defaults, symbols) {
                     out.push('\n');
@@ -1559,7 +1579,9 @@ fn emit_source_decls(
                 }
             }
             Item::Enum(item)
-                if has_serde(&item.attrs) && !is_skipped_type(&item.ident.to_string()) =>
+                if has_serde(&item.attrs)
+                    && !is_skipped_type(&item.ident.to_string())
+                    && is_allowed_type(&item.ident.to_string(), emit_only) =>
             {
                 out.push('\n');
                 emit_enum_item(out, &item, defaults, symbols);
@@ -1599,6 +1621,21 @@ const POLICY_MODELS_SOURCE: &str = include_str!("../src/task_board/policy_graph/
 const POLICY_IDS_SOURCE: &str = include_str!("../src/task_board/policy_graph/ids.rs");
 const POLICY_DEFAULTS_SOURCE: &str = include_str!("../src/task_board/policy_graph/defaults.rs");
 const POLICY_STORE_SOURCE: &str = include_str!("../src/task_board/policy_graph/store.rs");
+const SUMMARIES_SOURCE: &str = include_str!("../src/daemon/protocol/summaries.rs");
+const SUMMARIES_OUTPUT: &str =
+    "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SummariesWireTypes.generated.swift";
+/// summaries.rs is a 51-type mega-file whose session/observe/timeline/github
+/// types are foundation-entangled (reference unmigrated daemon-state and
+/// observe types). This allow-list surfaces only the self-contained
+/// health/readiness/control/log-level cluster - clean structs over primitives -
+/// as the first bottom-up slice; the rest migrate as their dependencies do.
+const SUMMARIES_EMIT_ONLY: &[&str] = &[
+    "HealthResponse",
+    "DaemonControlResponse",
+    "LogLevelResponse",
+    "SetLogLevelRequest",
+    "HostBridgeReconfigureRequest",
+];
 const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
     include_str!("../src/task_board/git_identity_defaults.rs");
 const OPENROUTER_SOURCE: &str = include_str!("../src/daemon/protocol/openrouter_models.rs");
@@ -1704,6 +1741,12 @@ fn modules() -> Vec<GeneratedModule> {
                 POLICY_MODELS_SOURCE,
                 POLICY_STORE_SOURCE,
             ],
+        },
+        GeneratedModule {
+            output: SUMMARIES_OUTPUT,
+            description: "the Rust daemon health/readiness summary types",
+            defaults: &[SUMMARIES_SOURCE],
+            sources: &[SUMMARIES_SOURCE],
         },
         GeneratedModule {
             output:
@@ -1836,8 +1879,12 @@ fn generate_module(module: &GeneratedModule) -> String {
          import Foundation\n",
         module.description
     );
+    let emit_only: &[&str] = match module.output {
+        SUMMARIES_OUTPUT => SUMMARIES_EMIT_ONLY,
+        _ => &[],
+    };
     for source in module.sources {
-        emit_source_decls(&mut out, source, &defaults, &symbols);
+        emit_source_decls(&mut out, source, &defaults, &symbols, emit_only);
     }
     out
 }
@@ -2016,6 +2063,30 @@ ExpressibleByStringLiteral, CustomStringConvertible {
         let mut out = String::new();
         emit_newtype(&mut out, "SampleId");
         assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn emit_only_restricts_to_allow_listed_types() {
+        let source = "\
+#[derive(Serialize, Deserialize)]
+pub struct Keep { pub value: String }
+#[derive(Serialize, Deserialize)]
+pub struct Drop { pub other: String }
+";
+        let symbols = build_symbol_table(&[source]);
+        let defaults = parse_defaults(&[], &symbols);
+
+        let mut restricted = String::new();
+        emit_source_decls(&mut restricted, source, &defaults, &symbols, &["Keep"]);
+        assert!(restricted.contains("struct Keep"));
+        assert!(!restricted.contains("struct Drop"));
+
+        // An empty allow-list keeps the default "emit every non-skipped type"
+        // behavior, so existing modules stay byte-identical.
+        let mut all = String::new();
+        emit_source_decls(&mut all, source, &defaults, &symbols, &[]);
+        assert!(all.contains("struct Keep"));
+        assert!(all.contains("struct Drop"));
     }
 
     #[test]
