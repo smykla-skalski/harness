@@ -132,6 +132,65 @@ struct PolicyCanvasCrossedPortsTests {
     #expect(spanning.markPoint == CGPoint(x: 2864 - PolicyCanvasLayout.portDiameter, y: (6423.4 + 6505.6) / 2))
   }
 
+  @Test func wiresSwappingInsideASharedChannelAreFlagged() {
+    // Two inbound wires funnel down the SAME vertical channel (x=360) and swap to
+    // their ports: `gate` comes from below, overshoots up the channel past the
+    // ports, then drops to the LOWER port (y=230); `event` comes from below and
+    // rises to the UPPER port (y=202). Their channel runs are collinear, so they
+    // never form a proper interior intersection (the proper-crossing test misses
+    // it), and `gate`'s overshoot reverses its y so the monotonic guard would drop
+    // it. But sharing one channel and attaching in swapped order is a real port
+    // cross - mirrors extreme-galaxy's Handoff fan-in. Contrast m13, where the
+    // wires use separate channel lanes and so must not be flagged this way.
+    let node = CGRect(x: 400, y: 180, width: 168, height: 105)
+    let gate = PolicyCanvasEdgeRoute(
+      points: [
+        CGPoint(x: 100, y: 400), CGPoint(x: 140, y: 400), CGPoint(x: 140, y: 160),
+        CGPoint(x: 360, y: 160), CGPoint(x: 360, y: 230), CGPoint(x: 400, y: 230),
+      ],
+      labelPosition: .zero
+    )
+    let event = PolicyCanvasEdgeRoute(
+      points: [
+        CGPoint(x: 300, y: 236), CGPoint(x: 360, y: 236), CGPoint(x: 360, y: 202),
+        CGPoint(x: 400, y: 202),
+      ],
+      labelPosition: .zero
+    )
+    let result = policyCanvasMeasureGraphQuality(
+      nodeFramesByID: ["t": node],
+      groupTitleFrames: [],
+      edges: ["gate", "event"].map(edge),
+      routes: ["gate": gate, "event": event]
+    )
+    #expect(result.count(for: .crossedPorts) == 1)
+    let violation = try! #require(result.crossedPorts.first)
+    #expect(Set([violation.edgeA, violation.edgeB]) == Set(["gate", "event"]))
+    #expect(violation.side == .leading)
+  }
+
+  @Test func wiresStackedInOneChannelWithoutSwappingStayClean() {
+    // Both wires run down the same channel (x=360) but keep their order: `high`
+    // attaches to the upper port and comes from higher up, `low` attaches lower
+    // and comes from lower down. Same channel, no swap - not a cross.
+    let node = CGRect(x: 400, y: 180, width: 168, height: 105)
+    let high = PolicyCanvasEdgeRoute(
+      points: [CGPoint(x: 300, y: 120), CGPoint(x: 360, y: 120), CGPoint(x: 360, y: 202), CGPoint(x: 400, y: 202)],
+      labelPosition: .zero
+    )
+    let low = PolicyCanvasEdgeRoute(
+      points: [CGPoint(x: 300, y: 320), CGPoint(x: 360, y: 320), CGPoint(x: 360, y: 230), CGPoint(x: 400, y: 230)],
+      labelPosition: .zero
+    )
+    let result = policyCanvasMeasureGraphQuality(
+      nodeFramesByID: ["t": node],
+      groupTitleFrames: [],
+      edges: ["high", "low"].map(edge),
+      routes: ["high": high, "low": low]
+    )
+    #expect(result.count(for: .crossedPorts) == 0)
+  }
+
   @Test func detouringWireIsNotCounted() {
     // e1 would invert against e2 by far position, but its route dives below the
     // node (y 900) then climbs back up to the top port (y 30) - a perpendicular

@@ -633,13 +633,18 @@ struct PolicyCanvasGraphQualityGateTests {
     for sample in PolicyCanvasLabSamples.all {
       let routed = try await routedSample(sampleID: sample.id)
       for violation in routed.report.crossedPorts {
-        let crosses = !policyCanvasBruteForceCrossings(
-          routed.routes[violation.edgeA]?.points ?? [],
-          routed.routes[violation.edgeB]?.points ?? []
-        ).isEmpty
+        let aPoints = routed.routes[violation.edgeA]?.points ?? []
+        let bPoints = routed.routes[violation.edgeB]?.points ?? []
+        // A flagged pair is real if the routes properly intersect, OR if they
+        // funnel through one shared collinear channel - the swap case the
+        // intersection test cannot see. Wires in separate lanes (the order-key
+        // regression) satisfy neither, so this still guards against it.
+        let crosses =
+          !policyCanvasBruteForceCrossings(aPoints, bPoints).isEmpty
+          || policyCanvasSharesCollinearChannel(aPoints, bPoints)
         #expect(
           crosses,
-          "\(sample.id): \(violation.edgeA) x \(violation.edgeB) flagged crossed but routes never meet"
+          "\(sample.id): \(violation.edgeA) x \(violation.edgeB) flagged crossed but routes neither meet nor share a channel"
         )
       }
     }
@@ -669,6 +674,39 @@ struct PolicyCanvasGraphQualityGateTests {
       }
     }
     return hits
+  }
+
+  /// True when the two polylines have a pair of collinear segments (same vertical
+  /// or horizontal line) whose extents overlap by more than a port diameter - the
+  /// shared channel two wires funnel through. Independent of the measure's own
+  /// channel test; together with the proper-intersection check it confirms a
+  /// flagged crossing is grounded in real geometry, not an order-key guess.
+  private func policyCanvasSharesCollinearChannel(_ a: [CGPoint], _ b: [CGPoint]) -> Bool {
+    guard a.count >= 2, b.count >= 2 else { return false }
+    for indexA in 1..<a.count {
+      for indexB in 1..<b.count {
+        let (a1, a2, b1, b2) = (a[indexA - 1], a[indexA], b[indexB - 1], b[indexB])
+        let aVertical = abs(a1.x - a2.x) <= 0.5
+        let bVertical = abs(b1.x - b2.x) <= 0.5
+        let aHorizontal = abs(a1.y - a2.y) <= 0.5
+        let bHorizontal = abs(b1.y - b2.y) <= 0.5
+        if aVertical, bVertical, abs(a1.x - b1.x) <= 0.5,
+          policyCanvasOverlap(a1.y, a2.y, b1.y, b2.y) > PolicyCanvasLayout.portDiameter {
+          return true
+        }
+        if aHorizontal, bHorizontal, abs(a1.y - b1.y) <= 0.5,
+          policyCanvasOverlap(a1.x, a2.x, b1.x, b2.x) > PolicyCanvasLayout.portDiameter {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  private func policyCanvasOverlap(_ a1: CGFloat, _ a2: CGFloat, _ b1: CGFloat, _ b2: CGFloat)
+    -> CGFloat
+  {
+    min(max(a1, a2), max(b1, b2)) - max(min(a1, a2), min(b1, b2))
   }
 
   /// Proper interior intersection of two segments, or nil if they miss, only

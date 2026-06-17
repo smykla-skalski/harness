@@ -9,6 +9,11 @@ private struct PolicyCanvasSideTerminal {
   let offset: CGFloat
   let point: CGPoint
   let points: [CGPoint]
+  /// False when the route reverses across the side's perpendicular axis (a detour
+  /// or channel overshoot). A proper interior crossing between two such routes is
+  /// a routing backtrack, not a wrong port, so it is ignored - but a swap inside a
+  /// shared channel still counts even when one wire overshoots.
+  let isMonotonic: Bool
 }
 
 /// Measure wires that picked the wrong port: two edges meeting one node side -
@@ -58,6 +63,7 @@ func policyCanvasMeasureCrossedPorts(
   var violations: [PolicyCanvasCrossedPortsViolation] = []
   for (nodeID, sideMap) in byNodeSide {
     for (side, terminals) in sideMap where terminals.count >= 2 {
+      let horizontalSide = side == .leading || side == .trailing
       let sorted = terminals.sorted {
         abs($0.offset - $1.offset) > 0.5 ? $0.offset < $1.offset : $0.edgeID < $1.edgeID
       }
@@ -65,11 +71,17 @@ func policyCanvasMeasureCrossedPorts(
         for jndex in (index + 1)..<sorted.count {
           let lower = sorted[index]
           let upper = sorted[jndex]
-          // Distinct attach points whose routes actually cross between the ports.
-          guard
-            abs(lower.offset - upper.offset) > 0.5,
-            policyCanvasRoutesCross(lower.points, upper.points, tolerance: tolerance)
-          else {
+          // Two ways two ports read as crossed: their direct routes properly
+          // intersect between the ports (a clean X, only trusted when neither wire
+          // detours), or they share one channel and attach in swapped order (a
+          // collinear swap the intersection test cannot see). Either counts.
+          let properCross =
+            lower.isMonotonic && upper.isMonotonic
+            && policyCanvasRoutesCross(lower.points, upper.points, tolerance: tolerance)
+          let channelSwap = policyCanvasRoutesSwapInSharedChannel(
+            lower, upper, horizontalSide: horizontalSide, tolerance: tolerance
+          )
+          guard abs(lower.offset - upper.offset) > 0.5, properCross || channelSwap else {
             continue
           }
           let spansPort = sorted.contains {
@@ -143,20 +155,95 @@ private func policyCanvasRegisterSideTerminal(
     return
   }
   let horizontalSide = side == .leading || side == .trailing
-  // A wire that reverses across the side axis (dives past its port then climbs
-  // back, or routes around) crosses its neighbours because of that backtrack, not
-  // because it picked the wrong port. That is a routing detour - flagged elsewhere
-  // as a wrong turn - so it must not read as a crossed port. Skip it here.
-  guard policyCanvasRoutePerpendicularlyMonotonic(route, horizontalSide: horizontalSide) else {
-    return
-  }
   let terminal = PolicyCanvasSideTerminal(
     edgeID: edgeID,
     offset: horizontalSide ? point.y : point.x,
     point: point,
-    points: route.points
+    points: route.points,
+    isMonotonic: policyCanvasRoutePerpendicularlyMonotonic(route, horizontalSide: horizontalSide)
   )
   byNodeSide[nodeID, default: [:]][side, default: []].append(terminal)
+}
+
+/// True when the two terminals funnel through one shared channel and attach in
+/// swapped order. Two wires sharing a collinear channel run (same x for a vertical
+/// channel feeding a leading/trailing side, same y for a horizontal channel
+/// feeding a top/bottom side) cannot reorder without crossing: if the wire
+/// attaching at the smaller offset reaches PAST the other wire's far end inside
+/// the shared run, they swap and so cross. This is the case the proper-crossing
+/// test misses, because collinear segments never produce an interior intersection
+/// and a channel overshoot reverses the route so the monotonic guard would drop
+/// it. It stays specific to a genuinely shared channel: wires in separate lanes
+/// (m13's fan-in) are not collinear, so they never reach this test.
+private func policyCanvasRoutesSwapInSharedChannel(
+  _ lower: PolicyCanvasSideTerminal,
+  _ upper: PolicyCanvasSideTerminal,
+  horizontalSide: Bool,
+  tolerance: CGFloat
+) -> Bool {
+  for segLower in policyCanvasRouteSegments(lower.points) {
+    for segUpper in policyCanvasRouteSegments(upper.points) {
+      guard
+        let lowerFar = policyCanvasSharedChannelFarEnd(
+          segment: segLower, other: segUpper, attach: lower.point,
+          horizontalSide: horizontalSide, tolerance: tolerance),
+        let upperFar = policyCanvasSharedChannelFarEnd(
+          segment: segUpper, other: segLower, attach: upper.point,
+          horizontalSide: horizontalSide, tolerance: tolerance)
+      else {
+        continue
+      }
+      // `lower` attaches at the smaller offset; a swap means its far end overshoots
+      // beyond `upper`'s far end along the side axis.
+      if lowerFar > upperFar {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+/// For a segment that shares a collinear channel with `other` (both run along the
+/// channel axis - constant x for a vertical channel, constant y for a horizontal
+/// one - at the same position, with an overlapping extent longer than
+/// `tolerance`), the coordinate of this segment's end farthest from `attach` along
+/// the side axis. Nil when the two segments do not form a shared channel.
+private func policyCanvasSharedChannelFarEnd(
+  segment: (CGPoint, CGPoint),
+  other: (CGPoint, CGPoint),
+  attach: CGPoint,
+  horizontalSide: Bool,
+  tolerance: CGFloat
+) -> CGFloat? {
+  // A vertical channel (constant x) feeds a leading/trailing side; a horizontal
+  // channel (constant y) feeds a top/bottom side. The side axis runs along the
+  // channel: y for a vertical channel, x for a horizontal one.
+  let along: (CGPoint) -> CGFloat = horizontalSide ? { $0.y } : { $0.x }
+  let across: (CGPoint) -> CGFloat = horizontalSide ? { $0.x } : { $0.y }
+  guard
+    abs(across(segment.0) - across(segment.1)) <= 0.5,
+    abs(across(other.0) - across(other.1)) <= 0.5,
+    abs(across(segment.0) - across(other.0)) <= 0.5
+  else {
+    return nil
+  }
+  let segLo = min(along(segment.0), along(segment.1))
+  let segHi = max(along(segment.0), along(segment.1))
+  let otherLo = min(along(other.0), along(other.1))
+  let otherHi = max(along(other.0), along(other.1))
+  guard min(segHi, otherHi) - max(segLo, otherLo) > tolerance else {
+    return nil
+  }
+  let attachAlong = along(attach)
+  return abs(segLo - attachAlong) >= abs(segHi - attachAlong) ? segLo : segHi
+}
+
+/// The ordered point pairs of a polyline.
+private func policyCanvasRouteSegments(_ points: [CGPoint]) -> [(CGPoint, CGPoint)] {
+  guard points.count >= 2 else {
+    return []
+  }
+  return (1..<points.count).map { (points[$0 - 1], points[$0]) }
 }
 
 /// True when the two polylines properly cross at an interior point that sits more
