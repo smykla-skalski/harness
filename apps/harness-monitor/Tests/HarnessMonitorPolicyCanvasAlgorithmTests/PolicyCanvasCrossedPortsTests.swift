@@ -81,6 +81,46 @@ struct PolicyCanvasCrossedPortsTests {
     #expect(result.count(for: .crossedPorts) == 0)
   }
 
+  @Test func fanInThroughSharedChannelFlagsOnlyRealCrossings() {
+    // Four wires funnel into one node side through a shared vertical channel
+    // (x=2828), mirroring extreme-galaxy's Human gate fan-in. A one-dimensional
+    // order key (where each wire came from) misreads this: it invents a crossing
+    // between `switch` and `gate` (whose routes run parallel and never meet) and
+    // misses the real `risk x evidence` and `gate x evidence` crossings. Only the
+    // pairs whose polylines actually intersect between the ports are flagged.
+    let node = CGRect(x: 2864, y: 6412, width: 168, height: 105)
+    func fan(source: CGFloat, channelTurn: CGFloat, channelEntry: CGFloat, attach: CGFloat)
+      -> PolicyCanvasEdgeRoute
+    {
+      PolicyCanvasEdgeRoute(
+        points: [
+          CGPoint(x: channelTurn - 36, y: source), CGPoint(x: channelTurn, y: source),
+          CGPoint(x: channelTurn, y: channelEntry), CGPoint(x: 2828, y: channelEntry),
+          CGPoint(x: 2828, y: attach), CGPoint(x: 2864, y: attach),
+        ],
+        labelPosition: .zero
+      )
+    }
+    let result = policyCanvasMeasureGraphQuality(
+      nodeFramesByID: ["t": node],
+      groupTitleFrames: [],
+      edges: ["risk", "switch", "gate", "evidence"].map(edge),
+      routes: [
+        "risk": fan(source: 6131.9, channelTurn: 2748, channelEntry: 6335, attach: 6423.4),
+        "switch": fan(source: 5985.4, channelTurn: 2088, channelEntry: 6255, attach: 6450.8),
+        "gate": fan(source: 5697.8, channelTurn: 1768, channelEntry: 6285, attach: 6478.2),
+        "evidence": fan(source: 6198.2, channelTurn: 2088, channelEntry: 6295, attach: 6505.6),
+      ]
+    )
+    let pairs = Set(result.crossedPorts.map { Set([$0.edgeA, $0.edgeB]) })
+    #expect(
+      pairs == [
+        ["risk", "switch"], ["risk", "gate"], ["risk", "evidence"], ["gate", "evidence"],
+      ],
+      "expected only the pairs that actually cross; got \(pairs)"
+    )
+  }
+
   @Test func detouringWireIsNotCounted() {
     // e1 would invert against e2 by far position, but its route dives below the
     // node (y 900) then climbs back up to the top port (y 30) - a perpendicular

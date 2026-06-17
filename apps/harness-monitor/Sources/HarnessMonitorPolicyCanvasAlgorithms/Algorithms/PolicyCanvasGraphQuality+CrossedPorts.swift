@@ -1,26 +1,31 @@
 import CoreGraphics
 
 /// One wire terminal resolved onto a node side: where it attaches (`offset`
-/// along the side, `point` in content space) and where it comes from (`far`,
-/// the opposite route endpoint projected onto the same axis).
+/// along the side, `point` in content space) plus the full route, so a pair of
+/// terminals on one side can be tested for an actual crossing rather than an
+/// inferred one.
 private struct PolicyCanvasSideTerminal {
   let edgeID: String
   let offset: CGFloat
-  let far: CGFloat
   let point: CGPoint
+  let points: [CGPoint]
 }
 
-/// Measure wires that picked the wrong port: two edges on one node side - inputs
-/// on a leading/top side, outputs on a trailing/bottom side - whose attach order
-/// along that side is inverted relative to where they come from, so the wires
-/// cross between the node and their far ends. The crossing-free order is the order
-/// of the far endpoints along the side axis (the same far-endpoint ordering the
-/// port-marker layout aims for). Every inverted pair is a crossing, so all pairs
-/// on a side are compared, not just adjacent ones: a fan where two ports share an
-/// attach offset (overlapping markers) would otherwise break the adjacency chain
-/// and hide the real crossings on either side of it. These are crossings between
-/// edges that share the node, which the independent-crossing metric deliberately
-/// ignores, so they need their own signal.
+/// Measure wires that picked the wrong port: two edges meeting one node side -
+/// inputs on a leading/top side, outputs on a trailing/bottom side - whose routes
+/// actually cross between their ports. Swapping the two ports would untangle them.
+///
+/// Earlier versions inferred the crossing from a one-dimensional order key (where
+/// each wire came from along the side axis). That is unreliable once several wires
+/// funnel through a shared fan-in channel: the channel re-stacks them, so the
+/// order key both invents crossings between wires that end up running parallel and
+/// misses real ones. The order key is replaced by a direct geometric test - two
+/// terminals are crossed only when their polylines properly intersect away from
+/// the shared node. Detour wires (a route that reverses across the side axis) are
+/// still skipped: their crossing is a routing backtrack flagged as a wrong turn,
+/// not a wrong port. These are crossings between edges that share the node, which
+/// the independent-crossing metric deliberately ignores, so they need their own
+/// signal.
 func policyCanvasMeasureCrossedPorts(
   routedEdges: [PolicyCanvasRoutedEdge],
   nodeFramesByID: [String: CGRect]
@@ -33,7 +38,6 @@ func policyCanvasMeasureCrossedPorts(
     }
     policyCanvasRegisterSideTerminal(
       point: first,
-      far: last,
       route: routed.route,
       nodeID: routed.edge.source.nodeID,
       edgeID: routed.edge.id,
@@ -43,7 +47,6 @@ func policyCanvasMeasureCrossedPorts(
     )
     policyCanvasRegisterSideTerminal(
       point: last,
-      far: first,
       route: routed.route,
       nodeID: routed.edge.target.nodeID,
       edgeID: routed.edge.id,
@@ -62,12 +65,10 @@ func policyCanvasMeasureCrossedPorts(
         for jndex in (index + 1)..<sorted.count {
           let lower = sorted[index]
           let upper = sorted[jndex]
-          // Distinct attach points coming from distinct far positions, inverted:
-          // the earlier port is fed from farther along the axis than the later one.
+          // Distinct attach points whose routes actually cross between the ports.
           guard
             abs(lower.offset - upper.offset) > 0.5,
-            abs(lower.far - upper.far) > 0.5,
-            lower.far > upper.far
+            policyCanvasRoutesCross(lower.points, upper.points, tolerance: tolerance)
           else {
             continue
           }
@@ -90,7 +91,6 @@ func policyCanvasMeasureCrossedPorts(
 
 private func policyCanvasRegisterSideTerminal(
   point: CGPoint,
-  far: CGPoint,
   route: PolicyCanvasEdgeRoute,
   nodeID: String,
   edgeID: String,
@@ -105,28 +105,71 @@ private func policyCanvasRegisterSideTerminal(
     return
   }
   let horizontalSide = side == .leading || side == .trailing
-  // The far-position inversion test assumes a direct approach: the wire moves
-  // monotonically across the side axis from its port to its far end. A wire that
-  // reverses (dives past then climbs back, or routes around) sits in the channel
-  // somewhere its far position does not predict, so its inclusion would invent a
-  // crossing that is really a routing detour - flagged elsewhere as a wrong turn,
-  // not a wrong port. Skip it here.
+  // A wire that reverses across the side axis (dives past its port then climbs
+  // back, or routes around) crosses its neighbours because of that backtrack, not
+  // because it picked the wrong port. That is a routing detour - flagged elsewhere
+  // as a wrong turn - so it must not read as a crossed port. Skip it here.
   guard policyCanvasRoutePerpendicularlyMonotonic(route, horizontalSide: horizontalSide) else {
     return
   }
   let terminal = PolicyCanvasSideTerminal(
     edgeID: edgeID,
     offset: horizontalSide ? point.y : point.x,
-    far: horizontalSide ? far.y : far.x,
-    point: point
+    point: point,
+    points: route.points
   )
   byNodeSide[nodeID, default: [:]][side, default: []].append(terminal)
 }
 
+/// True when the two polylines properly cross at an interior point that sits more
+/// than `tolerance` from either polyline's own endpoints. The endpoint guard drops
+/// the fan-in convergence near the shared node, where neighbouring wires crowd but
+/// do not tangle, so only a genuine crossing between the ports counts.
+private func policyCanvasRoutesCross(
+  _ a: [CGPoint],
+  _ b: [CGPoint],
+  tolerance: CGFloat
+) -> Bool {
+  let endpoints = [a.first, a.last, b.first, b.last].compactMap { $0 }
+  guard a.count >= 2, b.count >= 2 else {
+    return false
+  }
+  for indexA in 1..<a.count {
+    for indexB in 1..<b.count {
+      guard
+        let point = policyCanvasSegmentCrossing(a[indexA - 1], a[indexA], b[indexB - 1], b[indexB])
+      else {
+        continue
+      }
+      if endpoints.contains(where: { hypot($0.x - point.x, $0.y - point.y) < tolerance }) {
+        continue
+      }
+      return true
+    }
+  }
+  return false
+}
+
+/// Proper interior intersection of two segments, or nil when they miss, only meet
+/// at an endpoint, or are collinear (a shared corridor, not a crossing).
+private func policyCanvasSegmentCrossing(
+  _ p1: CGPoint, _ p2: CGPoint, _ p3: CGPoint, _ p4: CGPoint
+) -> CGPoint? {
+  let denominator = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x)
+  guard abs(denominator) > 0.0001 else {
+    return nil
+  }
+  let t = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / denominator
+  let u = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / denominator
+  guard t > 0.0001, t < 0.9999, u > 0.0001, u < 0.9999 else {
+    return nil
+  }
+  return CGPoint(x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y))
+}
+
 /// True when the route never reverses along the side's perpendicular axis (y for
 /// a leading/trailing side, x for top/bottom). A monotone run - flat steps
-/// allowed - is a direct approach the far-position test can reason about; a sign
-/// flip is a backtracking detour.
+/// allowed - is a direct approach; a sign flip is a backtracking detour.
 private func policyCanvasRoutePerpendicularlyMonotonic(
   _ route: PolicyCanvasEdgeRoute,
   horizontalSide: Bool
