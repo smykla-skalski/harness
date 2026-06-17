@@ -113,6 +113,8 @@ const OPEN_STRING_ENUMS: &[&str] = &[
     "ReviewReviewEventState",
     "ReviewActionKind",
     "ReviewActionOutcome",
+    // reviews leaves: split (suffixed) open enum, so the Wire name is listed.
+    "ReviewsBodyUpdateOutcomeWire",
 ];
 
 /// Emit an open Swift enum conforming to `TaskBoardOpenEnum` (which supplies the
@@ -761,6 +763,18 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "ImproverApplyRequest",
     "SessionArchiveResponse",
     "AdoptSessionRequest",
+    // reviews leaves (avatar/body_update/file_comment/review_thread_resolve):
+    // wire/model split - the hand models live in scattered/mixed Swift files.
+    "ReviewsAvatarRequest",
+    "ReviewsAvatarResponse",
+    "ReviewsBodyUpdateRequest",
+    "ReviewsBodyUpdateOutcome",
+    "ReviewsBodyUpdateResponse",
+    "ReviewsFileCommentKind",
+    "ReviewsFileCommentRequest",
+    "ReviewsFileCommentResponse",
+    "ReviewsReviewThreadResolveRequest",
+    "ReviewsReviewThreadResolveResponse",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1386,6 +1400,15 @@ const SESSION_REQUESTS_SOURCE: &str =
 // drop-in for the hand one. ReviewAuthorAssociation and ReviewActionPreviewKind
 // are SKIP_TYPES here.
 const REVIEWS_ENUMS_SOURCE: &str = include_str!("../src/reviews/enums.rs");
+// reviews leaves: small clean request/response structs (plus two enums). Split
+// into suffixed *Wire types; the hand models live in scattered/mixed Swift
+// files, so this is additive, not direct adoption. body_update's response
+// carries a DateTime (-> String) and the open ReviewsBodyUpdateOutcome.
+const REVIEWS_AVATAR_SOURCE: &str = include_str!("../src/reviews/avatar.rs");
+const REVIEWS_BODY_UPDATE_SOURCE: &str = include_str!("../src/reviews/body_update.rs");
+const REVIEWS_FILE_COMMENT_SOURCE: &str = include_str!("../src/reviews/file_comment.rs");
+const REVIEWS_THREAD_RESOLVE_SOURCE: &str =
+    include_str!("../src/reviews/review_thread_resolve.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, an optional defaults source informing decode defaults, a short
@@ -1474,6 +1497,18 @@ fn modules() -> Vec<GeneratedModule> {
             description: "the Rust reviews wire enums",
             defaults: None,
             sources: &[REVIEWS_ENUMS_SOURCE],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsLeavesWireTypes.generated.swift",
+            description: "the Rust reviews leaf request/response types",
+            defaults: None,
+            sources: &[
+                REVIEWS_AVATAR_SOURCE,
+                REVIEWS_BODY_UPDATE_SOURCE,
+                REVIEWS_FILE_COMMENT_SOURCE,
+                REVIEWS_THREAD_RESOLVE_SOURCE,
+            ],
         },
     ]
 }
