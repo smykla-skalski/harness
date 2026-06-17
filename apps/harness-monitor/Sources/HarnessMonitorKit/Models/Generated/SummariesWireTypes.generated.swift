@@ -662,6 +662,27 @@ public struct AcpTranscriptResponseWire: Codable, Equatable, Sendable {
   }
 }
 
+public struct StreamEventWire: Codable, Equatable, Sendable {
+  public var event: String
+  public var recordedAt: String
+  public var sessionId: String?
+  public var payload: JSONValue
+
+  public init(event: String, recordedAt: String, sessionId: String? = nil, payload: JSONValue) {
+    self.event = event
+    self.recordedAt = recordedAt
+    self.sessionId = sessionId
+    self.payload = payload
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case event
+    case recordedAt = "recorded_at"
+    case sessionId = "session_id"
+    case payload
+  }
+}
+
 public struct AskUserQuestionOptionWire: Codable, Equatable, Sendable {
   public var label: String
   public var description: String

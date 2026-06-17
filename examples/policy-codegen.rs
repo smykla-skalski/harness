@@ -1090,6 +1090,7 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TimelineEntry",
     "TimelineWindowResponse",
     "AcpTranscriptResponse",
+    "StreamEvent",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1867,6 +1868,9 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     // window response (entries + before/after cursors) and the acp transcript.
     "TimelineWindowResponse",
     "AcpTranscriptResponse",
+    // StreamEvent: the SSE envelope (event/recordedAt/sessionId + free-form payload
+    // serde_json::Value -> JSONValue). Clean, same-named hand mirror, generate-only.
+    "StreamEvent",
 ];
 const OBSERVE_CLASSIFICATION_SOURCE: &str = include_str!("../src/observe/types/classification.rs");
 const OBSERVE_ISSUE_CODE_SOURCE: &str = include_str!("../src/observe/types/issue_code.rs");
