@@ -926,6 +926,12 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "LogLevelResponse",
     "SetLogLevelRequest",
     "HostBridgeReconfigureRequest",
+    // github diagnostics sub-cluster (GitHubApiDiagnostics + nested rate/cooldown/
+    // operation structs); generate-only, GitHubApiDiagnostics is decoded by githubStatus().
+    "GitHubApiDiagnostics",
+    "GitHubRateBucketDiagnostics",
+    "GitHubCooldownDiagnostics",
+    "GitHubOperationSpendDiagnostics",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1635,6 +1641,14 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     "LogLevelResponse",
     "SetLogLevelRequest",
     "HostBridgeReconfigureRequest",
+    // github diagnostics sub-cluster: GitHubApiDiagnostics (decoded by the app's
+    // githubStatus()) + its three nested diagnostics structs. Self-contained over
+    // primitives + each other. DaemonDiagnosticsReport stays out - it nests the
+    // foundation-entangled manifest/launch-agent/acp-probe/audit types.
+    "GitHubApiDiagnostics",
+    "GitHubRateBucketDiagnostics",
+    "GitHubCooldownDiagnostics",
+    "GitHubOperationSpendDiagnostics",
 ];
 const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
     include_str!("../src/task_board/git_identity_defaults.rs");

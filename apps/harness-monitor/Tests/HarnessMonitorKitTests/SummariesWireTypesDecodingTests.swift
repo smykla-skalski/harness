@@ -49,4 +49,28 @@ struct SummariesWireTypesDecodingTests {
     )
     #expect(control.status == "stopping")
   }
+
+  @Test("github diagnostics decode their nested buckets and snake_case keys")
+  func decodesGitHubDiagnostics() throws {
+    let json = #"""
+    {"buckets":[{"resource":"core","remaining":4900,"limit":5000,"used":100,"reset_at":"2026-06-17T01:00:00Z"}],"cooling":[{"resource":"graphql","reason":"secondary_rate_limit","until_seconds_from_now":42}],"last_hour_network_requests":1200,"last_hour_graphql_points":850,"cache_hits":300,"cache_stale_hits":12,"cache_deferred_hits":4,"deferred_budget":1000,"top_operations":[{"operation":"list_pulls","network_requests":40,"graphql_points":0}]}
+    """#
+    let diagnostics = try decoder.decode(GitHubApiDiagnosticsWire.self, from: Data(json.utf8))
+
+    #expect(diagnostics.lastHourNetworkRequests == 1200)
+    #expect(diagnostics.lastHourGraphqlPoints == 850)
+    #expect(diagnostics.cacheStaleHits == 12)
+    #expect(diagnostics.deferredBudget == 1000)
+
+    #expect(diagnostics.buckets.count == 1)
+    #expect(diagnostics.buckets[0].resource == "core")
+    #expect(diagnostics.buckets[0].resetAt == "2026-06-17T01:00:00Z")
+
+    #expect(diagnostics.cooling.count == 1)
+    #expect(diagnostics.cooling[0].untilSecondsFromNow == 42)
+
+    #expect(diagnostics.topOperations.count == 1)
+    #expect(diagnostics.topOperations[0].operation == "list_pulls")
+    #expect(diagnostics.topOperations[0].networkRequests == 40)
+  }
 }

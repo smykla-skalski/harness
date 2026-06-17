@@ -119,3 +119,99 @@ public struct HostBridgeReconfigureRequestWire: Codable, Equatable, Sendable {
     case force
   }
 }
+
+public struct GitHubApiDiagnosticsWire: Codable, Equatable, Sendable {
+  public var buckets: [GitHubRateBucketDiagnosticsWire]
+  public var cooling: [GitHubCooldownDiagnosticsWire]
+  public var lastHourNetworkRequests: UInt64
+  public var lastHourGraphqlPoints: UInt64
+  public var cacheHits: UInt64
+  public var cacheStaleHits: UInt64
+  public var cacheDeferredHits: UInt64
+  public var deferredBudget: UInt64
+  public var topOperations: [GitHubOperationSpendDiagnosticsWire]
+
+  public init(buckets: [GitHubRateBucketDiagnosticsWire], cooling: [GitHubCooldownDiagnosticsWire], lastHourNetworkRequests: UInt64, lastHourGraphqlPoints: UInt64, cacheHits: UInt64, cacheStaleHits: UInt64, cacheDeferredHits: UInt64, deferredBudget: UInt64, topOperations: [GitHubOperationSpendDiagnosticsWire]) {
+    self.buckets = buckets
+    self.cooling = cooling
+    self.lastHourNetworkRequests = lastHourNetworkRequests
+    self.lastHourGraphqlPoints = lastHourGraphqlPoints
+    self.cacheHits = cacheHits
+    self.cacheStaleHits = cacheStaleHits
+    self.cacheDeferredHits = cacheDeferredHits
+    self.deferredBudget = deferredBudget
+    self.topOperations = topOperations
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case buckets
+    case cooling
+    case lastHourNetworkRequests = "last_hour_network_requests"
+    case lastHourGraphqlPoints = "last_hour_graphql_points"
+    case cacheHits = "cache_hits"
+    case cacheStaleHits = "cache_stale_hits"
+    case cacheDeferredHits = "cache_deferred_hits"
+    case deferredBudget = "deferred_budget"
+    case topOperations = "top_operations"
+  }
+}
+
+public struct GitHubRateBucketDiagnosticsWire: Codable, Equatable, Sendable {
+  public var resource: String
+  public var remaining: UInt32
+  public var limit: UInt32
+  public var used: UInt32
+  public var resetAt: String
+
+  public init(resource: String, remaining: UInt32, limit: UInt32, used: UInt32, resetAt: String) {
+    self.resource = resource
+    self.remaining = remaining
+    self.limit = limit
+    self.used = used
+    self.resetAt = resetAt
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case resource
+    case remaining
+    case limit
+    case used
+    case resetAt = "reset_at"
+  }
+}
+
+public struct GitHubCooldownDiagnosticsWire: Codable, Equatable, Sendable {
+  public var resource: String
+  public var reason: String
+  public var untilSecondsFromNow: UInt64
+
+  public init(resource: String, reason: String, untilSecondsFromNow: UInt64) {
+    self.resource = resource
+    self.reason = reason
+    self.untilSecondsFromNow = untilSecondsFromNow
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case resource
+    case reason
+    case untilSecondsFromNow = "until_seconds_from_now"
+  }
+}
+
+public struct GitHubOperationSpendDiagnosticsWire: Codable, Equatable, Sendable {
+  public var operation: String
+  public var networkRequests: UInt64
+  public var graphqlPoints: UInt64
+
+  public init(operation: String, networkRequests: UInt64, graphqlPoints: UInt64) {
+    self.operation = operation
+    self.networkRequests = networkRequests
+    self.graphqlPoints = graphqlPoints
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case operation
+    case networkRequests = "network_requests"
+    case graphqlPoints = "graphql_points"
+  }
+}
