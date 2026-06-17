@@ -14,7 +14,7 @@ struct PolicyCanvasPortMarkerLayoutTests {
       inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
       outputPorts: []
     )
-    let compactEdges = (0..<4).map { index in
+    let compactEdges = (0..<3).map { index in
       PolicyCanvasEdge(
         id: "compact-\(index)",
         source: PolicyCanvasPortEndpoint(nodeID: "source-\(index)", portID: "out", kind: .output),
@@ -79,8 +79,15 @@ struct PolicyCanvasPortMarkerLayoutTests {
       edges: edges,
       fontScale: 1
     )
+    let prepared = PolicyCanvasPreparedRouteInput(input: input)
+    let targetHeight = prepared.nodeIndex[target.id]?.size.height ?? PolicyCanvasLayout.nodeSize.height
+    let targetBase = PolicyCanvasLayout.portY(
+      index: 0,
+      count: target.inputPorts.count,
+      nodeHeight: targetHeight
+    )
     let targetPoint = CGPoint(
-      x: target.position.x, y: target.position.y + PolicyCanvasLayout.nodeSize.height / 2)
+      x: target.position.x, y: target.position.y + targetBase)
     let routes = Dictionary(
       uniqueKeysWithValues: edges.map { edge in
         (
@@ -92,7 +99,6 @@ struct PolicyCanvasPortMarkerLayoutTests {
         )
       })
 
-    let prepared = PolicyCanvasPreparedRouteInput(input: input)
     let layout = prepared.portMarkerLayout(routes: routes, nodeIndex: prepared.nodeIndex)
     let endpoint = edges[0].target
     let leadingMarkers = layout.markers(for: endpoint, side: .leading, isVisible: true)
@@ -110,20 +116,20 @@ struct PolicyCanvasPortMarkerLayoutTests {
     #expect(trailingMarkers.isEmpty)
     assertBorderCoordinates(
       markers: leadingMarkers,
-      base: PolicyCanvasLayout.nodeSize.height / 2,
-      extent: PolicyCanvasLayout.nodeSize.height
+      base: targetBase,
+      extent: targetHeight
     )
     assertBorderCoordinates(
       markers: trailingMarkers,
-      base: PolicyCanvasLayout.nodeSize.height / 2,
-      extent: PolicyCanvasLayout.nodeSize.height
+      base: targetBase,
+      extent: targetHeight
     )
     let leadingCoordinates = leadingMarkers.map {
-      PolicyCanvasLayout.nodeSize.height / 2 + $0.axisOffset
+      targetBase + $0.axisOffset
     }.sorted()
-    assertEvenSpacing(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
+    assertEvenSpacing(leadingCoordinates, extent: targetHeight)
     assertMinimumSpacing(leadingCoordinates)
-    assertCornerClearance(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
+    assertCornerClearance(leadingCoordinates, extent: targetHeight)
   }
 
   @Test("terminal markers share capacity and spacing across logical ports")
@@ -164,15 +170,23 @@ struct PolicyCanvasPortMarkerLayoutTests {
       edges: edges,
       fontScale: 1
     )
+    let prepared = PolicyCanvasPreparedRouteInput(input: input)
+    let sourceHeight = prepared.nodeIndex[source.id]?.size.height ?? PolicyCanvasLayout.nodeSize.height
+    let sourcePoint = CGPoint(
+      x: source.position.x + PolicyCanvasLayout.nodeSize.width,
+      y: source.position.y + sourceHeight / 2
+    )
     let routes = Dictionary(
       uniqueKeysWithValues: edges.map { edge in
         (
           edge.id,
-          PolicyCanvasEdgeRoute(points: [.zero, CGPoint(x: 80, y: 0)], labelPosition: .zero)
+          PolicyCanvasEdgeRoute(
+            points: [sourcePoint, CGPoint(x: sourcePoint.x + 80, y: sourcePoint.y)],
+            labelPosition: sourcePoint
+          )
         )
       })
 
-    let prepared = PolicyCanvasPreparedRouteInput(input: input)
     let layout = prepared.portMarkerLayout(routes: routes, nodeIndex: prepared.nodeIndex)
     let sourceTerminals = edges.compactMap { edge in
       layout.terminal(edgeID: edge.id, role: .source).map { (edge, $0) }
@@ -183,17 +197,17 @@ struct PolicyCanvasPortMarkerLayoutTests {
     #expect(trailing.count == 4)
     #expect(leading.isEmpty)
     let trailingCoordinates = trailing.map { edge, terminal in
-      sourceCoordinate(edge.source, side: .trailing) + terminal.axisOffset
+      sourceCoordinate(edge.source, side: .trailing, nodeHeight: sourceHeight) + terminal.axisOffset
     }.sorted()
     let leadingCoordinates = leading.map { edge, terminal in
-      sourceCoordinate(edge.source, side: .leading) + terminal.axisOffset
+      sourceCoordinate(edge.source, side: .leading, nodeHeight: sourceHeight) + terminal.axisOffset
     }.sorted()
-    assertEvenSpacing(trailingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
-    assertEvenSpacing(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
+    assertEvenSpacing(trailingCoordinates, extent: sourceHeight)
+    assertEvenSpacing(leadingCoordinates, extent: sourceHeight)
     assertMinimumSpacing(trailingCoordinates)
     assertMinimumSpacing(leadingCoordinates)
-    assertCornerClearance(trailingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
-    assertCornerClearance(leadingCoordinates, extent: PolicyCanvasLayout.nodeSize.height)
+    assertCornerClearance(trailingCoordinates, extent: sourceHeight)
+    assertCornerClearance(leadingCoordinates, extent: sourceHeight)
   }
 
   @Test("semantic sides override opposite explicit marker sides")
@@ -292,12 +306,13 @@ struct PolicyCanvasPortMarkerLayoutTests {
 
   func sourceCoordinate(
     _ endpoint: PolicyCanvasPortEndpoint,
-    side: PolicyCanvasPortSide
+    side: PolicyCanvasPortSide,
+    nodeHeight: CGFloat = PolicyCanvasLayout.nodeSize.height
   ) -> CGFloat {
     let index = endpoint.portID == "pass" ? 0 : 1
     switch side {
     case .leading, .trailing:
-      return PolicyCanvasLayout.portY(index: index, count: 2)
+      return PolicyCanvasLayout.portY(index: index, count: 2, nodeHeight: nodeHeight)
     case .top, .bottom:
       return PolicyCanvasLayout.portX(index: index, count: 2)
     }

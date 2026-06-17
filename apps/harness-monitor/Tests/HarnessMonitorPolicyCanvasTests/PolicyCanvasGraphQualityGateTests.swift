@@ -200,6 +200,30 @@ struct PolicyCanvasGraphQualityGateTests {
     )
   }
 
+  @Test func allSamplesKeepRouteSegmentsOnGrid() async throws {
+    var violations: [String] = []
+    for sample in PolicyCanvasLabSamples.all {
+      let routed = try await routedSample(sampleID: sample.id)
+      let count = routed.report.count(for: .routeSegments)
+      guard count > 0 else {
+        continue
+      }
+      violations.append(
+        [
+          "\(sample.id): \(count) short or off-grid route segments",
+          Self.routeSegmentDetail(routed.report),
+        ].joined(separator: " - ")
+      )
+    }
+    #expect(
+      violations.isEmpty,
+      """
+      lab sample route segments should be at least one grid step and a grid multiple
+      violations=\(violations.joined(separator: "\n"))
+      """
+    )
+  }
+
   /// Deterministic dump of every sample's report to
   /// `tmp/policy-canvas/graph-quality-baseline.txt` (resolved from `#filePath`,
   /// matching the fan-in dump convention). Captures the baseline used to set the
@@ -393,6 +417,8 @@ struct PolicyCanvasGraphQualityGateTests {
       "port_too_close: \(report.count(for: .portTooClose))",
       "port_detached: \(report.count(for: .portDetached))",
       "label_overlaps: \(report.count(for: .labelOverlaps))",
+      "route_segments: \(report.count(for: .routeSegments))",
+      "route_segment_detail: \(Self.routeSegmentDetail(report))",
       "corridor_parallel: \(report.count(for: .corridorParallel))",
       "corridor_parallel_detail: \(Self.corridorParallelDetail(report))",
       "corridor_parallel_route_detail: \(Self.corridorParallelRouteDetail(report, routes: timedRoute.output.routes))",
@@ -565,6 +591,20 @@ struct PolicyCanvasGraphQualityGateTests {
           axis,
           String(format: "sep=%.3f", violation.separation),
           "\(violation.overlapStart)->\(violation.overlapEnd)",
+        ].joined(separator: ":")
+      }
+      .joined(separator: ",")
+  }
+
+  private static func routeSegmentDetail(_ report: PolicyCanvasGraphQualityReport) -> String {
+    report.routeSegments
+      .prefix(80)
+      .map { violation in
+        [
+          violation.edgeID,
+          violation.kind.rawValue,
+          String(format: "len=%.3f", violation.length),
+          "\(violation.start)->\(violation.end)",
         ].joined(separator: ":")
       }
       .joined(separator: ",")

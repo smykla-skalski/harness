@@ -14,17 +14,19 @@ import HarnessMonitorPolicyCanvasAlgorithms
 /// repinned again on 2026-06-17 after ELK became the only automatic layout path
 /// for small and large samples, and again after the route grid / corridor-spacing
 /// pass made corridor reuse and parallel corridor spacing hard-zero gates.
-/// Corridor reuse and corridor parallel stay intentionally absent so every
-/// budgeted sample has a hard-zero corridor gate.
+/// The budgets were repinned again on 2026-06-17 after visible route geometry
+/// moved fully to the 20 pt grid. Corridor reuse, corridor parallel, and edge
+/// segments stay intentionally absent so every budgeted sample has a hard-zero
+/// gate for those categories.
 /// The gate fails if a sample regresses above its budget; improvements just leave
 /// headroom, so tighten the budget whenever a category is banked lower. Categories
 /// absent from a sample's table default to `0` - a hard-zero gate. A budgeted
 /// sample with no entry at all (e.g. a newly added non-debug lab sample) gets
 /// all-zero budgets and fails loudly until its baseline is captured. The four
 /// largest stress fixtures are debug-only for this gate and stay covered by the
-/// deterministic dump. Corridor reuse and parallel corridor spacing are hard-zero
-/// gates in `PolicyCanvasGraphQualityGateTests`. `PolicyCanvasQualityCategory.crossings`
-/// is the only non-gated category.
+/// deterministic dump. Corridor reuse, parallel corridor spacing, and edge
+/// segment grid/length are hard-zero gates in `PolicyCanvasGraphQualityGateTests`.
+/// `PolicyCanvasQualityCategory.crossings` is the only non-gated category.
 enum PolicyCanvasGraphQualityBudgets {
   /// Allowed count for a category on a given sample. Missing entries are `0`.
   static func limit(
@@ -37,28 +39,29 @@ enum PolicyCanvasGraphQualityBudgets {
   static let bySampleID: [String: [PolicyCanvasQualityCategory: Int]] = [
     "minimal": [:],
     "linear": [
-      .crossedPorts: 1, .labelNearTurn: 2,
+      .crossedPorts: 1, .labelNearTurn: 3,
     ],
     "branching": [
-      .crossedPorts: 5, .labelOnEdge: 4, .labelNearTurn: 3,
+      .crossedPorts: 5, .labelOnEdge: 6, .labelNearTurn: 3,
     ],
     "default": [
       .crossingsIndependent: 4, .longEdges: 4, .detours: 2, .nodeDistance: 5,
-      .wrongTurns: 2, .crossedPorts: 10, .labelOnBody: 1, .labelOnEdge: 5,
+      .wrongTurns: 2, .crossedPorts: 10, .labelOnBody: 2, .labelOnEdge: 5,
       .labelNearTurn: 8,
     ],
     "multi-group": [
-      .crossingsIndependent: 12, .longEdges: 5, .nodeDistance: 7, .crossedPorts: 7,
-      .labelOverlaps: 1, .labelOnBody: 1, .labelOnEdge: 3, .labelNearTurn: 11,
+      .crossingsIndependent: 12, .longEdges: 5, .detours: 1, .nodeDistance: 7,
+      .wrongTurns: 3, .crossedPorts: 7, .labelOverlaps: 1, .labelOnBody: 1,
+      .labelOnEdge: 7, .labelNearTurn: 11,
     ],
     "extreme": [
-      .crossingsIndependent: 22, .longEdges: 5, .nodeDistance: 6, .crossedPorts: 5,
-      .labelOverlaps: 1, .labelOnBody: 4, .labelOnEdge: 20, .labelNearTurn: 12,
+      .crossingsIndependent: 26, .longEdges: 5, .nodeDistance: 6, .crossedPorts: 5,
+      .labelOverlaps: 1, .labelOnBody: 5, .labelOnEdge: 20, .labelNearTurn: 12,
     ],
     "extreme-braid": [
       .crossingsIndependent: 53, .longEdges: 15, .detours: 3, .nodeDistance: 27,
-      .wrongTurns: 4, .crossedPorts: 13, .labelOverlaps: 1, .labelOnBody: 3,
-      .labelOnEdge: 26, .labelNearTurn: 30,
+      .wrongTurns: 5, .crossedPorts: 20, .labelOverlaps: 2, .labelOnBody: 8,
+      .labelOnEdge: 30, .labelNearTurn: 30,
     ],
   ]
 }

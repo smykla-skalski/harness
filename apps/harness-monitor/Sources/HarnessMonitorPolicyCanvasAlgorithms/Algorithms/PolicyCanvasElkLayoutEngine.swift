@@ -303,11 +303,25 @@ private struct PolicyCanvasElkLayoutEngine {
     alignedTo terminal: CGPoint,
     side: PolicyCanvasPortSide
   ) -> CGPoint {
+    let minimumLead = PolicyCanvasLayout.defaultEdgeLineSpacing
+    func leadDistance(_ delta: CGFloat) -> CGFloat {
+      max(minimumLead, PolicyCanvasLayout.routeGridRound(abs(delta)))
+    }
     switch side {
     case .leading, .trailing:
-      CGPoint(x: point.x, y: terminal.y)
+      let direction: CGFloat = side == .trailing ? 1 : -1
+      let delta = (point.x - terminal.x) * direction
+      return CGPoint(
+        x: terminal.x + (direction * leadDistance(delta)),
+        y: terminal.y
+      )
     case .top, .bottom:
-      CGPoint(x: terminal.x, y: point.y)
+      let direction: CGFloat = side == .bottom ? 1 : -1
+      let delta = (point.y - terminal.y) * direction
+      return CGPoint(
+        x: terminal.x,
+        y: terminal.y + (direction * leadDistance(delta))
+      )
     }
   }
 
@@ -358,7 +372,7 @@ private struct PolicyCanvasElkLayoutEngine {
       hash &*= 1_099_511_628_211
     }
 
-    elkCombine("elk-swift-grid-ports-1")
+    elkCombine("elk-swift-grid-ports-2")
     for node in nodes {
       elkCombine(node.id)
       elkCombine(node.groupID ?? "")

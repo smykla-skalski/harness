@@ -171,6 +171,9 @@ func policyCanvasQualityHoverMarks(
   for violation in report.detours {
     add(.detours, policyCanvasHoverPolyline(violation.points, width: 16))
   }
+  for violation in report.routeSegments {
+    add(.routeSegments, policyCanvasHoverLine(violation.start, violation.end, width: 16))
+  }
   for violation in report.nodeDistance {
     // Trace the whole mark - both end caps reaching to the nodes plus the bar
     // between them - so the caps are hoverable too. Butt cap and miter join keep

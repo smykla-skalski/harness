@@ -31,8 +31,8 @@ struct PolicyCanvasEdgeRoutingTests {
       target: CGPoint(x: 200, y: 100),
       lane: 0
     )
-    #expect(route.points[1].x == 90)
-    #expect(route.points[2].x == 90)
+    #expect(route.points[1].x == 100)
+    #expect(route.points[2].x == 100)
   }
 
   @Test("Lane offset spreads parallel default routes")

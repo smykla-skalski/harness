@@ -84,6 +84,7 @@ final class PolicyCanvasQualityOverlayView: NSView {
       let warning = PolicyCanvasVisualStyle.warningTint
 
       drawDetours(warning: warning, dirtyRect: dirtyRect)
+      drawRouteSegments(warning: warning, dirtyRect: dirtyRect)
       drawCorridors(error: error, warning: warning, dirtyRect: dirtyRect)
       drawLongEdges(warning: warning, dirtyRect: dirtyRect)
       drawNodeDistance(warning: warning, dirtyRect: dirtyRect)
@@ -119,6 +120,24 @@ final class PolicyCanvasQualityOverlayView: NSView {
     policyCanvasStroke(path, color: warning, alpha: 0.22, lineWidth: 12)
   }
 
+  private func drawRouteSegments(warning: Color, dirtyRect: CGRect) {
+    let path = NSBezierPath()
+    for violation in report.routeSegments {
+      let markRect = lineDirtyRect(from: violation.start, to: violation.end, padding: 10)
+      guard
+        qualityMarkIntersectsDirtyRect(
+          markRect,
+          dirtyRect: dirtyRect,
+          padding: 0
+        )
+      else {
+        continue
+      }
+      appendLine(to: path, from: violation.start, to: violation.end)
+    }
+    policyCanvasStroke(path, color: warning, alpha: 0.34, lineWidth: 10)
+  }
+
   private func drawNodeDistance(warning: Color, dirtyRect: CGRect) {
     let line = NSBezierPath()
     let ticks = NSBezierPath()
@@ -143,7 +162,11 @@ final class PolicyCanvasQualityOverlayView: NSView {
         (violation.gapEnd, violation.gapEndCap),
       ] {
         // Boundary tick at the measured edge, plus the cap stretching to its node.
-        appendLine(to: ticks, from: CGPoint(x: end.x, y: end.y - 6), to: CGPoint(x: end.x, y: end.y + 6))
+        appendLine(
+          to: ticks,
+          from: CGPoint(x: end.x, y: end.y - 6),
+          to: CGPoint(x: end.x, y: end.y + 6)
+        )
         appendLine(to: ticks, from: end, to: cap)
       }
     }

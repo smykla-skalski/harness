@@ -143,6 +143,25 @@ struct PolicyCanvasQualityHoverRegionTests {
     #expect(marks(under: CGPoint(x: 350, y: 300), in: report).isEmpty)
   }
 
+  @Test("an edge-segment mark covers the offending segment")
+  func routeSegmentMarkCoversSegment() {
+    var report = PolicyCanvasGraphQualityReport.empty
+    report.routeSegments = [
+      PolicyCanvasRouteSegmentLengthViolation(
+        kind: .tooShort,
+        edgeID: "e",
+        start: CGPoint(x: 100, y: 120),
+        end: CGPoint(x: 115, y: 120),
+        length: 15,
+        remainder: 15
+      )
+    ]
+    let hit = marks(under: CGPoint(x: 108, y: 120), in: report)
+    #expect(hit.count == 1)
+    #expect(hit.first?.category == .routeSegments)
+    #expect(marks(under: CGPoint(x: 108, y: 180), in: report).isEmpty)
+  }
+
   private func portOverlap(at point: CGPoint) -> PolicyCanvasPortSpacingViolation {
     PolicyCanvasPortSpacingViolation(
       kind: .overlap, nodeID: "n", side: .leading,

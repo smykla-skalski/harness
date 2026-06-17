@@ -254,6 +254,40 @@ public struct PolicyCanvasDetourViolation: Equatable, Sendable {
   public var severity: PolicyCanvasQualitySeverity { .warning }
 }
 
+/// A straight route segment that is shorter than one visible grid step or whose
+/// length is not an integer multiple of the visible route grid.
+public struct PolicyCanvasRouteSegmentLengthViolation: Equatable, Sendable {
+  public enum Kind: String, Equatable, Sendable {
+    case tooShort
+    case offGrid
+  }
+
+  public let kind: Kind
+  public let edgeID: String
+  public let start: CGPoint
+  public let end: CGPoint
+  public let length: CGFloat
+  public let remainder: CGFloat
+
+  public init(
+    kind: Kind,
+    edgeID: String,
+    start: CGPoint,
+    end: CGPoint,
+    length: CGFloat,
+    remainder: CGFloat
+  ) {
+    self.kind = kind
+    self.edgeID = edgeID
+    self.start = start
+    self.end = end
+    self.length = length
+    self.remainder = remainder
+  }
+
+  public var severity: PolicyCanvasQualitySeverity { .warning }
+}
+
 /// A route that doubles back on itself: it travels along one axis, then reverses
 /// and travels the opposite way along that same axis. The reversing segment is
 /// the visible spur - a wire that leaves a port the wrong way and hooks back, or

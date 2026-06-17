@@ -37,6 +37,10 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
   /// Distance a port dot may sit from the canonical evenly-spread slot for its
   /// position on the side before it reads as unevenly distributed.
   public var portEvenDistributionTolerance: CGFloat
+  /// Minimum visible length for every straight route segment.
+  public var minimumRouteSegmentLength: CGFloat
+  /// Segment lengths must be integer multiples of this grid step.
+  public var routeSegmentLengthGrid: CGFloat
 
   public init(
     minimumPortSpacing: CGFloat,
@@ -50,7 +54,9 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     wrongTurnDepth: CGFloat,
     portDetachDistance: CGFloat,
     labelTurnClearance: CGFloat,
-    portEvenDistributionTolerance: CGFloat
+    portEvenDistributionTolerance: CGFloat,
+    minimumRouteSegmentLength: CGFloat,
+    routeSegmentLengthGrid: CGFloat
   ) {
     self.minimumPortSpacing = minimumPortSpacing
     self.markerOverlap = markerOverlap
@@ -64,6 +70,8 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     self.portDetachDistance = portDetachDistance
     self.labelTurnClearance = labelTurnClearance
     self.portEvenDistributionTolerance = portEvenDistributionTolerance
+    self.minimumRouteSegmentLength = minimumRouteSegmentLength
+    self.routeSegmentLengthGrid = routeSegmentLengthGrid
   }
 
   public static let `default` = Self(
@@ -82,7 +90,9 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     // Half a port marker: a bend within this of the label box crowds the corner.
     labelTurnClearance: PolicyCanvasLayout.portDiameter / 2,
     // Half a port marker off the even slot reads as a mis-placed dot.
-    portEvenDistributionTolerance: PolicyCanvasLayout.portDiameter / 2
+    portEvenDistributionTolerance: PolicyCanvasLayout.portDiameter / 2,
+    minimumRouteSegmentLength: PolicyCanvasLayout.gridSize,
+    routeSegmentLengthGrid: PolicyCanvasLayout.gridSize
   )
 }
 
@@ -151,6 +161,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
   public var bodyHits: [PolicyCanvasBodyHitViolation]
   public var longEdges: [PolicyCanvasLongEdgeViolation]
   public var detours: [PolicyCanvasDetourViolation]
+  public var routeSegments: [PolicyCanvasRouteSegmentLengthViolation]
   public var nodeDistance: [PolicyCanvasNodeDistanceViolation]
   public var wrongTurns: [PolicyCanvasWrongTurnViolation]
   public var crossedPorts: [PolicyCanvasCrossedPortsViolation]
@@ -166,6 +177,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
     bodyHits: [PolicyCanvasBodyHitViolation],
     longEdges: [PolicyCanvasLongEdgeViolation],
     detours: [PolicyCanvasDetourViolation],
+    routeSegments: [PolicyCanvasRouteSegmentLengthViolation],
     nodeDistance: [PolicyCanvasNodeDistanceViolation],
     wrongTurns: [PolicyCanvasWrongTurnViolation],
     crossedPorts: [PolicyCanvasCrossedPortsViolation],
@@ -180,6 +192,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
     self.bodyHits = bodyHits
     self.longEdges = longEdges
     self.detours = detours
+    self.routeSegments = routeSegments
     self.nodeDistance = nodeDistance
     self.wrongTurns = wrongTurns
     self.crossedPorts = crossedPorts
@@ -196,6 +209,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
     bodyHits: [],
     longEdges: [],
     detours: [],
+    routeSegments: [],
     nodeDistance: [],
     wrongTurns: [],
     crossedPorts: [],
@@ -209,6 +223,7 @@ public struct PolicyCanvasGraphQualityReport: Equatable, Sendable {
   public var errorCount: Int {
     portSpacing.filter { $0.severity == .error }.count
       + corridors.filter { $0.severity == .error }.count
+      + routeSegments.filter { $0.severity == .error }.count
       + bodyHits.count
       + labels.filter { $0.severity == .error }.count
       + nodeOverlaps.count
@@ -318,6 +333,7 @@ public func policyCanvasMeasureGraphQuality(
     ),
     longEdges: edgeLengths.longEdges,
     detours: edgeLengths.detours,
+    routeSegments: edgeLengths.routeSegments,
     nodeDistance: policyCanvasMeasureNodeDistance(
       edges: edges,
       nodeFramesByID: nodeFramesByID,

@@ -40,9 +40,10 @@ extension PolicyCanvasPortMarkerLayoutTests {
       edges: edges,
       fontScale: 1
     )
-    let routes = siblingSideRoutes(source: source)
 
     let prepared = PolicyCanvasPreparedRouteInput(input: input)
+    let sourceHeight = prepared.nodeIndex[source.id]?.size.height ?? PolicyCanvasLayout.nodeSize.height
+    let routes = siblingSideRoutes(source: source, sourceHeight: sourceHeight)
     let layout = prepared.portMarkerLayout(routes: routes, nodeIndex: prepared.nodeIndex)
     var coordinatesBySide: [PolicyCanvasPortSide: [CGFloat]] = [:]
     for port in source.outputPorts {
@@ -50,7 +51,11 @@ extension PolicyCanvasPortMarkerLayoutTests {
       #expect(layout.markers(for: endpoint, side: .top, isVisible: true).isEmpty)
       #expect(layout.markers(for: endpoint, side: .bottom, isVisible: true).isEmpty)
       let portIndex = source.outputPorts.firstIndex(where: { $0.id == port.id }) ?? 0
-      let base = PolicyCanvasLayout.portY(index: portIndex, count: source.outputPorts.count)
+      let base = PolicyCanvasLayout.portY(
+        index: portIndex,
+        count: source.outputPorts.count,
+        nodeHeight: sourceHeight
+      )
       for side in [PolicyCanvasPortSide.leading, .trailing] {
         for marker in layout.markers(for: endpoint, side: side, isVisible: true) {
           coordinatesBySide[side, default: []].append(base + marker.axisOffset)
@@ -60,8 +65,8 @@ extension PolicyCanvasPortMarkerLayoutTests {
 
     #expect(coordinatesBySide.values.reduce(0) { $0 + $1.count } == edges.count)
     for coordinates in coordinatesBySide.values {
-      assertEvenSpacing(coordinates.sorted(), extent: PolicyCanvasLayout.nodeSize.height)
-      assertCornerClearance(coordinates.sorted(), extent: PolicyCanvasLayout.nodeSize.height)
+      assertEvenSpacing(coordinates.sorted(), extent: sourceHeight)
+      assertCornerClearance(coordinates.sorted(), extent: sourceHeight)
     }
   }
 
@@ -102,22 +107,30 @@ extension PolicyCanvasPortMarkerLayoutTests {
     ]
   }
 
-  private func siblingSideRoutes(source: PolicyCanvasNode) -> [String: PolicyCanvasEdgeRoute] {
+  private func siblingSideRoutes(
+    source: PolicyCanvasNode,
+    sourceHeight: CGFloat
+  ) -> [String: PolicyCanvasEdgeRoute] {
     let trailingSource = CGPoint(
       x: source.position.x + PolicyCanvasLayout.nodeSize.width,
-      y: source.position.y + PolicyCanvasLayout.portY(index: 2, count: source.outputPorts.count)
+      y: source.position.y
+        + PolicyCanvasLayout.portY(
+          index: 2,
+          count: source.outputPorts.count,
+          nodeHeight: sourceHeight
+        )
     )
     let bottomPassSource = CGPoint(
       x: source.position.x + PolicyCanvasLayout.portX(index: 0, count: source.outputPorts.count),
-      y: source.position.y + PolicyCanvasLayout.nodeSize.height
+      y: source.position.y + sourceHeight
     )
     let bottomFailSource = CGPoint(
       x: source.position.x + PolicyCanvasLayout.portX(index: 1, count: source.outputPorts.count),
-      y: source.position.y + PolicyCanvasLayout.nodeSize.height
+      y: source.position.y + sourceHeight
     )
     let bottomMissingSource = CGPoint(
       x: source.position.x + PolicyCanvasLayout.portX(index: 3, count: source.outputPorts.count),
-      y: source.position.y + PolicyCanvasLayout.nodeSize.height
+      y: source.position.y + sourceHeight
     )
     return [
       "edge-right": PolicyCanvasEdgeRoute(

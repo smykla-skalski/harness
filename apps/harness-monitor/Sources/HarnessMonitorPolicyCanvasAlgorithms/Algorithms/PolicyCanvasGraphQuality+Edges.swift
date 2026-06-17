@@ -10,12 +10,14 @@ func policyCanvasMeasureEdgeLengths(
 ) -> (
   summary: PolicyCanvasEdgeLengthSummary,
   longEdges: [PolicyCanvasLongEdgeViolation],
-  detours: [PolicyCanvasDetourViolation]
+  detours: [PolicyCanvasDetourViolation],
+  routeSegments: [PolicyCanvasRouteSegmentLengthViolation]
 ) {
   var lengths: [CGFloat] = []
   var bendCounts: [Int] = []
   var longEdges: [PolicyCanvasLongEdgeViolation] = []
   var detours: [PolicyCanvasDetourViolation] = []
+  var routeSegments: [PolicyCanvasRouteSegmentLengthViolation] = []
   for routed in routedEdges {
     let points = routed.route.points
     guard points.count >= 2 else {
@@ -23,7 +25,19 @@ func policyCanvasMeasureEdgeLengths(
     }
     var length: CGFloat = 0
     for index in 1..<points.count {
-      length += hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y)
+      let start = points[index - 1]
+      let end = points[index]
+      let segment = PolicyCanvasRouteSegment(start: start, end: end)
+      let segmentLength = hypot(end.x - start.x, end.y - start.y)
+      length += segmentLength
+      if let violation = policyCanvasRouteSegmentLengthViolation(
+        edgeID: routed.edge.id,
+        segment: segment,
+        length: segmentLength,
+        thresholds: thresholds
+      ) {
+        routeSegments.append(violation)
+      }
     }
     let bendCount = policyCanvasRouteBendCount(points)
     let xs = points.map(\.x)
@@ -84,7 +98,80 @@ func policyCanvasMeasureEdgeLengths(
   let sortedDetours = detours.sorted { lhs, rhs in
     abs(lhs.excess - rhs.excess) > 0.001 ? lhs.excess > rhs.excess : lhs.edgeID < rhs.edgeID
   }
-  return (summary, sortedLongEdges, sortedDetours)
+  return (
+    summary,
+    sortedLongEdges,
+    sortedDetours,
+    routeSegments.sorted(by: policyCanvasRouteSegmentLengthViolationOrder)
+  )
+}
+
+private func policyCanvasRouteSegmentLengthViolation(
+  edgeID: String,
+  segment: PolicyCanvasRouteSegment,
+  length: CGFloat,
+  thresholds: PolicyCanvasGraphQualityThresholds
+) -> PolicyCanvasRouteSegmentLengthViolation? {
+  let tolerance: CGFloat = 0.001
+  guard length > tolerance else {
+    return nil
+  }
+  if !segment.isHorizontal && !segment.isVertical {
+    return PolicyCanvasRouteSegmentLengthViolation(
+      kind: .offGrid,
+      edgeID: edgeID,
+      start: segment.start,
+      end: segment.end,
+      length: length,
+      remainder: length
+    )
+  }
+  if length + tolerance < thresholds.minimumRouteSegmentLength {
+    return PolicyCanvasRouteSegmentLengthViolation(
+      kind: .tooShort,
+      edgeID: edgeID,
+      start: segment.start,
+      end: segment.end,
+      length: length,
+      remainder: length
+    )
+  }
+  let grid = max(thresholds.routeSegmentLengthGrid, 1)
+  let remainder = length.truncatingRemainder(dividingBy: grid)
+  let gridDistance = min(remainder, grid - remainder)
+  guard gridDistance > tolerance else {
+    return nil
+  }
+  return PolicyCanvasRouteSegmentLengthViolation(
+    kind: .offGrid,
+    edgeID: edgeID,
+    start: segment.start,
+    end: segment.end,
+    length: length,
+    remainder: gridDistance
+  )
+}
+
+private func policyCanvasRouteSegmentLengthViolationOrder(
+  _ lhs: PolicyCanvasRouteSegmentLengthViolation,
+  _ rhs: PolicyCanvasRouteSegmentLengthViolation
+) -> Bool {
+  if lhs.edgeID != rhs.edgeID {
+    return lhs.edgeID < rhs.edgeID
+  }
+  if lhs.kind != rhs.kind {
+    return lhs.kind.rawValue < rhs.kind.rawValue
+  }
+  if abs(lhs.start.x - rhs.start.x) > 0.001 {
+    return lhs.start.x < rhs.start.x
+  }
+  if abs(lhs.start.y - rhs.start.y) > 0.001 {
+    return lhs.start.y < rhs.start.y
+  }
+  if abs(lhs.end.x - rhs.end.x) > 0.001 {
+    return lhs.end.x < rhs.end.x
+  }
+  return lhs.end.y < rhs.end.y
 }
 
 /// Count direction changes in an orthogonal polyline. A vertex is a bend when

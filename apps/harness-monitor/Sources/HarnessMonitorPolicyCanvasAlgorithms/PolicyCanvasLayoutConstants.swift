@@ -8,14 +8,12 @@ public enum PolicyCanvasLayout {
   public static let nodeWidth: CGFloat = 180
   public static let portDiameter: CGFloat = 20
   public static let portHitTestExtension: CGFloat = 10
-  public static let routeChannelStep: CGFloat = 5
-  public static let portMarkerInset: CGFloat = portDiameter / 2 + routeChannelStep
+  public static let routeChannelStep: CGFloat = gridSize
+  public static let portMarkerInset: CGFloat = gridSize
   public static let verticalPortMarkerSpacing: CGFloat = 20
   public static let defaultEdgeLineSpacing: CGFloat = verticalPortMarkerSpacing
   public static let minimumSidePortMarkerSpacing = verticalPortMarkerSpacing
-  public static let nodeMinimumHeight = routeGridCeil(
-    (portMarkerInset * 2) + (minimumSidePortMarkerSpacing * 3)
-  )
+  public static let nodeMinimumHeight = gridSize * 4
   public static let automaticLayoutNodeStepHeight: CGFloat = 160
   public static let nodeSize = CGSize(width: nodeWidth, height: nodeMinimumHeight)
   public static let groupCornerRadius: CGFloat = 8
@@ -112,10 +110,18 @@ public enum PolicyCanvasLayout {
 
   public static func nodeHeight(requiredVerticalPortSlots slots: Int) -> CGFloat {
     let requiredSlots = max(1, slots)
+    let portSpan = minimumSidePortMarkerSpacing * CGFloat(max(0, requiredSlots - 1))
     let requiredHeight =
       (portMarkerInset * 2)
-      + (minimumSidePortMarkerSpacing * CGFloat(max(0, requiredSlots - 1)))
-    return max(nodeMinimumHeight, routeGridCeil(requiredHeight))
+      + portSpan
+    var height = max(nodeMinimumHeight, routeGridCeil(requiredHeight))
+    // Centered side-port stacks only land on the 20 pt route grid when the
+    // remaining top/bottom margin is an even number of grid steps. Otherwise an
+    // edge between differently-sized nodes must contain a 10 pt jog somewhere.
+    while !routeGridAligned(height - portSpan, quantum: gridSize * 2) {
+      height += gridSize
+    }
+    return height
   }
 
   public static func requiredVerticalPortSlots(
@@ -157,17 +163,9 @@ public enum PolicyCanvasLayout {
     guard count > 1 else {
       return routeGridRound(nodeHeight / 2)
     }
-    let available = max(0, nodeHeight - (portMarkerInset * 2))
-    let step = max(
-      routeChannelStep,
-      routeGridFloor(min(verticalPortMarkerSpacing, available / CGFloat(count - 1)))
-    )
+    let step = minimumSidePortMarkerSpacing
     let span = step * CGFloat(count - 1)
-    let top = clampedRouteGridRound(
-      (nodeHeight - span) / 2,
-      lowerBound: portMarkerInset,
-      upperBound: nodeHeight - portMarkerInset - span
-    )
+    let top = routeGridRound((nodeHeight - span) / 2)
     return routeGridRound(top + (CGFloat(index) * step))
   }
 
@@ -215,6 +213,15 @@ public enum PolicyCanvasLayout {
   ) -> CGFloat {
     let high = max(lowerBound, upperBound)
     return min(max(routeGridRound(value), lowerBound), high)
+  }
+
+  public static func routeGridAligned(
+    _ value: CGFloat,
+    quantum: CGFloat = gridSize
+  ) -> Bool {
+    let step = max(quantum, 1)
+    let remainder = abs(value).truncatingRemainder(dividingBy: step)
+    return remainder < 0.001 || abs(step - remainder) < 0.001
   }
 }
 

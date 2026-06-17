@@ -13,6 +13,7 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
   case bodyHits
   case longEdges
   case detours
+  case routeSegments
   case nodeDistance
   case wrongTurns
   case crossedPorts
@@ -37,6 +38,7 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
     case .bodyHits: "body hits"
     case .longEdges: "long edges"
     case .detours: "detours"
+    case .routeSegments: "edge segments"
     case .nodeDistance: "node distance"
     case .wrongTurns: "wrong turns"
     case .crossedPorts: "crossed ports"
@@ -57,8 +59,8 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
       .labelOverlaps, .labelOnBody, .nodeOverlaps:
       .error
     case .portTooClose, .portUneven, .corridorParallel, .crossings, .crossingsIndependent,
-      .longEdges, .detours, .nodeDistance, .wrongTurns, .crossedPorts, .labelAdrift,
-      .labelOnEdge, .labelNearTurn:
+      .longEdges, .detours, .routeSegments, .nodeDistance, .wrongTurns, .crossedPorts,
+      .labelAdrift, .labelOnEdge, .labelNearTurn:
       .warning
     }
   }
@@ -97,6 +99,8 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
       "A wire spans most of the canvas width - a cross-canvas hauler"
     case .detours:
       "A wire travels much farther than the straight path between its ports - it loops or backtracks"
+    case .routeSegments:
+      "A straight wire segment is shorter than one grid step or not an integer multiple of the grid"
     case .nodeDistance:
       "Two connected nodes sit far apart horizontally with a wide empty gap between them"
     case .wrongTurns:
@@ -134,6 +138,7 @@ extension PolicyCanvasGraphQualityReport {
     case .bodyHits: bodyHits.count
     case .longEdges: longEdges.count
     case .detours: detours.count
+    case .routeSegments: routeSegments.count
     case .nodeDistance: nodeDistance.count
     case .wrongTurns: wrongTurns.count
     case .crossedPorts: crossedPorts.count

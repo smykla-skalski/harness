@@ -29,6 +29,8 @@ struct PolicyCanvasQualityMarkerSwatch: View {
         dashedRect(&context, rect, tint)
       case .detours:
         detourGlyph(&context, rect, tint)
+      case .routeSegments:
+        thickLine(&context, rect, tint)
       case .nodeDistance:
         dimensionGlyph(&context, rect, tint)
       case .wrongTurns:
@@ -61,7 +63,11 @@ struct PolicyCanvasQualityMarkerSwatch: View {
   }
 
   private func ring(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
-    context.stroke(Path(ellipseIn: centeredSquare(rect, side: 8)), with: .color(tint), lineWidth: 1.5)
+    context.stroke(
+      Path(ellipseIn: centeredSquare(rect, side: 8)),
+      with: .color(tint),
+      lineWidth: 1.5
+    )
   }
 
   private func dot(_ context: inout GraphicsContext, _ rect: CGRect, _ tint: Color) {
