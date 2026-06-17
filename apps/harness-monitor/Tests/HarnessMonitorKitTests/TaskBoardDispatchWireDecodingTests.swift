@@ -3,11 +3,11 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-/// Wire-contract for the task-board dispatch graph, generated from dispatch.rs plus
-/// policy.rs. The internally-tagged enums (readiness, block-reason, session-intent,
+/// Wire-contract and mapping for the task-board dispatch graph, generated from
+/// dispatch.rs. The internally-tagged enums (readiness, block-reason, session-intent,
 /// policy-decision) decode through the plain decoder as Swift enums with associated
-/// values; the daemon's lifecycle and failures fields are dropped via
-/// OMITTED_WIRE_FIELDS and ignored on decode. generate-only - mapping + reroute follow.
+/// values and flatten into the hand discriminator structs; the daemon's lifecycle and
+/// failures are dropped via OMITTED_WIRE_FIELDS. The dispatch endpoint is rerouted.
 @Suite("Task board dispatch wire type")
 struct TaskBoardDispatchWireDecodingTests {
   private let decoder = PolicyWireCoding.decoder
@@ -53,6 +53,31 @@ struct TaskBoardDispatchWireDecodingTests {
       DispatchExecutionSummaryWire.self, from: Data(dispatchSummaryFixture.utf8)
     )
     let applied = try #require(wire.applied.first)
+    #expect(applied.boardItemId == "task-9")
+    #expect(applied.item.id == "task-9")
+  }
+
+  @Test("maps a decoded dispatch summary to the rich hand model")
+  func mapsDispatchSummary() throws {
+    let wire = try decoder.decode(
+      DispatchExecutionSummaryWire.self, from: Data(dispatchSummaryFixture.utf8)
+    )
+    let summary = TaskBoardDispatchSummary(wire: wire)
+
+    #expect(summary.plans.count == 1)
+    let plan = try #require(summary.plans.first)
+    #expect(plan.boardItemId == "task-1")
+    #expect(plan.readiness.state == "blocked")
+    #expect(plan.readiness.reason?.kind == "policy")
+    #expect(plan.readiness.reason?.decision?.decision == "deny")
+    #expect(plan.readiness.reason?.decision?.reasonCode == "checks_not_green")
+    #expect(plan.session.kind == "create")
+    #expect(plan.session.title == "Fix the bug")
+    #expect(plan.policy?.decision == "deny")
+    #expect(plan.task.severity == .medium)
+    #expect(plan.reviewer.phase == "after_worker_review")
+
+    let applied = try #require(summary.applied.first)
     #expect(applied.boardItemId == "task-9")
     #expect(applied.item.id == "task-9")
   }

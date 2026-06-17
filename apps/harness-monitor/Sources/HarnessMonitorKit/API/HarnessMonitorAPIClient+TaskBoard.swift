@@ -99,7 +99,10 @@ extension HarnessMonitorAPIClient {
   public func dispatchTaskBoard(request: TaskBoardDispatchRequest) async throws
     -> TaskBoardDispatchSummary
   {
-    try await post("/v1/task-board/dispatch", body: request)
+    let wire: DispatchExecutionSummaryWire = try await post(
+      "/v1/task-board/dispatch", body: request, decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardDispatchSummary(wire: wire)
   }
 
   public func evaluateTaskBoard(request: TaskBoardEvaluateRequest) async throws
