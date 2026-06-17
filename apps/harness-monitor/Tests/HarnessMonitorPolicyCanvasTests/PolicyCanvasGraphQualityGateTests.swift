@@ -625,6 +625,65 @@ struct PolicyCanvasGraphQualityGateTests {
     #expect(output.routes.count == viewModel.edges.count)
   }
 
+  /// Every crossed-port the measure flags on a real lab sample must be a genuine
+  /// crossing: the two wires' routes must actually intersect between their ports.
+  /// Guards against the order-key regression where wires funnelling through a
+  /// shared fan-in channel were flagged as crossed even though they ran parallel.
+  @Test func crossedPortsFlagOnlyRealCrossings() async throws {
+    for sample in PolicyCanvasLabSamples.all {
+      let routed = try await routedSample(sampleID: sample.id)
+      for violation in routed.report.crossedPorts {
+        let crosses = !policyCanvasBruteForceCrossings(
+          routed.routes[violation.edgeA]?.points ?? [],
+          routed.routes[violation.edgeB]?.points ?? []
+        ).isEmpty
+        #expect(
+          crosses,
+          "\(sample.id): \(violation.edgeA) x \(violation.edgeB) flagged crossed but routes never meet"
+        )
+      }
+    }
+  }
+
+  /// True when two polylines properly intersect at an interior point more than a
+  /// port diameter from either polyline's own endpoints - the same geometric test
+  /// the measure uses, run independently here to confirm its verdicts.
+  private func policyCanvasBruteForceCrossings(
+    _ a: [CGPoint],
+    _ b: [CGPoint]
+  ) -> [CGPoint] {
+    guard a.count >= 2, b.count >= 2 else { return [] }
+    var hits: [CGPoint] = []
+    let endpoints = [a.first, a.last, b.first, b.last].compactMap { $0 }
+    for indexA in 1..<a.count {
+      for indexB in 1..<b.count {
+        guard
+          let point = policyCanvasSegmentIntersection(a[indexA - 1], a[indexA], b[indexB - 1], b[indexB])
+        else { continue }
+        if endpoints.contains(where: {
+          hypot($0.x - point.x, $0.y - point.y) < PolicyCanvasLayout.portDiameter
+        }) {
+          continue
+        }
+        hits.append(point)
+      }
+    }
+    return hits
+  }
+
+  /// Proper interior intersection of two segments, or nil if they miss, only
+  /// touch at an endpoint, or are collinear.
+  private func policyCanvasSegmentIntersection(
+    _ p1: CGPoint, _ p2: CGPoint, _ p3: CGPoint, _ p4: CGPoint
+  ) -> CGPoint? {
+    let denominator = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x)
+    guard abs(denominator) > 0.0001 else { return nil }
+    let t = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / denominator
+    let u = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / denominator
+    guard t > 0.0001, t < 0.9999, u > 0.0001, u < 0.9999 else { return nil }
+    return CGPoint(x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y))
+  }
+
   private func measuredRouteComputation(
     input: PolicyCanvasRouteWorkerInput
   ) -> TimedRouteComputation {
