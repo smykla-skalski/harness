@@ -97,36 +97,58 @@ fn emit_string_enum(out: &mut String, spec: &SwiftStringEnum) {
 /// name; every other fieldless enum emits as a closed `String`-backed enum. The
 /// app owns this list because the Rust enums are closed - the openness is a
 /// Swift-side resilience choice.
-const OPEN_STRING_ENUMS: &[&str] = &[];
+const OPEN_STRING_ENUMS: &[&str] = &[
+    // reviews/enums.rs: the GitHub review wire enums the app adopts directly
+    // (generated, bare-named), every one forward-compatible against an
+    // unrecognized GitHub value. ReviewAuthorAssociation and
+    // ReviewActionPreviewKind are SKIP_TYPES here (the first has a bespoke
+    // `.other(String)` catch-all, the second's hand model lives in a mixed
+    // file), so they are not in this list.
+    "ReviewPullRequestState",
+    "ReviewMergeableState",
+    "ReviewReviewStatus",
+    "ReviewCheckStatus",
+    "ReviewCheckRunStatus",
+    "ReviewCheckConclusion",
+    "ReviewReviewEventState",
+    "ReviewActionKind",
+    "ReviewActionOutcome",
+];
 
 /// Emit an open Swift enum conforming to `TaskBoardOpenEnum` (which supplies the
 /// single-value `Codable` over `rawValue`). Known variants plus a
 /// `.unknown(String)` fallback, with `allCases` listing only the known cases.
 fn emit_open_enum(out: &mut String, spec: &SwiftStringEnum) {
+    // The `.unknown(String)` catch-all subsumes any explicit Rust variant named
+    // `Unknown`: a wire value of "unknown" decodes to `.unknown("unknown")`.
+    // Emitting both a `case unknown` and the `case unknown(String)` catch-all
+    // is an invalid redeclaration, so drop the known case and let the catch-all
+    // own it - matching the hand-written open enums.
+    let cases: Vec<&(String, String)> =
+        spec.cases.iter().filter(|(case, _)| case != "unknown").collect();
     writeln!(
         out,
         "public enum {}: TaskBoardOpenEnum, CaseIterable, Identifiable {{",
         spec.name
     )
     .unwrap();
-    for (case, _) in &spec.cases {
+    for (case, _) in &cases {
         writeln!(out, "  case {case}").unwrap();
     }
     out.push_str("  case unknown(String)\n\n");
-    let known = spec
-        .cases
+    let known = cases
         .iter()
         .map(|(case, _)| format!(".{case}"))
         .collect::<Vec<_>>()
         .join(", ");
     writeln!(out, "  public static let allCases: [Self] = [{known}]\n").unwrap();
     out.push_str("  public var rawValue: String {\n    switch self {\n");
-    for (case, raw) in &spec.cases {
+    for (case, raw) in &cases {
         writeln!(out, "    case .{case}: \"{raw}\"").unwrap();
     }
     out.push_str("    case .unknown(let raw): raw\n    }\n  }\n\n");
     out.push_str("  public init(rawValue: String) {\n    switch rawValue {\n");
-    for (case, raw) in &spec.cases {
+    for (case, raw) in &cases {
         writeln!(out, "    case \"{raw}\": self = .{case}").unwrap();
     }
     out.push_str("    default: self = .unknown(rawValue)\n    }\n  }\n\n");
@@ -756,6 +778,12 @@ const SKIP_TYPES: &[&str] = &[
     "SessionMutationResponse",
     "AgentRuntimeSessionRegistrationRequest",
     "AgentRuntimeSessionRegistrationResponse",
+    // reviews/enums.rs: deferred from the enums cluster. ReviewAuthorAssociation
+    // has a bespoke `.other(String)` catch-all (not the generic `.unknown` open
+    // enum), and ReviewActionPreviewKind's hand model lives in a mixed Swift
+    // file handled with the action-preview cluster.
+    "ReviewAuthorAssociation",
+    "ReviewActionPreviewKind",
 ];
 
 /// Whether a Rust type is on the generator's skip list (see `SKIP_TYPES`).
@@ -1352,6 +1380,12 @@ const CODEX_SOURCE: &str = include_str!("../src/daemon/protocol/codex.rs");
 // already exist hand-written in Swift, so they stay unsuffixed references.
 const SESSION_REQUESTS_SOURCE: &str =
     include_str!("../src/daemon/protocol/session_requests.rs");
+// reviews/enums.rs: the GitHub review wire enums. Adopted directly (bare-named
+// open enums in OPEN_STRING_ENUMS, replacing the hand HarnessMonitorReviewsEnums
+// file) rather than wire/model split, since a string enum's generated form is a
+// drop-in for the hand one. ReviewAuthorAssociation and ReviewActionPreviewKind
+// are SKIP_TYPES here.
+const REVIEWS_ENUMS_SOURCE: &str = include_str!("../src/reviews/enums.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, an optional defaults source informing decode defaults, a short
@@ -1433,6 +1467,13 @@ fn modules() -> Vec<GeneratedModule> {
             description: "the Rust session request protocol",
             defaults: Some(SESSION_REQUESTS_SOURCE),
             sources: &[SESSION_REQUESTS_SOURCE],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsEnums.generated.swift",
+            description: "the Rust reviews wire enums",
+            defaults: None,
+            sources: &[REVIEWS_ENUMS_SOURCE],
         },
     ]
 }
@@ -1543,6 +1584,48 @@ mod tests {
     case "none": self = .none
     case "ssh": self = .ssh
     case "gpg": self = .gpg
+    default: self = .unknown(rawValue)
+    }
+  }
+
+  public var id: String { rawValue }
+}
+"#;
+        let mut out = String::new();
+        emit_open_enum(&mut out, &spec);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn open_enum_drops_explicit_unknown_variant() {
+        let spec = SwiftStringEnum {
+            name: "ReviewMergeableState".to_string(),
+            cases: vec![
+                ("mergeable".to_string(), "mergeable".to_string()),
+                ("conflicting".to_string(), "conflicting".to_string()),
+                ("unknown".to_string(), "unknown".to_string()),
+            ],
+        };
+
+        let expected = r#"public enum ReviewMergeableState: TaskBoardOpenEnum, CaseIterable, Identifiable {
+  case mergeable
+  case conflicting
+  case unknown(String)
+
+  public static let allCases: [Self] = [.mergeable, .conflicting]
+
+  public var rawValue: String {
+    switch self {
+    case .mergeable: "mergeable"
+    case .conflicting: "conflicting"
+    case .unknown(let raw): raw
+    }
+  }
+
+  public init(rawValue: String) {
+    switch rawValue {
+    case "mergeable": self = .mergeable
+    case "conflicting": self = .conflicting
     default: self = .unknown(rawValue)
     }
   }
