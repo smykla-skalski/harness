@@ -47,4 +47,20 @@ struct ReviewsTypesWireTypesDecodingTests {
     #expect(metrics.byTrigger["manual"] == 3)
     #expect(metrics.byTrigger["scheduled"] == 1)
   }
+
+  @Test("defaults omitted policy run metrics to a zeroed struct")
+  func decodesHistoryResponseDefaultingMetrics() throws {
+    // metrics carries #[serde(default)] over the Default-deriving
+    // ReviewsPolicyRunMetrics struct; omitting it (along with the defaulted runs
+    // and timeline) falls back to the zero struct rather than failing the decode.
+    let json = #"""
+    {"workflow_id":"reviews_auto","subject":{"repository":"o/r","pull_request_number":42}}
+    """#
+    let response = try decoder.decode(ReviewsPolicyHistoryResponseWire.self, from: Data(json.utf8))
+
+    #expect(response.metrics == ReviewsPolicyRunMetricsWire())
+    #expect(response.metrics.total == 0)
+    #expect(response.runs.isEmpty)
+    #expect(response.timeline.isEmpty)
+  }
 }

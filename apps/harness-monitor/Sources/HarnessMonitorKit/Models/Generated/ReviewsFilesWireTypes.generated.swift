@@ -306,7 +306,7 @@ public struct ReviewFilePreviewWire: Codable, Equatable, Sendable {
   public var lineLimit: UInt32
   public var hasMore: Bool
 
-  public init(path: String, patch: String, status: ReviewFileChangeTypeWire, additions: UInt32, deletions: UInt32, truncated: Bool = false, etag: String? = nil, servedBy: ReviewFileServedByWire, fetchedAt: String = "", headRefOid: String = "", lineCount: UInt32, lineLimit: UInt32, hasMore: Bool) {
+  public init(path: String, patch: String, status: ReviewFileChangeTypeWire, additions: UInt32, deletions: UInt32, truncated: Bool = false, etag: String? = nil, servedBy: ReviewFileServedByWire = .githubRest, fetchedAt: String = "", headRefOid: String = "", lineCount: UInt32, lineLimit: UInt32, hasMore: Bool) {
     self.path = path
     self.patch = patch
     self.status = status
@@ -331,7 +331,7 @@ public struct ReviewFilePreviewWire: Codable, Equatable, Sendable {
     deletions = try container.decode(UInt32.self, forKey: .deletions)
     truncated = try container.decodeIfPresent(Bool.self, forKey: .truncated) ?? false
     etag = try container.decodeIfPresent(String.self, forKey: .etag)
-    servedBy = try container.decode(ReviewFileServedByWire.self, forKey: .servedBy)
+    servedBy = try container.decodeIfPresent(ReviewFileServedByWire.self, forKey: .servedBy) ?? .githubRest
     fetchedAt = try container.decodeIfPresent(String.self, forKey: .fetchedAt) ?? ""
     headRefOid = try container.decodeIfPresent(String.self, forKey: .headRefOid) ?? ""
     lineCount = try container.decode(UInt32.self, forKey: .lineCount)
@@ -403,7 +403,7 @@ public struct ReviewFilePatchWire: Codable, Equatable, Sendable {
   public var fetchedAt: String
   public var headRefOid: String
 
-  public init(path: String, patch: String, status: ReviewFileChangeTypeWire, additions: UInt32, deletions: UInt32, truncated: Bool = false, etag: String? = nil, servedBy: ReviewFileServedByWire, fetchedAt: String = "", headRefOid: String = "") {
+  public init(path: String, patch: String, status: ReviewFileChangeTypeWire, additions: UInt32, deletions: UInt32, truncated: Bool = false, etag: String? = nil, servedBy: ReviewFileServedByWire = .githubRest, fetchedAt: String = "", headRefOid: String = "") {
     self.path = path
     self.patch = patch
     self.status = status
@@ -425,7 +425,7 @@ public struct ReviewFilePatchWire: Codable, Equatable, Sendable {
     deletions = try container.decode(UInt32.self, forKey: .deletions)
     truncated = try container.decodeIfPresent(Bool.self, forKey: .truncated) ?? false
     etag = try container.decodeIfPresent(String.self, forKey: .etag)
-    servedBy = try container.decode(ReviewFileServedByWire.self, forKey: .servedBy)
+    servedBy = try container.decodeIfPresent(ReviewFileServedByWire.self, forKey: .servedBy) ?? .githubRest
     fetchedAt = try container.decodeIfPresent(String.self, forKey: .fetchedAt) ?? ""
     headRefOid = try container.decodeIfPresent(String.self, forKey: .headRefOid) ?? ""
   }

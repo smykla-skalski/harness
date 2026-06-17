@@ -101,4 +101,17 @@ struct ReviewsFilesWireTypesDecodingTests {
     #expect(entry.sizeBytes == 4096)
     #expect(entry.lastFetchedAt == "2026-06-15T02:00:00Z")
   }
+
+  @Test("defaults an omitted served_by to the default enum variant")
+  func decodesPreviewRowDefaultingServedBy() throws {
+    // served_by carries #[serde(default)] over the Default-deriving
+    // ReviewFileServedBy enum; omitting it falls back to the default variant
+    // (githubRest) rather than failing the decode.
+    let json = #"""
+    {"path":"src/lib.rs","patch":"","status":"added","additions":0,"deletions":0,"line_count":0,"line_limit":1000,"has_more":false}
+    """#
+    let preview = try decoder.decode(ReviewFilePreviewWire.self, from: Data(json.utf8))
+
+    #expect(preview.servedBy == .githubRest)
+  }
 }
