@@ -212,8 +212,7 @@ struct PolicyCanvasGraphQualityGateTests {
     let componentClean = policyCanvasCleanInitialLayout(
       nodes: componentGraph.nodes,
       groups: componentGraph.groups,
-      edges: componentGraph.mappedEdges,
-      algorithmSelection: .referenceRouting
+      edges: componentGraph.mappedEdges
     )
     let componentCleanMs = Date().timeIntervalSince(componentCleanStart) * 1_000
     let componentFoldStart = Date()
@@ -260,8 +259,7 @@ struct PolicyCanvasGraphQualityGateTests {
       nodes: viewModel.nodes,
       groups: viewModel.groups,
       edges: viewModel.edges,
-      mode: .explicitReflow(preserveManualAnchors: false),
-      algorithmSelection: viewModel.algorithmSelection
+      mode: .explicitReflow(preserveManualAnchors: false)
     )
     let elkProbeMs = Date().timeIntervalSince(elkProbeStart) * 1_000
     var elkProbeAppliedRoutes = -1
@@ -371,6 +369,7 @@ struct PolicyCanvasGraphQualityGateTests {
       "port_detached: \(report.count(for: .portDetached))",
       "label_overlaps: \(report.count(for: .labelOverlaps))",
       "corridor_parallel: \(report.count(for: .corridorParallel))",
+      "corridor_parallel_route_detail: \(Self.corridorParallelRouteDetail(report, routes: timedRoute.output.routes))",
       "corridor_reuse: \(report.count(for: .corridorReuse))",
       "corridor_reuse_route_detail: \(Self.corridorReuseRouteDetail(report, routes: timedRoute.output.routes))",
       "body_hits: \(report.count(for: .bodyHits))",
@@ -499,6 +498,24 @@ struct PolicyCanvasGraphQualityGateTests {
   ) -> String {
     let routeIDs = Set(
       report.corridors.filter { $0.kind == .collinear }.flatMap {
+        [$0.edgeA, $0.edgeB]
+      }
+    )
+
+    return
+      routes
+      .filter { routeIDs.contains($0.key) }
+      .sorted { $0.key < $1.key }
+      .map { key, route in "\(key)=\(route.points)" }
+      .joined(separator: ";")
+  }
+
+  private static func corridorParallelRouteDetail(
+    _ report: PolicyCanvasGraphQualityReport,
+    routes: [String: PolicyCanvasEdgeRoute]
+  ) -> String {
+    let routeIDs = Set(
+      report.corridors.filter { $0.kind == .parallelTooClose }.prefix(40).flatMap {
         [$0.edgeA, $0.edgeB]
       }
     )

@@ -117,25 +117,25 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     )
   }
 
-  func testLabCanvasForcesAutoArrangeSoAlgorithmSwitchesReflow() throws {
+  func testLabCanvasForcesAutoArrangeOnTheSingleElkLayoutPath() throws {
     let source = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
 
     XCTAssertTrue(source.contains("PolicyCanvasViewportSurface("))
-    XCTAssertTrue(source.contains("algorithmSelection: algorithmSelection"))
     XCTAssertTrue(source.contains("showsQualityInspection: showsQualityMetrics"))
-    XCTAssertTrue(source.contains("usesElkLayoutForSmallGraphs: true"))
+    XCTAssertTrue(source.contains("forcesEngineLayout: true"))
+    XCTAssertFalse(source.contains("PolicyCanvasLabAlgorithmPresetPicker"))
+    XCTAssertFalse(source.contains("PolicyCanvasLabStageToolbar"))
   }
 
   @MainActor
-  func testLabElkDefaultAppliesToSmallSamples() throws {
+  func testElkDefaultAppliesToSmallSamples() throws {
     let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "default"))
     let viewModel = PolicyCanvasViewModel.liveStartupState(
       document: sample.document,
       simulation: nil,
       audit: nil,
       activeCanvasId: nil,
-      policyGroupTitle: sample.name,
-      usesElkLayoutForSmallGraphs: true
+      policyGroupTitle: sample.name
     )
 
     viewModel.reflowLayout(preserveManualAnchors: false, force: true)
@@ -150,13 +150,8 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertFalse(windowSource.contains("includesGroupsInLayout"))
     XCTAssertFalse(windowSource.contains("PolicyCanvasLabGroupsToggle"))
     XCTAssertTrue(windowSource.contains("ToolbarItem(placement: .primaryAction)"))
-    XCTAssertTrue(
-      windowSource.contains(
-        "PolicyCanvasLabStageToolbar(algorithmSelection: $algorithmSelection)"
-      )
-    )
-    XCTAssertTrue(controlsSource.contains("struct PolicyCanvasLabStageToolbar"))
-    XCTAssertTrue(controlsSource.contains("@ToolbarContentBuilder"))
+    XCTAssertFalse(windowSource.contains("PolicyCanvasLabStageToolbar"))
+    XCTAssertFalse(controlsSource.contains("struct PolicyCanvasLabStageToolbar"))
     XCTAssertFalse(windowSource.contains("ToolbarItemGroup(placement: .primaryAction)"))
     XCTAssertFalse(windowSource.contains(".sharedBackgroundVisibility(.automatic)"))
     XCTAssertFalse(controlsSource.contains("PolicyCanvasLabGroupsToggle"))
@@ -164,34 +159,13 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertFalse(controlsSource.contains("Text(\"Groups\")"))
   }
 
-  func testLabAlgorithmPickersUseSeparateToolbarGlassBubbles() throws {
+  func testLabDoesNotExposeAlgorithmPickers() throws {
+    let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
     let controlsSource = try policyCanvasSourceFile(named: "PolicyCanvasLabToolbarControls.swift")
 
-    XCTAssertTrue(controlsSource.contains("PolicyCanvasLabStageToolbar"))
-    XCTAssertTrue(
-      controlsSource.contains("ToolbarSpacer(.fixed, placement: .primaryAction)")
-    )
-    XCTAssertTrue(controlsSource.contains(".sharedBackgroundVisibility(.hidden)"))
-    XCTAssertTrue(
-      controlsSource.contains(
-        "let stageDescriptors = PolicyCanvasAlgorithmPickerCatalog.stageDescriptors"
-      )
-    )
-    XCTAssertTrue(controlsSource.contains("stageDescriptors.firstIndex("))
-    XCTAssertTrue(controlsSource.contains("where: { $0.stage == stage }"))
-    XCTAssertTrue(
-      controlsSource.contains("if stageIndex < stageDescriptors.count - 1")
-    )
-    XCTAssertFalse(
-      controlsSource.contains(
-        """
-        }
-              .sharedBackgroundVisibility(.hidden)
-              if stageIndex < stageDescriptors.count - 1 {
-        """
-      )
-    )
-    XCTAssertFalse(controlsSource.contains("ToolbarItemGroup(placement: .primaryAction)"))
+    XCTAssertFalse(windowSource.contains("PolicyCanvasLabAlgorithm"))
+    XCTAssertFalse(controlsSource.contains("PolicyCanvasLabAlgorithm"))
+    XCTAssertFalse(controlsSource.contains("PolicyCanvasAlgorithmPickerCatalog"))
   }
 
   func testLabToolbarTextMenusUseNativeButtonChromeOnly() throws {
@@ -201,13 +175,7 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(
       windowSource.contains("PolicyCanvasLabToolbarTextMenuLabel(title: samplePickerTitle)")
     )
-    XCTAssertTrue(
-      controlsSource.contains(
-        "PolicyCanvasLabToolbarTextMenuLabel(title: descriptor.stage.labToolbarLabel)"
-      )
-    )
     XCTAssertTrue(windowSource.contains(".controlSize(.small)"))
-    XCTAssertTrue(controlsSource.contains(".controlSize(.small)"))
     XCTAssertTrue(controlsSource.contains("private var horizontalContentPadding = 6.0"))
     XCTAssertTrue(
       controlsSource.contains(".padding(.horizontal, horizontalContentPadding)")
@@ -232,9 +200,6 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
       windowSource.contains("@AppStorage(PolicyCanvasLabToolbarDefaults.sampleSelectionKey)")
     )
     XCTAssertTrue(
-      windowSource.contains("@AppStorage(PolicyCanvasLabToolbarDefaults.algorithmSelectionKey)")
-    )
-    XCTAssertTrue(
       windowSource.contains("@AppStorage(PolicyCanvasLabToolbarDefaults.scalesZoomOnResizeKey)")
     )
     XCTAssertTrue(
@@ -242,7 +207,7 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
         "PolicyCanvasLabToolbarDefaults.selection(in: defaults) ?? initialSelection"
       )
     )
-    XCTAssertTrue(
+    XCTAssertFalse(
       windowSource.contains("PolicyCanvasLabToolbarDefaults.algorithmSelection(in: defaults)")
     )
     XCTAssertTrue(
@@ -250,11 +215,8 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
         "storedSampleSelectionRaw = PolicyCanvasLabToolbarDefaults.rawValue(for: newSelection)"
       )
     )
-    XCTAssertTrue(
-      windowSource.contains(
-        "storedAlgorithmSelectionRaw = PolicyCanvasLabToolbarDefaults.rawValue(for: newSelection)"
-      )
-    )
+    XCTAssertFalse(windowSource.contains("algorithmSelectionKey"))
+    XCTAssertFalse(windowSource.contains("storedAlgorithmSelectionRaw"))
   }
 
   func testLabResizeZoomDefaultsToScalingWithWindowSize() {

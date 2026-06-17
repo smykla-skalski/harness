@@ -7,7 +7,6 @@ private struct PolicyCanvasViewportSurfaceSnapshot: Equatable, Sendable {
   let simulationIdentity: PolicyCanvasViewportSurfaceSimulationIdentity?
   let auditIdentity: PolicyCanvasViewportSurfaceAuditIdentity?
   let algorithmSelection: PolicyCanvasAlgorithmSelection
-  let usesElkLayoutForSmallGraphs: Bool
   let policyDisplayName: String?
 }
 
@@ -89,14 +88,13 @@ public struct PolicyCanvasViewportSurface: View {
   let showsEdgeLegend: Bool
   let resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior
   let showsQualityInspection: Bool
-  let usesElkLayoutForSmallGraphs: Bool
-  /// When true the surface re-runs the layered layout engine on appear and after
+  /// When true the surface re-runs the automatic layout engine on appear and after
   /// every document load, so it reflects the algorithms rather than the
   /// document's authored seed coordinates. The Policy Canvas Lab sets this; the
   /// shipping canvas (PolicyCanvasView) keeps authored layouts and never does.
   let forcesEngineLayout: Bool
   /// Monotonic token the host bumps to request a manual reformat (toolbar
-  /// button). Every change re-runs the layered engine.
+  /// button). Every change re-runs the automatic layout engine.
   let reformatRequest: Int
   /// Display name shown on the single container group that wraps the graph.
   let policyDisplayName: String?
@@ -118,7 +116,6 @@ public struct PolicyCanvasViewportSurface: View {
     showsEdgeLegend: Bool = true,
     resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior = .preserveZoom,
     showsQualityInspection: Bool = false,
-    usesElkLayoutForSmallGraphs: Bool = false,
     forcesEngineLayout: Bool = false,
     reformatRequest: Int = 0,
     policyDisplayName: String? = nil
@@ -132,7 +129,6 @@ public struct PolicyCanvasViewportSurface: View {
     self.showsEdgeLegend = showsEdgeLegend
     self.resizeZoomBehavior = resizeZoomBehavior
     self.showsQualityInspection = showsQualityInspection
-    self.usesElkLayoutForSmallGraphs = usesElkLayoutForSmallGraphs
     self.forcesEngineLayout = forcesEngineLayout
     self.reformatRequest = reformatRequest
     self.policyDisplayName = policyDisplayName
@@ -143,8 +139,7 @@ public struct PolicyCanvasViewportSurface: View {
         audit: nil,
         activeCanvasId: nil,
         algorithmSelection: algorithmSelection,
-        policyGroupTitle: policyDisplayName,
-        usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
+        policyGroupTitle: policyDisplayName
       )
     )
   }
@@ -155,7 +150,6 @@ public struct PolicyCanvasViewportSurface: View {
       simulationIdentity: simulation.map(PolicyCanvasViewportSurfaceSimulationIdentity.init),
       auditIdentity: audit.map(PolicyCanvasViewportSurfaceAuditIdentity.init),
       algorithmSelection: algorithmSelection,
-      usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs,
       policyDisplayName: policyDisplayName
     )
   }
@@ -186,7 +180,7 @@ public struct PolicyCanvasViewportSurface: View {
     .task(id: snapshot) {
       // The fixture/document-load path renders the document's authored positions
       // without running the auto-arrange engine, so a load shows the saved seeds
-      // rather than the algorithm output. The lab wants the layered engine's
+      // rather than the algorithm output. The lab wants the automatic engine's
       // placement, so force an unconstrained reflow on appear. The env override
       // keeps the agent capture script working even when a caller leaves
       // forcesEngineLayout off. The shipping canvas uses PolicyCanvasView, not
@@ -207,7 +201,6 @@ public struct PolicyCanvasViewportSurface: View {
     appliedSnapshot = newSnapshot
 
     viewModel.algorithmSelection = newSnapshot.algorithmSelection
-    viewModel.usesElkLayoutForSmallGraphs = newSnapshot.usesElkLayoutForSmallGraphs
     viewModel.policyGroupTitle = newSnapshot.policyDisplayName
 
     if oldSnapshot?.documentIdentity != newSnapshot.documentIdentity {

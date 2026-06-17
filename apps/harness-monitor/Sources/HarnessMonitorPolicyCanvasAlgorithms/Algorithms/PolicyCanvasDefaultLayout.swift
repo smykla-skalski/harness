@@ -7,9 +7,9 @@ private let policyCanvasLayoutSignposter = OSSignposter(
 )
 
 /// Automatic-layout helpers + overlap detection used by
-/// `policyCanvasCleanInitialLayout(nodes:groups:edges:)`. The layered engine
-/// owns default placement now; these helpers only decide when a persisted
-/// arrangement is trustworthy and normalize the final canvas bounds.
+/// `policyCanvasCleanInitialLayout(nodes:groups:edges:)`. ELK owns default
+/// placement; these helpers decide when a persisted arrangement is trustworthy
+/// and normalize the final canvas bounds.
 
 public struct PolicyCanvasNormalizedLayout {
   public let nodes: [PolicyCanvasNode]
@@ -52,9 +52,7 @@ public func policyCanvasAutomaticLayoutResult(
   nodes: [PolicyCanvasNode],
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
-  mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
-  algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
-  usesElkLayoutForSmallGraphs: Bool = false
+  mode: PolicyCanvasAutomaticLayoutMode = .initialLoad
 ) -> PolicyCanvasLayoutResult? {
   let signpostID = policyCanvasLayoutSignposter.makeSignpostID()
   let interval = policyCanvasLayoutSignposter.beginInterval(
@@ -72,9 +70,7 @@ public func policyCanvasAutomaticLayoutResult(
     nodes: nodes,
     groups: groups,
     edges: edges,
-    mode: mode,
-    algorithmSelection: algorithmSelection,
-    usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
+    mode: mode
   ) {
     return elkResult
   }
@@ -84,13 +80,7 @@ public func policyCanvasAutomaticLayoutResult(
     edges: edges,
     mode: mode
   )
-  if PolicyCanvasLayoutAlgorithmRegistry.isHarnessCurrentLayout(algorithmSelection) {
-    return PolicyCanvasLayeredLayoutEngine(mode: mode).layout(graph: graph)
-  }
-  return PolicyCanvasDecoupledSugiyamaLayoutEngine(
-    mode: mode,
-    selection: algorithmSelection
-  ).layout(graph: graph)
+  return PolicyCanvasLayeredLayoutEngine(mode: mode).layout(graph: graph)
 }
 
 public func applyPolicyCanvasLayoutResult(
@@ -105,11 +95,9 @@ public func applyPolicyCanvasLayoutResult(
       continue
     }
     if result.autoPlacedNodeIDs.contains(nodes[index].id) {
-      // The layered engine's barycentric centering averages neighbor positions,
-      // which can land an auto-placed node on a fractional coordinate (a third of
-      // a pixel when three neighbors average). Snap auto placements to whole
-      // pixels so a saved layout round-trips exactly and a node never poking a
-      // sub-pixel past its integral group frame trips the tidiness gate. Manual
+      // Automatic layout can land an auto-placed node on a fractional coordinate.
+      // Snap auto placements to whole pixels so saved layouts round-trip exactly
+      // and sub-pixel group-frame drift does not trip the tidiness gate. Manual
       // anchors keep their exact authored position.
       nodes[index].position = CGPoint(x: position.x.rounded(), y: position.y.rounded())
       nodes[index].layoutSource = .auto
@@ -136,9 +124,7 @@ public func applyDefaultPolicyCanvasLayout(
   nodes: inout [PolicyCanvasNode],
   groups: inout [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
-  mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
-  algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
-  usesElkLayoutForSmallGraphs: Bool = false
+  mode: PolicyCanvasAutomaticLayoutMode = .initialLoad
 ) -> (
   metrics: PolicyCanvasLayoutMetrics?,
   routingHints: PolicyCanvasLayoutRoutingHints?,
@@ -149,9 +135,7 @@ public func applyDefaultPolicyCanvasLayout(
       nodes: nodes,
       groups: groups,
       edges: edges,
-      mode: mode,
-      algorithmSelection: algorithmSelection,
-      usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
+      mode: mode
     )
   else {
     return (metrics: nil, routingHints: nil, precomputedRoutes: nil)

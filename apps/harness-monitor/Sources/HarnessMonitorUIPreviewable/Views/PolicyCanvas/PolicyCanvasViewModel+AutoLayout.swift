@@ -73,7 +73,7 @@ extension PolicyCanvasViewModel {
       }
     }
     let preservesManualAnchors = shouldPreserveManualAnchors(preserveManualAnchors)
-    // Reformat re-runs the layered engine, whose depth-based output spreads a
+    // Reformat re-runs the automatic layout engine, whose depth-based output spreads a
     // hand-authored policy graph across the canvas. When the current layout is
     // already valid - no node or group overlaps and every node sits inside its
     // assigned group - and there are no auto-placed nodes that need to repack
@@ -143,7 +143,7 @@ extension PolicyCanvasViewModel {
   ) {
     if let nextRoutingHints, routingHints?.isEmpty != false {
       refreshRoutingHints(to: nextRoutingHints)
-    } else {
+    } else if precomputedRoutes == nil {
       restoreMissingRoutingHintsForCurrentLayout()
     }
     if requestsRouteComputation {
@@ -189,9 +189,7 @@ extension PolicyCanvasViewModel {
         // Reflow keeps current row order because it produces the best low-crossing
         // seed for the engine. Forced full reformat records the chosen output's
         // signature so repeated presses become a fixed point.
-        mode: .explicitReflow(preserveManualAnchors: preservesManualAnchors),
-        algorithmSelection: algorithmSelection,
-        usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
+        mode: .explicitReflow(preserveManualAnchors: preservesManualAnchors)
       )
     else {
       return nil

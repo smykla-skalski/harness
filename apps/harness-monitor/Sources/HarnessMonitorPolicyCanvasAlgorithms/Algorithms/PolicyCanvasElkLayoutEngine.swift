@@ -2,9 +2,6 @@ import CoreGraphics
 import ElkSwift
 import Foundation
 
-private let policyCanvasElkMinimumNodeCount = 300
-private let policyCanvasElkMinimumEdgeCount = 500
-
 nonisolated(unsafe) private let policyCanvasElkRunner = PolicyCanvasElkRunner()
 nonisolated(unsafe) private let policyCanvasElkLayoutCache = PolicyCanvasElkLayoutCache()
 private let policyCanvasElkLayoutComputationLock = NSLock()
@@ -13,47 +10,22 @@ func policyCanvasElkLayoutResult(
   nodes: [PolicyCanvasNode],
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
-  mode: PolicyCanvasAutomaticLayoutMode,
-  algorithmSelection: PolicyCanvasAlgorithmSelection,
-  usesElkLayoutForSmallGraphs: Bool = false
+  mode: PolicyCanvasAutomaticLayoutMode
 ) -> PolicyCanvasLayoutResult? {
-  guard
-    policyCanvasShouldUseElkLayout(
-      nodes: nodes,
-      edges: edges,
-      mode: mode,
-      algorithmSelection: algorithmSelection,
-      usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
-    )
-  else {
+  guard policyCanvasShouldUseElkLayout(mode: mode) else {
     return nil
   }
   return PolicyCanvasElkLayoutEngine(
     nodes: nodes,
     groups: groups,
     edges: edges,
-    mode: mode,
-    algorithmSelection: algorithmSelection
+    mode: mode
   ).layout()
 }
 
 private func policyCanvasShouldUseElkLayout(
-  nodes: [PolicyCanvasNode],
-  edges: [PolicyCanvasEdge],
-  mode: PolicyCanvasAutomaticLayoutMode,
-  algorithmSelection: PolicyCanvasAlgorithmSelection,
-  usesElkLayoutForSmallGraphs: Bool
+  mode: PolicyCanvasAutomaticLayoutMode
 ) -> Bool {
-  guard PolicyCanvasLayoutAlgorithmRegistry.isHarnessCurrentLayout(algorithmSelection) else {
-    return false
-  }
-  guard
-    usesElkLayoutForSmallGraphs
-      || nodes.count >= policyCanvasElkMinimumNodeCount
-      || edges.count >= policyCanvasElkMinimumEdgeCount
-  else {
-    return false
-  }
   switch mode {
   case .initialLoad:
     return true
@@ -67,7 +39,6 @@ private struct PolicyCanvasElkLayoutEngine {
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
   let mode: PolicyCanvasAutomaticLayoutMode
-  let algorithmSelection: PolicyCanvasAlgorithmSelection
 
   func layout() -> PolicyCanvasLayoutResult? {
     let identity = elkIdentity()
@@ -387,8 +358,7 @@ private struct PolicyCanvasElkLayoutEngine {
       hash &*= 1_099_511_628_211
     }
 
-    elkCombine("elk-swift-source-right-fixed-ports-4")
-    elkCombine(algorithmSelection.layoutCacheIdentity)
+    elkCombine("elk-swift-source-right-fixed-ports-5")
     for node in nodes {
       elkCombine(node.id)
       elkCombine(node.groupID ?? "")

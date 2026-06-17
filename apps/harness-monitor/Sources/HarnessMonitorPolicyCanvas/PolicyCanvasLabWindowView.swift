@@ -12,14 +12,10 @@ public struct PolicyCanvasLabWindowView: View {
   @State private var displayedSnapshot: PolicyCanvasHostSnapshot
   @State private var allowsEmptyLiveSnapshot: Bool
   @State private var sampleSelection: PolicyCanvasLabSelection
-  @State private var algorithmSelection: PolicyCanvasAlgorithmSelection
   @State private var reformatRequestID = 0
   @AppStorage(PolicyCanvasLabToolbarDefaults.sampleSelectionKey)
   private var storedSampleSelectionRaw =
     PolicyCanvasLabToolbarDefaults.defaultSampleSelectionRawValue
-  @AppStorage(PolicyCanvasLabToolbarDefaults.algorithmSelectionKey)
-  private var storedAlgorithmSelectionRaw =
-    PolicyCanvasLabToolbarDefaults.defaultAlgorithmSelectionRawValue
   @AppStorage(PolicyCanvasLabThemeDefaults.modeKey)
   private var windowThemeMode = PolicyCanvasLabThemeMode.defaultValue
   @AppStorage(PolicyCanvasLabToolbarDefaults.scalesZoomOnResizeKey)
@@ -71,17 +67,9 @@ public struct PolicyCanvasLabWindowView: View {
     )
     _allowsEmptyLiveSnapshot = State(initialValue: liveGraphVisible)
     _sampleSelection = State(initialValue: normalizedSelection)
-    _algorithmSelection = State(
-      initialValue: PolicyCanvasLabToolbarDefaults.algorithmSelection(in: defaults)
-    )
     _storedSampleSelectionRaw = AppStorage(
       wrappedValue: PolicyCanvasLabToolbarDefaults.defaultSampleSelectionRawValue,
       PolicyCanvasLabToolbarDefaults.sampleSelectionKey,
-      store: defaults
-    )
-    _storedAlgorithmSelectionRaw = AppStorage(
-      wrappedValue: PolicyCanvasLabToolbarDefaults.defaultAlgorithmSelectionRawValue,
-      PolicyCanvasLabToolbarDefaults.algorithmSelectionKey,
       store: defaults
     )
     _windowThemeMode = AppStorage(
@@ -170,13 +158,11 @@ public struct PolicyCanvasLabWindowView: View {
       document: renderedPolicyDocument,
       simulation: displayedSnapshot.simulation,
       audit: displayedSnapshot.audit,
-      algorithmSelection: algorithmSelection,
       minimapCenteringMode: .clickViewport,
       canvasColorScheme: windowThemeMode.colorScheme,
       showsEdgeLegend: false,
       resizeZoomBehavior: viewportResizeZoomBehavior,
       showsQualityInspection: showsQualityMetrics,
-      usesElkLayoutForSmallGraphs: true,
       forcesEngineLayout: true,
       reformatRequest: reformatRequestID,
       policyDisplayName: samplePickerTitle
@@ -189,16 +175,12 @@ public struct PolicyCanvasLabWindowView: View {
           Image(systemName: "arrow.clockwise")
             .accessibilityHidden(true)
         }
-        .help("Reformat the graph with the layered layout engine")
+        .help("Reformat the graph with the automatic layout engine")
         .accessibilityLabel("Reformat layout")
       }
       ToolbarItem(placement: .primaryAction) {
         samplePicker
       }
-      ToolbarItem(placement: .primaryAction) {
-        PolicyCanvasLabAlgorithmPresetPicker(algorithmSelection: $algorithmSelection)
-      }
-      PolicyCanvasLabStageToolbar(algorithmSelection: $algorithmSelection)
       ToolbarItem(placement: .primaryAction) {
         Toggle(isOn: $scalesZoomOnResize) {
           Label("Scale zoom on resize", systemImage: "arrow.up.left.and.arrow.down.right")
@@ -234,10 +216,6 @@ public struct PolicyCanvasLabWindowView: View {
     .onChange(of: sampleSelection) { _, newSelection in
       applySelection(newSelection)
       storedSampleSelectionRaw = PolicyCanvasLabToolbarDefaults.rawValue(for: newSelection)
-    }
-    .onChange(of: algorithmSelection) { _, newSelection in
-      storedAlgorithmSelectionRaw = PolicyCanvasLabToolbarDefaults.rawValue(for: newSelection)
-      scheduleSampleLayoutPrewarm()
     }
   }
 
@@ -339,7 +317,6 @@ public struct PolicyCanvasLabWindowView: View {
   }
 
   private func scheduleSampleLayoutPrewarm() {
-    let algorithmSelection = algorithmSelection
     let samples = Self.prewarmSamples(prioritizing: sampleSelection)
     guard !samples.isEmpty else {
       return
@@ -349,9 +326,7 @@ public struct PolicyCanvasLabWindowView: View {
         for sample in samples {
           policyCanvasPrewarmLabSampleLayouts(
             document: sample.document,
-            policyGroupTitle: sample.name,
-            algorithmSelection: algorithmSelection,
-            usesElkLayoutForSmallGraphs: true
+            policyGroupTitle: sample.name
           )
           await Task.yield()
         }

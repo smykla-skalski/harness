@@ -50,34 +50,6 @@ public enum PolicyCanvasAlgorithmStage: String, CaseIterable, Identifiable, Send
   }
 }
 
-public struct PolicyCanvasAlgorithmOptionDescriptor: Identifiable, Equatable, Sendable {
-  public let id: PolicyCanvasAlgorithmID
-  public let name: String
-  public let summary: String
-
-  public init(id: PolicyCanvasAlgorithmID, name: String, summary: String) {
-    self.id = id
-    self.name = name
-    self.summary = summary
-  }
-}
-
-public struct PolicyCanvasAlgorithmStageDescriptor: Identifiable, Equatable, Sendable {
-  public let stage: PolicyCanvasAlgorithmStage
-  public let options: [PolicyCanvasAlgorithmOptionDescriptor]
-
-  public var id: PolicyCanvasAlgorithmStage { stage }
-  public var label: String { stage.label }
-
-  public init(
-    stage: PolicyCanvasAlgorithmStage,
-    options: [PolicyCanvasAlgorithmOptionDescriptor]
-  ) {
-    self.stage = stage
-    self.options = options
-  }
-}
-
 public struct PolicyCanvasAlgorithmSelection: Equatable, Hashable, Sendable {
   public var selectedAlgorithmIDs: [PolicyCanvasAlgorithmStage: PolicyCanvasAlgorithmID]
 
@@ -114,10 +86,10 @@ public struct PolicyCanvasAlgorithmSelection: Equatable, Hashable, Sendable {
     selectedAlgorithmIDs: PolicyCanvasAlgorithmDefaults.referencePureIDs
   )
 
-  /// The production pipeline (and the default fill): the harness Sugiyama
-  /// layout paired with reference-form routing - padded visibility-graph A*,
-  /// first-feasible selection, crossing-aware orthogonal nudging, route-terminal
-  /// port markers - in place of the retired declutter/fan-in post-processing pile.
+  /// The production routing pipeline (and the default fill): padded
+  /// visibility-graph A*, first-feasible selection, crossing-aware orthogonal
+  /// nudging, and route-terminal port markers. Automatic placement is handled
+  /// by ELK and no longer varies by this selection.
   public static let referenceRouting = Self(
     selectedAlgorithmIDs: PolicyCanvasAlgorithmDefaults.harnessCurrentIDs
   )
@@ -131,16 +103,6 @@ public struct PolicyCanvasAlgorithmSelection: Equatable, Hashable, Sendable {
     }
     .joined(separator: "|")
   }
-}
-
-public enum PolicyCanvasAlgorithmPickerCatalog {
-  public static let stageDescriptors: [PolicyCanvasAlgorithmStageDescriptor] =
-    PolicyCanvasAlgorithmStage.allCases.map { stage in
-      PolicyCanvasAlgorithmStageDescriptor(
-        stage: stage,
-        options: PolicyCanvasAlgorithmDefaults.options(for: stage)
-      )
-    }
 }
 
 enum PolicyCanvasAlgorithmDefaults {
@@ -233,12 +195,9 @@ enum PolicyCanvasAlgorithmDefaults {
     .labelPlacement,
   ]
 
-  /// The production default pipeline and the fill used for any unspecified
-  /// stage: the harness Sugiyama layout (better crossing reduction, anchored
-  /// reflow, group-aware packing) paired with reference-form routing - padded
-  /// visibility-graph A*, first-feasible selection, crossing-aware orthogonal
-  /// nudging, and route-terminal port markers - in place of the retired
-  /// declutter/fan-in post-processing pile.
+  /// The production routing pipeline and the fill used for any unspecified
+  /// stage. Layout-stage IDs remain only for compatibility with focused
+  /// component tests; automatic placement is ELK-only.
   static let harnessCurrentIDs: [PolicyCanvasAlgorithmStage: PolicyCanvasAlgorithmID] = [
     .cycleBreaking: depthFirstBackEdgeReversal,
     .rankAssignment: harnessGroupAwareLongestPath,
@@ -278,73 +237,4 @@ enum PolicyCanvasAlgorithmDefaults {
     return id
   }
 
-  static func options(
-    for stage: PolicyCanvasAlgorithmStage
-  ) -> [PolicyCanvasAlgorithmOptionDescriptor] {
-    optionsByStage[stage] ?? []
-  }
-
-  private static let optionsByStage:
-    [PolicyCanvasAlgorithmStage: [PolicyCanvasAlgorithmOptionDescriptor]] = [
-      .cycleBreaking: [
-        option(depthFirstBackEdgeReversal, "Depth-First Back-Edge Reversal"),
-        option(greedyFeedbackArcReversal, "Greedy Feedback Arc Reversal"),
-      ],
-      .rankAssignment: [
-        option(harnessGroupAwareLongestPath, "Harness Group-Aware Longest-Path Layering"),
-        option(longestPathLayering, "Longest-Path Layering"),
-      ],
-      .longEdgeNormalization: [
-        option(interpolatedDummyChain, "Interpolated Dummy Chain Normalization"),
-        option(unitDummyChain, "Unit Dummy Chain Normalization"),
-      ],
-      .layerOrdering: [
-        option(seededBarycenterTranspose, "Seeded Barycenter Transpose Crossing Reduction"),
-        option(barycenterTransposeCrossingReduction, "Barycenter Transpose Crossing Reduction"),
-        option(barycenterCrossingReduction, "Barycenter Crossing Reduction"),
-      ],
-      .coordinateAssignment: [
-        option(brandesKopfCoordinateAssignment, "Brandes-Kopf Coordinate Assignment"),
-        option(layeredGridCoordinateAssignment, "Layered Grid Coordinate Assignment"),
-      ],
-      .groupPlacement: [
-        option(harnessGroupFramePacking, "Harness Group Frame Packing"),
-        option(layeredClusterFramePacking, "Layered Cluster Frame Packing"),
-        option(tightBoundingBoxGroupFrames, "Tight Bounding-Box Group Frames"),
-      ],
-      .layoutPostProcessing: [
-        option(terminalCombAndSingleFedAlignment, "Terminal Comb and Single-Fed Alignment"),
-        option(noOpLayoutPostProcessing, "No-Op Layout Post-Processing"),
-      ],
-      .portMarkerPlacement: [
-        option(routeTerminalPortMarkers, "Route-Terminal Port Marker Placement"),
-        option(noOpPortMarkers, "No-Op Port Marker Placement"),
-      ],
-      .edgeRouting: [
-        option(paddedOrthogonalVisibilityAStar, "Padded Orthogonal Visibility Graph A*"),
-        option(orthogonalVisibilityAStar, "Orthogonal Visibility Graph A*"),
-      ],
-      .routeSelection: [
-        option(firstFeasibleRouteSelection, "First Feasible Route Selection")
-      ],
-      .routePostProcessing: [
-        option(orthogonalNudgedRouteProcessing, "Orthogonal Nudged Route Processing"),
-        option(collinearRouteCompression, "Collinear Route Compression"),
-      ],
-      .labelPlacement: [
-        option(obstacleAwareGreedyLabelPlacement, "Obstacle-Aware Greedy Label Placement"),
-        option(polylineMidpointLabelPlacement, "Polyline Midpoint Label Placement"),
-      ],
-      .metrics: [
-        option(harnessReadabilityMetrics, "Harness Readability Metrics"),
-        option(sugiyamaCrossingMetrics, "Sugiyama Crossing Metrics"),
-      ],
-    ]
-
-  private static func option(
-    _ id: PolicyCanvasAlgorithmID,
-    _ name: String
-  ) -> PolicyCanvasAlgorithmOptionDescriptor {
-    PolicyCanvasAlgorithmOptionDescriptor(id: id, name: name, summary: name)
-  }
 }

@@ -104,9 +104,7 @@ extension PolicyCanvasViewModel {
     let cleanLayout = policyCanvasCleanInitialLayout(
       nodes: graph.nodes,
       groups: graph.groups,
-      edges: graph.mappedEdges,
-      algorithmSelection: algorithmSelection,
-      usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
+      edges: graph.mappedEdges
     )
     nodes = cleanLayout.nodes
     groups = cleanLayout.groups

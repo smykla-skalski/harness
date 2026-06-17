@@ -47,14 +47,4 @@ struct PolicyCanvasBootstrapTests {
     #expect(viewModel.viewportCenteringGeneration == 0)
   }
 
-  @Test("live startup state enables ELK for production-sized default graphs")
-  func liveStartupStateEnablesElkForDefaultGraphs() {
-    let viewModel = PolicyCanvasViewModel.liveStartupState(
-      document: nil,
-      simulation: nil,
-      audit: nil
-    )
-
-    #expect(viewModel.usesElkLayoutForSmallGraphs)
-  }
 }

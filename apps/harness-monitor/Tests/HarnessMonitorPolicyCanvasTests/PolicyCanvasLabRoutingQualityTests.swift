@@ -1100,8 +1100,7 @@ struct PolicyCanvasLabRoutingQualityTests {
         nodes: nodes,
         groups: groups,
         edges: edges,
-        mode: .explicitReflow(preserveManualAnchors: false),
-        algorithmSelection: .referenceRouting
+        mode: .explicitReflow(preserveManualAnchors: false)
       )
     )
     let routingHints = applyPolicyCanvasLayoutResult(

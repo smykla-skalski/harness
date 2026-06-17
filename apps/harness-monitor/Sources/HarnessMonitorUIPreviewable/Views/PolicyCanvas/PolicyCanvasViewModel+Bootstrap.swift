@@ -13,15 +13,13 @@ extension PolicyCanvasViewModel {
     audit: TaskBoardPolicyPipelineAuditSummary?,
     activeCanvasId: String? = nil,
     algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
-    policyGroupTitle: String? = nil,
-    usesElkLayoutForSmallGraphs: Bool = true
+    policyGroupTitle: String? = nil
   ) -> PolicyCanvasViewModel {
     let viewModel = PolicyCanvasViewModel(
       nodes: [],
       groups: [],
       edges: [],
-      algorithmSelection: algorithmSelection,
-      usesElkLayoutForSmallGraphs: usesElkLayoutForSmallGraphs
+      algorithmSelection: algorithmSelection
     )
     viewModel.policyGroupTitle = policyGroupTitle
     viewModel.applyPersistedDocument(

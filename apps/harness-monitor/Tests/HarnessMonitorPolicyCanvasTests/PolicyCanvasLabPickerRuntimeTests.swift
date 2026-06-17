@@ -66,8 +66,8 @@ struct PolicyCanvasLabPickerRuntimeTests {
   }
 
   @MainActor
-  @Test("changing the lab algorithm selection reflows rendered node positions")
-  func changingAlgorithmSelectionReflowsRenderedNodePositions() async throws {
+  @Test("changing an internal algorithm selection does not move ELK layout positions")
+  func changingAlgorithmSelectionDoesNotMoveElkLayoutPositions() async throws {
     let frame = CGRect(x: 0, y: 0, width: 1_400, height: 900)
     let host = NSHostingView(
       rootView: PolicyCanvasLabPickerHarness(
@@ -114,14 +114,15 @@ struct PolicyCanvasLabPickerRuntimeTests {
       await waitUntil(timeout: .seconds(3)) {
         window.layoutIfNeeded()
         host.layoutSubtreeIfNeeded()
-        return nodePositionsChanged(from: harnessPositions, to: nodePositions(in: host))
+        return nodePositions(in: host).count >= 16
       }
     )
+    #expect(nodePositions(in: host) == harnessPositions)
   }
 
   @MainActor
-  @Test("changing the lab sample after an algorithm edit replaces the rendered document")
-  func changingSampleAfterAlgorithmEditReplacesRenderedDocument() async throws {
+  @Test("changing the lab sample replaces the rendered document")
+  func changingSampleReplacesRenderedDocument() async throws {
     let frame = CGRect(x: 0, y: 0, width: 1_400, height: 900)
     let host = NSHostingView(
       rootView: PolicyCanvasLabPickerHarness(
@@ -154,26 +155,8 @@ struct PolicyCanvasLabPickerRuntimeTests {
       }
     )
 
-    let originalPositions = nodePositions(in: host)
-
     host.rootView = PolicyCanvasLabPickerHarness(
-      selection: .sample("default"),
-      algorithmSelection: .referencePure
-    )
-    window.layoutIfNeeded()
-    host.layoutSubtreeIfNeeded()
-
-    #expect(
-      await waitUntil(timeout: .seconds(3)) {
-        window.layoutIfNeeded()
-        host.layoutSubtreeIfNeeded()
-        return nodePositionsChanged(from: originalPositions, to: nodePositions(in: host))
-      }
-    )
-
-    host.rootView = PolicyCanvasLabPickerHarness(
-      selection: .sample("minimal"),
-      algorithmSelection: .referencePure
+      selection: .sample("minimal")
     )
     window.layoutIfNeeded()
     host.layoutSubtreeIfNeeded()
@@ -189,8 +172,8 @@ struct PolicyCanvasLabPickerRuntimeTests {
   }
 
   @MainActor
-  @Test("the lab window restores persisted sample and algorithm toolbar selections")
-  func labWindowRestoresPersistedToolbarSelections() async throws {
+  @Test("the lab window restores persisted sample and ignores legacy algorithm toolbar selections")
+  func labWindowRestoresPersistedSampleAndIgnoresLegacyAlgorithmSelection() async throws {
     let suiteName = "PolicyCanvasLabPickerRuntimeTests.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     let sampleKey = "policyCanvasLabSampleSelection"
@@ -240,7 +223,7 @@ struct PolicyCanvasLabPickerRuntimeTests {
         let viewModel = documentView.hostedState.snapshot.viewModel
         let ids = Set(viewModel.nodes.map(\.id))
         return ids == ["entry", "finish"]
-          && viewModel.algorithmSelection == .referencePure
+          && viewModel.algorithmSelection == .referenceRouting
       }
     )
   }
@@ -433,21 +416,6 @@ private func groupingSnapshot(in root: NSView) -> RenderedCanvasGroupingSnapshot
     nodeGroupIDs: viewModel.nodes.map(\.groupID),
     groupIDs: viewModel.groups.map(\.id)
   )
-}
-
-private func nodePositionsChanged(
-  from oldPositions: [String: CGPoint],
-  to newPositions: [String: CGPoint]
-) -> Bool {
-  guard oldPositions.keys == newPositions.keys else {
-    return false
-  }
-  return oldPositions.contains { id, oldPosition in
-    guard let newPosition = newPositions[id] else {
-      return false
-    }
-    return hypot(oldPosition.x - newPosition.x, oldPosition.y - newPosition.y) > 0.5
-  }
 }
 
 @MainActor

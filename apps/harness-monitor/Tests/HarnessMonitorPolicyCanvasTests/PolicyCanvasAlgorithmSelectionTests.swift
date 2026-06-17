@@ -7,22 +7,6 @@ import Testing
 
 @Suite("Policy canvas algorithm selection")
 struct PolicyCanvasAlgorithmSelectionTests {
-  @Test("picker catalog exposes concrete algorithms for every stage")
-  func pickerCatalogExposesConcreteAlgorithmsForEveryStage() {
-    let descriptors = PolicyCanvasAlgorithmPickerCatalog.stageDescriptors
-
-    #expect(descriptors.map(\.stage) == PolicyCanvasAlgorithmStage.allCases)
-    for descriptor in descriptors {
-      #expect(descriptor.options.count >= 1)
-      #expect(Set(descriptor.options.map(\.id)).count == descriptor.options.count)
-      #expect(
-        !descriptor.options.contains { option in
-          option.name.localizedCaseInsensitiveContains("variant")
-        }
-      )
-    }
-  }
-
   @Test("reference pure selection resolves to pure component implementations")
   func referencePureSelectionResolvesToPureComponentImplementations() {
     let layout = PolicyCanvasAlgorithmRegistry.layoutAlgorithms(for: .referencePure)
@@ -43,34 +27,29 @@ struct PolicyCanvasAlgorithmSelectionTests {
     #expect(typeName(routing.labelPlacement) == "PolicyCanvasPolylineMidpointLabelPlacement")
   }
 
-  @Test("reference and mixed layout selections produce deterministic positions")
-  func referenceAndMixedLayoutSelectionsProduceDeterministicPositions() throws {
+  @Test("automatic layout uses one deterministic ELK path")
+  func automaticLayoutUsesOneDeterministicElkPath() throws {
     let fixture = Self.linearFixture()
     let reference = try #require(
       policyCanvasAutomaticLayoutResult(
         nodes: fixture.nodes,
         groups: [],
-        edges: fixture.edges,
-        algorithmSelection: .referencePure
+        edges: fixture.edges
       )
-    )
-    let mixedSelection = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
-      stage: .coordinateAssignment,
-      with: PolicyCanvasAlgorithmDefaults.layeredGridCoordinateAssignment
     )
     let mixed = try #require(
       policyCanvasAutomaticLayoutResult(
         nodes: fixture.nodes,
         groups: [],
-        edges: fixture.edges,
-        algorithmSelection: mixedSelection
+        edges: fixture.edges
       )
     )
 
     #expect(reference.nodePositions["source"]!.x < reference.nodePositions["gate"]!.x)
     #expect(reference.nodePositions["gate"]!.x < reference.nodePositions["sink"]!.x)
-    #expect(mixed.nodePositions["source"]!.x < mixed.nodePositions["gate"]!.x)
-    #expect(mixed.nodePositions["gate"]!.x < mixed.nodePositions["sink"]!.x)
+    #expect(reference.nodePositions == mixed.nodePositions)
+    #expect(reference.precomputedRoutes?.routes.count == fixture.edges.count)
+    #expect(mixed.precomputedRoutes?.routes.count == fixture.edges.count)
   }
 
   @Test("route worker accepts reference routing components")

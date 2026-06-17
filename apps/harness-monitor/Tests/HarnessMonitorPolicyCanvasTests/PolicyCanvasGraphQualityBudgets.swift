@@ -10,8 +10,10 @@ import HarnessMonitorPolicyCanvasAlgorithms
 /// genuine adrift labels and banked large on-edge improvements. The crossed-port
 /// budgets were repinned again on 2026-06-17 once the measure began detecting
 /// crossings geometrically instead of from a one-dimensional order key, which
-/// surfaced real fan-in crossings the old key was blind to. Corridor reuse stays
-/// intentionally absent so every budgeted sample has a hard-zero reuse gate.
+/// surfaced real fan-in crossings the old key was blind to. The budgets were
+/// repinned again on 2026-06-17 after ELK became the only automatic layout path
+/// for small and large samples. Corridor reuse stays intentionally absent so
+/// every budgeted sample has a hard-zero reuse gate.
 /// The gate fails if a sample regresses above its budget; improvements just leave
 /// headroom, so tighten the budget whenever a category is banked lower. Categories
 /// absent from a sample's table default to `0` - a hard-zero gate. A budgeted
@@ -30,34 +32,32 @@ enum PolicyCanvasGraphQualityBudgets {
   }
 
   static let bySampleID: [String: [PolicyCanvasQualityCategory: Int]] = [
-    "minimal": [
-      .labelNearTurn: 1
-    ],
+    "minimal": [:],
     "linear": [
-      .wrongTurns: 2, .labelNearTurn: 3,
+      .labelNearTurn: 1,
     ],
     "branching": [
-      .corridorParallel: 2, .detours: 1, .nodeDistance: 1, .wrongTurns: 4,
-      .crossedPorts: 1, .labelOnEdge: 1, .labelNearTurn: 4,
+      .corridorParallel: 1, .labelOnBody: 2, .labelOnEdge: 5, .labelNearTurn: 6,
     ],
     "default": [
-      .corridorParallel: 6, .longEdges: 3, .nodeDistance: 2, .wrongTurns: 31,
-      .crossedPorts: 5, .labelOnEdge: 1, .labelNearTurn: 7,
+      .corridorParallel: 3, .crossingsIndependent: 4, .longEdges: 4, .detours: 2,
+      .nodeDistance: 5, .wrongTurns: 2, .crossedPorts: 1, .labelOnBody: 1,
+      .labelOnEdge: 4, .labelNearTurn: 10,
     ],
     "multi-group": [
-      .corridorParallel: 9, .crossingsIndependent: 10, .longEdges: 3, .detours: 1,
-      .nodeDistance: 1, .wrongTurns: 19, .crossedPorts: 8, .labelOnEdge: 2,
-      .labelNearTurn: 7,
+      .corridorParallel: 2, .crossingsIndependent: 12, .longEdges: 5,
+      .nodeDistance: 7, .crossedPorts: 7, .labelOnBody: 1, .labelOnEdge: 3,
+      .labelNearTurn: 8,
     ],
     "extreme": [
-      .corridorParallel: 29, .crossingsIndependent: 40, .longEdges: 12, .detours: 7,
-      .nodeDistance: 19, .wrongTurns: 43, .crossedPorts: 4, .labelOnEdge: 4,
-      .labelNearTurn: 5,
+      .corridorParallel: 6, .crossingsIndependent: 12, .longEdges: 5,
+      .nodeDistance: 6, .crossedPorts: 5, .labelOverlaps: 1, .labelOnBody: 4,
+      .labelOnEdge: 18, .labelNearTurn: 13,
     ],
     "extreme-braid": [
-      .corridorParallel: 348, .crossingsIndependent: 345, .longEdges: 67, .detours: 33,
-      .nodeDistance: 73, .wrongTurns: 102, .crossedPorts: 7, .labelOnEdge: 10,
-      .labelNearTurn: 27,
+      .corridorParallel: 50, .crossingsIndependent: 47, .longEdges: 15, .detours: 4,
+      .nodeDistance: 27, .wrongTurns: 6, .crossedPorts: 13, .labelOverlaps: 6,
+      .labelOnBody: 1, .labelOnEdge: 49, .labelNearTurn: 34,
     ],
   ]
 }

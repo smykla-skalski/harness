@@ -201,8 +201,8 @@ struct PolicyCanvasLabSamplesTests {
     }
   }
 
-  @Test("Reference algorithms produce coherent layouts for lab samples")
-  func referenceAlgorithmsProduceCoherentLayoutsForLabSamples() throws {
+  @Test("Automatic ELK layout produces coherent layouts for lab samples")
+  func automaticElkLayoutProducesCoherentLayoutsForLabSamples() throws {
     for id in PolicyCanvasReferenceAlgorithmSamples.ids {
       let sample = try #require(PolicyCanvasLabSamples.sample(id: id))
       var nodes = sample.document.nodes.map {
@@ -219,10 +219,9 @@ struct PolicyCanvasLabSamplesTests {
           nodes: nodes,
           groups: groups,
           edges: edges,
-          mode: .explicitReflow(preserveManualAnchors: false),
-          algorithmSelection: .referencePure
+          mode: .explicitReflow(preserveManualAnchors: false)
         ),
-        "reference algorithms did not produce a layout for \(sample.id)"
+        "automatic ELK layout did not produce a layout for \(sample.id)"
       )
       _ = applyPolicyCanvasLayoutResult(
         result,
@@ -243,11 +242,11 @@ struct PolicyCanvasLabSamplesTests {
     }
   }
 
-  @Test("Reference algorithms route lab samples around node bodies")
-  func referenceAlgorithmsRouteLabSamplesAroundNodeBodies() async throws {
+  @Test("Reference routing keeps ELK-laid-out lab samples around node bodies")
+  func referenceRoutingKeepsElkLaidOutLabSamplesAroundNodeBodies() async throws {
     for id in PolicyCanvasReferenceAlgorithmSamples.ids {
       let sample = try #require(PolicyCanvasLabSamples.sample(id: id))
-      let graph = try referenceLaidOutGraph(for: sample)
+      let graph = try elkLaidOutGraph(for: sample)
       let output = await PolicyCanvasRouteWorker().compute(
         input: PolicyCanvasRouteWorkerInput(
           nodes: graph.nodes,
@@ -276,7 +275,7 @@ struct PolicyCanvasLabSamplesTests {
     }
   }
 
-  private func referenceLaidOutGraph(
+  private func elkLaidOutGraph(
     for sample: PolicyCanvasLabSample
   ) throws -> PolicyCanvasReferenceGraph {
     var nodes = sample.document.nodes.map {
@@ -293,8 +292,7 @@ struct PolicyCanvasLabSamplesTests {
         nodes: nodes,
         groups: groups,
         edges: edges,
-        mode: .explicitReflow(preserveManualAnchors: false),
-        algorithmSelection: .referencePure
+        mode: .explicitReflow(preserveManualAnchors: false)
       )
     )
     let routingHints = applyPolicyCanvasLayoutResult(
