@@ -7,10 +7,11 @@ import Testing
 /// src/session/types/tasks.rs. The 10 review-flow structs own the snake_case
 /// shape (explicit CodingKeys, plain decoder); this pins the WorkItem core
 /// decode, its serde defaults (queue_policy/source fall back to the enum default,
-/// notes/review_round/required_consensus to their zero values), and that the
-/// structs reference the existing bare Swift hand enums - including TaskStatus,
-/// whose legacy-tolerant hand decode is exactly why those enums stay bare rather
-/// than being generated. Mapping these wire types to the rich hand models is a
+/// notes/review_round/required_consensus to their zero values). The three plain
+/// enums (TaskSeverity/TaskSource/ReviewPointState) are now generated bare and
+/// decode here; TaskStatus/TaskQueuePolicy/ReviewVerdict stay hand because their
+/// legacy-tolerant decode (in_progress AND legacy inProgress, etc.) a generated
+/// plain enum would regress. Mapping these wire types to the rich hand models is a
 /// follow-up.
 @Suite("Session tasks wire types decoding")
 struct SessionTasksWireTypesDecodingTests {
@@ -62,5 +63,18 @@ struct SessionTasksWireTypesDecodingTests {
     #expect(review.reviewId == "r-1")
     #expect(review.verdict == .approve)
     #expect(review.points.isEmpty)
+  }
+
+  @Test("decodes the three adopted enums and keeps their title")
+  func decodesAdoptedEnums() throws {
+    // The plain enums are generated bare now; each decodes from its snake_case
+    // wire string and the .title computed prop survives as a Swift extension.
+    #expect(try decoder.decode(TaskSeverity.self, from: Data(#""critical""#.utf8)) == .critical)
+    #expect(try decoder.decode(TaskSource.self, from: Data(#""observe""#.utf8)) == .observe)
+    #expect(try decoder.decode(ReviewPointState.self, from: Data(#""disputed""#.utf8)) == .disputed)
+
+    #expect(TaskSeverity.high.title == "High")
+    #expect(TaskSource.manual.title == "Manual")
+    #expect(ReviewPointState.disputed.title == "Disputed")
   }
 }

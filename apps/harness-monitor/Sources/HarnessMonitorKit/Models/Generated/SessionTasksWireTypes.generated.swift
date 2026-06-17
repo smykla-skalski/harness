@@ -120,6 +120,25 @@ public struct WorkItemWire: Codable, Equatable, Sendable {
   }
 }
 
+public enum TaskSeverity: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case low = "low"
+  case medium = "medium"
+  case high = "high"
+  case critical = "critical"
+
+  public var id: String { rawValue }
+}
+
+public enum TaskSource: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case manual = "manual"
+  case observe = "observe"
+  case signal = "signal"
+  case system = "system"
+  case improver = "improver"
+
+  public var id: String { rawValue }
+}
+
 public struct TaskNoteWire: Codable, Equatable, Sendable {
   public var timestamp: String
   public var agentId: String?
@@ -299,6 +318,15 @@ public struct ReviewWire: Codable, Equatable, Sendable {
     case points
     case recordedAt = "recorded_at"
   }
+}
+
+public enum ReviewPointState: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case `open` = "open"
+  case agreed = "agreed"
+  case disputed = "disputed"
+  case resolved = "resolved"
+
+  public var id: String { rawValue }
 }
 
 public struct ReviewConsensusWire: Codable, Equatable, Sendable {
