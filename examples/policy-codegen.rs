@@ -1084,6 +1084,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // project/worktree rollup structs (same-named Swift hand mirrors).
     "WorktreeSummary",
     "ProjectSummary",
+    // timeline pagination cursor + window request (same-named Swift hand mirrors).
+    "TimelineCursor",
+    "TimelineWindowRequest",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1847,6 +1850,11 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     // Vec<WorktreeSummary>. Clean structs over primitives, generate-only.
     "WorktreeSummary",
     "ProjectSummary",
+    // timeline pagination cursor + the window request that nests it. TimelineWindow
+    // Response is held back - it nests Option<Vec<TimelineEntry>>, and TimelineEntry
+    // is referenced bare by the codex wire types (suffixing it would ripple them).
+    "TimelineCursor",
+    "TimelineWindowRequest",
 ];
 const OBSERVE_CLASSIFICATION_SOURCE: &str = include_str!("../src/observe/types/classification.rs");
 const OBSERVE_ISSUE_CODE_SOURCE: &str = include_str!("../src/observe/types/issue_code.rs");

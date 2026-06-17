@@ -539,6 +539,45 @@ public struct AgentToolActivitySummaryWire: Codable, Equatable, Sendable {
   }
 }
 
+public struct TimelineCursorWire: Codable, Equatable, Sendable {
+  public var recordedAt: String
+  public var entryId: String
+
+  public init(recordedAt: String, entryId: String) {
+    self.recordedAt = recordedAt
+    self.entryId = entryId
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case recordedAt = "recorded_at"
+    case entryId = "entry_id"
+  }
+}
+
+public struct TimelineWindowRequestWire: Codable, Equatable, Sendable {
+  public var scope: String?
+  public var limit: UInt?
+  public var before: TimelineCursorWire?
+  public var after: TimelineCursorWire?
+  public var knownRevision: Int64?
+
+  public init(scope: String? = nil, limit: UInt? = nil, before: TimelineCursorWire? = nil, after: TimelineCursorWire? = nil, knownRevision: Int64? = nil) {
+    self.scope = scope
+    self.limit = limit
+    self.before = before
+    self.after = after
+    self.knownRevision = knownRevision
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case scope
+    case limit
+    case before
+    case after
+    case knownRevision = "known_revision"
+  }
+}
+
 public struct AskUserQuestionOptionWire: Codable, Equatable, Sendable {
   public var label: String
   public var description: String
