@@ -216,6 +216,78 @@ public struct GitHubOperationSpendDiagnosticsWire: Codable, Equatable, Sendable 
   }
 }
 
+public struct SessionSummaryWire: Codable, Equatable, Sendable {
+  public var projectId: String
+  public var projectName: String
+  public var projectDir: String?
+  public var contextRoot: String
+  public var worktreePath: String
+  public var sharedPath: String
+  public var originPath: String
+  public var branchRef: String
+  public var sessionId: String
+  public var title: String
+  public var context: String
+  public var status: SessionStatus
+  public var createdAt: String
+  public var updatedAt: String
+  public var lastActivityAt: String?
+  public var leaderId: String?
+  public var observeId: String?
+  public var pendingLeaderTransfer: PendingLeaderTransferWire?
+  public var externalOrigin: String?
+  public var adoptedAt: String?
+  public var metrics: SessionMetricsWire
+
+  public init(projectId: String, projectName: String, projectDir: String? = nil, contextRoot: String, worktreePath: String, sharedPath: String, originPath: String, branchRef: String, sessionId: String, title: String, context: String, status: SessionStatus, createdAt: String, updatedAt: String, lastActivityAt: String? = nil, leaderId: String? = nil, observeId: String? = nil, pendingLeaderTransfer: PendingLeaderTransferWire? = nil, externalOrigin: String? = nil, adoptedAt: String? = nil, metrics: SessionMetricsWire) {
+    self.projectId = projectId
+    self.projectName = projectName
+    self.projectDir = projectDir
+    self.contextRoot = contextRoot
+    self.worktreePath = worktreePath
+    self.sharedPath = sharedPath
+    self.originPath = originPath
+    self.branchRef = branchRef
+    self.sessionId = sessionId
+    self.title = title
+    self.context = context
+    self.status = status
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+    self.lastActivityAt = lastActivityAt
+    self.leaderId = leaderId
+    self.observeId = observeId
+    self.pendingLeaderTransfer = pendingLeaderTransfer
+    self.externalOrigin = externalOrigin
+    self.adoptedAt = adoptedAt
+    self.metrics = metrics
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case projectId = "project_id"
+    case projectName = "project_name"
+    case projectDir = "project_dir"
+    case contextRoot = "context_root"
+    case worktreePath = "worktree_path"
+    case sharedPath = "shared_path"
+    case originPath = "origin_path"
+    case branchRef = "branch_ref"
+    case sessionId = "session_id"
+    case title
+    case context
+    case status
+    case createdAt = "created_at"
+    case updatedAt = "updated_at"
+    case lastActivityAt = "last_activity_at"
+    case leaderId = "leader_id"
+    case observeId = "observe_id"
+    case pendingLeaderTransfer = "pending_leader_transfer"
+    case externalOrigin = "external_origin"
+    case adoptedAt = "adopted_at"
+    case metrics
+  }
+}
+
 public struct ObserverSummaryWire: Codable, Equatable, Sendable {
   public var observeId: String
   public var lastScanTime: String

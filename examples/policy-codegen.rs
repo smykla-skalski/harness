@@ -1069,6 +1069,11 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // session/types/state.rs: SessionMetrics takes the suffix (hand counts are Int,
     // wire is u32). SessionStatus is NOT suffixed - it is adopted bare.
     "SessionMetrics",
+    // session/types/agents.rs leaf + the summaries SessionSummary that nests it:
+    // both are structs with a Swift hand mirror, so they take the Wire suffix
+    // (generate-only until SessionSummary reroutes off convertFromSnakeCase).
+    "PendingLeaderTransfer",
+    "SessionSummary",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1812,6 +1817,12 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     "ObserverOpenIssue",
     "ObserverActiveWorker",
     "ObserverAgentSessionSummary",
+    // SessionSummary: the core dashboard session type and biggest SessionDetail
+    // member. References SessionStatus (bare) + SessionMetricsWire +
+    // PendingLeaderTransferWire, all generated in the session-state leaf. generate
+    // -only - the rich hand SessionSummary keeps Int metrics and decodes via convert
+    // until the SessionDetail reroute.
+    "SessionSummary",
 ];
 const OBSERVE_CLASSIFICATION_SOURCE: &str = include_str!("../src/observe/types/classification.rs");
 const OBSERVE_ISSUE_CODE_SOURCE: &str = include_str!("../src/observe/types/issue_code.rs");
@@ -1825,15 +1836,22 @@ const OBSERVE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Mod
 /// (no Swift consumer yet).
 const OBSERVE_EMIT_ONLY: &[&str] = &["IssueSeverity", "IssueCategory", "IssueCode", "FixSafety"];
 const SESSION_STATE_SOURCE: &str = include_str!("../src/session/types/state.rs");
+const SESSION_AGENTS_SOURCE: &str = include_str!("../src/session/types/agents.rs");
 const SESSION_STATE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionStateWireTypes.generated.swift";
-/// session/types/state.rs foundation leaf: SessionStatus (the session lifecycle
-/// enum) and SessionMetrics (the summary rollup counts), both SessionSummary deps.
-/// SessionStatus is adopted bare - a closed string enum whose 5 cases match the
-/// hand enum exactly, so the generated form replaces the hand decl (its `title`
-/// stays in an extension). SessionMetrics takes the Wire suffix: the hand model
-/// types its counts as Int, the wire is u32. SessionState itself stays out - it has
-/// no Swift mirror.
-const SESSION_STATE_EMIT_ONLY: &[&str] = &["SessionStatus", "SessionMetrics"];
+/// session/types foundation leaf for the SessionSummary dep graph: SessionStatus
+/// (lifecycle enum) + SessionMetrics (rollup counts) from state.rs, and
+/// PendingLeaderTransfer from agents.rs. SessionStatus is adopted bare - a closed
+/// string enum whose 5 cases match the hand enum exactly, so the generated form
+/// replaces the hand decl (its `title` stays in an extension). SessionMetrics and
+/// PendingLeaderTransfer take the Wire suffix (the hand SessionMetrics types its
+/// counts as Int over the wire u32; PendingLeaderTransfer is a thin mirror but a
+/// struct, so it can only adopt once SessionSummary reroutes off convertFromSnakeCase).
+/// agents.rs also holds try_from/untagged types (AgentRegistration/AgentStatus) - the
+/// emit-only list excludes them, and the symbol-table pass only reads metadata, so
+/// the blocked shapes never reach the panic-prone emit builders. SessionState stays
+/// out - it has no Swift mirror.
+const SESSION_STATE_EMIT_ONLY: &[&str] =
+    &["SessionStatus", "SessionMetrics", "PendingLeaderTransfer"];
 const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
     include_str!("../src/task_board/git_identity_defaults.rs");
 const OPENROUTER_SOURCE: &str = include_str!("../src/daemon/protocol/openrouter_models.rs");
@@ -2050,9 +2068,9 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: SESSION_STATE_OUTPUT,
-            description: "the Rust session lifecycle status and rollup metrics",
+            description: "the Rust session lifecycle status, metrics and leader transfer",
             defaults: &[],
-            sources: &[SESSION_STATE_SOURCE],
+            sources: &[SESSION_STATE_SOURCE, SESSION_AGENTS_SOURCE],
         },
     ]
 }
