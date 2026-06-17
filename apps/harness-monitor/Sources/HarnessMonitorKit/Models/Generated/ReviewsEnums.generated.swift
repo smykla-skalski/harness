@@ -242,6 +242,20 @@ public enum ReviewReviewEventState: TaskBoardOpenEnum, CaseIterable, Identifiabl
   public var id: String { rawValue }
 }
 
+public enum ReviewAuthorAssociation: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case owner = "owner"
+  case member = "member"
+  case collaborator = "collaborator"
+  case contributor = "contributor"
+  case firstTimer = "first_timer"
+  case firstTimeContributor = "first_time_contributor"
+  case mannequin = "mannequin"
+  case none = "none"
+  case other = "other"
+
+  public var id: String { rawValue }
+}
+
 public enum ReviewActionKind: TaskBoardOpenEnum, CaseIterable, Identifiable {
   case approve
   case merge
