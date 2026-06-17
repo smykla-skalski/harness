@@ -217,10 +217,10 @@ extension TaskBoardAPIClientTests {
         == .array([.object(reviewsActionTargetJSON)])
     )
     #expect(objectValue(calls[8].params, key: "method") == .string("squash"))
-    #expect(objectValue(calls[9].params, key: "target") == .object(reviewsTargetJSON))
+    #expect(objectValue(calls[9].params, key: "target") == .object(reviewsActionTargetJSON))
     #expect(objectValue(calls[9].params, key: "method") == .string("squash"))
     #expect(objectValue(calls[9].params, key: "workflow_id") == .string("reviews_auto"))
-    #expect(objectValue(calls[10].params, key: "target") == .object(reviewsTargetJSON))
+    #expect(objectValue(calls[10].params, key: "target") == .object(reviewsActionTargetJSON))
     #expect(objectValue(calls[10].params, key: "trigger") == .string("manual"))
     #expect(objectValue(calls[11].params, key: "workflow_id") == .string("reviews_auto"))
     #expect(

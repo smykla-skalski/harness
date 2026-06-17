@@ -4,25 +4,37 @@ extension WebSocketTransport: ReviewsPolicyClientRouting {
   public func previewReviewsPolicy(
     _ request: ReviewsPolicyPreviewRequest
   ) async throws -> ReviewsPolicyPreviewResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsPolicyPreviewRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsPolicyPreview, params: params)
-    return try decode(value)
+    let wire: ReviewsPolicyPreviewResponseWire = try decodePolicyWire(value)
+    return ReviewsPolicyPreviewResponse(wire: wire)
   }
 
   public func startReviewsPolicyRun(
     _ request: ReviewsPolicyRunStartRequest
   ) async throws -> ReviewsPolicyRunResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsPolicyRunStartRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsPolicyStart, params: params)
-    return try decode(value)
+    let wire: ReviewsPolicyRunResponseWire = try decodePolicyWire(value)
+    return ReviewsPolicyRunResponse(wire: wire)
   }
 
   public func reviewsPolicyStatus(
     _ request: ReviewsPolicyStatusRequest
   ) async throws -> ReviewsPolicyStatusResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsPolicyStatusRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsPolicyStatus, params: params)
-    return try decode(value)
+    let wire: ReviewsPolicyStatusResponseWire = try decodePolicyWire(value)
+    return ReviewsPolicyStatusResponse(wire: wire)
+  }
+
+  public func reviewsPolicyHistory(
+    _ request: ReviewsPolicyHistoryRequest
+  ) async throws -> ReviewsPolicyHistoryResponse {
+    let params = try encodeParams(ReviewsPolicyHistoryRequestWire(request), extra: [:])
+    let value = try await rpc(method: .reviewsPolicyHistory, params: params)
+    let wire: ReviewsPolicyHistoryResponseWire = try decodePolicyWire(value)
+    return ReviewsPolicyHistoryResponse(wire: wire)
   }
 }
 

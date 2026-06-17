@@ -199,6 +199,11 @@ let sampleReviewsAutoResponseText =
 let sampleReviewsPolicyPreviewResponseText =
   """
   {
+    "workflow_id": "reviews_auto",
+    "subject": {
+      "repository": "example/harness",
+      "pull_request_number": 42
+    },
     "eligible": true,
     "reason": null,
     "steps": [
@@ -261,6 +266,11 @@ let sampleReviewsPolicyRunResponseText =
 let sampleReviewsPolicyStatusResponseText =
   """
   {
+    "workflow_id": "reviews_auto",
+    "subject": {
+      "repository": "example/harness",
+      "pull_request_number": 42
+    },
     "active_run": {
       "run_id": "run-42",
       "workflow_id": "reviews_auto",
@@ -323,6 +333,55 @@ let sampleReviewsPolicyStatusResponseText =
             "recorded_at": "2026-05-29T12:00:01Z"
           }
         ]
+      }
+    ]
+  }
+  """
+
+let sampleReviewsPolicyHistoryResponseText =
+  """
+  {
+    "workflow_id": "reviews_auto",
+    "subject": {
+      "repository": "example/harness",
+      "pull_request_number": 42
+    },
+    "runs": [
+      {
+        "run_id": "run-42",
+        "workflow_id": "reviews_auto",
+        "subject": {
+          "repository": "example/harness",
+          "pull_request_number": 42
+        },
+        "trigger": "manual",
+        "status": "completed",
+        "started_at": "2026-05-29T12:00:00Z",
+        "updated_at": "2026-05-29T12:05:00Z",
+        "completed_at": "2026-05-29T12:05:00Z"
+      }
+    ],
+    "metrics": {
+      "total": 1,
+      "running": 0,
+      "waiting": 0,
+      "completed": 1,
+      "failed": 0,
+      "cancelled": 0,
+      "by_trigger": {
+        "manual": 1
+      }
+    },
+    "timeline": [
+      {
+        "recorded_at": "2026-05-29T12:00:00Z",
+        "run_id": "run-42",
+        "event": "started"
+      },
+      {
+        "recorded_at": "2026-05-29T12:05:00Z",
+        "run_id": "run-42",
+        "event": "completed"
       }
     ]
   }

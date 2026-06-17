@@ -82,6 +82,25 @@ extension RecordingHarnessClient: ReviewsPolicyClientRouting {
     }
     return ReviewsPolicyStatusResponse()
   }
+
+  func reviewsPolicyHistory(
+    _ request: ReviewsPolicyHistoryRequest
+  ) async throws -> ReviewsPolicyHistoryResponse {
+    let (response, error): (ReviewsPolicyHistoryResponse?, (any Error)?) = lock.withLock {
+      reviewPolicyHistoryRequests.append(request)
+      return (reviewPolicyHistoryResponse, reviewPolicyHistoryError)
+    }
+    if let error {
+      throw error
+    }
+    if let response {
+      return response
+    }
+    return ReviewsPolicyHistoryResponse(
+      workflowID: request.workflowID,
+      subject: request.subject
+    )
+  }
 }
 
 extension RecordingHarnessClient {

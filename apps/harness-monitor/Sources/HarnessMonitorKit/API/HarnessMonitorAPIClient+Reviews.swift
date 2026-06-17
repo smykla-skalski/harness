@@ -4,25 +4,45 @@ extension HarnessMonitorAPIClient: ReviewsPolicyClientRouting {
   public func previewReviewsPolicy(
     _ request: ReviewsPolicyPreviewRequest
   ) async throws -> ReviewsPolicyPreviewResponse {
-    try await post("/v1/reviews/policy/preview", body: request)
+    let wire: ReviewsPolicyPreviewResponseWire = try await post(
+      "/v1/reviews/policy/preview",
+      body: ReviewsPolicyPreviewRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsPolicyPreviewResponse(wire: wire)
   }
 
   public func startReviewsPolicyRun(
     _ request: ReviewsPolicyRunStartRequest
   ) async throws -> ReviewsPolicyRunResponse {
-    try await post("/v1/reviews/policy/start", body: request)
+    let wire: ReviewsPolicyRunResponseWire = try await post(
+      "/v1/reviews/policy/start",
+      body: ReviewsPolicyRunStartRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsPolicyRunResponse(wire: wire)
   }
 
   public func reviewsPolicyStatus(
     _ request: ReviewsPolicyStatusRequest
   ) async throws -> ReviewsPolicyStatusResponse {
-    try await post("/v1/reviews/policy/status", body: request)
+    let wire: ReviewsPolicyStatusResponseWire = try await post(
+      "/v1/reviews/policy/status",
+      body: ReviewsPolicyStatusRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsPolicyStatusResponse(wire: wire)
   }
 
   public func reviewsPolicyHistory(
     _ request: ReviewsPolicyHistoryRequest
   ) async throws -> ReviewsPolicyHistoryResponse {
-    try await post("/v1/reviews/policy/history", body: request)
+    let wire: ReviewsPolicyHistoryResponseWire = try await post(
+      "/v1/reviews/policy/history",
+      body: ReviewsPolicyHistoryRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsPolicyHistoryResponse(wire: wire)
   }
 }
 

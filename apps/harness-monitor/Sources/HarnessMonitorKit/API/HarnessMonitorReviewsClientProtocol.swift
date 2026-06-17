@@ -7,6 +7,8 @@ protocol ReviewsPolicyClientRouting: Sendable {
     -> ReviewsPolicyRunResponse
   func reviewsPolicyStatus(_ request: ReviewsPolicyStatusRequest) async throws
     -> ReviewsPolicyStatusResponse
+  func reviewsPolicyHistory(_ request: ReviewsPolicyHistoryRequest) async throws
+    -> ReviewsPolicyHistoryResponse
 }
 
 extension HarnessMonitorReviewsClientProtocol {
@@ -38,6 +40,16 @@ extension HarnessMonitorReviewsClientProtocol {
         code: 501, message: "Reviews policy status is not available.")
     }
     return try await client.reviewsPolicyStatus(request)
+  }
+
+  public func reviewsPolicyHistory(_ request: ReviewsPolicyHistoryRequest) async throws
+    -> ReviewsPolicyHistoryResponse
+  {
+    guard let client = self as? any ReviewsPolicyClientRouting else {
+      throw HarnessMonitorAPIError.server(
+        code: 501, message: "Reviews policy history is not available.")
+    }
+    return try await client.reviewsPolicyHistory(request)
   }
 }
 

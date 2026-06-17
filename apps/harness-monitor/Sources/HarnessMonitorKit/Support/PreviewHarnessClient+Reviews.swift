@@ -21,6 +21,16 @@ extension PreviewHarnessClient: ReviewsPolicyClientRouting {
     try await performActionDelay()
     return try await state.reviewsPolicyStatus(request)
   }
+
+  public func reviewsPolicyHistory(
+    _ request: ReviewsPolicyHistoryRequest
+  ) async throws -> ReviewsPolicyHistoryResponse {
+    try await performActionDelay()
+    return ReviewsPolicyHistoryResponse(
+      workflowID: request.workflowID,
+      subject: request.subject
+    )
+  }
 }
 
 extension PreviewHarnessClient {
