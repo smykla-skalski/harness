@@ -215,3 +215,132 @@ public struct GitHubOperationSpendDiagnosticsWire: Codable, Equatable, Sendable 
     case graphqlPoints = "graphql_points"
   }
 }
+
+public struct ObserverSummaryWire: Codable, Equatable, Sendable {
+  public var observeId: String
+  public var lastScanTime: String
+  public var openIssueCount: UInt
+  public var resolvedIssueCount: UInt
+  public var mutedCodeCount: UInt
+  public var activeWorkerCount: UInt
+  public var openIssues: [ObserverOpenIssueWire]
+  public var mutedCodes: [IssueCode]
+  public var activeWorkers: [ObserverActiveWorkerWire]
+  public var agentSessions: [ObserverAgentSessionSummaryWire]
+
+  public init(observeId: String, lastScanTime: String, openIssueCount: UInt, resolvedIssueCount: UInt, mutedCodeCount: UInt, activeWorkerCount: UInt, openIssues: [ObserverOpenIssueWire], mutedCodes: [IssueCode], activeWorkers: [ObserverActiveWorkerWire], agentSessions: [ObserverAgentSessionSummaryWire]) {
+    self.observeId = observeId
+    self.lastScanTime = lastScanTime
+    self.openIssueCount = openIssueCount
+    self.resolvedIssueCount = resolvedIssueCount
+    self.mutedCodeCount = mutedCodeCount
+    self.activeWorkerCount = activeWorkerCount
+    self.openIssues = openIssues
+    self.mutedCodes = mutedCodes
+    self.activeWorkers = activeWorkers
+    self.agentSessions = agentSessions
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case observeId = "observe_id"
+    case lastScanTime = "last_scan_time"
+    case openIssueCount = "open_issue_count"
+    case resolvedIssueCount = "resolved_issue_count"
+    case mutedCodeCount = "muted_code_count"
+    case activeWorkerCount = "active_worker_count"
+    case openIssues = "open_issues"
+    case mutedCodes = "muted_codes"
+    case activeWorkers = "active_workers"
+    case agentSessions = "agent_sessions"
+  }
+}
+
+public struct ObserverOpenIssueWire: Codable, Equatable, Sendable {
+  public var issueId: String
+  public var code: IssueCode
+  public var severity: IssueSeverity
+  public var category: IssueCategory
+  public var summary: String
+  public var fingerprint: String
+  public var firstSeenLine: UInt
+  public var occurrenceCount: UInt
+  public var lastSeenLine: UInt
+  public var fixSafety: FixSafety
+  public var evidenceExcerpt: String?
+
+  public init(issueId: String, code: IssueCode, severity: IssueSeverity, category: IssueCategory, summary: String, fingerprint: String, firstSeenLine: UInt, occurrenceCount: UInt, lastSeenLine: UInt, fixSafety: FixSafety, evidenceExcerpt: String? = nil) {
+    self.issueId = issueId
+    self.code = code
+    self.severity = severity
+    self.category = category
+    self.summary = summary
+    self.fingerprint = fingerprint
+    self.firstSeenLine = firstSeenLine
+    self.occurrenceCount = occurrenceCount
+    self.lastSeenLine = lastSeenLine
+    self.fixSafety = fixSafety
+    self.evidenceExcerpt = evidenceExcerpt
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case issueId = "issue_id"
+    case code
+    case severity
+    case category
+    case summary
+    case fingerprint
+    case firstSeenLine = "first_seen_line"
+    case occurrenceCount = "occurrence_count"
+    case lastSeenLine = "last_seen_line"
+    case fixSafety = "fix_safety"
+    case evidenceExcerpt = "evidence_excerpt"
+  }
+}
+
+public struct ObserverActiveWorkerWire: Codable, Equatable, Sendable {
+  public var issueId: String
+  public var targetFile: String
+  public var startedAt: String
+  public var agentId: String?
+  public var runtime: String?
+
+  public init(issueId: String, targetFile: String, startedAt: String, agentId: String? = nil, runtime: String? = nil) {
+    self.issueId = issueId
+    self.targetFile = targetFile
+    self.startedAt = startedAt
+    self.agentId = agentId
+    self.runtime = runtime
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case issueId = "issue_id"
+    case targetFile = "target_file"
+    case startedAt = "started_at"
+    case agentId = "agent_id"
+    case runtime
+  }
+}
+
+public struct ObserverAgentSessionSummaryWire: Codable, Equatable, Sendable {
+  public var agentId: String
+  public var runtime: String
+  public var logPath: String?
+  public var cursor: UInt
+  public var lastActivity: String?
+
+  public init(agentId: String, runtime: String, logPath: String? = nil, cursor: UInt, lastActivity: String? = nil) {
+    self.agentId = agentId
+    self.runtime = runtime
+    self.logPath = logPath
+    self.cursor = cursor
+    self.lastActivity = lastActivity
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case agentId = "agent_id"
+    case runtime
+    case logPath = "log_path"
+    case cursor
+    case lastActivity = "last_activity"
+  }
+}

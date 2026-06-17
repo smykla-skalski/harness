@@ -1058,6 +1058,14 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "GitHubRateBucketDiagnostics",
     "GitHubCooldownDiagnostics",
     "GitHubOperationSpendDiagnostics",
+    // observer summary cluster: ObserverSummary/ObserverAgentSessionSummary own a
+    // Swift hand name so must take the Wire suffix; ObserverOpenIssue/ObserverActive
+    // Worker are suffixed for consistency. They reference the bare observe enums
+    // (IssueCode etc.) which the observe module emits unsuffixed in the same Kit module.
+    "ObserverSummary",
+    "ObserverOpenIssue",
+    "ObserverActiveWorker",
+    "ObserverAgentSessionSummary",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1792,6 +1800,15 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     "GitHubRateBucketDiagnostics",
     "GitHubCooldownDiagnostics",
     "GitHubOperationSpendDiagnostics",
+    // observer summary cluster (ObserverSummary nests inside SessionDetail.observer):
+    // ObserverOpenIssue is the first wire consumer of the observe enums
+    // (IssueSeverity/IssueCategory/IssueCode/FixSafety). generate-only - the rich
+    // hand models (String-typed enums, optional Vecs, ObserverOpenIssue renamed to
+    // ObserverIssueSummary) stay until the SessionDetail reroute adopts them.
+    "ObserverSummary",
+    "ObserverOpenIssue",
+    "ObserverActiveWorker",
+    "ObserverAgentSessionSummary",
 ];
 const OBSERVE_CLASSIFICATION_SOURCE: &str = include_str!("../src/observe/types/classification.rs");
 const OBSERVE_ISSUE_CODE_SOURCE: &str = include_str!("../src/observe/types/issue_code.rs");
