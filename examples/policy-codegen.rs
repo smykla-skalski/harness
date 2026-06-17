@@ -886,6 +886,15 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "ReviewTargetFlags",
     "ReviewTarget",
     "ReviewActionResult",
+    // websocket transport envelope (protocol/websocket.rs): the 5 self-contained
+    // frame types. WsRequest/WsErrorPayload own a Swift hand name (WebSocketProtocol
+    // .swift); WsResponse/WsPushEvent/WsChunkFrame have no Swift mirror (the app
+    // decodes a unified WsFrame) - all suffixed for a consistent generate-only set.
+    "WsRequest",
+    "WsResponse",
+    "WsErrorPayload",
+    "WsPushEvent",
+    "WsChunkFrame",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -911,6 +920,13 @@ const SKIP_TYPES: &[&str] = &[
     "RepoKey",
     "RegistryEntry",
     "LocalCloneRegistry",
+    // websocket config/probe/inspect payloads: reference unmigrated persona,
+    // runtime-catalog and acp types (AgentPersona / RuntimeModelCatalog /
+    // AcpAgentDescriptor / AcpRuntimeProbeResponse / AcpAgentInspectResponse).
+    // Generate them with those subsystems, not the transport envelope.
+    "WsConfigPayload",
+    "WsRuntimeProbeUpdate",
+    "WsAcpInspect",
 ];
 
 /// Whether a Rust type is on the generator's skip list (see `SKIP_TYPES`).
@@ -1596,6 +1612,12 @@ const REVIEWS_TIMELINE_MOD_SOURCE: &str = include_str!("../src/reviews/timeline/
 // the hand type); ReviewAuthorAssociation references the adopted closed enum.
 const REVIEWS_TYPES_SOURCE: &str = include_str!("../src/reviews/types.rs");
 const REVIEWS_LOGIC_SOURCE: &str = include_str!("../src/reviews/logic.rs");
+// websocket: the JSON-RPC-ish transport envelope. The five self-contained frame
+// types (request/response/error/push/chunk) generate; the three config/probe/
+// inspect payloads reference unmigrated persona/runtime/acp types and are SKIP'd
+// until those subsystems land. serde_json::Value -> JSONValue, the request's
+// trace_context is a String dict.
+const WEBSOCKET_SOURCE: &str = include_str!("../src/daemon/protocol/websocket.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -1725,6 +1747,13 @@ fn modules() -> Vec<GeneratedModule> {
             description: "the Rust reviews query, item, check, action and policy types",
             defaults: &[REVIEWS_LOGIC_SOURCE],
             sources: &[REVIEWS_TYPES_SOURCE],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/WebSocketWireTypes.generated.swift",
+            description: "the Rust websocket transport frame types",
+            defaults: &[],
+            sources: &[WEBSOCKET_SOURCE],
         },
     ]
 }
