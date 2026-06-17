@@ -115,6 +115,13 @@ const OPEN_STRING_ENUMS: &[&str] = &[
     "ReviewActionPreviewKind",
     // reviews leaves: split (suffixed) open enum, so the Wire name is listed.
     "ReviewsBodyUpdateOutcomeWire",
+    // observe::types classification: forward-compatible against an evolving
+    // harness taxonomy (IssueCode grows as new issue families land) and a
+    // zero-regression match for the String fields they replace app-side.
+    "IssueSeverity",
+    "IssueCategory",
+    "IssueCode",
+    "FixSafety",
 ];
 
 /// Emit an open Swift enum conforming to `TaskBoardOpenEnum` (which supplies the
@@ -1650,6 +1657,17 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     "GitHubCooldownDiagnostics",
     "GitHubOperationSpendDiagnostics",
 ];
+const OBSERVE_CLASSIFICATION_SOURCE: &str = include_str!("../src/observe/types/classification.rs");
+const OBSERVE_ISSUE_CODE_SOURCE: &str = include_str!("../src/observe/types/issue_code.rs");
+const OBSERVE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ObserveWireTypes.generated.swift";
+/// observe::types classification leaf: the foundation enums the summaries issue
+/// cluster references. Only the four DECODE enums the app reuses are emitted -
+/// ObserverIssueSummary decodes IssueSeverity/IssueCategory/IssueCode/FixSafety
+/// as String today, and their typed form unblocks the summaries migration. The
+/// allow-list skips MessageRole (Serialize-only), SourceTool (no rename_all, so
+/// its wire values stay PascalCase the generator does not emit), and Confidence
+/// (no Swift consumer yet).
+const OBSERVE_EMIT_ONLY: &[&str] = &["IssueSeverity", "IssueCategory", "IssueCode", "FixSafety"];
 const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
     include_str!("../src/task_board/git_identity_defaults.rs");
 const OPENROUTER_SOURCE: &str = include_str!("../src/daemon/protocol/openrouter_models.rs");
@@ -1877,6 +1895,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[SESSION_TASKS_SOURCE],
             sources: &[SESSION_TASKS_SOURCE],
         },
+        GeneratedModule {
+            output: OBSERVE_OUTPUT,
+            description: "the Rust observe issue classification enums",
+            defaults: &[],
+            sources: &[OBSERVE_CLASSIFICATION_SOURCE, OBSERVE_ISSUE_CODE_SOURCE],
+        },
     ]
 }
 
@@ -1895,6 +1919,7 @@ fn generate_module(module: &GeneratedModule) -> String {
     );
     let emit_only: &[&str] = match module.output {
         SUMMARIES_OUTPUT => SUMMARIES_EMIT_ONLY,
+        OBSERVE_OUTPUT => OBSERVE_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
