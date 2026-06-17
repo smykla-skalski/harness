@@ -67,6 +67,60 @@ struct ReviewsFilesRerouteContractTests {
     #expect(response.rateLimitSnapshot?.cost == 1)
   }
 
+  @Test("HTTP client decodes a file patch through the wire types")
+  func httpFilesPatchReroute() async throws {
+    TaskBoardURLProtocol.reset()
+    let client = try makeHTTPClient()
+
+    let response = try await client.patchReviewFiles(
+      request: ReviewsFilesPatchRequest(
+        pullRequestID: "PR_kwReview1",
+        headRefOidExpected: "abc123",
+        paths: ["src/main.rs"]
+      )
+    )
+
+    assertFilesPatch(response)
+  }
+
+  @Test("WebSocket transport decodes a file patch through the wire types")
+  func webSocketFilesPatchReroute() async throws {
+    let probe = RPCProbe()
+    let transport = try makeWebSocketTransport(probe: probe)
+
+    let response = try await transport.patchReviewFiles(
+      request: ReviewsFilesPatchRequest(
+        pullRequestID: "PR_kwReview1",
+        headRefOidExpected: "abc123",
+        paths: ["src/main.rs"]
+      )
+    )
+
+    assertFilesPatch(response)
+
+    let methods = await probe.calls.map(\.method)
+    #expect(methods == [.reviewsFilesPatch])
+  }
+
+  private func assertFilesPatch(_ response: ReviewsFilesPatchResponse) {
+    #expect(response.pullRequestID == "PR_kwReview1")
+    #expect(response.drifted == false)
+    #expect(response.currentHeadRefOid == "abc123")
+
+    #expect(response.patches.count == 1)
+    let patch = response.patches.first
+    #expect(patch?.path == "src/main.rs")
+    #expect(patch?.status == .modified)
+    #expect(patch?.servedBy == .localClone)
+    #expect(patch?.additions == 1)
+    #expect(patch?.deletions == 1)
+    #expect(patch?.etag == "abc-etag")
+    #expect(patch?.headRefOid == "abc123")
+
+    #expect(response.rateLimitSnapshot?.remaining == 4800)
+    #expect(response.rateLimitSnapshot?.cost == 2)
+  }
+
   private func makeHTTPClient() throws -> HarnessMonitorAPIClient {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [TaskBoardURLProtocol.self]

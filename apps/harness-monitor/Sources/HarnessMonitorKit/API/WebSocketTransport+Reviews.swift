@@ -154,9 +154,10 @@ extension WebSocketTransport {
   public func patchReviewFiles(
     request: ReviewsFilesPatchRequest
   ) async throws -> ReviewsFilesPatchResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsFilesPatchRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsFilesPatch, params: params)
-    return try decode(value)
+    let wire: ReviewsFilesPatchResponseWire = try decodePolicyWire(value)
+    return ReviewsFilesPatchResponse(wire: wire)
   }
 
   public func previewReviewFiles(

@@ -132,7 +132,12 @@ extension HarnessMonitorAPIClient {
   public func patchReviewFiles(
     request: ReviewsFilesPatchRequest
   ) async throws -> ReviewsFilesPatchResponse {
-    try await post("/v1/reviews/files/patch", body: request)
+    let wire: ReviewsFilesPatchResponseWire = try await post(
+      "/v1/reviews/files/patch",
+      body: ReviewsFilesPatchRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsFilesPatchResponse(wire: wire)
   }
 
   public func previewReviewFiles(

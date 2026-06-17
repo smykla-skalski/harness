@@ -56,3 +56,50 @@ extension ReviewsFilesListRequestWire {
     self.init(pullRequestId: model.pullRequestID, forceRefresh: model.forceRefresh)
   }
 }
+
+extension ReviewFilePatch {
+  init(wire: ReviewFilePatchWire) {
+    self.init(
+      path: wire.path,
+      patch: wire.patch,
+      status: ReviewFileChangeType(rawValue: wire.status.rawValue) ?? .other,
+      additions: wire.additions,
+      deletions: wire.deletions,
+      truncated: wire.truncated,
+      etag: wire.etag,
+      servedBy: ReviewFileServedBy(rawValue: wire.servedBy.rawValue) ?? .githubRest,
+      fetchedAt: wire.fetchedAt,
+      headRefOid: wire.headRefOid
+    )
+  }
+}
+
+extension ReviewsFilesPatchResponse {
+  init(wire: ReviewsFilesPatchResponseWire) {
+    self.init(
+      pullRequestID: wire.pullRequestId,
+      patches: wire.patches.map(ReviewFilePatch.init(wire:)),
+      drifted: wire.drifted,
+      currentHeadRefOid: wire.currentHeadRefOid,
+      fetchedAt: wire.fetchedAt,
+      rateLimitSnapshot: wire.rateLimitSnapshot.map(ReviewsRateLimitSnapshot.init(wire:))
+    )
+  }
+}
+
+extension ReviewsFilesPatchRequestWire {
+  init(_ model: ReviewsFilesPatchRequest) {
+    self.init(
+      pullRequestId: model.pullRequestID,
+      headRefOidExpected: model.headRefOidExpected,
+      paths: model.paths,
+      number: model.number,
+      repositoryFullName: model.repositoryFullName,
+      baseRefOidExpected: model.baseRefOidExpected,
+      headRefName: model.headRefName,
+      baseRefName: model.baseRefName,
+      largeDiffStrategy: model.largeDiffStrategy
+        .map { FilesLargeDiffStrategyWire(rawValue: $0.rawValue) ?? .autoLocalClone }
+    )
+  }
+}

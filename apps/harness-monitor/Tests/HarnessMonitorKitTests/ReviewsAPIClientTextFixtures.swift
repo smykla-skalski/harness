@@ -469,3 +469,33 @@ let sampleReviewsFilesListResponseText =
     }
   }
   """
+
+let sampleReviewsFilesPatchResponseText =
+  """
+  {
+    "pull_request_id": "PR_kwReview1",
+    "patches": [
+      {
+        "path": "src/main.rs",
+        "patch": "@@ -1 +1 @@\\n-old\\n+new\\n",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "truncated": false,
+        "etag": "abc-etag",
+        "served_by": "local_clone",
+        "fetched_at": "2026-05-22T10:00:00Z",
+        "head_ref_oid": "abc123"
+      }
+    ],
+    "drifted": false,
+    "current_head_ref_oid": "abc123",
+    "fetched_at": "2026-05-22T10:00:01Z",
+    "rate_limit_snapshot": {
+      "remaining": 4800,
+      "limit": 5000,
+      "reset_at": "2026-05-22T11:00:00Z",
+      "cost": 2
+    }
+  }
+  """
