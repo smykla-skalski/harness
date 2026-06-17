@@ -2,32 +2,45 @@ import Foundation
 
 extension HarnessMonitorAPIClient {
   public func taskBoardItems(status: TaskBoardStatus? = nil) async throws -> [TaskBoardItem] {
-    let response: TaskBoardListItemsResponse = try await get(
+    let response: TaskBoardListItemsResponseWire = try await get(
       "/v1/task-board/items",
-      queryItems: taskBoardQueryItems(status: status)
+      queryItems: taskBoardQueryItems(status: status),
+      decoder: PolicyWireCoding.decoder
     )
-    return response.items
+    return response.items.map(TaskBoardItem.init(wire:))
   }
 
   public func taskBoardItem(id: String) async throws -> TaskBoardItem {
-    try await get("/v1/task-board/items/\(id)")
+    let wire: TaskBoardItemWire = try await get(
+      "/v1/task-board/items/\(id)", decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardItem(wire: wire)
   }
 
   public func createTaskBoardItem(
     request: TaskBoardCreateItemRequest
   ) async throws -> TaskBoardItem {
-    try await post("/v1/task-board/items", body: request)
+    let wire: TaskBoardItemWire = try await post(
+      "/v1/task-board/items", body: request, decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardItem(wire: wire)
   }
 
   public func updateTaskBoardItem(
     id: String,
     request: TaskBoardUpdateItemRequest
   ) async throws -> TaskBoardItem {
-    try await put("/v1/task-board/items/\(id)", body: request)
+    let wire: TaskBoardItemWire = try await put(
+      "/v1/task-board/items/\(id)", body: request, decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardItem(wire: wire)
   }
 
   public func deleteTaskBoardItem(id: String) async throws -> TaskBoardItem {
-    try await delete("/v1/task-board/items/\(id)")
+    let wire: TaskBoardItemWire = try await delete(
+      "/v1/task-board/items/\(id)", decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardItem(wire: wire)
   }
 
   public func beginTaskBoardPlan(id: String) async throws -> TaskBoardPlanningResponse {

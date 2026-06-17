@@ -3,12 +3,12 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-/// Wire-contract for the core TaskBoardItem and its nested graph, generated from
-/// src/task_board/types.rs. The rich hand TaskBoardItem decodes via
-/// convertFromSnakeCase today; this *Wire type owns the explicit snake_case decode
-/// through the plain decoder, references the adopted TaskBoardStatus/TaskBoardPriority
-/// /TaskBoardAgentMode enums bare, and faithfully carries the fields the hand model
-/// renames or drops (sync_state, changed workflow optionality). generate-only.
+/// Wire-contract and mapping for the core TaskBoardItem and its nested graph,
+/// generated from src/task_board/types.rs. The *Wire type owns the explicit
+/// snake_case decode through the plain decoder; the item endpoints now decode it and
+/// map to the rich hand TaskBoardItem. It references the adopted TaskBoardStatus
+/// /TaskBoardPriority/TaskBoardAgentMode enums bare and faithfully carries the fields
+/// the hand model renames or drops (sync_state, optional workflow).
 @Suite("Task board item wire type")
 struct TaskBoardItemWireDecodingTests {
   private let decoder = PolicyWireCoding.decoder
@@ -61,6 +61,53 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.workflow == nil)
     #expect(item.usage.inputTokens == nil)
     #expect(item.deletedAt == nil)
+  }
+
+  @Test("maps a decoded wire item to the rich hand model")
+  func mapsFullItemToHandModel() throws {
+    let wire = try decoder.decode(
+      TaskBoardItemWire.self, from: Data(fullItemPayloadFixture.utf8)
+    )
+    let item = TaskBoardItem(wire: wire)
+
+    #expect(item.id == "task-1")
+    #expect(item.status == .inProgress)
+    #expect(item.priority == .high)
+    #expect(item.agentMode == .interactive)
+    #expect(item.externalRefs.first?.provider == .gitHub)
+    #expect(item.externalRefs.first?.url == "https://example.com/123")
+    #expect(item.planning.approvedBy == "lead")
+    let workflow = try #require(item.workflow)
+    #expect(workflow.status == .running)
+    #expect(workflow.attempts == 2)
+    #expect(workflow.prNumber == 42)
+    #expect(item.usage.inputTokens == 100)
+  }
+
+  @Test("maps an omitted wire workflow to a nil hand workflow")
+  func mapsMinimalItemWorkflowToNil() throws {
+    let wire = try decoder.decode(
+      TaskBoardItemWire.self,
+      from: Data(
+        #"{"schema_version": 1, "id": "task-2", "title": "Minimal", "created_at": "a", "updated_at": "b"}"#
+          .utf8
+      )
+    )
+    let item = TaskBoardItem(wire: wire)
+    #expect(item.workflow == nil)
+    #expect(item.status == .new)
+  }
+
+  @Test("maps the items-list response wrapper")
+  func mapsListResponseWrapper() throws {
+    let json = #"{"items": [\#(fullItemPayloadFixture)]}"#
+    let wire = try decoder.decode(
+      TaskBoardListItemsResponseWire.self, from: Data(json.utf8)
+    )
+    let items = wire.items.map(TaskBoardItem.init(wire:))
+    #expect(items.count == 1)
+    #expect(items.first?.id == "task-1")
+    #expect(items.first?.workflow?.status == .running)
   }
 }
 

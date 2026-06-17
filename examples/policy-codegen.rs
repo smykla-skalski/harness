@@ -1126,6 +1126,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardWorkflowState",
     "TaskBoardWorkflowStatus",
     "TaskUsage",
+    // task_board.rs items-list response wrapper (Swift hand TaskBoardListItemsResponse);
+    // wraps [TaskBoardItemWire] for the /v1/task-board/items decode reroute.
+    "TaskBoardListItemsResponse",
     // task_board machines.rs host machine: Swift hand is TaskBoardHostMachine
     // (renamed); agent_modes references the adopted TaskBoardAgentMode bare.
     "Machine",
@@ -2093,10 +2096,11 @@ const TASK_BOARD_SUMMARY_EMIT_ONLY: &[&str] = &[
     "TaskBoardMachineSummary",
 ];
 const TASK_BOARD_ITEM_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardItemWireTypes.generated.swift";
-// The core TaskBoardItem and its nested structs/enums from types.rs. References
-// the adopted TaskBoardStatus/TaskBoardPriority/TaskBoardAgentMode enums bare; the
-// two closed enums here (ExternalRefProvider, TaskBoardWorkflowStatus) take the
-// suffix. generate-only - the rich hand models keep their renamed shape.
+// The core TaskBoardItem and its nested structs/enums from types.rs, plus the
+// items-list response wrapper from the protocol facade. References the adopted
+// TaskBoardStatus/TaskBoardPriority/TaskBoardAgentMode enums bare; the two closed
+// enums here (ExternalRefProvider, TaskBoardWorkflowStatus) take the suffix. The
+// *Wire types own the faithful daemon decode; the rich hand models keep their shape.
 const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskBoardItem",
     "ExternalRef",
@@ -2106,6 +2110,7 @@ const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
     "TaskBoardWorkflowState",
     "TaskBoardWorkflowStatus",
     "TaskUsage",
+    "TaskBoardListItemsResponse",
 ];
 const TASK_BOARD_MACHINES_SOURCE: &str = include_str!("../src/task_board/machines.rs");
 const TASK_BOARD_MACHINES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardMachineWireTypes.generated.swift";
@@ -2288,9 +2293,9 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: TASK_BOARD_ITEM_OUTPUT,
-            description: "the Rust task-board item and its planning, workflow and usage types",
+            description: "the Rust task-board item, its nested graph and the items-list response",
             defaults: &[],
-            sources: &[TASK_BOARD_TYPES_SOURCE],
+            sources: &[TASK_BOARD_TYPES_SOURCE, TASK_BOARD_PROTOCOL_SOURCE],
         },
         GeneratedModule {
             output: TASK_BOARD_MACHINES_OUTPUT,

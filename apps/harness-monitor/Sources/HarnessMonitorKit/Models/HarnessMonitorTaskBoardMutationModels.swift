@@ -61,10 +61,6 @@ public struct TaskBoardUpdateItemRequest: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardListItemsResponse: Codable, Equatable, Sendable {
-  public let items: [TaskBoardItem]
-}
-
 public struct TaskBoardPlanningTransition: Codable, Equatable, Sendable {
   public let boardItemId: String
   public let fromStatus: TaskBoardStatus

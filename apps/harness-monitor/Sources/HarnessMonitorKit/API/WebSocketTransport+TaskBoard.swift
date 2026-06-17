@@ -4,8 +4,8 @@ extension WebSocketTransport {
   public func taskBoardItems(status: TaskBoardStatus? = nil) async throws -> [TaskBoardItem] {
     let params = try encodeParams(TaskBoardListItemsRequest(status: status), extra: [:])
     let value = try await rpc(method: .taskBoardList, params: params)
-    let response: TaskBoardListItemsResponse = try decode(value)
-    return response.items
+    let response: TaskBoardListItemsResponseWire = try decodePolicyWire(value)
+    return response.items.map(TaskBoardItem.init(wire:))
   }
 
   public func taskBoardItem(id: String) async throws -> TaskBoardItem {
@@ -13,7 +13,8 @@ extension WebSocketTransport {
       method: .taskBoardGet,
       params: .object(["id": .string(id)])
     )
-    return try decode(value)
+    let wire: TaskBoardItemWire = try decodePolicyWire(value)
+    return TaskBoardItem(wire: wire)
   }
 
   public func createTaskBoardItem(
@@ -21,7 +22,8 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardItem {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardCreate, params: params)
-    return try decode(value)
+    let wire: TaskBoardItemWire = try decodePolicyWire(value)
+    return TaskBoardItem(wire: wire)
   }
 
   public func updateTaskBoardItem(
@@ -30,7 +32,8 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardItem {
     let params = try encodeParams(request, extra: ["id": .string(id)])
     let value = try await rpc(method: .taskBoardUpdate, params: params)
-    return try decode(value)
+    let wire: TaskBoardItemWire = try decodePolicyWire(value)
+    return TaskBoardItem(wire: wire)
   }
 
   public func deleteTaskBoardItem(id: String) async throws -> TaskBoardItem {
@@ -38,7 +41,8 @@ extension WebSocketTransport {
       method: .taskBoardDelete,
       params: .object(["id": .string(id)])
     )
-    return try decode(value)
+    let wire: TaskBoardItemWire = try decodePolicyWire(value)
+    return TaskBoardItem(wire: wire)
   }
 
   public func beginTaskBoardPlan(id: String) async throws -> TaskBoardPlanningResponse {
