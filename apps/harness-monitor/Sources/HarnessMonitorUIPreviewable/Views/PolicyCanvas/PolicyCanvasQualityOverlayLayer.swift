@@ -307,11 +307,22 @@ final class PolicyCanvasQualityOverlayView: NSView {
     let rings = NSBezierPath()
     let crosses = NSBezierPath()
     let radius: CGFloat = 5
+    // Bow the connector and its X off the port column toward the node body. The X
+    // used to sit on the straight midpoint of the two ports, which for a
+    // non-adjacent crossed pair lands exactly on the intermediate port dot between
+    // them - reading as a mark on the wrong port. Nudged inward it clears every
+    // dot and the dashed connector visibly routes around them.
+    let bow: CGFloat = PolicyCanvasLayout.portDiameter
     for violation in report.crossedPorts {
+      let mid = CGPoint(
+        x: (violation.pointA.x + violation.pointB.x) / 2,
+        y: (violation.pointA.y + violation.pointB.y) / 2
+      )
+      let apex = policyCanvasCrossedPortApex(mid: mid, side: violation.side, bow: bow)
       let markRect = lineDirtyRect(
         from: violation.pointA,
         to: violation.pointB,
-        padding: radius + 5
+        padding: bow + radius + 2
       )
       guard
         qualityMarkIntersectsDirtyRect(
@@ -322,7 +333,8 @@ final class PolicyCanvasQualityOverlayView: NSView {
       else {
         continue
       }
-      appendLine(to: connectors, from: violation.pointA, to: violation.pointB)
+      appendLine(to: connectors, from: violation.pointA, to: apex)
+      appendLine(to: connectors, from: apex, to: violation.pointB)
       for point in [violation.pointA, violation.pointB] {
         rings.append(
           NSBezierPath(
@@ -335,25 +347,42 @@ final class PolicyCanvasQualityOverlayView: NSView {
           )
         )
       }
-      let mid = CGPoint(
-        x: (violation.pointA.x + violation.pointB.x) / 2,
-        y: (violation.pointA.y + violation.pointB.y) / 2
-      )
       let arm: CGFloat = 5
       appendLine(
         to: crosses,
-        from: CGPoint(x: mid.x - arm, y: mid.y - arm),
-        to: CGPoint(x: mid.x + arm, y: mid.y + arm)
+        from: CGPoint(x: apex.x - arm, y: apex.y - arm),
+        to: CGPoint(x: apex.x + arm, y: apex.y + arm)
       )
       appendLine(
         to: crosses,
-        from: CGPoint(x: mid.x - arm, y: mid.y + arm),
-        to: CGPoint(x: mid.x + arm, y: mid.y - arm)
+        from: CGPoint(x: apex.x - arm, y: apex.y + arm),
+        to: CGPoint(x: apex.x + arm, y: apex.y - arm)
       )
     }
     policyCanvasStroke(connectors, color: warning, alpha: 0.45, lineWidth: 1, dash: [3, 3])
     policyCanvasStroke(rings, color: warning, lineWidth: 1.5)
     policyCanvasStroke(crosses, color: warning, lineWidth: 2)
+  }
+
+  /// The crossed-port X sits here: the connector midpoint nudged a port diameter
+  /// off the column toward the node body, so it never overlaps an intermediate
+  /// port dot. The ports stack along the side, so the nudge is perpendicular -
+  /// inward in x for a leading/trailing side, inward in y for top/bottom.
+  private func policyCanvasCrossedPortApex(
+    mid: CGPoint,
+    side: PolicyCanvasPortSide,
+    bow: CGFloat
+  ) -> CGPoint {
+    switch side {
+    case .leading:
+      CGPoint(x: mid.x + bow, y: mid.y)
+    case .trailing:
+      CGPoint(x: mid.x - bow, y: mid.y)
+    case .top:
+      CGPoint(x: mid.x, y: mid.y + bow)
+    case .bottom:
+      CGPoint(x: mid.x, y: mid.y - bow)
+    }
   }
 
   private func drawPortSpacing(error: Color, warning: Color, dirtyRect: CGRect) {
