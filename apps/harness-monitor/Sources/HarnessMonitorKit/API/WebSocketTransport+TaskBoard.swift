@@ -107,7 +107,8 @@ extension WebSocketTransport {
   {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardEvaluate, params: params)
-    return try decode(value)
+    let wire: TaskBoardEvaluationSummaryWire = try decodePolicyWire(value)
+    return TaskBoardEvaluationSummary(wire: wire)
   }
 
   public func auditTaskBoard(status: TaskBoardStatus? = nil) async throws -> TaskBoardAuditSummary {

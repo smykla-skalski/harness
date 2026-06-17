@@ -1134,6 +1134,13 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // /TaskBoardPlanningResponse.
     "PlanningTransition",
     "TaskBoardPlanningResponse",
+    // task_board evaluation.rs summary + record + outcome + signal-failure. The record
+    // carries the rerouted TaskBoardItemWire and references TaskStatus/TaskBoardStatus
+    // /TaskBoardWorkflowStatus bare; hands keep their renamed shape (drop signal_failures).
+    "TaskBoardEvaluationSummary",
+    "TaskBoardEvaluationRecord",
+    "TaskBoardEvaluationOutcome",
+    "EvaluationSignalFailure",
     // task_board machines.rs host machine: Swift hand is TaskBoardHostMachine
     // (renamed); agent_modes references the adopted TaskBoardAgentMode bare.
     "Machine",
@@ -2128,6 +2135,18 @@ const TASK_BOARD_PLANNING_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMo
 // which carries the rerouted TaskBoardItemWire. PlanApprovalGate (struct-variant
 // tagged) and the rest of the protocol facade are excluded by the allow-list.
 const TASK_BOARD_PLANNING_EMIT_ONLY: &[&str] = &["PlanningTransition", "TaskBoardPlanningResponse"];
+const TASK_BOARD_EVALUATION_SOURCE: &str = include_str!("../src/task_board/evaluation.rs");
+const TASK_BOARD_EVALUATION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardEvaluationWireTypes.generated.swift";
+// The evaluate-endpoint summary, its records, outcome enum and signal-failure
+// (evaluation.rs). The record carries the rerouted TaskBoardItemWire and references
+// TaskStatus/TaskBoardStatus/TaskBoardWorkflowStatus bare. The build helpers and the
+// rest of evaluation.rs are excluded by the allow-list.
+const TASK_BOARD_EVALUATION_EMIT_ONLY: &[&str] = &[
+    "TaskBoardEvaluationSummary",
+    "TaskBoardEvaluationRecord",
+    "TaskBoardEvaluationOutcome",
+    "EvaluationSignalFailure",
+];
 const TASK_BOARD_CANVAS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardPolicyCanvasWireTypes.generated.swift";
 // The policy-canvas read types in the task_board.rs facade. The rest of that file
 // (flatten, alias and struct-variant-tagged types) is excluded by the allow-list,
@@ -2320,6 +2339,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[TASK_BOARD_PLANNING_SOURCE, TASK_BOARD_PROTOCOL_SOURCE],
         },
+        GeneratedModule {
+            output: TASK_BOARD_EVALUATION_OUTPUT,
+            description: "the Rust task-board evaluation summary, records and outcome",
+            defaults: &[],
+            sources: &[TASK_BOARD_EVALUATION_SOURCE],
+        },
     ]
 }
 
@@ -2346,6 +2371,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_ITEM_OUTPUT => TASK_BOARD_ITEM_EMIT_ONLY,
         TASK_BOARD_MACHINES_OUTPUT => TASK_BOARD_MACHINES_EMIT_ONLY,
         TASK_BOARD_PLANNING_OUTPUT => TASK_BOARD_PLANNING_EMIT_ONLY,
+        TASK_BOARD_EVALUATION_OUTPUT => TASK_BOARD_EVALUATION_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
