@@ -665,7 +665,54 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "CodexRunEvent",
     "CodexRunSnapshot",
     "CodexApprovalRequestedPayload",
+    "RoleChangeRequest",
+    "AgentRemoveRequest",
+    "LeaderTransferRequest",
+    "TaskCreateRequest",
+    "TaskDeleteRequest",
+    "TaskAssignRequest",
+    "TaskDropRequest",
+    "TaskDropTarget",
+    "TaskQueuePolicyRequest",
+    "TaskUpdateRequest",
+    "TaskCheckpointRequest",
+    "SessionEndRequest",
+    "SessionArchiveRequest",
+    "SignalSendRequest",
+    "ObserveSessionRequest",
+    "SessionStartRequest",
+    "SignalCancelRequest",
+    "TaskSubmitForReviewRequest",
+    "TaskClaimReviewRequest",
+    "TaskSubmitReviewRequest",
+    "TaskRespondReviewRequest",
+    "TaskArbitrateRequest",
+    "ImproverApplyRequest",
+    "SessionArchiveResponse",
+    "AdoptSessionRequest",
 ];
+
+/// Rust serde types the generator must NOT emit for a module even though they
+/// carry a serde derive: they reference a daemon-only type with no Swift mirror
+/// (e.g. `SessionMutationResponse` -> `SessionState`), or the Swift app does not
+/// model that endpoint at all. Empty until a module needs an exclusion; with it
+/// empty every module stays byte-identical.
+const SKIP_TYPES: &[&str] = &[
+    // session_requests.rs: the seven types with no Swift hand model.
+    // SessionMutationResponse also references the unmirrored Rust `SessionState`.
+    "SessionLeaveRequest",
+    "SessionTitleRequest",
+    "SessionJoinRequest",
+    "SignalAckRequest",
+    "SessionMutationResponse",
+    "AgentRuntimeSessionRegistrationRequest",
+    "AgentRuntimeSessionRegistrationResponse",
+];
+
+/// Whether a Rust type is on the generator's skip list (see `SKIP_TYPES`).
+fn is_skipped_type(rust_name: &str) -> bool {
+    SKIP_TYPES.contains(&rust_name)
+}
 
 /// The Swift name for a Rust wire type: the bare name, or `{name}Wire` when the
 /// app owns the bare name for a rich model. Applied to both type definitions
@@ -1154,7 +1201,9 @@ fn emit_source_decls(
     let file = syn::parse_file(source).expect("policy source parses");
     for item in file.items {
         match item {
-            Item::Struct(item) if has_serde(&item.attrs) => {
+            Item::Struct(item)
+                if has_serde(&item.attrs) && !is_skipped_type(&item.ident.to_string()) =>
+            {
                 if let Some(spec) = build_struct(&item, defaults, symbols) {
                     out.push('\n');
                     emit_struct(out, &spec);
@@ -1166,7 +1215,9 @@ fn emit_source_decls(
                     );
                 }
             }
-            Item::Enum(item) if has_serde(&item.attrs) => {
+            Item::Enum(item)
+                if has_serde(&item.attrs) && !is_skipped_type(&item.ident.to_string()) =>
+            {
                 out.push('\n');
                 emit_enum_item(out, &item, defaults, symbols);
             }
@@ -1221,6 +1272,11 @@ const AGENT_TUI_SCREEN_SOURCE: &str = include_str!("../src/daemon/agent_tui/scre
 // TimelineEntry are referenced-not-defined, so they stay unsuffixed (the hand
 // Swift types).
 const CODEX_SOURCE: &str = include_str!("../src/daemon/protocol/codex.rs");
+// session_requests: clean serde request/response structs. Seven types are
+// SKIP_TYPES (no Swift mirror); the rest reference session::types enums that
+// already exist hand-written in Swift, so they stay unsuffixed references.
+const SESSION_REQUESTS_SOURCE: &str =
+    include_str!("../src/daemon/protocol/session_requests.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, an optional defaults source informing decode defaults, a short
@@ -1295,6 +1351,13 @@ fn modules() -> Vec<GeneratedModule> {
             description: "the Rust codex run protocol",
             defaults: Some(CODEX_SOURCE),
             sources: &[CODEX_SOURCE],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionRequestsWireTypes.generated.swift",
+            description: "the Rust session request protocol",
+            defaults: Some(SESSION_REQUESTS_SOURCE),
+            sources: &[SESSION_REQUESTS_SOURCE],
         },
     ]
 }
