@@ -62,4 +62,23 @@ struct PolicyCanvasPortDistributionTests {
   @Test func singleDotIsNeverUneven() {
     #expect(report(attachments: ["e1": 48]).count(for: .portUneven) == 0)
   }
+
+  @Test func tallNodeWithEvenlySpreadPortsIsClean() {
+    // A node sized by port demand is taller than the default node height. Its six
+    // evenly-spread dots sit at portY(index, count: 6, nodeHeight: 159) =
+    // 12, 39, 66, 93, 120, 147 - the Action-gate-14 trailing fan. The measure must
+    // judge them against the node's ACTUAL height, not the default, or every
+    // interior dot reads as mis-placed.
+    let tall = CGRect(x: 400, y: 0, width: 168, height: 159)
+    let attachments: [String: CGFloat] = [
+      "e0": 12, "e1": 39, "e2": 66, "e3": 93, "e4": 120, "e5": 147,
+    ]
+    let result = policyCanvasMeasureGraphQuality(
+      nodeFramesByID: ["t": tall],
+      groupTitleFrames: [],
+      edges: attachments.keys.sorted().map(edge),
+      routes: attachments.reduce(into: [:]) { $0[$1.key] = route(attach: $1.value) }
+    )
+    #expect(result.count(for: .portUneven) == 0)
+  }
 }

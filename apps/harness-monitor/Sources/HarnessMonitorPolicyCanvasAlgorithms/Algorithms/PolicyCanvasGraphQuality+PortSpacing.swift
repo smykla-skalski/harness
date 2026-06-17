@@ -79,10 +79,13 @@ func policyCanvasMeasurePortSpacing(
 /// Flag the dots on one node side that sit far from the canonical evenly-spread
 /// slot for their position. The k dots on a side should land at
 /// `PolicyCanvasLayout.portY`/`portX(index:count:)` for `count = k` - the same
-/// centered, equal-step distribution the node uses for its declared ports. A dot
-/// more than `tolerance` off its slot (dots clustered at one end, crammed toward
-/// the center, or unevenly gapped) is reported, carrying the ideal slot as
-/// `otherPoint` so the overlay can show where it should have gone.
+/// centered, equal-step distribution the node uses for its declared ports. The
+/// slot is computed against the node's ACTUAL frame size, not the default node
+/// size: a node sized by port demand is taller than the default, and judging its
+/// dots against the default height would read every evenly-spread interior dot as
+/// mis-placed. A dot more than `tolerance` off its slot (dots clustered at one
+/// end, crammed toward the center, or unevenly gapped) is reported, carrying the
+/// ideal slot as `otherPoint` so the overlay can show where it should have gone.
 private func policyCanvasPortDistributionViolations(
   sorted: [PolicyCanvasResolvedMarker],
   nodeFramesByID: [String: CGRect],
@@ -100,8 +103,8 @@ private func policyCanvasPortDistributionViolations(
     let idealAlong =
       base
       + (horizontalSide
-        ? PolicyCanvasLayout.portY(index: index, count: count)
-        : PolicyCanvasLayout.portX(index: index, count: count))
+        ? PolicyCanvasLayout.portY(index: index, count: count, nodeHeight: frame.height)
+        : PolicyCanvasLayout.portX(index: index, count: count, nodeWidth: frame.width))
     let deviation = abs(marker.alongAxis - idealAlong)
     guard deviation > tolerance else {
       continue
