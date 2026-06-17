@@ -1155,21 +1155,25 @@ fn serde_field(attrs: &[Attribute]) -> SerdeField {
     SerdeField { rename, default_fn, has_default, flatten }
 }
 
-/// Parse `defaults.rs`, mapping each zero-argument default function to the Swift
-/// literal it returns. The `is_default_*` predicate helpers take a parameter and
-/// are skipped.
-fn parse_defaults(source: &str, symbols: &SymbolTable) -> DefaultLiterals {
-    let file = syn::parse_file(source).expect("defaults.rs parses");
+/// Parse the defaults sources, mapping each zero-argument default function to the
+/// Swift literal it returns. The `is_default_*` predicate helpers take a parameter
+/// and are skipped. A module may name several defaults files when its default fns
+/// are split across modules (e.g. files-core resolves `preview_line_limit` from
+/// files/preview.rs alongside its mod.rs defaults).
+fn parse_defaults(sources: &[&str], symbols: &SymbolTable) -> DefaultLiterals {
     let mut literals = DefaultLiterals::new();
-    for item in file.items {
-        let Item::Fn(function) = item else {
-            continue;
-        };
-        if !function.sig.inputs.is_empty() {
-            continue;
-        }
-        if let Some(literal) = block_literal(&function.block, symbols) {
-            literals.insert(function.sig.ident.to_string(), literal);
+    for source in sources {
+        let file = syn::parse_file(source).expect("defaults.rs parses");
+        for item in file.items {
+            let Item::Fn(function) = item else {
+                continue;
+            };
+            if !function.sig.inputs.is_empty() {
+                continue;
+            }
+            if let Some(literal) = block_literal(&function.block, symbols) {
+                literals.insert(function.sig.ident.to_string(), literal);
+            }
         }
     }
     literals
@@ -1571,13 +1575,13 @@ const REVIEWS_TYPES_SOURCE: &str = include_str!("../src/reviews/types.rs");
 const REVIEWS_LOGIC_SOURCE: &str = include_str!("../src/reviews/logic.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
-/// emitted, an optional defaults source informing decode defaults, a short
+/// emitted, zero or more defaults sources informing decode defaults, a short
 /// description woven into the generated header, and the checked-in output path
 /// (relative to the crate root).
 struct GeneratedModule {
     output: &'static str,
     description: &'static str,
-    defaults: Option<&'static str>,
+    defaults: &'static [&'static str],
     sources: &'static [&'static str],
 }
 
@@ -1590,7 +1594,7 @@ fn modules() -> Vec<GeneratedModule> {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorPolicyModels/Generated/PolicyGraphWireTypes.generated.swift",
             description: "the Rust policy-graph wire types",
-            defaults: Some(POLICY_DEFAULTS_SOURCE),
+            defaults: &[POLICY_DEFAULTS_SOURCE],
             sources: &[
                 POLICY_IDS_SOURCE,
                 POLICY_SOURCE,
@@ -1602,35 +1606,35 @@ fn modules() -> Vec<GeneratedModule> {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitWireTypes.generated.swift",
             description: "the Rust task-board git identity sources",
-            defaults: Some(GIT_IDENTITY_DEFAULTS_SOURCE),
+            defaults: &[GIT_IDENTITY_DEFAULTS_SOURCE],
             sources: &[GIT_IDENTITY_DEFAULTS_SOURCE],
         },
         GeneratedModule {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/OpenRouterWireTypes.generated.swift",
             description: "the Rust OpenRouter model catalog",
-            defaults: None,
+            defaults: &[],
             sources: &[OPENROUTER_SOURCE],
         },
         GeneratedModule {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/VoiceWireTypes.generated.swift",
             description: "the Rust voice session protocol",
-            defaults: Some(VOICE_SOURCE),
+            defaults: &[VOICE_SOURCE],
             sources: &[VOICE_SOURCE],
         },
         GeneratedModule {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AuditWireTypes.generated.swift",
             description: "the Rust audit events protocol",
-            defaults: Some(AUDIT_SOURCE),
+            defaults: &[AUDIT_SOURCE],
             sources: &[AUDIT_SOURCE],
         },
         GeneratedModule {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentTuiWireTypes.generated.swift",
             description: "the Rust managed terminal agent protocol",
-            defaults: Some(AGENT_TUI_MODEL_SOURCE),
+            defaults: &[AGENT_TUI_MODEL_SOURCE],
             sources: &[
                 AGENT_TUI_MOD_SOURCE,
                 AGENT_TUI_SCREEN_SOURCE,
@@ -1641,28 +1645,28 @@ fn modules() -> Vec<GeneratedModule> {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/CodexWireTypes.generated.swift",
             description: "the Rust codex run protocol",
-            defaults: Some(CODEX_SOURCE),
+            defaults: &[CODEX_SOURCE],
             sources: &[CODEX_SOURCE],
         },
         GeneratedModule {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionRequestsWireTypes.generated.swift",
             description: "the Rust session request protocol",
-            defaults: Some(SESSION_REQUESTS_SOURCE),
+            defaults: &[SESSION_REQUESTS_SOURCE],
             sources: &[SESSION_REQUESTS_SOURCE],
         },
         GeneratedModule {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsEnums.generated.swift",
             description: "the Rust reviews wire enums",
-            defaults: None,
+            defaults: &[],
             sources: &[REVIEWS_ENUMS_SOURCE],
         },
         GeneratedModule {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsLeavesWireTypes.generated.swift",
             description: "the Rust reviews leaf request/response types",
-            defaults: None,
+            defaults: &[],
             sources: &[
                 REVIEWS_AVATAR_SOURCE,
                 REVIEWS_BODY_UPDATE_SOURCE,
@@ -1674,7 +1678,7 @@ fn modules() -> Vec<GeneratedModule> {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsFilesWireTypes.generated.swift",
             description: "the Rust reviews file list, patch, preview, blob and viewed types",
-            defaults: Some(REVIEWS_FILES_MOD_SOURCE),
+            defaults: &[REVIEWS_FILES_MOD_SOURCE],
             sources: &[
                 REVIEWS_FILES_MOD_SOURCE,
                 REVIEWS_FILES_BLOB_SOURCE,
@@ -1685,14 +1689,14 @@ fn modules() -> Vec<GeneratedModule> {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsTimelineWireTypes.generated.swift",
             description: "the Rust reviews pull request timeline types",
-            defaults: None,
+            defaults: &[],
             sources: &[REVIEWS_TIMELINE_TYPES_SOURCE, REVIEWS_TIMELINE_MOD_SOURCE],
         },
         GeneratedModule {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsTypesWireTypes.generated.swift",
             description: "the Rust reviews query, item, check, action and policy types",
-            defaults: Some(REVIEWS_LOGIC_SOURCE),
+            defaults: &[REVIEWS_LOGIC_SOURCE],
             sources: &[REVIEWS_TYPES_SOURCE],
         },
     ]
@@ -1704,7 +1708,7 @@ fn modules() -> Vec<GeneratedModule> {
 /// only the current file's syntax tree and one descriptor are live at once.
 fn generate_module(module: &GeneratedModule) -> String {
     let symbols = build_symbol_table(module.sources);
-    let defaults = parse_defaults(module.defaults.unwrap_or(""), &symbols);
+    let defaults = parse_defaults(module.defaults, &symbols);
     let mut out = format!(
         "// Generated by examples/policy-codegen.rs from {}\n\
          // Do not edit by hand - rerun: mise run codegen\n\n\
@@ -2294,7 +2298,7 @@ fn default_rows() -> u16 { DEFAULT_ROWS }
 fn default_label() -> String { \"draft\".to_string() }
 ";
         let symbols = build_symbol_table(&[source]);
-        let defaults = parse_defaults(source, &symbols);
+        let defaults = parse_defaults(&[source], &symbols);
 
         // Enum-variant body -> the Swift enum case.
         assert_eq!(defaults.get("default_role"), Some(&".worker".to_string()));
