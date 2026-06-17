@@ -50,7 +50,8 @@ extension WebSocketTransport {
       method: .taskBoardPlanBegin,
       params: .object(["id": .string(id)])
     )
-    return try decode(value)
+    let wire: TaskBoardPlanningResponseWire = try decodePolicyWire(value)
+    return TaskBoardPlanningResponse(wire: wire)
   }
 
   public func submitTaskBoardPlan(
@@ -59,7 +60,8 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardPlanningResponse {
     let params = try encodeParams(request, extra: ["id": .string(id)])
     let value = try await rpc(method: .taskBoardPlanSubmit, params: params)
-    return try decode(value)
+    let wire: TaskBoardPlanningResponseWire = try decodePolicyWire(value)
+    return TaskBoardPlanningResponse(wire: wire)
   }
 
   public func approveTaskBoardPlan(
@@ -68,7 +70,8 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardPlanningResponse {
     let params = try encodeParams(request, extra: ["id": .string(id)])
     let value = try await rpc(method: .taskBoardPlanApprove, params: params)
-    return try decode(value)
+    let wire: TaskBoardPlanningResponseWire = try decodePolicyWire(value)
+    return TaskBoardPlanningResponse(wire: wire)
   }
 
   public func revokeTaskBoardPlan(
@@ -77,7 +80,8 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardPlanningResponse {
     let params = try encodeParams(request, extra: ["id": .string(id)])
     let value = try await rpc(method: .taskBoardPlanRevoke, params: params)
-    return try decode(value)
+    let wire: TaskBoardPlanningResponseWire = try decodePolicyWire(value)
+    return TaskBoardPlanningResponse(wire: wire)
   }
 
   public func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary {

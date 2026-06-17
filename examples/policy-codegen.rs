@@ -1129,6 +1129,11 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // task_board.rs items-list response wrapper (Swift hand TaskBoardListItemsResponse);
     // wraps [TaskBoardItemWire] for the /v1/task-board/items decode reroute.
     "TaskBoardListItemsResponse",
+    // task_board planning.rs transition + its protocol response wrapper (the response
+    // carries the rerouted TaskBoardItemWire); Swift hands are TaskBoardPlanningTransition
+    // /TaskBoardPlanningResponse.
+    "PlanningTransition",
+    "TaskBoardPlanningResponse",
     // task_board machines.rs host machine: Swift hand is TaskBoardHostMachine
     // (renamed); agent_modes references the adopted TaskBoardAgentMode bare.
     "Machine",
@@ -2117,6 +2122,12 @@ const TASK_BOARD_MACHINES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMo
 // The host Machine struct (Swift hand TaskBoardHostMachine); references the adopted
 // TaskBoardAgentMode bare. MachineRegistry is excluded by the allow-list.
 const TASK_BOARD_MACHINES_EMIT_ONLY: &[&str] = &["Machine"];
+const TASK_BOARD_PLANNING_SOURCE: &str = include_str!("../src/task_board/planning.rs");
+const TASK_BOARD_PLANNING_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardPlanningWireTypes.generated.swift";
+// The planning transition (planning.rs) and its response wrapper (protocol facade),
+// which carries the rerouted TaskBoardItemWire. PlanApprovalGate (struct-variant
+// tagged) and the rest of the protocol facade are excluded by the allow-list.
+const TASK_BOARD_PLANNING_EMIT_ONLY: &[&str] = &["PlanningTransition", "TaskBoardPlanningResponse"];
 const TASK_BOARD_CANVAS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardPolicyCanvasWireTypes.generated.swift";
 // The policy-canvas read types in the task_board.rs facade. The rest of that file
 // (flatten, alias and struct-variant-tagged types) is excluded by the allow-list,
@@ -2303,6 +2314,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[TASK_BOARD_MACHINES_SOURCE],
         },
+        GeneratedModule {
+            output: TASK_BOARD_PLANNING_OUTPUT,
+            description: "the Rust task-board planning transition and response",
+            defaults: &[],
+            sources: &[TASK_BOARD_PLANNING_SOURCE, TASK_BOARD_PROTOCOL_SOURCE],
+        },
     ]
 }
 
@@ -2328,6 +2345,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_SUMMARY_OUTPUT => TASK_BOARD_SUMMARY_EMIT_ONLY,
         TASK_BOARD_ITEM_OUTPUT => TASK_BOARD_ITEM_EMIT_ONLY,
         TASK_BOARD_MACHINES_OUTPUT => TASK_BOARD_MACHINES_EMIT_ONLY,
+        TASK_BOARD_PLANNING_OUTPUT => TASK_BOARD_PLANNING_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {

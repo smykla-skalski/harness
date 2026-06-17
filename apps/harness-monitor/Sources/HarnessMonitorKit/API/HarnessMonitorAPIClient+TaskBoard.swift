@@ -44,28 +44,48 @@ extension HarnessMonitorAPIClient {
   }
 
   public func beginTaskBoardPlan(id: String) async throws -> TaskBoardPlanningResponse {
-    try await post("/v1/task-board/items/\(id)/planning/begin", body: EmptyBody())
+    let wire: TaskBoardPlanningResponseWire = try await post(
+      "/v1/task-board/items/\(id)/planning/begin",
+      body: EmptyBody(),
+      decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardPlanningResponse(wire: wire)
   }
 
   public func submitTaskBoardPlan(
     id: String,
     request: TaskBoardPlanSubmitRequest
   ) async throws -> TaskBoardPlanningResponse {
-    try await post("/v1/task-board/items/\(id)/planning/submit", body: request)
+    let wire: TaskBoardPlanningResponseWire = try await post(
+      "/v1/task-board/items/\(id)/planning/submit",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardPlanningResponse(wire: wire)
   }
 
   public func approveTaskBoardPlan(
     id: String,
     request: TaskBoardPlanApproveRequest
   ) async throws -> TaskBoardPlanningResponse {
-    try await post("/v1/task-board/items/\(id)/planning/approve", body: request)
+    let wire: TaskBoardPlanningResponseWire = try await post(
+      "/v1/task-board/items/\(id)/planning/approve",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardPlanningResponse(wire: wire)
   }
 
   public func revokeTaskBoardPlan(
     id: String,
     request: TaskBoardPlanRevokeRequest = TaskBoardPlanRevokeRequest()
   ) async throws -> TaskBoardPlanningResponse {
-    try await post("/v1/task-board/items/\(id)/planning/revoke", body: request)
+    let wire: TaskBoardPlanningResponseWire = try await post(
+      "/v1/task-board/items/\(id)/planning/revoke",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardPlanningResponse(wire: wire)
   }
 
   public func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary {
