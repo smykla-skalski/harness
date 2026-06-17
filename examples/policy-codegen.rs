@@ -644,6 +644,12 @@ fn rust_type_to_swift(ty: &Type) -> SwiftType {
             name: map_dictionary(&segment.arguments),
             optional: false,
         },
+        // Box<T> is transparent on the wire (serde serializes it exactly like
+        // T), so unwrap to the inner type's mapping. Used for boxed enum
+        // variants like ReviewTimelineEntry::SimpleActorEvent(Box<...>).
+        "Box" => first_generic_arg(&segment.arguments)
+            .map(rust_type_to_swift)
+            .unwrap_or_else(|| SwiftType { name: "AnyCodable".to_string(), optional: false }),
         scalar => SwiftType {
             name: map_scalar(scalar),
             optional: false,
@@ -1813,6 +1819,14 @@ ExpressibleByStringLiteral, CustomStringConvertible {
             swift_type_string("HashMap<String, Option<String>>"),
             "[String: String?]"
         );
+    }
+
+    #[test]
+    fn unwraps_box_to_the_inner_type() {
+        assert_eq!(swift_type_string("Box<SimpleActorEventEntry>"), "SimpleActorEventEntry");
+        assert_eq!(swift_type_string("Box<String>"), "String");
+        assert_eq!(swift_type_string("Option<Box<ReviewEntry>>"), "ReviewEntry?");
+        assert_eq!(swift_type_string("Vec<Box<ReviewEntry>>"), "[ReviewEntry]");
     }
 
     #[test]
