@@ -403,3 +403,34 @@ let sampleReviewsAvatarResponseText =
     "fetched_at": "2026-05-22T10:00:00Z"
   }
   """
+
+let sampleReviewsBodyUpdateResponseText =
+  """
+  {
+    "pull_request_id": "PR_kwReview1",
+    "outcome": "updated",
+    "current_body": "Updated description body.",
+    "current_body_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "pr_updated_at": "2026-05-22T10:05:00Z",
+    "fetched_at": "2026-05-22T10:05:01Z"
+  }
+  """
+
+let sampleReviewsFileCommentResponseText =
+  """
+  {
+    "pull_request_id": "PR_kwReview1",
+    "thread_id": "PRRT_thread1",
+    "comment_id": "PRRC_comment1",
+    "url": "https://github.com/example/harness/pull/1#discussion_r1",
+    "fetched_at": "2026-05-22T10:06:00Z"
+  }
+  """
+
+let sampleReviewsReviewThreadResolveResponseText =
+  """
+  {
+    "thread_id": "PRRT_thread1",
+    "resolved": true
+  }
+  """

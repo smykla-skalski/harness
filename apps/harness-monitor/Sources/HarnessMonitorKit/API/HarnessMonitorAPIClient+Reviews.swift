@@ -104,7 +104,12 @@ extension HarnessMonitorAPIClient {
   public func updateReviewBody(
     request: ReviewsBodyUpdateRequest
   ) async throws -> ReviewsBodyUpdateResponse {
-    try await post("/v1/reviews/body/update", body: request)
+    let wire: ReviewsBodyUpdateResponseWire = try await post(
+      "/v1/reviews/body/update",
+      body: ReviewsBodyUpdateRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsBodyUpdateResponse(wire: wire)
   }
 
   public func commentReviews(
@@ -165,19 +170,34 @@ extension HarnessMonitorAPIClient {
   public func fetchReviewAvatar(
     request: ReviewsAvatarRequest
   ) async throws -> ReviewsAvatarResponse {
-    try await post("/v1/reviews/avatar", body: request)
+    let wire: ReviewsAvatarResponseWire = try await post(
+      "/v1/reviews/avatar",
+      body: ReviewsAvatarRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsAvatarResponse(wire: wire)
   }
 
   public func setReviewThreadResolved(
     request: ReviewsReviewThreadResolveRequest
   ) async throws -> ReviewsReviewThreadResolveResponse {
-    try await post("/v1/reviews/review-threads/resolve", body: request)
+    let wire: ReviewsReviewThreadResolveResponseWire = try await post(
+      "/v1/reviews/review-threads/resolve",
+      body: ReviewsReviewThreadResolveRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsReviewThreadResolveResponse(wire: wire)
   }
 
   public func addReviewFileComment(
     request: ReviewsFileCommentRequest
   ) async throws -> ReviewsFileCommentResponse {
-    try await post("/v1/reviews/files/comment", body: request)
+    let wire: ReviewsFileCommentResponseWire = try await post(
+      "/v1/reviews/files/comment",
+      body: ReviewsFileCommentRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsFileCommentResponse(wire: wire)
   }
 }
 

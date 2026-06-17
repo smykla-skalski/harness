@@ -128,9 +128,10 @@ extension WebSocketTransport {
   public func updateReviewBody(
     request: ReviewsBodyUpdateRequest
   ) async throws -> ReviewsBodyUpdateResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsBodyUpdateRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsBodyUpdate, params: params)
-    return try decode(value)
+    let wire: ReviewsBodyUpdateResponseWire = try decodePolicyWire(value)
+    return ReviewsBodyUpdateResponse(wire: wire)
   }
 
   public func commentReviews(
@@ -203,24 +204,27 @@ extension WebSocketTransport {
   public func fetchReviewAvatar(
     request: ReviewsAvatarRequest
   ) async throws -> ReviewsAvatarResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsAvatarRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsAvatar, params: params)
-    return try decode(value)
+    let wire: ReviewsAvatarResponseWire = try decodePolicyWire(value)
+    return ReviewsAvatarResponse(wire: wire)
   }
 
   public func setReviewThreadResolved(
     request: ReviewsReviewThreadResolveRequest
   ) async throws -> ReviewsReviewThreadResolveResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsReviewThreadResolveRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsReviewThreadsResolve, params: params)
-    return try decode(value)
+    let wire: ReviewsReviewThreadResolveResponseWire = try decodePolicyWire(value)
+    return ReviewsReviewThreadResolveResponse(wire: wire)
   }
 
   public func addReviewFileComment(
     request: ReviewsFileCommentRequest
   ) async throws -> ReviewsFileCommentResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsFileCommentRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsFilesComment, params: params)
-    return try decode(value)
+    let wire: ReviewsFileCommentResponseWire = try decodePolicyWire(value)
+    return ReviewsFileCommentResponse(wire: wire)
   }
 }

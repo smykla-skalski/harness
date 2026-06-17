@@ -104,6 +104,10 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .reviewsRefresh: fixtureJSONValue(sampleReviewsRefreshResponseText),
   .reviewsComment: fixtureJSONValue(sampleReviewsCommentResponseText),
   .reviewsAvatar: fixtureJSONValue(sampleReviewsAvatarResponseText),
+  .reviewsBodyUpdate: fixtureJSONValue(sampleReviewsBodyUpdateResponseText),
+  .reviewsFilesComment: fixtureJSONValue(sampleReviewsFileCommentResponseText),
+  .reviewsReviewThreadsResolve:
+    fixtureJSONValue(sampleReviewsReviewThreadResolveResponseText),
   .reviewsTimeline: fixtureJSONValue(sampleReviewsTimelineResponseText),
 ]
 
@@ -178,6 +182,10 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/reviews/refresh"): sampleReviewsRefreshResponseText,
     Route("/v1/reviews/comment"): sampleReviewsCommentResponseText,
     Route("/v1/reviews/avatar"): sampleReviewsAvatarResponseText,
+    Route("/v1/reviews/body/update"): sampleReviewsBodyUpdateResponseText,
+    Route("/v1/reviews/files/comment"): sampleReviewsFileCommentResponseText,
+    Route("/v1/reviews/review-threads/resolve"):
+      sampleReviewsReviewThreadResolveResponseText,
     Route("/v1/reviews/timeline"): sampleReviewsTimelineResponseText,
   ]
 
