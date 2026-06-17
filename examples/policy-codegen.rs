@@ -1141,6 +1141,25 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardEvaluationRecord",
     "TaskBoardEvaluationOutcome",
     "EvaluationSignalFailure",
+    // task_board dispatch.rs + policy.rs graph. The hands are TaskBoard*-prefixed and
+    // flatten the internally-tagged enums (DispatchReadiness/BlockReason/SessionIntent
+    // /PolicyDecision) into discriminator structs; these *Wire types own the faithful
+    // tagged-enum decode and the lifecycle/failures fields are dropped via OMITTED_WIRE_FIELDS.
+    "DispatchExecutionSummary",
+    "DispatchPlan",
+    "DispatchAppliedTask",
+    "DispatchReadiness",
+    "DispatchBlockReason",
+    "SessionIntent",
+    "TaskCreationIntent",
+    "WorkerIntent",
+    "ReviewerIntent",
+    "EvaluatorIntent",
+    "FollowUpPhase",
+    "PlanApprovalBlockReason",
+    // PolicyDecision / PolicyReasonCode are NOT listed here: HarnessMonitorPolicyModels
+    // already owns those generated wire types, so the dispatch module imports that module
+    // and references them bare rather than re-emitting (and clashing across the two modules).
     // task_board machines.rs host machine: Swift hand is TaskBoardHostMachine
     // (renamed); agent_modes references the adopted TaskBoardAgentMode bare.
     "Machine",
@@ -1617,6 +1636,26 @@ fn is_skip_default_optional(struct_name: &str, field_name: &str) -> bool {
         .any(|(owner, field)| *owner == struct_name && *field == field_name)
 }
 
+/// `(Rust struct name, Rust field name)` pairs dropped from the generated wire
+/// type because the app does not reuse them (the hand model omits them). Decode
+/// stays faithful: `JSONDecoder` ignores keys with no matching property, so an
+/// omitted field just leaves the daemon's extra key unread. Keyed by the Rust
+/// names so the lookup runs before the `Wire` suffix. Use this to keep a wire type
+/// minimal instead of pulling a whole sub-graph the app never reads (e.g. the
+/// dispatch lifecycle and its step/phase/status enums).
+const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
+    ("DispatchExecutionSummary", "failures"),
+    ("DispatchPlan", "lifecycle"),
+    ("DispatchAppliedTask", "lifecycle"),
+];
+
+/// Whether `(struct_name, field_name)` is in `OMITTED_WIRE_FIELDS`.
+fn is_omitted_field(struct_name: &str, field_name: &str) -> bool {
+    OMITTED_WIRE_FIELDS
+        .iter()
+        .any(|(owner, field)| *owner == struct_name && *field == field_name)
+}
+
 fn build_fields(
     struct_name: &str,
     fields: &FieldsNamed,
@@ -1627,6 +1666,9 @@ fn build_fields(
     let mut out = Vec::new();
     for field in &fields.named {
         let name = field.ident.as_ref().expect("named field").to_string();
+        if is_omitted_field(struct_name, &name) {
+            continue;
+        }
         let serde = serde_field(&field.attrs);
         if serde.flatten {
             // `#[serde(flatten)]` merges the referenced struct's fields into the
@@ -2147,6 +2189,29 @@ const TASK_BOARD_EVALUATION_EMIT_ONLY: &[&str] = &[
     "TaskBoardEvaluationOutcome",
     "EvaluationSignalFailure",
 ];
+const TASK_BOARD_DISPATCH_SOURCE: &str = include_str!("../src/task_board/dispatch.rs");
+const TASK_BOARD_DISPATCH_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardDispatchWireTypes.generated.swift";
+// The dispatch-endpoint execution summary and its plan/intent graph (dispatch.rs).
+// The internally-tagged enums emit as Swift enums with associated values; references
+// to TaskBoardItem/ExternalRef/TaskStatus/TaskSeverity/TaskSource/AgentMode resolve
+// bare or via the item-cluster *Wire, and PolicyDecision/PolicyReasonCode resolve via
+// the imported HarnessMonitorPolicyModels (NOT re-emitted here - planning.rs is sourced
+// only for PlanApprovalBlockReason). The lifecycle/failure sub-graphs are dropped via
+// OMITTED_WIRE_FIELDS.
+const TASK_BOARD_DISPATCH_EMIT_ONLY: &[&str] = &[
+    "DispatchExecutionSummary",
+    "DispatchPlan",
+    "DispatchAppliedTask",
+    "DispatchReadiness",
+    "DispatchBlockReason",
+    "SessionIntent",
+    "TaskCreationIntent",
+    "WorkerIntent",
+    "ReviewerIntent",
+    "EvaluatorIntent",
+    "FollowUpPhase",
+    "PlanApprovalBlockReason",
+];
 const TASK_BOARD_CANVAS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardPolicyCanvasWireTypes.generated.swift";
 // The policy-canvas read types in the task_board.rs facade. The rest of that file
 // (flatten, alias and struct-variant-tagged types) is excluded by the allow-list,
@@ -2345,6 +2410,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[TASK_BOARD_EVALUATION_SOURCE],
         },
+        GeneratedModule {
+            output: TASK_BOARD_DISPATCH_OUTPUT,
+            description: "the Rust task-board dispatch execution summary and its plan graph",
+            defaults: &[],
+            sources: &[TASK_BOARD_DISPATCH_SOURCE, TASK_BOARD_PLANNING_SOURCE],
+        },
     ]
 }
 
@@ -2361,6 +2432,16 @@ fn generate_module(module: &GeneratedModule) -> String {
          import Foundation\n",
         module.description
     );
+    // Extra Swift module imports for a generated file, so it can reference wire
+    // types another module already owns instead of re-emitting them (the dispatch
+    // graph reuses HarnessMonitorPolicyModels' PolicyDecision/PolicyReasonCode).
+    let extra_imports: &[&str] = match module.output {
+        TASK_BOARD_DISPATCH_OUTPUT => &["HarnessMonitorPolicyModels"],
+        _ => &[],
+    };
+    for import in extra_imports {
+        writeln!(out, "import {import}").unwrap();
+    }
     let emit_only: &[&str] = match module.output {
         SUMMARIES_OUTPUT => SUMMARIES_EMIT_ONLY,
         OBSERVE_OUTPUT => OBSERVE_EMIT_ONLY,
@@ -2372,6 +2453,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_MACHINES_OUTPUT => TASK_BOARD_MACHINES_EMIT_ONLY,
         TASK_BOARD_PLANNING_OUTPUT => TASK_BOARD_PLANNING_EMIT_ONLY,
         TASK_BOARD_EVALUATION_OUTPUT => TASK_BOARD_EVALUATION_EMIT_ONLY,
+        TASK_BOARD_DISPATCH_OUTPUT => TASK_BOARD_DISPATCH_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
@@ -2818,6 +2900,37 @@ pub struct Drop { pub other: String }
             .expect("tags field present");
         assert!(!tags.optional, "tags keeps its empty-array default");
         assert_eq!(tags.decode_default.as_deref(), Some("[]"));
+    }
+
+    #[test]
+    fn omitted_wire_field_is_dropped_from_struct() {
+        // DispatchPlan.lifecycle is in OMITTED_WIRE_FIELDS: the app does not read it,
+        // so the wire type drops the field and the daemon's key is ignored on decode.
+        let source = r#"
+            #[derive(Serialize, Deserialize)]
+            pub struct DispatchPlan {
+                pub board_item_id: String,
+                pub lifecycle: DispatchLifecycle,
+            }
+        "#;
+        let symbols = build_symbol_table(&[source]);
+        let defaults = DefaultLiterals::new();
+        let file = syn::parse_file(source).expect("source parses");
+        let item = file
+            .items
+            .iter()
+            .find_map(|item| match item {
+                Item::Struct(item) if item.ident == "DispatchPlan" => Some(item.clone()),
+                _ => None,
+            })
+            .expect("DispatchPlan struct present");
+        let spec = build_struct(&item, &defaults, &symbols).expect("struct builds");
+        let properties: Vec<_> = spec
+            .fields
+            .iter()
+            .map(|field| field.property.as_str())
+            .collect();
+        assert_eq!(properties, vec!["boardItemId"], "lifecycle is dropped");
     }
 
     #[test]
