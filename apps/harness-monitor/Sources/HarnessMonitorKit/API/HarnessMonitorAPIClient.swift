@@ -196,7 +196,12 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     sessionID: String,
     request: SessionArchiveRequest
   ) async throws -> SessionArchiveResponse {
-    try await post("/v1/sessions/\(sessionID)/archive", body: request)
+    let wire: SessionArchiveResponseWire = try await post(
+      "/v1/sessions/\(sessionID)/archive",
+      body: SessionArchiveRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return SessionArchiveResponse(wire: wire)
   }
 
   public func sendSignal(
