@@ -72,6 +72,9 @@ func policyCanvasMeasureCrossedPorts(
           else {
             continue
           }
+          let spansPort = sorted.contains {
+            $0.offset > lower.offset + 0.5 && $0.offset < upper.offset - 0.5
+          }
           violations.append(
             PolicyCanvasCrossedPortsViolation(
               nodeID: nodeID,
@@ -79,7 +82,13 @@ func policyCanvasMeasureCrossedPorts(
               edgeA: lower.edgeID,
               edgeB: upper.edgeID,
               pointA: lower.point,
-              pointB: upper.point
+              pointB: upper.point,
+              markPoint: policyCanvasCrossedPortMark(
+                lower.point,
+                upper.point,
+                side: side,
+                spansPort: spansPort
+              )
             )
           )
         }
@@ -87,6 +96,35 @@ func policyCanvasMeasureCrossedPorts(
     }
   }
   return violations.sorted(by: policyCanvasCrossedPortsOrder)
+}
+
+/// The point where the overlay draws the crossing X. Two adjacent crossed ports
+/// have nothing between them, so the plain midpoint sits in the gap between the
+/// dots - between the ports, clear of the node body. When another port lies
+/// between the pair the midpoint would fall on that intermediate dot, so the mark
+/// is pushed one port diameter off the node side (outward, onto the wire margin,
+/// never into the body) to clear it while staying level with the two ports.
+private func policyCanvasCrossedPortMark(
+  _ a: CGPoint,
+  _ b: CGPoint,
+  side: PolicyCanvasPortSide,
+  spansPort: Bool
+) -> CGPoint {
+  let mid = CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
+  guard spansPort else {
+    return mid
+  }
+  let bow = PolicyCanvasLayout.portDiameter
+  switch side {
+  case .leading:
+    return CGPoint(x: mid.x - bow, y: mid.y)
+  case .trailing:
+    return CGPoint(x: mid.x + bow, y: mid.y)
+  case .top:
+    return CGPoint(x: mid.x, y: mid.y - bow)
+  case .bottom:
+    return CGPoint(x: mid.x, y: mid.y + bow)
+  }
 }
 
 private func policyCanvasRegisterSideTerminal(

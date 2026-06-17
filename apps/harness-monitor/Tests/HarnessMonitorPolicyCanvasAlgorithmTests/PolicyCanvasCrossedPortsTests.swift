@@ -119,6 +119,17 @@ struct PolicyCanvasCrossedPortsTests {
       ],
       "expected only the pairs that actually cross; got \(pairs)"
     )
+    // gate (6478.2) and evidence (6505.6) are adjacent on the leading side - the
+    // X sits at their midpoint, on the port column between the two dots.
+    let adjacent = try! #require(
+      result.crossedPorts.first { Set([$0.edgeA, $0.edgeB]) == ["gate", "evidence"] })
+    #expect(adjacent.markPoint == CGPoint(x: 2864, y: (6478.2 + 6505.6) / 2))
+    // risk (6423.4) and evidence (6505.6) have switch and gate between them, so the
+    // midpoint would land on a dot - the X is pushed one port diameter off the
+    // leading side (to the left, the wire margin), never onto the node body.
+    let spanning = try! #require(
+      result.crossedPorts.first { Set([$0.edgeA, $0.edgeB]) == ["risk", "evidence"] })
+    #expect(spanning.markPoint == CGPoint(x: 2864 - PolicyCanvasLayout.portDiameter, y: (6423.4 + 6505.6) / 2))
   }
 
   @Test func detouringWireIsNotCounted() {

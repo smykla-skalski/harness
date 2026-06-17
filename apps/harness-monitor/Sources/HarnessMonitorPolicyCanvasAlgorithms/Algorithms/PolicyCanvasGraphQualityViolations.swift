@@ -289,6 +289,11 @@ public struct PolicyCanvasCrossedPortsViolation: Equatable, Sendable {
   public let edgeB: String
   public let pointA: CGPoint
   public let pointB: CGPoint
+  /// Where the overlay draws the crossing X. The midpoint between the two ports
+  /// when they are adjacent (it sits in the gap, between them, off any dot); for a
+  /// pair with a port between them the midpoint would land on that intermediate
+  /// dot, so it is nudged just off the node side instead - never onto the body.
+  public let markPoint: CGPoint
 
   public init(
     nodeID: String,
@@ -296,7 +301,8 @@ public struct PolicyCanvasCrossedPortsViolation: Equatable, Sendable {
     edgeA: String,
     edgeB: String,
     pointA: CGPoint,
-    pointB: CGPoint
+    pointB: CGPoint,
+    markPoint: CGPoint
   ) {
     self.nodeID = nodeID
     self.side = side
@@ -304,6 +310,7 @@ public struct PolicyCanvasCrossedPortsViolation: Equatable, Sendable {
     self.edgeB = edgeB
     self.pointA = pointA
     self.pointB = pointB
+    self.markPoint = markPoint
   }
 
   public var severity: PolicyCanvasQualitySeverity { .warning }
