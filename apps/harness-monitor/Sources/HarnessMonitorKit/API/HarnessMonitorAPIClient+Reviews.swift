@@ -30,7 +30,12 @@ extension HarnessMonitorAPIClient {
   public func catalogReviewRepositories(
     request: ReviewsRepositoryCatalogRequest
   ) async throws -> ReviewsRepositoryCatalogResponse {
-    try await post("/v1/reviews/repositories", body: request)
+    let wire: ReviewsRepositoryCatalogResponseWire = try await post(
+      "/v1/reviews/repositories",
+      body: ReviewsRepositoryCatalogRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsRepositoryCatalogResponse(wire: wire)
   }
 
   public func queryReviews(
@@ -86,7 +91,11 @@ extension HarnessMonitorAPIClient {
   }
 
   public func clearReviewsCache() async throws -> ReviewsCacheClearResponse {
-    try await delete("/v1/reviews/cache")
+    let wire: ReviewsCacheClearResponseWire = try await delete(
+      "/v1/reviews/cache",
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsCacheClearResponse(wire: wire)
   }
 
   public func refreshReviews(
@@ -98,7 +107,12 @@ extension HarnessMonitorAPIClient {
   public func fetchReviewBody(
     request: ReviewsBodyRequest
   ) async throws -> ReviewsBodyResponse {
-    try await post("/v1/reviews/body", body: request)
+    let wire: ReviewsBodyResponseWire = try await post(
+      "/v1/reviews/body",
+      body: ReviewsBodyRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsBodyResponse(wire: wire)
   }
 
   public func updateReviewBody(

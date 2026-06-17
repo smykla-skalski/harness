@@ -331,6 +331,17 @@ let sampleDepsCacheClearResponseText =
   }
   """
 
+let sampleReviewsBodyResponseText =
+  """
+  {
+    "pull_request_id": "PR_body1",
+    "body": "## Summary\\nThis PR does the thing.",
+    "pr_updated_at": "2026-05-22T09:00:00Z",
+    "fetched_at": "2026-05-22T10:00:00Z",
+    "from_cache": false
+  }
+  """
+
 let sampleReviewsRefreshResponseText =
   """
   {

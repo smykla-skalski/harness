@@ -30,9 +30,10 @@ extension WebSocketTransport {
   public func catalogReviewRepositories(
     request: ReviewsRepositoryCatalogRequest
   ) async throws -> ReviewsRepositoryCatalogResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsRepositoryCatalogRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsRepositoryCatalog, params: params)
-    return try decode(value)
+    let wire: ReviewsRepositoryCatalogResponseWire = try decodePolicyWire(value)
+    return ReviewsRepositoryCatalogResponse(wire: wire)
   }
 
   public func queryReviews(
@@ -106,7 +107,8 @@ extension WebSocketTransport {
 
   public func clearReviewsCache() async throws -> ReviewsCacheClearResponse {
     let value = try await rpc(method: .reviewsClearCache, params: nil)
-    return try decode(value)
+    let wire: ReviewsCacheClearResponseWire = try decodePolicyWire(value)
+    return ReviewsCacheClearResponse(wire: wire)
   }
 
   public func refreshReviews(
@@ -120,9 +122,10 @@ extension WebSocketTransport {
   public func fetchReviewBody(
     request: ReviewsBodyRequest
   ) async throws -> ReviewsBodyResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsBodyRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsBody, params: params)
-    return try decode(value)
+    let wire: ReviewsBodyResponseWire = try decodePolicyWire(value)
+    return ReviewsBodyResponse(wire: wire)
   }
 
   public func updateReviewBody(
