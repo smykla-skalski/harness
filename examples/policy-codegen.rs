@@ -1074,6 +1074,13 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // (generate-only until SessionSummary reroutes off convertFromSnakeCase).
     "PendingLeaderTransfer",
     "SessionSummary",
+    // agent tool-activity cluster + the hooks AskUserQuestion leaf it nests. All take
+    // the Wire suffix (AgentPendingUserPrompt/AgentToolActivitySummary have same-named
+    // hand mirrors; the hooks types are renamed hand-side, suffixed for consistency).
+    "AskUserQuestionOption",
+    "AskUserQuestionPrompt",
+    "AgentPendingUserPrompt",
+    "AgentToolActivitySummary",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1788,6 +1795,7 @@ const POLICY_IDS_SOURCE: &str = include_str!("../src/task_board/policy_graph/ids
 const POLICY_DEFAULTS_SOURCE: &str = include_str!("../src/task_board/policy_graph/defaults.rs");
 const POLICY_STORE_SOURCE: &str = include_str!("../src/task_board/policy_graph/store.rs");
 const SUMMARIES_SOURCE: &str = include_str!("../src/daemon/protocol/summaries.rs");
+const HOOKS_PAYLOADS_SOURCE: &str = include_str!("../src/hooks/protocol/payloads.rs");
 const SUMMARIES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SummariesWireTypes.generated.swift";
 /// summaries.rs is a 51-type mega-file whose session/observe/timeline/github
 /// types are foundation-entangled (reference unmigrated daemon-state and
@@ -1823,6 +1831,15 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     // -only - the rich hand SessionSummary keeps Int metrics and decodes via convert
     // until the SessionDetail reroute.
     "SessionSummary",
+    // agent tool-activity cluster (AgentToolActivitySummary nests in SessionDetail.
+    // agent_activity): pulls AgentPendingUserPrompt, which nests the hooks
+    // AskUserQuestionPrompt/Option (from payloads.rs). All clean structs - generate
+    // -only; the hand models rename the hooks types (AgentPendingUserPromptQuestion/
+    // Option) and AgentPendingUserPrompt carries a legacy message-synthesis init.
+    "AskUserQuestionOption",
+    "AskUserQuestionPrompt",
+    "AgentPendingUserPrompt",
+    "AgentToolActivitySummary",
 ];
 const OBSERVE_CLASSIFICATION_SOURCE: &str = include_str!("../src/observe/types/classification.rs");
 const OBSERVE_ISSUE_CODE_SOURCE: &str = include_str!("../src/observe/types/issue_code.rs");
@@ -1956,9 +1973,9 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: SUMMARIES_OUTPUT,
-            description: "the Rust daemon health/readiness summary types",
+            description: "the Rust daemon health, summary and tool-activity types",
             defaults: &[SUMMARIES_SOURCE],
-            sources: &[SUMMARIES_SOURCE],
+            sources: &[SUMMARIES_SOURCE, HOOKS_PAYLOADS_SOURCE],
         },
         GeneratedModule {
             output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitWireTypes.generated.swift",
