@@ -499,3 +499,71 @@ let sampleReviewsFilesPatchResponseText =
     }
   }
   """
+
+let sampleReviewsFilesPreviewResponseText =
+  """
+  {
+    "pull_request_id": "PR_kwReview1",
+    "previews": [
+      {
+        "path": "src/lib.rs",
+        "patch": "@@ -1 +1 @@\\n-a\\n+b\\n",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "truncated": false,
+        "etag": "preview-etag",
+        "served_by": "local_clone",
+        "fetched_at": "2026-05-22T10:00:00Z",
+        "head_ref_oid": "abc123",
+        "line_count": 3,
+        "line_limit": 1000,
+        "has_more": false
+      }
+    ],
+    "drifted": false,
+    "current_head_ref_oid": "abc123",
+    "fetched_at": "2026-05-22T10:00:01Z",
+    "rate_limit_snapshot": {
+      "remaining": 4700,
+      "limit": 5000,
+      "reset_at": "2026-05-22T11:00:00Z",
+      "cost": 3
+    }
+  }
+  """
+
+let sampleReviewsFilesViewedResponseText =
+  """
+  {
+    "pull_request_id": "PR_kwReview1",
+    "results": [
+      {
+        "path": "src/main.rs",
+        "outcome": "updated",
+        "viewer_viewed_state": "viewed"
+      }
+    ],
+    "fetched_at": "2026-05-22T10:00:02Z"
+  }
+  """
+
+let sampleReviewsFilesBlobResponseText =
+  """
+  {
+    "path": "assets/logo.png",
+    "oid": "blob-oid-1",
+    "mime": "png",
+    "content_base64": "iVBORw0KGgo=",
+    "byte_size": 1024,
+    "is_truncated": false,
+    "is_too_large": false,
+    "fetched_at": "2026-05-22T10:00:03Z",
+    "rate_limit_snapshot": {
+      "remaining": 4600,
+      "limit": 5000,
+      "reset_at": "2026-05-22T11:00:00Z",
+      "cost": 1
+    }
+  }
+  """

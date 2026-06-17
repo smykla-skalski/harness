@@ -143,19 +143,34 @@ extension HarnessMonitorAPIClient {
   public func previewReviewFiles(
     request: ReviewsFilesPreviewRequest
   ) async throws -> ReviewsFilesPreviewResponse {
-    try await post("/v1/reviews/files/preview", body: request)
+    let wire: ReviewsFilesPreviewResponseWire = try await post(
+      "/v1/reviews/files/preview",
+      body: ReviewsFilesPreviewRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsFilesPreviewResponse(wire: wire)
   }
 
   public func viewedReviewFiles(
     request: ReviewsFilesViewedRequest
   ) async throws -> ReviewsFilesViewedResponse {
-    try await post("/v1/reviews/files/viewed", body: request)
+    let wire: ReviewsFilesViewedResponseWire = try await post(
+      "/v1/reviews/files/viewed",
+      body: ReviewsFilesViewedRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsFilesViewedResponse(wire: wire)
   }
 
   public func fetchReviewFileBlob(
     request: ReviewsFilesBlobRequest
   ) async throws -> ReviewsFilesBlobResponse {
-    try await post("/v1/reviews/files/blob", body: request)
+    let wire: ReviewsFilesBlobResponseWire = try await post(
+      "/v1/reviews/files/blob",
+      body: ReviewsFilesBlobRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsFilesBlobResponse(wire: wire)
   }
 
   public func listReviewLocalClones() async throws -> [ReviewLocalCloneEntry] {

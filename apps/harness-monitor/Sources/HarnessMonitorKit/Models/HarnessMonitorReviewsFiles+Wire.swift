@@ -103,3 +103,117 @@ extension ReviewsFilesPatchRequestWire {
     )
   }
 }
+
+extension ReviewFilePreview {
+  init(wire: ReviewFilePreviewWire) {
+    self.init(
+      path: wire.path,
+      patch: wire.patch,
+      status: ReviewFileChangeType(rawValue: wire.status.rawValue) ?? .other,
+      additions: wire.additions,
+      deletions: wire.deletions,
+      truncated: wire.truncated,
+      etag: wire.etag,
+      servedBy: ReviewFileServedBy(rawValue: wire.servedBy.rawValue) ?? .githubRest,
+      fetchedAt: wire.fetchedAt,
+      headRefOid: wire.headRefOid,
+      lineCount: wire.lineCount,
+      lineLimit: wire.lineLimit,
+      hasMore: wire.hasMore
+    )
+  }
+}
+
+extension ReviewsFilesPreviewResponse {
+  init(wire: ReviewsFilesPreviewResponseWire) {
+    self.init(
+      pullRequestID: wire.pullRequestId,
+      previews: wire.previews.map(ReviewFilePreview.init(wire:)),
+      drifted: wire.drifted,
+      currentHeadRefOid: wire.currentHeadRefOid,
+      fetchedAt: wire.fetchedAt,
+      rateLimitSnapshot: wire.rateLimitSnapshot.map(ReviewsRateLimitSnapshot.init(wire:))
+    )
+  }
+}
+
+extension ReviewsFilesPreviewRequestWire {
+  init(_ model: ReviewsFilesPreviewRequest) {
+    self.init(
+      pullRequestId: model.pullRequestID,
+      headRefOidExpected: model.headRefOidExpected,
+      paths: model.paths,
+      number: model.number,
+      repositoryFullName: model.repositoryFullName,
+      baseRefOidExpected: model.baseRefOidExpected,
+      headRefName: model.headRefName,
+      baseRefName: model.baseRefName,
+      largeDiffStrategy: model.largeDiffStrategy
+        .map { FilesLargeDiffStrategyWire(rawValue: $0.rawValue) ?? .autoLocalClone },
+      lineLimit: model.lineLimit
+    )
+  }
+}
+
+extension ReviewFilesViewedTargetWire {
+  init(_ model: ReviewFilesViewedTarget) {
+    self.init(
+      path: model.path,
+      expectedPriorState: ReviewFileViewedStateWire(rawValue: model.expectedPriorState.rawValue)
+        ?? .unviewed,
+      markViewed: model.markViewed
+    )
+  }
+}
+
+extension ReviewsFilesViewedRequestWire {
+  init(_ model: ReviewsFilesViewedRequest) {
+    self.init(
+      pullRequestId: model.pullRequestID,
+      paths: model.paths.map { ReviewFilesViewedTargetWire($0) }
+    )
+  }
+}
+
+extension ReviewFilesViewedResult {
+  init(wire: ReviewFilesViewedResultWire) {
+    self.init(
+      path: wire.path,
+      outcome: ReviewFileViewedOutcome(rawValue: wire.outcome.rawValue) ?? .failed,
+      viewerViewedState: ReviewFileViewedState(rawValue: wire.viewerViewedState.rawValue)
+        ?? .unviewed
+    )
+  }
+}
+
+extension ReviewsFilesViewedResponse {
+  init(wire: ReviewsFilesViewedResponseWire) {
+    self.init(
+      pullRequestID: wire.pullRequestId,
+      results: wire.results.map(ReviewFilesViewedResult.init(wire:)),
+      fetchedAt: wire.fetchedAt
+    )
+  }
+}
+
+extension ReviewsFilesBlobRequestWire {
+  init(_ model: ReviewsFilesBlobRequest) {
+    self.init(repositoryId: model.repositoryID, oid: model.oid, path: model.path)
+  }
+}
+
+extension ReviewsFilesBlobResponse {
+  init(wire: ReviewsFilesBlobResponseWire) {
+    self.init(
+      path: wire.path,
+      oid: wire.oid,
+      mime: HarnessReviewImageMime(rawValue: wire.mime.rawValue) ?? .png,
+      contentBase64: wire.contentBase64,
+      byteSize: wire.byteSize,
+      isTruncated: wire.isTruncated,
+      isTooLarge: wire.isTooLarge,
+      fetchedAt: wire.fetchedAt,
+      rateLimitSnapshot: wire.rateLimitSnapshot.map(ReviewsRateLimitSnapshot.init(wire:))
+    )
+  }
+}

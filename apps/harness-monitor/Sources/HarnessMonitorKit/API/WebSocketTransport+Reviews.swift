@@ -163,25 +163,28 @@ extension WebSocketTransport {
   public func previewReviewFiles(
     request: ReviewsFilesPreviewRequest
   ) async throws -> ReviewsFilesPreviewResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsFilesPreviewRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsFilesPreview, params: params)
-    return try decode(value)
+    let wire: ReviewsFilesPreviewResponseWire = try decodePolicyWire(value)
+    return ReviewsFilesPreviewResponse(wire: wire)
   }
 
   public func viewedReviewFiles(
     request: ReviewsFilesViewedRequest
   ) async throws -> ReviewsFilesViewedResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsFilesViewedRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsFilesViewed, params: params)
-    return try decode(value)
+    let wire: ReviewsFilesViewedResponseWire = try decodePolicyWire(value)
+    return ReviewsFilesViewedResponse(wire: wire)
   }
 
   public func fetchReviewFileBlob(
     request: ReviewsFilesBlobRequest
   ) async throws -> ReviewsFilesBlobResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsFilesBlobRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsFilesBlob, params: params)
-    return try decode(value)
+    let wire: ReviewsFilesBlobResponseWire = try decodePolicyWire(value)
+    return ReviewsFilesBlobResponse(wire: wire)
   }
 
   public func listReviewLocalClones() async throws -> [ReviewLocalCloneEntry] {

@@ -121,6 +121,102 @@ struct ReviewsFilesRerouteContractTests {
     #expect(response.rateLimitSnapshot?.cost == 2)
   }
 
+  @Test("HTTP client decodes preview, viewed and blob through the wire types")
+  func httpFilesContentReroute() async throws {
+    TaskBoardURLProtocol.reset()
+    let client = try makeHTTPClient()
+
+    let preview = try await client.previewReviewFiles(request: previewRequest())
+    let viewed = try await client.viewedReviewFiles(request: viewedRequest())
+    let blob = try await client.fetchReviewFileBlob(request: blobRequest())
+
+    assertPreview(preview)
+    assertViewed(viewed)
+    assertBlob(blob)
+  }
+
+  @Test("WebSocket transport decodes preview, viewed and blob through the wire types")
+  func webSocketFilesContentReroute() async throws {
+    let probe = RPCProbe()
+    let transport = try makeWebSocketTransport(probe: probe)
+
+    let preview = try await transport.previewReviewFiles(request: previewRequest())
+    let viewed = try await transport.viewedReviewFiles(request: viewedRequest())
+    let blob = try await transport.fetchReviewFileBlob(request: blobRequest())
+
+    assertPreview(preview)
+    assertViewed(viewed)
+    assertBlob(blob)
+
+    let methods = await probe.calls.map(\.method)
+    #expect(
+      methods == [
+        .reviewsFilesPreview,
+        .reviewsFilesViewed,
+        .reviewsFilesBlob,
+      ]
+    )
+  }
+
+  private func previewRequest() -> ReviewsFilesPreviewRequest {
+    ReviewsFilesPreviewRequest(
+      pullRequestID: "PR_kwReview1",
+      headRefOidExpected: "abc123",
+      paths: ["src/lib.rs"]
+    )
+  }
+
+  private func viewedRequest() -> ReviewsFilesViewedRequest {
+    ReviewsFilesViewedRequest(
+      pullRequestID: "PR_kwReview1",
+      paths: [
+        ReviewFilesViewedTarget(
+          path: "src/main.rs",
+          expectedPriorState: .unviewed,
+          markViewed: true
+        )
+      ]
+    )
+  }
+
+  private func blobRequest() -> ReviewsFilesBlobRequest {
+    ReviewsFilesBlobRequest(repositoryID: "repo-1", oid: "blob-oid-1", path: "assets/logo.png")
+  }
+
+  private func assertPreview(_ response: ReviewsFilesPreviewResponse) {
+    #expect(response.pullRequestID == "PR_kwReview1")
+    #expect(response.drifted == false)
+    #expect(response.previews.count == 1)
+    let preview = response.previews.first
+    #expect(preview?.path == "src/lib.rs")
+    #expect(preview?.status == .modified)
+    #expect(preview?.servedBy == .localClone)
+    #expect(preview?.lineCount == 3)
+    #expect(preview?.lineLimit == 1000)
+    #expect(preview?.hasMore == false)
+    #expect(response.rateLimitSnapshot?.cost == 3)
+  }
+
+  private func assertViewed(_ response: ReviewsFilesViewedResponse) {
+    #expect(response.pullRequestID == "PR_kwReview1")
+    #expect(response.fetchedAt == "2026-05-22T10:00:02Z")
+    #expect(response.results.count == 1)
+    let result = response.results.first
+    #expect(result?.path == "src/main.rs")
+    #expect(result?.outcome == .updated)
+    #expect(result?.viewerViewedState == .viewed)
+  }
+
+  private func assertBlob(_ response: ReviewsFilesBlobResponse) {
+    #expect(response.path == "assets/logo.png")
+    #expect(response.oid == "blob-oid-1")
+    #expect(response.mime == .png)
+    #expect(response.contentBase64 == "iVBORw0KGgo=")
+    #expect(response.byteSize == 1024)
+    #expect(response.isTruncated == false)
+    #expect(response.rateLimitSnapshot?.remaining == 4600)
+  }
+
   private func makeHTTPClient() throws -> HarnessMonitorAPIClient {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [TaskBoardURLProtocol.self]
