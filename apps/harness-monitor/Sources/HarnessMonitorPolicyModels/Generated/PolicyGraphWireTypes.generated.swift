@@ -1400,3 +1400,105 @@ public struct PolicyFinishNode: Codable, Equatable, Sendable {
     case reasonCode = "reason_code"
   }
 }
+
+public struct PolicyPipelineSimulatedDecisionWire: Codable, Equatable, Sendable {
+  public var action: PolicyAction
+  public var decision: PolicyDecision
+  public var visitedNodeIds: [String]
+  public var policyTraceIds: [String]
+  public var boundaries: [PolicyRuntimeBoundary]
+
+  public init(action: PolicyAction, decision: PolicyDecision, visitedNodeIds: [String] = [], policyTraceIds: [String] = [], boundaries: [PolicyRuntimeBoundary] = []) {
+    self.action = action
+    self.decision = decision
+    self.visitedNodeIds = visitedNodeIds
+    self.policyTraceIds = policyTraceIds
+    self.boundaries = boundaries
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    action = try container.decode(PolicyAction.self, forKey: .action)
+    decision = try container.decode(PolicyDecision.self, forKey: .decision)
+    visitedNodeIds = try container.decodeIfPresent([String].self, forKey: .visitedNodeIds) ?? []
+    policyTraceIds = try container.decodeIfPresent([String].self, forKey: .policyTraceIds) ?? []
+    boundaries = try container.decodeIfPresent([PolicyRuntimeBoundary].self, forKey: .boundaries) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case action
+    case decision
+    case visitedNodeIds = "visited_node_ids"
+    case policyTraceIds = "policy_trace_ids"
+    case boundaries
+  }
+}
+
+public struct PolicyPipelineSimulationResultWire: Codable, Equatable, Sendable {
+  public var revision: UInt64
+  public var traceId: String
+  public var simulatedAt: String
+  public var succeeded: Bool
+  public var validation: PolicyGraphValidationReport
+  public var decisions: [PolicyPipelineSimulatedDecisionWire]
+  public var policyTraceIds: [String]
+  public var hasRuntimeBoundaries: Bool
+
+  public init(revision: UInt64, traceId: String, simulatedAt: String, succeeded: Bool, validation: PolicyGraphValidationReport, decisions: [PolicyPipelineSimulatedDecisionWire] = [], policyTraceIds: [String] = [], hasRuntimeBoundaries: Bool = false) {
+    self.revision = revision
+    self.traceId = traceId
+    self.simulatedAt = simulatedAt
+    self.succeeded = succeeded
+    self.validation = validation
+    self.decisions = decisions
+    self.policyTraceIds = policyTraceIds
+    self.hasRuntimeBoundaries = hasRuntimeBoundaries
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    revision = try container.decode(UInt64.self, forKey: .revision)
+    traceId = try container.decode(String.self, forKey: .traceId)
+    simulatedAt = try container.decode(String.self, forKey: .simulatedAt)
+    succeeded = try container.decode(Bool.self, forKey: .succeeded)
+    validation = try container.decode(PolicyGraphValidationReport.self, forKey: .validation)
+    decisions = try container.decodeIfPresent([PolicyPipelineSimulatedDecisionWire].self, forKey: .decisions) ?? []
+    policyTraceIds = try container.decodeIfPresent([String].self, forKey: .policyTraceIds) ?? []
+    hasRuntimeBoundaries = try container.decodeIfPresent(Bool.self, forKey: .hasRuntimeBoundaries) ?? false
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case revision
+    case traceId = "trace_id"
+    case simulatedAt = "simulated_at"
+    case succeeded
+    case validation
+    case decisions
+    case policyTraceIds = "policy_trace_ids"
+    case hasRuntimeBoundaries = "has_runtime_boundaries"
+  }
+}
+
+public struct PolicyPipelineAuditSummaryWire: Codable, Equatable, Sendable {
+  public var activeRevision: UInt64
+  public var mode: PolicyGraphMode
+  public var latestTraceId: String?
+  public var latestSimulation: PolicyPipelineSimulationResultWire?
+  public var validation: PolicyGraphValidationReport
+
+  public init(activeRevision: UInt64, mode: PolicyGraphMode, latestTraceId: String? = nil, latestSimulation: PolicyPipelineSimulationResultWire? = nil, validation: PolicyGraphValidationReport) {
+    self.activeRevision = activeRevision
+    self.mode = mode
+    self.latestTraceId = latestTraceId
+    self.latestSimulation = latestSimulation
+    self.validation = validation
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case activeRevision = "active_revision"
+    case mode
+    case latestTraceId = "latest_trace_id"
+    case latestSimulation = "latest_simulation"
+    case validation
+  }
+}

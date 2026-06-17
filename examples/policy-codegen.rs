@@ -910,6 +910,14 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "Review",
     "ReviewConsensus",
     "ArbitrationOutcome",
+    // policy simulate/audit cluster (policy_graph/store.rs): the rich app models
+    // (TaskBoardPolicyPipelineSimulationResult/...AuditSummary) keep their flat
+    // shape; these *Wire types own the daemon snake_case decode (the validation
+    // report nests the generated PolicyGraphValidationIssue, which fixes the
+    // node_id/edge_id/node_ids drop when simulate/audit decoded via convertFromSnakeCase).
+    "PolicyPipelineSimulatedDecision",
+    "PolicyPipelineSimulationResult",
+    "PolicyPipelineAuditSummary",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -958,6 +966,15 @@ const SKIP_TYPES: &[&str] = &[
     // file + break the pass-through. Keep it bare-hand (Review/ReviewConsensus wire
     // structs reference the hand ReviewPoint) until session_requests also adopts it.
     "ReviewPoint",
+    // policy_graph/store.rs serde types OUTSIDE the simulate/audit cluster: the
+    // save/promote responses already decode via the plain policy-wire decoder and
+    // GraphPolicyGate is daemon-internal. Adding store.rs as a policy-module source
+    // for the cluster wire types must not also emit these (bare names that would
+    // clash / produce dead types).
+    "GraphPolicyGate",
+    "PolicyPipelineSaveResponse",
+    "PolicyPipelinePromoteRequest",
+    "PolicyPipelinePromoteResponse",
 ];
 
 /// Whether a Rust type is on the generator's skip list (see `SKIP_TYPES`).
@@ -1581,6 +1598,7 @@ const POLICY_GRAPH_SOURCE: &str = include_str!("../src/task_board/policy_graph.r
 const POLICY_MODELS_SOURCE: &str = include_str!("../src/task_board/policy_graph/models.rs");
 const POLICY_IDS_SOURCE: &str = include_str!("../src/task_board/policy_graph/ids.rs");
 const POLICY_DEFAULTS_SOURCE: &str = include_str!("../src/task_board/policy_graph/defaults.rs");
+const POLICY_STORE_SOURCE: &str = include_str!("../src/task_board/policy_graph/store.rs");
 const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
     include_str!("../src/task_board/git_identity_defaults.rs");
 const OPENROUTER_SOURCE: &str = include_str!("../src/daemon/protocol/openrouter_models.rs");
@@ -1684,6 +1702,7 @@ fn modules() -> Vec<GeneratedModule> {
                 POLICY_SOURCE,
                 POLICY_GRAPH_SOURCE,
                 POLICY_MODELS_SOURCE,
+                POLICY_STORE_SOURCE,
             ],
         },
         GeneratedModule {
