@@ -268,12 +268,28 @@ extension PolicyCanvasPreparedRouteInput {
     let splitter = PolicyCanvasOrthogonalNudgingRouteProcessing()
     let obstacles = routingObstacles()
     let originalBodyHits = precomputedBodyHits(routes: routes, nodeIndex: nodeIndex).count
+    let edgesByID = Dictionary(uniqueKeysWithValues: edges.map { ($0.id, $0) })
+    let acceptsBodySafeSplit:
+      (String, PolicyCanvasEdgeRoute, PolicyCanvasEdgeRoute) -> Bool = {
+        edgeID, oldRoute, newRoute in
+        guard let edge = edgesByID[edgeID] else {
+          return true
+        }
+        let oldHitCount = precomputedBodyHits(
+          edge: edge, route: oldRoute, nodeIndex: nodeIndex
+        ).count
+        let newHitCount = precomputedBodyHits(
+          edge: edge, route: newRoute, nodeIndex: nodeIndex
+        ).count
+        return newHitCount <= oldHitCount
+      }
     var current = routes
     var best = routes
     for _ in 0..<3 {
       let split = splitter.routesClearingRemainingCollinearReuse(
         current,
-        obstacles: obstacles
+        obstacles: obstacles,
+        accepts: acceptsBodySafeSplit
       )
       if precomputedBodyHits(routes: split, nodeIndex: nodeIndex).count <= originalBodyHits {
         best = split
@@ -297,7 +313,16 @@ extension PolicyCanvasPreparedRouteInput {
       best = repaired
       current = repaired
     }
-    return best
+    let pairSplit = splitter.routesClearingRemainingParallelPairs(
+      best,
+      obstacles: obstacles,
+      accepts: acceptsBodySafeSplit
+    )
+    guard precomputedBodyHits(routes: pairSplit, nodeIndex: nodeIndex).count <= originalBodyHits
+    else {
+      return best
+    }
+    return pairSplit
   }
 
   private func routesRepairingCrossedPorts(

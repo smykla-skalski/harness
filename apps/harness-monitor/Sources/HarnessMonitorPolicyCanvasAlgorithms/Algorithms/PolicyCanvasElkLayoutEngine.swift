@@ -358,7 +358,7 @@ private struct PolicyCanvasElkLayoutEngine {
       hash &*= 1_099_511_628_211
     }
 
-    elkCombine("elk-swift-source-right-fixed-ports-5")
+    elkCombine("elk-swift-grid-ports-1")
     for node in nodes {
       elkCombine(node.id)
       elkCombine(node.groupID ?? "")
@@ -423,7 +423,8 @@ private final class PolicyCanvasElkRunner {
 }
 
 private func policyCanvasElkLayoutOptions() -> [String: Any] {
-  [
+  let edgeSpacing = String(Int(PolicyCanvasLayout.defaultEdgeLineSpacing.rounded()))
+  return [
     "elk.algorithm": "layered",
     "elk.direction": "RIGHT",
     "elk.edgeRouting": "ORTHOGONAL",
@@ -434,7 +435,7 @@ private func policyCanvasElkLayoutOptions() -> [String: Any] {
     "elk.spacing.nodeNode": "80",
     "elk.layered.spacing.nodeNodeBetweenLayers": "120",
     "elk.spacing.edgeNode": "40",
-    "elk.spacing.edgeEdge": "38",
+    "elk.spacing.edgeEdge": edgeSpacing,
   ]
 }
 

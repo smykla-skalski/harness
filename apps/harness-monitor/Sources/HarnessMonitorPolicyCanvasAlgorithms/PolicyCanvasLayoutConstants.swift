@@ -5,18 +5,15 @@ public enum PolicyCanvasLayout {
   public static let minimumZoom: CGFloat = 0.1
   public static let maximumZoom: CGFloat = 2.0
   public static let defaultZoom: CGFloat = 0.92
-  public static let nodeWidth: CGFloat = 168
-  public static let portDiameter: CGFloat = 18
+  public static let nodeWidth: CGFloat = 180
+  public static let portDiameter: CGFloat = 20
   public static let portHitTestExtension: CGFloat = 10
-  public static let portMarkerInset: CGFloat = portDiameter / 2 + 2
-  public static let verticalPortMarkerSpacing: CGFloat = portDiameter * 1.5
-  public static let defaultEdgeLineSpacing: CGFloat = 22.4
   public static let routeChannelStep: CGFloat = 5
-  public static let minimumSidePortMarkerSpacing = max(
-    defaultEdgeLineSpacing + routeChannelStep,
-    verticalPortMarkerSpacing
-  )
-  public static let nodeMinimumHeight = ceil(
+  public static let portMarkerInset: CGFloat = portDiameter / 2 + routeChannelStep
+  public static let verticalPortMarkerSpacing: CGFloat = 20
+  public static let defaultEdgeLineSpacing: CGFloat = verticalPortMarkerSpacing
+  public static let minimumSidePortMarkerSpacing = verticalPortMarkerSpacing
+  public static let nodeMinimumHeight = routeGridCeil(
     (portMarkerInset * 2) + (minimumSidePortMarkerSpacing * 3)
   )
   public static let automaticLayoutNodeStepHeight: CGFloat = 160
@@ -25,19 +22,19 @@ public enum PolicyCanvasLayout {
   public static let nodeCornerRadius: CGFloat = 8
   /// Vertical breathing room kept between a node-distance measurement bar and any
   /// unrelated node body it would otherwise hug as it crosses the gap corridor.
-  public static let nodeDistanceObstacleClearance: CGFloat = 24
-  public static let edgeLabelHeight: CGFloat = 28
+  public static let nodeDistanceObstacleClearance: CGFloat = 25
+  public static let edgeLabelHeight: CGFloat = 30
   public static let edgeLabelMaxWidth: CGFloat = 220
-  public static let edgeLabelLaneSpacing: CGFloat = 46
-  public static let edgeBusLaneSpacing: CGFloat = 38
-  public static let edgeLabelNodeClearance: CGFloat = 24
-  public static let edgeLabelHorizontalMargin: CGFloat = 14
-  public static let edgePortTurnMinimumLead: CGFloat = 36
+  public static let edgeLabelLaneSpacing: CGFloat = 40
+  public static let edgeBusLaneSpacing: CGFloat = 40
+  public static let edgeLabelNodeClearance: CGFloat = 25
+  public static let edgeLabelHorizontalMargin: CGFloat = 15
+  public static let edgePortTurnMinimumLead: CGFloat = 40
   public static let initialContentOrigin = CGPoint(x: 520, y: 480)
   public static let initialViewportInset: CGFloat = 220
   public static let initialViewportTopBias: CGFloat = 64
-  public static let groupHorizontalPadding: CGFloat = 44
-  public static let groupVerticalPadding: CGFloat = 52
+  public static let groupHorizontalPadding: CGFloat = 40
+  public static let groupVerticalPadding: CGFloat = 60
   public static let minimumGroupSize = CGSize(width: 220, height: 180)
   public static let minimumCanvasSize = CGSize(width: 3_800, height: 3_000)
   public static let canvasTrailingPadding: CGFloat = 1_200
@@ -118,7 +115,7 @@ public enum PolicyCanvasLayout {
     let requiredHeight =
       (portMarkerInset * 2)
       + (minimumSidePortMarkerSpacing * CGFloat(max(0, requiredSlots - 1)))
-    return max(nodeMinimumHeight, ceil(requiredHeight))
+    return max(nodeMinimumHeight, routeGridCeil(requiredHeight))
   }
 
   public static func requiredVerticalPortSlots(
@@ -158,16 +155,20 @@ public enum PolicyCanvasLayout {
 
   public static func portY(index: Int, count: Int, nodeHeight: CGFloat) -> CGFloat {
     guard count > 1 else {
-      return nodeHeight / 2
+      return routeGridRound(nodeHeight / 2)
     }
     let available = max(0, nodeHeight - (portMarkerInset * 2))
-    let step = min(verticalPortMarkerSpacing, available / CGFloat(count - 1))
-    let span = step * CGFloat(count - 1)
-    let top = min(
-      max((nodeHeight - span) / 2, portMarkerInset),
-      nodeHeight - portMarkerInset - span
+    let step = max(
+      routeChannelStep,
+      routeGridFloor(min(verticalPortMarkerSpacing, available / CGFloat(count - 1)))
     )
-    return top + (CGFloat(index) * step)
+    let span = step * CGFloat(count - 1)
+    let top = clampedRouteGridRound(
+      (nodeHeight - span) / 2,
+      lowerBound: portMarkerInset,
+      upperBound: nodeHeight - portMarkerInset - span
+    )
+    return routeGridRound(top + (CGFloat(index) * step))
   }
 
   public static func portX(index: Int, count: Int) -> CGFloat {
@@ -176,11 +177,44 @@ public enum PolicyCanvasLayout {
 
   public static func portX(index: Int, count: Int, nodeWidth: CGFloat) -> CGFloat {
     guard count > 1 else {
-      return nodeWidth / 2
+      return routeGridRound(nodeWidth / 2)
     }
-    let step = min(CGFloat(32), nodeWidth / CGFloat(count + 1))
-    let leading = (nodeWidth - (step * CGFloat(count - 1))) / 2
-    return leading + (CGFloat(index) * step)
+    let available = max(0, nodeWidth - (portMarkerInset * 2))
+    let step = max(
+      routeChannelStep,
+      routeGridFloor(min(verticalPortMarkerSpacing, available / CGFloat(count - 1)))
+    )
+    let span = step * CGFloat(count - 1)
+    let leading = clampedRouteGridRound(
+      (nodeWidth - span) / 2,
+      lowerBound: portMarkerInset,
+      upperBound: nodeWidth - portMarkerInset - span
+    )
+    return routeGridRound(leading + (CGFloat(index) * step))
+  }
+
+  public static func routeGridFloor(_ value: CGFloat) -> CGFloat {
+    let step = max(routeChannelStep, 1)
+    return floor(value / step) * step
+  }
+
+  public static func routeGridRound(_ value: CGFloat) -> CGFloat {
+    let step = max(routeChannelStep, 1)
+    return (value / step).rounded() * step
+  }
+
+  public static func routeGridCeil(_ value: CGFloat) -> CGFloat {
+    let step = max(routeChannelStep, 1)
+    return ceil(value / step) * step
+  }
+
+  public static func clampedRouteGridRound(
+    _ value: CGFloat,
+    lowerBound: CGFloat,
+    upperBound: CGFloat
+  ) -> CGFloat {
+    let high = max(lowerBound, upperBound)
+    return min(max(routeGridRound(value), lowerBound), high)
   }
 }
 

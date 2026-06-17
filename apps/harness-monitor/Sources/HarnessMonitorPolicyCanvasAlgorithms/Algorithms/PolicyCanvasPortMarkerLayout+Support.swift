@@ -92,13 +92,26 @@ func policyCanvasPortMarkerCoordinates(
   inset: CGFloat
 ) -> [CGFloat] {
   guard count > 1 else {
-    return [min(max(base, inset), extent - inset)]
+    return [
+      PolicyCanvasLayout.clampedRouteGridRound(
+        base,
+        lowerBound: inset,
+        upperBound: extent - inset
+      )
+    ]
   }
   let available = max(0, extent - (inset * 2))
-  let step = min(spacing, available / CGFloat(count - 1))
+  let step = max(
+    PolicyCanvasLayout.routeChannelStep,
+    PolicyCanvasLayout.routeGridFloor(min(spacing, available / CGFloat(count - 1)))
+  )
   let span = step * CGFloat(count - 1)
-  let start = min(max(base - (span / 2), inset), extent - inset - span)
-  return (0..<count).map { start + (CGFloat($0) * step) }
+  let start = PolicyCanvasLayout.clampedRouteGridRound(
+    base - (span / 2),
+    lowerBound: inset,
+    upperBound: extent - inset - span
+  )
+  return (0..<count).map { PolicyCanvasLayout.routeGridRound(start + (CGFloat($0) * step)) }
 }
 
 func policyCanvasPortMarkerInset() -> CGFloat {

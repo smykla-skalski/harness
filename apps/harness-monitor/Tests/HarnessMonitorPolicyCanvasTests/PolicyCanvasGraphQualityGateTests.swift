@@ -175,6 +175,31 @@ struct PolicyCanvasGraphQualityGateTests {
     )
   }
 
+  @Test func allSamplesAvoidParallelCorridors() async throws {
+    var violations: [String] = []
+    for sample in PolicyCanvasLabSamples.all {
+      let routed = try await routedSample(sampleID: sample.id)
+      let count = routed.report.count(for: .corridorParallel)
+      guard count > 0 else {
+        continue
+      }
+      violations.append(
+        [
+          "\(sample.id): \(count) parallel corridors",
+          Self.corridorParallelDetail(routed.report),
+          Self.corridorParallelRouteDetail(routed.report, routes: routed.routes),
+        ].joined(separator: " - ")
+      )
+    }
+    #expect(
+      violations.isEmpty,
+      """
+      lab sample routes should keep parallel corridors at least one lane apart
+      violations=\(violations.joined(separator: "\n"))
+      """
+    )
+  }
+
   /// Deterministic dump of every sample's report to
   /// `tmp/policy-canvas/graph-quality-baseline.txt` (resolved from `#filePath`,
   /// matching the fan-in dump convention). Captures the baseline used to set the
@@ -369,6 +394,7 @@ struct PolicyCanvasGraphQualityGateTests {
       "port_detached: \(report.count(for: .portDetached))",
       "label_overlaps: \(report.count(for: .labelOverlaps))",
       "corridor_parallel: \(report.count(for: .corridorParallel))",
+      "corridor_parallel_detail: \(Self.corridorParallelDetail(report))",
       "corridor_parallel_route_detail: \(Self.corridorParallelRouteDetail(report, routes: timedRoute.output.routes))",
       "corridor_reuse: \(report.count(for: .corridorReuse))",
       "corridor_reuse_route_detail: \(Self.corridorReuseRouteDetail(report, routes: timedRoute.output.routes))",
@@ -526,6 +552,22 @@ struct PolicyCanvasGraphQualityGateTests {
       .sorted { $0.key < $1.key }
       .map { key, route in "\(key)=\(route.points)" }
       .joined(separator: ";")
+  }
+
+  private static func corridorParallelDetail(_ report: PolicyCanvasGraphQualityReport) -> String {
+    report.corridors
+      .filter { $0.kind == .parallelTooClose }
+      .prefix(80)
+      .map { violation in
+        let axis = violation.isHorizontal ? "h" : "v"
+        return [
+          "\(violation.edgeA)~\(violation.edgeB)",
+          axis,
+          String(format: "sep=%.3f", violation.separation),
+          "\(violation.overlapStart)->\(violation.overlapEnd)",
+        ].joined(separator: ":")
+      }
+      .joined(separator: ",")
   }
 
   private static func portSpacingDetail(
@@ -1065,7 +1107,7 @@ struct PolicyCanvasGraphQualityGateTests {
         "elk.direction": "RIGHT",
         "elk.edgeRouting": "ORTHOGONAL",
         "elk.spacing.nodeNode": "80",
-        "elk.spacing.edgeEdge": "38",
+        "elk.spacing.edgeEdge": "\(Int(PolicyCanvasLayout.defaultEdgeLineSpacing.rounded()))",
         "elk.spacing.edgeNode": "40",
         "elk.layered.spacing.nodeNodeBetweenLayers": "120",
       ],

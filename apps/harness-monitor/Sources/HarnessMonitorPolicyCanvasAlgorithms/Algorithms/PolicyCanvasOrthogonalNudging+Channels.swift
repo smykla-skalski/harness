@@ -79,14 +79,21 @@ extension PolicyCanvasOrthogonalNudgeProcessor {
       return []
     }
     let needed = CGFloat(count - 1) * laneGap
-    let gap = needed <= available ? laneGap : available / CGFloat(count - 1)
+    let gap =
+      needed <= available
+      ? laneGap
+      : PolicyCanvasLayout.routeGridFloor(available / CGFloat(count - 1))
+    guard gap >= PolicyCanvasLayout.routeChannelStep else {
+      return []
+    }
     // Centre of the asymmetric free band relative to the channel lane: positive
     // means the band can sit below (or right of) the original line.
     let bandCenter = (downRoom - upRoom) / 2
     let laneCenter = ordered.map(\.position).reduce(0, +) / CGFloat(count)
     let center = CGFloat(count - 1) / 2
+    let firstLane = PolicyCanvasLayout.routeGridRound(laneCenter + bandCenter - (center * gap))
     return ordered.enumerated().map { rank, segment in
-      let targetPosition = laneCenter + bandCenter + (CGFloat(rank) - center) * gap
+      let targetPosition = firstLane + (CGFloat(rank) * gap)
       return (segment, targetPosition - segment.position)
     }
   }

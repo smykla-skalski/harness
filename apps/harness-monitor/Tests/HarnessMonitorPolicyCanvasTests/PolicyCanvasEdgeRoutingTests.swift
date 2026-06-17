@@ -24,15 +24,15 @@ struct PolicyCanvasEdgeRoutingTests {
     #expect(route.points.last == CGPoint(x: 200, y: 100))
   }
 
-  @Test("Default route midX uses 0.46 * horizontalDistance with a 72pt floor")
+  @Test("Default route midX snaps the weighted distance to the route grid")
   func defaultRouteMidX() {
     let route = PolicyCanvasEdgeRoute(
       source: CGPoint(x: 0, y: 0),
       target: CGPoint(x: 200, y: 100),
       lane: 0
     )
-    #expect(route.points[1].x == 92)
-    #expect(route.points[2].x == 92)
+    #expect(route.points[1].x == 90)
+    #expect(route.points[2].x == 90)
   }
 
   @Test("Lane offset spreads parallel default routes")

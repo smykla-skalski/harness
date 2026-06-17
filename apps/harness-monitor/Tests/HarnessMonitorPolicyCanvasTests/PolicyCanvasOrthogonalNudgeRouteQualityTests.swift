@@ -141,6 +141,60 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
     }
   }
 
+  @Test("fast splitter clears near-parallel vertical corridors")
+  func fastSplitterClearsNearParallelVerticalCorridors() {
+    var routes: [String: PolicyCanvasEdgeRoute] = [
+      "near-a": verticalCorridorRoute(x: 100, sourceY: 0, targetY: 240),
+      "near-b": verticalCorridorRoute(x: 105, sourceY: 20, targetY: 260),
+      "near-c": verticalCorridorRoute(x: 115, sourceY: 40, targetY: 280),
+    ]
+    for index in 0..<81 {
+      routes["zz-dummy-\(index)"] = isolatedDummyRoute(index: index)
+    }
+
+    let processed = PolicyCanvasOrthogonalNudgingRouteProcessing()
+      .routesClearingRemainingCollinearReuse(routes, obstacles: [])
+    let pairs = parallelCorridorPairs(routes: processed)
+
+    #expect(
+      pairs.isEmpty,
+      "fast splitter left corridors closer than \(PolicyCanvasLayout.defaultEdgeLineSpacing): \(pairs)"
+    )
+  }
+
+  @Test("fast splitter clears source-side two-route vertical corridors")
+  func fastSplitterClearsSourceSideTwoRouteVerticalCorridors() {
+    var routes: [String: PolicyCanvasEdgeRoute] = [
+      "switch-human": route(
+        points: [
+          CGPoint(x: 8820, y: 1835),
+          CGPoint(x: 8870, y: 1835),
+          CGPoint(x: 8870, y: 2175),
+          CGPoint(x: 9660, y: 2175),
+        ]),
+      "switch-risk": route(
+        points: [
+          CGPoint(x: 8820, y: 1815),
+          CGPoint(x: 8860, y: 1815),
+          CGPoint(x: 8860, y: 1995),
+          CGPoint(x: 9280, y: 1995),
+          CGPoint(x: 9320, y: 1995),
+        ]),
+    ]
+    for index in 0..<81 {
+      routes["zz-dummy-\(index)"] = isolatedDummyRoute(index: index)
+    }
+
+    let processed = PolicyCanvasOrthogonalNudgingRouteProcessing()
+      .routesClearingRemainingCollinearReuse(routes, obstacles: [])
+    let pairs = parallelCorridorPairs(routes: processed)
+
+    #expect(
+      pairs.isEmpty,
+      "fast splitter left source-side corridors closer than \(PolicyCanvasLayout.defaultEdgeLineSpacing): \(pairs)"
+    )
+  }
+
   @Test("even corridor stacks anchor one route on the original lane")
   func evenCorridorStacksAnchorOneRouteOnOriginalLane() {
     let prepared = PolicyCanvasPreparedRouteInput(
@@ -309,6 +363,45 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
       .map(\.axisCoordinate)
   }
 
+  private func verticalCorridorRoute(
+    x: CGFloat,
+    sourceY: CGFloat,
+    targetY: CGFloat
+  ) -> PolicyCanvasEdgeRoute {
+    let points = [
+      CGPoint(x: 0, y: sourceY),
+      CGPoint(x: x, y: sourceY),
+      CGPoint(x: x, y: targetY),
+      CGPoint(x: 320, y: targetY),
+    ]
+    return PolicyCanvasEdgeRoute(
+      points: points,
+      labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: points)
+    )
+  }
+
+  private func isolatedDummyRoute(index: Int) -> PolicyCanvasEdgeRoute {
+    let x = CGFloat(10_000 + index * 100)
+    let y = CGFloat(10_000 + index * 60)
+    let points = [
+      CGPoint(x: x, y: y),
+      CGPoint(x: x + 40, y: y),
+      CGPoint(x: x + 40, y: y + 40),
+      CGPoint(x: x + 80, y: y + 40),
+    ]
+    return PolicyCanvasEdgeRoute(
+      points: points,
+      labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: points)
+    )
+  }
+
+  private func route(points: [CGPoint]) -> PolicyCanvasEdgeRoute {
+    PolicyCanvasEdgeRoute(
+      points: points,
+      labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: points)
+    )
+  }
+
   // MARK: - Metrics (mirrors PolicyCanvasFanInChannelTests; helpers there are private)
 
   private func interiorOverlapPairs(
@@ -348,6 +441,39 @@ struct PolicyCanvasOrthogonalNudgeRouteQualityTests {
       }
     }
     return best
+  }
+
+  private func parallelCorridorPairs(routes: [String: PolicyCanvasEdgeRoute]) -> [String] {
+    let interior = routes.keys.sorted().compactMap { edgeID -> (
+      id: String,
+      segments: [PolicyCanvasRouteSegment]
+    )? in
+      guard let route = routes[edgeID] else {
+        return nil
+      }
+      return (edgeID, Array(policyCanvasRouteSegments(route).dropFirst().dropLast()))
+    }
+    var pairs: [String] = []
+    for left in interior.indices {
+      for right in interior.index(after: left)..<interior.endIndex {
+        for leftSegment in interior[left].segments {
+          for rightSegment in interior[right].segments
+          where leftSegment.sharesParallelCorridor(
+            with: rightSegment,
+            minimumSpacing: PolicyCanvasLayout.defaultEdgeLineSpacing
+          ) && leftSegment.overlap(with: rightSegment) >= Self.overlapThreshold {
+            pairs.append(
+              [
+                "\(interior[left].id) ~ \(interior[right].id)",
+                leftSegment.isHorizontal ? "h" : "v",
+                String(format: "sep=%.3f", leftSegment.axisDistance(to: rightSegment)),
+              ].joined(separator: ":")
+            )
+          }
+        }
+      }
+    }
+    return pairs
   }
 
   private func crossingPairs(

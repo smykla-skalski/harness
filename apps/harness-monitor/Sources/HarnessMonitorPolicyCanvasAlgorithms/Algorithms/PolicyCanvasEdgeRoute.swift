@@ -129,7 +129,7 @@ public struct PolicyCanvasEdgeRoute: Equatable, Sendable {
         groupFrame: sourceGroupFrame,
         lane: lane
       )
-    } else if horizontalDistance > 260, abs(source.y - target.y) < 96 {
+    } else if horizontalDistance > 260, abs(source.y - target.y) < PolicyCanvasLayout.gridSize * 5 {
       (points, labelPosition) = Self.wideRoute(
         source: source,
         target: target,
@@ -166,12 +166,20 @@ public struct PolicyCanvasEdgeRoute: Equatable, Sendable {
     // which let routes crash straight through obstacles between source and
     // target whenever target.x < source.x.
     let horizontalRange = min(source.x, target.x)...max(source.x, target.x)
-    let yBand = min(source.y, target.y) - 18...max(source.y, target.y) + 18
+    let yBand = ClosedRange(
+      uncheckedBounds: (
+        lower: min(source.y, target.y) - PolicyCanvasLayout.defaultEdgeLineSpacing,
+        upper: max(source.y, target.y) + PolicyCanvasLayout.defaultEdgeLineSpacing
+      )
+    )
     return groups.compactMap { group in
       guard group.id != sourceGroupID, group.id != targetGroupID else {
         return nil
       }
-      let frame = group.frame.insetBy(dx: -18, dy: -18)
+      let frame = group.frame.insetBy(
+        dx: -PolicyCanvasLayout.defaultEdgeLineSpacing,
+        dy: -PolicyCanvasLayout.defaultEdgeLineSpacing
+      )
       return crosses(frame: frame, horizontalRange: horizontalRange, yBand: yBand, source: source)
         ? frame
         : nil
@@ -203,16 +211,20 @@ public struct PolicyCanvasEdgeRoute: Equatable, Sendable {
     laneOffset: CGFloat
   ) -> ([CGPoint], CGPoint) {
     let direction: CGFloat = target.x >= source.x ? 1 : -1
-    let leadDistance = 48 + laneOffset
+    let leadDistance =
+      PolicyCanvasLayout.edgePortTurnMinimumLead + (PolicyCanvasLayout.routeChannelStep * 2)
+      + laneOffset
     let sourceRunX = source.x + leadDistance * direction
     let targetRunX = target.x - leadDistance * direction
-    let topBase = (blockers.map(\.minY).min() ?? PolicyCanvasLayout.initialContentOrigin.y) - 58
+    let topBase =
+      (blockers.map(\.minY).min() ?? PolicyCanvasLayout.initialContentOrigin.y)
+      - (PolicyCanvasLayout.gridSize * 3)
     let topLaneY = topBase - (CGFloat(lane % 6) * PolicyCanvasLayout.edgeLabelLaneSpacing)
     let bottomLaneY =
       (blockers.map(\.maxY).max() ?? PolicyCanvasLayout.initialContentOrigin.y)
-      + 64
+      + (PolicyCanvasLayout.gridSize * 3)
       + (CGFloat(lane % 6) * PolicyCanvasLayout.edgeLabelLaneSpacing)
-    let routedY = topLaneY >= 18 ? topLaneY : bottomLaneY
+    let routedY = topLaneY >= PolicyCanvasLayout.defaultEdgeLineSpacing ? topLaneY : bottomLaneY
     let points = [
       source,
       CGPoint(x: sourceRunX, y: source.y),
@@ -247,7 +259,7 @@ public struct PolicyCanvasEdgeRoute: Equatable, Sendable {
     let busX =
       gapMinX < gapMaxX
       ? min(gapMaxX, max(gapMinX, preferredBusX))
-      : source.x + max(72, (target.x - source.x) * 0.46)
+      : PolicyCanvasLayout.routeGridRound(source.x + max(80, (target.x - source.x) * 0.46))
     let sourceExitX = min(busX, sourceGroupFrame.maxX + PolicyCanvasLayout.edgeLabelNodeClearance)
     let routedSourceY = source.y + (CGFloat(lane) * PolicyCanvasLayout.edgeLabelLaneSpacing)
     let points = [
@@ -298,8 +310,8 @@ public struct PolicyCanvasEdgeRoute: Equatable, Sendable {
     let sourceRunX = source.x + 40 + laneOffset
     let targetRunX = target.x - 40 - laneOffset
     let topLaneY = max(
-      groupFrame.minY + 38,
-      min(source.y, target.y) - 52 - laneOffset
+      groupFrame.minY + (PolicyCanvasLayout.gridSize * 2),
+      min(source.y, target.y) - (PolicyCanvasLayout.gridSize * 3) - laneOffset
     )
     let points = [
       source,
@@ -324,8 +336,11 @@ public struct PolicyCanvasEdgeRoute: Equatable, Sendable {
     let busX = groupFrame.maxX + 340 + (laneSlot * PolicyCanvasLayout.edgeBusLaneSpacing)
     let targetRunY = target.y
     let labelY = min(
-      groupFrame.maxY - 38,
-      max(groupFrame.minY + 38, source.y + (laneSlot * PolicyCanvasLayout.edgeLabelLaneSpacing))
+      groupFrame.maxY - (PolicyCanvasLayout.gridSize * 2),
+      max(
+        groupFrame.minY + (PolicyCanvasLayout.gridSize * 2),
+        source.y + (laneSlot * PolicyCanvasLayout.edgeLabelLaneSpacing)
+      )
     )
     let points = [
       source,
@@ -345,11 +360,11 @@ public struct PolicyCanvasEdgeRoute: Equatable, Sendable {
     lane: Int,
     laneOffset: CGFloat
   ) -> ([CGPoint], CGPoint) {
-    let sourceRunX = source.x + 54 + laneOffset
-    let targetRunX = target.x - 54 - laneOffset
+    let sourceRunX = source.x + (PolicyCanvasLayout.gridSize * 3) + laneOffset
+    let targetRunX = target.x - (PolicyCanvasLayout.gridSize * 3) - laneOffset
     let topLaneY = max(
-      PolicyCanvasLayout.initialContentOrigin.y + 16,
-      min(source.y, target.y) - 52 - laneOffset
+      PolicyCanvasLayout.initialContentOrigin.y + PolicyCanvasLayout.gridSize,
+      min(source.y, target.y) - (PolicyCanvasLayout.gridSize * 3) - laneOffset
     )
     let points = [
       source,
@@ -371,12 +386,13 @@ public struct PolicyCanvasEdgeRoute: Equatable, Sendable {
   ) -> ([CGPoint], CGPoint) {
     let midX =
       horizontalDistance >= 0
-      ? source.x + max(72, horizontalDistance * 0.46) + laneOffset
-      : max(source.x, target.x) + 84 + laneOffset
+      ? source.x + max(80, horizontalDistance * 0.46) + laneOffset
+      : max(source.x, target.x) + 80 + laneOffset
+    let snappedMidX = PolicyCanvasLayout.routeGridRound(midX)
     let points = [
       source,
-      CGPoint(x: midX, y: source.y),
-      CGPoint(x: midX, y: target.y),
+      CGPoint(x: snappedMidX, y: source.y),
+      CGPoint(x: snappedMidX, y: target.y),
       target,
     ]
     return (points, labelPosition(for: points, lane: lane))
@@ -406,10 +422,19 @@ public struct PolicyCanvasEdgeRoute: Equatable, Sendable {
     return CGPoint(
       x: segment.0.x + ((segment.1.x - segment.0.x) * positionFraction),
       y: segment.0.y + ((segment.1.y - segment.0.y) * positionFraction)
-    )
+    ).snappedToPolicyCanvasRouteGrid()
   }
 
   private static func segmentLength(_ segment: (CGPoint, CGPoint)) -> CGFloat {
     hypot(segment.1.x - segment.0.x, segment.1.y - segment.0.y)
+  }
+}
+
+extension CGPoint {
+  fileprivate func snappedToPolicyCanvasRouteGrid() -> CGPoint {
+    CGPoint(
+      x: PolicyCanvasLayout.routeGridRound(x),
+      y: PolicyCanvasLayout.routeGridRound(y)
+    )
   }
 }
