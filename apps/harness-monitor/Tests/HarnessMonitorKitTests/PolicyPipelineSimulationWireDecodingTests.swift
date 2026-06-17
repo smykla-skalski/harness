@@ -82,4 +82,39 @@ struct PolicyPipelineSimulationWireDecodingTests {
     #expect(provided == "json")
     #expect(required == "text")
   }
+
+  @Test("simulation result maps to the flat app model keeping issue ids")
+  func mapsSimulationResultToAppModel() throws {
+    // This is the end-to-end regression: decode the daemon payload through the
+    // wire type (plain decoder) then map to the flat app model the validation
+    // panel consumes. Before the fix, simulate decoded via convertFromSnakeCase
+    // and node_id/edge_id/node_ids dropped to nil/[]; here they survive.
+    let json = #"""
+    {"revision":4,"trace_id":"trace-2","simulated_at":"2026-06-17T00:00:00Z","succeeded":false,"validation":{"issues":[{"issue":"dangling_edge","edge_id":"e-9","node_id":"n-9"},{"issue":"cycle","node_ids":["a","b"]}]},"decisions":[{"action":"merge_pr","decision":{"decision":"deny","reason_code":"checks_not_green","policy_version":"v1"},"visited_node_ids":["n-9"],"policy_trace_ids":["t-2"]}],"policy_trace_ids":["t-2"],"has_runtime_boundaries":false}
+    """#
+    let wire = try decoder.decode(
+      PolicyPipelineSimulationResultWire.self,
+      from: Data(json.utf8)
+    )
+    let model = TaskBoardPolicyPipelineSimulationResult(wire: wire)
+
+    #expect(model.traceId == "trace-2")
+    #expect(model.validation.isValid == false)
+    #expect(model.validation.issues.count == 2)
+
+    let dangling = model.validation.issues[0]
+    #expect(dangling.code == "dangling_edge")
+    #expect(dangling.edgeId == "e-9")
+    #expect(dangling.nodeId == "n-9")
+    #expect(dangling.message == "Dangling edge e-9 references node n-9")
+
+    let cycle = model.validation.issues[1]
+    #expect(cycle.code == "cycle")
+    #expect(cycle.nodeIds == ["a", "b"])
+
+    #expect(model.decisions.count == 1)
+    #expect(model.decisions[0].action == .mergePr)
+    #expect(model.decisions[0].decision.decision == "deny")
+    #expect(model.decisions[0].decision.reasonCode == "checks_not_green")
+  }
 }

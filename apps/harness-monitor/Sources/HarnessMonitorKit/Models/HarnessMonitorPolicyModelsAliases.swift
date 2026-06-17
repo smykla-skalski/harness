@@ -15,3 +15,12 @@ public typealias TaskBoardPolicyPipelineSimulatedDecision =
   HarnessMonitorPolicyModels.TaskBoardPolicyPipelineSimulatedDecision
 public typealias TaskBoardPolicyPipelineSimulationResult =
   HarnessMonitorPolicyModels.TaskBoardPolicyPipelineSimulationResult
+
+// The generated simulate/audit wire types own the daemon snake_case decode; the
+// API client and audit mapping decode these through the plain decoder then map to
+// the hand models above. Surface them into Kit so those call sites reach them
+// without importing the models module directly.
+public typealias PolicyPipelineSimulationResultWire =
+  HarnessMonitorPolicyModels.PolicyPipelineSimulationResultWire
+public typealias PolicyPipelineAuditSummaryWire =
+  HarnessMonitorPolicyModels.PolicyPipelineAuditSummaryWire
