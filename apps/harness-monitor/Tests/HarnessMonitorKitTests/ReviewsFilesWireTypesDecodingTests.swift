@@ -4,12 +4,16 @@ import Testing
 @testable import HarnessMonitorKit
 
 /// Wire-contract regression for the reviews files-core types generated from
-/// src/reviews/files/{mod,blob,viewed}.rs. These *Wire types own the snake_case
-/// shape (explicit CodingKeys, plain decoder) and prove the daemon payload
-/// decodes: the file enums, the nested rate-limit snapshot, the mime enum, and
-/// the language_hint field whose Rust type (HarnessCodeLanguage) is renamed to
-/// the Swift hand enum HarnessReviewFileLanguage by the generator's rename map.
-/// Mapping these wire types to the rich hand models is a follow-up.
+/// src/reviews/files/{mod,blob,viewed,preview,service,local_clone}.rs. These
+/// *Wire types own the snake_case shape (explicit CodingKeys, plain decoder) and
+/// prove the daemon payload decodes: the file enums, the nested rate-limit
+/// snapshot, the mime enum, the language_hint field whose Rust type
+/// (HarnessCodeLanguage) is renamed to the Swift hand enum
+/// HarnessReviewFileLanguage by the generator's rename map, the preview
+/// request/response (line_limit defaulting from files/preview.rs), and the two
+/// cross-wire facade types (FilesLargeDiffStrategy, LocalCloneListEntry) whose
+/// daemon-internal siblings are skipped. Mapping these wire types to the rich
+/// hand models is a follow-up.
 @Suite("Reviews files wire types decoding")
 struct ReviewsFilesWireTypesDecodingTests {
   private let decoder = PolicyWireCoding.decoder
@@ -49,5 +53,52 @@ struct ReviewsFilesWireTypesDecodingTests {
     #expect(snapshot.limit == 5000)
     #expect(snapshot.resetAt == "2026-06-15T00:00:00Z")
     #expect(snapshot.cost == 1)
+  }
+
+  @Test("decodes a preview request, defaulting the omitted line limit to 1000")
+  func decodesPreviewRequest() throws {
+    // line_limit is omitted, so it resolves the preview_line_limit default (1000)
+    // collected from files/preview.rs; large_diff_strategy is absent -> nil.
+    let json = #"""
+    {"pull_request_id":"pr-9","head_ref_oid_expected":"abc","paths":["src/lib.rs"]}
+    """#
+    let request = try decoder.decode(ReviewsFilesPreviewRequestWire.self, from: Data(json.utf8))
+
+    #expect(request.pullRequestId == "pr-9")
+    #expect(request.paths == ["src/lib.rs"])
+    #expect(request.lineLimit == 1000)
+    #expect(request.largeDiffStrategy == nil)
+  }
+
+  @Test("decodes a preview response with one bounded preview row")
+  func decodesPreviewResponse() throws {
+    let json = #"""
+    {"pull_request_id":"pr-9","previews":[{"path":"src/lib.rs","patch":"@@ -1 +1 @@\n","status":"modified","additions":1,"deletions":0,"served_by":"local_clone","line_count":1,"line_limit":1000,"has_more":false}],"drifted":false,"current_head_ref_oid":"abc","fetched_at":"2026-06-15T00:00:00Z"}
+    """#
+    let response = try decoder.decode(ReviewsFilesPreviewResponseWire.self, from: Data(json.utf8))
+
+    #expect(response.previews.count == 1)
+    #expect(response.previews.first?.servedBy == .localClone)
+    #expect(response.drifted == false)
+    #expect(response.rateLimitSnapshot == nil)
+  }
+
+  @Test("decodes the large-diff strategy and a local clone list entry")
+  func decodesLargeDiffStrategyAndClonesEntry() throws {
+    // FilesLargeDiffStrategy is snake_case; serde splits the GitHub word so
+    // ForceGitHubRest serializes as force_git_hub_rest.
+    #expect(
+      try decoder.decode(FilesLargeDiffStrategyWire.self, from: Data("\"force_git_hub_rest\"".utf8))
+        == .forceGitHubRest
+    )
+
+    let json = #"""
+    {"repo_full_name":"o/r","repo_key_segment":"abcd1234","size_bytes":4096,"created_at":"2026-06-15T00:00:00Z","last_used_at":"2026-06-15T01:00:00Z","last_fetched_at":"2026-06-15T02:00:00Z"}
+    """#
+    let entry = try decoder.decode(LocalCloneListEntryWire.self, from: Data(json.utf8))
+
+    #expect(entry.repoFullName == "o/r")
+    #expect(entry.sizeBytes == 4096)
+    #expect(entry.lastFetchedAt == "2026-06-15T02:00:00Z")
   }
 }

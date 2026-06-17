@@ -802,6 +802,14 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "ReviewFileViewedOutcome",
     "ReviewFilesViewedResult",
     "ReviewsFilesViewedResponse",
+    // reviews files preview + local-clone facade: the preview request/response and
+    // the two cross-wire facade types. FilesLargeDiffStrategy is referenced by the
+    // preview/patch requests; LocalCloneListEntry is the Settings clones row.
+    "ReviewsFilesPreviewRequest",
+    "ReviewFilePreview",
+    "ReviewsFilesPreviewResponse",
+    "FilesLargeDiffStrategy",
+    "LocalCloneListEntry",
     // reviews timeline (timeline/types.rs + mod.rs): wire/model split, generated
     // generate-only (decode contract test, no hand mapping). Actor -> ActorWire
     // dodges the Swift `actor` keyword; ReviewTimelineEntry is an internally
@@ -898,12 +906,14 @@ const SKIP_TYPES: &[&str] = &[
     // file handled with the action-preview cluster.
     "ReviewAuthorAssociation",
     "ReviewActionPreviewKind",
-    // reviews files-core: the preview types use a default fn (preview_line_limit)
-    // defined in files/preview.rs, a separate file from this module's defaults
-    // source. Deferred to a preview sub-cluster that includes preview.rs.
-    "ReviewsFilesPreviewRequest",
-    "ReviewFilePreview",
-    "ReviewsFilesPreviewResponse",
+    // reviews files service.rs/local_clone.rs: daemon-internal serde types behind
+    // the FilesLargeDiffStrategy / LocalCloneListEntry facade. StrategyConfig is
+    // daemon config; RepoKey/RegistryEntry/LocalCloneRegistry are the on-disk
+    // clones registry. None cross the wire to Swift.
+    "StrategyConfig",
+    "RepoKey",
+    "RegistryEntry",
+    "LocalCloneRegistry",
 ];
 
 /// Whether a Rust type is on the generator's skip list (see `SKIP_TYPES`).
@@ -1555,12 +1565,19 @@ const REVIEWS_BODY_UPDATE_SOURCE: &str = include_str!("../src/reviews/body_updat
 const REVIEWS_FILE_COMMENT_SOURCE: &str = include_str!("../src/reviews/file_comment.rs");
 const REVIEWS_THREAD_RESOLVE_SOURCE: &str =
     include_str!("../src/reviews/review_thread_resolve.rs");
-// reviews files-core: the file list/patch/preview/blob/viewed surface. All
-// serde types here are facade types with Swift hand models; the internal
-// strategy/local-clone types live in service.rs/local_clone.rs (a later pass).
+// reviews files-core: the file list/patch/preview/blob/viewed surface plus the
+// two cross-wire facade types from service.rs/local_clone.rs. preview.rs carries
+// no types (the preview structs live in mod.rs) but supplies the
+// `preview_line_limit` default fn and its const. service.rs/local_clone.rs each
+// expose one wire type (FilesLargeDiffStrategy, LocalCloneListEntry); their
+// daemon-internal serde types are SKIP_TYPES.
 const REVIEWS_FILES_MOD_SOURCE: &str = include_str!("../src/reviews/files/mod.rs");
 const REVIEWS_FILES_BLOB_SOURCE: &str = include_str!("../src/reviews/files/blob.rs");
 const REVIEWS_FILES_VIEWED_SOURCE: &str = include_str!("../src/reviews/files/viewed.rs");
+const REVIEWS_FILES_PREVIEW_SOURCE: &str = include_str!("../src/reviews/files/preview.rs");
+const REVIEWS_FILES_SERVICE_SOURCE: &str = include_str!("../src/reviews/files/service.rs");
+const REVIEWS_FILES_LOCAL_CLONE_SOURCE: &str =
+    include_str!("../src/reviews/files/local_clone.rs");
 // reviews timeline: the PR timeline entries. ReviewTimelineEntry is internally
 // tagged (tag="kind") wrapping newtype entry structs (the generator re-inlines
 // the payload alongside the tag); the entries carry chrono DateTime, a boxed
@@ -1677,12 +1694,16 @@ fn modules() -> Vec<GeneratedModule> {
         GeneratedModule {
             output:
                 "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsFilesWireTypes.generated.swift",
-            description: "the Rust reviews file list, patch, preview, blob and viewed types",
-            defaults: &[REVIEWS_FILES_MOD_SOURCE],
+            description:
+                "the Rust reviews file list, patch, preview, blob, viewed and local-clone types",
+            defaults: &[REVIEWS_FILES_MOD_SOURCE, REVIEWS_FILES_PREVIEW_SOURCE],
             sources: &[
                 REVIEWS_FILES_MOD_SOURCE,
                 REVIEWS_FILES_BLOB_SOURCE,
                 REVIEWS_FILES_VIEWED_SOURCE,
+                REVIEWS_FILES_PREVIEW_SOURCE,
+                REVIEWS_FILES_SERVICE_SOURCE,
+                REVIEWS_FILES_LOCAL_CLONE_SOURCE,
             ],
         },
         GeneratedModule {
