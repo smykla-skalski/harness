@@ -32,9 +32,10 @@ struct TaskBoardItemWireDecodingTests {
     #expect(ref.syncState?.status == .todo)
 
     #expect(item.planning.approvedBy == "lead")
-    #expect(item.workflow.status == .running)
-    #expect(item.workflow.attempts == 2)
-    #expect(item.workflow.prNumber == 42)
+    let workflow = try #require(item.workflow)
+    #expect(workflow.status == .running)
+    #expect(workflow.attempts == 2)
+    #expect(workflow.prNumber == 42)
     #expect(item.usage.inputTokens == 100)
     #expect(item.usage.costUsd == 0.25)
   }
@@ -57,8 +58,7 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.externalRefs.isEmpty)
     #expect(item.importedFromProvider == nil)
     #expect(item.planning.summary == nil)
-    #expect(item.workflow.status == .idle)
-    #expect(item.workflow.attempts == 0)
+    #expect(item.workflow == nil)
     #expect(item.usage.inputTokens == nil)
     #expect(item.deletedAt == nil)
   }

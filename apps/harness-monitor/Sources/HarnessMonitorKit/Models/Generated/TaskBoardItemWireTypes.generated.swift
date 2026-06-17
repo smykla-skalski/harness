@@ -17,7 +17,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var externalRefs: [ExternalRefWire]
   public var importedFromProvider: ExternalRefProviderWire?
   public var planning: PlanningStateWire
-  public var workflow: TaskBoardWorkflowStateWire
+  public var workflow: TaskBoardWorkflowStateWire?
   public var sessionId: String?
   public var workItemId: String?
   public var usage: TaskUsageWire
@@ -25,7 +25,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var updatedAt: String
   public var deletedAt: String?
 
-  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .new, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire = TaskBoardWorkflowStateWire(), sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), createdAt: String, updatedAt: String, deletedAt: String? = nil) {
+  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .new, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), createdAt: String, updatedAt: String, deletedAt: String? = nil) {
     self.schemaVersion = schemaVersion
     self.id = id
     self.title = title
@@ -63,7 +63,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     externalRefs = try container.decodeIfPresent([ExternalRefWire].self, forKey: .externalRefs) ?? []
     importedFromProvider = try container.decodeIfPresent(ExternalRefProviderWire.self, forKey: .importedFromProvider)
     planning = try container.decodeIfPresent(PlanningStateWire.self, forKey: .planning) ?? PlanningStateWire()
-    workflow = try container.decodeIfPresent(TaskBoardWorkflowStateWire.self, forKey: .workflow) ?? TaskBoardWorkflowStateWire()
+    workflow = try container.decodeIfPresent(TaskBoardWorkflowStateWire.self, forKey: .workflow)
     sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
     workItemId = try container.decodeIfPresent(String.self, forKey: .workItemId)
     usage = try container.decodeIfPresent(TaskUsageWire.self, forKey: .usage) ?? TaskUsageWire()

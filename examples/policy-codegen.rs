@@ -1341,6 +1341,7 @@ struct SerdeField {
     default_fn: Option<String>,
     has_default: bool,
     flatten: bool,
+    skip_serializing_if: Option<String>,
 }
 
 /// The identifiers inside every `#[derive(...)]` on an item.
@@ -1421,6 +1422,7 @@ fn serde_field(attrs: &[Attribute]) -> SerdeField {
     let mut default_fn = None;
     let mut has_default = false;
     let mut flatten = false;
+    let mut skip_serializing_if = None;
     for attr in attrs {
         if !attr.path().is_ident("serde") {
             continue;
@@ -1428,6 +1430,7 @@ fn serde_field(attrs: &[Attribute]) -> SerdeField {
         let _ = attr.parse_nested_meta(|meta| {
             let is_default = meta.path.is_ident("default");
             let is_rename = meta.path.is_ident("rename");
+            let is_skip = meta.path.is_ident("skip_serializing_if");
             if is_default {
                 has_default = true;
             }
@@ -1441,6 +1444,8 @@ fn serde_field(attrs: &[Attribute]) -> SerdeField {
                         default_fn = Some(text.value());
                     } else if is_rename {
                         rename = Some(text.value());
+                    } else if is_skip {
+                        skip_serializing_if = Some(text.value());
                     }
                 }
             }
@@ -1452,6 +1457,7 @@ fn serde_field(attrs: &[Attribute]) -> SerdeField {
         default_fn,
         has_default,
         flatten,
+        skip_serializing_if,
     }
 }
 
@@ -1577,7 +1583,27 @@ fn build_symbol_table(sources: &[&str]) -> SymbolTable {
 }
 
 /// Build Swift field descriptors from named Rust fields.
+/// `(Rust struct name, Rust field name)` pairs whose value-typed field the app
+/// models as OPTIONAL rather than a defaulted value. These fields carry
+/// `skip_serializing_if = "*::is_default"`, so the daemon omits them when they
+/// equal their `Default`, and the hand model distinguishes that absence (`nil`)
+/// from a present non-default value. The generated wire field then decodes with a
+/// bare `decodeIfPresent` (no `?? Default()` coalesce) so absence maps to `nil`,
+/// matching the hand model the wire/model split maps into. Keyed by the Rust
+/// names so the lookup runs before the `Wire` suffix is applied. Guarded in
+/// `build_fields`: a listed field must actually carry a `*::is_default` skip
+/// predicate, so the list can never silently drop a value the daemon still sends.
+const SKIP_DEFAULT_OPTIONAL_FIELDS: &[(&str, &str)] = &[("TaskBoardItem", "workflow")];
+
+/// Whether `(struct_name, field_name)` is in `SKIP_DEFAULT_OPTIONAL_FIELDS`.
+fn is_skip_default_optional(struct_name: &str, field_name: &str) -> bool {
+    SKIP_DEFAULT_OPTIONAL_FIELDS
+        .iter()
+        .any(|(owner, field)| *owner == struct_name && *field == field_name)
+}
+
 fn build_fields(
+    struct_name: &str,
     fields: &FieldsNamed,
     defaults: &DefaultLiterals,
     symbols: &SymbolTable,
@@ -1591,25 +1617,50 @@ fn build_fields(
             // `#[serde(flatten)]` merges the referenced struct's fields into the
             // parent JSON object; Swift Codable has no flatten, so inline the
             // flattened struct's fields directly into the parent type.
-            if let Some(inner) =
-                type_ident(&field.ty).and_then(|ident| symbols.struct_fields.get(&ident))
-            {
-                out.extend(build_fields(inner, defaults, symbols, derives_default));
+            if let Some(ident) = type_ident(&field.ty) {
+                if let Some(inner) = symbols.struct_fields.get(&ident) {
+                    out.extend(build_fields(
+                        &ident,
+                        inner,
+                        defaults,
+                        symbols,
+                        derives_default,
+                    ));
+                }
             }
             continue;
         }
         let coding_key = serde.rename.clone().unwrap_or_else(|| name.clone());
         let swift_type = rust_type_to_swift(&field.ty);
         let rust_ident = type_ident(&field.ty);
-        let decode_default = field_decode_default(
-            &swift_type,
-            rust_ident.as_deref(),
-            &serde,
-            defaults,
-            symbols,
+        // An app-optional value field (see SKIP_DEFAULT_OPTIONAL_FIELDS): drop the
+        // `?? Default()` coalesce so an omitted value decodes to nil. The guard
+        // keeps the list honest - a listed field must be a `*::is_default` skip
+        // field, the only shape where absence and the default are interchangeable.
+        let force_optional = is_skip_default_optional(struct_name, &name);
+        assert!(
+            !force_optional
+                || serde
+                    .skip_serializing_if
+                    .as_deref()
+                    .is_some_and(|predicate| predicate.ends_with("::is_default")),
+            "SKIP_DEFAULT_OPTIONAL_FIELDS entry `{struct_name}.{name}` lacks a \
+             `*::is_default` skip predicate; it cannot drop a defaulted value"
         );
+        let optional = swift_type.optional || force_optional;
+        let decode_default = if force_optional {
+            None
+        } else {
+            field_decode_default(
+                &swift_type,
+                rust_ident.as_deref(),
+                &serde,
+                defaults,
+                symbols,
+            )
+        };
         let init_default = field_init_default(
-            swift_type.optional,
+            optional,
             &decode_default,
             &swift_type.name,
             rust_ident.as_deref(),
@@ -1620,7 +1671,7 @@ fn build_fields(
             property: escape_keyword(snake_to_camel(&name)),
             coding_key,
             type_name: swift_type.name,
-            optional: swift_type.optional,
+            optional,
             decode_default,
             init_default,
         });
@@ -1677,9 +1728,10 @@ fn build_struct(
         return None;
     };
     let derives = derives_default(&item.attrs);
+    let struct_name = item.ident.to_string();
     Some(SwiftStruct {
-        name: swift_type_name(&item.ident.to_string(), WIRE_SUFFIXED_TYPES),
-        fields: build_fields(fields, defaults, symbols, derives),
+        name: swift_type_name(&struct_name, WIRE_SUFFIXED_TYPES),
+        fields: build_fields(&struct_name, fields, defaults, symbols, derives),
     })
 }
 
@@ -1757,7 +1809,7 @@ fn build_tagged_variant(
     let payload = match &variant.fields {
         Fields::Unit => VariantPayload::Unit,
         Fields::Named(fields) => {
-            VariantPayload::Fields(build_fields(fields, defaults, symbols, false))
+            VariantPayload::Fields(build_fields(&name, fields, defaults, symbols, false))
         }
         Fields::Unnamed(fields) => {
             let mut iter = fields.unnamed.iter();
@@ -2669,6 +2721,54 @@ pub struct Drop { pub other: String }
             .map(|field| field.coding_key.as_str())
             .collect();
         assert_eq!(coding_keys, vec!["id", "starred", "is_draft", "trailing"]);
+    }
+
+    #[test]
+    fn app_optional_skip_default_field_decodes_without_coalesce() {
+        // TaskBoardItem.workflow is in SKIP_DEFAULT_OPTIONAL_FIELDS: the daemon
+        // omits it when default (`skip_serializing_if = "*::is_default"`) and the
+        // app models the absence as nil, so the wire field must be optional with a
+        // bare decodeIfPresent. A sibling Vec skip-empty field proves the rule does
+        // not over-reach to the ordinary defaulted collections.
+        let source = r#"
+            #[derive(Serialize, Deserialize)]
+            pub struct TaskBoardItem {
+                pub id: String,
+                #[serde(default, skip_serializing_if = "Vec::is_empty")]
+                pub tags: Vec<String>,
+                #[serde(default, skip_serializing_if = "TaskBoardWorkflowState::is_default")]
+                pub workflow: TaskBoardWorkflowState,
+            }
+        "#;
+        let symbols = build_symbol_table(&[source]);
+        let defaults = DefaultLiterals::new();
+        let file = syn::parse_file(source).expect("source parses");
+        let item = file
+            .items
+            .iter()
+            .find_map(|item| match item {
+                Item::Struct(item) if item.ident == "TaskBoardItem" => Some(item.clone()),
+                _ => None,
+            })
+            .expect("TaskBoardItem struct present");
+        let spec = build_struct(&item, &defaults, &symbols).expect("struct builds");
+
+        let workflow = spec
+            .fields
+            .iter()
+            .find(|field| field.property == "workflow")
+            .expect("workflow field present");
+        assert!(workflow.optional, "workflow is app-optional");
+        assert_eq!(workflow.decode_default, None, "no `?? Default()` coalesce");
+        assert_eq!(workflow.init_default.as_deref(), Some("nil"));
+
+        let tags = spec
+            .fields
+            .iter()
+            .find(|field| field.property == "tags")
+            .expect("tags field present");
+        assert!(!tags.optional, "tags keeps its empty-array default");
+        assert_eq!(tags.decode_default.as_deref(), Some("[]"));
     }
 
     #[test]
