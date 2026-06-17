@@ -781,6 +781,27 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "ReviewsFileCommentResponse",
     "ReviewsReviewThreadResolveRequest",
     "ReviewsReviewThreadResolveResponse",
+    // reviews files-core (files/mod.rs + blob.rs + viewed.rs): wire/model split.
+    // The hand models live in ReviewFile.swift / +Requests / +Previews (mixed),
+    // some renamed (ReviewImageMime -> HarnessReviewImageMime).
+    "ReviewsFilesListRequest",
+    "ReviewsFilesListResponse",
+    "ReviewFile",
+    "ReviewFileChangeType",
+    "ReviewFileViewedState",
+    "ReviewsRateLimitSnapshot",
+    "ReviewsFilesPatchRequest",
+    "ReviewsFilesPatchResponse",
+    "ReviewFileServedBy",
+    "ReviewFilePatch",
+    "ReviewImageMime",
+    "ReviewsFilesBlobRequest",
+    "ReviewsFilesBlobResponse",
+    "ReviewsFilesViewedRequest",
+    "ReviewFilesViewedTarget",
+    "ReviewFileViewedOutcome",
+    "ReviewFilesViewedResult",
+    "ReviewsFilesViewedResponse",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -804,6 +825,12 @@ const SKIP_TYPES: &[&str] = &[
     // file handled with the action-preview cluster.
     "ReviewAuthorAssociation",
     "ReviewActionPreviewKind",
+    // reviews files-core: the preview types use a default fn (preview_line_limit)
+    // defined in files/preview.rs, a separate file from this module's defaults
+    // source. Deferred to a preview sub-cluster that includes preview.rs.
+    "ReviewsFilesPreviewRequest",
+    "ReviewFilePreview",
+    "ReviewsFilesPreviewResponse",
 ];
 
 /// Whether a Rust type is on the generator's skip list (see `SKIP_TYPES`).
@@ -811,10 +838,25 @@ fn is_skipped_type(rust_name: &str) -> bool {
     SKIP_TYPES.contains(&rust_name)
 }
 
-/// The Swift name for a Rust wire type: the bare name, or `{name}Wire` when the
-/// app owns the bare name for a rich model. Applied to both type definitions
-/// and every reference so a `Vec<T>` field tracks the suffixed element name.
+/// Rust type names whose Swift hand model is named differently, mapped to that
+/// Swift name. Applied to references so a generated wire type that references a
+/// hand type (defined in another module) points at its real Swift name rather
+/// than the Rust name. Distinct from the `Wire` suffix, which is for types this
+/// generator also emits.
+const TYPE_RENAMES: &[(&str, &str)] = &[
+    // reviews ReviewFile.language_hint: Rust HarnessCodeLanguage is the Swift
+    // hand enum HarnessReviewFileLanguage.
+    ("HarnessCodeLanguage", "HarnessReviewFileLanguage"),
+];
+
+/// The Swift name for a Rust wire type: a hand rename when one applies, else the
+/// bare name, or `{name}Wire` when the app owns the bare name for a rich model.
+/// Applied to both type definitions and every reference so a `Vec<T>` field
+/// tracks the suffixed element name.
 fn swift_type_name(rust_name: &str, suffixed: &[&str]) -> String {
+    if let Some((_, swift_name)) = TYPE_RENAMES.iter().find(|(rust, _)| *rust == rust_name) {
+        return (*swift_name).to_string();
+    }
     if suffixed.contains(&rust_name) {
         format!("{rust_name}Wire")
     } else {
@@ -1415,6 +1457,12 @@ const REVIEWS_BODY_UPDATE_SOURCE: &str = include_str!("../src/reviews/body_updat
 const REVIEWS_FILE_COMMENT_SOURCE: &str = include_str!("../src/reviews/file_comment.rs");
 const REVIEWS_THREAD_RESOLVE_SOURCE: &str =
     include_str!("../src/reviews/review_thread_resolve.rs");
+// reviews files-core: the file list/patch/preview/blob/viewed surface. All
+// serde types here are facade types with Swift hand models; the internal
+// strategy/local-clone types live in service.rs/local_clone.rs (a later pass).
+const REVIEWS_FILES_MOD_SOURCE: &str = include_str!("../src/reviews/files/mod.rs");
+const REVIEWS_FILES_BLOB_SOURCE: &str = include_str!("../src/reviews/files/blob.rs");
+const REVIEWS_FILES_VIEWED_SOURCE: &str = include_str!("../src/reviews/files/viewed.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, an optional defaults source informing decode defaults, a short
@@ -1514,6 +1562,17 @@ fn modules() -> Vec<GeneratedModule> {
                 REVIEWS_BODY_UPDATE_SOURCE,
                 REVIEWS_FILE_COMMENT_SOURCE,
                 REVIEWS_THREAD_RESOLVE_SOURCE,
+            ],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsFilesWireTypes.generated.swift",
+            description: "the Rust reviews file list, patch, preview, blob and viewed types",
+            defaults: Some(REVIEWS_FILES_MOD_SOURCE),
+            sources: &[
+                REVIEWS_FILES_MOD_SOURCE,
+                REVIEWS_FILES_BLOB_SOURCE,
+                REVIEWS_FILES_VIEWED_SOURCE,
             ],
         },
     ]
@@ -1876,6 +1935,15 @@ ExpressibleByStringLiteral, CustomStringConvertible {
             "PolicyGraphNode"
         );
         assert_eq!(swift_type_name("Foo", &[]), "Foo");
+    }
+
+    #[test]
+    fn renames_take_precedence_over_suffix() {
+        assert_eq!(
+            swift_type_name("HarnessCodeLanguage", &["HarnessCodeLanguage"]),
+            "HarnessReviewFileLanguage"
+        );
+        assert_eq!(swift_type_name("HarnessCodeLanguage", &[]), "HarnessReviewFileLanguage");
     }
 
     #[test]
