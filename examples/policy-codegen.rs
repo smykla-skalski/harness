@@ -1066,6 +1066,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "ObserverOpenIssue",
     "ObserverActiveWorker",
     "ObserverAgentSessionSummary",
+    // session/types/state.rs: SessionMetrics takes the suffix (hand counts are Int,
+    // wire is u32). SessionStatus is NOT suffixed - it is adopted bare.
+    "SessionMetrics",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1821,6 +1824,16 @@ const OBSERVE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Mod
 /// its wire values stay PascalCase the generator does not emit), and Confidence
 /// (no Swift consumer yet).
 const OBSERVE_EMIT_ONLY: &[&str] = &["IssueSeverity", "IssueCategory", "IssueCode", "FixSafety"];
+const SESSION_STATE_SOURCE: &str = include_str!("../src/session/types/state.rs");
+const SESSION_STATE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionStateWireTypes.generated.swift";
+/// session/types/state.rs foundation leaf: SessionStatus (the session lifecycle
+/// enum) and SessionMetrics (the summary rollup counts), both SessionSummary deps.
+/// SessionStatus is adopted bare - a closed string enum whose 5 cases match the
+/// hand enum exactly, so the generated form replaces the hand decl (its `title`
+/// stays in an extension). SessionMetrics takes the Wire suffix: the hand model
+/// types its counts as Int, the wire is u32. SessionState itself stays out - it has
+/// no Swift mirror.
+const SESSION_STATE_EMIT_ONLY: &[&str] = &["SessionStatus", "SessionMetrics"];
 const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
     include_str!("../src/task_board/git_identity_defaults.rs");
 const OPENROUTER_SOURCE: &str = include_str!("../src/daemon/protocol/openrouter_models.rs");
@@ -2035,6 +2048,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[OBSERVE_CLASSIFICATION_SOURCE, OBSERVE_ISSUE_CODE_SOURCE],
         },
+        GeneratedModule {
+            output: SESSION_STATE_OUTPUT,
+            description: "the Rust session lifecycle status and rollup metrics",
+            defaults: &[],
+            sources: &[SESSION_STATE_SOURCE],
+        },
     ]
 }
 
@@ -2054,6 +2073,7 @@ fn generate_module(module: &GeneratedModule) -> String {
     let emit_only: &[&str] = match module.output {
         SUMMARIES_OUTPUT => SUMMARIES_EMIT_ONLY,
         OBSERVE_OUTPUT => OBSERVE_EMIT_ONLY,
+        SESSION_STATE_OUTPUT => SESSION_STATE_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
