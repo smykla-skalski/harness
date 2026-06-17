@@ -257,6 +257,7 @@ fn field_init_default(
     optional: bool,
     decode_default: &Option<String>,
     type_name: &str,
+    rust_ident: Option<&str>,
     derives_default: bool,
     symbols: &SymbolTable,
 ) -> Option<String> {
@@ -272,7 +273,8 @@ fn field_init_default(
     if let Some(zero) = zero_value(type_name) {
         return Some(zero);
     }
-    if symbols.structs_with_default.contains(type_name) {
+    // structs_with_default is keyed by the Rust name; type_name may be suffixed.
+    if rust_ident.is_some_and(|ident| symbols.structs_with_default.contains(ident)) {
         return Some(format!("{type_name}()"));
     }
     None
@@ -1307,11 +1309,14 @@ fn build_fields(
         }
         let coding_key = serde.rename.clone().unwrap_or_else(|| name.clone());
         let swift_type = rust_type_to_swift(&field.ty);
-        let decode_default = field_decode_default(&swift_type, &serde, defaults, symbols);
+        let rust_ident = type_ident(&field.ty);
+        let decode_default =
+            field_decode_default(&swift_type, rust_ident.as_deref(), &serde, defaults, symbols);
         let init_default = field_init_default(
             swift_type.optional,
             &decode_default,
             &swift_type.name,
+            rust_ident.as_deref(),
             derives_default,
             symbols,
         );
@@ -1331,6 +1336,7 @@ fn build_fields(
 /// optional decode or a plain required decode is correct.
 fn field_decode_default(
     swift_type: &SwiftType,
+    rust_ident: Option<&str>,
     serde: &SerdeField,
     defaults: &DefaultLiterals,
     symbols: &SymbolTable,
@@ -1350,11 +1356,16 @@ fn field_decode_default(
                 .unwrap_or_else(|| panic!("no default literal for `{function}`")),
         );
     }
-    if let Some(variant) = symbols.enum_default_variant.get(&swift_type.name) {
-        return Some(format!(".{variant}"));
-    }
-    if symbols.structs_with_default.contains(&swift_type.name) {
-        return Some(format!("{}()", swift_type.name));
+    // The symbol-table maps are keyed by the Rust type name, but a wire/model
+    // split gives the field a `Wire`-suffixed Swift type; probe with the Rust
+    // ident so a `#[serde(default)]` enum/struct field still resolves its default.
+    if let Some(ident) = rust_ident {
+        if let Some(variant) = symbols.enum_default_variant.get(ident) {
+            return Some(format!(".{variant}"));
+        }
+        if symbols.structs_with_default.contains(ident) {
+            return Some(format!("{}()", swift_type.name));
+        }
     }
     zero_value(&swift_type.name)
 }

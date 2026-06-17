@@ -559,7 +559,7 @@ public struct ReviewsPolicyRunStartRequestWire: Codable, Equatable, Sendable {
   public var method: TaskBoardGitHubMergeMethod
   public var trigger: ReviewsPolicyTriggerWire
 
-  public init(workflowId: String = "reviews_auto", target: ReviewTargetWire, method: TaskBoardGitHubMergeMethod, trigger: ReviewsPolicyTriggerWire) {
+  public init(workflowId: String = "reviews_auto", target: ReviewTargetWire, method: TaskBoardGitHubMergeMethod, trigger: ReviewsPolicyTriggerWire = .manual) {
     self.workflowId = workflowId
     self.target = target
     self.method = method
@@ -571,7 +571,7 @@ public struct ReviewsPolicyRunStartRequestWire: Codable, Equatable, Sendable {
     workflowId = try container.decodeIfPresent(String.self, forKey: .workflowId) ?? "reviews_auto"
     target = try container.decode(ReviewTargetWire.self, forKey: .target)
     method = try container.decode(TaskBoardGitHubMergeMethod.self, forKey: .method)
-    trigger = try container.decode(ReviewsPolicyTriggerWire.self, forKey: .trigger)
+    trigger = try container.decodeIfPresent(ReviewsPolicyTriggerWire.self, forKey: .trigger) ?? .manual
   }
 
   enum CodingKeys: String, CodingKey {
@@ -797,7 +797,7 @@ public struct ReviewsPolicyHistoryResponseWire: Codable, Equatable, Sendable {
   public var metrics: ReviewsPolicyRunMetricsWire
   public var timeline: [ReviewsPolicyTimelineEntryWire]
 
-  public init(workflowId: String, subject: ReviewsPolicySubjectWire, runs: [ReviewsPolicyRunResponseWire] = [], metrics: ReviewsPolicyRunMetricsWire, timeline: [ReviewsPolicyTimelineEntryWire] = []) {
+  public init(workflowId: String, subject: ReviewsPolicySubjectWire, runs: [ReviewsPolicyRunResponseWire] = [], metrics: ReviewsPolicyRunMetricsWire = ReviewsPolicyRunMetricsWire(), timeline: [ReviewsPolicyTimelineEntryWire] = []) {
     self.workflowId = workflowId
     self.subject = subject
     self.runs = runs
@@ -810,7 +810,7 @@ public struct ReviewsPolicyHistoryResponseWire: Codable, Equatable, Sendable {
     workflowId = try container.decode(String.self, forKey: .workflowId)
     subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
     runs = try container.decodeIfPresent([ReviewsPolicyRunResponseWire].self, forKey: .runs) ?? []
-    metrics = try container.decode(ReviewsPolicyRunMetricsWire.self, forKey: .metrics)
+    metrics = try container.decodeIfPresent(ReviewsPolicyRunMetricsWire.self, forKey: .metrics) ?? ReviewsPolicyRunMetricsWire()
     timeline = try container.decodeIfPresent([ReviewsPolicyTimelineEntryWire].self, forKey: .timeline) ?? []
   }
 
