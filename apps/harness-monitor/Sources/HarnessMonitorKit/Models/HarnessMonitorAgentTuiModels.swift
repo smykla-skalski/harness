@@ -29,6 +29,7 @@ public enum AgentTuiRuntime: String, Codable, CaseIterable, Identifiable, Sendab
 }
 
 public enum AgentTuiStatus: String, Codable, Sendable {
+  case starting
   case running
   case stopped
   case exited
@@ -36,6 +37,8 @@ public enum AgentTuiStatus: String, Codable, Sendable {
 
   public var title: String {
     switch self {
+    case .starting:
+      "Starting"
     case .running:
       "Running"
     case .stopped:
@@ -49,7 +52,7 @@ public enum AgentTuiStatus: String, Codable, Sendable {
 
   public var isActive: Bool {
     switch self {
-    case .running:
+    case .starting, .running:
       true
     case .stopped, .exited, .failed:
       false
@@ -128,6 +131,14 @@ public struct AgentTuiScreenSnapshot: Codable, Equatable, Sendable {
   public let cursorRow: Int
   public let cursorCol: Int
   public let text: String
+
+  public init(rows: Int, cols: Int, cursorRow: Int, cursorCol: Int, text: String) {
+    self.rows = rows
+    self.cols = cols
+    self.cursorRow = cursorRow
+    self.cursorCol = cursorCol
+    self.text = text
+  }
 
   public static let defaultVisibleRowLimit = 400
 

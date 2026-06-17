@@ -642,6 +642,14 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "HarnessMonitorAuditEventsRequest",
     "HarnessMonitorAuditEvent",
     "HarnessMonitorAuditEventsResponse",
+    "AgentTuiSize",
+    "AgentTuiLaunchProfile",
+    "AgentTuiStatus",
+    "AgentTuiStartRequest",
+    "AgentTuiResizeRequest",
+    "AgentTuiListResponse",
+    "AgentTuiSnapshot",
+    "TerminalScreenSnapshot",
 ];
 
 /// The Swift name for a Rust wire type: the bare name, or `{name}Wire` when the
@@ -1186,6 +1194,12 @@ const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
 const OPENROUTER_SOURCE: &str = include_str!("../src/daemon/protocol/openrouter_models.rs");
 const VOICE_SOURCE: &str = include_str!("../src/daemon/protocol/voice.rs");
 const AUDIT_SOURCE: &str = include_str!("../src/daemon/protocol/audit.rs");
+// agent_tui: mod.rs supplies the DEFAULT_ROWS/DEFAULT_COLS consts that the
+// start-request default fns resolve to (collected by the symbol table); model.rs
+// holds the snapshot/request types; screen.rs holds TerminalScreenSnapshot.
+const AGENT_TUI_MOD_SOURCE: &str = include_str!("../src/daemon/agent_tui/mod.rs");
+const AGENT_TUI_MODEL_SOURCE: &str = include_str!("../src/daemon/agent_tui/model.rs");
+const AGENT_TUI_SCREEN_SOURCE: &str = include_str!("../src/daemon/agent_tui/screen.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, an optional defaults source informing decode defaults, a short
@@ -1242,6 +1256,17 @@ fn modules() -> Vec<GeneratedModule> {
             description: "the Rust audit events protocol",
             defaults: Some(AUDIT_SOURCE),
             sources: &[AUDIT_SOURCE],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentTuiWireTypes.generated.swift",
+            description: "the Rust managed terminal agent protocol",
+            defaults: Some(AGENT_TUI_MODEL_SOURCE),
+            sources: &[
+                AGENT_TUI_MOD_SOURCE,
+                AGENT_TUI_SCREEN_SOURCE,
+                AGENT_TUI_MODEL_SOURCE,
+            ],
         },
     ]
 }

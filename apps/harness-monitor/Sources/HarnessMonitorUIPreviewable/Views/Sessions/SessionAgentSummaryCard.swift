@@ -62,6 +62,8 @@ struct SessionAgentSummaryCard: View {
   private var tuiMarkerColor: Color {
     guard let tuiStatus else { return .clear }
     switch tuiStatus {
+    case .starting:
+      return HarnessMonitorTheme.caution
     case .running:
       return HarnessMonitorTheme.success
     case .stopped:
