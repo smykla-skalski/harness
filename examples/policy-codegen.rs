@@ -616,6 +616,10 @@ fn rust_type_to_swift(ty: &Type) -> SwiftType {
             name: format!("[{}]", vec_element(&segment.arguments)),
             optional: false,
         },
+        "HashMap" | "BTreeMap" => SwiftType {
+            name: map_dictionary(&segment.arguments),
+            optional: false,
+        },
         scalar => SwiftType {
             name: map_scalar(scalar),
             optional: false,
@@ -630,6 +634,51 @@ fn vec_element(arguments: &PathArguments) -> String {
         Some(mapped) => mapped.name,
         None => "AnyCodable".to_string(),
     }
+}
+
+/// The Swift dictionary type for a `HashMap<K, V>` / `BTreeMap<K, V>`. JSON
+/// object keys are always strings, so the key maps through normally (the wire
+/// surface only uses `String` keys) and the value carries through an inner
+/// `Option` like `vec_element`.
+fn map_dictionary(arguments: &PathArguments) -> String {
+    let args = generic_type_args(arguments);
+    let key = args
+        .first()
+        .map_or_else(|| "String".to_string(), |ty| rust_type_to_swift(ty).name);
+    let value = match args.get(1).map(|ty| rust_type_to_swift(ty)) {
+        Some(mapped) if mapped.optional => format!("{}?", mapped.name),
+        Some(mapped) => mapped.name,
+        None => "AnyCodable".to_string(),
+    };
+    format!("[{key}: {value}]")
+}
+
+/// The bare type name of a path type - its last segment ident, e.g.
+/// `ReviewItemFlags` for `flags: ReviewItemFlags`. `None` for non-path types.
+fn type_ident(ty: &Type) -> Option<String> {
+    let Type::Path(type_path) = ty else {
+        return None;
+    };
+    type_path
+        .path
+        .segments
+        .last()
+        .map(|segment| segment.ident.to_string())
+}
+
+/// Every concrete type argument of an angle-bracketed path segment, in order.
+fn generic_type_args(arguments: &PathArguments) -> Vec<&Type> {
+    let PathArguments::AngleBracketed(bracketed) = arguments else {
+        return Vec::new();
+    };
+    bracketed
+        .args
+        .iter()
+        .filter_map(|arg| match arg {
+            GenericArgument::Type(ty) => Some(ty),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Rust wire types whose bare Swift name is owned by a hand-written rich app
@@ -743,6 +792,10 @@ fn map_scalar(ident: &str) -> String {
         "f64" => "Double",
         "bool" => "Bool",
         "String" | "str" => "String",
+        // chrono `DateTime<Tz>` serializes as an RFC3339 string and the app
+        // mirrors it as String; the timezone type argument does not change the
+        // wire shape, so the bare `DateTime` ident is enough to map it.
+        "DateTime" => "String",
         // serde_json::Value maps to the app's open JSON value type, which
         // round-trips an arbitrary payload exactly like serde_json::Value.
         "Value" => "JSONValue",
@@ -795,6 +848,9 @@ struct SymbolTable {
     enum_default_variant: HashMap<String, String>,
     structs_with_default: HashSet<String>,
     const_literals: HashMap<String, String>,
+    /// Every named-field struct keyed by name, so a `#[serde(flatten)]` field
+    /// can splice the flattened struct's fields into its parent inline.
+    struct_fields: HashMap<String, FieldsNamed>,
 }
 
 /// The serde container config read from a type's attributes.
@@ -809,6 +865,7 @@ struct SerdeField {
     rename: Option<String>,
     default_fn: Option<String>,
     has_default: bool,
+    flatten: bool,
 }
 
 /// The identifiers inside every `#[derive(...)]` on an item.
@@ -886,6 +943,7 @@ fn serde_field(attrs: &[Attribute]) -> SerdeField {
     let mut rename = None;
     let mut default_fn = None;
     let mut has_default = false;
+    let mut flatten = false;
     for attr in attrs {
         if !attr.path().is_ident("serde") {
             continue;
@@ -895,6 +953,9 @@ fn serde_field(attrs: &[Attribute]) -> SerdeField {
             let is_rename = meta.path.is_ident("rename");
             if is_default {
                 has_default = true;
+            }
+            if meta.path.is_ident("flatten") {
+                flatten = true;
             }
             if let Ok(value) = meta.value() {
                 let lit: Lit = value.parse()?;
@@ -909,7 +970,7 @@ fn serde_field(attrs: &[Attribute]) -> SerdeField {
             Ok(())
         });
     }
-    SerdeField { rename, default_fn, has_default }
+    SerdeField { rename, default_fn, has_default, flatten }
 }
 
 /// Parse `defaults.rs`, mapping each zero-argument default function to the Swift
@@ -980,12 +1041,18 @@ fn build_symbol_table(sources: &[&str]) -> SymbolTable {
     let mut enum_default_variant = HashMap::new();
     let mut structs_with_default = HashSet::new();
     let mut const_literals = HashMap::new();
+    let mut struct_fields = HashMap::new();
     for source in sources {
         let file = syn::parse_file(source).expect("policy source parses");
         for item in file.items {
             match item {
-                Item::Struct(item) if derives_default(&item.attrs) => {
-                    structs_with_default.insert(item.ident.to_string());
+                Item::Struct(item) => {
+                    if derives_default(&item.attrs) {
+                        structs_with_default.insert(item.ident.to_string());
+                    }
+                    if let Fields::Named(fields) = &item.fields {
+                        struct_fields.insert(item.ident.to_string(), fields.clone());
+                    }
                 }
                 Item::Enum(item) => {
                     if let Some(variant) = item
@@ -1016,6 +1083,7 @@ fn build_symbol_table(sources: &[&str]) -> SymbolTable {
         enum_default_variant,
         structs_with_default,
         const_literals,
+        struct_fields,
     }
 }
 
@@ -1026,32 +1094,39 @@ fn build_fields(
     symbols: &SymbolTable,
     derives_default: bool,
 ) -> Vec<SwiftField> {
-    fields
-        .named
-        .iter()
-        .map(|field| {
-            let name = field.ident.as_ref().expect("named field").to_string();
-            let serde = serde_field(&field.attrs);
-            let coding_key = serde.rename.clone().unwrap_or_else(|| name.clone());
-            let swift_type = rust_type_to_swift(&field.ty);
-            let decode_default = field_decode_default(&swift_type, &serde, defaults, symbols);
-            let init_default = field_init_default(
-                swift_type.optional,
-                &decode_default,
-                &swift_type.name,
-                derives_default,
-                symbols,
-            );
-            SwiftField {
-                property: escape_keyword(snake_to_camel(&name)),
-                coding_key,
-                type_name: swift_type.name,
-                optional: swift_type.optional,
-                decode_default,
-                init_default,
+    let mut out = Vec::new();
+    for field in &fields.named {
+        let name = field.ident.as_ref().expect("named field").to_string();
+        let serde = serde_field(&field.attrs);
+        if serde.flatten {
+            // `#[serde(flatten)]` merges the referenced struct's fields into the
+            // parent JSON object; Swift Codable has no flatten, so inline the
+            // flattened struct's fields directly into the parent type.
+            if let Some(inner) = type_ident(&field.ty).and_then(|ident| symbols.struct_fields.get(&ident)) {
+                out.extend(build_fields(inner, defaults, symbols, derives_default));
             }
-        })
-        .collect()
+            continue;
+        }
+        let coding_key = serde.rename.clone().unwrap_or_else(|| name.clone());
+        let swift_type = rust_type_to_swift(&field.ty);
+        let decode_default = field_decode_default(&swift_type, &serde, defaults, symbols);
+        let init_default = field_init_default(
+            swift_type.optional,
+            &decode_default,
+            &swift_type.name,
+            derives_default,
+            symbols,
+        );
+        out.push(SwiftField {
+            property: escape_keyword(snake_to_camel(&name)),
+            coding_key,
+            type_name: swift_type.name,
+            optional: swift_type.optional,
+            decode_default,
+            init_default,
+        });
+    }
+    out
 }
 
 /// The decoder fallback (`?? value`) for a field, or `None` when a synthesized
@@ -1599,6 +1674,63 @@ ExpressibleByStringLiteral, CustomStringConvertible {
         assert_eq!(swift_type_string("Value"), "JSONValue");
         assert_eq!(swift_type_string("Option<serde_json::Value>"), "JSONValue?");
         assert_eq!(swift_type_string("Vec<serde_json::Value>"), "[JSONValue]");
+    }
+
+    #[test]
+    fn maps_chrono_datetime_to_string() {
+        assert_eq!(swift_type_string("DateTime<Utc>"), "String");
+        assert_eq!(swift_type_string("Option<DateTime<Utc>>"), "String?");
+        assert_eq!(swift_type_string("Vec<DateTime<Utc>>"), "[String]");
+    }
+
+    #[test]
+    fn maps_hash_and_btree_maps_to_dictionaries() {
+        assert_eq!(swift_type_string("BTreeMap<String, usize>"), "[String: UInt]");
+        assert_eq!(swift_type_string("HashMap<String, String>"), "[String: String]");
+        assert_eq!(
+            swift_type_string("BTreeMap<String, Vec<PolicyAction>>"),
+            "[String: [PolicyAction]]"
+        );
+        assert_eq!(
+            swift_type_string("HashMap<String, Option<String>>"),
+            "[String: String?]"
+        );
+    }
+
+    #[test]
+    fn flattens_nested_struct_fields_into_parent() {
+        let source = r#"
+            #[derive(Serialize, Deserialize)]
+            pub struct Flags {
+                pub starred: bool,
+                #[serde(rename = "is_draft")]
+                pub draft: bool,
+            }
+            #[derive(Serialize, Deserialize)]
+            pub struct Parent {
+                pub id: String,
+                #[serde(flatten)]
+                pub flags: Flags,
+                pub trailing: u32,
+            }
+        "#;
+        let symbols = build_symbol_table(&[source]);
+        let defaults = DefaultLiterals::new();
+        let file = syn::parse_file(source).expect("source parses");
+        let parent = file
+            .items
+            .iter()
+            .find_map(|item| match item {
+                Item::Struct(item) if item.ident == "Parent" => Some(item.clone()),
+                _ => None,
+            })
+            .expect("Parent struct present");
+        let spec = build_struct(&parent, &defaults, &symbols).expect("struct builds");
+
+        let properties: Vec<_> = spec.fields.iter().map(|field| field.property.as_str()).collect();
+        assert_eq!(properties, vec!["id", "starred", "draft", "trailing"]);
+        let coding_keys: Vec<_> = spec.fields.iter().map(|field| field.coding_key.as_str()).collect();
+        assert_eq!(coding_keys, vec!["id", "starred", "is_draft", "trailing"]);
     }
 
     #[test]
