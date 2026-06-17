@@ -823,6 +823,58 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TimelinePageDirection",
     "ReviewsTimelineResponse",
     "TimelinePageInfo",
+    // reviews types.rs core (query/item/check/action/policy surface): generate
+    // -only split. ReviewItem/ReviewTarget/ReviewsCapabilitiesResponse flatten
+    // their *Flags/*Capabilities structs (inlined). ReviewAuthorAssociation is
+    // SKIP'd (bare hand ref); GitHubMergeMethod is renamed (TYPE_RENAMES).
+    "ReviewsQueryRequest",
+    "ReviewsRepositoryCatalogRequest",
+    "ReviewsRepositoryCatalogResponse",
+    "ReviewsQueryResponse",
+    "ReviewRepositoryLabel",
+    "ReviewsSummary",
+    "ReviewItemFlags",
+    "ReviewItem",
+    "ReviewCheck",
+    "PullRequestReview",
+    "ReviewsApproveRequest",
+    "ReviewsMergeRequest",
+    "ReviewsRerunChecksRequest",
+    "ReviewsLabelRequest",
+    "ReviewsAutoRequest",
+    "ReviewsPolicySubject",
+    "ReviewsPolicyTrigger",
+    "ReviewsPolicyRunStatus",
+    "ReviewsPolicyStepType",
+    "ReviewsPolicyWait",
+    "ReviewsPolicyPreviewStep",
+    "ReviewsPolicyPreviewRequest",
+    "ReviewsPolicyPreviewResponse",
+    "ReviewsPolicyRunStartRequest",
+    "ReviewsPolicyRunStep",
+    "ReviewsPolicyRunResponse",
+    "ReviewsPolicyStatusRequest",
+    "ReviewsPolicyStatusResponse",
+    "ReviewsPolicyHistoryRequest",
+    "ReviewsPolicyRunMetrics",
+    "ReviewsPolicyTimelineEntry",
+    "ReviewsPolicyHistoryResponse",
+    "ReviewsCommentRequest",
+    "ReviewsRequestReviewRequest",
+    "ReviewsActionCapabilities",
+    "ReviewsCapabilitiesResponse",
+    "ReviewsActionPreviewRequest",
+    "ReviewsActionPreviewResponse",
+    "ReviewActionPreviewTarget",
+    "ReviewsActionResponse",
+    "ReviewsCacheClearResponse",
+    "ReviewsRefreshRequest",
+    "ReviewsRefreshResponse",
+    "ReviewsBodyRequest",
+    "ReviewsBodyResponse",
+    "ReviewTargetFlags",
+    "ReviewTarget",
+    "ReviewActionResult",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -868,6 +920,9 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // reviews ReviewFile.language_hint: Rust HarnessCodeLanguage is the Swift
     // hand enum HarnessReviewFileLanguage.
     ("HarnessCodeLanguage", "HarnessReviewFileLanguage"),
+    // reviews types.rs request methods: Rust GitHubMergeMethod (task_board) is
+    // the Swift hand enum TaskBoardGitHubMergeMethod.
+    ("GitHubMergeMethod", "TaskBoardGitHubMergeMethod"),
 ];
 
 /// The Swift name for a Rust wire type: a hand rename when one applies, else the
@@ -927,11 +982,23 @@ fn first_generic_arg(arguments: &PathArguments) -> Option<&Type> {
     })
 }
 
+/// The empty literal for a Swift collection type: `[:]` for a top-level
+/// dictionary (`[Key: Value]`, where the key carries no nested bracket) and `[]`
+/// for an array. Keeps a `#[serde(default)]` dictionary field from defaulting to
+/// the empty-array literal, which would not type-check.
+fn empty_collection_literal(swift_type: &str) -> &'static str {
+    let is_dictionary = swift_type
+        .strip_prefix('[')
+        .and_then(|rest| rest.split_once(": "))
+        .map_or(false, |(key, _)| !key.contains('['));
+    if is_dictionary { "[:]" } else { "[]" }
+}
+
 /// The Swift zero value for a scalar or array type, used to default the
 /// required fields of `Default`-deriving structs.
 fn zero_value(swift_type: &str) -> Option<String> {
     if swift_type.starts_with('[') {
-        return Some("[]".to_string());
+        return Some(empty_collection_literal(swift_type).to_string());
     }
     let value = match swift_type {
         "Bool" => "false",
@@ -1122,7 +1189,9 @@ fn block_literal(block: &syn::Block, symbols: &SymbolTable) -> Option<String> {
 fn expr_literal(expr: &Expr, symbols: &SymbolTable) -> Option<String> {
     match expr {
         Expr::Lit(literal) => lit_to_swift(&literal.lit),
-        Expr::MethodCall(call) if call.method == "to_string" && call.args.is_empty() => {
+        Expr::MethodCall(call)
+            if (call.method == "to_string" || call.method == "to_owned") && call.args.is_empty() =>
+        {
             expr_literal(&call.receiver, symbols)
         }
         Expr::Path(path) => {
@@ -1256,7 +1325,7 @@ fn field_decode_default(
         return None;
     }
     if swift_type.name.starts_with('[') {
-        return Some("[]".to_string());
+        return Some(empty_collection_literal(&swift_type.name).to_string());
     }
     if let Some(function) = &serde.default_fn {
         let key = function.rsplit("::").next().unwrap_or(function);
@@ -1494,6 +1563,12 @@ const REVIEWS_FILES_VIEWED_SOURCE: &str = include_str!("../src/reviews/files/vie
 // SimpleActorEventEntry, and a JsonValue raw payload - all handled.
 const REVIEWS_TIMELINE_TYPES_SOURCE: &str = include_str!("../src/reviews/timeline/types.rs");
 const REVIEWS_TIMELINE_MOD_SOURCE: &str = include_str!("../src/reviews/timeline/mod.rs");
+// reviews types.rs core: the query/item/check/action/policy request-response
+// surface. The custom default fns it references live in src/reviews/logic.rs
+// (the defaults source). GitHubMergeMethod and ReviewAuthorAssociation are
+// referenced-not-defined (renamed / skipped to the hand types).
+const REVIEWS_TYPES_SOURCE: &str = include_str!("../src/reviews/types.rs");
+const REVIEWS_LOGIC_SOURCE: &str = include_str!("../src/reviews/logic.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, an optional defaults source informing decode defaults, a short
@@ -1612,6 +1687,13 @@ fn modules() -> Vec<GeneratedModule> {
             description: "the Rust reviews pull request timeline types",
             defaults: None,
             sources: &[REVIEWS_TIMELINE_TYPES_SOURCE, REVIEWS_TIMELINE_MOD_SOURCE],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsTypesWireTypes.generated.swift",
+            description: "the Rust reviews query, item, check, action and policy types",
+            defaults: Some(REVIEWS_LOGIC_SOURCE),
+            sources: &[REVIEWS_TYPES_SOURCE],
         },
     ]
 }
@@ -1917,6 +1999,15 @@ ExpressibleByStringLiteral, CustomStringConvertible {
             swift_type_string("HashMap<String, Option<String>>"),
             "[String: String?]"
         );
+    }
+
+    #[test]
+    fn empty_collection_literal_distinguishes_dict_from_array() {
+        assert_eq!(empty_collection_literal("[String]"), "[]");
+        assert_eq!(empty_collection_literal("[[String]]"), "[]");
+        assert_eq!(empty_collection_literal("[String: UInt]"), "[:]");
+        assert_eq!(empty_collection_literal("[String: [ReviewRepositoryLabelWire]]"), "[:]");
+        assert_eq!(empty_collection_literal("[[String: UInt]]"), "[]");
     }
 
     #[test]
