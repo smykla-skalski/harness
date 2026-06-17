@@ -41,7 +41,12 @@ extension HarnessMonitorAPIClient {
   public func queryReviews(
     request: ReviewsQueryRequest
   ) async throws -> ReviewsQueryResponse {
-    try await post("/v1/reviews/query", body: request)
+    let wire: ReviewsQueryResponseWire = try await post(
+      "/v1/reviews/query",
+      body: ReviewsQueryRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsQueryResponse(wire: wire)
   }
 
   public func reviewsCapabilities() async throws -> ReviewsCapabilitiesResponse {

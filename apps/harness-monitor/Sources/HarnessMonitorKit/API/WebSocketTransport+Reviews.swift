@@ -39,9 +39,10 @@ extension WebSocketTransport {
   public func queryReviews(
     request: ReviewsQueryRequest
   ) async throws -> ReviewsQueryResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsQueryRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsQuery, params: params)
-    return try decode(value)
+    let wire: ReviewsQueryResponseWire = try decodePolicyWire(value)
+    return ReviewsQueryResponse(wire: wire)
   }
 
   public func reviewsCapabilities() async throws -> ReviewsCapabilitiesResponse {
