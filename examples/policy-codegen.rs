@@ -650,6 +650,21 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "AgentTuiListResponse",
     "AgentTuiSnapshot",
     "TerminalScreenSnapshot",
+    "CodexRunMode",
+    "CodexRunStatus",
+    "CodexApprovalDecision",
+    "CodexRunRequest",
+    "CodexSteerRequest",
+    "CodexApprovalDecisionRequest",
+    "CodexRunListResponse",
+    "CodexAgentInspectResponse",
+    "CodexAgentInspectSnapshot",
+    "CodexTranscriptResponse",
+    "CodexApprovalRequest",
+    "CodexResolvedApproval",
+    "CodexRunEvent",
+    "CodexRunSnapshot",
+    "CodexApprovalRequestedPayload",
 ];
 
 /// The Swift name for a Rust wire type: the bare name, or `{name}Wire` when the
@@ -1200,6 +1215,12 @@ const AUDIT_SOURCE: &str = include_str!("../src/daemon/protocol/audit.rs");
 const AGENT_TUI_MOD_SOURCE: &str = include_str!("../src/daemon/agent_tui/mod.rs");
 const AGENT_TUI_MODEL_SOURCE: &str = include_str!("../src/daemon/agent_tui/model.rs");
 const AGENT_TUI_SCREEN_SOURCE: &str = include_str!("../src/daemon/agent_tui/screen.rs");
+// codex: the run snapshot subtree decodes inside ManagedAgentSnapshot.Codex;
+// the file also defines its own default fn (default_codex_agent_role ->
+// SessionRole::Worker) resolved by the symbol table. SessionRole and
+// TimelineEntry are referenced-not-defined, so they stay unsuffixed (the hand
+// Swift types).
+const CODEX_SOURCE: &str = include_str!("../src/daemon/protocol/codex.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, an optional defaults source informing decode defaults, a short
@@ -1267,6 +1288,13 @@ fn modules() -> Vec<GeneratedModule> {
                 AGENT_TUI_SCREEN_SOURCE,
                 AGENT_TUI_MODEL_SOURCE,
             ],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/CodexWireTypes.generated.swift",
+            description: "the Rust codex run protocol",
+            defaults: Some(CODEX_SOURCE),
+            sources: &[CODEX_SOURCE],
         },
     ]
 }
