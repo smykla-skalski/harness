@@ -217,3 +217,16 @@ extension ReviewsFilesBlobResponse {
     )
   }
 }
+
+extension ReviewLocalCloneEntry {
+  init(wire: LocalCloneListEntryWire) {
+    self.init(
+      repoFullName: wire.repoFullName,
+      repoKeySegment: wire.repoKeySegment,
+      sizeBytes: wire.sizeBytes,
+      createdAt: wire.createdAt,
+      lastUsedAt: wire.lastUsedAt,
+      lastFetchedAt: wire.lastFetchedAt
+    )
+  }
+}

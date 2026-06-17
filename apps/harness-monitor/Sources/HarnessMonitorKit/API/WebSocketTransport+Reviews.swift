@@ -189,7 +189,8 @@ extension WebSocketTransport {
 
   public func listReviewLocalClones() async throws -> [ReviewLocalCloneEntry] {
     let value = try await rpc(method: .reviewsFilesLocalClonesList, params: nil)
-    return try decode(value)
+    let wire: [LocalCloneListEntryWire] = try decodePolicyWire(value)
+    return wire.map(ReviewLocalCloneEntry.init(wire:))
   }
 
   public func deleteReviewLocalClone(repoKeySegment: String) async throws {

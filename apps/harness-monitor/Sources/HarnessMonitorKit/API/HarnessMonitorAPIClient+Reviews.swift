@@ -174,16 +174,20 @@ extension HarnessMonitorAPIClient {
   }
 
   public func listReviewLocalClones() async throws -> [ReviewLocalCloneEntry] {
-    let body = ReviewsFilesLocalClonesListRequest()
-    return try await post("/v1/reviews/files/local-clones", body: body)
+    let wire: [LocalCloneListEntryWire] = try await post(
+      "/v1/reviews/files/local-clones",
+      body: ReviewsFilesLocalClonesListRequest(),
+      decoder: PolicyWireCoding.decoder
+    )
+    return wire.map(ReviewLocalCloneEntry.init(wire:))
   }
 
   public func deleteReviewLocalClone(repoKeySegment: String) async throws {
     let body = ReviewsFilesLocalClonesDeleteRequest(repoKeySegment: repoKeySegment)
-    let _: ReviewsFilesLocalClonesDeleteResponse = try await post(
-      "/v1/reviews/files/local-clones/delete",
-      body: body
-    )
+    // The daemon returns the post-delete listing, but the Settings sheet
+    // refetches via listReviewLocalClones, so the body is decoded structurally
+    // and discarded rather than through a convert-bound hand mirror.
+    let _: JSONValue = try await post("/v1/reviews/files/local-clones/delete", body: body)
   }
 
   public func fetchReviewTimeline(
@@ -243,16 +247,5 @@ public struct ReviewsFilesLocalClonesDeleteRequest: Codable, Equatable, Sendable
 
   enum CodingKeys: String, CodingKey {
     case repoKeySegment = "repo_key_segment"
-  }
-}
-
-/// Response body for the local clones delete handler. Returns the post-
-/// delete listing so the Settings panel can refresh without an extra
-/// round-trip.
-public struct ReviewsFilesLocalClonesDeleteResponse: Codable, Equatable, Sendable {
-  public let clones: [ReviewLocalCloneEntry]
-
-  public init(clones: [ReviewLocalCloneEntry] = []) {
-    self.clones = clones
   }
 }

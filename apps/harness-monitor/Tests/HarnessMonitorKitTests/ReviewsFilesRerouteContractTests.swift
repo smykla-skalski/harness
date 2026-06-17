@@ -217,6 +217,40 @@ struct ReviewsFilesRerouteContractTests {
     #expect(response.rateLimitSnapshot?.remaining == 4600)
   }
 
+  @Test("HTTP client decodes the local clones listing through the wire types")
+  func httpLocalClonesListReroute() async throws {
+    TaskBoardURLProtocol.reset()
+    let client = try makeHTTPClient()
+
+    let clones = try await client.listReviewLocalClones()
+
+    assertLocalClones(clones)
+  }
+
+  @Test("WebSocket transport decodes the local clones listing through the wire types")
+  func webSocketLocalClonesListReroute() async throws {
+    let probe = RPCProbe()
+    let transport = try makeWebSocketTransport(probe: probe)
+
+    let clones = try await transport.listReviewLocalClones()
+
+    assertLocalClones(clones)
+
+    let methods = await probe.calls.map(\.method)
+    #expect(methods == [.reviewsFilesLocalClonesList])
+  }
+
+  private func assertLocalClones(_ clones: [ReviewLocalCloneEntry]) {
+    #expect(clones.count == 1)
+    let clone = clones.first
+    #expect(clone?.repoFullName == "kumahq/kuma")
+    #expect(clone?.repoKeySegment == "kumahq-kuma")
+    #expect(clone?.sizeBytes == 20480)
+    #expect(clone?.createdAt == "2026-05-20T09:00:00Z")
+    #expect(clone?.lastUsedAt == "2026-05-22T10:00:00Z")
+    #expect(clone?.lastFetchedAt == "2026-05-22T09:30:00Z")
+  }
+
   private func makeHTTPClient() throws -> HarnessMonitorAPIClient {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [TaskBoardURLProtocol.self]
