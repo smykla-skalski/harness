@@ -226,3 +226,18 @@ public struct TaskBoardPolicyPipelineAuditSummary: Codable, Equatable, Sendable 
     self.validation = validation
   }
 }
+
+extension TaskBoardPolicyPipelineAuditSummary {
+  /// Map the generated audit wire type to the rich app summary. `mode` shares its
+  /// raw values with the wire `PolicyGraphMode`; the nested simulation and
+  /// validation reuse their own wire mappings, which fix the dropped issue ids.
+  public init(wire: PolicyPipelineAuditSummaryWire) {
+    self.init(
+      activeRevision: wire.activeRevision,
+      mode: TaskBoardPolicyPipelineMode(rawValue: wire.mode.rawValue) ?? .draft,
+      latestTraceId: wire.latestTraceId,
+      latestSimulation: wire.latestSimulation.map(TaskBoardPolicyPipelineSimulationResult.init(wire:)),
+      validation: TaskBoardPolicyPipelineValidation(wire: wire.validation)
+    )
+  }
+}

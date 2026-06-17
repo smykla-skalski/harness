@@ -313,7 +313,8 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardPolicyPipelineSimulationResult {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardPolicyPipelineSimulate, params: params)
-    return try decode(value)
+    let wire: PolicyPipelineSimulationResultWire = try decodePolicyWire(value)
+    return TaskBoardPolicyPipelineSimulationResult(wire: wire)
   }
 
   public func promoteTaskBoardPolicyPipeline(
@@ -331,7 +332,8 @@ extension WebSocketTransport {
       method: .taskBoardPolicyPipelineAudit,
       params: taskBoardPolicyCanvasRPCParams(canvasId: canvasId)
     )
-    return try decode(value)
+    let wire: PolicyPipelineAuditSummaryWire = try decodePolicyWire(value)
+    return TaskBoardPolicyPipelineAuditSummary(wire: wire)
   }
 
   public func exportTaskBoardPolicy(

@@ -278,7 +278,12 @@ extension HarnessMonitorAPIClient {
   public func simulateTaskBoardPolicyPipeline(
     request: TaskBoardPolicyPipelineSimulateRequest
   ) async throws -> TaskBoardPolicyPipelineSimulationResult {
-    try await post("/v1/task-board/policy/simulate", body: request)
+    let wire: PolicyPipelineSimulationResultWire = try await post(
+      "/v1/task-board/policy/simulate",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardPolicyPipelineSimulationResult(wire: wire)
   }
 
   public func promoteTaskBoardPolicyPipeline(
@@ -294,10 +299,12 @@ extension HarnessMonitorAPIClient {
   public func taskBoardPolicyPipelineAudit(
     canvasId: String? = nil
   ) async throws -> TaskBoardPolicyPipelineAuditSummary {
-    try await get(
+    let wire: PolicyPipelineAuditSummaryWire = try await get(
       "/v1/task-board/policy/audit",
-      queryItems: taskBoardPolicyCanvasQueryItems(canvasId: canvasId)
+      queryItems: taskBoardPolicyCanvasQueryItems(canvasId: canvasId),
+      decoder: PolicyWireCoding.decoder
     )
+    return TaskBoardPolicyPipelineAuditSummary(wire: wire)
   }
 
   private func taskBoardQueryItems(status: TaskBoardStatus?) -> [URLQueryItem] {

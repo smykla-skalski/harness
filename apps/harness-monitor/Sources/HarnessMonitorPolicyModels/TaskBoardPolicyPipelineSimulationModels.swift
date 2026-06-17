@@ -232,3 +232,137 @@ public struct TaskBoardPolicyPipelineSimulationResult: Codable, Equatable, Senda
     self.policyTraceIds = policyTraceIds
   }
 }
+
+// MARK: - Wire mapping
+
+extension TaskBoardPolicyDecision {
+  /// Flatten the generated `PolicyDecision` tagged enum into the app's flat
+  /// decision/reasonCode/policyVersion shape, keeping the daemon's snake_case
+  /// discriminator the consumers already match on.
+  public init(wire: PolicyDecision) {
+    switch wire {
+    case let .allow(reasonCode, policyVersion):
+      self.init(decision: "allow", reasonCode: reasonCode.rawValue, policyVersion: policyVersion)
+    case let .deny(reasonCode, policyVersion):
+      self.init(decision: "deny", reasonCode: reasonCode.rawValue, policyVersion: policyVersion)
+    case let .requireHuman(reasonCode, policyVersion):
+      self.init(
+        decision: "require_human",
+        reasonCode: reasonCode.rawValue,
+        policyVersion: policyVersion
+      )
+    case let .requireConsensus(reasonCode, policyVersion):
+      self.init(
+        decision: "require_consensus",
+        reasonCode: reasonCode.rawValue,
+        policyVersion: policyVersion
+      )
+    case let .dryRunOnly(reasonCode, policyVersion):
+      self.init(
+        decision: "dry_run_only",
+        reasonCode: reasonCode.rawValue,
+        policyVersion: policyVersion
+      )
+    }
+  }
+}
+
+extension TaskBoardPolicyPipelineValidationIssue {
+  /// Flatten one generated `PolicyGraphValidationIssue` variant into the app's
+  /// flat issue. Decoding through the generated enum (plain decoder) is what
+  /// recovers node_id/edge_id/node_ids; the message the daemon never sends is
+  /// resynthesized from the recovered fields.
+  public init(wire: PolicyGraphValidationIssue) {
+    var id: String? = nil
+    var nodeId: String? = nil
+    var edgeId: String? = nil
+    var nodeIds: [String] = []
+    var expected: UInt16? = nil
+    var actual: UInt16? = nil
+    var port: String? = nil
+    var direction: String? = nil
+    var action: PolicyAction? = nil
+    var location: String? = nil
+    let code: String
+
+    switch wire {
+    case let .unsupportedSchemaVersion(expectedVersion, actualVersion):
+      code = "unsupported_schema_version"
+      expected = expectedVersion
+      actual = actualVersion
+    case let .duplicateId(duplicateId, duplicateLocation):
+      code = "duplicate_id"
+      id = duplicateId
+      location = duplicateLocation
+    case let .danglingEdge(danglingEdgeId, danglingNodeId):
+      code = "dangling_edge"
+      edgeId = danglingEdgeId
+      nodeId = danglingNodeId
+    case let .invalidPort(portEdgeId, portNodeId, portName, portDirection):
+      code = "invalid_port"
+      edgeId = portEdgeId
+      nodeId = portNodeId
+      port = portName
+      direction = portDirection.rawValue
+    case let .cycle(cycleNodeIds):
+      code = "cycle"
+      nodeIds = cycleNodeIds
+    case let .unsafeHighRiskAction(riskAction):
+      code = "unsafe_high_risk_action"
+      action = riskAction
+    case let .incompatiblePayloadEdge(incompatibleEdgeId, _, _):
+      code = "incompatible_payload_edge"
+      edgeId = incompatibleEdgeId
+    }
+
+    self.init(
+      code: code,
+      message: code,
+      id: id,
+      nodeId: nodeId,
+      edgeId: edgeId,
+      nodeIds: nodeIds,
+      expected: expected,
+      actual: actual,
+      port: port,
+      direction: direction,
+      action: action,
+      location: location
+    )
+    message = synthesizedMessage
+  }
+}
+
+extension TaskBoardPolicyPipelineValidation {
+  public init(wire: PolicyGraphValidationReport) {
+    self.init(
+      isValid: wire.issues.isEmpty,
+      issues: wire.issues.map(TaskBoardPolicyPipelineValidationIssue.init(wire:))
+    )
+  }
+}
+
+extension TaskBoardPolicyPipelineSimulatedDecision {
+  public init(wire: PolicyPipelineSimulatedDecisionWire) {
+    self.init(
+      action: wire.action,
+      decision: TaskBoardPolicyDecision(wire: wire.decision),
+      visitedNodeIds: wire.visitedNodeIds,
+      policyTraceIds: wire.policyTraceIds
+    )
+  }
+}
+
+extension TaskBoardPolicyPipelineSimulationResult {
+  public init(wire: PolicyPipelineSimulationResultWire) {
+    self.init(
+      revision: wire.revision,
+      traceId: wire.traceId,
+      simulatedAt: wire.simulatedAt,
+      succeeded: wire.succeeded,
+      validation: TaskBoardPolicyPipelineValidation(wire: wire.validation),
+      decisions: wire.decisions.map(TaskBoardPolicyPipelineSimulatedDecision.init(wire:)),
+      policyTraceIds: wire.policyTraceIds
+    )
+  }
+}
