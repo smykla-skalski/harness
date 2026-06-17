@@ -181,6 +181,8 @@ func agentStatusColor(for status: AgentStatus) -> Color {
 
 func agentTuiStatusColor(for status: AgentTuiStatus) -> Color {
   switch status {
+  case .starting:
+    HarnessMonitorTheme.caution
   case .running:
     HarnessMonitorTheme.success
   case .stopped:

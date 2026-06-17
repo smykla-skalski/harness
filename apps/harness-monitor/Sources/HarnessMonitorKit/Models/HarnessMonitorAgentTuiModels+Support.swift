@@ -49,14 +49,16 @@ extension ManagedAgentListResponse {
 extension AgentTuiStatus {
   public var sortPriority: Int {
     switch self {
-    case .running:
+    case .starting:
       0
-    case .stopped:
+    case .running:
       1
-    case .exited:
+    case .stopped:
       2
-    case .failed:
+    case .exited:
       3
+    case .failed:
+      4
     }
   }
 }
