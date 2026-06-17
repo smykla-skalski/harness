@@ -5,6 +5,7 @@ import SwiftUI
 private let policyCanvasAnimatedEdgeTimelineLimit = 24
 private let policyCanvasDenseEdgeCanvasLimit = 24
 private let policyCanvasSwiftUIEdgeContextMenuLimit = 24
+private let policyCanvasDenseEdgeDirtyPadding: CGFloat = 18
 
 struct PolicyCanvasEdgeLayer: View {
   let viewModel: PolicyCanvasViewModel
@@ -223,9 +224,21 @@ private struct PolicyCanvasDenseEdgeCanvas: View {
         route,
         endpointInset: policyCanvasRenderedRouteEndpointInset()
       )
+      let labelGapFrames = labelGapFrames(edge: edge)
+      let strokeWidth = PolicyCanvasEdgeStrokeMetrics.visibleStrokeWidth(
+        baseWidth: severity == nil ? 2.0 : 2.4,
+        isSelected: isSelected,
+        canvasZoom: canvasZoom
+      )
       return PolicyCanvasDenseEdgeDrawingItem(
         route: renderedRoute,
-        labelGapFrames: labelGapFrames(edge: edge),
+        dirtyBounds: policyCanvasDenseEdgeDirtyBounds(
+          route: renderedRoute,
+          labelGapFrames: labelGapFrames,
+          strokeWidth: strokeWidth,
+          isSelected: isSelected
+        ),
+        labelGapFrames: labelGapFrames,
         strokeColor: strokeColor(
           for: edge,
           severity: severity,
@@ -240,11 +253,7 @@ private struct PolicyCanvasDenseEdgeCanvas: View {
           bundleOrdinal: bundleOrdinal,
           bundleSize: bundleSize
         ),
-        strokeWidth: PolicyCanvasEdgeStrokeMetrics.visibleStrokeWidth(
-          baseWidth: severity == nil ? 2.0 : 2.4,
-          isSelected: isSelected,
-          canvasZoom: canvasZoom
-        ),
+        strokeWidth: strokeWidth,
         dashPattern: policyCanvasBundleRailDashPattern(
           kindDashPattern: edge.kind.strokeDashPattern,
           bundleOrdinal: bundleOrdinal,
@@ -319,6 +328,7 @@ private struct PolicyCanvasDenseEdgeDrawingSurface: NSViewRepresentable {
 
 private struct PolicyCanvasDenseEdgeDrawingItem: Equatable {
   let route: PolicyCanvasEdgeRoute
+  let dirtyBounds: CGRect
   let labelGapFrames: [CGRect]
   let strokeColor: Color
   let arrowheadColor: Color
@@ -363,6 +373,9 @@ private final class PolicyCanvasDenseEdgeDrawingView: NSView {
   override func draw(_ dirtyRect: NSRect) {
     effectiveAppearance.performAsCurrentDrawingAppearance {
       for item in items {
+        guard item.dirtyBounds.intersects(dirtyRect) else {
+          continue
+        }
         draw(item)
       }
     }
@@ -418,6 +431,24 @@ private func policyCanvasDenseEdgeArrowheadPath(route: PolicyCanvasEdgeRoute) ->
   path.line(to: base - perpendicular * halfWidth)
   path.close()
   return path
+}
+
+private func policyCanvasDenseEdgeDirtyBounds(
+  route: PolicyCanvasEdgeRoute,
+  labelGapFrames: [CGRect],
+  strokeWidth: CGFloat,
+  isSelected: Bool
+) -> CGRect {
+  var bounds = policyCanvasRouteBounds(route).standardized
+  for frame in labelGapFrames {
+    bounds = bounds.union(frame)
+  }
+  let selectionHaloWidth: CGFloat = isSelected ? 5 : 0
+  let padding =
+    policyCanvasDenseEdgeDirtyPadding
+    + max(strokeWidth, selectionHaloWidth)
+    + 12
+  return bounds.insetBy(dx: -padding, dy: -padding)
 }
 
 struct PolicyCanvasEdgeLabelLayer: View {
