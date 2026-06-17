@@ -245,10 +245,14 @@ struct PolicyCanvasGraphQualityReportTests {
     ]
     let edges = [edge("a", source: endpoint("n1", "o", .output), target: endpoint("n2", "i", .input))]
     let violation = try! #require(measure(frames: frames, edges: edges).nodeDistance.first)
+    let radius = PolicyCanvasLayout.nodeCornerRadius
     #expect(violation.gapStart == CGPoint(x: 168, y: 248))
     #expect(violation.gapEnd == CGPoint(x: 700, y: 248))
-    #expect(violation.gapStartCap == CGPoint(x: 168, y: 400))
-    #expect(violation.gapEndCap == CGPoint(x: 700, y: 96))
+    // Caps reach one corner radius past the straight edge: the cap sits at the
+    // node's corner x, where the rounded corner shaves the body inward, so it has
+    // to dip in by the radius to actually touch.
+    #expect(violation.gapStartCap == CGPoint(x: 168, y: 400 + radius))
+    #expect(violation.gapEndCap == CGPoint(x: 700, y: 96 - radius))
   }
 
   @Test func nodeDistanceCapsStayAtLineWhenNodesStraddleIt() {

@@ -75,14 +75,17 @@ func policyCanvasMeasureNodeDistance(
 /// The y the end cap stretches to so it touches its node. The measurement line
 /// sits at `midY`; a node entirely below the line (its top edge past `midY`) is
 /// met by extending down to that top edge, a node entirely above by extending up
-/// to its bottom edge. A node straddling the line already meets it, so the cap
-/// stays at `midY` (zero length).
+/// to its bottom edge. The cap sits at the node's corner x, where the rounded
+/// corner shaves the body inward, so it overshoots the straight edge by one
+/// corner radius to actually reach the rounded body. A node straddling the line
+/// already meets it, so the cap stays at `midY` (zero length).
 private func policyCanvasNodeDistanceCapY(midY: CGFloat, frame: CGRect) -> CGFloat {
+  let overshoot = PolicyCanvasLayout.nodeCornerRadius
   if midY < frame.minY {
-    return frame.minY
+    return frame.minY + overshoot
   }
   if midY > frame.maxY {
-    return frame.maxY
+    return frame.maxY - overshoot
   }
   return midY
 }

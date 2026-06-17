@@ -177,10 +177,10 @@ struct PolicyCanvasNodeCard: View {
 
   var body: some View {
     ZStack {
-      RoundedRectangle(cornerRadius: 8)
+      RoundedRectangle(cornerRadius: PolicyCanvasLayout.nodeCornerRadius)
         .fill(PolicyCanvasVisualStyle.elevatedSurface.opacity(colorScheme == .dark ? 0.96 : 0.98))
         .overlay {
-          RoundedRectangle(cornerRadius: 8)
+          RoundedRectangle(cornerRadius: PolicyCanvasLayout.nodeCornerRadius)
             .stroke(strokeColor, lineWidth: borderLineWidth)
             // P18 selection-mark: a short ease-out fade on the stroke color
             // when `isSelected` flips. Keyed on `isSelected` only — the

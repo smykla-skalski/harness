@@ -22,6 +22,7 @@ public enum PolicyCanvasLayout {
   public static let automaticLayoutNodeStepHeight: CGFloat = 160
   public static let nodeSize = CGSize(width: nodeWidth, height: nodeMinimumHeight)
   public static let groupCornerRadius: CGFloat = 8
+  public static let nodeCornerRadius: CGFloat = 8
   public static let edgeLabelHeight: CGFloat = 28
   public static let edgeLabelMaxWidth: CGFloat = 220
   public static let edgeLabelLaneSpacing: CGFloat = 46
