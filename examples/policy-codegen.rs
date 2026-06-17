@@ -1113,6 +1113,19 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardStatusCount",
     "TaskBoardProjectSummary",
     "TaskBoardMachineSummary",
+    // task_board types.rs core item cluster: wire/model split, generate-only. The
+    // rich hand models keep their renamed shape (TaskBoardExternalRef drops
+    // sync_state, workflow is optional app-side); these *Wire types own the faithful
+    // daemon decode. The adopted TaskBoardStatus/Priority/AgentMode are referenced
+    // bare; ExternalRefProvider/TaskBoardWorkflowStatus take the suffix.
+    "TaskBoardItem",
+    "ExternalRef",
+    "ExternalRefSyncState",
+    "ExternalRefProvider",
+    "PlanningState",
+    "TaskBoardWorkflowState",
+    "TaskBoardWorkflowStatus",
+    "TaskUsage",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -2024,6 +2037,21 @@ const TASK_BOARD_SUMMARY_EMIT_ONLY: &[&str] = &[
     "TaskBoardProjectSummary",
     "TaskBoardMachineSummary",
 ];
+const TASK_BOARD_ITEM_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardItemWireTypes.generated.swift";
+// The core TaskBoardItem and its nested structs/enums from types.rs. References
+// the adopted TaskBoardStatus/TaskBoardPriority/TaskBoardAgentMode enums bare; the
+// two closed enums here (ExternalRefProvider, TaskBoardWorkflowStatus) take the
+// suffix. generate-only - the rich hand models keep their renamed shape.
+const TASK_BOARD_ITEM_EMIT_ONLY: &[&str] = &[
+    "TaskBoardItem",
+    "ExternalRef",
+    "ExternalRefSyncState",
+    "ExternalRefProvider",
+    "PlanningState",
+    "TaskBoardWorkflowState",
+    "TaskBoardWorkflowStatus",
+    "TaskUsage",
+];
 const TASK_BOARD_CANVAS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardPolicyCanvasWireTypes.generated.swift";
 // The policy-canvas read types in the task_board.rs facade. The rest of that file
 // (flatten, alias and struct-variant-tagged types) is excluded by the allow-list,
@@ -2198,6 +2226,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[TASK_BOARD_SUMMARY_SOURCE],
         },
+        GeneratedModule {
+            output: TASK_BOARD_ITEM_OUTPUT,
+            description: "the Rust task-board item and its planning, workflow and usage types",
+            defaults: &[],
+            sources: &[TASK_BOARD_TYPES_SOURCE],
+        },
     ]
 }
 
@@ -2221,6 +2255,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_CANVAS_OUTPUT => TASK_BOARD_CANVAS_EMIT_ONLY,
         TASK_BOARD_ENUMS_OUTPUT => TASK_BOARD_ENUMS_EMIT_ONLY,
         TASK_BOARD_SUMMARY_OUTPUT => TASK_BOARD_SUMMARY_EMIT_ONLY,
+        TASK_BOARD_ITEM_OUTPUT => TASK_BOARD_ITEM_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
