@@ -1091,6 +1091,14 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TimelineWindowResponse",
     "AcpTranscriptResponse",
     "StreamEvent",
+    // task_board.rs policy-canvas read cluster: wire/model split. Summary and
+    // ExportResponse own same-named Swift hand models; WorkspaceResponse maps to
+    // the hand TaskBoardPolicyCanvasWorkspace (drops "Response"). They reference
+    // the generated PolicyGraphMode (PolicyModels, via Kit alias) and the hand
+    // TaskBoardPolicyPipelineDocument (Rust PolicyPipelineDocument, TYPE_RENAMES).
+    "TaskBoardPolicyCanvasSummary",
+    "TaskBoardPolicyCanvasWorkspaceResponse",
+    "TaskBoardPolicyExportResponse",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1167,6 +1175,12 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // reviews types.rs request methods: Rust GitHubMergeMethod (task_board) is
     // the Swift hand enum TaskBoardGitHubMergeMethod.
     ("GitHubMergeMethod", "TaskBoardGitHubMergeMethod"),
+    // task_board.rs policy-canvas read cluster: Rust PolicyPipelineDocument is a
+    // type alias for PolicyGraph (policy_graph.rs:389). The Swift app re-models it
+    // as the hand TaskBoardPolicyPipelineDocument (Kit, explicit snake CodingKeys,
+    // plain-decoder-safe), so the canvas wire fields point at that hand name. The
+    // token only appears in task_board.rs fields, never the generated PolicyGraph.
+    ("PolicyPipelineDocument", "TaskBoardPolicyPipelineDocument"),
 ];
 
 /// The Swift name for a Rust wire type: a hand rename when one applies, else the
@@ -1973,6 +1987,16 @@ const WEBSOCKET_SOURCE: &str = include_str!("../src/daemon/protocol/websocket.rs
 // so the structs reference the existing bare Swift hand enums. ReviewPoint is also
 // SKIP'd (bare hand) to avoid rippling its bare use in SessionRequestsWireTypes.
 const SESSION_TASKS_SOURCE: &str = include_str!("../src/session/types/tasks.rs");
+const TASK_BOARD_PROTOCOL_SOURCE: &str = include_str!("../src/daemon/protocol/task_board.rs");
+const TASK_BOARD_CANVAS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardPolicyCanvasWireTypes.generated.swift";
+// The policy-canvas read types in the task_board.rs facade. The rest of that file
+// (flatten, alias and struct-variant-tagged types) is excluded by the allow-list,
+// so it never reaches the panic-prone builders.
+const TASK_BOARD_CANVAS_EMIT_ONLY: &[&str] = &[
+    "TaskBoardPolicyCanvasSummary",
+    "TaskBoardPolicyCanvasWorkspaceResponse",
+    "TaskBoardPolicyExportResponse",
+];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2120,6 +2144,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[SESSION_STATE_SOURCE, SESSION_AGENTS_SOURCE],
         },
+        GeneratedModule {
+            output: TASK_BOARD_CANVAS_OUTPUT,
+            description: "the Rust task-board policy-canvas summary, workspace and export types",
+            defaults: &[TASK_BOARD_PROTOCOL_SOURCE],
+            sources: &[TASK_BOARD_PROTOCOL_SOURCE],
+        },
     ]
 }
 
@@ -2140,6 +2170,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         SUMMARIES_OUTPUT => SUMMARIES_EMIT_ONLY,
         OBSERVE_OUTPUT => OBSERVE_EMIT_ONLY,
         SESSION_STATE_OUTPUT => SESSION_STATE_EMIT_ONLY,
+        TASK_BOARD_CANVAS_OUTPUT => TASK_BOARD_CANVAS_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {

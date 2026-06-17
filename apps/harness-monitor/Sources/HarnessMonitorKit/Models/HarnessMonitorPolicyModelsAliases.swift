@@ -24,3 +24,8 @@ public typealias PolicyPipelineSimulationResultWire =
   HarnessMonitorPolicyModels.PolicyPipelineSimulationResultWire
 public typealias PolicyPipelineAuditSummaryWire =
   HarnessMonitorPolicyModels.PolicyPipelineAuditSummaryWire
+
+// The generated task-board canvas wire types name PolicyGraphMode as a stored
+// property type, so it must resolve from the Kit namespace. The mode rawValue
+// bridges to the hand TaskBoardPolicyPipelineMode in the +Wire mapping.
+public typealias PolicyGraphMode = HarnessMonitorPolicyModels.PolicyGraphMode
