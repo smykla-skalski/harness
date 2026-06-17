@@ -46,7 +46,7 @@ private struct PolicyCanvasQualityOverlaySurface: NSViewRepresentable {
 }
 
 @MainActor
-private final class PolicyCanvasQualityOverlayView: NSView {
+final class PolicyCanvasQualityOverlayView: NSView {
   var report = PolicyCanvasGraphQualityReport.empty {
     didSet {
       guard report != oldValue else {
@@ -83,40 +83,60 @@ private final class PolicyCanvasQualityOverlayView: NSView {
       let error = PolicyCanvasVisualStyle.blockedTint
       let warning = PolicyCanvasVisualStyle.warningTint
 
-      drawDetours(warning: warning)
-      drawCorridors(error: error, warning: warning)
-      drawLongEdges(warning: warning)
-      drawNodeDistance(warning: warning)
-      drawNodeOverlaps(error: error)
-      drawBodyHits(error: error)
-      drawLabels(error: error, warning: warning)
-      drawWrongTurns(warning: warning)
-      drawCrossings(warning: warning)
-      drawCrossedPorts(warning: warning)
-      drawPortSpacing(error: error, warning: warning)
+      drawDetours(warning: warning, dirtyRect: dirtyRect)
+      drawCorridors(error: error, warning: warning, dirtyRect: dirtyRect)
+      drawLongEdges(warning: warning, dirtyRect: dirtyRect)
+      drawNodeDistance(warning: warning, dirtyRect: dirtyRect)
+      drawNodeOverlaps(error: error, dirtyRect: dirtyRect)
+      drawBodyHits(error: error, dirtyRect: dirtyRect)
+      drawLabels(error: error, warning: warning, dirtyRect: dirtyRect)
+      drawWrongTurns(warning: warning, dirtyRect: dirtyRect)
+      drawCrossings(warning: warning, dirtyRect: dirtyRect)
+      drawCrossedPorts(warning: warning, dirtyRect: dirtyRect)
+      drawPortSpacing(error: error, warning: warning, dirtyRect: dirtyRect)
     }
   }
 
-  private func drawLongEdges(warning: Color) {
+  private func drawLongEdges(warning: Color, dirtyRect: CGRect) {
     let path = NSBezierPath()
     for violation in report.longEdges {
+      guard qualityMarkIntersectsDirtyRect(violation.bounds, dirtyRect: dirtyRect) else {
+        continue
+      }
       path.append(NSBezierPath(rect: violation.bounds))
     }
     policyCanvasStroke(path, color: warning, alpha: 0.4, lineWidth: 1, dash: [4, 4])
   }
 
-  private func drawDetours(warning: Color) {
+  private func drawDetours(warning: Color, dirtyRect: CGRect) {
     let path = NSBezierPath()
     for violation in report.detours {
+      guard qualityMarkIntersectsDirtyRect(violation.bounds, dirtyRect: dirtyRect) else {
+        continue
+      }
       path.append(policyCanvasAppKitPolylinePath(points: violation.points))
     }
     policyCanvasStroke(path, color: warning, alpha: 0.22, lineWidth: 12)
   }
 
-  private func drawNodeDistance(warning: Color) {
+  private func drawNodeDistance(warning: Color, dirtyRect: CGRect) {
     let line = NSBezierPath()
     let ticks = NSBezierPath()
     for violation in report.nodeDistance {
+      let markRect = lineDirtyRect(
+        from: violation.gapStart,
+        to: violation.gapEnd,
+        padding: 8
+      )
+      guard
+        qualityMarkIntersectsDirtyRect(
+          markRect,
+          dirtyRect: dirtyRect,
+          padding: 0
+        )
+      else {
+        continue
+      }
       appendLine(to: line, from: violation.gapStart, to: violation.gapEnd)
       for end in [violation.gapStart, violation.gapEnd] {
         appendLine(
@@ -130,11 +150,25 @@ private final class PolicyCanvasQualityOverlayView: NSView {
     policyCanvasStroke(ticks, color: warning, alpha: 0.7, lineWidth: 1.5)
   }
 
-  private func drawWrongTurns(warning: Color) {
+  private func drawWrongTurns(warning: Color, dirtyRect: CGRect) {
     let halo = NSBezierPath()
     let shafts = NSBezierPath()
     let heads = NSBezierPath()
     for violation in report.wrongTurns {
+      let markRect = lineDirtyRect(
+        from: violation.point,
+        to: violation.returnPoint,
+        padding: 10
+      )
+      guard
+        qualityMarkIntersectsDirtyRect(
+          markRect,
+          dirtyRect: dirtyRect,
+          padding: 0
+        )
+      else {
+        continue
+      }
       appendLine(to: halo, from: violation.point, to: violation.returnPoint)
       appendLine(to: shafts, from: violation.point, to: violation.returnPoint)
       heads.append(
@@ -146,27 +180,47 @@ private final class PolicyCanvasQualityOverlayView: NSView {
     policyCanvasFill(heads, color: warning, alpha: 0.9)
   }
 
-  private func drawNodeOverlaps(error: Color) {
+  private func drawNodeOverlaps(error: Color, dirtyRect: CGRect) {
     let path = NSBezierPath()
     for violation in report.nodeOverlaps {
+      guard qualityMarkIntersectsDirtyRect(violation.intersection, dirtyRect: dirtyRect) else {
+        continue
+      }
       path.append(NSBezierPath(rect: violation.intersection))
     }
     policyCanvasFill(path, color: error, alpha: 0.25)
     policyCanvasStroke(path, color: error, lineWidth: 1.5)
   }
 
-  private func drawBodyHits(error: Color) {
+  private func drawBodyHits(error: Color, dirtyRect: CGRect) {
     let path = NSBezierPath()
     for violation in report.bodyHits {
+      guard qualityMarkIntersectsDirtyRect(violation.frame, dirtyRect: dirtyRect) else {
+        continue
+      }
       path.append(roundedRect(violation.frame, radius: 4))
     }
     policyCanvasStroke(path, color: error, lineWidth: 2)
   }
 
-  private func drawCorridors(error: Color, warning: Color) {
+  private func drawCorridors(error: Color, warning: Color, dirtyRect: CGRect) {
     let collinear = NSBezierPath()
     let parallel = NSBezierPath()
     for violation in report.corridors {
+      let markRect = lineDirtyRect(
+        from: violation.overlapStart,
+        to: violation.overlapEnd,
+        padding: 12
+      )
+      guard
+        qualityMarkIntersectsDirtyRect(
+          markRect,
+          dirtyRect: dirtyRect,
+          padding: 0
+        )
+      else {
+        continue
+      }
       let target = violation.kind == .collinear ? collinear : parallel
       appendLine(to: target, from: violation.overlapStart, to: violation.overlapEnd)
     }
@@ -174,7 +228,7 @@ private final class PolicyCanvasQualityOverlayView: NSView {
     policyCanvasStroke(collinear, color: error, alpha: 0.32, lineWidth: 10)
   }
 
-  private func drawLabels(error: Color, warning: Color) {
+  private func drawLabels(error: Color, warning: Color, dirtyRect: CGRect) {
     let radius = PolicyCanvasVisualStyle.edgeLabelCornerRadius
     let overlapOuter = NSBezierPath()
     let overlapInner = NSBezierPath()
@@ -186,6 +240,9 @@ private final class PolicyCanvasQualityOverlayView: NSView {
     let nearTurnCorner = NSBezierPath()
     for violation in report.labels {
       let frame = violation.frame
+      guard qualityMarkIntersectsDirtyRect(frame, dirtyRect: dirtyRect) else {
+        continue
+      }
       switch violation.kind {
       case .overlap:
         overlapOuter.append(roundedRect(frame, radius: radius))
@@ -221,7 +278,7 @@ private final class PolicyCanvasQualityOverlayView: NSView {
     policyCanvasStroke(nearTurnCorner, color: warning, alpha: 0.95, lineWidth: 2)
   }
 
-  private func drawCrossings(warning: Color) {
+  private func drawCrossings(warning: Color, dirtyRect: CGRect) {
     let independent = NSBezierPath()
     let shared = NSBezierPath()
     for violation in report.crossings {
@@ -232,6 +289,9 @@ private final class PolicyCanvasQualityOverlayView: NSView {
         width: radius * 2,
         height: radius * 2
       )
+      guard qualityMarkIntersectsDirtyRect(rect, dirtyRect: dirtyRect) else {
+        continue
+      }
       if violation.sharesEndpointNode {
         shared.append(NSBezierPath(ovalIn: rect))
       } else {
@@ -242,12 +302,26 @@ private final class PolicyCanvasQualityOverlayView: NSView {
     policyCanvasFill(independent, color: warning, alpha: 0.95)
   }
 
-  private func drawCrossedPorts(warning: Color) {
+  private func drawCrossedPorts(warning: Color, dirtyRect: CGRect) {
     let connectors = NSBezierPath()
     let rings = NSBezierPath()
     let crosses = NSBezierPath()
     let radius: CGFloat = 5
     for violation in report.crossedPorts {
+      let markRect = lineDirtyRect(
+        from: violation.pointA,
+        to: violation.pointB,
+        padding: radius + 5
+      )
+      guard
+        qualityMarkIntersectsDirtyRect(
+          markRect,
+          dirtyRect: dirtyRect,
+          padding: 0
+        )
+      else {
+        continue
+      }
       appendLine(to: connectors, from: violation.pointA, to: violation.pointB)
       for point in [violation.pointA, violation.pointB] {
         rings.append(
@@ -282,13 +356,23 @@ private final class PolicyCanvasQualityOverlayView: NSView {
     policyCanvasStroke(crosses, color: warning, lineWidth: 2)
   }
 
-  private func drawPortSpacing(error: Color, warning: Color) {
+  private func drawPortSpacing(error: Color, warning: Color, dirtyRect: CGRect) {
     let errorRings = NSBezierPath()
     let warningRings = NSBezierPath()
     let detachedConnectors = NSBezierPath()
     let unevenArrows = NSBezierPath()
     let unevenGhosts = NSBezierPath()
     for violation in report.portSpacing {
+      let markRect = portSpacingDirtyRect(for: violation)
+      guard
+        qualityMarkIntersectsDirtyRect(
+          markRect,
+          dirtyRect: dirtyRect,
+          padding: 0
+        )
+      else {
+        continue
+      }
       switch violation.kind {
       case .overlap:
         errorRings.append(portRing(violation.point))
@@ -314,29 +398,5 @@ private final class PolicyCanvasQualityOverlayView: NSView {
     policyCanvasStroke(unevenGhosts, color: warning, alpha: 0.6, lineWidth: 1, dash: [2, 2])
     policyCanvasStroke(warningRings, color: warning, lineWidth: 1.5)
     policyCanvasStroke(errorRings, color: error, lineWidth: 1.5)
-  }
-
-  private func roundedRect(_ rect: CGRect, radius: CGFloat) -> NSBezierPath {
-    NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
-  }
-
-  private func appendLine(to path: NSBezierPath, from start: CGPoint, to end: CGPoint) {
-    path.move(to: start)
-    path.line(to: end)
-  }
-
-  private func portRingRect(_ point: CGPoint, radius: CGFloat = 6) -> CGRect {
-    CGRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)
-  }
-
-  private func portRing(_ point: CGPoint) -> NSBezierPath {
-    NSBezierPath(ovalIn: portRingRect(point))
-  }
-
-  private func portNudge(from start: CGPoint, to end: CGPoint) -> NSBezierPath {
-    let path = NSBezierPath()
-    appendLine(to: path, from: start, to: end)
-    path.append(policyCanvasAppKitArrowHead(from: start, to: end, size: 4))
-    return path
   }
 }

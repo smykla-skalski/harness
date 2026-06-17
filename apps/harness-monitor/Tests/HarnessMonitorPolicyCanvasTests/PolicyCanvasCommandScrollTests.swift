@@ -643,8 +643,13 @@ struct PolicyCanvasCommandScrollTests {
     #expect(edgeLayerSource.contains("PolicyCanvasDenseEdgeCanvas("))
     #expect(edgeLayerSource.contains("private struct PolicyCanvasDenseEdgeCanvas: View"))
     #expect(edgeLayerSource.contains("PolicyCanvasDenseEdgeDrawingSurface(items: drawingItems)"))
-    #expect(edgeLayerSource.contains("private struct PolicyCanvasDenseEdgeDrawingSurface: NSViewRepresentable"))
-    #expect(edgeLayerSource.contains("private final class PolicyCanvasDenseEdgeDrawingView: NSView"))
+    #expect(
+      edgeLayerSource.contains(
+        "private struct PolicyCanvasDenseEdgeDrawingSurface: NSViewRepresentable")
+    )
+    #expect(
+      edgeLayerSource.contains("private final class PolicyCanvasDenseEdgeDrawingView: NSView")
+    )
     #expect(edgeLayerSource.contains("override func draw(_ dirtyRect: NSRect)"))
     #expect(
       edgeLayerSource.contains(
@@ -713,19 +718,50 @@ struct PolicyCanvasCommandScrollTests {
     let qualityHoverSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasQualityHoverLayer.swift"
     )
+    let qualityOverlaySupportSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasQualityOverlayDrawingSupport.swift"
+    )
     let drawingSupportSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasAppKitDrawingSupport.swift"
     )
 
     #expect(edgeLayerSource.contains("PolicyCanvasDenseEdgeDrawingSurface(items: drawingItems)"))
     #expect(qualityOverlaySource.contains("PolicyCanvasQualityOverlaySurface(report: report)"))
-    #expect(qualityOverlaySource.contains("private struct PolicyCanvasQualityOverlaySurface: NSViewRepresentable"))
-    #expect(qualityOverlaySource.contains("private final class PolicyCanvasQualityOverlayView: NSView"))
+    #expect(
+      qualityOverlaySource.contains(
+        "private struct PolicyCanvasQualityOverlaySurface: NSViewRepresentable")
+    )
+    #expect(
+      qualityOverlaySource.contains(
+        "final class PolicyCanvasQualityOverlayView: NSView")
+    )
     #expect(qualityHoverSource.contains("ForEach(active)"))
     #expect(!edgeLayerSource.contains("Canvas { context"))
     #expect(!qualityOverlaySource.contains("Canvas { context"))
+    #expect(!qualityOverlaySupportSource.contains("Canvas { context"))
     #expect(!qualityHoverSource.contains("Canvas { context"))
     #expect(drawingSupportSource.contains("policyCanvasApplyTransparentDrawingBacking"))
+  }
+
+  @Test("dense document overlays cull AppKit redraws to the dirty rect")
+  func denseDocumentOverlaysCullAppKitRedrawsToDirtyRect() throws {
+    let edgeLayerSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEdgeLayers.swift"
+    )
+    let qualityOverlaySource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasQualityOverlayLayer.swift"
+    )
+    let qualityOverlaySupportSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasQualityOverlayDrawingSupport.swift"
+    )
+
+    #expect(edgeLayerSource.contains("let dirtyBounds: CGRect"))
+    #expect(edgeLayerSource.contains("guard item.dirtyBounds.intersects(dirtyRect)"))
+    #expect(edgeLayerSource.contains("policyCanvasDenseEdgeDirtyBounds("))
+    #expect(qualityOverlaySupportSource.contains("qualityMarkIntersectsDirtyRect("))
+    #expect(qualityOverlaySource.contains("dirtyRect: dirtyRect"))
+    #expect(qualityOverlaySupportSource.contains("portSpacingDirtyRect("))
+    #expect(!edgeLayerSource.contains("policyCanvasViewportCullRect("))
   }
 
   @Test("native host retries a pending scroll request until the viewport is ready")

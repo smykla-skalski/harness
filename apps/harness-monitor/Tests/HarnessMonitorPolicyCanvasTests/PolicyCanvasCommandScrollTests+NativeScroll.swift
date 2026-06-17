@@ -380,7 +380,8 @@ extension PolicyCanvasCommandScrollTests {
     rootView.layoutSubtreeIfNeeded()
 
     let resizedViewportSize = scrollView.contentView.frame.size
-    let expectedZoom = initialZoom
+    let expectedZoom =
+      initialZoom
       * min(
         resizedViewportSize.width / initialViewportSize.width,
         resizedViewportSize.height / initialViewportSize.height
@@ -1143,10 +1144,10 @@ extension PolicyCanvasCommandScrollTests {
 
     #expect(!nodeSource.contains(".offset(x: node.position.x, y: node.position.y)"))
     #expect(
-      nodeSource.contains("x: node.position.x + PolicyCanvasLayout.nodeSize.width / 2")
+      nodeSource.contains("x: node.position.x + nodeSize.width / 2")
     )
     #expect(
-      nodeSource.contains("y: node.position.y + PolicyCanvasLayout.nodeSize.height / 2")
+      nodeSource.contains("y: node.position.y + nodeSize.height / 2")
     )
     #expect(!groupSource.contains(".offset(x: group.frame.minX, y: group.frame.minY)"))
     #expect(groupSource.contains(".position(x: group.frame.midX, y: group.frame.midY)"))
