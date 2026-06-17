@@ -13,9 +13,9 @@ import Foundation
 // and the mapping ahead of that wiring. The standalone codex endpoints
 // (transcript, inspect, approvals, run/steer requests) reroute alongside it.
 //
-// CodexTranscriptResponseWire.entries is [TimelineEntry] (the hand summaries
-// model, referenced not regenerated); it becomes [TimelineEntryWire] when the
-// summaries subsystem migrates, at which point this mapping gains a map step.
+// CodexTranscriptResponseWire.entries is now [TimelineEntryWire] (the summaries
+// subsystem generated TimelineEntry), so this mapping bridges each entry to the
+// hand TimelineEntry via the TimelineEntry(wire:) pass-through map.
 
 extension CodexRunMode {
   init(wire: CodexRunModeWire) {
@@ -151,7 +151,7 @@ extension CodexAgentInspectResponse {
 
 extension CodexTranscriptResponse {
   init(wire: CodexTranscriptResponseWire) {
-    self.init(entries: wire.entries)
+    self.init(entries: wire.entries.map(TimelineEntry.init(wire:)))
   }
 }
 

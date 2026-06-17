@@ -539,6 +539,39 @@ public struct AgentToolActivitySummaryWire: Codable, Equatable, Sendable {
   }
 }
 
+public struct TimelineEntryWire: Codable, Equatable, Sendable {
+  public var entryId: String
+  public var recordedAt: String
+  public var kind: String
+  public var sessionId: String
+  public var agentId: String?
+  public var taskId: String?
+  public var summary: String
+  public var payload: JSONValue
+
+  public init(entryId: String, recordedAt: String, kind: String, sessionId: String, agentId: String? = nil, taskId: String? = nil, summary: String, payload: JSONValue) {
+    self.entryId = entryId
+    self.recordedAt = recordedAt
+    self.kind = kind
+    self.sessionId = sessionId
+    self.agentId = agentId
+    self.taskId = taskId
+    self.summary = summary
+    self.payload = payload
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case entryId = "entry_id"
+    case recordedAt = "recorded_at"
+    case kind
+    case sessionId = "session_id"
+    case agentId = "agent_id"
+    case taskId = "task_id"
+    case summary
+    case payload
+  }
+}
+
 public struct TimelineCursorWire: Codable, Equatable, Sendable {
   public var recordedAt: String
   public var entryId: String

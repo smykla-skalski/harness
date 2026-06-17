@@ -1,0 +1,20 @@
+import Foundation
+
+// Bridge the generated TimelineEntryWire to the rich hand TimelineEntry. The two are
+// field-identical thin mirrors (the hand payload is already JSONValue), so the map is
+// a straight pass-through - it exists so wire-decoded entries (e.g. the codex
+// transcript) reach the hand model the rest of the app consumes.
+extension TimelineEntry {
+  init(wire: TimelineEntryWire) {
+    self.init(
+      entryId: wire.entryId,
+      recordedAt: wire.recordedAt,
+      kind: wire.kind,
+      sessionId: wire.sessionId,
+      agentId: wire.agentId,
+      taskId: wire.taskId,
+      summary: wire.summary,
+      payload: wire.payload
+    )
+  }
+}

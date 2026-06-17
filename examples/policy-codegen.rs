@@ -1087,6 +1087,7 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // timeline pagination cursor + window request (same-named Swift hand mirrors).
     "TimelineCursor",
     "TimelineWindowRequest",
+    "TimelineEntry",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1855,6 +1856,11 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     // is referenced bare by the codex wire types (suffixing it would ripple them).
     "TimelineCursor",
     "TimelineWindowRequest",
+    // TimelineEntry: the high-traffic timeline row (payload: serde_json::Value ->
+    // JSONValue). Suffixed to TimelineEntryWire - the codex CodexTranscriptResponseWire
+    // referenced the hand TimelineEntry bare, so regenerating repoints it to the wire
+    // and the codex mapping gains a map step (its comment predicted this).
+    "TimelineEntry",
 ];
 const OBSERVE_CLASSIFICATION_SOURCE: &str = include_str!("../src/observe/types/classification.rs");
 const OBSERVE_ISSUE_CODE_SOURCE: &str = include_str!("../src/observe/types/issue_code.rs");

@@ -225,9 +225,9 @@ public struct CodexAgentInspectSnapshotWire: Codable, Equatable, Sendable {
 }
 
 public struct CodexTranscriptResponseWire: Codable, Equatable, Sendable {
-  public var entries: [TimelineEntry]
+  public var entries: [TimelineEntryWire]
 
-  public init(entries: [TimelineEntry]) {
+  public init(entries: [TimelineEntryWire]) {
     self.entries = entries
   }
 
