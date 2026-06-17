@@ -326,6 +326,15 @@ public struct PolicyCanvasNodeDistanceViolation: Equatable, Sendable {
   public let distance: CGFloat
   public let gapStart: CGPoint
   public let gapEnd: CGPoint
+  /// Far end of the vertical cap at `gapStart`, stretched off the measurement
+  /// line to touch the facing edge of the node on that side. The measurement
+  /// line runs at the averaged mid-y of the two nodes, so a node sitting above
+  /// or below the line is otherwise disconnected from its end of the bar; the
+  /// cap reaches up or down to meet it. Equal to `gapStart` when the node
+  /// already straddles the line (nothing to bridge).
+  public let gapStartCap: CGPoint
+  /// Far end of the vertical cap at `gapEnd`, reaching the node on that side.
+  public let gapEndCap: CGPoint
 
   public init(
     edgeID: String,
@@ -333,7 +342,9 @@ public struct PolicyCanvasNodeDistanceViolation: Equatable, Sendable {
     targetID: String,
     distance: CGFloat,
     gapStart: CGPoint,
-    gapEnd: CGPoint
+    gapEnd: CGPoint,
+    gapStartCap: CGPoint,
+    gapEndCap: CGPoint
   ) {
     self.edgeID = edgeID
     self.sourceID = sourceID
@@ -341,6 +352,8 @@ public struct PolicyCanvasNodeDistanceViolation: Equatable, Sendable {
     self.distance = distance
     self.gapStart = gapStart
     self.gapEnd = gapEnd
+    self.gapStartCap = gapStartCap
+    self.gapEndCap = gapEndCap
   }
 
   public var severity: PolicyCanvasQualitySeverity { .warning }

@@ -234,6 +234,36 @@ struct PolicyCanvasGraphQualityReportTests {
     #expect((report.nodeDistance.first?.distance ?? 0) == 532)
   }
 
+  @Test func nodeDistanceCapsReachTheirNodes() {
+    // Source sits low, target sits high - the dashed measurement bar runs at the
+    // averaged mid-y between them, so each end cap must stretch vertically to
+    // touch the node it measures: the left cap down to the source's top edge, the
+    // right cap up to the target's bottom edge.
+    let frames = [
+      "n1": CGRect(x: 0, y: 400, width: 168, height: 96),
+      "n2": CGRect(x: 700, y: 0, width: 168, height: 96),
+    ]
+    let edges = [edge("a", source: endpoint("n1", "o", .output), target: endpoint("n2", "i", .input))]
+    let violation = try! #require(measure(frames: frames, edges: edges).nodeDistance.first)
+    #expect(violation.gapStart == CGPoint(x: 168, y: 248))
+    #expect(violation.gapEnd == CGPoint(x: 700, y: 248))
+    #expect(violation.gapStartCap == CGPoint(x: 168, y: 400))
+    #expect(violation.gapEndCap == CGPoint(x: 700, y: 96))
+  }
+
+  @Test func nodeDistanceCapsStayAtLineWhenNodesStraddleIt() {
+    // Both nodes share the line's y band, so neither cap has a gap to bridge -
+    // the caps collapse onto the measurement line endpoints.
+    let frames = [
+      "n1": CGRect(x: 0, y: 0, width: 168, height: 96),
+      "n2": CGRect(x: 700, y: 0, width: 168, height: 96),
+    ]
+    let edges = [edge("a", source: endpoint("n1", "o", .output), target: endpoint("n2", "i", .input))]
+    let violation = try! #require(measure(frames: frames, edges: edges).nodeDistance.first)
+    #expect(violation.gapStartCap == violation.gapStart)
+    #expect(violation.gapEndCap == violation.gapEnd)
+  }
+
   @Test func adjacentNodesAreNotTooFar() {
     let frames = [
       "n1": CGRect(x: 0, y: 0, width: 168, height: 96),

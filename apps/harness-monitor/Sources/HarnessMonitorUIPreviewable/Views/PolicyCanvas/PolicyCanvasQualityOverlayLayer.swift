@@ -123,11 +123,11 @@ final class PolicyCanvasQualityOverlayView: NSView {
     let line = NSBezierPath()
     let ticks = NSBezierPath()
     for violation in report.nodeDistance {
-      let markRect = lineDirtyRect(
-        from: violation.gapStart,
-        to: violation.gapEnd,
-        padding: 8
-      )
+      // The caps stretch off the line to the nodes, so the cull rect has to span
+      // them too, not just the horizontal bar.
+      let markRect = lineDirtyRect(from: violation.gapStart, to: violation.gapEnd, padding: 8)
+        .union(lineDirtyRect(from: violation.gapStart, to: violation.gapStartCap, padding: 8))
+        .union(lineDirtyRect(from: violation.gapEnd, to: violation.gapEndCap, padding: 8))
       guard
         qualityMarkIntersectsDirtyRect(
           markRect,
@@ -138,12 +138,13 @@ final class PolicyCanvasQualityOverlayView: NSView {
         continue
       }
       appendLine(to: line, from: violation.gapStart, to: violation.gapEnd)
-      for end in [violation.gapStart, violation.gapEnd] {
-        appendLine(
-          to: ticks,
-          from: CGPoint(x: end.x, y: end.y - 6),
-          to: CGPoint(x: end.x, y: end.y + 6)
-        )
+      for (end, cap) in [
+        (violation.gapStart, violation.gapStartCap),
+        (violation.gapEnd, violation.gapEndCap),
+      ] {
+        // Boundary tick at the measured edge, plus the cap stretching to its node.
+        appendLine(to: ticks, from: CGPoint(x: end.x, y: end.y - 6), to: CGPoint(x: end.x, y: end.y + 6))
+        appendLine(to: ticks, from: end, to: cap)
       }
     }
     policyCanvasStroke(line, color: warning, alpha: 0.7, lineWidth: 1.5, dash: [5, 3])
