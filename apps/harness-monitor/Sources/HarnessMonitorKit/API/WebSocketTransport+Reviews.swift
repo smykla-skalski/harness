@@ -47,15 +47,17 @@ extension WebSocketTransport {
 
   public func reviewsCapabilities() async throws -> ReviewsCapabilitiesResponse {
     let value = try await rpc(method: .reviewsCapabilities, params: nil)
-    return try decode(value)
+    let wire: ReviewsCapabilitiesResponseWire = try decodePolicyWire(value)
+    return ReviewsCapabilitiesResponse(wire: wire)
   }
 
   public func previewReviewAction(
     request: ReviewsActionPreviewRequest
   ) async throws -> ReviewsActionPreviewResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsActionPreviewRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsActionPreview, params: params)
-    return try decode(value)
+    let wire: ReviewsActionPreviewResponseWire = try decodePolicyWire(value)
+    return ReviewsActionPreviewResponse(wire: wire)
   }
 
   public func approveReviews(
@@ -121,9 +123,10 @@ extension WebSocketTransport {
   public func refreshReviews(
     request: ReviewsRefreshRequest
   ) async throws -> ReviewsRefreshResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsRefreshRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsRefresh, params: params)
-    return try decode(value)
+    let wire: ReviewsRefreshResponseWire = try decodePolicyWire(value)
+    return ReviewsRefreshResponse(wire: wire)
   }
 
   public func fetchReviewBody(

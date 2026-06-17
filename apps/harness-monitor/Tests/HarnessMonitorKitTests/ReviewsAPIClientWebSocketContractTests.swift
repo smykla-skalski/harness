@@ -191,7 +191,7 @@ extension TaskBoardAPIClientTests {
     #expect(objectValue(calls[3].params, key: "action") == .string("merge"))
     #expect(
       objectValue(calls[3].params, key: "targets")
-        == .array([.object(reviewsTargetJSON)])
+        == .array([.object(reviewsActionTargetJSON)])
     )
     #expect(objectValue(calls[3].params, key: "method") == .string("rebase"))
     #expect(
@@ -233,7 +233,7 @@ extension TaskBoardAPIClientTests {
     #expect(calls[12].params == nil)
     #expect(
       objectValue(calls[13].params, key: "targets")
-        == .array([.object(reviewsTargetJSON)])
+        == .array([.object(reviewsActionTargetJSON)])
     )
     #expect(
       objectValue(calls[14].params, key: "targets")

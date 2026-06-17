@@ -50,13 +50,22 @@ extension HarnessMonitorAPIClient {
   }
 
   public func reviewsCapabilities() async throws -> ReviewsCapabilitiesResponse {
-    try await get("/v1/reviews/capabilities")
+    let wire: ReviewsCapabilitiesResponseWire = try await get(
+      "/v1/reviews/capabilities",
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsCapabilitiesResponse(wire: wire)
   }
 
   public func previewReviewAction(
     request: ReviewsActionPreviewRequest
   ) async throws -> ReviewsActionPreviewResponse {
-    try await post("/v1/reviews/action-preview", body: request)
+    let wire: ReviewsActionPreviewResponseWire = try await post(
+      "/v1/reviews/action-preview",
+      body: ReviewsActionPreviewRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsActionPreviewResponse(wire: wire)
   }
 
   public func approveReviews(
@@ -136,7 +145,12 @@ extension HarnessMonitorAPIClient {
   public func refreshReviews(
     request: ReviewsRefreshRequest
   ) async throws -> ReviewsRefreshResponse {
-    try await post("/v1/reviews/refresh", body: request)
+    let wire: ReviewsRefreshResponseWire = try await post(
+      "/v1/reviews/refresh",
+      body: ReviewsRefreshRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsRefreshResponse(wire: wire)
   }
 
   public func fetchReviewBody(
