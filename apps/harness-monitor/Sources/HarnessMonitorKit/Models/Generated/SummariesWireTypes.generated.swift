@@ -611,6 +611,57 @@ public struct TimelineWindowRequestWire: Codable, Equatable, Sendable {
   }
 }
 
+public struct TimelineWindowResponseWire: Codable, Equatable, Sendable {
+  public var revision: Int64
+  public var totalCount: UInt
+  public var windowStart: UInt
+  public var windowEnd: UInt
+  public var hasOlder: Bool
+  public var hasNewer: Bool
+  public var oldestCursor: TimelineCursorWire?
+  public var newestCursor: TimelineCursorWire?
+  public var entries: [TimelineEntryWire]?
+  public var unchanged: Bool
+
+  public init(revision: Int64, totalCount: UInt, windowStart: UInt, windowEnd: UInt, hasOlder: Bool, hasNewer: Bool, oldestCursor: TimelineCursorWire? = nil, newestCursor: TimelineCursorWire? = nil, entries: [TimelineEntryWire]? = nil, unchanged: Bool) {
+    self.revision = revision
+    self.totalCount = totalCount
+    self.windowStart = windowStart
+    self.windowEnd = windowEnd
+    self.hasOlder = hasOlder
+    self.hasNewer = hasNewer
+    self.oldestCursor = oldestCursor
+    self.newestCursor = newestCursor
+    self.entries = entries
+    self.unchanged = unchanged
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case revision
+    case totalCount = "total_count"
+    case windowStart = "window_start"
+    case windowEnd = "window_end"
+    case hasOlder = "has_older"
+    case hasNewer = "has_newer"
+    case oldestCursor = "oldest_cursor"
+    case newestCursor = "newest_cursor"
+    case entries
+    case unchanged
+  }
+}
+
+public struct AcpTranscriptResponseWire: Codable, Equatable, Sendable {
+  public var entries: [TimelineEntryWire]
+
+  public init(entries: [TimelineEntryWire]) {
+    self.entries = entries
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case entries
+  }
+}
+
 public struct AskUserQuestionOptionWire: Codable, Equatable, Sendable {
   public var label: String
   public var description: String

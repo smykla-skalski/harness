@@ -1088,6 +1088,8 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TimelineCursor",
     "TimelineWindowRequest",
     "TimelineEntry",
+    "TimelineWindowResponse",
+    "AcpTranscriptResponse",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1861,6 +1863,10 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     // referenced the hand TimelineEntry bare, so regenerating repoints it to the wire
     // and the codex mapping gains a map step (its comment predicted this).
     "TimelineEntry",
+    // with TimelineEntry generated, the two responses that nest it unblock: the
+    // window response (entries + before/after cursors) and the acp transcript.
+    "TimelineWindowResponse",
+    "AcpTranscriptResponse",
 ];
 const OBSERVE_CLASSIFICATION_SOURCE: &str = include_str!("../src/observe/types/classification.rs");
 const OBSERVE_ISSUE_CODE_SOURCE: &str = include_str!("../src/observe/types/issue_code.rs");
