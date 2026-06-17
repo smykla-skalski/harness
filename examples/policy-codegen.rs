@@ -895,6 +895,19 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "WsErrorPayload",
     "WsPushEvent",
     "WsChunkFrame",
+    // session tasks (session/types/tasks.rs): 10 review-flow structs, generate-only.
+    // WorkItem is the task-board core; the rest are its nested review state. The 6
+    // enums + ReviewPoint they reference are SKIP'd (bare Swift hand) - see SKIP_TYPES.
+    "WorkItem",
+    "TaskNote",
+    "TaskCheckpoint",
+    "TaskCheckpointSummary",
+    "AwaitingReview",
+    "ReviewerEntry",
+    "ReviewClaim",
+    "Review",
+    "ReviewConsensus",
+    "ArbitrationOutcome",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -927,6 +940,23 @@ const SKIP_TYPES: &[&str] = &[
     "WsConfigPayload",
     "WsRuntimeProbeUpdate",
     "WsAcpInspect",
+    // session tasks enums: closed snake_case, but each carries app divergence the
+    // generated form would regress - TaskStatus has a legacy-tolerant custom decode
+    // (accepts in_progress AND legacy inProgress), TaskSeverity has .title, etc. The
+    // structs reference these as the existing bare Swift hand enums; adopting them
+    // (preserving the app behavior) is separate per-enum work.
+    "TaskSeverity",
+    "TaskStatus",
+    "TaskQueuePolicy",
+    "TaskSource",
+    "ReviewVerdict",
+    "ReviewPointState",
+    // ReviewPoint (struct) is referenced bare by the already-generated
+    // SessionRequestsWireTypes (TaskSubmitReviewRequestWire.points) whose +Wire
+    // mapping passes model.points straight through; suffixing it would ripple that
+    // file + break the pass-through. Keep it bare-hand (Review/ReviewConsensus wire
+    // structs reference the hand ReviewPoint) until session_requests also adopts it.
+    "ReviewPoint",
 ];
 
 /// Whether a Rust type is on the generator's skip list (see `SKIP_TYPES`).
@@ -1618,6 +1648,14 @@ const REVIEWS_LOGIC_SOURCE: &str = include_str!("../src/reviews/logic.rs");
 // until those subsystems land. serde_json::Value -> JSONValue, the request's
 // trace_context is a String dict.
 const WEBSOCKET_SOURCE: &str = include_str!("../src/daemon/protocol/websocket.rs");
+// session tasks: the WorkItem task-board core + its review-flow structs. Fully
+// self-contained (no imports; fields are primitives or in-file types). 10 structs
+// generate as *Wire (generate-only); the 6 closed enums (TaskSeverity/TaskStatus/
+// TaskQueuePolicy/TaskSource/ReviewVerdict/ReviewPointState) are SKIP'd - they
+// carry app divergences (TaskStatus legacy-tolerant decode, TaskSeverity .title)
+// so the structs reference the existing bare Swift hand enums. ReviewPoint is also
+// SKIP'd (bare hand) to avoid rippling its bare use in SessionRequestsWireTypes.
+const SESSION_TASKS_SOURCE: &str = include_str!("../src/session/types/tasks.rs");
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -1754,6 +1792,13 @@ fn modules() -> Vec<GeneratedModule> {
             description: "the Rust websocket transport frame types",
             defaults: &[],
             sources: &[WEBSOCKET_SOURCE],
+        },
+        GeneratedModule {
+            output:
+                "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionTasksWireTypes.generated.swift",
+            description: "the Rust session work-item and review-flow types",
+            defaults: &[SESSION_TASKS_SOURCE],
+            sources: &[SESSION_TASKS_SOURCE],
         },
     ]
 }
