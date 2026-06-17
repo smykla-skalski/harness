@@ -196,25 +196,25 @@ extension TaskBoardAPIClientTests {
     #expect(objectValue(calls[3].params, key: "method") == .string("rebase"))
     #expect(
       objectValue(calls[4].params, key: "targets")
-        == .array([.object(reviewsTargetJSON)])
+        == .array([.object(reviewsActionTargetJSON)])
     )
     #expect(
       objectValue(calls[5].params, key: "targets")
-        == .array([.object(reviewsTargetJSON)])
+        == .array([.object(reviewsActionTargetJSON)])
     )
     #expect(objectValue(calls[5].params, key: "method") == .string("rebase"))
     #expect(
       objectValue(calls[6].params, key: "targets")
-        == .array([.object(reviewsTargetJSON)])
+        == .array([.object(reviewsActionTargetJSON)])
     )
     #expect(
       objectValue(calls[7].params, key: "targets")
-        == .array([.object(reviewsTargetJSON)])
+        == .array([.object(reviewsActionTargetJSON)])
     )
     #expect(objectValue(calls[7].params, key: "label") == .string("dependencies:ready"))
     #expect(
       objectValue(calls[8].params, key: "targets")
-        == .array([.object(reviewsTargetJSON)])
+        == .array([.object(reviewsActionTargetJSON)])
     )
     #expect(objectValue(calls[8].params, key: "method") == .string("squash"))
     #expect(objectValue(calls[9].params, key: "target") == .object(reviewsTargetJSON))
@@ -237,7 +237,7 @@ extension TaskBoardAPIClientTests {
     )
     #expect(
       objectValue(calls[14].params, key: "targets")
-        == .array([.object(reviewsTargetJSON)])
+        == .array([.object(reviewsActionTargetJSON)])
     )
     #expect(objectValue(calls[14].params, key: "body") == .string("@renovatebot rebase"))
     #expect(
@@ -381,3 +381,17 @@ private let reviewsTargetJSON: [String: JSONValue] = [
   "policy_blocked": .bool(false),
   "check_suite_ids": .array([.string("suite-1")]),
 ]
+
+// The action endpoints (approve/merge/rerun/label/auto/comment) encode their
+// targets through ReviewTargetWire, which emits the full daemon shape rather
+// than the hand encoder's default-omitting subset. The not-yet-rerouted
+// preview/policy/refresh paths still send the minimal reviewsTargetJSON above.
+private let reviewsActionTargetJSON: [String: JSONValue] = {
+  var target = reviewsTargetJSON
+  target["state"] = .string("open")
+  target["is_draft"] = .bool(false)
+  target["viewer_can_update"] = .bool(true)
+  target["viewer_can_merge_as_admin"] = .bool(false)
+  target["required_failed_check_names"] = .array([])
+  return target
+}()

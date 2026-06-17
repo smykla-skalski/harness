@@ -61,49 +61,55 @@ extension WebSocketTransport {
   public func approveReviews(
     request: ReviewsApproveRequest
   ) async throws -> ReviewsActionResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsApproveRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsApprove, params: params)
-    return try decode(value)
+    let wire: ReviewsActionResponseWire = try decodePolicyWire(value)
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func mergeReviews(
     request: ReviewsMergeRequest
   ) async throws -> ReviewsActionResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsMergeRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsMerge, params: params)
-    return try decode(value)
+    let wire: ReviewsActionResponseWire = try decodePolicyWire(value)
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func rerunReviewChecks(
     request: ReviewsRerunChecksRequest
   ) async throws -> ReviewsActionResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsRerunChecksRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsRerunChecks, params: params)
-    return try decode(value)
+    let wire: ReviewsActionResponseWire = try decodePolicyWire(value)
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func addReviewLabel(
     request: ReviewsLabelRequest
   ) async throws -> ReviewsActionResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsLabelRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsAddLabel, params: params)
-    return try decode(value)
+    let wire: ReviewsActionResponseWire = try decodePolicyWire(value)
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func autoReviews(
     request: ReviewsAutoRequest
   ) async throws -> ReviewsActionResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsAutoRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsAuto, params: params)
-    return try decode(value)
+    let wire: ReviewsActionResponseWire = try decodePolicyWire(value)
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func reRequestReview(
     request: ReviewsRequestReviewRequest
   ) async throws -> ReviewsActionResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsRequestReviewRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsRequestReview, params: params)
-    return try decode(value)
+    let wire: ReviewsActionResponseWire = try decodePolicyWire(value)
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func clearReviewsCache() async throws -> ReviewsCacheClearResponse {
@@ -141,9 +147,10 @@ extension WebSocketTransport {
   public func commentReviews(
     request: ReviewsCommentRequest
   ) async throws -> ReviewsActionResponse {
-    let params = try encodeParams(request, extra: [:])
+    let params = try encodeParams(ReviewsCommentRequestWire(request), extra: [:])
     let value = try await rpc(method: .reviewsComment, params: params)
-    return try decode(value)
+    let wire: ReviewsActionResponseWire = try decodePolicyWire(value)
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func listReviewFiles(

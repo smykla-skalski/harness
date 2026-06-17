@@ -62,37 +62,67 @@ extension HarnessMonitorAPIClient {
   public func approveReviews(
     request: ReviewsApproveRequest
   ) async throws -> ReviewsActionResponse {
-    try await post("/v1/reviews/approve", body: request)
+    let wire: ReviewsActionResponseWire = try await post(
+      "/v1/reviews/approve",
+      body: ReviewsApproveRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func mergeReviews(
     request: ReviewsMergeRequest
   ) async throws -> ReviewsActionResponse {
-    try await post("/v1/reviews/merge", body: request)
+    let wire: ReviewsActionResponseWire = try await post(
+      "/v1/reviews/merge",
+      body: ReviewsMergeRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func rerunReviewChecks(
     request: ReviewsRerunChecksRequest
   ) async throws -> ReviewsActionResponse {
-    try await post("/v1/reviews/rerun-checks", body: request)
+    let wire: ReviewsActionResponseWire = try await post(
+      "/v1/reviews/rerun-checks",
+      body: ReviewsRerunChecksRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func addReviewLabel(
     request: ReviewsLabelRequest
   ) async throws -> ReviewsActionResponse {
-    try await post("/v1/reviews/labels", body: request)
+    let wire: ReviewsActionResponseWire = try await post(
+      "/v1/reviews/labels",
+      body: ReviewsLabelRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func autoReviews(
     request: ReviewsAutoRequest
   ) async throws -> ReviewsActionResponse {
-    try await post("/v1/reviews/auto", body: request)
+    let wire: ReviewsActionResponseWire = try await post(
+      "/v1/reviews/auto",
+      body: ReviewsAutoRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func reRequestReview(
     request: ReviewsRequestReviewRequest
   ) async throws -> ReviewsActionResponse {
-    try await post("/v1/reviews/request-review", body: request)
+    let wire: ReviewsActionResponseWire = try await post(
+      "/v1/reviews/request-review",
+      body: ReviewsRequestReviewRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func clearReviewsCache() async throws -> ReviewsCacheClearResponse {
@@ -134,7 +164,12 @@ extension HarnessMonitorAPIClient {
   public func commentReviews(
     request: ReviewsCommentRequest
   ) async throws -> ReviewsActionResponse {
-    try await post("/v1/reviews/comment", body: request)
+    let wire: ReviewsActionResponseWire = try await post(
+      "/v1/reviews/comment",
+      body: ReviewsCommentRequestWire(request),
+      decoder: PolicyWireCoding.decoder
+    )
+    return ReviewsActionResponse(wire: wire)
   }
 
   public func listReviewFiles(
