@@ -216,6 +216,63 @@ public struct GitHubOperationSpendDiagnosticsWire: Codable, Equatable, Sendable 
   }
 }
 
+public struct WorktreeSummaryWire: Codable, Equatable, Sendable {
+  public var checkoutId: String
+  public var name: String
+  public var checkoutRoot: String
+  public var contextRoot: String
+  public var activeSessionCount: UInt
+  public var totalSessionCount: UInt
+
+  public init(checkoutId: String, name: String, checkoutRoot: String, contextRoot: String, activeSessionCount: UInt, totalSessionCount: UInt) {
+    self.checkoutId = checkoutId
+    self.name = name
+    self.checkoutRoot = checkoutRoot
+    self.contextRoot = contextRoot
+    self.activeSessionCount = activeSessionCount
+    self.totalSessionCount = totalSessionCount
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case checkoutId = "checkout_id"
+    case name
+    case checkoutRoot = "checkout_root"
+    case contextRoot = "context_root"
+    case activeSessionCount = "active_session_count"
+    case totalSessionCount = "total_session_count"
+  }
+}
+
+public struct ProjectSummaryWire: Codable, Equatable, Sendable {
+  public var projectId: String
+  public var name: String
+  public var projectDir: String?
+  public var contextRoot: String
+  public var activeSessionCount: UInt
+  public var totalSessionCount: UInt
+  public var worktrees: [WorktreeSummaryWire]
+
+  public init(projectId: String, name: String, projectDir: String? = nil, contextRoot: String, activeSessionCount: UInt, totalSessionCount: UInt, worktrees: [WorktreeSummaryWire]) {
+    self.projectId = projectId
+    self.name = name
+    self.projectDir = projectDir
+    self.contextRoot = contextRoot
+    self.activeSessionCount = activeSessionCount
+    self.totalSessionCount = totalSessionCount
+    self.worktrees = worktrees
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case projectId = "project_id"
+    case name
+    case projectDir = "project_dir"
+    case contextRoot = "context_root"
+    case activeSessionCount = "active_session_count"
+    case totalSessionCount = "total_session_count"
+    case worktrees
+  }
+}
+
 public struct SessionSummaryWire: Codable, Equatable, Sendable {
   public var projectId: String
   public var projectName: String

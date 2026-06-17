@@ -1081,6 +1081,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "AskUserQuestionPrompt",
     "AgentPendingUserPrompt",
     "AgentToolActivitySummary",
+    // project/worktree rollup structs (same-named Swift hand mirrors).
+    "WorktreeSummary",
+    "ProjectSummary",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1840,6 +1843,10 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     "AskUserQuestionPrompt",
     "AgentPendingUserPrompt",
     "AgentToolActivitySummary",
+    // project/worktree rollup: ProjectSummary (the project list row) nests
+    // Vec<WorktreeSummary>. Clean structs over primitives, generate-only.
+    "WorktreeSummary",
+    "ProjectSummary",
 ];
 const OBSERVE_CLASSIFICATION_SOURCE: &str = include_str!("../src/observe/types/classification.rs");
 const OBSERVE_ISSUE_CODE_SOURCE: &str = include_str!("../src/observe/types/issue_code.rs");
