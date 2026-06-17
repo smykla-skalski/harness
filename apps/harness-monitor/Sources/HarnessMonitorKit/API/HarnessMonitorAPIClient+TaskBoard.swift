@@ -76,28 +76,34 @@ extension HarnessMonitorAPIClient {
   }
 
   public func auditTaskBoard(status: TaskBoardStatus? = nil) async throws -> TaskBoardAuditSummary {
-    try await get(
+    let wire: TaskBoardAuditSummaryWire = try await get(
       "/v1/task-board/audit",
-      queryItems: taskBoardQueryItems(status: status)
+      queryItems: taskBoardQueryItems(status: status),
+      decoder: PolicyWireCoding.decoder
     )
+    return TaskBoardAuditSummary(wire: wire)
   }
 
   public func taskBoardProjects(status: TaskBoardStatus? = nil) async throws
     -> [TaskBoardProjectSummary]
   {
-    try await get(
+    let wire: [TaskBoardProjectSummaryWire] = try await get(
       "/v1/task-board/projects",
-      queryItems: taskBoardQueryItems(status: status)
+      queryItems: taskBoardQueryItems(status: status),
+      decoder: PolicyWireCoding.decoder
     )
+    return wire.map(TaskBoardProjectSummary.init(wire:))
   }
 
   public func taskBoardMachines(status: TaskBoardStatus? = nil) async throws
     -> [TaskBoardMachineSummary]
   {
-    try await get(
+    let wire: [TaskBoardMachineSummaryWire] = try await get(
       "/v1/task-board/machines",
-      queryItems: taskBoardQueryItems(status: status)
+      queryItems: taskBoardQueryItems(status: status),
+      decoder: PolicyWireCoding.decoder
     )
+    return wire.map(TaskBoardMachineSummary.init(wire:))
   }
 
   public func taskBoardHostLocal() async throws -> TaskBoardHostMachine {

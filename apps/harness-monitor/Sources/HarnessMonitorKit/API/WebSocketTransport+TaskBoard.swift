@@ -105,7 +105,8 @@ extension WebSocketTransport {
   public func auditTaskBoard(status: TaskBoardStatus? = nil) async throws -> TaskBoardAuditSummary {
     let params = try encodeParams(TaskBoardStatusFilterRequest(status: status), extra: [:])
     let value = try await rpc(method: .taskBoardAudit, params: params)
-    return try decode(value)
+    let wire: TaskBoardAuditSummaryWire = try decodePolicyWire(value)
+    return TaskBoardAuditSummary(wire: wire)
   }
 
   public func taskBoardProjects(status: TaskBoardStatus? = nil) async throws
@@ -113,7 +114,8 @@ extension WebSocketTransport {
   {
     let params = try encodeParams(TaskBoardStatusFilterRequest(status: status), extra: [:])
     let value = try await rpc(method: .taskBoardProjects, params: params)
-    return try decode(value)
+    let wire: [TaskBoardProjectSummaryWire] = try decodePolicyWire(value)
+    return wire.map(TaskBoardProjectSummary.init(wire:))
   }
 
   public func taskBoardMachines(status: TaskBoardStatus? = nil) async throws
@@ -121,7 +123,8 @@ extension WebSocketTransport {
   {
     let params = try encodeParams(TaskBoardStatusFilterRequest(status: status), extra: [:])
     let value = try await rpc(method: .taskBoardMachines, params: params)
-    return try decode(value)
+    let wire: [TaskBoardMachineSummaryWire] = try decodePolicyWire(value)
+    return wire.map(TaskBoardMachineSummary.init(wire:))
   }
 
   public func taskBoardHostLocal() async throws -> TaskBoardHostMachine {
