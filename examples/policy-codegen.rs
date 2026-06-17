@@ -1105,6 +1105,14 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardPolicyCanvasSummary",
     "TaskBoardPolicyCanvasWorkspaceResponse",
     "TaskBoardPolicyExportResponse",
+    // task_board summary.rs audit/project/machine cluster: wire/model split. The
+    // thin hand mirrors keep Int counts; these *Wire types own the daemon decode
+    // (UInt counts, explicit snake CodingKeys) and reference the adopted
+    // TaskBoardStatus/TaskBoardAgentMode bare. Sync summary deferred.
+    "TaskBoardAuditSummary",
+    "TaskBoardStatusCount",
+    "TaskBoardProjectSummary",
+    "TaskBoardMachineSummary",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -2005,6 +2013,17 @@ const TASK_BOARD_ENUMS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonit
 // references. The rich TaskBoardItem and the other types.rs structs are excluded by
 // the allow-list. TaskBoardStatus/AgentMode emit open, TaskBoardPriority closed.
 const TASK_BOARD_ENUMS_EMIT_ONLY: &[&str] = &["TaskBoardStatus", "TaskBoardPriority", "AgentMode"];
+const TASK_BOARD_SUMMARY_SOURCE: &str = include_str!("../src/task_board/summary.rs");
+const TASK_BOARD_SUMMARY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardSummaryWireTypes.generated.swift";
+// The audit, project and machine summary structs - all over primitives plus the
+// adopted TaskBoardStatus/TaskBoardAgentMode enums. The sync summary cluster is
+// excluded (it needs the external-sync provider/operation sub-graph first).
+const TASK_BOARD_SUMMARY_EMIT_ONLY: &[&str] = &[
+    "TaskBoardAuditSummary",
+    "TaskBoardStatusCount",
+    "TaskBoardProjectSummary",
+    "TaskBoardMachineSummary",
+];
 const TASK_BOARD_CANVAS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardPolicyCanvasWireTypes.generated.swift";
 // The policy-canvas read types in the task_board.rs facade. The rest of that file
 // (flatten, alias and struct-variant-tagged types) is excluded by the allow-list,
@@ -2173,6 +2192,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[TASK_BOARD_TYPES_SOURCE],
         },
+        GeneratedModule {
+            output: TASK_BOARD_SUMMARY_OUTPUT,
+            description: "the Rust task-board audit, project and machine summaries",
+            defaults: &[],
+            sources: &[TASK_BOARD_SUMMARY_SOURCE],
+        },
     ]
 }
 
@@ -2195,6 +2220,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         SESSION_STATE_OUTPUT => SESSION_STATE_EMIT_ONLY,
         TASK_BOARD_CANVAS_OUTPUT => TASK_BOARD_CANVAS_EMIT_ONLY,
         TASK_BOARD_ENUMS_OUTPUT => TASK_BOARD_ENUMS_EMIT_ONLY,
+        TASK_BOARD_SUMMARY_OUTPUT => TASK_BOARD_SUMMARY_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
