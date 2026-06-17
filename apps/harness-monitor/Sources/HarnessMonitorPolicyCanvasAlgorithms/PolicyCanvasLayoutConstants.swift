@@ -23,6 +23,9 @@ public enum PolicyCanvasLayout {
   public static let nodeSize = CGSize(width: nodeWidth, height: nodeMinimumHeight)
   public static let groupCornerRadius: CGFloat = 8
   public static let nodeCornerRadius: CGFloat = 8
+  /// Vertical breathing room kept between a node-distance measurement bar and any
+  /// unrelated node body it would otherwise hug as it crosses the gap corridor.
+  public static let nodeDistanceObstacleClearance: CGFloat = 24
   public static let edgeLabelHeight: CGFloat = 28
   public static let edgeLabelMaxWidth: CGFloat = 220
   public static let edgeLabelLaneSpacing: CGFloat = 46

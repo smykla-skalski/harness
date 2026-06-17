@@ -255,6 +255,34 @@ struct PolicyCanvasGraphQualityReportTests {
     #expect(violation.gapEndCap == CGPoint(x: 700, y: 96 - radius))
   }
 
+  @Test func nodeDistanceBarLiftsAboveAnIntrudingNode() {
+    // s and t are the measured pair; `mid` is an unrelated node sitting in the
+    // gap corridor right at the averaged mid-y (30), with its right edge at the
+    // bar's start. The bar would hug it, so it lifts one clearance above mid's top.
+    let frames = [
+      "s": CGRect(x: 0, y: 0, width: 100, height: 60),
+      "t": CGRect(x: 600, y: 0, width: 100, height: 60),
+      "mid": CGRect(x: 100, y: 20, width: 120, height: 80),
+    ]
+    let edges = [edge("a", source: endpoint("s", "out", .output), target: endpoint("t", "in", .input))]
+    let violation = try! #require(measure(frames: frames, edges: edges).nodeDistance.first)
+    let lifted = 20 - PolicyCanvasLayout.nodeDistanceObstacleClearance
+    #expect(violation.gapStart == CGPoint(x: 100, y: lifted))
+    #expect(violation.gapEnd == CGPoint(x: 600, y: lifted))
+  }
+
+  @Test func nodeDistanceBarStaysAtMidYWhenCorridorIsClear() {
+    // No third node in the corridor, so the bar keeps the plain averaged mid-y.
+    let frames = [
+      "s": CGRect(x: 0, y: 0, width: 100, height: 60),
+      "t": CGRect(x: 600, y: 0, width: 100, height: 60),
+    ]
+    let edges = [edge("a", source: endpoint("s", "out", .output), target: endpoint("t", "in", .input))]
+    let violation = try! #require(measure(frames: frames, edges: edges).nodeDistance.first)
+    #expect(violation.gapStart.y == 30)
+    #expect(violation.gapEnd.y == 30)
+  }
+
   @Test func nodeDistanceCapsStayAtLineWhenNodesStraddleIt() {
     // Both nodes share the line's y band, so neither cap has a gap to bridge -
     // the caps collapse onto the measurement line endpoints.
