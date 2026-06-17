@@ -110,6 +110,8 @@ func policyCanvasStroke(
     dashPattern.withUnsafeMutableBufferPointer { buffer in
       path.setLineDash(buffer.baseAddress, count: buffer.count, phase: 0)
     }
+  } else {
+    path.setLineDash(nil, count: 0, phase: 0)
   }
   path.stroke()
 }
