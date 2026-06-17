@@ -835,8 +835,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TimelinePageInfo",
     // reviews types.rs core (query/item/check/action/policy surface): generate
     // -only split. ReviewItem/ReviewTarget/ReviewsCapabilitiesResponse flatten
-    // their *Flags/*Capabilities structs (inlined). ReviewAuthorAssociation is
-    // SKIP'd (bare hand ref); GitHubMergeMethod is renamed (TYPE_RENAMES).
+    // their *Flags/*Capabilities structs (inlined). ReviewAuthorAssociation is a
+    // bare reference to the adopted closed enum; GitHubMergeMethod is renamed
+    // (TYPE_RENAMES).
     "ReviewsQueryRequest",
     "ReviewsRepositoryCatalogRequest",
     "ReviewsRepositoryCatalogResponse",
@@ -902,10 +903,6 @@ const SKIP_TYPES: &[&str] = &[
     "SessionMutationResponse",
     "AgentRuntimeSessionRegistrationRequest",
     "AgentRuntimeSessionRegistrationResponse",
-    // reviews/enums.rs: ReviewAuthorAssociation is held back from the open-enum
-    // cluster because its consumers switch over a real `other` variant with no
-    // unknown arm; it is adopted as a closed enum in a follow-up.
-    "ReviewAuthorAssociation",
     // reviews files service.rs/local_clone.rs: daemon-internal serde types behind
     // the FilesLargeDiffStrategy / LocalCloneListEntry facade. StrategyConfig is
     // daemon config; RepoKey/RegistryEntry/LocalCloneRegistry are the on-disk
@@ -1559,11 +1556,11 @@ const CODEX_SOURCE: &str = include_str!("../src/daemon/protocol/codex.rs");
 // already exist hand-written in Swift, so they stay unsuffixed references.
 const SESSION_REQUESTS_SOURCE: &str =
     include_str!("../src/daemon/protocol/session_requests.rs");
-// reviews/enums.rs: the GitHub review wire enums. Adopted directly (bare-named
-// open enums in OPEN_STRING_ENUMS, replacing the hand HarnessMonitorReviewsEnums
-// file) rather than wire/model split, since a string enum's generated form is a
-// drop-in for the hand one. ReviewAuthorAssociation is SKIP'd here (adopted as a
-// closed enum in a follow-up).
+// reviews/enums.rs: the GitHub review wire enums. Adopted directly (bare-named,
+// replacing the hand HarnessMonitorReviewsEnums file) rather than wire/model
+// split, since a string enum's generated form is a drop-in for the hand one.
+// Most are open enums (OPEN_STRING_ENUMS); ReviewAuthorAssociation is the lone
+// closed one, mirroring its closed Rust enum and exhaustive Swift consumers.
 const REVIEWS_ENUMS_SOURCE: &str = include_str!("../src/reviews/enums.rs");
 // reviews leaves: small clean request/response structs (plus two enums). Split
 // into suffixed *Wire types; the hand models live in scattered/mixed Swift
@@ -1595,8 +1592,8 @@ const REVIEWS_TIMELINE_TYPES_SOURCE: &str = include_str!("../src/reviews/timelin
 const REVIEWS_TIMELINE_MOD_SOURCE: &str = include_str!("../src/reviews/timeline/mod.rs");
 // reviews types.rs core: the query/item/check/action/policy request-response
 // surface. The custom default fns it references live in src/reviews/logic.rs
-// (the defaults source). GitHubMergeMethod and ReviewAuthorAssociation are
-// referenced-not-defined (renamed / skipped to the hand types).
+// (the defaults source). GitHubMergeMethod is referenced-not-defined (renamed to
+// the hand type); ReviewAuthorAssociation references the adopted closed enum.
 const REVIEWS_TYPES_SOURCE: &str = include_str!("../src/reviews/types.rs");
 const REVIEWS_LOGIC_SOURCE: &str = include_str!("../src/reviews/logic.rs");
 

@@ -34,51 +34,6 @@ public struct ReviewsSummary: Codable, Equatable, Sendable {
   }
 }
 
-public enum ReviewAuthorAssociation: Equatable, Sendable {
-  case owner
-  case member
-  case collaborator
-  case contributor
-  case firstTimer
-  case firstTimeContributor
-  case mannequin
-  case none
-  case other(String)
-}
-
-extension ReviewAuthorAssociation: Codable {
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    let rawValue = try container.decode(String.self)
-    switch rawValue {
-    case "owner": self = .owner
-    case "member": self = .member
-    case "collaborator": self = .collaborator
-    case "contributor": self = .contributor
-    case "first_timer": self = .firstTimer
-    case "first_time_contributor": self = .firstTimeContributor
-    case "mannequin": self = .mannequin
-    case "none": self = .none
-    default: self = .other(rawValue)
-    }
-  }
-
-  public func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-    switch self {
-    case .owner: try container.encode("owner")
-    case .member: try container.encode("member")
-    case .collaborator: try container.encode("collaborator")
-    case .contributor: try container.encode("contributor")
-    case .firstTimer: try container.encode("first_timer")
-    case .firstTimeContributor: try container.encode("first_time_contributor")
-    case .mannequin: try container.encode("mannequin")
-    case .none: try container.encode("none")
-    case .other(let rawValue): try container.encode(rawValue)
-    }
-  }
-}
-
 public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
   public let pullRequestID: String
   public let repositoryID: String
