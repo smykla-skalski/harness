@@ -162,7 +162,8 @@ extension WebSocketTransport {
 
   public func diagnostics() async throws -> DaemonDiagnosticsReport {
     let value = try await rpc(method: .diagnostics)
-    return try decode(value)
+    let wire: DaemonDiagnosticsReportWire = try decodePolicyWire(value)
+    return DaemonDiagnosticsReport(wire: wire)
   }
 
   public func githubStatus() async throws -> GitHubApiDiagnostics {

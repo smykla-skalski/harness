@@ -1198,6 +1198,17 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // three transport snapshots) + its list response, the managed-agent endpoint return types.
     "ManagedAgentSnapshot",
     "ManagedAgentListResponse",
+    // daemon-state /v1/diagnostics cluster: the rich hand DaemonDiagnosticsReport/DaemonManifest
+    // /DaemonDiagnostics/LaunchAgentStatus models own these bare names, so the wire suffixes
+    // them and the hand init(wire:) maps back (drops acp_runtime_probe + ownership).
+    "DaemonDiagnosticsReport",
+    "DaemonManifest",
+    "HostBridgeManifest",
+    "HostBridgeCapabilityManifest",
+    "DaemonBinaryStamp",
+    "DaemonAuditEvent",
+    "DaemonDiagnostics",
+    "LaunchAgentStatus",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1730,6 +1741,12 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     ("AcpAgentSnapshotDecode", "process_key"),
     ("AcpAgentSnapshotDecode", "permission_mode"),
     ("AcpAgentSnapshotDecode", "permission_log_path"),
+    // daemon diagnostics: the hand DaemonDiagnosticsReport has no acp_runtime_probe field, and the
+    // hand DaemonManifest drops ownership (daemon-internal entry-point discriminator). Dropping
+    // both keeps the wire to the shape the app actually decodes - matching today's convert decode,
+    // which simply ignores the unmodeled keys.
+    ("DaemonDiagnosticsReport", "acp_runtime_probe"),
+    ("DaemonManifest", "ownership"),
 ];
 
 /// Whether `(struct_name, field_name)` is in `OMITTED_WIRE_FIELDS`.
@@ -2416,6 +2433,26 @@ const MANAGED_AGENTS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitor
 // AcpAgentSnapshotWire (TYPE_RENAMES from the public no-derive AcpAgentSnapshot). The return
 // type of nearly every managed-agent endpoint.
 const MANAGED_AGENTS_EMIT_ONLY: &[&str] = &["ManagedAgentSnapshot", "ManagedAgentListResponse"];
+const DAEMON_STATE_SOURCE: &str = include_str!("../src/daemon/state/mod.rs");
+const DAEMON_LAUNCHD_SOURCE: &str = include_str!("../src/daemon/launchd/mod.rs");
+const DAEMON_STATE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/DaemonStateWireTypes.generated.swift";
+// The /v1/diagnostics report (DaemonDiagnosticsReport from summaries.rs) and the daemon-state
+// cluster it nests: the manifest tree (state/mod.rs DaemonManifest -> HostBridgeManifest ->
+// HostBridgeCapabilityManifest, plus DaemonBinaryStamp), the workspace diagnostics
+// (DaemonDiagnostics -> DaemonAuditEvent), and the launchd LaunchAgentStatus. health and
+// github_api resolve to the already-generated HealthResponseWire/GitHubApiDiagnosticsWire
+// (bare suffixed refs). acp_runtime_probe and DaemonManifest.ownership are dropped via
+// OMITTED_WIRE_FIELDS - the hand DaemonDiagnosticsReport/DaemonManifest never model them.
+const DAEMON_STATE_EMIT_ONLY: &[&str] = &[
+    "DaemonDiagnosticsReport",
+    "DaemonManifest",
+    "HostBridgeManifest",
+    "HostBridgeCapabilityManifest",
+    "DaemonBinaryStamp",
+    "DaemonAuditEvent",
+    "DaemonDiagnostics",
+    "LaunchAgentStatus",
+];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2671,6 +2708,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[MANAGED_AGENTS_SOURCE],
         },
+        GeneratedModule {
+            output: DAEMON_STATE_OUTPUT,
+            description: "the Rust daemon diagnostics report, manifest and launch-agent state",
+            defaults: &[DAEMON_STATE_SOURCE],
+            sources: &[SUMMARIES_SOURCE, DAEMON_STATE_SOURCE, DAEMON_LAUNCHD_SOURCE],
+        },
     ]
 }
 
@@ -2719,6 +2762,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         ACP_START_REQUEST_OUTPUT => ACP_START_REQUEST_EMIT_ONLY,
         AGENT_TUI_INPUT_OUTPUT => AGENT_TUI_INPUT_EMIT_ONLY,
         MANAGED_AGENTS_OUTPUT => MANAGED_AGENTS_EMIT_ONLY,
+        DAEMON_STATE_OUTPUT => DAEMON_STATE_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
