@@ -61,7 +61,10 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   public func reconfigureHostBridge(
     request: HostBridgeReconfigureRequest
   ) async throws -> BridgeStatusReport {
-    try await post("/v1/bridge/reconfigure", body: request)
+    let wire: BridgeStatusReportWire = try await post(
+      "/v1/bridge/reconfigure", body: request, decoder: PolicyWireCoding.decoder
+    )
+    return BridgeStatusReport(wire: wire)
   }
 
   public func projects() async throws -> [ProjectSummary] {

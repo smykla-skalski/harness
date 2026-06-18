@@ -1230,6 +1230,8 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardGitHubTokensSyncResponse",
     "TaskBoardTodoistTokenSyncResponse",
     "TaskBoardOpenRouterTokenSyncResponse",
+    // host-bridge reconfigure response (bridge/types.rs): nests the daemon-state capability wire.
+    "BridgeStatusReport",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -2526,6 +2528,12 @@ const TASK_BOARD_CREDENTIAL_EMIT_ONLY: &[&str] = &[
     "TaskBoardTodoistTokenSyncResponse",
     "TaskBoardOpenRouterTokenSyncResponse",
 ];
+const BRIDGE_STATUS_SOURCE: &str = include_str!("../src/daemon/bridge/types.rs");
+const BRIDGE_STATUS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/BridgeStatusWireTypes.generated.swift";
+// The host-bridge reconfigure response (reconfigureHostBridge). capabilities reuses the
+// already-generated HostBridgeCapabilityManifestWire (daemon-state cluster) bare; pid/uptime
+// narrow UInt -> Int in the map. The bridge-internal/persisted types stay out of the allow-list.
+const BRIDGE_STATUS_EMIT_ONLY: &[&str] = &["BridgeStatusReport"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2805,6 +2813,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[TASK_BOARD_CREDENTIAL_SOURCE],
         },
+        GeneratedModule {
+            output: BRIDGE_STATUS_OUTPUT,
+            description: "the Rust host-bridge reconfigure status report",
+            defaults: &[],
+            sources: &[BRIDGE_STATUS_SOURCE],
+        },
     ]
 }
 
@@ -2857,6 +2871,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         SESSION_SIGNAL_OUTPUT => SESSION_SIGNAL_EMIT_ONLY,
         AGENT_REGISTRATION_OUTPUT => AGENT_REGISTRATION_EMIT_ONLY,
         TASK_BOARD_CREDENTIAL_OUTPUT => TASK_BOARD_CREDENTIAL_EMIT_ONLY,
+        BRIDGE_STATUS_OUTPUT => BRIDGE_STATUS_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {

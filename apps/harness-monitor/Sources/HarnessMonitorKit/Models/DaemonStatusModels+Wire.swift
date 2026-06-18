@@ -182,3 +182,18 @@ extension DaemonControlResponse {
     self.init(status: wire.status)
   }
 }
+
+// The host-bridge reconfigure status report. pid/uptime narrow UInt -> Int; the capabilities reuse
+// the daemon-state HostBridgeCapabilityManifest map.
+extension BridgeStatusReport {
+  init(wire: BridgeStatusReportWire) {
+    self.init(
+      running: wire.running,
+      socketPath: wire.socketPath,
+      pid: wire.pid.map(Int.init),
+      startedAt: wire.startedAt,
+      uptimeSeconds: wire.uptimeSeconds.map(Int.init),
+      capabilities: wire.capabilities.mapValues(HostBridgeCapabilityManifest.init(wire:))
+    )
+  }
+}

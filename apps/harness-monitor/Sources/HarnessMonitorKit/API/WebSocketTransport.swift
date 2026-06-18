@@ -184,7 +184,8 @@ extension WebSocketTransport {
   ) async throws -> BridgeStatusReport {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .bridgeReconfigure, params: params)
-    return try decode(value)
+    let wire: BridgeStatusReportWire = try decodePolicyWire(value)
+    return BridgeStatusReport(wire: wire)
   }
 
   public func projects() async throws -> [ProjectSummary] {
