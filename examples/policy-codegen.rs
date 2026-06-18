@@ -1395,6 +1395,9 @@ fn map_scalar(ident: &str) -> String {
         "f64" => "Double",
         "bool" => "Bool",
         "String" | "str" => "String",
+        // std::path::PathBuf / Path serialize transparently as a string, and the app mirrors a
+        // path field as String (e.g. GitHubProjectConfig.checkout_path).
+        "PathBuf" | "Path" => "String",
         // chrono `DateTime<Tz>` serializes as an RFC3339 string and the app
         // mirrors it as String; the timezone type argument does not change the
         // wire shape, so the bare `DateTime` ident is enough to map it.
@@ -3214,6 +3217,13 @@ pub struct Drop { pub other: String }
         assert_eq!(swift_type_string("DateTime<Utc>"), "String");
         assert_eq!(swift_type_string("Option<DateTime<Utc>>"), "String?");
         assert_eq!(swift_type_string("Vec<DateTime<Utc>>"), "[String]");
+    }
+
+    #[test]
+    fn maps_pathbuf_to_string() {
+        assert_eq!(swift_type_string("PathBuf"), "String");
+        assert_eq!(swift_type_string("Option<PathBuf>"), "String?");
+        assert_eq!(swift_type_string("Vec<PathBuf>"), "[String]");
     }
 
     #[test]
