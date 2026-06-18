@@ -1254,6 +1254,14 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardOrchestratorRunSummary",
     "TaskBoardWorkflowExecutionCount",
     "TaskBoardOrchestratorStatus",
+    // task_board git runtime config tree (runtime_config.rs) + drain-secrets response
+    // (daemon/protocol/task_board.rs). The signing mode is the decoder-agnostic hand open enum
+    // TaskBoardGitSigningMode, referenced bare; everything else is a thin wire/model mirror.
+    "TaskBoardGitRuntimeConfig",
+    "TaskBoardGitRuntimeProfile",
+    "TaskBoardGitSigningConfig",
+    "TaskBoardGitRepositoryOverride",
+    "TaskBoardGitRuntimeDrainSecretsResponse",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -2616,6 +2624,18 @@ const ORCHESTRATOR_EMIT_ONLY: &[&str] = &[
     "TaskBoardWorkflowExecutionCount",
     "TaskBoardOrchestratorStatus",
 ];
+const GIT_RUNTIME_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitRuntimeWireTypes.generated.swift";
+// The git runtime config tree (runtime-config get/update + drain-secrets). The config/profile/
+// signing-config/override structs come from runtime_config.rs; the drain response wrapper comes
+// from daemon/protocol/task_board.rs and nests the config wire. The signing mode rides bare through
+// the decoder-agnostic TaskBoardGitSigningMode open enum.
+const GIT_RUNTIME_EMIT_ONLY: &[&str] = &[
+    "TaskBoardGitRuntimeConfig",
+    "TaskBoardGitRuntimeProfile",
+    "TaskBoardGitSigningConfig",
+    "TaskBoardGitRepositoryOverride",
+    "TaskBoardGitRuntimeDrainSecretsResponse",
+];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2919,6 +2939,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[ORCHESTRATOR_TYPES_SOURCE],
             sources: &[ORCHESTRATOR_TYPES_SOURCE, POLICY_SOURCE],
         },
+        GeneratedModule {
+            output: GIT_RUNTIME_OUTPUT,
+            description: "the Rust task-board git runtime config and drain-secrets response",
+            defaults: &[TASK_BOARD_CREDENTIAL_SOURCE],
+            sources: &[TASK_BOARD_CREDENTIAL_SOURCE, TASK_BOARD_PROTOCOL_SOURCE],
+        },
     ]
 }
 
@@ -2975,6 +3001,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         SYNC_SUMMARY_OUTPUT => SYNC_SUMMARY_EMIT_ONLY,
         GITHUB_CONFIG_OUTPUT => GITHUB_CONFIG_EMIT_ONLY,
         ORCHESTRATOR_OUTPUT => ORCHESTRATOR_EMIT_ONLY,
+        GIT_RUNTIME_OUTPUT => GIT_RUNTIME_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {

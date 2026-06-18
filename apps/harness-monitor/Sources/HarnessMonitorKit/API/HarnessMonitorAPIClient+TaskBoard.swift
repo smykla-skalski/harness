@@ -220,13 +220,20 @@ extension HarnessMonitorAPIClient {
   }
 
   public func taskBoardGitRuntimeConfig() async throws -> TaskBoardGitRuntimeConfig {
-    try await get("/v1/task-board/orchestrator/runtime-config")
+    let wire: TaskBoardGitRuntimeConfigWire = try await get(
+      "/v1/task-board/orchestrator/runtime-config", decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardGitRuntimeConfig(wire: wire)
   }
 
   public func updateTaskBoardGitRuntimeConfig(
     request: TaskBoardGitRuntimeConfig
   ) async throws -> TaskBoardGitRuntimeConfig {
-    try await put("/v1/task-board/orchestrator/runtime-config", body: request)
+    let wire: TaskBoardGitRuntimeConfigWire = try await put(
+      "/v1/task-board/orchestrator/runtime-config", body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardGitRuntimeConfig(wire: wire)
   }
 
   public func syncTaskBoardGitHubTokens(
@@ -272,10 +279,12 @@ extension HarnessMonitorAPIClient {
   public func drainTaskBoardGitRuntimeSecrets() async throws
     -> TaskBoardGitRuntimeDrainSecretsResponse
   {
-    try await post(
+    let wire: TaskBoardGitRuntimeDrainSecretsResponseWire = try await post(
       "/v1/task-board/git/runtime/drain-secrets",
-      body: TaskBoardGitRuntimeDrainSecretsRequest()
+      body: TaskBoardGitRuntimeDrainSecretsRequest(),
+      decoder: PolicyWireCoding.decoder
     )
+    return TaskBoardGitRuntimeDrainSecretsResponse(wire: wire)
   }
 
   public func taskBoardPolicyCanvasWorkspace() async throws -> TaskBoardPolicyCanvasWorkspace {
