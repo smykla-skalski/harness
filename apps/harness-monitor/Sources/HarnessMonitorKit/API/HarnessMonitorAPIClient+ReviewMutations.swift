@@ -6,7 +6,9 @@ extension HarnessMonitorAPIClient {
     taskID: String,
     request: TaskSubmitForReviewRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/submit-for-review", body: request)
+    try await postSessionDetail(
+      "/v1/sessions/\(sessionID)/tasks/\(taskID)/submit-for-review", body: request
+    )
   }
 
   public func claimTaskReview(
@@ -14,7 +16,9 @@ extension HarnessMonitorAPIClient {
     taskID: String,
     request: TaskClaimReviewRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/claim-review", body: request)
+    try await postSessionDetail(
+      "/v1/sessions/\(sessionID)/tasks/\(taskID)/claim-review", body: request
+    )
   }
 
   public func submitTaskReview(
@@ -22,7 +26,9 @@ extension HarnessMonitorAPIClient {
     taskID: String,
     request: TaskSubmitReviewRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/submit-review", body: request)
+    try await postSessionDetail(
+      "/v1/sessions/\(sessionID)/tasks/\(taskID)/submit-review", body: request
+    )
   }
 
   public func respondTaskReview(
@@ -30,7 +36,9 @@ extension HarnessMonitorAPIClient {
     taskID: String,
     request: TaskRespondReviewRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/respond-review", body: request)
+    try await postSessionDetail(
+      "/v1/sessions/\(sessionID)/tasks/\(taskID)/respond-review", body: request
+    )
   }
 
   public func arbitrateTask(
@@ -38,13 +46,15 @@ extension HarnessMonitorAPIClient {
     taskID: String,
     request: TaskArbitrateRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/arbitrate", body: request)
+    try await postSessionDetail(
+      "/v1/sessions/\(sessionID)/tasks/\(taskID)/arbitrate", body: request
+    )
   }
 
   public func applyImproverPatch(
     sessionID: String,
     request: ImproverApplyRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/improver/apply", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/improver/apply", body: request)
   }
 }

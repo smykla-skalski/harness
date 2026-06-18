@@ -71,9 +71,9 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
 
   public func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
     if let scope {
-      return try await get("/v1/sessions/\(id)?scope=\(scope)")
+      return try await getSessionDetail("/v1/sessions/\(id)?scope=\(scope)")
     }
-    return try await get("/v1/sessions/\(id)")
+    return try await getSessionDetail("/v1/sessions/\(id)")
   }
 
   public func timeline(sessionID: String) async throws -> [TimelineEntry] {
@@ -120,7 +120,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     sessionID: String,
     request: TaskCreateRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/task", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/task", body: request)
   }
 
   public func assignTask(
@@ -128,7 +128,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     taskID: String,
     request: TaskAssignRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/assign", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/tasks/\(taskID)/assign", body: request)
   }
 
   public func dropTask(
@@ -136,7 +136,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     taskID: String,
     request: TaskDropRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/drop", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/tasks/\(taskID)/drop", body: request)
   }
 
   public func deleteTask(
@@ -144,7 +144,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     taskID: String,
     request: TaskDeleteRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/tasks/\(taskID)", body: request)
   }
 
   public func updateTaskQueuePolicy(
@@ -152,7 +152,9 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     taskID: String,
     request: TaskQueuePolicyRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/queue-policy", body: request)
+    try await postSessionDetail(
+      "/v1/sessions/\(sessionID)/tasks/\(taskID)/queue-policy", body: request
+    )
   }
 
   public func updateTask(
@@ -160,7 +162,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     taskID: String,
     request: TaskUpdateRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/status", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/tasks/\(taskID)/status", body: request)
   }
 
   public func checkpointTask(
@@ -168,7 +170,9 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     taskID: String,
     request: TaskCheckpointRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/tasks/\(taskID)/checkpoint", body: request)
+    try await postSessionDetail(
+      "/v1/sessions/\(sessionID)/tasks/\(taskID)/checkpoint", body: request
+    )
   }
 
   public func changeRole(
@@ -176,7 +180,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     agentID: String,
     request: RoleChangeRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/agents/\(agentID)/role", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/agents/\(agentID)/role", body: request)
   }
 
   public func removeAgent(
@@ -184,21 +188,21 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     agentID: String,
     request: AgentRemoveRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/agents/\(agentID)/remove", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/agents/\(agentID)/remove", body: request)
   }
 
   public func transferLeader(
     sessionID: String,
     request: LeaderTransferRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/leader", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/leader", body: request)
   }
 
   public func endSession(
     sessionID: String,
     request: SessionEndRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/end", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/end", body: request)
   }
 
   public func archiveSession(
@@ -217,21 +221,21 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     sessionID: String,
     request: SignalSendRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/signal", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/signal", body: request)
   }
 
   public func cancelSignal(
     sessionID: String,
     request: SignalCancelRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/signal-cancel", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/signal-cancel", body: request)
   }
 
   public func observeSession(
     sessionID: String,
     request: ObserveSessionRequest
   ) async throws -> SessionDetail {
-    try await post("/v1/sessions/\(sessionID)/observe", body: request)
+    try await postSessionDetail("/v1/sessions/\(sessionID)/observe", body: request)
   }
 
   public func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse {

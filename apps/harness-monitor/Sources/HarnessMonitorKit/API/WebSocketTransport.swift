@@ -202,7 +202,8 @@ extension WebSocketTransport {
       params["scope"] = .string(scope)
     }
     let value = try await rpc(method: .sessionDetail, params: .object(params))
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func timeline(sessionID: String) async throws -> [TimelineEntry] {

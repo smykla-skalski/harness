@@ -50,6 +50,21 @@ extension HarnessMonitorAPIClient {
     return try await send(request, decoder: decoder)
   }
 
+  // SessionDetail is the aggregate every session-mutation endpoint returns. These decode the
+  // generated SessionDetailWire through the plain decoder and fold it onto the rich model, so the
+  // call sites stay one-liners instead of repeating the wire + map at each endpoint.
+  func postSessionDetail(_ path: String, body: some Encodable) async throws -> SessionDetail {
+    let wire: SessionDetailWire = try await post(
+      path, body: body, decoder: PolicyWireCoding.decoder
+    )
+    return try SessionDetail(wire: wire)
+  }
+
+  func getSessionDetail(_ path: String) async throws -> SessionDetail {
+    let wire: SessionDetailWire = try await get(path, decoder: PolicyWireCoding.decoder)
+    return try SessionDetail(wire: wire)
+  }
+
   func put<RequestBody: Encodable, Response: Decodable>(
     _ path: String,
     body: RequestBody,

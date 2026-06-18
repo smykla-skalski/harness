@@ -11,7 +11,8 @@ extension WebSocketTransport {
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
     let value = try await rpc(method: .taskSubmitForReview, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func claimTaskReview(
@@ -24,7 +25,8 @@ extension WebSocketTransport {
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
     let value = try await rpc(method: .taskClaimReview, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func submitTaskReview(
@@ -37,7 +39,8 @@ extension WebSocketTransport {
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
     let value = try await rpc(method: .taskSubmitReview, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func respondTaskReview(
@@ -50,7 +53,8 @@ extension WebSocketTransport {
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
     let value = try await rpc(method: .taskRespondReview, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func arbitrateTask(
@@ -63,7 +67,8 @@ extension WebSocketTransport {
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
     let value = try await rpc(method: .taskArbitrate, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func applyImproverPatch(
@@ -72,6 +77,7 @@ extension WebSocketTransport {
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
     let value = try await rpc(method: .improverApply, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 }

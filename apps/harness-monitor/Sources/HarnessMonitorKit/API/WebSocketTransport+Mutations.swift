@@ -7,7 +7,8 @@ extension WebSocketTransport {
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
     let value = try await rpc(method: .taskCreate, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func assignTask(
@@ -20,7 +21,8 @@ extension WebSocketTransport {
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
     let value = try await rpc(method: .taskAssign, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func dropTask(
@@ -33,7 +35,8 @@ extension WebSocketTransport {
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
     let value = try await rpc(method: .taskDrop, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func deleteTask(
@@ -46,7 +49,8 @@ extension WebSocketTransport {
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
     let value = try await rpc(method: .taskDelete, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func updateTaskQueuePolicy(
@@ -59,7 +63,8 @@ extension WebSocketTransport {
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
     let value = try await rpc(method: .taskQueuePolicy, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func updateTask(
@@ -72,7 +77,8 @@ extension WebSocketTransport {
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
     let value = try await rpc(method: .taskUpdate, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func checkpointTask(
@@ -85,7 +91,8 @@ extension WebSocketTransport {
       extra: ["session_id": .string(sessionID), "task_id": .string(taskID)]
     )
     let value = try await rpc(method: .taskCheckpoint, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func changeRole(
@@ -98,7 +105,8 @@ extension WebSocketTransport {
       extra: sessionAgentMutationParams(sessionID: sessionID, agentID: agentID)
     )
     let value = try await rpc(method: .agentChangeRole, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func removeAgent(
@@ -111,7 +119,8 @@ extension WebSocketTransport {
       extra: sessionAgentMutationParams(sessionID: sessionID, agentID: agentID)
     )
     let value = try await rpc(method: .agentRemove, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func transferLeader(
@@ -120,7 +129,8 @@ extension WebSocketTransport {
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
     let value = try await rpc(method: .leaderTransfer, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func startSession(request: SessionStartRequest) async throws -> SessionStartResult {
@@ -152,7 +162,8 @@ extension WebSocketTransport {
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
     let value = try await rpc(method: .sessionEnd, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func archiveSession(
@@ -174,7 +185,8 @@ extension WebSocketTransport {
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
     let value = try await rpc(method: .signalSend, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func cancelSignal(
@@ -183,7 +195,8 @@ extension WebSocketTransport {
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
     let value = try await rpc(method: .signalCancel, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func observeSession(
@@ -192,7 +205,8 @@ extension WebSocketTransport {
   ) async throws -> SessionDetail {
     let params = try encodeParams(request, extra: ["session_id": .string(sessionID)])
     let value = try await rpc(method: .sessionObserve, params: params)
-    return try decode(value)
+    let wire: SessionDetailWire = try decodePolicyWire(value)
+    return try SessionDetail(wire: wire)
   }
 
   public func agentTuis(sessionID: String) async throws -> AgentTuiListResponse {
