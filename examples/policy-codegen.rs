@@ -1237,6 +1237,12 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardSyncSummary",
     "TaskBoardProviderSyncSummary",
     "ExternalSyncOperation",
+    // GitHubProjectConfig sub-tree (github/config.rs) nested in the orchestrator settings.
+    "GitHubProjectConfig",
+    "GitHubAutomationLabels",
+    "GitHubRequestedReviewers",
+    "GitHubAutomationToggles",
+    "ProtectedPathRule",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1311,6 +1317,9 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // ones (decoder-agnostic, referenced bare by the sync-summary wire structs).
     ("ExternalProvider", "TaskBoardExternalProvider"),
     ("ExternalSyncAction", "TaskBoardExternalSyncAction"),
+    // GitHubProjectConfig.enabled_automations: the Rust GitHubAutomation is the Swift closed
+    // snake_case enum TaskBoardGitHubAutomation (decoder-agnostic, referenced bare).
+    ("GitHubAutomation", "TaskBoardGitHubAutomation"),
     // reviews ReviewFile.language_hint: Rust HarnessCodeLanguage is the Swift
     // hand enum HarnessReviewFileLanguage.
     ("HarnessCodeLanguage", "HarnessReviewFileLanguage"),
@@ -2563,6 +2572,19 @@ const SYNC_SUMMARY_EMIT_ONLY: &[&str] = &[
     "TaskBoardProviderSyncSummary",
     "ExternalSyncOperation",
 ];
+const GITHUB_CONFIG_SOURCE: &str = include_str!("../src/task_board/github/config.rs");
+const GITHUB_CONFIG_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitHubProjectWireTypes.generated.swift";
+// The GitHubProjectConfig sub-tree nested in TaskBoardOrchestratorSettings.github_project. The
+// five structs suffix to *Wire; GitHubMergeMethod/GitHubAutomation ride bare via TYPE_RENAMES (the
+// decoder-agnostic Swift TaskBoardGitHubMergeMethod/TaskBoardGitHubAutomation); checkout_path is the
+// PathBuf the new ext maps to String; default_branch/default_branch_prefix come from the same file.
+const GITHUB_CONFIG_EMIT_ONLY: &[&str] = &[
+    "GitHubProjectConfig",
+    "GitHubAutomationLabels",
+    "GitHubRequestedReviewers",
+    "GitHubAutomationToggles",
+    "ProtectedPathRule",
+];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2854,6 +2876,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[SYNC_SUMMARY_SOURCE, EXTERNAL_SYNC_SOURCE],
         },
+        GeneratedModule {
+            output: GITHUB_CONFIG_OUTPUT,
+            description: "the Rust task-board github project config sub-tree",
+            defaults: &[GITHUB_CONFIG_SOURCE],
+            sources: &[GITHUB_CONFIG_SOURCE],
+        },
     ]
 }
 
@@ -2908,6 +2936,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_CREDENTIAL_OUTPUT => TASK_BOARD_CREDENTIAL_EMIT_ONLY,
         BRIDGE_STATUS_OUTPUT => BRIDGE_STATUS_EMIT_ONLY,
         SYNC_SUMMARY_OUTPUT => SYNC_SUMMARY_EMIT_ONLY,
+        GITHUB_CONFIG_OUTPUT => GITHUB_CONFIG_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
