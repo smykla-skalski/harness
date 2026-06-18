@@ -61,3 +61,11 @@ extension AcpAgentDescriptor {
     )
   }
 }
+
+// The acp transcript response (entries: [TimelineEntry], generated into SummariesWireTypes);
+// reuses the TimelineEntry wire map. Backs the /v1/managed-agents/acp/transcript endpoint.
+extension AcpTranscriptResponse {
+  public init(wire: AcpTranscriptResponseWire) {
+    self.init(entries: wire.entries.map(TimelineEntry.init(wire:)))
+  }
+}

@@ -33,7 +33,8 @@ extension WebSocketTransport {
       method: .managedAgentAcpTranscript,
       params: .object(sessionScopeParams(sessionID: sessionID))
     )
-    return try decode(value)
+    let wire: AcpTranscriptResponseWire = try decodePolicyWire(value)
+    return AcpTranscriptResponse(wire: wire)
   }
 
   public func codexInspect(sessionID: String?) async throws -> CodexAgentInspectResponse {

@@ -31,10 +31,12 @@ extension HarnessMonitorAPIClient {
   }
 
   public func acpTranscript(sessionID: String) async throws -> AcpTranscriptResponse {
-    try await get(
+    let wire: AcpTranscriptResponseWire = try await get(
       "/v1/managed-agents/acp/transcript",
-      queryItems: sessionScopeQueryItems(sessionID: sessionID)
+      queryItems: sessionScopeQueryItems(sessionID: sessionID),
+      decoder: PolicyWireCoding.decoder
     )
+    return AcpTranscriptResponse(wire: wire)
   }
 
   public func codexInspect(sessionID: String?) async throws -> CodexAgentInspectResponse {
