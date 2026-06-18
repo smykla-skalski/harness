@@ -92,3 +92,11 @@ extension AgentTuiResizeRequestWire {
     self.init(rows: UInt16(clamping: request.rows), cols: UInt16(clamping: request.cols))
   }
 }
+
+extension AgentTuiInputRequestWire {
+  // input/sequence carry the decoder-agnostic hand AgentTuiInput/AgentTuiInputSequence directly;
+  // a valid request always sets exactly one (the hand inits enforce it), so the wire mirrors it.
+  init(_ request: AgentTuiInputRequest) {
+    self.init(input: request.input, sequence: request.sequence)
+  }
+}

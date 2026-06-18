@@ -268,7 +268,9 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     request: AgentTuiInputRequest
   ) async throws -> ManagedAgentSnapshot {
     let wire: ManagedAgentSnapshotWire = try await post(
-      "/v1/managed-agents/\(agentID)/input", body: request, decoder: PolicyWireCoding.decoder
+      "/v1/managed-agents/\(agentID)/input",
+      body: AgentTuiInputRequestWire(request),
+      decoder: PolicyWireCoding.decoder
     )
     return try ManagedAgentSnapshot(wire: wire)
   }

@@ -1314,6 +1314,9 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // acp start request: the public no-derive AcpAgentStartRequest's owned decode struct emits
     // as AcpAgentStartRequestWire (the request body for startManagedAcpAgent).
     ("AcpAgentStartRequestDecode", "AcpAgentStartRequestWire"),
+    // agent-tui input request: the public AgentTuiInputRequest uses #[serde(try_from)], so its
+    // private RawAgentTuiInputRequest proxy emits as AgentTuiInputRequestWire.
+    ("RawAgentTuiInputRequest", "AgentTuiInputRequestWire"),
 ];
 
 /// The Swift name for a Rust wire type: a hand rename when one applies, else the
@@ -2171,6 +2174,13 @@ const AUDIT_SOURCE: &str = include_str!("../src/daemon/protocol/audit.rs");
 const AGENT_TUI_MOD_SOURCE: &str = include_str!("../src/daemon/agent_tui/mod.rs");
 const AGENT_TUI_MODEL_SOURCE: &str = include_str!("../src/daemon/agent_tui/model.rs");
 const AGENT_TUI_SCREEN_SOURCE: &str = include_str!("../src/daemon/agent_tui/screen.rs");
+const AGENT_TUI_INPUT_SOURCE: &str = include_str!("../src/daemon/agent_tui/input_request.rs");
+const AGENT_TUI_INPUT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentTuiInputRequestWireTypes.generated.swift";
+// The agent-tui input request body (sendManagedAgentInput). The public AgentTuiInputRequest has
+// #[serde(try_from = "RawAgentTuiInputRequest")], so the generator targets the private
+// RawAgentTuiInputRequest proxy, emitted as AgentTuiInputRequestWire. Its input/sequence fields
+// reference the decoder-agnostic hand AgentTuiInput/AgentTuiInputSequence bare (single-word keys).
+const AGENT_TUI_INPUT_EMIT_ONLY: &[&str] = &["RawAgentTuiInputRequest"];
 // codex: the run snapshot subtree decodes inside ManagedAgentSnapshot.Codex;
 // the file also defines its own default fn (default_codex_agent_role ->
 // SessionRole::Worker) resolved by the symbol table. SessionRole and
@@ -2476,6 +2486,12 @@ fn modules() -> Vec<GeneratedModule> {
             ],
         },
         GeneratedModule {
+            output: AGENT_TUI_INPUT_OUTPUT,
+            description: "the Rust managed terminal agent input request from its raw proxy",
+            defaults: &[],
+            sources: &[AGENT_TUI_INPUT_SOURCE],
+        },
+        GeneratedModule {
             output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/CodexWireTypes.generated.swift",
             description: "the Rust codex run protocol",
             defaults: &[CODEX_SOURCE],
@@ -2701,6 +2717,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         ACP_PERMISSION_OUTPUT => ACP_PERMISSION_EMIT_ONLY,
         ACP_SNAPSHOT_OUTPUT => ACP_SNAPSHOT_EMIT_ONLY,
         ACP_START_REQUEST_OUTPUT => ACP_START_REQUEST_EMIT_ONLY,
+        AGENT_TUI_INPUT_OUTPUT => AGENT_TUI_INPUT_EMIT_ONLY,
         MANAGED_AGENTS_OUTPUT => MANAGED_AGENTS_EMIT_ONLY,
         _ => &[],
     };

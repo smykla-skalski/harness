@@ -127,4 +127,13 @@ struct ManagedAgentRequestWireEncodingTests {
     #expect(json["record_permissions"] as? Bool == true)
     #expect(json["role"] as? String == "worker")
   }
+
+  @Test("agent-tui input request wraps the input event faithfully")
+  func agentTuiInput() throws {
+    let json = try object(AgentTuiInputRequestWire(AgentTuiInputRequest(input: .text("hello"))))
+    let input = try #require(json["input"] as? [String: Any])
+    #expect(input["type"] as? String == "text")
+    #expect(input["text"] as? String == "hello")
+    #expect(json["sequence"] == nil)
+  }
 }

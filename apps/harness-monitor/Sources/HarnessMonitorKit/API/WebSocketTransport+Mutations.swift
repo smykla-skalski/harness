@@ -269,7 +269,10 @@ extension WebSocketTransport {
     agentID: String,
     request: AgentTuiInputRequest
   ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: managedAgentParams(agentID: agentID))
+    let params = try encodeParams(
+      AgentTuiInputRequestWire(request),
+      extra: managedAgentParams(agentID: agentID)
+    )
     let value = try await rpc(method: .managedAgentInput, params: params)
     let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
     return try ManagedAgentSnapshot(wire: wire)
