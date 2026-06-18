@@ -175,3 +175,10 @@ extension GitHubOperationSpendDiagnostics {
     )
   }
 }
+
+// The /v1/daemon/stop control response (status thin mirror), backs stopDaemon on both transports.
+extension DaemonControlResponse {
+  init(wire: DaemonControlResponseWire) {
+    self.init(status: wire.status)
+  }
+}

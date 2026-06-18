@@ -175,7 +175,8 @@ extension WebSocketTransport {
 
   public func stopDaemon() async throws -> DaemonControlResponse {
     let value = try await rpc(method: .daemonStop)
-    return try decode(value)
+    let wire: DaemonControlResponseWire = try decodePolicyWire(value)
+    return DaemonControlResponse(wire: wire)
   }
 
   public func reconfigureHostBridge(
@@ -188,12 +189,14 @@ extension WebSocketTransport {
 
   public func projects() async throws -> [ProjectSummary] {
     let value = try await rpc(method: .projects)
-    return try decode(value)
+    let wire: [ProjectSummaryWire] = try decodePolicyWire(value)
+    return wire.map(ProjectSummary.init(wire:))
   }
 
   public func sessions() async throws -> [SessionSummary] {
     let value = try await rpc(method: .sessions)
-    return try decode(value)
+    let wire: [SessionSummaryWire] = try decodePolicyWire(value)
+    return wire.map(SessionSummary.init(wire:))
   }
 
   public func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
@@ -225,7 +228,8 @@ extension WebSocketTransport {
       method: .sessionTimeline,
       params: timelineWindowParams(sessionID: sessionID, request: request)
     )
-    let response: TimelineWindowResponse = try decode(value)
+    let wire: TimelineWindowResponseWire = try decodePolicyWire(value)
+    let response = TimelineWindowResponse(wire: wire)
     await onBatch(response, 0, 1)
     return response
   }
@@ -256,12 +260,14 @@ extension WebSocketTransport {
       params: .object(params),
       onSemanticBatch: { [weak self] batchIndex, batchCount, result in
         guard let self else { return }
-        let entries: [TimelineEntry] = try self.decode(result ?? .array([]))
+        let entriesWire: [TimelineEntryWire] = try self.decodePolicyWire(result ?? .array([]))
+        let entries = entriesWire.map(TimelineEntry.init(wire:))
         deliveryTracker.delivered = true
         await onBatch(entries, batchIndex, batchCount)
       }
     )
-    let entries: [TimelineEntry] = try decode(value)
+    let entriesWire: [TimelineEntryWire] = try decodePolicyWire(value)
+    let entries = entriesWire.map(TimelineEntry.init(wire:))
     if deliveryTracker.delivered == false {
       await onBatch(entries, 0, 1)
     }

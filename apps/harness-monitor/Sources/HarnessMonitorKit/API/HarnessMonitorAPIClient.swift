@@ -52,7 +52,10 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   }
 
   public func stopDaemon() async throws -> DaemonControlResponse {
-    try await post("/v1/daemon/stop", body: EmptyBody())
+    let wire: DaemonControlResponseWire = try await post(
+      "/v1/daemon/stop", body: EmptyBody(), decoder: PolicyWireCoding.decoder
+    )
+    return DaemonControlResponse(wire: wire)
   }
 
   public func reconfigureHostBridge(
@@ -62,11 +65,17 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   }
 
   public func projects() async throws -> [ProjectSummary] {
-    try await get("/v1/projects")
+    let wire: [ProjectSummaryWire] = try await get(
+      "/v1/projects", decoder: PolicyWireCoding.decoder
+    )
+    return wire.map(ProjectSummary.init(wire:))
   }
 
   public func sessions() async throws -> [SessionSummary] {
-    try await get("/v1/sessions")
+    let wire: [SessionSummaryWire] = try await get(
+      "/v1/sessions", decoder: PolicyWireCoding.decoder
+    )
+    return wire.map(SessionSummary.init(wire:))
   }
 
   public func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
@@ -84,7 +93,11 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     -> TimelineWindowResponse
   {
     let queryItems = timelineWindowQueryItems(for: request)
-    return try await get("/v1/sessions/\(sessionID)/timeline", queryItems: queryItems)
+    let wire: TimelineWindowResponseWire = try await get(
+      "/v1/sessions/\(sessionID)/timeline", queryItems: queryItems,
+      decoder: PolicyWireCoding.decoder
+    )
+    return TimelineWindowResponse(wire: wire)
   }
 
   public func timelineWindow(
@@ -98,10 +111,12 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   }
 
   public func timeline(sessionID: String, scope: TimelineScope) async throws -> [TimelineEntry] {
-    if scope == .summary {
-      return try await get("/v1/sessions/\(sessionID)/timeline?scope=\(scope.rawValue)")
-    }
-    return try await get("/v1/sessions/\(sessionID)/timeline")
+    let path =
+      scope == .summary
+      ? "/v1/sessions/\(sessionID)/timeline?scope=\(scope.rawValue)"
+      : "/v1/sessions/\(sessionID)/timeline"
+    let wire: [TimelineEntryWire] = try await get(path, decoder: PolicyWireCoding.decoder)
+    return wire.map(TimelineEntry.init(wire:))
   }
 
   public func shutdown() async {

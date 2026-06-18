@@ -61,3 +61,32 @@ extension SessionSummary {
     )
   }
 }
+
+// The dashboard project/worktree rollups (projects() endpoint). Session counts narrow UInt -> Int.
+
+extension WorktreeSummary {
+  init(wire: WorktreeSummaryWire) {
+    self.init(
+      checkoutId: wire.checkoutId,
+      name: wire.name,
+      checkoutRoot: wire.checkoutRoot,
+      contextRoot: wire.contextRoot,
+      activeSessionCount: Int(wire.activeSessionCount),
+      totalSessionCount: Int(wire.totalSessionCount)
+    )
+  }
+}
+
+extension ProjectSummary {
+  init(wire: ProjectSummaryWire) {
+    self.init(
+      projectId: wire.projectId,
+      name: wire.name,
+      projectDir: wire.projectDir,
+      contextRoot: wire.contextRoot,
+      activeSessionCount: Int(wire.activeSessionCount),
+      totalSessionCount: Int(wire.totalSessionCount),
+      worktrees: wire.worktrees.map(WorktreeSummary.init(wire:))
+    )
+  }
+}

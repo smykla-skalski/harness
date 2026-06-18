@@ -26,3 +26,29 @@ extension LogLevelResponse {
     self.init(level: wire.level, filter: wire.filter)
   }
 }
+
+// Timeline pagination cursor + window response (timelineWindow endpoint). The counts narrow
+// UInt -> Int; the cursors and entries fold through their nested maps.
+
+extension TimelineCursor {
+  init(wire: TimelineCursorWire) {
+    self.init(recordedAt: wire.recordedAt, entryId: wire.entryId)
+  }
+}
+
+extension TimelineWindowResponse {
+  init(wire: TimelineWindowResponseWire) {
+    self.init(
+      revision: wire.revision,
+      totalCount: Int(wire.totalCount),
+      windowStart: Int(wire.windowStart),
+      windowEnd: Int(wire.windowEnd),
+      hasOlder: wire.hasOlder,
+      hasNewer: wire.hasNewer,
+      oldestCursor: wire.oldestCursor.map(TimelineCursor.init(wire:)),
+      newestCursor: wire.newestCursor.map(TimelineCursor.init(wire:)),
+      entries: wire.entries.map { $0.map(TimelineEntry.init(wire:)) },
+      unchanged: wire.unchanged
+    )
+  }
+}
