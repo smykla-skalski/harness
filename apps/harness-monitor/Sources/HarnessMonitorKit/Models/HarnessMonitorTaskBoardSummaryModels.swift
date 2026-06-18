@@ -13,6 +13,10 @@ public enum TaskBoardExternalProvider: String, Codable, Sendable {
 public enum TaskBoardExternalSyncAction: String, Codable, CaseIterable, Sendable {
   case pull
   case push
+  // The daemon's ExternalSyncAction also emits conflict/delete on real sync runs; modelling them
+  // keeps a populated operations list from failing to decode.
+  case conflict
+  case delete
 }
 
 public struct TaskBoardProviderSyncSummary: Codable, Equatable, Sendable {

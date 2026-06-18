@@ -1232,6 +1232,11 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardOpenRouterTokenSyncResponse",
     // host-bridge reconfigure response (bridge/types.rs): nests the daemon-state capability wire.
     "BridgeStatusReport",
+    // task_board sync summary (summary.rs + external/sync.rs): the syncTaskBoard return + orchestrator
+    // run-summary member. ExternalSyncOperation maps to the hand TaskBoardExternalSyncOperation.
+    "TaskBoardSyncSummary",
+    "TaskBoardProviderSyncSummary",
+    "ExternalSyncOperation",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1302,6 +1307,10 @@ fn is_skipped_type(rust_name: &str) -> bool {
 /// than the Rust name. Distinct from the `Wire` suffix, which is for types this
 /// generator also emits.
 const TYPE_RENAMES: &[(&str, &str)] = &[
+    // task_board sync summary: the Rust external-sync enums are the Swift hand TaskBoard-prefixed
+    // ones (decoder-agnostic, referenced bare by the sync-summary wire structs).
+    ("ExternalProvider", "TaskBoardExternalProvider"),
+    ("ExternalSyncAction", "TaskBoardExternalSyncAction"),
     // reviews ReviewFile.language_hint: Rust HarnessCodeLanguage is the Swift
     // hand enum HarnessReviewFileLanguage.
     ("HarnessCodeLanguage", "HarnessReviewFileLanguage"),
@@ -1770,6 +1779,10 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     // which simply ignores the unmodeled keys.
     ("DaemonDiagnosticsReport", "acp_runtime_probe"),
     ("DaemonManifest", "ownership"),
+    // sync operation: the hand TaskBoardExternalSyncOperation drops the changed/unsupported field
+    // lists (Vec<ExternalSyncField>, a daemon-only enum with no Swift mirror).
+    ("ExternalSyncOperation", "changed_fields"),
+    ("ExternalSyncOperation", "unsupported_fields"),
 ];
 
 /// Whether `(struct_name, field_name)` is in `OMITTED_WIRE_FIELDS`.
@@ -2534,6 +2547,19 @@ const BRIDGE_STATUS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorK
 // already-generated HostBridgeCapabilityManifestWire (daemon-state cluster) bare; pid/uptime
 // narrow UInt -> Int in the map. The bridge-internal/persisted types stay out of the allow-list.
 const BRIDGE_STATUS_EMIT_ONLY: &[&str] = &["BridgeStatusReport"];
+const SYNC_SUMMARY_SOURCE: &str = include_str!("../src/task_board/summary.rs");
+const EXTERNAL_SYNC_SOURCE: &str = include_str!("../src/task_board/external/sync.rs");
+const SYNC_SUMMARY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardSyncSummaryWireTypes.generated.swift";
+// The task_board sync summary (syncTaskBoard endpoint + nested in the orchestrator run summary).
+// ExternalProvider/ExternalSyncAction are decoder-agnostic hand enums (TaskBoardExternalProvider/
+// TaskBoardExternalSyncAction) referenced bare via TYPE_RENAMES; ExternalSyncOperation's
+// changed_fields/unsupported_fields (Vec<ExternalSyncField> - the genuine no-Swift-mirror type) are
+// dropped via OMITTED_WIRE_FIELDS to match the hand TaskBoardExternalSyncOperation.
+const SYNC_SUMMARY_EMIT_ONLY: &[&str] = &[
+    "TaskBoardSyncSummary",
+    "TaskBoardProviderSyncSummary",
+    "ExternalSyncOperation",
+];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2819,6 +2845,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[BRIDGE_STATUS_SOURCE],
         },
+        GeneratedModule {
+            output: SYNC_SUMMARY_OUTPUT,
+            description: "the Rust task-board sync summary and external operations",
+            defaults: &[],
+            sources: &[SYNC_SUMMARY_SOURCE, EXTERNAL_SYNC_SOURCE],
+        },
     ]
 }
 
@@ -2872,6 +2904,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         AGENT_REGISTRATION_OUTPUT => AGENT_REGISTRATION_EMIT_ONLY,
         TASK_BOARD_CREDENTIAL_OUTPUT => TASK_BOARD_CREDENTIAL_EMIT_ONLY,
         BRIDGE_STATUS_OUTPUT => BRIDGE_STATUS_EMIT_ONLY,
+        SYNC_SUMMARY_OUTPUT => SYNC_SUMMARY_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
