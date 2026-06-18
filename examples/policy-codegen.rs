@@ -1171,6 +1171,10 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // symbol is the internally-tagged sf_symbol/asset enum.
     "AgentPersona",
     "PersonaSymbol",
+    // agents/runtime/models/mod.rs catalog: Swift hands are RuntimeModelCatalog
+    // /RuntimeModel; tier (RuntimeModelTier) and effort family (EffortKind) reference bare.
+    "RuntimeModelCatalog",
+    "RuntimeModel",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -2244,6 +2248,14 @@ const AGENT_PERSONA_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorK
 // keeps the try_from/untagged agents.rs types (AgentRegistration/AgentStatus) out of the
 // emit builders - the same file already parses for the session-state module.
 const AGENT_PERSONA_EMIT_ONLY: &[&str] = &["AgentPersona", "PersonaSymbol"];
+const RUNTIME_MODELS_SOURCE: &str = include_str!("../src/agents/runtime/models/mod.rs");
+const RUNTIME_MODELS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/RuntimeModelCatalogWireTypes.generated.swift";
+// The runtime model catalog (models/mod.rs) backing MonitorConfiguration.runtimeModels
+// and AcpAgentDescriptor.modelCatalog. RuntimeModelTier (fast/balanced/max) and EffortKind
+// (none/thinking_budget/reasoning_effort) are closed string enums the hand Swift declares
+// with explicit snake_case raw values, so the wire references them bare; the effort_kind
+// default resolves to .none via the same-file defaults source.
+const RUNTIME_MODELS_EMIT_ONLY: &[&str] = &["RuntimeModelCatalog", "RuntimeModel"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2451,6 +2463,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[SESSION_AGENTS_SOURCE],
         },
+        GeneratedModule {
+            output: RUNTIME_MODELS_OUTPUT,
+            description: "the Rust runtime model catalog and its models",
+            defaults: &[RUNTIME_MODELS_SOURCE],
+            sources: &[RUNTIME_MODELS_SOURCE],
+        },
     ]
 }
 
@@ -2491,6 +2509,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_DISPATCH_OUTPUT => TASK_BOARD_DISPATCH_EMIT_ONLY,
         ACP_PROBE_OUTPUT => ACP_PROBE_EMIT_ONLY,
         AGENT_PERSONA_OUTPUT => AGENT_PERSONA_EMIT_ONLY,
+        RUNTIME_MODELS_OUTPUT => RUNTIME_MODELS_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
