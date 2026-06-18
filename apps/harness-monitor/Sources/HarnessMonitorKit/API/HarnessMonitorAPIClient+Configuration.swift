@@ -38,17 +38,21 @@ extension HarnessMonitorAPIClient {
   }
 
   public func codexInspect(sessionID: String?) async throws -> CodexAgentInspectResponse {
-    try await get(
+    let wire: CodexAgentInspectResponseWire = try await get(
       "/v1/managed-agents/codex/inspect",
-      queryItems: sessionScopeQueryItems(sessionID: sessionID)
+      queryItems: sessionScopeQueryItems(sessionID: sessionID),
+      decoder: PolicyWireCoding.decoder
     )
+    return CodexAgentInspectResponse(wire: wire)
   }
 
   public func codexTranscript(sessionID: String) async throws -> CodexTranscriptResponse {
-    try await get(
+    let wire: CodexTranscriptResponseWire = try await get(
       "/v1/managed-agents/codex/transcript",
-      queryItems: sessionScopeQueryItems(sessionID: sessionID)
+      queryItems: sessionScopeQueryItems(sessionID: sessionID),
+      decoder: PolicyWireCoding.decoder
     )
+    return CodexTranscriptResponse(wire: wire)
   }
 
   public func configuration() async throws -> MonitorConfiguration {

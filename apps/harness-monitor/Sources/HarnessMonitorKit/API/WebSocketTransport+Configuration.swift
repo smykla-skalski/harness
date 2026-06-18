@@ -42,7 +42,8 @@ extension WebSocketTransport {
       params.merge(sessionScopeParams(sessionID: sessionID)) { _, newValue in newValue }
     }
     let value = try await rpc(method: .managedAgentCodexInspect, params: .object(params))
-    return try decode(value)
+    let wire: CodexAgentInspectResponseWire = try decodePolicyWire(value)
+    return CodexAgentInspectResponse(wire: wire)
   }
 
   public func codexTranscript(sessionID: String) async throws -> CodexTranscriptResponse {
@@ -50,7 +51,8 @@ extension WebSocketTransport {
       method: .managedAgentCodexTranscript,
       params: .object(sessionScopeParams(sessionID: sessionID))
     )
-    return try decode(value)
+    let wire: CodexTranscriptResponseWire = try decodePolicyWire(value)
+    return CodexTranscriptResponse(wire: wire)
   }
 
   public func openRouterModelCatalog() async throws -> OpenRouterModelCatalogResponse {
