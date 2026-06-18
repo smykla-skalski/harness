@@ -5,7 +5,11 @@ extension HarnessMonitorAPIClient {
     sessionID: String,
     request: AcpAgentStartRequest
   ) async throws -> ManagedAgentSnapshot {
-    try await post("/v1/sessions/\(sessionID)/managed-agents/acp", body: request)
+    let wire: ManagedAgentSnapshotWire = try await post(
+      "/v1/sessions/\(sessionID)/managed-agents/acp", body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func resolveManagedAcpPermission(
@@ -13,14 +17,19 @@ extension HarnessMonitorAPIClient {
     batchID: String,
     decision: AcpPermissionDecision
   ) async throws -> ManagedAgentSnapshot {
-    try await post(
+    let wire: ManagedAgentSnapshotWire = try await post(
       "/v1/managed-agents/\(agentID)/permission-batches/\(batchID)",
-      body: decision
+      body: decision,
+      decoder: PolicyWireCoding.decoder
     )
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func stopManagedAcpAgent(agentID: String) async throws -> ManagedAgentSnapshot {
-    try await delete("/v1/managed-agents/\(agentID)")
+    let wire: ManagedAgentSnapshotWire = try await delete(
+      "/v1/managed-agents/\(agentID)", decoder: PolicyWireCoding.decoder
+    )
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func promptManagedAcpAgent(
@@ -28,10 +37,12 @@ extension HarnessMonitorAPIClient {
     prompt: String
   ) async throws -> ManagedAgentSnapshot {
     struct Body: Encodable { let prompt: String }
-    return try await post(
+    let wire: ManagedAgentSnapshotWire = try await post(
       "/v1/managed-agents/\(agentID)/prompt",
-      body: Body(prompt: prompt)
+      body: Body(prompt: prompt),
+      decoder: PolicyWireCoding.decoder
     )
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func openRouterModelCatalog() async throws -> OpenRouterModelCatalogResponse {
