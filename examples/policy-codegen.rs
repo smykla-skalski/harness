@@ -1217,6 +1217,10 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "SignalPayload",
     "DeliveryConfig",
     "SignalAck",
+    // agent registration runtime capabilities (agents/runtime/mod.rs): thin hand mirrors relying
+    // on convertFromSnakeCase, so the wire suffixes them (AgentRegistrationWire is already named).
+    "RuntimeCapabilities",
+    "HookIntegrationDescriptor",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1770,7 +1774,13 @@ fn is_omitted_field(struct_name: &str, field_name: &str) -> bool {
 /// re-decodes the typed value. Used for `AcpAgentSnapshotDecode.status` (the Rust AgentStatus
 /// has a custom hybrid bare-string-or-tagged-object Serialize/Deserialize, and the Swift app
 /// recovers both the flattened status and the disconnect reason/stderr_tail from the payload).
-const JSON_PASSTHROUGH_FIELDS: &[(&str, &str)] = &[("AcpAgentSnapshotDecode", "status")];
+const JSON_PASSTHROUGH_FIELDS: &[(&str, &str)] = &[
+    ("AcpAgentSnapshotDecode", "status"),
+    // AgentRegistrationWire.runtime is the untagged RuntimeKind (bare string or {kind,id} object).
+    // The hand AgentRegistration init collapses it to a String, so the wire passes the payload
+    // through as JSONValue and the map re-reads it.
+    ("AgentRegistrationWire", "runtime"),
+];
 
 /// Whether `(struct_name, field_name)` is in `JSON_PASSTHROUGH_FIELDS`.
 fn is_json_passthrough_field(struct_name: &str, field_name: &str) -> bool {
@@ -2477,6 +2487,22 @@ const SESSION_SIGNAL_EMIT_ONLY: &[&str] = &[
     "DeliveryConfig",
     "SignalAck",
 ];
+const AGENT_REGISTRATION_WIRE_SOURCE: &str = include_str!("../src/session/types/agents/wire.rs");
+const AGENT_RUNTIME_SOURCE: &str = include_str!("../src/agents/runtime/mod.rs");
+const AGENT_REGISTRATION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentRegistrationWireTypes.generated.swift";
+// The SessionDetail.agents member. The public AgentRegistration is `#[serde(try_from)]` its owned
+// wire::AgentRegistrationWire (agents/wire.rs) - that already-named *Wire companion carries the
+// flat decode shape, so the allow-list emits it directly (no Wire suffix - it is named that).
+// runtime is the untagged RuntimeKind (bare string or {kind,id}); the hand init collapses it to a
+// String, so the wire emits it as a JSON_PASSTHROUGH JSONValue the map re-reads. SessionRole,
+// AgentStatus (hybrid bare-string-or-{state} decode) and ManagedAgentKind are decoder-agnostic
+// hand enums referenced bare; persona reuses AgentPersonaWire; runtime_capabilities suffixes
+// RuntimeCapabilities + HookIntegrationDescriptor (agents/runtime/mod.rs).
+const AGENT_REGISTRATION_EMIT_ONLY: &[&str] = &[
+    "AgentRegistrationWire",
+    "RuntimeCapabilities",
+    "HookIntegrationDescriptor",
+];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2744,6 +2770,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[SESSION_SIGNAL_SOURCE, SESSION_EVENTS_SOURCE],
         },
+        GeneratedModule {
+            output: AGENT_REGISTRATION_OUTPUT,
+            description: "the Rust agent registration wire and runtime capabilities",
+            defaults: &[],
+            sources: &[AGENT_REGISTRATION_WIRE_SOURCE, AGENT_RUNTIME_SOURCE],
+        },
     ]
 }
 
@@ -2794,6 +2826,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         MANAGED_AGENTS_OUTPUT => MANAGED_AGENTS_EMIT_ONLY,
         DAEMON_STATE_OUTPUT => DAEMON_STATE_EMIT_ONLY,
         SESSION_SIGNAL_OUTPUT => SESSION_SIGNAL_EMIT_ONLY,
+        AGENT_REGISTRATION_OUTPUT => AGENT_REGISTRATION_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
