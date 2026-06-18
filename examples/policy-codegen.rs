@@ -1221,6 +1221,11 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // on convertFromSnakeCase, so the wire suffixes them (AgentRegistrationWire is already named).
     "RuntimeCapabilities",
     "HookIntegrationDescriptor",
+    // SessionDetail capstone (summaries.rs): the aggregate the session-mutation endpoints return.
+    // SessionDetail suffixes to SessionDetailWire; AgentRegistration suffixes so the agents field
+    // references the generated AgentRegistrationWire (the other five members already suffix).
+    "SessionDetail",
+    "AgentRegistration",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -2169,6 +2174,10 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     // StreamEvent: the SSE envelope (event/recordedAt/sessionId + free-form payload
     // serde_json::Value -> JSONValue). Clean, same-named hand mirror, generate-only.
     "StreamEvent",
+    // SessionDetail: the capstone aggregate every session-mutation endpoint returns. All six
+    // members are generated now (session/agents/tasks/signals/observer/agent_activity), so the
+    // wire references each member's *Wire and the hand init(wire:) maps the whole tree.
+    "SessionDetail",
 ];
 const OBSERVE_CLASSIFICATION_SOURCE: &str = include_str!("../src/observe/types/classification.rs");
 const OBSERVE_ISSUE_CODE_SOURCE: &str = include_str!("../src/observe/types/issue_code.rs");

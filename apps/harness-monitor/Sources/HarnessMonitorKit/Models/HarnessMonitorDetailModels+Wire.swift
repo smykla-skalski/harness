@@ -63,3 +63,18 @@ extension ObserverSummary {
     )
   }
 }
+
+// The SessionDetail capstone: fold the generated wire's six member arrays onto the rich models.
+// AgentRegistration(wire:) throws on a malformed managed-agent pair, so this init rethrows.
+extension SessionDetail {
+  init(wire: SessionDetailWire) throws {
+    self.init(
+      session: SessionSummary(wire: wire.session),
+      agents: try wire.agents.map(AgentRegistration.init(wire:)),
+      tasks: wire.tasks.map(WorkItem.init(wire:)),
+      signals: wire.signals.map(SessionSignalRecord.init(wire:)),
+      observer: wire.observer.map(ObserverSummary.init(wire:)),
+      agentActivity: wire.agentActivity.map(AgentToolActivitySummary.init(wire:))
+    )
+  }
+}

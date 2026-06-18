@@ -539,6 +539,33 @@ public struct AgentToolActivitySummaryWire: Codable, Equatable, Sendable {
   }
 }
 
+public struct SessionDetailWire: Codable, Equatable, Sendable {
+  public var session: SessionSummaryWire
+  public var agents: [AgentRegistrationWire]
+  public var tasks: [WorkItemWire]
+  public var signals: [SessionSignalRecordWire]
+  public var observer: ObserverSummaryWire?
+  public var agentActivity: [AgentToolActivitySummaryWire]
+
+  public init(session: SessionSummaryWire, agents: [AgentRegistrationWire], tasks: [WorkItemWire], signals: [SessionSignalRecordWire], observer: ObserverSummaryWire? = nil, agentActivity: [AgentToolActivitySummaryWire]) {
+    self.session = session
+    self.agents = agents
+    self.tasks = tasks
+    self.signals = signals
+    self.observer = observer
+    self.agentActivity = agentActivity
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case session
+    case agents
+    case tasks
+    case signals
+    case observer
+    case agentActivity = "agent_activity"
+  }
+}
+
 public struct TimelineEntryWire: Codable, Equatable, Sendable {
   public var entryId: String
   public var recordedAt: String
