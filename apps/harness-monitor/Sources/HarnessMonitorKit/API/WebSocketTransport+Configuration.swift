@@ -25,7 +25,8 @@ extension WebSocketTransport {
       params.merge(sessionScopeParams(sessionID: sessionID)) { _, newValue in newValue }
     }
     let value = try await rpc(method: .managedAgentAcpInspect, params: .object(params))
-    return try decode(value)
+    let wire: AcpAgentInspectResponseWire = try decodePolicyWire(value)
+    return AcpAgentInspectResponse(wire: wire)
   }
 
   public func acpTranscript(sessionID: String) async throws -> AcpTranscriptResponse {

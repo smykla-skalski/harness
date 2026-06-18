@@ -69,3 +69,41 @@ extension AcpTranscriptResponse {
     self.init(entries: wire.entries.map(TimelineEntry.init(wire:)))
   }
 }
+
+// The acp inspect response (generated from the owned AcpAgentInspectSnapshotDecode). The wire
+// keeps the daemon field names (managed_agent_id / session_agent_id), so the snapshot map
+// applies the hand cross-rename to acpId / agentId and narrows the UInt counts to Int; the
+// wire's process_key has no hand mirror and is dropped. Backs /v1/managed-agents/acp/inspect.
+extension AcpAgentInspectSnapshot {
+  public init(wire: AcpAgentInspectSnapshotWire) {
+    self.init(
+      acpId: wire.managedAgentId,
+      sessionId: wire.sessionId,
+      agentId: wire.sessionAgentId,
+      displayName: wire.displayName,
+      pid: wire.pid,
+      pgid: wire.pgid,
+      uptimeMs: wire.uptimeMs,
+      lastUpdateAt: wire.lastUpdateAt,
+      lastClientCallAt: wire.lastClientCallAt,
+      watchdogState: wire.watchdogState,
+      permissionMode: wire.permissionMode,
+      permissionLogPath: wire.permissionLogPath,
+      pendingPermissions: Int(wire.pendingPermissions),
+      permissionQueueDepth: Int(wire.permissionQueueDepth),
+      terminalCount: Int(wire.terminalCount),
+      promptDeadlineRemainingMs: wire.promptDeadlineRemainingMs
+    )
+  }
+}
+
+extension AcpAgentInspectResponse {
+  public init(wire: AcpAgentInspectResponseWire) {
+    self.init(
+      agents: wire.agents.map(AcpAgentInspectSnapshot.init(wire:)),
+      daemonPerceivedNow: wire.daemonPerceivedNow,
+      available: wire.available,
+      issueMessage: wire.issueMessage
+    )
+  }
+}

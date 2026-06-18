@@ -1184,6 +1184,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // the generated AgentPersonaWire/RuntimeModelCatalogWire/AcpAgentDescriptorWire and the
     // optional AcpRuntimeProbeResponseWire, all in this same module (no import).
     "WsConfigPayload",
+    // manager.rs acp inspect response: Swift hand is AcpAgentInspectResponse; its agents field
+    // references the renamed AcpAgentInspectSnapshotWire (the snapshot decode struct).
+    "AcpAgentInspectResponse",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1275,6 +1278,15 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // descriptor's `capabilities: Vec<CapabilityTag>` field is `[String]` (the app
     // hand already types it as [String]). The token only appears in that field.
     ("CapabilityTag", "String"),
+    // acp inspect: the rich AcpAgentInspectSnapshot has no serde derive; its owned decode
+    // struct AcpAgentInspectSnapshotDecode is emitted AS AcpAgentInspectSnapshotWire (the
+    // definition rename), and the response's `Vec<AcpAgentInspectSnapshot>` field reference
+    // points at that same Wire name. Both tokens only appear in the acp-inspect module.
+    (
+        "AcpAgentInspectSnapshotDecode",
+        "AcpAgentInspectSnapshotWire",
+    ),
+    ("AcpAgentInspectSnapshot", "AcpAgentInspectSnapshotWire"),
 ];
 
 /// The Swift name for a Rust wire type: a hand rename when one applies, else the
@@ -1677,6 +1689,9 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     // AcpSpawnConfiguration / transport sub-enums) never cross to Swift.
     ("AcpAgentDescriptor", "spawn_configuration"),
     ("AcpAgentDescriptor", "session_configuration"),
+    // acp inspect snapshot: the hand AcpAgentInspectSnapshot has no transport-family field,
+    // so dropping managed_agent_family (ManagedAgentKind) keeps the wire all-primitive.
+    ("AcpAgentInspectSnapshotDecode", "managed_agent_family"),
 ];
 
 /// Whether `(struct_name, field_name)` is in `OMITTED_WIRE_FIELDS`.
@@ -2282,6 +2297,19 @@ const ACP_DESCRIPTOR_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitor
 // the allow-list need only emit the descriptor and its DoctorProbe; model_catalog reuses the
 // RuntimeModelCatalogWire and capabilities is the CapabilityTag = String alias (TYPE_RENAMES).
 const ACP_DESCRIPTOR_EMIT_ONLY: &[&str] = &["AcpAgentDescriptor", "DoctorProbe"];
+const ACP_INSPECT_MANAGER_SOURCE: &str = include_str!("../src/daemon/agent_acp/manager.rs");
+const ACP_INSPECT_WIRE_SOURCE: &str =
+    include_str!("../src/daemon/agent_acp/manager/snapshot_wire.rs");
+const ACP_INSPECT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpInspectWireTypes.generated.swift";
+// The acp inspect response backing /v1/managed-agents/acp/inspect. The rich AcpAgentSnapshot
+// /AcpAgentInspectSnapshot carry NO serde derive (borrowed-serialize optimization), so the
+// faithful decode shape is the owned `AcpAgentInspectSnapshotDecode` in snapshot_wire.rs - we
+// emit THAT under the AcpAgentInspectSnapshotWire name (TYPE_RENAMES) and rename the response's
+// `AcpAgentInspectSnapshot` field reference to it. managed_agent_family (ManagedAgentKind) is
+// dropped via OMITTED_WIRE_FIELDS (the hand snapshot does not model it), so the only deps are
+// primitives. available's default_acp_inspect_available -> true resolves from the manager source.
+const ACP_INSPECT_EMIT_ONLY: &[&str] =
+    &["AcpAgentInspectResponse", "AcpAgentInspectSnapshotDecode"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2501,6 +2529,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[ACP_DESCRIPTOR_SOURCE],
             sources: &[ACP_DESCRIPTOR_SOURCE],
         },
+        GeneratedModule {
+            output: ACP_INSPECT_OUTPUT,
+            description: "the Rust acp inspect response and its owned snapshot decode",
+            defaults: &[ACP_INSPECT_MANAGER_SOURCE],
+            sources: &[ACP_INSPECT_MANAGER_SOURCE, ACP_INSPECT_WIRE_SOURCE],
+        },
     ]
 }
 
@@ -2543,6 +2577,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         AGENT_PERSONA_OUTPUT => AGENT_PERSONA_EMIT_ONLY,
         RUNTIME_MODELS_OUTPUT => RUNTIME_MODELS_EMIT_ONLY,
         ACP_DESCRIPTOR_OUTPUT => ACP_DESCRIPTOR_EMIT_ONLY,
+        ACP_INSPECT_OUTPUT => ACP_INSPECT_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
