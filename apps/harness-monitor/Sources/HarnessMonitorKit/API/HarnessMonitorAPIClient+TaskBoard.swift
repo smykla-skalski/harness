@@ -172,15 +172,24 @@ extension HarnessMonitorAPIClient {
   }
 
   public func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
-    try await get("/v1/task-board/orchestrator/status")
+    let wire: TaskBoardOrchestratorStatusWire = try await get(
+      "/v1/task-board/orchestrator/status", decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardOrchestratorStatus(wire: wire)
   }
 
   public func startTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus {
-    try await post("/v1/task-board/orchestrator/start", body: EmptyBody())
+    let wire: TaskBoardOrchestratorStatusWire = try await post(
+      "/v1/task-board/orchestrator/start", body: EmptyBody(), decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardOrchestratorStatus(wire: wire)
   }
 
   public func stopTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus {
-    try await post("/v1/task-board/orchestrator/stop", body: EmptyBody())
+    let wire: TaskBoardOrchestratorStatusWire = try await post(
+      "/v1/task-board/orchestrator/stop", body: EmptyBody(), decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardOrchestratorStatus(wire: wire)
   }
 
   public func runTaskBoardOrchestratorOnce(
@@ -188,17 +197,26 @@ extension HarnessMonitorAPIClient {
   ) async throws
     -> TaskBoardOrchestratorRunOnceResponse
   {
-    try await post("/v1/task-board/orchestrator/run-once", body: request)
+    let wire: TaskBoardOrchestratorStatusWire = try await post(
+      "/v1/task-board/orchestrator/run-once", body: request, decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardOrchestratorStatus(wire: wire)
   }
 
   public func taskBoardOrchestratorSettings() async throws -> TaskBoardOrchestratorSettings {
-    try await get("/v1/task-board/orchestrator/settings")
+    let wire: TaskBoardOrchestratorSettingsWire = try await get(
+      "/v1/task-board/orchestrator/settings", decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardOrchestratorSettings(wire: wire)
   }
 
   public func updateTaskBoardOrchestratorSettings(
     request: TaskBoardOrchestratorSettingsUpdateRequest
   ) async throws -> TaskBoardOrchestratorSettings {
-    try await put("/v1/task-board/orchestrator/settings", body: request)
+    let wire: TaskBoardOrchestratorSettingsWire = try await put(
+      "/v1/task-board/orchestrator/settings", body: request, decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardOrchestratorSettings(wire: wire)
   }
 
   public func taskBoardGitRuntimeConfig() async throws -> TaskBoardGitRuntimeConfig {

@@ -1243,6 +1243,17 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "GitHubRequestedReviewers",
     "GitHubAutomationToggles",
     "ProtectedPathRule",
+    // task_board orchestrator settings + status tree (orchestrator/types.rs). The settings nest
+    // the GitHubProjectConfigWire (via TYPE_RENAMES on the Rust alias) plus the two inbox configs;
+    // the status nests the run summary (sync/audit/dispatch/evaluation wires) and tick info. The
+    // Workflow/TickPhase/RunStatus enums + TaskBoardStatus/TaskBoardWorkflowStatus ride bare.
+    "TaskBoardOrchestratorSettings",
+    "TaskBoardGitHubInboxConfig",
+    "TaskBoardTodoistInboxConfig",
+    "TaskBoardOrchestratorTickInfo",
+    "TaskBoardOrchestratorRunSummary",
+    "TaskBoardWorkflowExecutionCount",
+    "TaskBoardOrchestratorStatus",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1326,6 +1337,10 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // reviews types.rs request methods: Rust GitHubMergeMethod (task_board) is
     // the Swift hand enum TaskBoardGitHubMergeMethod.
     ("GitHubMergeMethod", "TaskBoardGitHubMergeMethod"),
+    // orchestrator settings.github_project: the Rust field uses the type alias
+    // TaskBoardGitHubProjectConfig (= github::GitHubProjectConfig), so repoint it at the
+    // already-generated GitHubProjectConfigWire instead of re-emitting the sub-tree.
+    ("TaskBoardGitHubProjectConfig", "GitHubProjectConfigWire"),
     // task_board.rs policy-canvas read cluster: Rust PolicyPipelineDocument is a
     // type alias for PolicyGraph (policy_graph.rs:389). The Swift app re-models it
     // as the hand TaskBoardPolicyPipelineDocument (Kit, explicit snake CodingKeys,
@@ -2585,6 +2600,22 @@ const GITHUB_CONFIG_EMIT_ONLY: &[&str] = &[
     "GitHubAutomationToggles",
     "ProtectedPathRule",
 ];
+const ORCHESTRATOR_TYPES_SOURCE: &str = include_str!("../src/task_board/orchestrator/types.rs");
+const ORCHESTRATOR_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardOrchestratorWireTypes.generated.swift";
+// The orchestrator settings + status tree (orchestratorStatus/start/stop/run-once + settings get/
+// update). github_project rides the GitHubProjectConfigWire (TYPE_RENAMES on the alias); the run
+// summary nests the sync/audit/dispatch/evaluation wires; Workflow/TickPhase/RunStatus enums and
+// TaskBoardStatus/TaskBoardWorkflowStatus ride bare. policy.rs is a source so the policy_version
+// default fn resolves TASK_BOARD_POLICY_VERSION.
+const ORCHESTRATOR_EMIT_ONLY: &[&str] = &[
+    "TaskBoardOrchestratorSettings",
+    "TaskBoardGitHubInboxConfig",
+    "TaskBoardTodoistInboxConfig",
+    "TaskBoardOrchestratorTickInfo",
+    "TaskBoardOrchestratorRunSummary",
+    "TaskBoardWorkflowExecutionCount",
+    "TaskBoardOrchestratorStatus",
+];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2882,6 +2913,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[GITHUB_CONFIG_SOURCE],
             sources: &[GITHUB_CONFIG_SOURCE],
         },
+        GeneratedModule {
+            output: ORCHESTRATOR_OUTPUT,
+            description: "the Rust task-board orchestrator settings and status tree",
+            defaults: &[ORCHESTRATOR_TYPES_SOURCE],
+            sources: &[ORCHESTRATOR_TYPES_SOURCE, POLICY_SOURCE],
+        },
     ]
 }
 
@@ -2937,6 +2974,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         BRIDGE_STATUS_OUTPUT => BRIDGE_STATUS_EMIT_ONLY,
         SYNC_SUMMARY_OUTPUT => SYNC_SUMMARY_EMIT_ONLY,
         GITHUB_CONFIG_OUTPUT => GITHUB_CONFIG_EMIT_ONLY,
+        ORCHESTRATOR_OUTPUT => ORCHESTRATOR_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {

@@ -161,17 +161,20 @@ extension WebSocketTransport {
 
   public func taskBoardOrchestratorStatus() async throws -> TaskBoardOrchestratorStatus {
     let value = try await rpc(method: .taskBoardOrchestratorStatus)
-    return try decode(value)
+    let wire: TaskBoardOrchestratorStatusWire = try decodePolicyWire(value)
+    return TaskBoardOrchestratorStatus(wire: wire)
   }
 
   public func startTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus {
     let value = try await rpc(method: .taskBoardOrchestratorStart)
-    return try decode(value)
+    let wire: TaskBoardOrchestratorStatusWire = try decodePolicyWire(value)
+    return TaskBoardOrchestratorStatus(wire: wire)
   }
 
   public func stopTaskBoardOrchestrator() async throws -> TaskBoardOrchestratorStatus {
     let value = try await rpc(method: .taskBoardOrchestratorStop)
-    return try decode(value)
+    let wire: TaskBoardOrchestratorStatusWire = try decodePolicyWire(value)
+    return TaskBoardOrchestratorStatus(wire: wire)
   }
 
   public func runTaskBoardOrchestratorOnce(
@@ -181,12 +184,14 @@ extension WebSocketTransport {
   {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardOrchestratorRunOnce, params: params)
-    return try decode(value)
+    let wire: TaskBoardOrchestratorStatusWire = try decodePolicyWire(value)
+    return TaskBoardOrchestratorStatus(wire: wire)
   }
 
   public func taskBoardOrchestratorSettings() async throws -> TaskBoardOrchestratorSettings {
     let value = try await rpc(method: .taskBoardOrchestratorSettingsGet)
-    return try decode(value)
+    let wire: TaskBoardOrchestratorSettingsWire = try decodePolicyWire(value)
+    return TaskBoardOrchestratorSettings(wire: wire)
   }
 
   public func updateTaskBoardOrchestratorSettings(
@@ -194,7 +199,8 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardOrchestratorSettings {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardOrchestratorSettingsUpdate, params: params)
-    return try decode(value)
+    let wire: TaskBoardOrchestratorSettingsWire = try decodePolicyWire(value)
+    return TaskBoardOrchestratorSettings(wire: wire)
   }
 
   public func taskBoardGitRuntimeConfig() async throws -> TaskBoardGitRuntimeConfig {
