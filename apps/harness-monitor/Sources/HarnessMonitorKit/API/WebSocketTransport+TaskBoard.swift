@@ -214,7 +214,8 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardGitHubTokensSyncResponse {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardOrchestratorGitHubTokensSync, params: params)
-    return try decode(value)
+    let wire: TaskBoardGitHubTokensSyncResponseWire = try decodePolicyWire(value)
+    return TaskBoardGitHubTokensSyncResponse(wire: wire)
   }
 
   public func syncTaskBoardOpenRouterToken(
@@ -222,7 +223,8 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardOpenRouterTokenSyncResponse {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardOrchestratorOpenRouterTokenSync, params: params)
-    return try decode(value)
+    let wire: TaskBoardOpenRouterTokenSyncResponseWire = try decodePolicyWire(value)
+    return TaskBoardOpenRouterTokenSyncResponse(wire: wire)
   }
 
   public func syncTaskBoardTodoistToken(
@@ -230,7 +232,8 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardTodoistTokenSyncResponse {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardOrchestratorTodoistTokenSync, params: params)
-    return try decode(value)
+    let wire: TaskBoardTodoistTokenSyncResponseWire = try decodePolicyWire(value)
+    return TaskBoardTodoistTokenSyncResponse(wire: wire)
   }
 
   public func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults {

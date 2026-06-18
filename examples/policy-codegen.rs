@@ -1226,6 +1226,10 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // references the generated AgentRegistrationWire (the other five members already suffix).
     "SessionDetail",
     "AgentRegistration",
+    // task_board orchestrator credential responses (runtime_config.rs): thin hand mirrors.
+    "TaskBoardGitHubTokensSyncResponse",
+    "TaskBoardTodoistTokenSyncResponse",
+    "TaskBoardOpenRouterTokenSyncResponse",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -2512,6 +2516,16 @@ const AGENT_REGISTRATION_EMIT_ONLY: &[&str] = &[
     "RuntimeCapabilities",
     "HookIntegrationDescriptor",
 ];
+const TASK_BOARD_CREDENTIAL_SOURCE: &str = include_str!("../src/task_board/runtime_config.rs");
+const TASK_BOARD_CREDENTIAL_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardCredentialWireTypes.generated.swift";
+// The three token-sync response bodies (GitHub/Todoist/OpenRouter) the orchestrator credential
+// endpoints return - tiny bool/count structs. The big git-runtime-config tree and the request
+// bodies in this file stay out of the allow-list (requests are encode-only).
+const TASK_BOARD_CREDENTIAL_EMIT_ONLY: &[&str] = &[
+    "TaskBoardGitHubTokensSyncResponse",
+    "TaskBoardTodoistTokenSyncResponse",
+    "TaskBoardOpenRouterTokenSyncResponse",
+];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2785,6 +2799,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[AGENT_REGISTRATION_WIRE_SOURCE, AGENT_RUNTIME_SOURCE],
         },
+        GeneratedModule {
+            output: TASK_BOARD_CREDENTIAL_OUTPUT,
+            description: "the Rust task-board orchestrator token-sync responses",
+            defaults: &[],
+            sources: &[TASK_BOARD_CREDENTIAL_SOURCE],
+        },
     ]
 }
 
@@ -2836,6 +2856,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         DAEMON_STATE_OUTPUT => DAEMON_STATE_EMIT_ONLY,
         SESSION_SIGNAL_OUTPUT => SESSION_SIGNAL_EMIT_ONLY,
         AGENT_REGISTRATION_OUTPUT => AGENT_REGISTRATION_EMIT_ONLY,
+        TASK_BOARD_CREDENTIAL_OUTPUT => TASK_BOARD_CREDENTIAL_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {

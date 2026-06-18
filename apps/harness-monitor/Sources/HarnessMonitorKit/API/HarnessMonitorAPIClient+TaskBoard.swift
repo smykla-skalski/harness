@@ -211,19 +211,31 @@ extension HarnessMonitorAPIClient {
   public func syncTaskBoardGitHubTokens(
     request: TaskBoardGitHubTokensSyncRequest
   ) async throws -> TaskBoardGitHubTokensSyncResponse {
-    try await put("/v1/task-board/orchestrator/github-tokens", body: request)
+    let wire: TaskBoardGitHubTokensSyncResponseWire = try await put(
+      "/v1/task-board/orchestrator/github-tokens", body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardGitHubTokensSyncResponse(wire: wire)
   }
 
   public func syncTaskBoardTodoistToken(
     request: TaskBoardTodoistTokenSyncRequest
   ) async throws -> TaskBoardTodoistTokenSyncResponse {
-    try await put("/v1/task-board/orchestrator/todoist-token", body: request)
+    let wire: TaskBoardTodoistTokenSyncResponseWire = try await put(
+      "/v1/task-board/orchestrator/todoist-token", body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardTodoistTokenSyncResponse(wire: wire)
   }
 
   public func syncTaskBoardOpenRouterToken(
     request: TaskBoardOpenRouterTokenSyncRequest
   ) async throws -> TaskBoardOpenRouterTokenSyncResponse {
-    try await put("/v1/task-board/orchestrator/openrouter-token", body: request)
+    let wire: TaskBoardOpenRouterTokenSyncResponseWire = try await put(
+      "/v1/task-board/orchestrator/openrouter-token", body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardOpenRouterTokenSyncResponse(wire: wire)
   }
 
   public func taskBoardGitIdentityDefaults() async throws -> TaskBoardGitIdentityDefaults {
