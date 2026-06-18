@@ -256,7 +256,10 @@ extension WebSocketTransport {
     sessionID: String,
     request: AcpAgentStartRequest
   ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: sessionScopeParams(sessionID: sessionID))
+    let params = try encodeParams(
+      AcpAgentStartRequestWire(request),
+      extra: sessionScopeParams(sessionID: sessionID)
+    )
     let value = try await rpc(method: .managedAgentStartAcp, params: params)
     let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
     return try ManagedAgentSnapshot(wire: wire)

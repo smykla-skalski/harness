@@ -1311,6 +1311,9 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // managed-agents umbrella: the public no-derive AcpAgentSnapshot referenced by the
     // ManagedAgentSnapshot Acp variant resolves to the generated AcpAgentSnapshotWire.
     ("AcpAgentSnapshot", "AcpAgentSnapshotWire"),
+    // acp start request: the public no-derive AcpAgentStartRequest's owned decode struct emits
+    // as AcpAgentStartRequestWire (the request body for startManagedAcpAgent).
+    ("AcpAgentStartRequestDecode", "AcpAgentStartRequestWire"),
 ];
 
 /// The Swift name for a Rust wire type: a hand rename when one applies, else the
@@ -2387,6 +2390,14 @@ const ACP_SNAPSHOT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKi
 // JSONValue passthrough (JSON_PASSTHROUGH_FIELDS) - the map re-decodes the flattened AgentStatus
 // plus the disconnect reason/stderr_tail the daemon nests in the status object.
 const ACP_SNAPSHOT_EMIT_ONLY: &[&str] = &["AcpAgentSnapshotDecode"];
+const ACP_START_REQUEST_SOURCE: &str =
+    include_str!("../src/daemon/agent_acp/manager/request_wire.rs");
+const ACP_START_REQUEST_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpAgentStartRequestWireTypes.generated.swift";
+// The acp managed-agent start request body. The public AcpAgentStartRequest has no serde derive
+// (hand Serialize/Deserialize via proxy structs); its owned AcpAgentStartRequestDecode carries
+// the derive and emits as AcpAgentStartRequestWire. descriptor_id maps to the hand `agent` field;
+// role defaults via default_acp_role (resolved from manager.rs).
+const ACP_START_REQUEST_EMIT_ONLY: &[&str] = &["AcpAgentStartRequestDecode"];
 const MANAGED_AGENTS_SOURCE: &str = include_str!("../src/daemon/protocol/managed_agents.rs");
 const MANAGED_AGENTS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ManagedAgentSnapshotWireTypes.generated.swift";
 // The managed-agent snapshot umbrella + its list response. ManagedAgentSnapshot is adjacently
@@ -2633,6 +2644,12 @@ fn modules() -> Vec<GeneratedModule> {
             sources: &[ACP_INSPECT_WIRE_SOURCE],
         },
         GeneratedModule {
+            output: ACP_START_REQUEST_OUTPUT,
+            description: "the Rust acp managed-agent start request from its owned decode struct",
+            defaults: &[ACP_INSPECT_MANAGER_SOURCE],
+            sources: &[ACP_START_REQUEST_SOURCE, ACP_INSPECT_MANAGER_SOURCE],
+        },
+        GeneratedModule {
             output: MANAGED_AGENTS_OUTPUT,
             description: "the Rust managed-agent snapshot umbrella and list response",
             defaults: &[],
@@ -2683,6 +2700,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         ACP_INSPECT_OUTPUT => ACP_INSPECT_EMIT_ONLY,
         ACP_PERMISSION_OUTPUT => ACP_PERMISSION_EMIT_ONLY,
         ACP_SNAPSHOT_OUTPUT => ACP_SNAPSHOT_EMIT_ONLY,
+        ACP_START_REQUEST_OUTPUT => ACP_START_REQUEST_EMIT_ONLY,
         MANAGED_AGENTS_OUTPUT => MANAGED_AGENTS_EMIT_ONLY,
         _ => &[],
     };

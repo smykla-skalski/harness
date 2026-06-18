@@ -109,4 +109,22 @@ struct ManagedAgentRequestWireEncodingTests {
     #expect(approveAll["decision"] as? String == "approve_all")
     #expect(approveAll["request_ids"] == nil)
   }
+
+  @Test("acp start request pins descriptor_id and snake keys")
+  func acpStartRequest() throws {
+    let request = AcpAgentStartRequest(
+      agent: "claude-acp",
+      projectDir: "/tmp/acp",
+      taskID: "task-9",
+      allowCustomModel: true,
+      recordPermissions: true
+    )
+    let json = try object(AcpAgentStartRequestWire(request))
+    #expect(json["descriptor_id"] as? String == "claude-acp")
+    #expect(json["project_dir"] as? String == "/tmp/acp")
+    #expect(json["task_id"] as? String == "task-9")
+    #expect(json["allow_custom_model"] as? Bool == true)
+    #expect(json["record_permissions"] as? Bool == true)
+    #expect(json["role"] as? String == "worker")
+  }
 }

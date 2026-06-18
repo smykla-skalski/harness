@@ -6,7 +6,8 @@ extension HarnessMonitorAPIClient {
     request: AcpAgentStartRequest
   ) async throws -> ManagedAgentSnapshot {
     let wire: ManagedAgentSnapshotWire = try await post(
-      "/v1/sessions/\(sessionID)/managed-agents/acp", body: request,
+      "/v1/sessions/\(sessionID)/managed-agents/acp",
+      body: AcpAgentStartRequestWire(request),
       decoder: PolicyWireCoding.decoder
     )
     return try ManagedAgentSnapshot(wire: wire)

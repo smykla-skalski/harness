@@ -82,3 +82,25 @@ extension AcpPermissionDecisionWire {
     }
   }
 }
+
+extension AcpAgentStartRequestWire {
+  init(_ request: AcpAgentStartRequest) {
+    self.init(
+      descriptorId: request.agent,
+      role: request.role,
+      fallbackRole: request.fallbackRole,
+      capabilities: request.capabilities,
+      name: request.name,
+      prompt: request.prompt,
+      projectDir: request.projectDir,
+      persona: request.persona,
+      taskId: request.taskID,
+      boardItemId: request.boardItemID,
+      workflowExecutionId: request.workflowExecutionID,
+      model: request.model,
+      effort: request.effort,
+      allowCustomModel: request.allowCustomModel,
+      recordPermissions: request.recordPermissions
+    )
+  }
+}
