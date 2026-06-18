@@ -150,13 +150,25 @@ public struct ReviewPoint: Codable, Equatable, Identifiable, Sendable {
 
   enum CodingKeys: String, CodingKey { case pointId, text, state, workerNote }
 
+  // The daemon emits point_id/worker_note. The default decoder reaches them via convertFromSnakeCase
+  // (point_id -> pointId), but the plain generated-wire decoder matches the literal key, so this
+  // also reads the snake forms directly - making ReviewPoint decoder-agnostic when a wire type
+  // references it bare.
+  private enum SnakeCodingKeys: String, CodingKey {
+    case pointId = "point_id"
+    case workerNote = "worker_note"
+  }
+
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    let snake = try decoder.container(keyedBy: SnakeCodingKeys.self)
     self.init(
-      pointId: try container.decode(String.self, forKey: .pointId),
+      pointId: try container.decodeIfPresent(String.self, forKey: .pointId)
+        ?? snake.decode(String.self, forKey: .pointId),
       text: try container.decode(String.self, forKey: .text),
       state: try container.decodeIfPresent(ReviewPointState.self, forKey: .state) ?? .open,
       workerNote: try container.decodeIfPresent(String.self, forKey: .workerNote)
+        ?? snake.decodeIfPresent(String.self, forKey: .workerNote)
     )
   }
 }
