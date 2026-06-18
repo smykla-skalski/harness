@@ -242,7 +242,9 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("currentRouteKey: routeKey"))
     #expect(source.contains("appliedRouteKey: routeCache.appliedRouteKey"))
     #expect(source.contains("viewportCenteringGeneration: viewModel.viewportCenteringGeneration"))
-    #expect(!source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
+    #expect(source.contains("let provisionalRouteOutput ="))
+    #expect(source.contains("policyCanvasProvisionalRouteOutput("))
+    #expect(source.contains("let routeOutput = provisionalRouteOutput ?? projectedRouteResult.output"))
     #expect(source.contains("routeCache.outputsByCanvasIdentity"))
     #expect(
       source.contains("let cachedRouteOutput = routeCache.outputsByCanvasIdentity[newIdentity]"))

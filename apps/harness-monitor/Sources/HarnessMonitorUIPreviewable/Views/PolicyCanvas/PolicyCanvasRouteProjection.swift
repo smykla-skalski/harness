@@ -15,6 +15,31 @@ struct PolicyCanvasProjectedRouteResult {
   let canCommitAsCurrentGraph: Bool
 }
 
+@MainActor
+func policyCanvasProvisionalRouteOutput(
+  graphGeneration: UInt64,
+  nodes: [PolicyCanvasNode],
+  groups: [PolicyCanvasGroup],
+  edges: [PolicyCanvasEdge],
+  fontScale: CGFloat,
+  routingHints: PolicyCanvasLayoutRoutingHints?,
+  precomputedRoutes: PolicyCanvasPrecomputedRouteSet?,
+  algorithmSelection: PolicyCanvasAlgorithmSelection
+) -> PolicyCanvasRouteWorkerOutput {
+  PolicyCanvasRouteWorkerOutput.fallback(
+    for: PolicyCanvasRouteWorkerInput(
+      graphGeneration: graphGeneration,
+      nodes: nodes,
+      groups: groups,
+      edges: edges,
+      fontScale: fontScale,
+      routingHints: routingHints,
+      precomputedRoutes: precomputedRoutes,
+      algorithmSelection: algorithmSelection
+    )
+  )
+}
+
 func policyCanvasNodePositionsByID(_ nodes: [PolicyCanvasNode]) -> [String: CGPoint] {
   Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
 }

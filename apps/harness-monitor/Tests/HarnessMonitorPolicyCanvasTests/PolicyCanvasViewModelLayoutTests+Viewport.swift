@@ -370,15 +370,15 @@ extension PolicyCanvasViewModelLayoutTests {
       fontScale: 1,
       routingHints: viewModel.routingHints
     )
-    let provisionalOutput = PolicyCanvasRouteWorkerOutput.fallback(
-      for: PolicyCanvasRouteWorkerInput(
-        graphGeneration: viewModel.routeComputationGeneration,
-        nodes: viewModel.nodes,
-        groups: viewModel.groups,
-        edges: viewModel.edges,
-        fontScale: 1,
-        routingHints: viewModel.routingHints
-      )
+    let provisionalOutput = policyCanvasProvisionalRouteOutput(
+      graphGeneration: viewModel.routeComputationGeneration,
+      nodes: viewModel.nodes,
+      groups: viewModel.groups,
+      edges: viewModel.edges,
+      fontScale: 1,
+      routingHints: viewModel.routingHints,
+      precomputedRoutes: viewModel.precomputedRoutes,
+      algorithmSelection: viewModel.algorithmSelection
     )
 
     #expect(

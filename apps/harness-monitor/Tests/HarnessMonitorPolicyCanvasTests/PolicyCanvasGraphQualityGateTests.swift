@@ -126,6 +126,28 @@ struct PolicyCanvasGraphQualityGateTests {
     #expect(!budgetedSampleIDs.contains("extreme-galaxy"))
   }
 
+  @Test func allSamplesHaveProvisionalRoutesWhileWorkerCatchesUp() throws {
+    for sample in PolicyCanvasLabSamples.all {
+      let viewModel = PolicyCanvasViewModel.sample()
+      viewModel.load(document: sample.document, simulation: nil, audit: nil)
+      let output = policyCanvasProvisionalRouteOutput(
+        graphGeneration: viewModel.routeComputationGeneration,
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        fontScale: 1,
+        routingHints: viewModel.routingHints,
+        precomputedRoutes: viewModel.precomputedRoutes,
+        algorithmSelection: viewModel.algorithmSelection
+      )
+
+      #expect(
+        output.routes.count == viewModel.edges.count,
+        "\(sample.id): provisional routes should cover every visible edge"
+      )
+    }
+  }
+
   @Test func extremeGalaxyPrecomputedRoutesAvoidBodyHits() async throws {
     let report = try await routedReport(sampleID: "extreme-galaxy")
     #expect(

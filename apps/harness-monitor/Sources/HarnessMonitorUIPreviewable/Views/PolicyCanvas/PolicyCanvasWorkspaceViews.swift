@@ -111,7 +111,20 @@ struct PolicyCanvasViewport: View {
         routeKeyIsStale && projectedRouteResult.canCommitAsCurrentGraph
       let routeOutputIsCurrentGraphMissing =
         !viewModel.isEmpty && projectedRouteResult.output.signature == .empty
-      let routeOutput = projectedRouteResult.output
+      let provisionalRouteOutput =
+        routeOutputIsCurrentGraphMissing
+        ? policyCanvasProvisionalRouteOutput(
+          graphGeneration: viewModel.routeComputationGeneration,
+          nodes: nodes,
+          groups: groups,
+          edges: edges,
+          fontScale: fontScale,
+          routingHints: viewModel.routingHints,
+          precomputedRoutes: viewModel.precomputedRoutes,
+          algorithmSelection: viewModel.algorithmSelection
+        )
+        : nil
+      let routeOutput = provisionalRouteOutput ?? projectedRouteResult.output
       let routeOutputNeedsRefresh =
         !hasActivePositionDrag
         && (routeOutputIsCurrentGraphMissing || (routeKeyIsStale && !routeProjectionCanCommit))

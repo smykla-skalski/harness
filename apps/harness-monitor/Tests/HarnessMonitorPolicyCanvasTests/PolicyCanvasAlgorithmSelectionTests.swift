@@ -70,14 +70,16 @@ struct PolicyCanvasAlgorithmSelectionTests {
     #expect(output.labelPositions["edge-source-gate"] != nil)
   }
 
-  @Test("workspace does not render fallback routes while worker catches up")
-  func workspaceDoesNotRenderFallbackRoutesWhileWorkerCatchesUp() throws {
+  @Test("workspace renders provisional routes while worker catches up")
+  func workspaceRendersProvisionalRoutesWhileWorkerCatchesUp() throws {
     let source =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
 
-    #expect(!source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
-    #expect(source.contains("let routeOutput = projectedRouteResult.output"))
+    #expect(source.contains("let provisionalRouteOutput ="))
+    #expect(source.contains("policyCanvasProvisionalRouteOutput("))
+    #expect(source.contains("let routeOutput = provisionalRouteOutput ?? projectedRouteResult.output"))
     #expect(source.contains("let routeOutputIsCurrentGraphMissing ="))
+    #expect(source.contains("guard routeOutputNeedsRefresh else { return }"))
   }
 
   @Test("greedy feedback arc reversal returns an acyclic orientation")
