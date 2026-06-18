@@ -17,7 +17,10 @@ extension HarnessMonitorAPIClient {
     if let cached = try await configuration().runtimeProbe {
       return cached
     }
-    return try await get("/v1/runtimes/probe")
+    let wire: AcpRuntimeProbeResponseWire = try await get(
+      "/v1/runtimes/probe", decoder: PolicyWireCoding.decoder
+    )
+    return AcpRuntimeProbeResponse(wire: wire)
   }
 
   public func acpInspect(sessionID: String?) async throws -> AcpAgentInspectResponse {

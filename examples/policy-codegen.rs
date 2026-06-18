@@ -1163,6 +1163,10 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // task_board machines.rs host machine: Swift hand is TaskBoardHostMachine
     // (renamed); agent_modes references the adopted TaskBoardAgentMode bare.
     "Machine",
+    // agents/acp/probe.rs runtime-doctor probe: Swift hands are AcpRuntimeProbeResponse
+    // /AcpRuntimeProbe (thin mirrors); the probe references AcpAuthState bare.
+    "AcpRuntimeProbeResponse",
+    "AcpRuntimeProbe",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -2221,6 +2225,14 @@ const TASK_BOARD_CANVAS_EMIT_ONLY: &[&str] = &[
     "TaskBoardPolicyCanvasWorkspaceResponse",
     "TaskBoardPolicyExportResponse",
 ];
+const ACP_PROBE_SOURCE: &str = include_str!("../src/agents/acp/probe.rs");
+const ACP_PROBE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpProbeWireTypes.generated.swift";
+// The runtime-doctor probe response (probe.rs) backing /v1/runtimes/probe and the
+// MonitorConfiguration.runtimeProbe field. AcpAuthState is a closed single-word
+// snake_case enum (ready/unknown/unavailable) - decoder-agnostic, so it is referenced
+// bare (the hand Swift enum) rather than suffixed. The probe-cache internals carry no
+// serde derive, so the allow-list keeps them out of the emit builders.
+const ACP_PROBE_EMIT_ONLY: &[&str] = &["AcpRuntimeProbeResponse", "AcpRuntimeProbe"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2416,6 +2428,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[TASK_BOARD_DISPATCH_SOURCE, TASK_BOARD_PLANNING_SOURCE],
         },
+        GeneratedModule {
+            output: ACP_PROBE_OUTPUT,
+            description: "the Rust acp runtime-probe response",
+            defaults: &[],
+            sources: &[ACP_PROBE_SOURCE],
+        },
     ]
 }
 
@@ -2454,6 +2472,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_PLANNING_OUTPUT => TASK_BOARD_PLANNING_EMIT_ONLY,
         TASK_BOARD_EVALUATION_OUTPUT => TASK_BOARD_EVALUATION_EMIT_ONLY,
         TASK_BOARD_DISPATCH_OUTPUT => TASK_BOARD_DISPATCH_EMIT_ONLY,
+        ACP_PROBE_OUTPUT => ACP_PROBE_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {

@@ -15,7 +15,8 @@ extension WebSocketTransport {
 
   public func runtimeProbeResults() async throws -> AcpRuntimeProbeResponse {
     let value = try await rpc(method: .runtimesProbe)
-    return try decode(value)
+    let wire: AcpRuntimeProbeResponseWire = try decodePolicyWire(value)
+    return AcpRuntimeProbeResponse(wire: wire)
   }
 
   public func acpInspect(sessionID: String?) async throws -> AcpAgentInspectResponse {
