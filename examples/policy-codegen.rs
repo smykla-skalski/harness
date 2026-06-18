@@ -1262,6 +1262,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardGitSigningConfig",
     "TaskBoardGitRepositoryOverride",
     "TaskBoardGitRuntimeDrainSecretsResponse",
+    // task_board git signing verify outcome (daemon/protocol/task_board.rs): an internally-tagged
+    // (tag = "outcome") enum with unit + struct variants, emitted as a Swift associated-value enum.
+    "TaskBoardGitSigningVerifyResponse",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -2636,6 +2639,11 @@ const GIT_RUNTIME_EMIT_ONLY: &[&str] = &[
     "TaskBoardGitRepositoryOverride",
     "TaskBoardGitRuntimeDrainSecretsResponse",
 ];
+const GIT_SIGNING_VERIFY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitSigningVerifyWireTypes.generated.swift";
+// The git signing verify outcome (git/signing/verify). An internally-tagged enum on "outcome" with
+// a unit variant (skipped), a two-field struct variant (signed: mode + signature_kind) and a
+// single-field struct variant (failed: message); the generator emits a Swift associated-value enum.
+const GIT_SIGNING_VERIFY_EMIT_ONLY: &[&str] = &["TaskBoardGitSigningVerifyResponse"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2945,6 +2953,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[TASK_BOARD_CREDENTIAL_SOURCE],
             sources: &[TASK_BOARD_CREDENTIAL_SOURCE, TASK_BOARD_PROTOCOL_SOURCE],
         },
+        GeneratedModule {
+            output: GIT_SIGNING_VERIFY_OUTPUT,
+            description: "the Rust task-board git signing verify outcome",
+            defaults: &[],
+            sources: &[TASK_BOARD_PROTOCOL_SOURCE],
+        },
     ]
 }
 
@@ -3002,6 +3016,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         GITHUB_CONFIG_OUTPUT => GITHUB_CONFIG_EMIT_ONLY,
         ORCHESTRATOR_OUTPUT => ORCHESTRATOR_EMIT_ONLY,
         GIT_RUNTIME_OUTPUT => GIT_RUNTIME_EMIT_ONLY,
+        GIT_SIGNING_VERIFY_OUTPUT => GIT_SIGNING_VERIFY_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {

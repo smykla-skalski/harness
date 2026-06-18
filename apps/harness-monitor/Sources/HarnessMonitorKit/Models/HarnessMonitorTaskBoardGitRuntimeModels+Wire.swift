@@ -64,3 +64,16 @@ extension TaskBoardGitRuntimeDrainSecretsResponse {
     )
   }
 }
+
+extension TaskBoardGitSigningVerifyResponse {
+  init(wire: TaskBoardGitSigningVerifyResponseWire) {
+    switch wire {
+    case .skipped:
+      self = .skipped
+    case .signed(let mode, let signatureKind):
+      self = .signed(mode: mode, signatureKind: signatureKind)
+    case .failed(let message):
+      self = .failed(message: message)
+    }
+  }
+}

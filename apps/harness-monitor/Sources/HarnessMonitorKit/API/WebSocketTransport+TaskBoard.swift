@@ -255,7 +255,8 @@ extension WebSocketTransport {
   ) async throws -> TaskBoardGitSigningVerifyResponse {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .taskBoardGitSigningVerify, params: params)
-    return try decode(value)
+    let wire: TaskBoardGitSigningVerifyResponseWire = try decodePolicyWire(value)
+    return TaskBoardGitSigningVerifyResponse(wire: wire)
   }
 
   public func drainTaskBoardGitRuntimeSecrets() async throws

@@ -273,7 +273,10 @@ extension HarnessMonitorAPIClient {
   public func verifyTaskBoardGitSigning(
     request: TaskBoardGitSigningVerifyRequest
   ) async throws -> TaskBoardGitSigningVerifyResponse {
-    try await post("/v1/task-board/git/signing/verify", body: request)
+    let wire: TaskBoardGitSigningVerifyResponseWire = try await post(
+      "/v1/task-board/git/signing/verify", body: request, decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardGitSigningVerifyResponse(wire: wire)
   }
 
   public func drainTaskBoardGitRuntimeSecrets() async throws
