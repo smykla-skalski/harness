@@ -222,7 +222,8 @@ extension WebSocketTransport {
 
   func handleConfigurationPush(payload: JSONValue) {
     do {
-      let configuration: MonitorConfiguration = try decode(payload)
+      let wire: WsConfigPayloadWire = try decodePolicyWire(payload)
+      let configuration = try MonitorConfiguration(wire: wire)
       cachedConfiguration = configuration
       let waiters = configurationWaiters
       configurationWaiters.removeAll()

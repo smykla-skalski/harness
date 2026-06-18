@@ -133,3 +133,32 @@ public struct WsChunkFrameWire: Codable, Equatable, Sendable {
     case chunkBase64 = "chunk_base64"
   }
 }
+
+public struct WsConfigPayloadWire: Codable, Equatable, Sendable {
+  public var personas: [AgentPersonaWire]
+  public var runtimeModels: [RuntimeModelCatalogWire]
+  public var acpAgents: [AcpAgentDescriptorWire]
+  public var runtimeProbe: AcpRuntimeProbeResponseWire?
+
+  public init(personas: [AgentPersonaWire], runtimeModels: [RuntimeModelCatalogWire], acpAgents: [AcpAgentDescriptorWire] = [], runtimeProbe: AcpRuntimeProbeResponseWire? = nil) {
+    self.personas = personas
+    self.runtimeModels = runtimeModels
+    self.acpAgents = acpAgents
+    self.runtimeProbe = runtimeProbe
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    personas = try container.decode([AgentPersonaWire].self, forKey: .personas)
+    runtimeModels = try container.decode([RuntimeModelCatalogWire].self, forKey: .runtimeModels)
+    acpAgents = try container.decodeIfPresent([AcpAgentDescriptorWire].self, forKey: .acpAgents) ?? []
+    runtimeProbe = try container.decodeIfPresent(AcpRuntimeProbeResponseWire.self, forKey: .runtimeProbe)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case personas
+    case runtimeModels = "runtime_models"
+    case acpAgents = "acp_agents"
+    case runtimeProbe = "runtime_probe"
+  }
+}

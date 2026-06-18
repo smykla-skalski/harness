@@ -52,7 +52,8 @@ extension HarnessMonitorAPIClient {
   }
 
   public func configuration() async throws -> MonitorConfiguration {
-    try await get("/v1/config")
+    let wire: WsConfigPayloadWire = try await get("/v1/config", decoder: PolicyWireCoding.decoder)
+    return try MonitorConfiguration(wire: wire)
   }
 
   public func logLevel() async throws -> LogLevelResponse {

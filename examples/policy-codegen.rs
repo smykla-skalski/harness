@@ -1180,6 +1180,10 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // to avoid clashing with the hand type), model_catalog reuses RuntimeModelCatalogWire.
     "AcpAgentDescriptor",
     "DoctorProbe",
+    // protocol/websocket.rs config push: Swift hand is MonitorConfiguration; the wire nests
+    // the generated AgentPersonaWire/RuntimeModelCatalogWire/AcpAgentDescriptorWire and the
+    // optional AcpRuntimeProbeResponseWire, all in this same module (no import).
+    "WsConfigPayload",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1205,11 +1209,11 @@ const SKIP_TYPES: &[&str] = &[
     "RepoKey",
     "RegistryEntry",
     "LocalCloneRegistry",
-    // websocket config/probe/inspect payloads: reference unmigrated persona,
-    // runtime-catalog and acp types (AgentPersona / RuntimeModelCatalog /
-    // AcpAgentDescriptor / AcpRuntimeProbeResponse / AcpAgentInspectResponse).
-    // Generate them with those subsystems, not the transport envelope.
-    "WsConfigPayload",
+    // websocket probe/inspect push payloads still pending: WsRuntimeProbeUpdate wraps the
+    // now-generated AcpRuntimeProbeResponse but has no decode reroute yet, and WsAcpInspect
+    // references the still-unmigrated AcpAgentInspectResponse. WsConfigPayload itself is now
+    // generated (it is the MonitorConfiguration wire - personas/runtime_models/acp_agents
+    // /runtime_probe all generated) and emits WsConfigPayloadWire into this module.
     "WsRuntimeProbeUpdate",
     "WsAcpInspect",
     // session tasks enums kept hand-authored: each has a legacy-tolerant custom
