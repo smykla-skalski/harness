@@ -1187,6 +1187,9 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // manager.rs acp inspect response: Swift hand is AcpAgentInspectResponse; its agents field
     // references the renamed AcpAgentInspectSnapshotWire (the snapshot decode struct).
     "AcpAgentInspectResponse",
+    // permission_bridge.rs acp permission item: Swift hand is AcpPermissionItem (toolCall and
+    // options modelled as raw JSON); referenced by AcpPermissionBatchWire.requests.
+    "AcpPermissionItem",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1287,6 +1290,11 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
         "AcpAgentInspectSnapshotWire",
     ),
     ("AcpAgentInspectSnapshot", "AcpAgentInspectSnapshotWire"),
+    // acp permission: the no-derive AcpPermissionBatch's owned decode struct emits as
+    // AcpPermissionBatchWire, and the external-crate PermissionOption (the app models
+    // permission options as raw JSON) maps to JSONValue. Both tokens are acp-permission only.
+    ("AcpPermissionBatchDecode", "AcpPermissionBatchWire"),
+    ("PermissionOption", "JSONValue"),
 ];
 
 /// The Swift name for a Rust wire type: a hand rename when one applies, else the
@@ -1692,6 +1700,8 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     // acp inspect snapshot: the hand AcpAgentInspectSnapshot has no transport-family field,
     // so dropping managed_agent_family (ManagedAgentKind) keeps the wire all-primitive.
     ("AcpAgentInspectSnapshotDecode", "managed_agent_family"),
+    // acp permission batch: the hand AcpPermissionBatch has no transport-family field.
+    ("AcpPermissionBatchDecode", "managed_agent_family"),
 ];
 
 /// Whether `(struct_name, field_name)` is in `OMITTED_WIRE_FIELDS`.
@@ -2310,6 +2320,18 @@ const ACP_INSPECT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit
 // primitives. available's default_acp_inspect_available -> true resolves from the manager source.
 const ACP_INSPECT_EMIT_ONLY: &[&str] =
     &["AcpAgentInspectResponse", "AcpAgentInspectSnapshotDecode"];
+const ACP_PERMISSION_ITEM_SOURCE: &str =
+    include_str!("../src/daemon/agent_acp/permission_bridge.rs");
+const ACP_PERMISSION_WIRE_SOURCE: &str =
+    include_str!("../src/daemon/agent_acp/permission_bridge/wire.rs");
+const ACP_PERMISSION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpPermissionWireTypes.generated.swift";
+// The acp permission batch/item carried by AcpAgentSnapshot.pending_permission_batches. The
+// public AcpPermissionBatch has no serde derive (borrowed-serialize), so its owned
+// AcpPermissionBatchDecode is emitted as AcpPermissionBatchWire; managed_agent_family
+// (ManagedAgentKind) is dropped. AcpPermissionItem carries its derive directly; its
+// options: Vec<PermissionOption> (external agent_client_protocol crate, the app models it as
+// raw JSON) maps to [JSONValue] via TYPE_RENAMES, and tool_call is serde_json::Value -> JSONValue.
+const ACP_PERMISSION_EMIT_ONLY: &[&str] = &["AcpPermissionItem", "AcpPermissionBatchDecode"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2535,6 +2557,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[ACP_INSPECT_MANAGER_SOURCE],
             sources: &[ACP_INSPECT_MANAGER_SOURCE, ACP_INSPECT_WIRE_SOURCE],
         },
+        GeneratedModule {
+            output: ACP_PERMISSION_OUTPUT,
+            description: "the Rust acp permission batch and item",
+            defaults: &[],
+            sources: &[ACP_PERMISSION_ITEM_SOURCE, ACP_PERMISSION_WIRE_SOURCE],
+        },
     ]
 }
 
@@ -2578,6 +2606,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         RUNTIME_MODELS_OUTPUT => RUNTIME_MODELS_EMIT_ONLY,
         ACP_DESCRIPTOR_OUTPUT => ACP_DESCRIPTOR_EMIT_ONLY,
         ACP_INSPECT_OUTPUT => ACP_INSPECT_EMIT_ONLY,
+        ACP_PERMISSION_OUTPUT => ACP_PERMISSION_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
