@@ -46,8 +46,9 @@ public struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
   public let precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
 
   public init(input: PolicyCanvasRouteWorkerInput) {
-    let nodeSizes = PolicyCanvasLayout.nodeSizes(for: input.nodes, edges: input.edges)
-    nodes = input.nodes.map { node in
+    let optimizedNodes = policyCanvasOptimizedPortOrder(nodes: input.nodes, edges: input.edges)
+    let nodeSizes = PolicyCanvasLayout.nodeSizes(for: optimizedNodes, edges: input.edges)
+    nodes = optimizedNodes.map { node in
       PolicyCanvasRouteNode(
         node: node,
         size: nodeSizes[node.id] ?? PolicyCanvasLayout.nodeSize(for: node)

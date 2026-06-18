@@ -41,7 +41,9 @@ struct PolicyCanvasGraphQualityGateTests {
 
   private struct RoutedSample {
     let report: PolicyCanvasGraphQualityReport
+    let edges: [PolicyCanvasEdge]
     let routes: [String: PolicyCanvasEdgeRoute]
+    let portMarkerLayout: PolicyCanvasPortMarkerLayout
   }
 
   /// Route a lab sample exactly the way the lab renders it (load -> reflow ->
@@ -73,7 +75,12 @@ struct PolicyCanvasGraphQualityGateTests {
       labelPositions: output.labelPositions,
       portMarkerLayout: output.portMarkerLayout
     )
-    return RoutedSample(report: report, routes: output.routes)
+    return RoutedSample(
+      report: report,
+      edges: viewModel.edges,
+      routes: output.routes,
+      portMarkerLayout: output.portMarkerLayout
+    )
   }
 
   /// Per-sample regression gate across the routine lab samples: each gated
@@ -149,6 +156,34 @@ struct PolicyCanvasGraphQualityGateTests {
       violations.isEmpty,
       """
       lab sample routes should not attach ports in crossed order
+      violations=\(violations.joined(separator: "\n"))
+      """
+    )
+  }
+
+  @Test func allSamplesKeepRouteTerminalsOnSemanticSides() async throws {
+    var violations: [String] = []
+    for sample in PolicyCanvasLabSamples.all {
+      let routed = try await routedSample(sampleID: sample.id)
+      for edge in routed.edges {
+        guard let route = routed.routes[edge.id] else {
+          violations.append("\(sample.id):\(edge.id): missing route")
+          continue
+        }
+        violations.append(
+          contentsOf: Self.semanticTerminalSideViolations(
+            sampleID: sample.id,
+            edge: edge,
+            route: route,
+            markerLayout: routed.portMarkerLayout
+          )
+        )
+      }
+    }
+    #expect(
+      violations.isEmpty,
+      """
+      lab sample route terminals should stay on left input and right output sides
       violations=\(violations.joined(separator: "\n"))
       """
     )
@@ -484,6 +519,53 @@ struct PolicyCanvasGraphQualityGateTests {
       .map { key, violations in "\(key)=\(violations.count)" }
       .sorted()
       .joined(separator: ",")
+  }
+
+  private static func semanticTerminalSideViolations(
+    sampleID: String,
+    edge: PolicyCanvasEdge,
+    route: PolicyCanvasEdgeRoute,
+    markerLayout: PolicyCanvasPortMarkerLayout
+  ) -> [String] {
+    [
+      semanticTerminalSideViolation(
+        sampleID: sampleID,
+        edge: edge,
+        role: .source,
+        route: route,
+        markerLayout: markerLayout
+      ),
+      semanticTerminalSideViolation(
+        sampleID: sampleID,
+        edge: edge,
+        role: .target,
+        route: route,
+        markerLayout: markerLayout
+      ),
+    ].compactMap { $0 }
+  }
+
+  private static func semanticTerminalSideViolation(
+    sampleID: String,
+    edge: PolicyCanvasEdge,
+    role: PolicyCanvasRouteEndpointRole,
+    route: PolicyCanvasEdgeRoute,
+    markerLayout: PolicyCanvasPortMarkerLayout
+  ) -> String? {
+    let endpoint = role == .source ? edge.source : edge.target
+    let routeSide =
+      role == .source ? policyCanvasRouteSourceSide(route) : policyCanvasRouteTargetSide(route)
+    let expectedSide = policyCanvasResolvedPortSide(for: endpoint)
+    let markerSide = markerLayout.terminal(edgeID: edge.id, role: role)?.side
+    guard routeSide != expectedSide || markerSide != expectedSide else {
+      return nil
+    }
+    return [
+      "\(sampleID):\(edge.id):\(role)",
+      "routeSide=\(String(describing: routeSide))",
+      "markerSide=\(String(describing: markerSide))",
+      "expected=\(expectedSide)",
+    ].joined(separator: " ")
   }
 
   private static func bodyHitDetail(_ report: PolicyCanvasGraphQualityReport) -> String {

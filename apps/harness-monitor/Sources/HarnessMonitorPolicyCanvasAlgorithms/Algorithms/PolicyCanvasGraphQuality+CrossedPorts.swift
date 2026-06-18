@@ -77,7 +77,7 @@ func policyCanvasMeasureCrossedPorts(
           // collinear swap the intersection test cannot see). Either counts.
           let properCross =
             lower.isMonotonic && upper.isMonotonic
-            && policyCanvasRoutesCross(lower.points, upper.points, tolerance: tolerance)
+            && policyCanvasRoutesCrossNearTerminals(lower, upper, tolerance: tolerance)
           let channelSwap = policyCanvasRoutesSwapInSharedChannel(
             lower, upper, horizontalSide: horizontalSide, tolerance: tolerance
           )
@@ -250,23 +250,39 @@ private func policyCanvasRouteSegments(_ points: [CGPoint]) -> [(CGPoint, CGPoin
 /// than `tolerance` from either polyline's own endpoints. The endpoint guard drops
 /// the fan-in convergence near the shared node, where neighbouring wires crowd but
 /// do not tangle, so only a genuine crossing between the ports counts.
-private func policyCanvasRoutesCross(
-  _ a: [CGPoint],
-  _ b: [CGPoint],
+private func policyCanvasRoutesCrossNearTerminals(
+  _ lower: PolicyCanvasSideTerminal,
+  _ upper: PolicyCanvasSideTerminal,
   tolerance: CGFloat
 ) -> Bool {
-  let endpoints = [a.first, a.last, b.first, b.last].compactMap { $0 }
-  guard a.count >= 2, b.count >= 2 else {
+  let lowerPoints = lower.points
+  let upperPoints = upper.points
+  let endpoints = [lowerPoints.first, lowerPoints.last, upperPoints.first, upperPoints.last]
+    .compactMap { $0 }
+  guard lowerPoints.count >= 2, upperPoints.count >= 2 else {
     return false
   }
-  for indexA in 1..<a.count {
-    for indexB in 1..<b.count {
+  let terminalReach =
+    PolicyCanvasLayout.edgePortTurnMinimumLead + PolicyCanvasLayout.defaultEdgeLineSpacing
+  for indexA in 1..<lowerPoints.count {
+    for indexB in 1..<upperPoints.count {
       guard
-        let point = policyCanvasSegmentCrossing(a[indexA - 1], a[indexA], b[indexB - 1], b[indexB])
+        let point = policyCanvasSegmentCrossing(
+          lowerPoints[indexA - 1],
+          lowerPoints[indexA],
+          upperPoints[indexB - 1],
+          upperPoints[indexB]
+        )
       else {
         continue
       }
       if endpoints.contains(where: { hypot($0.x - point.x, $0.y - point.y) < tolerance }) {
+        continue
+      }
+      guard
+        hypot(lower.point.x - point.x, lower.point.y - point.y) <= terminalReach
+          || hypot(upper.point.x - point.x, upper.point.y - point.y) <= terminalReach
+      else {
         continue
       }
       return true

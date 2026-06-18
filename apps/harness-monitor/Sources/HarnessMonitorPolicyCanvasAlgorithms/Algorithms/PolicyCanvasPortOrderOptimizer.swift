@@ -22,19 +22,22 @@ public func policyCanvasOptimizedPortOrder(
     return nodes
   }
   let framesByID = policyCanvasNodeFramesByID(nodes: nodes, edges: edges)
+  let nodesByID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
   var signals: [PolicyCanvasPortOrderNodeKindKey: [String: [PolicyCanvasPortSide: [CGFloat]]]] =
     [:]
   signals.reserveCapacity(nodes.count * 2)
   for edge in edges {
     registerPortOrderSignal(
       endpoint: edge.source,
-      farNodeID: edge.target.nodeID,
+      farEndpoint: edge.target,
+      nodesByID: nodesByID,
       framesByID: framesByID,
       signals: &signals
     )
     registerPortOrderSignal(
       endpoint: edge.target,
-      farNodeID: edge.source.nodeID,
+      farEndpoint: edge.source,
+      nodesByID: nodesByID,
       framesByID: framesByID,
       signals: &signals
     )
@@ -59,17 +62,26 @@ public func policyCanvasOptimizedPortOrder(
 
 private func registerPortOrderSignal(
   endpoint: PolicyCanvasPortEndpoint,
-  farNodeID: String,
+  farEndpoint: PolicyCanvasPortEndpoint,
+  nodesByID: [String: PolicyCanvasNode],
   framesByID: [String: CGRect],
   signals: inout [PolicyCanvasPortOrderNodeKindKey: [String: [PolicyCanvasPortSide: [CGFloat]]]]
 ) {
-  guard let farFrame = framesByID[farNodeID] else {
+  guard let farFrame = framesByID[farEndpoint.nodeID] else {
     return
   }
   let side = policyCanvasResolvedPortSide(for: endpoint)
   let key = PolicyCanvasPortOrderNodeKindKey(nodeID: endpoint.nodeID, kind: endpoint.kind.rawValue)
+  let axis =
+    portOrderAxis(
+      side: side,
+      farEndpoint: farEndpoint,
+      nodesByID: nodesByID,
+      framesByID: framesByID
+    )
+    ?? portOrderAxis(side: side, farFrame: farFrame)
   signals[key, default: [:]][endpoint.portID, default: [:]][side, default: []].append(
-    portOrderAxis(side: side, farFrame: farFrame)
+    axis
   )
 }
 
@@ -310,5 +322,66 @@ private func portOrderAxis(side: PolicyCanvasPortSide, farFrame: CGRect) -> CGFl
     farFrame.midY
   case .top, .bottom:
     farFrame.midX
+  }
+}
+
+private func portOrderAxis(
+  side: PolicyCanvasPortSide,
+  farEndpoint: PolicyCanvasPortEndpoint,
+  nodesByID: [String: PolicyCanvasNode],
+  framesByID: [String: CGRect]
+) -> CGFloat? {
+  guard
+    let farNode = nodesByID[farEndpoint.nodeID],
+    let farFrame = framesByID[farEndpoint.nodeID]
+  else {
+    return nil
+  }
+  let ports = farEndpoint.kind == .input ? farNode.inputPorts : farNode.outputPorts
+  guard let index = ports.firstIndex(where: { $0.id == farEndpoint.portID }) else {
+    return nil
+  }
+  let farSide = policyCanvasResolvedPortSide(for: farEndpoint)
+  let point = portOrderAnchorPoint(
+    frame: farFrame,
+    side: farSide,
+    index: index,
+    count: ports.count
+  )
+  switch side {
+  case .leading, .trailing:
+    return point.y
+  case .top, .bottom:
+    return point.x
+  }
+}
+
+private func portOrderAnchorPoint(
+  frame: CGRect,
+  side: PolicyCanvasPortSide,
+  index: Int,
+  count: Int
+) -> CGPoint {
+  switch side {
+  case .leading:
+    CGPoint(
+      x: frame.minX,
+      y: frame.minY + PolicyCanvasLayout.portY(index: index, count: count, nodeHeight: frame.height)
+    )
+  case .trailing:
+    CGPoint(
+      x: frame.maxX,
+      y: frame.minY + PolicyCanvasLayout.portY(index: index, count: count, nodeHeight: frame.height)
+    )
+  case .top:
+    CGPoint(
+      x: frame.minX + PolicyCanvasLayout.portX(index: index, count: count, nodeWidth: frame.width),
+      y: frame.minY
+    )
+  case .bottom:
+    CGPoint(
+      x: frame.minX + PolicyCanvasLayout.portX(index: index, count: count, nodeWidth: frame.width),
+      y: frame.maxY
+    )
   }
 }
