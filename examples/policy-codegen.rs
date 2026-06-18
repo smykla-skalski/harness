@@ -1175,6 +1175,11 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // /RuntimeModel; tier (RuntimeModelTier) and effort family (EffortKind) reference bare.
     "RuntimeModelCatalog",
     "RuntimeModel",
+    // agents/acp/catalog/mod.rs descriptor: Swift hands are AcpAgentDescriptor and
+    // AcpDoctorProbe; DoctorProbe takes the suffix (the map renames it to AcpDoctorProbe
+    // to avoid clashing with the hand type), model_catalog reuses RuntimeModelCatalogWire.
+    "AcpAgentDescriptor",
+    "DoctorProbe",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1262,6 +1267,10 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // enum replaces the hand one in place. No generated module references AgentMode
     // as a field type yet, so the rename is scoped to the enums module.
     ("AgentMode", "TaskBoardAgentMode"),
+    // acp catalog/tags.rs: CapabilityTag is `type CapabilityTag = String`, so the
+    // descriptor's `capabilities: Vec<CapabilityTag>` field is `[String]` (the app
+    // hand already types it as [String]). The token only appears in that field.
+    ("CapabilityTag", "String"),
 ];
 
 /// The Swift name for a Rust wire type: a hand rename when one applies, else the
@@ -1659,6 +1668,11 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     ("DispatchExecutionSummary", "failures"),
     ("DispatchPlan", "lifecycle"),
     ("DispatchAppliedTask", "lifecycle"),
+    // acp descriptor daemon-only injection config: the app does not model how the
+    // daemon maps model/effort onto ACP startup, so these (and their tagged
+    // AcpSpawnConfiguration / transport sub-enums) never cross to Swift.
+    ("AcpAgentDescriptor", "spawn_configuration"),
+    ("AcpAgentDescriptor", "session_configuration"),
 ];
 
 /// Whether `(struct_name, field_name)` is in `OMITTED_WIRE_FIELDS`.
@@ -2256,6 +2270,14 @@ const RUNTIME_MODELS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitor
 // with explicit snake_case raw values, so the wire references them bare; the effort_kind
 // default resolves to .none via the same-file defaults source.
 const RUNTIME_MODELS_EMIT_ONLY: &[&str] = &["RuntimeModelCatalog", "RuntimeModel"];
+const ACP_DESCRIPTOR_SOURCE: &str = include_str!("../src/agents/acp/catalog/mod.rs");
+const ACP_DESCRIPTOR_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpAgentDescriptorWireTypes.generated.swift";
+// The acp agent descriptor (catalog/mod.rs) backing MonitorConfiguration.acpAgents. The
+// daemon-only spawn_configuration/session_configuration fields (their AcpSpawnConfiguration
+// /transport sub-enums are not modelled by the app) are dropped via OMITTED_WIRE_FIELDS, so
+// the allow-list need only emit the descriptor and its DoctorProbe; model_catalog reuses the
+// RuntimeModelCatalogWire and capabilities is the CapabilityTag = String alias (TYPE_RENAMES).
+const ACP_DESCRIPTOR_EMIT_ONLY: &[&str] = &["AcpAgentDescriptor", "DoctorProbe"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2469,6 +2491,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[RUNTIME_MODELS_SOURCE],
             sources: &[RUNTIME_MODELS_SOURCE],
         },
+        GeneratedModule {
+            output: ACP_DESCRIPTOR_OUTPUT,
+            description: "the Rust acp agent descriptor and its doctor probe",
+            defaults: &[ACP_DESCRIPTOR_SOURCE],
+            sources: &[ACP_DESCRIPTOR_SOURCE],
+        },
     ]
 }
 
@@ -2510,6 +2538,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         ACP_PROBE_OUTPUT => ACP_PROBE_EMIT_ONLY,
         AGENT_PERSONA_OUTPUT => AGENT_PERSONA_EMIT_ONLY,
         RUNTIME_MODELS_OUTPUT => RUNTIME_MODELS_EMIT_ONLY,
+        ACP_DESCRIPTOR_OUTPUT => ACP_DESCRIPTOR_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
