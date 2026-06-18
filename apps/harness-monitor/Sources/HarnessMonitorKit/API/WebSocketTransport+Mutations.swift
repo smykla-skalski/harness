@@ -230,7 +230,10 @@ extension WebSocketTransport {
     sessionID: String,
     request: AgentTuiStartRequest
   ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: sessionScopeParams(sessionID: sessionID))
+    let params = try encodeParams(
+      AgentTuiStartRequestWire(request),
+      extra: sessionScopeParams(sessionID: sessionID)
+    )
     let value = try await rpc(method: .managedAgentStartTerminal, params: params)
     let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
     return try ManagedAgentSnapshot(wire: wire)
@@ -240,7 +243,10 @@ extension WebSocketTransport {
     sessionID: String,
     request: CodexRunRequest
   ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: sessionScopeParams(sessionID: sessionID))
+    let params = try encodeParams(
+      CodexRunRequestWire(request),
+      extra: sessionScopeParams(sessionID: sessionID)
+    )
     let value = try await rpc(method: .managedAgentStartCodex, params: params)
     let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
     return try ManagedAgentSnapshot(wire: wire)
@@ -270,7 +276,10 @@ extension WebSocketTransport {
     agentID: String,
     request: AgentTuiResizeRequest
   ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: managedAgentParams(agentID: agentID))
+    let params = try encodeParams(
+      AgentTuiResizeRequestWire(request),
+      extra: managedAgentParams(agentID: agentID)
+    )
     let value = try await rpc(method: .managedAgentResize, params: params)
     let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
     return try ManagedAgentSnapshot(wire: wire)
@@ -309,7 +318,10 @@ extension WebSocketTransport {
     agentID: String,
     request: CodexSteerRequest
   ) async throws -> ManagedAgentSnapshot {
-    let params = try encodeParams(request, extra: managedAgentParams(agentID: agentID))
+    let params = try encodeParams(
+      CodexSteerRequestWire(request),
+      extra: managedAgentParams(agentID: agentID)
+    )
     let value = try await rpc(method: .managedAgentSteerCodex, params: params)
     let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
     return try ManagedAgentSnapshot(wire: wire)
@@ -330,7 +342,7 @@ extension WebSocketTransport {
     request: CodexApprovalDecisionRequest
   ) async throws -> ManagedAgentSnapshot {
     let params = try encodeParams(
-      request,
+      CodexApprovalDecisionRequestWire(request),
       extra: managedAgentParams(agentID: agentID).merging(
         ["approval_id": .string(approvalID)]
       ) { _, newValue in newValue }

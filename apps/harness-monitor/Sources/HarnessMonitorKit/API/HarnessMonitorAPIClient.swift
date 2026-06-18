@@ -244,7 +244,8 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     request: AgentTuiStartRequest
   ) async throws -> ManagedAgentSnapshot {
     let wire: ManagedAgentSnapshotWire = try await post(
-      "/v1/sessions/\(sessionID)/managed-agents/terminal", body: request,
+      "/v1/sessions/\(sessionID)/managed-agents/terminal",
+      body: AgentTuiStartRequestWire(request),
       decoder: PolicyWireCoding.decoder
     )
     return try ManagedAgentSnapshot(wire: wire)
@@ -255,7 +256,8 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     request: CodexRunRequest
   ) async throws -> ManagedAgentSnapshot {
     let wire: ManagedAgentSnapshotWire = try await post(
-      "/v1/sessions/\(sessionID)/managed-agents/codex", body: request,
+      "/v1/sessions/\(sessionID)/managed-agents/codex",
+      body: CodexRunRequestWire(request),
       decoder: PolicyWireCoding.decoder
     )
     return try ManagedAgentSnapshot(wire: wire)
@@ -276,7 +278,9 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     request: AgentTuiResizeRequest
   ) async throws -> ManagedAgentSnapshot {
     let wire: ManagedAgentSnapshotWire = try await post(
-      "/v1/managed-agents/\(agentID)/resize", body: request, decoder: PolicyWireCoding.decoder
+      "/v1/managed-agents/\(agentID)/resize",
+      body: AgentTuiResizeRequestWire(request),
+      decoder: PolicyWireCoding.decoder
     )
     return try ManagedAgentSnapshot(wire: wire)
   }
@@ -293,7 +297,9 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     request: CodexSteerRequest
   ) async throws -> ManagedAgentSnapshot {
     let wire: ManagedAgentSnapshotWire = try await post(
-      "/v1/managed-agents/\(agentID)/steer", body: request, decoder: PolicyWireCoding.decoder
+      "/v1/managed-agents/\(agentID)/steer",
+      body: CodexSteerRequestWire(request),
+      decoder: PolicyWireCoding.decoder
     )
     return try ManagedAgentSnapshot(wire: wire)
   }
@@ -312,7 +318,8 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     request: CodexApprovalDecisionRequest
   ) async throws -> ManagedAgentSnapshot {
     let wire: ManagedAgentSnapshotWire = try await post(
-      "/v1/managed-agents/\(agentID)/approvals/\(approvalID)", body: request,
+      "/v1/managed-agents/\(agentID)/approvals/\(approvalID)",
+      body: CodexApprovalDecisionRequestWire(request),
       decoder: PolicyWireCoding.decoder
     )
     return try ManagedAgentSnapshot(wire: wire)
