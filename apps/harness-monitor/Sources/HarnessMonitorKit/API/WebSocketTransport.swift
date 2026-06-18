@@ -157,7 +157,8 @@ extension WebSocketTransport {
 
   public func health() async throws -> HealthResponse {
     let value = try await rpc(method: .health)
-    return try decode(value)
+    let wire: HealthResponseWire = try decodePolicyWire(value)
+    return HealthResponse(wire: wire)
   }
 
   public func diagnostics() async throws -> DaemonDiagnosticsReport {
@@ -168,7 +169,8 @@ extension WebSocketTransport {
 
   public func githubStatus() async throws -> GitHubApiDiagnostics {
     let value = try await rpc(method: .githubStatus)
-    return try decode(value)
+    let wire: GitHubApiDiagnosticsWire = try decodePolicyWire(value)
+    return GitHubApiDiagnostics(wire: wire)
   }
 
   public func stopDaemon() async throws -> DaemonControlResponse {

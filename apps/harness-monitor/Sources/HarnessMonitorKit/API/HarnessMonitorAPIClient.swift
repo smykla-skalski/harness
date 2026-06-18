@@ -31,7 +31,10 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   }
 
   public func health() async throws -> HealthResponse {
-    try await get("/v1/health")
+    let wire: HealthResponseWire = try await get(
+      "/v1/health", decoder: PolicyWireCoding.decoder
+    )
+    return HealthResponse(wire: wire)
   }
 
   public func diagnostics() async throws -> DaemonDiagnosticsReport {
@@ -42,7 +45,10 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   }
 
   public func githubStatus() async throws -> GitHubApiDiagnostics {
-    try await get("/v1/github/status")
+    let wire: GitHubApiDiagnosticsWire = try await get(
+      "/v1/github/status", decoder: PolicyWireCoding.decoder
+    )
+    return GitHubApiDiagnostics(wire: wire)
   }
 
   public func stopDaemon() async throws -> DaemonControlResponse {
