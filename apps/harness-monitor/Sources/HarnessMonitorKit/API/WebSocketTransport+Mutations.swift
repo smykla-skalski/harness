@@ -136,7 +136,7 @@ extension WebSocketTransport {
   public func startSession(request: SessionStartRequest) async throws -> SessionStartResult {
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .sessionStart, params: params)
-    let response: SessionStartMutationResponse = try decode(value)
+    let response: SessionStartMutationResponse = try decodePolicyWire(value)
     return response.result
   }
 
@@ -144,7 +144,7 @@ extension WebSocketTransport {
     bookmarkID: String?,
     sessionRoot: URL
   ) async throws -> SessionSummary {
-    struct Response: Decodable { let state: SessionSummary }
+    struct Response: Decodable { let state: SessionSummaryWire }
 
     let request = AdoptSessionRequest(
       bookmarkID: bookmarkID,
@@ -152,8 +152,8 @@ extension WebSocketTransport {
     )
     let params = try encodeParams(request, extra: [:])
     let value = try await rpc(method: .sessionAdopt, params: params)
-    let response: Response = try decode(value)
-    return response.state
+    let response: Response = try decodePolicyWire(value)
+    return SessionSummary(wire: response.state)
   }
 
   public func endSession(

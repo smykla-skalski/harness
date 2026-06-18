@@ -50,6 +50,12 @@ public struct SessionStartResult: Equatable, Sendable {
 struct SessionStartMutationResponse: Decodable, Sendable {
   struct State: Decodable, Sendable {
     let sessionId: String
+
+    // The daemon returns the full session state object; the app only needs its id. Pin the snake
+    // key so this minimal extractor decodes through the plain wire decoder too.
+    enum CodingKeys: String, CodingKey {
+      case sessionId = "session_id"
+    }
   }
 
   let state: State

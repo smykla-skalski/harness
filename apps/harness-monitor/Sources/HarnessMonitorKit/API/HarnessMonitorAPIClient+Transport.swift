@@ -322,7 +322,8 @@ extension HarnessMonitorAPIClient {
     isTrailingFrame: Bool = false
   ) throws {
     do {
-      let event = try decoder.decode(StreamEvent.self, from: Data(data.utf8))
+      let wire = try PolicyWireCoding.decoder.decode(StreamEventWire.self, from: Data(data.utf8))
+      let event = StreamEvent(wire: wire)
       continuation.yield(try DaemonPushEvent(streamEvent: event))
     } catch {
       logMalformedStreamFrame(

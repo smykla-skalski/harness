@@ -36,6 +36,18 @@ extension TimelineCursor {
   }
 }
 
+// The SSE push envelope (stream parse path). Thin mirror; the hand model keeps its UI stableID.
+extension StreamEvent {
+  init(wire: StreamEventWire) {
+    self.init(
+      event: wire.event,
+      recordedAt: wire.recordedAt,
+      sessionId: wire.sessionId,
+      payload: wire.payload
+    )
+  }
+}
+
 extension TimelineWindowResponse {
   init(wire: TimelineWindowResponseWire) {
     self.init(

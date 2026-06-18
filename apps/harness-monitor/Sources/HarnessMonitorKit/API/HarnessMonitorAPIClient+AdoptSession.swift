@@ -42,9 +42,9 @@ extension HarnessMonitorAPIClient {
       )
     }
 
-    struct Response: Decodable { let state: SessionSummary }
-    let decoded: Response = try decoder.decode(Response.self, from: data)
-    return decoded.state
+    struct Response: Decodable { let state: SessionSummaryWire }
+    let decoded: Response = try PolicyWireCoding.decoder.decode(Response.self, from: data)
+    return SessionSummary(wire: decoded.state)
   }
 
   // Parses adopt-specific error shapes from raw response data before field stripping.
