@@ -1167,6 +1167,10 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // /AcpRuntimeProbe (thin mirrors); the probe references AcpAuthState bare.
     "AcpRuntimeProbeResponse",
     "AcpRuntimeProbe",
+    // session/types/agents.rs persona: Swift hands are AgentPersona/PersonaSymbol; the
+    // symbol is the internally-tagged sf_symbol/asset enum.
+    "AgentPersona",
+    "PersonaSymbol",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -2233,6 +2237,13 @@ const ACP_PROBE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/M
 // bare (the hand Swift enum) rather than suffixed. The probe-cache internals carry no
 // serde derive, so the allow-list keeps them out of the emit builders.
 const ACP_PROBE_EMIT_ONLY: &[&str] = &["AcpRuntimeProbeResponse", "AcpRuntimeProbe"];
+const AGENT_PERSONA_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentPersonaWireTypes.generated.swift";
+// The persona definition (agents.rs) backing the MonitorConfiguration.personas field.
+// PersonaSymbol is internally tagged on "type" (sf_symbol/asset, both newtype-shaped
+// `{ name }` variants) and emits as a Swift enum with associated values. The allow-list
+// keeps the try_from/untagged agents.rs types (AgentRegistration/AgentStatus) out of the
+// emit builders - the same file already parses for the session-state module.
+const AGENT_PERSONA_EMIT_ONLY: &[&str] = &["AgentPersona", "PersonaSymbol"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2434,6 +2445,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[ACP_PROBE_SOURCE],
         },
+        GeneratedModule {
+            output: AGENT_PERSONA_OUTPUT,
+            description: "the Rust agent persona definition and its symbol",
+            defaults: &[],
+            sources: &[SESSION_AGENTS_SOURCE],
+        },
     ]
 }
 
@@ -2473,6 +2490,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         TASK_BOARD_EVALUATION_OUTPUT => TASK_BOARD_EVALUATION_EMIT_ONLY,
         TASK_BOARD_DISPATCH_OUTPUT => TASK_BOARD_DISPATCH_EMIT_ONLY,
         ACP_PROBE_OUTPUT => ACP_PROBE_EMIT_ONLY,
+        AGENT_PERSONA_OUTPUT => AGENT_PERSONA_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
