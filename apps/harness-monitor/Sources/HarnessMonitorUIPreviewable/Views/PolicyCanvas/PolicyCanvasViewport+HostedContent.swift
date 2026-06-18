@@ -64,7 +64,7 @@ struct PolicyCanvasViewportHostedContent: View {
       labelPositions: snapshot.labelPositions,
       portMarkerLayout: snapshot.portMarkerLayout,
       routeSignature: snapshot.routeSignature,
-      isEnabled: showsQualityInspection,
+      isEnabled: showsQualityInspection && snapshot.hasRenderableRouteOutput,
       resolvedCanvasColorScheme: resolvedCanvasColorScheme
     )
   }

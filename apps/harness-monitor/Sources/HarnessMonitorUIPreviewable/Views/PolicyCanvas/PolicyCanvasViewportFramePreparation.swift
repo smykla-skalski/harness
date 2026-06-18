@@ -47,6 +47,7 @@ struct PolicyCanvasViewportHostedSnapshotInput {
   let nodeValidationIssueMessagesByID: [String: String]
   let resolvedCanvasColorScheme: ColorScheme?
   let showSimulationOverlay: Bool
+  let hasRenderableRouteOutput: Bool
   let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   let requestKeyboardFocus: @MainActor () -> Void
 }
@@ -72,6 +73,7 @@ func policyCanvasViewportHostedSnapshot(
     contentSize: input.routeOutput.contentSize,
     resolvedCanvasColorScheme: input.resolvedCanvasColorScheme,
     showSimulationOverlay: input.showSimulationOverlay,
+    hasRenderableRouteOutput: input.hasRenderableRouteOutput,
     openEditor: input.openEditor,
     requestKeyboardFocus: input.requestKeyboardFocus
   )

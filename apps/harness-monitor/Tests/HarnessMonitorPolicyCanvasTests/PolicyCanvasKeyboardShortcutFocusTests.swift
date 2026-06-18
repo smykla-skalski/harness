@@ -282,6 +282,7 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
       contentSize: routeOutput.contentSize,
       resolvedCanvasColorScheme: nil,
       showSimulationOverlay: false,
+      hasRenderableRouteOutput: routeOutput.signature != .empty,
       openEditor: { _ in },
       requestKeyboardFocus: requestKeyboardFocus
     )

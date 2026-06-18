@@ -70,14 +70,15 @@ struct PolicyCanvasAlgorithmSelectionTests {
     #expect(output.labelPositions["edge-source-gate"] != nil)
   }
 
-  @Test("workspace renders provisional routes while worker catches up")
-  func workspaceRendersProvisionalRoutesWhileWorkerCatchesUp() throws {
+  @Test("workspace does not render synthetic routes while worker catches up")
+  func workspaceDoesNotRenderSyntheticRoutesWhileWorkerCatchesUp() throws {
     let source =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
 
-    #expect(source.contains("let provisionalRouteOutput ="))
-    #expect(source.contains("policyCanvasProvisionalRouteOutput("))
-    #expect(source.contains("let routeOutput = provisionalRouteOutput ?? projectedRouteResult.output"))
+    #expect(!source.contains("PolicyCanvasRouteWorkerOutput.fallback("))
+    #expect(!source.contains("policyCanvasProvisionalRouteOutput("))
+    #expect(!source.contains("policyCanvasNodeBoundsPlaceholderOutput("))
+    #expect(source.contains("let routeOutput = projectedRouteResult.output"))
     #expect(source.contains("let routeOutputIsCurrentGraphMissing ="))
     #expect(source.contains("guard routeOutputNeedsRefresh else { return }"))
   }

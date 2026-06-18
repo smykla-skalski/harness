@@ -1,6 +1,20 @@
 import CoreGraphics
 import HarnessMonitorPolicyCanvasAlgorithms
 
+struct PolicyCanvasViewportRouteSeed: Equatable {
+  let id: String
+  let routeKey: PolicyCanvasRouteWorkerKey
+  let pipelineIdentity: String?
+  let output: PolicyCanvasRouteWorkerOutput
+  let nodePositionsByID: [String: CGPoint]
+}
+
+struct PolicyCanvasViewportResolvedRouteCache {
+  let appliedRouteKey: PolicyCanvasRouteWorkerKey?
+  let output: PolicyCanvasRouteWorkerOutput
+  let nodePositionsByID: [String: CGPoint]
+}
+
 struct PolicyCanvasViewportRouteCache {
   var worker = PolicyCanvasRouteWorker()
   var generation: UInt64 = 0
@@ -43,4 +57,35 @@ struct PolicyCanvasViewportRouteCache {
     }
     appliedRouteKey = routeKey
   }
+}
+
+func policyCanvasViewportResolvedRouteCache(
+  routeCache: PolicyCanvasViewportRouteCache,
+  routeKey: PolicyCanvasRouteWorkerKey,
+  pipelineIdentity: String?,
+  routeSeed: PolicyCanvasViewportRouteSeed?
+) -> PolicyCanvasViewportResolvedRouteCache {
+  if let routeSeed,
+    routeSeed.routeKey == routeKey,
+    routeSeed.pipelineIdentity == pipelineIdentity
+  {
+    return PolicyCanvasViewportResolvedRouteCache(
+      appliedRouteKey: routeSeed.routeKey,
+      output: routeSeed.output,
+      nodePositionsByID: routeSeed.nodePositionsByID
+    )
+  }
+
+  guard routeCache.cachedCanvasIdentity == pipelineIdentity else {
+    return PolicyCanvasViewportResolvedRouteCache(
+      appliedRouteKey: nil,
+      output: .empty,
+      nodePositionsByID: [:]
+    )
+  }
+  return PolicyCanvasViewportResolvedRouteCache(
+    appliedRouteKey: routeCache.appliedRouteKey,
+    output: routeCache.cachedOutput,
+    nodePositionsByID: routeCache.cachedNodePositionsByID
+  )
 }

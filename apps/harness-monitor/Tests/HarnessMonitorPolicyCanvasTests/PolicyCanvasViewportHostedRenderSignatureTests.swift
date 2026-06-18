@@ -206,6 +206,7 @@ struct PolicyCanvasViewportHostedRenderSignatureTests {
       contentSize: output.contentSize,
       resolvedCanvasColorScheme: resolvedCanvasColorScheme,
       showSimulationOverlay: showSimulationOverlay,
+      hasRenderableRouteOutput: output.signature != .empty,
       openEditor: { _ in },
       requestKeyboardFocus: {}
     )

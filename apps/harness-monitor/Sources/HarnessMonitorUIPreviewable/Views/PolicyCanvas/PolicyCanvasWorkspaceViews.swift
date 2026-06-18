@@ -20,6 +20,8 @@ struct PolicyCanvasViewport: View {
   var canvasColorSchemeOverride: ColorScheme?
   var showsEdgeLegend = true
   var showsQualityInspection = false
+  var routeSeed: PolicyCanvasViewportRouteSeed?
+  var onFinalRouteOutputReady: @MainActor () -> Void = {}
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var layoutFocusDispatcher = PolicyCanvasLayoutFocusDispatcher()
   @State private var saveFocusDispatcher = PolicyCanvasSaveFocusDispatcher()
@@ -79,10 +81,6 @@ struct PolicyCanvasViewport: View {
 
   var body: some View {
     let routeCacheIdentity = viewModel.pipelineIdentity
-    let routeCacheMatchesCanvas = routeCache.cachedCanvasIdentity == routeCacheIdentity
-    let cachedOutput = routeCacheMatchesCanvas ? routeCache.cachedOutput : .empty
-    let cachedNodePositionsByID =
-      routeCacheMatchesCanvas ? routeCache.cachedNodePositionsByID : [:]
     let nodeValidationIssueMessagesByID = viewModel.nodeValidationIssueMessagesByID
     GeometryReader { proxy in
       let nodes = viewModel.nodes
@@ -95,7 +93,16 @@ struct PolicyCanvasViewport: View {
         edges: edges,
         fontScale: fontScale
       )
-      let routeKeyIsStale = routeCache.appliedRouteKey != routeKey
+      let resolvedRouteCache = policyCanvasViewportResolvedRouteCache(
+        routeCache: routeCache,
+        routeKey: routeKey,
+        pipelineIdentity: routeCacheIdentity,
+        routeSeed: routeSeed
+      )
+      let cachedOutput = resolvedRouteCache.output
+      let cachedNodePositionsByID = resolvedRouteCache.nodePositionsByID
+      let appliedRouteKey = resolvedRouteCache.appliedRouteKey
+      let routeKeyIsStale = appliedRouteKey != routeKey
       let hasActivePositionDrag = viewModel.hasActivePositionDrag
       let projectedRouteResult = policyCanvasProjectedRouteResult(
         input: PolicyCanvasProjectedRouteInput(
@@ -111,20 +118,11 @@ struct PolicyCanvasViewport: View {
         routeKeyIsStale && projectedRouteResult.canCommitAsCurrentGraph
       let routeOutputIsCurrentGraphMissing =
         !viewModel.isEmpty && projectedRouteResult.output.signature == .empty
-      let provisionalRouteOutput =
-        routeOutputIsCurrentGraphMissing
-        ? policyCanvasProvisionalRouteOutput(
-          graphGeneration: viewModel.routeComputationGeneration,
-          nodes: nodes,
-          groups: groups,
-          edges: edges,
-          fontScale: fontScale,
-          routingHints: viewModel.routingHints,
-          precomputedRoutes: viewModel.precomputedRoutes,
-          algorithmSelection: viewModel.algorithmSelection
-        )
-        : nil
-      let routeOutput = provisionalRouteOutput ?? projectedRouteResult.output
+      let routeOutput = projectedRouteResult.output
+      let finalRouteOutputReady =
+        !viewModel.isEmpty && !routeKeyIsStale && routeOutput.signature != .empty
+      let hasRenderableRouteOutput =
+        viewModel.isEmpty || finalRouteOutputReady
       let routeOutputNeedsRefresh =
         !hasActivePositionDrag
         && (routeOutputIsCurrentGraphMissing || (routeKeyIsStale && !routeProjectionCanCommit))
@@ -136,7 +134,7 @@ struct PolicyCanvasViewport: View {
       )
       let centeringRouteState = PolicyCanvasViewportCenteringRouteState(
         currentRouteKey: routeKey,
-        appliedRouteKey: routeCache.appliedRouteKey,
+        appliedRouteKey: appliedRouteKey,
         routeOutputSignature: routeOutput.signature,
         viewportCenteringGeneration: viewModel.viewportCenteringGeneration
       )
@@ -149,6 +147,7 @@ struct PolicyCanvasViewport: View {
           nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
           resolvedCanvasColorScheme: resolvedCanvasColorScheme,
           showSimulationOverlay: showSimulationOverlay,
+          hasRenderableRouteOutput: hasRenderableRouteOutput,
           openEditor: openEditor,
           requestKeyboardFocus: requestKeyboardFocus
         )
@@ -212,8 +211,7 @@ struct PolicyCanvasViewport: View {
         await centerViewportAfterRouteStateSettles(
           viewportSize: proxy.size,
           routeOutput: routeOutput,
-          currentRouteKey: routeKey,
-          routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphMissing
+          currentRouteKey: routeKey
         )
       }
       .onChange(of: routeOutput.signature, initial: false) {
@@ -257,6 +255,31 @@ struct PolicyCanvasViewport: View {
           output: routeOutput,
           nodePositionsByID: policyCanvasNodePositionsByID(nodes)
         )
+      }
+      .task(id: routeSeed?.id) {
+        guard
+          let routeSeed,
+          routeSeed.routeKey == routeKey,
+          routeSeed.pipelineIdentity == routeCacheIdentity
+        else {
+          return
+        }
+        updateCachedRoutes(
+          routeKey: routeSeed.routeKey,
+          pipelineIdentity: routeSeed.pipelineIdentity,
+          output: routeSeed.output,
+          nodePositionsByID: routeSeed.nodePositionsByID
+        )
+      }
+      .task(id: finalRouteOutputReady) {
+        guard finalRouteOutputReady else {
+          return
+        }
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        guard !Task.isCancelled else {
+          return
+        }
+        onFinalRouteOutputReady()
       }
       .onChange(of: scenePhase) { _, newPhase in
         if newPhase != ScenePhase.active {
@@ -333,8 +356,7 @@ extension PolicyCanvasViewport {
   private func centerViewportAfterRouteStateSettles(
     viewportSize: CGSize,
     routeOutput: PolicyCanvasRouteWorkerOutput,
-    currentRouteKey: PolicyCanvasRouteWorkerKey,
-    routeOutputIsCurrentGraphProvisional: Bool
+    currentRouteKey: PolicyCanvasRouteWorkerKey
   ) async {
     await Task.yield()
     guard !Task.isCancelled else {
@@ -343,15 +365,13 @@ extension PolicyCanvasViewport {
     centerViewportIfNeeded(
       viewportSize: viewportSize,
       routeOutput: routeOutput,
-      currentRouteKey: currentRouteKey,
-      routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphProvisional
+      currentRouteKey: currentRouteKey
     )
   }
   private func centerViewportIfNeeded(
     viewportSize: CGSize,
     routeOutput: PolicyCanvasRouteWorkerOutput,
-    currentRouteKey: PolicyCanvasRouteWorkerKey,
-    routeOutputIsCurrentGraphProvisional: Bool = false
+    currentRouteKey: PolicyCanvasRouteWorkerKey
   ) {
     guard
       let plan = policyCanvasViewportCenteringPlan(
@@ -360,8 +380,12 @@ extension PolicyCanvasViewport {
           viewportSize: viewportSize,
           routeOutput: routeOutput,
           currentRouteKey: currentRouteKey,
-          appliedRouteKey: routeCache.appliedRouteKey,
-          routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphProvisional,
+          appliedRouteKey: policyCanvasViewportResolvedRouteCache(
+            routeCache: routeCache,
+            routeKey: currentRouteKey,
+            pipelineIdentity: viewModel.pipelineIdentity,
+            routeSeed: routeSeed
+          ).appliedRouteKey,
           storedPipelineStateRaw: storedPipelineStateRaw,
           suppressesSceneStorage: suppressesSceneStorage,
           hasAppliedRestoredSceneZoom: hasAppliedRestoredSceneZoom

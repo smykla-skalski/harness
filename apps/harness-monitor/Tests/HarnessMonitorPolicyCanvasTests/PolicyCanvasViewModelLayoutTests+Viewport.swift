@@ -354,46 +354,6 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(viewModel.hasPendingViewportCenteringRequest)
   }
 
-  @Test("initial load centers from cheap fallback routes without requesting route work")
-  func initialLoadCentersFromFallbackRoutesWithoutRequestingRouteWork() {
-    let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.load(
-      document: PreviewFixtures.policyCanvasPipelineDocument(),
-      simulation: nil,
-      audit: nil
-    )
-    let currentRouteKey = PolicyCanvasRouteWorkerKey(
-      graphGeneration: viewModel.routeComputationGeneration,
-      nodeCount: viewModel.nodes.count,
-      groupCount: viewModel.groups.count,
-      edgeCount: viewModel.edges.count,
-      fontScale: 1,
-      routingHints: viewModel.routingHints
-    )
-    let provisionalOutput = policyCanvasProvisionalRouteOutput(
-      graphGeneration: viewModel.routeComputationGeneration,
-      nodes: viewModel.nodes,
-      groups: viewModel.groups,
-      edges: viewModel.edges,
-      fontScale: 1,
-      routingHints: viewModel.routingHints,
-      precomputedRoutes: viewModel.precomputedRoutes,
-      algorithmSelection: viewModel.algorithmSelection
-    )
-
-    #expect(
-      policyCanvasCanCenterViewport(
-        isCanvasEmpty: viewModel.isEmpty,
-        routeOutputSignature: provisionalOutput.signature,
-        currentRouteKey: currentRouteKey,
-        appliedRouteKey: nil,
-        routeOutputIsCurrentGraphProvisional: true
-      )
-    )
-    #expect(provisionalOutput.routes.count == viewModel.edges.count)
-    #expect(viewModel.routeComputationRequestGeneration == 0)
-  }
-
   @Test(
     "a reflow re-requests viewport centering so a switched or reformatted canvas lands on content")
   func reflowReRequestsViewportCentering() {
@@ -509,9 +469,7 @@ extension PolicyCanvasViewModelLayoutTests {
         isCanvasEmpty: false,
         routeOutputSignature: routeSignature,
         currentRouteKey: routeKey,
-        appliedRouteKey: nil,
-        routeOutputIsCurrentGraphProvisional: true,
-        allowsProvisionalRouteOutput: false
+        appliedRouteKey: nil
       )
     )
     #expect(
@@ -519,9 +477,7 @@ extension PolicyCanvasViewModelLayoutTests {
         isCanvasEmpty: false,
         routeOutputSignature: routeSignature,
         currentRouteKey: routeKey,
-        appliedRouteKey: routeKey,
-        routeOutputIsCurrentGraphProvisional: true,
-        allowsProvisionalRouteOutput: false
+        appliedRouteKey: routeKey
       )
     )
   }

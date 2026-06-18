@@ -34,6 +34,10 @@ WORK_DIR="$(dirname "$OUT")"
 mkdir -p "$WORK_DIR"
 BUILD_LOG="$WORK_DIR/build-$LANE.log"
 FINDER="$WORK_DIR/.find-window.swift"
+LAB_BUNDLE_ID="io.harnessmonitor.policy-canvas-lab"
+LAB_CONTAINER="$HOME/Library/Containers/$LAB_BUNDLE_ID/Data"
+mkdir -p "$LAB_CONTAINER"
+READY_FILE="$LAB_CONTAINER/policy-canvas-lab-ready-$LANE-$$"
 
 # 1. Generate (only when forced) so the standalone lab target is present.
 if [[ "${HARNESS_MONITOR_POLICY_LAB_GENERATE:-0}" == "1" ]]; then
@@ -63,7 +67,7 @@ BINARY="$APP/Contents/MacOS/$EXECUTABLE"
 if [[ -z "$EXECUTABLE" || ! -x "$BINARY" ]]; then
   echo "error: standalone lab binary missing after build: $BINARY" >&2; exit 1
 fi
-DECODE_LOG="$HOME/policy-canvas-lab-decode.log"
+DECODE_LOG="$LAB_CONTAINER/policy-canvas-lab-decode.log"
 
 # 3. Fixture -> base64 env (survives the sandbox with no file-read permission).
 fixture_env=()
@@ -82,6 +86,8 @@ reflow_env=()
 if [[ "${HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW:-}" == "1" ]]; then
   reflow_env=(--env "HARNESS_MONITOR_POLICY_CANVAS_LAB_FORCE_REFLOW=1")
 fi
+rm -f "$READY_FILE" 2>/dev/null
+ready_env=(--env "HARNESS_MONITOR_POLICY_LAB_READY_FILE=$READY_FILE")
 sample_args=()
 if [[ -n "${HARNESS_MONITOR_POLICY_CANVAS_LAB_SAMPLE_ID:-}" ]]; then
   sample_args=(
@@ -94,7 +100,12 @@ fi
 # 4. Relaunch: close any prior standalone lab host from this lane's build
 #    products, then force a fresh instance so the fixture env applies.
 for _ in $(seq 1 12); do
-  mapfile -t lane_pids < <(pgrep -f "$BINARY" || true)
+  mapfile -t lane_pids < <(
+    {
+      pgrep -f "$BINARY" || true
+      pgrep -f "Harness Monitor Policy Canvas Lab.app/Contents/MacOS" || true
+    } | sort -u
+  )
   [[ ${#lane_pids[@]} -eq 0 ]] && break
   for pid in "${lane_pids[@]}"; do
     kill "$pid" 2>/dev/null || true
@@ -106,6 +117,7 @@ done
 open -n "$APP" \
   ${fixture_env[@]+"${fixture_env[@]}"} \
   ${reflow_env[@]+"${reflow_env[@]}"} \
+  ${ready_env[@]+"${ready_env[@]}"} \
   ${sample_args[@]+"${sample_args[@]}"} \
   || { echo "error: open failed" >&2; exit 1; }
 
@@ -158,9 +170,16 @@ if [[ -z "$winid" ]]; then
   exit 2
 fi
 
-# 7. Let the canvas finish its async fetch+layout, then capture by window id.
+# 7. Capture only after the viewport reports a current, non-empty route output.
 #    Re-resolve before each attempt so a recreated window never leaves a stale id.
-sleep 5
+for _ in $(seq 1 90); do
+  [[ -s "$READY_FILE" ]] && break
+  sleep 1
+done
+if [[ ! -s "$READY_FILE" ]]; then
+  echo "error: Policy Canvas Lab did not publish a final route output before capture" >&2
+  exit 4
+fi
 for _ in 1 2 3 4; do
   winid="$(resolve_lab_window "$pid")"
   if [[ -n "$winid" ]] && screencapture -l "$winid" -o "$OUT" 2>/dev/null && [[ -s "$OUT" ]]; then

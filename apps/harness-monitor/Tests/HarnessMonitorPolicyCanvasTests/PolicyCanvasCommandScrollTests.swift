@@ -219,8 +219,8 @@ struct PolicyCanvasCommandScrollTests {
         "viewModel.consumeViewportCenteringRequest(generation: viewportCenteringGeneration)"))
   }
 
-  @Test("canvas switching refreshes stale or provisional routes lazily")
-  func viewportRefreshesProvisionalFallbackRoutes() throws {
+  @Test("canvas switching refreshes stale final routes lazily")
+  func viewportRefreshesStaleFinalRoutes() throws {
     let source =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
     let routeCacheSource = try previewableSourceFile(
@@ -228,6 +228,12 @@ struct PolicyCanvasCommandScrollTests {
     )
     let surfaceSource =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift")
+    let hostedContentSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewport+HostedContent.swift"
+    )
+    let scrollCoordinatorSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    )
 
     #expect(source.contains("@State private var routeCache = PolicyCanvasViewportRouteCache()"))
     #expect(
@@ -240,21 +246,41 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("await Task.yield()"))
     #expect(source.contains("guard !Task.isCancelled else"))
     #expect(source.contains("currentRouteKey: routeKey"))
-    #expect(source.contains("appliedRouteKey: routeCache.appliedRouteKey"))
+    #expect(source.contains("let resolvedRouteCache = policyCanvasViewportResolvedRouteCache("))
+    #expect(source.contains("let appliedRouteKey = resolvedRouteCache.appliedRouteKey"))
+    #expect(source.contains("appliedRouteKey: appliedRouteKey"))
     #expect(source.contains("viewportCenteringGeneration: viewModel.viewportCenteringGeneration"))
-    #expect(source.contains("let provisionalRouteOutput ="))
-    #expect(source.contains("policyCanvasProvisionalRouteOutput("))
-    #expect(source.contains("let routeOutput = provisionalRouteOutput ?? projectedRouteResult.output"))
+    #expect(!source.contains("PolicyCanvasRouteWorkerOutput.fallback("))
+    #expect(!source.contains("policyCanvasProvisionalRouteOutput("))
+    #expect(!source.contains("policyCanvasNodeBoundsPlaceholderOutput("))
+    #expect(!source.contains("routeOutputIsCurrentGraphProvisional"))
+    #expect(!source.contains("allowsProvisionalRouteOutput"))
+    #expect(source.contains("let routeOutput = projectedRouteResult.output"))
+    #expect(source.contains("let finalRouteOutputReady ="))
+    #expect(
+      source.contains(
+        "!viewModel.isEmpty && !routeKeyIsStale && routeOutput.signature != .empty"))
+    #expect(source.contains("let hasRenderableRouteOutput ="))
+    #expect(source.contains("viewModel.isEmpty || finalRouteOutputReady"))
+    #expect(source.contains("hasRenderableRouteOutput: hasRenderableRouteOutput"))
+    #expect(source.contains("var routeSeed: PolicyCanvasViewportRouteSeed?"))
+    #expect(source.contains("onFinalRouteOutputReady()"))
+    #expect(source.contains(".task(id: routeSeed?.id)"))
+    #expect(routeCacheSource.contains("updateCachedRoutes("))
+    #expect(
+      hostedContentSource.contains(
+        "isEnabled: showsQualityInspection && snapshot.hasRenderableRouteOutput"))
+    #expect(
+      scrollCoordinatorSource.contains("if snapshot.hasRenderableRouteOutput {"))
     #expect(source.contains("routeCache.outputsByCanvasIdentity"))
     #expect(
       source.contains("let cachedRouteOutput = routeCache.outputsByCanvasIdentity[newIdentity]"))
-    #expect(routeCacheSource.contains("updateCachedRoutes("))
     #expect(source.contains(".onChange(of: viewModel.routeComputationRequestGeneration"))
     #expect(source.contains("await rebuildRoutes("))
     #expect(source.contains("pipelineIdentity: routeCacheIdentity"))
     #expect(source.contains("fontScale: fontScale"))
     #expect(source.contains("PolicyCanvasViewportRouteRefreshKey("))
-    #expect(source.contains("let routeKeyIsStale = routeCache.appliedRouteKey != routeKey"))
+    #expect(source.contains("let routeKeyIsStale = appliedRouteKey != routeKey"))
     #expect(source.contains("let hasActivePositionDrag = viewModel.hasActivePositionDrag"))
     #expect(source.contains("let projectedRouteResult = policyCanvasProjectedRouteResult("))
     #expect(!source.contains("suppressesProjection: hasActivePositionDrag"))
@@ -290,9 +316,15 @@ struct PolicyCanvasCommandScrollTests {
     let initializer = try sourceFunction(named: "public init(", in: surfaceSource)
 
     #expect(surfaceSource.contains("@State private var appliedSnapshot:"))
-    #expect(surfaceSource.contains(".task(id: snapshot)"))
-    #expect(surfaceSource.contains("applySurfaceSnapshot(snapshot)"))
+    #expect(surfaceSource.contains(".task(id: renderKey)"))
+    #expect(surfaceSource.contains("await applySurfaceSnapshot(renderKey.snapshot"))
     #expect(surfaceSource.contains("private func applySurfaceSnapshot("))
+    #expect(surfaceSource.contains("@State private var routeSeed:"))
+    #expect(surfaceSource.contains("applyForcedEngineSurfaceSnapshot("))
+    #expect(surfaceSource.contains("PolicyCanvasRouteWorker().compute(input: routeInput)"))
+    #expect(surfaceSource.contains("PolicyCanvasViewportRouteSeed("))
+    #expect(surfaceSource.contains("markPolicyCanvasLabReadyIfNeeded"))
+    #expect(surfaceSource.contains("HARNESS_MONITOR_POLICY_LAB_READY_FILE"))
     #expect(surfaceSource.contains("PolicyCanvasViewportSurfaceDocumentIdentity"))
     #expect(
       initializer.contains("document: nil,\n        simulation: nil,\n        audit: nil,")
@@ -868,6 +900,7 @@ struct PolicyCanvasCommandScrollTests {
       contentSize: routeOutput.contentSize,
       resolvedCanvasColorScheme: nil,
       showSimulationOverlay: false,
+      hasRenderableRouteOutput: routeOutput.signature != .empty,
       openEditor: { _ in },
       requestKeyboardFocus: {}
     )

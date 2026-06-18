@@ -127,8 +127,14 @@ extension PolicyCanvasPreparedRouteInput {
       router: selectedRouter,
       algorithms: algorithms
     )
-    let finalRoutes = routesRepairingFinalTerminalOrder(
+    let terminalOrderedRoutes = routesRepairingFinalTerminalOrder(
       routes: routes,
+      nodeIndex: nodeIndex,
+      router: selectedRouter,
+      algorithms: algorithms
+    )
+    let finalRoutes = routesClearingCorridorsAndRestoringTerminalLeads(
+      routes: terminalOrderedRoutes,
       nodeIndex: nodeIndex,
       router: selectedRouter,
       algorithms: algorithms
@@ -229,19 +235,25 @@ extension PolicyCanvasPreparedRouteInput {
       algorithms: algorithms,
       portMarkerLayout: portMarkerLayout
     )
-    let finalPortMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
+    let finalRoutes = routesClearingCorridorsAndRestoringTerminalLeads(
       routes: crossedPortRoutes,
+      nodeIndex: nodeIndex,
+      router: selectedRouter,
+      algorithms: algorithms
+    )
+    let finalPortMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
+      routes: finalRoutes,
       nodeIndex: nodeIndex
     )
     let labelPositions = PolicyCanvasPolylineMidpointLabelPlacement().placeLabels(
-      input: PolicyCanvasLabelPlacementInput(prepared: self, routes: crossedPortRoutes)
+      input: PolicyCanvasLabelPlacementInput(prepared: self, routes: finalRoutes)
     )
     return PolicyCanvasPreparedRouteComputation(
-      routes: crossedPortRoutes,
+      routes: finalRoutes,
       labelPositions: labelPositions,
-      portVisibility: portVisibility(routes: crossedPortRoutes, nodeIndex: nodeIndex),
+      portVisibility: portVisibility(routes: finalRoutes, nodeIndex: nodeIndex),
       portMarkerLayout: finalPortMarkerLayout,
-      visibleBounds: visibleBounds(routes: crossedPortRoutes, labelPositions: labelPositions)
+      visibleBounds: visibleBounds(routes: finalRoutes, labelPositions: labelPositions)
     )
   }
 
@@ -280,21 +292,22 @@ extension PolicyCanvasPreparedRouteInput {
         score: currentScore,
         bodyHits: currentBodyHits
       )
-      route = routeAcceptingTerminalSnap(
-        edge: edge,
-        route: route,
-        role: .source,
-        context: context,
-        state: &state
-      )
-      route = routeAcceptingTerminalSnap(
-        edge: edge,
-        route: route,
-        role: .target,
-        context: context,
-        state: &state
-      )
-      normalized[edge.id] = route
+      for role in [PolicyCanvasRouteEndpointRole.source, .target] {
+        var candidateState = state
+        let candidate = routeAcceptingTerminalSnap(
+          edge: edge,
+          route: route,
+          role: role,
+          context: context,
+          state: &candidateState
+        )
+        guard candidate != route else {
+          continue
+        }
+        route = candidate
+        state = candidateState
+        normalized[edge.id] = route
+      }
     }
     return normalized
   }
@@ -344,6 +357,127 @@ extension PolicyCanvasPreparedRouteInput {
     state.score = score
     state.bodyHits = hitCount
     return candidate
+  }
+
+  private func routesRestoringTerminalLeadSides(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    preservingInterior: Bool = false
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    var repaired = routes
+    let markerLayout = precomputedRouteTerminalPortMarkerLayout(
+      routes: routes,
+      nodeIndex: nodeIndex
+    )
+    for edge in edges {
+      guard var route = repaired[edge.id] else {
+        continue
+      }
+      if let sourcePoint = portMarkerPoint(
+        edgeID: edge.id,
+        role: .source,
+        endpoint: edge.source,
+        portMarkerLayout: markerLayout,
+        nodeIndex: nodeIndex
+      ) {
+        route = routeRestoringTerminalLeadSide(
+          route,
+          role: .source,
+          side: sourcePoint.side,
+          point: sourcePoint.point,
+          preservingInterior: preservingInterior
+        )
+      }
+      if let targetPoint = portMarkerPoint(
+        edgeID: edge.id,
+        role: .target,
+        endpoint: edge.target,
+        portMarkerLayout: markerLayout,
+        nodeIndex: nodeIndex
+      ) {
+        route = routeRestoringTerminalLeadSide(
+          route,
+          role: .target,
+          side: targetPoint.side,
+          point: targetPoint.point,
+          preservingInterior: preservingInterior
+        )
+      }
+      repaired[edge.id] = route
+    }
+    return repaired
+  }
+
+  private func routeRestoringTerminalLeadSide(
+    _ route: PolicyCanvasEdgeRoute,
+    role: PolicyCanvasRouteEndpointRole,
+    side: PolicyCanvasPortSide,
+    point: CGPoint,
+    preservingInterior: Bool
+  ) -> PolicyCanvasEdgeRoute {
+    if preservingInterior {
+      return routeRestoringTerminalStubOnly(route, role: role, side: side, point: point)
+    }
+    return routeMovingTerminal(route, role: role, side: side, point: point)
+  }
+
+  private func routeRestoringTerminalStubOnly(
+    _ route: PolicyCanvasEdgeRoute,
+    role: PolicyCanvasRouteEndpointRole,
+    side: PolicyCanvasPortSide,
+    point: CGPoint
+  ) -> PolicyCanvasEdgeRoute {
+    guard route.points.count >= 2 else {
+      return route
+    }
+    let currentSide =
+      switch role {
+      case .source: policyCanvasRouteSourceSide(route)
+      case .target: policyCanvasRouteTargetSide(route)
+      }
+    guard currentSide != side else {
+      return route
+    }
+    let lead = policyCanvasPortLeadPoint(point, side: side)
+    var points: [CGPoint] = []
+    switch role {
+    case .source:
+      policyCanvasAppendOrthogonalBridge(point, to: &points)
+      policyCanvasAppendOrthogonalBridge(lead, to: &points)
+      for oldPoint in route.points.dropFirst() {
+        policyCanvasAppendOrthogonalBridge(oldPoint, to: &points)
+      }
+    case .target:
+      for oldPoint in route.points.dropLast() {
+        policyCanvasAppendOrthogonalBridge(oldPoint, to: &points)
+      }
+      while let last = points.last, last == point || last == lead {
+        points.removeLast()
+      }
+      policyCanvasAppendOrthogonalBridgePreservingCurrentLane(lead, to: &points)
+      policyCanvasAppendOrthogonalBridge(point, to: &points)
+    }
+    let compressed = policyCanvasCompressPreservingTerminalStubs(points)
+    return PolicyCanvasEdgeRoute(
+      points: compressed,
+      labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: compressed)
+    )
+  }
+
+  private func policyCanvasAppendOrthogonalBridgePreservingCurrentLane(
+    _ point: CGPoint,
+    to points: inout [CGPoint]
+  ) {
+    guard let last = points.last else {
+      points.append(point)
+      return
+    }
+    if abs(last.x - point.x) > 0.001, abs(last.y - point.y) > 0.001 {
+      points.append(CGPoint(x: last.x, y: point.y))
+    }
+    if points.last != point {
+      points.append(point)
+    }
   }
 
   private func precomputedRouteTerminalMismatchScore(
@@ -544,6 +678,250 @@ extension PolicyCanvasPreparedRouteInput {
       return best
     }
     return pairSplit
+  }
+
+  private func routesClearingCorridorsAndRestoringTerminalLeads(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    var currentRoutes = routesRestoringTerminalLeadSides(
+      routes: routes,
+      nodeIndex: nodeIndex
+    )
+    for _ in 0..<5 {
+      let corridorRoutes = routesClearingCorridorReuse(
+        routes: currentRoutes,
+        nodeIndex: nodeIndex,
+        router: selectedRouter,
+        algorithms: algorithms
+      )
+      let terminalRoutes = routesRestoringTerminalLeadSides(
+        routes: corridorRoutes,
+        nodeIndex: nodeIndex,
+        preservingInterior: true
+      )
+      guard terminalRoutes != currentRoutes else {
+        return terminalRoutes
+      }
+      currentRoutes = terminalRoutes
+    }
+    return routesRepairingResidualCorridorReuse(routes: currentRoutes, nodeIndex: nodeIndex)
+  }
+
+  private func routesRepairingResidualCorridorReuse(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    var currentRoutes = routes
+    var currentViolations = precomputedCorridorReuseViolations(routes: currentRoutes)
+    var currentScore = residualCorridorReuseScore(currentViolations)
+    let repairLimit = min(16, max(2, currentViolations.count * 4))
+    for _ in 0..<repairLimit {
+      guard let violation = currentViolations.first else {
+        return currentRoutes
+      }
+      let currentBodyHits = precomputedBodyHits(routes: currentRoutes, nodeIndex: nodeIndex).count
+      var accepted: ([String: PolicyCanvasEdgeRoute], [PolicyCanvasCorridorViolation])?
+      for edgeID in [violation.edgeB, violation.edgeA] {
+        guard let route = currentRoutes[edgeID] else {
+          continue
+        }
+        for offset in residualCorridorRepairOffsets {
+          guard
+            let shiftedRoute = routeShiftingResidualCorridor(
+              route,
+              violation: violation,
+              offset: offset
+            )
+          else {
+            continue
+          }
+          var candidateRoutes = currentRoutes
+          candidateRoutes[edgeID] = shiftedRoute
+          guard precomputedTerminalSideMismatchCount(routes: candidateRoutes) == 0,
+            precomputedBodyHits(routes: candidateRoutes, nodeIndex: nodeIndex).count
+              <= currentBodyHits
+          else {
+            continue
+          }
+          let candidateViolations = precomputedCorridorReuseViolations(routes: candidateRoutes)
+          let candidateScore = residualCorridorReuseScore(candidateViolations)
+          guard residualCorridorReuseScore(candidateScore, improves: currentScore) else {
+            continue
+          }
+          accepted = (candidateRoutes, candidateViolations)
+          break
+        }
+        if accepted != nil {
+          break
+        }
+      }
+      guard let accepted else {
+        break
+      }
+      currentRoutes = accepted.0
+      currentViolations = accepted.1
+      currentScore = residualCorridorReuseScore(currentViolations)
+    }
+    return currentRoutes
+  }
+
+  private func residualCorridorReuseScore(
+    _ violations: [PolicyCanvasCorridorViolation]
+  ) -> (count: Int, length: CGFloat) {
+    (
+      violations.count,
+      violations.reduce(CGFloat.zero) { total, violation in
+        total + residualCorridorReuseLength(violation)
+      }
+    )
+  }
+
+  private func residualCorridorReuseScore(
+    _ candidate: (count: Int, length: CGFloat),
+    improves current: (count: Int, length: CGFloat)
+  ) -> Bool {
+    candidate.count < current.count
+      || (candidate.count == current.count && candidate.length < current.length - 0.001)
+  }
+
+  private func residualCorridorReuseLength(_ violation: PolicyCanvasCorridorViolation) -> CGFloat {
+    if violation.isHorizontal {
+      return abs(violation.overlapEnd.x - violation.overlapStart.x)
+    }
+    return abs(violation.overlapEnd.y - violation.overlapStart.y)
+  }
+
+  private var residualCorridorRepairOffsets: [CGFloat] {
+    let step = PolicyCanvasVisibilityRouter.laneSpreadStep
+    return [step, -step, step * 2, -(step * 2)]
+  }
+
+  private func precomputedCorridorReuseViolations(
+    routes: [String: PolicyCanvasEdgeRoute]
+  ) -> [PolicyCanvasCorridorViolation] {
+    policyCanvasMeasureCorridors(
+      routedEdges: precomputedRoutedEdges(routes: routes),
+      thresholds: .default
+    )
+    .filter { $0.kind == .collinear }
+  }
+
+  private func routeShiftingResidualCorridor(
+    _ route: PolicyCanvasEdgeRoute,
+    violation: PolicyCanvasCorridorViolation,
+    offset: CGFloat
+  ) -> PolicyCanvasEdgeRoute? {
+    let points = route.points
+    guard points.count >= 4 else {
+      return nil
+    }
+    let segmentIndex = residualCorridorSegmentIndex(points, violation: violation)
+    guard let segmentIndex else {
+      return nil
+    }
+    var rebuilt: [CGPoint] = []
+    var index = points.startIndex
+    while index < points.endIndex {
+      if index == segmentIndex {
+        policyCanvasAppendOrthogonalBridge(
+          residualCorridorShifted(points[index], violation: violation, offset: offset),
+          to: &rebuilt
+        )
+        policyCanvasAppendOrthogonalBridge(
+          residualCorridorShifted(
+            points[points.index(after: index)], violation: violation, offset: offset),
+          to: &rebuilt
+        )
+        index = points.index(index, offsetBy: 2)
+      } else {
+        policyCanvasAppendOrthogonalBridge(points[index], to: &rebuilt)
+        index = points.index(after: index)
+      }
+    }
+    let compressed = policyCanvasCompressPreservingTerminalStubs(rebuilt)
+    guard compressed != route.points else {
+      return nil
+    }
+    return PolicyCanvasEdgeRoute(
+      points: compressed,
+      labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: compressed)
+    )
+  }
+
+  private func residualCorridorSegmentIndex(
+    _ points: [CGPoint],
+    violation: PolicyCanvasCorridorViolation
+  ) -> Int? {
+    guard points.count >= 4 else {
+      return nil
+    }
+    for index in 1..<(points.count - 2) {
+      let start = points[index]
+      let end = points[index + 1]
+      guard residualCorridorSegmentMatches(start, end, violation: violation) else {
+        continue
+      }
+      return index
+    }
+    return nil
+  }
+
+  private func residualCorridorSegmentMatches(
+    _ start: CGPoint,
+    _ end: CGPoint,
+    violation: PolicyCanvasCorridorViolation
+  ) -> Bool {
+    if violation.isHorizontal {
+      guard abs(start.y - end.y) <= 0.001,
+        abs(start.y - violation.overlapStart.y) <= 0.001
+      else {
+        return false
+      }
+      return residualCorridorSpanOverlaps(
+        start.x,
+        end.x,
+        violation.overlapStart.x,
+        violation.overlapEnd.x
+      )
+    }
+    guard abs(start.x - end.x) <= 0.001,
+      abs(start.x - violation.overlapStart.x) <= 0.001
+    else {
+      return false
+    }
+    return residualCorridorSpanOverlaps(
+      start.y,
+      end.y,
+      violation.overlapStart.y,
+      violation.overlapEnd.y
+    )
+  }
+
+  private func residualCorridorSpanOverlaps(
+    _ start: CGFloat,
+    _ end: CGFloat,
+    _ overlapStart: CGFloat,
+    _ overlapEnd: CGFloat
+  ) -> Bool {
+    let lower = min(start, end)
+    let upper = max(start, end)
+    let overlapLower = min(overlapStart, overlapEnd)
+    let overlapUpper = max(overlapStart, overlapEnd)
+    return min(upper, overlapUpper) - max(lower, overlapLower) >= 0.001
+  }
+
+  private func residualCorridorShifted(
+    _ point: CGPoint,
+    violation: PolicyCanvasCorridorViolation,
+    offset: CGFloat
+  ) -> CGPoint {
+    if violation.isHorizontal {
+      return CGPoint(x: point.x, y: PolicyCanvasLayout.routeGridRound(point.y + offset))
+    }
+    return CGPoint(x: PolicyCanvasLayout.routeGridRound(point.x + offset), y: point.y)
   }
 
   private func routesRepairingCrossedPortOrder(

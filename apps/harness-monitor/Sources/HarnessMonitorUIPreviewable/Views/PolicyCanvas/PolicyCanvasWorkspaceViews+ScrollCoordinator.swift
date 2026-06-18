@@ -54,6 +54,7 @@ struct PolicyCanvasViewportHostedSnapshot {
   let contentSize: CGSize
   let resolvedCanvasColorScheme: ColorScheme?
   let showSimulationOverlay: Bool
+  let hasRenderableRouteOutput: Bool
   let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   let requestKeyboardFocus: @MainActor () -> Void
 
@@ -69,7 +70,8 @@ struct PolicyCanvasViewportHostedSnapshot {
       nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
       contentSize: contentSize,
       resolvedCanvasColorScheme: resolvedCanvasColorScheme,
-      showSimulationOverlay: showSimulationOverlay
+      showSimulationOverlay: showSimulationOverlay,
+      hasRenderableRouteOutput: hasRenderableRouteOutput
     )
   }
 }
@@ -85,6 +87,7 @@ struct PolicyCanvasViewportHostedRenderSignature: Equatable {
   let contentSize: CGSize
   let resolvedCanvasColorScheme: ColorScheme?
   let showSimulationOverlay: Bool
+  let hasRenderableRouteOutput: Bool
 }
 
 @Observable
@@ -172,61 +175,63 @@ struct PolicyCanvasViewportHostedRoot: View {
           snapshot.viewModel.select(nil)
         }
       ZStack(alignment: .topLeading) {
-        ZStack(alignment: .topLeading) {
-          PolicyCanvasGroupLayer(
-            viewModel: snapshot.viewModel,
-            focusedComponent: snapshot.focusedComponent,
-            openEditor: snapshot.openEditor
-          )
-          .policyCanvasDocumentLayer(size: snapshot.contentSize)
-          PolicyCanvasEdgeLayer(
-            viewModel: snapshot.viewModel,
-            focusedComponent: snapshot.focusedComponent,
-            edges: snapshot.edges,
-            routes: snapshot.routes,
-            labelPositions: snapshot.labelPositions,
-            contentSize: snapshot.contentSize,
-            accessibilityLabelsByEdgeID: snapshot.accessibilityLabelsByEdgeID,
-            openEditor: snapshot.openEditor
-          )
-          .policyCanvasDocumentLayer(size: snapshot.contentSize)
-          PolicyCanvasMarqueeSelectionLayer(
-            marqueeSelection: snapshot.viewModel.marqueeSelection
-          )
-          .policyCanvasDocumentLayer(size: snapshot.contentSize)
-          PolicyCanvasRubberBandLayer(viewModel: snapshot.viewModel)
+        Group {
+          if snapshot.hasRenderableRouteOutput {
+            PolicyCanvasGroupLayer(
+              viewModel: snapshot.viewModel,
+              focusedComponent: snapshot.focusedComponent,
+              openEditor: snapshot.openEditor
+            )
             .policyCanvasDocumentLayer(size: snapshot.contentSize)
-          PolicyCanvasNodeLayer(
-            viewModel: snapshot.viewModel,
-            focusedComponent: snapshot.focusedComponent,
-            nodeAccessibilityValuesByID: snapshot.nodeAccessibilityValuesByID,
-            connectTargetsByNodeID: snapshot.connectTargetsByNodeID,
-            nodeValidationIssueMessagesByID: snapshot.nodeValidationIssueMessagesByID,
-            portVisibility: snapshot.portVisibility,
-            portMarkerLayout: snapshot.portMarkerLayout,
-            openEditor: snapshot.openEditor
-          )
-          .policyCanvasDocumentLayer(size: snapshot.contentSize)
-          if snapshot.showSimulationOverlay {
-            PolicyCanvasSimulationLayer(viewModel: snapshot.viewModel)
+            PolicyCanvasEdgeLayer(
+              viewModel: snapshot.viewModel,
+              focusedComponent: snapshot.focusedComponent,
+              edges: snapshot.edges,
+              routes: snapshot.routes,
+              labelPositions: snapshot.labelPositions,
+              contentSize: snapshot.contentSize,
+              accessibilityLabelsByEdgeID: snapshot.accessibilityLabelsByEdgeID,
+              openEditor: snapshot.openEditor
+            )
+            .policyCanvasDocumentLayer(size: snapshot.contentSize)
+            PolicyCanvasMarqueeSelectionLayer(
+              marqueeSelection: snapshot.viewModel.marqueeSelection
+            )
+            .policyCanvasDocumentLayer(size: snapshot.contentSize)
+            PolicyCanvasRubberBandLayer(viewModel: snapshot.viewModel)
+              .policyCanvasDocumentLayer(size: snapshot.contentSize)
+            PolicyCanvasNodeLayer(
+              viewModel: snapshot.viewModel,
+              focusedComponent: snapshot.focusedComponent,
+              nodeAccessibilityValuesByID: snapshot.nodeAccessibilityValuesByID,
+              connectTargetsByNodeID: snapshot.connectTargetsByNodeID,
+              nodeValidationIssueMessagesByID: snapshot.nodeValidationIssueMessagesByID,
+              portVisibility: snapshot.portVisibility,
+              portMarkerLayout: snapshot.portMarkerLayout,
+              openEditor: snapshot.openEditor
+            )
+            .policyCanvasDocumentLayer(size: snapshot.contentSize)
+            if snapshot.showSimulationOverlay {
+              PolicyCanvasSimulationLayer(viewModel: snapshot.viewModel)
+                .policyCanvasDocumentLayer(size: snapshot.contentSize)
+            }
+            PolicyCanvasEdgeLabelLayer(
+              viewModel: snapshot.viewModel,
+              focusedComponent: snapshot.focusedComponent,
+              edges: snapshot.edges,
+              routes: snapshot.routes,
+              labelPositions: snapshot.labelPositions
+            )
+            .policyCanvasDocumentLayer(size: snapshot.contentSize)
+            // Mounted unconditionally and reading the report live in their own
+            // bodies, so a variant switch or overlay toggle re-renders them. A
+            // parent `if let` here would capture a stale report inside the hosted
+            // canvas. Both draw nothing when the lab overlay is off.
+            PolicyCanvasQualityOverlayLayer(viewModel: snapshot.viewModel)
+              .policyCanvasDocumentLayer(size: snapshot.contentSize)
+            PolicyCanvasQualityHoverLayer(viewModel: snapshot.viewModel)
               .policyCanvasDocumentLayer(size: snapshot.contentSize)
           }
-          PolicyCanvasEdgeLabelLayer(
-            viewModel: snapshot.viewModel,
-            focusedComponent: snapshot.focusedComponent,
-            edges: snapshot.edges,
-            routes: snapshot.routes,
-            labelPositions: snapshot.labelPositions
-          )
-          .policyCanvasDocumentLayer(size: snapshot.contentSize)
-          // Mounted unconditionally and reading the report live in their own
-          // bodies, so a variant switch or overlay toggle re-renders them. A
-          // parent `if let` here would capture a stale report inside the hosted
-          // canvas. Both draw nothing when the lab overlay is off.
-          PolicyCanvasQualityOverlayLayer(viewModel: snapshot.viewModel)
-            .policyCanvasDocumentLayer(size: snapshot.contentSize)
-          PolicyCanvasQualityHoverLayer(viewModel: snapshot.viewModel)
-            .policyCanvasDocumentLayer(size: snapshot.contentSize)
         }
         .policyCanvasDocumentLayer(size: snapshot.contentSize)
       }

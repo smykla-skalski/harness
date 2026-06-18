@@ -7,7 +7,6 @@ struct PolicyCanvasViewportCenteringPlanInput {
   let routeOutput: PolicyCanvasRouteWorkerOutput
   let currentRouteKey: PolicyCanvasRouteWorkerKey
   let appliedRouteKey: PolicyCanvasRouteWorkerKey?
-  let routeOutputIsCurrentGraphProvisional: Bool
   let storedPipelineStateRaw: String
   let suppressesSceneStorage: Bool
   let hasAppliedRestoredSceneZoom: Bool
@@ -30,10 +29,7 @@ func policyCanvasViewportCenteringPlan(
       isCanvasEmpty: input.viewModel.isEmpty,
       routeOutputSignature: input.routeOutput.signature,
       currentRouteKey: input.currentRouteKey,
-      appliedRouteKey: input.appliedRouteKey,
-      routeOutputIsCurrentGraphProvisional: input.routeOutputIsCurrentGraphProvisional,
-      allowsProvisionalRouteOutput:
-        input.viewModel.viewportCenteringBehavior.allowsProvisionalRouteOutput
+      appliedRouteKey: input.appliedRouteKey
     )
   else {
     return nil

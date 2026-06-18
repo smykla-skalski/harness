@@ -10,6 +10,11 @@ private struct PolicyCanvasViewportSurfaceSnapshot: Equatable, Sendable {
   let policyDisplayName: String?
 }
 
+private struct PolicyCanvasViewportSurfaceRenderKey: Equatable {
+  let snapshot: PolicyCanvasViewportSurfaceSnapshot
+  let fontScale: CGFloat
+}
+
 private struct PolicyCanvasViewportSurfaceDocumentIdentity: Equatable, Sendable {
   let schemaVersion: UInt16
   let revision: UInt64
@@ -100,10 +105,13 @@ public struct PolicyCanvasViewportSurface: View {
   let policyDisplayName: String?
 
   @State private var viewModel: PolicyCanvasViewModel
+  @State private var routeSeed: PolicyCanvasViewportRouteSeed?
   @State private var appliedSnapshot: PolicyCanvasViewportSurfaceSnapshot?
   @AccessibilityFocusState private var focusedComponentState: PolicyCanvasSelection?
   @Environment(\.accessibilityReduceMotion)
   private var systemReduceMotion
+  @Environment(\.fontScale)
+  private var fontScale
 
   @MainActor
   public init(
@@ -161,6 +169,10 @@ public struct PolicyCanvasViewportSurface: View {
       ] == "1"
   }
 
+  private var renderKey: PolicyCanvasViewportSurfaceRenderKey {
+    PolicyCanvasViewportSurfaceRenderKey(snapshot: snapshot, fontScale: fontScale)
+  }
+
   public var body: some View {
     PolicyCanvasViewport(
       viewModel: viewModel,
@@ -171,13 +183,15 @@ public struct PolicyCanvasViewportSurface: View {
       minimapCenteringModeOverride: minimapCenteringModeOverride,
       canvasColorSchemeOverride: canvasColorSchemeOverride,
       showsEdgeLegend: showsEdgeLegend,
-      showsQualityInspection: showsQualityInspection
+      showsQualityInspection: showsQualityInspection,
+      routeSeed: routeSeed,
+      onFinalRouteOutputReady: markPolicyCanvasLabReadyIfNeeded
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
     .environment(\.policyCanvasReducedMotion, systemReduceMotion)
-    .task(id: snapshot) {
+    .task(id: renderKey) {
       // The fixture/document-load path renders the document's authored positions
       // without running the auto-arrange engine, so a load shows the saved seeds
       // rather than the algorithm output. The lab wants the automatic engine's
@@ -185,7 +199,7 @@ public struct PolicyCanvasViewportSurface: View {
       // keeps the agent capture script working even when a caller leaves
       // forcesEngineLayout off. The shipping canvas uses PolicyCanvasView, not
       // this surface, and keeps its authored layout.
-      applySurfaceSnapshot(snapshot)
+      await applySurfaceSnapshot(renderKey.snapshot, fontScale: renderKey.fontScale)
     }
     .onChange(of: reformatRequest, initial: false) { _, _ in
       viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
@@ -193,12 +207,20 @@ public struct PolicyCanvasViewportSurface: View {
   }
 
   @MainActor
-  private func applySurfaceSnapshot(_ newSnapshot: PolicyCanvasViewportSurfaceSnapshot) {
+  private func applySurfaceSnapshot(
+    _ newSnapshot: PolicyCanvasViewportSurfaceSnapshot,
+    fontScale: CGFloat
+  ) async {
     let oldSnapshot = appliedSnapshot
     guard oldSnapshot != newSnapshot else {
       return
     }
+    if surfaceForcesEngineLayout, oldSnapshot?.documentIdentity != newSnapshot.documentIdentity {
+      await applyForcedEngineSurfaceSnapshot(newSnapshot, fontScale: fontScale)
+      return
+    }
     appliedSnapshot = newSnapshot
+    routeSeed = nil
 
     viewModel.algorithmSelection = newSnapshot.algorithmSelection
     viewModel.policyGroupTitle = newSnapshot.policyDisplayName
@@ -210,9 +232,6 @@ public struct PolicyCanvasViewportSurface: View {
         audit: audit,
         forceDocumentReload: true
       )
-      if surfaceForcesEngineLayout {
-        requestForcedEngineLayoutIfNeeded()
-      }
     } else {
       viewModel.loadIfChanged(
         document: document,
@@ -223,10 +242,92 @@ public struct PolicyCanvasViewportSurface: View {
   }
 
   @MainActor
-  private func requestForcedEngineLayoutIfNeeded() {
-    guard viewModel.precomputedRoutes == nil else {
+  private func applyForcedEngineSurfaceSnapshot(
+    _ newSnapshot: PolicyCanvasViewportSurfaceSnapshot,
+    fontScale: CGFloat
+  ) async {
+    let stagedViewModel = PolicyCanvasViewModel.liveStartupState(
+      document: document,
+      simulation: simulation,
+      audit: audit,
+      algorithmSelection: newSnapshot.algorithmSelection,
+      policyGroupTitle: newSnapshot.policyDisplayName
+    )
+    guard !stagedViewModel.isEmpty else {
+      guard !Task.isCancelled else {
+        return
+      }
+      appliedSnapshot = newSnapshot
+      routeSeed = nil
+      viewModel = stagedViewModel
       return
     }
-    viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
+    let plannedGraph = stagedViewModel.plannedReflowGraph(
+      preserveManualAnchors: false,
+      force: true
+    )
+    let routeGraph =
+      plannedGraph
+      ?? PolicyCanvasReflowGraph(
+        nodes: stagedViewModel.nodes,
+        groups: stagedViewModel.groups,
+        edges: stagedViewModel.edges,
+        routingHints: stagedViewModel.routingHints,
+        precomputedRoutes: stagedViewModel.precomputedRoutes
+      )
+    let routeInput = PolicyCanvasRouteWorkerInput(
+      graphGeneration: stagedViewModel.routeComputationGeneration,
+      nodes: routeGraph.nodes,
+      groups: routeGraph.groups,
+      edges: routeGraph.edges,
+      fontScale: fontScale,
+      routingHints: routeGraph.routingHints,
+      precomputedRoutes: routeGraph.precomputedRoutes,
+      algorithmSelection: stagedViewModel.algorithmSelection
+    )
+    let output = await PolicyCanvasRouteWorker().compute(input: routeInput)
+    guard !Task.isCancelled else {
+      return
+    }
+    if let plannedGraph {
+      stagedViewModel.commitPlannedReflowGraph(
+        plannedGraph,
+        preserveManualAnchors: false,
+        force: true,
+        requestsRouteComputation: false
+      )
+    }
+    let routeKey = policyCanvasRouteWorkerKey(
+      viewModel: stagedViewModel,
+      nodes: stagedViewModel.nodes,
+      groups: stagedViewModel.groups,
+      edges: stagedViewModel.edges,
+      fontScale: fontScale
+    )
+    appliedSnapshot = newSnapshot
+    viewModel = stagedViewModel
+    let seedID =
+      "\(newSnapshot.documentIdentity?.lastPolicyTraceID ?? "nil")|"
+      + "\(routeKey.graphGeneration)|\(routeKey.fontScale)"
+    routeSeed = PolicyCanvasViewportRouteSeed(
+      id: seedID,
+      routeKey: routeKey,
+      pipelineIdentity: stagedViewModel.pipelineIdentity,
+      output: output,
+      nodePositionsByID: policyCanvasNodePositionsByID(stagedViewModel.nodes)
+    )
+  }
+
+  @MainActor
+  private func markPolicyCanvasLabReadyIfNeeded() {
+    guard
+      let readyPath = ProcessInfo.processInfo.environment[
+        "HARNESS_MONITOR_POLICY_LAB_READY_FILE"
+      ],
+      !readyPath.isEmpty
+    else {
+      return
+    }
+    try? "ready\n".write(toFile: readyPath, atomically: true, encoding: .utf8)
   }
 }
