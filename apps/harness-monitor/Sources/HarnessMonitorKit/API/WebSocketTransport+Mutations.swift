@@ -232,7 +232,8 @@ extension WebSocketTransport {
   ) async throws -> ManagedAgentSnapshot {
     let params = try encodeParams(request, extra: sessionScopeParams(sessionID: sessionID))
     let value = try await rpc(method: .managedAgentStartTerminal, params: params)
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func startManagedCodexAgent(
@@ -241,7 +242,8 @@ extension WebSocketTransport {
   ) async throws -> ManagedAgentSnapshot {
     let params = try encodeParams(request, extra: sessionScopeParams(sessionID: sessionID))
     let value = try await rpc(method: .managedAgentStartCodex, params: params)
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func startManagedAcpAgent(
@@ -250,7 +252,8 @@ extension WebSocketTransport {
   ) async throws -> ManagedAgentSnapshot {
     let params = try encodeParams(request, extra: sessionScopeParams(sessionID: sessionID))
     let value = try await rpc(method: .managedAgentStartAcp, params: params)
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func sendManagedAgentInput(
@@ -259,7 +262,8 @@ extension WebSocketTransport {
   ) async throws -> ManagedAgentSnapshot {
     let params = try encodeParams(request, extra: managedAgentParams(agentID: agentID))
     let value = try await rpc(method: .managedAgentInput, params: params)
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func resizeManagedAgent(
@@ -268,7 +272,8 @@ extension WebSocketTransport {
   ) async throws -> ManagedAgentSnapshot {
     let params = try encodeParams(request, extra: managedAgentParams(agentID: agentID))
     let value = try await rpc(method: .managedAgentResize, params: params)
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func stopManagedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
@@ -276,7 +281,8 @@ extension WebSocketTransport {
       method: .managedAgentStop,
       params: .object(managedAgentParams(agentID: agentID))
     )
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func stopManagedAcpAgent(agentID: String) async throws -> ManagedAgentSnapshot {
@@ -284,7 +290,8 @@ extension WebSocketTransport {
       method: .managedAgentStopAcp,
       params: .object(managedAgentParams(agentID: agentID))
     )
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func promptManagedAcpAgent(
@@ -294,7 +301,8 @@ extension WebSocketTransport {
     var params = managedAgentParams(agentID: agentID)
     params["prompt"] = .string(prompt)
     let value = try await rpc(method: .managedAgentPromptAcp, params: .object(params))
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func steerManagedCodexAgent(
@@ -303,7 +311,8 @@ extension WebSocketTransport {
   ) async throws -> ManagedAgentSnapshot {
     let params = try encodeParams(request, extra: managedAgentParams(agentID: agentID))
     let value = try await rpc(method: .managedAgentSteerCodex, params: params)
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func interruptManagedCodexAgent(agentID: String) async throws -> ManagedAgentSnapshot {
@@ -311,7 +320,8 @@ extension WebSocketTransport {
       method: .managedAgentInterruptCodex,
       params: .object(managedAgentParams(agentID: agentID))
     )
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func resolveManagedCodexApproval(
@@ -326,7 +336,8 @@ extension WebSocketTransport {
       ) { _, newValue in newValue }
     )
     let value = try await rpc(method: .managedAgentResolveCodexApproval, params: params)
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func resolveManagedAcpPermission(
@@ -341,7 +352,8 @@ extension WebSocketTransport {
       ) { _, newValue in newValue }
     )
     let value = try await rpc(method: .managedAgentResolveAcpPermission, params: params)
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func startAgentTui(
