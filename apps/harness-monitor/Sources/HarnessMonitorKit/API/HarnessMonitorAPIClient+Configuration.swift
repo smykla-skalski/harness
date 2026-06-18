@@ -57,11 +57,18 @@ extension HarnessMonitorAPIClient {
   }
 
   public func logLevel() async throws -> LogLevelResponse {
-    try await get("/v1/daemon/log-level")
+    let wire: LogLevelResponseWire = try await get(
+      "/v1/daemon/log-level", decoder: PolicyWireCoding.decoder
+    )
+    return LogLevelResponse(wire: wire)
   }
 
   public func setLogLevel(_ level: String) async throws -> LogLevelResponse {
-    try await put("/v1/daemon/log-level", body: SetLogLevelRequest(level: level))
+    let wire: LogLevelResponseWire = try await put(
+      "/v1/daemon/log-level", body: SetLogLevelRequest(level: level),
+      decoder: PolicyWireCoding.decoder
+    )
+    return LogLevelResponse(wire: wire)
   }
 
   private func sessionScopeQueryItems(sessionID: String?) -> [URLQueryItem] {

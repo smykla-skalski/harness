@@ -69,12 +69,14 @@ extension WebSocketTransport {
 
   public func logLevel() async throws -> LogLevelResponse {
     let value = try await rpc(method: .daemonLogLevel)
-    return try decode(value)
+    let wire: LogLevelResponseWire = try decodePolicyWire(value)
+    return LogLevelResponse(wire: wire)
   }
 
   public func setLogLevel(_ level: String) async throws -> LogLevelResponse {
     let params = JSONValue.object(["level": .string(level)])
     let value = try await rpc(method: .daemonSetLogLevel, params: params)
-    return try decode(value)
+    let wire: LogLevelResponseWire = try decodePolicyWire(value)
+    return LogLevelResponse(wire: wire)
   }
 }

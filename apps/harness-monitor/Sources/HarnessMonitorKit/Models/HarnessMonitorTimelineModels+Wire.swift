@@ -18,3 +18,11 @@ extension TimelineEntry {
     )
   }
 }
+
+// The /v1/daemon/log-level get/set response (level/filter thin mirror, generated into
+// SummariesWireTypes); backs both endpoints on both transports.
+extension LogLevelResponse {
+  public init(wire: LogLevelResponseWire) {
+    self.init(level: wire.level, filter: wire.filter)
+  }
+}
