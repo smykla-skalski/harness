@@ -1295,6 +1295,11 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // permission options as raw JSON) maps to JSONValue. Both tokens are acp-permission only.
     ("AcpPermissionBatchDecode", "AcpPermissionBatchWire"),
     ("PermissionOption", "JSONValue"),
+    // acp snapshot: AcpAgentSnapshotDecode emits as AcpAgentSnapshotWire, and its
+    // pending_permission_batches: Vec<AcpPermissionBatch> field reference resolves to the
+    // generated AcpPermissionBatchWire (the public AcpPermissionBatch has no derive).
+    ("AcpAgentSnapshotDecode", "AcpAgentSnapshotWire"),
+    ("AcpPermissionBatch", "AcpPermissionBatchWire"),
 ];
 
 /// The Swift name for a Rust wire type: a hand rename when one applies, else the
@@ -1702,11 +1707,32 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     ("AcpAgentInspectSnapshotDecode", "managed_agent_family"),
     // acp permission batch: the hand AcpPermissionBatch has no transport-family field.
     ("AcpPermissionBatchDecode", "managed_agent_family"),
+    // acp snapshot: the hand AcpAgentSnapshot drops the transport family, process_key,
+    // permission_mode and permission_log_path (daemon-internal); the app does not model them.
+    ("AcpAgentSnapshotDecode", "managed_agent_family"),
+    ("AcpAgentSnapshotDecode", "process_key"),
+    ("AcpAgentSnapshotDecode", "permission_mode"),
+    ("AcpAgentSnapshotDecode", "permission_log_path"),
 ];
 
 /// Whether `(struct_name, field_name)` is in `OMITTED_WIRE_FIELDS`.
 fn is_omitted_field(struct_name: &str, field_name: &str) -> bool {
     OMITTED_WIRE_FIELDS
+        .iter()
+        .any(|(owner, field)| *owner == struct_name && *field == field_name)
+}
+
+/// Rust struct fields whose value carries a hand-rolled (non-derive) serde shape the
+/// generator cannot mirror as a typed Swift property - emit them as a raw `JSONValue`
+/// passthrough so the wire round-trips the payload exactly and the hand `init(wire:)` map
+/// re-decodes the typed value. Used for `AcpAgentSnapshotDecode.status` (the Rust AgentStatus
+/// has a custom hybrid bare-string-or-tagged-object Serialize/Deserialize, and the Swift app
+/// recovers both the flattened status and the disconnect reason/stderr_tail from the payload).
+const JSON_PASSTHROUGH_FIELDS: &[(&str, &str)] = &[("AcpAgentSnapshotDecode", "status")];
+
+/// Whether `(struct_name, field_name)` is in `JSON_PASSTHROUGH_FIELDS`.
+fn is_json_passthrough_field(struct_name: &str, field_name: &str) -> bool {
+    JSON_PASSTHROUGH_FIELDS
         .iter()
         .any(|(owner, field)| *owner == struct_name && *field == field_name)
 }
@@ -1743,7 +1769,14 @@ fn build_fields(
             continue;
         }
         let coding_key = serde.rename.clone().unwrap_or_else(|| name.clone());
-        let swift_type = rust_type_to_swift(&field.ty);
+        let swift_type = if is_json_passthrough_field(struct_name, &name) {
+            SwiftType {
+                name: "JSONValue".to_string(),
+                optional: false,
+            }
+        } else {
+            rust_type_to_swift(&field.ty)
+        };
         let rust_ident = type_ident(&field.ty);
         // An app-optional value field (see SKIP_DEFAULT_OPTIONAL_FIELDS): drop the
         // `?? Default()` coalesce so an omitted value decodes to nil. The guard
@@ -2332,6 +2365,13 @@ const ACP_PERMISSION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitor
 // options: Vec<PermissionOption> (external agent_client_protocol crate, the app models it as
 // raw JSON) maps to [JSONValue] via TYPE_RENAMES, and tool_call is serde_json::Value -> JSONValue.
 const ACP_PERMISSION_EMIT_ONLY: &[&str] = &["AcpPermissionItem", "AcpPermissionBatchDecode"];
+const ACP_SNAPSHOT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpAgentSnapshotWireTypes.generated.swift";
+// The full acp managed-agent snapshot, the Acp variant of ManagedAgentSnapshot. Generated from
+// its owned AcpAgentSnapshotDecode (the public type has no serde derive); managed_agent_family
+// is dropped, pending_permission_batches reuses AcpPermissionBatchWire, and status is a
+// JSONValue passthrough (JSON_PASSTHROUGH_FIELDS) - the map re-decodes the flattened AgentStatus
+// plus the disconnect reason/stderr_tail the daemon nests in the status object.
+const ACP_SNAPSHOT_EMIT_ONLY: &[&str] = &["AcpAgentSnapshotDecode"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2563,6 +2603,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[ACP_PERMISSION_ITEM_SOURCE, ACP_PERMISSION_WIRE_SOURCE],
         },
+        GeneratedModule {
+            output: ACP_SNAPSHOT_OUTPUT,
+            description: "the Rust acp managed-agent snapshot from its owned decode struct",
+            defaults: &[],
+            sources: &[ACP_INSPECT_WIRE_SOURCE],
+        },
     ]
 }
 
@@ -2607,6 +2653,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         ACP_DESCRIPTOR_OUTPUT => ACP_DESCRIPTOR_EMIT_ONLY,
         ACP_INSPECT_OUTPUT => ACP_INSPECT_EMIT_ONLY,
         ACP_PERMISSION_OUTPUT => ACP_PERMISSION_EMIT_ONLY,
+        ACP_SNAPSHOT_OUTPUT => ACP_SNAPSHOT_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
