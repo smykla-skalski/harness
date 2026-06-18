@@ -767,7 +767,7 @@ fn rust_type_to_swift(ty: &Type) -> SwiftType {
                 .map_or_else(|| "AnyCodable".to_string(), |mapped| mapped.name),
             optional: true,
         },
-        "Vec" => SwiftType {
+        "Vec" | "BTreeSet" | "HashSet" => SwiftType {
             name: format!("[{}]", vec_element(&segment.arguments)),
             optional: false,
         },
@@ -1190,6 +1190,10 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // permission_bridge.rs acp permission item: Swift hand is AcpPermissionItem (toolCall and
     // options modelled as raw JSON); referenced by AcpPermissionBatchWire.requests.
     "AcpPermissionItem",
+    // permission_bridge.rs acp permission decision: the resolveManagedAcpPermission request
+    // body. Internally-tagged enum (decision tag); the hand AcpPermissionDecision relies on
+    // convertToSnakeCase for request_ids, the wire pins it.
+    "AcpPermissionDecision",
     // protocol/managed_agents.rs umbrella: ManagedAgentSnapshot (adjacently-tagged over the
     // three transport snapshots) + its list response, the managed-agent endpoint return types.
     "ManagedAgentSnapshot",
@@ -2371,7 +2375,11 @@ const ACP_PERMISSION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitor
 // (ManagedAgentKind) is dropped. AcpPermissionItem carries its derive directly; its
 // options: Vec<PermissionOption> (external agent_client_protocol crate, the app models it as
 // raw JSON) maps to [JSONValue] via TYPE_RENAMES, and tool_call is serde_json::Value -> JSONValue.
-const ACP_PERMISSION_EMIT_ONLY: &[&str] = &["AcpPermissionItem", "AcpPermissionBatchDecode"];
+const ACP_PERMISSION_EMIT_ONLY: &[&str] = &[
+    "AcpPermissionItem",
+    "AcpPermissionBatchDecode",
+    "AcpPermissionDecision",
+];
 const ACP_SNAPSHOT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpAgentSnapshotWireTypes.generated.swift";
 // The full acp managed-agent snapshot, the Acp variant of ManagedAgentSnapshot. Generated from
 // its owned AcpAgentSnapshotDecode (the public type has no serde derive); managed_agent_family

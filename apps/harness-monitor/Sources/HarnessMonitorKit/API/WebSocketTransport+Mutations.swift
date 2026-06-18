@@ -358,7 +358,7 @@ extension WebSocketTransport {
     decision: AcpPermissionDecision
   ) async throws -> ManagedAgentSnapshot {
     let params = try encodeParams(
-      decision,
+      AcpPermissionDecisionWire(decision),
       extra: managedAgentParams(agentID: agentID).merging(
         ["batch_id": .string(batchID)]
       ) { _, newValue in newValue }

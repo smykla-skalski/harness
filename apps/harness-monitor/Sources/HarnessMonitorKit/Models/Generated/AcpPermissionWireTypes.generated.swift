@@ -24,6 +24,45 @@ public struct AcpPermissionItemWire: Codable, Equatable, Sendable {
   }
 }
 
+public enum AcpPermissionDecisionWire: Codable, Equatable, Sendable {
+  case approveAll
+  case approveSome(requestIds: [String])
+  case denyAll
+
+  enum CodingKeys: String, CodingKey {
+    case decision
+    case requestIds = "request_ids"
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let decision = try container.decode(String.self, forKey: .decision)
+    switch decision {
+    case "approve_all":
+      self = .approveAll
+    case "approve_some":
+      self = .approveSome(requestIds: try container.decode([String].self, forKey: .requestIds))
+    case "deny_all":
+      self = .denyAll
+    default:
+      throw DecodingError.dataCorruptedError(forKey: .decision, in: container, debugDescription: "unknown AcpPermissionDecisionWire decision \(decision)")
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    switch self {
+    case .approveAll:
+      try container.encode("approve_all", forKey: .decision)
+    case .approveSome(let requestIds):
+      try container.encode("approve_some", forKey: .decision)
+      try container.encode(requestIds, forKey: .requestIds)
+    case .denyAll:
+      try container.encode("deny_all", forKey: .decision)
+    }
+  }
+}
+
 public struct AcpPermissionBatchWire: Codable, Equatable, Sendable {
   public var batchId: String
   public var managedAgentId: String

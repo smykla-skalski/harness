@@ -19,7 +19,7 @@ extension HarnessMonitorAPIClient {
   ) async throws -> ManagedAgentSnapshot {
     let wire: ManagedAgentSnapshotWire = try await post(
       "/v1/managed-agents/\(agentID)/permission-batches/\(batchID)",
-      body: decision,
+      body: AcpPermissionDecisionWire(decision),
       decoder: PolicyWireCoding.decoder
     )
     return try ManagedAgentSnapshot(wire: wire)

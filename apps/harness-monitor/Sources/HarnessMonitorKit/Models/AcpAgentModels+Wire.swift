@@ -72,3 +72,13 @@ extension AcpAgentSnapshot {
     )
   }
 }
+
+extension AcpPermissionDecisionWire {
+  init(_ decision: AcpPermissionDecision) {
+    switch decision {
+    case .approveAll: self = .approveAll
+    case .approveSome(let requestIDs): self = .approveSome(requestIds: requestIDs)
+    case .denyAll: self = .denyAll
+    }
+  }
+}

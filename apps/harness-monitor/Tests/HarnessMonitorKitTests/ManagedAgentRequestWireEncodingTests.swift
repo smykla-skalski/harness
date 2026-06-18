@@ -98,4 +98,15 @@ struct ManagedAgentRequestWireEncodingTests {
     )
     #expect(plainKeys == convertedKeys)
   }
+
+  @Test("acp permission decision pins the request_ids key")
+  func acpPermissionDecision() throws {
+    let approveSome = try object(AcpPermissionDecisionWire(.approveSome(["id-1", "id-2"])))
+    #expect(approveSome["decision"] as? String == "approve_some")
+    #expect(approveSome["request_ids"] as? [String] == ["id-1", "id-2"])
+
+    let approveAll = try object(AcpPermissionDecisionWire(.approveAll))
+    #expect(approveAll["decision"] as? String == "approve_all")
+    #expect(approveAll["request_ids"] == nil)
+  }
 }
