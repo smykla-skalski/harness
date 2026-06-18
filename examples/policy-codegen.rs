@@ -1209,6 +1209,14 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "DaemonAuditEvent",
     "DaemonDiagnostics",
     "LaunchAgentStatus",
+    // session signal cluster (events.rs SessionSignalRecord + signal/mod.rs Signal tree): rich hand
+    // models (Identifiable, computed effectiveStatus, custom SignalPayload decode) own these bare
+    // names, so the wire suffixes them; SignalPriority/AckResult/SessionSignalStatus stay bare.
+    "SessionSignalRecord",
+    "Signal",
+    "SignalPayload",
+    "DeliveryConfig",
+    "SignalAck",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -2453,6 +2461,22 @@ const DAEMON_STATE_EMIT_ONLY: &[&str] = &[
     "DaemonDiagnostics",
     "LaunchAgentStatus",
 ];
+const SESSION_SIGNAL_SOURCE: &str = include_str!("../src/agents/runtime/signal/mod.rs");
+const SESSION_EVENTS_SOURCE: &str = include_str!("../src/session/types/events.rs");
+const SESSION_SIGNAL_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionSignalWireTypes.generated.swift";
+// The session signal record (events.rs SessionSignalRecord) + the runtime signal cluster it nests
+// (signal/mod.rs Signal -> SignalPayload/DeliveryConfig, SignalAck), the SessionDetail.signals
+// member. SignalPriority/AckResult/SessionSignalStatus are single-word snake_case enums the hand
+// Swift declares with matching raw values (SessionSignalStatus even keeps the `acknowledged`
+// legacy-alias decode) - decoder-agnostic, so the wire references them BARE. SignalPayload.metadata
+// is serde_json::Value -> JSONValue.
+const SESSION_SIGNAL_EMIT_ONLY: &[&str] = &[
+    "SessionSignalRecord",
+    "Signal",
+    "SignalPayload",
+    "DeliveryConfig",
+    "SignalAck",
+];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2714,6 +2738,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[DAEMON_STATE_SOURCE],
             sources: &[SUMMARIES_SOURCE, DAEMON_STATE_SOURCE, DAEMON_LAUNCHD_SOURCE],
         },
+        GeneratedModule {
+            output: SESSION_SIGNAL_OUTPUT,
+            description: "the Rust session signal record and runtime signal cluster",
+            defaults: &[],
+            sources: &[SESSION_SIGNAL_SOURCE, SESSION_EVENTS_SOURCE],
+        },
     ]
 }
 
@@ -2763,6 +2793,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         AGENT_TUI_INPUT_OUTPUT => AGENT_TUI_INPUT_EMIT_ONLY,
         MANAGED_AGENTS_OUTPUT => MANAGED_AGENTS_EMIT_ONLY,
         DAEMON_STATE_OUTPUT => DAEMON_STATE_EMIT_ONLY,
+        SESSION_SIGNAL_OUTPUT => SESSION_SIGNAL_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
