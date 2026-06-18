@@ -213,7 +213,8 @@ extension WebSocketTransport {
       method: .sessionManagedAgents,
       params: .object(sessionScopeParams(sessionID: sessionID))
     )
-    return try decode(value)
+    let wire: ManagedAgentListResponseWire = try decodePolicyWire(value)
+    return try ManagedAgentListResponse(wire: wire)
   }
 
   public func managedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
@@ -221,7 +222,8 @@ extension WebSocketTransport {
       method: .managedAgentDetail,
       params: .object(managedAgentParams(agentID: agentID))
     )
-    return try decode(value)
+    let wire: ManagedAgentSnapshotWire = try decodePolicyWire(value)
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func startManagedTerminalAgent(

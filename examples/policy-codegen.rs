@@ -1190,6 +1190,10 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // permission_bridge.rs acp permission item: Swift hand is AcpPermissionItem (toolCall and
     // options modelled as raw JSON); referenced by AcpPermissionBatchWire.requests.
     "AcpPermissionItem",
+    // protocol/managed_agents.rs umbrella: ManagedAgentSnapshot (adjacently-tagged over the
+    // three transport snapshots) + its list response, the managed-agent endpoint return types.
+    "ManagedAgentSnapshot",
+    "ManagedAgentListResponse",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1300,6 +1304,9 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // generated AcpPermissionBatchWire (the public AcpPermissionBatch has no derive).
     ("AcpAgentSnapshotDecode", "AcpAgentSnapshotWire"),
     ("AcpPermissionBatch", "AcpPermissionBatchWire"),
+    // managed-agents umbrella: the public no-derive AcpAgentSnapshot referenced by the
+    // ManagedAgentSnapshot Acp variant resolves to the generated AcpAgentSnapshotWire.
+    ("AcpAgentSnapshot", "AcpAgentSnapshotWire"),
 ];
 
 /// The Swift name for a Rust wire type: a hand rename when one applies, else the
@@ -2372,6 +2379,14 @@ const ACP_SNAPSHOT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKi
 // JSONValue passthrough (JSON_PASSTHROUGH_FIELDS) - the map re-decodes the flattened AgentStatus
 // plus the disconnect reason/stderr_tail the daemon nests in the status object.
 const ACP_SNAPSHOT_EMIT_ONLY: &[&str] = &["AcpAgentSnapshotDecode"];
+const MANAGED_AGENTS_SOURCE: &str = include_str!("../src/daemon/protocol/managed_agents.rs");
+const MANAGED_AGENTS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ManagedAgentSnapshotWireTypes.generated.swift";
+// The managed-agent snapshot umbrella + its list response. ManagedAgentSnapshot is adjacently
+// tagged (kind + snapshot) over the three transport snapshots - Terminal/Codex resolve to the
+// already-generated AgentTuiSnapshotWire/CodexRunSnapshotWire, and Acp resolves to the
+// AcpAgentSnapshotWire (TYPE_RENAMES from the public no-derive AcpAgentSnapshot). The return
+// type of nearly every managed-agent endpoint.
+const MANAGED_AGENTS_EMIT_ONLY: &[&str] = &["ManagedAgentSnapshot", "ManagedAgentListResponse"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2609,6 +2624,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[ACP_INSPECT_WIRE_SOURCE],
         },
+        GeneratedModule {
+            output: MANAGED_AGENTS_OUTPUT,
+            description: "the Rust managed-agent snapshot umbrella and list response",
+            defaults: &[],
+            sources: &[MANAGED_AGENTS_SOURCE],
+        },
     ]
 }
 
@@ -2654,6 +2675,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         ACP_INSPECT_OUTPUT => ACP_INSPECT_EMIT_ONLY,
         ACP_PERMISSION_OUTPUT => ACP_PERMISSION_EMIT_ONLY,
         ACP_SNAPSHOT_OUTPUT => ACP_SNAPSHOT_EMIT_ONLY,
+        MANAGED_AGENTS_OUTPUT => MANAGED_AGENTS_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {

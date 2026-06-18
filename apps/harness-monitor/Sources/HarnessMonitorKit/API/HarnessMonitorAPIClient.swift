@@ -226,11 +226,17 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
   }
 
   public func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse {
-    try await get("/v1/sessions/\(sessionID)/managed-agents")
+    let wire: ManagedAgentListResponseWire = try await get(
+      "/v1/sessions/\(sessionID)/managed-agents", decoder: PolicyWireCoding.decoder
+    )
+    return try ManagedAgentListResponse(wire: wire)
   }
 
   public func managedAgent(agentID: String) async throws -> ManagedAgentSnapshot {
-    try await get("/v1/managed-agents/\(agentID)")
+    let wire: ManagedAgentSnapshotWire = try await get(
+      "/v1/managed-agents/\(agentID)", decoder: PolicyWireCoding.decoder
+    )
+    return try ManagedAgentSnapshot(wire: wire)
   }
 
   public func startManagedTerminalAgent(
