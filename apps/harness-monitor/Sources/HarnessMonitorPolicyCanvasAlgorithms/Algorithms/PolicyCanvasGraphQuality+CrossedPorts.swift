@@ -16,6 +16,15 @@ private struct PolicyCanvasSideTerminal {
   let isMonotonic: Bool
 }
 
+/// One route terminal awaiting resolution onto a node side: the wire end point,
+/// its full route, and the node and edge it belongs to.
+private struct PolicyCanvasCrossedPortTerminal {
+  let point: CGPoint
+  let route: PolicyCanvasEdgeRoute
+  let nodeID: String
+  let edgeID: String
+}
+
 /// Measure wires that picked the wrong port: two edges meeting one node side -
 /// inputs on a leading/top side, outputs on a trailing/bottom side - whose routes
 /// actually cross between their ports. Swapping the two ports would untangle them.
@@ -42,19 +51,23 @@ func policyCanvasMeasureCrossedPorts(
       continue
     }
     policyCanvasRegisterSideTerminal(
-      point: first,
-      route: routed.route,
-      nodeID: routed.edge.source.nodeID,
-      edgeID: routed.edge.id,
+      terminal: PolicyCanvasCrossedPortTerminal(
+        point: first,
+        route: routed.route,
+        nodeID: routed.edge.source.nodeID,
+        edgeID: routed.edge.id
+      ),
       nodeFramesByID: nodeFramesByID,
       tolerance: tolerance,
       byNodeSide: &byNodeSide
     )
     policyCanvasRegisterSideTerminal(
-      point: last,
-      route: routed.route,
-      nodeID: routed.edge.target.nodeID,
-      edgeID: routed.edge.id,
+      terminal: PolicyCanvasCrossedPortTerminal(
+        point: last,
+        route: routed.route,
+        nodeID: routed.edge.target.nodeID,
+        edgeID: routed.edge.id
+      ),
       nodeFramesByID: nodeFramesByID,
       tolerance: tolerance,
       byNodeSide: &byNodeSide
@@ -140,29 +153,28 @@ private func policyCanvasCrossedPortMark(
 }
 
 private func policyCanvasRegisterSideTerminal(
-  point: CGPoint,
-  route: PolicyCanvasEdgeRoute,
-  nodeID: String,
-  edgeID: String,
+  terminal: PolicyCanvasCrossedPortTerminal,
   nodeFramesByID: [String: CGRect],
   tolerance: CGFloat,
   byNodeSide: inout [String: [PolicyCanvasPortSide: [PolicyCanvasSideTerminal]]]
 ) {
+  let point = terminal.point
+  let route = terminal.route
   guard
-    let frame = nodeFramesByID[nodeID],
+    let frame = nodeFramesByID[terminal.nodeID],
     let side = policyCanvasMarkerSide(point: point, frame: frame, tolerance: tolerance)
   else {
     return
   }
   let horizontalSide = side == .leading || side == .trailing
-  let terminal = PolicyCanvasSideTerminal(
-    edgeID: edgeID,
+  let resolved = PolicyCanvasSideTerminal(
+    edgeID: terminal.edgeID,
     offset: horizontalSide ? point.y : point.x,
     point: point,
     points: route.points,
     isMonotonic: policyCanvasRoutePerpendicularlyMonotonic(route, horizontalSide: horizontalSide)
   )
-  byNodeSide[nodeID, default: [:]][side, default: []].append(terminal)
+  byNodeSide[terminal.nodeID, default: [:]][side, default: []].append(resolved)
 }
 
 /// True when the two terminals funnel through one shared channel and attach in

@@ -1,5 +1,14 @@
 import CoreGraphics
 
+/// Bundled output of `policyCanvasMeasureEdgeLengths`: the aggregate summary plus
+/// the per-category route-length violations, each sorted deterministically.
+struct PolicyCanvasEdgeLengthMeasurement {
+  let summary: PolicyCanvasEdgeLengthSummary
+  let longEdges: [PolicyCanvasLongEdgeViolation]
+  let detours: [PolicyCanvasDetourViolation]
+  let routeSegments: [PolicyCanvasRouteSegmentLengthViolation]
+}
+
 /// Measure per-route length and bend figures, and flag cross-canvas long edges.
 /// `horizontalSpan` (the route's bounding-box width) is the dominant long-edge
 /// signal: a wire dragged across most of the canvas is the braid sample's
@@ -7,12 +16,7 @@ import CoreGraphics
 func policyCanvasMeasureEdgeLengths(
   routedEdges: [PolicyCanvasRoutedEdge],
   thresholds: PolicyCanvasGraphQualityThresholds
-) -> (
-  summary: PolicyCanvasEdgeLengthSummary,
-  longEdges: [PolicyCanvasLongEdgeViolation],
-  detours: [PolicyCanvasDetourViolation],
-  routeSegments: [PolicyCanvasRouteSegmentLengthViolation]
-) {
+) -> PolicyCanvasEdgeLengthMeasurement {
   var lengths: [CGFloat] = []
   var bendCounts: [Int] = []
   var longEdges: [PolicyCanvasLongEdgeViolation] = []
@@ -80,6 +84,24 @@ func policyCanvasMeasureEdgeLengths(
       }
     }
   }
+  return policyCanvasAssembleEdgeLengthMeasurement(
+    lengths: lengths,
+    bendCounts: bendCounts,
+    longEdges: longEdges,
+    detours: detours,
+    routeSegments: routeSegments
+  )
+}
+
+/// Fold the per-edge figures accumulated during measurement into the aggregate
+/// summary and the deterministically sorted violation lists.
+private func policyCanvasAssembleEdgeLengthMeasurement(
+  lengths: [CGFloat],
+  bendCounts: [Int],
+  longEdges: [PolicyCanvasLongEdgeViolation],
+  detours: [PolicyCanvasDetourViolation],
+  routeSegments: [PolicyCanvasRouteSegmentLengthViolation]
+) -> PolicyCanvasEdgeLengthMeasurement {
   let count = lengths.count
   let total = lengths.reduce(0, +)
   let summary = PolicyCanvasEdgeLengthSummary(
@@ -98,11 +120,11 @@ func policyCanvasMeasureEdgeLengths(
   let sortedDetours = detours.sorted { lhs, rhs in
     abs(lhs.excess - rhs.excess) > 0.001 ? lhs.excess > rhs.excess : lhs.edgeID < rhs.edgeID
   }
-  return (
-    summary,
-    sortedLongEdges,
-    sortedDetours,
-    routeSegments.sorted(by: policyCanvasRouteSegmentLengthViolationOrder)
+  return PolicyCanvasEdgeLengthMeasurement(
+    summary: summary,
+    longEdges: sortedLongEdges,
+    detours: sortedDetours,
+    routeSegments: routeSegments.sorted(by: policyCanvasRouteSegmentLengthViolationOrder)
   )
 }
 

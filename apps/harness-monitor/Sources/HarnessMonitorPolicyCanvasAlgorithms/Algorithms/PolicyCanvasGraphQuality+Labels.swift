@@ -41,6 +41,32 @@ func policyCanvasMeasureLabels(
       )
     }
     .sorted { $0.edgeID < $1.edgeID }
+  let sortedNodes = nodeFramesByID.sorted { $0.key < $1.key }
+  // Turn points per edge, computed once: the label-near-turn pass compares every
+  // label box against every wire's bends, its own included.
+  let turnsByEdge =
+    routedEdges
+    .map { (edgeID: $0.edge.id, turns: policyCanvasRouteTurnPoints($0.route)) }
+  var violations = policyCanvasLabelOverlapViolations(labeled: labeled)
+  for item in labeled {
+    violations.append(
+      contentsOf: policyCanvasLabelPlacementViolations(
+        item: item,
+        routedEdges: routedEdges,
+        sortedNodes: sortedNodes,
+        turnsByEdge: turnsByEdge,
+        thresholds: thresholds
+      )
+    )
+  }
+  return violations.sorted(by: policyCanvasLabelViolationOrder)
+}
+
+/// Pairwise label-box overlaps, walked in sorted order so each clashing pair is
+/// reported once.
+private func policyCanvasLabelOverlapViolations(
+  labeled: [PolicyCanvasLabeledEdge]
+) -> [PolicyCanvasLabelViolation] {
   var violations: [PolicyCanvasLabelViolation] = []
   for leftIndex in labeled.indices {
     for rightIndex in labeled.index(after: leftIndex)..<labeled.endIndex {
@@ -60,76 +86,81 @@ func policyCanvasMeasureLabels(
       )
     }
   }
-  let sortedNodes = nodeFramesByID.sorted { $0.key < $1.key }
-  // Turn points per edge, computed once: the label-near-turn pass compares every
-  // label box against every wire's bends, its own included.
-  let turnsByEdge =
-    routedEdges
-    .map { (edgeID: $0.edge.id, turns: policyCanvasRouteTurnPoints($0.route)) }
-  for item in labeled {
-    for (nodeID, frame) in sortedNodes where !item.endpoints.contains(nodeID) {
-      guard item.frame.intersects(frame) else {
-        continue
-      }
-      violations.append(
-        PolicyCanvasLabelViolation(
-          kind: .onBody,
-          edgeID: item.edgeID,
-          otherID: nodeID,
-          frame: item.frame,
-          distance: 0
-        )
-      )
+  return violations
+}
+
+/// The on-body, drift, foreign-edge, and near-turn checks for a single label,
+/// appended in that fixed order (the caller re-sorts the combined set).
+private func policyCanvasLabelPlacementViolations(
+  item: PolicyCanvasLabeledEdge,
+  routedEdges: [PolicyCanvasRoutedEdge],
+  sortedNodes: [(key: String, value: CGRect)],
+  turnsByEdge: [(edgeID: String, turns: [CGPoint])],
+  thresholds: PolicyCanvasGraphQualityThresholds
+) -> [PolicyCanvasLabelViolation] {
+  var violations: [PolicyCanvasLabelViolation] = []
+  for (nodeID, frame) in sortedNodes where !item.endpoints.contains(nodeID) {
+    guard item.frame.intersects(frame) else {
+      continue
     }
-    let distance = policyCanvasPointToRouteDistance(item.position, route: item.route)
-    if distance > thresholds.labelFarDistance {
-      violations.append(
-        PolicyCanvasLabelViolation(
-          kind: .farFromEdge,
-          edgeID: item.edgeID,
-          otherID: nil,
-          frame: item.frame,
-          distance: distance
-        )
+    violations.append(
+      PolicyCanvasLabelViolation(
+        kind: .onBody,
+        edgeID: item.edgeID,
+        otherID: nodeID,
+        frame: item.frame,
+        distance: 0
       )
-    }
-    // The label box laid over a wire that is not the one it names. The label's
-    // own route runs through its box by design, so only foreign routes count.
-    for routed in routedEdges where routed.edge.id != item.edgeID {
-      guard policyCanvasRouteIntersectsObstacles(routed.route, obstacles: [item.frame]) else {
-        continue
-      }
-      violations.append(
-        PolicyCanvasLabelViolation(
-          kind: .crossesEdge,
-          edgeID: item.edgeID,
-          otherID: routed.edge.id,
-          frame: item.frame,
-          distance: 0
-        )
-      )
-    }
-    // The label box overlapping or crowding a bend - one hit per crowding edge,
-    // at its nearest qualifying turn.
-    for entry in turnsByEdge {
-      let nearest = entry.turns.reduce(CGFloat.greatestFiniteMagnitude) { best, turn in
-        min(best, policyCanvasPointToRectGap(turn, item.frame))
-      }
-      guard nearest <= thresholds.labelTurnClearance else {
-        continue
-      }
-      violations.append(
-        PolicyCanvasLabelViolation(
-          kind: .nearTurn,
-          edgeID: item.edgeID,
-          otherID: entry.edgeID,
-          frame: item.frame,
-          distance: nearest
-        )
-      )
-    }
+    )
   }
-  return violations.sorted(by: policyCanvasLabelViolationOrder)
+  let distance = policyCanvasPointToRouteDistance(item.position, route: item.route)
+  if distance > thresholds.labelFarDistance {
+    violations.append(
+      PolicyCanvasLabelViolation(
+        kind: .farFromEdge,
+        edgeID: item.edgeID,
+        otherID: nil,
+        frame: item.frame,
+        distance: distance
+      )
+    )
+  }
+  // The label box laid over a wire that is not the one it names. The label's
+  // own route runs through its box by design, so only foreign routes count.
+  for routed in routedEdges where routed.edge.id != item.edgeID {
+    guard policyCanvasRouteIntersectsObstacles(routed.route, obstacles: [item.frame]) else {
+      continue
+    }
+    violations.append(
+      PolicyCanvasLabelViolation(
+        kind: .crossesEdge,
+        edgeID: item.edgeID,
+        otherID: routed.edge.id,
+        frame: item.frame,
+        distance: 0
+      )
+    )
+  }
+  // The label box overlapping or crowding a bend - one hit per crowding edge,
+  // at its nearest qualifying turn.
+  for entry in turnsByEdge {
+    let nearest = entry.turns.reduce(CGFloat.greatestFiniteMagnitude) { best, turn in
+      min(best, policyCanvasPointToRectGap(turn, item.frame))
+    }
+    guard nearest <= thresholds.labelTurnClearance else {
+      continue
+    }
+    violations.append(
+      PolicyCanvasLabelViolation(
+        kind: .nearTurn,
+        edgeID: item.edgeID,
+        otherID: entry.edgeID,
+        frame: item.frame,
+        distance: nearest
+      )
+    )
+  }
+  return violations
 }
 
 /// Interior vertices where a route changes direction - the visible corners. A

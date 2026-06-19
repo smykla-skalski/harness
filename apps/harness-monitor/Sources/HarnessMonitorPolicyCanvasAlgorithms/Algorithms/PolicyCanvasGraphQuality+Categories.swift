@@ -125,8 +125,19 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
 }
 
 extension PolicyCanvasGraphQualityReport {
-  /// Count of violations in a single category.
+  /// Count of violations in a single category. Split across three grouped
+  /// helpers so no single switch trips the cyclomatic-complexity gate: each
+  /// helper owns a disjoint slice of the categories and returns nil for the
+  /// rest, so exactly one helper answers any category.
   public func count(for category: PolicyCanvasQualityCategory) -> Int {
+    portCorridorCrossingCount(for: category)
+      ?? edgeRouteViolationCount(for: category)
+      ?? labelNodeViolationCount(for: category)
+      ?? 0
+  }
+
+  /// Port-spacing, corridor, and raw/independent crossing counters.
+  private func portCorridorCrossingCount(for category: PolicyCanvasQualityCategory) -> Int? {
     switch category {
     case .portOverlaps: portSpacing.filter { $0.kind == .overlap }.count
     case .portTooClose: portSpacing.filter { $0.kind == .tooClose }.count
@@ -136,6 +147,14 @@ extension PolicyCanvasGraphQualityReport {
     case .corridorParallel: corridors.filter { $0.kind == .parallelTooClose }.count
     case .crossings: crossings.count
     case .crossingsIndependent: crossings.filter { !$0.sharesEndpointNode }.count
+    default: nil
+    }
+  }
+
+  /// Edge- and route-geometry counters (body hits, long edges, detours,
+  /// segments, node distance, wrong turns, crossed ports).
+  private func edgeRouteViolationCount(for category: PolicyCanvasQualityCategory) -> Int? {
+    switch category {
     case .bodyHits: bodyHits.count
     case .longEdges: longEdges.count
     case .detours: detours.count
@@ -143,12 +162,20 @@ extension PolicyCanvasGraphQualityReport {
     case .nodeDistance: nodeDistance.count
     case .wrongTurns: wrongTurns.count
     case .crossedPorts: crossedPorts.count
+    default: nil
+    }
+  }
+
+  /// Label-placement and node-overlap counters.
+  private func labelNodeViolationCount(for category: PolicyCanvasQualityCategory) -> Int? {
+    switch category {
     case .labelOverlaps: labels.filter { $0.kind == .overlap }.count
     case .labelOnBody: labels.filter { $0.kind == .onBody }.count
     case .labelAdrift: labels.filter { $0.kind == .farFromEdge }.count
     case .labelOnEdge: labels.filter { $0.kind == .crossesEdge }.count
     case .labelNearTurn: labels.filter { $0.kind == .nearTurn }.count
     case .nodeOverlaps: nodeOverlaps.count
+    default: nil
     }
   }
 }
