@@ -31,6 +31,10 @@ custom_rules:
     severity: error
     included:
       - "Sources/HarnessMonitor"
+    excluded:
+      # Canvas root suppresses its own focus ring on purpose (components draw
+      # their own focus); the rationale is documented at the call site.
+      - "Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas/PolicyCanvasView.swift"
   no_selection_root_identity_churn:
     name: "No Selection Root Identity Churn"
     regex: '\.id\(store\.selectedSessionID'

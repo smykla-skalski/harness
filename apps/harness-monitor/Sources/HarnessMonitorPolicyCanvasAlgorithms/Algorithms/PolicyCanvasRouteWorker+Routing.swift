@@ -5,7 +5,7 @@ private let policyCanvasRouteComputationSignposter = OSSignposter(
   subsystem: "io.harnessmonitor",
   category: "policy-canvas.perf"
 )
-private let policyCanvasSinglePassSeededRoutingThreshold = 1_000
+private let policyCanvasSinglePassRoutingThreshold = 1_000
 
 struct PolicyCanvasDisplayedRoutePassContext: Sendable {
   let nodeIndex: [String: PolicyCanvasRouteNode]
@@ -2563,7 +2563,7 @@ extension PolicyCanvasPreparedRouteInput {
         current: PolicyCanvasRouteComputationState(routes: [:], portMarkerLayout: seedLayout),
         context: context
       )
-      if prepared.edges.count > policyCanvasSinglePassSeededRoutingThreshold {
+      if prepared.edges.count > policyCanvasSinglePassRoutingThreshold {
         return PolicyCanvasRouteComputationState(
           routes: state.routes,
           portMarkerLayout: seedLayout

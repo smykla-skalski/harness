@@ -88,7 +88,7 @@ private struct PolicyCanvasQualityHoverTooltip: View {
     .padding(.vertical, 5)
     .background(
       RoundedRectangle(cornerRadius: 6, style: .continuous)
-        .fill(.regularMaterial)
+        .fill(PolicyCanvasVisualStyle.elevatedSurface)
     )
     .overlay(
       RoundedRectangle(cornerRadius: 6, style: .continuous)

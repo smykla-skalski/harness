@@ -84,7 +84,8 @@ public enum PolicyCanvasQualityCategory: CaseIterable, Equatable, Hashable, Send
     case .portDetached:
       "A wire ends away from its port dot - the edge does not reach the marker it should attach to"
     case .portUneven:
-      "A port dot sits far from where an even spread would place it - dots clustered or crammed, not evenly distributed on the side"
+      "A port dot sits far from where an even spread would place it - dots clustered or "
+        + "crammed, not evenly distributed on the side"
     case .corridorReuse:
       "Two wires share one lane and overlap along it - they stack on the same rail"
     case .corridorParallel:

@@ -316,7 +316,7 @@ extension WebSocketTransport {
     request: TaskBoardPolicyCanvasSetGlobalEnforcementRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyCanvasSetGlobalEnforcement, params: params)
+    let value = try await rpc(method: .taskBoardPolicyCanvasSetEnforcement, params: params)
     return try decodePolicyWire(value)
   }
 

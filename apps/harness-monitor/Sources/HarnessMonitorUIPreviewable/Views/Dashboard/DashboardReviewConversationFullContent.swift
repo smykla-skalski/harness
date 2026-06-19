@@ -121,7 +121,7 @@ struct DashboardReviewConversationFullContentSheet: View {
     .frame(width: sheetMetrics.contentWidth(for: preferredBodyWidth))
     .frame(maxHeight: sheetMetrics.maxHeight)
     .background(Color(nsColor: .windowBackgroundColor))
-    .background(DashboardReviewConversationFullContentSheetMetricsReader(metrics: $sheetMetrics))
+    .background(DashboardReviewSheetMetricsReader(metrics: $sheetMetrics))
   }
 }
 
@@ -229,7 +229,7 @@ struct DashboardReviewConversationFullContentSheetMetrics: Equatable {
   }
 }
 
-private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewRepresentable {
+private struct DashboardReviewSheetMetricsReader: NSViewRepresentable {
   @Binding var metrics: DashboardReviewConversationFullContentSheetMetrics
 
   func makeNSView(context: Context) -> MetricsView {

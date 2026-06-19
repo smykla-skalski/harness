@@ -117,12 +117,12 @@ func policyCanvasMeasureCrossedPorts(
 /// is pushed one port diameter off the node side (outward, onto the wire margin,
 /// never into the body) to clear it while staying level with the two ports.
 private func policyCanvasCrossedPortMark(
-  _ a: CGPoint,
-  _ b: CGPoint,
+  _ pointA: CGPoint,
+  _ pointB: CGPoint,
   side: PolicyCanvasPortSide,
   spansPort: Bool
 ) -> CGPoint {
-  let mid = CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
+  let mid = CGPoint(x: (pointA.x + pointB.x) / 2, y: (pointA.y + pointB.y) / 2)
   guard spansPort else {
     return mid
   }
@@ -300,12 +300,12 @@ private func policyCanvasSegmentCrossing(
   guard abs(denominator) > 0.0001 else {
     return nil
   }
-  let t = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / denominator
-  let u = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / denominator
-  guard t > 0.0001, t < 0.9999, u > 0.0001, u < 0.9999 else {
+  let tFraction = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / denominator
+  let uFraction = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / denominator
+  guard tFraction > 0.0001, tFraction < 0.9999, uFraction > 0.0001, uFraction < 0.9999 else {
     return nil
   }
-  return CGPoint(x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y))
+  return CGPoint(x: p1.x + tFraction * (p2.x - p1.x), y: p1.y + tFraction * (p2.y - p1.y))
 }
 
 /// True when the route never reverses along the side's perpendicular axis (y for

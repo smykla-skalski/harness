@@ -215,11 +215,11 @@ private func policyCanvasDistanceSquared(
   guard lengthSquared > .ulpOfOne else {
     return policyCanvasDistanceSquared(point, start)
   }
-  let t = max(
+  let tClamped = max(
     0,
     min(1, (((point.x - start.x) * dx) + ((point.y - start.y) * dy)) / lengthSquared)
   )
-  let projected = CGPoint(x: start.x + (t * dx), y: start.y + (t * dy))
+  let projected = CGPoint(x: start.x + (tClamped * dx), y: start.y + (tClamped * dy))
   return policyCanvasDistanceSquared(point, projected)
 }
 

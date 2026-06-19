@@ -34,17 +34,16 @@ func policyCanvasMeasureBodyHits(
         )
       }
     }
-    for title in groupTitleFrames {
-      if policyCanvasRouteIntersectsObstacles(routed.route, obstacles: [title.frame]) {
-        violations.append(
-          PolicyCanvasBodyHitViolation(
-            edgeID: routed.edge.id,
-            obstacle: .groupTitle,
-            obstacleID: title.id,
-            frame: title.frame
-          )
+    for title in groupTitleFrames
+    where policyCanvasRouteIntersectsObstacles(routed.route, obstacles: [title.frame]) {
+      violations.append(
+        PolicyCanvasBodyHitViolation(
+          edgeID: routed.edge.id,
+          obstacle: .groupTitle,
+          obstacleID: title.id,
+          frame: title.frame
         )
-      }
+      )
     }
   }
   return violations.sorted(by: policyCanvasBodyHitViolationOrder)

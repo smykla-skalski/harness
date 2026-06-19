@@ -58,7 +58,7 @@ public func policyCanvasAutomaticLayoutResult(
   let interval = policyCanvasLayoutSignposter.beginInterval(
     "policy_canvas.layout.compute",
     id: signpostID,
-    "nodes=\(nodes.count, privacy: .public) edges=\(edges.count, privacy: .public) groups=\(groups.count, privacy: .public)"
+    "nodes=\(nodes.count) edges=\(edges.count) groups=\(groups.count)"
   )
   defer {
     policyCanvasLayoutSignposter.endInterval(
@@ -168,7 +168,7 @@ public func policyCanvasAppliedPrecomputedRoutes(
   }
   let appliedPositions = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
   let offsetRoutes: PolicyCanvasPrecomputedRouteSet
-  if let nodeID = result.nodePositions.keys.sorted().first,
+  if let nodeID = result.nodePositions.keys.min(),
     let position = result.nodePositions[nodeID],
     let applied = appliedPositions[nodeID]
   {
