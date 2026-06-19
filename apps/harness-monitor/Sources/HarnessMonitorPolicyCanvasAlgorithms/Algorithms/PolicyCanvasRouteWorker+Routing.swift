@@ -1,11 +1,11 @@
 import OSLog
 import SwiftUI
 
-private let policyCanvasRouteComputationSignposter = OSSignposter(
+let policyCanvasRouteComputationSignposter = OSSignposter(
   subsystem: "io.harnessmonitor",
   category: "policy-canvas.perf"
 )
-private let policyCanvasSinglePassRoutingThreshold = 1_000
+let policyCanvasSinglePassRoutingThreshold = 1_000
 
 struct PolicyCanvasDisplayedRoutePassContext: Sendable {
   let nodeIndex: [String: PolicyCanvasRouteNode]

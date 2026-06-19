@@ -39,7 +39,6 @@ struct PolicyCanvasDecoupledSugiyamaLayoutEngine: PolicyCanvasLayoutEngine {
       algorithms: algorithms,
       configuration: configuration
     )
-    let acyclicEdges = pipeline.acyclicEdges
     let rankAssignment = pipeline.rankAssignment
     let resolvedConfiguration = pipeline.resolvedConfiguration
     let orderingGraph = pipeline.orderingGraph
