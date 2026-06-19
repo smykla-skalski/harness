@@ -54,12 +54,14 @@ public struct TaskBoardPolicyCanvasWorkspaceResponseWire: Codable, Equatable, Se
   public var activeCanvasId: String
   public var canvases: [TaskBoardPolicyCanvasSummaryWire]
   public var globalPolicyEnforcementEnabled: Bool
+  public var scenarios: [PolicyScenario]
 
-  public init(schemaVersion: UInt32, activeCanvasId: String, canvases: [TaskBoardPolicyCanvasSummaryWire] = [], globalPolicyEnforcementEnabled: Bool = true) {
+  public init(schemaVersion: UInt32, activeCanvasId: String, canvases: [TaskBoardPolicyCanvasSummaryWire] = [], globalPolicyEnforcementEnabled: Bool = true, scenarios: [PolicyScenario] = []) {
     self.schemaVersion = schemaVersion
     self.activeCanvasId = activeCanvasId
     self.canvases = canvases
     self.globalPolicyEnforcementEnabled = globalPolicyEnforcementEnabled
+    self.scenarios = scenarios
   }
 
   public init(from decoder: Decoder) throws {
@@ -68,6 +70,7 @@ public struct TaskBoardPolicyCanvasWorkspaceResponseWire: Codable, Equatable, Se
     activeCanvasId = try container.decode(String.self, forKey: .activeCanvasId)
     canvases = try container.decodeIfPresent([TaskBoardPolicyCanvasSummaryWire].self, forKey: .canvases) ?? []
     globalPolicyEnforcementEnabled = try container.decodeIfPresent(Bool.self, forKey: .globalPolicyEnforcementEnabled) ?? true
+    scenarios = try container.decodeIfPresent([PolicyScenario].self, forKey: .scenarios) ?? []
   }
 
   enum CodingKeys: String, CodingKey {
@@ -75,6 +78,7 @@ public struct TaskBoardPolicyCanvasWorkspaceResponseWire: Codable, Equatable, Se
     case activeCanvasId = "active_canvas_id"
     case canvases
     case globalPolicyEnforcementEnabled = "global_policy_enforcement_enabled"
+    case scenarios
   }
 }
 

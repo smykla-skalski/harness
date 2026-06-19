@@ -2190,6 +2190,7 @@ const POLICY_MODELS_SOURCE: &str = include_str!("../src/task_board/policy_graph/
 const POLICY_IDS_SOURCE: &str = include_str!("../src/task_board/policy_graph/ids.rs");
 const POLICY_DEFAULTS_SOURCE: &str = include_str!("../src/task_board/policy_graph/defaults.rs");
 const POLICY_STORE_SOURCE: &str = include_str!("../src/task_board/policy_graph/store.rs");
+const POLICY_SCENARIO_SOURCE: &str = include_str!("../src/task_board/policy_graph/scenario.rs");
 const SUMMARIES_SOURCE: &str = include_str!("../src/daemon/protocol/summaries.rs");
 const HOOKS_PAYLOADS_SOURCE: &str = include_str!("../src/hooks/protocol/payloads.rs");
 const SUMMARIES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SummariesWireTypes.generated.swift";
@@ -2735,6 +2736,7 @@ fn modules() -> Vec<GeneratedModule> {
                 POLICY_GRAPH_SOURCE,
                 POLICY_MODELS_SOURCE,
                 POLICY_STORE_SOURCE,
+                POLICY_SCENARIO_SOURCE,
             ],
         },
         GeneratedModule {

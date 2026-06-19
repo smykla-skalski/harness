@@ -1402,14 +1402,106 @@ public struct PolicyFinishNode: Codable, Equatable, Sendable {
   }
 }
 
+public struct PolicyPipelineMakeLiveRequest: Codable, Equatable, Sendable {
+  public var revision: UInt64
+  public var actor: String?
+  public var canvasId: String?
+
+  public init(revision: UInt64 = 0, actor: String? = nil, canvasId: String? = nil) {
+    self.revision = revision
+    self.actor = actor
+    self.canvasId = canvasId
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case revision
+    case actor
+    case canvasId = "canvas_id"
+  }
+}
+
+public struct PolicyPipelineMakeLiveResponse: Codable, Equatable, Sendable {
+  public var document: PolicyGraph
+  public var traceId: String
+  public var globalPolicyEnforcementEnabled: Bool
+
+  public init(document: PolicyGraph, traceId: String, globalPolicyEnforcementEnabled: Bool) {
+    self.document = document
+    self.traceId = traceId
+    self.globalPolicyEnforcementEnabled = globalPolicyEnforcementEnabled
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case document
+    case traceId = "trace_id"
+    case globalPolicyEnforcementEnabled = "global_policy_enforcement_enabled"
+  }
+}
+
+public struct PolicyPipelineGoLiveDiffEntry: Codable, Equatable, Sendable {
+  public var scenarioId: String
+  public var scenarioName: String
+  public var action: PolicyAction
+  public var liveDecision: PolicyDecision?
+  public var draftDecision: PolicyDecision
+  public var changed: Bool
+
+  public init(scenarioId: String, scenarioName: String, action: PolicyAction, liveDecision: PolicyDecision? = nil, draftDecision: PolicyDecision, changed: Bool) {
+    self.scenarioId = scenarioId
+    self.scenarioName = scenarioName
+    self.action = action
+    self.liveDecision = liveDecision
+    self.draftDecision = draftDecision
+    self.changed = changed
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case scenarioId = "scenario_id"
+    case scenarioName = "scenario_name"
+    case action
+    case liveDecision = "live_decision"
+    case draftDecision = "draft_decision"
+    case changed
+  }
+}
+
+public struct PolicyPipelineGoLiveDiff: Codable, Equatable, Sendable {
+  public var hasLivePolicy: Bool
+  public var changedCount: UInt
+  public var diffs: [PolicyPipelineGoLiveDiffEntry]
+
+  public init(hasLivePolicy: Bool, changedCount: UInt, diffs: [PolicyPipelineGoLiveDiffEntry] = []) {
+    self.hasLivePolicy = hasLivePolicy
+    self.changedCount = changedCount
+    self.diffs = diffs
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    hasLivePolicy = try container.decode(Bool.self, forKey: .hasLivePolicy)
+    changedCount = try container.decode(UInt.self, forKey: .changedCount)
+    diffs = try container.decodeIfPresent([PolicyPipelineGoLiveDiffEntry].self, forKey: .diffs) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case hasLivePolicy = "has_live_policy"
+    case changedCount = "changed_count"
+    case diffs
+  }
+}
+
 public struct PolicyPipelineSimulatedDecisionWire: Codable, Equatable, Sendable {
+  public var scenarioId: String
+  public var scenarioName: String
   public var action: PolicyAction
   public var decision: PolicyDecision
   public var visitedNodeIds: [String]
   public var policyTraceIds: [String]
   public var boundaries: [PolicyRuntimeBoundary]
 
-  public init(action: PolicyAction, decision: PolicyDecision, visitedNodeIds: [String] = [], policyTraceIds: [String] = [], boundaries: [PolicyRuntimeBoundary] = []) {
+  public init(scenarioId: String = "", scenarioName: String = "", action: PolicyAction, decision: PolicyDecision, visitedNodeIds: [String] = [], policyTraceIds: [String] = [], boundaries: [PolicyRuntimeBoundary] = []) {
+    self.scenarioId = scenarioId
+    self.scenarioName = scenarioName
     self.action = action
     self.decision = decision
     self.visitedNodeIds = visitedNodeIds
@@ -1419,6 +1511,8 @@ public struct PolicyPipelineSimulatedDecisionWire: Codable, Equatable, Sendable 
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    scenarioId = try container.decodeIfPresent(String.self, forKey: .scenarioId) ?? ""
+    scenarioName = try container.decodeIfPresent(String.self, forKey: .scenarioName) ?? ""
     action = try container.decode(PolicyAction.self, forKey: .action)
     decision = try container.decode(PolicyDecision.self, forKey: .decision)
     visitedNodeIds = try container.decodeIfPresent([String].self, forKey: .visitedNodeIds) ?? []
@@ -1427,6 +1521,8 @@ public struct PolicyPipelineSimulatedDecisionWire: Codable, Equatable, Sendable 
   }
 
   enum CodingKeys: String, CodingKey {
+    case scenarioId = "scenario_id"
+    case scenarioName = "scenario_name"
     case action
     case decision
     case visitedNodeIds = "visited_node_ids"
@@ -1501,5 +1597,34 @@ public struct PolicyPipelineAuditSummaryWire: Codable, Equatable, Sendable {
     case latestTraceId = "latest_trace_id"
     case latestSimulation = "latest_simulation"
     case validation
+  }
+}
+
+public struct PolicyScenario: Codable, Equatable, Sendable {
+  public var id: String
+  public var name: String
+  public var input: PolicyInput
+  public var seeded: Bool
+
+  public init(id: String, name: String, input: PolicyInput, seeded: Bool = false) {
+    self.id = id
+    self.name = name
+    self.input = input
+    self.seeded = seeded
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    name = try container.decode(String.self, forKey: .name)
+    input = try container.decode(PolicyInput.self, forKey: .input)
+    seeded = try container.decodeIfPresent(Bool.self, forKey: .seeded) ?? false
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case name
+    case input
+    case seeded
   }
 }
