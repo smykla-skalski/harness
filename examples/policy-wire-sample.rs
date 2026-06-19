@@ -87,7 +87,7 @@ fn all_node_kinds() -> Vec<PolicyGraphNodeKind> {
         }),
         Kind::Switch(PolicySwitchNode {
             arms: vec![PolicySwitchArm {
-                port: "high".to_string(),
+                port: "high".to_string().into(),
                 field: PolicyEvidenceField::RiskScore,
                 predicate: PolicyEvidencePredicate::IsPositive,
             }],
