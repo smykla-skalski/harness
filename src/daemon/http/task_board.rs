@@ -10,7 +10,8 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
     TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, http_paths,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyScenarioCreateRequest,
+    TaskBoardPolicyScenarioDeleteRequest, TaskBoardPolicyScenarioUpdateRequest, http_paths,
 };
 
 use super::DaemonHttpState;
@@ -140,6 +141,22 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::TASK_BOARD_POLICY_AUDIT,
             get(get_task_board_policy_audit),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_SCENARIOS_CREATE,
+            post(post_task_board_policy_scenario_create),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_SCENARIOS_UPDATE,
+            post(post_task_board_policy_scenario_update),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_SCENARIOS_DELETE,
+            post(post_task_board_policy_scenario_delete),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_SCENARIOS_RESET,
+            post(post_task_board_policy_scenario_reset),
         )
 }
 
@@ -405,5 +422,92 @@ async fn get_task_board_policy_audit(
         &request_id,
         start,
         audit,
+    )
+}
+
+async fn post_task_board_policy_scenario_create(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyScenarioCreateRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    let workspace = match require_async_db(&state, "policy scenario create") {
+        Ok(db) => task_board_route_executor::create_policy_scenario(db, &request).await,
+        Err(error) => Err(error),
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_SCENARIOS_CREATE,
+        &request_id,
+        start,
+        workspace,
+    )
+}
+
+async fn post_task_board_policy_scenario_update(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyScenarioUpdateRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    let workspace = match require_async_db(&state, "policy scenario update") {
+        Ok(db) => task_board_route_executor::update_policy_scenario(db, &request).await,
+        Err(error) => Err(error),
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_SCENARIOS_UPDATE,
+        &request_id,
+        start,
+        workspace,
+    )
+}
+
+async fn post_task_board_policy_scenario_delete(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyScenarioDeleteRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    let workspace = match require_async_db(&state, "policy scenario delete") {
+        Ok(db) => task_board_route_executor::delete_policy_scenario(db, &request).await,
+        Err(error) => Err(error),
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_SCENARIOS_DELETE,
+        &request_id,
+        start,
+        workspace,
+    )
+}
+
+async fn post_task_board_policy_scenario_reset(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    let workspace = match require_async_db(&state, "policy scenario reset") {
+        Ok(db) => task_board_route_executor::reset_policy_scenarios(db).await,
+        Err(error) => Err(error),
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_SCENARIOS_RESET,
+        &request_id,
+        start,
+        workspace,
     )
 }

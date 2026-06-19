@@ -7,7 +7,9 @@ use crate::daemon::protocol::{
     TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest,
     TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, WsRequest, WsResponse, ws_methods,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyScenarioCreateRequest,
+    TaskBoardPolicyScenarioDeleteRequest, TaskBoardPolicyScenarioResetRequest,
+    TaskBoardPolicyScenarioUpdateRequest, WsRequest, WsResponse, ws_methods,
 };
 
 use super::super::mutations::dispatch_query_result;
@@ -23,7 +25,31 @@ pub(super) async fn dispatch_task_board_policy_method(
     if let Some(response) = dispatch_policy_pipeline_method(request, state).await {
         return Some(response);
     }
+    if let Some(response) = dispatch_policy_scenario_method(request, state).await {
+        return Some(response);
+    }
     dispatch_policy_io_method(request, state).await
+}
+
+async fn dispatch_policy_scenario_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::TASK_BOARD_POLICY_SCENARIO_CREATE => {
+            Some(dispatch_task_board_policy_scenario_create(request, state).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_SCENARIO_UPDATE => {
+            Some(dispatch_task_board_policy_scenario_update(request, state).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_SCENARIO_DELETE => {
+            Some(dispatch_task_board_policy_scenario_delete(request, state).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_SCENARIO_RESET => {
+            Some(dispatch_task_board_policy_scenario_reset(request, state).await)
+        }
+        _ => None,
+    }
 }
 
 async fn dispatch_policy_canvas_method(
@@ -430,6 +456,102 @@ pub(super) async fn dispatch_task_board_policy_import(
         serde_json::json!({
             "title": &body.title,
         }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_task_board_policy_scenario_create(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyScenarioCreateRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy scenario create") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    let result = task_board_route_executor::create_policy_scenario(db, &body).await;
+    super::record_task_board_audit_result(
+        state,
+        "task_board.policy_scenario_create",
+        "Create policy scenario",
+        None,
+        serde_json::json!({ "name": &body.name }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_task_board_policy_scenario_update(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyScenarioUpdateRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy scenario update") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    let result = task_board_route_executor::update_policy_scenario(db, &body).await;
+    super::record_task_board_audit_result(
+        state,
+        "task_board.policy_scenario_update",
+        "Update policy scenario",
+        Some(body.id.as_str()),
+        serde_json::json!({ "id": &body.id, "name": &body.name }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_task_board_policy_scenario_delete(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyScenarioDeleteRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy scenario delete") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    let result = task_board_route_executor::delete_policy_scenario(db, &body).await;
+    super::record_task_board_audit_result(
+        state,
+        "task_board.policy_scenario_delete",
+        "Delete policy scenario",
+        Some(body.id.as_str()),
+        serde_json::json!({ "id": &body.id }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_task_board_policy_scenario_reset(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(_body) = parse_params_or_default::<TaskBoardPolicyScenarioResetRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy scenario reset") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    let result = task_board_route_executor::reset_policy_scenarios(db).await;
+    super::record_task_board_audit_result(
+        state,
+        "task_board.policy_scenario_reset",
+        "Reset policy scenarios",
+        None,
+        serde_json::json!({}),
         &result,
     )
     .await;

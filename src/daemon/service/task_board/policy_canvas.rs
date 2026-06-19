@@ -10,7 +10,8 @@ use crate::daemon::protocol::{
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
     TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
     TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardPolicyPipelineSimulationResponse,
+    TaskBoardPolicyPipelineSimulationResponse, TaskBoardPolicyScenarioCreateRequest,
+    TaskBoardPolicyScenarioDeleteRequest, TaskBoardPolicyScenarioUpdateRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::default_board_root;
@@ -205,6 +206,90 @@ pub(crate) async fn set_task_board_policy_canvas_global_enforcement(
     Ok(policy_canvas_workspace_response(&workspace))
 }
 
+/// Create a new editable policy scenario and return the updated workspace.
+///
+/// Scenarios feed only the confidence simulation, never the enforcement gate,
+/// so this skips `feed_gate_cache`.
+///
+/// # Errors
+/// Returns `CliError` when the scenario name is blank or persistence fails.
+pub(crate) async fn create_task_board_policy_scenario(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyScenarioCreateRequest,
+) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
+    let name = request.name.clone();
+    let input = request.input.clone();
+    let (workspace, _scenario) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
+            policy_graph::apply_scenario_create(workspace, name, input)
+        })
+        .await?;
+    bump_change_policy(db).await;
+    Ok(policy_canvas_workspace_response(&workspace))
+}
+
+/// Update an existing policy scenario and return the updated workspace.
+///
+/// # Errors
+/// Returns `CliError` when the name is blank, the id is unknown, or persistence
+/// fails.
+pub(crate) async fn update_task_board_policy_scenario(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyScenarioUpdateRequest,
+) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
+    let id = request.id.clone();
+    let name = request.name.clone();
+    let input = request.input.clone();
+    let (workspace, _scenario) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
+            policy_graph::apply_scenario_update(workspace, &id, name, input)
+        })
+        .await?;
+    bump_change_policy(db).await;
+    Ok(policy_canvas_workspace_response(&workspace))
+}
+
+/// Delete a policy scenario and return the updated workspace.
+///
+/// # Errors
+/// Returns `CliError` when the id is unknown or persistence fails.
+pub(crate) async fn delete_task_board_policy_scenario(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyScenarioDeleteRequest,
+) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
+    let id = request.id.clone();
+    let (workspace, ()) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
+            policy_graph::apply_scenario_delete(workspace, &id)
+        })
+        .await?;
+    bump_change_policy(db).await;
+    Ok(policy_canvas_workspace_response(&workspace))
+}
+
+/// Restore the default seeded scenario set and return the updated workspace.
+///
+/// # Errors
+/// Returns `CliError` when durable policy state cannot be written.
+pub(crate) async fn reset_task_board_policy_scenarios(
+    db: &AsyncDaemonDb,
+) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
+    let (workspace, _scenarios) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_seeded_automation_canvases();
+            Ok(policy_graph::apply_scenario_reset(workspace))
+        })
+        .await?;
+    bump_change_policy(db).await;
+    Ok(policy_canvas_workspace_response(&workspace))
+}
+
 /// Load the V2 task-board policy pipeline document for the active canvas.
 ///
 /// # Errors
@@ -368,6 +453,7 @@ fn policy_canvas_workspace_response(
             .iter()
             .map(policy_canvas_summary)
             .collect(),
+        scenarios: workspace.scenarios.clone(),
     }
 }
 

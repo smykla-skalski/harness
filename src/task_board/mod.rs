@@ -69,7 +69,7 @@ pub use policy_graph::{
     PolicyPipelineMode, PolicyPipelineNode, PolicyPipelineNodeKind, PolicyPipelinePort,
     PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse,
     PolicyPipelineSimulatedDecision, PolicyPipelineSimulationResult, PolicyPipelineValidation,
-    PolicyPipelineValidationCode, PolicyPipelineValidationIssue,
+    PolicyPipelineValidationCode, PolicyPipelineValidationIssue, PolicyScenario,
 };
 pub use runtime_config::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,

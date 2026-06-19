@@ -6,7 +6,8 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
     TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, ws_methods,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyScenarioCreateRequest,
+    TaskBoardPolicyScenarioDeleteRequest, TaskBoardPolicyScenarioUpdateRequest, ws_methods,
 };
 use crate::mcp::tool::ToolRegistry;
 
@@ -102,6 +103,30 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 input_schema: document_schema,
                 normalize: validate_params::<TaskBoardPolicyImportRequest>,
             },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POLICY_SCENARIO_CREATE,
+                description: "Create an editable policy simulation scenario.",
+                input_schema: scenario_create_schema,
+                normalize: validate_params::<TaskBoardPolicyScenarioCreateRequest>,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POLICY_SCENARIO_UPDATE,
+                description: "Update an editable policy simulation scenario.",
+                input_schema: scenario_update_schema,
+                normalize: validate_params::<TaskBoardPolicyScenarioUpdateRequest>,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POLICY_SCENARIO_DELETE,
+                description: "Delete a policy simulation scenario.",
+                input_schema: scenario_id_schema,
+                normalize: validate_params::<TaskBoardPolicyScenarioDeleteRequest>,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POLICY_SCENARIO_RESET,
+                description: "Reset policy simulation scenarios to the seeded defaults.",
+                input_schema: empty_schema,
+                normalize: validate_empty_object,
+            },
         ],
     );
 }
@@ -190,6 +215,42 @@ fn global_enforcement_schema() -> Value {
             "enabled": { "type": "boolean" }
         },
         "required": ["enabled"],
+        "additionalProperties": false
+    })
+}
+
+fn scenario_create_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "input": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["name", "input"],
+        "additionalProperties": false
+    })
+}
+
+fn scenario_update_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "name": { "type": "string" },
+            "input": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["id", "name", "input"],
+        "additionalProperties": false
+    })
+}
+
+fn scenario_id_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" }
+        },
+        "required": ["id"],
         "additionalProperties": false
     })
 }

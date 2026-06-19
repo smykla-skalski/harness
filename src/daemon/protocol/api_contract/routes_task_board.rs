@@ -369,4 +369,36 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         },
         swift_client_exposed: true,
     },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_SCENARIOS_CREATE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_SCENARIO_CREATE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_SCENARIOS_UPDATE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_SCENARIO_UPDATE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_SCENARIOS_DELETE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_SCENARIO_DELETE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_SCENARIOS_RESET,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_SCENARIO_RESET,
+        },
+        swift_client_exposed: true,
+    },
 ];

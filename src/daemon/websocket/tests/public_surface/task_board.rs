@@ -356,6 +356,75 @@ fn websocket_task_board_policy_optional_routes_accept_missing_params() {
     });
 }
 
+#[test]
+fn websocket_task_board_policy_scenario_crud_roundtrips() {
+    let sandbox = tempdir().expect("tempdir");
+    with_isolated_harness_env(sandbox.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let state =
+                test_websocket_state_with_empty_async_db(&sandbox.path().join("daemon.sqlite"))
+                    .await;
+            let connection = Arc::new(Mutex::new(ConnectionState::new()));
+
+            let workspace_request: WsRequest = serde_json::from_value(json!({
+                "id": "req-scenario-workspace",
+                "method": ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET,
+            }))
+            .expect("workspace request");
+            let seeded = dispatch(&workspace_request, &state, &connection).await;
+            let seeded_count = seeded.result.expect("workspace result")["scenarios"]
+                .as_array()
+                .expect("scenarios array")
+                .len();
+            assert!(seeded_count > 0, "workspace get seeds default scenarios");
+
+            let create_request: WsRequest = serde_json::from_value(json!({
+                "id": "req-scenario-create",
+                "method": ws_methods::TASK_BOARD_POLICY_SCENARIO_CREATE,
+                "params": { "name": "Risky merge", "input": { "action": "merge_pr" } },
+            }))
+            .expect("scenario create request");
+            let created = dispatch(&create_request, &state, &connection).await;
+            assert!(
+                created.error.is_none(),
+                "unexpected create error: {:?}",
+                created.error
+            );
+            let created_scenarios = created.result.expect("create result")["scenarios"]
+                .as_array()
+                .expect("scenarios array")
+                .clone();
+            assert_eq!(created_scenarios.len(), seeded_count + 1);
+            assert!(
+                created_scenarios
+                    .iter()
+                    .any(|scenario| scenario["name"] == "Risky merge"),
+                "the created scenario appears in the workspace"
+            );
+
+            let reset_request: WsRequest = serde_json::from_value(json!({
+                "id": "req-scenario-reset",
+                "method": ws_methods::TASK_BOARD_POLICY_SCENARIO_RESET,
+            }))
+            .expect("scenario reset request");
+            let reset = dispatch(&reset_request, &state, &connection).await;
+            assert!(
+                reset.error.is_none(),
+                "unexpected reset error: {:?}",
+                reset.error
+            );
+            assert_eq!(
+                reset.result.expect("reset result")["scenarios"]
+                    .as_array()
+                    .expect("scenarios array")
+                    .len(),
+                seeded_count
+            );
+        });
+    });
+}
+
 async fn join_leader(
     state: &crate::daemon::http::DaemonHttpState,
     session_id: &str,

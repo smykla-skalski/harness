@@ -4,12 +4,12 @@ use crate::task_board::planning::PlanningTransition;
 use crate::task_board::types::TaskBoardWorkflowState;
 use crate::task_board::{
     AgentMode, DispatchExecutionSummary, ExternalProvider, ExternalRef, ExternalSyncConflictPolicy,
-    ExternalSyncDirection, Machine, PlanningState, PolicyGraphMode, PolicyPipelineAuditSummary,
-    PolicyPipelineDocument, PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse,
-    PolicyPipelineSaveResponse, PolicyPipelineSimulationResult, TaskBoardAuditSummary,
-    TaskBoardEvaluationSummary, TaskBoardGitIdentityDefaults, TaskBoardItem,
-    TaskBoardMachineSummary, TaskBoardPriority, TaskBoardProjectSummary, TaskBoardStatus,
-    TaskBoardSyncSummary,
+    ExternalSyncDirection, Machine, PlanningState, PolicyGraphMode, PolicyInput,
+    PolicyPipelineAuditSummary, PolicyPipelineDocument, PolicyPipelinePromoteRequest,
+    PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse, PolicyPipelineSimulationResult,
+    PolicyScenario, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
+    TaskBoardGitIdentityDefaults, TaskBoardItem, TaskBoardMachineSummary, TaskBoardPriority,
+    TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary,
 };
 
 pub use crate::task_board::{
@@ -275,6 +275,8 @@ pub struct TaskBoardPolicyCanvasWorkspaceResponse {
     pub canvases: Vec<TaskBoardPolicyCanvasSummary>,
     #[serde(default = "default_global_policy_enforcement_enabled")]
     pub global_policy_enforcement_enabled: bool,
+    #[serde(default)]
+    pub scenarios: Vec<PolicyScenario>,
 }
 
 const fn default_global_policy_enforcement_enabled() -> bool {
@@ -314,6 +316,27 @@ pub struct TaskBoardPolicyCanvasDeleteRequest {
 pub struct TaskBoardPolicyCanvasSetGlobalEnforcementRequest {
     pub enabled: bool,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPolicyScenarioCreateRequest {
+    pub name: String,
+    pub input: PolicyInput,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPolicyScenarioUpdateRequest {
+    pub id: String,
+    pub name: String,
+    pub input: PolicyInput,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPolicyScenarioDeleteRequest {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardPolicyScenarioResetRequest {}
 
 pub type TaskBoardSyncResponse = TaskBoardSyncSummary;
 pub type TaskBoardProjectsResponse = Vec<TaskBoardProjectSummary>;

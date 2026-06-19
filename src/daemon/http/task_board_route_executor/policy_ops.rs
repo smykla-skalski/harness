@@ -10,6 +10,8 @@ use crate::daemon::protocol::{
     TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineResponse,
     TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
     TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
+    TaskBoardPolicyScenarioCreateRequest, TaskBoardPolicyScenarioDeleteRequest,
+    TaskBoardPolicyScenarioUpdateRequest,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -109,4 +111,31 @@ pub(crate) async fn import_policy_canvas(
     request: &TaskBoardPolicyImportRequest,
 ) -> Result<TaskBoardPolicyImportResponse, CliError> {
     service::import_task_board_policy(db, request).await
+}
+
+pub(crate) async fn create_policy_scenario(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyScenarioCreateRequest,
+) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
+    service::create_task_board_policy_scenario(db, request).await
+}
+
+pub(crate) async fn update_policy_scenario(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyScenarioUpdateRequest,
+) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
+    service::update_task_board_policy_scenario(db, request).await
+}
+
+pub(crate) async fn delete_policy_scenario(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyScenarioDeleteRequest,
+) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
+    service::delete_task_board_policy_scenario(db, request).await
+}
+
+pub(crate) async fn reset_policy_scenarios(
+    db: &AsyncDaemonDb,
+) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
+    service::reset_task_board_policy_scenarios(db).await
 }

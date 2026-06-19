@@ -365,6 +365,30 @@ fn task_board_routes_have_complete_ws_parity() {
                 ws_methods::TASK_BOARD_POLICY_IMPORT,
                 true,
             ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_POLICY_SCENARIOS_CREATE,
+                ws_methods::TASK_BOARD_POLICY_SCENARIO_CREATE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_POLICY_SCENARIOS_UPDATE,
+                ws_methods::TASK_BOARD_POLICY_SCENARIO_UPDATE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_POLICY_SCENARIOS_DELETE,
+                ws_methods::TASK_BOARD_POLICY_SCENARIO_DELETE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_POLICY_SCENARIOS_RESET,
+                ws_methods::TASK_BOARD_POLICY_SCENARIO_RESET,
+                true,
+            ),
         ]
     );
     let expected_mcp_methods: Vec<_> = actual
