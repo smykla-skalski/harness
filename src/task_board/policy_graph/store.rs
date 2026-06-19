@@ -7,7 +7,7 @@ use super::{
     PolicyGraph, PolicyGraphMode, PolicyGraphValidationReport, PolicyInput,
 };
 
-use super::store_canvas::{new_trace_id, simulation_inputs, validation_error};
+use super::store_canvas::{new_trace_id, validation_error};
 
 #[derive(Debug, Clone)]
 pub struct GraphPolicyGate {
@@ -52,6 +52,10 @@ pub struct PolicyPipelinePromoteResponse {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyPipelineSimulatedDecision {
+    #[serde(default)]
+    pub scenario_id: String,
+    #[serde(default)]
+    pub scenario_name: String,
     pub action: PolicyAction,
     pub decision: PolicyDecision,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -178,12 +182,17 @@ pub fn apply_simulate(
     };
     let document = base_document.with_mode(PolicyGraphMode::DryRun);
     let validation = document.validate();
-    let decisions: Vec<_> = simulation_inputs()
+    // Clone the scenario set before the `&mut ws` reborrow below so the iteration
+    // does not split the workspace borrow.
+    let scenarios = ws.scenarios.clone();
+    let decisions: Vec<_> = scenarios
         .into_iter()
-        .map(|input| {
-            let simulation = document.simulate(&input);
+        .map(|scenario| {
+            let simulation = document.simulate(&scenario.input);
             PolicyPipelineSimulatedDecision {
-                action: input.action,
+                scenario_id: scenario.id,
+                scenario_name: scenario.name,
+                action: scenario.input.action,
                 decision: simulation.decision,
                 visited_node_ids: simulation.visited_node_ids,
                 policy_trace_ids: simulation.policy_trace_ids,

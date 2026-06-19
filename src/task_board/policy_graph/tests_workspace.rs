@@ -434,3 +434,37 @@ fn ensure_seeded_scenarios_backfills_once_then_respects_deletions() {
     assert!(!ws.ensure_seeded_scenarios(), "guard prevents re-seeding");
     assert_eq!(ws.scenarios.len(), 1);
 }
+
+#[test]
+fn simulate_runs_each_scenario_and_labels_its_decision() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let result = apply_simulate(&mut ws, None, None).expect("simulate");
+
+    assert_eq!(result.decisions.len(), default_seeded_scenarios().len());
+    assert!(
+        result
+            .decisions
+            .iter()
+            .all(|decision| !decision.scenario_id.is_empty()),
+        "every decision carries its scenario id"
+    );
+    assert!(
+        result
+            .decisions
+            .iter()
+            .any(|decision| decision.scenario_id == "scenario-seed-merge_pr"),
+        "the seeded merge scenario is simulated"
+    );
+}
+
+#[test]
+fn simulate_honors_a_custom_scenario_set() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let kept = ws.scenarios[0].clone();
+    ws.scenarios = vec![kept.clone()];
+
+    let result = apply_simulate(&mut ws, None, None).expect("simulate");
+
+    assert_eq!(result.decisions.len(), 1);
+    assert_eq!(result.decisions[0].scenario_id, kept.id);
+}
