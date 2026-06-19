@@ -202,6 +202,27 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(!support.contains("Text(item.authorLogin)"))
   }
 
+  @Test("Header title and metadata links expose copy context menus")
+  func headerTitleAndMetadataLinksExposeCopyContextMenus() throws {
+    let support = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
+    )
+
+    #expect(support.contains("private struct DashboardReviewCopyableLinkContextMenu: View"))
+    #expect(support.contains("HarnessMonitorClipboard.copy(value)"))
+    #expect(support.contains("HarnessMonitorClipboard.copy(destination.absoluteString)"))
+    #expect(support.contains("Button(openTitle)"))
+    #expect(support.contains("valueTitle: \"Copy Title\""))
+    #expect(support.contains("value: item.title"))
+    #expect(support.contains("copyValueTitle: \"Copy Repository and Number\""))
+    #expect(support.contains("title: \"\\(item.repository)#\\(item.number)\""))
+    #expect(support.contains("copyValueTitle: \"Copy Author\""))
+    #expect(support.contains("title: \"@\\(item.authorLogin)\""))
+    #expect(support.contains("item.authorLogin.dashboardReviewGitHubPathEncoded"))
+    #expect(support.contains("urlTitle: \"Copy Pull Request URL\""))
+    #expect(support.contains("copyURLTitle: \"Copy Author URL\""))
+  }
+
   @Test("Status pill drops icon when attention summary owns it")
   func statusPillDropsIconWhenAttentionSummaryOwnsIt() throws {
     let visuals = try source(

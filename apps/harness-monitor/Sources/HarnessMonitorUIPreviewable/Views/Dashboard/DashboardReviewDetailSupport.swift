@@ -146,7 +146,7 @@ struct DashboardReviewDetailHeader<Actions: View>: View {
   }
 
   private var authorProfileURL: URL? {
-    URL(string: "https://github.com/\(item.authorLogin)")
+    URL(string: "https://github.com/\(item.authorLogin.dashboardReviewGitHubPathEncoded)")
   }
 
   var body: some View {
@@ -170,7 +170,15 @@ struct DashboardReviewDetailHeader<Actions: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
           }
           .harnessPlainButtonStyle()
-          .disabled(pullRequestURL == nil)
+          .contextMenu {
+            DashboardReviewCopyableLinkContextMenu(
+              valueTitle: "Copy Title",
+              value: item.title,
+              urlTitle: "Copy Pull Request URL",
+              openTitle: "Open Pull Request",
+              destination: pullRequestURL
+            )
+          }
           .help("Open pull request on GitHub")
           .accessibilityHint("Opens the pull request on GitHub")
 
@@ -189,6 +197,9 @@ struct DashboardReviewDetailHeader<Actions: View>: View {
             destination: pullRequestURL,
             helpText: "Open pull request on GitHub",
             accessibilityHint: "Opens the pull request on GitHub",
+            copyValueTitle: "Copy Repository and Number",
+            copyURLTitle: "Copy Pull Request URL",
+            openDestinationTitle: "Open Pull Request",
             truncationMode: .middle
           )
           .layoutPriority(1)
@@ -198,6 +209,9 @@ struct DashboardReviewDetailHeader<Actions: View>: View {
             destination: authorProfileURL,
             helpText: "Open author profile on GitHub",
             accessibilityHint: "Opens the author profile on GitHub",
+            copyValueTitle: "Copy Author",
+            copyURLTitle: "Copy Author URL",
+            openDestinationTitle: "Open Author Profile",
             fixesHorizontalSize: true
           )
         }
@@ -253,6 +267,9 @@ private struct DashboardReviewMetadataLink: View {
   let destination: URL?
   let helpText: String
   let accessibilityHint: String
+  let copyValueTitle: String
+  let copyURLTitle: String
+  let openDestinationTitle: String
   var truncationMode: Text.TruncationMode = .tail
   var fixesHorizontalSize = false
 
@@ -273,7 +290,15 @@ private struct DashboardReviewMetadataLink: View {
         .foregroundStyle(foregroundColor)
     }
     .buttonStyle(DashboardReviewMetadataLinkButtonStyle(isHovering: isHovering))
-    .disabled(destination == nil)
+    .contextMenu {
+      DashboardReviewCopyableLinkContextMenu(
+        valueTitle: copyValueTitle,
+        value: title,
+        urlTitle: copyURLTitle,
+        openTitle: openDestinationTitle,
+        destination: destination
+      )
+    }
     .help(helpText)
     .accessibilityLabel(title)
     .accessibilityHint(accessibilityHint)
@@ -303,6 +328,24 @@ private struct DashboardReviewMetadataLink: View {
       NSCursor.pointingHand.push()
     } else {
       NSCursor.pop()
+    }
+  }
+}
+
+private struct DashboardReviewCopyableLinkContextMenu: View {
+  let valueTitle: String, value: String
+  let urlTitle: String, openTitle: String
+  let destination: URL?
+
+  @Environment(\.openURL)
+  private var openURL
+
+  var body: some View {
+    Button(valueTitle) { HarnessMonitorClipboard.copy(value) }
+    if let destination {
+      Button(urlTitle) { HarnessMonitorClipboard.copy(destination.absoluteString) }
+      Divider()
+      Button(openTitle) { openURL(destination) }
     }
   }
 }
