@@ -41,6 +41,8 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
   public let number: UInt64
   public let title: String
   public let url: String
+  public let baseRefName: String?
+  public let defaultBranchName: String?
   public let authorLogin: String
   public let authorAvatarURL: URL?
   public let authorAssociation: ReviewAuthorAssociation
@@ -72,6 +74,8 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     number: UInt64,
     title: String,
     url: String,
+    baseRefName: String? = nil,
+    defaultBranchName: String? = nil,
     authorLogin: String,
     authorAvatarURL: URL? = nil,
     authorAssociation: ReviewAuthorAssociation = .none,
@@ -100,6 +104,8 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     self.number = number
     self.title = title
     self.url = url
+    self.baseRefName = baseRefName
+    self.defaultBranchName = defaultBranchName
     self.authorLogin = authorLogin
     self.authorAvatarURL = authorAvatarURL
     self.authorAssociation = authorAssociation
@@ -130,6 +136,8 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     case number
     case title
     case url
+    case baseRefName
+    case defaultBranchName
     case authorLogin
     case authorAvatarURL = "authorAvatarUrl"
     case authorAssociation
@@ -161,6 +169,8 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     number = try container.decode(UInt64.self, forKey: .number)
     title = try container.decode(String.self, forKey: .title)
     url = try container.decode(String.self, forKey: .url)
+    baseRefName = try container.decodeIfPresent(String.self, forKey: .baseRefName)
+    defaultBranchName = try container.decodeIfPresent(String.self, forKey: .defaultBranchName)
     authorLogin = try container.decode(String.self, forKey: .authorLogin)
     authorAvatarURL =
       try container.decodeIfPresent(String.self, forKey: .authorAvatarURL)
@@ -197,5 +207,23 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     viewerCanUpdate = try container.decodeIfPresent(Bool.self, forKey: .viewerCanUpdate) ?? false
     viewerCanMergeAsAdmin =
       try container.decodeIfPresent(Bool.self, forKey: .viewerCanMergeAsAdmin) ?? false
+  }
+}
+
+extension ReviewItem {
+  public var nonDefaultTargetBranchName: String? {
+    guard
+      let baseRefName = Self.normalizedBranchName(baseRefName),
+      let defaultBranchName = Self.normalizedBranchName(defaultBranchName),
+      baseRefName != defaultBranchName
+    else {
+      return nil
+    }
+    return baseRefName
+  }
+
+  private static func normalizedBranchName(_ value: String?) -> String? {
+    let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return trimmed.isEmpty ? nil : trimmed
   }
 }

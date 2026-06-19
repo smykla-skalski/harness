@@ -65,6 +65,8 @@ extension ReviewItem {
       number: wire.number,
       title: wire.title,
       url: wire.url,
+      baseRefName: wire.baseRefName,
+      defaultBranchName: wire.defaultBranchName,
       authorLogin: wire.authorLogin,
       authorAvatarURL: wire.authorAvatarUrl.flatMap { URL(string: $0) },
       authorAssociation: wire.authorAssociation,

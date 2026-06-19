@@ -182,6 +182,10 @@ extension DashboardReviewsRouteView {
     routePreferencesToggleBinding(\.showApprovalCountsInRows)
   }
 
+  var routeShowTargetBranchInRowsBinding: Binding<Bool> {
+    routePreferencesToggleBinding(\.showTargetBranchInRows)
+  }
+
   var routeShowPullRequestNumberInRowsBinding: Binding<Bool> {
     routePreferencesToggleBinding(\.showPullRequestNumberInRows)
   }

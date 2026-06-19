@@ -19,6 +19,7 @@ extension DashboardReviewsRouteView {
       showsLabels: normalizedPreferences.showLabelsInRows,
       showsLineCounters: normalizedPreferences.showLineCountersInRows,
       showsApprovalCounts: normalizedPreferences.showApprovalCountsInRows,
+      showsTargetBranch: normalizedPreferences.showTargetBranchInRows,
       showsPullRequestNumber: normalizedPreferences.showPullRequestNumberInRows,
       showsPullRequestAge: normalizedPreferences.showPullRequestAgeInRows,
       wrapsTitle: normalizedPreferences.wrapTitlesInRows,

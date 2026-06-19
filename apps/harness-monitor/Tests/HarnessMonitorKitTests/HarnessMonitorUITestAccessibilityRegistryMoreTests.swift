@@ -135,6 +135,10 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
         == "harness.settings.reviews.show-row-approval-counts"
     )
     #expect(
+      HarnessMonitorAccessibility.settingsReviewsTargetBranchToggle
+        == "harness.settings.reviews.show-row-target-branch"
+    )
+    #expect(
       HarnessMonitorAccessibility.settingsReviewsGeneratedPatternsTable
         == "harness.settings.reviews.generated-patterns"
     )
@@ -237,6 +241,7 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
         ".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"display\"))"
       )
     )
+    #expect(displayPane.contains("HarnessMonitorAccessibility.settingsReviewsTargetBranchToggle"))
     #expect(
       filesPane.contains(
         ".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"files\"))"

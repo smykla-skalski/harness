@@ -152,6 +152,8 @@ struct ReviewItemViewerCanUpdateDefaultTests {
   func daemonNormalizerForwardsAuthorAssociationAndReviewerRequestFields() throws {
     let source = try harnessMonitorKitSource(named: "HarnessMonitorReviewsDaemonNormalizer.swift")
     #expect(source.contains("authorAssociation: item.authorAssociation"))
+    #expect(source.contains("baseRefName: item.baseRefName"))
+    #expect(source.contains("defaultBranchName: item.defaultBranchName"))
     #expect(source.contains("viewerIsRequestedReviewer: item.viewerIsRequestedReviewer"))
   }
 

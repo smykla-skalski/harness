@@ -17,6 +17,7 @@ query SearchReviews($query: String!, $after: String) {
         viewerCanMergeAsAdmin
         reviewDecision
         headRefOid
+        baseRefName
         author { login avatarUrl }
         authorAssociation
         reviewRequests(first: 100) {
@@ -32,6 +33,7 @@ query SearchReviews($query: String!, $after: String) {
         repository {
           id
           nameWithOwner
+          defaultBranchRef { name }
           labels(first: 100) {
             pageInfo { hasNextPage endCursor }
             nodes {
@@ -124,6 +126,7 @@ query ReviewNodes($ids: [ID!]!) {
       viewerCanMergeAsAdmin
       reviewDecision
       headRefOid
+      baseRefName
       author { login avatarUrl }
       authorAssociation
       reviewRequests(first: 100) {
@@ -139,6 +142,7 @@ query ReviewNodes($ids: [ID!]!) {
       repository {
         id
         nameWithOwner
+        defaultBranchRef { name }
         labels(first: 100) {
           pageInfo { hasNextPage endCursor }
           nodes {

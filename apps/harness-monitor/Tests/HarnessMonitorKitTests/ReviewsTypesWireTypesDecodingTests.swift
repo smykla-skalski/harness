@@ -37,6 +37,23 @@ struct ReviewsTypesWireTypesDecodingTests {
     #expect(target.viewerCanUpdate == true)
   }
 
+  @Test("decodes review item target branch metadata")
+  func decodesReviewItemTargetBranchMetadata() throws {
+    let json = #"""
+      {"pull_request_id":"pr-1","repository_id":"r-1","repository":"o/r","number":42,
+      "title":"Ship release branch","url":"https://example.com/pr/42",
+      "base_ref_name":"release/3.4","default_branch_name":"main",
+      "author_login":"octocat","author_association":"none","state":"open",
+      "mergeable":"mergeable","review_status":"review_required","check_status":"pending",
+      "head_sha":"abc123","additions":2,"deletions":1,
+      "created_at":"2026-06-19T10:00:00Z","updated_at":"2026-06-19T11:00:00Z"}
+      """#
+    let item = try decoder.decode(ReviewItemWire.self, from: Data(json.utf8))
+
+    #expect(item.baseRefName == "release/3.4")
+    #expect(item.defaultBranchName == "main")
+  }
+
   @Test("decodes policy run metrics with a dictionary field")
   func decodesPolicyRunMetricsDict() throws {
     // The counters are required (the struct derives Default for construction but

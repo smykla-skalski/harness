@@ -74,6 +74,8 @@ public enum HarnessMonitorReviewsDaemonNormalizer {
       number: item.number,
       title: item.title,
       url: item.url,
+      baseRefName: item.baseRefName,
+      defaultBranchName: item.defaultBranchName,
       authorLogin: item.authorLogin,
       authorAvatarURL: item.authorAvatarURL,
       authorAssociation: item.authorAssociation,

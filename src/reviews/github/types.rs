@@ -64,6 +64,8 @@ pub(super) struct SearchNode {
     pub(super) review_decision: Option<String>,
     #[serde(rename = "headRefOid")]
     pub(super) head_ref_oid: Option<String>,
+    #[serde(rename = "baseRefName", default)]
+    pub(super) base_ref_name: Option<String>,
     pub(super) author: Option<LoginNode>,
     #[serde(rename = "authorAssociation", default)]
     pub(super) author_association: Option<String>,
@@ -97,8 +99,15 @@ pub(super) struct RepositoryNode {
     pub(super) id: String,
     #[serde(rename = "nameWithOwner")]
     pub(super) name_with_owner: String,
+    #[serde(rename = "defaultBranchRef", default)]
+    pub(super) default_branch_ref: Option<RepositoryDefaultBranchRefNode>,
     #[serde(default)]
     pub(super) labels: Option<RepositoryLabelConnection>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RepositoryDefaultBranchRefNode {
+    pub(super) name: String,
 }
 
 #[derive(Debug, Deserialize)]

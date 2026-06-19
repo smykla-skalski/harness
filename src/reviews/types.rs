@@ -108,6 +108,10 @@ pub struct ReviewItem {
     pub number: u64,
     pub title: String,
     pub url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_ref_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_branch_name: Option<String>,
     pub author_login: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author_avatar_url: Option<String>,

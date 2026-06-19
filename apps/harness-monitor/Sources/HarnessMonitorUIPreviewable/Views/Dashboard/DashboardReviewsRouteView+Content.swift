@@ -126,6 +126,7 @@ extension DashboardReviewsRouteView {
       showLabelsInRows: routeShowLabelsInRowsBinding,
       showLineCountersInRows: routeShowLineCountersInRowsBinding,
       showApprovalCountsInRows: routeShowApprovalCountsInRowsBinding,
+      showTargetBranchInRows: routeShowTargetBranchInRowsBinding,
       showPullRequestNumberInRows: routeShowPullRequestNumberInRowsBinding,
       showPullRequestAgeInRows: routeShowPullRequestAgeInRowsBinding,
       wrapTitlesInRows: routeWrapTitlesInRowsBinding,

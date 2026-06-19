@@ -32,6 +32,7 @@ struct DashboardReviewsControlStrip: View {
   @Binding var showLabelsInRows: Bool
   @Binding var showLineCountersInRows: Bool
   @Binding var showApprovalCountsInRows: Bool
+  @Binding var showTargetBranchInRows: Bool
   @Binding var showPullRequestNumberInRows: Bool
   @Binding var showPullRequestAgeInRows: Bool
   @Binding var wrapTitlesInRows: Bool
@@ -270,6 +271,11 @@ struct DashboardReviewsControlStrip: View {
             HarnessMonitorAccessibility.dashboardReviewsApprovalCountsToggle
           )
           .accessibilityLabel("Show approval counts in review rows")
+        Toggle("Target branch", isOn: $showTargetBranchInRows)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.dashboardReviewsTargetBranchToggle
+          )
+          .accessibilityLabel("Show target branch for non-default pull requests in review rows")
         Toggle("PR number", isOn: $showPullRequestNumberInRows)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.dashboardReviewsPullRequestNumberToggle

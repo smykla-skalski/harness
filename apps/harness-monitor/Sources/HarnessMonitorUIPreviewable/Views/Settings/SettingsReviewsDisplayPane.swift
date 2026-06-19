@@ -50,6 +50,10 @@ struct SettingsReviewsDisplayPane: View {
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.settingsReviewsApprovalCountsToggle
         )
+      Toggle("Show target branch for non-default PRs", isOn: $draft.showTargetBranchInRows)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsReviewsTargetBranchToggle
+        )
       Toggle("Show PR numbers in review rows", isOn: $draft.showPullRequestNumberInRows)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.settingsReviewsPullRequestNumberToggle

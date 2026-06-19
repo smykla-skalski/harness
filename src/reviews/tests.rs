@@ -13,6 +13,8 @@ fn sample_item(
         number: 42,
         title: "chore(deps): bump".into(),
         url: "https://example.com".into(),
+        base_ref_name: None,
+        default_branch_name: None,
         author_login: "renovate[bot]".into(),
         author_avatar_url: None,
         author_association: ReviewAuthorAssociation::None,

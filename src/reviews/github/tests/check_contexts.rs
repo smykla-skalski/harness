@@ -304,6 +304,8 @@ pub(super) fn sample_review_item() -> ReviewItem {
         number: 1,
         title: "Update dependencies".into(),
         url: "https://github.com/acme/api/pull/1".into(),
+        base_ref_name: None,
+        default_branch_name: None,
         author_login: "renovate[bot]".into(),
         author_avatar_url: None,
         author_association: crate::reviews::ReviewAuthorAssociation::None,

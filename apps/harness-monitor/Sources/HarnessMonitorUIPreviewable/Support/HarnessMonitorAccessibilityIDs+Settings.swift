@@ -169,6 +169,8 @@ extension HarnessMonitorAccessibility {
     "harness.settings.reviews.show-row-line-counters"
   public static let settingsReviewsApprovalCountsToggle =
     "harness.settings.reviews.show-row-approval-counts"
+  public static let settingsReviewsTargetBranchToggle =
+    "harness.settings.reviews.show-row-target-branch"
   public static let settingsReviewsPullRequestNumberToggle =
     "harness.settings.reviews.show-row-pr-number"
   public static let settingsReviewsPullRequestAgeToggle =

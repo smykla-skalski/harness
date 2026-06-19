@@ -201,6 +201,11 @@ fn build_review_item(
         || (String::new(), None),
         |author| (author.login.unwrap_or_default(), author.avatar_url),
     );
+    let default_branch_name = node
+        .repository
+        .default_branch_ref
+        .as_ref()
+        .map(|branch| branch.name.clone());
     let viewer_is_requested_reviewer = viewer_login.is_some_and(|viewer_login| {
         node.review_requests
             .as_ref()
@@ -221,6 +226,8 @@ fn build_review_item(
         number: node.number,
         title: node.title,
         url: node.url,
+        base_ref_name: node.base_ref_name,
+        default_branch_name,
         author_login,
         author_avatar_url,
         author_association: ReviewAuthorAssociation::parse(node.author_association.as_deref()),

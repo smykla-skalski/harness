@@ -9,9 +9,11 @@ import SwiftUI
 /// Structure (top to bottom):
 /// 1. Title row: optional avatar chip · wrapped title (dimmed for draft pull
 ///    requests) · trailing icon strip
-/// 2. Metadata row: optional `#N · age` identity plus repository text on the
+/// 2. Optional target-branch pill for pull requests aimed away from the
+///    repository default branch
+/// 3. Metadata row: optional `#N · age` identity plus repository text on the
 ///    left, with quieter reviewer/change chrome trailing when present
-/// 3. Optional labels strip: muted chips for `item.labels`
+/// 4. Optional labels strip: muted chips for `item.labels`
 ///
 /// Draft pull requests drop the old inline Draft pill and signal draft state by
 /// dimming the title (`draftTitleOpacity`); the trailing status icon still
@@ -42,6 +44,7 @@ struct DashboardReviewListRow: View, Equatable {
   let showsLabels: Bool
   let showsLineCounters: Bool
   let showsApprovalCounts: Bool
+  let showsTargetBranch: Bool
   let showsPullRequestNumber: Bool
   let showsPullRequestAge: Bool
   let wrapsTitle: Bool
@@ -79,6 +82,7 @@ struct DashboardReviewListRow: View, Equatable {
       && lhs.showsLabels == rhs.showsLabels
       && lhs.showsLineCounters == rhs.showsLineCounters
       && lhs.showsApprovalCounts == rhs.showsApprovalCounts
+      && lhs.showsTargetBranch == rhs.showsTargetBranch
       && lhs.showsPullRequestNumber == rhs.showsPullRequestNumber
       && lhs.showsPullRequestAge == rhs.showsPullRequestAge
       && lhs.wrapsTitle == rhs.wrapsTitle
@@ -111,6 +115,7 @@ struct DashboardReviewListRow: View, Equatable {
     showsLabels: Bool = true,
     showsLineCounters: Bool = true,
     showsApprovalCounts: Bool = false,
+    showsTargetBranch: Bool = true,
     showsPullRequestNumber: Bool = true,
     showsPullRequestAge: Bool = true,
     wrapsTitle: Bool = true,
@@ -130,6 +135,7 @@ struct DashboardReviewListRow: View, Equatable {
     self.showsLabels = showsLabels
     self.showsLineCounters = showsLineCounters
     self.showsApprovalCounts = showsApprovalCounts
+    self.showsTargetBranch = showsTargetBranch
     self.showsPullRequestNumber = showsPullRequestNumber
     self.showsPullRequestAge = showsPullRequestAge
     self.wrapsTitle = wrapsTitle
@@ -171,6 +177,11 @@ struct DashboardReviewListRow: View, Equatable {
 
     VStack(alignment: .leading, spacing: rowVerticalSpacing) {
       titleBlock
+
+      if targetBranchPillLabel != nil {
+        targetBranchPill
+          .padding(.leading, titleContentLeadingInset)
+      }
 
       if showsMetadataLine {
         metadataLine
@@ -327,6 +338,19 @@ struct DashboardReviewListRow: View, Equatable {
 
   var metadataLineIdealHeight: CGFloat {
     metadataLineHasPillChrome ? statusPillLineHeight : captionLineHeight
+  }
+
+  @ViewBuilder var targetBranchPill: some View {
+    if let targetBranchPillLabel {
+      DashboardReviewStatusPill(
+        label: targetBranchPillLabel,
+        tint: HarnessMonitorTheme.caution,
+        systemImage: "arrow.triangle.branch",
+        isQuiet: true,
+        usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
+        help: targetBranchPillHelp
+      )
+    }
   }
 
   var showsMetadataLine: Bool {

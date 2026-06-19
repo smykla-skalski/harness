@@ -192,6 +192,8 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
   public var number: UInt64
   public var title: String
   public var url: String
+  public var baseRefName: String?
+  public var defaultBranchName: String?
   public var authorLogin: String
   public var authorAvatarUrl: String?
   public var authorAssociation: ReviewAuthorAssociation
@@ -214,13 +216,15 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
   public var updatedAt: String
   public var requiredFailedCheckNames: [String]
 
-  public init(pullRequestId: String, repositoryId: String, repository: String, number: UInt64, title: String, url: String, authorLogin: String, authorAvatarUrl: String? = nil, authorAssociation: ReviewAuthorAssociation, state: ReviewPullRequestState, mergeable: ReviewMergeableState, reviewStatus: ReviewReviewStatus, checkStatus: ReviewCheckStatus, isDraft: Bool = false, policyBlocked: Bool = false, viewerCanUpdate: Bool = true, viewerIsRequestedReviewer: Bool = false, viewerCanMergeAsAdmin: Bool = false, headSha: String, labels: [String] = [], checks: [ReviewCheckWire] = [], reviews: [PullRequestReviewWire] = [], additions: UInt64, deletions: UInt64, createdAt: String, updatedAt: String, requiredFailedCheckNames: [String] = []) {
+  public init(pullRequestId: String, repositoryId: String, repository: String, number: UInt64, title: String, url: String, baseRefName: String? = nil, defaultBranchName: String? = nil, authorLogin: String, authorAvatarUrl: String? = nil, authorAssociation: ReviewAuthorAssociation, state: ReviewPullRequestState, mergeable: ReviewMergeableState, reviewStatus: ReviewReviewStatus, checkStatus: ReviewCheckStatus, isDraft: Bool = false, policyBlocked: Bool = false, viewerCanUpdate: Bool = true, viewerIsRequestedReviewer: Bool = false, viewerCanMergeAsAdmin: Bool = false, headSha: String, labels: [String] = [], checks: [ReviewCheckWire] = [], reviews: [PullRequestReviewWire] = [], additions: UInt64, deletions: UInt64, createdAt: String, updatedAt: String, requiredFailedCheckNames: [String] = []) {
     self.pullRequestId = pullRequestId
     self.repositoryId = repositoryId
     self.repository = repository
     self.number = number
     self.title = title
     self.url = url
+    self.baseRefName = baseRefName
+    self.defaultBranchName = defaultBranchName
     self.authorLogin = authorLogin
     self.authorAvatarUrl = authorAvatarUrl
     self.authorAssociation = authorAssociation
@@ -252,6 +256,8 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
     number = try container.decode(UInt64.self, forKey: .number)
     title = try container.decode(String.self, forKey: .title)
     url = try container.decode(String.self, forKey: .url)
+    baseRefName = try container.decodeIfPresent(String.self, forKey: .baseRefName)
+    defaultBranchName = try container.decodeIfPresent(String.self, forKey: .defaultBranchName)
     authorLogin = try container.decode(String.self, forKey: .authorLogin)
     authorAvatarUrl = try container.decodeIfPresent(String.self, forKey: .authorAvatarUrl)
     authorAssociation = try container.decode(ReviewAuthorAssociation.self, forKey: .authorAssociation)
@@ -282,6 +288,8 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
     case number
     case title
     case url
+    case baseRefName = "base_ref_name"
+    case defaultBranchName = "default_branch_name"
     case authorLogin = "author_login"
     case authorAvatarUrl = "author_avatar_url"
     case authorAssociation = "author_association"

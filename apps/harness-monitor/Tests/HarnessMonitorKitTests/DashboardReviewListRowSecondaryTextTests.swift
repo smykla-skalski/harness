@@ -129,6 +129,40 @@ struct DashboardReviewListRowSecondaryTextTests {
     #expect(complete.missingApprovalsMetadataHelp == nil)
   }
 
+  @Test("target branch pill appears only for non-default branch rows")
+  func targetBranchPillAppearsOnlyForNonDefaultBranchRows() {
+    let nonDefaultRow = makeRow(
+      showsRepository: true,
+      baseRefName: "release/3.4",
+      defaultBranchName: "main"
+    )
+    #expect(nonDefaultRow.targetBranchPillLabel == "release/3.4")
+    #expect(
+      nonDefaultRow.targetBranchPillHelp
+        == "Targets release/3.4 instead of default branch main"
+    )
+
+    let defaultRow = makeRow(
+      showsRepository: true,
+      baseRefName: "main",
+      defaultBranchName: "main"
+    )
+    #expect(defaultRow.targetBranchPillLabel == nil)
+  }
+
+  @Test("target branch preference hides the branch pill")
+  func targetBranchPreferenceHidesBranchPill() {
+    let row = makeRow(
+      showsRepository: true,
+      baseRefName: "release/3.4",
+      defaultBranchName: "main",
+      showsTargetBranch: false
+    )
+
+    #expect(row.targetBranchPillLabel == nil)
+    #expect(row.targetBranchPillHelp == nil)
+  }
+
   private func makeRow(
     showsRepository: Bool,
     title: String = "Bump dependency",
@@ -136,7 +170,10 @@ struct DashboardReviewListRowSecondaryTextTests {
     checkStatus: ReviewCheckStatus = .pending,
     showsPullRequestNumber: Bool = true,
     showsPullRequestAge: Bool = true,
-    showsAvatars: Bool = true
+    showsAvatars: Bool = true,
+    baseRefName: String? = nil,
+    defaultBranchName: String? = nil,
+    showsTargetBranch: Bool = true
   ) -> DashboardReviewListRow {
     DashboardReviewListRow(
       item: ReviewItem(
@@ -146,6 +183,8 @@ struct DashboardReviewListRowSecondaryTextTests {
         number: 42,
         title: title,
         url: "https://github.com/octocat/example/pull/42",
+        baseRefName: baseRefName,
+        defaultBranchName: defaultBranchName,
         authorLogin: "octocat",
         state: .open,
         mergeable: .mergeable,
@@ -164,6 +203,7 @@ struct DashboardReviewListRowSecondaryTextTests {
       actionTitle: nil,
       updatedLabel: "3h ago",
       showsAvatars: showsAvatars,
+      showsTargetBranch: showsTargetBranch,
       showsPullRequestNumber: showsPullRequestNumber,
       showsPullRequestAge: showsPullRequestAge
     )

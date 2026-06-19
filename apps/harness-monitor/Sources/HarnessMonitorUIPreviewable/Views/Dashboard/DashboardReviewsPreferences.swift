@@ -36,6 +36,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var showLabelsInRows = true
   var showLineCountersInRows = true
   var showApprovalCountsInRows = false
+  var showTargetBranchInRows = true
   var showPullRequestNumberInRows = true
   var showPullRequestAgeInRows = true
   var wrapTitlesInRows = true
@@ -89,6 +90,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case showLabelsInRows
     case showLineCountersInRows
     case showApprovalCountsInRows
+    case showTargetBranchInRows
     case showPullRequestNumberInRows
     case showPullRequestAgeInRows
     case wrapTitlesInRows

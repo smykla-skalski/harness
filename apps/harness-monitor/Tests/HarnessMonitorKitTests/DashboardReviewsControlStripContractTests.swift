@@ -34,6 +34,7 @@ struct DashboardReviewsControlStripContractTests {
       "HarnessMonitorAccessibility.dashboardReviewsShowRowLabelsToggle",
       "HarnessMonitorAccessibility.dashboardReviewsLineCountersToggle",
       "HarnessMonitorAccessibility.dashboardReviewsApprovalCountsToggle",
+      "HarnessMonitorAccessibility.dashboardReviewsTargetBranchToggle",
       "HarnessMonitorAccessibility.dashboardReviewsPullRequestNumberToggle",
       "HarnessMonitorAccessibility.dashboardReviewsPullRequestAgeToggle",
       "HarnessMonitorAccessibility.dashboardReviewsWrapRowTitlesToggle",

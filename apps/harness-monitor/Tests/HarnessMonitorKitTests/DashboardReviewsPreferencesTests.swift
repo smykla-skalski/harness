@@ -22,6 +22,7 @@ struct DashboardReviewsPreferencesTests {
     #expect(prefs.filesTabWidth == DashboardReviewsPreferences.defaultFilesTabWidth)
     #expect(!prefs.showActivityInlineComments)
     #expect(!prefs.showApprovalCountsInRows)
+    #expect(prefs.showTargetBranchInRows)
   }
 
   @Test("legacy stored preferences migrate the polling interval into the per-repo field")
@@ -200,6 +201,7 @@ struct DashboardReviewsPreferencesTests {
     prefs.filesDefaultViewModeRaw = FilesViewMode.split.rawValue
     prefs.filesSoftWrapEnabled = false
     prefs.showApprovalCountsInRows = true
+    prefs.showTargetBranchInRows = false
     prefs.showActivityInlineComments = true
 
     let encoded = prefs.encodedString
@@ -211,6 +213,7 @@ struct DashboardReviewsPreferencesTests {
     #expect(decoded.filesDefaultViewMode == .split)
     #expect(!decoded.filesSoftWrapEnabled)
     #expect(decoded.showApprovalCountsInRows)
+    #expect(!decoded.showTargetBranchInRows)
     #expect(decoded.showActivityInlineComments)
     #expect(decoded.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns)
   }

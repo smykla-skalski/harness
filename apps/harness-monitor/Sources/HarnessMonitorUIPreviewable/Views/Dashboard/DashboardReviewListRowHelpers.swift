@@ -21,6 +21,21 @@ extension DashboardReviewListRow {
     showsLineCounters && (item.additions > 0 || item.deletions > 0)
   }
 
+  var targetBranchPillLabel: String? {
+    guard showsTargetBranch else { return nil }
+    return item.nonDefaultTargetBranchName
+  }
+
+  var targetBranchPillHelp: String? {
+    guard let branchName = targetBranchPillLabel else { return nil }
+    let defaultBranchName =
+      item.defaultBranchName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard !defaultBranchName.isEmpty else {
+      return "Targets \(branchName)"
+    }
+    return "Targets \(branchName) instead of default branch \(defaultBranchName)"
+  }
+
   var effectiveTitleMaximumLines: Int {
     if !wrapsTitle {
       return 1
