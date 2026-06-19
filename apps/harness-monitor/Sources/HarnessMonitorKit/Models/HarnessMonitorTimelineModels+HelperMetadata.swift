@@ -102,4 +102,12 @@ extension StreamEvent {
     let data = try Self.payloadEncoder.encode(payload)
     return try Self.payloadDecoder.decode(type, from: data)
   }
+
+  /// Decodes a generated wire payload with `PolicyWireCoding.decoder` (no key
+  /// strategy). The caller maps the wire to its hand model; this is the plain
+  /// counterpart to `decodePayload` for push payloads that own a generated wire.
+  public func decodePayloadWire<Wire: Decodable>(as type: Wire.Type) throws -> Wire {
+    let data = try Self.payloadEncoder.encode(payload)
+    return try PolicyWireCoding.decoder.decode(type, from: data)
+  }
 }

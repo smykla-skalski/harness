@@ -100,7 +100,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: nil,
-        kind: .logLevelChanged(try streamEvent.decodePayload(as: LogLevelResponse.self))
+        kind: .logLevelChanged(try LogLevelResponse(wire: streamEvent.decodePayloadWire(as: LogLevelResponseWire.self)))
       )
     case "acp_bridge_resync_incident":
       return Self(
@@ -122,7 +122,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: nil,
-        kind: .auditEvent(try streamEvent.decodePayload(as: HarnessMonitorAuditEvent.self))
+        kind: .auditEvent(try HarnessMonitorAuditEvent(wire: streamEvent.decodePayloadWire(as: HarnessMonitorAuditEventWire.self)))
       )
     default:
       return try Self.makeSessionScopedEvent(from: streamEvent)
@@ -157,21 +157,23 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .codexRunUpdated(try streamEvent.decodePayload(as: CodexRunSnapshot.self))
+        kind: .codexRunUpdated(try CodexRunSnapshot(wire: streamEvent.decodePayloadWire(as: CodexRunSnapshotWire.self)))
       )
     case "codex_approval_requested":
       return Self(
         recordedAt: at,
         sessionId: sessionId,
         kind: .codexApprovalRequested(
-          try streamEvent.decodePayload(as: CodexApprovalRequestedPayload.self)
+          try CodexApprovalRequestedPayload(
+            wire: streamEvent.decodePayloadWire(as: CodexApprovalRequestedPayloadWire.self)
+          )
         )
       )
     case "agent_tui_started", "agent_tui_updated", "agent_tui_stopped", "agent_tui_failed":
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .agentTuiUpdated(try streamEvent.decodePayload(as: AgentTuiSnapshot.self))
+        kind: .agentTuiUpdated(try AgentTuiSnapshot(wire: streamEvent.decodePayloadWire(as: AgentTuiSnapshotWire.self)))
       )
     default:
       return Self(
@@ -209,13 +211,13 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .acpAgentUpdated(try streamEvent.decodePayload(as: AcpAgentSnapshot.self))
+        kind: .acpAgentUpdated(try AcpAgentSnapshot(wire: streamEvent.decodePayloadWire(as: AcpAgentSnapshotWire.self)))
       )
     case "acp_events":
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .acpEvents(try streamEvent.decodePayload(as: AcpEventBatchPayload.self))
+        kind: .acpEvents(try AcpEventBatchPayload(wire: streamEvent.decodePayloadWire(as: AcpEventBatchPayloadWire.self)))
       )
     case "acp_process_incident":
       return Self(
@@ -229,7 +231,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .acpPermissionBatch(try streamEvent.decodePayload(as: AcpPermissionBatch.self))
+        kind: .acpPermissionBatch(try AcpPermissionBatch(wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)))
       )
     case "acp_permission_resolved":
       return Self(
@@ -237,7 +239,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         sessionId: sessionId,
         kind: .acpPermissionBatchRemoved(
           AcpPermissionBatchRemovedPayload(
-            batch: try streamEvent.decodePayload(as: AcpPermissionBatch.self),
+            batch: try AcpPermissionBatch(wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
             reason: .resolved
           )
         )
@@ -248,7 +250,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         sessionId: sessionId,
         kind: .acpPermissionBatchRemoved(
           AcpPermissionBatchRemovedPayload(
-            batch: try streamEvent.decodePayload(as: AcpPermissionBatch.self),
+            batch: try AcpPermissionBatch(wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
             reason: .shutdown
           )
         )
@@ -259,7 +261,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         sessionId: sessionId,
         kind: .acpPermissionBatchRemoved(
           AcpPermissionBatchRemovedPayload(
-            batch: try streamEvent.decodePayload(as: AcpPermissionBatch.self),
+            batch: try AcpPermissionBatch(wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
             reason: .timeout
           )
         )
