@@ -262,108 +262,40 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
             wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)))
       )
     case "acp_permission_resolved":
-      return Self(
-        recordedAt: at,
-        sessionId: sessionId,
-        kind: .acpPermissionBatchRemoved(
-          AcpPermissionBatchRemovedPayload(
-            batch: try AcpPermissionBatch(
-              wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
-            reason: .resolved
-          )
-        )
+      return try makeAcpPermissionBatchRemoved(
+        from: streamEvent, sessionId: sessionId, reason: .resolved
       )
     case "acp_permission_shutdown":
-      return Self(
-        recordedAt: at,
-        sessionId: sessionId,
-        kind: .acpPermissionBatchRemoved(
-          AcpPermissionBatchRemovedPayload(
-            batch: try AcpPermissionBatch(
-              wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
-            reason: .shutdown
-          )
-        )
+      return try makeAcpPermissionBatchRemoved(
+        from: streamEvent, sessionId: sessionId, reason: .shutdown
       )
     case "acp_permission_timeout":
-      return Self(
-        recordedAt: at,
-        sessionId: sessionId,
-        kind: .acpPermissionBatchRemoved(
-          AcpPermissionBatchRemovedPayload(
-            batch: try AcpPermissionBatch(
-              wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
-            reason: .timeout
-          )
-        )
+      return try makeAcpPermissionBatchRemoved(
+        from: streamEvent, sessionId: sessionId, reason: .timeout
       )
     default:
       return nil
     }
   }
 
-  public static func ready(
-    recordedAt: String,
-    sessionId: String? = nil
-  ) -> Self {
-    Self(recordedAt: recordedAt, sessionId: sessionId, kind: .ready)
-  }
-
-  public static func sessionsUpdated(
-    recordedAt: String,
-    projects: [ProjectSummary],
-    sessions: [SessionSummary]
-  ) -> Self {
-    Self(
-      recordedAt: recordedAt,
-      sessionId: nil,
-      kind: .sessionsUpdated(
-        SessionsUpdatedPayload(projects: projects, sessions: sessions)
-      )
-    )
-  }
-
-  public static func sessionsUpdatedDelta(
-    recordedAt: String,
-    sessionId: String? = nil,
-    changed: [SessionSummary],
-    removed: [String],
-    projects: [ProjectSummary]
-  ) -> Self {
-    Self(
-      recordedAt: recordedAt,
-      sessionId: sessionId,
-      kind: .sessionsUpdatedDelta(
-        SessionsUpdatedDeltaPayload(changed: changed, removed: removed, projects: projects)
-      )
-    )
-  }
-
-  public static func sessionUpdated(
-    recordedAt: String,
+  private static func makeAcpPermissionBatchRemoved(
+    from streamEvent: StreamEvent,
     sessionId: String,
-    detail: SessionDetail,
-    timeline: [TimelineEntry]? = nil,
-    extensionsPending: Bool? = nil
-  ) -> Self {
+    reason: AcpPermissionBatchRemovalReason
+  ) throws -> Self {
     Self(
-      recordedAt: recordedAt,
+      recordedAt: streamEvent.recordedAt,
       sessionId: sessionId,
-      kind: .sessionUpdated(
-        SessionUpdatedPayload(
-          detail: detail,
-          timeline: timeline,
-          extensionsPending: extensionsPending
+      kind: .acpPermissionBatchRemoved(
+        AcpPermissionBatchRemovedPayload(
+          batch: try AcpPermissionBatch(
+            wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
+          reason: reason
         )
       )
     )
   }
 
-  public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.recordedAt == rhs.recordedAt
-      && lhs.sessionId == rhs.sessionId
-      && lhs.kind == rhs.kind
-  }
 }
 
 /// Authoritative ACP agent snapshot set for one session.
