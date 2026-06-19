@@ -38,7 +38,7 @@ struct AgentToolActivityWireDecodingTests {
     #expect(question.options[0].label == "Option A")
     #expect(question.options[0].description == "first")
     #expect(question.options[1].label == "Option B")
-    #expect(question.options[1].description == "")
+    #expect(question.options[1].description.isEmpty)
   }
 
   @Test("decodes a summary with no pending user prompt")

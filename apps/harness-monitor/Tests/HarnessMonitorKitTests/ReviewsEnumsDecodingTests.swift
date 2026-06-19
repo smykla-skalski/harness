@@ -48,7 +48,7 @@ struct ReviewsEnumsDecodingTests {
   @Test("round-trips a known case through encode")
   func roundTripsKnownCase() throws {
     let data = try JSONEncoder().encode(ReviewCheckRunStatus.inProgress)
-    #expect(String(decoding: data, as: UTF8.self) == "\"in_progress\"")
+    #expect(String(bytes: data, encoding: .utf8) == "\"in_progress\"")
   }
 
   @Test("decodes the closed author association and rejects unknown values")

@@ -50,7 +50,7 @@ struct TaskBoardItemWireDecodingTests {
       )
     )
 
-    #expect(item.body == "")
+    #expect(item.body.isEmpty)
     #expect(item.status == .new)
     #expect(item.priority == .medium)
     #expect(item.agentMode == .headless)

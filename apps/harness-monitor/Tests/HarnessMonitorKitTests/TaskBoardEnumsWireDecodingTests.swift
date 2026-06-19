@@ -57,7 +57,7 @@ struct TaskBoardEnumsWireDecodingTests {
   }
 
   private func wireString(_ value: some Encodable) throws -> String {
-    String(decoding: try encoder.encode(value), as: UTF8.self)
+    (String(bytes: try encoder.encode(value), encoding: .utf8) ?? "")
       .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
   }
 }

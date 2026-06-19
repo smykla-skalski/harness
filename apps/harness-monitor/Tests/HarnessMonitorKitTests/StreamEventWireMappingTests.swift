@@ -11,11 +11,11 @@ struct StreamEventWireMappingTests {
 
   @Test("stream event decodes its snake keys and free-form payload through the wire")
   func streamEventMapping() throws {
-    let data = try #require(
+    let data = Data(
       #"""
       {"event": "task.updated", "recorded_at": "2026-06-18T10:00:00Z",
        "session_id": "s1", "payload": {"task_id": "t1"}}
-      """#.data(using: .utf8)
+      """#.utf8
     )
     let wire = try decoder.decode(StreamEventWire.self, from: data)
     let event = StreamEvent(wire: wire)

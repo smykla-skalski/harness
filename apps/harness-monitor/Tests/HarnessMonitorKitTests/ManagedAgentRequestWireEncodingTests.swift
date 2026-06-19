@@ -63,7 +63,7 @@ struct ManagedAgentRequestWireEncodingTests {
     #expect(json["allow_custom_model"] as? Bool == true)
     // The hand request leaves role and capabilities nil; the wire mirrors the daemon defaults.
     #expect(json["role"] as? String == "worker")
-    #expect(json["capabilities"] as? [String] == [])
+    #expect((json["capabilities"] as? [String])?.isEmpty == true)
   }
 
   @Test("resize, steer and approval requests encode faithfully")

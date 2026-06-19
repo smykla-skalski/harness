@@ -11,8 +11,8 @@ struct TaskBoardCredentialWireDecodingTests {
 
   @Test("github tokens response maps the flag and narrows the count")
   func githubTokensResponse() throws {
-    let data = try #require(
-      #"{"global_token_configured": true, "repository_token_count": 3}"#.data(using: .utf8)
+    let data = Data(
+      #"{"global_token_configured": true, "repository_token_count": 3}"#.utf8
     )
     let wire = try decoder.decode(TaskBoardGitHubTokensSyncResponseWire.self, from: data)
     let response = TaskBoardGitHubTokensSyncResponse(wire: wire)
@@ -22,13 +22,13 @@ struct TaskBoardCredentialWireDecodingTests {
 
   @Test("todoist and openrouter responses map the configured flag")
   func tokenConfiguredResponses() throws {
-    let todoistData = try #require(#"{"token_configured": true}"#.data(using: .utf8))
+    let todoistData = Data(#"{"token_configured": true}"#.utf8)
     let todoist = TaskBoardTodoistTokenSyncResponse(
       wire: try decoder.decode(TaskBoardTodoistTokenSyncResponseWire.self, from: todoistData)
     )
     #expect(todoist.tokenConfigured == true)
 
-    let openRouterData = try #require(#"{"token_configured": false}"#.data(using: .utf8))
+    let openRouterData = Data(#"{"token_configured": false}"#.utf8)
     let openRouter = TaskBoardOpenRouterTokenSyncResponse(
       wire: try decoder.decode(TaskBoardOpenRouterTokenSyncResponseWire.self, from: openRouterData)
     )

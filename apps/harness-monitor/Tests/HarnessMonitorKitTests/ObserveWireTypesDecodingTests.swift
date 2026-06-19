@@ -48,7 +48,7 @@ struct ObserveWireTypesDecodingTests {
   @Test("encodes back to the daemon wire string")
   func encodesToWireString() throws {
     let data = try JSONEncoder().encode(FixSafety.autoFixGuarded)
-    #expect(String(decoding: data, as: UTF8.self) == "\"auto_fix_guarded\"")
+    #expect(String(bytes: data, encoding: .utf8) == "\"auto_fix_guarded\"")
   }
 
   private func decodeEnum<T: Decodable>(_ type: T.Type, _ value: String) throws -> T {
