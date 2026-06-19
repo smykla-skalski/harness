@@ -5,7 +5,7 @@ private struct PolicyCanvasDecoupledSugiyamaPipeline {
   let acyclicEdges: [PolicyCanvasLayoutEdge]
   let rankAssignment: PolicyCanvasRankAssignmentOutput
   let resolvedConfiguration: PolicyCanvasLayoutConfiguration
-  let orderingGraph: PolicyCanvasAugmentedLayeredGraph
+  let orderingGraph: PolicyCanvasLayeredOrderingGraph
   let orderedLayers: [[String]]
   let coordinates: PolicyCanvasCoordinateAssignmentOutput
 }
@@ -97,7 +97,7 @@ struct PolicyCanvasDecoupledSugiyamaLayoutEngine: PolicyCanvasLayoutEngine {
     graph: PolicyCanvasLayoutGraph,
     nodeIDs: [String],
     originalOrder: [String: Int],
-    algorithms: PolicyCanvasLayoutAlgorithms,
+    algorithms: PolicyCanvasLayoutStageAlgorithmSet,
     configuration: PolicyCanvasLayoutConfiguration
   ) -> PolicyCanvasDecoupledSugiyamaPipeline {
     let acyclicEdges = algorithms.cycleBreaking.breakCycles(
