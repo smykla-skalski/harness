@@ -174,6 +174,43 @@ public struct PolicyCanvasViewportSurface: View {
   }
 
   public var body: some View {
+    viewportContent
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
+      .environment(\.policyCanvasReducedMotion, systemReduceMotion)
+      .task(id: renderKey) {
+        // The fixture/document-load path renders the document's authored positions
+        // without running the auto-arrange engine, so a load shows the saved seeds
+        // rather than the algorithm output. The lab wants the automatic engine's
+        // placement, so force an unconstrained reflow on appear. The env override
+        // keeps the agent capture script working even when a caller leaves
+        // forcesEngineLayout off. The shipping canvas uses PolicyCanvasView, not
+        // this surface, and keeps its authored layout.
+        await applySurfaceSnapshot(renderKey.snapshot, fontScale: renderKey.fontScale)
+      }
+      .onChange(of: reformatRequest, initial: false) { _, _ in
+        viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
+      }
+  }
+
+  private var holdsViewportUntilFinalRoute: Bool {
+    surfaceForcesEngineLayout
+      && document?.nodes.isEmpty == false
+      && appliedSnapshot != snapshot
+  }
+
+  @ViewBuilder
+  private var viewportContent: some View {
+    if holdsViewportUntilFinalRoute {
+      PolicyCanvasPendingFinalRouteSurface()
+        .policyCanvasResolvedThemeScope(canvasColorSchemeOverride)
+    } else {
+      viewport
+    }
+  }
+
+  private var viewport: some View {
     PolicyCanvasViewport(
       viewModel: viewModel,
       focusedComponent: $focusedComponentState,
@@ -187,23 +224,6 @@ public struct PolicyCanvasViewportSurface: View {
       routeSeed: routeSeed,
       onFinalRouteOutputReady: markPolicyCanvasLabReadyIfNeeded
     )
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
-    .environment(\.policyCanvasReducedMotion, systemReduceMotion)
-    .task(id: renderKey) {
-      // The fixture/document-load path renders the document's authored positions
-      // without running the auto-arrange engine, so a load shows the saved seeds
-      // rather than the algorithm output. The lab wants the automatic engine's
-      // placement, so force an unconstrained reflow on appear. The env override
-      // keeps the agent capture script working even when a caller leaves
-      // forcesEngineLayout off. The shipping canvas uses PolicyCanvasView, not
-      // this surface, and keeps its authored layout.
-      await applySurfaceSnapshot(renderKey.snapshot, fontScale: renderKey.fontScale)
-    }
-    .onChange(of: reformatRequest, initial: false) { _, _ in
-      viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
-    }
   }
 
   @MainActor
@@ -304,11 +324,10 @@ public struct PolicyCanvasViewportSurface: View {
       edges: stagedViewModel.edges,
       fontScale: fontScale
     )
-    appliedSnapshot = newSnapshot
-    viewModel = stagedViewModel
     let seedID =
       "\(newSnapshot.documentIdentity?.lastPolicyTraceID ?? "nil")|"
       + "\(routeKey.graphGeneration)|\(routeKey.fontScale)"
+    viewModel = stagedViewModel
     routeSeed = PolicyCanvasViewportRouteSeed(
       id: seedID,
       routeKey: routeKey,
@@ -316,6 +335,7 @@ public struct PolicyCanvasViewportSurface: View {
       output: output,
       nodePositionsByID: policyCanvasNodePositionsByID(stagedViewModel.nodes)
     )
+    appliedSnapshot = newSnapshot
   }
 
   @MainActor
@@ -329,5 +349,12 @@ public struct PolicyCanvasViewportSurface: View {
       return
     }
     try? "ready\n".write(toFile: readyPath, atomically: true, encoding: .utf8)
+  }
+}
+
+private struct PolicyCanvasPendingFinalRouteSurface: View {
+  var body: some View {
+    PolicyCanvasBackgroundSurface()
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }

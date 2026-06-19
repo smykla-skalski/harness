@@ -326,6 +326,14 @@ struct PolicyCanvasCommandScrollTests {
     #expect(surfaceSource.contains("markPolicyCanvasLabReadyIfNeeded"))
     #expect(surfaceSource.contains("HARNESS_MONITOR_POLICY_LAB_READY_FILE"))
     #expect(surfaceSource.contains("PolicyCanvasViewportSurfaceDocumentIdentity"))
+    #expect(surfaceSource.contains("private var holdsViewportUntilFinalRoute: Bool"))
+    #expect(surfaceSource.contains("PolicyCanvasPendingFinalRouteSurface()"))
+    #expect(
+      surfaceSource.contains(
+        "surfaceForcesEngineLayout\n      && document?.nodes.isEmpty == false"
+      )
+    )
+    #expect(surfaceSource.contains("&& appliedSnapshot != snapshot"))
     #expect(
       initializer.contains("document: nil,\n        simulation: nil,\n        audit: nil,")
     )
