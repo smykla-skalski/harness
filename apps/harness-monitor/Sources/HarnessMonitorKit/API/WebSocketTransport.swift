@@ -10,7 +10,6 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
 
   let connection: HarnessMonitorConnection
   let encoder: JSONEncoder
-  let decoder: JSONDecoder
   let session: URLSession
   let rpcSender: RPCSender?
   let pending = PendingRequestStore()
@@ -60,8 +59,6 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     self.connection = connection
     encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase
-    decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
     self.session = session
     self.rpcSender = rpcSender
   }

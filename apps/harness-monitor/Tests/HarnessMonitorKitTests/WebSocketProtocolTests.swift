@@ -202,7 +202,7 @@ struct WebSocketProtocolTests {
     let json = """
       {"id":"req-1","result":{"status":"ok"},"error":null}
       """
-    let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
+    let frame = try PolicyWireCoding.decoder.decode(WsFrame.self, from: Data(json.utf8))
     guard case .response(let id, let result, let error, let batchIndex, let batchCount) = frame.kind
     else {
       Issue.record("Expected response frame kind, got \(frame.kind)")
@@ -220,7 +220,7 @@ struct WebSocketProtocolTests {
     let json = """
       {"id":"req-2","result":null,"error":{"code":"NOT_FOUND","message":"session not found","details":[]}}
       """
-    let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
+    let frame = try PolicyWireCoding.decoder.decode(WsFrame.self, from: Data(json.utf8))
     guard case .response(let id, _, let error, let batchIndex, let batchCount) = frame.kind else {
       Issue.record("Expected response frame kind, got \(frame.kind)")
       return
@@ -247,7 +247,7 @@ struct WebSocketProtocolTests {
         }
       }
       """
-    let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
+    let frame = try PolicyWireCoding.decoder.decode(WsFrame.self, from: Data(json.utf8))
     guard case .response(let id, _, let error, _, _) = frame.kind else {
       Issue.record("Expected response frame kind, got \(frame.kind)")
       return
@@ -275,7 +275,7 @@ struct WebSocketProtocolTests {
         "result":[{"entry_id":"entry-1","summary":"hello"}]
       }
       """
-    let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
+    let frame = try PolicyWireCoding.decoder.decode(WsFrame.self, from: Data(json.utf8))
     guard case .response(let id, let result, let error, let batchIndex, let batchCount) = frame.kind
     else {
       Issue.record("Expected response batch frame kind, got \(frame.kind)")
@@ -303,7 +303,7 @@ struct WebSocketProtocolTests {
       {"event":"session_updated","recorded_at":"2026-03-29T12:00:00Z",\
       "session_id":"sess-1","payload":{},"seq":42}
       """
-    let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
+    let frame = try PolicyWireCoding.decoder.decode(WsFrame.self, from: Data(json.utf8))
     guard case .push(let event, _, let sessionId, _, let seq) = frame.kind else {
       Issue.record("Expected push frame kind, got \(frame.kind)")
       return

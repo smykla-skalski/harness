@@ -187,14 +187,9 @@ extension WebSocketTransport {
   static let reencodeEncoder = JSONEncoder()
   private static let mergeDecoder = JSONDecoder()
 
-  nonisolated func decode<T: Decodable>(_ value: JSONValue) throws -> T {
-    let data = try Self.reencodeEncoder.encode(value)
-    return try decoder.decode(T.self, from: data)
-  }
-
-  /// Decodes a policy-graph wire value with `PolicyWireCoding.decoder` (no key
-  /// strategy) instead of the transport's `.convertFromSnakeCase` decoder, which
-  /// is incompatible with the generated node-kind payloads' explicit snake keys.
+  /// Decodes a wire value with `PolicyWireCoding.decoder` (no key strategy). Every
+  /// daemon payload the transport decodes now carries explicit snake CodingKeys
+  /// (generated wires plus the WsFrame envelope), so this is the sole decode path.
   nonisolated func decodePolicyWire<T: Decodable>(_ value: JSONValue) throws -> T {
     let data = try Self.reencodeEncoder.encode(value)
     return try PolicyWireCoding.decoder.decode(T.self, from: data)

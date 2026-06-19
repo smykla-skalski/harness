@@ -134,7 +134,7 @@ extension WebSocketTransport {
     guard let data = text.data(using: .utf8) else {
       throw WebSocketTransportError.unexpectedResponse
     }
-    let frame = try decoder.decode(WsFrame.self, from: data)
+    let frame = try PolicyWireCoding.decoder.decode(WsFrame.self, from: data)
     try await handleFrame(frame)
   }
 
@@ -166,7 +166,7 @@ extension WebSocketTransport {
       else {
         return
       }
-      let frame = try decoder.decode(WsFrame.self, from: assembled)
+      let frame = try PolicyWireCoding.decoder.decode(WsFrame.self, from: assembled)
       try await handleFrame(frame)
     case .unknown:
       break
@@ -208,7 +208,7 @@ extension WebSocketTransport {
   func handleResponseFrame(
     id: String,
     result: JSONValue?,
-    error: WsErrorPayload?,
+    error: WsErrorPayloadWire?,
     batchIndex: Int?,
     batchCount: Int?
   ) async {

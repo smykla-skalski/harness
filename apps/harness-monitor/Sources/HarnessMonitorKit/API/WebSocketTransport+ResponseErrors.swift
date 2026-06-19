@@ -3,9 +3,9 @@ import Foundation
 extension WebSocketTransport {
   func responseError(
     method: WebSocketRPCMethod?,
-    error: WsErrorPayload
+    error: WsErrorPayloadWire
   ) -> any Error {
-    guard let statusCode = error.statusCode else {
+    guard let statusCode = error.statusCode.map(Int.init) else {
       return WebSocketTransportError.serverError(
         code: error.code,
         message: error.message

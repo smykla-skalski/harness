@@ -42,7 +42,7 @@ extension WebSocketProtocolTests {
     ])
     let adoptError = await transport.responseError(
       method: .sessionAdopt,
-      error: WsErrorPayload(
+      error: WsErrorPayloadWire(
         code: "SESSION_ADOPT_FAILED",
         message: "already attached",
         details: [],
@@ -55,7 +55,7 @@ extension WebSocketProtocolTests {
     )
     let bridgeError = await transport.responseError(
       method: .bridgeReconfigure,
-      error: WsErrorPayload(
+      error: WsErrorPayloadWire(
         code: "BRIDGE_RECONFIGURE_FAILED",
         message: "bridge unavailable",
         details: [],
@@ -93,7 +93,7 @@ extension WebSocketProtocolTests {
   @Test("WsFrame returns unknown for empty object")
   func unknownFrame() throws {
     let json = "{}"
-    let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
+    let frame = try PolicyWireCoding.decoder.decode(WsFrame.self, from: Data(json.utf8))
     guard case .unknown = frame.kind else {
       Issue.record("Expected unknown frame kind, got \(frame.kind)")
       return
@@ -110,7 +110,7 @@ extension WebSocketProtocolTests {
         "chunk_base64":"e30="
       }
       """
-    let frame = try decoder.decode(WsFrame.self, from: Data(json.utf8))
+    let frame = try PolicyWireCoding.decoder.decode(WsFrame.self, from: Data(json.utf8))
     guard case .chunk(let chunkID, let chunkIndex, let chunkCount, let chunkBase64) = frame.kind
     else {
       Issue.record("Expected chunk frame kind, got \(frame.kind)")

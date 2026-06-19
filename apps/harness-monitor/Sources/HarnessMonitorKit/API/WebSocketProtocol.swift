@@ -20,10 +20,14 @@ struct WsRequest: Codable, Sendable {
   }
 }
 
+// The permissive WS transport envelope: a superset of the daemon's WsResponse / WsPushEvent /
+// WsChunkFrame frames (no single Rust mirror exists, so it carries explicit snake CodingKeys and
+// decodes through the plain PolicyWireCoding.decoder rather than the transport's convert decoder).
+// The error payload reuses the generated WsErrorPayloadWire.
 struct WsFrame: Codable, Sendable {
   let id: String?
   let result: JSONValue?
-  let error: WsErrorPayload?
+  let error: WsErrorPayloadWire?
   let batchIndex: Int?
   let batchCount: Int?
   let event: String?
@@ -35,14 +39,23 @@ struct WsFrame: Codable, Sendable {
   let chunkIndex: Int?
   let chunkCount: Int?
   let chunkBase64: String?
-}
 
-struct WsErrorPayload: Codable, Sendable {
-  let code: String
-  let message: String
-  let details: [String]?
-  let statusCode: Int?
-  let data: JSONValue?
+  enum CodingKeys: String, CodingKey {
+    case id
+    case result
+    case error
+    case batchIndex = "batch_index"
+    case batchCount = "batch_count"
+    case event
+    case recordedAt = "recorded_at"
+    case sessionId = "session_id"
+    case payload
+    case seq
+    case chunkId = "chunk_id"
+    case chunkIndex = "chunk_index"
+    case chunkCount = "chunk_count"
+    case chunkBase64 = "chunk_base64"
+  }
 }
 
 typealias ResponseBatchHandler =
@@ -52,7 +65,7 @@ enum WsFrameKind {
   case response(
     id: String,
     result: JSONValue?,
-    error: WsErrorPayload?,
+    error: WsErrorPayloadWire?,
     batchIndex: Int?,
     batchCount: Int?
   )
