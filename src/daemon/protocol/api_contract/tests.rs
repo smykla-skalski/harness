@@ -389,6 +389,18 @@ fn task_board_routes_have_complete_ws_parity() {
                 ws_methods::TASK_BOARD_POLICY_SCENARIO_RESET,
                 true,
             ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_POLICY_MAKE_LIVE,
+                ws_methods::TASK_BOARD_POLICY_PIPELINE_MAKE_LIVE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_POLICY_GO_LIVE_DIFF,
+                ws_methods::TASK_BOARD_POLICY_PIPELINE_GO_LIVE_DIFF,
+                true,
+            ),
         ]
     );
     let expected_mcp_methods: Vec<_> = actual

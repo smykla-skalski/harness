@@ -5,6 +5,7 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
     TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest,
+    TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineMakeLiveRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
     TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyScenarioCreateRequest,
     TaskBoardPolicyScenarioDeleteRequest, TaskBoardPolicyScenarioUpdateRequest, ws_methods,
@@ -126,6 +127,18 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 description: "Reset policy simulation scenarios to the seeded defaults.",
                 input_schema: empty_schema,
                 normalize: validate_empty_object,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POLICY_PIPELINE_MAKE_LIVE,
+                description: "Make a policy pipeline revision live: promote and enable enforcement.",
+                input_schema: promote_schema,
+                normalize: validate_params::<TaskBoardPolicyPipelineMakeLiveRequest>,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POLICY_PIPELINE_GO_LIVE_DIFF,
+                description: "Diff a candidate policy draft against the live enforced policy.",
+                input_schema: document_schema,
+                normalize: validate_params::<TaskBoardPolicyPipelineGoLiveDiffRequest>,
             },
         ],
     );

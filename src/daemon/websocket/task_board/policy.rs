@@ -6,6 +6,7 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
     TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest,
     TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
+    TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineMakeLiveRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
     TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyScenarioCreateRequest,
     TaskBoardPolicyScenarioDeleteRequest, TaskBoardPolicyScenarioResetRequest,
@@ -117,6 +118,12 @@ async fn dispatch_policy_pipeline_method(
         }
         ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE => {
             Some(dispatch_task_board_policy_pipeline_promote(request, state).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_MAKE_LIVE => {
+            Some(dispatch_task_board_policy_pipeline_make_live(request, state).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_GO_LIVE_DIFF => {
+            Some(dispatch_task_board_policy_pipeline_go_live_diff(request, state).await)
         }
         ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT => {
             Some(dispatch_task_board_policy_pipeline_audit(request, state).await)
@@ -400,6 +407,48 @@ pub(super) async fn dispatch_task_board_policy_pipeline_promote(
     )
     .await;
     dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_task_board_policy_pipeline_make_live(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyPipelineMakeLiveRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy pipeline make live") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    let result = task_board_route_executor::make_live_policy_pipeline(db, &body).await;
+    super::record_task_board_audit_result(
+        state,
+        "task_board.policy_pipeline_make_live",
+        "Make policy pipeline live",
+        body.canvas_id.as_deref(),
+        serde_json::json!({ "canvas_id": &body.canvas_id, "revision": body.revision }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_task_board_policy_pipeline_go_live_diff(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params_or_default::<TaskBoardPolicyPipelineGoLiveDiffRequest>(request)
+    else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy pipeline go live diff") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::go_live_diff_policy_pipeline(db, &body).await,
+    )
 }
 
 pub(super) async fn dispatch_task_board_policy_pipeline_audit(

@@ -7,7 +7,7 @@ use super::{
     PolicyGraph, PolicyGraphMode, PolicyGraphValidationReport, PolicyInput,
 };
 
-use super::store_canvas::{new_trace_id, validation_error};
+use super::store_canvas::{apply_set_global_enforcement, new_trace_id, validation_error};
 
 #[derive(Debug, Clone)]
 pub struct GraphPolicyGate {
@@ -48,6 +48,41 @@ pub struct PolicyPipelinePromoteRequest {
 pub struct PolicyPipelinePromoteResponse {
     pub document: PolicyGraph,
     pub trace_id: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PolicyPipelineMakeLiveRequest {
+    pub revision: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PolicyPipelineMakeLiveResponse {
+    pub document: PolicyGraph,
+    pub trace_id: String,
+    pub global_policy_enforcement_enabled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyPipelineGoLiveDiffEntry {
+    pub scenario_id: String,
+    pub scenario_name: String,
+    pub action: PolicyAction,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub live_decision: Option<PolicyDecision>,
+    pub draft_decision: PolicyDecision,
+    pub changed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyPipelineGoLiveDiff {
+    pub has_live_policy: bool,
+    pub changed_count: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub diffs: Vec<PolicyPipelineGoLiveDiffEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -277,6 +312,92 @@ pub fn apply_promote(
     Ok(PolicyPipelinePromoteResponse {
         document,
         trace_id: new_trace_id(),
+    })
+}
+
+/// Make the active canvas live: refresh its simulation, promote it to enforced
+/// mode, and turn on global enforcement in one workspace mutation.
+///
+/// A fresh simulation is run first so the caller is never forced to simulate
+/// before going live; promotion then applies its usual revision, simulation,
+/// and runtime-boundary preconditions. Global enforcement is only ever turned
+/// on here - the kill-switch that turns it off stays a separate action.
+///
+/// # Errors
+/// Returns `CliError` when the active canvas cannot be resolved, the revision
+/// precondition fails, or the document is not valid to promote.
+pub fn apply_make_live(
+    ws: &mut PolicyCanvasWorkspace,
+    request: &PolicyPipelineMakeLiveRequest,
+) -> Result<PolicyPipelineMakeLiveResponse, CliError> {
+    apply_simulate(ws, None, request.canvas_id.as_deref())?;
+    let promote_request = PolicyPipelinePromoteRequest {
+        revision: request.revision,
+        actor: request.actor.clone(),
+        canvas_id: request.canvas_id.clone(),
+    };
+    let promoted = apply_promote(ws, &promote_request)?;
+    let global_policy_enforcement_enabled = apply_set_global_enforcement(ws, true);
+    Ok(PolicyPipelineMakeLiveResponse {
+        document: promoted.document,
+        trace_id: promoted.trace_id,
+        global_policy_enforcement_enabled,
+    })
+}
+
+/// Diff a candidate draft against the currently live (enforced) policy across
+/// every workspace scenario, without mutating any state.
+///
+/// When no policy is live the result carries `has_live_policy: false` and every
+/// entry reports `live_decision: None` with `changed: false`, so the caller can
+/// render a "first go-live" parity state. Decisions are graph-derived and mode
+/// independent, so both sides are compared directly.
+///
+/// # Errors
+/// Returns `CliError` when no candidate document is supplied and the active
+/// canvas cannot be resolved.
+pub fn apply_diff_against_live(
+    ws: &PolicyCanvasWorkspace,
+    candidate_document: Option<PolicyGraph>,
+    expected_canvas_id: Option<&str>,
+) -> Result<PolicyPipelineGoLiveDiff, CliError> {
+    let candidate = if let Some(document) = candidate_document {
+        document
+    } else {
+        active_canvas_for_request(ws, expected_canvas_id)?
+            .document
+            .clone()
+    };
+    let live_document = ws
+        .active_enforced_canvas()
+        .map(|canvas| canvas.document.clone());
+    let has_live_policy = live_document.is_some();
+    let diffs: Vec<_> = ws
+        .scenarios
+        .iter()
+        .map(|scenario| {
+            let draft_decision = candidate.simulate(&scenario.input).decision;
+            let live_decision = live_document
+                .as_ref()
+                .map(|document| document.simulate(&scenario.input).decision);
+            let changed = live_decision
+                .as_ref()
+                .is_some_and(|live| *live != draft_decision);
+            PolicyPipelineGoLiveDiffEntry {
+                scenario_id: scenario.id.clone(),
+                scenario_name: scenario.name.clone(),
+                action: scenario.input.action,
+                live_decision,
+                draft_decision,
+                changed,
+            }
+        })
+        .collect();
+    let changed_count = diffs.iter().filter(|entry| entry.changed).count();
+    Ok(PolicyPipelineGoLiveDiff {
+        has_live_policy,
+        changed_count,
+        diffs,
     })
 }
 

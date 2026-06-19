@@ -7,6 +7,8 @@ use crate::daemon::protocol::{
     TaskBoardPolicyExportRequest, TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest,
     TaskBoardPolicyImportResponse, TaskBoardPolicyPipelineAuditRequest,
     TaskBoardPolicyPipelineAuditResponse, TaskBoardPolicyPipelineGetRequest,
+    TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineGoLiveDiffResponse,
+    TaskBoardPolicyPipelineMakeLiveRequest, TaskBoardPolicyPipelineMakeLiveResponse,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
     TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
     TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
@@ -371,6 +373,52 @@ pub(crate) async fn promote_task_board_policy_pipeline(
     feed_gate_cache(&workspace);
     bump_change_policy(db).await;
     Ok(response)
+}
+
+/// Make the active V2 policy pipeline live: refresh its simulation, promote it
+/// to enforced mode, and enable global enforcement in one transaction.
+///
+/// # Errors
+/// Returns `CliError` when the revision precondition fails, the document is not
+/// valid to promote, or the workspace cannot be persisted.
+pub(crate) async fn make_live_task_board_policy_pipeline(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyPipelineMakeLiveRequest,
+) -> Result<TaskBoardPolicyPipelineMakeLiveResponse, CliError> {
+    let request = request.clone();
+    let (workspace, response) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
+            policy_graph::apply_make_live(workspace, &request)
+        })
+        .await?;
+    feed_gate_cache(&workspace);
+    bump_change_policy(db).await;
+    Ok(TaskBoardPolicyPipelineMakeLiveResponse {
+        document: response.document,
+        trace_id: response.trace_id,
+        global_policy_enforcement_enabled: response.global_policy_enforcement_enabled,
+        workspace: policy_canvas_workspace_response(&workspace),
+    })
+}
+
+/// Diff a candidate draft against the live enforced policy across every
+/// scenario without mutating any durable state.
+///
+/// # Errors
+/// Returns `CliError` when durable policy state cannot be loaded or the active
+/// canvas cannot be resolved.
+pub(crate) async fn go_live_diff_task_board_policy_pipeline(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyPipelineGoLiveDiffRequest,
+) -> Result<TaskBoardPolicyPipelineGoLiveDiffResponse, CliError> {
+    let workspace = load_or_seed_workspace(db).await?;
+    policy_graph::apply_diff_against_live(
+        &workspace,
+        request.document.clone(),
+        request.canvas_id.as_deref(),
+    )
 }
 
 /// Summarize V2 policy pipeline audit state.

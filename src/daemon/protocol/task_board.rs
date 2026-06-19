@@ -5,11 +5,12 @@ use crate::task_board::types::TaskBoardWorkflowState;
 use crate::task_board::{
     AgentMode, DispatchExecutionSummary, ExternalProvider, ExternalRef, ExternalSyncConflictPolicy,
     ExternalSyncDirection, Machine, PlanningState, PolicyGraphMode, PolicyInput,
-    PolicyPipelineAuditSummary, PolicyPipelineDocument, PolicyPipelinePromoteRequest,
-    PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse, PolicyPipelineSimulationResult,
-    PolicyScenario, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
-    TaskBoardGitIdentityDefaults, TaskBoardItem, TaskBoardMachineSummary, TaskBoardPriority,
-    TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary,
+    PolicyPipelineAuditSummary, PolicyPipelineDocument, PolicyPipelineGoLiveDiff,
+    PolicyPipelineMakeLiveRequest, PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse,
+    PolicyPipelineSaveResponse, PolicyPipelineSimulationResult, PolicyScenario,
+    TaskBoardAuditSummary, TaskBoardEvaluationSummary, TaskBoardGitIdentityDefaults, TaskBoardItem,
+    TaskBoardMachineSummary, TaskBoardPriority, TaskBoardProjectSummary, TaskBoardStatus,
+    TaskBoardSyncSummary,
 };
 
 pub use crate::task_board::{
@@ -243,6 +244,14 @@ pub struct TaskBoardPolicyPipelineSimulateRequest {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardPolicyPipelineGoLiveDiffRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub document: Option<PolicyPipelineDocument>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskBoardPolicyPipelineAuditRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_id: Option<String>,
@@ -281,6 +290,14 @@ pub struct TaskBoardPolicyCanvasWorkspaceResponse {
 
 const fn default_global_policy_enforcement_enabled() -> bool {
     true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPolicyPipelineMakeLiveResponse {
+    pub document: PolicyPipelineDocument,
+    pub trace_id: String,
+    pub global_policy_enforcement_enabled: bool,
+    pub workspace: TaskBoardPolicyCanvasWorkspaceResponse,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -407,6 +424,8 @@ pub type TaskBoardPolicyPipelineSimulationResponse = PolicyPipelineSimulationRes
 pub type TaskBoardPolicyPipelinePromoteResponse = PolicyPipelinePromoteResponse;
 pub type TaskBoardPolicyPipelineAuditResponse = PolicyPipelineAuditSummary;
 pub type TaskBoardPolicyPipelinePromoteRequest = PolicyPipelinePromoteRequest;
+pub type TaskBoardPolicyPipelineMakeLiveRequest = PolicyPipelineMakeLiveRequest;
+pub type TaskBoardPolicyPipelineGoLiveDiffResponse = PolicyPipelineGoLiveDiff;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskBoardPolicyExportRequest {

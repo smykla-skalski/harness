@@ -9,6 +9,7 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
     TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
+    TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineMakeLiveRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
     TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyScenarioCreateRequest,
     TaskBoardPolicyScenarioDeleteRequest, TaskBoardPolicyScenarioUpdateRequest, http_paths,
@@ -137,6 +138,14 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::TASK_BOARD_POLICY_PROMOTE,
             post(post_task_board_policy_promote),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_MAKE_LIVE,
+            post(post_task_board_policy_make_live),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_GO_LIVE_DIFF,
+            post(post_task_board_policy_go_live_diff),
         )
         .route(
             http_paths::TASK_BOARD_POLICY_AUDIT,
@@ -400,6 +409,50 @@ async fn post_task_board_policy_promote(
         &request_id,
         start,
         pipeline,
+    )
+}
+
+async fn post_task_board_policy_make_live(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyPipelineMakeLiveRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    let pipeline = match require_async_db(&state, "policy pipeline make live") {
+        Ok(db) => task_board_route_executor::make_live_policy_pipeline(db, &request).await,
+        Err(error) => Err(error),
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_MAKE_LIVE,
+        &request_id,
+        start,
+        pipeline,
+    )
+}
+
+async fn post_task_board_policy_go_live_diff(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyPipelineGoLiveDiffRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    let diff = match require_async_db(&state, "policy pipeline go live diff") {
+        Ok(db) => task_board_route_executor::go_live_diff_policy_pipeline(db, &request).await,
+        Err(error) => Err(error),
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_GO_LIVE_DIFF,
+        &request_id,
+        start,
+        diff,
     )
 }
 

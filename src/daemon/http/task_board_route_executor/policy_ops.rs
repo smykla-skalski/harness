@@ -6,7 +6,9 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasWorkspaceResponse, TaskBoardPolicyExportRequest,
     TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest, TaskBoardPolicyImportResponse,
     TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineAuditResponse,
-    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelineGoLiveDiffRequest,
+    TaskBoardPolicyPipelineGoLiveDiffResponse, TaskBoardPolicyPipelineMakeLiveRequest,
+    TaskBoardPolicyPipelineMakeLiveResponse, TaskBoardPolicyPipelinePromoteRequest,
     TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineResponse,
     TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
     TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
@@ -90,6 +92,20 @@ pub(crate) async fn promote_policy_pipeline(
     request: &TaskBoardPolicyPipelinePromoteRequest,
 ) -> Result<TaskBoardPolicyPipelinePromoteResponse, CliError> {
     service::promote_task_board_policy_pipeline(db, request).await
+}
+
+pub(crate) async fn make_live_policy_pipeline(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyPipelineMakeLiveRequest,
+) -> Result<TaskBoardPolicyPipelineMakeLiveResponse, CliError> {
+    service::make_live_task_board_policy_pipeline(db, request).await
+}
+
+pub(crate) async fn go_live_diff_policy_pipeline(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyPipelineGoLiveDiffRequest,
+) -> Result<TaskBoardPolicyPipelineGoLiveDiffResponse, CliError> {
+    service::go_live_diff_task_board_policy_pipeline(db, request).await
 }
 
 pub(crate) async fn audit_policy_pipeline(

@@ -65,11 +65,13 @@ pub use policy_graph::{
     PolicyGraphLayout, PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind,
     PolicyGraphNodeLayout, PolicyGraphPortDirection, PolicyGraphSimulation,
     PolicyGraphValidationIssue, PolicyGraphValidationReport, PolicyPipelineAuditSummary,
-    PolicyPipelineDocument, PolicyPipelineEdge, PolicyPipelineGroup, PolicyPipelineLayout,
-    PolicyPipelineMode, PolicyPipelineNode, PolicyPipelineNodeKind, PolicyPipelinePort,
-    PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse,
-    PolicyPipelineSimulatedDecision, PolicyPipelineSimulationResult, PolicyPipelineValidation,
-    PolicyPipelineValidationCode, PolicyPipelineValidationIssue, PolicyScenario,
+    PolicyPipelineDocument, PolicyPipelineEdge, PolicyPipelineGoLiveDiff,
+    PolicyPipelineGoLiveDiffEntry, PolicyPipelineGroup, PolicyPipelineLayout,
+    PolicyPipelineMakeLiveRequest, PolicyPipelineMakeLiveResponse, PolicyPipelineMode,
+    PolicyPipelineNode, PolicyPipelineNodeKind, PolicyPipelinePort, PolicyPipelinePromoteRequest,
+    PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse, PolicyPipelineSimulatedDecision,
+    PolicyPipelineSimulationResult, PolicyPipelineValidation, PolicyPipelineValidationCode,
+    PolicyPipelineValidationIssue, PolicyScenario,
 };
 pub use runtime_config::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
