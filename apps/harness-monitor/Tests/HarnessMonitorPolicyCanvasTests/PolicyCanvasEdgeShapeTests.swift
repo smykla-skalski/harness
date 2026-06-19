@@ -105,6 +105,25 @@ struct PolicyCanvasEdgeShapeTests {
       ])
   }
 
+  @Test("Label gap covering a short route keeps the stroke visible")
+  func labelGapCoveringShortRouteKeepsStrokeVisible() {
+    let route = PolicyCanvasEdgeRoute(
+      points: [CGPoint(x: 0, y: 0), CGPoint(x: 40, y: 0)],
+      labelPosition: CGPoint(x: 20, y: 0)
+    )
+    let path = PolicyCanvasEdgeShape(
+      route: route,
+      gapFrames: [CGRect(x: -10, y: -10, width: 60, height: 20)]
+    ).path(in: .zero)
+    let points = pathPoints(of: path)
+
+    #expect(
+      points == [
+        CGPoint(x: 0, y: 0),
+        CGPoint(x: 40, y: 0),
+      ])
+  }
+
   @Test("Endpoint trim tucks rendered edge under port markers")
   func endpointTrimTucksRenderedEdgeUnderPortMarkers() {
     let route = PolicyCanvasEdgeRoute(
@@ -121,8 +140,8 @@ struct PolicyCanvasEdgeShapeTests {
       endpointInset: policyCanvasRenderedRouteEndpointInset()
     )
 
-    #expect(trimmed.points.first == CGPoint(x: 7, y: 0))
-    #expect(trimmed.points.last == CGPoint(x: 100, y: 93))
+    #expect(trimmed.points.first == CGPoint(x: 8, y: 0))
+    #expect(trimmed.points.last == CGPoint(x: 100, y: 92))
   }
 
   @Test("Arrowhead defaults render at readable canvas scale")

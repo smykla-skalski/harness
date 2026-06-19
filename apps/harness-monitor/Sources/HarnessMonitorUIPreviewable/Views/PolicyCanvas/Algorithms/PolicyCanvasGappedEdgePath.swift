@@ -45,6 +45,9 @@ func policyCanvasVisibleEdgeSubroutes(
     }
   }
   policyCanvasFinishSubroute(&current, into: &subroutes)
+  if subroutes.isEmpty, !gapFrames.isEmpty, points.count >= 2 {
+    return [points]
+  }
   return subroutes
 }
 

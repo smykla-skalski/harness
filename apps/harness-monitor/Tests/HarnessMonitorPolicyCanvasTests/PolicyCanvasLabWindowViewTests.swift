@@ -600,6 +600,30 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
   }
 
   @MainActor
+  func testForcedDefaultReformatKeepsEveryLabelledEdgeStrokeVisible() async throws {
+    let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "default"))
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: sample.document,
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "default"
+    )
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+    let output = await routeOutput(for: viewModel)
+    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
+
+    for edge in viewModel.edges where !edge.label.isEmpty {
+      let route = try XCTUnwrap(output.routes[edge.id], "missing route for \(edge.id)")
+      let labelPosition = output.labelPositions[edge.id] ?? route.labelPosition
+      let subroutes = policyCanvasVisibleEdgeSubroutes(
+        points: route.points,
+        gapFrames: [metrics.frame(for: edge.label, center: labelPosition)]
+      )
+      XCTAssertFalse(subroutes.isEmpty, "label gap clipped the whole edge \(edge.id)")
+    }
+  }
+
+  @MainActor
   func testPlannedReflowGraphPredictsReflowCommitWithoutMutating() throws {
     let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "extreme"))
     let viewModel = PolicyCanvasViewModel.sample()
