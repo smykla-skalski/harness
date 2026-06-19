@@ -1187,6 +1187,11 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // manager.rs acp inspect response: Swift hand is AcpAgentInspectResponse; its agents field
     // references the renamed AcpAgentInspectSnapshotWire (the snapshot decode struct).
     "AcpAgentInspectResponse",
+    // ACP incident + agents-reconciled push payloads (daemon-internal Serialize structs). The
+    // reconciled payload nests AcpAgentSnapshotWire + AcpAgentInspectResponseWire.
+    "AcpProcessIncidentPayload",
+    "AcpBridgeResyncIncidentPayload",
+    "AcpAgentsReconciledPayload",
     // permission_bridge.rs acp permission item: Swift hand is AcpPermissionItem (toolCall and
     // options modelled as raw JSON); referenced by AcpPermissionBatchWire.requests.
     "AcpPermissionItem",
@@ -1807,6 +1812,10 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     ("DispatchExecutionSummary", "failures"),
     ("DispatchPlan", "lifecycle"),
     ("DispatchAppliedTask", "lifecycle"),
+    // acp process incident: the daemon-only remediation booleans the Swift hand never models.
+    ("AcpProcessIncidentPayload", "restart_applied"),
+    ("AcpProcessIncidentPayload", "backoff_applied"),
+    ("AcpProcessIncidentPayload", "quarantine_applied"),
     // acp descriptor daemon-only injection config: the app does not model how the
     // daemon maps model/effort onto ACP startup, so these (and their tagged
     // AcpSpawnConfiguration / transport sub-enums) never cross to Swift.
@@ -2674,6 +2683,20 @@ const ACP_EVENT_BATCH_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonito
 // tagged ConversationEventKind the Swift side keeps opaque, so it rides through as JSONValue
 // (JSON_PASSTHROUGH_FIELDS) and the event kind enum is never emitted.
 const ACP_EVENT_BATCH_EMIT_ONLY: &[&str] = &["AcpEventBatchPayload", "ConversationEvent"];
+const ACP_ACTIVE_SOURCE: &str = include_str!("../src/daemon/agent_acp/active.rs");
+const ACP_INCIDENTS_SOURCE: &str =
+    include_str!("../src/daemon/agent_acp/sandbox_proxy/incidents.rs");
+const ACP_SANDBOX_PROXY_SOURCE: &str = include_str!("../src/daemon/agent_acp/sandbox_proxy.rs");
+const ACP_INCIDENT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpIncidentWireTypes.generated.swift";
+// The ACP process/bridge incident + agents-reconciled push payloads (daemon-internal Serialize
+// structs the daemon broadcasts). The reconciled payload nests AcpAgentSnapshotWire (TYPE_RENAMES)
+// + AcpAgentInspectResponseWire; the process incident drops the daemon-only restart/backoff/
+// quarantine booleans the Swift hand never models (OMITTED_WIRE_FIELDS).
+const ACP_INCIDENT_EMIT_ONLY: &[&str] = &[
+    "AcpProcessIncidentPayload",
+    "AcpBridgeResyncIncidentPayload",
+    "AcpAgentsReconciledPayload",
+];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2995,6 +3018,16 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[ACP_EVENT_FRAME_SOURCE, ACP_CONVERSATION_EVENT_SOURCE],
         },
+        GeneratedModule {
+            output: ACP_INCIDENT_OUTPUT,
+            description: "the Rust acp incident and agents-reconciled push payloads",
+            defaults: &[],
+            sources: &[
+                ACP_ACTIVE_SOURCE,
+                ACP_INCIDENTS_SOURCE,
+                ACP_SANDBOX_PROXY_SOURCE,
+            ],
+        },
     ]
 }
 
@@ -3054,6 +3087,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         GIT_RUNTIME_OUTPUT => GIT_RUNTIME_EMIT_ONLY,
         GIT_SIGNING_VERIFY_OUTPUT => GIT_SIGNING_VERIFY_EMIT_ONLY,
         ACP_EVENT_BATCH_OUTPUT => ACP_EVENT_BATCH_EMIT_ONLY,
+        ACP_INCIDENT_OUTPUT => ACP_INCIDENT_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {

@@ -31,7 +31,11 @@ const SANDBOX_ACP_IDLE_INSPECT_POLLS: usize = 20;
 struct AcpAgentsReconciledPayload {
     session_id: String,
     agents: Vec<AcpAgentSnapshot>,
-    inspect: AcpAgentInspectResponse,
+    /// Inline ACP inspect telemetry. Optional per the reconcile contract so a
+    /// consumer can hydrate without waiting for a separate inspect push; the
+    /// current producer always attaches it, but the wire tolerates its absence.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    inspect: Option<AcpAgentInspectResponse>,
 }
 
 impl AcpAgentManagerHandle {
@@ -256,7 +260,7 @@ impl AcpAgentManagerHandle {
             let payload = AcpAgentsReconciledPayload {
                 session_id: session_id.clone(),
                 agents: agents_by_session.remove(&session_id).unwrap_or_default(),
-                inspect: inspect_for_session(&inspect, &session_id),
+                inspect: Some(inspect_for_session(&inspect, &session_id)),
             };
             if let Some(event) = reconciled_event(&payload) {
                 let _ = self.sender().send(event);

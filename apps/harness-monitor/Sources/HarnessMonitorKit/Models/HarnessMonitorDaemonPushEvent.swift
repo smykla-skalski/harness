@@ -109,7 +109,9 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         recordedAt: at,
         sessionId: streamEvent.sessionId,
         kind: .acpBridgeResyncIncident(
-          try streamEvent.decodePayload(as: AcpBridgeResyncIncidentPayload.self)
+          try AcpBridgeResyncIncidentPayload(
+            wire: streamEvent.decodePayloadWire(as: AcpBridgeResyncIncidentPayloadWire.self)
+          )
         )
       )
     case "reviews_local_clone_progress":
@@ -207,7 +209,9 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         recordedAt: at,
         sessionId: sessionId,
         kind: .acpAgentsReconciled(
-          try streamEvent.decodePayload(as: AcpAgentsReconciledPayload.self)
+          try AcpAgentsReconciledPayload(
+            wire: streamEvent.decodePayloadWire(as: AcpAgentsReconciledPayloadWire.self)
+          )
         )
       )
     case "acp_agent_started", "acp_agent_updated", "acp_agent_stopped", "acp_agent_failed",
@@ -228,7 +232,9 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         recordedAt: at,
         sessionId: sessionId,
         kind: .acpProcessIncident(
-          try streamEvent.decodePayload(as: AcpProcessIncidentPayload.self)
+          try AcpProcessIncidentPayload(
+            wire: streamEvent.decodePayloadWire(as: AcpProcessIncidentPayloadWire.self)
+          )
         )
       )
     case "acp_permission_requested":
