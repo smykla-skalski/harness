@@ -6,11 +6,11 @@ import Testing
 @testable import HarnessMonitorPolicyCanvas
 @testable import HarnessMonitorPolicyCanvasAlgorithms
 
-/// Wave 3M P49 follow-up: clearSelection() transient-gesture-state contract and
-/// the selectedTab independence from selection transitions. Sibling to wave 1C's
-/// PolicyCanvasSelectionTests.swift which covers the single-source-of-truth
-/// invariants — this file fills the cross-state-channel gaps.
-@Suite("Policy canvas selection state — transient + tab")
+/// Wave 3M P49 follow-up: clearSelection() transient-gesture-state contract.
+/// Sibling to wave 1C's PolicyCanvasSelectionTests.swift which covers the
+/// single-source-of-truth invariants — this file fills the cross-state-channel
+/// gaps.
+@Suite("Policy canvas selection state — transient")
 @MainActor
 struct PolicyCanvasSelectionStateTests {
   @Test("clearSelection() also drops highlightedInput and highlightedGroupID")
@@ -44,39 +44,6 @@ struct PolicyCanvasSelectionStateTests {
     #expect(viewModel.selection == nil)
     #expect(viewModel.highlightedInput != nil)
     #expect(viewModel.highlightedGroupID == "group-evaluation")
-  }
-
-  @Test("selection transitions do not change selectedTab")
-  func selectionTransitionsLeaveSelectedTabAlone() {
-    let viewModel = PolicyCanvasViewModel.sample()
-    let initialTab = viewModel.selectedTab
-
-    viewModel.select(.node("risk-score"))
-    #expect(viewModel.selectedTab == initialTab)
-
-    viewModel.select(.edge("edge-intake-risk"))
-    #expect(viewModel.selectedTab == initialTab)
-
-    viewModel.select(.group("group-evaluation"))
-    #expect(viewModel.selectedTab == initialTab)
-
-    viewModel.select(nil)
-    #expect(viewModel.selectedTab == initialTab)
-
-    viewModel.clearSelection()
-    #expect(viewModel.selectedTab == initialTab)
-  }
-
-  @Test("selectedTab survives clearSelection in non-default starting state")
-  func selectedTabSurvivesEscapeFromSimulationTab() {
-    let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.simulate()
-    #expect(viewModel.selectedTab == .simulation)
-
-    viewModel.select(.node("risk-score"))
-    viewModel.clearSelection()
-
-    #expect(viewModel.selectedTab == .simulation)
   }
 
   @Test("node selection clears any prior highlightedInput from a previous gesture")

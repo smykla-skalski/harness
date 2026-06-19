@@ -309,7 +309,6 @@ struct PolicyCanvasUndoFunnelTests {
 
     #expect(viewModel.node(nodeID)?.position == originalPosition)
     #expect(!viewModel.documentDirty)
-    #expect(viewModel.draftStatusText == "Saved draft")
   }
 
   @Test("undo emits a status callback so the inspector line tracks the rollback")

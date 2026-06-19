@@ -48,9 +48,6 @@ extension PolicyCanvasView {
       let simulated = await runtime?.simulatePolicyCanvas(document: document) ?? false
       if simulated {
         await forceReloadPolicyPipeline()
-        viewModel.flashHealthyWorkflowStatusStagesAfterSimulation(
-          remoteActionsEnabled: remoteActionsEnabled
-        )
       } else {
         viewModel.restoreState(snapshot, reason: "Simulation rejected, restored previous canvas")
       }

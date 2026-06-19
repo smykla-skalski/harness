@@ -260,11 +260,9 @@ extension PolicyCanvasViewModel {
     )
   }
 
-  /// Open the inspector on the given node by selecting it and raising the
-  /// draft tab so the form is visible. Mirrors what the right-click "Open
-  /// inspector" path does for mouse users.
+  /// Open the inspector on the given node by selecting it. Mirrors what the
+  /// right-click "Open inspector" path does for mouse users.
   func accessibilityOpenInspector(forNodeID nodeID: String) {
-    selectedTab = .draft
     select(.node(nodeID))
   }
 }

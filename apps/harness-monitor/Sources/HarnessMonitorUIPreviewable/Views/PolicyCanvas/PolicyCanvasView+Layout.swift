@@ -30,7 +30,6 @@ extension PolicyCanvasView {
         reflowLayout: {
           viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
         },
-        save: saveDraft,
         simulate: simulate,
         promote: requestPromote
       )
@@ -90,25 +89,12 @@ extension PolicyCanvasView {
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .overlay(alignment: .topTrailing) {
-      VStack(alignment: .trailing, spacing: 12) {
-        if workflowStatusVisible && !workflowStatusCards.isEmpty {
-          PolicyCanvasWorkflowStatusOverlay(cards: workflowStatusCards)
-        }
-
-        PolicyCanvasSelectionEditButton(
-          isDisabled: currentEditSheet == nil,
-          open: presentCurrentEditSheet
-        )
-      }
+      PolicyCanvasSelectionEditButton(
+        isDisabled: currentEditSheet == nil,
+        open: presentCurrentEditSheet
+      )
       .padding(14)
     }
-  }
-
-  var workflowStatusCards: [PolicyCanvasWorkflowStatusCardModel] {
-    viewModel.workflowStatusCards(
-      remoteActionsEnabled: remoteActionsEnabled,
-      remoteActionDisabledReason: remoteActionDisabledReason
-    )
   }
 
   var currentEditSheet: PolicyCanvasEditSheet? {

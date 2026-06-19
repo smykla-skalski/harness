@@ -122,30 +122,6 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(dragSource.contains("policyCanvasAcceptedTextPasteboardTypes"))
   }
 
-  @Test("Policy canvas workflow status floats as a stacked overlay")
-  func policyCanvasWorkflowStatusFloatsAsAStackedOverlay() throws {
-    let topBarSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
-    )
-    let layoutSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
-    )
-    let workflowStatusSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasWorkflowStatusViews.swift"
-    )
-    let accessibilitySource = try previewableSourceFile(
-      named: "Support/HarnessMonitorAccessibilityIDs+PolicyCanvas.swift"
-    )
-
-    #expect(!topBarSource.contains("workflowStatusStrip"))
-    #expect(!topBarSource.contains("PolicyCanvasWorkflowStatusStrip("))
-    #expect(layoutSource.contains("PolicyCanvasWorkflowStatusOverlay("))
-    #expect(layoutSource.contains(".overlay(alignment: .topTrailing)"))
-    #expect(workflowStatusSource.contains("VStack(alignment: .trailing"))
-    #expect(workflowStatusSource.contains("lineLimit(2)"))
-    #expect(accessibilitySource.contains("policyCanvasWorkflowStatusStack"))
-  }
-
   @Test("Policy library pane keeps command drag rows with measured width")
   func policyLibraryPaneKeepsCommandDragRowsWithMeasuredWidth() throws {
     let layoutSource = try previewableSourceFile(

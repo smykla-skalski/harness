@@ -2,25 +2,6 @@ import CoreGraphics
 import Foundation
 import HarnessMonitorPolicyModels
 
-public enum PolicyCanvasTab: String, CaseIterable, Identifiable {
-  case draft
-  case simulation
-  case promotion
-
-  public var id: String { rawValue }
-
-  public var title: String {
-    switch self {
-    case .draft:
-      "Draft"
-    case .simulation:
-      "Simulation"
-    case .promotion:
-      "Promotion"
-    }
-  }
-}
-
 public enum PolicyCanvasNodeCategory: String, CaseIterable, Identifiable, Sendable {
   case source
   case condition

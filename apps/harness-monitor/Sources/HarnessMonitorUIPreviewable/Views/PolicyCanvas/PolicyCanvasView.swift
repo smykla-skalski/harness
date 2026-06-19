@@ -52,8 +52,6 @@ public struct PolicyCanvasView: View {
   /// `+Support` extension can gate on it.
   @AppStorage(PolicyCanvasAutosaveDefaults.debounceSecondsKey)
   private var autosaveDebounceSecondsState = PolicyCanvasAutosaveDefaults.defaultDebounceSeconds
-  @AppStorage(PolicyCanvasWorkflowStatusDefaults.isVisibleKey)
-  private var workflowStatusVisibleState = PolicyCanvasWorkflowStatusDefaults.isVisibleDefault
 
   /// Scene-scoped storage for viewport state (zoom, selection, scroll
   /// position) keyed by pipeline identity. Before this commit each viewport
@@ -135,11 +133,6 @@ public struct PolicyCanvasView: View {
 
   var autosaveDebounceSeconds: Int {
     autosaveDebounceSecondsState
-  }
-
-  var workflowStatusVisible: Bool {
-    get { workflowStatusVisibleState }
-    nonmutating set { workflowStatusVisibleState = newValue }
   }
 
   public init() {

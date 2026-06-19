@@ -341,7 +341,6 @@ extension PolicyCanvasViewModel {
       return true
     }
     markSavedDocument(savedDocument)
-    flashWorkflowStatusStage(.draft)
     enterSaveActivity(.idle)
     return false
   }

@@ -17,7 +17,6 @@ struct PolicyCanvasTopBar: View {
   let simulationOverlayVisible: Bool
   let toggleSimulationOverlay: @MainActor () -> Void
   let reflowLayout: @MainActor () -> Void
-  let save: @MainActor () -> Void
   let simulate: @MainActor () -> Void
   let promote: @MainActor () -> Void
 
@@ -36,8 +35,6 @@ struct PolicyCanvasTopBar: View {
 
   private var mainRow: some View {
     HStack(alignment: .center, spacing: 12) {
-      workflowContext
-
       Spacer(minLength: 16)
 
       PolicyCanvasSimulationToggleButton(
@@ -66,29 +63,13 @@ struct PolicyCanvasTopBar: View {
       )
 
       PolicyCanvasActionButton(
-        title: "Save",
-        systemImage: "square.and.arrow.down",
-        isDisabled: !remoteActionsEnabled,
-        disabledReason: remoteActionDisabledReason,
-        isBusy: viewModel.isSavingDraft,
-        accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasSaveButton,
-        action: {
-          viewModel.save()
-          save()
-        }
-      )
-
-      PolicyCanvasActionButton(
         title: "Simulate",
         systemImage: "play.circle",
         isDisabled: !remoteActionsEnabled,
         disabledReason: remoteActionDisabledReason,
         isBusy: viewModel.isSimulating,
         accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasSimulateButton,
-        action: {
-          viewModel.simulate()
-          simulate()
-        }
+        action: simulate
       )
 
       PolicyCanvasActionButton(
@@ -101,25 +82,9 @@ struct PolicyCanvasTopBar: View {
           : remoteActionDisabledReason,
         isBusy: viewModel.isPromoting,
         accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasPromoteButton,
-        action: {
-          viewModel.promote()
-          promote()
-        }
+        action: promote
       )
     }
-  }
-
-  private var workflowContext: some View {
-    Picker("Canvas mode", selection: $viewModel.selectedTab) {
-      ForEach(PolicyCanvasTab.allCases) { tab in
-        Text(tab.title).tag(tab)
-      }
-    }
-    .pickerStyle(.segmented)
-    .labelsHidden()
-    .accessibilityLabel("Canvas mode")
-    .frame(width: 290, alignment: .leading)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasTabs)
   }
 
 }
@@ -252,8 +217,6 @@ private struct PolicyCanvasToolsDisplayOptionsSection: View {
   private var minimapCenteringMode = PolicyCanvasMinimapCenteringMode.defaultValue
   @AppStorage(PolicyCanvasThemeDefaults.modeKey)
   private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
-  @AppStorage(PolicyCanvasWorkflowStatusDefaults.isVisibleKey)
-  private var workflowStatusVisible = PolicyCanvasWorkflowStatusDefaults.isVisibleDefault
 
   var body: some View {
     Menu("Canvas theme") {
@@ -313,15 +276,6 @@ private struct PolicyCanvasToolsDisplayOptionsSection: View {
       Label(
         shortcutsVisible ? "Hide shortcuts reference" : "Show shortcuts reference",
         systemImage: "keyboard"
-      )
-    }
-
-    Button {
-      workflowStatusVisible.toggle()
-    } label: {
-      Label(
-        workflowStatusVisible ? "Hide workflow status" : "Show workflow status",
-        systemImage: workflowStatusVisible ? "eye.slash" : "eye"
       )
     }
   }

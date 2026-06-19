@@ -235,7 +235,6 @@ struct PolicyCanvasInspectorEditingTests {
 
     #expect(viewModel.node("risk-score")?.title == originalTitle)
     #expect(!viewModel.documentDirty)
-    #expect(viewModel.draftStatusText == "Saved draft")
   }
 
   @Test("node group commit lands through undo funnel")

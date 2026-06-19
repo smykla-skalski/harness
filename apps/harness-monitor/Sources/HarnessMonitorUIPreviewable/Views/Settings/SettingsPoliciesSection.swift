@@ -156,8 +156,6 @@ public struct SettingsPoliciesSection: View {
     private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
     @AppStorage(PolicyCanvasAutosaveDefaults.debounceSecondsKey)
     private var autosaveDebounceSeconds = PolicyCanvasAutosaveDefaults.defaultDebounceSeconds
-    @AppStorage(PolicyCanvasWorkflowStatusDefaults.isVisibleKey)
-    private var workflowStatusVisible = PolicyCanvasWorkflowStatusDefaults.isVisibleDefault
 
     var body: some View {
       Section {
@@ -223,14 +221,6 @@ public struct SettingsPoliciesSection: View {
         Toggle("Show shortcuts reference", isOn: $shortcutsVisible)
           .accessibilityHint(
             "Shows or hides the shortcuts reference card in Policy Canvas windows"
-          )
-
-        Toggle("Show workflow status cards", isOn: $workflowStatusVisible)
-          .accessibilityHint(
-            "Shows or hides the Draft, Validation, and Promotion status cards on the canvas"
-          )
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsPoliciesWorkflowStatusToggle
           )
       } header: {
         Text("Canvas")

@@ -127,86 +127,6 @@ struct PolicyCanvasValidationPanelTests {
     #expect(PolicyCanvasIssueSeverity.from(code: "unknown_future_code") == .warning)
   }
 
-  @Test("workflow status summaries explain the next step")
-  func workflowStatusSummariesExplainNextStep() async {
-    let viewModel = PolicyCanvasViewModel.sample()
-
-    #expect(viewModel.draftStatusText == "Not saved yet")
-    #expect(viewModel.validationStatusText == "Save before validation")
-    #expect(viewModel.promotionStatusText == "Save a draft first")
-
-    viewModel.backingDocument = PreviewFixtures.policyCanvasPipelineDocument(revision: 2)
-    #expect(viewModel.draftStatusText == "Saved draft")
-    #expect(viewModel.validationStatusText == "Run simulation")
-
-    viewModel.isSavingDraft = true
-    #expect(viewModel.draftStatusText == "Saving draft")
-    viewModel.isSavingDraft = false
-
-    viewModel.latestSimulation = makeSimulation(issues: [])
-    await applyValidationPresentation(viewModel)
-    #expect(viewModel.validationStatusText == "Run again after changes")
-
-    viewModel.backingDocument = PreviewFixtures.policyCanvasPipelineDocument(revision: 1)
-    await applyValidationPresentation(viewModel)
-    #expect(viewModel.validationStatusText == "No issues found")
-
-    viewModel.latestSimulation = makeSimulation(
-      issues: [
-        TaskBoardPolicyPipelineValidationIssue(
-          code: "cycle",
-          message: "cycle across two nodes",
-          nodeIds: ["risk-score", "review-gate"]
-        )
-      ]
-    )
-    await applyValidationPresentation(viewModel)
-    #expect(viewModel.validationStatusText == "Fix 1 issue")
-    #expect(viewModel.validationSummaryText == "1 error")
-  }
-
-  @Test("workflow toasts only keep the current actionable stage visible")
-  func workflowToastsPreferCurrentActionableStage() async {
-    let viewModel = PolicyCanvasViewModel.sample()
-
-    #expect(workflowStatusIDs(for: viewModel) == ["draft"])
-
-    viewModel.backingDocument = PreviewFixtures.policyCanvasPipelineDocument(revision: 1)
-    #expect(workflowStatusIDs(for: viewModel) == ["validation"])
-
-    viewModel.latestSimulation = makeSimulation(
-      issues: [
-        TaskBoardPolicyPipelineValidationIssue(
-          code: "cycle",
-          message: "cycle across two nodes",
-          nodeIds: ["risk-score", "review-gate"]
-        )
-      ]
-    )
-    await applyValidationPresentation(viewModel)
-    #expect(workflowStatusIDs(for: viewModel) == ["validation"])
-  }
-
-  @Test("healthy workflow toasts flash briefly and then auto-hide")
-  func healthyWorkflowToastsFlashAndAutoHide() async {
-    let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.backingDocument = PreviewFixtures.policyCanvasPipelineDocument(revision: 1)
-    viewModel.latestSimulation = makeSimulation(issues: [])
-    await applyValidationPresentation(viewModel)
-
-    #expect(workflowStatusIDs(for: viewModel).isEmpty)
-
-    viewModel.flashWorkflowStatusStage(.draft, clearAfter: .milliseconds(40))
-    viewModel.flashWorkflowStatusStage(.validation, clearAfter: .milliseconds(40))
-    viewModel.flashWorkflowStatusStage(.promotion, clearAfter: .milliseconds(40))
-
-    #expect(workflowStatusIDs(for: viewModel) == ["draft", "validation", "promotion"])
-
-    try? await Task.sleep(for: .milliseconds(80))
-
-    #expect(workflowStatusIDs(for: viewModel).isEmpty)
-  }
-
   @Test("issue presentation uses actionable titles and target summaries")
   func issuePresentationUsesActionableTitlesAndTargets() async {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -377,12 +297,5 @@ struct PolicyCanvasValidationPanelTests {
       )
     )
     viewModel.applyValidationPresentation(output)
-  }
-
-  private func workflowStatusIDs(for viewModel: PolicyCanvasViewModel) -> [String] {
-    viewModel.workflowStatusCards(
-      remoteActionsEnabled: true,
-      remoteActionDisabledReason: "Remote actions unavailable"
-    ).map(\.id)
   }
 }

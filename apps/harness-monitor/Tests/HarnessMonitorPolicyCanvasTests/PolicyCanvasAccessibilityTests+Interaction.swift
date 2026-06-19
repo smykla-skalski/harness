@@ -175,14 +175,12 @@ extension PolicyCanvasAccessibilityTests {
     #expect(named.count == cap)
   }
 
-  // P28 open inspector: raises the draft tab + selects the node so the
-  // inspector form is the active surface.
-  @Test("accessibility open inspector selects node and raises draft tab")
-  func accessibilityOpenInspectorSelectsAndRaisesTab() {
+  // P28 open inspector: selects the node so the inspector form is the active
+  // surface.
+  @Test("accessibility open inspector selects node")
+  func accessibilityOpenInspectorSelectsNode() {
     let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.selectedTab = .simulation
     viewModel.accessibilityOpenInspector(forNodeID: "promote-release")
-    #expect(viewModel.selectedTab == .draft)
     #expect(viewModel.selection == .node("promote-release"))
   }
 

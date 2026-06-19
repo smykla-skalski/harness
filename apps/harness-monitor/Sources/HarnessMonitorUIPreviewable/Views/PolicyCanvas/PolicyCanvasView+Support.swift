@@ -35,10 +35,10 @@ extension PolicyCanvasView {
     guard simulationOverlayAvailable else {
       return false
     }
-    if let override = simulationOverlayOverride {
-      return override
-    }
-    return viewModel.selectedTab == .simulation
+    // Hidden by default once a simulation exists; the top-bar toggle is the
+    // only thing that pins it on. The always-on confidence panel will later
+    // replace this manual overlay.
+    return simulationOverlayOverride ?? false
   }
 
   func toggleSimulationOverlay() {

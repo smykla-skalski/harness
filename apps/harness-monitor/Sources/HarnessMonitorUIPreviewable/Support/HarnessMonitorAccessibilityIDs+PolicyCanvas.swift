@@ -4,14 +4,12 @@ extension HarnessMonitorAccessibility {
   public static let policyCanvasRoot = "harness.policy-canvas.root"
   public static let policyCanvasTopBar = "harness.policy-canvas.top-bar"
   public static let policyCanvasViewport = "harness.policy-canvas.viewport"
-  public static let policyCanvasTabs = "harness.policy-canvas.tabs"
   public static let policyCanvasToolRail = "harness.policy-canvas.tool-rail"
   public static let policyCanvasComponentLibrary = "harness.policy-canvas.component-library"
   public static let policyCanvasEditButton = "harness.policy-canvas.action.edit"
   public static let policyCanvasEditSheet = "harness.policy-canvas.edit-sheet"
   public static let policyCanvasEditDoneButton = "harness.policy-canvas.edit-sheet.done"
   public static let policyCanvasReformatButton = "harness.policy-canvas.action.reformat"
-  public static let policyCanvasSaveButton = "harness.policy-canvas.action.save"
   public static let policyCanvasSimulateButton = "harness.policy-canvas.action.simulate"
   public static let policyCanvasPromoteButton = "harness.policy-canvas.action.promote"
   public static let policyCanvasGlobalEnforcementButton =
@@ -45,7 +43,6 @@ extension HarnessMonitorAccessibility {
   public static let policyCanvasSearchEmptyHint = "harness.policy-canvas.search.empty"
   public static let policyCanvasSearchNoMatch = "harness.policy-canvas.search.no-match"
   public static let policyCanvasSearchLiveRegion = "harness.policy-canvas.search.live-region"
-  public static let policyCanvasWorkflowStatusStack = "harness.policy-canvas.workflow-status"
 
   public static func policyCanvasSearchResult(_ hitID: String) -> String {
     "harness.policy-canvas.search.result.\(slug(hitID))"

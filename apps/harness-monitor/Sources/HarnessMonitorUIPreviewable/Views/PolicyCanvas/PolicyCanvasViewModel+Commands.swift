@@ -50,20 +50,6 @@ extension PolicyCanvasViewModel {
     clearPendingEdge()
   }
 
-  func save() {
-    notifyStatus("Draft saved")
-  }
-
-  func simulate() {
-    selectedTab = .simulation
-    notifyStatus("Simulation queued")
-  }
-
-  func promote() {
-    selectedTab = .promotion
-    notifyStatus("Promotion requested")
-  }
-
   func zoomIn() {
     setZoom(zoom + 0.1)
   }

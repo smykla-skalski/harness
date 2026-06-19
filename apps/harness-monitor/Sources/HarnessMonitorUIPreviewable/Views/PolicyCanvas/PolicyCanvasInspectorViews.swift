@@ -297,17 +297,10 @@ struct PolicyCanvasEditForm: View {
 
   var canvasSection: some View {
     PolicyCanvasInspectorSection(title: "Policy summary") {
-      // Mode is intentionally absent here. The Draft/Simulation/Promote
-      // segmented control above the canvas owns the mode display; an
-      // inspector row duplicating it wasted the panel on a value the
-      // user has already seen.
       PolicyCanvasInspectorRow(label: "Nodes", value: "\(viewModel.nodes.count)")
       PolicyCanvasInspectorRow(label: "Edges", value: "\(viewModel.edges.count)")
       PolicyCanvasInspectorRow(label: "Groups", value: "\(viewModel.groups.count)")
       PolicyCanvasInspectorRow(label: "Zoom", value: zoomDisplayValue)
-      PolicyCanvasInspectorRow(label: "Draft", value: viewModel.draftStatusText)
-      PolicyCanvasInspectorRow(label: "Validate", value: viewModel.validationSummaryText)
-      PolicyCanvasInspectorRow(label: "Promote", value: viewModel.promotionStatusText)
       canvasAutomationPolicySummaryRow
     }
   }
