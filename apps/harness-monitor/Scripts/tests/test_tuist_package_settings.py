@@ -35,6 +35,11 @@ RECOMMENDED_FRAMEWORK_SETTINGS = (
     '"MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS": "gnu17 gnu++20"',
 )
 
+RECOMMENDED_STATIC_FRAMEWORK_SETTINGS = (
+    '"CODE_SIGN_IDENTITY": ""',
+    *RECOMMENDED_FRAMEWORK_SETTINGS,
+)
+
 FORBIDDEN_MODULE_VERIFIER_OVERRIDES = ('"ENABLE_MODULE_VERIFIER": "NO"',)
 
 PREVIEW_OVERRIDE_SETTINGS = ('"SWIFT_ENABLE_PREFIX_MAPPING": "NO"',)
@@ -78,6 +83,14 @@ class TuistPackageSettingsTests(unittest.TestCase):
         for setting in RECOMMENDED_FRAMEWORK_SETTINGS:
             with self.subTest(setting=setting):
                 self.assertIn(setting, manifest)
+
+        for setting in RECOMMENDED_STATIC_FRAMEWORK_SETTINGS:
+            with self.subTest(setting=setting):
+                self.assertIn(setting, manifest)
+        self.assertEqual(
+            manifest.count("settings: staticFrameworkSettings("),
+            manifest.count("product: .staticFramework"),
+        )
 
         for setting in PREVIEW_OVERRIDE_SETTINGS:
             with self.subTest(setting=setting):

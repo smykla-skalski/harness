@@ -21,6 +21,31 @@ private let generatedAppEntitlements: SettingValue =
 private let isolatedAppEntitlementsPath: Path = "HarnessMonitorIsolated.entitlements"
 private let isolatedAppBundleId: String = IsolatedAppIdentity.bundleId
 
+private func staticFrameworkSettings(
+    bundleId: String,
+    moduleName: String,
+    configurations: [Configuration] = [],
+    extraBase: SettingsDictionary = [:]
+) -> Settings {
+    var base: SettingsDictionary = [
+        "CODE_SIGN_IDENTITY": "",
+        "CODE_SIGN_STYLE": "Automatic",
+        "ENABLE_MODULE_VERIFIER": "YES",
+        "MODULE_VERIFIER_SUPPORTED_LANGUAGES": "objective-c objective-c++",
+        "MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS": "gnu17 gnu++20",
+        "PRODUCT_BUNDLE_IDENTIFIER": .string(bundleId),
+        "PRODUCT_MODULE_NAME": .string(moduleName),
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]
+    for (key, value) in extraBase {
+        base[key] = value
+    }
+    guard !configurations.isEmpty else {
+        return .settings(base: base)
+    }
+    return .settings(base: base, configurations: configurations)
+}
+
 private let coreSources: SourceFilesList = SourceFilesList(globs: [
     .glob("Sources/HarnessMonitorCore/**/*.swift")
 ])
@@ -33,12 +58,10 @@ private let coreTarget: Target = .target(
     deploymentTargets: applePlatformDeploymentTargets,
     sources: coreSources,
     resources: ["Sources/HarnessMonitorCore/Localizable.xcstrings"],
-    settings: .settings(base: [
-        "CODE_SIGN_STYLE": "Automatic",
-        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.core",
-        "PRODUCT_MODULE_NAME": "HarnessMonitorCore",
-        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
-    ]),
+    settings: staticFrameworkSettings(
+        bundleId: "io.harnessmonitor.core",
+        moduleName: "HarnessMonitorCore"
+    ),
     metadata: .metadata(tags: ["tag:feature:mobile", "tag:layer:core"])
 )
 
@@ -58,12 +81,10 @@ private let cryptoTarget: Target = .target(
         .sdk(name: "CryptoKit", type: .framework),
         .sdk(name: "Security", type: .framework)
     ],
-    settings: .settings(base: [
-        "CODE_SIGN_STYLE": "Automatic",
-        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.crypto",
-        "PRODUCT_MODULE_NAME": "HarnessMonitorCrypto",
-        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
-    ]),
+    settings: staticFrameworkSettings(
+        bundleId: "io.harnessmonitor.crypto",
+        moduleName: "HarnessMonitorCrypto"
+    ),
     metadata: .metadata(tags: ["tag:feature:mobile", "tag:layer:security"])
 )
 
@@ -83,12 +104,10 @@ private let cloudMirrorTarget: Target = .target(
         .target(name: "HarnessMonitorCrypto"),
         .sdk(name: "CloudKit", type: .framework)
     ],
-    settings: .settings(base: [
-        "CODE_SIGN_STYLE": "Automatic",
-        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.cloudmirror",
-        "PRODUCT_MODULE_NAME": "HarnessMonitorCloudMirror",
-        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
-    ]),
+    settings: staticFrameworkSettings(
+        bundleId: "io.harnessmonitor.cloudmirror",
+        moduleName: "HarnessMonitorCloudMirror"
+    ),
     metadata: .metadata(tags: ["tag:feature:mobile", "tag:layer:integration"])
 )
 
@@ -110,12 +129,10 @@ private let mirrorStoreTarget: Target = .target(
         .target(name: "HarnessMonitorCloudKit"),
         .sdk(name: "LocalAuthentication", type: .framework)
     ],
-    settings: .settings(base: [
-        "CODE_SIGN_STYLE": "Automatic",
-        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.mirrorstore",
-        "PRODUCT_MODULE_NAME": "HarnessMonitorMirrorStore",
-        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
-    ]),
+    settings: staticFrameworkSettings(
+        bundleId: "io.harnessmonitor.mirrorstore",
+        moduleName: "HarnessMonitorMirrorStore"
+    ),
     metadata: .metadata(tags: ["tag:feature:mobile", "tag:layer:integration"])
 )
 
@@ -230,12 +247,10 @@ private let policyModelsTarget: Target = .target(
     bundleId: "io.harnessmonitor.policy-models",
     deploymentTargets: macOSDeploymentTargets,
     sources: policyModelSources,
-    settings: .settings(base: [
-        "CODE_SIGN_STYLE": "Automatic",
-        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-models",
-        "PRODUCT_MODULE_NAME": "HarnessMonitorPolicyModels",
-        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
-    ]),
+    settings: staticFrameworkSettings(
+        bundleId: "io.harnessmonitor.policy-models",
+        moduleName: "HarnessMonitorPolicyModels"
+    ),
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:feature:policy-canvas", "tag:layer:model"])
 )
 
@@ -250,22 +265,21 @@ private let policyCanvasAlgorithmsTarget: Target = .target(
         .target(name: "HarnessMonitorPolicyModels"),
         .external(name: "ElkSwift")
     ],
-    settings: .settings(base: [
-        "CODE_SIGN_STYLE": "Automatic",
-        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-canvas-algorithms",
-        "PRODUCT_MODULE_NAME": "HarnessMonitorPolicyCanvasAlgorithms",
-        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
-    ], configurations: [
-        .debug(name: "Debug", settings: [
-            "SWIFT_COMPILATION_MODE": "wholemodule",
-            "SWIFT_OPTIMIZATION_LEVEL": "-O"
-        ]),
-        .debug(name: "Preview", settings: [
-            "SWIFT_COMPILATION_MODE": "wholemodule",
-            "SWIFT_OPTIMIZATION_LEVEL": "-O"
-        ]),
-        .release(name: "Release")
-    ]),
+    settings: staticFrameworkSettings(
+        bundleId: "io.harnessmonitor.policy-canvas-algorithms",
+        moduleName: "HarnessMonitorPolicyCanvasAlgorithms",
+        configurations: [
+            .debug(name: "Debug", settings: [
+                "SWIFT_COMPILATION_MODE": "wholemodule",
+                "SWIFT_OPTIMIZATION_LEVEL": "-O"
+            ]),
+            .debug(name: "Preview", settings: [
+                "SWIFT_COMPILATION_MODE": "wholemodule",
+                "SWIFT_OPTIMIZATION_LEVEL": "-O"
+            ]),
+            .release(name: "Release")
+        ]
+    ),
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:feature:policy-canvas", "tag:layer:core"])
 )
 
@@ -307,13 +321,9 @@ private let cloudKitTarget: Target = .target(
         .target(name: "HarnessMonitorCore"),
         .sdk(name: "CloudKit", type: .framework)
     ],
-    settings: .settings(
-        base: [
-            "CODE_SIGN_STYLE": "Automatic",
-            "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.cloudkit",
-            "PRODUCT_MODULE_NAME": "HarnessMonitorCloudKit",
-            "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
-        ]
+    settings: staticFrameworkSettings(
+        bundleId: "io.harnessmonitor.cloudkit",
+        moduleName: "HarnessMonitorCloudKit"
     ),
     metadata: .metadata(tags: ["tag:feature:cloudkit", "tag:layer:integration"])
 )
