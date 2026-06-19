@@ -1,12 +1,19 @@
 import Foundation
 
 public struct ReviewsQueryRequest: Codable, Equatable, Sendable {
+  public static let defaultBackportPatterns: [String] = [
+    #"(?i)\s*\(backport\s+of\s+#(?P<number>\d+)\)\s*$"#,
+    #"(?i)\s*\[backport\s+of\s+#(?P<number>\d+)\]\s*$"#,
+  ]
+
   public let authors: [String]
   public let organizations: [String]
   public let repositories: [String]
   public let excludeRepositories: [String]
   public let forceRefresh: Bool
   public let cacheMaxAgeSeconds: UInt64
+  public let backportDetectionEnabled: Bool
+  public let backportPatterns: [String]
 
   public init(
     authors: [String] = [],
@@ -14,7 +21,9 @@ public struct ReviewsQueryRequest: Codable, Equatable, Sendable {
     repositories: [String] = [],
     excludeRepositories: [String] = [],
     forceRefresh: Bool = false,
-    cacheMaxAgeSeconds: UInt64 = 600
+    cacheMaxAgeSeconds: UInt64 = 600,
+    backportDetectionEnabled: Bool = true,
+    backportPatterns: [String] = Self.defaultBackportPatterns
   ) {
     self.authors = authors
     self.organizations = organizations
@@ -22,6 +31,8 @@ public struct ReviewsQueryRequest: Codable, Equatable, Sendable {
     self.excludeRepositories = excludeRepositories
     self.forceRefresh = forceRefresh
     self.cacheMaxAgeSeconds = cacheMaxAgeSeconds
+    self.backportDetectionEnabled = backportDetectionEnabled
+    self.backportPatterns = backportPatterns
   }
 }
 

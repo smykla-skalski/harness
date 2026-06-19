@@ -27,6 +27,7 @@ fn item(
         url: "https://example.com".into(),
         base_ref_name: None,
         default_branch_name: None,
+        backport_source: None,
         author_login: "renovate[bot]".into(),
         author_avatar_url: None,
         author_association: ReviewAuthorAssociation::None,
@@ -252,6 +253,7 @@ fn one_repo_item(repository: &str, pr_id: &str) -> ReviewItem {
         url: format!("https://example.com/{pr_id}"),
         base_ref_name: None,
         default_branch_name: None,
+        backport_source: None,
         author_login: "renovate[bot]".into(),
         author_avatar_url: None,
         author_association: ReviewAuthorAssociation::None,
@@ -286,6 +288,7 @@ fn base_request_with_authors(authors: &[&str]) -> ReviewsQueryRequest {
         exclude_repositories: vec!["acme/legacy".into()],
         force_refresh: false,
         cache_max_age_seconds: 600,
+        ..ReviewsQueryRequest::default()
     }
 }
 

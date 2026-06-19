@@ -40,7 +40,10 @@ fn gemini_lifecycle_transcript_uses_assistant_response_not_prompt_body() {
             agent: Some(AgentContext {
                 agent_id: None,
                 agent_type: Some("gemini".into()),
-                prompt: Some("harness session join eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23 --role reviewer".into()),
+                prompt: Some(
+                    "harness session join eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23 --role reviewer"
+                        .into(),
+                ),
                 response: Some("actual assistant reply".into()),
             }),
             skill: SkillContext::inactive(),

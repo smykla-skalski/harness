@@ -37,12 +37,13 @@ struct ReviewsTypesWireTypesDecodingTests {
     #expect(target.viewerCanUpdate == true)
   }
 
-  @Test("decodes review item target branch metadata")
-  func decodesReviewItemTargetBranchMetadata() throws {
+  @Test("decodes review item branch and backport metadata")
+  func decodesReviewItemBranchAndBackportMetadata() throws {
     let json = #"""
       {"pull_request_id":"pr-1","repository_id":"r-1","repository":"o/r","number":42,
       "title":"Ship release branch","url":"https://example.com/pr/42",
       "base_ref_name":"release/3.4","default_branch_name":"main",
+      "backport_source":{"number":17,"repository":"o/r","url":"https://github.com/o/r/pull/17"},
       "author_login":"octocat","author_association":"none","state":"open",
       "mergeable":"mergeable","review_status":"review_required","check_status":"pending",
       "head_sha":"abc123","additions":2,"deletions":1,
@@ -52,6 +53,8 @@ struct ReviewsTypesWireTypesDecodingTests {
 
     #expect(item.baseRefName == "release/3.4")
     #expect(item.defaultBranchName == "main")
+    #expect(item.backportSource?.number == 17)
+    #expect(item.backportSource?.repository == "o/r")
   }
 
   @Test("decodes policy run metrics with a dictionary field")

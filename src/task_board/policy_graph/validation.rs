@@ -4,8 +4,7 @@ use super::{
     POLICY_GRAPH_SCHEMA_VERSION, PORT_IMAGE, PORT_IN, PORT_PULL_REQUESTS, PORT_TEXT, PolicyAction,
     PolicyGraph, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeKind,
     PolicyGraphPortDirection, PolicyGraphPortId, PolicyGraphValidationIssue,
-    PolicyGraphValidationReport,
-    UNSAFE_HIGH_RISK_ACTIONS,
+    PolicyGraphValidationReport, UNSAFE_HIGH_RISK_ACTIONS,
 };
 
 pub(super) fn validate(graph: &PolicyGraph) -> PolicyGraphValidationReport {

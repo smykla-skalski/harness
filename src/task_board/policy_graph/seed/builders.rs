@@ -93,7 +93,11 @@ pub(super) fn strings(values: &[&str]) -> Vec<String> {
 }
 
 fn port_ids(values: &[&str]) -> Vec<PolicyGraphPortId> {
-    values.iter().copied().map(PolicyGraphPortId::from).collect()
+    values
+        .iter()
+        .copied()
+        .map(PolicyGraphPortId::from)
+        .collect()
 }
 
 fn edge_label(from_port: &str, condition: &PolicyGraphEdgeCondition) -> String {

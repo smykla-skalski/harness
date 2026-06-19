@@ -28,6 +28,8 @@ extension DashboardReviewsPreferences {
     try container.encode(cacheMaxAgeSeconds, forKey: .cacheMaxAgeSeconds)
     try container.encode(preferredGroupModeRaw, forKey: .preferredGroupModeRaw)
     try container.encode(showLabelDescriptions, forKey: .showLabelDescriptions)
+    try container.encode(backportDetectionEnabled, forKey: .backportDetectionEnabled)
+    try container.encode(backportPatternsText, forKey: .backportPatternsText)
     try container.encode(frequentLabelsCount, forKey: .frequentLabelsCount)
     try container.encode(perRepositoryIntervalSeconds, forKey: .perRepositoryIntervalSeconds)
     try container.encode(maxConcurrentRepositoryFetches, forKey: .maxConcurrentRepositoryFetches)
@@ -137,6 +139,12 @@ extension DashboardReviewsPreferences {
     showLabelDescriptions =
       try container.decodeIfPresent(Bool.self, forKey: .showLabelDescriptions)
       ?? defaults.showLabelDescriptions
+    backportDetectionEnabled =
+      try container.decodeIfPresent(Bool.self, forKey: .backportDetectionEnabled)
+      ?? defaults.backportDetectionEnabled
+    backportPatternsText =
+      try container.decodeIfPresent(String.self, forKey: .backportPatternsText)
+      ?? defaults.backportPatternsText
     frequentLabelsCount =
       try container.decodeIfPresent(Int.self, forKey: .frequentLabelsCount)
       ?? defaults.frequentLabelsCount

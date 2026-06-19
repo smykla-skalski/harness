@@ -161,6 +161,12 @@ extension HarnessMonitorAccessibility {
     "harness.settings.reviews.merge-method"
   public static let settingsDepsShowLabelDescriptionsToggle =
     "harness.settings.reviews.show-label-descriptions"
+  public static let settingsReviewsBackportDetectionToggle =
+    "harness.settings.reviews.backport-detection"
+  public static let settingsReviewsBackportPatternsField =
+    "harness.settings.reviews.backport-patterns"
+  public static let settingsReviewsBackportRestoreButton =
+    "harness.settings.reviews.backport-patterns.restore-defaults"
   public static let settingsReviewsShowRowAvatarsToggle =
     "harness.settings.reviews.show-row-avatars"
   public static let settingsReviewsShowRowLabelsToggle =

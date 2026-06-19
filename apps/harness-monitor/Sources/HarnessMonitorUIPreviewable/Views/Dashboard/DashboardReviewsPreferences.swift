@@ -17,6 +17,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   static let maximumFilesTabWidth: Int = 16
   static let defaultFilesTabWidth: Int = 8
   static let filesTabWidthRange = minimumFilesTabWidth...maximumFilesTabWidth
+  static let defaultBackportPatterns = ReviewsQueryRequest.defaultBackportPatterns
 
   static let minimumTimelinePageSize: Int = 10
   static let maximumTimelinePageSize: Int = 100
@@ -37,6 +38,8 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var showLineCountersInRows = true
   var showApprovalCountsInRows = false
   var showTargetBranchInRows = true
+  var backportDetectionEnabled = true
+  var backportPatternsText = defaultBackportPatterns.joined(separator: "\n")
   var showPullRequestNumberInRows = true
   var showPullRequestAgeInRows = true
   var wrapTitlesInRows = true
@@ -91,6 +94,8 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case showLineCountersInRows
     case showApprovalCountsInRows
     case showTargetBranchInRows
+    case backportDetectionEnabled
+    case backportPatternsText
     case showPullRequestNumberInRows
     case showPullRequestAgeInRows
     case wrapTitlesInRows
@@ -221,6 +226,10 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     Self.normalizedEntries(authorsText)
   }
 
+  var normalizedBackportPatterns: [String] {
+    Self.normalizedBackportPatterns(backportPatternsText)
+  }
+
   var refreshIntervalDescription: String {
     if refreshIntervalSeconds.isMultiple(of: 60) {
       let minutes = refreshIntervalSeconds / 60
@@ -247,6 +256,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     copy.organizationsText = Self.normalizedText(organizationsText)
     copy.repositoriesText = Self.normalizedText(repositoriesText)
     copy.excludeRepositoriesText = Self.normalizedText(excludeRepositoriesText)
+    copy.backportPatternsText = normalizedBackportPatterns.joined(separator: "\n")
     copy.filesGeneratedPatterns = Self.normalizedGeneratedPatterns(filesGeneratedPatterns)
     copy.refreshIntervalSeconds = max(
       refreshIntervalSeconds, Self.minimumPerRepositoryIntervalSeconds)
@@ -311,7 +321,9 @@ struct DashboardReviewsPreferences: Codable, Equatable {
       repositories: normalizedRepositories,
       excludeRepositories: normalizedExcludeRepositories,
       forceRefresh: forceRefresh,
-      cacheMaxAgeSeconds: max(cacheMaxAgeSeconds, Self.minimumPerRepositoryIntervalSeconds)
+      cacheMaxAgeSeconds: max(cacheMaxAgeSeconds, Self.minimumPerRepositoryIntervalSeconds),
+      backportDetectionEnabled: backportDetectionEnabled,
+      backportPatterns: normalizedBackportPatterns
     )
   }
 
@@ -325,7 +337,9 @@ struct DashboardReviewsPreferences: Codable, Equatable {
       repositories: [repository],
       excludeRepositories: normalizedExcludeRepositories,
       forceRefresh: forceRefresh,
-      cacheMaxAgeSeconds: max(cacheMaxAgeSeconds, Self.minimumPerRepositoryIntervalSeconds)
+      cacheMaxAgeSeconds: max(cacheMaxAgeSeconds, Self.minimumPerRepositoryIntervalSeconds),
+      backportDetectionEnabled: backportDetectionEnabled,
+      backportPatterns: normalizedBackportPatterns
     )
   }
 
@@ -342,6 +356,18 @@ struct DashboardReviewsPreferences: Codable, Equatable {
       .map(normalizedGeneratedPattern)
       .filter { !$0.isEmpty }
       .removingDuplicates()
+  }
+
+  static func normalizedBackportPatterns(_ text: String) -> [String] {
+    text
+      .split(whereSeparator: { $0.isNewline })
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+      .removingDuplicates()
+  }
+
+  mutating func restoreDefaultBackportPatterns() {
+    backportPatternsText = Self.defaultBackportPatterns.joined(separator: "\n")
   }
 
   static func migratedGeneratedPatterns(_ patterns: [String]) -> [String] {

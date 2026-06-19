@@ -221,10 +221,9 @@ public struct ReviewsCache {
 }
 
 extension ReviewsCache {
-  /// Stable cache key derived from the bucket-determining fields of the
-  /// daemon query request (authors / orgs / repos / excludes). Freshness
-  /// inputs (`forceRefresh`, `cacheMaxAgeSeconds`) are excluded because they
-  /// do not change which PRs the response represents.
+  /// Stable cache key derived from the fields that change the review rows the
+  /// app can hydrate. Freshness inputs (`forceRefresh`, `cacheMaxAgeSeconds`)
+  /// are excluded because they do not change response content.
   public static func preferencesHash(
     for request: ReviewsQueryRequest
   ) -> String {
@@ -232,7 +231,11 @@ extension ReviewsCache {
       authors: request.authors.sorted(),
       organizations: request.organizations.sorted(),
       repositories: request.repositories.sorted(),
-      excludeRepositories: request.excludeRepositories.sorted()
+      excludeRepositories: request.excludeRepositories.sorted(),
+      backportDetectionEnabled: request.backportDetectionEnabled,
+      backportPatterns: request.backportPatterns
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
@@ -314,4 +317,6 @@ private struct ReviewsCacheKey: Codable {
   let organizations: [String]
   let repositories: [String]
   let excludeRepositories: [String]
+  let backportDetectionEnabled: Bool
+  let backportPatterns: [String]
 }

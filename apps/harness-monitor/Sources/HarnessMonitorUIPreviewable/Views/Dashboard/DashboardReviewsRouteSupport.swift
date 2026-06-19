@@ -108,6 +108,8 @@ struct DashboardReviewsQueryRequestParts {
   let excludeRepositories: [String]
   let cacheMaxAgeSeconds: UInt64
   let forceRefresh: Bool
+  let backportDetectionEnabled: Bool
+  let backportPatterns: [String]
 }
 
 struct DashboardReviewsResolvedPreferences: Equatable {
@@ -137,7 +139,9 @@ struct DashboardReviewsResolvedPreferences: Equatable {
           repositories: repositories,
           excludeRepositories: excludeRepositories,
           cacheMaxAgeSeconds: normalized.cacheMaxAgeSeconds,
-          forceRefresh: false
+          forceRefresh: false,
+          backportDetectionEnabled: normalized.backportDetectionEnabled,
+          backportPatterns: normalized.normalizedBackportPatterns
         )
       )
     )
@@ -151,7 +155,9 @@ struct DashboardReviewsResolvedPreferences: Equatable {
         repositories: repositories,
         excludeRepositories: excludeRepositories,
         cacheMaxAgeSeconds: preferences.cacheMaxAgeSeconds,
-        forceRefresh: forceRefresh
+        forceRefresh: forceRefresh,
+        backportDetectionEnabled: preferences.backportDetectionEnabled,
+        backportPatterns: preferences.normalizedBackportPatterns
       )
     )
   }
@@ -167,7 +173,9 @@ struct DashboardReviewsResolvedPreferences: Equatable {
         repositories: [repository],
         excludeRepositories: excludeRepositories,
         cacheMaxAgeSeconds: preferences.cacheMaxAgeSeconds,
-        forceRefresh: forceRefresh
+        forceRefresh: forceRefresh,
+        backportDetectionEnabled: preferences.backportDetectionEnabled,
+        backportPatterns: preferences.normalizedBackportPatterns
       )
     )
   }
@@ -184,7 +192,9 @@ struct DashboardReviewsResolvedPreferences: Equatable {
       cacheMaxAgeSeconds: max(
         parts.cacheMaxAgeSeconds,
         DashboardReviewsPreferences.minimumPerRepositoryIntervalSeconds
-      )
+      ),
+      backportDetectionEnabled: parts.backportDetectionEnabled,
+      backportPatterns: parts.backportPatterns
     )
   }
 }

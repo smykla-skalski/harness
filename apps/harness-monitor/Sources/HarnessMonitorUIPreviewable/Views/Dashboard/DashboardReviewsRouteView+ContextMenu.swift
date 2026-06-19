@@ -55,6 +55,16 @@ extension DashboardReviewsRouteView {
       Button("Copy Link") {
         HarnessMonitorClipboard.copy(primaryItem.url)
       }
+      if let backportSource = primaryItem.backportSource {
+        Button("Open Backported PR #\(backportSource.number)") {
+          if let url = URL(string: backportSource.url) {
+            openURL(url)
+          }
+        }
+        Button("Copy Backported PR Link") {
+          HarnessMonitorClipboard.copy(backportSource.url)
+        }
+      }
     } else if items.count > 1 {
       Button(dashboardReviewsCopyLinksMenuTitle(itemCount: items.count)) {
         HarnessMonitorClipboard.copy(items.map(\.url).joined(separator: "\n"))

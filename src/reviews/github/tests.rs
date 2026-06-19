@@ -15,6 +15,7 @@ fn scope_query_cap_rejects_broad_cartesian_requests() {
         exclude_repositories: Vec::new(),
         force_refresh: false,
         cache_max_age_seconds: 600,
+        ..ReviewsQueryRequest::default()
     };
 
     assert!(scopes(&request).is_err());
@@ -36,6 +37,7 @@ fn scopes_drop_author_clause_when_authors_empty() {
         exclude_repositories: Vec::new(),
         force_refresh: false,
         cache_max_age_seconds: 600,
+        ..ReviewsQueryRequest::default()
     };
     let queries = scopes(&request)
         .expect("scopes")
@@ -58,6 +60,7 @@ fn scopes_keep_review_searches_author_scoped() {
         exclude_repositories: Vec::new(),
         force_refresh: false,
         cache_max_age_seconds: 600,
+        ..ReviewsQueryRequest::default()
     };
     let queries = scopes(&request)
         .expect("scopes")
@@ -85,6 +88,7 @@ fn search_descriptor_marks_forced_refreshes_uncacheable() {
         exclude_repositories: Vec::new(),
         force_refresh: true,
         cache_max_age_seconds: 600,
+        ..ReviewsQueryRequest::default()
     };
 
     let forced = super::fetch::search_descriptor(&request);

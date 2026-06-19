@@ -6,9 +6,7 @@ use super::{
     PORT_DEFAULT, PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField,
     PolicyEvidencePredicate, PolicyGraph, PolicyGraphDecision, PolicyGraphEdgeCondition,
     PolicyGraphNode, PolicyGraphNodeId, PolicyGraphNodeKind, PolicyIfThenElseCondition,
-    PolicyReasonCode,
-    PolicyRuntimeBoundary, PolicySwitchArm,
-    PolicySwitchNode,
+    PolicyReasonCode, PolicyRuntimeBoundary, PolicySwitchArm, PolicySwitchNode,
 };
 use crate::task_board::policy::{PolicyAction, PolicyInput, TASK_BOARD_POLICY_VERSION};
 
@@ -126,11 +124,19 @@ impl PolicyGraph {
             ),
             PolicyGraphNodeKind::EvidenceCheck { checks } => {
                 let condition = evidence_condition(checks, input);
-                EvaluationStep::Continue(self.next_node(node.id.as_str(), &condition).into_iter().collect())
+                EvaluationStep::Continue(
+                    self.next_node(node.id.as_str(), &condition)
+                        .into_iter()
+                        .collect(),
+                )
             }
             PolicyGraphNodeKind::IfThenElse(condition) => {
                 let branch = if_then_else_condition(*condition, input);
-                EvaluationStep::Continue(self.next_node(node.id.as_str(), &branch).into_iter().collect())
+                EvaluationStep::Continue(
+                    self.next_node(node.id.as_str(), &branch)
+                        .into_iter()
+                        .collect(),
+                )
             }
             PolicyGraphNodeKind::Switch(switch) => EvaluationStep::Continue(
                 self.next_node_for_port(node.id.as_str(), switch_port(switch, input))
@@ -141,7 +147,11 @@ impl PolicyGraph {
                 field, threshold, ..
             } => {
                 let condition = risk_condition(*field, *threshold, input);
-                EvaluationStep::Continue(self.next_node(node.id.as_str(), &condition).into_iter().collect())
+                EvaluationStep::Continue(
+                    self.next_node(node.id.as_str(), &condition)
+                        .into_iter()
+                        .collect(),
+                )
             }
             PolicyGraphNodeKind::Hub => EvaluationStep::Continue(self.next_nodes(node.id.as_str())),
             PolicyGraphNodeKind::HumanGate { reason_code } => {
@@ -208,7 +218,10 @@ impl PolicyGraph {
                 .cmp(&right.from_port)
                 .then_with(|| left.id.cmp(&right.id))
         });
-        edges.into_iter().map(|edge| edge.to_node.as_str().to_owned()).collect()
+        edges
+            .into_iter()
+            .map(|edge| edge.to_node.as_str().to_owned())
+            .collect()
     }
 
     fn matching_entry_node<'a>(

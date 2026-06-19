@@ -178,8 +178,8 @@ struct DashboardReviewListRow: View, Equatable {
     VStack(alignment: .leading, spacing: rowVerticalSpacing) {
       titleBlock
 
-      if targetBranchPillLabel != nil {
-        targetBranchPill
+      if titlePillRowVisible {
+        titlePillRow
           .padding(.leading, titleContentLeadingInset)
       }
 
@@ -338,6 +338,26 @@ struct DashboardReviewListRow: View, Equatable {
 
   var metadataLineIdealHeight: CGFloat {
     metadataLineHasPillChrome ? statusPillLineHeight : captionLineHeight
+  }
+
+  @ViewBuilder var titlePillRow: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      backportSourcePill
+      targetBranchPill
+    }
+  }
+
+  @ViewBuilder var backportSourcePill: some View {
+    if let backportSourcePillLabel {
+      DashboardReviewStatusPill(
+        label: backportSourcePillLabel,
+        tint: HarnessMonitorTheme.accent,
+        systemImage: "arrow.uturn.backward",
+        isQuiet: true,
+        usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
+        help: backportSourcePillHelp
+      )
+    }
   }
 
   @ViewBuilder var targetBranchPill: some View {

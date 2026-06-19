@@ -15,6 +15,7 @@ fn sample_item(
         url: "https://example.com".into(),
         base_ref_name: None,
         default_branch_name: None,
+        backport_source: None,
         author_login: "renovate[bot]".into(),
         author_avatar_url: None,
         author_association: ReviewAuthorAssociation::None,
@@ -54,13 +55,19 @@ fn query_request_normalizes_cache_key_inputs() {
         exclude_repositories: vec![" acme/old ".into()],
         force_refresh: false,
         cache_max_age_seconds: 0,
+        ..ReviewsQueryRequest::default()
     };
 
     assert_eq!(request.normalized_authors(), vec!["renovate[bot]"]);
     assert_eq!(request.cache_max_age_seconds(), 1);
     assert_eq!(
         request.cache_key(),
-        "authors=renovate[bot]|orgs=acme|repos=acme/api|exclude=acme/old"
+        concat!(
+            "authors=renovate[bot]|orgs=acme|repos=acme/api|exclude=acme/old",
+            "|backports=true|backport_patterns=",
+            "(?i)\\s*\\(backport\\s+of\\s+#(?P<number>\\d+)\\)\\s*$\u{1f}",
+            "(?i)\\s*\\[backport\\s+of\\s+#(?P<number>\\d+)\\]\\s*$",
+        )
     );
 }
 
@@ -73,9 +80,30 @@ fn query_request_accepts_empty_authors_when_scope_is_present() {
         exclude_repositories: Vec::new(),
         force_refresh: false,
         cache_max_age_seconds: 600,
+        ..ReviewsQueryRequest::default()
     };
 
     assert!(request.validate().is_ok());
+}
+
+#[test]
+fn query_request_cache_key_includes_backport_detection_settings() {
+    let base = ReviewsQueryRequest {
+        organizations: vec!["acme".into()],
+        backport_patterns: vec![r"(?i)\s*\(backport of #(?P<number>\d+)\)\s*$".into()],
+        ..ReviewsQueryRequest::default()
+    };
+    let disabled = ReviewsQueryRequest {
+        backport_detection_enabled: false,
+        ..base.clone()
+    };
+    let custom = ReviewsQueryRequest {
+        backport_patterns: vec![r"(?i)\s*\[picked from #(?P<number>\d+)\]\s*$".into()],
+        ..base.clone()
+    };
+
+    assert_ne!(base.cache_key(), disabled.cache_key());
+    assert_ne!(base.cache_key(), custom.cache_key());
 }
 
 #[test]
@@ -87,6 +115,7 @@ fn query_request_rejects_empty_scope_even_with_authors() {
         exclude_repositories: Vec::new(),
         force_refresh: false,
         cache_max_age_seconds: 600,
+        ..ReviewsQueryRequest::default()
     };
 
     assert!(request.validate().is_err());

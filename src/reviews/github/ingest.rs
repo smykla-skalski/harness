@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::errors::CliError;
+use crate::reviews::backports::BackportDetector;
 
 use super::mapping::{NodeContinuation, RepositoryLabelBundle, convert_node};
 use super::types::SearchNode;
@@ -9,13 +10,14 @@ use super::{ReviewItem, ReviewRepositoryLabel, ReviewsQueryRequest};
 pub(super) fn ingest_search_node(
     node: SearchNode,
     request: &ReviewsQueryRequest,
+    backport_detector: Option<&BackportDetector>,
     viewer_login: Option<&str>,
     deduped: &mut BTreeMap<String, ReviewItem>,
     continuations: &mut BTreeMap<String, NodeContinuation>,
     repository_labels: &mut BTreeMap<String, Vec<ReviewRepositoryLabel>>,
     repository_label_continuation_seen: &mut BTreeSet<String>,
 ) -> Result<(), CliError> {
-    let (item, bundle, mut continuation) = convert_node(node, viewer_login)?;
+    let (item, bundle, mut continuation) = convert_node(node, backport_detector, viewer_login)?;
     if request
         .normalized_exclude_repositories()
         .contains(&item.repository)
@@ -45,6 +47,7 @@ pub(super) fn ingest_search_node(
 pub(super) fn ingest_nodes_chunk(
     nodes: Vec<Option<SearchNode>>,
     chunk: &[String],
+    backport_detector: Option<&BackportDetector>,
     viewer_login: Option<&str>,
     items: &mut Vec<ReviewItem>,
     continuations: &mut Vec<NodeContinuation>,
@@ -59,7 +62,7 @@ pub(super) fn ingest_nodes_chunk(
             }
             continue;
         };
-        let (item, bundle, mut continuation) = convert_node(node, viewer_login)?;
+        let (item, bundle, mut continuation) = convert_node(node, backport_detector, viewer_login)?;
         if let Some(bundle) = bundle {
             merge_repository_label_bundle(repository_labels, bundle);
         }

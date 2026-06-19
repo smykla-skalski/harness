@@ -228,9 +228,17 @@ public struct ReviewsCacheClearResponse: Codable, Equatable, Sendable {
 
 public struct ReviewsRefreshRequest: Codable, Equatable, Sendable {
   public let targets: [ReviewTarget]
+  public let backportDetectionEnabled: Bool
+  public let backportPatterns: [String]
 
-  public init(targets: [ReviewTarget]) {
+  public init(
+    targets: [ReviewTarget],
+    backportDetectionEnabled: Bool = true,
+    backportPatterns: [String] = ReviewsQueryRequest.defaultBackportPatterns
+  ) {
     self.targets = targets
+    self.backportDetectionEnabled = backportDetectionEnabled
+    self.backportPatterns = backportPatterns
   }
 }
 

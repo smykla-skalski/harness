@@ -15,9 +15,8 @@ use crate::task_board::policy::PolicyReasonCode;
 use crate::task_board::policy_graph::{
     PORT_IN, PolicyActionStep, PolicyFinishNode, PolicyGraph, PolicyGraphDecision, PolicyGraphEdge,
     PolicyGraphEdgeCondition, PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeId,
-    PolicyGraphNodeKind,
-    PolicyGraphNodeLayout, PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
-    store_gate_policy,
+    PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyWaitCondition, PolicyWaitStep,
+    PolicyWorkflowEntry, store_gate_policy,
 };
 use crate::task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject,

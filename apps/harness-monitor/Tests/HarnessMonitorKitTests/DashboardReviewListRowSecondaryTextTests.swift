@@ -163,6 +163,22 @@ struct DashboardReviewListRowSecondaryTextTests {
     #expect(row.targetBranchPillHelp == nil)
   }
 
+  @Test("backport source pill uses daemon-provided metadata")
+  func backportSourcePillUsesDaemonProvidedMetadata() {
+    let row = makeRow(
+      showsRepository: true,
+      backportSource: ReviewBackportSource(
+        number: 16926,
+        repository: "octocat/example",
+        url: "https://github.com/octocat/example/pull/16926"
+      )
+    )
+
+    #expect(row.backportSourcePillLabel == "#16926")
+    #expect(row.backportSourcePillHelp == "Backport of octocat/example#16926")
+    #expect(row.titlePillRowVisible)
+  }
+
   private func makeRow(
     showsRepository: Bool,
     title: String = "Bump dependency",
@@ -173,6 +189,7 @@ struct DashboardReviewListRowSecondaryTextTests {
     showsAvatars: Bool = true,
     baseRefName: String? = nil,
     defaultBranchName: String? = nil,
+    backportSource: ReviewBackportSource? = nil,
     showsTargetBranch: Bool = true
   ) -> DashboardReviewListRow {
     DashboardReviewListRow(
@@ -185,6 +202,7 @@ struct DashboardReviewListRowSecondaryTextTests {
         url: "https://github.com/octocat/example/pull/42",
         baseRefName: baseRefName,
         defaultBranchName: defaultBranchName,
+        backportSource: backportSource,
         authorLogin: "octocat",
         state: .open,
         mergeable: .mergeable,

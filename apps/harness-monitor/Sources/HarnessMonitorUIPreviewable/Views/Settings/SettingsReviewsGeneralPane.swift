@@ -39,6 +39,7 @@ struct SettingsReviewsGeneralPane: View {
     Form {
       sourceScopeSection
       behaviorSection
+      backportSection
       slaSection
       refreshSection
     }

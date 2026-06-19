@@ -34,8 +34,8 @@ fn claude_runtime_config_contains_expected_lifecycle_commands() {
     let dir = tempfile::tempdir().unwrap();
     write_agent_bootstrap(dir.path(), HookAgent::Claude, &[], legacy_flags()).unwrap();
     let settings_path = dir.path().join(".claude").join("settings.json");
-    let hooks: serde_json::Value = serde_json::from_str(&fs::read_to_string(settings_path).unwrap())
-        .unwrap();
+    let hooks: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(settings_path).unwrap()).unwrap();
 
     let commands = [
         (
@@ -53,7 +53,9 @@ fn claude_runtime_config_contains_expected_lifecycle_commands() {
     ];
 
     for (event, expected) in commands {
-        let actual = hooks["hooks"][event][0]["hooks"][0]["command"].as_str().unwrap();
+        let actual = hooks["hooks"][event][0]["hooks"][0]["command"]
+            .as_str()
+            .unwrap();
         assert_eq!(actual, expected, "{event} lifecycle command drifted");
     }
 
@@ -61,8 +63,7 @@ fn claude_runtime_config_contains_expected_lifecycle_commands() {
         .as_str()
         .unwrap();
     assert_eq!(
-        stop_command,
-        "harness hook --agent claude suite:run guard-stop",
+        stop_command, "harness hook --agent claude suite:run guard-stop",
         "Stop lifecycle command drifted"
     );
 }
@@ -100,7 +101,8 @@ fn write_agent_bootstrap_skips_codex_project_outputs() {
 #[test]
 fn write_agent_bootstrap_writes_only_claude_runtime_config() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Claude, &[], legacy_flags()).unwrap();
+    let written =
+        write_agent_bootstrap(dir.path(), HookAgent::Claude, &[], legacy_flags()).unwrap();
 
     let settings_path = dir.path().join(".claude").join("settings.json");
     let plugin_skill = dir
@@ -119,7 +121,8 @@ fn write_agent_bootstrap_writes_only_claude_runtime_config() {
 #[test]
 fn write_agent_bootstrap_omits_gemini_session_command_by_default() {
     let dir = tempfile::tempdir().unwrap();
-    let written = write_agent_bootstrap(dir.path(), HookAgent::Gemini, &[], legacy_flags()).unwrap();
+    let written =
+        write_agent_bootstrap(dir.path(), HookAgent::Gemini, &[], legacy_flags()).unwrap();
 
     let settings_path = dir.path().join(".gemini").join("settings.json");
     let command_path = dir

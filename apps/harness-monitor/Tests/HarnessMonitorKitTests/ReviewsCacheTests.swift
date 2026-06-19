@@ -38,6 +38,33 @@ final class ReviewsCacheTests: XCTestCase {
     )
   }
 
+  func testPreferencesHashChangesWhenBackportSettingsChange() {
+    let base = ReviewsQueryRequest(
+      repositories: ["acme/api"],
+      backportDetectionEnabled: true,
+      backportPatterns: [#"(?i)\s*\(backport of #(?P<number>\d+)\)\s*$"#]
+    )
+    let disabled = ReviewsQueryRequest(
+      repositories: ["acme/api"],
+      backportDetectionEnabled: false,
+      backportPatterns: base.backportPatterns
+    )
+    let custom = ReviewsQueryRequest(
+      repositories: ["acme/api"],
+      backportDetectionEnabled: true,
+      backportPatterns: [#"(?i)\s*\[picked from #(?P<number>\d+)\]\s*$"#]
+    )
+
+    XCTAssertNotEqual(
+      ReviewsCache.preferencesHash(for: base),
+      ReviewsCache.preferencesHash(for: disabled)
+    )
+    XCTAssertNotEqual(
+      ReviewsCache.preferencesHash(for: base),
+      ReviewsCache.preferencesHash(for: custom)
+    )
+  }
+
   func testSaveAndLoadRoundTrip() throws {
     let context = try makeContext()
     let cache = ReviewsCache(context: context)

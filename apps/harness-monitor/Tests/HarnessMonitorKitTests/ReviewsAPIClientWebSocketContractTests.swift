@@ -188,6 +188,11 @@ extension TaskBoardAPIClientTests {
     )
     #expect(objectValue(calls[2].params, key: "force_refresh") == .bool(true))
     #expect(objectValue(calls[2].params, key: "cache_max_age_seconds") == .number(120))
+    #expect(objectValue(calls[2].params, key: "backport_detection_enabled") == .bool(true))
+    #expect(
+      objectValue(calls[2].params, key: "backport_patterns")
+        == .array(ReviewsQueryRequest.defaultBackportPatterns.map(JSONValue.string))
+    )
     #expect(objectValue(calls[3].params, key: "action") == .string("merge"))
     #expect(
       objectValue(calls[3].params, key: "targets")
@@ -234,6 +239,11 @@ extension TaskBoardAPIClientTests {
     #expect(
       objectValue(calls[13].params, key: "targets")
         == .array([.object(reviewsActionTargetJSON)])
+    )
+    #expect(objectValue(calls[13].params, key: "backport_detection_enabled") == .bool(true))
+    #expect(
+      objectValue(calls[13].params, key: "backport_patterns")
+        == .array(ReviewsQueryRequest.defaultBackportPatterns.map(JSONValue.string))
     )
     #expect(
       objectValue(calls[14].params, key: "targets")

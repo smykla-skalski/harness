@@ -218,6 +218,10 @@ struct DashboardReviewDetailHeader<Actions: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+
+        if let backportSource = item.backportSource {
+          DashboardReviewBackportMetadataPill(source: backportSource)
+        }
       }
 
       actionBar()
@@ -332,7 +336,7 @@ private struct DashboardReviewMetadataLink: View {
   }
 }
 
-private struct DashboardReviewCopyableLinkContextMenu: View {
+struct DashboardReviewCopyableLinkContextMenu: View {
   let valueTitle: String, value: String
   let urlTitle: String, openTitle: String
   let destination: URL?

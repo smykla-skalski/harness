@@ -11,14 +11,18 @@ public struct ReviewsQueryRequestWire: Codable, Equatable, Sendable {
   public var excludeRepositories: [String]
   public var forceRefresh: Bool
   public var cacheMaxAgeSeconds: UInt64
+  public var backportDetectionEnabled: Bool
+  public var backportPatterns: [String]
 
-  public init(authors: [String] = [], organizations: [String] = [], repositories: [String] = [], excludeRepositories: [String] = [], forceRefresh: Bool = false, cacheMaxAgeSeconds: UInt64 = 600) {
+  public init(authors: [String] = [], organizations: [String] = [], repositories: [String] = [], excludeRepositories: [String] = [], forceRefresh: Bool = false, cacheMaxAgeSeconds: UInt64 = 600, backportDetectionEnabled: Bool = true, backportPatterns: [String] = []) {
     self.authors = authors
     self.organizations = organizations
     self.repositories = repositories
     self.excludeRepositories = excludeRepositories
     self.forceRefresh = forceRefresh
     self.cacheMaxAgeSeconds = cacheMaxAgeSeconds
+    self.backportDetectionEnabled = backportDetectionEnabled
+    self.backportPatterns = backportPatterns
   }
 
   public init(from decoder: Decoder) throws {
@@ -29,6 +33,8 @@ public struct ReviewsQueryRequestWire: Codable, Equatable, Sendable {
     excludeRepositories = try container.decodeIfPresent([String].self, forKey: .excludeRepositories) ?? []
     forceRefresh = try container.decodeIfPresent(Bool.self, forKey: .forceRefresh) ?? false
     cacheMaxAgeSeconds = try container.decodeIfPresent(UInt64.self, forKey: .cacheMaxAgeSeconds) ?? 600
+    backportDetectionEnabled = try container.decodeIfPresent(Bool.self, forKey: .backportDetectionEnabled) ?? true
+    backportPatterns = try container.decodeIfPresent([String].self, forKey: .backportPatterns) ?? []
   }
 
   enum CodingKeys: String, CodingKey {
@@ -38,6 +44,8 @@ public struct ReviewsQueryRequestWire: Codable, Equatable, Sendable {
     case excludeRepositories = "exclude_repositories"
     case forceRefresh = "force_refresh"
     case cacheMaxAgeSeconds = "cache_max_age_seconds"
+    case backportDetectionEnabled = "backport_detection_enabled"
+    case backportPatterns = "backport_patterns"
   }
 }
 
@@ -194,6 +202,7 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
   public var url: String
   public var baseRefName: String?
   public var defaultBranchName: String?
+  public var backportSource: ReviewBackportSource?
   public var authorLogin: String
   public var authorAvatarUrl: String?
   public var authorAssociation: ReviewAuthorAssociation
@@ -216,7 +225,7 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
   public var updatedAt: String
   public var requiredFailedCheckNames: [String]
 
-  public init(pullRequestId: String, repositoryId: String, repository: String, number: UInt64, title: String, url: String, baseRefName: String? = nil, defaultBranchName: String? = nil, authorLogin: String, authorAvatarUrl: String? = nil, authorAssociation: ReviewAuthorAssociation, state: ReviewPullRequestState, mergeable: ReviewMergeableState, reviewStatus: ReviewReviewStatus, checkStatus: ReviewCheckStatus, isDraft: Bool = false, policyBlocked: Bool = false, viewerCanUpdate: Bool = true, viewerIsRequestedReviewer: Bool = false, viewerCanMergeAsAdmin: Bool = false, headSha: String, labels: [String] = [], checks: [ReviewCheckWire] = [], reviews: [PullRequestReviewWire] = [], additions: UInt64, deletions: UInt64, createdAt: String, updatedAt: String, requiredFailedCheckNames: [String] = []) {
+  public init(pullRequestId: String, repositoryId: String, repository: String, number: UInt64, title: String, url: String, baseRefName: String? = nil, defaultBranchName: String? = nil, backportSource: ReviewBackportSource? = nil, authorLogin: String, authorAvatarUrl: String? = nil, authorAssociation: ReviewAuthorAssociation, state: ReviewPullRequestState, mergeable: ReviewMergeableState, reviewStatus: ReviewReviewStatus, checkStatus: ReviewCheckStatus, isDraft: Bool = false, policyBlocked: Bool = false, viewerCanUpdate: Bool = true, viewerIsRequestedReviewer: Bool = false, viewerCanMergeAsAdmin: Bool = false, headSha: String, labels: [String] = [], checks: [ReviewCheckWire] = [], reviews: [PullRequestReviewWire] = [], additions: UInt64, deletions: UInt64, createdAt: String, updatedAt: String, requiredFailedCheckNames: [String] = []) {
     self.pullRequestId = pullRequestId
     self.repositoryId = repositoryId
     self.repository = repository
@@ -225,6 +234,7 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
     self.url = url
     self.baseRefName = baseRefName
     self.defaultBranchName = defaultBranchName
+    self.backportSource = backportSource
     self.authorLogin = authorLogin
     self.authorAvatarUrl = authorAvatarUrl
     self.authorAssociation = authorAssociation
@@ -258,6 +268,7 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
     url = try container.decode(String.self, forKey: .url)
     baseRefName = try container.decodeIfPresent(String.self, forKey: .baseRefName)
     defaultBranchName = try container.decodeIfPresent(String.self, forKey: .defaultBranchName)
+    backportSource = try container.decodeIfPresent(ReviewBackportSource.self, forKey: .backportSource)
     authorLogin = try container.decode(String.self, forKey: .authorLogin)
     authorAvatarUrl = try container.decodeIfPresent(String.self, forKey: .authorAvatarUrl)
     authorAssociation = try container.decode(ReviewAuthorAssociation.self, forKey: .authorAssociation)
@@ -290,6 +301,7 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
     case url
     case baseRefName = "base_ref_name"
     case defaultBranchName = "default_branch_name"
+    case backportSource = "backport_source"
     case authorLogin = "author_login"
     case authorAvatarUrl = "author_avatar_url"
     case authorAssociation = "author_association"
@@ -311,6 +323,24 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
     case createdAt = "created_at"
     case updatedAt = "updated_at"
     case requiredFailedCheckNames = "required_failed_check_names"
+  }
+}
+
+public struct ReviewBackportSource: Codable, Equatable, Sendable {
+  public var number: UInt64
+  public var repository: String
+  public var url: String
+
+  public init(number: UInt64, repository: String, url: String) {
+    self.number = number
+    self.repository = repository
+    self.url = url
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case number
+    case repository
+    case url
   }
 }
 
@@ -1051,18 +1081,26 @@ public struct ReviewsCacheClearResponseWire: Codable, Equatable, Sendable {
 
 public struct ReviewsRefreshRequestWire: Codable, Equatable, Sendable {
   public var targets: [ReviewTargetWire]
+  public var backportDetectionEnabled: Bool
+  public var backportPatterns: [String]
 
-  public init(targets: [ReviewTargetWire] = []) {
+  public init(targets: [ReviewTargetWire] = [], backportDetectionEnabled: Bool = true, backportPatterns: [String] = []) {
     self.targets = targets
+    self.backportDetectionEnabled = backportDetectionEnabled
+    self.backportPatterns = backportPatterns
   }
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     targets = try container.decodeIfPresent([ReviewTargetWire].self, forKey: .targets) ?? []
+    backportDetectionEnabled = try container.decodeIfPresent(Bool.self, forKey: .backportDetectionEnabled) ?? true
+    backportPatterns = try container.decodeIfPresent([String].self, forKey: .backportPatterns) ?? []
   }
 
   enum CodingKeys: String, CodingKey {
     case targets
+    case backportDetectionEnabled = "backport_detection_enabled"
+    case backportPatterns = "backport_patterns"
   }
 }
 

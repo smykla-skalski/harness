@@ -158,14 +158,12 @@ mod tests {
             || build_report(tmp.path()),
         );
 
-        assert!(
-            !report.checks.iter().any(|check| matches!(
-                check.code,
-                "observe_project_plugin"
-                    | "observe_project_plugin_missing"
-                    | "observe_project_wrapper"
-                    | "observe_project_wrapper_missing"
-            ))
-        );
+        assert!(!report.checks.iter().any(|check| matches!(
+            check.code,
+            "observe_project_plugin"
+                | "observe_project_plugin_missing"
+                | "observe_project_wrapper"
+                | "observe_project_wrapper_missing"
+        )));
     }
 }

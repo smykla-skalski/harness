@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::reviews::ReviewAuthorAssociation;
+use crate::reviews::backports::BackportDetector;
 use crate::task_board::github::GitHubProjectConfig;
 
 use super::types::{
@@ -98,6 +99,7 @@ pub(super) fn scopes(request: &ReviewsQueryRequest) -> Result<Vec<ScopeQuery>, C
 
 pub(super) fn convert_node(
     mut node: SearchNode,
+    backport_detector: Option<&BackportDetector>,
     viewer_login: Option<&str>,
 ) -> Result<(ReviewItem, Option<RepositoryLabelBundle>, NodeContinuation), CliError> {
     let created_at = parse_timestamp(node.created_at.as_str())?;
@@ -145,6 +147,7 @@ pub(super) fn convert_node(
             updated_at,
         },
         node,
+        backport_detector,
         viewer_login,
     );
     let continuation = NodeContinuation {
@@ -195,6 +198,7 @@ struct NodeItemContext {
 fn build_review_item(
     ctx: NodeItemContext,
     node: SearchNode,
+    backport_detector: Option<&BackportDetector>,
     viewer_login: Option<&str>,
 ) -> ReviewItem {
     let (author_login, author_avatar_url) = node.author.map_or_else(
@@ -219,15 +223,22 @@ fn build_review_item(
                 })
             })
     });
+    let backport_detection =
+        backport_detector.and_then(|detector| detector.detect(&ctx.repository_name, &node.title));
+    let (title, backport_source) = backport_detection.map_or_else(
+        || (node.title, None),
+        |detection| (detection.title, Some(detection.source)),
+    );
     ReviewItem {
         pull_request_id: ctx.pull_request_id,
         repository_id: ctx.repository_id,
         repository: ctx.repository_name,
         number: node.number,
-        title: node.title,
+        title,
         url: node.url,
         base_ref_name: node.base_ref_name,
         default_branch_name,
+        backport_source,
         author_login,
         author_avatar_url,
         author_association: ReviewAuthorAssociation::parse(node.author_association.as_deref()),

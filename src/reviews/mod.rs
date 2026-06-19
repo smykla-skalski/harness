@@ -1,4 +1,5 @@
 mod avatar;
+mod backports;
 mod body_update;
 mod enums;
 mod file_comment;
@@ -39,20 +40,20 @@ pub use files::{
 };
 pub(crate) use github::ReviewsGitHubClient;
 pub use types::{
-    PullRequestReview, ReviewActionPreviewTarget, ReviewActionResult, ReviewCheck, ReviewItem,
-    ReviewItemFlags, ReviewRepositoryLabel, ReviewTarget, ReviewTargetFlags,
-    ReviewsActionCapabilities, ReviewsActionPreviewRequest, ReviewsActionPreviewResponse,
-    ReviewsActionResponse, ReviewsApproveRequest, ReviewsAutoRequest, ReviewsBodyRequest,
-    ReviewsBodyResponse, ReviewsCacheClearResponse, ReviewsCapabilitiesResponse,
-    ReviewsCommentRequest, ReviewsLabelRequest, ReviewsMergeRequest, ReviewsPolicyHistoryRequest,
-    ReviewsPolicyHistoryResponse, ReviewsPolicyPreviewRequest, ReviewsPolicyPreviewResponse,
-    ReviewsPolicyPreviewStep, ReviewsPolicyRunMetrics, ReviewsPolicyRunResponse,
-    ReviewsPolicyRunStartRequest, ReviewsPolicyRunStatus, ReviewsPolicyRunStep,
-    ReviewsPolicyStatusRequest, ReviewsPolicyStatusResponse, ReviewsPolicyStepType,
-    ReviewsPolicySubject, ReviewsPolicyTimelineEntry, ReviewsPolicyTrigger, ReviewsPolicyWait,
-    ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest, ReviewsRefreshResponse,
-    ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest,
-    ReviewsRerunChecksRequest, ReviewsSummary,
+    PullRequestReview, ReviewActionPreviewTarget, ReviewActionResult, ReviewBackportSource,
+    ReviewCheck, ReviewItem, ReviewItemFlags, ReviewRepositoryLabel, ReviewTarget,
+    ReviewTargetFlags, ReviewsActionCapabilities, ReviewsActionPreviewRequest,
+    ReviewsActionPreviewResponse, ReviewsActionResponse, ReviewsApproveRequest, ReviewsAutoRequest,
+    ReviewsBodyRequest, ReviewsBodyResponse, ReviewsCacheClearResponse,
+    ReviewsCapabilitiesResponse, ReviewsCommentRequest, ReviewsLabelRequest, ReviewsMergeRequest,
+    ReviewsPolicyHistoryRequest, ReviewsPolicyHistoryResponse, ReviewsPolicyPreviewRequest,
+    ReviewsPolicyPreviewResponse, ReviewsPolicyPreviewStep, ReviewsPolicyRunMetrics,
+    ReviewsPolicyRunResponse, ReviewsPolicyRunStartRequest, ReviewsPolicyRunStatus,
+    ReviewsPolicyRunStep, ReviewsPolicyStatusRequest, ReviewsPolicyStatusResponse,
+    ReviewsPolicyStepType, ReviewsPolicySubject, ReviewsPolicyTimelineEntry, ReviewsPolicyTrigger,
+    ReviewsPolicyWait, ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest,
+    ReviewsRefreshResponse, ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
+    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, ReviewsSummary,
 };
 
 // Re-exports used by `mod tests;` via `use super::*;`. These were previously

@@ -401,10 +401,7 @@ fn reviews_auto_test_graph() -> PolicyGraph {
             width: 260,
             height: 240,
         },
-        node_ids: vec![
-            "entry-reviews-auto".into(),
-            "entry-reviews-manual".into(),
-        ],
+        node_ids: vec!["entry-reviews-auto".into(), "entry-reviews-manual".into()],
     });
     graph.layout.nodes.extend([
         PolicyGraphNodeLayout {

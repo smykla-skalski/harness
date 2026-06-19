@@ -215,9 +215,7 @@ fn record_hook_event_registers_late_managed_runtime_session() {
             agent: Some(AgentContext {
                 agent_id: None,
                 agent_type: Some("gemini".into()),
-                prompt: Some(
-                    "harness session join bc9852b3-c89f-5cb2-a896-e59adffc8316".into(),
-                ),
+                prompt: Some("harness session join bc9852b3-c89f-5cb2-a896-e59adffc8316".into()),
                 response: Some("stop".into()),
             }),
             skill: SkillContext::inactive(),

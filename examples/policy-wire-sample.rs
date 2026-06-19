@@ -61,10 +61,18 @@ fn canonical() -> Samples {
 fn all_node_kinds() -> Vec<PolicyGraphNodeKind> {
     use PolicyGraphNodeKind as Kind;
     vec![
-        Kind::Trigger { workflow: "review".to_string() },
-        Kind::WorkflowEntry(PolicyWorkflowEntry { workflow_id: "wf-1".to_string() }),
-        Kind::ActionGate { actions: vec![PolicyAction::MergePr, PolicyAction::OpenPr] },
-        Kind::ActionStep(PolicyActionStep { action_id: "act-1".to_string() }),
+        Kind::Trigger {
+            workflow: "review".to_string(),
+        },
+        Kind::WorkflowEntry(PolicyWorkflowEntry {
+            workflow_id: "wf-1".to_string(),
+        }),
+        Kind::ActionGate {
+            actions: vec![PolicyAction::MergePr, PolicyAction::OpenPr],
+        },
+        Kind::ActionStep(PolicyActionStep {
+            action_id: "act-1".to_string(),
+        }),
         Kind::EvidenceCheck {
             checks: vec![PolicyEvidenceCheck {
                 field: PolicyEvidenceField::ChecksGreen,
@@ -91,15 +99,27 @@ fn all_node_kinds() -> Vec<PolicyGraphNodeKind> {
             missing_reason_code: PolicyReasonCode::MissingMergeEvidence,
         },
         Kind::WaitStep(PolicyWaitStep {
-            wait: PolicyWaitCondition::Timer { duration_seconds: 30 },
+            wait: PolicyWaitCondition::Timer {
+                duration_seconds: 30,
+            },
             resume_key: "resume-1".to_string(),
         }),
-        Kind::EventWait(PolicyEventWait { event_key: "evt-1".to_string() }),
-        Kind::Handoff(PolicyHandoffStep { handoff_key: "handoff-1".to_string() }),
+        Kind::EventWait(PolicyEventWait {
+            event_key: "evt-1".to_string(),
+        }),
+        Kind::Handoff(PolicyHandoffStep {
+            handoff_key: "handoff-1".to_string(),
+        }),
         Kind::Hub,
-        Kind::HumanGate { reason_code: PolicyReasonCode::HumanRequired },
-        Kind::ConsensusGate { reason_code: PolicyReasonCode::ProtectedPathTouched },
-        Kind::DryRunGate { reason_code: PolicyReasonCode::DryRunRequired },
+        Kind::HumanGate {
+            reason_code: PolicyReasonCode::HumanRequired,
+        },
+        Kind::ConsensusGate {
+            reason_code: PolicyReasonCode::ProtectedPathTouched,
+        },
+        Kind::DryRunGate {
+            reason_code: PolicyReasonCode::DryRunRequired,
+        },
         Kind::SupervisorRule {
             decision: PolicyGraphDecision::Allow,
             reason_codes: vec![PolicyReasonCode::DefaultAllow],
@@ -118,9 +138,15 @@ fn all_node_kinds() -> Vec<PolicyGraphNodeKind> {
 fn main() {
     if std::env::args().nth(1).as_deref() == Some("verify") {
         let mut input = String::new();
-        std::io::stdin().read_to_string(&mut input).expect("read stdin");
+        std::io::stdin()
+            .read_to_string(&mut input)
+            .expect("read stdin");
         let parsed: Samples = serde_json::from_str(&input).expect("decode round-tripped JSON");
-        assert_eq!(parsed, canonical(), "Swift round-trip changed the wire value");
+        assert_eq!(
+            parsed,
+            canonical(),
+            "Swift round-trip changed the wire value"
+        );
         println!("round-trip OK: {} node kinds preserved", parsed.kinds.len());
     } else {
         let json = serde_json::to_string_pretty(&canonical()).expect("serialize samples");

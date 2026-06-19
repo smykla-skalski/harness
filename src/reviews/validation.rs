@@ -1,4 +1,5 @@
 use crate::errors::{CliError, CliErrorKind};
+use crate::reviews::backports::BackportDetector;
 
 use super::{
     ReviewTarget, ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest,
@@ -23,6 +24,7 @@ impl ReviewsQueryRequest {
             )
             .into());
         }
+        BackportDetector::validate_patterns(&self.normalized_backport_patterns())?;
         Ok(())
     }
 }
@@ -201,7 +203,8 @@ impl ReviewsRefreshRequest {
     /// # Errors
     /// Returns `CliError` when no dependency update targets are provided.
     pub fn validate(&self) -> Result<(), CliError> {
-        ensure_targets(&self.targets, "refresh")
+        ensure_targets(&self.targets, "refresh")?;
+        BackportDetector::validate_patterns(&self.normalized_backport_patterns())
     }
 }
 

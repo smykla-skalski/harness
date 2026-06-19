@@ -19,7 +19,11 @@ extension DashboardReviewsRouteView {
           ) {
             try await DashboardReviewsRemoteLoader.refresh(
               client: client,
-              request: ReviewsRefreshRequest(targets: targets)
+              request: ReviewsRefreshRequest(
+                targets: targets,
+                backportDetectionEnabled: normalizedPreferences.backportDetectionEnabled,
+                backportPatterns: normalizedPreferences.normalizedBackportPatterns
+              )
             )
           }
           applyRefreshedItems(refreshed)

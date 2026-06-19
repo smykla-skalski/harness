@@ -70,6 +70,10 @@ extension ReviewsRefreshResponse {
 
 extension ReviewsRefreshRequestWire {
   init(_ model: ReviewsRefreshRequest) {
-    self.init(targets: model.targets.map { ReviewTargetWire($0) })
+    self.init(
+      targets: model.targets.map { ReviewTargetWire($0) },
+      backportDetectionEnabled: model.backportDetectionEnabled,
+      backportPatterns: model.backportPatterns
+    )
   }
 }

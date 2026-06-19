@@ -67,6 +67,7 @@ extension ReviewItem {
       url: wire.url,
       baseRefName: wire.baseRefName,
       defaultBranchName: wire.defaultBranchName,
+      backportSource: wire.backportSource,
       authorLogin: wire.authorLogin,
       authorAvatarURL: wire.authorAvatarUrl.flatMap { URL(string: $0) },
       authorAssociation: wire.authorAssociation,
@@ -115,7 +116,9 @@ extension ReviewsQueryRequestWire {
       repositories: model.repositories,
       excludeRepositories: model.excludeRepositories,
       forceRefresh: model.forceRefresh,
-      cacheMaxAgeSeconds: model.cacheMaxAgeSeconds
+      cacheMaxAgeSeconds: model.cacheMaxAgeSeconds,
+      backportDetectionEnabled: model.backportDetectionEnabled,
+      backportPatterns: model.backportPatterns
     )
   }
 }

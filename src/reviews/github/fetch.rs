@@ -5,6 +5,7 @@ use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
+use crate::reviews::backports::BackportDetector;
 
 use super::client::{
     NODES_BATCH_SIZE, REPOSITORY_CATALOG_PAGE_CAP, ReviewsFetch, ReviewsFetchByIds,
@@ -16,7 +17,7 @@ use super::mapping::{self, NodeContinuation, next_cursor_or_scope_limit, scopes}
 use super::pagination::resolve_continuation;
 use super::queries::{NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY, SEARCH_QUERY};
 use super::types::{NodesResponse, OrganizationRepositoriesResponse, SearchResponse};
-use super::{ReviewItem, ReviewRepositoryLabel, ReviewsQueryRequest};
+use super::{ReviewItem, ReviewRepositoryLabel, ReviewsQueryRequest, ReviewsRefreshRequest};
 
 const HOURS: u64 = 60 * 60;
 
@@ -50,10 +51,12 @@ impl ReviewsGitHubClient {
         let mut continuations: BTreeMap<String, NodeContinuation> = BTreeMap::new();
         let mut repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>> = BTreeMap::new();
         let mut repository_label_continuation_seen: BTreeSet<String> = BTreeSet::new();
+        let backport_detector = BackportDetector::from_query(request)?;
         for scope in scopes(request)? {
             self.fetch_updates_scope(
                 request,
                 &scope,
+                backport_detector.as_ref(),
                 viewer_login,
                 &mut deduped,
                 &mut continuations,
@@ -84,6 +87,7 @@ impl ReviewsGitHubClient {
         &self,
         request: &ReviewsQueryRequest,
         scope: &mapping::ScopeQuery,
+        backport_detector: Option<&BackportDetector>,
         viewer_login: Option<&str>,
         deduped: &mut BTreeMap<String, ReviewItem>,
         continuations: &mut BTreeMap<String, NodeContinuation>,
@@ -112,6 +116,7 @@ impl ReviewsGitHubClient {
                 ingest_search_node(
                     node,
                     request,
+                    backport_detector,
                     viewer_login,
                     deduped,
                     continuations,
@@ -135,6 +140,7 @@ impl ReviewsGitHubClient {
     pub(crate) async fn fetch_by_ids(
         &self,
         ids: &[String],
+        request: &ReviewsRefreshRequest,
         viewer_login: Option<&str>,
     ) -> Result<ReviewsFetchByIds, CliError> {
         if ids.is_empty() {
@@ -149,6 +155,7 @@ impl ReviewsGitHubClient {
         let mut missing = Vec::new();
         let mut repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>> = BTreeMap::new();
         let mut repository_label_continuation_seen: BTreeSet<String> = BTreeSet::new();
+        let backport_detector = BackportDetector::from_refresh(request)?;
         for chunk in ids.chunks(NODES_BATCH_SIZE) {
             let response: NodesResponse = self
                 .client
@@ -171,6 +178,7 @@ impl ReviewsGitHubClient {
             ingest_nodes_chunk(
                 response.nodes,
                 chunk,
+                backport_detector.as_ref(),
                 viewer_login,
                 &mut items,
                 &mut continuations,

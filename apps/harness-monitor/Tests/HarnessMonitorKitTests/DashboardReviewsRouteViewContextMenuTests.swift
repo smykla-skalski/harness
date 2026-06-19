@@ -121,4 +121,16 @@ struct DashboardReviewsRouteViewContextMenuTests {
     #expect(snapshot.cacheLabel == "Cached data")
     #expect(snapshot.checkLinkLabel == "2/3 check links missing")
   }
+
+  @Test("single-item context menu exposes backported PR action")
+  func singleItemContextMenuExposesBackportedPRAction() throws {
+    let contextMenuSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+ContextMenu.swift"
+    )
+
+    #expect(contextMenuSource.contains("primaryItem.backportSource"))
+    #expect(contextMenuSource.contains("Open Backported PR #\\(backportSource.number)"))
+    #expect(contextMenuSource.contains("Copy Backported PR Link"))
+    #expect(contextMenuSource.contains("HarnessMonitorClipboard.copy(backportSource.url)"))
+  }
 }

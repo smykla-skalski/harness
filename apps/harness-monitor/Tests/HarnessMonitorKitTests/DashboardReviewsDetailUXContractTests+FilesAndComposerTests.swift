@@ -119,7 +119,9 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(conversation.contains(".padding(.bottom, HarnessMonitorTheme.spacingLG)"))
     #expect(
       conversation.contains(
-        "DashboardReviewConversationFullContentSheetMetricsReader(metrics: $sheetMetrics)"))
+        "DashboardReviewSheetMetricsReader(metrics: $sheetMetrics)"
+      )
+    )
     #expect(conversation.contains("@Binding var metrics"))
     #expect(conversation.contains("DispatchQueue.main.async"))
     #expect(!conversation.contains("sheetWindow?.sheetParent ?? sheetWindow"))

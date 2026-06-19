@@ -194,7 +194,9 @@ extension DashboardReviewsRouteView {
           request: ReviewsQueryRequest(
             repositories: repositories,
             forceRefresh: true,
-            cacheMaxAgeSeconds: 0
+            cacheMaxAgeSeconds: 0,
+            backportDetectionEnabled: normalizedPreferences.backportDetectionEnabled,
+            backportPatterns: normalizedPreferences.normalizedBackportPatterns
           )
         )
       }

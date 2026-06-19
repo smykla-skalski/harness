@@ -43,6 +43,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
   public let url: String
   public let baseRefName: String?
   public let defaultBranchName: String?
+  public let backportSource: ReviewBackportSource?
   public let authorLogin: String
   public let authorAvatarURL: URL?
   public let authorAssociation: ReviewAuthorAssociation
@@ -76,6 +77,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     url: String,
     baseRefName: String? = nil,
     defaultBranchName: String? = nil,
+    backportSource: ReviewBackportSource? = nil,
     authorLogin: String,
     authorAvatarURL: URL? = nil,
     authorAssociation: ReviewAuthorAssociation = .none,
@@ -106,6 +108,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     self.url = url
     self.baseRefName = baseRefName
     self.defaultBranchName = defaultBranchName
+    self.backportSource = backportSource
     self.authorLogin = authorLogin
     self.authorAvatarURL = authorAvatarURL
     self.authorAssociation = authorAssociation
@@ -138,6 +141,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     case url
     case baseRefName
     case defaultBranchName
+    case backportSource
     case authorLogin
     case authorAvatarURL = "authorAvatarUrl"
     case authorAssociation
@@ -171,6 +175,8 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     url = try container.decode(String.self, forKey: .url)
     baseRefName = try container.decodeIfPresent(String.self, forKey: .baseRefName)
     defaultBranchName = try container.decodeIfPresent(String.self, forKey: .defaultBranchName)
+    backportSource =
+      try container.decodeIfPresent(ReviewBackportSource.self, forKey: .backportSource)
     authorLogin = try container.decode(String.self, forKey: .authorLogin)
     authorAvatarURL =
       try container.decodeIfPresent(String.self, forKey: .authorAvatarURL)

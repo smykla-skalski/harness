@@ -45,6 +45,11 @@ extension TaskBoardAPIClientTests {
     #expect(records[2].body?["exclude_repositories"] as? [String] == ["example/archive"])
     #expect(records[2].body?["force_refresh"] as? Bool == true)
     #expect(records[2].body?["cache_max_age_seconds"] as? Int == 120)
+    #expect(records[2].body?["backport_detection_enabled"] as? Bool == true)
+    #expect(
+      records[2].body?["backport_patterns"] as? [String]
+        == ReviewsQueryRequest.defaultBackportPatterns
+    )
     #expect(records[3].body?["action"] as? String == "merge")
     #expect(records[3].body?["method"] as? String == "rebase")
 
@@ -66,6 +71,11 @@ extension TaskBoardAPIClientTests {
         == "example/harness")
     #expect((records[11].body?["subject"] as? [String: Any])?["pull_request_number"] as? Int == 42)
     #expect(records[12].body == nil)
+    #expect(records[13].body?["backport_detection_enabled"] as? Bool == true)
+    #expect(
+      records[13].body?["backport_patterns"] as? [String]
+        == ReviewsQueryRequest.defaultBackportPatterns
+    )
     #expect(records[14].body?["body"] as? String == "@renovatebot rebase")
     #expect(records[14].body?["targets"] is [[String: Any]])
     #expect(

@@ -207,8 +207,12 @@ extension DashboardReviewsDetailUXContractTests {
     let support = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
     )
+    let backportPill = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewBackportMetadataPill.swift"
+    )
 
-    #expect(support.contains("private struct DashboardReviewCopyableLinkContextMenu: View"))
+    #expect(support.contains("struct DashboardReviewCopyableLinkContextMenu: View"))
     #expect(support.contains("HarnessMonitorClipboard.copy(value)"))
     #expect(support.contains("HarnessMonitorClipboard.copy(destination.absoluteString)"))
     #expect(support.contains("Button(openTitle)"))
@@ -221,6 +225,9 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(support.contains("item.authorLogin.dashboardReviewGitHubPathEncoded"))
     #expect(support.contains("urlTitle: \"Copy Pull Request URL\""))
     #expect(support.contains("copyURLTitle: \"Copy Author URL\""))
+    #expect(support.contains("DashboardReviewBackportMetadataPill"))
+    #expect(backportPill.contains("valueTitle: \"Copy Backported PR\""))
+    #expect(backportPill.contains("openTitle: \"Open Backported PR\""))
   }
 
   @Test("Status pill drops icon when attention summary owns it")

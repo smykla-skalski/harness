@@ -39,8 +39,8 @@ pub(super) use super::{
     ReviewMergeableState, ReviewPullRequestState, ReviewRepositoryLabel, ReviewReviewEventState,
     ReviewReviewStatus, ReviewTarget, ReviewsApproveRequest, ReviewsCommentRequest,
     ReviewsFileCommentKind, ReviewsFileCommentRequest, ReviewsFileCommentResponse,
-    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRequestReviewRequest,
-    ReviewsRerunChecksRequest, timeline,
+    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
+    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, timeline,
 };
 
 #[cfg(test)]

@@ -21,6 +21,20 @@ extension DashboardReviewListRow {
     showsLineCounters && (item.additions > 0 || item.deletions > 0)
   }
 
+  var titlePillRowVisible: Bool {
+    backportSourcePillLabel != nil || targetBranchPillLabel != nil
+  }
+
+  var backportSourcePillLabel: String? {
+    guard let source = item.backportSource else { return nil }
+    return "#\(source.number)"
+  }
+
+  var backportSourcePillHelp: String? {
+    guard let source = item.backportSource else { return nil }
+    return "Backport of \(source.repository)#\(source.number)"
+  }
+
   var targetBranchPillLabel: String? {
     guard showsTargetBranch else { return nil }
     return item.nonDefaultTargetBranchName

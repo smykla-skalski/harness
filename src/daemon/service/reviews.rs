@@ -444,7 +444,9 @@ pub async fn refresh_reviews(
             .collect();
         let client = ReviewsGitHubClient::new(&segment.token)?;
         let viewer_login = client.fetch_viewer_login().await;
-        let fetch = client.fetch_by_ids(&ids, viewer_login.as_deref()).await?;
+        let fetch = client
+            .fetch_by_ids(&ids, request, viewer_login.as_deref())
+            .await?;
         items.extend(fetch.items);
         missing.extend(fetch.missing);
         if !fetch.repository_labels.is_empty() {

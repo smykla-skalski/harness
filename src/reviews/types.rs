@@ -17,12 +17,13 @@ use super::enums::{
     ReviewPullRequestState, ReviewReviewEventState, ReviewReviewStatus,
 };
 use super::logic::{
-    default_cache_max_age_seconds, default_pull_request_state, default_reviews_policy_workflow_id,
+    default_backport_detection_enabled, default_backport_patterns, default_cache_max_age_seconds,
+    default_pull_request_state, default_reviews_policy_workflow_id,
     default_viewer_can_merge_as_admin, default_viewer_can_update,
 };
 use super::timeline;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewsQueryRequest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub authors: Vec<String>,
@@ -36,6 +37,13 @@ pub struct ReviewsQueryRequest {
     pub force_refresh: bool,
     #[serde(default = "default_cache_max_age_seconds")]
     pub cache_max_age_seconds: u64,
+    #[serde(default = "default_backport_detection_enabled")]
+    pub backport_detection_enabled: bool,
+    #[serde(
+        default = "default_backport_patterns",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub backport_patterns: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -112,6 +120,8 @@ pub struct ReviewItem {
     pub base_ref_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_branch_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backport_source: Option<ReviewBackportSource>,
     pub author_login: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author_avatar_url: Option<String>,
@@ -138,6 +148,13 @@ pub struct ReviewItem {
     pub updated_at: DateTime<Utc>,
     #[serde(default)]
     pub required_failed_check_names: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewBackportSource {
+    pub number: u64,
+    pub repository: String,
+    pub url: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -444,10 +461,17 @@ pub struct ReviewsCacheClearResponse {
     pub cleared_entries: usize,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewsRefreshRequest {
     #[serde(default)]
     pub targets: Vec<ReviewTarget>,
+    #[serde(default = "default_backport_detection_enabled")]
+    pub backport_detection_enabled: bool,
+    #[serde(
+        default = "default_backport_patterns",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub backport_patterns: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

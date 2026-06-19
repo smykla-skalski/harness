@@ -23,6 +23,8 @@ struct DashboardReviewsPreferencesTests {
     #expect(!prefs.showActivityInlineComments)
     #expect(!prefs.showApprovalCountsInRows)
     #expect(prefs.showTargetBranchInRows)
+    #expect(prefs.backportDetectionEnabled)
+    #expect(prefs.normalizedBackportPatterns == DashboardReviewsPreferences.defaultBackportPatterns)
   }
 
   @Test("legacy stored preferences migrate the polling interval into the per-repo field")
@@ -102,6 +104,34 @@ struct DashboardReviewsPreferencesTests {
     #expect(request.excludeRepositories == ["acme/legacy"])
     #expect(request.authors.sorted() == ["dependabot[bot]", "renovate[bot]"].sorted())
     #expect(request.forceRefresh)
+    #expect(request.backportDetectionEnabled)
+    #expect(request.backportPatterns == DashboardReviewsPreferences.defaultBackportPatterns)
+  }
+
+  @Test("backport regex settings normalize and flow into query requests")
+  func backportRegexSettingsNormalizeAndFlowIntoQueries() {
+    var prefs = DashboardReviewsPreferences()
+    prefs.repositoriesText = "acme/api"
+    prefs.backportDetectionEnabled = false
+    prefs.backportPatternsText = """
+
+      (?i)\\s*\\(backport of #(?P<number>\\d+)\\)\\s*$
+      (?i)\\s*\\(backport of #(?P<number>\\d+)\\)\\s*$
+      (?i)\\s*\\[picked from #(?P<number>\\d+)\\]\\s*$
+      """
+
+    let normalized = prefs.normalized()
+    let request = normalized.queryRequest(forceRefresh: false)
+
+    #expect(
+      normalized.backportPatternsText
+        == """
+        (?i)\\s*\\(backport of #(?P<number>\\d+)\\)\\s*$
+        (?i)\\s*\\[picked from #(?P<number>\\d+)\\]\\s*$
+        """
+    )
+    #expect(!request.backportDetectionEnabled)
+    #expect(request.backportPatterns == normalized.normalizedBackportPatterns)
   }
 
   @Test("legacy authorsText defaulting to renovate[bot] clears on decode")

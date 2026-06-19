@@ -13,9 +13,25 @@ use super::types::{
     ReviewItem, ReviewRepositoryLabel, ReviewTarget, ReviewTargetFlags, ReviewsActionCapabilities,
     ReviewsBodyRequest, ReviewsCapabilitiesResponse, ReviewsPolicyHistoryRequest,
     ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest, ReviewsPolicyStatusRequest,
-    ReviewsPolicySubject, ReviewsQueryRequest, ReviewsQueryResponse,
+    ReviewsPolicySubject, ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest,
     ReviewsRepositoryCatalogRequest, ReviewsSummary,
 };
+
+const DEFAULT_BACKPORT_PATTERNS: &[&str] = &[
+    r"(?i)\s*\(backport\s+of\s+#(?P<number>\d+)\)\s*$",
+    r"(?i)\s*\[backport\s+of\s+#(?P<number>\d+)\]\s*$",
+];
+
+pub(super) fn default_backport_detection_enabled() -> bool {
+    true
+}
+
+pub(super) fn default_backport_patterns() -> Vec<String> {
+    DEFAULT_BACKPORT_PATTERNS
+        .iter()
+        .map(ToString::to_string)
+        .collect()
+}
 
 pub(super) fn default_viewer_can_update() -> bool {
     true
@@ -35,6 +51,21 @@ pub(super) fn default_pull_request_state() -> ReviewPullRequestState {
 
 pub(super) fn default_reviews_policy_workflow_id() -> String {
     "reviews_auto".to_owned()
+}
+
+impl Default for ReviewsQueryRequest {
+    fn default() -> Self {
+        Self {
+            authors: Vec::new(),
+            organizations: Vec::new(),
+            repositories: Vec::new(),
+            exclude_repositories: Vec::new(),
+            force_refresh: false,
+            cache_max_age_seconds: default_cache_max_age_seconds(),
+            backport_detection_enabled: default_backport_detection_enabled(),
+            backport_patterns: default_backport_patterns(),
+        }
+    }
 }
 
 impl ReviewsQueryRequest {
@@ -59,9 +90,16 @@ impl ReviewsQueryRequest {
     }
 
     #[must_use]
+    pub fn normalized_backport_patterns(&self) -> Vec<String> {
+        normalized_preserving_order(&self.backport_patterns)
+    }
+
+    #[must_use]
     pub fn cache_key(&self) -> String {
+        let backport_enabled = self.backport_detection_enabled;
+        let backport_patterns = self.normalized_backport_patterns().join("\u{1f}");
         format!(
-            "authors={}|orgs={}|repos={}|exclude={}",
+            "authors={}|orgs={}|repos={}|exclude={}|backports={backport_enabled}|backport_patterns={backport_patterns}",
             self.normalized_authors().join(","),
             self.normalized_organizations().join(","),
             self.normalized_repositories().join(","),
@@ -83,6 +121,8 @@ impl ReviewsQueryRequest {
             exclude_repositories: self.normalized_exclude_repositories(),
             force_refresh: self.force_refresh,
             cache_max_age_seconds: self.cache_max_age_seconds(),
+            backport_detection_enabled: self.backport_detection_enabled,
+            backport_patterns: self.normalized_backport_patterns(),
         }
     }
 
@@ -95,7 +135,26 @@ impl ReviewsQueryRequest {
             exclude_repositories: self.normalized_exclude_repositories(),
             force_refresh: self.force_refresh,
             cache_max_age_seconds: self.cache_max_age_seconds(),
+            backport_detection_enabled: self.backport_detection_enabled,
+            backport_patterns: self.normalized_backport_patterns(),
         }
+    }
+}
+
+impl Default for ReviewsRefreshRequest {
+    fn default() -> Self {
+        Self {
+            targets: Vec::new(),
+            backport_detection_enabled: default_backport_detection_enabled(),
+            backport_patterns: default_backport_patterns(),
+        }
+    }
+}
+
+impl ReviewsRefreshRequest {
+    #[must_use]
+    pub fn normalized_backport_patterns(&self) -> Vec<String> {
+        normalized_preserving_order(&self.backport_patterns)
     }
 }
 
@@ -365,6 +424,18 @@ fn normalized_entries(entries: &[String]) -> Vec<String> {
         .collect::<Vec<_>>();
     normalized.sort();
     normalized.dedup();
+    normalized
+}
+
+fn normalized_preserving_order(entries: &[String]) -> Vec<String> {
+    let mut normalized = Vec::new();
+    for entry in entries {
+        let trimmed = entry.trim();
+        if trimmed.is_empty() || normalized.iter().any(|existing| existing == trimmed) {
+            continue;
+        }
+        normalized.push(trimmed.to_owned());
+    }
     normalized
 }
 
