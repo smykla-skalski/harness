@@ -20,7 +20,6 @@ struct DashboardReviewRow: View {
   let titleMaximumLines: Int
   let hidesSemanticPrefixesInTitle: Bool
   let slaThresholdHours: Int?
-  @State private var isHovered = false
 
   init(
     item: ReviewItem,
@@ -85,11 +84,6 @@ struct DashboardReviewRow: View {
     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
     .listRowSeparator(.hidden)
     .listRowBackground(rowChromeBackground)
-    .onHover { hovering in
-      if isHovered != hovering {
-        isHovered = hovering
-      }
-    }
   }
 
   private var rowChromeBackground: some View {
@@ -104,12 +98,10 @@ struct DashboardReviewRow: View {
     }
   }
 
-  /// PR rows carry a resting `ink` tint so they read as distinct cards against
-  /// the untinted section-header rows. Pinned rows swap that for an `accent`
-  /// tint. Hover deepens whichever tint by another 5%.
+  /// PR rows carry a stable resting tint so they read as distinct cards without
+  /// installing per-row hover tracking while the list scrolls.
   private var rowTint: Color {
-    let opacity = isHovered ? 0.1 : 0.05
     let base = isPinned ? HarnessMonitorTheme.accent : HarnessMonitorTheme.ink
-    return base.opacity(opacity)
+    return base.opacity(0.05)
   }
 }

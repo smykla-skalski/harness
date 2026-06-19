@@ -14,7 +14,6 @@ struct DashboardReviewListRowMetadataIconStrip: View {
   let selectedIconDimmedOpacity: Double
   let progressAccessibilityLabel: String
   let statusIndicatorHelp: String
-  @State private var isHovered = false
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
@@ -23,9 +22,7 @@ struct DashboardReviewListRowMetadataIconStrip: View {
           label: "Needs me",
           systemImage: "person.crop.circle.badge.checkmark",
           tint: HarnessMonitorTheme.accent,
-          mutedUntilHovered: true,
           usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
-          isRowHovered: isHovered,
           help: "You are a requested reviewer"
         )
       }
@@ -44,11 +41,6 @@ struct DashboardReviewListRowMetadataIconStrip: View {
       )
     }
     .fixedSize(horizontal: true, vertical: false)
-    .onHover { hovering in
-      if isHovered != hovering {
-        isHovered = hovering
-      }
-    }
   }
 
   @ViewBuilder
@@ -58,9 +50,7 @@ struct DashboardReviewListRowMetadataIconStrip: View {
         label: kind.label,
         systemImage: systemImage,
         tint: kind.tint,
-        mutedUntilHovered: true,
         usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
-        isRowHovered: isHovered,
         help: metadataHelp(for: kind)
       )
     }
@@ -81,10 +71,9 @@ private struct DashboardReviewListRowMetadataIcon: View {
   let label: String
   let systemImage: String
   let tint: Color
-  let mutedUntilHovered: Bool
   let usesSelectedBackgroundContrast: Bool
-  let isRowHovered: Bool
   let help: String
+  var tintOpacity: Double = 0.74
   var opacity: Double = 1
 
   var body: some View {
@@ -96,18 +85,14 @@ private struct DashboardReviewListRowMetadataIcon: View {
       .accessibilityLabel(label)
       .accessibilityHint(accessibilityHint)
       .help(help)
-      .animation(.easeInOut(duration: 0.16), value: isRowHovered)
   }
 
   private var iconForegroundColor: Color {
     let selectedForeground = Color(nsColor: .alternateSelectedControlTextColor)
     if usesSelectedBackgroundContrast {
-      return selectedForeground.opacity(mutedUntilHovered ? 0.82 : 0.96)
+      return selectedForeground.opacity(tintOpacity == 1 ? 0.96 : 0.88)
     }
-    if mutedUntilHovered && !isRowHovered {
-      return HarnessMonitorTheme.secondaryInk.opacity(0.44)
-    }
-    return tint
+    return tint.opacity(tintOpacity)
   }
 
   private var accessibilityHint: String {
@@ -136,10 +121,9 @@ private struct DashboardReviewListRowMetadataStatusIcon: View {
           label: item.statusAccessibilityLabel,
           systemImage: item.statusSystemImage,
           tint: statusIndicatorColor,
-          mutedUntilHovered: false,
           usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
-          isRowHovered: false,
           help: statusIndicatorHelp,
+          tintOpacity: 1,
           opacity: item.viewerCanUpdate ? 1 : selectedIconDimmedOpacity
         )
       }

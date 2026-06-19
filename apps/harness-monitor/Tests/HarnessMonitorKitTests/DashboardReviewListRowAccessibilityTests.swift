@@ -131,12 +131,12 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(firstTimeHalo?.lineWidth == 3.5)
   }
 
-  @Test("row source renders requested-review and attention as muted metadata icons")
-  func rowSourceRendersRequestedReviewAndAttentionAsMutedMetadataIcons() throws {
+  @Test("row source renders requested-review and attention as subdued metadata icons")
+  func rowSourceRendersRequestedReviewAndAttentionAsSubduedMetadataIcons() throws {
     let source = try rowSource(named: "DashboardReviewListRow+AttentionIcons.swift")
     #expect(source.contains("if item.viewerIsRequestedReviewer {"))
     #expect(source.contains("label: \"Needs me\""))
-    #expect(source.contains("mutedUntilHovered: true"))
+    #expect(!source.contains("mutedUntilHovered"))
     #expect(source.contains("label: kind.label"))
   }
 
@@ -161,7 +161,7 @@ struct DashboardReviewListRowAccessibilityTests {
     let iconSource = try rowSource(named: "DashboardReviewListRow+AttentionIcons.swift")
 
     #expect(rowSourceText.contains("DashboardReviewListRowMetadataIconStrip("))
-    #expect(iconSource.contains("mutedUntilHovered: true"))
+    #expect(!iconSource.contains("mutedUntilHovered"))
     #expect(iconSource.contains("item.statusSystemImage"))
   }
 
@@ -173,7 +173,7 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains("private let metadataIconFrameWidth: CGFloat = 16"))
     #expect(source.contains(".font(.system(size: metadataIconPointSize, weight: .semibold))"))
     #expect(source.contains(".frame(width: metadataIconFrameWidth, alignment: .center)"))
-    #expect(source.contains("mutedUntilHovered: false"))
+    #expect(!source.contains(".onHover"))
   }
 
   @Test("reviewer summary source uses compact inline chrome instead of a pill")
@@ -208,8 +208,8 @@ struct DashboardReviewListRowAccessibilityTests {
       try rowSource(named: "DashboardReviewRow.swift")
       + "\n"
       + rowSource(named: "DashboardReviewListRow.swift")
-    #expect(source.contains("} else if isPinned {"))
-    #expect(source.contains("HarnessMonitorTheme.accent.opacity(0.05)"))
+    #expect(source.contains("let base = isPinned ? HarnessMonitorTheme.accent"))
+    #expect(source.contains("return base.opacity(0.05)"))
     #expect(!source.contains("dashboardReviewPinnedIndicator("))
   }
 
