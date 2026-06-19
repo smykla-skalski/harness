@@ -86,7 +86,9 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: nil,
-        kind: .sessionsUpdated(try SessionsUpdatedPayload(wire: streamEvent.decodePayloadWire(as: SessionsUpdatedPayloadWire.self)))
+        kind: .sessionsUpdated(
+          try SessionsUpdatedPayload(
+            wire: streamEvent.decodePayloadWire(as: SessionsUpdatedPayloadWire.self)))
       )
     case "sessions_updated_delta":
       return Self(
@@ -102,7 +104,8 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: nil,
-        kind: .logLevelChanged(try LogLevelResponse(wire: streamEvent.decodePayloadWire(as: LogLevelResponseWire.self)))
+        kind: .logLevelChanged(
+          try LogLevelResponse(wire: streamEvent.decodePayloadWire(as: LogLevelResponseWire.self)))
       )
     case "acp_bridge_resync_incident":
       return Self(
@@ -128,7 +131,9 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: nil,
-        kind: .auditEvent(try HarnessMonitorAuditEvent(wire: streamEvent.decodePayloadWire(as: HarnessMonitorAuditEventWire.self)))
+        kind: .auditEvent(
+          try HarnessMonitorAuditEvent(
+            wire: streamEvent.decodePayloadWire(as: HarnessMonitorAuditEventWire.self)))
       )
     default:
       return try Self.makeSessionScopedEvent(from: streamEvent)
@@ -149,7 +154,9 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .sessionUpdated(try SessionUpdatedPayload(wire: streamEvent.decodePayloadWire(as: SessionUpdatedPayloadWire.self)))
+        kind: .sessionUpdated(
+          try SessionUpdatedPayload(
+            wire: streamEvent.decodePayloadWire(as: SessionUpdatedPayloadWire.self)))
       )
     case "session_extensions":
       return Self(
@@ -165,7 +172,8 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .codexRunUpdated(try CodexRunSnapshot(wire: streamEvent.decodePayloadWire(as: CodexRunSnapshotWire.self)))
+        kind: .codexRunUpdated(
+          try CodexRunSnapshot(wire: streamEvent.decodePayloadWire(as: CodexRunSnapshotWire.self)))
       )
     case "codex_approval_requested":
       return Self(
@@ -181,7 +189,8 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .agentTuiUpdated(try AgentTuiSnapshot(wire: streamEvent.decodePayloadWire(as: AgentTuiSnapshotWire.self)))
+        kind: .agentTuiUpdated(
+          try AgentTuiSnapshot(wire: streamEvent.decodePayloadWire(as: AgentTuiSnapshotWire.self)))
       )
     default:
       return Self(
@@ -223,13 +232,16 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .acpAgentUpdated(try AcpAgentSnapshot(wire: streamEvent.decodePayloadWire(as: AcpAgentSnapshotWire.self)))
+        kind: .acpAgentUpdated(
+          try AcpAgentSnapshot(wire: streamEvent.decodePayloadWire(as: AcpAgentSnapshotWire.self)))
       )
     case "acp_events":
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .acpEvents(try AcpEventBatchPayload(wire: streamEvent.decodePayloadWire(as: AcpEventBatchPayloadWire.self)))
+        kind: .acpEvents(
+          try AcpEventBatchPayload(
+            wire: streamEvent.decodePayloadWire(as: AcpEventBatchPayloadWire.self)))
       )
     case "acp_process_incident":
       return Self(
@@ -245,7 +257,9 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .acpPermissionBatch(try AcpPermissionBatch(wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)))
+        kind: .acpPermissionBatch(
+          try AcpPermissionBatch(
+            wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)))
       )
     case "acp_permission_resolved":
       return Self(
@@ -253,7 +267,8 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         sessionId: sessionId,
         kind: .acpPermissionBatchRemoved(
           AcpPermissionBatchRemovedPayload(
-            batch: try AcpPermissionBatch(wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
+            batch: try AcpPermissionBatch(
+              wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
             reason: .resolved
           )
         )
@@ -264,7 +279,8 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         sessionId: sessionId,
         kind: .acpPermissionBatchRemoved(
           AcpPermissionBatchRemovedPayload(
-            batch: try AcpPermissionBatch(wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
+            batch: try AcpPermissionBatch(
+              wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
             reason: .shutdown
           )
         )
@@ -275,7 +291,8 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         sessionId: sessionId,
         kind: .acpPermissionBatchRemoved(
           AcpPermissionBatchRemovedPayload(
-            batch: try AcpPermissionBatch(wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
+            batch: try AcpPermissionBatch(
+              wire: streamEvent.decodePayloadWire(as: AcpPermissionBatchWire.self)),
             reason: .timeout
           )
         )

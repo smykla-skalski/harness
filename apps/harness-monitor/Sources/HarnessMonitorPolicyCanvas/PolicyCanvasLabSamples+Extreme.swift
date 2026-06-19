@@ -55,10 +55,11 @@ extension PolicyCanvasLabSamples {
     ),
     node(
       "x-switch", "Review switch",
-      .switch(PolicySwitchNode(arms: [
-        PolicySwitchArm(port: "case_open", field: .reviewIsOpen, predicate: .isTrue),
-        PolicySwitchArm(port: "case_draft", field: .reviewIsDraft, predicate: .isTrue),
-      ])),
+      .switch(
+        PolicySwitchNode(arms: [
+          PolicySwitchArm(port: "case_open", field: .reviewIsOpen, predicate: .isTrue),
+          PolicySwitchArm(port: "case_draft", field: .reviewIsDraft, predicate: .isTrue),
+        ])),
       group: "x-checks", inputs: ["in"], outputs: ["case_open", "case_draft", "default"]
     ),
     node(
@@ -79,7 +80,8 @@ extension PolicyCanvasLabSamples {
   private static let extremeOrchestrationNodes = [
     node(
       "x-wait", "Wait for checks",
-      .waitStep(PolicyWaitStep(wait: .event(eventKey: "reviews.checks_passed"), resumeKey: "checks-ready")),
+      .waitStep(
+        PolicyWaitStep(wait: .event(eventKey: "reviews.checks_passed"), resumeKey: "checks-ready")),
       group: "x-orchestration", inputs: ["in"], outputs: ["out"]
     ),
     node(

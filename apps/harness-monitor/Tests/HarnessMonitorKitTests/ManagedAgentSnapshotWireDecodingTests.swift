@@ -14,7 +14,8 @@ struct ManagedAgentSnapshotWireDecodingTests {
 
   @Test("decodes and maps an acp variant through the adjacently-tagged umbrella")
   func mapsAcpVariant() throws {
-    let wire = try decoder.decode(ManagedAgentSnapshotWire.self, from: Data(acpSnapshotFixture.utf8))
+    let wire = try decoder.decode(
+      ManagedAgentSnapshotWire.self, from: Data(acpSnapshotFixture.utf8))
     guard case .acp(let acpWire) = wire else {
       Issue.record("expected an acp variant")
       return

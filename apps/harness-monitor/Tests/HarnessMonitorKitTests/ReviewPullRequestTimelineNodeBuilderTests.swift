@@ -160,12 +160,14 @@ final class ReviewPullRequestTimelineNodeBuilderTests: XCTestCase {
       configuration: .default
     )
 
-    XCTAssertEqual(nodes.map(\.identity), [
-      .entry("issue-1"),
-      .entry("issue-hidden"),
-      .entry("review-1"),
-      .entry("commit-1"),
-    ])
+    XCTAssertEqual(
+      nodes.map(\.identity),
+      [
+        .entry("issue-1"),
+        .entry("issue-hidden"),
+        .entry("review-1"),
+        .entry("commit-1"),
+      ])
     XCTAssertTrue(nodes.allSatisfy { $0.reviewInlineConversation == nil })
   }
 

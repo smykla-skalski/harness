@@ -142,7 +142,8 @@ private func policyCanvasRouteTurnPoints(_ route: PolicyCanvasEdgeRoute) -> [CGP
     return []
   }
   var turns: [CGPoint] = []
-  for index in 1..<segments.count where policyCanvasSegmentDirection(segments[index - 1])
+  for index in 1..<segments.count
+  where policyCanvasSegmentDirection(segments[index - 1])
     != policyCanvasSegmentDirection(segments[index])
   {
     turns.append(segments[index - 1].end)

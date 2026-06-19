@@ -18,8 +18,8 @@ struct WebSocketWireTypesDecodingTests {
   @Test("decodes a request with its value params and trace context")
   func decodesRequest() throws {
     let json = #"""
-    {"id":"req-1","method":"session.detail","params":{"session_id":"s-1"},"trace_context":{"traceparent":"abc"}}
-    """#
+      {"id":"req-1","method":"session.detail","params":{"session_id":"s-1"},"trace_context":{"traceparent":"abc"}}
+      """#
     let request = try decoder.decode(WsRequestWire.self, from: Data(json.utf8))
 
     #expect(request.id == "req-1")
@@ -40,8 +40,8 @@ struct WebSocketWireTypesDecodingTests {
   @Test("decodes a response carrying a nested error payload")
   func decodesResponseWithError() throws {
     let json = #"""
-    {"id":"req-3","error":{"code":"not_found","message":"missing","status_code":404},"batch_index":0,"batch_count":2}
-    """#
+      {"id":"req-3","error":{"code":"not_found","message":"missing","status_code":404},"batch_index":0,"batch_count":2}
+      """#
     let response = try decoder.decode(WsResponseWire.self, from: Data(json.utf8))
 
     #expect(response.id == "req-3")
@@ -56,8 +56,8 @@ struct WebSocketWireTypesDecodingTests {
   @Test("decodes a push event with its json payload and sequence")
   func decodesPushEvent() throws {
     let json = #"""
-    {"event":"session.updated","recorded_at":"2026-06-15T00:00:00Z","session_id":"s-1","payload":{"status":"running"},"seq":42}
-    """#
+      {"event":"session.updated","recorded_at":"2026-06-15T00:00:00Z","session_id":"s-1","payload":{"status":"running"},"seq":42}
+      """#
     let push = try decoder.decode(WsPushEventWire.self, from: Data(json.utf8))
 
     #expect(push.event == "session.updated")
@@ -70,8 +70,8 @@ struct WebSocketWireTypesDecodingTests {
   @Test("decodes a chunk frame from its snake_case keys")
   func decodesChunkFrame() throws {
     let json = #"""
-    {"chunk_id":"c-1","chunk_index":1,"chunk_count":3,"chunk_base64":"YWJj"}
-    """#
+      {"chunk_id":"c-1","chunk_index":1,"chunk_count":3,"chunk_base64":"YWJj"}
+      """#
     let chunk = try decoder.decode(WsChunkFrameWire.self, from: Data(json.utf8))
 
     #expect(chunk.chunkId == "c-1")

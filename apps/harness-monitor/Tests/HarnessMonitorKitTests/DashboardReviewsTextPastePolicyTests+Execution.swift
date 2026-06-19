@@ -1,9 +1,9 @@
 import AppKit
 import Foundation
 import HarnessMonitorKit
+import HarnessMonitorPolicyModels
 import Testing
 
-import HarnessMonitorPolicyModels
 @testable import HarnessMonitorUIPreviewable
 
 extension DashboardReviewsTextPastePolicyTests {

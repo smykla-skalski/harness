@@ -92,7 +92,8 @@ struct ManagedAgentRequestWireEncodingTests {
     convertEncoder.keyEncodingStrategy = .convertToSnakeCase
     let plain = try JSONEncoder().encode(wire)
     let converted = try convertEncoder.encode(wire)
-    let plainKeys = Set(try #require(JSONSerialization.jsonObject(with: plain) as? [String: Any]).keys)
+    let plainKeys = Set(
+      try #require(JSONSerialization.jsonObject(with: plain) as? [String: Any]).keys)
     let convertedKeys = Set(
       try #require(JSONSerialization.jsonObject(with: converted) as? [String: Any]).keys
     )

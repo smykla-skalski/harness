@@ -32,9 +32,10 @@ extension PolicyCanvasLabSamples {
   private static let multiGroupReviewNodes = [
     node(
       "rv-switch", "Review switch",
-      .switch(PolicySwitchNode(arms: [
-        PolicySwitchArm(port: "pass", field: .reviewReviewRequired, predicate: .isTrue)
-      ])),
+      .switch(
+        PolicySwitchNode(arms: [
+          PolicySwitchArm(port: "pass", field: .reviewReviewRequired, predicate: .isTrue)
+        ])),
       group: "review", inputs: ["in"], outputs: ["pass", "escalate", "default"]
     ),
     node(
@@ -71,7 +72,8 @@ extension PolicyCanvasLabSamples {
     ),
     node(
       "dp-wait", "Wait for checks",
-      .waitStep(PolicyWaitStep(wait: .event(eventKey: "reviews.checks_passed"), resumeKey: "checks-ready")),
+      .waitStep(
+        PolicyWaitStep(wait: .event(eventKey: "reviews.checks_passed"), resumeKey: "checks-ready")),
       group: "deploy", inputs: ["in"], outputs: ["out"]
     ),
     node(

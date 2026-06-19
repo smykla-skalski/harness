@@ -439,12 +439,14 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
           context: context,
           router: input.router
         )
-        guard routeAvoidsNonEndpointObstacles(
-          route,
-          sourceActual: source.actual,
-          targetActual: target.actual,
-          context: input.baseContext
-        ) else {
+        guard
+          routeAvoidsNonEndpointObstacles(
+            route,
+            sourceActual: source.actual,
+            targetActual: target.actual,
+            context: input.baseContext
+          )
+        else {
           continue
         }
         let sidePenalty =

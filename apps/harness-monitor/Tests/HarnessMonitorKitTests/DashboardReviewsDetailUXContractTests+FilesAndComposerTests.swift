@@ -109,12 +109,17 @@ extension DashboardReviewsDetailUXContractTests {
       conversation.contains("HarnessMonitorMarkdownText(content.markdown, textSelection: .enabled)")
     )
     #expect(conversation.contains("@State private var sheetMetrics"))
-    #expect(conversation.contains("preferredBodyWidth = DashboardReviewConversationFullContentSheetMetrics.preferredBodyWidth"))
+    #expect(
+      conversation.contains(
+        "preferredBodyWidth = DashboardReviewConversationFullContentSheetMetrics.preferredBodyWidth"
+      ))
     #expect(conversation.contains(".frame(width: sheetMetrics.bodyWidth(for: preferredBodyWidth)"))
     #expect(conversation.contains("width: sheetMetrics.contentWidth(for: preferredBodyWidth)"))
     #expect(conversation.contains("maxHeight: sheetMetrics.maxHeight"))
     #expect(conversation.contains(".padding(.bottom, HarnessMonitorTheme.spacingLG)"))
-    #expect(conversation.contains("DashboardReviewConversationFullContentSheetMetricsReader(metrics: $sheetMetrics)"))
+    #expect(
+      conversation.contains(
+        "DashboardReviewConversationFullContentSheetMetricsReader(metrics: $sheetMetrics)"))
     #expect(conversation.contains("@Binding var metrics"))
     #expect(conversation.contains("DispatchQueue.main.async"))
     #expect(!conversation.contains("sheetWindow?.sheetParent ?? sheetWindow"))
@@ -139,8 +144,10 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(conversation.contains("guard appliedSizing != sizing else { return }"))
     #expect(conversation.contains("scheduleRefresh()"))
     #expect(conversation.contains("sheetWindow.frameRect(forContentRect: contentRect)"))
-    #expect(conversation.contains("parentFrame.width - (toolbarHeight * 2) - sheetChromeSize.width"))
-    #expect(conversation.contains("parentFrame.height - (toolbarHeight * 2) - sheetChromeSize.height"))
+    #expect(
+      conversation.contains("parentFrame.width - (toolbarHeight * 2) - sheetChromeSize.width"))
+    #expect(
+      conversation.contains("parentFrame.height - (toolbarHeight * 2) - sheetChromeSize.height"))
     #expect(timeline.contains("let onOpenFullContent: ((SessionTimelineNode) -> Void)?"))
     #expect(timeline.contains("let fullContentRevision: UInt64?"))
     #expect(

@@ -74,8 +74,10 @@ func policyCanvasMeasureNodeDistance(
         distance: gap,
         gapStart: gapStart,
         gapEnd: gapEnd,
-        gapStartCap: CGPoint(x: gapStart.x, y: policyCanvasNodeDistanceCapY(midY: barY, frame: leftFrame)),
-        gapEndCap: CGPoint(x: gapEnd.x, y: policyCanvasNodeDistanceCapY(midY: barY, frame: rightFrame))
+        gapStartCap: CGPoint(
+          x: gapStart.x, y: policyCanvasNodeDistanceCapY(midY: barY, frame: leftFrame)),
+        gapEndCap: CGPoint(
+          x: gapEnd.x, y: policyCanvasNodeDistanceCapY(midY: barY, frame: rightFrame))
       )
     )
   }

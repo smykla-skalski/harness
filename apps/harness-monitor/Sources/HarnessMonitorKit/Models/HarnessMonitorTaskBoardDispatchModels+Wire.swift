@@ -35,7 +35,8 @@ extension TaskBoardDispatchBlockReason {
   public init(wire: DispatchBlockReasonWire) {
     switch wire {
     case .alreadyLinked(let workItemId):
-      self.init(kind: "already_linked", workItemId: workItemId, reason: nil, decision: nil, status: nil)
+      self.init(
+        kind: "already_linked", workItemId: workItemId, reason: nil, decision: nil, status: nil)
     case .deleted:
       self.init(kind: "deleted", workItemId: nil, reason: nil, decision: nil, status: nil)
     case .machineMismatch:
@@ -79,7 +80,8 @@ extension TaskBoardSessionIntent {
     case .existing(let sessionId):
       self.init(kind: "existing", sessionId: sessionId, title: nil, context: nil, projectId: nil)
     case .create(let title, let context, let projectId):
-      self.init(kind: "create", sessionId: nil, title: title, context: context, projectId: projectId)
+      self.init(
+        kind: "create", sessionId: nil, title: title, context: context, projectId: projectId)
     }
   }
 }

@@ -241,23 +241,23 @@ extension TaskBoardPolicyDecision {
   /// discriminator the consumers already match on.
   public init(wire: PolicyDecision) {
     switch wire {
-    case let .allow(reasonCode, policyVersion):
+    case .allow(let reasonCode, let policyVersion):
       self.init(decision: "allow", reasonCode: reasonCode.rawValue, policyVersion: policyVersion)
-    case let .deny(reasonCode, policyVersion):
+    case .deny(let reasonCode, let policyVersion):
       self.init(decision: "deny", reasonCode: reasonCode.rawValue, policyVersion: policyVersion)
-    case let .requireHuman(reasonCode, policyVersion):
+    case .requireHuman(let reasonCode, let policyVersion):
       self.init(
         decision: "require_human",
         reasonCode: reasonCode.rawValue,
         policyVersion: policyVersion
       )
-    case let .requireConsensus(reasonCode, policyVersion):
+    case .requireConsensus(let reasonCode, let policyVersion):
       self.init(
         decision: "require_consensus",
         reasonCode: reasonCode.rawValue,
         policyVersion: policyVersion
       )
-    case let .dryRunOnly(reasonCode, policyVersion):
+    case .dryRunOnly(let reasonCode, let policyVersion):
       self.init(
         decision: "dry_run_only",
         reasonCode: reasonCode.rawValue,
@@ -286,31 +286,31 @@ extension TaskBoardPolicyPipelineValidationIssue {
     let code: String
 
     switch wire {
-    case let .unsupportedSchemaVersion(expectedVersion, actualVersion):
+    case .unsupportedSchemaVersion(let expectedVersion, let actualVersion):
       code = "unsupported_schema_version"
       expected = expectedVersion
       actual = actualVersion
-    case let .duplicateId(duplicateId, duplicateLocation):
+    case .duplicateId(let duplicateId, let duplicateLocation):
       code = "duplicate_id"
       id = duplicateId
       location = duplicateLocation
-    case let .danglingEdge(danglingEdgeId, danglingNodeId):
+    case .danglingEdge(let danglingEdgeId, let danglingNodeId):
       code = "dangling_edge"
       edgeId = danglingEdgeId
       nodeId = danglingNodeId
-    case let .invalidPort(portEdgeId, portNodeId, portName, portDirection):
+    case .invalidPort(let portEdgeId, let portNodeId, let portName, let portDirection):
       code = "invalid_port"
       edgeId = portEdgeId
       nodeId = portNodeId
       port = portName
       direction = portDirection.rawValue
-    case let .cycle(cycleNodeIds):
+    case .cycle(let cycleNodeIds):
       code = "cycle"
       nodeIds = cycleNodeIds
-    case let .unsafeHighRiskAction(riskAction):
+    case .unsafeHighRiskAction(let riskAction):
       code = "unsafe_high_risk_action"
       action = riskAction
-    case let .incompatiblePayloadEdge(incompatibleEdgeId, _, _):
+    case .incompatiblePayloadEdge(let incompatibleEdgeId, _, _):
       code = "incompatible_payload_edge"
       edgeId = incompatibleEdgeId
     }

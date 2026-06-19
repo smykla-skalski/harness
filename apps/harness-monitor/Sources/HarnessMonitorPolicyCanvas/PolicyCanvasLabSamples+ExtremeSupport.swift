@@ -35,11 +35,12 @@ extension PolicyCanvasLabSamples {
   ) -> TaskBoardPolicyPipelineNode {
     node(
       id.node("switch"), "Ordered switch \(id.index)",
-      .switch(PolicySwitchNode(arms: [
-        switchArm("case_open", index: id.index, offset: 4),
-        switchArm("case_draft", index: id.index, offset: 5),
-        switchArm("case_blocked", index: id.index, offset: 6),
-      ])),
+      .switch(
+        PolicySwitchNode(arms: [
+          switchArm("case_open", index: id.index, offset: 4),
+          switchArm("case_draft", index: id.index, offset: 5),
+          switchArm("case_blocked", index: id.index, offset: 6),
+        ])),
       group: group, inputs: ["in"],
       outputs: ["case_open", "case_draft", "case_blocked", "default"]
     )

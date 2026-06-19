@@ -114,11 +114,9 @@ extension PolicyCanvasViewModel {
     }
     routingHints =
       savedRoutingHints
-      ?? (
-        cleanLayout.precomputedRoutes == nil
+      ?? (cleanLayout.precomputedRoutes == nil
         ? policyCanvasRoutingHintsForCurrentLayout(nodes: nodes, groups: groups, edges: edges)
-        : nil
-      )
+        : nil)
       ?? cleanLayout.routingHints
     precomputedRoutes = cleanLayout.precomputedRoutes
     zoom = Self.sanitizedZoom(CGFloat(document.layout.zoom), fallback: 1)

@@ -19,7 +19,8 @@ struct TaskBoardGitSigningVerifyWireDecodingTests {
 
   @Test("signed maps the mode and the snake_case signature_kind field")
   func signedOutcome() throws {
-    let outcome = try decodeOutcome(#"{"outcome": "signed", "mode": "ssh", "signature_kind": "openssh"}"#)
+    let outcome = try decodeOutcome(
+      #"{"outcome": "signed", "mode": "ssh", "signature_kind": "openssh"}"#)
     #expect(outcome == .signed(mode: "ssh", signatureKind: "openssh"))
   }
 

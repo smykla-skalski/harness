@@ -236,7 +236,8 @@ extension TaskBoardPolicyPipelineAuditSummary {
       activeRevision: wire.activeRevision,
       mode: TaskBoardPolicyPipelineMode(rawValue: wire.mode.rawValue) ?? .draft,
       latestTraceId: wire.latestTraceId,
-      latestSimulation: wire.latestSimulation.map(TaskBoardPolicyPipelineSimulationResult.init(wire:)),
+      latestSimulation: wire.latestSimulation.map(
+        TaskBoardPolicyPipelineSimulationResult.init(wire:)),
       validation: TaskBoardPolicyPipelineValidation(wire: wire.validation)
     )
   }

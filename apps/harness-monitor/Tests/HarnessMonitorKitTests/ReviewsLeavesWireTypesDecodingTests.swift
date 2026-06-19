@@ -16,8 +16,8 @@ struct ReviewsLeavesWireTypesDecodingTests {
   @Test("decodes a body update response wire and maps it to the rich model")
   func decodesBodyUpdateResponse() throws {
     let json = #"""
-    {"pull_request_id":"pr-1","outcome":"body_drifted","current_body":"new","current_body_sha256":"abc","pr_updated_at":"2026-06-15T18:30:45Z","fetched_at":"2026-06-15T18:31:00Z"}
-    """#
+      {"pull_request_id":"pr-1","outcome":"body_drifted","current_body":"new","current_body_sha256":"abc","pr_updated_at":"2026-06-15T18:30:45Z","fetched_at":"2026-06-15T18:31:00Z"}
+      """#
     let wire = try decoder.decode(ReviewsBodyUpdateResponseWire.self, from: Data(json.utf8))
     let model = ReviewsBodyUpdateResponse(wire: wire)
 

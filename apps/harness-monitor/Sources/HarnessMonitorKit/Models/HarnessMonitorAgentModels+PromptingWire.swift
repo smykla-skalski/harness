@@ -27,7 +27,8 @@ extension AgentPendingUserPrompt {
     if !wire.questions.isEmpty {
       questions = wire.questions.map(AgentPendingUserPromptQuestion.init(wire:))
     } else if let message = wire.message,
-      !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    {
       questions = [AgentPendingUserPromptQuestion(question: message)]
     } else {
       questions = []

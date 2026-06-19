@@ -436,9 +436,11 @@ struct PolicyCanvasOrthogonalNudgingRouteProcessing: PolicyCanvasRoutePostProces
     while remainingApplications > 0 {
       var applied = false
       for axis in [PolicyCanvasSegmentAxis.horizontal, .vertical] {
-        guard let pair = worstCrowdedPair(
-          in: decompose(splitPoints).filter { $0.axis == axis }
-        ) else {
+        guard
+          let pair = worstCrowdedPair(
+            in: decompose(splitPoints).filter { $0.axis == axis }
+          )
+        else {
           continue
         }
         let offsets = localPairLaneOffsets(for: pair)

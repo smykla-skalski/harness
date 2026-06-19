@@ -310,7 +310,8 @@ private struct DashboardReviewConversationFullContentSheetMetricsReader: NSViewR
           && !candidate.isExcludedFromWindowsMenu
       }
       if let overlapping = candidates.max(by: {
-        intersectionArea($0.frame, sheetWindow.frame) < intersectionArea($1.frame, sheetWindow.frame)
+        intersectionArea($0.frame, sheetWindow.frame)
+          < intersectionArea($1.frame, sheetWindow.frame)
       }), intersectionArea(overlapping.frame, sheetWindow.frame) > 0 {
         return overlapping
       }

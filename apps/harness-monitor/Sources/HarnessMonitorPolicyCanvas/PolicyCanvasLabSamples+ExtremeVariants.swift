@@ -136,10 +136,11 @@ extension PolicyCanvasLabSamples {
       extremeStressEvidenceNode(id: id, group: group),
       node(
         id.node("ifelse"), "Boolean split \(id.index)",
-        .ifThenElse(PolicyIfThenElseCondition(
-          field: evidenceField(index: id.index, offset: 3),
-          predicate: evidencePredicate(index: id.index, offset: 3)
-        )),
+        .ifThenElse(
+          PolicyIfThenElseCondition(
+            field: evidenceField(index: id.index, offset: 3),
+            predicate: evidencePredicate(index: id.index, offset: 3)
+          )),
         group: group, inputs: ["in"], outputs: ["then", "else"]
       ),
       extremeStressSwitchNode(id: id, group: group),
@@ -160,10 +161,11 @@ extension PolicyCanvasLabSamples {
       ),
       node(
         id.node("wait"), "Timer wait \(id.index)",
-        .waitStep(PolicyWaitStep(
-          wait: .timer(durationSeconds: UInt64(60 + id.index * 15)),
-          resumeKey: "stress-timer-\(id.index)"
-        )),
+        .waitStep(
+          PolicyWaitStep(
+            wait: .timer(durationSeconds: UInt64(60 + id.index * 15)),
+            resumeKey: "stress-timer-\(id.index)"
+          )),
         group: group, inputs: ["in"], outputs: ["out"]
       ),
       node(

@@ -16,7 +16,8 @@ struct ReviewsEnumsDecodingTests {
 
   @Test("decodes snake_case wire values to the matching case")
   func decodesKnownValues() throws {
-    #expect(try decoder.decode(ReviewPullRequestState.self, from: Data("\"merged\"".utf8)) == .merged)
+    #expect(
+      try decoder.decode(ReviewPullRequestState.self, from: Data("\"merged\"".utf8)) == .merged)
     #expect(
       try decoder.decode(ReviewReviewStatus.self, from: Data("\"review_required\"".utf8))
         == .reviewRequired
@@ -33,7 +34,8 @@ struct ReviewsEnumsDecodingTests {
   @Test("decodes an unrecognized value to the unknown fallback")
   func decodesUnknownFallback() throws {
     #expect(
-      try decoder.decode(ReviewPullRequestState.self, from: Data("\"draft\"".utf8)) == .unknown("draft")
+      try decoder.decode(ReviewPullRequestState.self, from: Data("\"draft\"".utf8))
+        == .unknown("draft")
     )
     // The Rust `Unknown` variant has no dedicated Swift case; its wire value
     // falls into the open-enum catch-all like any other unrecognized value.
@@ -52,10 +54,12 @@ struct ReviewsEnumsDecodingTests {
   @Test("decodes the closed author association and rejects unknown values")
   func decodesAuthorAssociation() throws {
     #expect(
-      try decoder.decode(ReviewAuthorAssociation.self, from: Data("\"first_time_contributor\"".utf8))
+      try decoder.decode(
+        ReviewAuthorAssociation.self, from: Data("\"first_time_contributor\"".utf8))
         == .firstTimeContributor
     )
-    #expect(try decoder.decode(ReviewAuthorAssociation.self, from: Data("\"other\"".utf8)) == .other)
+    #expect(
+      try decoder.decode(ReviewAuthorAssociation.self, from: Data("\"other\"".utf8)) == .other)
     #expect(
       try decoder.decode(ReviewAuthorAssociation.self, from: Data("\"none\"".utf8))
         == ReviewAuthorAssociation.none

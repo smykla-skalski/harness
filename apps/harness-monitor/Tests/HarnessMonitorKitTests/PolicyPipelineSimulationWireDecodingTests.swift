@@ -20,8 +20,8 @@ struct PolicyPipelineSimulationWireDecodingTests {
   @Test("simulation result decodes validation issues keeping node/edge ids")
   func decodesSimulationValidationIssues() throws {
     let json = #"""
-    {"revision":3,"trace_id":"trace-1","simulated_at":"2026-06-17T00:00:00Z","succeeded":false,"validation":{"issues":[{"issue":"dangling_edge","edge_id":"e-1","node_id":"n-1"},{"issue":"cycle","node_ids":["n-2","n-3"]},{"issue":"invalid_port","edge_id":"e-2","node_id":"n-4","port":"in","direction":"input"}]},"policy_trace_ids":["t-1"],"has_runtime_boundaries":true}
-    """#
+      {"revision":3,"trace_id":"trace-1","simulated_at":"2026-06-17T00:00:00Z","succeeded":false,"validation":{"issues":[{"issue":"dangling_edge","edge_id":"e-1","node_id":"n-1"},{"issue":"cycle","node_ids":["n-2","n-3"]},{"issue":"invalid_port","edge_id":"e-2","node_id":"n-4","port":"in","direction":"input"}]},"policy_trace_ids":["t-1"],"has_runtime_boundaries":true}
+      """#
     let result = try decoder.decode(
       PolicyPipelineSimulationResultWire.self,
       from: Data(json.utf8)
@@ -32,21 +32,22 @@ struct PolicyPipelineSimulationWireDecodingTests {
     #expect(result.decisions.isEmpty)
     #expect(result.validation.issues.count == 3)
 
-    guard case let .danglingEdge(edgeId, nodeId) = result.validation.issues[0] else {
+    guard case .danglingEdge(let edgeId, let nodeId) = result.validation.issues[0] else {
       Issue.record("expected dangling_edge, got \(result.validation.issues[0])")
       return
     }
     #expect(edgeId == "e-1")
     #expect(nodeId == "n-1")
 
-    guard case let .cycle(nodeIds) = result.validation.issues[1] else {
+    guard case .cycle(let nodeIds) = result.validation.issues[1] else {
       Issue.record("expected cycle, got \(result.validation.issues[1])")
       return
     }
     #expect(nodeIds == ["n-2", "n-3"])
 
-    guard case let .invalidPort(portEdgeId, portNodeId, port, direction) =
-      result.validation.issues[2]
+    guard
+      case .invalidPort(let portEdgeId, let portNodeId, let port, let direction) =
+        result.validation.issues[2]
     else {
       Issue.record("expected invalid_port, got \(result.validation.issues[2])")
       return
@@ -60,8 +61,8 @@ struct PolicyPipelineSimulationWireDecodingTests {
   @Test("audit summary decodes its nested validation and latest simulation")
   func decodesAuditSummary() throws {
     let json = #"""
-    {"active_revision":7,"mode":"enforced","latest_trace_id":"trace-9","latest_simulation":{"revision":7,"trace_id":"trace-9","simulated_at":"2026-06-17T00:00:00Z","succeeded":true,"validation":{"issues":[]}},"validation":{"issues":[{"issue":"incompatible_payload_edge","edge_id":"e-3","provided":"json","required":"text"}]}}
-    """#
+      {"active_revision":7,"mode":"enforced","latest_trace_id":"trace-9","latest_simulation":{"revision":7,"trace_id":"trace-9","simulated_at":"2026-06-17T00:00:00Z","succeeded":true,"validation":{"issues":[]}},"validation":{"issues":[{"issue":"incompatible_payload_edge","edge_id":"e-3","provided":"json","required":"text"}]}}
+      """#
     let summary = try decoder.decode(
       PolicyPipelineAuditSummaryWire.self,
       from: Data(json.utf8)
@@ -72,8 +73,9 @@ struct PolicyPipelineSimulationWireDecodingTests {
     #expect(summary.latestSimulation?.traceId == "trace-9")
     #expect(summary.validation.issues.count == 1)
 
-    guard case let .incompatiblePayloadEdge(edgeId, provided, required) =
-      summary.validation.issues[0]
+    guard
+      case .incompatiblePayloadEdge(let edgeId, let provided, let required) =
+        summary.validation.issues[0]
     else {
       Issue.record("expected incompatible_payload_edge, got \(summary.validation.issues[0])")
       return
@@ -90,8 +92,8 @@ struct PolicyPipelineSimulationWireDecodingTests {
     // panel consumes. Before the fix, simulate decoded via convertFromSnakeCase
     // and node_id/edge_id/node_ids dropped to nil/[]; here they survive.
     let json = #"""
-    {"revision":4,"trace_id":"trace-2","simulated_at":"2026-06-17T00:00:00Z","succeeded":false,"validation":{"issues":[{"issue":"dangling_edge","edge_id":"e-9","node_id":"n-9"},{"issue":"cycle","node_ids":["a","b"]}]},"decisions":[{"action":"merge_pr","decision":{"decision":"deny","reason_code":"checks_not_green","policy_version":"v1"},"visited_node_ids":["n-9"],"policy_trace_ids":["t-2"]}],"policy_trace_ids":["t-2"],"has_runtime_boundaries":false}
-    """#
+      {"revision":4,"trace_id":"trace-2","simulated_at":"2026-06-17T00:00:00Z","succeeded":false,"validation":{"issues":[{"issue":"dangling_edge","edge_id":"e-9","node_id":"n-9"},{"issue":"cycle","node_ids":["a","b"]}]},"decisions":[{"action":"merge_pr","decision":{"decision":"deny","reason_code":"checks_not_green","policy_version":"v1"},"visited_node_ids":["n-9"],"policy_trace_ids":["t-2"]}],"policy_trace_ids":["t-2"],"has_runtime_boundaries":false}
+      """#
     let wire = try decoder.decode(
       PolicyPipelineSimulationResultWire.self,
       from: Data(json.utf8)

@@ -340,7 +340,8 @@ extension PolicyCanvasViewModel {
     commitPolicyKindMutation { kind in
       let resumeKey = waitResumeKey(from: kind)
       kind = .waitStep(
-        PolicyWaitStep(wait: .timer(durationSeconds: UInt64(max(1, durationSeconds))), resumeKey: resumeKey)
+        PolicyWaitStep(
+          wait: .timer(durationSeconds: UInt64(max(1, durationSeconds))), resumeKey: resumeKey)
       )
     }
   }

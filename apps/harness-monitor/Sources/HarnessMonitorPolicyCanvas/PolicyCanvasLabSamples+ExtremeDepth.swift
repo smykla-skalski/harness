@@ -29,11 +29,12 @@ extension PolicyCanvasLabSamples {
     ),
     node(
       "x-switch2", "Verify switch",
-      .switch(PolicySwitchNode(arms: [
-        PolicySwitchArm(port: "case_a", field: .reviewReviewRequired, predicate: .isTrue),
-        PolicySwitchArm(port: "case_b", field: .reviewViewerCanUpdate, predicate: .isTrue),
-        PolicySwitchArm(port: "case_c", field: .reviewPolicyBlocked, predicate: .isFalse),
-      ])),
+      .switch(
+        PolicySwitchNode(arms: [
+          PolicySwitchArm(port: "case_a", field: .reviewReviewRequired, predicate: .isTrue),
+          PolicySwitchArm(port: "case_b", field: .reviewViewerCanUpdate, predicate: .isTrue),
+          PolicySwitchArm(port: "case_c", field: .reviewPolicyBlocked, predicate: .isFalse),
+        ])),
       group: "x-checks", inputs: ["in"], outputs: ["case_a", "case_b", "case_c", "default"]
     ),
     node(
@@ -58,7 +59,7 @@ extension PolicyCanvasLabSamples {
           field: .reviewHasNoDecision,
           pass: .isFalse,
           failReasonCode: .protectedPathTouched, missingReasonCode: .missingMergeEvidence
-        ),
+        )
       ]),
       group: "x-agent", inputs: ["in"], outputs: ["pass", "fail", "missing"]
     ),

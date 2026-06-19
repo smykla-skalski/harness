@@ -104,7 +104,8 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
 
     init(
       snapshot: PolicyCanvasViewportHostedSnapshot,
-      observationStore: PolicyCanvasViewportObservationStore = PolicyCanvasViewportObservationStore(),
+      observationStore: PolicyCanvasViewportObservationStore =
+        PolicyCanvasViewportObservationStore(),
       viewportIdentity: String?
     ) {
       hostedState = PolicyCanvasViewportHostedState(

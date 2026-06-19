@@ -121,7 +121,8 @@ private func policyCanvasOffsetPrecomputedRoutes(
   guard let routes else {
     return nil
   }
-  let originalPositions = Dictionary(uniqueKeysWithValues: originalNodes.map { ($0.id, $0.position) })
+  let originalPositions = Dictionary(
+    uniqueKeysWithValues: originalNodes.map { ($0.id, $0.position) })
   for node in normalizedNodes {
     guard let original = originalPositions[node.id] else {
       continue
@@ -185,8 +186,10 @@ func policyCanvasEdge(
   else {
     return nil
   }
-  let sourcePortID = policyCanvasImportedPortID(edge.fromPort.rawValue, node: sourceNode, kind: .output)
-  let targetPortID = policyCanvasImportedPortID(edge.toPort.rawValue, node: targetNode, kind: .input)
+  let sourcePortID = policyCanvasImportedPortID(
+    edge.fromPort.rawValue, node: sourceNode, kind: .output)
+  let targetPortID = policyCanvasImportedPortID(
+    edge.toPort.rawValue, node: targetNode, kind: .input)
   // An edge maps whenever both endpoint nodes exist - it does not require the
   // resolved port id to be present in the node's declared ports. Terminal port
   // markers are seeded from the edges themselves (see `seededPortMarkerEntries`),
@@ -265,8 +268,10 @@ func policyCanvasEdgeEndpointsExist(
   else {
     return false
   }
-  let sourcePortID = policyCanvasImportedPortID(edge.fromPort.rawValue, node: sourceNode, kind: .output)
-  let targetPortID = policyCanvasImportedPortID(edge.toPort.rawValue, node: targetNode, kind: .input)
+  let sourcePortID = policyCanvasImportedPortID(
+    edge.fromPort.rawValue, node: sourceNode, kind: .output)
+  let targetPortID = policyCanvasImportedPortID(
+    edge.toPort.rawValue, node: targetNode, kind: .input)
   return sourceNode.outputPorts.contains { $0.id == sourcePortID }
     && targetNode.inputPorts.contains { $0.id == targetPortID }
 }
@@ -313,17 +318,19 @@ func taskBoardPolicyEdge(
   return TaskBoardPolicyPipelineEdge(
     id: PolicyGraphEdgeId(edge.id),
     fromNodeId: PolicyGraphNodeId(edge.source.nodeID),
-    fromPort: PolicyGraphPortId(taskBoardPolicyPersistedPortID(
-      edge.source.portID,
-      node: sourceNode,
-      kind: .output
-    )),
+    fromPort: PolicyGraphPortId(
+      taskBoardPolicyPersistedPortID(
+        edge.source.portID,
+        node: sourceNode,
+        kind: .output
+      )),
     toNodeId: PolicyGraphNodeId(edge.target.nodeID),
-    toPort: PolicyGraphPortId(taskBoardPolicyPersistedPortID(
-      edge.target.portID,
-      node: targetNode,
-      kind: .input
-    )),
+    toPort: PolicyGraphPortId(
+      taskBoardPolicyPersistedPortID(
+        edge.target.portID,
+        node: targetNode,
+        kind: .input
+      )),
     label: edge.label,
     condition: condition
   )

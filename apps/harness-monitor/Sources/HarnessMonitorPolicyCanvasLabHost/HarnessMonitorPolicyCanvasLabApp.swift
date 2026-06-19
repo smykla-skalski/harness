@@ -229,7 +229,7 @@ private final class PolicyCanvasLabWindowFramePersistenceView: NSView {
 
   private func removeObservers() {
     let center = NotificationCenter.default
-    observerTokens.forEach { center.removeObserver($0) }
+    for token in observerTokens { center.removeObserver(token) }
     observerTokens.removeAll()
   }
 

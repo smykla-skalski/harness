@@ -17,7 +17,8 @@ final class LoggingPolicyObserverTests: XCTestCase {
     )
   }
 
-  private func makeAction(id: String = "log-1", ruleID: String = "stuck-agent") -> SupervisorAction {
+  private func makeAction(id: String = "log-1", ruleID: String = "stuck-agent") -> SupervisorAction
+  {
     .logEvent(
       SupervisorAction.LogPayload(
         id: id,

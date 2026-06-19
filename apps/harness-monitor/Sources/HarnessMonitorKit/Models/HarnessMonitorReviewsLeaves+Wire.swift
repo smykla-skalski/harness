@@ -89,7 +89,8 @@ extension ReviewsFileCommentResponse {
 
 extension ReviewsReviewThreadResolveRequestWire {
   init(_ model: ReviewsReviewThreadResolveRequest) {
-    self.init(threadId: model.threadId, resolved: model.resolved, pullRequestId: model.pullRequestId)
+    self.init(
+      threadId: model.threadId, resolved: model.resolved, pullRequestId: model.pullRequestId)
   }
 }
 

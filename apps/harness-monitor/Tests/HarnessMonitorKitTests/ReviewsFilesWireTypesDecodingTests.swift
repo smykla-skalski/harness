@@ -21,8 +21,8 @@ struct ReviewsFilesWireTypesDecodingTests {
   @Test("decodes a file wire with its enums and the renamed language hint")
   func decodesReviewFile() throws {
     let json = #"""
-    {"path":"src/main.rs","change_type":"modified","additions":10,"deletions":2,"viewer_viewed_state":"viewed","is_binary":false,"language_hint":"rust"}
-    """#
+      {"path":"src/main.rs","change_type":"modified","additions":10,"deletions":2,"viewer_viewed_state":"viewed","is_binary":false,"language_hint":"rust"}
+      """#
     let file = try decoder.decode(ReviewFileWire.self, from: Data(json.utf8))
 
     #expect(file.path == "src/main.rs")
@@ -34,14 +34,19 @@ struct ReviewsFilesWireTypesDecodingTests {
 
   @Test("decodes the closed file enums from their snake_case wire values")
   func decodesFileEnums() throws {
-    #expect(try decoder.decode(ReviewFileChangeTypeWire.self, from: Data("\"renamed\"".utf8)) == .renamed)
-    #expect(try decoder.decode(ReviewFileViewedStateWire.self, from: Data("\"dismissed\"".utf8)) == .dismissed)
+    #expect(
+      try decoder.decode(ReviewFileChangeTypeWire.self, from: Data("\"renamed\"".utf8)) == .renamed)
+    #expect(
+      try decoder.decode(ReviewFileViewedStateWire.self, from: Data("\"dismissed\"".utf8))
+        == .dismissed)
     #expect(
       try decoder.decode(ReviewFileServedByWire.self, from: Data("\"github_rest_fallback\"".utf8))
         == .githubRestFallback
     )
     #expect(try decoder.decode(ReviewImageMimeWire.self, from: Data("\"png\"".utf8)) == .png)
-    #expect(try decoder.decode(ReviewFileViewedOutcomeWire.self, from: Data("\"drifted\"".utf8)) == .drifted)
+    #expect(
+      try decoder.decode(ReviewFileViewedOutcomeWire.self, from: Data("\"drifted\"".utf8))
+        == .drifted)
   }
 
   @Test("decodes a rate limit snapshot with its snake_case reset key")
@@ -60,8 +65,8 @@ struct ReviewsFilesWireTypesDecodingTests {
     // line_limit is omitted, so it resolves the preview_line_limit default (1000)
     // collected from files/preview.rs; large_diff_strategy is absent -> nil.
     let json = #"""
-    {"pull_request_id":"pr-9","head_ref_oid_expected":"abc","paths":["src/lib.rs"]}
-    """#
+      {"pull_request_id":"pr-9","head_ref_oid_expected":"abc","paths":["src/lib.rs"]}
+      """#
     let request = try decoder.decode(ReviewsFilesPreviewRequestWire.self, from: Data(json.utf8))
 
     #expect(request.pullRequestId == "pr-9")
@@ -73,8 +78,8 @@ struct ReviewsFilesWireTypesDecodingTests {
   @Test("decodes a preview response with one bounded preview row")
   func decodesPreviewResponse() throws {
     let json = #"""
-    {"pull_request_id":"pr-9","previews":[{"path":"src/lib.rs","patch":"@@ -1 +1 @@\n","status":"modified","additions":1,"deletions":0,"served_by":"local_clone","line_count":1,"line_limit":1000,"has_more":false}],"drifted":false,"current_head_ref_oid":"abc","fetched_at":"2026-06-15T00:00:00Z"}
-    """#
+      {"pull_request_id":"pr-9","previews":[{"path":"src/lib.rs","patch":"@@ -1 +1 @@\n","status":"modified","additions":1,"deletions":0,"served_by":"local_clone","line_count":1,"line_limit":1000,"has_more":false}],"drifted":false,"current_head_ref_oid":"abc","fetched_at":"2026-06-15T00:00:00Z"}
+      """#
     let response = try decoder.decode(ReviewsFilesPreviewResponseWire.self, from: Data(json.utf8))
 
     #expect(response.previews.count == 1)
@@ -93,8 +98,8 @@ struct ReviewsFilesWireTypesDecodingTests {
     )
 
     let json = #"""
-    {"repo_full_name":"o/r","repo_key_segment":"abcd1234","size_bytes":4096,"created_at":"2026-06-15T00:00:00Z","last_used_at":"2026-06-15T01:00:00Z","last_fetched_at":"2026-06-15T02:00:00Z"}
-    """#
+      {"repo_full_name":"o/r","repo_key_segment":"abcd1234","size_bytes":4096,"created_at":"2026-06-15T00:00:00Z","last_used_at":"2026-06-15T01:00:00Z","last_fetched_at":"2026-06-15T02:00:00Z"}
+      """#
     let entry = try decoder.decode(LocalCloneListEntryWire.self, from: Data(json.utf8))
 
     #expect(entry.repoFullName == "o/r")
@@ -108,8 +113,8 @@ struct ReviewsFilesWireTypesDecodingTests {
     // ReviewFileServedBy enum; omitting it falls back to the default variant
     // (githubRest) rather than failing the decode.
     let json = #"""
-    {"path":"src/lib.rs","patch":"","status":"added","additions":0,"deletions":0,"line_count":0,"line_limit":1000,"has_more":false}
-    """#
+      {"path":"src/lib.rs","patch":"","status":"added","additions":0,"deletions":0,"line_count":0,"line_limit":1000,"has_more":false}
+      """#
     let preview = try decoder.decode(ReviewFilePreviewWire.self, from: Data(json.utf8))
 
     #expect(preview.servedBy == .githubRest)

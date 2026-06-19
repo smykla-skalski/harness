@@ -1,8 +1,8 @@
 import Foundation
+import HarnessMonitorPolicyModels
 import Testing
 
 @testable import HarnessMonitorKit
-import HarnessMonitorPolicyModels
 
 @Suite("Task-board policy pipeline daemon API client", .serialized)
 struct TaskBoardPolicyPipelineAPIClientTests {

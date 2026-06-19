@@ -1,8 +1,8 @@
 import Foundation
+import HarnessMonitorPolicyModels
 import Testing
 
 @testable import HarnessMonitorKit
-import HarnessMonitorPolicyModels
 
 /// Pins the snake_case decode contract for the policy document. The daemon emits
 /// uniform snake_case (`from_node`, `reason_codes`, `high_risk_reason_code`), and
@@ -13,66 +13,66 @@ import HarnessMonitorPolicyModels
 @Suite("Policy document snake_case decoding")
 struct TaskBoardPolicyDocumentDecodingTests {
   private static let snakeDocument = """
-  {
-    "schema_version": 2,
-    "revision": 7,
-    "mode": "draft",
-    "nodes": [
-      {
-        "id": "supervisor:allow",
-        "label": "allow",
-        "kind": {
-          "kind": "supervisor_rule",
-          "decision": "allow",
-          "reason_codes": ["default_allow"]
+    {
+      "schema_version": 2,
+      "revision": 7,
+      "mode": "draft",
+      "nodes": [
+        {
+          "id": "supervisor:allow",
+          "label": "allow",
+          "kind": {
+            "kind": "supervisor_rule",
+            "decision": "allow",
+            "reason_codes": ["default_allow"]
+          },
+          "input_ports": ["in"],
+          "output_ports": [],
+          "group_id": "terminal"
         },
-        "input_ports": ["in"],
-        "output_ports": [],
-        "group_id": "terminal"
+        {
+          "id": "risk:merge",
+          "label": "Merge risk",
+          "kind": {
+            "kind": "risk_classifier",
+            "field": "risk_score",
+            "threshold": 40,
+            "high_risk_reason_code": "risk_above_threshold",
+            "missing_reason_code": "missing_merge_evidence"
+          },
+          "input_ports": ["in"],
+          "output_ports": ["low_or_equal", "high", "missing"],
+          "group_id": "merge"
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge:risk-high",
+          "from_node": "risk:merge",
+          "from_port": "high",
+          "to_node": "supervisor:allow",
+          "to_port": "in",
+          "condition": { "condition": "risk_high" },
+          "label": "high risk"
+        }
+      ],
+      "groups": [
+        {
+          "id": "terminal",
+          "label": "Terminal decisions",
+          "color": "#72d989",
+          "frame": { "x": 10, "y": 20, "width": 256, "height": 200 },
+          "node_ids": ["supervisor:allow"]
+        }
+      ],
+      "layout": {
+        "zoom": 1,
+        "offset": { "x": 0, "y": 0 },
+        "nodes": [{ "node_id": "risk:merge", "x": 1240, "y": 1260 }]
       },
-      {
-        "id": "risk:merge",
-        "label": "Merge risk",
-        "kind": {
-          "kind": "risk_classifier",
-          "field": "risk_score",
-          "threshold": 40,
-          "high_risk_reason_code": "risk_above_threshold",
-          "missing_reason_code": "missing_merge_evidence"
-        },
-        "input_ports": ["in"],
-        "output_ports": ["low_or_equal", "high", "missing"],
-        "group_id": "merge"
-      }
-    ],
-    "edges": [
-      {
-        "id": "edge:risk-high",
-        "from_node": "risk:merge",
-        "from_port": "high",
-        "to_node": "supervisor:allow",
-        "to_port": "in",
-        "condition": { "condition": "risk_high" },
-        "label": "high risk"
-      }
-    ],
-    "groups": [
-      {
-        "id": "terminal",
-        "label": "Terminal decisions",
-        "color": "#72d989",
-        "frame": { "x": 10, "y": 20, "width": 256, "height": 200 },
-        "node_ids": ["supervisor:allow"]
-      }
-    ],
-    "layout": {
-      "zoom": 1,
-      "offset": { "x": 0, "y": 0 },
-      "nodes": [{ "node_id": "risk:merge", "x": 1240, "y": 1260 }]
-    },
-    "policy_trace_ids": ["task-board-policy-graph-v2"]
-  }
-  """
+      "policy_trace_ids": ["task-board-policy-graph-v2"]
+    }
+    """
 
   @Test("decodes the daemon's snake_case wire end to end")
   func decodesSnakeWire() throws {
@@ -88,7 +88,7 @@ struct TaskBoardPolicyDocumentDecodingTests {
     #expect(document.policyTraceIds == ["task-board-policy-graph-v2"])
 
     let supervisor = document.nodes.first { $0.id == "supervisor:allow" }
-    guard case let .supervisorRule(decision, reasonCodes) = supervisor?.kind else {
+    guard case .supervisorRule(let decision, let reasonCodes) = supervisor?.kind else {
       Issue.record("supervisor node did not decode as .supervisorRule")
       return
     }
@@ -97,7 +97,7 @@ struct TaskBoardPolicyDocumentDecodingTests {
 
     let risk = document.nodes.first { $0.id == "risk:merge" }
     guard
-      case let .riskClassifier(field, threshold, highRisk, missing) = risk?.kind
+      case .riskClassifier(let field, let threshold, let highRisk, let missing) = risk?.kind
     else {
       Issue.record("risk node did not decode as .riskClassifier")
       return

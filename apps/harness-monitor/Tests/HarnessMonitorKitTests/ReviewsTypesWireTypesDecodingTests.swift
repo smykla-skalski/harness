@@ -20,8 +20,8 @@ struct ReviewsTypesWireTypesDecodingTests {
     // at the top level next to the target fields; viewer_can_update is omitted so
     // it takes its logic.rs default (true).
     let json = #"""
-    {"pull_request_id":"pr-1","repository_id":"r-1","repository":"o/r","number":42,"url":"https://example.com/pr/42","state":"open","head_sha":"abc123","mergeable":"mergeable","review_status":"approved","check_status":"success","is_draft":false,"policy_blocked":true,"required_failed_check_names":[],"check_suite_ids":[]}
-    """#
+      {"pull_request_id":"pr-1","repository_id":"r-1","repository":"o/r","number":42,"url":"https://example.com/pr/42","state":"open","head_sha":"abc123","mergeable":"mergeable","review_status":"approved","check_status":"success","is_draft":false,"policy_blocked":true,"required_failed_check_names":[],"check_suite_ids":[]}
+      """#
     let target = try decoder.decode(ReviewTargetWire.self, from: Data(json.utf8))
 
     #expect(target.pullRequestId == "pr-1")
@@ -38,8 +38,8 @@ struct ReviewsTypesWireTypesDecodingTests {
     // The counters are required (the struct derives Default for construction but
     // the fields carry no serde default); by_trigger is the dictionary field.
     let json = #"""
-    {"total":4,"running":1,"waiting":0,"completed":2,"failed":1,"cancelled":0,"by_trigger":{"manual":3,"scheduled":1}}
-    """#
+      {"total":4,"running":1,"waiting":0,"completed":2,"failed":1,"cancelled":0,"by_trigger":{"manual":3,"scheduled":1}}
+      """#
     let metrics = try decoder.decode(ReviewsPolicyRunMetricsWire.self, from: Data(json.utf8))
 
     #expect(metrics.total == 4)
@@ -54,8 +54,8 @@ struct ReviewsTypesWireTypesDecodingTests {
     // ReviewsPolicyRunMetrics struct; omitting it (along with the defaulted runs
     // and timeline) falls back to the zero struct rather than failing the decode.
     let json = #"""
-    {"workflow_id":"reviews_auto","subject":{"repository":"o/r","pull_request_number":42}}
-    """#
+      {"workflow_id":"reviews_auto","subject":{"repository":"o/r","pull_request_number":42}}
+      """#
     let response = try decoder.decode(ReviewsPolicyHistoryResponseWire.self, from: Data(json.utf8))
 
     #expect(response.metrics == ReviewsPolicyRunMetricsWire())
