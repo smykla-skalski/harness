@@ -86,14 +86,16 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: nil,
-        kind: .sessionsUpdated(try streamEvent.decodePayload(as: SessionsUpdatedPayload.self))
+        kind: .sessionsUpdated(try SessionsUpdatedPayload(wire: streamEvent.decodePayloadWire(as: SessionsUpdatedPayloadWire.self)))
       )
     case "sessions_updated_delta":
       return Self(
         recordedAt: at,
         sessionId: streamEvent.sessionId,
         kind: .sessionsUpdatedDelta(
-          try streamEvent.decodePayload(as: SessionsUpdatedDeltaPayload.self)
+          try SessionsUpdatedDeltaPayload(
+            wire: streamEvent.decodePayloadWire(as: SessionsUpdatedDeltaPayloadWire.self)
+          )
         )
       )
     case "log_level_changed":
@@ -143,14 +145,16 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       return Self(
         recordedAt: at,
         sessionId: sessionId,
-        kind: .sessionUpdated(try streamEvent.decodePayload(as: SessionUpdatedPayload.self))
+        kind: .sessionUpdated(try SessionUpdatedPayload(wire: streamEvent.decodePayloadWire(as: SessionUpdatedPayloadWire.self)))
       )
     case "session_extensions":
       return Self(
         recordedAt: at,
         sessionId: sessionId,
         kind: .sessionExtensions(
-          try streamEvent.decodePayload(as: SessionExtensionsPayload.self)
+          try SessionExtensionsPayload(
+            wire: streamEvent.decodePayloadWire(as: SessionExtensionsPayloadWire.self)
+          )
         )
       )
     case "codex_run_updated":

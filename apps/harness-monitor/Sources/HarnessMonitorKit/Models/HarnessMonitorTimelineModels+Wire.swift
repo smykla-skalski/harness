@@ -98,3 +98,34 @@ extension AcpEventBatchPayload {
     )
   }
 }
+
+// Session watch-loop push payloads. Each reuses the already-generated member maps; the
+// session-updated payload nests SessionDetail so its map rethrows the agent-registration decode.
+extension SessionsUpdatedPayload {
+  init(wire: SessionsUpdatedPayloadWire) {
+    self.init(
+      projects: wire.projects.map(ProjectSummary.init(wire:)),
+      sessions: wire.sessions.map(SessionSummary.init(wire:))
+    )
+  }
+}
+
+extension SessionsUpdatedDeltaPayload {
+  init(wire: SessionsUpdatedDeltaPayloadWire) {
+    self.init(
+      changed: wire.changed.map(SessionSummary.init(wire:)),
+      removed: wire.removed,
+      projects: wire.projects.map(ProjectSummary.init(wire:))
+    )
+  }
+}
+
+extension SessionUpdatedPayload {
+  init(wire: SessionUpdatedPayloadWire) throws {
+    self.init(
+      detail: try SessionDetail(wire: wire.detail),
+      timeline: wire.timeline.map { $0.map(TimelineEntry.init(wire:)) },
+      extensionsPending: wire.extensionsPending
+    )
+  }
+}

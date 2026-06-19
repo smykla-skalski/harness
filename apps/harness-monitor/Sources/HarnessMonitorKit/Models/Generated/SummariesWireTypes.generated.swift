@@ -689,6 +689,85 @@ public struct AcpTranscriptResponseWire: Codable, Equatable, Sendable {
   }
 }
 
+public struct SessionsUpdatedPayloadWire: Codable, Equatable, Sendable {
+  public var projects: [ProjectSummaryWire]
+  public var sessions: [SessionSummaryWire]
+
+  public init(projects: [ProjectSummaryWire], sessions: [SessionSummaryWire]) {
+    self.projects = projects
+    self.sessions = sessions
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case projects
+    case sessions
+  }
+}
+
+public struct SessionsUpdatedDeltaPayloadWire: Codable, Equatable, Sendable {
+  public var changed: [SessionSummaryWire]
+  public var removed: [String]
+  public var projects: [ProjectSummaryWire]
+
+  public init(changed: [SessionSummaryWire], removed: [String], projects: [ProjectSummaryWire]) {
+    self.changed = changed
+    self.removed = removed
+    self.projects = projects
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case changed
+    case removed
+    case projects
+  }
+}
+
+public struct SessionUpdatedPayloadWire: Codable, Equatable, Sendable {
+  public var detail: SessionDetailWire
+  public var timeline: [TimelineEntryWire]?
+  public var extensionsPending: Bool
+
+  public init(detail: SessionDetailWire, timeline: [TimelineEntryWire]? = nil, extensionsPending: Bool = false) {
+    self.detail = detail
+    self.timeline = timeline
+    self.extensionsPending = extensionsPending
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    detail = try container.decode(SessionDetailWire.self, forKey: .detail)
+    timeline = try container.decodeIfPresent([TimelineEntryWire].self, forKey: .timeline)
+    extensionsPending = try container.decodeIfPresent(Bool.self, forKey: .extensionsPending) ?? false
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case detail
+    case timeline
+    case extensionsPending = "extensions_pending"
+  }
+}
+
+public struct SessionExtensionsPayloadWire: Codable, Equatable, Sendable {
+  public var sessionId: String
+  public var signals: [SessionSignalRecordWire]?
+  public var observer: ObserverSummaryWire?
+  public var agentActivity: [AgentToolActivitySummaryWire]?
+
+  public init(sessionId: String, signals: [SessionSignalRecordWire]? = nil, observer: ObserverSummaryWire? = nil, agentActivity: [AgentToolActivitySummaryWire]? = nil) {
+    self.sessionId = sessionId
+    self.signals = signals
+    self.observer = observer
+    self.agentActivity = agentActivity
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case sessionId = "session_id"
+    case signals
+    case observer
+    case agentActivity = "agent_activity"
+  }
+}
+
 public struct StreamEventWire: Codable, Equatable, Sendable {
   public var event: String
   public var recordedAt: String

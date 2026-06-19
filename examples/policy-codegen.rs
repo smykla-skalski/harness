@@ -1226,6 +1226,13 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // references the generated AgentRegistrationWire (the other five members already suffix).
     "SessionDetail",
     "AgentRegistration",
+    // session push-event payloads (summaries.rs): the watch-loop stream frames. Each nests
+    // already-suffixed member wires (project/session summary, session detail, timeline entry,
+    // signal record, observer, agent activity).
+    "SessionsUpdatedPayload",
+    "SessionsUpdatedDeltaPayload",
+    "SessionUpdatedPayload",
+    "SessionExtensionsPayload",
     // task_board orchestrator credential responses (runtime_config.rs): thin hand mirrors.
     "TaskBoardGitHubTokensSyncResponse",
     "TaskBoardTodoistTokenSyncResponse",
@@ -2243,6 +2250,13 @@ const SUMMARIES_EMIT_ONLY: &[&str] = &[
     // members are generated now (session/agents/tasks/signals/observer/agent_activity), so the
     // wire references each member's *Wire and the hand init(wire:) maps the whole tree.
     "SessionDetail",
+    // session push-event payloads: the watch-loop frames the Monitor decodes from the stream.
+    // Each nests already-generated member wires (project/session summary, session detail, timeline
+    // entry, signal record, observer, agent activity), so the maps reuse those member maps.
+    "SessionsUpdatedPayload",
+    "SessionsUpdatedDeltaPayload",
+    "SessionUpdatedPayload",
+    "SessionExtensionsPayload",
 ];
 const OBSERVE_CLASSIFICATION_SOURCE: &str = include_str!("../src/observe/types/classification.rs");
 const OBSERVE_ISSUE_CODE_SOURCE: &str = include_str!("../src/observe/types/issue_code.rs");

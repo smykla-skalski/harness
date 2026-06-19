@@ -78,3 +78,16 @@ extension SessionDetail {
     )
   }
 }
+
+// The deferred session-extensions push payload (signals/observer/agent-activity pushed after a
+// core-scope request). Reuses the same member maps the SessionDetail tree uses.
+extension SessionExtensionsPayload {
+  init(wire: SessionExtensionsPayloadWire) {
+    self.init(
+      sessionId: wire.sessionId,
+      signals: wire.signals.map { $0.map(SessionSignalRecord.init(wire:)) },
+      observer: wire.observer.map(ObserverSummary.init(wire:)),
+      agentActivity: wire.agentActivity.map { $0.map(AgentToolActivitySummary.init(wire:)) }
+    )
+  }
+}
