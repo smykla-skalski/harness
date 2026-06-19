@@ -93,6 +93,55 @@ extension PolicyCanvasPreparedRouteInput {
     selectedRouter: any PolicyCanvasEdgeRouter,
     algorithms: PolicyCanvasRoutingAlgorithmSet
   ) -> PolicyCanvasPreparedRouteComputation {
+    let (finalRoutes, portMarkerLayout) = routeComputationRepairedTerminals(
+      routeState: routeState,
+      nodeIndex: nodeIndex,
+      selectedRouter: selectedRouter,
+      algorithms: algorithms
+    )
+
+    let labelSignpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
+    let labelInterval = policyCanvasRouteComputationSignposter.beginInterval(
+      "policy_canvas.routes.phase.labels",
+      id: labelSignpostID,
+      "routes=\(finalRoutes.count, privacy: .public)"
+    )
+    let labelPositions = algorithms.labelPlacement.placeLabels(
+      input: PolicyCanvasLabelPlacementInput(prepared: self, routes: finalRoutes)
+    )
+    policyCanvasRouteComputationSignposter.endInterval(
+      "policy_canvas.routes.phase.labels",
+      labelInterval,
+      "labels=\(labelPositions.count, privacy: .public)"
+    )
+
+    let boundsSignpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
+    let boundsInterval = policyCanvasRouteComputationSignposter.beginInterval(
+      "policy_canvas.routes.phase.bounds",
+      id: boundsSignpostID,
+      "routes=\(finalRoutes.count, privacy: .public) labels=\(labelPositions.count, privacy: .public)"
+    )
+    let visibleBounds = visibleBounds(routes: finalRoutes, labelPositions: labelPositions)
+    policyCanvasRouteComputationSignposter.endInterval(
+      "policy_canvas.routes.phase.bounds",
+      boundsInterval,
+      "width=\(visibleBounds.width, privacy: .public) height=\(visibleBounds.height, privacy: .public)"
+    )
+    return PolicyCanvasPreparedRouteComputation(
+      routes: finalRoutes,
+      labelPositions: labelPositions,
+      portVisibility: portVisibility(routes: finalRoutes, nodeIndex: nodeIndex),
+      portMarkerLayout: portMarkerLayout,
+      visibleBounds: visibleBounds
+    )
+  }
+
+  private func routeComputationRepairedTerminals(
+    routeState: PolicyCanvasRouteComputationState,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> ([String: PolicyCanvasEdgeRoute], PolicyCanvasPortMarkerLayout) {
     let postProcessSignpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
     let postProcessInterval = policyCanvasRouteComputationSignposter.beginInterval(
       "policy_canvas.routes.phase.post_process",
@@ -164,41 +213,7 @@ extension PolicyCanvasPreparedRouteInput {
       terminalsInterval,
       "routes=\(finalRoutes.count, privacy: .public)"
     )
-
-    let labelSignpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
-    let labelInterval = policyCanvasRouteComputationSignposter.beginInterval(
-      "policy_canvas.routes.phase.labels",
-      id: labelSignpostID,
-      "routes=\(finalRoutes.count, privacy: .public)"
-    )
-    let labelPositions = algorithms.labelPlacement.placeLabels(
-      input: PolicyCanvasLabelPlacementInput(prepared: self, routes: finalRoutes)
-    )
-    policyCanvasRouteComputationSignposter.endInterval(
-      "policy_canvas.routes.phase.labels",
-      labelInterval,
-      "labels=\(labelPositions.count, privacy: .public)"
-    )
-
-    let boundsSignpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
-    let boundsInterval = policyCanvasRouteComputationSignposter.beginInterval(
-      "policy_canvas.routes.phase.bounds",
-      id: boundsSignpostID,
-      "routes=\(finalRoutes.count, privacy: .public) labels=\(labelPositions.count, privacy: .public)"
-    )
-    let visibleBounds = visibleBounds(routes: finalRoutes, labelPositions: labelPositions)
-    policyCanvasRouteComputationSignposter.endInterval(
-      "policy_canvas.routes.phase.bounds",
-      boundsInterval,
-      "width=\(visibleBounds.width, privacy: .public) height=\(visibleBounds.height, privacy: .public)"
-    )
-    return PolicyCanvasPreparedRouteComputation(
-      routes: finalRoutes,
-      labelPositions: labelPositions,
-      portVisibility: portVisibility(routes: finalRoutes, nodeIndex: nodeIndex),
-      portMarkerLayout: portMarkerLayout,
-      visibleBounds: visibleBounds
-    )
+    return (finalRoutes, portMarkerLayout)
   }
 
   func precomputedRouteComputation(
