@@ -10,6 +10,12 @@ private struct PolicyCanvasUnconstrainedOrdering {
   let groupOrder: [PolicyCanvasNormalizedLayoutGroup]
 }
 
+private struct PolicyCanvasGroupFrameLayout {
+  let nodePositions: [String: CGPoint]
+  let groupFrames: [String: CGRect]
+  let groupFramesByLayoutID: [String: CGRect]
+}
+
 extension PolicyCanvasLayeredLayoutEngine {
   func normalizedGroups(for graph: PolicyCanvasLayoutGraph)
     -> [PolicyCanvasNormalizedLayoutGroup]
@@ -104,12 +110,52 @@ extension PolicyCanvasLayeredLayoutEngine {
       ),
       nodeSizes: nodeSizes
     )
-    var groupFrames = accumulator.groupFrames
-    var groupFramesByLayoutID = accumulator.groupFramesByLayoutID
+    let resolved = resolvedGroupFrameLayout(
+      nodePositions: nodePositions,
+      groupFrames: accumulator.groupFrames,
+      groupFramesByLayoutID: accumulator.groupFramesByLayoutID,
+      inputs: inputs,
+      nodeSizes: nodeSizes
+    )
+    nodePositions = resolved.nodePositions
+    let groupFrames = resolved.groupFrames
+    let groupFramesByLayoutID = resolved.groupFramesByLayoutID
 
-    // The terminal-arrangement pass scatters group members (collector up, branch
-    // terminals down), so the column-era frames no longer bound them. Rebuild
-    // every group frame from the rearranged positions.
+    let metrics = policyCanvasMeasureLayoutMetrics(
+      graph: inputs.graph,
+      nodePositions: nodePositions,
+      groupRanks: inputs.groupRanks,
+      layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID
+    )
+    let routingHints = policyCanvasLayoutRoutingHints(
+      graph: inputs.graph,
+      nodePositions: nodePositions,
+      layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID,
+      groupFramesByLayoutID: groupFramesByLayoutID
+    )
+    return PolicyCanvasLayoutResult(
+      nodePositions: nodePositions,
+      groupFrames: groupFrames,
+      autoPlacedNodeIDs: accumulator.autoPlacedNodeIDs,
+      metrics: metrics,
+      routingHints: routingHints,
+      precomputedRoutes: nil
+    )
+  }
+
+  // Rebuilds group frames after terminal arrangement and resolves cross-group
+  // title overlaps, then shifts all positions up to y=0 if needed.
+  private func resolvedGroupFrameLayout(
+    nodePositions: [String: CGPoint],
+    groupFrames: [String: CGRect],
+    groupFramesByLayoutID: [String: CGRect],
+    inputs: PolicyCanvasLayeredLayoutInputs,
+    nodeSizes: [String: CGSize]
+  ) -> PolicyCanvasGroupFrameLayout {
+    var nodePositions = nodePositions
+    var groupFrames = groupFrames
+    var groupFramesByLayoutID = groupFramesByLayoutID
+
     func rebuiltGroupFrame(layoutID: String, positions: [String: CGPoint]) -> CGRect? {
       let bounds = positions.keys
         .filter { inputs.layoutGroupIDByNodeID[$0] == layoutID }
@@ -134,6 +180,7 @@ extension PolicyCanvasLayeredLayoutEngine {
         }
       }
     }
+
     rebuildGroupFrames(positions: nodePositions)
     for _ in 0..<3 {
       let resolvedPositions = policyCanvasResolveNodeAndForeignTitleOverlaps(
@@ -162,25 +209,10 @@ extension PolicyCanvasLayeredLayoutEngine {
       groupFramesByLayoutID = groupFramesByLayoutID.mapValues { $0.offsetBy(dx: 0, dy: yShift) }
     }
 
-    let metrics = policyCanvasMeasureLayoutMetrics(
-      graph: inputs.graph,
-      nodePositions: nodePositions,
-      groupRanks: inputs.groupRanks,
-      layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID
-    )
-    let routingHints = policyCanvasLayoutRoutingHints(
-      graph: inputs.graph,
-      nodePositions: nodePositions,
-      layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID,
-      groupFramesByLayoutID: groupFramesByLayoutID
-    )
-    return PolicyCanvasLayoutResult(
+    return PolicyCanvasGroupFrameLayout(
       nodePositions: nodePositions,
       groupFrames: groupFrames,
-      autoPlacedNodeIDs: accumulator.autoPlacedNodeIDs,
-      metrics: metrics,
-      routingHints: routingHints,
-      precomputedRoutes: nil
+      groupFramesByLayoutID: groupFramesByLayoutID
     )
   }
 
@@ -366,53 +398,6 @@ extension PolicyCanvasLayeredLayoutEngine {
       }
       partial[nodeID] = snappedLayoutPoint(CGPoint(x: position.x, y: position.y + yShift))
     }
-  }
-
-  func unconstrainedPlacedNeighborCenters(
-    memberIDs: [String],
-    edges: [PolicyCanvasLayoutEdge],
-    nodePositions: [String: CGPoint]
-  ) -> [String: CGFloat] {
-    memberIDs.reduce(into: [:]) { partial, nodeID in
-      let neighborCenters = edges.compactMap { edge -> CGFloat? in
-        if edge.targetNodeID == nodeID, let sourcePosition = nodePositions[edge.sourceNodeID] {
-          return sourcePosition.y + (PolicyCanvasLayout.nodeSize.height / 2)
-        }
-        if edge.sourceNodeID == nodeID, let targetPosition = nodePositions[edge.targetNodeID] {
-          return targetPosition.y + (PolicyCanvasLayout.nodeSize.height / 2)
-        }
-        return nil
-      }
-      guard !neighborCenters.isEmpty else {
-        return
-      }
-      partial[nodeID] = neighborCenters.reduce(CGFloat.zero, +) / CGFloat(neighborCenters.count)
-    }
-  }
-
-  func unconstrainedMemberPrecedes(
-    leftID: String,
-    rightID: String,
-    tables: PolicyCanvasMemberOrderingTables
-  ) -> Bool {
-    let leftRank = tables.internalRanks[leftID] ?? 0
-    let rightRank = tables.internalRanks[rightID] ?? 0
-    if leftRank != rightRank {
-      return leftRank < rightRank
-    }
-    let leftPlacedCenterY = tables.placedNeighborCenterY[leftID]
-    let rightPlacedCenterY = tables.placedNeighborCenterY[rightID]
-    if let leftPlacedCenterY, let rightPlacedCenterY,
-      abs(leftPlacedCenterY - rightPlacedCenterY) >= (PolicyCanvasLayout.gridSize / 2)
-    {
-      return leftPlacedCenterY < rightPlacedCenterY
-    }
-    let leftCenterY = tables.itemCenterY[leftID] ?? 0
-    let rightCenterY = tables.itemCenterY[rightID] ?? 0
-    if abs(leftCenterY - rightCenterY) >= (PolicyCanvasLayout.gridSize / 2) {
-      return leftCenterY < rightCenterY
-    }
-    return (tables.orderHints[leftID] ?? .zero) < (tables.orderHints[rightID] ?? .zero)
   }
 
 }

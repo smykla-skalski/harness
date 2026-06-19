@@ -1,6 +1,15 @@
 import CoreGraphics
 import Foundation
 
+private struct PolicyCanvasDecoupledSugiyamaPipeline {
+  let acyclicEdges: [PolicyCanvasLayoutEdge]
+  let rankAssignment: PolicyCanvasRankAssignmentOutput
+  let resolvedConfiguration: PolicyCanvasLayoutConfiguration
+  let orderingGraph: PolicyCanvasAugmentedLayeredGraph
+  let orderedLayers: [[String]]
+  let coordinates: PolicyCanvasCoordinateAssignmentOutput
+}
+
 struct PolicyCanvasDecoupledSugiyamaLayoutEngine: PolicyCanvasLayoutEngine {
   let mode: PolicyCanvasAutomaticLayoutMode
   let selection: PolicyCanvasAlgorithmSelection
@@ -23,47 +32,19 @@ struct PolicyCanvasDecoupledSugiyamaLayoutEngine: PolicyCanvasLayoutEngine {
     let algorithms = PolicyCanvasLayoutAlgorithmRegistry.layoutAlgorithms(for: selection)
     let nodeIDs = graph.nodes.map(\.id)
     let originalOrder = originalOrder(for: graph)
-    let acyclicEdges = algorithms.cycleBreaking.breakCycles(
-      input: PolicyCanvasCycleBreakingInput(
-        nodeIDs: nodeIDs,
-        originalOrder: originalOrder,
-        edges: graph.edges
-      )
-    )
-    let rankAssignment = algorithms.rankAssignment.assignRanks(
-      input: PolicyCanvasRankAssignmentInput(
-        graph: graph,
-        nodeIDs: nodeIDs,
-        originalOrder: originalOrder,
-        edges: acyclicEdges,
-        mode: mode
-      )
-    )
-    let resolvedConfiguration = configuration.pressureAdjusted(
+    let pipeline = buildSugiyamaPipeline(
       graph: graph,
-      rankAssignment: rankAssignment
+      nodeIDs: nodeIDs,
+      originalOrder: originalOrder,
+      algorithms: algorithms,
+      configuration: configuration
     )
-    let orderingGraph = algorithms.longEdgeNormalization.normalize(
-      input: PolicyCanvasLongEdgeNormalizationInput(
-        nodeIDs: nodeIDs,
-        ranks: rankAssignment.nodeRanks,
-        edges: acyclicEdges,
-        initialOrders: rankAssignment.initialOrders
-      )
-    )
-    let orderedLayers = algorithms.layerOrdering.orderLayers(
-      input: PolicyCanvasLayerOrderingInput(
-        graph: orderingGraph,
-        maxPasses: resolvedConfiguration.sweepPassCount
-      )
-    )
-    let coordinates = algorithms.coordinateAssignment.assignCoordinates(
-      input: PolicyCanvasCoordinateAssignmentInput(
-        layers: orderedLayers,
-        graph: orderingGraph,
-        configuration: resolvedConfiguration
-      )
-    )
+    let acyclicEdges = pipeline.acyclicEdges
+    let rankAssignment = pipeline.rankAssignment
+    let resolvedConfiguration = pipeline.resolvedConfiguration
+    let orderingGraph = pipeline.orderingGraph
+    let orderedLayers = pipeline.orderedLayers
+    let coordinates = pipeline.coordinates
     let fallbackNodePositions = positionedNodes(
       graph: graph,
       ranks: rankAssignment.nodeRanks,
@@ -109,6 +90,64 @@ struct PolicyCanvasDecoupledSugiyamaLayoutEngine: PolicyCanvasLayoutEngine {
       metrics: metrics,
       routingHints: routingHints,
       precomputedRoutes: nil
+    )
+  }
+
+  private func buildSugiyamaPipeline(
+    graph: PolicyCanvasLayoutGraph,
+    nodeIDs: [String],
+    originalOrder: [String: Int],
+    algorithms: PolicyCanvasLayoutAlgorithms,
+    configuration: PolicyCanvasLayoutConfiguration
+  ) -> PolicyCanvasDecoupledSugiyamaPipeline {
+    let acyclicEdges = algorithms.cycleBreaking.breakCycles(
+      input: PolicyCanvasCycleBreakingInput(
+        nodeIDs: nodeIDs,
+        originalOrder: originalOrder,
+        edges: graph.edges
+      )
+    )
+    let rankAssignment = algorithms.rankAssignment.assignRanks(
+      input: PolicyCanvasRankAssignmentInput(
+        graph: graph,
+        nodeIDs: nodeIDs,
+        originalOrder: originalOrder,
+        edges: acyclicEdges,
+        mode: mode
+      )
+    )
+    let resolvedConfiguration = configuration.pressureAdjusted(
+      graph: graph,
+      rankAssignment: rankAssignment
+    )
+    let orderingGraph = algorithms.longEdgeNormalization.normalize(
+      input: PolicyCanvasLongEdgeNormalizationInput(
+        nodeIDs: nodeIDs,
+        ranks: rankAssignment.nodeRanks,
+        edges: acyclicEdges,
+        initialOrders: rankAssignment.initialOrders
+      )
+    )
+    let orderedLayers = algorithms.layerOrdering.orderLayers(
+      input: PolicyCanvasLayerOrderingInput(
+        graph: orderingGraph,
+        maxPasses: resolvedConfiguration.sweepPassCount
+      )
+    )
+    let coordinates = algorithms.coordinateAssignment.assignCoordinates(
+      input: PolicyCanvasCoordinateAssignmentInput(
+        layers: orderedLayers,
+        graph: orderingGraph,
+        configuration: resolvedConfiguration
+      )
+    )
+    return PolicyCanvasDecoupledSugiyamaPipeline(
+      acyclicEdges: acyclicEdges,
+      rankAssignment: rankAssignment,
+      resolvedConfiguration: resolvedConfiguration,
+      orderingGraph: orderingGraph,
+      orderedLayers: orderedLayers,
+      coordinates: coordinates
     )
   }
 

@@ -101,6 +101,21 @@ public struct PolicyCanvasPortMarkerLayout: Equatable, Sendable {
   }
 }
 
+// Bundles the three per-group assignment inputs that flow unchanged through the
+// side-assignment and offset-assignment helpers.
+struct PolicyCanvasPortMarkerAssignmentContext {
+  let edgesByID: [String: PolicyCanvasEdge]
+  let nodeIndex: [String: PolicyCanvasRouteNode]
+  let ordering: PolicyCanvasPortMarkerOrdering
+}
+
+// Bundles the routable sides for one node kind together with their computed
+// capacities so they travel as a unit through firstAvailableSide.
+struct PolicyCanvasPortSideCapacities {
+  let sides: [PolicyCanvasPortSide]
+  let capacities: [PolicyCanvasPortSide: Int]
+}
+
 extension PolicyCanvasPreparedRouteInput {
   public func portMarkerLayout(
     routes: [String: PolicyCanvasEdgeRoute],
@@ -134,13 +149,16 @@ extension PolicyCanvasPreparedRouteInput {
   ) -> PolicyCanvasPortMarkerLayout {
     let groups = Dictionary(grouping: entries) { $0.nodeKey }
     let edgesByID = Dictionary(edges.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    let context = PolicyCanvasPortMarkerAssignmentContext(
+      edgesByID: edgesByID,
+      nodeIndex: nodeIndex,
+      ordering: ordering
+    )
     var terminals: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal] = [:]
     for groupEntries in groups.values {
       assignPortMarkerTerminals(
         entries: groupEntries.sorted(),
-        edgesByID: edgesByID,
-        nodeIndex: nodeIndex,
-        ordering: ordering,
+        context: context,
         terminals: &terminals
       )
     }
@@ -201,24 +219,26 @@ extension PolicyCanvasPreparedRouteInput {
 
   private func assignPortMarkerTerminals(
     entries: [PolicyCanvasPortMarkerEntry],
-    edgesByID: [String: PolicyCanvasEdge],
-    nodeIndex: [String: PolicyCanvasRouteNode],
-    ordering: PolicyCanvasPortMarkerOrdering,
+    context: PolicyCanvasPortMarkerAssignmentContext,
     terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
   ) {
     guard let kind = entries.first?.endpoint.kind else {
       return
     }
-    let node = entries.first.flatMap { nodeIndex[$0.endpoint.nodeID] }
+    let node = entries.first.flatMap { context.nodeIndex[$0.endpoint.nodeID] }
     let sides = policyCanvasRoutablePortSides(for: kind)
     let units = policyCanvasPortMarkerAssignmentUnits(entries, sides: sides)
     var unitsBySide = Dictionary(
       uniqueKeysWithValues: sides.map { ($0, [PolicyCanvasPortMarkerAssignmentUnit]()) }
     )
-    let capacities = Dictionary(
-      uniqueKeysWithValues: sides.map { side in
-        (side, portMarkerCapacity(side: side, node: node))
-      })
+    let sideCapacities = PolicyCanvasPortSideCapacities(
+      sides: sides,
+      capacities: Dictionary(
+        uniqueKeysWithValues: sides.map { side in
+          (side, portMarkerCapacity(side: side, node: node))
+        }
+      )
+    )
     let preferredSidesByEndpoint = Dictionary(
       grouping: units,
       by: \.endpointKey
@@ -243,7 +263,7 @@ extension PolicyCanvasPreparedRouteInput {
       guard
         let preferredSide = preferredSidesByEndpoint[endpointKey],
         unitsBySide[preferredSide, default: []].count + groupUnits.count
-          <= capacities[preferredSide, default: 1]
+          <= sideCapacities.capacities[preferredSide, default: 1]
       else {
         continue
       }
@@ -253,314 +273,25 @@ extension PolicyCanvasPreparedRouteInput {
     let remainingUnits = units.filter { !reservedUnitIDs.contains($0.id) }
     guard !remainingUnits.isEmpty else {
       assignPortMarkerOffsetsForSides(
-        sides,
         unitsBySide: unitsBySide,
-        edgesByID: edgesByID,
-        nodeIndex: nodeIndex,
-        ordering: ordering,
+        sideCapacities: sideCapacities,
+        context: context,
         terminals: &terminals
       )
       return
     }
-    let remainingCapacities = Dictionary(
-      uniqueKeysWithValues: sides.map { side in
-        (
-          side,
-          max(0, capacities[side, default: 1] - unitsBySide[side, default: []].count)
-        )
-      }
+    dispatchRemainingPortMarkerUnits(
+      remainingUnits,
+      sideCapacities: sideCapacities,
+      unitsBySide: &unitsBySide,
+      context: context
     )
-    if let side = dominantSideThatFits(
-      units: remainingUnits,
-      sides: sides,
-      capacities: remainingCapacities
-    ) {
-      unitsBySide[side, default: []].append(contentsOf: remainingUnits)
-    } else {
-      for unit in remainingUnits {
-        let preferred = sides.contains(unit.preferredSide) ? unit.preferredSide : sides[0]
-        let side = firstAvailableSide(
-          unit: unit,
-          preferred: preferred,
-          sides: sides,
-          capacities: capacities,
-          counts: unitsBySide,
-          edgesByID: edgesByID,
-          nodeIndex: nodeIndex
-        )
-        unitsBySide[side, default: []].append(unit)
-      }
-    }
     assignPortMarkerOffsetsForSides(
-      sides,
       unitsBySide: unitsBySide,
-      edgesByID: edgesByID,
-      nodeIndex: nodeIndex,
-      ordering: ordering,
+      sideCapacities: sideCapacities,
+      context: context,
       terminals: &terminals
     )
   }
 
-  private func assignPortMarkerOffsetsForSides(
-    _ sides: [PolicyCanvasPortSide],
-    unitsBySide: [PolicyCanvasPortSide: [PolicyCanvasPortMarkerAssignmentUnit]],
-    edgesByID: [String: PolicyCanvasEdge],
-    nodeIndex: [String: PolicyCanvasRouteNode],
-    ordering: PolicyCanvasPortMarkerOrdering,
-    terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
-  ) {
-    for side in sides {
-      assignPortMarkerOffsets(
-        units: unitsBySide[side, default: []],
-        side: side,
-        edgesByID: edgesByID,
-        nodeIndex: nodeIndex,
-        ordering: ordering,
-        terminals: &terminals
-      )
-    }
-  }
-
-  private func firstAvailableSide(
-    unit: PolicyCanvasPortMarkerAssignmentUnit,
-    preferred: PolicyCanvasPortSide,
-    sides: [PolicyCanvasPortSide],
-    capacities: [PolicyCanvasPortSide: Int],
-    counts: [PolicyCanvasPortSide: [PolicyCanvasPortMarkerAssignmentUnit]],
-    edgesByID: [String: PolicyCanvasEdge],
-    nodeIndex: [String: PolicyCanvasRouteNode]
-  ) -> PolicyCanvasPortSide {
-    let orderedSides = [preferred] + sides.filter { $0 != preferred }
-    let availableSides = orderedSides.filter { side in
-      counts[side, default: []].count < capacities[side, default: 1]
-    }
-    if let unblocked = availableSides.first(where: { side in
-      !portMarkerSideIsBlocked(
-        unit: unit,
-        side: side,
-        edgesByID: edgesByID,
-        nodeIndex: nodeIndex
-      )
-    }) {
-      return unblocked
-    }
-    return availableSides.first ?? orderedSides.min { left, right in
-      counts[left, default: []].count < counts[right, default: []].count
-    } ?? preferred
-  }
-
-  private func portMarkerSideIsBlocked(
-    unit: PolicyCanvasPortMarkerAssignmentUnit,
-    side: PolicyCanvasPortSide,
-    edgesByID: [String: PolicyCanvasEdge],
-    nodeIndex: [String: PolicyCanvasRouteNode]
-  ) -> Bool {
-    guard
-      let endpoint = unit.entries.first?.endpoint,
-      let node = nodeIndex[endpoint.nodeID]
-    else {
-      return false
-    }
-    let endpointNodeIDs = Set(
-      unit.entries.compactMap { entry -> String? in
-        guard let edge = edgesByID[entry.key.edgeID] else {
-          return nil
-        }
-        return entry.key.role == .source ? edge.target.nodeID : edge.source.nodeID
-      } + [endpoint.nodeID]
-    )
-    let reach = PolicyCanvasLayout.edgePortTurnMinimumLead + 1
-    let corridor: CGRect
-    switch side {
-    case .leading:
-      corridor = CGRect(
-        x: node.frame.minX - reach,
-        y: node.frame.minY,
-        width: reach,
-        height: node.frame.height
-      )
-    case .trailing:
-      corridor = CGRect(
-        x: node.frame.maxX,
-        y: node.frame.minY,
-        width: reach,
-        height: node.frame.height
-      )
-    case .top:
-      corridor = CGRect(
-        x: node.frame.minX,
-        y: node.frame.minY - reach,
-        width: node.frame.width,
-        height: reach
-      )
-    case .bottom:
-      corridor = CGRect(
-        x: node.frame.minX,
-        y: node.frame.maxY,
-        width: node.frame.width,
-        height: reach
-      )
-    }
-    return nodeIndex.values.contains { other in
-      !endpointNodeIDs.contains(other.id) && other.frame.intersects(corridor)
-    }
-  }
-
-  private func dominantSideThatFits(
-    units: [PolicyCanvasPortMarkerAssignmentUnit],
-    sides: [PolicyCanvasPortSide],
-    capacities: [PolicyCanvasPortSide: Int]
-  ) -> PolicyCanvasPortSide? {
-    guard units.count > 1 else {
-      return nil
-    }
-    let preferredCounts = Dictionary(grouping: units) { unit in
-      sides.contains(unit.preferredSide) ? unit.preferredSide : sides[0]
-    }
-    var dominantSide: PolicyCanvasPortSide?
-    var dominantCount = -1
-    for side in sides
-    where
-      preferredCounts[side, default: []].count > units.count / 2
-      && capacities[side, default: 1] >= units.count
-    {
-      let count = preferredCounts[side, default: []].count
-      if count > dominantCount {
-        dominantSide = side
-        dominantCount = count
-      }
-    }
-    return dominantSide
-  }
-
-  private func assignPortMarkerOffsets(
-    units: [PolicyCanvasPortMarkerAssignmentUnit],
-    side: PolicyCanvasPortSide,
-    edgesByID: [String: PolicyCanvasEdge],
-    nodeIndex: [String: PolicyCanvasRouteNode],
-    ordering: PolicyCanvasPortMarkerOrdering,
-    terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
-  ) {
-    guard
-      let endpoint = units.first?.entries.first?.endpoint
-    else {
-      return
-    }
-    let placements: [PolicyCanvasPortMarkerPlacement] =
-      units.compactMap { unit in
-        guard
-          let entry = unit.entries.first,
-          let node = nodeIndex[entry.endpoint.nodeID],
-          let basePoint = portAnchor(for: entry.endpoint, side: side, nodeIndex: nodeIndex)
-        else {
-          return nil
-        }
-        let base = policyCanvasLocalAxisCoordinate(basePoint, side: side, frame: node.frame)
-        // Order ports along the side by the selected comb order, not by natural
-        // port index. The production order preserves existing sample budgets;
-        // targeted repair passes may request metric-aligned far-axis ordering.
-        let order =
-          policyCanvasFarEndpointAnchor(unit: unit, edgesByID: edgesByID, nodeIndex: nodeIndex)
-          .map { farAnchor in
-            policyCanvasPortMarkerOrderKey(
-              ordering: ordering,
-              side: side,
-              sideCenter: policyCanvasSideCenter(side: side, frame: node.frame),
-              farAnchor: farAnchor
-            )
-          } ?? 0
-        return PolicyCanvasPortMarkerPlacement(unit: unit, base: base, order: order)
-      }
-      .sorted { left, right in
-        if abs(left.order - right.order) > 0.001 {
-          return left.order < right.order
-        }
-        return abs(left.base - right.base) > 0.001 ? left.base < right.base : left.unit < right.unit
-      }
-    guard !placements.isEmpty else {
-      return
-    }
-    let extent =
-      nodeIndex[endpoint.nodeID].map {
-        policyCanvasSideExtent(side: side, frame: $0.frame)
-      } ?? policyCanvasSideExtent(side: side)
-    // Side-local port layout should not inherit the global port index from
-    // sibling ports that render on the alternate side. A lone marker on a side
-    // stays centered on that side even when other ports of the same kind fan
-    // out elsewhere.
-    let base = extent / 2
-    let coordinates = policyCanvasPortMarkerCoordinates(
-      count: placements.count,
-      base: base,
-      spacing: portMarkerSpacing(for: endpoint, side: side, nodeIndex: nodeIndex),
-      extent: extent,
-      inset: policyCanvasPortMarkerInset()
-    )
-    for (placement, coordinate) in zip(placements, coordinates) {
-      let terminal = PolicyCanvasPortTerminal(side: side, axisOffset: coordinate - placement.base)
-      for entry in placement.unit.entries {
-        terminals[entry.key] = terminal
-      }
-    }
-  }
-
-  private func policyCanvasFarEndpointAnchor(
-    unit: PolicyCanvasPortMarkerAssignmentUnit,
-    edgesByID: [String: PolicyCanvasEdge],
-    nodeIndex: [String: PolicyCanvasRouteNode]
-  ) -> CGPoint? {
-    var sumX: CGFloat = 0
-    var sumY: CGFloat = 0
-    var count = 0
-    for entry in unit.entries {
-      guard let edge = edgesByID[entry.key.edgeID] else {
-        continue
-      }
-      let farEndpoint = entry.key.role == .source ? edge.target : edge.source
-      guard let anchor = portAnchor(for: farEndpoint, nodeIndex: nodeIndex) else {
-        continue
-      }
-      sumX += anchor.x
-      sumY += anchor.y
-      count += 1
-    }
-    guard count > 0 else {
-      return nil
-    }
-    return CGPoint(x: sumX / CGFloat(count), y: sumY / CGFloat(count))
-  }
-
-  private func portMarkerCapacity(
-    side: PolicyCanvasPortSide,
-    node: PolicyCanvasRouteNode?
-  ) -> Int {
-    let inset = policyCanvasPortMarkerInset()
-    let extent =
-      node.map { policyCanvasSideExtent(side: side, frame: $0.frame) }
-      ?? policyCanvasSideExtent(side: side)
-    let available = max(0, extent - (inset * 2))
-    // Capacity is how many markers fit at the minimum channel spacing before
-    // they would overlap, not the wider preferred port spacing. A logical port
-    // that fans into several markers compresses to this floor rather than
-    // spilling onto an adjacent side.
-    return max(1, Int(floor(available / policyCanvasMinimumPortMarkerSpacing())) + 1)
-  }
-
-  private func policyCanvasPortMarkerEndpointGroupSortKey(
-    _ group: (key: PolicyCanvasPortEndpoint, value: [PolicyCanvasPortMarkerAssignmentUnit])
-  ) -> String {
-    let sortKey = group.value.map(\.sortKey).min() ?? ""
-    return [sortKey, group.key.portID].joined(separator: "|")
-  }
-
-  private func portMarkerSpacing(
-    for endpoint: PolicyCanvasPortEndpoint,
-    side: PolicyCanvasPortSide,
-    nodeIndex: [String: PolicyCanvasRouteNode]
-  ) -> CGFloat {
-    max(
-      portSpacing(for: endpoint, side: side, nodeIndex: nodeIndex),
-      policyCanvasMinimumPortMarkerSpacing()
-    )
-  }
 }

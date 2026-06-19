@@ -179,23 +179,12 @@ public func policyCanvasResolvedLabelPositions(
     "remaining=\(routes.count - positions.count, privacy: .public)"
   )
   for entry in policyCanvasSortedLabelRoutes(routes) where positions[entry.id] == nil {
-    let blockingRouteFrames = routeFrames.reduce(into: [CGRect]()) { result, element in
-      if element.key != entry.id {
-        result.append(contentsOf: element.value)
-      }
-    }
-    let avoidedSegments = sharedSegmentAvoidance[entry.id, default: []]
-    let preferredAxis = policyCanvasPreferredLabelAxis(avoidedSegments: avoidedSegments)
-    let position = policyCanvasResolvedLabelPosition(
-      route: entry.route,
-      size: entry.size,
-      avoidedSegments: avoidedSegments,
-      preferredAxis: preferredAxis,
-      obstacleFrames: PolicyCanvasLabelObstacleFrames(
-        occupied: occupiedFrames,
-        nodes: nodeFrames,
-        routes: blockingRouteFrames
-      )
+    let position = policyCanvasGreedyLabelPosition(
+      entry: entry,
+      occupiedFrames: occupiedFrames,
+      nodeFrames: nodeFrames,
+      routeFrames: routeFrames,
+      sharedSegmentAvoidance: sharedSegmentAvoidance
     )
     positions[entry.id] = position
     occupiedFrames.append(policyCanvasLabelFrame(center: position, size: entry.size))
@@ -206,6 +195,33 @@ public func policyCanvasResolvedLabelPositions(
     "labels=\(positions.count, privacy: .public)"
   )
   return positions
+}
+
+private func policyCanvasGreedyLabelPosition(
+  entry: PolicyCanvasLabelPlacementRoute,
+  occupiedFrames: [CGRect],
+  nodeFrames: [CGRect],
+  routeFrames: [String: [CGRect]],
+  sharedSegmentAvoidance: [String: [PolicyCanvasSharedLabelSegment]]
+) -> CGPoint {
+  let blockingRouteFrames = routeFrames.reduce(into: [CGRect]()) { result, element in
+    if element.key != entry.id {
+      result.append(contentsOf: element.value)
+    }
+  }
+  let avoidedSegments = sharedSegmentAvoidance[entry.id, default: []]
+  let preferredAxis = policyCanvasPreferredLabelAxis(avoidedSegments: avoidedSegments)
+  return policyCanvasResolvedLabelPosition(
+    route: entry.route,
+    size: entry.size,
+    avoidedSegments: avoidedSegments,
+    preferredAxis: preferredAxis,
+    obstacleFrames: PolicyCanvasLabelObstacleFrames(
+      occupied: occupiedFrames,
+      nodes: nodeFrames,
+      routes: blockingRouteFrames
+    )
+  )
 }
 
 func policyCanvasFastResolvedLabelPositions(
