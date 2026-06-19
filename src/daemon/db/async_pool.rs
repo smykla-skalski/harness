@@ -100,7 +100,11 @@ const RESOLVE_SESSION_SQL: &str = "SELECT
    )";
 
 /// Async `SQLx` pool over the canonical daemon `SQLite` database.
-#[derive(Debug)]
+///
+/// `Clone` shares the underlying `SqlitePool` (an `Arc` internally), so a clone
+/// is cheap and lets long-lived background tasks (e.g. the policy-decision
+/// recording drain) own a handle without re-opening the database.
+#[derive(Debug, Clone)]
 pub(crate) struct AsyncDaemonDb {
     pool: SqlitePool,
     pub(super) path: PathBuf,

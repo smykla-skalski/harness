@@ -38,6 +38,7 @@ pub(super) fn current_schema_shape_needs_repair(
         "policy_groups",
         "policy_group_nodes",
         "audit_events",
+        "policy_decisions",
     ] {
         if !table_exists(conn, table)? {
             return Ok(true);

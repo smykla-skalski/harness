@@ -11,6 +11,7 @@ use super::policy::{
 };
 
 mod compiler;
+mod decisions;
 mod defaults;
 mod evaluation;
 mod gate_cache;
@@ -31,10 +32,11 @@ pub const POLICY_GRAPH_SCHEMA_VERSION: u16 = 2;
 pub const POLICY_GRAPH_INITIAL_REVISION: u64 = 1;
 
 pub use compiler::{CompiledWorkflowPlan, CompiledWorkflowStep};
-pub use ids::{PolicyGraphEdgeId, PolicyGraphGroupId, PolicyGraphNodeId, PolicyGraphPortId};
+pub(crate) use decisions::{RecordedPolicyDecision, install_decision_sink, record_policy_decision};
 pub(crate) use gate_cache::{
     cached_gate_policy, install_gate_coldfill, resolve_gate_policy, store_gate_policy,
 };
+pub use ids::{PolicyGraphEdgeId, PolicyGraphGroupId, PolicyGraphNodeId, PolicyGraphPortId};
 pub use models::{
     PolicyActionStep, PolicyEventWait, PolicyFinishNode, PolicyGraphAutomationBinding,
     PolicyGraphOCRConfiguration, PolicyGraphReviewPullRequestExtraction, PolicyHandoffStep,

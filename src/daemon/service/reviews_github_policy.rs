@@ -1,7 +1,9 @@
 use crate::errors::{CliError, CliErrorKind};
 use crate::reviews::policy::review_target_policy_evidence;
 use crate::reviews::{ReviewTarget, ReviewsFileCommentRequest};
-use crate::task_board::policy_graph::cached_gate_policy;
+use crate::task_board::policy_graph::{
+    RecordedPolicyDecision, cached_gate_policy, record_policy_decision,
+};
 use crate::task_board::store::default_board_root;
 use crate::task_board::{
     PolicyAction, PolicyDecision, PolicyEvidence, PolicyGraph, PolicyGraphMode, PolicyInput,
@@ -140,6 +142,13 @@ fn enforce_reviews_policy_input(
             "the enforced policy canvas does not cover this action",
         ));
     }
+    record_policy_decision(RecordedPolicyDecision::new(
+        document.revision,
+        input.clone(),
+        simulation.decision.clone(),
+        simulation.visited_node_ids.clone(),
+        "reviews_github",
+    ));
     if simulation.decision.is_allow() {
         return Ok(());
     }
