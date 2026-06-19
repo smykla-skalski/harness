@@ -102,7 +102,7 @@ public final class PolicyCanvasViewModel {
   /// toggle is on. Observed so both the floating panel and the content-space
   /// violation overlay redraw when it changes. Stays `nil` on the shipping
   /// canvas (no toggle), so production never pays for it.
-  var qualityInspectionReport: PolicyCanvasGraphQualityReport? = nil
+  var qualityInspectionReport: PolicyCanvasGraphQualityReport?
 
   /// Lab quality-overlay hover state from the document view's AppKit pointer
   /// tracking: `hoveredQualityMarks` = active marks under the pointer (highlight,

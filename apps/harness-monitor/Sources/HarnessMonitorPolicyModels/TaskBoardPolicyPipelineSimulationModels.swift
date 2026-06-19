@@ -273,16 +273,16 @@ extension TaskBoardPolicyPipelineValidationIssue {
   /// recovers node_id/edge_id/node_ids; the message the daemon never sends is
   /// resynthesized from the recovered fields.
   public init(wire: PolicyGraphValidationIssue) {
-    var id: String? = nil
-    var nodeId: String? = nil
-    var edgeId: String? = nil
+    var id: String?
+    var nodeId: String?
+    var edgeId: String?
     var nodeIds: [String] = []
-    var expected: UInt16? = nil
-    var actual: UInt16? = nil
-    var port: String? = nil
-    var direction: String? = nil
-    var action: PolicyAction? = nil
-    var location: String? = nil
+    var expected: UInt16?
+    var actual: UInt16?
+    var port: String?
+    var direction: String?
+    var action: PolicyAction?
+    var location: String?
     let code: String
 
     switch wire {

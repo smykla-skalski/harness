@@ -68,8 +68,8 @@ struct PolicyCanvasInteractiveEdge: View, Equatable {
   let onDelete: () -> Void
 
   nonisolated static func == (
-    lhs: PolicyCanvasInteractiveEdge,
-    rhs: PolicyCanvasInteractiveEdge
+    lhs: Self,
+    rhs: Self
   ) -> Bool {
     lhs.route == rhs.route
       && lhs.labelGapFrames == rhs.labelGapFrames

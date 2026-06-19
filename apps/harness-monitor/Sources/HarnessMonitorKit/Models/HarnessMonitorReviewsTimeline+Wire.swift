@@ -29,9 +29,9 @@ extension AnyCodableJSONValue {
     case .string(let value):
       self = .string(value)
     case .array(let items):
-      self = .array(items.map(AnyCodableJSONValue.init(jsonValue:)))
+      self = .array(items.map(Self.init(jsonValue:)))
     case .object(let fields):
-      self = .object(fields.mapValues(AnyCodableJSONValue.init(jsonValue:)))
+      self = .object(fields.mapValues(Self.init(jsonValue:)))
     }
   }
 }

@@ -304,8 +304,8 @@ final class PolicyCanvasNativeDocumentView: NSView {
     var didBeginDrag = false
   }
 
-  nonisolated override var isFlipped: Bool { true }
-  nonisolated override var isOpaque: Bool { true }
+  override nonisolated var isFlipped: Bool { true }
+  override nonisolated var isOpaque: Bool { true }
 
   override var intrinsicContentSize: NSSize {
     NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
