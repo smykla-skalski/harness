@@ -28,7 +28,9 @@ const POLICY_PIPELINE_CHANGE_CHANNEL: &str = "policy_pipeline";
 /// Returns `CliError` when the database read or seed write fails.
 async fn load_or_seed_workspace(db: &AsyncDaemonDb) -> Result<PolicyCanvasWorkspace, CliError> {
     if let Some(mut workspace) = db.load_policy_workspace().await? {
-        if workspace.ensure_seeded_automation_canvases() {
+        let repaired_canvases = workspace.ensure_seeded_automation_canvases();
+        let seeded_scenarios = workspace.ensure_seeded_scenarios();
+        if repaired_canvases || seeded_scenarios {
             db.replace_policy_workspace(&workspace).await?;
             feed_gate_cache(&workspace);
         }
@@ -85,6 +87,7 @@ pub(crate) async fn create_task_board_policy_canvas(
     let (workspace, _new_canvas) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
             policy_graph::apply_create(workspace, title)
         })
         .await?;
@@ -106,6 +109,7 @@ pub(crate) async fn duplicate_task_board_policy_canvas(
     let (workspace, _new_canvas) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
             policy_graph::apply_duplicate(workspace, &canvas_id, title)
         })
         .await?;
@@ -127,6 +131,7 @@ pub(crate) async fn rename_task_board_policy_canvas(
     let (workspace, ()) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
             policy_graph::apply_rename(workspace, &canvas_id, title)
         })
         .await?;
@@ -147,6 +152,7 @@ pub(crate) async fn set_active_task_board_policy_canvas(
     let (workspace, ()) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
             policy_graph::apply_set_active(workspace, &canvas_id)
         })
         .await?;
@@ -167,6 +173,7 @@ pub(crate) async fn delete_task_board_policy_canvas(
     let (workspace, ()) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
             policy_graph::apply_delete(workspace, &canvas_id)
         })
         .await?;
@@ -187,6 +194,7 @@ pub(crate) async fn set_task_board_policy_canvas_global_enforcement(
     let (workspace, _enabled) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
             Ok(policy_graph::apply_set_global_enforcement(
                 workspace, enabled,
             ))
@@ -250,6 +258,7 @@ pub(crate) async fn simulate_task_board_policy_pipeline(
     let (workspace, result) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
             policy_graph::apply_simulate(workspace, document, expected_canvas_id.as_deref())
         })
         .await?;
@@ -270,6 +279,7 @@ pub(crate) async fn promote_task_board_policy_pipeline(
     let (workspace, response) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
             policy_graph::apply_promote(workspace, &request)
         })
         .await?;
@@ -337,6 +347,7 @@ pub(crate) async fn import_task_board_policy(
     let (workspace, _new_canvas) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
+            workspace.ensure_seeded_scenarios();
             policy_graph::apply_import(workspace, document, title)
         })
         .await?;

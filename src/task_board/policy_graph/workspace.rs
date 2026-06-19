@@ -2,6 +2,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::scenario::{PolicyScenario, default_seeded_scenarios};
 use super::store::PolicyPipelineSimulationResult;
 use super::{
     PORT_IMAGE, PORT_IN, PORT_PULL_REQUESTS, PORT_TEXT, PolicyGraph, PolicyGraphEdgeCondition,
@@ -79,6 +80,10 @@ pub struct PolicyCanvasWorkspace {
     pub review_text_paste_dry_run_canvas_deleted: bool,
     #[serde(default)]
     pub review_screenshot_extraction_canvas_deleted: bool,
+    #[serde(default)]
+    pub scenarios: Vec<PolicyScenario>,
+    #[serde(default)]
+    pub scenarios_seeded: bool,
 }
 
 impl PolicyCanvasWorkspace {
@@ -102,6 +107,8 @@ impl PolicyCanvasWorkspace {
             manual_ocr_paste_canvas_deleted: false,
             review_text_paste_dry_run_canvas_deleted: false,
             review_screenshot_extraction_canvas_deleted: false,
+            scenarios: default_seeded_scenarios(),
+            scenarios_seeded: true,
         }
     }
 
@@ -210,6 +217,20 @@ impl PolicyCanvasWorkspace {
         let repaired_text_paste = self.ensure_review_text_paste_dry_run_canvas();
         let repaired_screenshot = self.ensure_review_screenshot_extraction_canvas();
         repaired_manual_ocr || repaired_text_paste || repaired_screenshot
+    }
+
+    /// Seed the default scenario set exactly once. Workspaces predating scenarios
+    /// load with `scenarios_seeded == false`; the first call fills the baseline
+    /// and flips the guard so later deletions are not resurrected on reload.
+    pub fn ensure_seeded_scenarios(&mut self) -> bool {
+        if self.scenarios_seeded {
+            return false;
+        }
+        self.scenarios_seeded = true;
+        if self.scenarios.is_empty() {
+            self.scenarios = default_seeded_scenarios();
+        }
+        true
     }
 }
 

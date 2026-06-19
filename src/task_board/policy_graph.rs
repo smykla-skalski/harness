@@ -19,6 +19,7 @@ mod graph_impls;
 mod ids;
 mod models;
 mod node_kinds;
+mod scenario;
 mod seed;
 mod store;
 mod store_canvas;
@@ -44,6 +45,10 @@ pub use models::{
 };
 pub use node_kinds::{
     POLICY_NODE_KIND_DESCRIPTORS, PolicyNodeCategory, PolicyNodeKindDescriptor, descriptor_for,
+};
+pub use scenario::{
+    PolicyScenario, apply_scenario_create, apply_scenario_delete, apply_scenario_reset,
+    apply_scenario_update, default_seeded_scenarios,
 };
 pub use store::{
     GraphPolicyGate, PolicyPipelineAuditSummary, PolicyPipelinePromoteRequest,

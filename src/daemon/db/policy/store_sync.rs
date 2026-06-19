@@ -62,6 +62,8 @@ impl DaemonDb {
                     review_text_paste_dry_run_canvas_deleted: row.get(3)?,
                     review_screenshot_extraction_canvas_deleted: row.get(4)?,
                     global_policy_enforcement_enabled: row.get(5)?,
+                    scenarios_json: row.get(6)?,
+                    scenarios_seeded: row.get(7)?,
                 })
             })
             .optional()

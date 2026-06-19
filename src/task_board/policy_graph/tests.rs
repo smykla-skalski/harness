@@ -18,7 +18,7 @@ use super::{
     PolicyWorkflowEntry, REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE,
     REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE, apply_create, apply_delete, apply_duplicate,
     apply_import, apply_promote, apply_rename, apply_save_draft, apply_set_active,
-    apply_set_global_enforcement, apply_simulate,
+    apply_set_global_enforcement, apply_simulate, default_seeded_scenarios,
 };
 
 const NODE_WIDTH: i32 = 168;

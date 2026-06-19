@@ -13,6 +13,8 @@ pub(crate) struct WorkspaceRow {
     pub review_text_paste_dry_run_canvas_deleted: bool,
     pub review_screenshot_extraction_canvas_deleted: bool,
     pub global_policy_enforcement_enabled: bool,
+    pub scenarios_json: String,
+    pub scenarios_seeded: bool,
 }
 
 /// One row of `policy_canvases`. Document structure lives in the child tables;

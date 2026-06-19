@@ -407,3 +407,30 @@ fn import_canvas_uses_default_title_when_none_given() {
         "default title must not be empty"
     );
 }
+
+#[test]
+fn seeded_workspace_carries_the_default_scenarios() {
+    let ws = PolicyCanvasWorkspace::seeded();
+    assert!(ws.scenarios_seeded);
+    assert_eq!(ws.scenarios, default_seeded_scenarios());
+}
+
+#[test]
+fn ensure_seeded_scenarios_backfills_once_then_respects_deletions() {
+    // Simulate a workspace persisted before scenarios existed.
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    ws.scenarios.clear();
+    ws.scenarios_seeded = false;
+
+    assert!(
+        ws.ensure_seeded_scenarios(),
+        "first call seeds the baseline"
+    );
+    assert_eq!(ws.scenarios, default_seeded_scenarios());
+
+    // A later deletion must stick: re-running ensure is now a no-op.
+    let kept = ws.scenarios[0].id.clone();
+    ws.scenarios.retain(|scenario| scenario.id == kept);
+    assert!(!ws.ensure_seeded_scenarios(), "guard prevents re-seeding");
+    assert_eq!(ws.scenarios.len(), 1);
+}
