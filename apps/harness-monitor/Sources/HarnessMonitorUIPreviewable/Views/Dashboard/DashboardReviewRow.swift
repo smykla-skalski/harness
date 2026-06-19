@@ -14,6 +14,7 @@ struct DashboardReviewRow: View {
   let showsAvatars: Bool
   let showsLabels: Bool
   let showsLineCounters: Bool
+  let showsApprovalCounts: Bool
   let showsPullRequestNumber: Bool
   let showsPullRequestAge: Bool
   let wrapsTitle: Bool
@@ -33,6 +34,7 @@ struct DashboardReviewRow: View {
     showsAvatars: Bool = true,
     showsLabels: Bool = true,
     showsLineCounters: Bool = true,
+    showsApprovalCounts: Bool = false,
     showsPullRequestNumber: Bool = true,
     showsPullRequestAge: Bool = true,
     wrapsTitle: Bool = true,
@@ -51,6 +53,7 @@ struct DashboardReviewRow: View {
     self.showsAvatars = showsAvatars
     self.showsLabels = showsLabels
     self.showsLineCounters = showsLineCounters
+    self.showsApprovalCounts = showsApprovalCounts
     self.showsPullRequestNumber = showsPullRequestNumber
     self.showsPullRequestAge = showsPullRequestAge
     self.wrapsTitle = wrapsTitle
@@ -72,6 +75,7 @@ struct DashboardReviewRow: View {
       showsAvatars: showsAvatars,
       showsLabels: showsLabels,
       showsLineCounters: showsLineCounters,
+      showsApprovalCounts: showsApprovalCounts,
       showsPullRequestNumber: showsPullRequestNumber,
       showsPullRequestAge: showsPullRequestAge,
       wrapsTitle: wrapsTitle,

@@ -118,6 +118,17 @@ struct DashboardReviewListRowSecondaryTextTests {
     #expect(summary.compactLabel == "1/2")
   }
 
+  @Test("reviewer summary exposes missing approvals metadata help")
+  func reviewerSummaryExposesMissingApprovalsMetadataHelp() {
+    let missing = DashboardReviewerSummary(approvedCount: 0, reviewerCount: 1)
+    let complete = DashboardReviewerSummary(approvedCount: 2, reviewerCount: 2)
+
+    #expect(missing.hasMissingApprovals)
+    #expect(missing.missingApprovalsMetadataHelp == "Missing approvals: 0 of 1 reviewer approved")
+    #expect(!complete.hasMissingApprovals)
+    #expect(complete.missingApprovalsMetadataHelp == nil)
+  }
+
   private func makeRow(
     showsRepository: Bool,
     title: String = "Bump dependency",

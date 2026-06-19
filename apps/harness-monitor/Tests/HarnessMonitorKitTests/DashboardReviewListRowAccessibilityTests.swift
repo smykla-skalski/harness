@@ -136,6 +136,9 @@ struct DashboardReviewListRowAccessibilityTests {
     let source = try rowSource(named: "DashboardReviewListRow+AttentionIcons.swift")
     #expect(source.contains("if item.viewerIsRequestedReviewer {"))
     #expect(source.contains("label: \"Needs me\""))
+    #expect(source.contains("if let missingApprovalsHelp {"))
+    #expect(source.contains("label: \"Missing approvals\""))
+    #expect(source.contains("tint: HarnessMonitorTheme.caution"))
     #expect(!source.contains("mutedUntilHovered"))
     #expect(source.contains("label: kind.label"))
   }
@@ -161,8 +164,19 @@ struct DashboardReviewListRowAccessibilityTests {
     let iconSource = try rowSource(named: "DashboardReviewListRow+AttentionIcons.swift")
 
     #expect(rowSourceText.contains("DashboardReviewListRowMetadataIconStrip("))
+    #expect(rowSourceText.contains("missingApprovalsHelp: missingApprovalsMetadataHelp"))
     #expect(!iconSource.contains("mutedUntilHovered"))
     #expect(iconSource.contains("item.statusSystemImage"))
+  }
+
+  @Test("row source gates reviewer count chrome behind the approval-count preference")
+  func rowSourceGatesReviewerCountChromeBehindApprovalCountPreference() throws {
+    let source = try rowSource(named: "DashboardReviewListRow.swift")
+
+    #expect(source.contains("let showsApprovalCounts: Bool"))
+    #expect(source.contains("showsApprovalCounts: Bool = false"))
+    #expect(source.contains("(showsApprovalCounts && reviewerSummary != nil)"))
+    #expect(source.contains("guard !showsApprovalCounts else { return nil }"))
   }
 
   @Test("status icon source shares the same size and frame contract as the metadata icons")

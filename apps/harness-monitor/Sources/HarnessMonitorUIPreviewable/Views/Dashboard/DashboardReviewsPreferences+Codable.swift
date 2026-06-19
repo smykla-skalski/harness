@@ -40,6 +40,7 @@ extension DashboardReviewsPreferences {
     try container.encode(showAvatarsInRows, forKey: .showAvatarsInRows)
     try container.encode(showLabelsInRows, forKey: .showLabelsInRows)
     try container.encode(showLineCountersInRows, forKey: .showLineCountersInRows)
+    try container.encode(showApprovalCountsInRows, forKey: .showApprovalCountsInRows)
     try container.encode(showPullRequestNumberInRows, forKey: .showPullRequestNumberInRows)
     try container.encode(showPullRequestAgeInRows, forKey: .showPullRequestAgeInRows)
     try container.encode(wrapTitlesInRows, forKey: .wrapTitlesInRows)
@@ -162,6 +163,9 @@ extension DashboardReviewsPreferences {
     showLineCountersInRows =
       try container.decodeIfPresent(Bool.self, forKey: .showLineCountersInRows)
       ?? defaults.showLineCountersInRows
+    showApprovalCountsInRows =
+      try container.decodeIfPresent(Bool.self, forKey: .showApprovalCountsInRows)
+      ?? defaults.showApprovalCountsInRows
     showPullRequestNumberInRows =
       try container.decodeIfPresent(Bool.self, forKey: .showPullRequestNumberInRows)
       ?? defaults.showPullRequestNumberInRows

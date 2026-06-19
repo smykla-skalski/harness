@@ -18,6 +18,7 @@ extension DashboardReviewsRouteView {
       showsAvatars: normalizedPreferences.showAvatarsInRows,
       showsLabels: normalizedPreferences.showLabelsInRows,
       showsLineCounters: normalizedPreferences.showLineCountersInRows,
+      showsApprovalCounts: normalizedPreferences.showApprovalCountsInRows,
       showsPullRequestNumber: normalizedPreferences.showPullRequestNumberInRows,
       showsPullRequestAge: normalizedPreferences.showPullRequestAgeInRows,
       wrapsTitle: normalizedPreferences.wrapTitlesInRows,

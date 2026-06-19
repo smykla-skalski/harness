@@ -14,6 +14,7 @@ struct DashboardReviewListRowMetadataIconStrip: View {
   let selectedIconDimmedOpacity: Double
   let progressAccessibilityLabel: String
   let statusIndicatorHelp: String
+  let missingApprovalsHelp: String?
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
@@ -24,6 +25,16 @@ struct DashboardReviewListRowMetadataIconStrip: View {
           tint: HarnessMonitorTheme.accent,
           usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
           help: "You are a requested reviewer"
+        )
+      }
+
+      if let missingApprovalsHelp {
+        DashboardReviewListRowMetadataIcon(
+          label: "Missing approvals",
+          systemImage: "person.2",
+          tint: HarnessMonitorTheme.caution,
+          usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
+          help: missingApprovalsHelp
         )
       }
 

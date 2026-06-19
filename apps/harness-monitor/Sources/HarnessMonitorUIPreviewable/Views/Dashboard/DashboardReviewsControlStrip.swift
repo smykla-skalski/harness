@@ -31,6 +31,7 @@ struct DashboardReviewsControlStrip: View {
   @Binding var showAvatarsInRows: Bool
   @Binding var showLabelsInRows: Bool
   @Binding var showLineCountersInRows: Bool
+  @Binding var showApprovalCountsInRows: Bool
   @Binding var showPullRequestNumberInRows: Bool
   @Binding var showPullRequestAgeInRows: Bool
   @Binding var wrapTitlesInRows: Bool
@@ -264,6 +265,11 @@ struct DashboardReviewsControlStrip: View {
             HarnessMonitorAccessibility.dashboardReviewsLineCountersToggle
           )
           .accessibilityLabel("Show line counters in review rows")
+        Toggle("Approval counts", isOn: $showApprovalCountsInRows)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.dashboardReviewsApprovalCountsToggle
+          )
+          .accessibilityLabel("Show approval counts in review rows")
         Toggle("PR number", isOn: $showPullRequestNumberInRows)
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.dashboardReviewsPullRequestNumberToggle

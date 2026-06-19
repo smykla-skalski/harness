@@ -178,6 +178,10 @@ extension DashboardReviewsRouteView {
     routePreferencesToggleBinding(\.showLineCountersInRows)
   }
 
+  var routeShowApprovalCountsInRowsBinding: Binding<Bool> {
+    routePreferencesToggleBinding(\.showApprovalCountsInRows)
+  }
+
   var routeShowPullRequestNumberInRowsBinding: Binding<Bool> {
     routePreferencesToggleBinding(\.showPullRequestNumberInRows)
   }

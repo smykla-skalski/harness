@@ -98,4 +98,13 @@ struct DashboardReviewerSummary: Equatable {
     let reviewerNoun = reviewerCount == 1 ? "reviewer" : "reviewers"
     return "\(approvedCount) of \(reviewerCount) \(reviewerNoun) approved"
   }
+
+  var hasMissingApprovals: Bool {
+    reviewerCount > 0 && approvedCount < reviewerCount
+  }
+
+  var missingApprovalsMetadataHelp: String? {
+    guard hasMissingApprovals else { return nil }
+    return "Missing approvals: \(expandedTitle)"
+  }
 }

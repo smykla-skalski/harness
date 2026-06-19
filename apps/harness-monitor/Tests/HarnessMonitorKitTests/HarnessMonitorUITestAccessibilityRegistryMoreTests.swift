@@ -131,6 +131,10 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
         == "harness.settings.reviews.show-row-line-counters"
     )
     #expect(
+      HarnessMonitorAccessibility.settingsReviewsApprovalCountsToggle
+        == "harness.settings.reviews.show-row-approval-counts"
+    )
+    #expect(
       HarnessMonitorAccessibility.settingsReviewsGeneratedPatternsTable
         == "harness.settings.reviews.generated-patterns"
     )

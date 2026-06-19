@@ -46,6 +46,10 @@ struct SettingsReviewsDisplayPane: View {
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.settingsReviewsShowRowLineCountersToggle
       )
+      Toggle("Show approval counts in review rows", isOn: $draft.showApprovalCountsInRows)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsReviewsApprovalCountsToggle
+        )
       Toggle("Show PR numbers in review rows", isOn: $draft.showPullRequestNumberInRows)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.settingsReviewsPullRequestNumberToggle

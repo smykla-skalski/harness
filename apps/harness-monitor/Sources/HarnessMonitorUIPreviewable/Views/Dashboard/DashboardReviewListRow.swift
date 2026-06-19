@@ -41,6 +41,7 @@ struct DashboardReviewListRow: View, Equatable {
   let showsAvatars: Bool
   let showsLabels: Bool
   let showsLineCounters: Bool
+  let showsApprovalCounts: Bool
   let showsPullRequestNumber: Bool
   let showsPullRequestAge: Bool
   let wrapsTitle: Bool
@@ -77,6 +78,7 @@ struct DashboardReviewListRow: View, Equatable {
       && lhs.showsAvatars == rhs.showsAvatars
       && lhs.showsLabels == rhs.showsLabels
       && lhs.showsLineCounters == rhs.showsLineCounters
+      && lhs.showsApprovalCounts == rhs.showsApprovalCounts
       && lhs.showsPullRequestNumber == rhs.showsPullRequestNumber
       && lhs.showsPullRequestAge == rhs.showsPullRequestAge
       && lhs.wrapsTitle == rhs.wrapsTitle
@@ -108,6 +110,7 @@ struct DashboardReviewListRow: View, Equatable {
     showsAvatars: Bool = true,
     showsLabels: Bool = true,
     showsLineCounters: Bool = true,
+    showsApprovalCounts: Bool = false,
     showsPullRequestNumber: Bool = true,
     showsPullRequestAge: Bool = true,
     wrapsTitle: Bool = true,
@@ -126,6 +129,7 @@ struct DashboardReviewListRow: View, Equatable {
     self.showsAvatars = showsAvatars
     self.showsLabels = showsLabels
     self.showsLineCounters = showsLineCounters
+    self.showsApprovalCounts = showsApprovalCounts
     self.showsPullRequestNumber = showsPullRequestNumber
     self.showsPullRequestAge = showsPullRequestAge
     self.wrapsTitle = wrapsTitle
@@ -215,7 +219,8 @@ struct DashboardReviewListRow: View, Equatable {
         usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
         selectedIconDimmedOpacity: selectedIconDimmedOpacity,
         progressAccessibilityLabel: progressAccessibilityLabel,
-        statusIndicatorHelp: statusIndicatorHelp
+        statusIndicatorHelp: statusIndicatorHelp,
+        missingApprovalsHelp: missingApprovalsMetadataHelp
       )
       .frame(height: titleLineHeight, alignment: .center)
     }
@@ -316,7 +321,7 @@ struct DashboardReviewListRow: View, Equatable {
   }
 
   var metadataLineHasPillChrome: Bool {
-    !item.reviews.isEmpty
+    (showsApprovalCounts && reviewerSummary != nil)
       || showsChangePill
   }
 
@@ -332,10 +337,12 @@ struct DashboardReviewListRow: View, Equatable {
 
   @ViewBuilder var metadataPillContent: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      DashboardReviewListRowReviewerSummary(
-        summary: reviewerSummary,
-        usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
-      )
+      if showsApprovalCounts {
+        DashboardReviewListRowReviewerSummary(
+          summary: reviewerSummary,
+          usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
+        )
+      }
 
       if showsChangePill {
         DashboardReviewChangePill(
@@ -346,6 +353,11 @@ struct DashboardReviewListRow: View, Equatable {
         )
       }
     }
+  }
+
+  var missingApprovalsMetadataHelp: String? {
+    guard !showsApprovalCounts else { return nil }
+    return reviewerSummary?.missingApprovalsMetadataHelp
   }
 }
 

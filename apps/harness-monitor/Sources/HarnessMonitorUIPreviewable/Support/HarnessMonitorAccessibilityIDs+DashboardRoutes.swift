@@ -57,6 +57,8 @@ extension HarnessMonitorAccessibility {
     "harness.dashboard.reviews.show-row-labels"
   public static let dashboardReviewsLineCountersToggle =
     "harness.dashboard.reviews.show-row-line-counters"
+  public static let dashboardReviewsApprovalCountsToggle =
+    "harness.dashboard.reviews.show-row-approval-counts"
   public static let dashboardReviewsPullRequestNumberToggle =
     "harness.dashboard.reviews.show-row-pr-number"
   public static let dashboardReviewsPullRequestAgeToggle =
