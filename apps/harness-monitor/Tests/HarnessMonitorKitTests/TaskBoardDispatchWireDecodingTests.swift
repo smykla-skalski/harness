@@ -96,9 +96,15 @@ private let dispatchSummaryFixture = """
           }
         },
         "session": { "kind": "create", "title": "Fix the bug", "context": null, "project_id": "owner/repo" },
-        "task": { "title": "Fix the bug", "severity": "medium", "source": "manual", "tags": [], "external_refs": [] },
+        "task": {
+          "title": "Fix the bug", "severity": "medium", "source": "manual",
+          "tags": [], "external_refs": []
+        },
         "worker": { "mode": "headless" },
-        "reviewer": { "phase": "after_worker_review", "suggested_persona": "code-reviewer", "required_consensus": 2 },
+        "reviewer": {
+          "phase": "after_worker_review", "suggested_persona": "code-reviewer",
+          "required_consensus": 2
+        },
         "evaluator": { "phase": "after_worker_review", "mode": "headless" },
         "policy": { "decision": "deny", "reason_code": "checks_not_green", "policy_version": "v3" },
         "lifecycle": { "worker": {}, "reviewer": {}, "evaluator": {} }

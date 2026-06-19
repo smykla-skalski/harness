@@ -94,7 +94,8 @@ struct DaemonStateWireDecodingTests {
       },
       "github_api": {
         "buckets": [
-          {"resource": "core", "remaining": 4900, "limit": 5000, "used": 100, "reset_at": "2026-06-15T11:00:00Z"}
+          {"resource": "core", "remaining": 4900, "limit": 5000,
+           "used": 100, "reset_at": "2026-06-15T11:00:00Z"}
         ],
         "cooling": [
           {"resource": "search", "reason": "secondary_rate_limit", "until_seconds_from_now": 45}

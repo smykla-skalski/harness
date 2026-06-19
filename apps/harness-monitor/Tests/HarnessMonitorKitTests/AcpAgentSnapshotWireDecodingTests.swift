@@ -87,7 +87,10 @@ private let disconnectedFixture = """
     "session_id": "sess-1",
     "session_agent_id": "worker-2",
     "display_name": "Copilot",
-    "status": { "state": "disconnected", "reason": { "kind": "process_exited", "code": 1 }, "stderr_tail": "boom" },
+    "status": {
+      "state": "disconnected", "reason": { "kind": "process_exited", "code": 1 },
+      "stderr_tail": "boom"
+    },
     "pid": 42,
     "pgid": 42,
     "project_dir": "/tmp/project",

@@ -20,7 +20,11 @@ struct PolicyPipelineSimulationWireDecodingTests {
   @Test("simulation result decodes validation issues keeping node/edge ids")
   func decodesSimulationValidationIssues() throws {
     let json = #"""
-      {"revision":3,"trace_id":"trace-1","simulated_at":"2026-06-17T00:00:00Z","succeeded":false,"validation":{"issues":[{"issue":"dangling_edge","edge_id":"e-1","node_id":"n-1"},{"issue":"cycle","node_ids":["n-2","n-3"]},{"issue":"invalid_port","edge_id":"e-2","node_id":"n-4","port":"in","direction":"input"}]},"policy_trace_ids":["t-1"],"has_runtime_boundaries":true}
+      {"revision":3,"trace_id":"trace-1","simulated_at":"2026-06-17T00:00:00Z","succeeded":false,
+      "validation":{"issues":[{"issue":"dangling_edge","edge_id":"e-1","node_id":"n-1"},
+      {"issue":"cycle","node_ids":["n-2","n-3"]},
+      {"issue":"invalid_port","edge_id":"e-2","node_id":"n-4","port":"in","direction":"input"}]},
+      "policy_trace_ids":["t-1"],"has_runtime_boundaries":true}
       """#
     let result = try decoder.decode(
       PolicyPipelineSimulationResultWire.self,
@@ -61,7 +65,11 @@ struct PolicyPipelineSimulationWireDecodingTests {
   @Test("audit summary decodes its nested validation and latest simulation")
   func decodesAuditSummary() throws {
     let json = #"""
-      {"active_revision":7,"mode":"enforced","latest_trace_id":"trace-9","latest_simulation":{"revision":7,"trace_id":"trace-9","simulated_at":"2026-06-17T00:00:00Z","succeeded":true,"validation":{"issues":[]}},"validation":{"issues":[{"issue":"incompatible_payload_edge","edge_id":"e-3","provided":"json","required":"text"}]}}
+      {"active_revision":7,"mode":"enforced","latest_trace_id":"trace-9",
+      "latest_simulation":{"revision":7,"trace_id":"trace-9","simulated_at":"2026-06-17T00:00:00Z",
+      "succeeded":true,"validation":{"issues":[]}},
+      "validation":{"issues":[{"issue":"incompatible_payload_edge","edge_id":"e-3",
+      "provided":"json","required":"text"}]}}
       """#
     let summary = try decoder.decode(
       PolicyPipelineAuditSummaryWire.self,
@@ -92,7 +100,12 @@ struct PolicyPipelineSimulationWireDecodingTests {
     // panel consumes. Before the fix, simulate decoded via convertFromSnakeCase
     // and node_id/edge_id/node_ids dropped to nil/[]; here they survive.
     let json = #"""
-      {"revision":4,"trace_id":"trace-2","simulated_at":"2026-06-17T00:00:00Z","succeeded":false,"validation":{"issues":[{"issue":"dangling_edge","edge_id":"e-9","node_id":"n-9"},{"issue":"cycle","node_ids":["a","b"]}]},"decisions":[{"action":"merge_pr","decision":{"decision":"deny","reason_code":"checks_not_green","policy_version":"v1"},"visited_node_ids":["n-9"],"policy_trace_ids":["t-2"]}],"policy_trace_ids":["t-2"],"has_runtime_boundaries":false}
+      {"revision":4,"trace_id":"trace-2","simulated_at":"2026-06-17T00:00:00Z","succeeded":false,
+      "validation":{"issues":[{"issue":"dangling_edge","edge_id":"e-9","node_id":"n-9"},
+      {"issue":"cycle","node_ids":["a","b"]}]},
+      "decisions":[{"action":"merge_pr","decision":{"decision":"deny","reason_code":"checks_not_green",
+      "policy_version":"v1"},"visited_node_ids":["n-9"],"policy_trace_ids":["t-2"]}],
+      "policy_trace_ids":["t-2"],"has_runtime_boundaries":false}
       """#
     let wire = try decoder.decode(
       PolicyPipelineSimulationResultWire.self,

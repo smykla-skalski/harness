@@ -26,7 +26,8 @@ struct VoiceWireTypesDecodingTests {
   @Test("transcript segment decodes snake_case fields")
   func decodesTranscriptSegment() throws {
     let json = #"""
-      {"sequence":3,"text":"hello","is_final":true,"started_at_seconds":1.5,"duration_seconds":0.5,"confidence":0.9}
+      {"sequence":3,"text":"hello","is_final":true,"started_at_seconds":1.5,
+      "duration_seconds":0.5,"confidence":0.9}
       """#
     let segment = try decoder.decode(VoiceTranscriptSegment.self, from: Data(json.utf8))
     #expect(segment.sequence == 3)

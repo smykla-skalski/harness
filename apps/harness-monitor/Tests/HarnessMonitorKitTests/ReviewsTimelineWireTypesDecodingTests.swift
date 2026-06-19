@@ -17,7 +17,9 @@ struct ReviewsTimelineWireTypesDecodingTests {
   @Test("decodes an issue comment timeline entry through the kind tag")
   func decodesIssueCommentEntry() throws {
     let json = #"""
-      {"kind":"issue_comment","id":"ic-1","created_at":"2026-06-15T00:00:00Z","actor":{"login":"alice"},"body":"hello","is_minimized":false,"reactions_total":3,"viewer_did_author":true,"viewer_can_edit":true}
+      {"kind":"issue_comment","id":"ic-1","created_at":"2026-06-15T00:00:00Z",
+      "actor":{"login":"alice"},"body":"hello","is_minimized":false,
+      "reactions_total":3,"viewer_did_author":true,"viewer_can_edit":true}
       """#
     let entry = try decoder.decode(ReviewTimelineEntryWire.self, from: Data(json.utf8))
 
@@ -34,7 +36,8 @@ struct ReviewsTimelineWireTypesDecodingTests {
   @Test("decodes the boxed simple actor event variant")
   func decodesSimpleActorEventEntry() throws {
     let json = #"""
-      {"kind":"simple_actor_event","id":"se-1","created_at":"2026-06-15T00:00:00Z","event_kind":"head_ref_deleted"}
+      {"kind":"simple_actor_event","id":"se-1",
+      "created_at":"2026-06-15T00:00:00Z","event_kind":"head_ref_deleted"}
       """#
     let entry = try decoder.decode(ReviewTimelineEntryWire.self, from: Data(json.utf8))
 

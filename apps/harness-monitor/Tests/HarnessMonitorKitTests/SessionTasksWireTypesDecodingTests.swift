@@ -23,7 +23,8 @@ struct SessionTasksWireTypesDecodingTests {
     // their serde defaults; status arrives snake_case and decodes through the
     // hand TaskStatus.
     let json = #"""
-      {"task_id":"t-1","title":"Fix the parser","severity":"high","status":"in_progress","created_at":"2026-06-15T00:00:00Z","updated_at":"2026-06-15T01:00:00Z"}
+      {"task_id":"t-1","title":"Fix the parser","severity":"high","status":"in_progress",
+      "created_at":"2026-06-15T00:00:00Z","updated_at":"2026-06-15T01:00:00Z"}
       """#
     let item = try decoder.decode(WorkItemWire.self, from: Data(json.utf8))
 
@@ -56,7 +57,8 @@ struct SessionTasksWireTypesDecodingTests {
   func decodesReview() throws {
     // points defaults to empty; verdict decodes through the bare hand ReviewVerdict.
     let json = #"""
-      {"review_id":"r-1","round":1,"reviewer_agent_id":"agent-2","reviewer_runtime":"codex","verdict":"approve","summary":"looks good","recorded_at":"2026-06-15T00:00:00Z"}
+      {"review_id":"r-1","round":1,"reviewer_agent_id":"agent-2","reviewer_runtime":"codex",
+      "verdict":"approve","summary":"looks good","recorded_at":"2026-06-15T00:00:00Z"}
       """#
     let review = try decoder.decode(ReviewWire.self, from: Data(json.utf8))
 

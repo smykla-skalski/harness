@@ -98,7 +98,9 @@ struct AuditWireTypesDecodingTests {
   @Test("degrades a malformed timestamp to distantPast without failing the page")
   func degradesMalformedTimestamp() throws {
     let json = #"""
-      {"events":[{"id":"x","recorded_at":"not-a-date","source":"s","category":"c","kind":"k","severity":"info","outcome":"success","title":"t","summary":"y","related_urls":[]}],"has_older":false}
+      {"events":[{"id":"x","recorded_at":"not-a-date","source":"s","category":"c",
+      "kind":"k","severity":"info","outcome":"success","title":"t","summary":"y",
+      "related_urls":[]}],"has_older":false}
       """#
     let wire = try decoder.decode(
       HarnessMonitorAuditEventsResponseWire.self,
