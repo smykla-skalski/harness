@@ -1,0 +1,26 @@
+import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
+
+/// Always-on confidence surface under the canvas top bar. Stacks the existing
+/// validation panel over the decision matrix so the user sees "is it correct"
+/// and "what will it decide" in one place - replacing the bare validation panel
+/// the three-mode chrome used to gate behind a Simulation tab. The matrix takes
+/// a resolved rows value, so it skips its body when only validation changes.
+struct PolicyCanvasConfidencePanel: View {
+  let viewModel: PolicyCanvasViewModel
+  let focusIssue: PolicyCanvasIssueFocusAction
+  let focusDecision: @MainActor ([String]) -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      PolicyCanvasValidationPanel(viewModel: viewModel, focus: focusIssue)
+      PolicyCanvasDecisionMatrixView(
+        rows: viewModel.decisionMatrixRows,
+        focusDecision: focusDecision
+      )
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasConfidencePanel)
+  }
+}

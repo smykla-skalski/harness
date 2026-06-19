@@ -37,9 +37,9 @@ extension PolicyCanvasView {
 
       ZStack(alignment: .top) {
         VStack(spacing: 0) {
-          PolicyCanvasValidationPanel(
+          PolicyCanvasConfidencePanel(
             viewModel: viewModel,
-            focus: { resolved in
+            focusIssue: { resolved in
               viewModel.focusIssue(resolved)
               if let selection = resolved.focusSelection {
                 selectionFocusRequestID &+= 1
@@ -48,6 +48,17 @@ extension PolicyCanvasView {
                   selection: selection
                 )
               }
+            },
+            focusDecision: { visitedNodeIds in
+              guard let terminal = visitedNodeIds.last else {
+                return
+              }
+              viewModel.select(.node(terminal))
+              selectionFocusRequestID &+= 1
+              selectionFocusRequest = PolicyCanvasViewportSelectionFocusRequest(
+                id: selectionFocusRequestID,
+                selection: .node(terminal)
+              )
             }
           )
 

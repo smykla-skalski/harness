@@ -2,6 +2,8 @@ extension HarnessMonitorUITestAccessibility {
   static let policyCanvasRoot = "harness.policy-canvas.root"
   static let policyCanvasTopBar = "harness.policy-canvas.top-bar"
   static let policyCanvasLiveStatusBadge = "harness.policy-canvas.live-status"
+  static let policyCanvasConfidencePanel = "harness.policy-canvas.confidence"
+  static let policyCanvasDecisionMatrix = "harness.policy-canvas.decision-matrix"
   static let policyCanvasViewport = "harness.policy-canvas.viewport"
   static let policyCanvasToolRail = "harness.policy-canvas.tool-rail"
   static let policyCanvasComponentLibrary = "harness.policy-canvas.component-library"
@@ -42,5 +44,9 @@ extension HarnessMonitorUITestAccessibility {
 
   static func policyCanvasPaletteItem(_ kind: String) -> String {
     "harness.policy-canvas.palette.\(slug(kind))"
+  }
+
+  static func policyCanvasDecisionRow(_ actionRaw: String) -> String {
+    "harness.policy-canvas.decision-matrix.row.\(slug(actionRaw))"
   }
 }
