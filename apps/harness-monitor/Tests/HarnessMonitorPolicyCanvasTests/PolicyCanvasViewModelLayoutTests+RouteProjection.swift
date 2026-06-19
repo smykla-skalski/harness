@@ -147,6 +147,60 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(projectedOutput.signature != cachedOutput.signature)
   }
 
+  @Test("same-shape stale route output remains renderable while refresh is pending")
+  func sameShapeStaleRouteOutputRemainsRenderableWhileRefreshIsPending() async throws {
+    let source = PolicyCanvasNode(
+      id: "source",
+      title: "Source",
+      kind: .workflowEntry,
+      position: CGPoint(x: 80, y: 120)
+    )
+    let target = PolicyCanvasNode(
+      id: "target",
+      title: "Target",
+      kind: .evidenceCheck,
+      position: CGPoint(x: 360, y: 120)
+    )
+    let edge = PolicyCanvasEdge(
+      id: "edge",
+      source: PolicyCanvasPortEndpoint(
+        nodeID: source.id,
+        portID: source.outputPorts[0].id,
+        kind: .output
+      ),
+      target: PolicyCanvasPortEndpoint(
+        nodeID: target.id,
+        portID: target.inputPorts[0].id,
+        kind: .input
+      ),
+      label: "flow"
+    )
+    let cachedOutput = await PolicyCanvasRouteWorker(router: PolicyCanvasVisibilityRouter())
+      .compute(
+        input: PolicyCanvasRouteWorkerInput(
+          nodes: [source, target],
+          groups: [],
+          edges: [edge],
+          fontScale: 1
+        )
+      )
+    let result = policyCanvasProjectedRouteResult(
+      input: PolicyCanvasProjectedRouteInput(
+        cachedOutput: cachedOutput,
+        cachedNodePositionsByID: policyCanvasNodePositionsByID([source, target]),
+        currentNodes: [source, target],
+        groups: [],
+        edges: [edge],
+        fontScale: 1.1
+      )
+    )
+
+    #expect(result.matchesCurrentGraphShape)
+    #expect(!result.canCommitAsCurrentGraph)
+    #expect(result.output == cachedOutput)
+    #expect(result.output.signature != .empty)
+  }
+
   @Test("stale route projection preserves cached interior corridor")
   func staleRouteProjectionPreservesCachedInteriorCorridor() {
     let source = PolicyCanvasNode(
@@ -333,6 +387,7 @@ extension PolicyCanvasViewModelLayoutTests {
     let projectedMovedRoute = try #require(result.output.routes[movedEdge.id])
 
     #expect(result.canCommitAsCurrentGraph)
+    #expect(result.matchesCurrentGraphShape)
     #expect(result.output.routes[stableEdge.id] == stableRoute)
     #expect(projectedMovedRoute != movedRoute)
     #expect(projectedMovedRoute.points.last == CGPoint(x: 640, y: 328))

@@ -286,6 +286,125 @@ struct PolicyCanvasLabPickerRuntimeTests {
     let optedOutScrollView = try await labWindowScrollView(defaults: defaults)
     #expect(optedOutScrollView.viewportResizeZoomBehavior == .preserveZoom)
   }
+
+  @MainActor
+  @Test("first zoom on the extreme galaxy lab keeps the graph visible and recenterable")
+  func firstZoomOnExtremeGalaxyLabKeepsTheGraphVisibleAndRecenterable() async throws {
+    let suiteName = "PolicyCanvasLabPickerRuntimeTests.firstZoom.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+
+    let frame = CGRect(x: 0, y: 0, width: 1_500, height: 980)
+    let host = NSHostingView(
+      rootView: PolicyCanvasLabWindowView(
+        initialSelection: .sample("extreme-galaxy"),
+        fixtureDocument: nil,
+        defaults: defaults
+      )
+    )
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable, .resizable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      defaults.removePersistentDomain(forName: suiteName)
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = frame
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil(timeout: .seconds(6)) {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        guard
+          let scrollView = descendant(of: host, as: PolicyCanvasNativeScrollView.self),
+          let documentView = descendant(of: host, as: PolicyCanvasNativeDocumentView.self)
+        else {
+          return false
+        }
+        let snapshot = documentView.hostedState.snapshot
+        return scrollView.contentView.bounds.width > 1
+          && scrollView.contentView.bounds.height > 1
+          && snapshot.hasRenderableRouteOutput
+          && snapshot.routes.count >= snapshot.edges.count
+          && !snapshot.viewModel.hasPendingViewportCenteringRequest
+      }
+    )
+
+    let scrollView = try #require(descendant(of: host, as: PolicyCanvasNativeScrollView.self))
+    let documentView = try #require(descendant(of: host, as: PolicyCanvasNativeDocumentView.self))
+    let viewModel = documentView.hostedState.snapshot.viewModel
+    let graphBounds = renderedGraphBounds(in: documentView.hostedState.snapshot)
+    let initialVisibleRect = try visibleContentRect(in: scrollView)
+
+    #expect(
+      initialVisibleRect.intersects(graphBounds),
+      "Expected initial viewport \(initialVisibleRect) to intersect graph \(graphBounds)"
+    )
+
+    let targetZoom = max(
+      PolicyCanvasLayout.minimumZoom,
+      scrollView.magnification * 0.72
+    )
+    scrollView.setMagnification(targetZoom, centeredAt: scrollView.visibleDocumentCenter)
+    scrollView.magnificationDidChange?(scrollView.magnification)
+
+    let stayedVisible = await waitUntil(timeout: .seconds(2)) {
+      window.layoutIfNeeded()
+      host.layoutSubtreeIfNeeded()
+      guard let visibleRect = try? visibleContentRect(in: scrollView) else {
+        return false
+      }
+      return visibleRect.intersects(graphBounds)
+        && documentView.hostedState.snapshot.hasRenderableRouteOutput
+    }
+    let postZoomVisibleRect = try visibleContentRect(in: scrollView)
+    let postZoomWorkspaceLayout = documentView.hostedState.workspaceLayout
+    if !stayedVisible {
+      Issue.record(
+        """
+        Expected first zoom to keep graph visible. \
+        graphBounds=\(graphBounds) postZoomVisibleRect=\(postZoomVisibleRect) \
+        clipBounds=\(scrollView.contentView.bounds) zoom=\(scrollView.magnification) \
+        workspaceOrigin=\(postZoomWorkspaceLayout.contentOrigin) \
+        workspaceSize=\(postZoomWorkspaceLayout.workspaceSize)
+        """
+      )
+    }
+    #expect(stayedVisible)
+
+    viewModel.requestViewportCentering(.document)
+
+    let didRecenter = await waitUntil(timeout: .seconds(2)) {
+      window.layoutIfNeeded()
+      host.layoutSubtreeIfNeeded()
+      guard let visibleRect = try? visibleContentRect(in: scrollView) else {
+        return false
+      }
+      return visibleRect.intersects(graphBounds)
+        && abs(visibleRect.midX - graphBounds.midX) < 40
+        && abs(visibleRect.midY - graphBounds.midY) < 40
+        && !viewModel.hasPendingViewportCenteringRequest
+    }
+    let finalVisibleRect = try visibleContentRect(in: scrollView)
+
+    #expect(
+      didRecenter,
+      """
+      Expected recenter after first zoom to land on graph center. \
+      graphBounds=\(graphBounds) finalVisibleRect=\(finalVisibleRect) \
+      zoom=\(scrollView.magnification) pending=\(viewModel.hasPendingViewportCenteringRequest)
+      """
+    )
+  }
 }
 
 private struct PolicyCanvasLabPickerRenderedSnapshot: Equatable {
@@ -415,6 +534,39 @@ private func groupingSnapshot(in root: NSView) -> RenderedCanvasGroupingSnapshot
     nodeIDs: Set(viewModel.nodes.map(\.id)),
     nodeGroupIDs: viewModel.nodes.map(\.groupID),
     groupIDs: viewModel.groups.map(\.id)
+  )
+}
+
+@MainActor
+private func renderedGraphBounds(in snapshot: PolicyCanvasViewportHostedSnapshot) -> CGRect {
+  let viewModel = snapshot.viewModel
+  let nodeSizes = PolicyCanvasLayout.nodeSizes(for: viewModel.nodes, edges: viewModel.edges)
+  var bounds = CGRect.null
+  for node in viewModel.nodes {
+    bounds = bounds.union(
+      CGRect(
+        origin: node.position,
+        size: nodeSizes[node.id] ?? PolicyCanvasLayout.nodeSize(for: node)
+      )
+    )
+  }
+  for group in viewModel.groups {
+    bounds = bounds.union(group.frame)
+  }
+  for route in snapshot.routes.values {
+    for point in route.points {
+      bounds = bounds.union(CGRect(origin: point, size: .zero))
+    }
+    bounds = bounds.union(CGRect(origin: route.labelPosition, size: .zero))
+  }
+  return bounds
+}
+
+@MainActor
+private func visibleContentRect(in scrollView: PolicyCanvasNativeScrollView) throws -> CGRect {
+  let documentView = try #require(scrollView.documentView as? PolicyCanvasNativeDocumentView)
+  return documentView.hostedState.workspaceLayout.contentRect(
+    forWorkspaceRect: scrollView.contentView.bounds
   )
 }
 

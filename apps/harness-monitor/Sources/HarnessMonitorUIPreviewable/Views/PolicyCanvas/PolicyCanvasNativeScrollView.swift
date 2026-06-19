@@ -69,6 +69,31 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     return CGPoint(x: visibleRect.midX, y: visibleRect.midY)
   }
 
+  override func setMagnification(_ magnification: CGFloat, centeredAt point: NSPoint) {
+    guard
+      let adaptiveWorkspaceLayout,
+      contentView.bounds.width > 1,
+      contentView.bounds.height > 1,
+      documentView != nil
+    else {
+      super.setMagnification(magnification, centeredAt: point)
+      return
+    }
+    let visibleRect = visibleWorkspaceRect
+    let anchorUnit = CGPoint(
+      x: (point.x - visibleRect.minX) / visibleRect.width,
+      y: (point.y - visibleRect.minY) / visibleRect.height
+    )
+    let contentAnchor = adaptiveWorkspaceLayout.contentPoint(forWorkspacePoint: point)
+
+    isPreservingViewportCenter = true
+    super.setMagnification(magnification, centeredAt: point)
+    scrollToPreserveContentAnchor(contentAnchor, viewportUnitAnchor: anchorUnit)
+    super.reflectScrolledClipView(contentView)
+    isPreservingViewportCenter = false
+    reportViewportStateIfNeeded()
+  }
+
   func setInteractionEnabled(_ isEnabled: Bool) {
     if !isEnabled {
       cancelWheelScrollSmoothing()

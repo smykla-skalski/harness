@@ -351,6 +351,22 @@ extension PolicyCanvasViewModelLayoutTests {
         appliedRouteKey: currentRouteKey
       )
     )
+    #expect(
+      policyCanvasCanCenterViewport(
+        isCanvasEmpty: viewModel.isEmpty,
+        routeOutputSignature: output.signature,
+        currentRouteKey: PolicyCanvasRouteWorkerKey(
+          graphGeneration: currentRouteKey.graphGeneration,
+          nodeCount: currentRouteKey.nodeCount,
+          groupCount: currentRouteKey.groupCount,
+          edgeCount: currentRouteKey.edgeCount,
+          fontScale: 1.2,
+          routingHints: currentRouteKey.routingHints
+        ),
+        appliedRouteKey: currentRouteKey,
+        routeOutputMatchesCurrentGraph: true
+      )
+    )
     #expect(viewModel.hasPendingViewportCenteringRequest)
   }
 

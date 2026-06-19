@@ -164,10 +164,15 @@ struct PolicyCanvasViewport: View {
       let routeOutputIsCurrentGraphMissing =
         !viewModel.isEmpty && projectedRouteResult.output.signature == .empty
       let routeOutput = projectedRouteResult.output
+      let routeOutputMatchesCurrentGraph =
+        !viewModel.isEmpty
+        && projectedRouteResult.matchesCurrentGraphShape
+        && routeOutput.signature != .empty
       let finalRouteOutputReady =
         !viewModel.isEmpty && !routeKeyIsStale && routeOutput.signature != .empty
       let hasRenderableRouteOutput =
         viewModel.isEmpty || finalRouteOutputReady
+        || (routeKeyIsStale && routeOutputMatchesCurrentGraph)
       let routeOutputNeedsRefresh =
         !hasActivePositionDrag
         && (routeOutputIsCurrentGraphMissing || (routeKeyIsStale && !routeProjectionCanCommit))
@@ -181,6 +186,7 @@ struct PolicyCanvasViewport: View {
         currentRouteKey: routeKey,
         appliedRouteKey: appliedRouteKey,
         routeOutputSignature: routeOutput.signature,
+        routeOutputMatchesCurrentGraph: routeOutputMatchesCurrentGraph,
         viewportCenteringGeneration: viewModel.viewportCenteringGeneration
       )
       let hostedSnapshot = policyCanvasViewportHostedSnapshot(
@@ -256,7 +262,8 @@ struct PolicyCanvasViewport: View {
         await centerViewportAfterRouteStateSettles(
           viewportSize: proxy.size,
           routeOutput: routeOutput,
-          currentRouteKey: routeKey
+          currentRouteKey: routeKey,
+          routeOutputMatchesCurrentGraph: routeOutputMatchesCurrentGraph
         )
       }
       .onChange(of: routeOutput.signature, initial: false) {

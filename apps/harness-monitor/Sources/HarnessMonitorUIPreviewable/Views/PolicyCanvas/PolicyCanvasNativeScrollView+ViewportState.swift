@@ -62,6 +62,35 @@ extension PolicyCanvasNativeScrollView {
     scrollToPreserveContentCenter(contentCenter, in: adaptiveWorkspaceLayout)
   }
 
+  func scrollToPreserveContentAnchor(
+    _ contentAnchor: CGPoint,
+    viewportUnitAnchor: CGPoint
+  ) {
+    guard
+      let adaptiveWorkspaceLayout,
+      contentView.bounds.width > 1,
+      contentView.bounds.height > 1
+    else {
+      return
+    }
+    let clampedUnitAnchor = CGPoint(
+      x: min(max(viewportUnitAnchor.x, 0), 1),
+      y: min(max(viewportUnitAnchor.y, 0), 1)
+    )
+    let workspaceAnchor = adaptiveWorkspaceLayout.workspacePoint(forContentPoint: contentAnchor)
+    let targetOrigin = CGPoint(
+      x: workspaceAnchor.x - (contentView.bounds.width * clampedUnitAnchor.x),
+      y: workspaceAnchor.y - (contentView.bounds.height * clampedUnitAnchor.y)
+    )
+    guard
+      abs(contentView.bounds.origin.x - targetOrigin.x) > 0.5
+        || abs(contentView.bounds.origin.y - targetOrigin.y) > 0.5
+    else {
+      return
+    }
+    contentView.scroll(to: targetOrigin)
+  }
+
   func reportViewportStateIfNeeded() {
     let observedState = PolicyCanvasViewportObservedState(
       visibleContentRect: adaptiveWorkspaceLayout?.contentRect(

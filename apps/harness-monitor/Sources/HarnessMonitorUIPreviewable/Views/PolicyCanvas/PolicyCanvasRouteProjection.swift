@@ -12,6 +12,7 @@ struct PolicyCanvasProjectedRouteInput {
 
 struct PolicyCanvasProjectedRouteResult {
   let output: PolicyCanvasRouteWorkerOutput
+  let matchesCurrentGraphShape: Bool
   let canCommitAsCurrentGraph: Bool
 }
 
@@ -31,12 +32,14 @@ func policyCanvasProjectedRouteResult(
   guard !input.cachedOutput.routes.isEmpty, !input.cachedNodePositionsByID.isEmpty else {
     return PolicyCanvasProjectedRouteResult(
       output: input.cachedOutput,
+      matchesCurrentGraphShape: false,
       canCommitAsCurrentGraph: false
     )
   }
   guard policyCanvasProjectionMatchesCurrentGraphShape(input) else {
     return PolicyCanvasProjectedRouteResult(
       output: input.cachedOutput,
+      matchesCurrentGraphShape: false,
       canCommitAsCurrentGraph: false
     )
   }
@@ -48,6 +51,7 @@ func policyCanvasProjectedRouteResult(
   guard !movedNodeDeltas.isEmpty else {
     return PolicyCanvasProjectedRouteResult(
       output: input.cachedOutput,
+      matchesCurrentGraphShape: true,
       canCommitAsCurrentGraph: false
     )
   }
@@ -82,6 +86,7 @@ func policyCanvasProjectedRouteResult(
       routes: routes,
       labelPositions: labelPositions
     ),
+    matchesCurrentGraphShape: true,
     canCommitAsCurrentGraph: true
   )
 }

@@ -26,7 +26,8 @@ extension PolicyCanvasViewport {
   func centerViewportAfterRouteStateSettles(
     viewportSize: CGSize,
     routeOutput: PolicyCanvasRouteWorkerOutput,
-    currentRouteKey: PolicyCanvasRouteWorkerKey
+    currentRouteKey: PolicyCanvasRouteWorkerKey,
+    routeOutputMatchesCurrentGraph: Bool
   ) async {
     await Task.yield()
     guard !Task.isCancelled else {
@@ -35,13 +36,15 @@ extension PolicyCanvasViewport {
     centerViewportIfNeeded(
       viewportSize: viewportSize,
       routeOutput: routeOutput,
-      currentRouteKey: currentRouteKey
+      currentRouteKey: currentRouteKey,
+      routeOutputMatchesCurrentGraph: routeOutputMatchesCurrentGraph
     )
   }
   func centerViewportIfNeeded(
     viewportSize: CGSize,
     routeOutput: PolicyCanvasRouteWorkerOutput,
-    currentRouteKey: PolicyCanvasRouteWorkerKey
+    currentRouteKey: PolicyCanvasRouteWorkerKey,
+    routeOutputMatchesCurrentGraph: Bool
   ) {
     guard
       let plan = policyCanvasViewportCenteringPlan(
@@ -56,6 +59,7 @@ extension PolicyCanvasViewport {
             pipelineIdentity: viewModel.pipelineIdentity,
             routeSeed: routeSeed
           ).appliedRouteKey,
+          routeOutputMatchesCurrentGraph: routeOutputMatchesCurrentGraph,
           storedPipelineStateRaw: storedPipelineStateRaw,
           suppressesSceneStorage: suppressesSceneStorage,
           hasAppliedRestoredSceneZoom: bridgeHasAppliedRestoredSceneZoom
