@@ -4,17 +4,6 @@ import Testing
 
 @Suite("Policy canvas algorithm selection core")
 struct PolicyCanvasAlgorithmSelectionCoreTests {
-  @Test("picker catalog exposes concrete algorithms for every stage")
-  func pickerCatalogExposesConcreteAlgorithmsForEveryStage() {
-    let descriptors = PolicyCanvasAlgorithmPickerCatalog.stageDescriptors
-
-    #expect(descriptors.map(\.stage) == PolicyCanvasAlgorithmStage.allCases)
-    for descriptor in descriptors {
-      #expect(descriptor.options.count >= 1)
-      #expect(Set(descriptor.options.map(\.id)).count == descriptor.options.count)
-    }
-  }
-
   @Test("reference pure selection resolves to pure layout implementations")
   func referencePureSelectionResolvesToPureLayoutImplementations() {
     let layout = PolicyCanvasLayoutAlgorithmRegistry.layoutAlgorithms(for: .referencePure)

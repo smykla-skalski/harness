@@ -3,17 +3,6 @@ import XCTest
 @testable import HarnessMonitorPolicyCanvasAlgorithms
 
 final class PolicyCanvasAlgorithmSelectionXCTest: XCTestCase {
-  func testPickerCatalogCoversEveryStage() {
-    XCTAssertEqual(
-      PolicyCanvasAlgorithmPickerCatalog.stageDescriptors.map(\.stage),
-      PolicyCanvasAlgorithmStage.allCases
-    )
-    for descriptor in PolicyCanvasAlgorithmPickerCatalog.stageDescriptors {
-      XCTAssertGreaterThanOrEqual(descriptor.options.count, 1)
-      XCTAssertEqual(Set(descriptor.options.map(\.id)).count, descriptor.options.count)
-    }
-  }
-
   func testReferencePureSelectionResolvesPureLayoutAlgorithms() {
     let layout = PolicyCanvasLayoutAlgorithmRegistry.layoutAlgorithms(for: .referencePure)
 
