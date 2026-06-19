@@ -19,7 +19,6 @@ struct PolicyCanvasTopBar: View {
   let simulationOverlayVisible: Bool
   let toggleSimulationOverlay: @MainActor () -> Void
   let reflowLayout: @MainActor () -> Void
-  let simulate: @MainActor () -> Void
   let promote: @MainActor () -> Void
 
   var body: some View {
@@ -64,16 +63,6 @@ struct PolicyCanvasTopBar: View {
         disabledReason: "Add nodes before reformatting the canvas",
         accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasReformatButton,
         action: reflowLayout
-      )
-
-      PolicyCanvasActionButton(
-        title: "Simulate",
-        systemImage: "play.circle",
-        isDisabled: !remoteActionsEnabled,
-        disabledReason: remoteActionDisabledReason,
-        isBusy: viewModel.isSimulating,
-        accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasSimulateButton,
-        action: simulate
       )
 
       PolicyCanvasActionButton(

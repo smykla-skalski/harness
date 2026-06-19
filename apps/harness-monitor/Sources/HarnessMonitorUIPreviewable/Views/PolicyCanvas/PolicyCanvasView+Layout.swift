@@ -31,7 +31,6 @@ extension PolicyCanvasView {
         reflowLayout: {
           viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
         },
-        simulate: simulate,
         promote: requestPromote
       )
 

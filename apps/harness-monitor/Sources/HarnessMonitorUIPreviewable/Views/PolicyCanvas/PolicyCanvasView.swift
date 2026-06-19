@@ -267,6 +267,7 @@ public struct PolicyCanvasView: View {
         bindStatusLine()
         viewModel.attachUndoManager(undoManager)
         bindAutosaveTrigger()
+        bindConfidenceTrigger()
         restoreSceneStorageIfNeeded()
         await loadPolicyPipeline()
       }

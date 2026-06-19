@@ -70,4 +70,21 @@ extension PolicyCanvasView {
       }
     }
   }
+
+  /// Binds the debounced confidence auto-runner that replaced the Simulate
+  /// button. Unbound (and any in-flight run cancelled) when remote actions are
+  /// unavailable - the lab and the missing-store path have no daemon to run a
+  /// simulation, exactly like `bindAutosaveTrigger`.
+  func bindConfidenceTrigger() {
+    guard remoteActionsEnabled else {
+      viewModel.cancelConfidenceEvaluation()
+      viewModel.confidenceTrigger = nil
+      return
+    }
+    viewModel.confidenceTrigger = { @MainActor in
+      viewModel.scheduleConfidenceEvaluation {
+        simulate()
+      }
+    }
+  }
 }

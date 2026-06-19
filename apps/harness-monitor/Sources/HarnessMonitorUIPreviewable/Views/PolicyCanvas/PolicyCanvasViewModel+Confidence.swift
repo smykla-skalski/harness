@@ -92,4 +92,56 @@ extension PolicyCanvasViewModel {
       )
     }
   }
+
+  /// Quiet window with no further edits before a confidence simulation runs.
+  /// Slightly longer than the autosave quiet window so the draft is usually
+  /// saved (and clean) by the time the simulation runs against it.
+  static let confidenceQuietWindowMilliseconds: UInt64 = 900
+
+  /// Ceiling on the adaptive confidence wait - run even if edits keep coming.
+  static let confidenceMaxWindowMilliseconds: UInt64 = 2_800
+
+  /// Cancel any in-flight confidence task.
+  func cancelConfidenceEvaluation() {
+    confidenceTask?.cancel()
+    confidenceTask = nil
+  }
+
+  /// Schedule a debounced confidence run. Each call supersedes the previous, so
+  /// an edit burst collapses to one simulation once edits settle. The `perform`
+  /// closure runs the same daemon simulate path the old Simulate button used, so
+  /// the view model stays daemon-agnostic. Skips when a simulation is already in
+  /// flight (the debounce keeps runs from stacking).
+  func scheduleConfidenceEvaluation(perform: @escaping @MainActor () -> Void) {
+    cancelConfidenceEvaluation()
+    confidenceTask = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+      await self.waitForConfidenceQuietWindow()
+      guard !Task.isCancelled, !self.isSimulating else {
+        return
+      }
+      perform()
+    }
+  }
+
+  /// Sleep in quiet-window chunks until `documentGeneration` stops advancing
+  /// (edits settled) or the ceiling elapses. Mirrors the autosave adaptive
+  /// window so a drag that fires `markDocumentDirty()` at ~60Hz still collapses
+  /// to a single run.
+  private func waitForConfidenceQuietWindow() async {
+    let quiet = Self.confidenceQuietWindowMilliseconds
+    var elapsed: UInt64 = 0
+    var lastGeneration = documentGeneration
+    while !Task.isCancelled, elapsed < Self.confidenceMaxWindowMilliseconds {
+      try? await Task.sleep(for: .milliseconds(Int(quiet)))
+      elapsed &+= quiet
+      let current = documentGeneration
+      if current == lastGeneration {
+        return
+      }
+      lastGeneration = current
+    }
+  }
 }

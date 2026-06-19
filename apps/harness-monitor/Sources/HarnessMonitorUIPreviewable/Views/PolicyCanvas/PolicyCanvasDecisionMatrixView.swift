@@ -8,6 +8,9 @@ import SwiftUI
 /// separate struct so a tap never invalidates its siblings.
 struct PolicyCanvasDecisionMatrixView: View {
   let rows: [PolicyCanvasDecisionMatrixRowModel]
+  /// True while a confidence simulation is in flight, so the header can show a
+  /// spinner now that the auto-runner replaced the manual Simulate button.
+  let isEvaluating: Bool
   let focusDecision: @MainActor ([String]) -> Void
 
   var body: some View {
@@ -47,6 +50,10 @@ struct PolicyCanvasDecisionMatrixView: View {
       Label("Decisions", systemImage: "checklist")
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+
+      if isEvaluating {
+        HarnessMonitorSpinner(size: 12, tint: PolicyCanvasVisualStyle.secondaryText)
+      }
 
       Spacer(minLength: 0)
 

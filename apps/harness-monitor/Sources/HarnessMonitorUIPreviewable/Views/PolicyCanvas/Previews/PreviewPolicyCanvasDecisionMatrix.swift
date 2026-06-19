@@ -32,6 +32,7 @@ import SwiftUI
         visitedNodeIds: []
       ),
     ],
+    isEvaluating: false,
     focusDecision: { _ in }
   )
   .frame(width: 380)

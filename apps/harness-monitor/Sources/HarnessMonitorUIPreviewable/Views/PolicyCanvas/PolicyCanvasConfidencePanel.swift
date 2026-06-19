@@ -17,6 +17,7 @@ struct PolicyCanvasConfidencePanel: View {
       PolicyCanvasValidationPanel(viewModel: viewModel, focus: focusIssue)
       PolicyCanvasDecisionMatrixView(
         rows: viewModel.decisionMatrixRows,
+        isEvaluating: viewModel.isSimulating,
         focusDecision: focusDecision
       )
     }

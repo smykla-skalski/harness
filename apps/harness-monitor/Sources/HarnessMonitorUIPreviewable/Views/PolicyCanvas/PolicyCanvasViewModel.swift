@@ -215,6 +215,12 @@ public final class PolicyCanvasViewModel {
   /// MainActor-bound and cancel is synchronous.
   @ObservationIgnored var autosaveTask: Task<Void, Never>?
 
+  /// Confidence auto-runner, mirror of autosave: `confidenceTrigger` fires on
+  /// the clean->dirty edge in `markDocumentDirty()` and the host binds it to a
+  /// debounced daemon simulation; `confidenceTask` holds the in-flight debounce.
+  @ObservationIgnored var confidenceTrigger: (@MainActor () -> Void)?
+  @ObservationIgnored var confidenceTask: Task<Void, Never>?
+
   /// Debounce window the host applies from the Settings > Policies autosave
   /// picker (defaults to `defaultAutosaveDebounceMilliseconds`). `Off` in
   /// settings leaves `autosaveTrigger` nil so no debounce runs; Cmd+S and the
@@ -405,6 +411,7 @@ public final class PolicyCanvasViewModel {
     documentDirty = true
     if wasClean {
       autosaveTrigger?()
+      confidenceTrigger?()
     }
   }
 
