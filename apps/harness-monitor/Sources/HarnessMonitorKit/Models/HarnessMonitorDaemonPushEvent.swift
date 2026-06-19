@@ -119,7 +119,9 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         recordedAt: at,
         sessionId: nil,
         kind: .reviewsLocalCloneProgress(
-          try streamEvent.decodePayload(as: ReviewLocalCloneProgress.self)
+          ReviewLocalCloneProgress(
+            wire: try streamEvent.decodePayloadWire(as: LocalCloneProgressEventPayloadWire.self)
+          )
         )
       )
     case "audit_event":
@@ -201,7 +203,9 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         recordedAt: at,
         sessionId: sessionId,
         kind: .acpInspect(
-          try streamEvent.decodePayload(as: AcpInspectPushPayload.self).inspect
+          AcpAgentInspectResponse(
+            wire: try streamEvent.decodePayloadWire(as: AcpInspectPushPayload.self).inspect
+          )
         )
       )
     case "acp_agents_reconciled":
@@ -381,7 +385,7 @@ public struct AcpAgentsReconciledPayload: Codable, Equatable, Sendable {
 }
 
 private struct AcpInspectPushPayload: Codable, Equatable, Sendable {
-  let inspect: AcpAgentInspectResponse
+  let inspect: AcpAgentInspectResponseWire
 }
 
 public struct AcpProcessIncidentPayload: Codable, Equatable, Sendable {

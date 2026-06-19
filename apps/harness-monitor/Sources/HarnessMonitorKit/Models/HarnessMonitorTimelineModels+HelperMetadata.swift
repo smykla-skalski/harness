@@ -92,16 +92,6 @@ public struct ToolCallTimelineEntryMetadata: Equatable, Sendable {
 
 extension StreamEvent {
   private static let payloadEncoder = JSONEncoder()
-  private static let payloadDecoder: JSONDecoder = {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    return decoder
-  }()
-
-  public func decodePayload<Payload: Decodable>(as type: Payload.Type) throws -> Payload {
-    let data = try Self.payloadEncoder.encode(payload)
-    return try Self.payloadDecoder.decode(type, from: data)
-  }
 
   /// Decodes a generated wire payload with `PolicyWireCoding.decoder` (no key
   /// strategy). The caller maps the wire to its hand model; this is the plain

@@ -1192,6 +1192,8 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "AcpProcessIncidentPayload",
     "AcpBridgeResyncIncidentPayload",
     "AcpAgentsReconciledPayload",
+    // reviews local-clone progress push payload: internally-tagged enum the Swift hand flattens.
+    "LocalCloneProgressEventPayload",
     // permission_bridge.rs acp permission item: Swift hand is AcpPermissionItem (toolCall and
     // options modelled as raw JSON); referenced by AcpPermissionBatchWire.requests.
     "AcpPermissionItem",
@@ -2697,6 +2699,15 @@ const ACP_INCIDENT_EMIT_ONLY: &[&str] = &[
     "AcpBridgeResyncIncidentPayload",
     "AcpAgentsReconciledPayload",
 ];
+const LOCAL_CLONE_PROGRESS_SOURCE: &str =
+    include_str!("../src/reviews/files/local_clone_progress_event.rs");
+const LOCAL_CLONE_PROGRESS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewLocalCloneProgressWireTypes.generated.swift";
+// The reviews local-clone progress push payload: an internally-tagged enum (tag = "kind") with
+// struct variants the Swift hand ReviewLocalCloneProgress flattens. The operation rides the
+// string-serialized LocalCloneOperationWire (clone/fetch); the map projects the enum to the flat
+// hand struct.
+const LOCAL_CLONE_PROGRESS_EMIT_ONLY: &[&str] =
+    &["LocalCloneProgressEventPayload", "LocalCloneOperationWire"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -3028,6 +3039,12 @@ fn modules() -> Vec<GeneratedModule> {
                 ACP_SANDBOX_PROXY_SOURCE,
             ],
         },
+        GeneratedModule {
+            output: LOCAL_CLONE_PROGRESS_OUTPUT,
+            description: "the Rust reviews local-clone progress push payload",
+            defaults: &[],
+            sources: &[LOCAL_CLONE_PROGRESS_SOURCE],
+        },
     ]
 }
 
@@ -3088,6 +3105,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         GIT_SIGNING_VERIFY_OUTPUT => GIT_SIGNING_VERIFY_EMIT_ONLY,
         ACP_EVENT_BATCH_OUTPUT => ACP_EVENT_BATCH_EMIT_ONLY,
         ACP_INCIDENT_OUTPUT => ACP_INCIDENT_EMIT_ONLY,
+        LOCAL_CLONE_PROGRESS_OUTPUT => LOCAL_CLONE_PROGRESS_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {
