@@ -51,6 +51,51 @@ struct PolicyCanvasViewport: View {
     canvasColorSchemeOverride ?? canvasThemeMode.resolvedColorScheme(appThemeMode: appThemeMode)
   }
 
+  // Internal bridge accessors so companion-file extensions can read/write @State private storage.
+  var bridgeHasAppliedRestoredSceneZoom: Bool {
+    get { hasAppliedRestoredSceneZoom }
+    nonmutating set { hasAppliedRestoredSceneZoom = newValue }
+  }
+  var bridgeScrollApplicatorRequest: PolicyCanvasViewportScrollRequest? {
+    get { scrollApplicatorRequest }
+    nonmutating set { scrollApplicatorRequest = newValue }
+  }
+  var bridgeScrollApplicatorRequestID: UInt64 {
+    get { scrollApplicatorRequestID }
+    nonmutating set { scrollApplicatorRequestID = newValue }
+  }
+  var bridgeRouteCache: PolicyCanvasViewportRouteCache {
+    get { routeCache }
+    nonmutating set { routeCache = newValue }
+  }
+  var bridgeValidationWorker: PolicyCanvasValidationWorker {
+    validationWorker
+  }
+  var bridgeValidationGeneration: UInt64 {
+    get { validationGeneration }
+    nonmutating set { validationGeneration = newValue }
+  }
+  var bridgeHandledSelectionFocusRequestID: UInt64? {
+    get { handledSelectionFocusRequestID }
+    nonmutating set { handledSelectionFocusRequestID = newValue }
+  }
+  var bridgeCommandFocus: PolicyCanvasCommandFocus? {
+    get { commandFocus }
+    nonmutating set { commandFocus = newValue }
+  }
+  var bridgeZoomFocusDispatcher: PolicyCanvasZoomFocusDispatcher {
+    get { zoomFocusDispatcher }
+    nonmutating set { zoomFocusDispatcher = newValue }
+  }
+  var bridgeLayoutFocusDispatcher: PolicyCanvasLayoutFocusDispatcher {
+    get { layoutFocusDispatcher }
+    nonmutating set { layoutFocusDispatcher = newValue }
+  }
+  var bridgeSaveFocusDispatcher: PolicyCanvasSaveFocusDispatcher {
+    get { saveFocusDispatcher }
+    nonmutating set { saveFocusDispatcher = newValue }
+  }
+
   @MainActor
   func clearRouteCache(pipelineIdentity: String?) {
     routeCache.clear(pipelineIdentity: pipelineIdentity)
@@ -331,177 +376,5 @@ struct PolicyCanvasViewport: View {
       }
     }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.policyCanvasViewport)
-  }
-}
-
-extension PolicyCanvasViewport {
-  @MainActor
-  private func bindCommandFocus() {
-    bindZoomFocusDispatcher()
-    bindLayoutFocusDispatcher()
-    bindSaveFocusDispatcher()
-    let nextFocus = policyCanvasCommandFocus(
-      zoomFocusDispatcher: zoomFocusDispatcher,
-      canReflow: viewModel.canReflowLayout,
-      layoutFocusDispatcher: layoutFocusDispatcher,
-      canSave: canSave,
-      saveFocusDispatcher: saveFocusDispatcher
-    )
-    guard commandFocus != nextFocus else {
-      return
-    }
-    commandFocus = nextFocus
-  }
-  @MainActor
-  private func centerViewportAfterRouteStateSettles(
-    viewportSize: CGSize,
-    routeOutput: PolicyCanvasRouteWorkerOutput,
-    currentRouteKey: PolicyCanvasRouteWorkerKey
-  ) async {
-    await Task.yield()
-    guard !Task.isCancelled else {
-      return
-    }
-    centerViewportIfNeeded(
-      viewportSize: viewportSize,
-      routeOutput: routeOutput,
-      currentRouteKey: currentRouteKey
-    )
-  }
-  private func centerViewportIfNeeded(
-    viewportSize: CGSize,
-    routeOutput: PolicyCanvasRouteWorkerOutput,
-    currentRouteKey: PolicyCanvasRouteWorkerKey
-  ) {
-    guard
-      let plan = policyCanvasViewportCenteringPlan(
-        input: PolicyCanvasViewportCenteringPlanInput(
-          viewModel: viewModel,
-          viewportSize: viewportSize,
-          routeOutput: routeOutput,
-          currentRouteKey: currentRouteKey,
-          appliedRouteKey: policyCanvasViewportResolvedRouteCache(
-            routeCache: routeCache,
-            routeKey: currentRouteKey,
-            pipelineIdentity: viewModel.pipelineIdentity,
-            routeSeed: routeSeed
-          ).appliedRouteKey,
-          storedPipelineStateRaw: storedPipelineStateRaw,
-          suppressesSceneStorage: suppressesSceneStorage,
-          hasAppliedRestoredSceneZoom: hasAppliedRestoredSceneZoom
-        )
-      )
-    else {
-      return
-    }
-    if let targetZoom = plan.targetZoom, abs(targetZoom - viewModel.zoom) > 0.001 {
-      viewModel.setZoom(targetZoom)
-    }
-    hasAppliedRestoredSceneZoom = plan.appliedRestoredSceneZoom
-    let viewportCenteringGeneration = viewModel.viewportCenteringGeneration
-    if plan.defersScrollUntilNextRunloop {
-      Task { @MainActor in
-        await Task.yield()
-        await Task.yield()
-        guard
-          viewModel.viewportCenteringGeneration == viewportCenteringGeneration,
-          viewModel.hasPendingViewportCenteringRequest
-        else {
-          return
-        }
-        requestViewportScroll(
-          target: .centeredDocumentAnchor(plan.anchorPoint),
-          viewportCenteringGenerationToConsume: viewportCenteringGeneration
-        )
-      }
-      return
-    }
-    requestViewportScroll(
-      target: .contentOrigin(plan.anchorPoint),
-      viewportCenteringGenerationToConsume: viewportCenteringGeneration
-    )
-  }
-  private func focusSelectionIfNeeded(
-    request: PolicyCanvasViewportSelectionFocusRequest?,
-    routeOutput: PolicyCanvasRouteWorkerOutput
-  ) {
-    guard
-      let plan = policyCanvasViewportSelectionFocusPlan(
-        request: request,
-        handledRequestID: handledSelectionFocusRequestID,
-        viewModel: viewModel,
-        routeOutput: routeOutput
-      )
-    else {
-      return
-    }
-    handledSelectionFocusRequestID = plan.handledRequestID
-    Task { @MainActor in
-      await Task.yield()
-      await Task.yield()
-      requestViewportScroll(target: .centeredDocumentAnchor(plan.anchorPoint))
-    }
-  }
-  private func bindZoomFocusDispatcher() {
-    zoomFocusDispatcher = policyCanvasZoomFocusDispatcher(viewModel: viewModel)
-  }
-  private func bindLayoutFocusDispatcher() {
-    layoutFocusDispatcher = policyCanvasLayoutFocusDispatcher(viewModel: viewModel)
-  }
-  private func bindSaveFocusDispatcher() {
-    saveFocusDispatcher = policyCanvasSaveFocusDispatcher(saveDraft: saveDraft)
-  }
-  @MainActor
-  private func rebuildValidation() async {
-    validationGeneration &+= 1
-    let generation = validationGeneration
-    let output = await policyCanvasViewportValidationPresentation(
-      worker: validationWorker,
-      viewModel: viewModel
-    )
-    guard !Task.isCancelled, validationGeneration == generation else {
-      return
-    }
-    viewModel.applyValidationPresentation(output)
-  }
-  private func requestViewportScroll(
-    target: PolicyCanvasViewportScrollTarget,
-    viewportCenteringGenerationToConsume: UInt64? = nil
-  ) {
-    scrollApplicatorRequestID &+= 1
-    scrollApplicatorRequest = PolicyCanvasViewportScrollRequest(
-      id: scrollApplicatorRequestID,
-      target: target,
-      viewportCenteringGenerationToConsume: viewportCenteringGenerationToConsume
-    )
-  }
-  private func activeViewportScrollRequest(
-    _ request: PolicyCanvasViewportScrollRequest?
-  ) -> PolicyCanvasViewportScrollRequest? {
-    guard
-      let request,
-      let viewportCenteringGeneration = request.viewportCenteringGenerationToConsume
-    else {
-      return request
-    }
-    guard
-      viewportCenteringGeneration == viewModel.viewportCenteringGeneration,
-      viewModel.hasPendingViewportCenteringRequest
-    else {
-      return nil
-    }
-    return request
-  }
-  private func handleViewportScrollRequestFulfilled(
-    _ request: PolicyCanvasViewportScrollRequest,
-    appliesScroll: Bool
-  ) {
-    guard scrollApplicatorRequest?.id == request.id else {
-      return
-    }
-    if let viewportCenteringGeneration = request.viewportCenteringGenerationToConsume {
-      _ = viewModel.consumeViewportCenteringRequest(generation: viewportCenteringGeneration)
-    }
-    _ = appliesScroll
   }
 }

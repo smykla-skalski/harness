@@ -56,37 +56,53 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
     output.reserveCapacity(entries.count)
     for entry in entries {
       guard !hiddenKinds.contains(entry.kind) else { continue }
-      switch entry {
-      case .issueComment(let payload):
-        output.append(issueCommentNode(payload))
-      case .review(let payload):
-        output.append(
-          contentsOf: reviewNodes(
-            payload,
-            visibleReviewThreadSignatures: visibleReviewThreadSignatures,
-            showInlineComments: showInlineComments,
-            autoCollapseHeavyReviewThreads: autoCollapseHeavyReviewThreads
-          )
-        )
-      case .reviewThread(let payload):
-        guard showInlineComments else { continue }
-        output.append(
-          contentsOf: reviewThreadNodes(
-            payload,
-            autoCollapseHeavyReviewThreads: autoCollapseHeavyReviewThreads
-          )
-        )
-      case .commit(let payload):
-        output.append(commitNode(payload))
-      case .headRefForcePushed(let payload):
-        output.append(headRefForcePushedNode(payload))
-      case .simpleActorEvent(let payload):
-        output.append(simpleActorEventNode(payload))
-      case .unknown(let payload):
-        output.append(unknownNode(payload))
-      }
+      appendNodes(
+        for: entry,
+        into: &output,
+        showInlineComments: showInlineComments,
+        autoCollapseHeavyReviewThreads: autoCollapseHeavyReviewThreads,
+        visibleReviewThreadSignatures: visibleReviewThreadSignatures
+      )
     }
     return output
+  }
+
+  private func appendNodes(
+    for entry: ReviewTimelineEntry,
+    into output: inout [SessionTimelineNode],
+    showInlineComments: Bool,
+    autoCollapseHeavyReviewThreads: Bool,
+    visibleReviewThreadSignatures: Set<ReviewInlineConversationSignature>
+  ) {
+    switch entry {
+    case .issueComment(let payload):
+      output.append(issueCommentNode(payload))
+    case .review(let payload):
+      output.append(
+        contentsOf: reviewNodes(
+          payload,
+          visibleReviewThreadSignatures: visibleReviewThreadSignatures,
+          showInlineComments: showInlineComments,
+          autoCollapseHeavyReviewThreads: autoCollapseHeavyReviewThreads
+        )
+      )
+    case .reviewThread(let payload):
+      guard showInlineComments else { return }
+      output.append(
+        contentsOf: reviewThreadNodes(
+          payload,
+          autoCollapseHeavyReviewThreads: autoCollapseHeavyReviewThreads
+        )
+      )
+    case .commit(let payload):
+      output.append(commitNode(payload))
+    case .headRefForcePushed(let payload):
+      output.append(headRefForcePushedNode(payload))
+    case .simpleActorEvent(let payload):
+      output.append(simpleActorEventNode(payload))
+    case .unknown(let payload):
+      output.append(unknownNode(payload))
+    }
   }
 
   // MARK: - Issue comment

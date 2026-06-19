@@ -119,9 +119,7 @@ func policyCanvasQualityHoverMarks(
 ) -> [PolicyCanvasQualityHoverMark] {
   var marks: [PolicyCanvasQualityHoverMark] = []
   func add(_ category: PolicyCanvasQualityCategory, _ path: Path) {
-    guard !path.isEmpty else {
-      return
-    }
+    guard !path.isEmpty else { return }
     marks.append(
       PolicyCanvasQualityHoverMark(
         id: marks.count,
@@ -131,33 +129,9 @@ func policyCanvasQualityHoverMarks(
       )
     )
   }
-  for violation in report.portSpacing {
-    let category: PolicyCanvasQualityCategory =
-      switch violation.kind {
-      case .overlap: .portOverlaps
-      case .tooClose: .portTooClose
-      case .detached: .portDetached
-      case .uneven: .portUneven
-      }
-    add(category, Path(ellipseIn: policyCanvasHoverDot(violation.point, radius: 10)))
-    // Overlap/too-close pairs ring both dots, so both are hoverable - a stack of
-    // crammed dots resolves every dot, not just the lower one in each pair.
-    if violation.kind == .overlap || violation.kind == .tooClose, let other = violation.otherPoint {
-      add(category, Path(ellipseIn: policyCanvasHoverDot(other, radius: 10)))
-    }
-  }
-  for violation in report.crossings {
-    add(
-      violation.sharesEndpointNode ? .crossings : .crossingsIndependent,
-      Path(ellipseIn: policyCanvasHoverDot(violation.point, radius: 9))
-    )
-  }
-  for violation in report.corridors {
-    add(
-      violation.kind == .collinear ? .corridorReuse : .corridorParallel,
-      policyCanvasHoverLine(violation.overlapStart, violation.overlapEnd, width: 16)
-    )
-  }
+  policyCanvasHoverPortSpacingMarks(report: report, add: add)
+  policyCanvasHoverCrossingsMarks(report: report, add: add)
+  policyCanvasHoverCorridorMarks(report: report, add: add)
   for violation in report.bodyHits {
     add(.bodyHits, policyCanvasHoverRect(violation.frame))
   }
@@ -174,6 +148,76 @@ func policyCanvasQualityHoverMarks(
   for violation in report.routeSegments {
     add(.routeSegments, policyCanvasHoverLine(violation.start, violation.end, width: 16))
   }
+  policyCanvasHoverNodeDistanceMarks(report: report, add: add)
+  for violation in report.wrongTurns {
+    // Round-capped fat line only: the width-16 cap (radius 8) already covers the
+    // size-6 arrowhead at the return point. A separate end dot is avoided on
+    // purpose - an `addEllipse` winds opposite the `strokedPath` line, so under
+    // the nonzero fill `contains` uses, their overlap would read as a hole at the
+    // spur tip.
+    add(.wrongTurns, policyCanvasHoverLine(violation.point, violation.returnPoint, width: 16))
+  }
+  for violation in report.crossedPorts {
+    add(.crossedPorts, policyCanvasHoverLine(violation.pointA, violation.pointB, width: 18))
+  }
+  policyCanvasHoverLabelMarks(report: report, add: add)
+  for violation in report.nodeOverlaps {
+    add(.nodeOverlaps, Path(violation.intersection.insetBy(dx: -4, dy: -4)))
+  }
+  return marks
+}
+
+private func policyCanvasHoverPortSpacingMarks(
+  report: PolicyCanvasGraphQualityReport,
+  add: (PolicyCanvasQualityCategory, Path) -> Void
+) {
+  for violation in report.portSpacing {
+    let category: PolicyCanvasQualityCategory =
+      switch violation.kind {
+      case .overlap: .portOverlaps
+      case .tooClose: .portTooClose
+      case .detached: .portDetached
+      case .uneven: .portUneven
+      }
+    add(category, Path(ellipseIn: policyCanvasHoverDot(violation.point, radius: 10)))
+    // Overlap/too-close pairs ring both dots, so both are hoverable - a stack of
+    // crammed dots resolves every dot, not just the lower one in each pair.
+    if violation.kind == .overlap || violation.kind == .tooClose,
+      let other = violation.otherPoint
+    {
+      add(category, Path(ellipseIn: policyCanvasHoverDot(other, radius: 10)))
+    }
+  }
+}
+
+private func policyCanvasHoverCrossingsMarks(
+  report: PolicyCanvasGraphQualityReport,
+  add: (PolicyCanvasQualityCategory, Path) -> Void
+) {
+  for violation in report.crossings {
+    add(
+      violation.sharesEndpointNode ? .crossings : .crossingsIndependent,
+      Path(ellipseIn: policyCanvasHoverDot(violation.point, radius: 9))
+    )
+  }
+}
+
+private func policyCanvasHoverCorridorMarks(
+  report: PolicyCanvasGraphQualityReport,
+  add: (PolicyCanvasQualityCategory, Path) -> Void
+) {
+  for violation in report.corridors {
+    add(
+      violation.kind == .collinear ? .corridorReuse : .corridorParallel,
+      policyCanvasHoverLine(violation.overlapStart, violation.overlapEnd, width: 16)
+    )
+  }
+}
+
+private func policyCanvasHoverNodeDistanceMarks(
+  report: PolicyCanvasGraphQualityReport,
+  add: (PolicyCanvasQualityCategory, Path) -> Void
+) {
   for violation in report.nodeDistance {
     // Trace the whole mark - both end caps reaching to the nodes plus the bar
     // between them - so the caps are hoverable too. Butt cap and miter join keep
@@ -186,17 +230,12 @@ func policyCanvasQualityHoverMarks(
       )
     )
   }
-  for violation in report.wrongTurns {
-    // Round-capped fat line only: the width-16 cap (radius 8) already covers the
-    // size-6 arrowhead at the return point. A separate end dot is avoided on
-    // purpose - an `addEllipse` winds opposite the `strokedPath` line, so under
-    // the nonzero fill `contains` uses, their overlap would read as a hole at the
-    // spur tip.
-    add(.wrongTurns, policyCanvasHoverLine(violation.point, violation.returnPoint, width: 16))
-  }
-  for violation in report.crossedPorts {
-    add(.crossedPorts, policyCanvasHoverLine(violation.pointA, violation.pointB, width: 18))
-  }
+}
+
+private func policyCanvasHoverLabelMarks(
+  report: PolicyCanvasGraphQualityReport,
+  add: (PolicyCanvasQualityCategory, Path) -> Void
+) {
   for violation in report.labels {
     let category: PolicyCanvasQualityCategory =
       switch violation.kind {
@@ -208,10 +247,6 @@ func policyCanvasQualityHoverMarks(
       }
     add(category, Path(violation.frame.insetBy(dx: -4, dy: -4)))
   }
-  for violation in report.nodeOverlaps {
-    add(.nodeOverlaps, Path(violation.intersection.insetBy(dx: -4, dy: -4)))
-  }
-  return marks
 }
 
 private func policyCanvasHoverDot(_ point: CGPoint, radius: CGFloat) -> CGRect {

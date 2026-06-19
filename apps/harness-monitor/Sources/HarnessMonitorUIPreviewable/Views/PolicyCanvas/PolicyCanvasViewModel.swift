@@ -412,14 +412,4 @@ public final class PolicyCanvasViewModel {
     }
   }
 
-  /// Commit-time helper for mutations that may either diverge from or return to
-  /// the saved backing document.
-  func updateDocumentDirtyAfterCommittedMutation() {
-    guard backingDocument != nil else {
-      markDocumentDirty()
-      return
-    }
-    markDocumentDirty()
-    reconcileDocumentDirtyWithBackingDocument()
-  }
 }
