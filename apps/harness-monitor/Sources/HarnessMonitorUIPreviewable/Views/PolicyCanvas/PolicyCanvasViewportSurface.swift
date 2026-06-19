@@ -200,8 +200,7 @@ public struct PolicyCanvasViewportSurface: View {
       && appliedSnapshot != snapshot
   }
 
-  @ViewBuilder
-  private var viewportContent: some View {
+  @ViewBuilder private var viewportContent: some View {
     if holdsViewportUntilFinalRoute {
       PolicyCanvasPendingFinalRouteSurface()
         .policyCanvasResolvedThemeScope(canvasColorSchemeOverride)

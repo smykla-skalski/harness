@@ -113,25 +113,31 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
   }
 }
 
+/// The routed-graph snapshot the metrics panel measures: the projected routes
+/// the canvas draws plus the signature that gates recomputation.
+struct PolicyCanvasQualityInspectionInputs {
+  let routes: [String: PolicyCanvasEdgeRoute]
+  let labelPositions: [String: CGPoint]
+  let portMarkerLayout: PolicyCanvasPortMarkerLayout
+  let routeSignature: PolicyCanvasRouteWorkerOutputSignature
+}
+
 extension View {
-  /// Attach the lab graph-quality metrics panel, measured from `routes` and
-  /// recomputed whenever `routeSignature` changes.
+  /// Attach the lab graph-quality metrics panel, measured from `inputs.routes`
+  /// and recomputed whenever the route signature changes.
   func policyCanvasQualityInspection(
     viewModel: PolicyCanvasViewModel,
-    routes: [String: PolicyCanvasEdgeRoute],
-    labelPositions: [String: CGPoint],
-    portMarkerLayout: PolicyCanvasPortMarkerLayout,
-    routeSignature: PolicyCanvasRouteWorkerOutputSignature,
+    inputs: PolicyCanvasQualityInspectionInputs,
     isEnabled: Bool,
     resolvedCanvasColorScheme: ColorScheme?
   ) -> some View {
     modifier(
       PolicyCanvasQualityInspectionModifier(
         viewModel: viewModel,
-        routes: routes,
-        labelPositions: labelPositions,
-        portMarkerLayout: portMarkerLayout,
-        routeSignature: routeSignature,
+        routes: inputs.routes,
+        labelPositions: inputs.labelPositions,
+        portMarkerLayout: inputs.portMarkerLayout,
+        routeSignature: inputs.routeSignature,
         isEnabled: isEnabled,
         resolvedCanvasColorScheme: resolvedCanvasColorScheme
       )

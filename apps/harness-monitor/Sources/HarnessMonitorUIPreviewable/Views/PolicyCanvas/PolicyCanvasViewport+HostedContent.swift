@@ -60,10 +60,12 @@ struct PolicyCanvasViewportHostedContent: View {
     )
     .policyCanvasQualityInspection(
       viewModel: viewModel,
-      routes: snapshot.routes,
-      labelPositions: snapshot.labelPositions,
-      portMarkerLayout: snapshot.portMarkerLayout,
-      routeSignature: snapshot.routeSignature,
+      inputs: PolicyCanvasQualityInspectionInputs(
+        routes: snapshot.routes,
+        labelPositions: snapshot.labelPositions,
+        portMarkerLayout: snapshot.portMarkerLayout,
+        routeSignature: snapshot.routeSignature
+      ),
       isEnabled: showsQualityInspection && snapshot.hasRenderableRouteOutput,
       resolvedCanvasColorScheme: resolvedCanvasColorScheme
     )
