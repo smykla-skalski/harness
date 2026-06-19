@@ -86,8 +86,6 @@ public struct SettingsView: View {
   }
 
   @ToolbarContentBuilder private var settingsToolbarItems: some ToolbarContent {
-    GlobalPolicyEnforcementToolbarGroup(store: store)
-
     if selectedSection == .supervisor {
       ToolbarSpacer(.fixed, placement: .primaryAction)
         .sharedBackgroundVisibility(.hidden)

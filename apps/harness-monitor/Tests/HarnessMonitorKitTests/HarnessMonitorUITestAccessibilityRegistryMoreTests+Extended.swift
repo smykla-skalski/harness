@@ -99,8 +99,8 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(!dashboardToolbar.contains("Divider()"))
   }
 
-  @Test("Global enforcement button keeps native toolbar glass and stays out of the lab")
-  func globalEnforcementButtonKeepsNativeToolbarGlassAndStaysOutOfLab() throws {
+  @Test("Global enforcement button stays out of auxiliary windows")
+  func globalEnforcementButtonStaysOutOfAuxiliaryWindows() throws {
     let globalEnforcementToolbar = try sourceFile(
       named: "Toolbar/GlobalPolicyEnforcementToolbarGroup.swift"
     )
@@ -146,11 +146,10 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
         """
       )
     )
+    #expect(!settingsView.contains("GlobalPolicyEnforcementToolbarGroup(store: store)"))
     #expect(
       settingsView.contains(
         """
-        GlobalPolicyEnforcementToolbarGroup(store: store)
-
             if selectedSection == .supervisor {
               ToolbarSpacer(.fixed, placement: .primaryAction)
                 .sharedBackgroundVisibility(.hidden)
