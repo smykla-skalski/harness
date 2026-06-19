@@ -90,7 +90,12 @@ shell_scripts=(
   "$ROOT"/scripts/swarm-iterate/tests/*.sh
   "$ROOT"/scripts/tests/*.sh
 )
-python_scripts=("$ROOT"/scripts/*.py)
+python_scripts=(
+  "$ROOT"/scripts/*.py
+  "$ROOT"/scripts/lib/*.py
+  "$ROOT"/scripts/tests/test_*.py
+)
+root_python_tests=("$ROOT"/scripts/tests/test_*.py)
 monitor_shell_scripts=(
   "$ROOT"/apps/harness-monitor/ci_scripts/*.sh
   "$ROOT"/apps/harness-monitor/Scripts/*.sh
@@ -117,6 +122,12 @@ fi
 if (( ${#python_scripts[@]} > 0 )); then
   python3 -m py_compile "${python_scripts[@]}"
 fi
+if (( ${#root_python_tests[@]} > 0 )); then
+  run_quiet_step \
+    "root python script tests" \
+    env PYTHONDONTWRITEBYTECODE=1 \
+    python3 -m unittest discover -s "$ROOT/scripts/tests" -p 'test_*.py'
+fi
 if (( ${#monitor_python_tests[@]} > 0 )); then
   python3 -m py_compile "${monitor_python_tests[@]}"
   for test_path in "${monitor_python_tests[@]}"; do
@@ -136,16 +147,19 @@ if (( ${#monitor_python_tests[@]} > 0 )); then
   fi
 fi
 
+run_quiet_step "check-scripts shell tests" "$ROOT/scripts/tests/test-check-scripts.sh"
 run_quiet_step "run-step shell tests" "$ROOT/scripts/tests/test-run-step.sh"
 run_quiet_step "clean-build-caches shell tests" "$ROOT/scripts/tests/test-clean-build-caches.sh"
+run_quiet_step "clean-stale-lanes shell tests" "$ROOT/scripts/tests/test-clean-stale-lanes.sh"
 run_quiet_step "mcp shell tests" "$ROOT/scripts/tests/test-mcp-scripts.sh"
 if [[ "${HARNESS_CHECK_SCRIPTS_FULL:-0}" == "1" ]]; then
-  HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS=180 \
+  HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS="${HARNESS_CHECK_SCRIPTS_FULL_TIMEOUT_SECONDS:-${HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS:-600}}" \
     run_quiet_step "stale-scan shell tests" "$ROOT/scripts/tests/test-stale-scan.sh"
 else
   printf 'ok: stale-scan shell tests (skipped in fast mode; set HARNESS_CHECK_SCRIPTS_FULL=1)\n'
 fi
 run_quiet_step "swarm e2e contract shell tests" "$ROOT/scripts/tests/test-e2e-swarm-contract.sh"
+run_quiet_step "e2e triage-run shell tests" "$ROOT/scripts/tests/test-e2e-triage-run.sh"
 run_quiet_step \
   "recording triage shell tests" \
   "$ROOT/scripts/e2e/recording-triage/tests/run-all.sh"
