@@ -44,6 +44,11 @@ public final class PolicyCanvasViewModel {
   var policyGroupTitle: String?
   var backingDocument: TaskBoardPolicyPipelineDocument?
   var latestSimulation: TaskBoardPolicyPipelineSimulationResult?
+  /// Most recent daemon audit summary (active enforced revision + mode). The
+  /// persistent live anchor reads this to tell LIVE from DRAFT. Written only by
+  /// `captureLiveAudit(_:)` on the document-apply paths and preserved across
+  /// nil-republishes, so an audit-only push never blanks the badge.
+  var latestAudit: TaskBoardPolicyPipelineAuditSummary?
   public internal(set) var documentDirty: Bool
   var viewportDirty: Bool
   var hasRequestedInitialRemoteLoad: Bool
@@ -289,6 +294,7 @@ public final class PolicyCanvasViewModel {
     self.activeCanvasId = nil
     self.backingDocument = nil
     self.latestSimulation = nil
+    self.latestAudit = nil
     self.documentDirty = false
     self.viewportDirty = false
     self.hasRequestedInitialRemoteLoad = false

@@ -21,6 +21,7 @@ extension PolicyCanvasView {
     VStack(spacing: 0) {
       PolicyCanvasTopBar(
         viewModel: viewModel,
+        liveStatus: viewModel.liveStatus,
         canPromote: viewModel.canPromote,
         remoteActionsEnabled: remoteActionsEnabled,
         remoteActionDisabledReason: remoteActionDisabledReason,

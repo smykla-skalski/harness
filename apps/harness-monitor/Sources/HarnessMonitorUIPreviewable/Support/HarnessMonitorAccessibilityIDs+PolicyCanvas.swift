@@ -3,6 +3,7 @@ import SwiftUI
 extension HarnessMonitorAccessibility {
   public static let policyCanvasRoot = "harness.policy-canvas.root"
   public static let policyCanvasTopBar = "harness.policy-canvas.top-bar"
+  public static let policyCanvasLiveStatusBadge = "harness.policy-canvas.live-status"
   public static let policyCanvasViewport = "harness.policy-canvas.viewport"
   public static let policyCanvasToolRail = "harness.policy-canvas.tool-rail"
   public static let policyCanvasComponentLibrary = "harness.policy-canvas.component-library"

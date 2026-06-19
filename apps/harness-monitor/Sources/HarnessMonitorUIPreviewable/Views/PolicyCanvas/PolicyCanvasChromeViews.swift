@@ -5,6 +5,8 @@ import SwiftUI
 
 struct PolicyCanvasTopBar: View {
   @Bindable var viewModel: PolicyCanvasViewModel
+  /// Resolved persistent LIVE/DRAFT anchor rendered in the leading slot.
+  let liveStatus: PolicyCanvasLiveState
   let canPromote: Bool
   let remoteActionsEnabled: Bool
   let remoteActionDisabledReason: String
@@ -35,6 +37,8 @@ struct PolicyCanvasTopBar: View {
 
   private var mainRow: some View {
     HStack(alignment: .center, spacing: 12) {
+      PolicyCanvasLiveStatusBadge(status: liveStatus)
+
       Spacer(minLength: 16)
 
       PolicyCanvasSimulationToggleButton(

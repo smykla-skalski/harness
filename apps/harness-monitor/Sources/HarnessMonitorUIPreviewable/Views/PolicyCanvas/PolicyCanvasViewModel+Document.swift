@@ -57,6 +57,7 @@ extension PolicyCanvasViewModel {
     forceDocumentReload: Bool = false
   ) {
     self.activeCanvasId = activeCanvasId
+    captureLiveAudit(audit)
     // On document-preserving paths (nil incoming doc, same-revision republish)
     // only overwrite latestSimulation when the incoming payload actually
     // carries one. A nil-republish must not nil out a sim that still matches
@@ -147,6 +148,7 @@ extension PolicyCanvasViewModel {
     activeCanvasId: String?
   ) {
     self.activeCanvasId = activeCanvasId
+    captureLiveAudit(audit)
     guard let document else {
       if let incoming = simulation ?? audit?.latestSimulation {
         latestSimulation = incoming
@@ -204,6 +206,7 @@ extension PolicyCanvasViewModel {
     force: Bool = false
   ) {
     guard force || shouldApplyExternalDocument(document) else {
+      captureLiveAudit(audit)
       latestSimulation = simulation ?? audit?.latestSimulation
       return
     }

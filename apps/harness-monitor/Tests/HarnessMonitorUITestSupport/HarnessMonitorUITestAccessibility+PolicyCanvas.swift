@@ -1,6 +1,7 @@
 extension HarnessMonitorUITestAccessibility {
   static let policyCanvasRoot = "harness.policy-canvas.root"
   static let policyCanvasTopBar = "harness.policy-canvas.top-bar"
+  static let policyCanvasLiveStatusBadge = "harness.policy-canvas.live-status"
   static let policyCanvasViewport = "harness.policy-canvas.viewport"
   static let policyCanvasToolRail = "harness.policy-canvas.tool-rail"
   static let policyCanvasComponentLibrary = "harness.policy-canvas.component-library"

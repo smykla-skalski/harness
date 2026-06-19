@@ -205,6 +205,7 @@ extension PolicyCanvasViewModel {
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?
   ) {
+    captureLiveAudit(audit)
     if let incoming = simulation ?? audit?.latestSimulation {
       latestSimulation = incoming
       invalidateValidationCache()
