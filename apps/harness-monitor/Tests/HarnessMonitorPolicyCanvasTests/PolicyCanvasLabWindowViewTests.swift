@@ -345,6 +345,17 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(windowSource.contains("reformatRequestID += 1"))
   }
 
+  func testLabPrewarmDoesNotDuplicateTheSelectedStressSample() throws {
+    let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
+
+    XCTAssertTrue(
+      windowSource.contains(
+        "let priorityIDs = selectedSampleID == \"extreme-galaxy\" ? [] : [\"extreme-galaxy\"]"
+      )
+    )
+    XCTAssertFalse(windowSource.contains("[selectedSampleID, \"extreme-galaxy\"]"))
+  }
+
   func testLabViewportSurfaceForcesEngineLayoutReflow() throws {
     let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
     let surfaceSource = try previewablePolicyCanvasSourceFile(
@@ -357,6 +368,44 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(
       surfaceSource.contains("requestAtomicReflow(preserveManualAnchors: false, force: true)")
     )
+  }
+
+  @MainActor
+  func testExtremeGalaxyForcedEngineFirstPaintPrepStaysBelowOneSecond() throws {
+    let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "extreme-galaxy"))
+    let start = Date()
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: sample.document,
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: nil,
+      policyGroupTitle: sample.name
+    )
+    let plannedGraph = try XCTUnwrap(
+      viewModel.plannedReflowGraph(preserveManualAnchors: false, force: true)
+    )
+    let routeInput = PolicyCanvasRouteWorkerInput(
+      graphGeneration: viewModel.routeComputationGeneration,
+      nodes: plannedGraph.nodes,
+      groups: plannedGraph.groups,
+      edges: plannedGraph.edges,
+      fontScale: 1,
+      routingHints: plannedGraph.routingHints,
+      precomputedRoutes: plannedGraph.precomputedRoutes,
+      algorithmSelection: viewModel.algorithmSelection
+    )
+    let output = try XCTUnwrap(policyCanvasFastPrecomputedRouteOutput(input: routeInput))
+    viewModel.commitPlannedReflowGraph(
+      plannedGraph,
+      preserveManualAnchors: false,
+      force: true,
+      requestsRouteComputation: false
+    )
+    let elapsedMs = Date().timeIntervalSince(start) * 1_000
+
+    XCTAssertEqual(output.routes.count, plannedGraph.edges.count)
+    XCTAssertFalse(output.visibleBounds.isNull)
+    XCTAssertLessThan(elapsedMs, 1_000)
   }
 
   func testStandaloneLabHostPersistsWindowFrame() throws {

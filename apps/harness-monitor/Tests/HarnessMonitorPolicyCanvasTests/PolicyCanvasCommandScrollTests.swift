@@ -321,7 +321,10 @@ struct PolicyCanvasCommandScrollTests {
     #expect(surfaceSource.contains("private func applySurfaceSnapshot("))
     #expect(surfaceSource.contains("@State private var routeSeed:"))
     #expect(surfaceSource.contains("applyForcedEngineSurfaceSnapshot("))
-    #expect(surfaceSource.contains("PolicyCanvasRouteWorker().compute(input: routeInput)"))
+    #expect(surfaceSource.contains("policyCanvasFastPrecomputedRouteOutput(input: routeInput)"))
+    #expect(
+      surfaceSource.contains("output = await PolicyCanvasRouteWorker().compute(input: routeInput)")
+    )
     #expect(surfaceSource.contains("PolicyCanvasViewportRouteSeed("))
     #expect(surfaceSource.contains("markPolicyCanvasLabReadyIfNeeded"))
     #expect(surfaceSource.contains("HARNESS_MONITOR_POLICY_LAB_READY_FILE"))

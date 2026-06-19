@@ -305,7 +305,12 @@ public struct PolicyCanvasViewportSurface: View {
       precomputedRoutes: routeGraph.precomputedRoutes,
       algorithmSelection: stagedViewModel.algorithmSelection
     )
-    let output = await PolicyCanvasRouteWorker().compute(input: routeInput)
+    let output: PolicyCanvasRouteWorkerOutput
+    if let fastOutput = policyCanvasFastPrecomputedRouteOutput(input: routeInput) {
+      output = fastOutput
+    } else {
+      output = await PolicyCanvasRouteWorker().compute(input: routeInput)
+    }
     guard !Task.isCancelled else {
       return
     }

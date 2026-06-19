@@ -1,7 +1,7 @@
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
-private struct PolicyCanvasReflowSnapshot {
+struct PolicyCanvasReflowSnapshot {
   let nodes: [PolicyCanvasNode]
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]

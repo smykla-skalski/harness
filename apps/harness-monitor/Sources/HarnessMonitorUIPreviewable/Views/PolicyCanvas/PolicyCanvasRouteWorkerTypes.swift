@@ -176,6 +176,53 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
   }
 }
 
+func policyCanvasFastPrecomputedRouteOutput(
+  input: PolicyCanvasRouteWorkerInput
+) -> PolicyCanvasRouteWorkerOutput? {
+  guard let precomputedRoutes = input.precomputedRoutes else {
+    return nil
+  }
+  let edgeIDs = Set(input.edges.map(\.id))
+  guard
+    precomputedRoutes.routes.count == edgeIDs.count,
+    Set(precomputedRoutes.routes.keys) == edgeIDs
+  else {
+    return nil
+  }
+
+  let prepared = PolicyCanvasPreparedRouteInput(input: input)
+  let nodeIndex = prepared.nodeIndex
+  let routes = precomputedRoutes.routes
+  var labelPositions: [String: CGPoint] = [:]
+  labelPositions.reserveCapacity(input.edges.count)
+  for edge in input.edges where !edge.label.isEmpty {
+    guard let route = routes[edge.id] else {
+      continue
+    }
+    labelPositions[edge.id] = route.labelPosition
+  }
+  let portMarkerLayout = prepared.portMarkerLayout(routes: routes, nodeIndex: nodeIndex)
+  let visibleBounds = prepared.visibleBounds(routes: routes, labelPositions: labelPositions)
+  let accessibilityEdgeEntries = prepared.accessibilityEdgeEntries(nodeIndex: nodeIndex)
+  let nodeAccessibilityValuesByID = prepared.nodeAccessibilityValuesByID(nodeIndex: nodeIndex)
+  let accessibilityNodeEntries = prepared.accessibilityNodeEntries()
+  let connectTargetsByNodeID = prepared.connectTargetsByNodeID()
+
+  return PolicyCanvasRouteWorkerOutput(
+    routes: routes,
+    labelPositions: labelPositions,
+    portVisibility: [:],
+    portMarkerLayout: portMarkerLayout,
+    visibleBounds: visibleBounds,
+    contentSize: policyCanvasVisibleContentSize(visibleBounds: visibleBounds),
+    accessibilityEdgeLabelsByID: PolicyCanvasRouteWorker.edgeLabelsByID(accessibilityEdgeEntries),
+    accessibilityNodeEntries: accessibilityNodeEntries,
+    accessibilityEdgeEntries: accessibilityEdgeEntries,
+    nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
+    connectTargetsByNodeID: connectTargetsByNodeID
+  )
+}
+
 struct PolicyCanvasAccessibilityNodeEntry: Equatable, Sendable, Identifiable {
   let id: String
   let label: String

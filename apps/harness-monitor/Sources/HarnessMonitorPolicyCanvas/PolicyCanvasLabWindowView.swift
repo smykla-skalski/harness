@@ -345,7 +345,7 @@ public struct PolicyCanvasLabWindowView: View {
     case .live:
       selectedSampleID = nil
     }
-    let priorityIDs = [selectedSampleID, "extreme-galaxy"].compactMap { $0 }
+    let priorityIDs = selectedSampleID == "extreme-galaxy" ? [] : ["extreme-galaxy"]
     var emitted: Set<String> = []
     var ordered: [PolicyCanvasLabSample] = []
     for id in priorityIDs {
