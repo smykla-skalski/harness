@@ -41,9 +41,14 @@ struct PolicyCanvasGraphQualityGateTests {
 
   private struct RoutedSample {
     let report: PolicyCanvasGraphQualityReport
+    let nodes: [PolicyCanvasNode]
     let edges: [PolicyCanvasEdge]
     let routes: [String: PolicyCanvasEdgeRoute]
     let portMarkerLayout: PolicyCanvasPortMarkerLayout
+  }
+
+  private static func nodesByID(_ nodes: [PolicyCanvasNode]) -> [String: PolicyCanvasNode] {
+    Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
   }
 
   /// Route a lab sample exactly the way the lab renders it (load -> reflow ->
@@ -77,6 +82,7 @@ struct PolicyCanvasGraphQualityGateTests {
     )
     return RoutedSample(
       report: report,
+      nodes: viewModel.nodes,
       edges: viewModel.edges,
       routes: output.routes,
       portMarkerLayout: output.portMarkerLayout
@@ -134,6 +140,53 @@ struct PolicyCanvasGraphQualityGateTests {
       extreme-galaxy precomputed routes should not pass through node or group-title bodies
       bodyHits=\(Self.bodyHitDetail(report))
       """
+    )
+  }
+
+  /// The rendered port-marker dot must sit at the wire's along-side position. The
+  /// route worker fans wires through a crossing-minimal optimized port order, but
+  /// the canvas and the detachment detector draw each dot at its declaration-order
+  /// anchor. The final marker layout must therefore measure each terminal's axis
+  /// offset from the declaration-order anchor, so the dot lands on the wire end
+  /// along the side instead of floating off by the optimized-vs-declaration gap.
+  /// `extreme-galaxy` ships precomputed routes whose gate node reorders its output
+  /// ports, so it exercises the case the desync first surfaced on.
+  ///
+  /// This is the along-side axis only: perpendicular detachment (a wire that does
+  /// not reach the node edge at all) is a routing concern the marker offset cannot
+  /// express, so it stays out of scope here.
+  @Test func renderedPortMarkersSitOnWiresAlongSide() async throws {
+    let routed = try await routedSample(sampleID: "extreme-galaxy")
+    var offenders: [String] = []
+    for edge in routed.edges {
+      for (role, endpoint, point) in [
+        (PolicyCanvasRouteEndpointRole.source, edge.source, routed.routes[edge.id]?.points.first),
+        (PolicyCanvasRouteEndpointRole.target, edge.target, routed.routes[edge.id]?.points.last),
+      ] {
+        guard
+          let point,
+          let terminal = routed.portMarkerLayout.terminal(edgeID: edge.id, role: role),
+          let center = policyCanvasPortMarkerCenter(
+            endpoint: endpoint,
+            terminal: terminal,
+            nodesByID: Self.nodesByID(routed.nodes),
+            nodeSizes: PolicyCanvasLayout.nodeSizes(for: routed.nodes, edges: routed.edges)
+          )
+        else {
+          continue
+        }
+        let alongSide =
+          (terminal.side == .leading || terminal.side == .trailing)
+          ? abs(point.y - center.y)
+          : abs(point.x - center.x)
+        if alongSide > 0.5 {
+          offenders.append("\(edge.id):\(role):\(terminal.side.rawValue):alongSide=\(alongSide)")
+        }
+      }
+    }
+    #expect(
+      offenders.isEmpty,
+      "rendered port dots should sit on their wire along the side: \(offenders.prefix(40))"
     )
   }
 

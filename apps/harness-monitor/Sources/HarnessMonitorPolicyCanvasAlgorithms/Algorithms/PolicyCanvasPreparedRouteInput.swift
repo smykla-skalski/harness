@@ -44,6 +44,12 @@ public struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
   public let fontScale: CGFloat
   public let routingHints: PolicyCanvasLayoutRoutingHints?
   public let precomputedRoutes: PolicyCanvasPrecomputedRouteSet?
+  // Each port's index in its node's declaration-order array (before the routing
+  // pass reorders ports into crossing-minimal order). The canvas and the
+  // detachment detector both anchor port dots at the declaration-order position,
+  // so the marker axis offset must be measured against this index, not the
+  // optimized one, or the rendered dot floats away from the wire end.
+  public let declarationPortIndices: [PolicyCanvasPortEndpoint: Int]
 
   public init(input: PolicyCanvasRouteWorkerInput) {
     let optimizedNodes = policyCanvasOptimizedPortOrder(nodes: input.nodes, edges: input.edges)
@@ -59,6 +65,23 @@ public struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
     fontScale = input.fontScale
     routingHints = input.routingHints
     precomputedRoutes = input.precomputedRoutes
+    declarationPortIndices = Self.makeDeclarationPortIndices(nodes: input.nodes)
+  }
+
+  private static func makeDeclarationPortIndices(
+    nodes: [PolicyCanvasNode]
+  ) -> [PolicyCanvasPortEndpoint: Int] {
+    var indices: [PolicyCanvasPortEndpoint: Int] = [:]
+    indices.reserveCapacity(nodes.reduce(0) { $0 + $1.inputPorts.count + $1.outputPorts.count })
+    for node in nodes {
+      for (index, port) in node.inputPorts.enumerated() {
+        indices[PolicyCanvasPortEndpoint(nodeID: node.id, portID: port.id, kind: .input)] = index
+      }
+      for (index, port) in node.outputPorts.enumerated() {
+        indices[PolicyCanvasPortEndpoint(nodeID: node.id, portID: port.id, kind: .output)] = index
+      }
+    }
+    return indices
   }
 
   public var contentBounds: CGRect {

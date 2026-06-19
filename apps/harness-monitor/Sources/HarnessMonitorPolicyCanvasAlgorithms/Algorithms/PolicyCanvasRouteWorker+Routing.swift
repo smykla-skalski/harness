@@ -141,7 +141,8 @@ extension PolicyCanvasPreparedRouteInput {
     )
     let portMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
       routes: finalRoutes,
-      nodeIndex: nodeIndex
+      nodeIndex: nodeIndex,
+      usesDeclarationOrderAnchor: true
     )
     policyCanvasRouteComputationSignposter.endInterval(
       "policy_canvas.routes.phase.terminals",
@@ -243,7 +244,8 @@ extension PolicyCanvasPreparedRouteInput {
     )
     let finalPortMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
       routes: finalRoutes,
-      nodeIndex: nodeIndex
+      nodeIndex: nodeIndex,
+      usesDeclarationOrderAnchor: true
     )
     let labelPositions = PolicyCanvasPolylineMidpointLabelPlacement().placeLabels(
       input: PolicyCanvasLabelPlacementInput(prepared: self, routes: finalRoutes)
@@ -2368,9 +2370,19 @@ extension PolicyCanvasPreparedRouteInput {
     )
   }
 
+  /// Build the port-marker layout for a set of precomputed routes.
+  ///
+  /// `usesDeclarationOrderAnchor` selects which port anchor the axis offset is
+  /// measured against. Internal route-repair passes keep the default optimized
+  /// anchor so the crossing-minimal port order the router fans wires through is
+  /// preserved. The single layout that the canvas renders (and the detachment
+  /// detector reads) passes `true`: the canvas draws each port dot at its
+  /// declaration-order anchor, so the offset must be measured from there or the
+  /// dot floats off its wire end.
   private func precomputedRouteTerminalPortMarkerLayout(
     routes: [String: PolicyCanvasEdgeRoute],
-    nodeIndex: [String: PolicyCanvasRouteNode]
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    usesDeclarationOrderAnchor: Bool = false
   ) -> PolicyCanvasPortMarkerLayout {
     var terminals: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal] = [:]
     var endpoints: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortEndpoint] = [:]
@@ -2387,6 +2399,7 @@ extension PolicyCanvasPreparedRouteInput {
         point: route.points.first,
         side: policyCanvasRouteSourceSide(route),
         nodeIndex: nodeIndex,
+        usesDeclarationOrderAnchor: usesDeclarationOrderAnchor,
         terminals: &terminals,
         endpoints: &endpoints
       )
@@ -2397,6 +2410,7 @@ extension PolicyCanvasPreparedRouteInput {
         point: route.points.last,
         side: policyCanvasRouteTargetSide(route),
         nodeIndex: nodeIndex,
+        usesDeclarationOrderAnchor: usesDeclarationOrderAnchor,
         terminals: &terminals,
         endpoints: &endpoints
       )
@@ -2411,13 +2425,18 @@ extension PolicyCanvasPreparedRouteInput {
     point: CGPoint?,
     side: PolicyCanvasPortSide?,
     nodeIndex: [String: PolicyCanvasRouteNode],
+    usesDeclarationOrderAnchor: Bool,
     terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal],
     endpoints: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortEndpoint]
   ) {
     let side = policyCanvasResolvedRoutablePortSide(for: endpoint, preferredSide: side)
+    let anchor =
+      usesDeclarationOrderAnchor
+      ? declarationPortAnchor(for: endpoint, side: side, nodeIndex: nodeIndex)
+      : portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex)
     guard
       let point,
-      let base = portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex)
+      let base = anchor
     else {
       return
     }
@@ -2756,6 +2775,31 @@ extension PolicyCanvasPreparedRouteInput {
     let ports = endpoint.kind == .input ? node.inputPorts : node.outputPorts
     guard let index = ports.firstIndex(where: { $0.id == endpoint.portID }) else {
       return nil
+    }
+    return portAnchor(for: node, side: side, index: index, count: ports.count)
+  }
+
+  /// The port anchor at the endpoint's declaration-order index rather than the
+  /// routing pass's optimized index. The canvas and the detachment detector both
+  /// draw the port dot at this position, so terminal marker offsets must be
+  /// measured from here for the wire end to land on the dot. Falls back to the
+  /// optimized anchor if the endpoint has no recorded declaration index.
+  func declarationPortAnchor(
+    for endpoint: PolicyCanvasPortEndpoint,
+    side: PolicyCanvasPortSide,
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> CGPoint? {
+    guard let node = nodeIndex[endpoint.nodeID] else {
+      return nil
+    }
+    let ports = endpoint.kind == .input ? node.inputPorts : node.outputPorts
+    let key = PolicyCanvasPortEndpoint(
+      nodeID: endpoint.nodeID,
+      portID: endpoint.portID,
+      kind: endpoint.kind
+    )
+    guard let index = declarationPortIndices[key] else {
+      return portAnchor(for: endpoint, side: side, nodeIndex: nodeIndex)
     }
     return portAnchor(for: node, side: side, index: index, count: ports.count)
   }
