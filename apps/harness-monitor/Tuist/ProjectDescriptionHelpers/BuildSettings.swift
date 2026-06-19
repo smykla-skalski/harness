@@ -89,14 +89,9 @@ public enum BuildSettings {
         "COMPILATION_CACHE_ENABLE_CACHING": "NO",
         "COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS": "NO",
         "COMPILER_INDEX_STORE_ENABLE": "NO",
-        "ENABLE_MODULE_VERIFIER": "NO",
         "ONLY_ACTIVE_ARCH": "YES",
         "SWIFT_ENABLE_EAGER_LINKING": "NO",
         "SWIFT_ENABLE_PREFIX_MAPPING": "NO"
-    ]
-
-    public static let frameworkDebugOverrides: SettingsDictionary = [
-        "ENABLE_MODULE_VERIFIER": "NO"
     ]
 
     public static let debugOverrides: SettingsDictionary = [
@@ -139,7 +134,7 @@ public enum BuildSettings {
         return .settings(
             base: base,
             configurations: [
-                .debug(name: "Debug", settings: frameworkDebugOverrides),
+                .debug(name: "Debug"),
                 .debug(name: "Preview", settings: preview),
                 .release(name: "Release")
             ]

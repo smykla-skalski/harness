@@ -19,6 +19,21 @@ def load_patcher_module():
 
 
 class PatchTuistPbxprojTests(unittest.TestCase):
+    def test_external_project_roots_include_tuist_derived_projects(self) -> None:
+        module = load_patcher_module()
+        repo_root = Path("/tmp/repo")
+        app_root = repo_root / "apps" / "harness-monitor"
+
+        roots = module.generated_external_project_roots(
+            app_root=app_root,
+            repo_root=repo_root,
+        )
+
+        self.assertIn(
+            app_root / "Tuist" / ".build" / "tuist-derived" / "Projects",
+            roots,
+        )
+
     def test_strips_target_team_attributes_from_generated_project(self) -> None:
         module = load_patcher_module()
         pbxproj = """// !$*UTF8*$!

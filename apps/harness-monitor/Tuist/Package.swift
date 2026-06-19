@@ -40,11 +40,9 @@ let packageSettings = PackageSettings(
         ],
         configurations: [
             .debug(name: "Debug", settings: [
-                "ENABLE_MODULE_VERIFIER": "NO",
                 "MTL_ENABLE_DEBUG_INFO": "INCLUDE_SOURCE"
             ]),
             .debug(name: "Preview", settings: [
-                "ENABLE_MODULE_VERIFIER": "NO",
                 "MTL_ENABLE_DEBUG_INFO": "INCLUDE_SOURCE",
                 "SWIFT_ENABLE_PREFIX_MAPPING": "NO"
             ]),

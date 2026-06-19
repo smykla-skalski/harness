@@ -320,6 +320,14 @@ def patch_generated_xcschemes(
             patch_xcscheme_last_upgrade_version(scheme_path, last_upgrade)
 
 
+def generated_external_project_roots(*, app_root: Path, repo_root: Path) -> list[Path]:
+    return [
+        repo_root / "mcp-servers" / "harness-monitor-registry",
+        app_root / "Derived",
+        app_root / "Tuist" / ".build" / "tuist-derived" / "Projects",
+    ]
+
+
 def main() -> int:
     main_pbxproj = Path(os.environ["HARNESS_MONITOR_PBXPROJ"])
     last_upgrade = os.environ["HARNESS_MONITOR_LAST_UPGRADE_CHECK"]
@@ -359,11 +367,9 @@ def main() -> int:
     # Only patch xcodeprojs Tuist generates, not vendored package examples.
     # Tuist materializes external SPM packages into per-package xcodeprojs:
     # - the local registry SPM: mcp-servers/harness-monitor-registry/HarnessMonitorRegistry.xcodeproj
-    # - remote SPM packages: <app>/Derived/<Package>/Project.xcodeproj
-    extra_roots = [
-        repo_root / "mcp-servers" / "harness-monitor-registry",
-        app_root / "Derived",
-    ]
+    # - older remote SPM output: <app>/Derived/<Package>/Project.xcodeproj
+    # - current Tuist remote SPM output: <app>/Tuist/.build/tuist-derived/Projects/<Package>
+    extra_roots = generated_external_project_roots(app_root=app_root, repo_root=repo_root)
 
     seen: set[Path] = {main_pbxproj.resolve()}
     for root in extra_roots:

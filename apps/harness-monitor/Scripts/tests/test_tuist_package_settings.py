@@ -35,7 +35,7 @@ RECOMMENDED_FRAMEWORK_SETTINGS = (
     '"MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS": "gnu17 gnu++20"',
 )
 
-DEBUG_FRAMEWORK_OVERRIDE_SETTINGS = ('"ENABLE_MODULE_VERIFIER": "NO"',)
+FORBIDDEN_MODULE_VERIFIER_OVERRIDES = ('"ENABLE_MODULE_VERIFIER": "NO"',)
 
 PREVIEW_OVERRIDE_SETTINGS = ('"SWIFT_ENABLE_PREFIX_MAPPING": "NO"',)
 
@@ -64,9 +64,9 @@ class TuistPackageSettingsTests(unittest.TestCase):
             with self.subTest(setting=setting):
                 self.assertIn(setting, helper)
 
-        for setting in DEBUG_FRAMEWORK_OVERRIDE_SETTINGS:
+        for setting in FORBIDDEN_MODULE_VERIFIER_OVERRIDES:
             with self.subTest(setting=setting):
-                self.assertIn(setting, helper)
+                self.assertNotIn(setting, helper)
 
         for setting in PREVIEW_OVERRIDE_SETTINGS:
             with self.subTest(setting=setting):
@@ -156,9 +156,9 @@ class TuistPackageSettingsTests(unittest.TestCase):
             with self.subTest(setting=setting):
                 self.assertIn(setting, manifest)
 
-        for setting in DEBUG_FRAMEWORK_OVERRIDE_SETTINGS:
+        for setting in FORBIDDEN_MODULE_VERIFIER_OVERRIDES:
             with self.subTest(setting=setting):
-                self.assertIn(setting, manifest)
+                self.assertNotIn(setting, manifest)
 
         for setting in PREVIEW_OVERRIDE_SETTINGS:
             with self.subTest(setting=setting):
