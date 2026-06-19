@@ -42,6 +42,13 @@ public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   /// citation (50-200 typical range).
   static let bendPenalty: CGFloat = 100
 
+  /// Parameters bundled for a single sparse-grid A* attempt.
+  struct VisibilityAttemptParameters {
+    let laneOffset: Int
+    let searchPrepared: [CGRect]
+    let validationPrepared: [CGRect]
+  }
+
   public init() {}
 
   public func route(
@@ -146,32 +153,55 @@ public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       context: context,
       prepared: prepared
     )
+    let baseParams = VisibilityAttemptParameters(
+      laneOffset: 0,
+      searchPrepared: searchPrepared,
+      validationPrepared: prepared
+    )
     for laneOffset in Self.retryLaneOffsets {
-      if let attempt = visibilityRouteAttempt(
-        source: source,
-        target: target,
-        context: context,
+      let params = VisibilityAttemptParameters(
         laneOffset: laneOffset,
-        searchPrepared: searchPrepared,
-        validationPrepared: prepared
+        searchPrepared: baseParams.searchPrepared,
+        validationPrepared: baseParams.validationPrepared
+      )
+      if let attempt = visibilityRouteAttempt(
+        source: source, target: target, context: context, params: params
       ) {
         return (attempt, Self.routeCost(points: attempt.points))
       }
     }
     if searchPrepared.count != prepared.count {
       for laneOffset in Self.retryLaneOffsets {
-        if let attempt = visibilityRouteAttempt(
-          source: source,
-          target: target,
-          context: context,
+        let params = VisibilityAttemptParameters(
           laneOffset: laneOffset,
           searchPrepared: prepared,
           validationPrepared: prepared
+        )
+        if let attempt = visibilityRouteAttempt(
+          source: source, target: target, context: context, params: params
         ) {
           return (attempt, Self.routeCost(points: attempt.points))
         }
       }
     }
+    return applyFallbackSafetyRoute(
+      source: source,
+      target: target,
+      context: context,
+      prepared: prepared
+    )
+  }
+
+  /// Applies the hand-coded fallback router, then checks whether the result
+  /// pierces any raw obstacle and substitutes a detour if so. Returns a
+  /// `(route, cost)` pair; cost is `nil` when the result is a pure fallback
+  /// (no A* path was found).
+  private func applyFallbackSafetyRoute(
+    source: CGPoint,
+    target: CGPoint,
+    context: PolicyCanvasRouteContext,
+    prepared: [CGRect]
+  ) -> (route: PolicyCanvasEdgeRoute, cost: CGFloat?) {
     if let detourPoints = fallbackDetourPoints(
       source: source,
       target: target,
@@ -231,166 +261,22 @@ public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     )
   }
 
-  private func simpleVisibilityRoute(
-    source: CGPoint,
-    target: CGPoint,
-    context: PolicyCanvasRouteContext,
-    prepared: [CGRect]
-  ) -> PolicyCanvasEdgeRoute? {
-    let snapValidationObstacles = prepared.map {
-      $0.insetBy(dx: Self.channelStep / 2, dy: Self.channelStep / 2)
-    }
-    let candidates = simpleVisibilityCandidatePoints(
-      source: source,
-      target: target,
-      context: context
-    )
-    var best: (route: PolicyCanvasEdgeRoute, cost: CGFloat)?
-    for candidate in candidates {
-      let compressed = Self.compressCollinear(candidate)
-      guard compressed.count >= 2 else {
-        continue
-      }
-      let spread = Self.applyLaneSpread(
-        compressed,
-        lane: context.lane,
-        source: source,
-        target: target,
-        lineSpacing: context.lineSpacing
-      )
-      let snapped = Self.snapToChannels(spread, source: source, target: target)
-      guard !policyCanvasRouteIntersectsObstacles(snapped, obstacles: snapValidationObstacles)
-      else {
-        continue
-      }
-      let route = PolicyCanvasEdgeRoute(
-        points: snapped,
-        labelPosition: Self.labelPosition(for: snapped)
-      )
-      let cost = Self.routeCost(points: snapped)
-      if let current = best {
-        if cost < current.cost {
-          best = (route, cost)
-        }
-      } else {
-        best = (route, cost)
-      }
-    }
-    return best?.route
-  }
-
-  private func simpleVisibilityCandidatePoints(
-    source: CGPoint,
-    target: CGPoint,
-    context: PolicyCanvasRouteContext
-  ) -> [[CGPoint]] {
-    var candidates: [[CGPoint]] = []
-    var seen: Set<String> = []
-
-    func append(_ points: [CGPoint]) {
-      let compressed = Self.compressCollinear(points)
-      let key =
-        compressed
-        .map { "\(Self.quantizedCoordinate($0.x)):\(Self.quantizedCoordinate($0.y))" }
-        .joined(separator: "|")
-      guard seen.insert(key).inserted else {
-        return
-      }
-      candidates.append(compressed)
-    }
-
-    if let corridorHint = context.corridorHint {
-      let y = corridorHint.horizontalLaneY
-      append([
-        source,
-        CGPoint(x: source.x, y: y),
-        CGPoint(x: target.x, y: y),
-        target,
-      ])
-      if let x = corridorHint.verticalLaneX {
-        append([
-          source,
-          CGPoint(x: x, y: source.y),
-          CGPoint(x: x, y: target.y),
-          target,
-        ])
-      }
-      return candidates
-    }
-
-    if abs(source.x - target.x) < 0.001 || abs(source.y - target.y) < 0.001 {
-      append([source, target])
-    }
-    append([
-      source,
-      CGPoint(x: target.x, y: source.y),
-      target,
-    ])
-    append([
-      source,
-      CGPoint(x: source.x, y: target.y),
-      target,
-    ])
-    return candidates
-  }
-
-  private func searchObstacles(
-    source: CGPoint,
-    target: CGPoint,
-    context: PolicyCanvasRouteContext,
-    prepared: [CGRect]
-  ) -> [CGRect] {
-    guard prepared.count > 12 else {
-      return prepared
-    }
-    let candidatePoints = simpleVisibilityCandidatePoints(
-      source: source,
-      target: target,
-      context: context
-    )
-    let anchorBounds =
-      candidatePoints.isEmpty
-      ? routeBounds([source, target])
-      : candidatePoints.reduce(into: CGRect.null) { partial, points in
-        partial = partial.union(routeBounds(points))
-      }
-    let clearance = max(
-      PolicyCanvasLayout.nodeSize.width,
-      PolicyCanvasLayout.nodeSize.height,
-      context.lineSpacing * 8
-    )
-    let searchBounds = anchorBounds.insetBy(dx: -clearance, dy: -clearance)
-    let local = prepared.filter { $0.intersects(searchBounds) }
-    return local.isEmpty ? prepared : local
-  }
-
-  private func routeBounds(_ points: [CGPoint]) -> CGRect {
-    guard let first = points.first else {
-      return .null
-    }
-    return points.dropFirst().reduce(into: CGRect(origin: first, size: .zero)) { result, point in
-      result = result.union(CGRect(origin: point, size: .zero))
-    }
-  }
-
   /// One sparse-grid A* attempt at a given lane offset. Returns the
   /// post-processed (spread + channel-snapped) route, or `nil` when the grid
   /// indices cannot be located, A* finds no path, or the snapped route still
   /// intersects an obstacle - in which case the caller advances to the next
   /// lane offset or the fallback path.
-  private func visibilityRouteAttempt(
+  func visibilityRouteAttempt(
     source: CGPoint,
     target: CGPoint,
     context: PolicyCanvasRouteContext,
-    laneOffset: Int,
-    searchPrepared: [CGRect],
-    validationPrepared: [CGRect]
+    params: VisibilityAttemptParameters
   ) -> PolicyCanvasEdgeRoute? {
     let attemptContext =
-      laneOffset == 0
+      params.laneOffset == 0
       ? context
       : PolicyCanvasRouteContext(
-        lane: context.lane + laneOffset,
+        lane: context.lane + params.laneOffset,
         groups: context.groups,
         sourceGroupID: context.sourceGroupID,
         targetGroupID: context.targetGroupID,
@@ -405,7 +291,7 @@ public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       source: source,
       target: target,
       context: attemptContext,
-      prepared: searchPrepared
+      prepared: params.searchPrepared
     )
     guard
       let sx = gridAxes.xs.firstIndex(of: Self.quantizedCoordinate(source.x)),
@@ -421,7 +307,7 @@ public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
         gridYs: gridAxes.ys,
         sourceIndex: PolicyCanvasGridIndex(x: sx, y: sy),
         targetIndex: PolicyCanvasGridIndex(x: tx, y: ty),
-        obstacles: searchPrepared
+        obstacles: params.searchPrepared
       ),
       aStarResult.points.count >= 2
     else {
@@ -445,7 +331,7 @@ public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     // Shrink the obstacles by the snap tolerance for this check so a
     // <= channelStep/2 intrusion into the 15pt pad is not treated as a hit;
     // the real node body still clears by the remaining pad.
-    let snapValidationObstacles = validationPrepared.map {
+    let snapValidationObstacles = params.validationPrepared.map {
       $0.insetBy(dx: Self.channelStep / 2, dy: Self.channelStep / 2)
     }
     guard !policyCanvasRouteIntersectsObstacles(snapped, obstacles: snapValidationObstacles)
@@ -497,88 +383,6 @@ public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       let ownFrame = rect.insetBy(dx: -Self.endpointDropProbe, dy: -Self.endpointDropProbe)
       return !dropPoints.contains(where: { ownFrame.contains($0) })
     }
-  }
-
-  func visibilityGridAxes(
-    source: CGPoint,
-    target: CGPoint,
-    context: PolicyCanvasRouteContext,
-    prepared: [CGRect],
-    includeAllCorridorBounds: Bool = false
-  ) -> (xs: [CGFloat], ys: [CGFloat]) {
-    let corridorObstacles =
-      includeAllCorridorBounds
-      ? prepared
-      : prepared.filter {
-        max($0.width, $0.height) >= 220
-      }
-    let corridorStep = max(
-      PolicyCanvasLayout.edgePortTurnMinimumLead,
-      context.lineSpacing * 2
-    )
-    return (
-      xs: Self.sortedAxisCoordinates(
-        anchor1: source.x,
-        anchor2: target.x,
-        laneOffset: laneOffsetX(lane: context.lane, spacing: context.lineSpacing),
-        bounds: prepared.map { ($0.minX, $0.maxX) },
-        corridorBounds: corridorObstacles.map { ($0.minX, $0.maxX) },
-        corridorStep: corridorStep,
-        preferredCoordinates: context.corridorHint?.verticalLaneX.map { [$0] } ?? []
-      ),
-      ys: Self.sortedAxisCoordinates(
-        anchor1: source.y,
-        anchor2: target.y,
-        laneOffset: laneOffsetY(lane: context.lane, spacing: context.lineSpacing),
-        bounds: prepared.map { ($0.minY, $0.maxY) },
-        corridorBounds: corridorObstacles.map { ($0.minY, $0.maxY) },
-        corridorStep: corridorStep,
-        preferredCoordinates: context.corridorHint.map { [$0.horizontalLaneY] } ?? []
-      )
-    )
-  }
-
-  /// Snap a coordinate to a 0.001pt grid before Set insertion. Sub-pt
-  /// divergence from accumulated float math is below visual perception and
-  /// well above 1-ULP error; bit-different computations that should produce
-  /// the same logical value collapse to one grid line instead of doubling
-  /// the A* search space.
-  static func quantizedCoordinate(_ value: CGFloat) -> CGFloat {
-    (value * 1_000).rounded() / 1_000
-  }
-
-  static func sortedAxisCoordinates(
-    anchor1: CGFloat,
-    anchor2: CGFloat,
-    laneOffset: CGFloat,
-    bounds: [(CGFloat, CGFloat)],
-    corridorBounds: [(CGFloat, CGFloat)] = [],
-    corridorStep: CGFloat,
-    preferredCoordinates: [CGFloat] = []
-  ) -> [CGFloat] {
-    var values: Set<CGFloat> = [quantizedCoordinate(anchor1), quantizedCoordinate(anchor2)]
-    let mid = (anchor1 + anchor2) / 2 + laneOffset
-    values.insert(quantizedCoordinate(mid))
-    for coordinate in preferredCoordinates {
-      values.insert(quantizedCoordinate(coordinate))
-    }
-    for bound in corridorBounds {
-      values.insert(quantizedCoordinate(bound.0 - corridorStep))
-      values.insert(quantizedCoordinate(bound.1 + corridorStep))
-    }
-    for bound in bounds {
-      values.insert(quantizedCoordinate(bound.0))
-      values.insert(quantizedCoordinate(bound.1))
-    }
-    return values.sorted()
-  }
-
-  func laneOffsetX(lane: Int, spacing: CGFloat) -> CGFloat {
-    CGFloat(((lane % 12) - 6)) * spacing
-  }
-
-  func laneOffsetY(lane: Int, spacing: CGFloat) -> CGFloat {
-    CGFloat(((lane / 12) - 6)) * spacing
   }
 
 }
