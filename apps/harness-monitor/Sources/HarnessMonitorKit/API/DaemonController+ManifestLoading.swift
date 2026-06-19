@@ -121,12 +121,17 @@ extension DaemonController {
     guard let data = try? handle.readToEnd(), !data.isEmpty else {
       return nil
     }
-    let decoder = makeDecoder()
-
     for line in data.split(separator: UInt8(ascii: "\n")).reversed() {
-      guard let event = try? decoder.decode(DaemonAuditEvent.self, from: Data(line)),
-        let endpoint = Self.daemonListeningEndpoint(from: event.message)
+      guard
+        let wire = try? PolicyWireCoding.decoder.decode(
+          DaemonAuditEventWire.self,
+          from: Data(line)
+        )
       else {
+        continue
+      }
+      let event = DaemonAuditEvent(wire: wire)
+      guard let endpoint = Self.daemonListeningEndpoint(from: event.message) else {
         continue
       }
       return DaemonListeningEvent(endpoint: endpoint, recordedAt: event.recordedAt)
@@ -261,12 +266,6 @@ extension DaemonController {
     }
   }
 
-  func makeDecoder() -> JSONDecoder {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    return decoder
-  }
-
   func loadManifest(
     at manifestURL: URL,
     emitTrace: Bool
@@ -279,7 +278,8 @@ extension DaemonController {
       throw DaemonControlError.manifestUnreadable
     }
 
-    let manifest = try makeDecoder().decode(DaemonManifest.self, from: data)
+    let wire = try PolicyWireCoding.decoder.decode(DaemonManifestWire.self, from: data)
+    let manifest = DaemonManifest(wire: wire)
     externalManifestLocator.activate(manifestURL)
     let resolvedManifest = recoverManifestEndpointIfNeeded(manifest)
     if emitTrace {

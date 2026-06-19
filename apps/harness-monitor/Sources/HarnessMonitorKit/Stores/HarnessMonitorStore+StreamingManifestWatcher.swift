@@ -34,9 +34,12 @@ actor ManifestWatcherStartupWorker {
   func waitForIdle() async {}
 
   private static func decodeManifest(from data: Data) -> DaemonManifest? {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    return try? decoder.decode(DaemonManifest.self, from: data)
+    guard
+      let wire = try? PolicyWireCoding.decoder.decode(DaemonManifestWire.self, from: data)
+    else {
+      return nil
+    }
+    return DaemonManifest(wire: wire)
   }
 }
 

@@ -51,7 +51,6 @@ final class ManifestWatcher: Sendable {
   private let directoryPath: String
   private let manifestPath: String
   private let onChange: @Sendable (ManifestChange) -> Void
-  private let decoder: JSONDecoder
   private let state: Mutex<ManifestWatcherState>
 
   init(
@@ -64,9 +63,6 @@ final class ManifestWatcher: Sendable {
     self.directoryPath = manifestURL.deletingLastPathComponent().path
     self.manifestPath = manifestURL.path
     self.onChange = onChange
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    self.decoder = decoder
     self.state = Mutex(
       ManifestWatcherState(
         lastEndpoint: currentEndpoint,
@@ -149,7 +145,8 @@ final class ManifestWatcher: Sendable {
     }
     let manifest: DaemonManifest
     do {
-      manifest = try decoder.decode(DaemonManifest.self, from: data)
+      let wire = try PolicyWireCoding.decoder.decode(DaemonManifestWire.self, from: data)
+      manifest = DaemonManifest(wire: wire)
     } catch {
       HarnessMonitorLogger.lifecycle.warning(
         """

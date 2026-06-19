@@ -82,11 +82,10 @@ extension HarnessMonitorStore {
         return .failure("Failed to read daemon manifest at \(manifestURL.path)")
       }
 
-      let decoder = JSONDecoder()
-      decoder.keyDecodingStrategy = .convertFromSnakeCase
       let manifest: DaemonManifest
       do {
-        manifest = try decoder.decode(DaemonManifest.self, from: data)
+        let wire = try PolicyWireCoding.decoder.decode(DaemonManifestWire.self, from: data)
+        manifest = DaemonManifest(wire: wire)
       } catch {
         return .failure(
           "Failed to decode daemon manifest at \(manifestURL.path): \(error.localizedDescription)"

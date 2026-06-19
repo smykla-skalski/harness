@@ -9,8 +9,9 @@ struct FlatErrorEnvelope: Decodable {
 
 extension HarnessMonitorAPIClient {
   static func decodeError(statusCode: Int, data: Data) -> HarnessMonitorAPIError {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    // ErrorEnvelope/FlatErrorEnvelope are all single-word keys, so the plain decoder
+    // (no key strategy) decodes them identically - no convertFromSnakeCase needed.
+    let decoder = PolicyWireCoding.decoder
 
     if let envelope = try? decoder.decode(ErrorEnvelope.self, from: data) {
       let rawMessage = String(data: data, encoding: .utf8) ?? envelope.error.message
