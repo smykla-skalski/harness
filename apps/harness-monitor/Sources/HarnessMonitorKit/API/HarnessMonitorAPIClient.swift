@@ -21,9 +21,7 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
       self.session = URLSession(configuration: configuration)
     }
 
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    self.decoder = decoder
+    self.decoder = JSONDecoder()
 
     let encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase
