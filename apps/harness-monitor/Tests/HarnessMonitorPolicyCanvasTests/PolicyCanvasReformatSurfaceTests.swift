@@ -47,13 +47,18 @@ struct PolicyCanvasReformatSurfaceTests {
       named: "Views/PolicyCanvas/PolicyCanvasViewport+Dispatchers.swift"
     )
 
+    let forcedReformatRequest =
+      "viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)"
+
     // Production reformat triggers route the new layout off-main before
-    // publishing it (atomic reveal), using the forced default so saved
-    // coordinates and lab samples go through the same engine pass; none call
-    // the synchronous reflow directly.
-    #expect(layoutSource.contains("viewModel.requestAtomicReflow()"))
-    #expect(chromeSource.contains("viewModel.requestAtomicReflow()"))
-    #expect(dispatcherSource.contains("viewModel.requestAtomicReflow()"))
+    // publishing it (atomic reveal), and it strips saved/manual anchors so the
+    // visible app action uses the same unconstrained engine pass as the lab.
+    #expect(layoutSource.contains(forcedReformatRequest))
+    #expect(chromeSource.contains(forcedReformatRequest))
+    #expect(dispatcherSource.contains(forcedReformatRequest))
+    #expect(!layoutSource.contains("viewModel.requestAtomicReflow()"))
+    #expect(!chromeSource.contains("viewModel.requestAtomicReflow()"))
+    #expect(!dispatcherSource.contains("viewModel.requestAtomicReflow()"))
     #expect(!layoutSource.contains("viewModel.reflowLayout("))
     #expect(!chromeSource.contains("viewModel.reflowLayout("))
     #expect(!dispatcherSource.contains("viewModel.reflowLayout("))

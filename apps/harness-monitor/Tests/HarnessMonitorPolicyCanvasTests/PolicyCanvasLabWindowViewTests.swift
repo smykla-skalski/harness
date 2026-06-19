@@ -566,7 +566,7 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
   }
 
   @MainActor
-  func testProductionAndLabForcedDefaultReformatMatch() throws {
+  func testProductionAndLabForcedDefaultReformatMatch() async throws {
     let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "default"))
     let productionViewModel = PolicyCanvasViewModel.liveStartupState(
       document: sample.document,
@@ -582,12 +582,21 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
       policyGroupTitle: sample.name
     )
 
-    productionViewModel.reflowLayout(force: true)
+    productionViewModel.reflowLayout(preserveManualAnchors: false, force: true)
     labViewModel.reflowLayout(preserveManualAnchors: false, force: true)
 
     XCTAssertEqual(nodePositionsByID(productionViewModel), nodePositionsByID(labViewModel))
     XCTAssertEqual(groupFramesByID(productionViewModel), groupFramesByID(labViewModel))
     XCTAssertEqual(productionViewModel.routingHints, labViewModel.routingHints)
+    XCTAssertEqual(productionViewModel.precomputedRoutes, labViewModel.precomputedRoutes)
+    let productionRoutes = await routeOutput(for: productionViewModel)
+    let labRoutes = await routeOutput(for: labViewModel)
+    XCTAssertEqual(productionRoutes.routes, labRoutes.routes)
+    XCTAssertEqual(productionRoutes.labelPositions, labRoutes.labelPositions)
+    XCTAssertEqual(productionRoutes.portVisibility, labRoutes.portVisibility)
+    XCTAssertEqual(productionRoutes.portMarkerLayout, labRoutes.portMarkerLayout)
+    XCTAssertEqual(productionRoutes.visibleBounds, labRoutes.visibleBounds)
+    XCTAssertEqual(productionRoutes.contentSize, labRoutes.contentSize)
   }
 
   @MainActor
@@ -629,15 +638,21 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
       named: "PolicyCanvasViewport+Dispatchers.swift"
     )
 
-    // Lab and production Reformat both force the engine layout, but lab strips
-    // manual anchors so algorithm comparisons always start from the same graph.
+    let forcedReformatRequest =
+      "requestAtomicReflow(preserveManualAnchors: false, force: true)"
+
+    // Lab and production Reformat both force the engine layout and strip manual
+    // anchors so they start from the same graph.
     XCTAssertTrue(
-      surfaceSource.contains("requestAtomicReflow(preserveManualAnchors: false, force: true)")
+      surfaceSource.contains(forcedReformatRequest)
     )
     XCTAssertFalse(surfaceSource.contains("viewModel.reflowLayout("))
-    XCTAssertTrue(chromeSource.contains("viewModel.requestAtomicReflow()"))
-    XCTAssertTrue(layoutSource.contains("viewModel.requestAtomicReflow()"))
-    XCTAssertTrue(dispatcherSource.contains("viewModel.requestAtomicReflow()"))
+    XCTAssertTrue(chromeSource.contains("viewModel.\(forcedReformatRequest)"))
+    XCTAssertTrue(layoutSource.contains("viewModel.\(forcedReformatRequest)"))
+    XCTAssertTrue(dispatcherSource.contains("viewModel.\(forcedReformatRequest)"))
+    XCTAssertFalse(chromeSource.contains("viewModel.requestAtomicReflow()"))
+    XCTAssertFalse(layoutSource.contains("viewModel.requestAtomicReflow()"))
+    XCTAssertFalse(dispatcherSource.contains("viewModel.requestAtomicReflow()"))
     XCTAssertFalse(chromeSource.contains("viewModel.reflowLayout()"))
   }
 
@@ -722,5 +737,23 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
       )
       .appendingPathComponent(name)
     return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  @MainActor
+  private func routeOutput(
+    for viewModel: PolicyCanvasViewModel
+  ) async -> PolicyCanvasRouteWorkerOutput {
+    await PolicyCanvasRouteWorker(router: PolicyCanvasVisibilityRouter()).compute(
+      input: PolicyCanvasRouteWorkerInput(
+        graphGeneration: viewModel.routeComputationGeneration,
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        fontScale: 1,
+        routingHints: viewModel.routingHints,
+        precomputedRoutes: viewModel.precomputedRoutes,
+        algorithmSelection: viewModel.algorithmSelection
+      )
+    )
   }
 }

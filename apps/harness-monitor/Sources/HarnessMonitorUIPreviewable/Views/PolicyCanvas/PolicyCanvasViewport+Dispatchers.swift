@@ -24,7 +24,7 @@ func policyCanvasLayoutFocusDispatcher(
 ) -> PolicyCanvasLayoutFocusDispatcher {
   let dispatcher = PolicyCanvasLayoutFocusDispatcher()
   dispatcher.reflowLayout = {
-    viewModel.requestAtomicReflow()
+    viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
   }
   return dispatcher
 }
