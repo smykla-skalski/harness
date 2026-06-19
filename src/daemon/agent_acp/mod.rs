@@ -45,6 +45,7 @@
 //!   per-logical-session registration and disconnect guarantees.
 
 mod active;
+mod event_frame;
 mod local_runtime;
 mod manager;
 pub(crate) mod permission_bridge;

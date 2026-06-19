@@ -296,7 +296,8 @@ extension WebSocketTransport {
       return
     }
     do {
-      let batch: AcpEventBatchPayload = try decode(payload)
+      let wire: AcpEventBatchPayloadWire = try decodePolicyWire(payload)
+      let batch = try AcpEventBatchPayload(wire: wire)
       guard batch.sessionId == sessionId else {
         HarnessMonitorLogger.websocket.warning(
           """

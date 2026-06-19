@@ -1265,6 +1265,11 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     // task_board git signing verify outcome (daemon/protocol/task_board.rs): an internally-tagged
     // (tag = "outcome") enum with unit + struct variants, emitted as a Swift associated-value enum.
     "TaskBoardGitSigningVerifyResponse",
+    // acp_events broadcast push frame (daemon/agent_acp/event_frame.rs) + its conversation event
+    // (agents/runtime/event.rs). ConversationEvent.kind rides through as JSONValue (passthrough);
+    // managed_agent_family is the bare ManagedAgentKind the map validates is acp.
+    "AcpEventBatchPayload",
+    "ConversationEvent",
 ];
 
 /// Rust serde types the generator must NOT emit for a module even though they
@@ -1842,6 +1847,9 @@ const JSON_PASSTHROUGH_FIELDS: &[(&str, &str)] = &[
     // The hand AgentRegistration init collapses it to a String, so the wire passes the payload
     // through as JSONValue and the map re-reads it.
     ("AgentRegistrationWire", "runtime"),
+    // ConversationEvent.kind is the richly-tagged ConversationEventKind; the Swift hand
+    // AcpConversationEvent keeps it opaque as JSONValue, so the wire passes the payload through.
+    ("ConversationEvent", "kind"),
 ];
 
 /// Whether `(struct_name, field_name)` is in `JSON_PASSTHROUGH_FIELDS`.
@@ -2644,6 +2652,14 @@ const GIT_SIGNING_VERIFY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMon
 // a unit variant (skipped), a two-field struct variant (signed: mode + signature_kind) and a
 // single-field struct variant (failed: message); the generator emits a Swift associated-value enum.
 const GIT_SIGNING_VERIFY_EMIT_ONLY: &[&str] = &["TaskBoardGitSigningVerifyResponse"];
+const ACP_EVENT_FRAME_SOURCE: &str = include_str!("../src/daemon/agent_acp/event_frame.rs");
+const ACP_CONVERSATION_EVENT_SOURCE: &str = include_str!("../src/agents/runtime/event.rs");
+const ACP_EVENT_BATCH_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpEventBatchWireTypes.generated.swift";
+// The acp_events broadcast push frame + its conversation event. The frame's managed_agent_family is
+// the bare ManagedAgentKind (the map validates it is acp); ConversationEvent.kind is the richly
+// tagged ConversationEventKind the Swift side keeps opaque, so it rides through as JSONValue
+// (JSON_PASSTHROUGH_FIELDS) and the event kind enum is never emitted.
+const ACP_EVENT_BATCH_EMIT_ONLY: &[&str] = &["AcpEventBatchPayload", "ConversationEvent"];
 
 /// One Rust -> Swift wire-type module: the Rust sources whose serde types are
 /// emitted, zero or more defaults sources informing decode defaults, a short
@@ -2959,6 +2975,12 @@ fn modules() -> Vec<GeneratedModule> {
             defaults: &[],
             sources: &[TASK_BOARD_PROTOCOL_SOURCE],
         },
+        GeneratedModule {
+            output: ACP_EVENT_BATCH_OUTPUT,
+            description: "the Rust acp_events broadcast push frame and conversation event",
+            defaults: &[],
+            sources: &[ACP_EVENT_FRAME_SOURCE, ACP_CONVERSATION_EVENT_SOURCE],
+        },
     ]
 }
 
@@ -3017,6 +3039,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         ORCHESTRATOR_OUTPUT => ORCHESTRATOR_EMIT_ONLY,
         GIT_RUNTIME_OUTPUT => GIT_RUNTIME_EMIT_ONLY,
         GIT_SIGNING_VERIFY_OUTPUT => GIT_SIGNING_VERIFY_EMIT_ONLY,
+        ACP_EVENT_BATCH_OUTPUT => ACP_EVENT_BATCH_EMIT_ONLY,
         _ => &[],
     };
     for source in module.sources {

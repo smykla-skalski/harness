@@ -64,3 +64,37 @@ extension TimelineWindowResponse {
     )
   }
 }
+
+// The acp_events broadcast push frame. The conversation event is a field-identical mirror (kind is
+// already JSONValue both sides); the batch map validates managed_agent_family is acp - the throwing
+// contract the hand requireAcpManagedAgentFamily used to enforce at decode time.
+extension AcpConversationEvent {
+  init(wire: ConversationEventWire) {
+    self.init(
+      timestamp: wire.timestamp,
+      sequence: wire.sequence,
+      kind: wire.kind,
+      agent: wire.agent,
+      sessionId: wire.sessionId
+    )
+  }
+}
+
+extension AcpEventBatchPayload {
+  init(wire: AcpEventBatchPayloadWire) throws {
+    guard wire.managedAgentFamily == .acp else {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: [],
+          debugDescription: "managed_agent_family must be 'acp'"
+        )
+      )
+    }
+    self.init(
+      acpId: wire.managedAgentId,
+      sessionId: wire.sessionId,
+      rawCount: Int(wire.rawCount),
+      events: wire.events.map(AcpConversationEvent.init(wire:))
+    )
+  }
+}

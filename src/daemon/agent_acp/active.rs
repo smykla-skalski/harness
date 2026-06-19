@@ -15,6 +15,7 @@ use crate::errors::CliError;
 use crate::session::types::{AgentStatus, ManagedAgentKind};
 use crate::workspace::utc_now;
 
+use super::event_frame::AcpEventBatchPayload;
 use super::manager::{AcpAgentManagerHandle, AcpAgentSnapshot};
 
 const STDERR_TAIL_LIMIT: usize = 16 * 1024;
@@ -98,25 +99,37 @@ pub(super) fn spawn_event_forwarder(
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         while let Some(batch) = events.recv().await {
-            let payload = serde_json::json!({
-                "managed_agent_id": batch.acp_id,
-                "managed_agent_family": ManagedAgentKind::Acp,
-                "session_id": batch.session_id,
-                "raw_count": batch.raw_count,
-                "events": batch.events,
-            });
+            let frame = AcpEventBatchPayload {
+                managed_agent_id: batch.acp_id,
+                managed_agent_family: ManagedAgentKind::Acp,
+                session_id: batch.session_id,
+                raw_count: batch.raw_count,
+                events: batch.events,
+            };
+            let payload = match serde_json::to_value(&frame) {
+                Ok(payload) => payload,
+                Err(error) => {
+                    tracing::warn!(?error, "dropping acp_events frame: serialize failed");
+                    continue;
+                }
+            };
+            // Move the owned fields back out of the frame so the event Vec reaches
+            // the persist closure without a clone (the serialize above only borrowed).
+            let AcpEventBatchPayload {
+                session_id,
+                events: batch_events,
+                ..
+            } = frame;
             let _ = sender.send(StreamEvent {
                 event: "acp_events".to_string(),
                 recorded_at: utc_now(),
-                session_id: Some(batch.session_id),
+                session_id: Some(session_id),
                 payload,
             });
             if let Some(persistence) = persistence.clone() {
                 let persist_session_id = persistence.session_id.clone();
                 let persist_agent_id = persistence.agent_id.clone();
-                // `json!` above only borrows `batch.events`, so the Vec is free
-                // to move into the persist closure - no clone needed.
-                let persisted_events = batch.events;
+                let persisted_events = batch_events;
                 match spawn_blocking(move || persistence.persist(&persisted_events)).await {
                     Ok(Ok(())) => {}
                     Ok(Err(error)) => tracing::warn!(
