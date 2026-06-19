@@ -225,7 +225,11 @@ final class IntentConnectionResolverTests: XCTestCase {
   // MARK: - helpers
 
   private func writeManifest(_ manifest: DaemonManifest, to url: URL) throws {
+    // The daemon serializes the manifest with snake_case keys, which is what the
+    // resolver decodes through the generated DaemonManifestWire. Encode the same
+    // shape so the fixtures exercise the real wire contract, not camelCase.
     let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     let data = try encoder.encode(manifest)
     try data.write(to: url)

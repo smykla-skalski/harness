@@ -48,9 +48,8 @@ public enum IntentConnectionResolver {
       )
     }
     do {
-      let decoder = JSONDecoder()
-      decoder.keyDecodingStrategy = .convertFromSnakeCase
-      return try decoder.decode(DaemonManifest.self, from: data)
+      let wire = try PolicyWireCoding.decoder.decode(DaemonManifestWire.self, from: data)
+      return DaemonManifest(wire: wire)
     } catch {
       throw IntentDaemonError.manifestMalformed(
         path: url.path,

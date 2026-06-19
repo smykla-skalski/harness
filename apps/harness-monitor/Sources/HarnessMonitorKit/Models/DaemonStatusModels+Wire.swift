@@ -23,7 +23,7 @@ extension DaemonDiagnosticsReport {
 }
 
 extension DaemonManifest {
-  init(wire: DaemonManifestWire) {
+  public init(wire: DaemonManifestWire) {
     self.init(
       version: wire.version,
       pid: Int(wire.pid),
