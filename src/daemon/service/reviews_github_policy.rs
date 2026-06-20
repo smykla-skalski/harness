@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use crate::errors::{CliError, CliErrorKind};
 use crate::reviews::policy::review_target_policy_evidence;
 use crate::reviews::{ReviewTarget, ReviewsFileCommentRequest};
 use crate::task_board::policy_graph::{
-    RecordedPolicyDecision, cached_gate_policy, record_policy_decision,
+    CachedGatePolicy, RecordedPolicyDecision, cached_gate_policy, record_policy_decision,
 };
 use crate::task_board::store::default_board_root;
 use crate::task_board::{
@@ -59,7 +61,7 @@ pub(crate) fn enforce_review_targets_policy(
     mutation: ReviewsGitHubMutation,
     targets: &[ReviewTarget],
 ) -> Result<(), CliError> {
-    let document = enforced_reviews_github_policy_document(mutation)?;
+    let entry = enforced_reviews_github_policy_entry(mutation)?;
     for target in targets {
         let input = PolicyInput {
             workflow: None,
@@ -71,7 +73,13 @@ pub(crate) fn enforce_review_targets_policy(
             },
             evidence: review_target_policy_evidence(target),
         };
-        enforce_reviews_policy_input(mutation, &document, &input, Some(target))?;
+        enforce_reviews_policy_input(
+            mutation,
+            &entry.document,
+            &input,
+            Some(target),
+            entry.canvas_id.as_deref(),
+        )?;
     }
     Ok(())
 }
@@ -95,7 +103,7 @@ pub(crate) fn enforce_review_pull_request_policy(
     paths: &[String],
 ) -> Result<(), CliError> {
     let pull_request_id = pull_request_id.trim();
-    let document = enforced_reviews_github_policy_document(mutation)?;
+    let entry = enforced_reviews_github_policy_entry(mutation)?;
     let input = PolicyInput {
         workflow: None,
         action: mutation.policy_action(),
@@ -107,26 +115,32 @@ pub(crate) fn enforce_review_pull_request_policy(
         },
         evidence: PolicyEvidence::default(),
     };
-    enforce_reviews_policy_input(mutation, &document, &input, None)
+    enforce_reviews_policy_input(
+        mutation,
+        &entry.document,
+        &input,
+        None,
+        entry.canvas_id.as_deref(),
+    )
 }
 
-fn enforced_reviews_github_policy_document(
+fn enforced_reviews_github_policy_entry(
     mutation: ReviewsGitHubMutation,
-) -> Result<PolicyGraph, CliError> {
+) -> Result<Arc<CachedGatePolicy>, CliError> {
     let root = default_board_root();
-    let Some(document) = cached_gate_policy(&root) else {
+    let Some(cached) = cached_gate_policy(&root) else {
         return Err(disabled_reviews_policy_error(
             mutation,
             "no enforced policy canvas is active",
         ));
     };
-    if document.mode != PolicyGraphMode::Enforced {
+    if cached.mode != PolicyGraphMode::Enforced {
         return Err(disabled_reviews_policy_error(
             mutation,
             "no enforced policy canvas is active",
         ));
     }
-    Ok((*document).clone())
+    Ok(cached)
 }
 
 fn enforce_reviews_policy_input(
@@ -134,6 +148,7 @@ fn enforce_reviews_policy_input(
     document: &PolicyGraph,
     input: &PolicyInput,
     target: Option<&ReviewTarget>,
+    canvas_id: Option<&str>,
 ) -> Result<(), CliError> {
     let simulation = document.simulate(input);
     if !policy_graph_covers_input(document, &simulation.visited_node_ids) {
@@ -142,13 +157,16 @@ fn enforce_reviews_policy_input(
             "the enforced policy canvas does not cover this action",
         ));
     }
-    record_policy_decision(RecordedPolicyDecision::new(
-        document.revision,
-        input.clone(),
-        simulation.decision.clone(),
-        simulation.visited_node_ids.clone(),
-        "reviews_github",
-    ));
+    record_policy_decision(
+        RecordedPolicyDecision::new(
+            document.revision,
+            input.clone(),
+            simulation.decision.clone(),
+            simulation.visited_node_ids.clone(),
+            "reviews_github",
+        )
+        .with_canvas_id(canvas_id.map(str::to_owned)),
+    );
     if simulation.decision.is_allow() {
         return Ok(());
     }

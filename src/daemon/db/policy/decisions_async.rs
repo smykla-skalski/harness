@@ -337,6 +337,17 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn writer_round_trips_canvas_id() {
+        let (_dir, db) = connect().await;
+        let record = sample_record(1).with_canvas_id(Some("canvas-xyz".to_owned()));
+        db.record_policy_decision_row(&record)
+            .await
+            .expect("record");
+        let read = db.recent_policy_decisions(1).await.expect("read");
+        assert_eq!(read[0].canvas_id.as_deref(), Some("canvas-xyz"));
+    }
+
+    #[tokio::test]
     async fn reader_round_trips_records_and_honors_limit() {
         let (_dir, db) = connect().await;
         for revision in 0..3 {
@@ -370,13 +381,18 @@ mod tests {
             let mut record = sample_record(second);
             record.id = format!("policy-decision-{second}");
             record.recorded_at = format!("2026-06-20T10:00:0{second}Z");
-            db.record_policy_decision_row(&record).await.expect("record");
+            db.record_policy_decision_row(&record)
+                .await
+                .expect("record");
         }
 
         let removed = db.prune_policy_decisions(2).await.expect("prune");
         assert_eq!(removed, 3);
 
-        let remaining = db.recent_policy_decisions(10).await.expect("read remaining");
+        let remaining = db
+            .recent_policy_decisions(10)
+            .await
+            .expect("read remaining");
         let mut survivors: Vec<String> = remaining
             .iter()
             .map(|record| record.recorded_at.clone())
@@ -401,9 +417,6 @@ mod tests {
         }
         let removed = db.prune_policy_decisions(100).await.expect("prune");
         assert_eq!(removed, 0);
-        assert_eq!(
-            db.recent_policy_decisions(10).await.expect("read").len(),
-            3
-        );
+        assert_eq!(db.recent_policy_decisions(10).await.expect("read").len(), 3);
     }
 }

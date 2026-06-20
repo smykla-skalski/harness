@@ -55,11 +55,11 @@ async fn load_or_seed_workspace(db: &AsyncDaemonDb) -> Result<PolicyCanvasWorksp
 /// Refresh the synchronous gating cache with the active enforced canvas
 /// document so the allow/deny hot path never re-reads the database.
 fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
-    policy_graph::store_gate_policy(
+    policy_graph::store_gate_policy_entry(
         &default_board_root(),
-        workspace
-            .active_enforced_canvas()
-            .map(|canvas| canvas.document.clone()),
+        workspace.active_enforced_canvas().map(|canvas| {
+            policy_graph::CachedGatePolicy::for_canvas(canvas.id.clone(), canvas.document.clone())
+        }),
     );
 }
 
@@ -327,10 +327,13 @@ pub(crate) async fn save_task_board_policy_pipeline_draft(
         .await?;
     if saved.response.persisted {
         if saved.saved_active_canvas() {
-            let document = saved
-                .global_policy_enforcement_enabled
-                .then(|| saved.response.document.clone());
-            policy_graph::store_gate_policy(&default_board_root(), document);
+            let entry = saved.global_policy_enforcement_enabled.then(|| {
+                policy_graph::CachedGatePolicy::for_canvas(
+                    canvas_id,
+                    saved.response.document.clone(),
+                )
+            });
+            policy_graph::store_gate_policy_entry(&default_board_root(), entry);
         }
         bump_change_policy(db).await;
     }

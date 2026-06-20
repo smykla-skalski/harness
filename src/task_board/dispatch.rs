@@ -308,7 +308,7 @@ fn dispatch_policy(item: &TaskBoardItem, policy_root: &Path) -> PolicyDecision {
     if let Some(document) = resolve_gate_policy(policy_root)
         && document.mode != PolicyPipelineMode::Draft
     {
-        return GraphPolicyGate::new((*document).clone()).evaluate(&input);
+        return GraphPolicyGate::new((**document).clone()).evaluate(&input);
     }
     BuiltInPolicyGate::default().evaluate(&input)
 }

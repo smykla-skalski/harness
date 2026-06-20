@@ -10,8 +10,8 @@ use crate::daemon::state;
 use crate::errors::CliError;
 use crate::task_board::default_board_root;
 use crate::task_board::policy_graph::{
-    PolicyCanvasWorkspace, PolicyGraph, RecordedPolicyDecision, install_decision_sink,
-    install_gate_coldfill, store_gate_policy,
+    CachedGatePolicy, PolicyCanvasWorkspace, PolicyGraph, RecordedPolicyDecision,
+    install_decision_sink, install_gate_coldfill, store_gate_policy_entry,
 };
 
 /// Wire policy storage at daemon boot: install the cold-read seam and warm the
@@ -101,11 +101,11 @@ async fn warm_gate_cache(async_db: &AsyncDaemonDb) -> Result<(), CliError> {
         async_db.replace_policy_workspace(&seeded).await?;
         seeded
     };
-    store_gate_policy(
+    store_gate_policy_entry(
         &default_board_root(),
         workspace
             .active_enforced_canvas()
-            .map(|canvas| canvas.document.clone()),
+            .map(|canvas| CachedGatePolicy::for_canvas(canvas.id.clone(), canvas.document.clone())),
     );
     Ok(())
 }

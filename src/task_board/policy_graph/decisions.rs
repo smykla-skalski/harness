@@ -63,6 +63,15 @@ impl RecordedPolicyDecision {
         }
     }
 
+    /// Attach the originating canvas id. The recording seam sets this from the
+    /// gate cache so the feed carries decision provenance; [`Self::new`] leaves
+    /// it `None`.
+    #[must_use]
+    pub fn with_canvas_id(mut self, canvas_id: Option<String>) -> Self {
+        self.canvas_id = canvas_id;
+        self
+    }
+
     /// Stable `snake_case` tag for the decision variant, stored as its own
     /// column so the feed can be filtered without decoding the decision payload.
     #[must_use]
@@ -141,6 +150,14 @@ mod tests {
         let deny = RecordedPolicyDecision::new(7, sample_input(), deny_decision(), vec![], "test");
         assert!(deny.enforced);
         assert_eq!(deny.decision_tag(), "deny");
+    }
+
+    #[test]
+    fn with_canvas_id_attaches_provenance() {
+        let record =
+            RecordedPolicyDecision::new(1, sample_input(), allow_decision(), vec![], "test")
+                .with_canvas_id(Some("canvas-7".to_owned()));
+        assert_eq!(record.canvas_id.as_deref(), Some("canvas-7"));
     }
 
     #[test]

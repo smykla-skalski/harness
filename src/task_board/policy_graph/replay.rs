@@ -107,7 +107,7 @@ const fn reason_code(decision: &PolicyDecision) -> PolicyReasonCode {
 mod tests {
     use super::*;
     use crate::task_board::PolicyInput;
-    use crate::task_board::policy_graph::TASK_BOARD_POLICY_VERSION;
+    use crate::task_board::policy::TASK_BOARD_POLICY_VERSION;
 
     fn record(input: PolicyInput, decision: PolicyDecision) -> RecordedPolicyDecision {
         RecordedPolicyDecision::new(1, input, decision, vec![], "test")

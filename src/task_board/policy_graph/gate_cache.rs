@@ -13,6 +13,7 @@
 //! `task_board::store::parse_cache::BOARD_PARSE_CACHE` idiom.
 
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, OnceLock};
 
@@ -20,7 +21,36 @@ use arc_swap::ArcSwap;
 
 use super::PolicyGraph;
 
-type GatePolicyMap = HashMap<PathBuf, Arc<PolicyGraph>>;
+/// A cached active gating policy plus the identity of the canvas it came from.
+///
+/// The synchronous gate reads the document to decide allow/deny; the recording
+/// seam reads `canvas_id` to stamp each decision with its provenance. The type
+/// derefs to the document so existing gating callers read the graph unchanged.
+#[derive(Debug)]
+pub(crate) struct CachedGatePolicy {
+    pub canvas_id: Option<String>,
+    pub document: PolicyGraph,
+}
+
+impl CachedGatePolicy {
+    /// Build a cached entry tagged with the originating canvas id.
+    pub(crate) fn for_canvas(canvas_id: impl Into<String>, document: PolicyGraph) -> Self {
+        Self {
+            canvas_id: Some(canvas_id.into()),
+            document,
+        }
+    }
+}
+
+impl Deref for CachedGatePolicy {
+    type Target = PolicyGraph;
+
+    fn deref(&self) -> &PolicyGraph {
+        &self.document
+    }
+}
+
+type GatePolicyMap = HashMap<PathBuf, Arc<CachedGatePolicy>>;
 
 /// Cold-read hook installed at daemon boot. When the warm cache misses, the
 /// gating path falls through to this seam, which reads the active canvas
@@ -45,23 +75,36 @@ pub(crate) fn install_gate_coldfill(hook: GateColdfill) {
 /// access and no deserialization. Returns `None` until the root is first
 /// populated by a write or the startup warm.
 #[must_use]
-pub(crate) fn cached_gate_policy(root: &Path) -> Option<Arc<PolicyGraph>> {
+pub(crate) fn cached_gate_policy(root: &Path) -> Option<Arc<CachedGatePolicy>> {
     ACTIVE_GATE_POLICY.load().get(root).cloned()
 }
 
-/// Swap the cached active gating policy for `root`, inserting `document` or
-/// clearing the entry when `None`.
+/// Test-only convenience: cache a bare gating policy with no canvas identity.
 ///
-/// Called after each successful policy write/promotion and at daemon startup.
-/// The swap is atomic; concurrent gating reads observe either the previous or
-/// the new graph, never a torn value.
+/// Production write paths use [`store_gate_policy_entry`] so the recording seam
+/// can stamp each decision with the canvas it came from; tests that only
+/// exercise allow/deny do not care about provenance and set a bare graph.
+#[cfg(test)]
 pub(crate) fn store_gate_policy(root: &Path, document: Option<PolicyGraph>) {
-    let entry = document.map(Arc::new);
+    store_gate_policy_entry(
+        root,
+        document.map(|document| CachedGatePolicy {
+            canvas_id: None,
+            document,
+        }),
+    );
+}
+
+/// Swap the cached gating entry for `root`, carrying the canvas identity so the
+/// recording seam can stamp decision provenance. Inserts `entry` or clears the
+/// root when `None`. The swap is atomic; concurrent reads never see a torn value.
+pub(crate) fn store_gate_policy_entry(root: &Path, entry: Option<CachedGatePolicy>) {
+    let entry = entry.map(Arc::new);
     ACTIVE_GATE_POLICY.rcu(|current| {
         let mut next = current.as_ref().clone();
         match &entry {
-            Some(document) => {
-                next.insert(root.to_path_buf(), Arc::clone(document));
+            Some(entry) => {
+                next.insert(root.to_path_buf(), Arc::clone(entry));
             }
             None => {
                 next.remove(root);
@@ -74,8 +117,15 @@ pub(crate) fn store_gate_policy(root: &Path, document: Option<PolicyGraph>) {
 /// Resolve the active gating policy for `root`: the warm process cache when
 /// present, otherwise a cold read from the durable store. The cold read does
 /// not populate the cache; the policy write path keeps the cache current.
-pub(crate) fn resolve_gate_policy(root: &Path) -> Option<Arc<PolicyGraph>> {
-    cached_gate_policy(root).or_else(|| GATE_COLDFILL.get().and_then(|hook| hook()).map(Arc::new))
+pub(crate) fn resolve_gate_policy(root: &Path) -> Option<Arc<CachedGatePolicy>> {
+    cached_gate_policy(root).or_else(|| {
+        GATE_COLDFILL.get().and_then(|hook| hook()).map(|document| {
+            Arc::new(CachedGatePolicy {
+                canvas_id: None,
+                document,
+            })
+        })
+    })
 }
 
 #[cfg(test)]
@@ -96,9 +146,28 @@ mod tests {
         let root = key("round-trip");
         store_gate_policy(&root, Some(PolicyGraph::seeded_v2()));
         let cached = cached_gate_policy(&root).expect("policy cached");
-        assert_eq!(cached.as_ref(), &PolicyGraph::seeded_v2());
+        assert_eq!(cached.document, PolicyGraph::seeded_v2());
+        assert!(cached.canvas_id.is_none());
         store_gate_policy(&root, None);
         assert!(cached_gate_policy(&root).is_none());
+    }
+
+    #[test]
+    fn entry_round_trips_canvas_id() {
+        let root = key("entry-canvas");
+        store_gate_policy_entry(
+            &root,
+            Some(CachedGatePolicy::for_canvas(
+                "canvas-9",
+                PolicyGraph::seeded_v2(),
+            )),
+        );
+        let cached = cached_gate_policy(&root).expect("entry cached");
+        assert_eq!(cached.canvas_id.as_deref(), Some("canvas-9"));
+        assert_eq!(cached.document, PolicyGraph::seeded_v2());
+        // Deref keeps gating reads working through the wrapper.
+        assert_eq!(cached.mode, PolicyGraph::seeded_v2().mode);
+        store_gate_policy(&root, None);
     }
 
     #[test]

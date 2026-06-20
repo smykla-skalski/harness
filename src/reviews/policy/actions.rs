@@ -222,7 +222,7 @@ pub(crate) fn authored_reviews_policy_plan(
 
 fn enforced_reviews_policy_document(root: &Path) -> Option<PolicyGraph> {
     let document = cached_gate_policy(root)?;
-    (document.mode == PolicyGraphMode::Enforced).then(|| (*document).clone())
+    (document.mode == PolicyGraphMode::Enforced).then(|| (**document).clone())
 }
 
 fn policy_action(

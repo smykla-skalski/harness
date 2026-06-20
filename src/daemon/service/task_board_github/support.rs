@@ -228,7 +228,7 @@ pub(super) fn action_policy(
     if let Some(document) = resolve_gate_policy(board_root)
         && document.mode != PolicyPipelineMode::Draft
     {
-        return GraphPolicyGate::new((*document).clone()).evaluate(&policy_input);
+        return GraphPolicyGate::new((**document).clone()).evaluate(&policy_input);
     }
     BuiltInPolicyGate::default().evaluate(&policy_input)
 }
