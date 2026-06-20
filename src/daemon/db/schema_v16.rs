@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use super::{CliError, db_error};
 
 /// Historical v16 migration. The active code no longer reads this column, but
-/// the SQLx migration identity must stay stable for existing local databases.
+/// the `SQLx` migration identity must stay stable for existing local databases.
 const POLICY_ENFORCEMENT_SNAPSHOT_DDL: &str =
     include_str!("migrations/0010_daemon_v16_policy_enforcement_snapshot.sql");
 
