@@ -59,7 +59,9 @@ struct PolicyCanvasReplayRow: View {
     if row.insufficientEvidence {
       return PolicyCanvasVisualStyle.tertiaryText
     }
-    return row.changed ? PolicyCanvasWorkflowTone.warning.tint : PolicyCanvasVisualStyle.tertiaryText
+    return row.changed
+      ? PolicyCanvasWorkflowTone.warning.tint
+      : PolicyCanvasVisualStyle.tertiaryText
   }
 
   private var accessibilityLabel: String {
