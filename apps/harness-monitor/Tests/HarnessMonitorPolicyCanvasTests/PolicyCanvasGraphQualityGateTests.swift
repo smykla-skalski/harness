@@ -543,7 +543,6 @@ struct PolicyCanvasGraphQualityGateTests {
       "route_fast_path: \(timedRoute.fastPath)",
       String(format: "quality_report_ms: %.3f", qualityMs),
       "port_overlaps: \(report.count(for: .portOverlaps))",
-      "port_too_close: \(report.count(for: .portTooClose))",
       "port_detached: \(report.count(for: .portDetached))",
       "label_overlaps: \(report.count(for: .labelOverlaps))",
       "route_segments: \(report.count(for: .routeSegments))",

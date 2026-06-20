@@ -21,11 +21,11 @@ private struct PolicyCanvasPortMarkerTerminal {
 /// judged on the node side it actually lands on - a single logical port can fan
 /// its wires onto more than one side, so collapsing a port into one centroid
 /// would invent a mid-body point with no dot under it. Dots on one side that
-/// stack below the port diameter are an overlap; below the minimum spacing, a
-/// too-close warning. The detached case (a wire that does not reach its dot) is
-/// measured separately in `policyCanvasMeasurePortDetachment`, which compares the
-/// wire end against the rendered marker layout - a terminal landing off the node
-/// here is simply not bucketed onto any side.
+/// stack below the port diameter are an overlap. The detached case (a wire that
+/// does not reach its dot) is measured separately in
+/// `policyCanvasMeasurePortDetachment`, which compares the wire end against the
+/// rendered marker layout - a terminal landing off the node here is simply not
+/// bucketed onto any side.
 func policyCanvasMeasurePortSpacing(
   routedEdges: [PolicyCanvasRoutedEdge],
   nodeFramesByID: [String: CGRect],
@@ -72,8 +72,6 @@ func policyCanvasMeasurePortSpacing(
         let gap = upper.alongAxis - lower.alongAxis
         if gap + thresholdTolerance < thresholds.markerOverlap {
           violations.append(policyCanvasPortSpacingPairViolation(.overlap, lower, upper, gap: gap))
-        } else if gap + thresholdTolerance < thresholds.minimumPortSpacing {
-          violations.append(policyCanvasPortSpacingPairViolation(.tooClose, lower, upper, gap: gap))
         }
       }
       violations.append(

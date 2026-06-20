@@ -5,9 +5,7 @@ import CoreGraphics
 /// flags exactly what those passes were trying to avoid. A gate can tighten or
 /// relax any field without touching the measurement logic.
 public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
-  /// Minimum gap between two distinct port markers on one node side.
-  public var minimumPortSpacing: CGFloat
-  /// Gap below which two markers count as overlapping rather than merely tight.
+  /// Gap below which two markers count as overlapping.
   public var markerOverlap: CGFloat
   /// Collinear overlap length that reads as one wire stacked on another.
   public var corridorOverlap: CGFloat
@@ -43,7 +41,6 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
   public var routeSegmentLengthGrid: CGFloat
 
   public init(
-    minimumPortSpacing: CGFloat,
     markerOverlap: CGFloat,
     corridorOverlap: CGFloat,
     minimumCorridorSeparation: CGFloat,
@@ -58,7 +55,6 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
     minimumRouteSegmentLength: CGFloat,
     routeSegmentLengthGrid: CGFloat
   ) {
-    self.minimumPortSpacing = minimumPortSpacing
     self.markerOverlap = markerOverlap
     self.corridorOverlap = corridorOverlap
     self.minimumCorridorSeparation = minimumCorridorSeparation
@@ -75,7 +71,6 @@ public struct PolicyCanvasGraphQualityThresholds: Equatable, Sendable {
   }
 
   public static let `default` = Self(
-    minimumPortSpacing: policyCanvasMinimumPortMarkerSpacing(),
     markerOverlap: PolicyCanvasLayout.portDiameter,
     corridorOverlap: 8,
     minimumCorridorSeparation: PolicyCanvasLayout.defaultEdgeLineSpacing,

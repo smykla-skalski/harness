@@ -26,9 +26,6 @@ extension PolicyCanvasQualityOverlayView {
       case .overlap:
         errorRings.append(portRing(violation.point))
         violation.otherPoint.map { errorRings.append(portRing($0)) }
-      case .tooClose:
-        warningRings.append(portRing(violation.point))
-        violation.otherPoint.map { warningRings.append(portRing($0)) }
       case .detached:
         errorRings.append(portRing(violation.point))
         if let other = violation.otherPoint {

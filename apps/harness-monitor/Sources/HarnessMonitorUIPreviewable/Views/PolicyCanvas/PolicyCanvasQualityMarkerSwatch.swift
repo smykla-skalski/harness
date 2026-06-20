@@ -13,7 +13,7 @@ struct PolicyCanvasQualityMarkerSwatch: View {
       let tint = Self.tint(for: category)
       let rect = CGRect(origin: .zero, size: size).insetBy(dx: 1.5, dy: 1.5)
       switch category {
-      case .portOverlaps, .portTooClose, .portDetached:
+      case .portOverlaps, .portDetached:
         ring(&context, rect, tint)
       case .portUneven:
         portUnevenGlyph(&context, rect, tint)

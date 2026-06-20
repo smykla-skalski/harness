@@ -71,28 +71,10 @@ struct PolicyCanvasGraphQualityReportTests {
     #expect(overlaps.first?.side == .trailing)
   }
 
-  @Test func tooClosePortMarkersAreWarned() {
-    let frames = [
-      "n1": CGRect(x: 0, y: 0, width: 168, height: 96),
-      "n2": CGRect(x: 400, y: 0, width: 168, height: 96),
-    ]
-    let edges = [
-      edge("ea", source: endpoint("n1", "output-a", .output), target: endpoint("n2", "input-a", .input)),
-      edge("eb", source: endpoint("n1", "output-b", .output), target: endpoint("n2", "input-b", .input)),
-    ]
-    let routes = [
-      "ea": route([CGPoint(x: 168, y: 20), CGPoint(x: 400, y: 30)]),
-      "eb": route([CGPoint(x: 168, y: 50), CGPoint(x: 400, y: 50)]),
-    ]
-    let report = measure(frames: frames, edges: edges, routes: routes)
-    #expect(report.portSpacing.contains { $0.kind == .tooClose })
-    #expect(report.portSpacing.allSatisfy { $0.kind != .overlap })
-  }
-
   // The detached signal (a wire that does not reach its port dot) is measured
   // against the rendered marker layout, not the node frame, so it lives in
   // `PolicyCanvasPortDetachmentTests`. The frame-based core measures only
-  // overlap and too-close spacing.
+  // overlap spacing.
 
   @Test func portFanningAcrossTwoSidesIsNotDetached() {
     // One logical input port fed by two wires that attach on opposite node

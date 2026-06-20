@@ -175,14 +175,13 @@ private func policyCanvasHoverPortSpacingMarks(
     let category: PolicyCanvasQualityCategory =
       switch violation.kind {
       case .overlap: .portOverlaps
-      case .tooClose: .portTooClose
       case .detached: .portDetached
       case .uneven: .portUneven
       }
     add(category, Path(ellipseIn: policyCanvasHoverDot(violation.point, radius: 10)))
-    // Overlap/too-close pairs ring both dots, so both are hoverable - a stack of
-    // crammed dots resolves every dot, not just the lower one in each pair.
-    if violation.kind == .overlap || violation.kind == .tooClose,
+    // Overlap pairs ring both dots, so both are hoverable - a stack of crammed
+    // dots resolves every dot, not just the lower one in each pair.
+    if violation.kind == .overlap,
       let other = violation.otherPoint
     {
       add(category, Path(ellipseIn: policyCanvasHoverDot(other, radius: 10)))

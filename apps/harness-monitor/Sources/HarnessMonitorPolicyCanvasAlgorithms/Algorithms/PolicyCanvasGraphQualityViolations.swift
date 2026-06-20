@@ -12,13 +12,11 @@ public enum PolicyCanvasQualitySeverity: String, Equatable, Sendable {
 /// A port marker (route attach point) spaced wrong on a node side. The
 /// route-terminal marker placement draws each port dot exactly where its wire
 /// attaches, so measuring the attach points groups the visible dots per node
-/// side and flags overlaps, sub-minimum gaps, and dots that float off the node.
+/// side and flags overlaps and dots that float off the node.
 public struct PolicyCanvasPortSpacingViolation: Equatable, Sendable {
   public enum Kind: String, Equatable, Sendable {
     /// Two markers closer than the port diameter - they visibly overlap.
     case overlap
-    /// Closer than the minimum spacing but not yet overlapping.
-    case tooClose
     /// A marker that does not sit on any edge of its node frame.
     case detached
     /// A marker sitting far from the canonical evenly-spread slot for its
@@ -55,7 +53,7 @@ public struct PolicyCanvasPortSpacingViolation: Equatable, Sendable {
   public var severity: PolicyCanvasQualitySeverity {
     switch kind {
     case .overlap, .detached: .error
-    case .tooClose, .uneven: .warning
+    case .uneven: .warning
     }
   }
 }
