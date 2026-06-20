@@ -135,8 +135,11 @@ struct AppOpenAnythingSourceContractTests {
     #expect(clipboardSource.contains("final class ClipboardAutomationPolicyService"))
     #expect(
       !labelSource.contains(".background"),
-      "MenuBarExtra labels are mirrored through Control Center NSStatusItemView scenes; "
-        + "side-effect hosts must not mount inside that label."
+      Comment(
+        rawValue: "MenuBarExtra labels are mirrored through Control Center "
+          + "NSStatusItemView scenes; "
+          + "side-effect hosts must not mount inside that label."
+      )
     )
   }
 
