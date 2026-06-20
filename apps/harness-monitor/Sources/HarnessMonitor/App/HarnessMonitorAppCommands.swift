@@ -59,6 +59,16 @@ struct HarnessMonitorAppCommands: Commands {
     policyCanvasSaveFocus != nil
   }
 
+  private var policyCanvasInspectorFocus: PolicyCanvasInspectorFocus? {
+    policyCanvasCommandFocus?.inspector
+  }
+
+  private var policyCanvasInspectorMenuTitle: String {
+    policyCanvasInspectorFocus?.isVisible == true
+      ? "Hide Policy Inspector"
+      : "Show Policy Inspector"
+  }
+
   private var searchCommandTitle: LocalizedStringKey {
     searchFocusAction?.menuLabel.localizedTitle ?? "Find"
   }
@@ -69,6 +79,7 @@ struct HarnessMonitorAppCommands: Commands {
     viewCommands
     policyCanvasZoomCommands
     policyCanvasLayoutCommands
+    policyCanvasInspectorCommands
     policyCanvasSaveCommands
     helpCommands
   }
@@ -232,6 +243,22 @@ struct HarnessMonitorAppCommands: Commands {
           policyCanvasLayoutFocus?.dispatcher.performReflowLayout()
         }
         .disabled(!hasPolicyCanvasLayoutFocus)
+      }
+    }
+  }
+
+  @CommandsBuilder private var policyCanvasInspectorCommands: some Commands {
+    CommandGroup(after: .toolbar) {
+      if let inspectorFocus = policyCanvasInspectorFocus {
+        Button(policyCanvasInspectorMenuTitle) {
+          inspectorFocus.dispatcher.performToggleInspector()
+        }
+        .disabled(!inspectorFocus.canToggle)
+      } else {
+        Button("Show Policy Inspector") {
+          policyCanvasInspectorFocus?.dispatcher.performToggleInspector()
+        }
+        .disabled(true)
       }
     }
   }

@@ -15,6 +15,9 @@ struct PolicyCanvasViewport: View {
     { _, _ in }
   var saveDraft: @MainActor () -> Void = {}
   var canSave = false
+  var isInspectorVisible = false
+  var canToggleInspector = false
+  var toggleInspector: @MainActor () -> Void = {}
   var resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior = .preserveZoom
   var minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
   var canvasColorSchemeOverride: ColorScheme?
@@ -25,6 +28,7 @@ struct PolicyCanvasViewport: View {
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var layoutFocusDispatcher = PolicyCanvasLayoutFocusDispatcher()
   @State private var saveFocusDispatcher = PolicyCanvasSaveFocusDispatcher()
+  @State private var inspectorFocusDispatcher = PolicyCanvasInspectorFocusDispatcher()
   @State private var commandFocus: PolicyCanvasCommandFocus?
   @State private var hasAppliedRestoredSceneZoom = false
   @State private var scrollApplicatorRequest: PolicyCanvasViewportScrollRequest?
@@ -94,6 +98,10 @@ struct PolicyCanvasViewport: View {
   var bridgeSaveFocusDispatcher: PolicyCanvasSaveFocusDispatcher {
     get { saveFocusDispatcher }
     nonmutating set { saveFocusDispatcher = newValue }
+  }
+  var bridgeInspectorFocusDispatcher: PolicyCanvasInspectorFocusDispatcher {
+    get { inspectorFocusDispatcher }
+    nonmutating set { inspectorFocusDispatcher = newValue }
   }
 
   @MainActor
@@ -340,6 +348,12 @@ struct PolicyCanvasViewport: View {
       }
 
       .onChange(of: viewModel.canReflowLayout, initial: false) {
+        bindCommandFocus()
+      }
+      .onChange(of: isInspectorVisible, initial: false) {
+        bindCommandFocus()
+      }
+      .onChange(of: canToggleInspector, initial: false) {
         bindCommandFocus()
       }
       .onChange(of: viewModel.pipelineIdentity, initial: false) { _, newIdentity in

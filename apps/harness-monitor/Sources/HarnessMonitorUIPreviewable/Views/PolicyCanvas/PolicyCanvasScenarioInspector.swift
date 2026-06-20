@@ -52,20 +52,20 @@ struct PolicyCanvasScenarioInspector: View {
         }
         .contentShape(Rectangle())
       }
-      .harnessPlainButtonStyle()
+      .buttonStyle(.borderless)
       .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
 
       Spacer(minLength: 8)
 
       Button("Add", action: addScenario)
         .scaledFont(.caption2.weight(.semibold))
-        .harnessPlainButtonStyle()
+        .buttonStyle(.borderless)
         .foregroundStyle(PolicyCanvasVisualStyle.readyTint)
         .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasScenarioAddButton)
 
       Button("Reset", action: resetScenarios)
         .scaledFont(.caption2.weight(.medium))
-        .harnessPlainButtonStyle()
+        .buttonStyle(.borderless)
         .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
         .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasScenarioResetButton)
     }

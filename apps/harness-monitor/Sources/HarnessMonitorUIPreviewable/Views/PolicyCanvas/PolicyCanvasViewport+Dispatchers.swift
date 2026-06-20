@@ -38,12 +38,24 @@ func policyCanvasSaveFocusDispatcher(
   return dispatcher
 }
 
+@MainActor
+func policyCanvasInspectorFocusDispatcher(
+  toggleInspector: @escaping @MainActor () -> Void
+) -> PolicyCanvasInspectorFocusDispatcher {
+  let dispatcher = PolicyCanvasInspectorFocusDispatcher()
+  dispatcher.toggleInspector = toggleInspector
+  return dispatcher
+}
+
 func policyCanvasCommandFocus(
   zoomFocusDispatcher: PolicyCanvasZoomFocusDispatcher,
   canReflow: Bool,
   layoutFocusDispatcher: PolicyCanvasLayoutFocusDispatcher,
   canSave: Bool,
-  saveFocusDispatcher: PolicyCanvasSaveFocusDispatcher
+  saveFocusDispatcher: PolicyCanvasSaveFocusDispatcher,
+  isInspectorVisible: Bool,
+  canToggleInspector: Bool,
+  inspectorFocusDispatcher: PolicyCanvasInspectorFocusDispatcher
 ) -> PolicyCanvasCommandFocus {
   PolicyCanvasCommandFocus(
     zoom: PolicyCanvasZoomFocus(dispatcher: zoomFocusDispatcher),
@@ -54,6 +66,11 @@ func policyCanvasCommandFocus(
     save: PolicyCanvasSaveFocus(
       canSave: canSave,
       dispatcher: saveFocusDispatcher
+    ),
+    inspector: PolicyCanvasInspectorFocus(
+      isVisible: isInspectorVisible,
+      canToggle: canToggleInspector,
+      dispatcher: inspectorFocusDispatcher
     )
   )
 }

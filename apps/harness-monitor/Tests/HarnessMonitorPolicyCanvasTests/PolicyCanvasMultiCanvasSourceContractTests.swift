@@ -243,17 +243,40 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     let layoutSource = try previewableSourceFile(
       at: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
     )
+    let viewSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasView.swift"
+    )
     let chromeSource = try previewableSourceFile(
       at: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
     )
 
     XCTAssertTrue(layoutSource.contains("ZStack(alignment: .top) {"))
     XCTAssertTrue(layoutSource.contains("PolicyCanvasChromeBannerOverlay("))
-    XCTAssertTrue(layoutSource.contains("PolicyCanvasValidationPanel("))
+    XCTAssertTrue(viewSource.contains(".inspector(isPresented: $policyCanvasInspectorVisibleState)"))
+    XCTAssertTrue(viewSource.contains("@State private var policyCanvasInspectorVisibleState = true"))
+    XCTAssertFalse(layoutSource.contains("PolicyCanvasConfidencePanel("))
+    XCTAssertFalse(layoutSource.contains("PolicyCanvasValidationPanel("))
     XCTAssertTrue(layoutSource.contains("policyCanvasViewportPane"))
     XCTAssertFalse(chromeSource.contains("if viewModel.hasPendingDocumentUpdate"))
     XCTAssertFalse(chromeSource.contains("PolicyCanvasAutosaveDisabledBanner("))
     XCTAssertFalse(chromeSource.contains("PolicyCanvasRecoveryBanner("))
+  }
+
+  func testPolicyCanvasConfidencePanelLivesInNativeInspector() throws {
+    let layoutSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
+    )
+    let inspectorSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasConfidenceInspector.swift"
+    )
+
+    XCTAssertFalse(
+      layoutSource.contains("PolicyCanvasConfidencePanel("),
+      "Confidence content should not take vertical space from the viewport."
+    )
+    XCTAssertTrue(inspectorSource.contains("PolicyCanvasConfidencePanel("))
+    XCTAssertTrue(inspectorSource.contains(".inspectorColumnWidth(min: 300, ideal: 380, max: 520)"))
+    XCTAssertTrue(inspectorSource.contains("HarnessMonitorAccessibility.policyCanvasConfidencePanel"))
   }
 
   func testPolicyCanvasChromeBannersFollowCanvasThemeMode() throws {
@@ -428,6 +451,31 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertTrue(sessionRootSource.contains("\\.openDashboardRoute"))
     XCTAssertTrue(
       sessionRootSource.contains("windowNavigationHistory.requestDashboardRoute(route)"))
+  }
+
+  func testPolicyCanvasInspectorToggleUsesSingleCommandFocus() throws {
+    let focusSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasLayoutFocus.swift"
+    )
+    let dispatcherSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasViewport+Dispatchers.swift"
+    )
+    let viewportControlSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ViewportControl.swift"
+    )
+    let commandsSource = try appSourceFile(
+      at: "App/HarnessMonitorAppCommands.swift"
+    )
+
+    XCTAssertTrue(focusSource.contains("public let inspector: PolicyCanvasInspectorFocus"))
+    XCTAssertTrue(focusSource.contains("PolicyCanvasInspectorFocusDispatcher"))
+    XCTAssertTrue(dispatcherSource.contains("policyCanvasInspectorFocusDispatcher("))
+    XCTAssertTrue(viewportControlSource.contains("inspectorFocusDispatcher:"))
+    XCTAssertTrue(commandsSource.contains("policyCanvasInspectorCommands"))
+    XCTAssertTrue(commandsSource.contains("policyCanvasInspectorMenuTitle"))
+    XCTAssertTrue(commandsSource.contains("Show Policy Inspector"))
+    XCTAssertTrue(commandsSource.contains("Hide Policy Inspector"))
+    XCTAssertFalse(focusSource.contains("harnessPolicyCanvasInspectorFocus"))
   }
 
   private func previewableSourceFile(at relativePath: String) throws -> String {

@@ -52,14 +52,14 @@ struct PolicyCanvasReplayInspector: View {
         }
         .contentShape(Rectangle())
       }
-      .harnessPlainButtonStyle()
+      .buttonStyle(.borderless)
       .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
 
       Spacer(minLength: 8)
 
       Button(summary == nil ? "Load" : "Refresh", action: loadReplay)
         .scaledFont(.caption2.weight(.semibold))
-        .harnessPlainButtonStyle()
+        .buttonStyle(.borderless)
         .foregroundStyle(PolicyCanvasVisualStyle.readyTint)
         .disabled(isLoading)
         .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasReplayLoadButton)

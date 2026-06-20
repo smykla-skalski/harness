@@ -10,12 +10,16 @@ extension PolicyCanvasViewport {
     bindZoomFocusDispatcher()
     bindLayoutFocusDispatcher()
     bindSaveFocusDispatcher()
+    bindInspectorFocusDispatcher()
     let nextFocus = policyCanvasCommandFocus(
       zoomFocusDispatcher: bridgeZoomFocusDispatcher,
       canReflow: viewModel.canReflowLayout,
       layoutFocusDispatcher: bridgeLayoutFocusDispatcher,
       canSave: canSave,
-      saveFocusDispatcher: bridgeSaveFocusDispatcher
+      saveFocusDispatcher: bridgeSaveFocusDispatcher,
+      isInspectorVisible: isInspectorVisible,
+      canToggleInspector: canToggleInspector,
+      inspectorFocusDispatcher: bridgeInspectorFocusDispatcher
     )
     guard bridgeCommandFocus != nextFocus else {
       return
@@ -124,6 +128,11 @@ extension PolicyCanvasViewport {
   }
   func bindSaveFocusDispatcher() {
     bridgeSaveFocusDispatcher = policyCanvasSaveFocusDispatcher(saveDraft: saveDraft)
+  }
+  func bindInspectorFocusDispatcher() {
+    bridgeInspectorFocusDispatcher = policyCanvasInspectorFocusDispatcher(
+      toggleInspector: toggleInspector
+    )
   }
   @MainActor
   func rebuildValidation() async {

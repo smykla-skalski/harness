@@ -33,46 +33,6 @@ extension PolicyCanvasView {
 
       ZStack(alignment: .top) {
         VStack(spacing: 0) {
-          PolicyCanvasConfidencePanel(
-            viewModel: viewModel,
-            focusIssue: { resolved in
-              viewModel.focusIssue(resolved)
-              if let selection = resolved.focusSelection {
-                selectionFocusRequestID &+= 1
-                selectionFocusRequest = PolicyCanvasViewportSelectionFocusRequest(
-                  id: selectionFocusRequestID,
-                  selection: selection
-                )
-              }
-            },
-            focusDecision: { visitedNodeIds in
-              guard let terminal = visitedNodeIds.last else {
-                return
-              }
-              viewModel.select(.node(terminal))
-              selectionFocusRequestID &+= 1
-              selectionFocusRequest = PolicyCanvasViewportSelectionFocusRequest(
-                id: selectionFocusRequestID,
-                selection: .node(terminal)
-              )
-            },
-            addScenario: {
-              addScenario()
-            },
-            editScenario: { id in
-              editScenario(id: id)
-            },
-            deleteScenario: { id in
-              deleteScenario(id: id)
-            },
-            resetScenarios: {
-              resetScenarios()
-            },
-            loadReplay: {
-              loadReplay()
-            }
-          )
-
           policyCanvasViewportPane
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -108,7 +68,10 @@ extension PolicyCanvasView {
         persistSceneStorageIfNeeded(viewportState, for: identity)
       },
       saveDraft: saveDraft,
-      canSave: remoteActionsEnabled
+      canSave: remoteActionsEnabled,
+      isInspectorVisible: policyCanvasInspectorVisible,
+      canToggleInspector: true,
+      toggleInspector: togglePolicyCanvasInspector
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .overlay(alignment: .topTrailing) {
