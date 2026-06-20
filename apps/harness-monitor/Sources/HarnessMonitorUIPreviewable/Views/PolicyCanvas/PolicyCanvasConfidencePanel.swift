@@ -11,6 +11,8 @@ struct PolicyCanvasConfidencePanel: View {
   let viewModel: PolicyCanvasViewModel
   let focusIssue: PolicyCanvasIssueFocusAction
   let focusDecision: @MainActor ([String]) -> Void
+  let addScenario: @MainActor () -> Void
+  let editScenario: @MainActor (String) -> Void
   let deleteScenario: @MainActor (String) -> Void
   let resetScenarios: @MainActor () -> Void
 
@@ -26,6 +28,8 @@ struct PolicyCanvasConfidencePanel: View {
         rows: viewModel.scenarioRows,
         isEvaluating: viewModel.isSimulating,
         focusDecision: focusDecision,
+        addScenario: addScenario,
+        editScenario: editScenario,
         deleteScenario: deleteScenario,
         resetScenarios: resetScenarios
       )

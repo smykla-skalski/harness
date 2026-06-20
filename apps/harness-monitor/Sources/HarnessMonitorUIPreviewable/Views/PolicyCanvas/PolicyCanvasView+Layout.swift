@@ -59,6 +59,12 @@ extension PolicyCanvasView {
                 selection: .node(terminal)
               )
             },
+            addScenario: {
+              addScenario()
+            },
+            editScenario: { id in
+              editScenario(id: id)
+            },
             deleteScenario: { id in
               deleteScenario(id: id)
             },

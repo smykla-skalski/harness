@@ -12,6 +12,7 @@ public struct PolicyCanvasView: View {
   @State private var statusLineState: String = "No pending changes"
   @State private var searchPaletteVisibleState: Bool = false
   @State private var presentedEditSheetState: PolicyCanvasEditSheet?
+  @State private var scenarioEditRequestState: PolicyCanvasScenarioEditRequest?
   @State private var selectionFocusRequestState: PolicyCanvasViewportSelectionFocusRequest?
   @State private var selectionFocusRequestIDState: UInt64 = 0
   @FocusState var canvasKeyboardFocusedState: Bool
@@ -105,6 +106,11 @@ public struct PolicyCanvasView: View {
   var presentedEditSheet: PolicyCanvasEditSheet? {
     get { presentedEditSheetState }
     nonmutating set { presentedEditSheetState = newValue }
+  }
+
+  var scenarioEditRequest: PolicyCanvasScenarioEditRequest? {
+    get { scenarioEditRequestState }
+    nonmutating set { scenarioEditRequestState = newValue }
   }
 
   var selectionFocusRequest: PolicyCanvasViewportSelectionFocusRequest? {
@@ -224,6 +230,7 @@ public struct PolicyCanvasView: View {
           dismiss: { goLiveRequest = nil }
         )
       }
+      .sheet(item: $scenarioEditRequestState, content: scenarioEditorSheet)
       .confirmationDialog(
         pendingDeletionRequest?.title ?? "Delete policy component?",
         isPresented: deletionConfirmationPresented,
@@ -238,6 +245,18 @@ public struct PolicyCanvasView: View {
       } message: { request in
         Text(request.message)
       }
+  }
+
+  private func scenarioEditorSheet(
+    for request: PolicyCanvasScenarioEditRequest
+  ) -> some View {
+    PolicyCanvasScenarioEditorSheet(
+      request: request,
+      confirm: { name, input in
+        confirmScenarioEdit(request: request, name: name, input: input)
+      },
+      dismiss: { scenarioEditRequest = nil }
+    )
   }
 
   private var policyCanvasCoreBody: some View {

@@ -9,6 +9,7 @@ import SwiftUI
 struct PolicyCanvasScenarioRow: View {
   let row: PolicyCanvasScenarioRowModel
   let focusDecision: @MainActor ([String]) -> Void
+  let editScenario: @MainActor (String) -> Void
   let deleteScenario: @MainActor (String) -> Void
 
   var body: some View {
@@ -33,6 +34,16 @@ struct PolicyCanvasScenarioRow: View {
         .contentShape(Rectangle())
       }
       .harnessPlainButtonStyle()
+
+      Button {
+        editScenario(row.id)
+      } label: {
+        Image(systemName: "pencil")
+          .scaledFont(.caption2)
+          .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
+      }
+      .harnessPlainButtonStyle()
+      .accessibilityLabel("Edit scenario \(row.name)")
 
       Button {
         deleteScenario(row.id)

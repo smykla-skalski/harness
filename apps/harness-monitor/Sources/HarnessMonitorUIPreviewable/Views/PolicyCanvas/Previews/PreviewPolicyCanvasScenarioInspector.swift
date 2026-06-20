@@ -32,6 +32,8 @@ private let sampleScenarioRows: [PolicyCanvasScenarioRowModel] = [
     rows: sampleScenarioRows,
     isEvaluating: false,
     focusDecision: { _ in },
+    addScenario: {},
+    editScenario: { _ in },
     deleteScenario: { _ in },
     resetScenarios: {}
   )
@@ -42,7 +44,12 @@ private let sampleScenarioRows: [PolicyCanvasScenarioRowModel] = [
 #Preview("Policy canvas scenario rows") {
   VStack(spacing: 0) {
     ForEach(sampleScenarioRows) { row in
-      PolicyCanvasScenarioRow(row: row, focusDecision: { _ in }, deleteScenario: { _ in })
+      PolicyCanvasScenarioRow(
+        row: row,
+        focusDecision: { _ in },
+        editScenario: { _ in },
+        deleteScenario: { _ in }
+      )
     }
   }
   .frame(width: 380)

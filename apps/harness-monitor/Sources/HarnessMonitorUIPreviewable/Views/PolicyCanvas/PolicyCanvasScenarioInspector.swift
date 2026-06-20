@@ -12,6 +12,8 @@ struct PolicyCanvasScenarioInspector: View {
   let rows: [PolicyCanvasScenarioRowModel]
   let isEvaluating: Bool
   let focusDecision: @MainActor ([String]) -> Void
+  let addScenario: @MainActor () -> Void
+  let editScenario: @MainActor (String) -> Void
   let deleteScenario: @MainActor (String) -> Void
   let resetScenarios: @MainActor () -> Void
 
@@ -55,6 +57,12 @@ struct PolicyCanvasScenarioInspector: View {
 
       Spacer(minLength: 8)
 
+      Button("Add", action: addScenario)
+        .scaledFont(.caption2.weight(.semibold))
+        .harnessPlainButtonStyle()
+        .foregroundStyle(PolicyCanvasVisualStyle.readyTint)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasScenarioAddButton)
+
       Button("Reset", action: resetScenarios)
         .scaledFont(.caption2.weight(.medium))
         .harnessPlainButtonStyle()
@@ -79,6 +87,7 @@ struct PolicyCanvasScenarioInspector: View {
             PolicyCanvasScenarioRow(
               row: row,
               focusDecision: focusDecision,
+              editScenario: editScenario,
               deleteScenario: deleteScenario
             )
           }
