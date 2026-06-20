@@ -1,6 +1,7 @@
 import Foundation
 import HarnessMonitorKit
 import HarnessMonitorMacRelay
+import Security
 
 @MainActor
 final class HarnessMonitorMobileRelayClientProvider: @unchecked Sendable {
@@ -36,12 +37,19 @@ extension HarnessMonitorApp {
   static func makeMobileRelayRuntime(
     environment: HarnessMonitorEnvironment,
     store: HarnessMonitorStore,
-    runsLiveSideEffects: Bool
+    runsLiveSideEffects: Bool,
+    hasCloudKitEntitlement: @MainActor () -> Bool = Self.hasMobileRelayCloudKitEntitlement
   ) -> MobileMacRelayRuntime? {
     guard runsLiveSideEffects else {
       return nil
     }
     guard environment.values["HARNESS_MONITOR_DISABLE_MOBILE_RELAY"] != "1" else {
+      return nil
+    }
+    guard hasCloudKitEntitlement() else {
+      HarnessMonitorLogger.store.info(
+        "Mobile relay disabled because the app lacks the iCloud CloudKit entitlement."
+      )
       return nil
     }
 
@@ -65,6 +73,31 @@ extension HarnessMonitorApp {
       )
       return nil
     }
+  }
+
+  static func hasMobileRelayCloudKitEntitlement() -> Bool {
+    var code: SecCode?
+    guard SecCodeCopySelf(SecCSFlags(), &code) == errSecSuccess, let code else {
+      return false
+    }
+    var staticCode: SecStaticCode?
+    guard SecCodeCopyStaticCode(code, SecCSFlags(), &staticCode) == errSecSuccess,
+      let staticCode
+    else {
+      return false
+    }
+    var signingInfo: CFDictionary?
+    let flags = SecCSFlags(rawValue: kSecCSSigningInformation)
+    guard SecCodeCopySigningInformation(staticCode, flags, &signingInfo) == errSecSuccess,
+      let info = signingInfo as? [String: Any],
+      let entitlements = info[kSecCodeInfoEntitlementsDict as String] as? [String: Any],
+      let containers = entitlements[
+        "com.apple.developer.icloud-container-identifiers"
+      ] as? [String]
+    else {
+      return false
+    }
+    return containers.contains("iCloud.io.harnessmonitor")
   }
 
   private static func mobileRelayStationName() -> String {

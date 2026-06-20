@@ -156,27 +156,4 @@ extension HarnessMonitorApp {
       hasBound: hasBoundOpenAnythingExecutorBinding
     )
   }
-
-  var openAnythingAppServiceHost: some View {
-    // Initial window routing can restore only session windows, so the
-    // single-instance Open Anything driver cannot depend on the dashboard
-    // scene mounting first. The menu bar scene is present for every live app
-    // run, making it the stable place to keep corpus updates, executor
-    // binding, and global hot-key registration alive.
-    openAnythingEngineHost
-      .modifier(openAnythingExecutorBinder)
-  }
-
-  private var openAnythingEngineHost: some View {
-    OpenAnythingEngineHost(
-      coordinator: appOpenAnythingCoordinator,
-      store: appStore,
-      reviewRegistry: appOpenAnythingReviews,
-      loadedSessionOverride: appOpenAnythingLoadedSessionOverride,
-      globalHotKeyController: appGlobalHotKeyController,
-      globalHotKeyEnabled: globalOpenAnythingHotKeyEnabled,
-      globalHotKeyDescriptorStorage: globalOpenAnythingHotKeyDescriptor,
-      presentPalette: { presentOpenAnythingPalette() }
-    )
-  }
 }

@@ -108,29 +108,25 @@ struct AppOpenAnythingSourceContractTests {
     #expect(!paletteSource.contains(".font(.title3)"))
   }
 
-  @Test("Open Anything app services mount from the always-present menu bar scene")
-  func openAnythingAppServicesMountFromMenuBarScene() throws {
+  @Test("App services install without status item label background hosts")
+  func appServicesInstallWithoutStatusItemLabelBackgroundHosts() throws {
     let scenesSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
-    let sceneContentSource = try harnessSourceFile(
-      named: "App/HarnessMonitorApp+SceneContent.swift"
-    )
-    let dashboardRange = try #require(
-      sceneContentSource.range(of: "@ViewBuilder var dashboardWindowSceneContent: some View")
-    )
-    let deepLinkRange = try #require(
-      sceneContentSource.range(of: "func handleHarnessDeepLink(_ url: URL)")
-    )
-    let dashboardSceneSource = String(
-      sceneContentSource[dashboardRange.lowerBound..<deepLinkRange.lowerBound]
-    )
+    let openAnythingSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")
+    let clipboardSource = try previewableSourceFile(named: "Support/ClipboardAutomationMonitor.swift")
+    let labelRange = try #require(scenesSource.range(of: "private var menuBarExtraLabel: some View"))
+    let labelSource = String(scenesSource[labelRange.lowerBound...])
 
-    #expect(scenesSource.contains("private var menuBarExtraLabel: some View"))
-    #expect(scenesSource.contains("openAnythingAppServiceHost"))
-    #expect(sceneContentSource.contains("var openAnythingAppServiceHost: some View"))
-    #expect(sceneContentSource.contains("openAnythingEngineHost"))
-    #expect(sceneContentSource.contains(".modifier(openAnythingExecutorBinder)"))
-    #expect(!dashboardSceneSource.contains("openAnythingEngineHost"))
-    #expect(!dashboardSceneSource.contains(".modifier(openAnythingExecutorBinder)"))
+    #expect(scenesSource.contains("installAppSceneServicesIfNeeded()"))
+    #expect(scenesSource.contains("syncOpenAnythingGlobalHotKey()"))
+    #expect(scenesSource.contains("restartOpenAnythingCorpusDriver("))
+    #expect(openAnythingSource.contains("func installAppSceneServicesIfNeeded()"))
+    #expect(openAnythingSource.contains("appOpenAnythingCorpusDriver.start("))
+    #expect(openAnythingSource.contains("appClipboardAutomationPolicyService.start(openWindow: openWindow)"))
+    #expect(clipboardSource.contains("final class ClipboardAutomationPolicyService"))
+    #expect(
+      !labelSource.contains(".background"),
+      "MenuBarExtra labels are mirrored through Control Center NSStatusItemView scenes; side-effect hosts must not mount inside that label."
+    )
   }
 
   @Test("Open Anything transparency toggle gates the palette glass")

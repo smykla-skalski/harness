@@ -17,7 +17,20 @@ extension HarnessMonitorApp {
     .defaultLaunchBehavior(shouldHandleInitialWindowRouting ? .suppressed : .automatic)
     .onChange(of: scenePhase, initial: true) { _, _ in
       installMainWindowLauncherIfNeeded()
+      installAppSceneServicesIfNeeded()
       scheduleInitialWindowRoutingIfNeeded()
+    }
+    .onChange(of: globalOpenAnythingHotKeyEnabled, initial: true) { _, _ in
+      installAppSceneServicesIfNeeded()
+      syncOpenAnythingGlobalHotKey()
+    }
+    .onChange(of: globalOpenAnythingHotKeyDescriptor, initial: true) { _, _ in
+      installAppSceneServicesIfNeeded()
+      syncOpenAnythingGlobalHotKey()
+    }
+    .onChange(of: appOpenAnythingLoadedSessionOverride, initial: true) { _, newValue in
+      installAppSceneServicesIfNeeded()
+      restartOpenAnythingCorpusDriver(loadedSessionOverride: newValue)
     }
     .commands {
       mainWindowCommands
@@ -107,9 +120,5 @@ extension HarnessMonitorApp {
     Label(HarnessMonitorMenuBarSnapshot.statusItemTitle, image: menuBarStatusItemImageName)
       .help(menuBarStatusItemHelpText)
       .accessibilityLabel(menuBarStatusItemAccessibilityLabel)
-      .background {
-        openAnythingAppServiceHost
-        ClipboardAutomationPolicyHost()
-      }
   }
 }

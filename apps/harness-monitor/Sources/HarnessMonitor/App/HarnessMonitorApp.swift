@@ -33,10 +33,13 @@ struct HarnessMonitorApp: App {
   @State private var windowNavigationHistory: GlobalWindowNavigationHistory
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @State private var openAnythingCoordinator: OpenAnythingCorpusCoordinator
+  @State private var openAnythingCorpusDriver: OpenAnythingCorpusUpdateDriver
   @State private var openAnythingLoadedSessionOverride: OpenAnythingLoadedSessionSnapshot?
   @State private var openAnythingReviews: OpenAnythingDashboardReviewRegistry
   @State private var openAnythingPaletteController: OpenAnythingPaletteWindowController
   @State private var globalHotKeyController: GlobalHotKeyController
+  @State private var clipboardAutomationPolicyService: ClipboardAutomationPolicyService
+  @State private var hasInstalledAppSceneServices = false
   @State private var hasBoundOpenAnythingExecutor = false
   @State private var settingsSelectedSection: SettingsSection
   @State private var settingsNavigationRequest: SettingsNavigationRequest?
@@ -148,11 +151,13 @@ struct HarnessMonitorApp: App {
     )
     let coordinator = OpenAnythingCorpusCoordinator()
     _openAnythingCoordinator = State(initialValue: coordinator)
+    _openAnythingCorpusDriver = State(initialValue: OpenAnythingCorpusUpdateDriver())
     _openAnythingReviews = State(initialValue: OpenAnythingDashboardReviewRegistry())
     _openAnythingPaletteController = State(
       initialValue: OpenAnythingPaletteWindowController(model: coordinator.palette)
     )
     _globalHotKeyController = State(initialValue: GlobalHotKeyController())
+    _clipboardAutomationPolicyService = State(initialValue: ClipboardAutomationPolicyService())
     _settingsSelectedSection = State(
       initialValue: SettingsRestorationDefaults.initialSelectedSection(
         fallback: configuration.settingsInitialSection,
@@ -254,6 +259,10 @@ struct HarnessMonitorApp: App {
     openAnythingCoordinator
   }
 
+  var appOpenAnythingCorpusDriver: OpenAnythingCorpusUpdateDriver {
+    openAnythingCorpusDriver
+  }
+
   var appOpenAnythingLoadedSessionOverride: OpenAnythingLoadedSessionSnapshot? {
     get { openAnythingLoadedSessionOverride }
     nonmutating set { openAnythingLoadedSessionOverride = newValue }
@@ -281,6 +290,15 @@ struct HarnessMonitorApp: App {
 
   var appGlobalHotKeyController: GlobalHotKeyController {
     globalHotKeyController
+  }
+
+  var appClipboardAutomationPolicyService: ClipboardAutomationPolicyService {
+    clipboardAutomationPolicyService
+  }
+
+  var hasInstalledAppSceneServicesFlag: Bool {
+    get { hasInstalledAppSceneServices }
+    nonmutating set { hasInstalledAppSceneServices = newValue }
   }
 
   var appAuditTimelineDispatcher: SupervisorAuditTimelineFocusDispatcher {

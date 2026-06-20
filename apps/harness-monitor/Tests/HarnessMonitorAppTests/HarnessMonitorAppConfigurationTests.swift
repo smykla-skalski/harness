@@ -73,6 +73,23 @@ final class HarnessMonitorAppConfigurationTests: XCTestCase {
   }
 
   @MainActor
+  func testMobileRelayRuntimeSkipsCloudKitWhenEntitlementIsUnavailable() {
+    let home = FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-monitor-mobile-relay-no-icloud-\(UUID().uuidString)")
+    let environment = HarnessMonitorEnvironment(values: [:], homeDirectory: home)
+    let store = HarnessMonitorStore(daemonController: PreviewDaemonController(mode: .empty))
+
+    let runtime = HarnessMonitorApp.makeMobileRelayRuntime(
+      environment: environment,
+      store: store,
+      runsLiveSideEffects: true,
+      hasCloudKitEntitlement: { false }
+    )
+
+    XCTAssertNil(runtime)
+  }
+
+  @MainActor
   func testResolveRegistersMCPRegistryHostEnabledOnInjectedStore() throws {
     let suiteName = "io.harnessmonitor.app-tests.mcp-contract"
     let isolated = try XCTUnwrap(UserDefaults(suiteName: suiteName))

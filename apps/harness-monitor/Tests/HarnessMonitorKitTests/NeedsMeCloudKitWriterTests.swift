@@ -169,6 +169,27 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
       "Disabled writer must never construct CKContainer via the store"
     )
   }
+
+  func testSharedFactoryDisablesWritesWhenCloudKitEntitlementIsUnavailable() async {
+    let stub = StubDatabase()
+    let store = NeedsMeCloudKitStore(database: stub)
+    let writer = NeedsMeCloudKitWriter.makeShared(
+      store: store,
+      debounceInterval: .zero,
+      isCloudKitAvailable: { false },
+      registerSubscription: {}
+    )
+
+    writer.submit(count: 5)
+    await writer.flush()
+
+    let upserts = await stub.upsertCount
+    XCTAssertEqual(
+      upserts,
+      0,
+      "Shared writer must not touch CloudKit when the running app lacks iCloud entitlements"
+    )
+  }
 }
 
 actor RegisterCounter {

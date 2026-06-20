@@ -26,6 +26,24 @@ public struct ClipboardAutomationPolicyHost: View {
 }
 
 @MainActor
+public final class ClipboardAutomationPolicyService {
+  private let center = AutomationPolicyCenter.shared
+  private let monitor = ClipboardAutomationMonitor()
+
+  public init() {}
+
+  public func start(openWindow: OpenWindowAction) {
+    monitor.start(center: center) { dispatch in
+      ClipboardAutomationCommands.apply(dispatch, openWindow: openWindow)
+    }
+  }
+
+  public func stop() {
+    monitor.stop(center: center)
+  }
+}
+
+@MainActor
 public enum ClipboardAutomationCommands {
   public static func captureCurrentClipboard(openWindow: OpenWindowAction) {
     Task { @MainActor in

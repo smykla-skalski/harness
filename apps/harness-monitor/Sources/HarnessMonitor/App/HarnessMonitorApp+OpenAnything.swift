@@ -58,81 +58,46 @@ extension HarnessMonitorApp {
 
 }
 
-/// Single-mount engine driver for the Open Anything palette.
-///
-/// Previously, every window's host modifier carried its own corpus-rebuild
-/// task plus its own Carbon hot-key registration call. With N session windows
-/// open, every store change triggered N redundant hashes (200-entry timeline
-/// included) and N redundant `RegisterEventHotKey` cycles. Mounting this
-/// driver exactly once in the dashboard scene centralises both responsibilities
-/// behind a deterministic content signature.
-struct OpenAnythingEngineHost: View {
-  let coordinator: OpenAnythingCorpusCoordinator
-  let store: HarnessMonitorStore
-  let reviewRegistry: OpenAnythingDashboardReviewRegistry
-  let loadedSessionOverride: OpenAnythingLoadedSessionSnapshot?
-  let globalHotKeyController: GlobalHotKeyController
-  let globalHotKeyEnabled: Bool
-  let globalHotKeyDescriptorStorage: String
-  let presentPalette: @MainActor @Sendable () -> Void
-  @State private var corpusDriver = OpenAnythingCorpusUpdateDriver()
+extension HarnessMonitorApp {
+  func installAppSceneServicesIfNeeded() {
+    guard rendersMenuBarExtraContent else { return }
+    guard !hasInstalledAppSceneServicesFlag else { return }
+    hasInstalledAppSceneServicesFlag = true
+    openAnythingExecutorBinder.bind(openWindow: openWindow)
+    syncOpenAnythingGlobalHotKey()
+    restartOpenAnythingCorpusDriver(
+      loadedSessionOverride: appOpenAnythingLoadedSessionOverride
+    )
+    appClipboardAutomationPolicyService.start(openWindow: openWindow)
+  }
 
-  private static let settingsSectionProjections = SettingsSection.allCases.map {
-    OpenAnythingSettingsSectionProjection(
-      rawValue: $0.rawValue,
-      title: $0.title,
-      systemImage: $0.systemImage
+  func syncOpenAnythingGlobalHotKey() {
+    guard hasInstalledAppSceneServicesFlag else { return }
+    appGlobalHotKeyController.configure(
+      enabled: globalOpenAnythingHotKeyEnabled,
+      descriptor: OpenAnythingHotKeyDescriptor.decode(globalOpenAnythingHotKeyDescriptor),
+      onInvoke: { presentOpenAnythingPalette() }
     )
   }
 
-  var body: some View {
-    Color.clear
-      .frame(width: 0, height: 0)
-      .accessibilityHidden(true)
-      .task {
-        startCorpusDriver(loadedSessionOverride: loadedSessionOverride)
-      }
-      .onChange(of: loadedSessionOverride) { _, newValue in
-        Task { @MainActor in
-          startCorpusDriver(loadedSessionOverride: newValue)
-        }
-      }
-      .onDisappear {
-        Task { @MainActor in
-          corpusDriver.stop()
-        }
-      }
-      .task(id: hotKeySignature) {
-        globalHotKeyController.configure(
-          enabled: globalHotKeyEnabled,
-          descriptor: OpenAnythingHotKeyDescriptor.decode(globalHotKeyDescriptorStorage),
-          onInvoke: presentPalette
-        )
-      }
-  }
-
-  private var hotKeySignature: String {
-    "\(globalHotKeyEnabled)-\(globalHotKeyDescriptorStorage)"
-  }
-
-  @MainActor
-  private func startCorpusDriver(
+  func restartOpenAnythingCorpusDriver(
     loadedSessionOverride: OpenAnythingLoadedSessionSnapshot?
   ) {
-    corpusDriver.start(coordinator: coordinator) {
-      makeInput(loadedSessionOverride: loadedSessionOverride)
+    guard hasInstalledAppSceneServicesFlag else { return }
+    appOpenAnythingCorpusDriver.start(coordinator: appOpenAnythingCoordinator) {
+      makeOpenAnythingCorpusInput(loadedSessionOverride: loadedSessionOverride)
     }
   }
 
-  private func makeInput(
+  private func makeOpenAnythingCorpusInput(
     loadedSessionOverride: OpenAnythingLoadedSessionSnapshot?
   ) -> OpenAnythingCorpusInput {
     OpenAnythingCorpusInput(
-      settingsSections: Self.settingsSectionProjections,
-      sessions: store.sessions,
-      taskBoardItems: store.globalTaskBoardItems,
-      decisions: store.supervisorOpenDecisionPresentationItems,
-      reviews: reviewRegistry.loadedItems,
+      settingsSections: OpenAnythingAppServiceSettings.settingsSectionProjections,
+      sessions: appStore.sessions,
+      taskBoardItems: appStore.globalTaskBoardItems,
+      decisions: appStore.supervisorOpenDecisionPresentationItems,
+      reviews: appOpenAnythingReviews.loadedItems,
       loadedSession: loadedSessionSnapshot(override: loadedSessionOverride)
     )
   }
@@ -143,12 +108,22 @@ struct OpenAnythingEngineHost: View {
     if let loadedSessionOverride {
       return loadedSessionOverride
     }
-    guard let sessionID = store.selectedSessionID else { return nil }
+    guard let sessionID = appStore.selectedSessionID else { return nil }
     return OpenAnythingLoadedSessionSnapshot(
       sessionID: sessionID,
-      agents: store.selectedSessionAgents,
-      tasks: store.selectedSessionTasks,
-      timeline: store.timeline
+      agents: appStore.selectedSessionAgents,
+      tasks: appStore.selectedSessionTasks,
+      timeline: appStore.timeline
+    )
+  }
+}
+
+private enum OpenAnythingAppServiceSettings {
+  static let settingsSectionProjections = SettingsSection.allCases.map {
+    OpenAnythingSettingsSectionProjection(
+      rawValue: $0.rawValue,
+      title: $0.title,
+      systemImage: $0.systemImage
     )
   }
 }
@@ -175,20 +150,25 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
   func body(content: Content) -> some View {
     content
       .task {
-        guard !hasBound else { return }
-        hasBound = true
-        controller.bindExecutor(
-          { hit in execute(hit) },
-          reviewPinToggle: { pullRequestID in
-            toggleReviewPin(pullRequestID: pullRequestID) { message in
-              store.presentSuccessFeedback(message)
-            }
-          }
-        )
+        bind(openWindow: openWindow)
       }
   }
 
-  private func execute(_ hit: OpenAnythingHit) {
+  @MainActor
+  func bind(openWindow: OpenWindowAction) {
+    guard !hasBound else { return }
+    hasBound = true
+    controller.bindExecutor(
+      { hit in execute(hit, openWindow: openWindow) },
+      reviewPinToggle: { pullRequestID in
+        toggleReviewPin(pullRequestID: pullRequestID) { message in
+          store.presentSuccessFeedback(message)
+        }
+      }
+    )
+  }
+
+  private func execute(_ hit: OpenAnythingHit, openWindow: OpenWindowAction) {
     let signpost = OpenAnythingSignposter.shared.beginInterval(
       OpenAnythingSignposter.Interval.execute
     )
@@ -201,20 +181,20 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
     // Keep the executor surface as a single entry point keyed on
     // `OpenAnythingTarget`.
     for step in OpenAnythingRouteExecutor.steps(for: hit.target) {
-      executeRoutingStep(step)
+      executeRoutingStep(step, openWindow: openWindow)
     }
   }
 
-  private func executeRoutingStep(_ step: OpenAnythingRoutingStep) {
+  private func executeRoutingStep(_ step: OpenAnythingRoutingStep, openWindow: OpenWindowAction) {
     guard !executePresentationStep(step) else { return }
     guard !executeCommandStep(step) else { return }
     switch step {
     case .openWindow(let target):
-      openWindowTarget(target)
+      openWindowTarget(target, openWindow: openWindow)
     case .openDashboard(let route):
-      openDashboard(route)
+      openDashboard(route, openWindow: openWindow)
     case .openSettings(let rawValue):
-      openSettings(rawValue: rawValue)
+      openSettings(rawValue: rawValue, openWindow: openWindow)
     case .openSessionWindow(let sessionID):
       openWindow.openHarnessSessionWindow(sessionID: sessionID)
     case .requestSessionRoute(let target):
@@ -267,7 +247,7 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
     return true
   }
 
-  private func openWindowTarget(_ target: OpenAnythingWindowTarget) {
+  private func openWindowTarget(_ target: OpenAnythingWindowTarget, openWindow: OpenWindowAction) {
     switch target {
     case .dashboard:
       openWindow.openHarnessDashboardWindow()
@@ -276,7 +256,7 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
     }
   }
 
-  private func openDashboard(_ route: OpenAnythingDashboardRoute) {
+  private func openDashboard(_ route: OpenAnythingDashboardRoute, openWindow: OpenWindowAction) {
     let dashboardRoute = DashboardWindowRoute.restoredRoute(rawValue: route.rawValue) ?? .taskBoard
     windowNavigationHistory.requestDashboardRoute(dashboardRoute)
     openWindow.openHarnessDashboardWindow()
@@ -333,7 +313,7 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
     return "\(value) ms"
   }
 
-  private func openSettings(rawValue: String) {
+  private func openSettings(rawValue: String, openWindow: OpenWindowAction) {
     guard let section = SettingsSection(rawValue: rawValue) else {
       openWindow(id: HarnessMonitorWindowID.settings)
       return

@@ -4,7 +4,7 @@ import os
 
 @MainActor
 public final class NeedsMeCloudKitWriter {
-  public static let shared = NeedsMeCloudKitWriter(isEnabled: true)
+  public static let shared = NeedsMeCloudKitWriter.makeShared()
 
   private let store: NeedsMeCloudKitStore
   private let debounceInterval: Duration
@@ -29,6 +29,31 @@ public final class NeedsMeCloudKitWriter {
     self.debounceInterval = debounceInterval
     self.isEnabled = isEnabled
     self.registerSubscription = registerSubscription
+  }
+
+  public static func makeShared(
+    store: NeedsMeCloudKitStore = NeedsMeCloudKitStore(),
+    debounceInterval: Duration = .seconds(5),
+    isCloudKitAvailable: @escaping @Sendable () -> Bool = CloudKitContainer.hasCloudKitEntitlement,
+    registerSubscription: @escaping @Sendable () async -> Void = {
+      await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
+    }
+  ) -> NeedsMeCloudKitWriter {
+    let isEnabled = isCloudKitAvailable()
+    if !isEnabled {
+      Logger(
+        subsystem: "io.harnessmonitor.kit",
+        category: "needsme-cloudkit-writer"
+      ).info(
+        "Needs-me CloudKit writer disabled because the app lacks the iCloud CloudKit entitlement."
+      )
+    }
+    return NeedsMeCloudKitWriter(
+      store: store,
+      debounceInterval: debounceInterval,
+      isEnabled: isEnabled,
+      registerSubscription: registerSubscription
+    )
   }
 
   public func submit(count: Int) {
