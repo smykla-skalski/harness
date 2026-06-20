@@ -49,6 +49,13 @@ public final class PolicyCanvasViewModel {
   /// `captureLiveAudit(_:)` on the document-apply paths and preserved across
   /// nil-republishes, so an audit-only push never blanks the badge.
   var latestAudit: TaskBoardPolicyPipelineAuditSummary?
+  /// Workspace-level kill switch for the live enforcement gate. The daemon can
+  /// keep a canvas in enforced mode while global enforcement is disabled, so the
+  /// live badge must consider both the audit and this workspace bit.
+  var globalPolicyEnforcementEnabled: Bool
+  /// Updated timestamp for the active live canvas, parsed once when a workspace
+  /// snapshot arrives so the badge does not parse dates in its body.
+  var livePublishedAt: Date?
   public internal(set) var documentDirty: Bool
   var viewportDirty: Bool
   var hasRequestedInitialRemoteLoad: Bool
@@ -301,6 +308,8 @@ public final class PolicyCanvasViewModel {
     self.backingDocument = nil
     self.latestSimulation = nil
     self.latestAudit = nil
+    self.globalPolicyEnforcementEnabled = true
+    self.livePublishedAt = nil
     self.documentDirty = false
     self.viewportDirty = false
     self.hasRequestedInitialRemoteLoad = false

@@ -43,9 +43,7 @@ struct DashboardPolicyCanvasFooterToolsMenuButton: View {
   @ScaledMetric(relativeTo: .callout)
   private var buttonMinWidth = 44.0
 
-  let workspace: TaskBoardPolicyCanvasWorkspace?
   let viewModel: PolicyCanvasViewModel
-  let automationPolicyCenter: AutomationPolicyCenter
   @Binding var isAutomationPolicySheetPresented: Bool
   let onExport: (@MainActor () -> Void)?
   let onImport: (@MainActor () -> Void)?
@@ -57,9 +55,7 @@ struct DashboardPolicyCanvasFooterToolsMenuButton: View {
   var body: some View {
     Menu {
       PolicyCanvasToolsMenuContent(
-        workspace: workspace,
         viewModel: viewModel,
-        automationStore: .automationCenterBridge(center: automationPolicyCenter),
         isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented,
         onExport: onExport,
         onImport: onImport

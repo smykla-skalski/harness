@@ -120,6 +120,8 @@ pub struct PolicyPipelineSimulationResult {
 pub struct PolicyPipelineAuditSummary {
     pub active_revision: u64,
     pub mode: PolicyGraphMode,
+    #[serde(default = "super::defaults::default_true")]
+    pub global_policy_enforcement_enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_trace_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -414,6 +416,7 @@ pub fn audit_summary(
     Ok(PolicyPipelineAuditSummary {
         active_revision: canvas.document.revision,
         mode: canvas.document.mode,
+        global_policy_enforcement_enabled: ws.global_policy_enforcement_enabled,
         latest_trace_id: latest_simulation
             .as_ref()
             .map(|simulation| simulation.trace_id.clone()),

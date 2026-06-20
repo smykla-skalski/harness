@@ -7,7 +7,8 @@ extension PolicyCanvasViewModel {
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
-    activeCanvasId: String? = nil
+    activeCanvasId: String? = nil,
+    workspace: TaskBoardPolicyCanvasWorkspace? = nil
   ) {
     // While the user has unsaved edits, an incoming daemon document is a remote
     // change worth surfacing only when its revision is strictly newer than the
@@ -25,7 +26,8 @@ extension PolicyCanvasViewModel {
             document: document,
             simulation: simulation,
             audit: audit,
-            activeCanvasId: activeCanvasId
+            activeCanvasId: activeCanvasId,
+            workspace: workspace
           )
         )
         return
@@ -33,14 +35,20 @@ extension PolicyCanvasViewModel {
       // Same-or-older revision while dirty: keep local edits untouched and only
       // refresh the attached simulation/audit, mirroring applyDocument's
       // exact-republish branch without rebuilding the graph.
-      absorbExternalSimulationAudit(simulation: simulation, audit: audit)
+      absorbExternalSimulationAudit(
+        simulation: simulation,
+        audit: audit,
+        workspace: workspace,
+        activeCanvasId: activeCanvasId
+      )
       return
     }
     applyDocument(
       document: document,
       simulation: simulation,
       audit: audit,
-      activeCanvasId: activeCanvasId
+      activeCanvasId: activeCanvasId,
+      workspace: workspace
     )
   }
 
@@ -54,10 +62,12 @@ extension PolicyCanvasViewModel {
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
     activeCanvasId: String? = nil,
+    workspace: TaskBoardPolicyCanvasWorkspace? = nil,
     forceDocumentReload: Bool = false
   ) {
     self.activeCanvasId = activeCanvasId
     captureLiveAudit(audit)
+    captureLiveWorkspace(workspace, activeCanvasId: activeCanvasId)
     // On document-preserving paths (nil incoming doc, same-revision republish)
     // only overwrite latestSimulation when the incoming payload actually
     // carries one. A nil-republish must not nil out a sim that still matches
@@ -145,10 +155,12 @@ extension PolicyCanvasViewModel {
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
-    activeCanvasId: String?
+    activeCanvasId: String?,
+    workspace: TaskBoardPolicyCanvasWorkspace? = nil
   ) {
     self.activeCanvasId = activeCanvasId
     captureLiveAudit(audit)
+    captureLiveWorkspace(workspace, activeCanvasId: activeCanvasId)
     guard let document else {
       if let incoming = simulation ?? audit?.latestSimulation {
         latestSimulation = incoming
@@ -203,10 +215,12 @@ extension PolicyCanvasViewModel {
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
+    workspace: TaskBoardPolicyCanvasWorkspace? = nil,
     force: Bool = false
   ) {
     guard force || shouldApplyExternalDocument(document) else {
       captureLiveAudit(audit)
+      captureLiveWorkspace(workspace, activeCanvasId: activeCanvasId)
       latestSimulation = simulation ?? audit?.latestSimulation
       return
     }
@@ -214,7 +228,8 @@ extension PolicyCanvasViewModel {
       document: document,
       simulation: simulation,
       audit: audit,
-      activeCanvasId: activeCanvasId
+      activeCanvasId: activeCanvasId,
+      workspace: workspace
     )
   }
 

@@ -1,9 +1,9 @@
 import Foundation
+import HarnessMonitorPolicyModels
 import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
-import HarnessMonitorPolicyModels
 
 /// Phase 3 confidence panel: the decision-matrix projection over the latest
 /// simulation, plus the verdict-string mapping that distinguishes needs-human
@@ -27,14 +27,37 @@ struct PolicyCanvasDecisionMatrixTests {
     viewModel.latestSimulation = simulation(
       succeeded: true,
       decisions: [
-        decision(action: .mergePr, verdict: "allow", reason: "default_allow", visited: ["a", "b"]),
-        decision(action: .accessSecret, verdict: "deny", reason: "checks_not_green", visited: ["c"]),
-        decision(action: .spawnAgent, verdict: "require_human", reason: "human_required", visited: []),
+        decision(
+          scenarioId: "scenario-merge",
+          scenarioName: "Merge - checks green",
+          action: .mergePr,
+          verdict: "allow",
+          reason: "default_allow",
+          visited: ["a", "b"]
+        ),
+        decision(
+          scenarioId: "scenario-secret",
+          scenarioName: "Access secret",
+          action: .accessSecret,
+          verdict: "deny",
+          reason: "checks_not_green",
+          visited: ["c"]
+        ),
+        decision(
+          scenarioId: "scenario-agent",
+          scenarioName: "Spawn agent",
+          action: .spawnAgent,
+          verdict: "require_human",
+          reason: "human_required",
+          visited: []
+        ),
       ]
     )
 
     let rows = viewModel.decisionMatrixRows
     #expect(rows.count == 3)
+    #expect(rows[0].id == "scenario-merge.merge_pr")
+    #expect(rows[0].scenarioName == "Merge - checks green")
     #expect(rows[0].actionRaw == "merge_pr")
     #expect(rows[0].actionTitle == "merge pr")
     #expect(rows[0].verdict == .allow)
@@ -44,12 +67,44 @@ struct PolicyCanvasDecisionMatrixTests {
     #expect(rows[2].verdict == .needsHuman)
   }
 
+  @Test("Rows stay distinct when editable scenarios share an action")
+  func rowsUseScenarioIdentity() {
+    let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [])
+    viewModel.latestSimulation = simulation(
+      succeeded: true,
+      decisions: [
+        decision(
+          scenarioId: "scenario-a",
+          scenarioName: "Merge A",
+          action: .mergePr,
+          verdict: "allow",
+          reason: "default_allow",
+          visited: ["a"]
+        ),
+        decision(
+          scenarioId: "scenario-b",
+          scenarioName: "Merge B",
+          action: .mergePr,
+          verdict: "deny",
+          reason: "checks_not_green",
+          visited: ["b"]
+        ),
+      ]
+    )
+
+    let rows = viewModel.decisionMatrixRows
+
+    #expect(rows.map(\.id) == ["scenario-a.merge_pr", "scenario-b.merge_pr"])
+  }
+
   @Test("A failed simulation yields no decision rows")
   func failedSimulationHasNoRows() {
     let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [])
     viewModel.latestSimulation = simulation(
       succeeded: false,
-      decisions: [decision(action: .mergePr, verdict: "allow", reason: "default_allow", visited: ["a"])]
+      decisions: [
+        decision(action: .mergePr, verdict: "allow", reason: "default_allow", visited: ["a"])
+      ]
     )
 
     #expect(viewModel.decisionMatrixRows.isEmpty)
@@ -62,12 +117,16 @@ struct PolicyCanvasDecisionMatrixTests {
   }
 
   private func decision(
+    scenarioId: String = "",
+    scenarioName: String = "",
     action: PolicyAction,
     verdict: String,
     reason: String,
     visited: [String]
   ) -> TaskBoardPolicyPipelineSimulatedDecision {
     TaskBoardPolicyPipelineSimulatedDecision(
+      scenarioId: scenarioId,
+      scenarioName: scenarioName,
       action: action,
       decision: TaskBoardPolicyDecision(decision: verdict, reasonCode: reason, policyVersion: "v1"),
       visitedNodeIds: visited

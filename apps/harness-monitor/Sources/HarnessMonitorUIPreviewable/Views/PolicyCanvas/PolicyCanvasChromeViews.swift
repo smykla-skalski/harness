@@ -10,14 +10,6 @@ struct PolicyCanvasTopBar: View {
   let canMakeLive: Bool
   let remoteActionsEnabled: Bool
   let remoteActionDisabledReason: String
-  /// True when there is a simulation payload to visualize. The toggle is
-  /// disabled when this is false so the user doesn't get a button that
-  /// does nothing.
-  let simulationOverlayAvailable: Bool
-  /// Resolved visibility (host's `@State` override OR auto-show on
-  /// simulation tab). The button checkmark mirrors this value.
-  let simulationOverlayVisible: Bool
-  let toggleSimulationOverlay: @MainActor () -> Void
   let reflowLayout: @MainActor () -> Void
   let makeLive: @MainActor () -> Void
 
@@ -39,12 +31,6 @@ struct PolicyCanvasTopBar: View {
       PolicyCanvasLiveStatusBadge(status: liveStatus)
 
       Spacer(minLength: 16)
-
-      PolicyCanvasSimulationToggleButton(
-        available: simulationOverlayAvailable,
-        visible: simulationOverlayVisible,
-        toggle: toggleSimulationOverlay
-      )
 
       primaryActionGroup
 
@@ -86,64 +72,25 @@ struct PolicyCanvasTopBar: View {
 // `PolicyCanvasChromeBannerOverlay` and its banner rows live
 // in `PolicyCanvasBanners.swift` so this file stays under the 420-line cap.
 
-/// Topbar toggle for the simulation-result overlay. The icon flips between
-/// an empty waveform and a filled waveform to mirror "off"/"on" the same
-/// way the validation panel's filter chips do; disabled rendering kicks in
-/// when there's no simulation to visualize so the user doesn't get a
-/// button that does nothing.
-private struct PolicyCanvasSimulationToggleButton: View {
-  let available: Bool
-  let visible: Bool
-  let toggle: @MainActor () -> Void
-
-  var body: some View {
-    Button(action: toggle) {
-      Label(
-        visible ? "Hide simulation" : "Show simulation",
-        systemImage: visible ? "waveform.path.ecg" : "waveform"
-      )
-      .scaledFont(.callout.weight(.semibold))
-      .lineLimit(1)
-    }
-    .harnessActionButtonStyle(variant: .bordered, tint: PolicyCanvasVisualStyle.activeTint)
-    .controlSize(.small)
-    .disabled(!available)
-    .help(
-      available
-        ? (visible ? "Hide simulation outcome badges" : "Show simulation outcome badges")
-        : "Run a simulation to see outcomes"
-    )
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasSimulationToggle)
-  }
-}
-
 public struct PolicyCanvasToolsMenuContent: View {
-  let workspace: TaskBoardPolicyCanvasWorkspace?
   let viewModel: PolicyCanvasViewModel
-  let automationStore: PolicyCanvasAutomationStore
   @Binding var isAutomationPolicySheetPresented: Bool
   let onExport: (@MainActor () -> Void)?
   let onImport: (@MainActor () -> Void)?
 
   public init(
-    workspace: TaskBoardPolicyCanvasWorkspace?,
     viewModel: PolicyCanvasViewModel,
-    automationStore: PolicyCanvasAutomationStore,
     isAutomationPolicySheetPresented: Binding<Bool>,
     onExport: (@MainActor () -> Void)? = nil,
     onImport: (@MainActor () -> Void)? = nil
   ) {
-    self.workspace = workspace
     self.viewModel = viewModel
-    self.automationStore = automationStore
     _isAutomationPolicySheetPresented = isAutomationPolicySheetPresented
     self.onExport = onExport
     self.onImport = onImport
   }
 
   public var body: some View {
-    let enforcement = canvasEnforcementState
-
     Button {
       viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
     } label: {
@@ -174,27 +121,6 @@ public struct PolicyCanvasToolsMenuContent: View {
     Divider()
 
     PolicyCanvasToolsDisplayOptionsSection()
-
-    Divider()
-
-    Button {
-      automationStore.replaceCanvasPolicies(enforcement.policies)
-    } label: {
-      Label(enforcement.title, systemImage: enforcement.systemImage)
-    }
-    .disabled(!enforcement.isAvailable)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
-  }
-
-  private var canvasEnforcementState: PolicyCanvasEnforcementState {
-    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
-      workspace: workspace,
-      activeDocument: nil
-    )
-    return PolicyCanvasEnforcementState(
-      policies: compilation.policies,
-      hasExistingPolicies: automationStore.document.hasCanvasPolicies
-    )
   }
 }
 
@@ -290,26 +216,5 @@ private struct PolicyCanvasToolsDisplayOptionsSection: View {
     } else {
       Text(mode.label)
     }
-  }
-}
-
-private struct PolicyCanvasEnforcementState {
-  let policies: [AutomationPolicy]
-  let hasExistingPolicies: Bool
-
-  var isAvailable: Bool {
-    !policies.isEmpty || hasExistingPolicies
-  }
-
-  var title: String {
-    isClearing ? "Clear Effective Canvases" : "Sync Effective Canvases"
-  }
-
-  var systemImage: String {
-    isClearing ? "xmark.shield" : "checkmark.shield"
-  }
-
-  private var isClearing: Bool {
-    policies.isEmpty && hasExistingPolicies
   }
 }

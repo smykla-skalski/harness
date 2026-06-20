@@ -20,7 +20,7 @@ struct PolicyCanvasDecisionMatrixRow: View {
     .accessibilityElement(children: .combine)
     .accessibilityLabel("\(model.actionTitle): \(model.verdict.label)")
     .accessibilityIdentifier(
-      HarnessMonitorAccessibility.policyCanvasDecisionRow(model.actionRaw)
+      HarnessMonitorAccessibility.policyCanvasDecisionRow(model.id)
     )
   }
 
@@ -33,6 +33,13 @@ struct PolicyCanvasDecisionMatrixRow: View {
           .scaledFont(.callout.weight(.semibold))
           .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
           .lineLimit(1)
+
+        if !model.scenarioName.isEmpty {
+          Text(model.scenarioName)
+            .scaledFont(.caption2)
+            .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
+            .lineLimit(1)
+        }
 
         if !model.reasonCode.isEmpty {
           Text(model.reasonCode.replacingOccurrences(of: "_", with: " "))

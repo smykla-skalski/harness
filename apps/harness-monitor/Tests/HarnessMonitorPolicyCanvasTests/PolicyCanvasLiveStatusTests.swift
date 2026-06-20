@@ -1,9 +1,9 @@
 import Foundation
+import HarnessMonitorPolicyModels
 import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
-import HarnessMonitorPolicyModels
 
 /// Phase 3 live anchor: the persistent LIVE/DRAFT signal derived from the daemon
 /// audit (active enforced revision + mode) versus the draft being edited, plus
@@ -17,7 +17,7 @@ struct PolicyCanvasLiveStatusTests {
     viewModel.backingDocument = draftDocument(revision: 5)
     viewModel.latestAudit = liveAudit(revision: 5, mode: .enforced)
 
-    #expect(viewModel.liveStatus == .live(revision: 5))
+    #expect(viewModel.liveStatus == .live(revision: 5, publishedAt: nil))
     #expect(viewModel.liveStatus.isLive)
   }
 
@@ -49,6 +49,36 @@ struct PolicyCanvasLiveStatusTests {
     #expect(viewModel.liveStatus == .draft(liveRevision: nil))
   }
 
+  @Test("Global enforcement disabled prevents an enforced canvas reading as LIVE")
+  func draftWhenGlobalEnforcementDisabled() {
+    let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [])
+    viewModel.backingDocument = draftDocument(revision: 5)
+    viewModel.captureLiveAudit(
+      liveAudit(revision: 5, mode: .enforced, globalPolicyEnforcementEnabled: false)
+    )
+
+    #expect(viewModel.liveStatus == .draft(liveRevision: nil))
+    #expect(!viewModel.liveStatus.isLive)
+  }
+
+  @Test("Workspace capture adds live published timestamp")
+  func liveStatusCarriesPublishedTimestamp() throws {
+    let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [])
+    viewModel.backingDocument = draftDocument(revision: 5)
+    viewModel.captureLiveAudit(liveAudit(revision: 5, mode: .enforced))
+    viewModel.captureLiveWorkspace(
+      liveWorkspace(canvasId: "canvas-live", revision: 5, updatedAt: "2026-06-20T08:15:30Z"),
+      activeCanvasId: "canvas-live"
+    )
+
+    guard case .live(revision: 5, let publishedAtCandidate) = viewModel.liveStatus else {
+      Issue.record("Expected live status")
+      return
+    }
+    let publishedAt = try #require(publishedAtCandidate)
+    #expect(publishedAt == PolicyCanvasLiveStatusDateFormatting.date(from: "2026-06-20T08:15:30Z"))
+  }
+
   @Test("No backing document or audit reads as no policy")
   func noPolicyWhenNothingLoaded() {
     let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [])
@@ -67,7 +97,7 @@ struct PolicyCanvasLiveStatusTests {
     )
 
     #expect(viewModel.latestAudit != nil)
-    #expect(viewModel.liveStatus == .live(revision: 9))
+    #expect(viewModel.liveStatus == .live(revision: 9, publishedAt: nil))
   }
 
   @Test("A nil audit republish never blanks an existing anchor")
@@ -95,12 +125,39 @@ struct PolicyCanvasLiveStatusTests {
 
   private func liveAudit(
     revision: UInt64,
-    mode: TaskBoardPolicyPipelineMode
+    mode: TaskBoardPolicyPipelineMode,
+    globalPolicyEnforcementEnabled: Bool = true
   ) -> TaskBoardPolicyPipelineAuditSummary {
     TaskBoardPolicyPipelineAuditSummary(
       activeRevision: revision,
       mode: mode,
+      globalPolicyEnforcementEnabled: globalPolicyEnforcementEnabled,
       validation: TaskBoardPolicyPipelineValidation(isValid: true)
+    )
+  }
+
+  private func liveWorkspace(
+    canvasId: String,
+    revision: UInt64,
+    updatedAt: String
+  ) -> TaskBoardPolicyCanvasWorkspace {
+    TaskBoardPolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: canvasId,
+      canvases: [
+        TaskBoardPolicyCanvasSummary(
+          canvasId: canvasId,
+          title: "Live",
+          revision: revision,
+          mode: .enforced,
+          document: draftDocument(revision: revision),
+          nodeCount: 0,
+          edgeCount: 0,
+          groupCount: 0,
+          updatedAt: updatedAt
+        )
+      ],
+      globalPolicyEnforcementEnabled: true
     )
   }
 }

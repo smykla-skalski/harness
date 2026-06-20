@@ -1543,21 +1543,34 @@ public struct PolicyPipelineSimulationResultWire: Codable, Equatable, Sendable {
 public struct PolicyPipelineAuditSummaryWire: Codable, Equatable, Sendable {
   public var activeRevision: UInt64
   public var mode: PolicyGraphMode
+  public var globalPolicyEnforcementEnabled: Bool
   public var latestTraceId: String?
   public var latestSimulation: PolicyPipelineSimulationResultWire?
   public var validation: PolicyGraphValidationReport
 
-  public init(activeRevision: UInt64, mode: PolicyGraphMode, latestTraceId: String? = nil, latestSimulation: PolicyPipelineSimulationResultWire? = nil, validation: PolicyGraphValidationReport) {
+  public init(activeRevision: UInt64, mode: PolicyGraphMode, globalPolicyEnforcementEnabled: Bool = true, latestTraceId: String? = nil, latestSimulation: PolicyPipelineSimulationResultWire? = nil, validation: PolicyGraphValidationReport) {
     self.activeRevision = activeRevision
     self.mode = mode
+    self.globalPolicyEnforcementEnabled = globalPolicyEnforcementEnabled
     self.latestTraceId = latestTraceId
     self.latestSimulation = latestSimulation
     self.validation = validation
   }
 
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    activeRevision = try container.decode(UInt64.self, forKey: .activeRevision)
+    mode = try container.decode(PolicyGraphMode.self, forKey: .mode)
+    globalPolicyEnforcementEnabled = try container.decodeIfPresent(Bool.self, forKey: .globalPolicyEnforcementEnabled) ?? true
+    latestTraceId = try container.decodeIfPresent(String.self, forKey: .latestTraceId)
+    latestSimulation = try container.decodeIfPresent(PolicyPipelineSimulationResultWire.self, forKey: .latestSimulation)
+    validation = try container.decode(PolicyGraphValidationReport.self, forKey: .validation)
+  }
+
   enum CodingKeys: String, CodingKey {
     case activeRevision = "active_revision"
     case mode
+    case globalPolicyEnforcementEnabled = "global_policy_enforcement_enabled"
     case latestTraceId = "latest_trace_id"
     case latestSimulation = "latest_simulation"
     case validation

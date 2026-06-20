@@ -10,7 +10,6 @@ struct DashboardPolicyCanvasFooterBar: View {
   let fallbackDocument: TaskBoardPolicyPipelineDocument?
   let selectedCanvasId: String?
   let policyCanvasViewModel: PolicyCanvasViewModel
-  let automationPolicyCenter: AutomationPolicyCenter
   let isCanvasMutationDisabled: Bool
   let editingCanvasId: String?
   @Binding var isAutomationPolicySheetPresented: Bool
@@ -37,9 +36,7 @@ struct DashboardPolicyCanvasFooterBar: View {
         )
 
         DashboardPolicyCanvasFooterToolsMenuButton(
-          workspace: workspace,
           viewModel: policyCanvasViewModel,
-          automationPolicyCenter: automationPolicyCenter,
           isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented,
           onExport: onExport,
           onImport: onImport

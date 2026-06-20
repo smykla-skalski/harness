@@ -25,9 +25,6 @@ extension PolicyCanvasView {
         canMakeLive: viewModel.canMakeLive,
         remoteActionsEnabled: remoteActionsEnabled,
         remoteActionDisabledReason: remoteActionDisabledReason,
-        simulationOverlayAvailable: simulationOverlayAvailable,
-        simulationOverlayVisible: simulationOverlayResolved,
-        toggleSimulationOverlay: toggleSimulationOverlay,
         reflowLayout: {
           viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
         },
@@ -98,7 +95,7 @@ extension PolicyCanvasView {
       viewModel: viewModel,
       focusedComponent: $focusedComponentState,
       selectionFocusRequest: selectionFocusRequest,
-      showSimulationOverlay: simulationOverlayResolved,
+      showSimulationOverlay: false,
       sceneFocusEnabled: sceneFocusEnabled,
       suppressesSceneStorage: suppressesSceneStorage,
       storedPipelineStateRaw: storedPipelineStateRaw,

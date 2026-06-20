@@ -5,6 +5,7 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
     TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest,
+    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
     TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineMakeLiveRequest,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineReplayRequest,
     TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
@@ -66,13 +67,13 @@ pub(super) fn register(registry: &mut ToolRegistry) {
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
                 description: "Read the task-board policy pipeline document.",
-                input_schema: empty_schema,
-                normalize: validate_empty_object,
+                input_schema: canvas_selector_schema,
+                normalize: validate_params::<TaskBoardPolicyPipelineGetRequest>,
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
                 description: "Save a draft task-board policy pipeline document.",
-                input_schema: document_schema,
+                input_schema: save_draft_schema,
                 normalize: validate_params::<TaskBoardPolicyPipelineSaveDraftRequest>,
             },
             TaskBoardToolDescriptor {
@@ -90,19 +91,19 @@ pub(super) fn register(registry: &mut ToolRegistry) {
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
                 description: "Read task-board policy pipeline audit summaries.",
-                input_schema: empty_schema,
-                normalize: validate_empty_object,
+                input_schema: canvas_selector_schema,
+                normalize: validate_params::<TaskBoardPolicyPipelineAuditRequest>,
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_POLICY_EXPORT,
                 description: "Export the active policy canvas document as a JSON snapshot.",
-                input_schema: empty_schema,
+                input_schema: canvas_selector_schema,
                 normalize: validate_params::<TaskBoardPolicyExportRequest>,
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_POLICY_IMPORT,
                 description: "Import a policy canvas from a JSON document, creating a new canvas.",
-                input_schema: document_schema,
+                input_schema: import_schema,
                 normalize: validate_params::<TaskBoardPolicyImportRequest>,
             },
             TaskBoardToolDescriptor {
@@ -159,10 +160,27 @@ fn empty_schema() -> Value {
     })
 }
 
+fn save_draft_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "canvas_id": { "type": "string" },
+            "if_revision": { "type": "integer", "minimum": 0 },
+            "document": {
+                "type": "object",
+                "additionalProperties": true
+            }
+        },
+        "required": ["document"],
+        "additionalProperties": false
+    })
+}
+
 fn document_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
+            "canvas_id": { "type": "string" },
             "document": {
                 "type": "object",
                 "additionalProperties": true
@@ -172,11 +190,38 @@ fn document_schema() -> Value {
     })
 }
 
+fn canvas_selector_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "canvas_id": { "type": "string" }
+        },
+        "additionalProperties": false
+    })
+}
+
+fn import_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "document": {
+                "type": "object",
+                "additionalProperties": true
+            },
+            "title": { "type": "string" }
+        },
+        "required": ["document"],
+        "additionalProperties": false
+    })
+}
+
 fn promote_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
-            "revision": { "type": "integer", "minimum": 0 }
+            "canvas_id": { "type": "string" },
+            "revision": { "type": "integer", "minimum": 0 },
+            "actor": { "type": "string" }
         },
         "required": ["revision"],
         "additionalProperties": false

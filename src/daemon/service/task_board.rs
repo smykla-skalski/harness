@@ -32,6 +32,7 @@ use super::task_board_runtime::external_sync_config_for_repository;
 
 mod dispatch;
 mod policy_canvas;
+mod policy_canvas_response;
 mod sync;
 
 pub(crate) use policy_canvas::{

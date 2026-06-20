@@ -66,7 +66,7 @@ struct PolicyCanvasDecisionMatrixView: View {
   }
 
   private var emptyState: some View {
-    Text("Run a simulation to see how each action resolves.")
+    Text("Waiting for confidence evaluation.")
       .scaledFont(.caption)
       .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
       .fixedSize(horizontal: false, vertical: true)

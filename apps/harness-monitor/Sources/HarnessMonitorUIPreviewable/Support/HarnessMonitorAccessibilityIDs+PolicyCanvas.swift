@@ -17,7 +17,6 @@ extension HarnessMonitorAccessibility {
   public static let policyCanvasGlobalEnforcementButton =
     "harness.policy-canvas.action.global-enforcement"
   public static let policyCanvasReloadButton = "harness.policy-canvas.action.reload"
-  public static let policyCanvasSimulationToggle = "harness.policy-canvas.action.simulation-overlay"
   public static let policyCanvasZoomControls = "harness.policy-canvas.zoom"
   public static let policyCanvasZoomOutButton = "harness.policy-canvas.zoom.out"
   public static let policyCanvasZoomInButton = "harness.policy-canvas.zoom.in"

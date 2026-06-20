@@ -40,8 +40,10 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     )
 
     #expect(topBarSource.contains("Automation Coverage"))
-    #expect(topBarSource.contains("Sync Effective Canvases"))
-    #expect(topBarSource.contains("Clear Effective Canvases"))
+    #expect(!topBarSource.contains("Sync Effective Canvases"))
+    #expect(!topBarSource.contains("Clear Effective Canvases"))
+    #expect(!topBarSource.contains("PolicyCanvasSimulationToggleButton"))
+    #expect(!topBarSource.contains("policyCanvasSimulationToggle"))
     #expect(topBarSource.contains("PolicyCanvasMinimapDefaults.isVisibleKey"))
     #expect(topBarSource.contains("PolicyCanvasMinimapDefaults.centeringModeKey"))
     #expect(topBarSource.contains("Hide minimap"))
@@ -249,6 +251,9 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let scrollCoordinatorSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
     )
+    let hostedRootSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator+HostedRoot.swift"
+    )
     let visualStyleSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift"
     )
@@ -262,7 +267,7 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(!viewportSource.contains(".policyCanvasThemeScope()"))
     #expect(!workspaceSource.contains(".policyCanvasThemeScope()"))
     #expect(scrollCoordinatorSource.contains("let resolvedCanvasColorScheme: ColorScheme?"))
-    #expect(scrollCoordinatorSource.contains(".policyCanvasResolvedThemeScope("))
+    #expect(hostedRootSource.contains(".policyCanvasResolvedThemeScope("))
     #expect(!scrollCoordinatorSource.contains("transformEnvironment(\\.colorScheme)"))
     #expect(!labSource.contains("private var resolvedCanvasThemeMode"))
     #expect(!labSource.contains("themeMode: .constant(resolvedCanvasThemeMode)"))
@@ -291,16 +296,16 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let viewportSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
     )
-    let scrollCoordinatorSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    let hostedRootSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator+HostedRoot.swift"
     )
 
     #expect(!viewportSource.contains(".background(PolicyCanvasVisualStyle.canvasBackground)"))
-    #expect(scrollCoordinatorSource.contains("PolicyCanvasBackgroundSurface()"))
+    #expect(hostedRootSource.contains("PolicyCanvasBackgroundSurface()"))
     #expect(
-      scrollCoordinatorSource.contains(".policyCanvasDocumentLayer(size: snapshot.contentSize)"))
+      hostedRootSource.contains(".policyCanvasDocumentLayer(size: snapshot.contentSize)"))
     #expect(
-      scrollCoordinatorSource.contains(
+      hostedRootSource.contains(
         ".offset(x: workspaceLayout.contentOrigin.x, y: workspaceLayout.contentOrigin.y)"
       ))
   }

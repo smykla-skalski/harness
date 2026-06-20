@@ -32,7 +32,8 @@ struct DashboardPolicyCanvasRouteView: View {
         document: dashboardUI.taskBoardPolicyPipeline,
         simulation: dashboardUI.taskBoardPolicySimulation,
         audit: dashboardUI.taskBoardPolicyAudit,
-        activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId
+        activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId,
+        workspace: dashboardUI.taskBoardPolicyCanvasWorkspace
       )
     )
     _selectedCanvasId = State(
@@ -109,7 +110,6 @@ struct DashboardPolicyCanvasRouteView: View {
           fallbackDocument: dashboardUI.taskBoardPolicyPipeline,
           selectedCanvasId: selectedCanvasId,
           policyCanvasViewModel: policyCanvasViewModel,
-          automationPolicyCenter: AutomationPolicyCenter.shared,
           isCanvasMutationDisabled: isCanvasMutationDisabled,
           editingCanvasId: editingCanvasId,
           isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented,
@@ -411,7 +411,8 @@ struct DashboardPolicyCanvasRouteView: View {
       document: dashboardUI.taskBoardPolicyPipeline,
       simulation: dashboardUI.taskBoardPolicySimulation,
       audit: dashboardUI.taskBoardPolicyAudit,
-      activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId
+      activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId,
+      workspace: dashboardUI.taskBoardPolicyCanvasWorkspace
     )
   }
 

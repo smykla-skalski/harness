@@ -43,15 +43,22 @@ extension PolicyCanvasView {
     let snapshot = viewModel.snapshotState()
     let document = viewModel.exportDocument()
     viewModel.isSimulating = true
-    Task { @MainActor in
-      defer { viewModel.isSimulating = false }
-      let simulated = await runtime?.simulatePolicyCanvas(document: document) ?? false
-      if simulated {
-        await forceReloadPolicyPipeline()
-      } else {
-        viewModel.restoreState(snapshot, reason: "Simulation rejected, restored previous canvas")
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      HarnessMonitorAsyncWorkQueue.WorkItem(title: "Evaluating policy confidence") {
+        let simulated = await runPolicyCanvasSimulation(document: document)
+        if simulated {
+          await forceReloadPolicyPipeline()
+        } else {
+          await MainActor.run {
+            viewModel.restoreState(
+              snapshot, reason: "Simulation rejected, restored previous canvas")
+          }
+        }
+        await MainActor.run {
+          viewModel.isSimulating = false
+        }
       }
-    }
+    )
   }
 
   func performSave(reason: SaveReason) {
@@ -148,18 +155,37 @@ extension PolicyCanvasView {
       return
     }
     viewModel.isMakingLive = true
-    Task { @MainActor in
-      defer { viewModel.isMakingLive = false }
-      let madeLive = await runtime?.makeLivePolicyCanvas(revision: revision) ?? false
-      if madeLive {
-        enforceCanvasAutomationPolicies()
-        await forceReloadPolicyPipeline()
-      } else {
-        statusLine = "Make live blocked"
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      HarnessMonitorAsyncWorkQueue.WorkItem(title: "Making policy canvas live") {
+        let madeLive = await makePolicyCanvasLive(revision: revision)
+        if madeLive {
+          await MainActor.run {
+            enforceCanvasAutomationPolicies()
+          }
+          await forceReloadPolicyPipeline()
+        } else {
+          await MainActor.run {
+            statusLine = "Make live blocked"
+          }
+        }
+        await MainActor.run {
+          viewModel.isMakingLive = false
+        }
       }
-    }
+    )
   }
 
+  @MainActor
+  private func runPolicyCanvasSimulation(document: TaskBoardPolicyPipelineDocument) async -> Bool {
+    await runtime?.simulatePolicyCanvas(document: document) ?? false
+  }
+
+  @MainActor
+  private func makePolicyCanvasLive(revision: UInt64) async -> Bool {
+    await runtime?.makeLivePolicyCanvas(revision: revision) ?? false
+  }
+
+  @MainActor
   func forceReloadPolicyPipeline() async {
     guard let runtime else {
       return
@@ -179,7 +205,8 @@ extension PolicyCanvasView {
         document: snapshot.document,
         simulation: snapshot.simulation,
         audit: snapshot.audit,
-        activeCanvasId: snapshot.activeCanvasId
+        activeCanvasId: snapshot.activeCanvasId,
+        workspace: snapshot.workspace
       )
       return
     }
@@ -187,7 +214,8 @@ extension PolicyCanvasView {
       document: snapshot.document,
       simulation: snapshot.simulation,
       audit: snapshot.audit,
-      activeCanvasId: snapshot.activeCanvasId
+      activeCanvasId: snapshot.activeCanvasId,
+      workspace: snapshot.workspace
     )
   }
 

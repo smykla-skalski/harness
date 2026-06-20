@@ -3,17 +3,18 @@ import HarnessMonitorPolicyCanvasAlgorithms
 import HarnessMonitorPolicyModels
 
 /// One row of the always-on decision matrix: how the current draft resolves a
-/// single policy action under the latest simulation. Identifiable by the raw
-/// action string (each action appears at most once per simulation). Carries
-/// only value types so the matrix views never depend on the wire model.
+/// single policy action under the latest simulation. Identifiable by scenario
+/// plus action because editable scenarios can exercise the same action more than
+/// once. Carries only value types so the matrix views never depend on the wire
+/// model.
 struct PolicyCanvasDecisionMatrixRowModel: Identifiable, Equatable {
+  let id: String
+  let scenarioName: String
   let actionRaw: String
   let actionTitle: String
   let verdict: PolicyCanvasDecisionVerdict
   let reasonCode: String
   let visitedNodeIds: [String]
-
-  var id: String { actionRaw }
 }
 
 /// The five terminal verdicts the daemon emits, plus an `unknown` escape hatch
@@ -101,7 +102,11 @@ extension PolicyCanvasViewModel {
       return []
     }
     return simulation.decisions.map { decision in
-      PolicyCanvasDecisionMatrixRowModel(
+      let scenarioID =
+        decision.scenarioId.isEmpty ? decision.scenarioName : decision.scenarioId
+      return PolicyCanvasDecisionMatrixRowModel(
+        id: "\(scenarioID).\(decision.action.rawValue)",
+        scenarioName: decision.scenarioName,
         actionRaw: decision.action.rawValue,
         actionTitle: decision.action.policyCanvasTitle,
         verdict: PolicyCanvasDecisionVerdict(decisionString: decision.decision.decision),

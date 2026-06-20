@@ -11,13 +11,15 @@ final class DashboardPolicyCanvasViewModelStore: ObservableObject {
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
-    activeCanvasId: String?
+    activeCanvasId: String?,
+    workspace: TaskBoardPolicyCanvasWorkspace?
   ) {
     viewModel = PolicyCanvasViewModel.liveStartupState(
       document: document,
       simulation: simulation,
       audit: audit,
-      activeCanvasId: activeCanvasId
+      activeCanvasId: activeCanvasId,
+      workspace: workspace
     )
   }
 }

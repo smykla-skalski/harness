@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 /// Persistent LIVE/DRAFT anchor in the policy-canvas top bar. Takes a resolved
@@ -32,7 +33,10 @@ struct PolicyCanvasLiveStatusBadge: View {
     switch status {
     case .noPolicy:
       return "No live policy"
-    case .live(let revision):
+    case .live(let revision, let publishedAt):
+      if let publishedAt {
+        return "LIVE \u{00b7} rev \(revision) \u{00b7} \(publishedAge(from: publishedAt))"
+      }
       return "LIVE \u{00b7} rev \(revision)"
     case .draft(let liveRevision):
       return liveRevision == nil
@@ -67,7 +71,11 @@ struct PolicyCanvasLiveStatusBadge: View {
     switch status {
     case .noPolicy:
       return "Policy status: no live policy"
-    case .live(let revision):
+    case .live(let revision, let publishedAt):
+      if let publishedAt {
+        return
+          "Policy status: live, revision \(revision), published \(publishedAge(from: publishedAt))"
+      }
       return "Policy status: live, revision \(revision)"
     case .draft(let liveRevision):
       if let liveRevision {
@@ -81,12 +89,23 @@ struct PolicyCanvasLiveStatusBadge: View {
     switch status {
     case .noPolicy:
       return "No policy is governing real work yet"
-    case .live:
+    case .live(_, let publishedAt):
+      if let publishedAt {
+        return
+          "This canvas is the live, enforced policy, published \(publishedAge(from: publishedAt))"
+      }
       return "This canvas is the live, enforced policy"
     case .draft(let liveRevision):
       return liveRevision == nil
         ? "This draft has not been made live yet"
         : "You have unpublished edits - the live policy is an earlier revision"
     }
+  }
+
+  private func publishedAge(from date: Date) -> String {
+    PolicyCanvasLiveStatusDateFormatting.relativeFormatter.localizedString(
+      for: date,
+      relativeTo: Date()
+    )
   }
 }

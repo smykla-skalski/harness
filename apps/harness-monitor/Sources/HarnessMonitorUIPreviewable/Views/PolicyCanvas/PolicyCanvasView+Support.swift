@@ -27,24 +27,6 @@ extension PolicyCanvasView {
     return Self.missingStoreRemoteActionDisabledReason
   }
 
-  var simulationOverlayAvailable: Bool {
-    viewModel.latestSimulation != nil
-  }
-
-  var simulationOverlayResolved: Bool {
-    guard simulationOverlayAvailable else {
-      return false
-    }
-    // Hidden by default once a simulation exists; the top-bar toggle is the
-    // only thing that pins it on. The always-on confidence panel will later
-    // replace this manual overlay.
-    return simulationOverlayOverride ?? false
-  }
-
-  func toggleSimulationOverlay() {
-    simulationOverlayOverride = !simulationOverlayResolved
-  }
-
   func bindStatusLine() {
     viewModel.statusCallback = { @MainActor newStatus in
       statusLine = newStatus

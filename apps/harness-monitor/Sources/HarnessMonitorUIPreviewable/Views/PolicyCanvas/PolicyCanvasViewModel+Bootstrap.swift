@@ -12,6 +12,7 @@ extension PolicyCanvasViewModel {
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
     activeCanvasId: String? = nil,
+    workspace: TaskBoardPolicyCanvasWorkspace? = nil,
     algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
     policyGroupTitle: String? = nil
   ) -> PolicyCanvasViewModel {
@@ -26,7 +27,8 @@ extension PolicyCanvasViewModel {
       document: document,
       simulation: simulation,
       audit: audit,
-      activeCanvasId: activeCanvasId
+      activeCanvasId: activeCanvasId,
+      workspace: workspace
     )
     return viewModel
   }

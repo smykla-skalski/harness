@@ -273,10 +273,16 @@ struct PolicyCanvasViewModelTests {
     )
 
     viewModel.load(document: document, simulation: simulation, audit: nil)
-    // A saved, valid draft is allowed straight away - unlike promote, autosave
-    // means local edits no longer block, and the daemon re-simulates on make-live.
+    // A saved, valid draft is allowed straight away; the daemon re-simulates on
+    // make-live, but unsaved local edits must still be persisted before the saved
+    // backing revision can be published.
     #expect(viewModel.canMakeLive)
     #expect(viewModel.makeLiveDisabledReason == nil)
+
+    viewModel.markDocumentDirty()
+
+    #expect(!viewModel.canMakeLive)
+    #expect(viewModel.makeLiveDisabledReason == "Save pending changes before making live")
   }
 
   @Test("go-live diff row maps live and draft verdicts")
@@ -345,7 +351,7 @@ struct PolicyCanvasViewModelTests {
     #expect(riskKind?.discriminator == "risk_classifier")
     #expect(riskKind?.field == .riskScore)
     #expect(riskKind?.threshold == 74)
-    if case let .riskClassifier(_, _, highRiskReasonCode, missingReasonCode) = riskKind {
+    if case .riskClassifier(_, _, let highRiskReasonCode, let missingReasonCode) = riskKind {
       #expect(highRiskReasonCode == .riskAboveThreshold)
       #expect(missingReasonCode == .humanRequired)
     } else {
@@ -488,7 +494,7 @@ struct PolicyCanvasViewModelTests {
           fromPort: "out",
           toNodeId: "target",
           toPort: "in"
-        ),
+        )
       ],
       groups: [],
       layout: TaskBoardPolicyPipelineLayout(nodes: []),

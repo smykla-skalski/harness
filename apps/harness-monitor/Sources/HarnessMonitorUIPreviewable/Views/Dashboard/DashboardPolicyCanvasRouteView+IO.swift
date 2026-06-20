@@ -23,7 +23,8 @@ extension DashboardPolicyCanvasRouteView {
         document: nil,
         simulation: nil,
         audit: nil,
-        activeCanvasId: preview.snapshot.activeCanvasId
+        activeCanvasId: preview.snapshot.activeCanvasId,
+        workspace: preview.snapshot.workspace
       )
       return
     }
@@ -31,7 +32,8 @@ extension DashboardPolicyCanvasRouteView {
       document: preview.snapshot.document,
       simulation: preview.snapshot.simulation,
       audit: preview.snapshot.audit,
-      activeCanvasId: preview.snapshot.activeCanvasId
+      activeCanvasId: preview.snapshot.activeCanvasId,
+      workspace: preview.snapshot.workspace
     )
   }
 

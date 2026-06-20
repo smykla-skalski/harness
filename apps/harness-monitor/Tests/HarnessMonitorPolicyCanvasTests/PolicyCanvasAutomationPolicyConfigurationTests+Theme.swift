@@ -22,6 +22,9 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     let edgeSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasEdgeLayers.swift"
     )
+    let edgeLabelSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEdgeLabelLayer.swift"
+    )
     let minimapSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasMinimapOverlay.swift"
     )
@@ -54,7 +57,8 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(edgeSource.contains("@Environment(\\.colorScheme)"))
     #expect(edgeSource.contains("PolicyCanvasVisualStyle.edgeStrokeOpacity("))
     #expect(edgeSource.contains("PolicyCanvasVisualStyle.edgeArrowOpacity("))
-    #expect(edgeSource.contains("PolicyCanvasVisualStyle.edgeLabelBackground("))
+    #expect(edgeLabelSource.contains("@Environment(\\.colorScheme)"))
+    #expect(edgeLabelSource.contains("PolicyCanvasVisualStyle.edgeLabelBackground("))
     #expect(!edgeSource.contains("PolicyCanvasVisualStyle.canvasBackground.opacity(0.72)"))
     #expect(minimapSource.contains("@Environment(\\.colorScheme)"))
     #expect(minimapSource.contains("PolicyCanvasVisualStyle.minimapBackground("))
@@ -234,12 +238,12 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
 
   @Test("Policy canvas native workspace paints the full scrollable background")
   func policyCanvasNativeWorkspacePaintsFullScrollableBackground() throws {
-    let scrollCoordinatorSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    let hostedRootSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator+HostedRoot.swift"
     )
 
     #expect(
-      scrollCoordinatorSource.contains(
+      hostedRootSource.contains(
         "PolicyCanvasBackgroundSurface()\n"
           + "        .frame(\n"
           + "          width: workspaceLayout.workspaceSize.width,\n"
@@ -247,12 +251,12 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
       )
     )
     #expect(
-      scrollCoordinatorSource.contains(
+      hostedRootSource.contains(
         ".policyCanvasResolvedThemeScope(snapshot.resolvedCanvasColorScheme)"
       )
     )
     #expect(
-      !scrollCoordinatorSource.contains(
+      !hostedRootSource.contains(
         """
         PolicyCanvasBackgroundSurface()
                   .contentShape(Rectangle())

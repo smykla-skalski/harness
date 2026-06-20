@@ -16,18 +16,6 @@ public struct PolicyCanvasView: View {
   @State private var selectionFocusRequestState: PolicyCanvasViewportSelectionFocusRequest?
   @State private var selectionFocusRequestIDState: UInt64 = 0
   @FocusState var canvasKeyboardFocusedState: Bool
-  /// User-facing override for the simulation overlay. Defaults to nil
-  /// (auto-show whenever a simulation exists and the user is on the
-  /// simulation tab); the chrome toggle in the top bar flips this to
-  /// `true`/`false` so the user can hide noise while staying on the
-  /// simulation tab, or pin the overlay while reviewing the draft tab.
-  ///
-  /// Simulation visibility is purely view state — never marks
-  /// `documentDirty`. Holding the override in @State (not in the view
-  /// model) keeps document state separate from per-window viewport
-  /// preferences, matching how the rest of the canvas treats zoom and
-  /// inspector visibility.
-  @State private var simulationOverlayOverrideState: Bool?
   @FocusState var focusedFieldState: PolicyCanvasFocusedField?
   /// VoiceOver focus anchor for the canvas surface. The search palette writes
   /// the just-selected component into this binding after dismiss so VO lands
@@ -123,11 +111,6 @@ public struct PolicyCanvasView: View {
     nonmutating set { selectionFocusRequestIDState = newValue }
   }
 
-  var simulationOverlayOverride: Bool? {
-    get { simulationOverlayOverrideState }
-    nonmutating set { simulationOverlayOverrideState = newValue }
-  }
-
   var focusedField: PolicyCanvasFocusedField? {
     focusedFieldState
   }
@@ -168,7 +151,8 @@ public struct PolicyCanvasView: View {
         document: snapshot.document,
         simulation: snapshot.simulation,
         audit: snapshot.audit,
-        activeCanvasId: snapshot.activeCanvasId
+        activeCanvasId: snapshot.activeCanvasId,
+        workspace: snapshot.workspace
       )
     )
     self.runtime = runtime

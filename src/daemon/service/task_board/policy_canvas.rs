@@ -3,22 +3,24 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
-    TaskBoardPolicyCanvasSummary, TaskBoardPolicyCanvasWorkspaceResponse,
-    TaskBoardPolicyExportRequest, TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest,
-    TaskBoardPolicyImportResponse, TaskBoardPolicyPipelineAuditRequest,
-    TaskBoardPolicyPipelineAuditResponse, TaskBoardPolicyPipelineGetRequest,
-    TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineGoLiveDiffResponse,
-    TaskBoardPolicyPipelineMakeLiveRequest, TaskBoardPolicyPipelineMakeLiveResponse,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
-    TaskBoardPolicyPipelineReplayRequest, TaskBoardPolicyPipelineReplayResponse,
-    TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardPolicyPipelineSimulationResponse, TaskBoardPolicyScenarioCreateRequest,
-    TaskBoardPolicyScenarioDeleteRequest, TaskBoardPolicyScenarioUpdateRequest,
+    TaskBoardPolicyCanvasWorkspaceResponse, TaskBoardPolicyExportRequest,
+    TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest, TaskBoardPolicyImportResponse,
+    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineAuditResponse,
+    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelineGoLiveDiffRequest,
+    TaskBoardPolicyPipelineGoLiveDiffResponse, TaskBoardPolicyPipelineMakeLiveRequest,
+    TaskBoardPolicyPipelineMakeLiveResponse, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineReplayRequest,
+    TaskBoardPolicyPipelineReplayResponse, TaskBoardPolicyPipelineResponse,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
+    TaskBoardPolicyScenarioCreateRequest, TaskBoardPolicyScenarioDeleteRequest,
+    TaskBoardPolicyScenarioUpdateRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::default_board_root;
-use crate::task_board::policy_graph::{self, PolicyCanvasRecord, PolicyCanvasWorkspace};
+use crate::task_board::policy_graph::{self, PolicyCanvasWorkspace};
+
+use super::policy_canvas_response::policy_canvas_workspace_response;
 
 const POLICY_PIPELINE_CHANGE_CHANNEL: &str = "policy_pipeline";
 
@@ -513,46 +515,4 @@ pub(crate) async fn import_task_board_policy(
     feed_gate_cache(&workspace);
     bump_change_policy(db).await;
     Ok(policy_canvas_workspace_response(&workspace))
-}
-
-fn policy_canvas_workspace_response(
-    workspace: &PolicyCanvasWorkspace,
-) -> TaskBoardPolicyCanvasWorkspaceResponse {
-    TaskBoardPolicyCanvasWorkspaceResponse {
-        schema_version: workspace.schema_version,
-        active_canvas_id: workspace.active_canvas_id.clone(),
-        global_policy_enforcement_enabled: workspace.global_policy_enforcement_enabled,
-        canvases: workspace
-            .canvases
-            .iter()
-            .map(policy_canvas_summary)
-            .collect(),
-        scenarios: workspace.scenarios.clone(),
-    }
-}
-
-fn policy_canvas_summary(canvas: &PolicyCanvasRecord) -> TaskBoardPolicyCanvasSummary {
-    TaskBoardPolicyCanvasSummary {
-        canvas_id: canvas.id.clone(),
-        title: canvas.title.clone(),
-        revision: canvas.document.revision,
-        mode: canvas.document.mode,
-        document: canvas.document.clone(),
-        node_count: canvas.document.nodes.len(),
-        edge_count: canvas.document.edges.len(),
-        group_count: canvas.document.groups.len(),
-        latest_simulation_trace_id: canvas
-            .latest_simulation
-            .as_ref()
-            .map(|simulation| simulation.trace_id.clone()),
-        latest_simulation_succeeded: canvas
-            .latest_simulation
-            .as_ref()
-            .map(|simulation| simulation.succeeded),
-        latest_simulation_at: canvas
-            .latest_simulation
-            .as_ref()
-            .map(|simulation| simulation.simulated_at.clone()),
-        updated_at: canvas.updated_at.clone(),
-    }
 }

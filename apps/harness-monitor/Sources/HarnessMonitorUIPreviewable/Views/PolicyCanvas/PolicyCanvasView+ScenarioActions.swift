@@ -47,21 +47,19 @@ extension PolicyCanvasView {
       statusLine = remoteActionDisabledReason
       return
     }
-    Task { @MainActor in
-      let succeeded: Bool
-      if let scenarioId = request.scenarioId {
-        succeeded =
-          await runtime?.updatePolicyScenario(id: scenarioId, name: name, input: input) ?? false
-      } else {
-        succeeded = await runtime?.createPolicyScenario(name: name, input: input) ?? false
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      HarnessMonitorAsyncWorkQueue.WorkItem(title: "Saving policy scenario") {
+        let succeeded = await savePolicyScenario(request: request, name: name, input: input)
+        guard succeeded else {
+          await MainActor.run {
+            statusLine =
+              request.scenarioId == nil ? "Could not add scenario" : "Could not update scenario"
+          }
+          return
+        }
+        await reloadAfterScenarioChange()
       }
-      guard succeeded else {
-        statusLine =
-          request.scenarioId == nil ? "Could not add scenario" : "Could not update scenario"
-        return
-      }
-      await reloadAfterScenarioChange()
-    }
+    )
   }
 
   /// Drop a scenario, then re-evaluate. Routed from the confidence panel's
@@ -71,13 +69,17 @@ extension PolicyCanvasView {
       statusLine = remoteActionDisabledReason
       return
     }
-    Task { @MainActor in
-      guard await runtime?.deletePolicyScenario(id: id) == true else {
-        statusLine = "Could not delete scenario"
-        return
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      HarnessMonitorAsyncWorkQueue.WorkItem(title: "Deleting policy scenario") {
+        guard await deletePolicyScenarioRuntime(id: id) else {
+          await MainActor.run {
+            statusLine = "Could not delete scenario"
+          }
+          return
+        }
+        await reloadAfterScenarioChange()
       }
-      await reloadAfterScenarioChange()
-    }
+    )
   }
 
   /// Restore the seeded scenario set, then re-evaluate.
@@ -86,18 +88,45 @@ extension PolicyCanvasView {
       statusLine = remoteActionDisabledReason
       return
     }
-    Task { @MainActor in
-      guard await runtime?.resetPolicyScenarios() == true else {
-        statusLine = "Could not reset scenarios"
-        return
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      HarnessMonitorAsyncWorkQueue.WorkItem(title: "Resetting policy scenarios") {
+        guard await resetPolicyScenariosRuntime() else {
+          await MainActor.run {
+            statusLine = "Could not reset scenarios"
+          }
+          return
+        }
+        await reloadAfterScenarioChange()
       }
-      await reloadAfterScenarioChange()
-    }
+    )
   }
 
   /// Re-run the simulation over the now-current scenario set and refresh the
   /// pipeline so the decision matrix and scenario inspector reflect the change -
   /// the same simulate-then-reload the manual confidence run uses.
+  @MainActor
+  private func savePolicyScenario(
+    request: PolicyCanvasScenarioEditRequest,
+    name: String,
+    input: PolicyInput
+  ) async -> Bool {
+    if let scenarioId = request.scenarioId {
+      return await runtime?.updatePolicyScenario(id: scenarioId, name: name, input: input) ?? false
+    }
+    return await runtime?.createPolicyScenario(name: name, input: input) ?? false
+  }
+
+  @MainActor
+  private func deletePolicyScenarioRuntime(id: String) async -> Bool {
+    await runtime?.deletePolicyScenario(id: id) == true
+  }
+
+  @MainActor
+  private func resetPolicyScenariosRuntime() async -> Bool {
+    await runtime?.resetPolicyScenarios() == true
+  }
+
+  @MainActor
   private func reloadAfterScenarioChange() async {
     viewModel.isSimulating = true
     defer { viewModel.isSimulating = false }

@@ -10,6 +10,7 @@ struct PolicyCanvasPendingUpdate: Equatable {
   let simulation: TaskBoardPolicyPipelineSimulationResult?
   let audit: TaskBoardPolicyPipelineAuditSummary?
   let activeCanvasId: String?
+  let workspace: TaskBoardPolicyCanvasWorkspace?
 }
 
 struct PolicyCanvasLoadedGraph {
@@ -115,7 +116,8 @@ extension PolicyCanvasViewModel {
       document: pending.document,
       simulation: pending.simulation,
       audit: pending.audit,
-      activeCanvasId: pending.activeCanvasId
+      activeCanvasId: pending.activeCanvasId,
+      workspace: pending.workspace
     )
   }
 
@@ -203,9 +205,12 @@ extension PolicyCanvasViewModel {
   /// republish.
   func absorbExternalSimulationAudit(
     simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?
+    audit: TaskBoardPolicyPipelineAuditSummary?,
+    workspace: TaskBoardPolicyCanvasWorkspace? = nil,
+    activeCanvasId: String? = nil
   ) {
     captureLiveAudit(audit)
+    captureLiveWorkspace(workspace, activeCanvasId: activeCanvasId ?? self.activeCanvasId)
     if let incoming = simulation ?? audit?.latestSimulation {
       latestSimulation = incoming
       invalidateValidationCache()

@@ -323,6 +323,7 @@ public struct TaskBoardPolicyPipelineGoLiveDiffRequest: Codable, Equatable, Send
 public struct TaskBoardPolicyPipelineAuditSummary: Codable, Equatable, Sendable {
   public var activeRevision: UInt64
   public var mode: TaskBoardPolicyPipelineMode
+  public var globalPolicyEnforcementEnabled: Bool
   public var latestTraceId: String?
   public var latestSimulation: TaskBoardPolicyPipelineSimulationResult?
   public var validation: TaskBoardPolicyPipelineValidation
@@ -330,15 +331,40 @@ public struct TaskBoardPolicyPipelineAuditSummary: Codable, Equatable, Sendable 
   public init(
     activeRevision: UInt64,
     mode: TaskBoardPolicyPipelineMode,
+    globalPolicyEnforcementEnabled: Bool = true,
     latestTraceId: String? = nil,
     latestSimulation: TaskBoardPolicyPipelineSimulationResult? = nil,
     validation: TaskBoardPolicyPipelineValidation
   ) {
     self.activeRevision = activeRevision
     self.mode = mode
+    self.globalPolicyEnforcementEnabled = globalPolicyEnforcementEnabled
     self.latestTraceId = latestTraceId
     self.latestSimulation = latestSimulation
     self.validation = validation
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case activeRevision = "active_revision"
+    case mode
+    case globalPolicyEnforcementEnabled = "global_policy_enforcement_enabled"
+    case latestTraceId = "latest_trace_id"
+    case latestSimulation = "latest_simulation"
+    case validation
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    activeRevision = try container.decode(UInt64.self, forKey: .activeRevision)
+    mode = try container.decode(TaskBoardPolicyPipelineMode.self, forKey: .mode)
+    globalPolicyEnforcementEnabled =
+      try container.decodeIfPresent(Bool.self, forKey: .globalPolicyEnforcementEnabled) ?? true
+    latestTraceId = try container.decodeIfPresent(String.self, forKey: .latestTraceId)
+    latestSimulation = try container.decodeIfPresent(
+      TaskBoardPolicyPipelineSimulationResult.self,
+      forKey: .latestSimulation
+    )
+    validation = try container.decode(TaskBoardPolicyPipelineValidation.self, forKey: .validation)
   }
 }
 
@@ -350,6 +376,7 @@ extension TaskBoardPolicyPipelineAuditSummary {
     self.init(
       activeRevision: wire.activeRevision,
       mode: TaskBoardPolicyPipelineMode(rawValue: wire.mode.rawValue) ?? .draft,
+      globalPolicyEnforcementEnabled: wire.globalPolicyEnforcementEnabled,
       latestTraceId: wire.latestTraceId,
       latestSimulation: wire.latestSimulation.map(
         TaskBoardPolicyPipelineSimulationResult.init(wire:)),
