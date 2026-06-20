@@ -40,6 +40,8 @@ extension HarnessMonitorAccessibility {
   public static let policyCanvasValidationToggle = "harness.policy-canvas.validation.toggle"
   public static let policyCanvasConfidencePanel = "harness.policy-canvas.confidence"
   public static let policyCanvasDecisionMatrix = "harness.policy-canvas.decision-matrix"
+  public static let policyCanvasScenarioInspector = "harness.policy-canvas.scenarios"
+  public static let policyCanvasScenarioResetButton = "harness.policy-canvas.scenarios.reset"
   public static let policyCanvasEmptyState = "harness.policy-canvas.empty-state"
   public static let policyCanvasSearchPalette = "harness.policy-canvas.search.palette"
   public static let policyCanvasSearchField = "harness.policy-canvas.search.field"

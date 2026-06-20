@@ -11,6 +11,8 @@ struct PolicyCanvasConfidencePanel: View {
   let viewModel: PolicyCanvasViewModel
   let focusIssue: PolicyCanvasIssueFocusAction
   let focusDecision: @MainActor ([String]) -> Void
+  let deleteScenario: @MainActor (String) -> Void
+  let resetScenarios: @MainActor () -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -19,6 +21,13 @@ struct PolicyCanvasConfidencePanel: View {
         rows: viewModel.decisionMatrixRows,
         isEvaluating: viewModel.isSimulating,
         focusDecision: focusDecision
+      )
+      PolicyCanvasScenarioInspector(
+        rows: viewModel.scenarioRows,
+        isEvaluating: viewModel.isSimulating,
+        focusDecision: focusDecision,
+        deleteScenario: deleteScenario,
+        resetScenarios: resetScenarios
       )
     }
     .accessibilityElement(children: .contain)

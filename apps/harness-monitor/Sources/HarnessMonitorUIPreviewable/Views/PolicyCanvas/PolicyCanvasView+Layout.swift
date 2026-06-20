@@ -58,6 +58,12 @@ extension PolicyCanvasView {
                 id: selectionFocusRequestID,
                 selection: .node(terminal)
               )
+            },
+            deleteScenario: { id in
+              deleteScenario(id: id)
+            },
+            resetScenarios: {
+              resetScenarios()
             }
           )
 

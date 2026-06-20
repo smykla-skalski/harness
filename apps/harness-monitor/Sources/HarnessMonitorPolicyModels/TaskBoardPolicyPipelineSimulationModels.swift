@@ -164,17 +164,23 @@ public struct TaskBoardPolicyDecision: Codable, Equatable, Sendable {
 }
 
 public struct TaskBoardPolicyPipelineSimulatedDecision: Codable, Equatable, Sendable {
+  public var scenarioId: String
+  public var scenarioName: String
   public var action: PolicyAction
   public var decision: TaskBoardPolicyDecision
   public var visitedNodeIds: [String]
   public var policyTraceIds: [String]
 
   public init(
+    scenarioId: String = "",
+    scenarioName: String = "",
     action: PolicyAction,
     decision: TaskBoardPolicyDecision,
     visitedNodeIds: [String] = [],
     policyTraceIds: [String] = []
   ) {
+    self.scenarioId = scenarioId
+    self.scenarioName = scenarioName
     self.action = action
     self.decision = decision
     self.visitedNodeIds = visitedNodeIds
@@ -182,6 +188,8 @@ public struct TaskBoardPolicyPipelineSimulatedDecision: Codable, Equatable, Send
   }
 
   enum CodingKeys: String, CodingKey {
+    case scenarioId
+    case scenarioName
     case action
     case decision
     case visitedNodeIds
@@ -190,6 +198,8 @@ public struct TaskBoardPolicyPipelineSimulatedDecision: Codable, Equatable, Send
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    scenarioId = try container.decodeIfPresent(String.self, forKey: .scenarioId) ?? ""
+    scenarioName = try container.decodeIfPresent(String.self, forKey: .scenarioName) ?? ""
     action = try container.decode(PolicyAction.self, forKey: .action)
     decision = try container.decode(TaskBoardPolicyDecision.self, forKey: .decision)
     visitedNodeIds = try container.decodeIfPresent([String].self, forKey: .visitedNodeIds) ?? []
@@ -198,6 +208,8 @@ public struct TaskBoardPolicyPipelineSimulatedDecision: Codable, Equatable, Send
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(scenarioId, forKey: .scenarioId)
+    try container.encode(scenarioName, forKey: .scenarioName)
     try container.encode(action, forKey: .action)
     try container.encode(decision, forKey: .decision)
     try container.encode(visitedNodeIds, forKey: .visitedNodeIds)
@@ -345,6 +357,8 @@ extension TaskBoardPolicyPipelineValidation {
 extension TaskBoardPolicyPipelineSimulatedDecision {
   public init(wire: PolicyPipelineSimulatedDecisionWire) {
     self.init(
+      scenarioId: wire.scenarioId,
+      scenarioName: wire.scenarioName,
       action: wire.action,
       decision: TaskBoardPolicyDecision(wire: wire.decision),
       visitedNodeIds: wire.visitedNodeIds,

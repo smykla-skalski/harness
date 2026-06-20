@@ -18,6 +18,10 @@ public protocol PolicyCanvasEditorRuntime: PolicyCanvasLabRuntime {
     -> TaskBoardPolicyPipelineDocument?
   func makeLivePolicyCanvas(revision: UInt64) async -> Bool
   func goLiveDiffPolicyCanvas(canvasId: String?) async -> TaskBoardPolicyPipelineGoLiveDiff?
+  func createPolicyScenario(name: String, input: PolicyInput) async -> Bool
+  func updatePolicyScenario(id: String, name: String, input: PolicyInput) async -> Bool
+  func deletePolicyScenario(id: String) async -> Bool
+  func resetPolicyScenarios() async -> Bool
 }
 
 extension HarnessMonitorStore: PolicyCanvasEditorRuntime {
@@ -63,5 +67,21 @@ extension HarnessMonitorStore: PolicyCanvasEditorRuntime {
     -> TaskBoardPolicyPipelineGoLiveDiff?
   {
     await goLiveDiffTaskBoardPolicyPipeline(canvasId: canvasId)
+  }
+
+  public func createPolicyScenario(name: String, input: PolicyInput) async -> Bool {
+    await createTaskBoardPolicyScenario(name: name, input: input)
+  }
+
+  public func updatePolicyScenario(id: String, name: String, input: PolicyInput) async -> Bool {
+    await updateTaskBoardPolicyScenario(id: id, name: name, input: input)
+  }
+
+  public func deletePolicyScenario(id: String) async -> Bool {
+    await deleteTaskBoardPolicyScenario(id: id)
+  }
+
+  public func resetPolicyScenarios() async -> Bool {
+    await resetTaskBoardPolicyScenarios()
   }
 }
