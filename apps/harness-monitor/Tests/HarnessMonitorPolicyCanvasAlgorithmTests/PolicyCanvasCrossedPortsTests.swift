@@ -61,15 +61,33 @@ struct PolicyCanvasCrossedPortsTests {
   }
 
   @Test func nonAdjacentInversionsAreAllCounted() {
-    // Three ports: top->100, middle->200, bottom->50. The bottom port crosses
-    // both the others (it is fed from above both), so two crossings - one of
-    // them non-adjacent. All pairs are compared, not just neighbors.
-    let result = report(routes: [
-      "e1": route(far: 100, attach: 30),
-      "e2": route(far: 200, attach: 60),
-      "e3": route(far: 50, attach: 90),
-    ])
+    // Three wires funnel into one leading side through a shared vertical channel
+    // (x=360). The bottom port (e3) overshoots highest into the channel (entry 10,
+    // above both others) then drops to its dot, so its run swaps past BOTH the top
+    // port (e1, non-adjacent - e2 sits between them) and the middle port (e2,
+    // adjacent). e1 and e2 keep their order and never share an overlapping run.
+    // Two crossings, one non-adjacent: every pair is compared, not just neighbours.
+    func channelRoute(source: CGFloat, attach: CGFloat) -> PolicyCanvasEdgeRoute {
+      PolicyCanvasEdgeRoute(
+        points: [
+          CGPoint(x: 340, y: source), CGPoint(x: 360, y: source),
+          CGPoint(x: 360, y: attach), CGPoint(x: 400, y: attach),
+        ],
+        labelPosition: .zero
+      )
+    }
+    let result = policyCanvasMeasureGraphQuality(
+      nodeFramesByID: ["t": target],
+      groupTitleFrames: [],
+      edges: ["e1", "e2", "e3"].map(edge),
+      routes: [
+        "e1": channelRoute(source: 55, attach: 30),
+        "e2": channelRoute(source: 85, attach: 60),
+        "e3": channelRoute(source: 10, attach: 90),
+      ]
+    )
     #expect(result.count(for: .crossedPorts) == 2)
+    #expect(Set(result.crossedPorts.map { Set([$0.edgeA, $0.edgeB]) }) == [["e1", "e3"], ["e2", "e3"]])
   }
 
   @Test func sameFarPositionIsNotACross() {
@@ -83,11 +101,13 @@ struct PolicyCanvasCrossedPortsTests {
 
   @Test func fanInThroughSharedChannelFlagsOnlyRealCrossings() {
     // Four wires funnel into one node side through a shared vertical channel
-    // (x=2828), mirroring extreme-galaxy's Human gate fan-in. A one-dimensional
-    // order key (where each wire came from) misreads this: it invents a crossing
-    // between `switch` and `gate` (whose routes run parallel and never meet) and
-    // misses the real `risk x evidence` and `gate x evidence` crossings. Only the
-    // pairs whose polylines actually intersect between the ports are flagged.
+    // (x=2828), mirroring extreme-galaxy's Human gate fan-in. `risk` attaches
+    // highest yet overshoots lowest into the channel (entry 6335, below the other
+    // three entries), so its run swaps past all of them. `switch`, `gate`, and
+    // `evidence` keep their channel order and stay parallel, so none of those pairs
+    // cross. Only the pairs that actually swap in the shared channel are flagged -
+    // a one-dimensional order key would invent switch x gate and misread which wire
+    // really reorders.
     let node = CGRect(x: 2864, y: 6412, width: 168, height: 105)
     func fan(source: CGFloat, channelTurn: CGFloat, channelEntry: CGFloat, attach: CGFloat)
       -> PolicyCanvasEdgeRoute
@@ -115,15 +135,15 @@ struct PolicyCanvasCrossedPortsTests {
     let pairs = Set(result.crossedPorts.map { Set([$0.edgeA, $0.edgeB]) })
     #expect(
       pairs == [
-        ["risk", "switch"], ["risk", "gate"], ["risk", "evidence"], ["gate", "evidence"],
+        ["risk", "switch"], ["risk", "gate"], ["risk", "evidence"],
       ],
-      "expected only the pairs that actually cross; got \(pairs)"
+      "expected only the pairs that actually swap in the channel; got \(pairs)"
     )
-    // gate (6478.2) and evidence (6505.6) are adjacent on the leading side - the
+    // risk (6423.4) and switch (6450.8) are adjacent on the leading side - the
     // X sits at their midpoint, on the port column between the two dots.
     let adjacent = try! #require(
-      result.crossedPorts.first { Set([$0.edgeA, $0.edgeB]) == ["gate", "evidence"] })
-    #expect(adjacent.markPoint == CGPoint(x: 2864, y: (6478.2 + 6505.6) / 2))
+      result.crossedPorts.first { Set([$0.edgeA, $0.edgeB]) == ["risk", "switch"] })
+    #expect(adjacent.markPoint == CGPoint(x: 2864, y: (6423.4 + 6450.8) / 2))
     // risk (6423.4) and evidence (6505.6) have switch and gate between them, so the
     // midpoint would land on a dot - the X is pushed one port diameter off the
     // leading side (to the left, the wire margin), never onto the node body.

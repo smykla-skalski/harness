@@ -35,8 +35,13 @@ struct PolicyCanvasPortDistributionTests {
   }
 
   @Test func evenlyDistributedPortsAreClean() {
-    // Three dots at exactly the canonical even slots for count 3 (21, 48, 75).
-    let result = report(attachments: ["e1": 21, "e2": 48, "e3": 75])
+    // Three dots at exactly the canonical even slots for count 3, taken from the
+    // same layout the node uses for its declared ports so the test tracks the real
+    // spacing rather than hard-coding it.
+    let slots = (0..<3).map {
+      PolicyCanvasLayout.portY(index: $0, count: 3, nodeHeight: target.height)
+    }
+    let result = report(attachments: ["e1": slots[0], "e2": slots[1], "e3": slots[2]])
     #expect(result.count(for: .portUneven) == 0)
   }
 
@@ -65,14 +70,16 @@ struct PolicyCanvasPortDistributionTests {
 
   @Test func tallNodeWithEvenlySpreadPortsIsClean() {
     // A node sized by port demand is taller than the default node height. Its six
-    // evenly-spread dots sit at portY(index, count: 6, nodeHeight: 159) =
-    // 12, 39, 66, 93, 120, 147 - the Action-gate-14 trailing fan. The measure must
-    // judge them against the node's ACTUAL height, not the default, or every
-    // interior dot reads as mis-placed.
+    // evenly-spread dots sit at the canonical slots for count 6 against the node's
+    // ACTUAL height - the Action-gate-14 trailing fan. The measure must judge them
+    // against that height, not the default, or every interior dot reads as
+    // mis-placed.
     let tall = CGRect(x: 400, y: 0, width: 168, height: 159)
-    let attachments: [String: CGFloat] = [
-      "e0": 12, "e1": 39, "e2": 66, "e3": 93, "e4": 120, "e5": 147,
-    ]
+    let attachments: [String: CGFloat] = Dictionary(
+      uniqueKeysWithValues: (0..<6).map {
+        ("e\($0)", PolicyCanvasLayout.portY(index: $0, count: 6, nodeHeight: tall.height))
+      }
+    )
     let result = policyCanvasMeasureGraphQuality(
       nodeFramesByID: ["t": tall],
       groupTitleFrames: [],
