@@ -91,6 +91,12 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func promoteTaskBoardPolicyPipeline(
     request: TaskBoardPolicyPipelinePromoteRequest
   ) async throws -> TaskBoardPolicyPipelinePromoteResponse
+  func makeLiveTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineMakeLiveRequest
+  ) async throws -> TaskBoardPolicyPipelineMakeLiveResponse
+  func goLiveDiffTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineGoLiveDiffRequest
+  ) async throws -> TaskBoardPolicyPipelineGoLiveDiff
   func taskBoardPolicyPipelineAudit(canvasId: String?) async throws
     -> TaskBoardPolicyPipelineAuditSummary
   func exportTaskBoardPolicy(
@@ -369,6 +375,18 @@ extension HarnessMonitorTaskBoardClientProtocol {
   public func promoteTaskBoardPolicyPipeline(
     request _: TaskBoardPolicyPipelinePromoteRequest
   ) async throws -> TaskBoardPolicyPipelinePromoteResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
+  }
+
+  public func makeLiveTaskBoardPolicyPipeline(
+    request _: TaskBoardPolicyPipelineMakeLiveRequest
+  ) async throws -> TaskBoardPolicyPipelineMakeLiveResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
+  }
+
+  public func goLiveDiffTaskBoardPolicyPipeline(
+    request _: TaskBoardPolicyPipelineGoLiveDiffRequest
+  ) async throws -> TaskBoardPolicyPipelineGoLiveDiff {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
   }
 

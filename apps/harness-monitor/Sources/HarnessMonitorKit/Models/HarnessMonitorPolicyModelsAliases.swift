@@ -33,3 +33,14 @@ public typealias PolicyGraphMode = HarnessMonitorPolicyModels.PolicyGraphMode
 // The generated canvas workspace wire type names PolicyScenario in its scenarios
 // array, so it must resolve from the Kit namespace too.
 public typealias PolicyScenario = HarnessMonitorPolicyModels.PolicyScenario
+
+// The go-live decision diff is pure data (per-scenario live-vs-draft verdicts),
+// so the API client decodes the generated wire type directly the way the
+// simulate result wire is consumed, rather than through a hand model. Surfaced
+// into Kit under a distinct `TaskBoard…` name (not the bare generated name) so
+// the client/store/runtime reach it without importing the models module, and so
+// view files that import BOTH modules can name it without a lookup clash against
+// the generated `PolicyPipelineGoLiveDiff`. Its `diffs` entries stay the
+// generated `PolicyPipelineGoLiveDiffEntry`, resolved from the models module.
+public typealias TaskBoardPolicyPipelineGoLiveDiff =
+  HarnessMonitorPolicyModels.PolicyPipelineGoLiveDiff

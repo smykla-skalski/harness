@@ -107,6 +107,26 @@ extension HarnessMonitorAPIClient {
     )
   }
 
+  public func makeLiveTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineMakeLiveRequest
+  ) async throws -> TaskBoardPolicyPipelineMakeLiveResponse {
+    try await post(
+      "/v1/task-board/policy/make-live",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
+  public func goLiveDiffTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineGoLiveDiffRequest
+  ) async throws -> TaskBoardPolicyPipelineGoLiveDiff {
+    try await post(
+      "/v1/task-board/policy/go-live-diff",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
   public func taskBoardPolicyPipelineAudit(
     canvasId: String? = nil
   ) async throws -> TaskBoardPolicyPipelineAuditSummary {

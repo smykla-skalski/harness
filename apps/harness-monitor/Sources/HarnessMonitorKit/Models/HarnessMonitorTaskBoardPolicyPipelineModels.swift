@@ -205,6 +205,73 @@ public struct TaskBoardPolicyPipelinePromoteResponse: Codable, Equatable, Sendab
   }
 }
 
+public struct TaskBoardPolicyPipelineMakeLiveRequest: Codable, Equatable, Sendable {
+  public var canvasId: String?
+  public var revision: UInt64
+  public var actor: String?
+
+  public init(canvasId: String? = nil, revision: UInt64, actor: String? = nil) {
+    self.canvasId = canvasId
+    self.revision = revision
+    self.actor = actor
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case canvasId = "canvas_id"
+    case revision
+    case actor
+  }
+}
+
+/// Hand-authored because the make-live response carries the post-promotion
+/// workspace snapshot the generated `PolicyPipelineMakeLiveResponse` does not
+/// model (and types `document` as the hand `TaskBoardPolicyPipelineDocument`,
+/// not the bare generated `PolicyGraph`). The workspace lets the store run one
+/// deterministic `syncTaskBoardPolicyCanvasWorkspace` instead of re-fetching.
+public struct TaskBoardPolicyPipelineMakeLiveResponse: Codable, Equatable, Sendable {
+  public var document: TaskBoardPolicyPipelineDocument
+  public var traceId: String
+  public var globalPolicyEnforcementEnabled: Bool
+  public var workspace: TaskBoardPolicyCanvasWorkspace
+
+  public init(
+    document: TaskBoardPolicyPipelineDocument,
+    traceId: String,
+    globalPolicyEnforcementEnabled: Bool,
+    workspace: TaskBoardPolicyCanvasWorkspace
+  ) {
+    self.document = document
+    self.traceId = traceId
+    self.globalPolicyEnforcementEnabled = globalPolicyEnforcementEnabled
+    self.workspace = workspace
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case document
+    case traceId = "trace_id"
+    case globalPolicyEnforcementEnabled = "global_policy_enforcement_enabled"
+    case workspace
+  }
+}
+
+/// Candidate selector for the read-only go-live decision diff. `document` lets a
+/// caller diff an unsaved draft; the go-live sheet sends only `canvasId` so the
+/// preview matches the saved revision make-live will actually enforce.
+public struct TaskBoardPolicyPipelineGoLiveDiffRequest: Codable, Equatable, Sendable {
+  public var canvasId: String?
+  public var document: TaskBoardPolicyPipelineDocument?
+
+  public init(canvasId: String? = nil, document: TaskBoardPolicyPipelineDocument? = nil) {
+    self.canvasId = canvasId
+    self.document = document
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case canvasId = "canvas_id"
+    case document
+  }
+}
+
 public struct TaskBoardPolicyPipelineAuditSummary: Codable, Equatable, Sendable {
   public var activeRevision: UInt64
   public var mode: TaskBoardPolicyPipelineMode
