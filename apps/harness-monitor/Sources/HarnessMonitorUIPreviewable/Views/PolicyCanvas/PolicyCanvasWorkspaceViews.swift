@@ -104,34 +104,6 @@ struct PolicyCanvasViewport: View {
     nonmutating set { inspectorFocusDispatcher = newValue }
   }
 
-  @MainActor
-  func clearRouteCache(pipelineIdentity: String?) {
-    routeCache.clear(pipelineIdentity: pipelineIdentity)
-  }
-  @MainActor
-  func nextRouteGeneration() -> UInt64 {
-    routeCache.nextGeneration()
-  }
-  @MainActor
-  func routeGenerationMatches(_ generation: UInt64) -> Bool {
-    routeCache.generationMatches(generation)
-  }
-  @MainActor
-  func updateCachedRoutes(
-    routeKey: PolicyCanvasRouteWorkerKey?,
-    pipelineIdentity: String?,
-    output: PolicyCanvasRouteWorkerOutput,
-    nodePositionsByID: [String: CGPoint]
-  ) {
-    routeCache.update(
-      routeKey: routeKey,
-      pipelineIdentity: pipelineIdentity,
-      output: output,
-      nodePositionsByID: nodePositionsByID
-    )
-  }
-  func routeWorkerInstance() -> PolicyCanvasRouteWorker { routeCache.worker }
-
   var body: some View {
     let routeCacheIdentity = viewModel.pipelineIdentity
     let nodeValidationIssueMessagesByID = viewModel.nodeValidationIssueMessagesByID

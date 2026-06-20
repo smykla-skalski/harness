@@ -47,30 +47,34 @@ func policyCanvasInspectorFocusDispatcher(
   return dispatcher
 }
 
+struct PolicyCanvasCommandFocusInput {
+  let zoomFocusDispatcher: PolicyCanvasZoomFocusDispatcher
+  let canReflow: Bool
+  let layoutFocusDispatcher: PolicyCanvasLayoutFocusDispatcher
+  let canSave: Bool
+  let saveFocusDispatcher: PolicyCanvasSaveFocusDispatcher
+  let isInspectorVisible: Bool
+  let canToggleInspector: Bool
+  let inspectorFocusDispatcher: PolicyCanvasInspectorFocusDispatcher
+}
+
 func policyCanvasCommandFocus(
-  zoomFocusDispatcher: PolicyCanvasZoomFocusDispatcher,
-  canReflow: Bool,
-  layoutFocusDispatcher: PolicyCanvasLayoutFocusDispatcher,
-  canSave: Bool,
-  saveFocusDispatcher: PolicyCanvasSaveFocusDispatcher,
-  isInspectorVisible: Bool,
-  canToggleInspector: Bool,
-  inspectorFocusDispatcher: PolicyCanvasInspectorFocusDispatcher
+  input: PolicyCanvasCommandFocusInput
 ) -> PolicyCanvasCommandFocus {
   PolicyCanvasCommandFocus(
-    zoom: PolicyCanvasZoomFocus(dispatcher: zoomFocusDispatcher),
+    zoom: PolicyCanvasZoomFocus(dispatcher: input.zoomFocusDispatcher),
     layout: PolicyCanvasLayoutFocus(
-      canReflow: canReflow,
-      dispatcher: layoutFocusDispatcher
+      canReflow: input.canReflow,
+      dispatcher: input.layoutFocusDispatcher
     ),
     save: PolicyCanvasSaveFocus(
-      canSave: canSave,
-      dispatcher: saveFocusDispatcher
+      canSave: input.canSave,
+      dispatcher: input.saveFocusDispatcher
     ),
     inspector: PolicyCanvasInspectorFocus(
-      isVisible: isInspectorVisible,
-      canToggle: canToggleInspector,
-      dispatcher: inspectorFocusDispatcher
+      isVisible: input.isInspectorVisible,
+      canToggle: input.canToggleInspector,
+      dispatcher: input.inspectorFocusDispatcher
     )
   )
 }

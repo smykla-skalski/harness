@@ -12,14 +12,16 @@ extension PolicyCanvasViewport {
     bindSaveFocusDispatcher()
     bindInspectorFocusDispatcher()
     let nextFocus = policyCanvasCommandFocus(
-      zoomFocusDispatcher: bridgeZoomFocusDispatcher,
-      canReflow: viewModel.canReflowLayout,
-      layoutFocusDispatcher: bridgeLayoutFocusDispatcher,
-      canSave: canSave,
-      saveFocusDispatcher: bridgeSaveFocusDispatcher,
-      isInspectorVisible: isInspectorVisible,
-      canToggleInspector: canToggleInspector,
-      inspectorFocusDispatcher: bridgeInspectorFocusDispatcher
+      input: PolicyCanvasCommandFocusInput(
+        zoomFocusDispatcher: bridgeZoomFocusDispatcher,
+        canReflow: viewModel.canReflowLayout,
+        layoutFocusDispatcher: bridgeLayoutFocusDispatcher,
+        canSave: canSave,
+        saveFocusDispatcher: bridgeSaveFocusDispatcher,
+        isInspectorVisible: isInspectorVisible,
+        canToggleInspector: canToggleInspector,
+        inspectorFocusDispatcher: bridgeInspectorFocusDispatcher
+      )
     )
     guard bridgeCommandFocus != nextFocus else {
       return
@@ -134,6 +136,34 @@ extension PolicyCanvasViewport {
       toggleInspector: toggleInspector
     )
   }
+  @MainActor
+  func clearRouteCache(pipelineIdentity: String?) {
+    bridgeRouteCache.clear(pipelineIdentity: pipelineIdentity)
+  }
+  @MainActor
+  func nextRouteGeneration() -> UInt64 {
+    bridgeRouteCache.nextGeneration()
+  }
+  @MainActor
+  func routeGenerationMatches(_ generation: UInt64) -> Bool {
+    bridgeRouteCache.generationMatches(generation)
+  }
+  @MainActor
+  func updateCachedRoutes(
+    routeKey: PolicyCanvasRouteWorkerKey?,
+    pipelineIdentity: String?,
+    output: PolicyCanvasRouteWorkerOutput,
+    nodePositionsByID: [String: CGPoint]
+  ) {
+    bridgeRouteCache.update(
+      routeKey: routeKey,
+      pipelineIdentity: pipelineIdentity,
+      output: output,
+      nodePositionsByID: nodePositionsByID
+    )
+  }
+  func routeWorkerInstance() -> PolicyCanvasRouteWorker { bridgeRouteCache.worker }
+
   @MainActor
   func rebuildValidation() async {
     bridgeValidationGeneration &+= 1
