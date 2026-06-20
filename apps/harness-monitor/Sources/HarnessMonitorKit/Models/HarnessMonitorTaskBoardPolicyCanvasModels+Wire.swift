@@ -32,7 +32,8 @@ extension TaskBoardPolicyCanvasWorkspace {
       schemaVersion: UInt64(wire.schemaVersion),
       activeCanvasId: wire.activeCanvasId,
       canvases: wire.canvases.map(TaskBoardPolicyCanvasSummary.init(wire:)),
-      globalPolicyEnforcementEnabled: wire.globalPolicyEnforcementEnabled
+      globalPolicyEnforcementEnabled: wire.globalPolicyEnforcementEnabled,
+      scenarios: wire.scenarios
     )
   }
 }

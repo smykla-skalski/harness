@@ -81,6 +81,18 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func setTaskBoardPolicyCanvasGlobalEnforcement(
     request: TaskBoardPolicyCanvasSetGlobalEnforcementRequest
   ) async throws -> TaskBoardPolicyCanvasWorkspace
+  func createTaskBoardPolicyScenario(
+    request: TaskBoardPolicyScenarioCreateRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace
+  func updateTaskBoardPolicyScenario(
+    request: TaskBoardPolicyScenarioUpdateRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace
+  func deleteTaskBoardPolicyScenario(
+    request: TaskBoardPolicyScenarioDeleteRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace
+  func resetTaskBoardPolicyScenarios(
+    request: TaskBoardPolicyScenarioResetRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace
   func taskBoardPolicyPipeline(canvasId: String?) async throws -> TaskBoardPolicyPipelineDocument
   func saveTaskBoardPolicyPipelineDraft(
     request: TaskBoardPolicyPipelineSaveDraftRequest
@@ -348,67 +360,5 @@ extension HarnessMonitorTaskBoardClientProtocol {
 
   public func runTaskBoardOrchestratorOnce() async throws -> TaskBoardOrchestratorRunOnceResponse {
     try await runTaskBoardOrchestratorOnce(request: TaskBoardOrchestratorRunOnceRequest())
-  }
-
-  public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
-    try await taskBoardPolicyPipeline(canvasId: nil)
-  }
-
-  public func taskBoardPolicyPipeline(canvasId _: String?) async throws
-    -> TaskBoardPolicyPipelineDocument
-  {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
-  }
-
-  public func saveTaskBoardPolicyPipelineDraft(
-    request _: TaskBoardPolicyPipelineSaveDraftRequest
-  ) async throws -> TaskBoardPolicyPipelineSaveDraftResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
-  }
-
-  public func simulateTaskBoardPolicyPipeline(
-    request _: TaskBoardPolicyPipelineSimulateRequest
-  ) async throws -> TaskBoardPolicyPipelineSimulationResult {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
-  }
-
-  public func promoteTaskBoardPolicyPipeline(
-    request _: TaskBoardPolicyPipelinePromoteRequest
-  ) async throws -> TaskBoardPolicyPipelinePromoteResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
-  }
-
-  public func makeLiveTaskBoardPolicyPipeline(
-    request _: TaskBoardPolicyPipelineMakeLiveRequest
-  ) async throws -> TaskBoardPolicyPipelineMakeLiveResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
-  }
-
-  public func goLiveDiffTaskBoardPolicyPipeline(
-    request _: TaskBoardPolicyPipelineGoLiveDiffRequest
-  ) async throws -> TaskBoardPolicyPipelineGoLiveDiff {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
-  }
-
-  public func taskBoardPolicyPipelineAudit() async throws -> TaskBoardPolicyPipelineAuditSummary {
-    try await taskBoardPolicyPipelineAudit(canvasId: nil)
-  }
-
-  public func taskBoardPolicyPipelineAudit(canvasId _: String?) async throws
-    -> TaskBoardPolicyPipelineAuditSummary
-  {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
-  }
-
-  public func exportTaskBoardPolicy(
-    request _: TaskBoardPolicyExportRequest
-  ) async throws -> TaskBoardPolicyExportResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
-  }
-
-  public func importTaskBoardPolicy(
-    request _: TaskBoardPolicyImportRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
   }
 }

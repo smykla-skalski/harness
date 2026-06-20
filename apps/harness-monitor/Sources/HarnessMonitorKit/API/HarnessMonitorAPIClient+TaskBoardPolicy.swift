@@ -66,6 +66,46 @@ extension HarnessMonitorAPIClient {
     )
   }
 
+  public func createTaskBoardPolicyScenario(
+    request: TaskBoardPolicyScenarioCreateRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    try await post(
+      "/v1/task-board/policy/scenarios/create",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
+  public func updateTaskBoardPolicyScenario(
+    request: TaskBoardPolicyScenarioUpdateRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    try await post(
+      "/v1/task-board/policy/scenarios/update",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
+  public func deleteTaskBoardPolicyScenario(
+    request: TaskBoardPolicyScenarioDeleteRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    try await post(
+      "/v1/task-board/policy/scenarios/delete",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
+  public func resetTaskBoardPolicyScenarios(
+    request: TaskBoardPolicyScenarioResetRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    try await post(
+      "/v1/task-board/policy/scenarios/reset",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
   public func taskBoardPolicyPipeline(
     canvasId: String? = nil
   ) async throws -> TaskBoardPolicyPipelineDocument {

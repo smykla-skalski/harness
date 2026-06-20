@@ -31,8 +31,11 @@ public typealias PolicyPipelineAuditSummaryWire =
 public typealias PolicyGraphMode = HarnessMonitorPolicyModels.PolicyGraphMode
 
 // The generated canvas workspace wire type names PolicyScenario in its scenarios
-// array, so it must resolve from the Kit namespace too.
+// array, so it must resolve from the Kit namespace too. PolicyInput rides along
+// because the hand scenario request types and the scenario store methods name it
+// without importing the models module directly.
 public typealias PolicyScenario = HarnessMonitorPolicyModels.PolicyScenario
+public typealias PolicyInput = HarnessMonitorPolicyModels.PolicyInput
 
 // The go-live decision diff is pure data (per-scenario live-vs-draft verdicts),
 // so the API client decodes the generated wire type directly the way the

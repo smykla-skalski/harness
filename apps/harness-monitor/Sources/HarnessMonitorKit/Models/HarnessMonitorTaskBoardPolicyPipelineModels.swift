@@ -65,24 +65,28 @@ public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
   public var activeCanvasId: String
   public var canvases: [TaskBoardPolicyCanvasSummary]
   public var globalPolicyEnforcementEnabled: Bool
+  public var scenarios: [PolicyScenario]
 
   private enum CodingKeys: String, CodingKey {
     case schemaVersion = "schema_version"
     case activeCanvasId = "active_canvas_id"
     case canvases
     case globalPolicyEnforcementEnabled = "global_policy_enforcement_enabled"
+    case scenarios
   }
 
   public init(
     schemaVersion: UInt64,
     activeCanvasId: String,
     canvases: [TaskBoardPolicyCanvasSummary],
-    globalPolicyEnforcementEnabled: Bool = true
+    globalPolicyEnforcementEnabled: Bool = true,
+    scenarios: [PolicyScenario] = []
   ) {
     self.schemaVersion = schemaVersion
     self.activeCanvasId = activeCanvasId
     self.canvases = canvases
     self.globalPolicyEnforcementEnabled = globalPolicyEnforcementEnabled
+    self.scenarios = scenarios
   }
 
   public init(from decoder: Decoder) throws {
@@ -93,6 +97,8 @@ public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
     self.globalPolicyEnforcementEnabled =
       try container.decodeIfPresent(Bool.self, forKey: .globalPolicyEnforcementEnabled)
       ?? true
+    self.scenarios =
+      try container.decodeIfPresent([PolicyScenario].self, forKey: .scenarios) ?? []
   }
 }
 
@@ -142,6 +148,38 @@ public struct TaskBoardPolicyCanvasSetGlobalEnforcementRequest: Codable, Equatab
   public init(enabled: Bool) {
     self.enabled = enabled
   }
+}
+
+public struct TaskBoardPolicyScenarioCreateRequest: Codable, Equatable, Sendable {
+  public var name: String
+  public var input: PolicyInput
+
+  public init(name: String, input: PolicyInput) {
+    self.name = name
+    self.input = input
+  }
+}
+
+public struct TaskBoardPolicyScenarioUpdateRequest: Codable, Equatable, Sendable {
+  public var id: String
+  public var name: String
+  public var input: PolicyInput
+
+  public init(id: String, name: String, input: PolicyInput) {
+    self.id = id
+    self.name = name
+    self.input = input
+  }
+}
+
+public struct TaskBoardPolicyScenarioDeleteRequest: Codable, Equatable, Sendable {
+  public var id: String
+
+  public init(id: String) { self.id = id }
+}
+
+public struct TaskBoardPolicyScenarioResetRequest: Codable, Equatable, Sendable {
+  public init() {}
 }
 
 public struct TaskBoardPolicyPipelineSaveDraftRequest: Codable, Equatable, Sendable {
