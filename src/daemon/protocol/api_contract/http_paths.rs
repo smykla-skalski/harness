@@ -85,6 +85,7 @@ pub const TASK_BOARD_POLICY_SIMULATE: &str = "/v1/task-board/policy/simulate";
 pub const TASK_BOARD_POLICY_PROMOTE: &str = "/v1/task-board/policy/promote";
 pub const TASK_BOARD_POLICY_MAKE_LIVE: &str = "/v1/task-board/policy/make-live";
 pub const TASK_BOARD_POLICY_GO_LIVE_DIFF: &str = "/v1/task-board/policy/go-live-diff";
+pub const TASK_BOARD_POLICY_REPLAY: &str = "/v1/task-board/policy/replay";
 pub const TASK_BOARD_POLICY_AUDIT: &str = "/v1/task-board/policy/audit";
 pub const TASK_BOARD_POLICY_EXPORT: &str = "/v1/task-board/policy/export";
 pub const TASK_BOARD_POLICY_IMPORT: &str = "/v1/task-board/policy/import";

@@ -7,10 +7,11 @@ use crate::daemon::protocol::{
     TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest,
     TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
     TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineMakeLiveRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyScenarioCreateRequest,
-    TaskBoardPolicyScenarioDeleteRequest, TaskBoardPolicyScenarioResetRequest,
-    TaskBoardPolicyScenarioUpdateRequest, WsRequest, WsResponse, ws_methods,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineReplayRequest,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardPolicyScenarioCreateRequest, TaskBoardPolicyScenarioDeleteRequest,
+    TaskBoardPolicyScenarioResetRequest, TaskBoardPolicyScenarioUpdateRequest, WsRequest,
+    WsResponse, ws_methods,
 };
 
 use super::super::mutations::dispatch_query_result;
@@ -124,6 +125,9 @@ async fn dispatch_policy_pipeline_method(
         }
         ws_methods::TASK_BOARD_POLICY_PIPELINE_GO_LIVE_DIFF => {
             Some(dispatch_task_board_policy_pipeline_go_live_diff(request, state).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_REPLAY => {
+            Some(dispatch_task_board_policy_pipeline_replay(request, state).await)
         }
         ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT => {
             Some(dispatch_task_board_policy_pipeline_audit(request, state).await)
@@ -448,6 +452,23 @@ pub(super) async fn dispatch_task_board_policy_pipeline_go_live_diff(
     dispatch_query_result(
         &request.id,
         task_board_route_executor::go_live_diff_policy_pipeline(db, &body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_pipeline_replay(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params_or_default::<TaskBoardPolicyPipelineReplayRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy pipeline replay") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::replay_policy_pipeline(db, &body).await,
     )
 }
 

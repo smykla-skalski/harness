@@ -19,6 +19,7 @@ mod graph_impls;
 mod ids;
 mod models;
 mod node_kinds;
+pub mod replay;
 mod scenario;
 mod seed;
 mod store;

@@ -346,11 +346,11 @@ pub(crate) use task_board::{
     delete_task_board_policy_scenario, duplicate_task_board_policy_canvas,
     export_task_board_policy, go_live_diff_task_board_policy_pipeline, import_task_board_policy,
     make_live_task_board_policy_pipeline, promote_task_board_policy_pipeline,
-    rename_task_board_policy_canvas, reset_task_board_policy_scenarios,
-    save_task_board_policy_pipeline_draft, set_active_task_board_policy_canvas,
-    set_task_board_policy_canvas_global_enforcement, simulate_task_board_policy_pipeline,
-    task_board_policy_canvas_workspace, task_board_policy_pipeline,
-    update_task_board_policy_scenario,
+    rename_task_board_policy_canvas, replay_task_board_policy_pipeline,
+    reset_task_board_policy_scenarios, save_task_board_policy_pipeline_draft,
+    set_active_task_board_policy_canvas, set_task_board_policy_canvas_global_enforcement,
+    simulate_task_board_policy_pipeline, task_board_policy_canvas_workspace,
+    task_board_policy_pipeline, update_task_board_policy_scenario,
 };
 pub use task_board_evaluation::evaluate_task_board;
 #[allow(unused_imports)]

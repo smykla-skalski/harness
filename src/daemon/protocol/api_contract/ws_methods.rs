@@ -92,6 +92,7 @@ pub const TASK_BOARD_POLICY_PIPELINE_SIMULATE: &str = "task_board.policy_pipelin
 pub const TASK_BOARD_POLICY_PIPELINE_PROMOTE: &str = "task_board.policy_pipeline_promote";
 pub const TASK_BOARD_POLICY_PIPELINE_MAKE_LIVE: &str = "task_board.policy_pipeline_make_live";
 pub const TASK_BOARD_POLICY_PIPELINE_GO_LIVE_DIFF: &str = "task_board.policy_pipeline_go_live_diff";
+pub const TASK_BOARD_POLICY_PIPELINE_REPLAY: &str = "task_board.policy_pipeline_replay";
 pub const TASK_BOARD_POLICY_PIPELINE_AUDIT: &str = "task_board.policy_pipeline_audit";
 pub const TASK_BOARD_POLICY_EXPORT: &str = "task_board.policy_export";
 pub const TASK_BOARD_POLICY_IMPORT: &str = "task_board.policy_import";

@@ -417,4 +417,12 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         },
         swift_client_exposed: true,
     },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_REPLAY,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_REPLAY,
+        },
+        swift_client_exposed: true,
+    },
 ];

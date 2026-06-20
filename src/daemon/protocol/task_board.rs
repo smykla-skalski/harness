@@ -7,10 +7,10 @@ use crate::task_board::{
     ExternalSyncDirection, Machine, PlanningState, PolicyGraphMode, PolicyInput,
     PolicyPipelineAuditSummary, PolicyPipelineDocument, PolicyPipelineGoLiveDiff,
     PolicyPipelineMakeLiveRequest, PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse,
-    PolicyPipelineSaveResponse, PolicyPipelineSimulationResult, PolicyScenario,
-    TaskBoardAuditSummary, TaskBoardEvaluationSummary, TaskBoardGitIdentityDefaults, TaskBoardItem,
-    TaskBoardMachineSummary, TaskBoardPriority, TaskBoardProjectSummary, TaskBoardStatus,
-    TaskBoardSyncSummary,
+    PolicyPipelineReplayResult, PolicyPipelineSaveResponse, PolicyPipelineSimulationResult,
+    PolicyScenario, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
+    TaskBoardGitIdentityDefaults, TaskBoardItem, TaskBoardMachineSummary, TaskBoardPriority,
+    TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary,
 };
 
 pub use crate::task_board::{
@@ -257,6 +257,14 @@ pub struct TaskBoardPolicyPipelineAuditRequest {
     pub canvas_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardPolicyPipelineReplayRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TaskBoardPolicyCanvasSummary {
     pub canvas_id: String,
@@ -426,6 +434,7 @@ pub type TaskBoardPolicyPipelineAuditResponse = PolicyPipelineAuditSummary;
 pub type TaskBoardPolicyPipelinePromoteRequest = PolicyPipelinePromoteRequest;
 pub type TaskBoardPolicyPipelineMakeLiveRequest = PolicyPipelineMakeLiveRequest;
 pub type TaskBoardPolicyPipelineGoLiveDiffResponse = PolicyPipelineGoLiveDiff;
+pub type TaskBoardPolicyPipelineReplayResponse = PolicyPipelineReplayResult;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskBoardPolicyExportRequest {

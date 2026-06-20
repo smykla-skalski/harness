@@ -10,6 +10,7 @@ use crate::daemon::protocol::{
     TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineGoLiveDiffResponse,
     TaskBoardPolicyPipelineMakeLiveRequest, TaskBoardPolicyPipelineMakeLiveResponse,
     TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
+    TaskBoardPolicyPipelineReplayRequest, TaskBoardPolicyPipelineReplayResponse,
     TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
     TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
     TaskBoardPolicyPipelineSimulationResponse, TaskBoardPolicyScenarioCreateRequest,
@@ -20,6 +21,10 @@ use crate::task_board::default_board_root;
 use crate::task_board::policy_graph::{self, PolicyCanvasRecord, PolicyCanvasWorkspace};
 
 const POLICY_PIPELINE_CHANGE_CHANNEL: &str = "policy_pipeline";
+
+/// Default and ceiling for how many recorded decisions a replay re-simulates.
+const DEFAULT_REPLAY_LIMIT: u32 = 50;
+const MAX_REPLAY_LIMIT: u32 = 500;
 
 /// Load the durable policy-canvas workspace from the database, seeding and
 /// persisting a default workspace when the database is empty.
@@ -419,6 +424,27 @@ pub(crate) async fn go_live_diff_task_board_policy_pipeline(
         request.document.clone(),
         request.canvas_id.as_deref(),
     )
+}
+
+/// Replay the active draft against the recorded real-decision feed.
+///
+/// Read-only: loads the workspace and the most recent recorded decisions, then
+/// re-simulates the draft against each without mutating any durable state.
+///
+/// # Errors
+/// Returns `CliError` when durable policy state cannot be loaded, the recorded
+/// feed cannot be read, or the active canvas cannot be resolved.
+pub(crate) async fn replay_task_board_policy_pipeline(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyPipelineReplayRequest,
+) -> Result<TaskBoardPolicyPipelineReplayResponse, CliError> {
+    let workspace = load_or_seed_workspace(db).await?;
+    let limit = request
+        .limit
+        .unwrap_or(DEFAULT_REPLAY_LIMIT)
+        .clamp(1, MAX_REPLAY_LIMIT) as usize;
+    let recorded = db.recent_policy_decisions(limit).await?;
+    policy_graph::replay::apply_replay(&workspace, &recorded, request.canvas_id.as_deref())
 }
 
 /// Summarize V2 policy pipeline audit state.

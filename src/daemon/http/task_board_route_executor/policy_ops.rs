@@ -9,7 +9,8 @@ use crate::daemon::protocol::{
     TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelineGoLiveDiffRequest,
     TaskBoardPolicyPipelineGoLiveDiffResponse, TaskBoardPolicyPipelineMakeLiveRequest,
     TaskBoardPolicyPipelineMakeLiveResponse, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineResponse,
+    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineReplayRequest,
+    TaskBoardPolicyPipelineReplayResponse, TaskBoardPolicyPipelineResponse,
     TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
     TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
     TaskBoardPolicyScenarioCreateRequest, TaskBoardPolicyScenarioDeleteRequest,
@@ -106,6 +107,13 @@ pub(crate) async fn go_live_diff_policy_pipeline(
     request: &TaskBoardPolicyPipelineGoLiveDiffRequest,
 ) -> Result<TaskBoardPolicyPipelineGoLiveDiffResponse, CliError> {
     service::go_live_diff_task_board_policy_pipeline(db, request).await
+}
+
+pub(crate) async fn replay_policy_pipeline(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyPipelineReplayRequest,
+) -> Result<TaskBoardPolicyPipelineReplayResponse, CliError> {
+    service::replay_task_board_policy_pipeline(db, request).await
 }
 
 pub(crate) async fn audit_policy_pipeline(

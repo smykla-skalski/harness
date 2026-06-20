@@ -6,9 +6,10 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
     TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest,
     TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineMakeLiveRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyScenarioCreateRequest,
-    TaskBoardPolicyScenarioDeleteRequest, TaskBoardPolicyScenarioUpdateRequest, ws_methods,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineReplayRequest,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardPolicyScenarioCreateRequest, TaskBoardPolicyScenarioDeleteRequest,
+    TaskBoardPolicyScenarioUpdateRequest, ws_methods,
 };
 use crate::mcp::tool::ToolRegistry;
 
@@ -140,6 +141,12 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 input_schema: document_schema,
                 normalize: validate_params::<TaskBoardPolicyPipelineGoLiveDiffRequest>,
             },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POLICY_PIPELINE_REPLAY,
+                description: "Replay the draft policy against the recorded real-decision feed.",
+                input_schema: replay_schema,
+                normalize: validate_params::<TaskBoardPolicyPipelineReplayRequest>,
+            },
         ],
     );
 }
@@ -172,6 +179,17 @@ fn promote_schema() -> Value {
             "revision": { "type": "integer", "minimum": 0 }
         },
         "required": ["revision"],
+        "additionalProperties": false
+    })
+}
+
+fn replay_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "canvas_id": { "type": "string" },
+            "limit": { "type": "integer", "minimum": 1 }
+        },
         "additionalProperties": false
     })
 }

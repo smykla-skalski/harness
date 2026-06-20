@@ -115,6 +115,40 @@ fn websocket_task_board_policy_make_live_and_go_live_diff_round_trip() {
 }
 
 #[test]
+fn websocket_task_board_policy_pipeline_replay_round_trip() {
+    let sandbox = tempdir().expect("tempdir");
+    with_isolated_harness_env(sandbox.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let state =
+                test_websocket_state_with_empty_async_db(&sandbox.path().join("daemon.sqlite"))
+                    .await;
+            let connection = Arc::new(Mutex::new(ConnectionState::new()));
+            // A fresh daemon has recorded no real decisions, so replay reports an
+            // empty sample while still proving the full RPC surface is wired.
+            let replay_response = dispatch(
+                &request(
+                    "req-replay",
+                    ws_methods::TASK_BOARD_POLICY_PIPELINE_REPLAY,
+                    json!({ "limit": 25 }),
+                ),
+                &state,
+                &connection,
+            )
+            .await;
+            let replay = response_result(&replay_response);
+            assert_eq!(replay["sample_size"].as_u64(), Some(0));
+            assert_eq!(replay["changed_count"].as_u64(), Some(0));
+            assert_eq!(
+                replay["decisions"].as_array().map_or(0, Vec::len),
+                0,
+                "fresh daemon has no recorded decisions to replay"
+            );
+        });
+    });
+}
+
+#[test]
 fn websocket_task_board_policy_pipeline_routes_round_trip() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {

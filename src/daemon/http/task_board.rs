@@ -10,9 +10,10 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
     TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
     TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineMakeLiveRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyScenarioCreateRequest,
-    TaskBoardPolicyScenarioDeleteRequest, TaskBoardPolicyScenarioUpdateRequest, http_paths,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineReplayRequest,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardPolicyScenarioCreateRequest, TaskBoardPolicyScenarioDeleteRequest,
+    TaskBoardPolicyScenarioUpdateRequest, http_paths,
 };
 
 use super::DaemonHttpState;
@@ -146,6 +147,10 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::TASK_BOARD_POLICY_GO_LIVE_DIFF,
             post(post_task_board_policy_go_live_diff),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_REPLAY,
+            post(post_task_board_policy_replay),
         )
         .route(
             http_paths::TASK_BOARD_POLICY_AUDIT,
@@ -453,6 +458,28 @@ async fn post_task_board_policy_go_live_diff(
         &request_id,
         start,
         diff,
+    )
+}
+
+async fn post_task_board_policy_replay(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyPipelineReplayRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    let replay = match require_async_db(&state, "policy pipeline replay") {
+        Ok(db) => task_board_route_executor::replay_policy_pipeline(db, &request).await,
+        Err(error) => Err(error),
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_REPLAY,
+        &request_id,
+        start,
+        replay,
     )
 }
 
