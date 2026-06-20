@@ -91,9 +91,11 @@ impl DaemonDb {
                     layout_offset_x: row.get(10)?,
                     layout_offset_y: row.get(11)?,
                     policy_trace_ids_json: row.get(12)?,
-                    latest_simulation_json: row.get(13)?,
-                    created_at: row.get(14)?,
-                    updated_at: row.get(15)?,
+                    live_document_json: row.get(13)?,
+                    live_updated_at: row.get(14)?,
+                    latest_simulation_json: row.get(15)?,
+                    created_at: row.get(16)?,
+                    updated_at: row.get(17)?,
                 })
             })
             .map_err(|error| db_error(format!("query policy canvases: {error}")))?;

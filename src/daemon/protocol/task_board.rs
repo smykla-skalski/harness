@@ -272,6 +272,10 @@ pub struct TaskBoardPolicyCanvasSummary {
     pub revision: u64,
     pub mode: PolicyGraphMode,
     pub document: PolicyPipelineDocument,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub live_document: Option<PolicyPipelineDocument>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub live_updated_at: Option<String>,
     pub node_count: usize,
     pub edge_count: usize,
     pub group_count: usize,

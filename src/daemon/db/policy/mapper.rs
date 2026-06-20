@@ -48,6 +48,8 @@ pub(crate) fn disassemble_canvas(
         layout_offset_x: i64::from(document.layout.offset.x),
         layout_offset_y: i64::from(document.layout.offset.y),
         policy_trace_ids_json: to_json(&document.policy_trace_ids)?,
+        live_document_json: record.live_document.as_ref().map(to_json).transpose()?,
+        live_updated_at: record.live_updated_at.clone(),
         latest_simulation_json: record.latest_simulation.as_ref().map(to_json).transpose()?,
         created_at: record.created_at.clone(),
         updated_at: record.updated_at.clone(),
@@ -128,6 +130,12 @@ pub(crate) fn assemble_canvas(set: CanvasRowSet) -> Result<PolicyCanvasRecord, C
         created_at: canvas.created_at,
         updated_at: canvas.updated_at,
         document,
+        live_document: canvas
+            .live_document_json
+            .as_deref()
+            .map(|raw| from_json(raw, "live_document"))
+            .transpose()?,
+        live_updated_at: canvas.live_updated_at,
         latest_simulation: canvas
             .latest_simulation_json
             .as_deref()

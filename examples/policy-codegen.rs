@@ -2365,11 +2365,15 @@ const REVIEWS_FILES_LOCAL_CLONE_SOURCE: &str = include_str!("../src/reviews/file
 // SimpleActorEventEntry, and a JsonValue raw payload - all handled.
 const REVIEWS_TIMELINE_TYPES_SOURCE: &str = include_str!("../src/reviews/timeline/types.rs");
 const REVIEWS_TIMELINE_MOD_SOURCE: &str = include_str!("../src/reviews/timeline/mod.rs");
-// reviews types.rs core: the query/item/check/action/policy request-response
-// surface. The custom default fns it references live in src/reviews/logic.rs
-// (the defaults source). GitHubMergeMethod is referenced-not-defined (renamed to
-// the hand type); ReviewAuthorAssociation references the adopted closed enum.
+// reviews types core: the query/item/check/action/policy request-response
+// surface. The public umbrella re-exports the split action and policy modules,
+// so generation needs all three files. The custom default fns it references live
+// in src/reviews/logic.rs (the defaults source). GitHubMergeMethod is
+// referenced-not-defined (renamed to the hand type); ReviewAuthorAssociation
+// references the adopted closed enum.
 const REVIEWS_TYPES_SOURCE: &str = include_str!("../src/reviews/types.rs");
+const REVIEWS_TYPES_ACTIONS_SOURCE: &str = include_str!("../src/reviews/types/actions.rs");
+const REVIEWS_TYPES_POLICY_SOURCE: &str = include_str!("../src/reviews/types/policy.rs");
 const REVIEWS_LOGIC_SOURCE: &str = include_str!("../src/reviews/logic.rs");
 // websocket: the JSON-RPC-ish transport envelope. The five self-contained frame
 // types (request/response/error/push/chunk) generate; the three config/probe/
@@ -2845,7 +2849,11 @@ fn modules() -> Vec<GeneratedModule> {
             output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ReviewsTypesWireTypes.generated.swift",
             description: "the Rust reviews query, item, check, action and policy types",
             defaults: &[REVIEWS_LOGIC_SOURCE],
-            sources: &[REVIEWS_TYPES_SOURCE],
+            sources: &[
+                REVIEWS_TYPES_SOURCE,
+                REVIEWS_TYPES_ACTIONS_SOURCE,
+                REVIEWS_TYPES_POLICY_SOURCE,
+            ],
         },
         GeneratedModule {
             output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/WebSocketWireTypes.generated.swift",

@@ -6,6 +6,8 @@ public struct TaskBoardPolicyCanvasSummary: Codable, Equatable, Identifiable, Se
   public var revision: UInt64
   public var mode: TaskBoardPolicyPipelineMode
   public var document: TaskBoardPolicyPipelineDocument?
+  public var liveDocument: TaskBoardPolicyPipelineDocument?
+  public var liveUpdatedAt: String?
   public var nodeCount: Int
   public var edgeCount: Int
   public var groupCount: Int
@@ -22,6 +24,8 @@ public struct TaskBoardPolicyCanvasSummary: Codable, Equatable, Identifiable, Se
     revision: UInt64,
     mode: TaskBoardPolicyPipelineMode,
     document: TaskBoardPolicyPipelineDocument? = nil,
+    liveDocument: TaskBoardPolicyPipelineDocument? = nil,
+    liveUpdatedAt: String? = nil,
     nodeCount: Int,
     edgeCount: Int,
     groupCount: Int,
@@ -35,6 +39,8 @@ public struct TaskBoardPolicyCanvasSummary: Codable, Equatable, Identifiable, Se
     self.revision = revision
     self.mode = mode
     self.document = document
+    self.liveDocument = liveDocument
+    self.liveUpdatedAt = liveUpdatedAt
     self.nodeCount = nodeCount
     self.edgeCount = edgeCount
     self.groupCount = groupCount
@@ -50,6 +56,8 @@ public struct TaskBoardPolicyCanvasSummary: Codable, Equatable, Identifiable, Se
     case revision
     case mode
     case document
+    case liveDocument = "live_document"
+    case liveUpdatedAt = "live_updated_at"
     case nodeCount = "node_count"
     case edgeCount = "edge_count"
     case groupCount = "group_count"

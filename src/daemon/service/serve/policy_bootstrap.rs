@@ -86,9 +86,7 @@ async fn prune_recorded_decisions(db: &AsyncDaemonDb) {
 fn sync_coldfill_active_document() -> Option<PolicyGraph> {
     let database = DaemonDb::open(&state::daemon_root().join("harness.db")).ok()?;
     let workspace = database.load_policy_workspace().ok().flatten()?;
-    workspace
-        .active_enforced_canvas()
-        .map(|canvas| canvas.document.clone())
+    workspace.active_live_document().cloned()
 }
 
 /// Warm the synchronous gating cache from the durable workspace, seeding and
@@ -103,9 +101,9 @@ async fn warm_gate_cache(async_db: &AsyncDaemonDb) -> Result<(), CliError> {
     };
     store_gate_policy_entry(
         &default_board_root(),
-        workspace
-            .active_enforced_canvas()
-            .map(|canvas| CachedGatePolicy::for_canvas(canvas.id.clone(), canvas.document.clone())),
+        workspace.active_live_canvas().map(|(canvas, document)| {
+            CachedGatePolicy::for_canvas(canvas.id.clone(), document.clone())
+        }),
     );
     Ok(())
 }

@@ -31,6 +31,10 @@ pub struct PolicyCanvasRecord {
     pub updated_at: String,
     pub document: PolicyGraph,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub live_document: Option<PolicyGraph>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub live_updated_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_simulation: Option<PolicyPipelineSimulationResult>,
     #[serde(default)]
     pub is_manual_ocr_paste_canvas: bool,
@@ -54,6 +58,8 @@ impl PolicyCanvasRecord {
             created_at: now.clone(),
             updated_at: now,
             document,
+            live_document: None,
+            live_updated_at: None,
             latest_simulation,
             is_manual_ocr_paste_canvas: false,
             is_review_text_paste_dry_run_canvas: false,
@@ -63,6 +69,27 @@ impl PolicyCanvasRecord {
 
     pub fn touch(&mut self) {
         self.updated_at = Utc::now().to_rfc3339();
+    }
+
+    pub fn mark_live(&mut self, document: PolicyGraph) {
+        self.document = document.clone();
+        self.touch();
+        self.live_document = Some(document);
+        self.live_updated_at = Some(self.updated_at.clone());
+    }
+
+    #[must_use]
+    pub fn live_document(&self) -> Option<&PolicyGraph> {
+        self.live_document
+            .as_ref()
+            .or_else(|| (self.document.mode == PolicyGraphMode::Enforced).then_some(&self.document))
+    }
+
+    #[must_use]
+    pub fn live_updated_at(&self) -> Option<&str> {
+        self.live_updated_at.as_deref().or_else(|| {
+            (self.document.mode == PolicyGraphMode::Enforced).then_some(self.updated_at.as_str())
+        })
     }
 }
 
@@ -130,6 +157,21 @@ impl PolicyCanvasWorkspace {
         }
         self.active_canvas()
             .filter(|canvas| canvas.document.mode == PolicyGraphMode::Enforced)
+    }
+
+    #[must_use]
+    pub fn active_live_document(&self) -> Option<&PolicyGraph> {
+        self.active_live_canvas()
+            .map(|(_canvas, document)| document)
+    }
+
+    #[must_use]
+    pub fn active_live_canvas(&self) -> Option<(&PolicyCanvasRecord, &PolicyGraph)> {
+        if !self.global_policy_enforcement_enabled {
+            return None;
+        }
+        let canvas = self.active_canvas()?;
+        canvas.live_document().map(|document| (canvas, document))
     }
 
     pub fn active_canvas_mut(&mut self) -> Option<&mut PolicyCanvasRecord> {

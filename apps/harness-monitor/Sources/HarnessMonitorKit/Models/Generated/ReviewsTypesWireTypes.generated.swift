@@ -455,413 +455,6 @@ public struct ReviewsAutoRequestWire: Codable, Equatable, Sendable {
   }
 }
 
-public struct ReviewsPolicySubjectWire: Codable, Equatable, Sendable {
-  public var repository: String
-  public var pullRequestNumber: UInt64
-
-  public init(repository: String, pullRequestNumber: UInt64) {
-    self.repository = repository
-    self.pullRequestNumber = pullRequestNumber
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case repository
-    case pullRequestNumber = "pull_request_number"
-  }
-}
-
-public enum ReviewsPolicyTriggerWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
-  case background = "background"
-  case event = "event"
-  case manual = "manual"
-  case manualNudge = "manual_nudge"
-  case timer = "timer"
-
-  public var id: String { rawValue }
-}
-
-public enum ReviewsPolicyRunStatusWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
-  case completed = "completed"
-  case failed = "failed"
-  case running = "running"
-  case waiting = "waiting"
-  case cancelled = "cancelled"
-
-  public var id: String { rawValue }
-}
-
-public enum ReviewsPolicyStepTypeWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
-  case action = "action"
-  case wait = "wait"
-
-  public var id: String { rawValue }
-}
-
-public struct ReviewsPolicyWaitWire: Codable, Equatable, Sendable {
-  public var eventKey: String?
-  public var durationSeconds: UInt64?
-
-  public init(eventKey: String? = nil, durationSeconds: UInt64? = nil) {
-    self.eventKey = eventKey
-    self.durationSeconds = durationSeconds
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case eventKey = "event_key"
-    case durationSeconds = "duration_seconds"
-  }
-}
-
-public struct ReviewsPolicyPreviewStepWire: Codable, Equatable, Sendable {
-  public var stepType: ReviewsPolicyStepTypeWire
-  public var actionKey: String?
-  public var waitingOn: ReviewsPolicyWaitWire?
-
-  public init(stepType: ReviewsPolicyStepTypeWire, actionKey: String? = nil, waitingOn: ReviewsPolicyWaitWire? = nil) {
-    self.stepType = stepType
-    self.actionKey = actionKey
-    self.waitingOn = waitingOn
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case stepType = "step_type"
-    case actionKey = "action_key"
-    case waitingOn = "waiting_on"
-  }
-}
-
-public struct ReviewsPolicyPreviewRequestWire: Codable, Equatable, Sendable {
-  public var workflowId: String
-  public var target: ReviewTargetWire
-  public var method: TaskBoardGitHubMergeMethod
-
-  public init(workflowId: String = "reviews_auto", target: ReviewTargetWire, method: TaskBoardGitHubMergeMethod) {
-    self.workflowId = workflowId
-    self.target = target
-    self.method = method
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    workflowId = try container.decodeIfPresent(String.self, forKey: .workflowId) ?? "reviews_auto"
-    target = try container.decode(ReviewTargetWire.self, forKey: .target)
-    method = try container.decode(TaskBoardGitHubMergeMethod.self, forKey: .method)
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case workflowId = "workflow_id"
-    case target
-    case method
-  }
-}
-
-public struct ReviewsPolicyPreviewResponseWire: Codable, Equatable, Sendable {
-  public var workflowId: String
-  public var subject: ReviewsPolicySubjectWire
-  public var eligible: Bool
-  public var reason: String?
-  public var warnings: [String]
-  public var steps: [ReviewsPolicyPreviewStepWire]
-
-  public init(workflowId: String, subject: ReviewsPolicySubjectWire, eligible: Bool, reason: String? = nil, warnings: [String] = [], steps: [ReviewsPolicyPreviewStepWire] = []) {
-    self.workflowId = workflowId
-    self.subject = subject
-    self.eligible = eligible
-    self.reason = reason
-    self.warnings = warnings
-    self.steps = steps
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    workflowId = try container.decode(String.self, forKey: .workflowId)
-    subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
-    eligible = try container.decode(Bool.self, forKey: .eligible)
-    reason = try container.decodeIfPresent(String.self, forKey: .reason)
-    warnings = try container.decodeIfPresent([String].self, forKey: .warnings) ?? []
-    steps = try container.decodeIfPresent([ReviewsPolicyPreviewStepWire].self, forKey: .steps) ?? []
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case workflowId = "workflow_id"
-    case subject
-    case eligible
-    case reason
-    case warnings
-    case steps
-  }
-}
-
-public struct ReviewsPolicyRunStartRequestWire: Codable, Equatable, Sendable {
-  public var workflowId: String
-  public var target: ReviewTargetWire
-  public var method: TaskBoardGitHubMergeMethod
-  public var trigger: ReviewsPolicyTriggerWire
-
-  public init(workflowId: String = "reviews_auto", target: ReviewTargetWire, method: TaskBoardGitHubMergeMethod, trigger: ReviewsPolicyTriggerWire = .manual) {
-    self.workflowId = workflowId
-    self.target = target
-    self.method = method
-    self.trigger = trigger
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    workflowId = try container.decodeIfPresent(String.self, forKey: .workflowId) ?? "reviews_auto"
-    target = try container.decode(ReviewTargetWire.self, forKey: .target)
-    method = try container.decode(TaskBoardGitHubMergeMethod.self, forKey: .method)
-    trigger = try container.decodeIfPresent(ReviewsPolicyTriggerWire.self, forKey: .trigger) ?? .manual
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case workflowId = "workflow_id"
-    case target
-    case method
-    case trigger
-  }
-}
-
-public struct ReviewsPolicyRunStepWire: Codable, Equatable, Sendable {
-  public var stepType: ReviewsPolicyStepTypeWire
-  public var actionKey: String?
-  public var waitingOn: ReviewsPolicyWaitWire?
-  public var recordedAt: String
-
-  public init(stepType: ReviewsPolicyStepTypeWire, actionKey: String? = nil, waitingOn: ReviewsPolicyWaitWire? = nil, recordedAt: String) {
-    self.stepType = stepType
-    self.actionKey = actionKey
-    self.waitingOn = waitingOn
-    self.recordedAt = recordedAt
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case stepType = "step_type"
-    case actionKey = "action_key"
-    case waitingOn = "waiting_on"
-    case recordedAt = "recorded_at"
-  }
-}
-
-public struct ReviewsPolicyRunResponseWire: Codable, Equatable, Sendable {
-  public var workflowId: String
-  public var runId: String
-  public var subject: ReviewsPolicySubjectWire
-  public var trigger: ReviewsPolicyTriggerWire
-  public var status: ReviewsPolicyRunStatusWire
-  public var startedAt: String
-  public var updatedAt: String
-  public var waitingOn: ReviewsPolicyWaitWire?
-  public var completedAt: String?
-  public var errorMessage: String?
-  public var steps: [ReviewsPolicyRunStepWire]
-
-  public init(workflowId: String, runId: String, subject: ReviewsPolicySubjectWire, trigger: ReviewsPolicyTriggerWire, status: ReviewsPolicyRunStatusWire, startedAt: String, updatedAt: String, waitingOn: ReviewsPolicyWaitWire? = nil, completedAt: String? = nil, errorMessage: String? = nil, steps: [ReviewsPolicyRunStepWire] = []) {
-    self.workflowId = workflowId
-    self.runId = runId
-    self.subject = subject
-    self.trigger = trigger
-    self.status = status
-    self.startedAt = startedAt
-    self.updatedAt = updatedAt
-    self.waitingOn = waitingOn
-    self.completedAt = completedAt
-    self.errorMessage = errorMessage
-    self.steps = steps
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    workflowId = try container.decode(String.self, forKey: .workflowId)
-    runId = try container.decode(String.self, forKey: .runId)
-    subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
-    trigger = try container.decode(ReviewsPolicyTriggerWire.self, forKey: .trigger)
-    status = try container.decode(ReviewsPolicyRunStatusWire.self, forKey: .status)
-    startedAt = try container.decode(String.self, forKey: .startedAt)
-    updatedAt = try container.decode(String.self, forKey: .updatedAt)
-    waitingOn = try container.decodeIfPresent(ReviewsPolicyWaitWire.self, forKey: .waitingOn)
-    completedAt = try container.decodeIfPresent(String.self, forKey: .completedAt)
-    errorMessage = try container.decodeIfPresent(String.self, forKey: .errorMessage)
-    steps = try container.decodeIfPresent([ReviewsPolicyRunStepWire].self, forKey: .steps) ?? []
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case workflowId = "workflow_id"
-    case runId = "run_id"
-    case subject
-    case trigger
-    case status
-    case startedAt = "started_at"
-    case updatedAt = "updated_at"
-    case waitingOn = "waiting_on"
-    case completedAt = "completed_at"
-    case errorMessage = "error_message"
-    case steps
-  }
-}
-
-public struct ReviewsPolicyStatusRequestWire: Codable, Equatable, Sendable {
-  public var workflowId: String
-  public var subject: ReviewsPolicySubjectWire
-
-  public init(workflowId: String = "reviews_auto", subject: ReviewsPolicySubjectWire) {
-    self.workflowId = workflowId
-    self.subject = subject
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    workflowId = try container.decodeIfPresent(String.self, forKey: .workflowId) ?? "reviews_auto"
-    subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case workflowId = "workflow_id"
-    case subject
-  }
-}
-
-public struct ReviewsPolicyStatusResponseWire: Codable, Equatable, Sendable {
-  public var workflowId: String
-  public var subject: ReviewsPolicySubjectWire
-  public var activeRun: ReviewsPolicyRunResponseWire?
-  public var recentRuns: [ReviewsPolicyRunResponseWire]
-
-  public init(workflowId: String, subject: ReviewsPolicySubjectWire, activeRun: ReviewsPolicyRunResponseWire? = nil, recentRuns: [ReviewsPolicyRunResponseWire] = []) {
-    self.workflowId = workflowId
-    self.subject = subject
-    self.activeRun = activeRun
-    self.recentRuns = recentRuns
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    workflowId = try container.decode(String.self, forKey: .workflowId)
-    subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
-    activeRun = try container.decodeIfPresent(ReviewsPolicyRunResponseWire.self, forKey: .activeRun)
-    recentRuns = try container.decodeIfPresent([ReviewsPolicyRunResponseWire].self, forKey: .recentRuns) ?? []
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case workflowId = "workflow_id"
-    case subject
-    case activeRun = "active_run"
-    case recentRuns = "recent_runs"
-  }
-}
-
-public struct ReviewsPolicyHistoryRequestWire: Codable, Equatable, Sendable {
-  public var workflowId: String
-  public var subject: ReviewsPolicySubjectWire
-
-  public init(workflowId: String = "reviews_auto", subject: ReviewsPolicySubjectWire) {
-    self.workflowId = workflowId
-    self.subject = subject
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    workflowId = try container.decodeIfPresent(String.self, forKey: .workflowId) ?? "reviews_auto"
-    subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case workflowId = "workflow_id"
-    case subject
-  }
-}
-
-public struct ReviewsPolicyRunMetricsWire: Codable, Equatable, Sendable {
-  public var total: UInt
-  public var running: UInt
-  public var waiting: UInt
-  public var completed: UInt
-  public var failed: UInt
-  public var cancelled: UInt
-  public var byTrigger: [String: UInt]
-
-  public init(total: UInt = 0, running: UInt = 0, waiting: UInt = 0, completed: UInt = 0, failed: UInt = 0, cancelled: UInt = 0, byTrigger: [String: UInt] = [:]) {
-    self.total = total
-    self.running = running
-    self.waiting = waiting
-    self.completed = completed
-    self.failed = failed
-    self.cancelled = cancelled
-    self.byTrigger = byTrigger
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    total = try container.decode(UInt.self, forKey: .total)
-    running = try container.decode(UInt.self, forKey: .running)
-    waiting = try container.decode(UInt.self, forKey: .waiting)
-    completed = try container.decode(UInt.self, forKey: .completed)
-    failed = try container.decode(UInt.self, forKey: .failed)
-    cancelled = try container.decode(UInt.self, forKey: .cancelled)
-    byTrigger = try container.decodeIfPresent([String: UInt].self, forKey: .byTrigger) ?? [:]
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case total
-    case running
-    case waiting
-    case completed
-    case failed
-    case cancelled
-    case byTrigger = "by_trigger"
-  }
-}
-
-public struct ReviewsPolicyTimelineEntryWire: Codable, Equatable, Sendable {
-  public var recordedAt: String
-  public var runId: String
-  public var event: String
-
-  public init(recordedAt: String, runId: String, event: String) {
-    self.recordedAt = recordedAt
-    self.runId = runId
-    self.event = event
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case recordedAt = "recorded_at"
-    case runId = "run_id"
-    case event
-  }
-}
-
-public struct ReviewsPolicyHistoryResponseWire: Codable, Equatable, Sendable {
-  public var workflowId: String
-  public var subject: ReviewsPolicySubjectWire
-  public var runs: [ReviewsPolicyRunResponseWire]
-  public var metrics: ReviewsPolicyRunMetricsWire
-  public var timeline: [ReviewsPolicyTimelineEntryWire]
-
-  public init(workflowId: String, subject: ReviewsPolicySubjectWire, runs: [ReviewsPolicyRunResponseWire] = [], metrics: ReviewsPolicyRunMetricsWire = ReviewsPolicyRunMetricsWire(), timeline: [ReviewsPolicyTimelineEntryWire] = []) {
-    self.workflowId = workflowId
-    self.subject = subject
-    self.runs = runs
-    self.metrics = metrics
-    self.timeline = timeline
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    workflowId = try container.decode(String.self, forKey: .workflowId)
-    subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
-    runs = try container.decodeIfPresent([ReviewsPolicyRunResponseWire].self, forKey: .runs) ?? []
-    metrics = try container.decodeIfPresent(ReviewsPolicyRunMetricsWire.self, forKey: .metrics) ?? ReviewsPolicyRunMetricsWire()
-    timeline = try container.decodeIfPresent([ReviewsPolicyTimelineEntryWire].self, forKey: .timeline) ?? []
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case workflowId = "workflow_id"
-    case subject
-    case runs
-    case metrics
-    case timeline
-  }
-}
-
 public struct ReviewsCommentRequestWire: Codable, Equatable, Sendable {
   public var targets: [ReviewTargetWire]
   public var body: String
@@ -1304,5 +897,412 @@ public struct ReviewActionResultWire: Codable, Equatable, Sendable {
     case outcome
     case message
     case timelineEntry = "timeline_entry"
+  }
+}
+
+public struct ReviewsPolicySubjectWire: Codable, Equatable, Sendable {
+  public var repository: String
+  public var pullRequestNumber: UInt64
+
+  public init(repository: String, pullRequestNumber: UInt64) {
+    self.repository = repository
+    self.pullRequestNumber = pullRequestNumber
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case repository
+    case pullRequestNumber = "pull_request_number"
+  }
+}
+
+public enum ReviewsPolicyTriggerWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case background = "background"
+  case event = "event"
+  case manual = "manual"
+  case manualNudge = "manual_nudge"
+  case timer = "timer"
+
+  public var id: String { rawValue }
+}
+
+public enum ReviewsPolicyRunStatusWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case completed = "completed"
+  case failed = "failed"
+  case running = "running"
+  case waiting = "waiting"
+  case cancelled = "cancelled"
+
+  public var id: String { rawValue }
+}
+
+public enum ReviewsPolicyStepTypeWire: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case action = "action"
+  case wait = "wait"
+
+  public var id: String { rawValue }
+}
+
+public struct ReviewsPolicyWaitWire: Codable, Equatable, Sendable {
+  public var eventKey: String?
+  public var durationSeconds: UInt64?
+
+  public init(eventKey: String? = nil, durationSeconds: UInt64? = nil) {
+    self.eventKey = eventKey
+    self.durationSeconds = durationSeconds
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case eventKey = "event_key"
+    case durationSeconds = "duration_seconds"
+  }
+}
+
+public struct ReviewsPolicyPreviewStepWire: Codable, Equatable, Sendable {
+  public var stepType: ReviewsPolicyStepTypeWire
+  public var actionKey: String?
+  public var waitingOn: ReviewsPolicyWaitWire?
+
+  public init(stepType: ReviewsPolicyStepTypeWire, actionKey: String? = nil, waitingOn: ReviewsPolicyWaitWire? = nil) {
+    self.stepType = stepType
+    self.actionKey = actionKey
+    self.waitingOn = waitingOn
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case stepType = "step_type"
+    case actionKey = "action_key"
+    case waitingOn = "waiting_on"
+  }
+}
+
+public struct ReviewsPolicyPreviewRequestWire: Codable, Equatable, Sendable {
+  public var workflowId: String
+  public var target: ReviewTargetWire
+  public var method: TaskBoardGitHubMergeMethod
+
+  public init(workflowId: String = "reviews_auto", target: ReviewTargetWire, method: TaskBoardGitHubMergeMethod) {
+    self.workflowId = workflowId
+    self.target = target
+    self.method = method
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    workflowId = try container.decodeIfPresent(String.self, forKey: .workflowId) ?? "reviews_auto"
+    target = try container.decode(ReviewTargetWire.self, forKey: .target)
+    method = try container.decode(TaskBoardGitHubMergeMethod.self, forKey: .method)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case workflowId = "workflow_id"
+    case target
+    case method
+  }
+}
+
+public struct ReviewsPolicyPreviewResponseWire: Codable, Equatable, Sendable {
+  public var workflowId: String
+  public var subject: ReviewsPolicySubjectWire
+  public var eligible: Bool
+  public var reason: String?
+  public var warnings: [String]
+  public var steps: [ReviewsPolicyPreviewStepWire]
+
+  public init(workflowId: String, subject: ReviewsPolicySubjectWire, eligible: Bool, reason: String? = nil, warnings: [String] = [], steps: [ReviewsPolicyPreviewStepWire] = []) {
+    self.workflowId = workflowId
+    self.subject = subject
+    self.eligible = eligible
+    self.reason = reason
+    self.warnings = warnings
+    self.steps = steps
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    workflowId = try container.decode(String.self, forKey: .workflowId)
+    subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
+    eligible = try container.decode(Bool.self, forKey: .eligible)
+    reason = try container.decodeIfPresent(String.self, forKey: .reason)
+    warnings = try container.decodeIfPresent([String].self, forKey: .warnings) ?? []
+    steps = try container.decodeIfPresent([ReviewsPolicyPreviewStepWire].self, forKey: .steps) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case workflowId = "workflow_id"
+    case subject
+    case eligible
+    case reason
+    case warnings
+    case steps
+  }
+}
+
+public struct ReviewsPolicyRunStartRequestWire: Codable, Equatable, Sendable {
+  public var workflowId: String
+  public var target: ReviewTargetWire
+  public var method: TaskBoardGitHubMergeMethod
+  public var trigger: ReviewsPolicyTriggerWire
+
+  public init(workflowId: String = "reviews_auto", target: ReviewTargetWire, method: TaskBoardGitHubMergeMethod, trigger: ReviewsPolicyTriggerWire = .manual) {
+    self.workflowId = workflowId
+    self.target = target
+    self.method = method
+    self.trigger = trigger
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    workflowId = try container.decodeIfPresent(String.self, forKey: .workflowId) ?? "reviews_auto"
+    target = try container.decode(ReviewTargetWire.self, forKey: .target)
+    method = try container.decode(TaskBoardGitHubMergeMethod.self, forKey: .method)
+    trigger = try container.decodeIfPresent(ReviewsPolicyTriggerWire.self, forKey: .trigger) ?? .manual
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case workflowId = "workflow_id"
+    case target
+    case method
+    case trigger
+  }
+}
+
+public struct ReviewsPolicyRunStepWire: Codable, Equatable, Sendable {
+  public var stepType: ReviewsPolicyStepTypeWire
+  public var actionKey: String?
+  public var waitingOn: ReviewsPolicyWaitWire?
+  public var recordedAt: String
+
+  public init(stepType: ReviewsPolicyStepTypeWire, actionKey: String? = nil, waitingOn: ReviewsPolicyWaitWire? = nil, recordedAt: String) {
+    self.stepType = stepType
+    self.actionKey = actionKey
+    self.waitingOn = waitingOn
+    self.recordedAt = recordedAt
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case stepType = "step_type"
+    case actionKey = "action_key"
+    case waitingOn = "waiting_on"
+    case recordedAt = "recorded_at"
+  }
+}
+
+public struct ReviewsPolicyRunResponseWire: Codable, Equatable, Sendable {
+  public var workflowId: String
+  public var runId: String
+  public var subject: ReviewsPolicySubjectWire
+  public var trigger: ReviewsPolicyTriggerWire
+  public var status: ReviewsPolicyRunStatusWire
+  public var startedAt: String
+  public var updatedAt: String
+  public var waitingOn: ReviewsPolicyWaitWire?
+  public var completedAt: String?
+  public var errorMessage: String?
+  public var steps: [ReviewsPolicyRunStepWire]
+
+  public init(workflowId: String, runId: String, subject: ReviewsPolicySubjectWire, trigger: ReviewsPolicyTriggerWire, status: ReviewsPolicyRunStatusWire, startedAt: String, updatedAt: String, waitingOn: ReviewsPolicyWaitWire? = nil, completedAt: String? = nil, errorMessage: String? = nil, steps: [ReviewsPolicyRunStepWire] = []) {
+    self.workflowId = workflowId
+    self.runId = runId
+    self.subject = subject
+    self.trigger = trigger
+    self.status = status
+    self.startedAt = startedAt
+    self.updatedAt = updatedAt
+    self.waitingOn = waitingOn
+    self.completedAt = completedAt
+    self.errorMessage = errorMessage
+    self.steps = steps
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    workflowId = try container.decode(String.self, forKey: .workflowId)
+    runId = try container.decode(String.self, forKey: .runId)
+    subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
+    trigger = try container.decode(ReviewsPolicyTriggerWire.self, forKey: .trigger)
+    status = try container.decode(ReviewsPolicyRunStatusWire.self, forKey: .status)
+    startedAt = try container.decode(String.self, forKey: .startedAt)
+    updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    waitingOn = try container.decodeIfPresent(ReviewsPolicyWaitWire.self, forKey: .waitingOn)
+    completedAt = try container.decodeIfPresent(String.self, forKey: .completedAt)
+    errorMessage = try container.decodeIfPresent(String.self, forKey: .errorMessage)
+    steps = try container.decodeIfPresent([ReviewsPolicyRunStepWire].self, forKey: .steps) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case workflowId = "workflow_id"
+    case runId = "run_id"
+    case subject
+    case trigger
+    case status
+    case startedAt = "started_at"
+    case updatedAt = "updated_at"
+    case waitingOn = "waiting_on"
+    case completedAt = "completed_at"
+    case errorMessage = "error_message"
+    case steps
+  }
+}
+
+public struct ReviewsPolicyStatusRequestWire: Codable, Equatable, Sendable {
+  public var workflowId: String
+  public var subject: ReviewsPolicySubjectWire
+
+  public init(workflowId: String = "reviews_auto", subject: ReviewsPolicySubjectWire) {
+    self.workflowId = workflowId
+    self.subject = subject
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    workflowId = try container.decodeIfPresent(String.self, forKey: .workflowId) ?? "reviews_auto"
+    subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case workflowId = "workflow_id"
+    case subject
+  }
+}
+
+public struct ReviewsPolicyStatusResponseWire: Codable, Equatable, Sendable {
+  public var workflowId: String
+  public var subject: ReviewsPolicySubjectWire
+  public var activeRun: ReviewsPolicyRunResponseWire?
+  public var recentRuns: [ReviewsPolicyRunResponseWire]
+
+  public init(workflowId: String, subject: ReviewsPolicySubjectWire, activeRun: ReviewsPolicyRunResponseWire? = nil, recentRuns: [ReviewsPolicyRunResponseWire] = []) {
+    self.workflowId = workflowId
+    self.subject = subject
+    self.activeRun = activeRun
+    self.recentRuns = recentRuns
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    workflowId = try container.decode(String.self, forKey: .workflowId)
+    subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
+    activeRun = try container.decodeIfPresent(ReviewsPolicyRunResponseWire.self, forKey: .activeRun)
+    recentRuns = try container.decodeIfPresent([ReviewsPolicyRunResponseWire].self, forKey: .recentRuns) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case workflowId = "workflow_id"
+    case subject
+    case activeRun = "active_run"
+    case recentRuns = "recent_runs"
+  }
+}
+
+public struct ReviewsPolicyHistoryRequestWire: Codable, Equatable, Sendable {
+  public var workflowId: String
+  public var subject: ReviewsPolicySubjectWire
+
+  public init(workflowId: String = "reviews_auto", subject: ReviewsPolicySubjectWire) {
+    self.workflowId = workflowId
+    self.subject = subject
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    workflowId = try container.decodeIfPresent(String.self, forKey: .workflowId) ?? "reviews_auto"
+    subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case workflowId = "workflow_id"
+    case subject
+  }
+}
+
+public struct ReviewsPolicyRunMetricsWire: Codable, Equatable, Sendable {
+  public var total: UInt
+  public var running: UInt
+  public var waiting: UInt
+  public var completed: UInt
+  public var failed: UInt
+  public var cancelled: UInt
+  public var byTrigger: [String: UInt]
+
+  public init(total: UInt = 0, running: UInt = 0, waiting: UInt = 0, completed: UInt = 0, failed: UInt = 0, cancelled: UInt = 0, byTrigger: [String: UInt] = [:]) {
+    self.total = total
+    self.running = running
+    self.waiting = waiting
+    self.completed = completed
+    self.failed = failed
+    self.cancelled = cancelled
+    self.byTrigger = byTrigger
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    total = try container.decode(UInt.self, forKey: .total)
+    running = try container.decode(UInt.self, forKey: .running)
+    waiting = try container.decode(UInt.self, forKey: .waiting)
+    completed = try container.decode(UInt.self, forKey: .completed)
+    failed = try container.decode(UInt.self, forKey: .failed)
+    cancelled = try container.decode(UInt.self, forKey: .cancelled)
+    byTrigger = try container.decodeIfPresent([String: UInt].self, forKey: .byTrigger) ?? [:]
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case total
+    case running
+    case waiting
+    case completed
+    case failed
+    case cancelled
+    case byTrigger = "by_trigger"
+  }
+}
+
+public struct ReviewsPolicyTimelineEntryWire: Codable, Equatable, Sendable {
+  public var recordedAt: String
+  public var runId: String
+  public var event: String
+
+  public init(recordedAt: String, runId: String, event: String) {
+    self.recordedAt = recordedAt
+    self.runId = runId
+    self.event = event
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case recordedAt = "recorded_at"
+    case runId = "run_id"
+    case event
+  }
+}
+
+public struct ReviewsPolicyHistoryResponseWire: Codable, Equatable, Sendable {
+  public var workflowId: String
+  public var subject: ReviewsPolicySubjectWire
+  public var runs: [ReviewsPolicyRunResponseWire]
+  public var metrics: ReviewsPolicyRunMetricsWire
+  public var timeline: [ReviewsPolicyTimelineEntryWire]
+
+  public init(workflowId: String, subject: ReviewsPolicySubjectWire, runs: [ReviewsPolicyRunResponseWire] = [], metrics: ReviewsPolicyRunMetricsWire = ReviewsPolicyRunMetricsWire(), timeline: [ReviewsPolicyTimelineEntryWire] = []) {
+    self.workflowId = workflowId
+    self.subject = subject
+    self.runs = runs
+    self.metrics = metrics
+    self.timeline = timeline
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    workflowId = try container.decode(String.self, forKey: .workflowId)
+    subject = try container.decode(ReviewsPolicySubjectWire.self, forKey: .subject)
+    runs = try container.decodeIfPresent([ReviewsPolicyRunResponseWire].self, forKey: .runs) ?? []
+    metrics = try container.decodeIfPresent(ReviewsPolicyRunMetricsWire.self, forKey: .metrics) ?? ReviewsPolicyRunMetricsWire()
+    timeline = try container.decodeIfPresent([ReviewsPolicyTimelineEntryWire].self, forKey: .timeline) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case workflowId = "workflow_id"
+    case subject
+    case runs
+    case metrics
+    case timeline
   }
 }

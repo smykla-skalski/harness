@@ -15,6 +15,8 @@ extension TaskBoardPolicyCanvasSummary {
       revision: wire.revision,
       mode: TaskBoardPolicyPipelineMode(rawValue: wire.mode.rawValue) ?? .draft,
       document: wire.document,
+      liveDocument: wire.liveDocument,
+      liveUpdatedAt: wire.liveUpdatedAt,
       nodeCount: Int(wire.nodeCount),
       edgeCount: Int(wire.edgeCount),
       groupCount: Int(wire.groupCount),

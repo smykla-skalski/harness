@@ -11,15 +11,24 @@ pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
              CHECK (global_policy_enforcement_enabled IN (0, 1))",
     )?;
     if column_exists(conn, "policy_workspace", "enforcement_snapshot_json")? {
-        conn.execute(
-            "UPDATE policy_workspace
-             SET global_policy_enforcement_enabled = 0
-             WHERE enforcement_snapshot_json IS NOT NULL",
-            [],
-        )
-        .map_err(|error| db_error(format!("backfill global policy enforcement flag: {error}")))?;
+        backfill_global_policy_enforcement(conn)?;
     }
     stamp_schema_version(conn)
+}
+
+fn backfill_global_policy_enforcement(conn: &Connection) -> Result<(), CliError> {
+    match conn.execute(
+        "UPDATE policy_workspace
+         SET global_policy_enforcement_enabled = 0
+         WHERE enforcement_snapshot_json IS NOT NULL",
+        [],
+    ) {
+        Ok(_) => Ok(()),
+        Err(_) if !column_exists(conn, "policy_workspace", "enforcement_snapshot_json")? => Ok(()),
+        Err(error) => Err(db_error(format!(
+            "backfill global policy enforcement flag: {error}"
+        ))),
+    }
 }
 
 fn add_column_if_missing(conn: &Connection, column_name: &str, sql: &str) -> Result<(), CliError> {

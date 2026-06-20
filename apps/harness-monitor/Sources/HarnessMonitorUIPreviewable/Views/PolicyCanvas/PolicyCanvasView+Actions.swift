@@ -31,15 +31,21 @@ extension PolicyCanvasView {
   }
 
   func simulate() {
+    runSimulation(cancelPendingAutosave: true)
+  }
+
+  func evaluateConfidence() {
+    runSimulation(cancelPendingAutosave: false)
+  }
+
+  private func runSimulation(cancelPendingAutosave: Bool) {
     guard remoteActionsEnabled else {
       statusLine = remoteActionDisabledReason
       return
     }
-    // `beginForegroundSave` is autosave-specific; simulate uses its own
-    // in-flight flag but should still cancel the pending autosave for the
-    // same race-window reason. Set `isSimulating` synchronously here
-    // (before the Task spawns) for symmetry with the save path.
-    viewModel.cancelAutosave()
+    if cancelPendingAutosave {
+      viewModel.cancelAutosave()
+    }
     let snapshot = viewModel.snapshotState()
     let document = viewModel.exportDocument()
     viewModel.isSimulating = true

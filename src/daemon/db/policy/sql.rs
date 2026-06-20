@@ -10,12 +10,13 @@ pub(super) const SELECT_WORKSPACE: &str = "SELECT active_canvas_id, workspace_sc
     FROM policy_workspace WHERE singleton = 1";
 pub(super) const SELECT_CANVASES: &str = "SELECT canvas_id, position, title, is_manual_ocr_paste_canvas, \
     is_review_text_paste_dry_run_canvas, is_review_screenshot_extraction_canvas, graph_schema_version, revision, mode, \
-    layout_zoom, layout_offset_x, layout_offset_y, policy_trace_ids_json, latest_simulation_json, created_at, updated_at \
+    layout_zoom, layout_offset_x, layout_offset_y, policy_trace_ids_json, live_document_json, live_updated_at, \
+    latest_simulation_json, created_at, updated_at \
     FROM policy_canvases ORDER BY position, canvas_id";
 pub(super) const SELECT_CANVAS_BY_ID: &str = "SELECT canvas_id, position, title, \
     is_manual_ocr_paste_canvas, is_review_text_paste_dry_run_canvas, is_review_screenshot_extraction_canvas, \
     graph_schema_version, revision, mode, layout_zoom, layout_offset_x, layout_offset_y, \
-    policy_trace_ids_json, latest_simulation_json, created_at, updated_at \
+    policy_trace_ids_json, live_document_json, live_updated_at, latest_simulation_json, created_at, updated_at \
     FROM policy_canvases WHERE canvas_id = ?1";
 pub(super) const SELECT_NODES: &str = "SELECT canvas_id, node_id, position, label, kind_tag, kind_config_json, \
     automation_json, input_ports_json, output_ports_json, group_id, layout_x, layout_y, layout_source \

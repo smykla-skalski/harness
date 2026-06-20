@@ -65,7 +65,7 @@ extension PolicyCanvasView {
     }
     viewModel.confidenceTrigger = { @MainActor in
       viewModel.scheduleConfidenceEvaluation {
-        simulate()
+        evaluateConfidence()
       }
     }
   }

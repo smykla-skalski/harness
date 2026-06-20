@@ -38,6 +38,8 @@ pub(crate) struct CanvasRow {
     pub layout_offset_x: i64,
     pub layout_offset_y: i64,
     pub policy_trace_ids_json: String,
+    pub live_document_json: Option<String>,
+    pub live_updated_at: Option<String>,
     pub latest_simulation_json: Option<String>,
     pub created_at: String,
     pub updated_at: String,

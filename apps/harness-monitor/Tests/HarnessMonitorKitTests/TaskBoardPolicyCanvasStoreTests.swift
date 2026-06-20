@@ -315,6 +315,7 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
       ]
     )
   }
+
 }
 
 private struct PolicyCanvasWorkspaceState: Equatable {
@@ -332,12 +333,16 @@ private struct PolicyCanvasState: Equatable {
   var revision: UInt64
   var mode: TaskBoardPolicyPipelineMode
   var document: TaskBoardPolicyPipelineDocument?
+  var liveDocument: TaskBoardPolicyPipelineDocument?
+  var liveUpdatedAt: String?
 
   init(canvas: TaskBoardPolicyCanvasSummary) {
     self.canvasId = canvas.canvasId
     self.revision = canvas.revision
     self.mode = canvas.mode
     self.document = canvas.document
+    self.liveDocument = canvas.liveDocument
+    self.liveUpdatedAt = canvas.liveUpdatedAt
   }
 }
 
@@ -347,6 +352,8 @@ private struct TaskBoardPolicyCanvasSummaryInput {
   var revision: UInt64
   var mode: TaskBoardPolicyPipelineMode
   var document: TaskBoardPolicyPipelineDocument?
+  var liveDocument: TaskBoardPolicyPipelineDocument?
+  var liveUpdatedAt: String?
   var nodeCount: Int
   var edgeCount: Int
   var groupCount: Int
@@ -361,6 +368,8 @@ private func makeTaskBoardPolicyCanvasSummary(
     revision: input.revision,
     mode: input.mode,
     document: input.document,
+    liveDocument: input.liveDocument,
+    liveUpdatedAt: input.liveUpdatedAt,
     nodeCount: input.nodeCount,
     edgeCount: input.edgeCount,
     groupCount: input.groupCount,

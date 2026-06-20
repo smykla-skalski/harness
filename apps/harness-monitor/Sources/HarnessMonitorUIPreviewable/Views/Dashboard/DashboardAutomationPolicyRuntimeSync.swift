@@ -89,12 +89,16 @@ private struct DashboardAutomationPolicyRuntimeSyncID: Equatable {
     let revision: UInt64
     let mode: TaskBoardPolicyPipelineMode
     let embeddedDocumentFingerprint: DocumentFingerprint?
+    let liveDocumentFingerprint: DocumentFingerprint?
 
     init(summary: TaskBoardPolicyCanvasSummary) {
       canvasId = summary.canvasId
       revision = summary.revision
       mode = summary.mode
       embeddedDocumentFingerprint = summary.document.map(DocumentFingerprint.init(document:))
+      liveDocumentFingerprint = summary.liveDocument.map(
+        DocumentFingerprint.init(document:)
+      )
     }
   }
 

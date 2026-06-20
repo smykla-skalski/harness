@@ -5,6 +5,7 @@ use super::{CliError, Connection, DaemonDb, Path, db_error};
 
 const TABLE_EXISTS_SQL: &str =
     "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?1";
+const COLUMN_EXISTS_SQL: &str = "SELECT COUNT(*) FROM pragma_table_info(?1) WHERE name = ?2";
 const SCHEMA_VERSION_SQL: &str = "SELECT value FROM schema_meta WHERE key = 'version'";
 const SQLX_MIGRATIONS_TABLE_SQL: &str = "
 CREATE TABLE IF NOT EXISTS _sqlx_migrations (
@@ -45,12 +46,48 @@ async fn ensure_schema_meta_migrations_recorded(
             continue;
         }
         let migration_floor = migration_floor_version(migration.version);
-        if reached < migration_floor {
+        if reached < migration_floor && !migration_effect_observed(pool, migration.version).await? {
             continue;
         }
         record_migration_if_missing(pool, migration).await?;
     }
     Ok(())
+}
+
+async fn migration_effect_observed(
+    pool: &SqlitePool,
+    migration_version: i64,
+) -> Result<bool, CliError> {
+    if migration_version == 17 {
+        return policy_snapshot_migration_effect_observed(pool).await;
+    }
+    if migration_version == 18 {
+        return table_exists(pool, "audit_events").await;
+    }
+    let Some((table, column)) = migration_effect_column(migration_version) else {
+        return Ok(false);
+    };
+    column_exists(pool, table, column).await
+}
+
+async fn policy_snapshot_migration_effect_observed(pool: &SqlitePool) -> Result<bool, CliError> {
+    let has_global_flag = column_exists(
+        pool,
+        "policy_workspace",
+        "global_policy_enforcement_enabled",
+    )
+    .await?;
+    let has_snapshot = column_exists(pool, "policy_workspace", "enforcement_snapshot_json").await?;
+    Ok(has_global_flag && !has_snapshot)
+}
+
+const fn migration_effect_column(migration_version: i64) -> Option<(&'static str, &'static str)> {
+    match migration_version {
+        16 => Some(("policy_workspace", "global_policy_enforcement_enabled")),
+        19 => Some(("policy_workspace", "scenarios_json")),
+        20 => Some(("policy_canvases", "live_document_json")),
+        _ => None,
+    }
 }
 
 /// The `schema_meta.version` threshold for each sqlx migration id. Used to
@@ -76,6 +113,7 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         17 => 23,
         18 => 24,
         19 => 25,
+        20 => 26,
         _ => u64::MAX,
     }
 }
@@ -184,6 +222,24 @@ async fn table_exists(pool: &SqlitePool, table_name: &str) -> Result<bool, CliEr
         .await
         .map(|count| count > 0)
         .map_err(|error| db_error(format!("check async table {table_name} existence: {error}")))
+}
+
+async fn column_exists(
+    pool: &SqlitePool,
+    table_name: &str,
+    column_name: &str,
+) -> Result<bool, CliError> {
+    query_scalar::<_, i64>(COLUMN_EXISTS_SQL)
+        .bind(table_name)
+        .bind(column_name)
+        .fetch_one(pool)
+        .await
+        .map(|count| count > 0)
+        .map_err(|error| {
+            db_error(format!(
+                "check async column {table_name}.{column_name}: {error}"
+            ))
+        })
 }
 
 fn sync_table_exists(conn: &Connection, table_name: &str) -> Result<bool, CliError> {

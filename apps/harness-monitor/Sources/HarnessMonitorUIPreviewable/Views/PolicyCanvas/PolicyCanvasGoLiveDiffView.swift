@@ -50,7 +50,7 @@ struct PolicyCanvasGoLiveDiffView: View {
           icon: "exclamationmark.triangle",
           tone: .warning,
           title: "Comparison unavailable",
-          subtitle: "The go-live comparison could not be loaded. You can still make the draft live."
+          subtitle: "Resolve the comparison before making the draft live."
         )
       }
     }

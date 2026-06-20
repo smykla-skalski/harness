@@ -264,6 +264,39 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
     #expect(policy.executionPlan?.fanOuts.first?.payload == .text)
   }
 
+  @Test("workspace compilation uses live document when the active document is draft")
+  func workspaceCompilationUsesLiveDocumentWhenActiveDocumentIsDraft() throws {
+    let draftDocument = TaskBoardPolicyPipelineDocument(
+      revision: 2,
+      mode: .draft,
+      nodes: [],
+      edges: [],
+      groups: []
+    )
+    let workspace = TaskBoardPolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: "manual-ocr-canvas",
+      canvases: [
+        policyCanvasSummary(
+          canvasId: "manual-ocr-canvas",
+          title: "Manual OCR Paste",
+          document: draftDocument,
+          liveDocument: policyCanvasManualOCRPasteDocument()
+        )
+      ]
+    )
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
+      workspace: workspace,
+      activeDocument: draftDocument
+    )
+    let policy = try #require(compilation.policies.first)
+
+    #expect(compilation.policies.count == 1)
+    #expect(policy.eventSource == .manualOCRPaste)
+    #expect(policy.executionPlan?.fanOuts.first?.payload == .text)
+  }
+
   @Test("workspace compilation assigns stable priorities across multiple enforced canvases")
   func workspaceCompilationAssignsStablePrioritiesAcrossMultipleEnforcedCanvases() throws {
     let defaultDocument = TaskBoardPolicyPipelineDocument(
@@ -568,7 +601,8 @@ func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipeline
 private func policyCanvasSummary(
   canvasId: String,
   title: String,
-  document: TaskBoardPolicyPipelineDocument
+  document: TaskBoardPolicyPipelineDocument,
+  liveDocument: TaskBoardPolicyPipelineDocument? = nil
 ) -> TaskBoardPolicyCanvasSummary {
   TaskBoardPolicyCanvasSummary(
     canvasId: canvasId,
@@ -576,6 +610,7 @@ private func policyCanvasSummary(
     revision: document.revision,
     mode: document.mode,
     document: document,
+    liveDocument: liveDocument,
     nodeCount: document.nodes.count,
     edgeCount: document.edges.count,
     groupCount: document.groups.count,

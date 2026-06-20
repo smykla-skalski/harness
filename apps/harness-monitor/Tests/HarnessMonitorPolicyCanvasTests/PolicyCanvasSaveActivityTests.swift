@@ -96,7 +96,7 @@ struct PolicyCanvasSaveActivityTests {
     let performSaveRange = try #require(source.range(of: "func performSave("))
     let nextFunctionRange = try #require(
       source.range(
-        of: "\n  func requestPromote(",
+        of: "\n  func requestMakeLive(",
         range: performSaveRange.upperBound..<source.endIndex
       )
     )
@@ -118,7 +118,7 @@ struct PolicyCanvasSaveActivityTests {
     let performSaveRange = try #require(source.range(of: "func performSave("))
     let nextFunctionRange = try #require(
       source.range(
-        of: "\n  func requestPromote(",
+        of: "\n  func requestMakeLive(",
         range: performSaveRange.upperBound..<source.endIndex
       )
     )

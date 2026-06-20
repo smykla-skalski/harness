@@ -12,7 +12,9 @@ use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
     GitHubPullRequestHandle,
 };
-use crate::task_board::policy_graph::{GraphPolicyGate, resolve_gate_policy};
+use crate::task_board::policy_graph::{
+    RecordedPolicyDecision, record_policy_decision, resolve_gate_policy,
+};
 use crate::task_board::{
     BuiltInPolicyGate, ExternalProvider, ExternalRefProvider, PolicyAction, PolicyDecision,
     PolicyGate, PolicyInput, PolicyPipelineMode, PolicySubject, TaskBoardItem,
@@ -228,7 +230,19 @@ pub(super) fn action_policy(
     if let Some(document) = resolve_gate_policy(board_root)
         && document.mode != PolicyPipelineMode::Draft
     {
-        return GraphPolicyGate::new((**document).clone()).evaluate(&policy_input);
+        let simulation = document.simulate(&policy_input);
+        let decision = simulation.decision;
+        record_policy_decision(
+            RecordedPolicyDecision::new(
+                document.revision,
+                policy_input,
+                decision.clone(),
+                simulation.visited_node_ids,
+                "task_board_github",
+            )
+            .with_canvas_id(document.canvas_id.clone()),
+        );
+        return decision;
     }
     BuiltInPolicyGate::default().evaluate(&policy_input)
 }

@@ -97,6 +97,44 @@ fn go_live_diff_reports_parity_when_candidate_matches_live() {
 }
 
 #[test]
+fn draft_save_after_make_live_preserves_the_live_snapshot() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let revision = ws.active_canvas().expect("active canvas").document.revision;
+    apply_make_live(
+        &mut ws,
+        &PolicyPipelineMakeLiveRequest {
+            revision,
+            actor: None,
+            canvas_id: None,
+        },
+    )
+    .expect("make live");
+    let live_document = ws.active_live_document().expect("live document").clone();
+    let mut draft = live_document.clone();
+    for node in &mut draft.nodes {
+        if let PolicyGraphNodeKind::RiskClassifier { threshold, .. } = &mut node.kind {
+            *threshold = 0;
+        }
+    }
+
+    let saved = apply_save_draft(&mut ws, draft, live_document.revision, None).expect("save draft");
+
+    assert!(saved.persisted);
+    assert_eq!(saved.document.mode, PolicyGraphMode::Draft);
+    assert_eq!(
+        ws.active_live_document().expect("live document").revision,
+        live_document.revision,
+        "saving a draft must not replace the enforced live snapshot",
+    );
+    let diff = apply_diff_against_live(&ws, None, None).expect("diff against live");
+    assert!(diff.has_live_policy);
+    assert!(
+        diff.changed_count >= 1,
+        "the edited draft must compare against the previous live snapshot",
+    );
+}
+
+#[test]
 fn go_live_diff_flags_a_changed_decision_against_live() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     let revision = ws.active_canvas().expect("active canvas").document.revision;

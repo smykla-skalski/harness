@@ -3,14 +3,17 @@ use super::{CliError, Connection, DaemonDb, Path, db_error};
 use rusqlite::ffi::ErrorCode;
 use rusqlite::{Transaction, TransactionBehavior};
 use std::cell::RefCell;
+use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 
 #[cfg(test)]
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[cfg(test)]
 type SchemaInitHook = dyn Fn() + Send + Sync + 'static;
+
+static SCHEMA_MIGRATION_LOCK: Mutex<()> = Mutex::new(());
 
 #[cfg(test)]
 static SCHEMA_INIT_HOOK: Mutex<Option<Arc<SchemaInitHook>>> = Mutex::new(None);
@@ -88,13 +91,22 @@ impl DaemonDb {
     }
 
     fn run_migrations(&self) -> Result<(), CliError> {
+        let _schema_migration_guard = SCHEMA_MIGRATION_LOCK
+            .lock()
+            .map_err(|error| db_error(format!("lock schema migrations: {error}")))?;
         let version = self.schema_version()?;
-        let should_reclaim_space =
-            super::schema_migrations::run_pre_v7_migrations(&self.conn, version.as_str())?;
-        self.run_post_v7_migrations(version.as_str())?;
-        super::schema_repairs::repair_current_schema_shape(self)?;
-        if should_reclaim_space {
-            reclaim_unused_pages(&self.conn)?;
+        let version_number = parse_and_check_schema_version(version.as_str())?;
+        if version_number < 7 {
+            let should_reclaim_space =
+                super::schema_migrations::run_pre_v7_migrations(&self.conn, version.as_str())?;
+            self.run_post_v7_migrations(version.as_str())?;
+            super::schema_repairs::repair_current_schema_shape(self)?;
+            if should_reclaim_space {
+                reclaim_unused_pages(&self.conn)?;
+            }
+        } else {
+            self.run_post_v7_migrations(version.as_str())?;
+            super::schema_repairs::repair_current_schema_shape(self)?;
         }
         super::schema_repairs::repair_noncanonical_session_state_wire(self)?;
         Ok(())
@@ -162,6 +174,9 @@ impl DaemonDb {
         }
         if version_number <= 24 {
             self.migrate_v24_to_v25()?;
+        }
+        if version_number <= 25 {
+            self.migrate_v25_to_v26()?;
         }
         Ok(())
     }
@@ -254,6 +269,10 @@ impl DaemonDb {
 
     fn migrate_v24_to_v25(&self) -> Result<(), CliError> {
         super::schema_v25::run(&self.conn)
+    }
+
+    fn migrate_v25_to_v26(&self) -> Result<(), CliError> {
+        super::schema_v26::run(&self.conn)
     }
 }
 

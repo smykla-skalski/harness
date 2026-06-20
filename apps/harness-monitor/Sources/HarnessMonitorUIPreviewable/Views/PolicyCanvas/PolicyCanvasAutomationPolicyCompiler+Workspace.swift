@@ -18,9 +18,13 @@ extension PolicyCanvasAutomationPolicyCompiler {
 
     var merged = PolicyCanvasAutomationPolicyCompilation.empty
     var usedPolicyIDs = Set<String>()
-    for canvas in workspace.canvases where canvas.mode == .enforced {
+    for canvas in workspace.canvases {
+      guard canvas.liveDocument != nil || canvas.mode == .enforced else {
+        continue
+      }
       mergeEnforcedCanvas(
         canvas,
+        document: canvas.liveDocument ?? canvas.document,
         into: &merged,
         usedPolicyIDs: &usedPolicyIDs
       )
@@ -36,10 +40,11 @@ extension PolicyCanvasAutomationPolicyCompiler {
 
   private static func mergeEnforcedCanvas(
     _ canvas: TaskBoardPolicyCanvasSummary,
+    document: TaskBoardPolicyPipelineDocument?,
     into merged: inout PolicyCanvasAutomationPolicyCompilation,
     usedPolicyIDs: inout Set<String>
   ) {
-    guard let document = canvas.document else {
+    guard let document else {
       merged.diagnostics.append(
         PolicyCanvasAutomationPolicyDiagnostic(
           id: "missing-document-\(canvas.canvasId)",

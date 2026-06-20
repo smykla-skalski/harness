@@ -189,6 +189,10 @@ pub fn apply_save_canvas_draft(
             persisted: false,
         });
     }
+    if canvas.live_document.is_none() && canvas.document.mode == PolicyGraphMode::Enforced {
+        canvas.live_document = Some(canvas.document.clone());
+        canvas.live_updated_at = Some(canvas.updated_at.clone());
+    }
     document.revision = current_revision.max(document.revision).saturating_add(1);
     canvas.document = document.clone();
     canvas.latest_simulation = None;
@@ -309,8 +313,7 @@ pub fn apply_promote(
         .clone()
         .promoted(PolicyGraphMode::Enforced, request.revision)
         .map_err(|report| validation_error(&report))?;
-    canvas.document = document.clone();
-    canvas.touch();
+    canvas.mark_live(document.clone());
     Ok(PolicyPipelinePromoteResponse {
         document,
         trace_id: new_trace_id(),
@@ -370,9 +373,7 @@ pub fn apply_diff_against_live(
             .document
             .clone()
     };
-    let live_document = ws
-        .active_enforced_canvas()
-        .map(|canvas| canvas.document.clone());
+    let live_document = ws.active_live_document().cloned();
     let has_live_policy = live_document.is_some();
     let diffs: Vec<_> = ws
         .scenarios
@@ -413,9 +414,13 @@ pub fn audit_summary(
 ) -> Result<PolicyPipelineAuditSummary, CliError> {
     let canvas = active_canvas_for_request(ws, expected_canvas_id)?;
     let latest_simulation = canvas.latest_simulation.clone();
+    let live_document = ws.active_live_document();
+    let active_revision =
+        live_document.map_or(canvas.document.revision, |document| document.revision);
+    let mode = live_document.map_or(canvas.document.mode, |document| document.mode);
     Ok(PolicyPipelineAuditSummary {
-        active_revision: canvas.document.revision,
-        mode: canvas.document.mode,
+        active_revision,
+        mode,
         global_policy_enforcement_enabled: ws.global_policy_enforcement_enabled,
         latest_trace_id: latest_simulation
             .as_ref()

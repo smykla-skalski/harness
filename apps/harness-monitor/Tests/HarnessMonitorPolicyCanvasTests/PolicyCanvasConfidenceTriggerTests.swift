@@ -38,4 +38,27 @@ struct PolicyCanvasConfidenceTriggerTests {
     viewModel.cancelConfidenceEvaluation()
     #expect(viewModel.confidenceTask == nil)
   }
+
+  @Test("Confidence auto-run evaluates without cancelling autosave")
+  func confidenceAutoRunEvaluatesWithoutCancellingAutosave() throws {
+    let supportSource = try previewablePolicyCanvasSourceFile(named: "PolicyCanvasView+Support.swift")
+    let actionsSource = try previewablePolicyCanvasSourceFile(named: "PolicyCanvasView+Actions.swift")
+
+    #expect(supportSource.contains("evaluateConfidence()"))
+    #expect(!supportSource.contains("simulate()"))
+    #expect(actionsSource.contains("func simulate() {\n    runSimulation(cancelPendingAutosave: true)"))
+    #expect(
+      actionsSource.contains("func evaluateConfidence() {\n    runSimulation(cancelPendingAutosave: false)")
+    )
+    #expect(actionsSource.contains("if cancelPendingAutosave {\n      viewModel.cancelAutosave()"))
+  }
+}
+
+private func previewablePolicyCanvasSourceFile(named fileName: String) throws -> String {
+  let testsDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+  let monitorRoot = testsDir.deletingLastPathComponent().deletingLastPathComponent()
+  let url = monitorRoot
+    .appendingPathComponent("Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas")
+    .appendingPathComponent(fileName)
+  return try String(contentsOf: url, encoding: .utf8)
 }

@@ -26,6 +26,8 @@ fn policy_canvas_summary(canvas: &PolicyCanvasRecord) -> TaskBoardPolicyCanvasSu
         revision: canvas.document.revision,
         mode: canvas.document.mode,
         document: canvas.document.clone(),
+        live_document: canvas.live_document().cloned(),
+        live_updated_at: canvas.live_updated_at().map(ToString::to_string),
         node_count: canvas.document.nodes.len(),
         edge_count: canvas.document.edges.len(),
         group_count: canvas.document.groups.len(),

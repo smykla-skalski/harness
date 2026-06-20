@@ -25,6 +25,10 @@ struct PolicyCanvasGoLiveSheet: View {
   @State private var diff: TaskBoardPolicyPipelineGoLiveDiff?
   @State private var isLoadingDiff = true
 
+  private var canConfirm: Bool {
+    viewModel.canMakeLive && !isLoadingDiff && diff != nil
+  }
+
   var body: some View {
     VStack(spacing: 0) {
       header
@@ -115,7 +119,7 @@ struct PolicyCanvasGoLiveSheet: View {
       .keyboardShortcut(.defaultAction)
       .harnessActionButtonStyle(variant: .prominent, tint: PolicyCanvasVisualStyle.readyTint)
       .controlSize(.small)
-      .disabled(!viewModel.canMakeLive)
+      .disabled(!canConfirm)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasMakeLiveButton)
     }
     .padding(.horizontal, 16)

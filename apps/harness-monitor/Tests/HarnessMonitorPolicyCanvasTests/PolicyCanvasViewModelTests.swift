@@ -322,6 +322,18 @@ struct PolicyCanvasViewModelTests {
     #expect(row.draftVerdict == .deny)
   }
 
+  @Test("go-live sheet requires a loaded comparison before confirm")
+  func goLiveSheetRequiresLoadedComparisonBeforeConfirm() throws {
+    let sheetSource = try previewablePolicyCanvasSourceFile(named: "PolicyCanvasGoLiveSheet.swift")
+    let diffSource = try previewablePolicyCanvasSourceFile(named: "PolicyCanvasGoLiveDiffView.swift")
+
+    #expect(sheetSource.contains("private var canConfirm: Bool"))
+    #expect(sheetSource.contains("viewModel.canMakeLive && !isLoadingDiff && diff != nil"))
+    #expect(sheetSource.contains(".disabled(!canConfirm)"))
+    #expect(diffSource.contains("Resolve the comparison before making the draft live."))
+    #expect(!diffSource.contains("You can still make the draft live."))
+  }
+
   @Test("supervisor rule nodes map to policy overrides")
   func supervisorRuleNodesMapToPolicyOverrides() {
     let document = policyDocument(revision: 11)
@@ -592,4 +604,13 @@ struct PolicyCanvasViewModelTests {
     #expect(validation.issues[3].location == "nodes")
     #expect(validation.issues[4].action == .mergePr)
   }
+}
+
+private func previewablePolicyCanvasSourceFile(named fileName: String) throws -> String {
+  let testsDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+  let monitorRoot = testsDir.deletingLastPathComponent().deletingLastPathComponent()
+  let url = monitorRoot
+    .appendingPathComponent("Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas")
+    .appendingPathComponent(fileName)
+  return try String(contentsOf: url, encoding: .utf8)
 }

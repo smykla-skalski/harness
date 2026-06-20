@@ -28,6 +28,13 @@ impl PolicyCanvasDraftSaveResult {
     pub(crate) fn saved_active_canvas(&self) -> bool {
         self.saved_canvas.id == self.active_canvas_id
     }
+
+    #[must_use]
+    pub(crate) fn gate_document(&self) -> Option<PolicyGraph> {
+        (self.global_policy_enforcement_enabled && self.saved_active_canvas())
+            .then(|| self.saved_canvas.live_document().cloned())
+            .flatten()
+    }
 }
 
 impl AsyncDaemonDb {

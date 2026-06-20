@@ -10,6 +10,8 @@ public struct TaskBoardPolicyCanvasSummaryWire: Codable, Equatable, Sendable {
   public var revision: UInt64
   public var mode: PolicyGraphMode
   public var document: TaskBoardPolicyPipelineDocument
+  public var liveDocument: TaskBoardPolicyPipelineDocument?
+  public var liveUpdatedAt: String?
   public var nodeCount: UInt
   public var edgeCount: UInt
   public var groupCount: UInt
@@ -18,12 +20,14 @@ public struct TaskBoardPolicyCanvasSummaryWire: Codable, Equatable, Sendable {
   public var latestSimulationAt: String?
   public var updatedAt: String
 
-  public init(canvasId: String, title: String, revision: UInt64, mode: PolicyGraphMode, document: TaskBoardPolicyPipelineDocument, nodeCount: UInt, edgeCount: UInt, groupCount: UInt, latestSimulationTraceId: String? = nil, latestSimulationSucceeded: Bool? = nil, latestSimulationAt: String? = nil, updatedAt: String) {
+  public init(canvasId: String, title: String, revision: UInt64, mode: PolicyGraphMode, document: TaskBoardPolicyPipelineDocument, liveDocument: TaskBoardPolicyPipelineDocument? = nil, liveUpdatedAt: String? = nil, nodeCount: UInt, edgeCount: UInt, groupCount: UInt, latestSimulationTraceId: String? = nil, latestSimulationSucceeded: Bool? = nil, latestSimulationAt: String? = nil, updatedAt: String) {
     self.canvasId = canvasId
     self.title = title
     self.revision = revision
     self.mode = mode
     self.document = document
+    self.liveDocument = liveDocument
+    self.liveUpdatedAt = liveUpdatedAt
     self.nodeCount = nodeCount
     self.edgeCount = edgeCount
     self.groupCount = groupCount
@@ -39,6 +43,8 @@ public struct TaskBoardPolicyCanvasSummaryWire: Codable, Equatable, Sendable {
     case revision
     case mode
     case document
+    case liveDocument = "live_document"
+    case liveUpdatedAt = "live_updated_at"
     case nodeCount = "node_count"
     case edgeCount = "edge_count"
     case groupCount = "group_count"

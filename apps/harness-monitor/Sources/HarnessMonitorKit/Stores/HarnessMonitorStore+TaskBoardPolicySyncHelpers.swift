@@ -16,13 +16,15 @@ extension HarnessMonitorStore {
       await registry.applyOverrides(await loadPolicyOverrides())
       return
     }
-    let enforcedCanvases = workspace.canvases.filter { $0.mode == .enforced }
-    guard !enforcedCanvases.isEmpty else {
+    let liveDocuments = workspace.canvases.compactMap { canvas in
+      canvas.liveDocument ?? (canvas.mode == .enforced ? canvas.document : nil)
+    }
+    guard !liveDocuments.isEmpty else {
       await registry.applyOverrides(await loadPolicyOverrides())
       return
     }
     await registry.applyOverrides(
-      enforcedCanvases.compactMap(\.document).flatMap { $0.supervisorPolicyOverrides() }
+      liveDocuments.flatMap { $0.supervisorPolicyOverrides() }
     )
   }
 
@@ -92,7 +94,7 @@ extension HarnessMonitorStore {
       )
     }
     let missingEnforcedCanvasIDs: [String] = hydratedWorkspace.canvases.compactMap { canvas in
-      guard canvas.mode == .enforced, canvas.document == nil else {
+      guard canvas.mode == .enforced, canvas.document == nil, canvas.liveDocument == nil else {
         return nil
       }
       return canvas.canvasId
@@ -134,6 +136,10 @@ extension HarnessMonitorStore {
       return
     }
     workspace.canvases[index].document = document
+    if document.mode == .enforced {
+      workspace.canvases[index].liveDocument = document
+      workspace.canvases[index].liveUpdatedAt = workspace.canvases[index].updatedAt
+    }
     workspace.canvases[index].revision = document.revision
     workspace.canvases[index].mode = document.mode
     workspace.canvases[index].nodeCount = document.nodes.count

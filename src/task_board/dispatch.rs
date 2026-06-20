@@ -10,7 +10,9 @@ use super::planning::{PlanApprovalBlockReason, PlanApprovalGate, approval_gate};
 use super::policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyGate, PolicyInput, PolicySubject,
 };
-use super::policy_graph::{GraphPolicyGate, PolicyPipelineMode, resolve_gate_policy};
+use super::policy_graph::{
+    PolicyPipelineMode, RecordedPolicyDecision, record_policy_decision, resolve_gate_policy,
+};
 use super::store::TaskBoardStore;
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
@@ -308,7 +310,19 @@ fn dispatch_policy(item: &TaskBoardItem, policy_root: &Path) -> PolicyDecision {
     if let Some(document) = resolve_gate_policy(policy_root)
         && document.mode != PolicyPipelineMode::Draft
     {
-        return GraphPolicyGate::new((**document).clone()).evaluate(&input);
+        let simulation = document.simulate(&input);
+        let decision = simulation.decision;
+        record_policy_decision(
+            RecordedPolicyDecision::new(
+                document.revision,
+                input,
+                decision.clone(),
+                simulation.visited_node_ids,
+                "task_board_dispatch",
+            )
+            .with_canvas_id(document.canvas_id.clone()),
+        );
+        return decision;
     }
     BuiltInPolicyGate::default().evaluate(&input)
 }
