@@ -48,10 +48,10 @@ pub fn default_seeded_scenarios() -> Vec<PolicyScenario> {
 /// Returns `CliError` when `name` is blank.
 pub fn apply_scenario_create(
     ws: &mut PolicyCanvasWorkspace,
-    name: String,
+    name: &str,
     input: PolicyInput,
 ) -> Result<PolicyScenario, CliError> {
-    let name = sanitize_scenario_name(&name)?;
+    let name = sanitize_scenario_name(name)?;
     let scenario = PolicyScenario {
         id: format!("scenario-{}", Uuid::new_v4().simple()),
         name,
@@ -70,10 +70,10 @@ pub fn apply_scenario_create(
 pub fn apply_scenario_update(
     ws: &mut PolicyCanvasWorkspace,
     id: &str,
-    name: String,
+    name: &str,
     input: PolicyInput,
 ) -> Result<PolicyScenario, CliError> {
-    let name = sanitize_scenario_name(&name)?;
+    let name = sanitize_scenario_name(name)?;
     let scenario = ws
         .scenarios
         .iter_mut()
@@ -157,12 +157,8 @@ mod tests {
     fn create_appends_a_user_scenario() {
         let mut ws = PolicyCanvasWorkspace::seeded();
         let baseline = ws.scenarios.len();
-        let created = apply_scenario_create(
-            &mut ws,
-            "  Hot merge  ".to_string(),
-            input(PolicyAction::MergePr),
-        )
-        .expect("create");
+        let created = apply_scenario_create(&mut ws, "  Hot merge  ", input(PolicyAction::MergePr))
+            .expect("create");
         assert_eq!(created.name, "Hot merge");
         assert!(!created.seeded);
         assert_eq!(ws.scenarios.len(), baseline + 1);
@@ -171,22 +167,16 @@ mod tests {
     #[test]
     fn create_rejects_blank_name() {
         let mut ws = PolicyCanvasWorkspace::seeded();
-        assert!(
-            apply_scenario_create(&mut ws, "   ".to_string(), input(PolicyAction::Sync)).is_err()
-        );
+        assert!(apply_scenario_create(&mut ws, "   ", input(PolicyAction::Sync)).is_err());
     }
 
     #[test]
     fn update_replaces_name_and_input_for_known_id() {
         let mut ws = PolicyCanvasWorkspace::seeded();
         let id = ws.scenarios[0].id.clone();
-        let updated = apply_scenario_update(
-            &mut ws,
-            &id,
-            "Renamed".to_string(),
-            input(PolicyAction::DestructiveFs),
-        )
-        .expect("update");
+        let updated =
+            apply_scenario_update(&mut ws, &id, "Renamed", input(PolicyAction::DestructiveFs))
+                .expect("update");
         assert_eq!(updated.name, "Renamed");
         assert_eq!(updated.input.action, PolicyAction::DestructiveFs);
     }

@@ -226,13 +226,12 @@ pub(crate) async fn create_task_board_policy_scenario(
     db: &AsyncDaemonDb,
     request: &TaskBoardPolicyScenarioCreateRequest,
 ) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
-    let name = request.name.clone();
     let input = request.input.clone();
     let (workspace, _scenario) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
             workspace.ensure_seeded_scenarios();
-            policy_graph::apply_scenario_create(workspace, name, input)
+            policy_graph::apply_scenario_create(workspace, &request.name, input)
         })
         .await?;
     bump_change_policy(db).await;
@@ -249,13 +248,12 @@ pub(crate) async fn update_task_board_policy_scenario(
     request: &TaskBoardPolicyScenarioUpdateRequest,
 ) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
     let id = request.id.clone();
-    let name = request.name.clone();
     let input = request.input.clone();
     let (workspace, _scenario) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
             workspace.ensure_seeded_scenarios();
-            policy_graph::apply_scenario_update(workspace, &id, name, input)
+            policy_graph::apply_scenario_update(workspace, &id, &request.name, input)
         })
         .await?;
     bump_change_policy(db).await;
