@@ -22,6 +22,8 @@ public protocol PolicyCanvasEditorRuntime: PolicyCanvasLabRuntime {
   func updatePolicyScenario(id: String, name: String, input: PolicyInput) async -> Bool
   func deletePolicyScenario(id: String) async -> Bool
   func resetPolicyScenarios() async -> Bool
+  func replayPolicyCanvas(canvasId: String?, limit: UInt32?) async
+    -> TaskBoardPolicyPipelineReplayResult?
 }
 
 extension HarnessMonitorStore: PolicyCanvasEditorRuntime {
@@ -83,5 +85,11 @@ extension HarnessMonitorStore: PolicyCanvasEditorRuntime {
 
   public func resetPolicyScenarios() async -> Bool {
     await resetTaskBoardPolicyScenarios()
+  }
+
+  public func replayPolicyCanvas(canvasId: String?, limit: UInt32?) async
+    -> TaskBoardPolicyPipelineReplayResult?
+  {
+    await replayTaskBoardPolicyPipeline(canvasId: canvasId, limit: limit)
   }
 }

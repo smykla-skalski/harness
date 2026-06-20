@@ -56,6 +56,11 @@ public final class PolicyCanvasViewModel {
   /// Updated timestamp for the active live canvas, parsed once when a workspace
   /// snapshot arrives so the badge does not parse dates in its body.
   var livePublishedAt: Date?
+  /// Most recent replay result: the active draft re-run over the recorded
+  /// real-decision feed. Written only by the replay action and cleared on the
+  /// next edit (a draft change makes a loaded replay stale), so the panel shows
+  /// a load prompt until the user replays the current draft.
+  var latestReplay: TaskBoardPolicyPipelineReplayResult?
   public internal(set) var documentDirty: Bool
   var viewportDirty: Bool
   var hasRequestedInitialRemoteLoad: Bool
@@ -201,6 +206,7 @@ public final class PolicyCanvasViewModel {
   var isSavingDraft: Bool
   var isSimulating: Bool
   var isMakingLive: Bool
+  var isReplaying: Bool
 
   /// User-facing save progress cue the bottom-right status pill reads (see
   /// `PolicyCanvasSaveActivity`). Distinct from `lastAutosaveOutcome`, which
@@ -310,6 +316,7 @@ public final class PolicyCanvasViewModel {
     self.latestAudit = nil
     self.globalPolicyEnforcementEnabled = true
     self.livePublishedAt = nil
+    self.latestReplay = nil
     self.documentDirty = false
     self.viewportDirty = false
     self.hasRequestedInitialRemoteLoad = false
@@ -331,6 +338,7 @@ public final class PolicyCanvasViewModel {
     self.isSavingDraft = false
     self.isSimulating = false
     self.isMakingLive = false
+    self.isReplaying = false
     self.saveActivity = .idle
     self.autosaveSuppressed = false
     self.lastAutosaveOutcome = .idle
@@ -396,6 +404,9 @@ public final class PolicyCanvasViewModel {
     let wasClean = !documentDirty
     documentGeneration = documentGeneration &+ 1
     documentDirty = true
+    if latestReplay != nil {
+      latestReplay = nil
+    }
     if wasClean {
       autosaveTrigger?()
       confidenceTrigger?()

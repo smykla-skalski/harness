@@ -15,6 +15,7 @@ struct PolicyCanvasConfidencePanel: View {
   let editScenario: @MainActor (String) -> Void
   let deleteScenario: @MainActor (String) -> Void
   let resetScenarios: @MainActor () -> Void
+  let loadReplay: @MainActor () -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -32,6 +33,13 @@ struct PolicyCanvasConfidencePanel: View {
         editScenario: editScenario,
         deleteScenario: deleteScenario,
         resetScenarios: resetScenarios
+      )
+      PolicyCanvasReplayInspector(
+        rows: viewModel.replayRows,
+        summary: viewModel.replaySummary,
+        isLoading: viewModel.isReplaying,
+        focusDecision: focusDecision,
+        loadReplay: loadReplay
       )
     }
     .accessibilityElement(children: .contain)

@@ -43,6 +43,8 @@ extension HarnessMonitorAccessibility {
   public static let policyCanvasScenarioResetButton = "harness.policy-canvas.scenarios.reset"
   public static let policyCanvasScenarioAddButton = "harness.policy-canvas.scenarios.add"
   public static let policyCanvasScenarioEditorSheet = "harness.policy-canvas.scenarios.editor"
+  public static let policyCanvasReplayInspector = "harness.policy-canvas.replay"
+  public static let policyCanvasReplayLoadButton = "harness.policy-canvas.replay.load"
   public static let policyCanvasEmptyState = "harness.policy-canvas.empty-state"
   public static let policyCanvasSearchPalette = "harness.policy-canvas.search.palette"
   public static let policyCanvasSearchField = "harness.policy-canvas.search.field"

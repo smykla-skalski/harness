@@ -67,6 +67,9 @@ extension PolicyCanvasView {
             },
             resetScenarios: {
               resetScenarios()
+            },
+            loadReplay: {
+              loadReplay()
             }
           )
 
