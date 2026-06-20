@@ -29,6 +29,14 @@ FROM policy_decisions
 ORDER BY recorded_at DESC, id DESC
 LIMIT ?1";
 
+const PRUNE_POLICY_DECISIONS_SQL: &str = "
+DELETE FROM policy_decisions
+WHERE id NOT IN (
+    SELECT id FROM policy_decisions
+    ORDER BY recorded_at DESC, id DESC
+    LIMIT ?1
+)";
+
 impl AsyncDaemonDb {
     /// Persist one recorded enforced decision.
     ///
@@ -91,6 +99,23 @@ impl AsyncDaemonDb {
         rows.into_iter()
             .map(PolicyDecisionRow::into_record)
             .collect()
+    }
+
+    /// Delete recorded decisions beyond the newest `keep`, bounding table growth.
+    ///
+    /// The feed is a rolling window for replay, so only the most recent `keep`
+    /// rows by recorded time are retained. Returns the number of rows removed.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failure.
+    pub(crate) async fn prune_policy_decisions(&self, keep: usize) -> Result<u64, CliError> {
+        let keep = i64::try_from(keep).unwrap_or(i64::MAX);
+        let result = query(PRUNE_POLICY_DECISIONS_SQL)
+            .bind(keep)
+            .execute(self.pool())
+            .await
+            .map_err(|error| db_error(format!("prune policy decisions: {error}")))?;
+        Ok(result.rows_affected())
     }
 }
 
@@ -336,5 +361,49 @@ mod tests {
 
         let limited = db.recent_policy_decisions(2).await.expect("read limited");
         assert_eq!(limited.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn prune_keeps_only_the_newest_rows() {
+        let (_dir, db) = connect().await;
+        for second in 0..5 {
+            let mut record = sample_record(second);
+            record.id = format!("policy-decision-{second}");
+            record.recorded_at = format!("2026-06-20T10:00:0{second}Z");
+            db.record_policy_decision_row(&record).await.expect("record");
+        }
+
+        let removed = db.prune_policy_decisions(2).await.expect("prune");
+        assert_eq!(removed, 3);
+
+        let remaining = db.recent_policy_decisions(10).await.expect("read remaining");
+        let mut survivors: Vec<String> = remaining
+            .iter()
+            .map(|record| record.recorded_at.clone())
+            .collect();
+        survivors.sort();
+        assert_eq!(
+            survivors,
+            vec![
+                "2026-06-20T10:00:03Z".to_owned(),
+                "2026-06-20T10:00:04Z".to_owned(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn prune_with_a_high_keep_removes_nothing() {
+        let (_dir, db) = connect().await;
+        for revision in 0..3 {
+            db.record_policy_decision_row(&sample_record(revision))
+                .await
+                .expect("record");
+        }
+        let removed = db.prune_policy_decisions(100).await.expect("prune");
+        assert_eq!(removed, 0);
+        assert_eq!(
+            db.recent_policy_decisions(10).await.expect("read").len(),
+            3
+        );
     }
 }
