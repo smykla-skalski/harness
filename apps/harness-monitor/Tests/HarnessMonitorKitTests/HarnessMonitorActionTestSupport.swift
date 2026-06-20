@@ -217,6 +217,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case saveTaskBoardPolicyPipelineDraft(revision: UInt64)
     case simulateTaskBoardPolicyPipeline
     case promoteTaskBoardPolicyPipeline(revision: UInt64)
+    case makeLiveTaskBoardPolicyPipeline(revision: UInt64)
     case updateTaskQueuePolicy(
       sessionID: String,
       taskID: String,

@@ -272,6 +272,49 @@ extension RecordingHarnessClient {
     )
   }
 
+  func makeLiveTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineMakeLiveRequest
+  ) async throws -> TaskBoardPolicyPipelineMakeLiveResponse {
+    let resolvedCanvasID = lock.withLock {
+      let workspace = ensureTaskBoardPolicyWorkspaceStateLocked()
+      let canvasID = request.canvasId ?? workspace.activeCanvasId
+      promotedTaskBoardPolicyCanvasIDs.append(canvasID)
+      return canvasID
+    }
+    calls.append(
+      .makeLiveTaskBoardPolicyPipeline(revision: request.revision)
+    )
+    return lock.withLock {
+      var document =
+        taskBoardPolicyPipelinesByCanvasID[resolvedCanvasID]
+        ?? sampleTaskBoardPolicyPipeline(canvasId: resolvedCanvasID, title: resolvedCanvasID)
+      document.mode = .enforced
+      document.revision = request.revision
+      taskBoardPolicyPipelinesByCanvasID[resolvedCanvasID] = document
+      updateTaskBoardPolicyCanvasSummaryLocked(
+        canvasId: resolvedCanvasID,
+        title: nil,
+        document: document,
+        latestSimulation: taskBoardPolicyAuditByCanvasID[resolvedCanvasID]?.latestSimulation
+      )
+      var workspace = ensureTaskBoardPolicyWorkspaceStateLocked()
+      workspace.globalPolicyEnforcementEnabled = true
+      taskBoardPolicyCanvasWorkspaceStorage = workspace
+      return TaskBoardPolicyPipelineMakeLiveResponse(
+        document: document,
+        traceId: "trace-policy-make-live",
+        globalPolicyEnforcementEnabled: true,
+        workspace: workspace
+      )
+    }
+  }
+
+  func goLiveDiffTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineGoLiveDiffRequest
+  ) async throws -> TaskBoardPolicyPipelineGoLiveDiff {
+    TaskBoardPolicyPipelineGoLiveDiff(hasLivePolicy: false, changedCount: 0, diffs: [])
+  }
+
   func taskBoardPolicyPipelineAudit(
     canvasId: String? = nil
   ) async throws -> TaskBoardPolicyPipelineAuditSummary {

@@ -255,9 +255,14 @@ struct PolicyCanvasViewModelTests {
     #expect(edge?.label == "approved policy")
   }
 
-  @Test("promote requires saved exact simulation")
-  func promoteRequiresSavedExactSimulation() {
+  @Test("make-live blocks until a draft is saved")
+  func makeLiveBlocksUntilDraftSaved() {
     let viewModel = PolicyCanvasViewModel.sample()
+    // No backing document yet: make-live is gated on the save precondition, not
+    // the old promote bookkeeping.
+    #expect(!viewModel.canMakeLive)
+    #expect(viewModel.makeLiveDisabledReason == "Save a draft before making it live")
+
     let document = policyDocument(revision: 11)
     let simulation = TaskBoardPolicyPipelineSimulationResult(
       revision: 11,
@@ -268,11 +273,47 @@ struct PolicyCanvasViewModelTests {
     )
 
     viewModel.load(document: document, simulation: simulation, audit: nil)
-    #expect(viewModel.canPromote)
+    // A saved, valid draft is allowed straight away - unlike promote, autosave
+    // means local edits no longer block, and the daemon re-simulates on make-live.
+    #expect(viewModel.canMakeLive)
+    #expect(viewModel.makeLiveDisabledReason == nil)
+  }
 
-    viewModel.createNode(kind: .condition, at: CGPoint(x: 100, y: 100))
-    #expect(!viewModel.canPromote)
-    #expect(viewModel.promoteDisabledReason == "Save draft changes first")
+  @Test("go-live diff row maps live and draft verdicts")
+  func goLiveDiffRowMapsVerdicts() {
+    let entry = PolicyPipelineGoLiveDiffEntry(
+      scenarioId: "scenario-merge",
+      scenarioName: "Merge - checks green",
+      action: .mergePr,
+      liveDecision: .allow(reasonCode: .autoMergeAllowed, policyVersion: "v1"),
+      draftDecision: .requireHuman(reasonCode: .humanRequired, policyVersion: "v2"),
+      changed: true
+    )
+
+    let row = PolicyCanvasGoLiveDiffRowModel(entry: entry)
+
+    #expect(row.id == "scenario-merge.merge_pr")
+    #expect(row.actionTitle == "merge pr")
+    #expect(row.scenarioName == "Merge - checks green")
+    #expect(row.liveVerdict == .allow)
+    #expect(row.draftVerdict == .needsHuman)
+  }
+
+  @Test("go-live diff row marks a decision with no live counterpart as new")
+  func goLiveDiffRowMarksNewDecision() {
+    let entry = PolicyPipelineGoLiveDiffEntry(
+      scenarioId: "scenario-secret",
+      scenarioName: "Access secret",
+      action: .accessSecret,
+      liveDecision: nil,
+      draftDecision: .deny(reasonCode: .checksNotGreen, policyVersion: "v2"),
+      changed: true
+    )
+
+    let row = PolicyCanvasGoLiveDiffRowModel(entry: entry)
+
+    #expect(row.liveVerdict == nil)
+    #expect(row.draftVerdict == .deny)
   }
 
   @Test("supervisor rule nodes map to policy overrides")
