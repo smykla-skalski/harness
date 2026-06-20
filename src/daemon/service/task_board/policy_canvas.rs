@@ -3,18 +3,16 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
-    TaskBoardPolicyCanvasWorkspaceResponse, TaskBoardPolicyExportRequest,
-    TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest, TaskBoardPolicyImportResponse,
-    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineAuditResponse,
-    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelineGoLiveDiffRequest,
-    TaskBoardPolicyPipelineGoLiveDiffResponse, TaskBoardPolicyPipelineMakeLiveRequest,
-    TaskBoardPolicyPipelineMakeLiveResponse, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineReplayRequest,
-    TaskBoardPolicyPipelineReplayResponse, TaskBoardPolicyPipelineResponse,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
-    TaskBoardPolicyScenarioCreateRequest, TaskBoardPolicyScenarioDeleteRequest,
-    TaskBoardPolicyScenarioUpdateRequest,
+    TaskBoardPolicyCanvasWorkspaceResponse, TaskBoardPolicyPipelineAuditRequest,
+    TaskBoardPolicyPipelineAuditResponse, TaskBoardPolicyPipelineGetRequest,
+    TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineGoLiveDiffResponse,
+    TaskBoardPolicyPipelineMakeLiveRequest, TaskBoardPolicyPipelineMakeLiveResponse,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
+    TaskBoardPolicyPipelineReplayRequest, TaskBoardPolicyPipelineReplayResponse,
+    TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
+    TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardPolicyPipelineSimulationResponse, TaskBoardPolicyScenarioCreateRequest,
+    TaskBoardPolicyScenarioDeleteRequest, TaskBoardPolicyScenarioUpdateRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::default_board_root;
@@ -36,7 +34,9 @@ const MAX_REPLAY_LIMIT: u32 = 500;
 ///
 /// # Errors
 /// Returns `CliError` when the database read or seed write fails.
-async fn load_or_seed_workspace(db: &AsyncDaemonDb) -> Result<PolicyCanvasWorkspace, CliError> {
+pub(super) async fn load_or_seed_workspace(
+    db: &AsyncDaemonDb,
+) -> Result<PolicyCanvasWorkspace, CliError> {
     if let Some(mut workspace) = db.load_policy_workspace().await? {
         let repaired_canvases = workspace.ensure_seeded_automation_canvases();
         let seeded_scenarios = workspace.ensure_seeded_scenarios();
@@ -54,7 +54,7 @@ async fn load_or_seed_workspace(db: &AsyncDaemonDb) -> Result<PolicyCanvasWorksp
 
 /// Refresh the synchronous gating cache with the active enforced canvas
 /// document so the allow/deny hot path never re-reads the database.
-fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
+pub(super) fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
     policy_graph::store_gate_policy_entry(
         &default_board_root(),
         workspace.active_live_canvas().map(|(canvas, document)| {
@@ -68,7 +68,7 @@ fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
     clippy::cognitive_complexity,
     reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
 )]
-async fn bump_change_policy(db: &AsyncDaemonDb) {
+pub(super) async fn bump_change_policy(db: &AsyncDaemonDb) {
     if let Err(error) = db.bump_change(POLICY_PIPELINE_CHANGE_CHANNEL).await {
         tracing::warn!(%error, "failed to bump policy_pipeline change marker");
     }
@@ -428,8 +428,9 @@ pub(crate) async fn go_live_diff_task_board_policy_pipeline(
 
 /// Replay the active draft against the recorded real-decision feed.
 ///
-/// Read-only: loads the workspace and the most recent recorded decisions, then
-/// re-simulates the draft against each without mutating any durable state.
+/// Read-only: loads the workspace and the most recent decisions recorded for
+/// the canvas under review, then re-simulates the draft against each without
+/// mutating any durable state.
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be loaded, the recorded
@@ -443,7 +444,13 @@ pub(crate) async fn replay_task_board_policy_pipeline(
         .limit
         .unwrap_or(DEFAULT_REPLAY_LIMIT)
         .clamp(1, MAX_REPLAY_LIMIT) as usize;
-    let recorded = db.recent_policy_decisions(limit).await?;
+    let target_canvas_id = request
+        .canvas_id
+        .as_deref()
+        .unwrap_or(workspace.active_canvas_id.as_str());
+    let recorded = db
+        .recent_policy_decisions_for_canvas(target_canvas_id, limit)
+        .await?;
     policy_graph::replay::apply_replay(&workspace, &recorded, request.canvas_id.as_deref())
 }
 
@@ -457,60 +464,4 @@ pub(crate) async fn audit_task_board_policy_pipeline(
 ) -> Result<TaskBoardPolicyPipelineAuditResponse, CliError> {
     let workspace = load_or_seed_workspace(db).await?;
     policy_graph::audit_summary(&workspace, request.canvas_id.as_deref())
-}
-
-/// Serialize the active (or named) canvas document so the caller can save it
-/// to disk as a JSON file.
-///
-/// # Errors
-/// Returns `CliError` when durable policy state cannot be loaded or when the
-/// requested canvas does not exist.
-pub(crate) async fn export_task_board_policy(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardPolicyExportRequest,
-) -> Result<TaskBoardPolicyExportResponse, CliError> {
-    use crate::errors::CliErrorKind;
-    let workspace = load_or_seed_workspace(db).await?;
-    let canvas = if let Some(canvas_id) = request.canvas_id.as_deref() {
-        workspace.canvas(canvas_id).ok_or_else(|| {
-            CliError::from(CliErrorKind::invalid_transition(format!(
-                "unknown policy canvas '{canvas_id}'"
-            )))
-        })?
-    } else {
-        workspace.active_canvas().ok_or_else(|| {
-            CliError::from(CliErrorKind::invalid_transition(
-                "no active policy canvas".to_string(),
-            ))
-        })?
-    };
-    Ok(TaskBoardPolicyExportResponse {
-        canvas_id: canvas.id.clone(),
-        title: canvas.title.clone(),
-        document: canvas.document.clone(),
-    })
-}
-
-/// Import a policy graph document from an external JSON file, validate it, and
-/// create a new canvas from it. The new canvas becomes active.
-///
-/// # Errors
-/// Returns `CliError` when the document fails validation or the database
-/// cannot be written.
-pub(crate) async fn import_task_board_policy(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardPolicyImportRequest,
-) -> Result<TaskBoardPolicyImportResponse, CliError> {
-    let document = request.document.clone();
-    let title = request.title.clone();
-    let (workspace, _new_canvas) = db
-        .update_policy_workspace(|workspace| {
-            workspace.ensure_seeded_automation_canvases();
-            workspace.ensure_seeded_scenarios();
-            policy_graph::apply_import(workspace, document, title)
-        })
-        .await?;
-    feed_gate_cache(&workspace);
-    bump_change_policy(db).await;
-    Ok(policy_canvas_workspace_response(&workspace))
 }

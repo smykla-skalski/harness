@@ -21,13 +21,14 @@ INSERT INTO policy_decisions (
     source, enforced
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)";
 
-const SELECT_RECENT_POLICY_DECISIONS_SQL: &str = "
+const SELECT_RECENT_POLICY_DECISIONS_FOR_CANVAS_SQL: &str = "
 SELECT id, recorded_at, canvas_id, revision, action, decision_tag, reason_code,
     policy_version, workflow, subject_json, evidence_json, visited_node_ids_json,
     source, enforced
 FROM policy_decisions
+WHERE canvas_id = ?1 OR canvas_id IS NULL
 ORDER BY recorded_at DESC, id DESC
-LIMIT ?1";
+LIMIT ?2";
 
 const PRUNE_POLICY_DECISIONS_SQL: &str = "
 DELETE FROM policy_decisions
@@ -77,7 +78,11 @@ impl AsyncDaemonDb {
         Ok(())
     }
 
-    /// Read the most recent recorded enforced decisions, newest first.
+    /// Read the most recent recorded decisions for one canvas, newest first.
+    ///
+    /// Scopes the feed to rows the given canvas produced, plus legacy rows with
+    /// no recorded provenance, so replay compares a draft against its own
+    /// canvas's history rather than decisions another canvas governed.
     ///
     /// Reconstructs each [`RecordedPolicyDecision`] from its columnar row so the
     /// replay feature can re-simulate the current draft against real historical
@@ -86,12 +91,14 @@ impl AsyncDaemonDb {
     /// # Errors
     /// Returns [`CliError`] on SQL failure or when a stored payload cannot be
     /// decoded back into its domain type.
-    pub(crate) async fn recent_policy_decisions(
+    pub(crate) async fn recent_policy_decisions_for_canvas(
         &self,
+        canvas_id: &str,
         limit: usize,
     ) -> Result<Vec<RecordedPolicyDecision>, CliError> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX);
-        let rows: Vec<PolicyDecisionRow> = query_as(SELECT_RECENT_POLICY_DECISIONS_SQL)
+        let rows: Vec<PolicyDecisionRow> = query_as(SELECT_RECENT_POLICY_DECISIONS_FOR_CANVAS_SQL)
+            .bind(canvas_id)
             .bind(limit)
             .fetch_all(self.pool())
             .await
@@ -343,8 +350,40 @@ mod tests {
         db.record_policy_decision_row(&record)
             .await
             .expect("record");
-        let read = db.recent_policy_decisions(1).await.expect("read");
+        let read = db
+            .recent_policy_decisions_for_canvas("canvas-xyz", 1)
+            .await
+            .expect("read");
         assert_eq!(read[0].canvas_id.as_deref(), Some("canvas-xyz"));
+    }
+
+    #[tokio::test]
+    async fn reader_scopes_to_canvas_and_keeps_legacy_null() {
+        let (_dir, db) = connect().await;
+        let mut from_a = sample_record(1);
+        from_a.id = "decision-a".to_owned();
+        from_a.canvas_id = Some("canvas-a".to_owned());
+        let mut from_b = sample_record(2);
+        from_b.id = "decision-b".to_owned();
+        from_b.canvas_id = Some("canvas-b".to_owned());
+        let mut legacy = sample_record(3);
+        legacy.id = "decision-legacy".to_owned();
+        legacy.canvas_id = None;
+        for record in [&from_a, &from_b, &legacy] {
+            db.record_policy_decision_row(record).await.expect("record");
+        }
+
+        let scoped = db
+            .recent_policy_decisions_for_canvas("canvas-a", 10)
+            .await
+            .expect("scoped read");
+        let mut ids: Vec<&str> = scoped.iter().map(|record| record.id.as_str()).collect();
+        ids.sort_unstable();
+        assert_eq!(
+            ids,
+            vec!["decision-a", "decision-legacy"],
+            "replay feed must keep this canvas and legacy rows, exclude other canvases"
+        );
     }
 
     #[tokio::test]
@@ -356,7 +395,10 @@ mod tests {
                 .expect("record");
         }
 
-        let all = db.recent_policy_decisions(10).await.expect("read all");
+        let all = db
+            .recent_policy_decisions_for_canvas("canvas-test", 10)
+            .await
+            .expect("read all");
         assert_eq!(all.len(), 3);
 
         let original = sample_record(0);
@@ -370,7 +412,10 @@ mod tests {
         assert_eq!(decoded.source, "reviews_github");
         assert!(decoded.enforced);
 
-        let limited = db.recent_policy_decisions(2).await.expect("read limited");
+        let limited = db
+            .recent_policy_decisions_for_canvas("canvas-test", 2)
+            .await
+            .expect("read limited");
         assert_eq!(limited.len(), 2);
     }
 
@@ -390,7 +435,7 @@ mod tests {
         assert_eq!(removed, 3);
 
         let remaining = db
-            .recent_policy_decisions(10)
+            .recent_policy_decisions_for_canvas("canvas-test", 10)
             .await
             .expect("read remaining");
         let mut survivors: Vec<String> = remaining
@@ -417,6 +462,12 @@ mod tests {
         }
         let removed = db.prune_policy_decisions(100).await.expect("prune");
         assert_eq!(removed, 0);
-        assert_eq!(db.recent_policy_decisions(10).await.expect("read").len(), 3);
+        assert_eq!(
+            db.recent_policy_decisions_for_canvas("canvas-test", 10)
+                .await
+                .expect("read")
+                .len(),
+            3
+        );
     }
 }

@@ -32,6 +32,7 @@ use super::task_board_runtime::external_sync_config_for_repository;
 
 mod dispatch;
 mod policy_canvas;
+mod policy_canvas_io;
 mod policy_canvas_response;
 mod sync;
 
@@ -39,14 +40,15 @@ pub(crate) use policy_canvas::{
     audit_task_board_policy_pipeline, create_task_board_policy_canvas,
     create_task_board_policy_scenario, delete_task_board_policy_canvas,
     delete_task_board_policy_scenario, duplicate_task_board_policy_canvas,
-    export_task_board_policy, go_live_diff_task_board_policy_pipeline, import_task_board_policy,
-    make_live_task_board_policy_pipeline, promote_task_board_policy_pipeline,
-    rename_task_board_policy_canvas, replay_task_board_policy_pipeline,
-    reset_task_board_policy_scenarios, save_task_board_policy_pipeline_draft,
-    set_active_task_board_policy_canvas, set_task_board_policy_canvas_global_enforcement,
-    simulate_task_board_policy_pipeline, task_board_policy_canvas_workspace,
-    task_board_policy_pipeline, update_task_board_policy_scenario,
+    go_live_diff_task_board_policy_pipeline, make_live_task_board_policy_pipeline,
+    promote_task_board_policy_pipeline, rename_task_board_policy_canvas,
+    replay_task_board_policy_pipeline, reset_task_board_policy_scenarios,
+    save_task_board_policy_pipeline_draft, set_active_task_board_policy_canvas,
+    set_task_board_policy_canvas_global_enforcement, simulate_task_board_policy_pipeline,
+    task_board_policy_canvas_workspace, task_board_policy_pipeline,
+    update_task_board_policy_scenario,
 };
+pub(crate) use policy_canvas_io::{export_task_board_policy, import_task_board_policy};
 
 /// Create a persisted task-board item.
 ///

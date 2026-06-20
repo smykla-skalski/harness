@@ -22,8 +22,9 @@ use crate::task_board::{PolicyDecision, PolicyInput};
 ///
 /// `revision` is the enforced document revision at decision time; `enforced`
 /// records whether the decision blocked a real mutation (anything other than
-/// allow). `canvas_id` stays `None` in the first cut because the gate cache
-/// holds a bare `PolicyGraph` with no canvas identity.
+/// allow). `canvas_id` records the originating canvas, set by the recording
+/// seam from the gate cache so replay can scope the feed to one canvas's own
+/// history; it is `None` only for legacy rows recorded before provenance existed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecordedPolicyDecision {
     pub id: String,

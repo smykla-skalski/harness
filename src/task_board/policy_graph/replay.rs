@@ -1,7 +1,8 @@
 //! Replay the current draft policy against the recorded real-decision feed.
 //!
 //! Phase 1 captures every enforced evaluation into `policy_decisions`. Replay
-//! reads the last N of those real inputs, re-simulates the current draft in
+//! reads the last N real inputs recorded for the canvas under review (plus
+//! legacy rows with no recorded provenance), re-simulates the current draft in
 //! dry-run mode against each, and reports where the draft would now decide
 //! differently than history actually did. This answers "if I make this draft
 //! live, what changes for the traffic I have already seen?".
