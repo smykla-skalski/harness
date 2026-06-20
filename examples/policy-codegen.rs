@@ -1333,14 +1333,20 @@ const SKIP_TYPES: &[&str] = &[
     // structs reference the hand ReviewPoint) until session_requests also adopts it.
     "ReviewPoint",
     // policy_graph/store.rs serde types OUTSIDE the simulate/audit cluster: the
-    // save/promote responses already decode via the plain policy-wire decoder and
-    // GraphPolicyGate is daemon-internal. Adding store.rs as a policy-module source
-    // for the cluster wire types must not also emit these (bare names that would
-    // clash / produce dead types).
+    // save/promote/make-live responses already decode via the plain policy-wire
+    // decoder and GraphPolicyGate is daemon-internal. Adding store.rs as a
+    // policy-module source for the cluster wire types must not also emit these
+    // (bare names that would clash / produce dead types). The make-live request
+    // and response are hand-authored in HarnessMonitorTaskBoardPolicyPipelineModels
+    // because the app response also carries the post-promotion workspace snapshot
+    // the store.rs type does not model, and types `document` as the hand
+    // TaskBoardPolicyPipelineDocument rather than the bare generated PolicyGraph.
     "GraphPolicyGate",
     "PolicyPipelineSaveResponse",
     "PolicyPipelinePromoteRequest",
     "PolicyPipelinePromoteResponse",
+    "PolicyPipelineMakeLiveRequest",
+    "PolicyPipelineMakeLiveResponse",
 ];
 
 /// Whether a Rust type is on the generator's skip list (see `SKIP_TYPES`).

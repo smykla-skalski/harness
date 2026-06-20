@@ -1402,42 +1402,6 @@ public struct PolicyFinishNode: Codable, Equatable, Sendable {
   }
 }
 
-public struct PolicyPipelineMakeLiveRequest: Codable, Equatable, Sendable {
-  public var revision: UInt64
-  public var actor: String?
-  public var canvasId: String?
-
-  public init(revision: UInt64 = 0, actor: String? = nil, canvasId: String? = nil) {
-    self.revision = revision
-    self.actor = actor
-    self.canvasId = canvasId
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case revision
-    case actor
-    case canvasId = "canvas_id"
-  }
-}
-
-public struct PolicyPipelineMakeLiveResponse: Codable, Equatable, Sendable {
-  public var document: PolicyGraph
-  public var traceId: String
-  public var globalPolicyEnforcementEnabled: Bool
-
-  public init(document: PolicyGraph, traceId: String, globalPolicyEnforcementEnabled: Bool) {
-    self.document = document
-    self.traceId = traceId
-    self.globalPolicyEnforcementEnabled = globalPolicyEnforcementEnabled
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case document
-    case traceId = "trace_id"
-    case globalPolicyEnforcementEnabled = "global_policy_enforcement_enabled"
-  }
-}
-
 public struct PolicyPipelineGoLiveDiffEntry: Codable, Equatable, Sendable {
   public var scenarioId: String
   public var scenarioName: String
