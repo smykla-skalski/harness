@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvas
 import SwiftUI
 
 struct DashboardWindowToolbar: ToolbarContent {

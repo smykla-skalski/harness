@@ -483,6 +483,7 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertTrue(commandsSource.contains("Hide Policy Inspector"))
     XCTAssertFalse(focusSource.contains("harnessPolicyCanvasInspectorFocus"))
     XCTAssertTrue(dashboardToolbarSource.contains("PolicyCanvasInspectorToolbarButton()"))
+    XCTAssertTrue(dashboardToolbarSource.contains("import HarnessMonitorPolicyCanvas"))
     XCTAssertTrue(dashboardToolbarSource.contains("@FocusedValue(\\.harnessPolicyCanvasCommandFocus)"))
     XCTAssertTrue(dashboardToolbarSource.contains("policyCanvasInspectorButtonTitle"))
     XCTAssertTrue(dashboardToolbarSource.contains("Image(systemName: \"sidebar.trailing\")"))
