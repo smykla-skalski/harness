@@ -197,11 +197,15 @@ extension PolicyCanvasPreparedRouteInput {
       router: selectedRouter,
       algorithms: algorithms
     )
-    let finalRoutes = routesClearingCorridorsAndRestoringTerminalLeads(
+    let leadRestoredRoutes = routesClearingCorridorsAndRestoringTerminalLeads(
       routes: terminalOrderedRoutes,
       nodeIndex: nodeIndex,
       router: selectedRouter,
       algorithms: algorithms
+    )
+    let finalRoutes = routesReachingRenderedPorts(
+      routes: leadRestoredRoutes,
+      nodeIndex: nodeIndex
     )
     let portMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
       routes: finalRoutes,
@@ -266,11 +270,15 @@ extension PolicyCanvasPreparedRouteInput {
       algorithms: algorithms,
       portMarkerLayout: portMarkerLayout
     )
-    let finalRoutes = routesClearingCorridorsAndRestoringTerminalLeads(
+    let leadRestoredRoutes = routesClearingCorridorsAndRestoringTerminalLeads(
       routes: crossedPortRoutes,
       nodeIndex: nodeIndex,
       router: selectedRouter,
       algorithms: algorithms
+    )
+    let finalRoutes = routesReachingRenderedPorts(
+      routes: leadRestoredRoutes,
+      nodeIndex: nodeIndex
     )
     let finalPortMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
       routes: finalRoutes,

@@ -190,6 +190,47 @@ struct PolicyCanvasGraphQualityGateTests {
     )
   }
 
+  /// The wire must also reach its port dot on the perpendicular axis: a precomputed
+  /// route can terminate one routing channel outward from the node edge (right side
+  /// and correct along-side coordinate, but offset in x for a trailing port), so the
+  /// wire visibly ends in empty space short of the dot. The terminal-reach pass
+  /// extends each terminal inward to the node-edge anchor when that stub adds no
+  /// node-body crossing, closing the perpendicular gap the marker offset cannot
+  /// express. Checked across every precomputed stress sample.
+  @Test func renderedPortMarkersReachWiresPerpendicular() async throws {
+    var offenders: [String] = []
+    for sampleID in ["extreme-galaxy", "extreme-mesh", "extreme-lattice", "extreme"] {
+      let routed = try await routedSample(sampleID: sampleID)
+      let nodesByID = Self.nodesByID(routed.nodes)
+      let nodeSizes = PolicyCanvasLayout.nodeSizes(for: routed.nodes, edges: routed.edges)
+      for edge in routed.edges {
+        for (role, endpoint, point) in [
+          (PolicyCanvasRouteEndpointRole.source, edge.source, routed.routes[edge.id]?.points.first),
+          (PolicyCanvasRouteEndpointRole.target, edge.target, routed.routes[edge.id]?.points.last),
+        ] {
+          guard
+            let point,
+            let terminal = routed.portMarkerLayout.terminal(edgeID: edge.id, role: role),
+            let center = policyCanvasPortMarkerCenter(
+              endpoint: endpoint, terminal: terminal,
+              nodesByID: nodesByID, nodeSizes: nodeSizes)
+          else { continue }
+          let perpendicular =
+            (terminal.side == .leading || terminal.side == .trailing)
+            ? abs(point.x - center.x)
+            : abs(point.y - center.y)
+          if perpendicular > 0.5 {
+            offenders.append("\(sampleID):\(edge.id):\(role):perp=\(perpendicular)")
+          }
+        }
+      }
+    }
+    #expect(
+      offenders.isEmpty,
+      "rendered port dots should reach their wire perpendicular: \(offenders.count) - \(offenders.prefix(20))"
+    )
+  }
+
   @Test func allSamplesAvoidCrossedPorts() async throws {
     var violations: [String] = []
     for sample in PolicyCanvasLabSamples.all {

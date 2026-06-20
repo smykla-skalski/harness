@@ -59,7 +59,10 @@ enum PolicyCanvasGraphQualityBudgets {
       .labelOverlaps: 1, .labelOnBody: 5, .labelOnEdge: 20, .labelNearTurn: 12,
     ],
     "extreme-braid": [
-      .crossingsIndependent: 53, .longEdges: 15, .detours: 3, .nodeDistance: 27,
+      // crossingsIndependent repinned 53 -> 56 on 2026-06-20: the terminal-reach
+      // pass extends detached wires back to their port dot, trading 15 detached and
+      // 13 uneven ports (now both zero) for a few more honest wire crossings.
+      .crossingsIndependent: 56, .longEdges: 15, .detours: 3, .nodeDistance: 27,
       .wrongTurns: 5, .crossedPorts: 20, .labelOverlaps: 2, .labelOnBody: 8,
       .labelOnEdge: 30, .labelNearTurn: 30,
     ],
