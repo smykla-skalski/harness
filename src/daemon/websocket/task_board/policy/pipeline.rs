@@ -88,7 +88,7 @@ pub(super) async fn dispatch_task_board_policy_pipeline_promote(
     let Ok(body) = parse_params::<TaskBoardPolicyPipelinePromoteRequest>(request) else {
         return invalid_params(request);
     };
-    let db = match require_async_db(state, "policy pipeline promote") {
+    let db = match require_async_db(state, "policy pipeline make live") {
         Ok(db) => db,
         Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
     };
@@ -96,7 +96,7 @@ pub(super) async fn dispatch_task_board_policy_pipeline_promote(
     super::super::record_task_board_audit_result(
         state,
         "task_board.policy_pipeline_promote",
-        "Promote policy pipeline",
+        "Make policy pipeline live (legacy promote alias)",
         body.canvas_id.as_deref(),
         serde_json::json!({ "canvas_id": &body.canvas_id }),
         &result,

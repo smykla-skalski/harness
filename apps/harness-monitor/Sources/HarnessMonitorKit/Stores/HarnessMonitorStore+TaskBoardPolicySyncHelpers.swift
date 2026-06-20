@@ -138,7 +138,8 @@ extension HarnessMonitorStore {
     workspace.canvases[index].document = document
     if document.mode == .enforced {
       workspace.canvases[index].liveDocument = document
-      workspace.canvases[index].liveUpdatedAt = workspace.canvases[index].updatedAt
+      workspace.canvases[index].liveUpdatedAt =
+        workspace.canvases[index].liveUpdatedAt ?? workspace.canvases[index].updatedAt
     }
     workspace.canvases[index].revision = document.revision
     workspace.canvases[index].mode = document.mode

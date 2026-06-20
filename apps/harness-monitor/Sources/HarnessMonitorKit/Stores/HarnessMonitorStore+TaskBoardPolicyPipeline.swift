@@ -205,36 +205,7 @@ extension HarnessMonitorStore {
   }
   @discardableResult
   public func promoteTaskBoardPolicyPipeline(revision: UInt64) async -> Bool {
-    guard let client else {
-      return false
-    }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
-
-    do {
-      let response = try await client.promoteTaskBoardPolicyPipeline(
-        request: TaskBoardPolicyPipelinePromoteRequest(
-          canvasId: globalTaskBoardPolicyCanvasWorkspace?.activeCanvasId,
-          revision: revision
-        )
-      )
-      recordRequestSuccess()
-      globalTaskBoardPolicyPipeline = response.document
-      refreshActivePolicyCanvasSummary(document: response.document)
-      globalTaskBoardPolicyAudit = await loadTaskBoardPolicyAudit(
-        using: client,
-        canvasId: globalTaskBoardPolicyCanvasWorkspace?.activeCanvasId
-      )
-      await applyEffectiveTaskBoardPolicyCanvasSupervisorOverrides(
-        for: globalTaskBoardPolicyCanvasWorkspace,
-        activeDocument: response.document
-      )
-      presentSuccessFeedback("Promoted policy")
-      return true
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return false
-    }
+    await makeLiveTaskBoardPolicyPipeline(revision: revision)
   }
   nonisolated func loadTaskBoardPolicyAudit(
     using client: any HarnessMonitorClientProtocol,

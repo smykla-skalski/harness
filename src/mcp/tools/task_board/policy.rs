@@ -93,7 +93,7 @@ fn pipeline_descriptors() -> [TaskBoardToolDescriptor; 10] {
         },
         TaskBoardToolDescriptor {
             name: ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE,
-            description: "Promote a task-board policy pipeline document revision.",
+            description: "Legacy alias for making a policy pipeline revision live.",
             input_schema: promote_schema,
             normalize: validate_params::<TaskBoardPolicyPipelinePromoteRequest>,
         },

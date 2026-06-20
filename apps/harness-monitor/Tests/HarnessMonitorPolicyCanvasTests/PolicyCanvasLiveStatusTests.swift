@@ -67,7 +67,12 @@ struct PolicyCanvasLiveStatusTests {
     viewModel.backingDocument = draftDocument(revision: 5)
     viewModel.captureLiveAudit(liveAudit(revision: 5, mode: .enforced))
     viewModel.captureLiveWorkspace(
-      liveWorkspace(canvasId: "canvas-live", revision: 5, updatedAt: "2026-06-20T08:15:30Z"),
+      liveWorkspace(
+        canvasId: "canvas-live",
+        revision: 5,
+        liveUpdatedAt: "2026-06-20T08:15:30Z",
+        updatedAt: "2026-06-20T09:45:00Z"
+      ),
       activeCanvasId: "canvas-live"
     )
 
@@ -139,6 +144,7 @@ struct PolicyCanvasLiveStatusTests {
   private func liveWorkspace(
     canvasId: String,
     revision: UInt64,
+    liveUpdatedAt: String? = nil,
     updatedAt: String
   ) -> TaskBoardPolicyCanvasWorkspace {
     TaskBoardPolicyCanvasWorkspace(
@@ -151,6 +157,7 @@ struct PolicyCanvasLiveStatusTests {
           revision: revision,
           mode: .enforced,
           document: draftDocument(revision: revision),
+          liveUpdatedAt: liveUpdatedAt,
           nodeCount: 0,
           edgeCount: 0,
           groupCount: 0,

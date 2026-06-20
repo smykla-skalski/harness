@@ -43,7 +43,7 @@ extension PolicyCanvasViewModel {
     livePublishedAt = workspace.canvases.first { canvas in
       canvas.canvasId == resolvedCanvasId
     }.flatMap { canvas in
-      PolicyCanvasLiveStatusDateFormatting.date(from: canvas.updatedAt)
+      PolicyCanvasLiveStatusDateFormatting.date(from: canvas.liveUpdatedAt ?? canvas.updatedAt)
     }
   }
 

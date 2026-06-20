@@ -20,6 +20,9 @@ use crate::task_board::policy_graph::{self, PolicyCanvasWorkspace};
 
 use super::policy_canvas_response::policy_canvas_workspace_response;
 
+#[cfg(test)]
+mod tests;
+
 const POLICY_PIPELINE_CHANGE_CHANNEL: &str = "policy_pipeline";
 
 /// Default and ceiling for how many recorded decisions a replay re-simulates.
@@ -337,8 +340,6 @@ pub(crate) async fn save_task_board_policy_pipeline_draft(
     Ok(saved.response)
 }
 
-/// Simulate a V2 policy pipeline in dry-run mode.
-///
 /// # Errors
 /// Returns `CliError` when simulation state cannot be written.
 pub(crate) async fn simulate_task_board_policy_pipeline(
@@ -359,33 +360,37 @@ pub(crate) async fn simulate_task_board_policy_pipeline(
     Ok(result)
 }
 
-/// Promote a simulated V2 policy pipeline for enforcement.
-///
 /// # Errors
-/// Returns `CliError` when simulation is missing/stale or promotion cannot be persisted.
+/// Returns `CliError` on invalid revision, validation, or persistence failure.
 pub(crate) async fn promote_task_board_policy_pipeline(
     db: &AsyncDaemonDb,
     request: &TaskBoardPolicyPipelinePromoteRequest,
 ) -> Result<TaskBoardPolicyPipelinePromoteResponse, CliError> {
-    let request = request.clone();
+    let request = TaskBoardPolicyPipelineMakeLiveRequest {
+        revision: request.revision,
+        actor: request.actor.clone(),
+        canvas_id: request.canvas_id.clone(),
+    };
     let (workspace, response) = db
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
             workspace.ensure_seeded_scenarios();
-            policy_graph::apply_promote(workspace, &request)
+            policy_graph::apply_make_live(workspace, &request)
         })
         .await?;
     feed_gate_cache(&workspace);
     bump_change_policy(db).await;
-    Ok(response)
+    Ok(TaskBoardPolicyPipelinePromoteResponse {
+        document: response.document,
+        trace_id: response.trace_id,
+    })
 }
 
 /// Make the active V2 policy pipeline live: refresh its simulation, promote it
 /// to enforced mode, and enable global enforcement in one transaction.
 ///
 /// # Errors
-/// Returns `CliError` when the revision precondition fails, the document is not
-/// valid to promote, or the workspace cannot be persisted.
+/// Returns `CliError` on invalid revision, validation, or persistence failure.
 pub(crate) async fn make_live_task_board_policy_pipeline(
     db: &AsyncDaemonDb,
     request: &TaskBoardPolicyPipelineMakeLiveRequest,
@@ -412,8 +417,7 @@ pub(crate) async fn make_live_task_board_policy_pipeline(
 /// scenario without mutating any durable state.
 ///
 /// # Errors
-/// Returns `CliError` when durable policy state cannot be loaded or the active
-/// canvas cannot be resolved.
+/// Returns `CliError` when state or the active canvas cannot be resolved.
 pub(crate) async fn go_live_diff_task_board_policy_pipeline(
     db: &AsyncDaemonDb,
     request: &TaskBoardPolicyPipelineGoLiveDiffRequest,
@@ -433,8 +437,7 @@ pub(crate) async fn go_live_diff_task_board_policy_pipeline(
 /// mutating any durable state.
 ///
 /// # Errors
-/// Returns `CliError` when durable policy state cannot be loaded, the recorded
-/// feed cannot be read, or the active canvas cannot be resolved.
+/// Returns `CliError` when state, feed, or active canvas cannot be resolved.
 pub(crate) async fn replay_task_board_policy_pipeline(
     db: &AsyncDaemonDb,
     request: &TaskBoardPolicyPipelineReplayRequest,
