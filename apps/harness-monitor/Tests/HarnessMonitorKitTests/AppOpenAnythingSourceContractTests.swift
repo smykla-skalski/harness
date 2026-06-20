@@ -111,9 +111,15 @@ struct AppOpenAnythingSourceContractTests {
   @Test("App services install without status item label background hosts")
   func appServicesInstallWithoutStatusItemLabelBackgroundHosts() throws {
     let scenesSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
-    let openAnythingSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")
-    let clipboardSource = try previewableSourceFile(named: "Support/ClipboardAutomationMonitor.swift")
-    let labelRange = try #require(scenesSource.range(of: "private var menuBarExtraLabel: some View"))
+    let openAnythingSource = try harnessSourceFile(
+      named: "App/HarnessMonitorApp+OpenAnything.swift"
+    )
+    let clipboardSource = try previewableSourceFile(
+      named: "Support/ClipboardAutomationMonitor.swift"
+    )
+    let labelRange = try #require(
+      scenesSource.range(of: "private var menuBarExtraLabel: some View")
+    )
     let labelSource = String(scenesSource[labelRange.lowerBound...])
 
     #expect(scenesSource.contains("installAppSceneServicesIfNeeded()"))
@@ -121,11 +127,16 @@ struct AppOpenAnythingSourceContractTests {
     #expect(scenesSource.contains("restartOpenAnythingCorpusDriver("))
     #expect(openAnythingSource.contains("func installAppSceneServicesIfNeeded()"))
     #expect(openAnythingSource.contains("appOpenAnythingCorpusDriver.start("))
-    #expect(openAnythingSource.contains("appClipboardAutomationPolicyService.start(openWindow: openWindow)"))
+    #expect(
+      openAnythingSource.contains(
+        "appClipboardAutomationPolicyService.start(openWindow: openWindow)"
+      )
+    )
     #expect(clipboardSource.contains("final class ClipboardAutomationPolicyService"))
     #expect(
       !labelSource.contains(".background"),
-      "MenuBarExtra labels are mirrored through Control Center NSStatusItemView scenes; side-effect hosts must not mount inside that label."
+      "MenuBarExtra labels are mirrored through Control Center NSStatusItemView scenes; "
+        + "side-effect hosts must not mount inside that label."
     )
   }
 
