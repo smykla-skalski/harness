@@ -5,6 +5,10 @@
 use sqlx::FromRow;
 
 /// One row of `policy_workspace` (singleton).
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "database row mirrors persisted workspace flag columns"
+)]
 #[derive(Debug, Clone, FromRow)]
 pub(crate) struct WorkspaceRow {
     pub active_canvas_id: String,
