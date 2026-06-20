@@ -89,6 +89,52 @@ struct PolicyCanvasGraphQualityGateTests {
     )
   }
 
+  /// Routing must be canonical: the geometry a sample produces cannot depend on
+  /// the order its nodes and edges arrive in. The route worker keys and sorts by
+  /// stable IDs throughout, so reversing the input arrays must yield byte-identical
+  /// routes. This is the determinism property a single-process unit test can hold
+  /// without flaking; cross-process Swift-hash-seed independence was verified
+  /// out of band by routing every budgeted sample under several randomized hash
+  /// seeds and getting identical geometry each time. Together they keep the budget
+  /// gate above stable run to run instead of flickering whenever an unordered Set
+  /// or Dictionary iteration leaks into route geometry.
+  @Test func routeGeometryIsInputOrderInvariant() async throws {
+    for sample in Self.budgetedSamples {
+      let document = try #require(PolicyCanvasLabSamples.sample(id: sample.id)).document
+      let viewModel = PolicyCanvasViewModel.sample()
+      viewModel.load(document: document, simulation: nil, audit: nil)
+      viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+      func routedGeometry(reversedInput: Bool) async -> String {
+        let input = PolicyCanvasRouteWorkerInput(
+          nodes: reversedInput ? Array(viewModel.nodes.reversed()) : viewModel.nodes,
+          groups: reversedInput ? Array(viewModel.groups.reversed()) : viewModel.groups,
+          edges: reversedInput ? Array(viewModel.edges.reversed()) : viewModel.edges,
+          fontScale: 1,
+          routingHints: viewModel.routingHints,
+          precomputedRoutes: viewModel.precomputedRoutes,
+          algorithmSelection: .referenceRouting
+        )
+        let routes = await PolicyCanvasRouteWorker().compute(input: input).routes
+        return
+          routes
+          .sorted { $0.key < $1.key }
+          .map { id, route in
+            id + "="
+              + route.points
+              .map { "\(Int(($0.x * 1_000).rounded())),\(Int(($0.y * 1_000).rounded()))" }
+              .joined(separator: ">")
+          }
+          .joined(separator: ";")
+      }
+      let natural = await routedGeometry(reversedInput: false)
+      let reversed = await routedGeometry(reversedInput: true)
+      #expect(
+        natural == reversed,
+        "\(sample.id): route geometry changed when node/edge input order was reversed - an unordered Set or Dictionary is leaking into routing"
+      )
+    }
+  }
+
   /// Per-sample regression gate across the routine lab samples: each gated
   /// category must stay at or below its budget. Budgets are today's measured
   /// values, so any layout or routing change that makes a sample worse fails
