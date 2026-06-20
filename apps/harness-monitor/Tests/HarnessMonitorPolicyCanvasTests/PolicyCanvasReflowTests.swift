@@ -95,6 +95,44 @@ struct PolicyCanvasReflowTests {
     #expect(viewModel.routingHints == staleRoutingHintsBeforeReflow)
   }
 
+  @Test("dirty forced Reformat survives a same-revision document refresh")
+  func dirtyForcedReformatSurvivesSameRevisionDocumentRefresh() {
+    guard let sample = PolicyCanvasLabSamples.sample(id: "default") else {
+      Issue.record("Expected the real Default policy sample")
+      return
+    }
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: sample.document,
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "default"
+    )
+    let savedPositions = Dictionary(uniqueKeysWithValues: viewModel.nodes.map {
+      ($0.id, $0.position)
+    })
+
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+    let reformattedPositions = Dictionary(uniqueKeysWithValues: viewModel.nodes.map {
+      ($0.id, $0.position)
+    })
+
+    #expect(reformattedPositions != savedPositions)
+    #expect(viewModel.documentDirty)
+
+    viewModel.load(
+      document: sample.document,
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "default"
+    )
+
+    #expect(viewModel.documentDirty)
+    #expect(
+      Dictionary(uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.position) })
+        == reformattedPositions
+    )
+  }
+
   @Test("reflow falls back to laying out all nodes when every node is manual")
   func reflowFallsBackToLayingOutAllManualNodes() {
     let viewModel = PolicyCanvasViewModel.sample()

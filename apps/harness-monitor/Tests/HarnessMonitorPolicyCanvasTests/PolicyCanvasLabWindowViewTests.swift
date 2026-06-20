@@ -368,10 +368,13 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(
       surfaceSource.contains("requestAtomicReflow(preserveManualAnchors: false, force: true)")
     )
+    XCTAssertTrue(surfaceSource.contains("policyCanvasAtomicReflowRoutePlan("))
+    XCTAssertTrue(surfaceSource.contains("routesCurrentGraphWhenUnchanged: true"))
+    XCTAssertFalse(surfaceSource.contains("policyCanvasFastPrecomputedRouteOutput"))
   }
 
   @MainActor
-  func testExtremeGalaxyForcedEngineFirstPaintPrepStaysBelowOneSecond() throws {
+  func testExtremeGalaxyForcedEngineFirstPaintPrepStaysBelowOneSecond() async throws {
     let sample = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "extreme-galaxy"))
     let start = Date()
     let viewModel = PolicyCanvasViewModel.liveStartupState(
@@ -381,30 +384,25 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
       activeCanvasId: nil,
       policyGroupTitle: sample.name
     )
-    let plannedGraph = try XCTUnwrap(
-      viewModel.plannedReflowGraph(preserveManualAnchors: false, force: true)
-    )
-    let routeInput = PolicyCanvasRouteWorkerInput(
-      graphGeneration: viewModel.routeComputationGeneration,
-      nodes: plannedGraph.nodes,
-      groups: plannedGraph.groups,
-      edges: plannedGraph.edges,
+    let maybePlan = await policyCanvasAtomicReflowRoutePlan(
+      viewModel: viewModel,
+      preserveManualAnchors: false,
+      force: true,
       fontScale: 1,
-      routingHints: plannedGraph.routingHints,
-      precomputedRoutes: plannedGraph.precomputedRoutes,
-      algorithmSelection: viewModel.algorithmSelection
+      routeWorker: PolicyCanvasRouteWorker(),
+      routesCurrentGraphWhenUnchanged: true
     )
-    let output = try XCTUnwrap(policyCanvasFastPrecomputedRouteOutput(input: routeInput))
+    let plan = try XCTUnwrap(maybePlan)
     viewModel.commitPlannedReflowGraph(
-      plannedGraph,
+      plan.graph,
       preserveManualAnchors: false,
       force: true,
       requestsRouteComputation: false
     )
     let elapsedMs = Date().timeIntervalSince(start) * 1_000
 
-    XCTAssertEqual(output.routes.count, plannedGraph.edges.count)
-    XCTAssertFalse(output.visibleBounds.isNull)
+    XCTAssertEqual(plan.output.routes.count, plan.graph.edges.count)
+    XCTAssertFalse(plan.output.visibleBounds.isNull)
     XCTAssertLessThan(elapsedMs, 1_000)
   }
 
@@ -582,21 +580,48 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
       policyGroupTitle: sample.name
     )
 
-    productionViewModel.reflowLayout(preserveManualAnchors: false, force: true)
-    labViewModel.reflowLayout(preserveManualAnchors: false, force: true)
+    let maybeProductionPlan = await policyCanvasAtomicReflowRoutePlan(
+      viewModel: productionViewModel,
+      preserveManualAnchors: false,
+      force: true,
+      fontScale: 1,
+      routeWorker: PolicyCanvasRouteWorker()
+    )
+    let productionPlan = try XCTUnwrap(maybeProductionPlan)
+    let maybeLabPlan = await policyCanvasAtomicReflowRoutePlan(
+      viewModel: labViewModel,
+      preserveManualAnchors: false,
+      force: true,
+      fontScale: 1,
+      routeWorker: PolicyCanvasRouteWorker(),
+      routesCurrentGraphWhenUnchanged: true
+    )
+    let labPlan = try XCTUnwrap(maybeLabPlan)
+    XCTAssertTrue(productionPlan.appliesLayoutChange)
+    XCTAssertTrue(labPlan.appliesLayoutChange)
+    productionViewModel.commitPlannedReflowGraph(
+      productionPlan.graph,
+      preserveManualAnchors: false,
+      force: true,
+      requestsRouteComputation: false
+    )
+    labViewModel.commitPlannedReflowGraph(
+      labPlan.graph,
+      preserveManualAnchors: false,
+      force: true,
+      requestsRouteComputation: false
+    )
 
     XCTAssertEqual(nodePositionsByID(productionViewModel), nodePositionsByID(labViewModel))
     XCTAssertEqual(groupFramesByID(productionViewModel), groupFramesByID(labViewModel))
     XCTAssertEqual(productionViewModel.routingHints, labViewModel.routingHints)
     XCTAssertEqual(productionViewModel.precomputedRoutes, labViewModel.precomputedRoutes)
-    let productionRoutes = await routeOutput(for: productionViewModel)
-    let labRoutes = await routeOutput(for: labViewModel)
-    XCTAssertEqual(productionRoutes.routes, labRoutes.routes)
-    XCTAssertEqual(productionRoutes.labelPositions, labRoutes.labelPositions)
-    XCTAssertEqual(productionRoutes.portVisibility, labRoutes.portVisibility)
-    XCTAssertEqual(productionRoutes.portMarkerLayout, labRoutes.portMarkerLayout)
-    XCTAssertEqual(productionRoutes.visibleBounds, labRoutes.visibleBounds)
-    XCTAssertEqual(productionRoutes.contentSize, labRoutes.contentSize)
+    XCTAssertEqual(productionPlan.output.routes, labPlan.output.routes)
+    XCTAssertEqual(productionPlan.output.labelPositions, labPlan.output.labelPositions)
+    XCTAssertEqual(productionPlan.output.portVisibility, labPlan.output.portVisibility)
+    XCTAssertEqual(productionPlan.output.portMarkerLayout, labPlan.output.portMarkerLayout)
+    XCTAssertEqual(productionPlan.output.visibleBounds, labPlan.output.visibleBounds)
+    XCTAssertEqual(productionPlan.output.contentSize, labPlan.output.contentSize)
   }
 
   @MainActor
@@ -665,11 +690,12 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     let forcedReformatRequest =
       "requestAtomicReflow(preserveManualAnchors: false, force: true)"
 
-    // Lab and production Reformat both force the engine layout and strip manual
-    // anchors so they start from the same graph.
+    // Lab and production Reformat both force the engine layout, strip manual
+    // anchors, and render through the shared route-plan contract.
     XCTAssertTrue(
       surfaceSource.contains(forcedReformatRequest)
     )
+    XCTAssertTrue(surfaceSource.contains("policyCanvasAtomicReflowRoutePlan("))
     XCTAssertFalse(surfaceSource.contains("viewModel.reflowLayout("))
     XCTAssertTrue(chromeSource.contains("viewModel.\(forcedReformatRequest)"))
     XCTAssertTrue(layoutSource.contains("viewModel.\(forcedReformatRequest)"))
@@ -695,8 +721,8 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     )
     XCTAssertTrue(atomicSource.contains("func performAtomicReflow("))
     XCTAssertTrue(atomicSource.contains("viewModel.atomicReflowRequest"))
-    XCTAssertTrue(atomicSource.contains("plannedReflowGraph("))
-    XCTAssertTrue(atomicSource.contains("routeWorkerInstance().compute(input: routeInput)"))
+    XCTAssertTrue(atomicSource.contains("policyCanvasAtomicReflowRoutePlan("))
+    XCTAssertTrue(atomicSource.contains("routeWorker: routeWorkerInstance()"))
     // The commit publishes positions WITHOUT an async route request so the
     // precomputed routes reveal together with the nodes in a single frame.
     XCTAssertTrue(atomicSource.contains("requestsRouteComputation: false"))

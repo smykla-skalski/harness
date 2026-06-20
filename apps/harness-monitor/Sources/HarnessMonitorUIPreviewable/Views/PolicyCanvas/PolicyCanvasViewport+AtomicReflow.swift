@@ -46,10 +46,14 @@ extension PolicyCanvasViewport {
     guard let request = viewModel.atomicReflowRequest else {
       return
     }
+    let generation = nextRouteGeneration()
     guard
-      let graph = viewModel.plannedReflowGraph(
+      let plan = await policyCanvasAtomicReflowRoutePlan(
+        viewModel: viewModel,
         preserveManualAnchors: request.preserveManualAnchors,
-        force: request.force
+        force: request.force,
+        fontScale: fontScale,
+        routeWorker: routeWorkerInstance()
       )
     else {
       // Empty or already-tidy layout: fall back so status and centering still fire.
@@ -59,22 +63,10 @@ extension PolicyCanvasViewport {
       )
       return
     }
-    let routeInput = PolicyCanvasRouteWorkerInput(
-      graphGeneration: viewModel.routeComputationGeneration,
-      nodes: graph.nodes,
-      groups: graph.groups,
-      edges: graph.edges,
-      fontScale: fontScale,
-      routingHints: graph.routingHints,
-      precomputedRoutes: graph.precomputedRoutes,
-      algorithmSelection: viewModel.algorithmSelection
-    )
-    let generation = nextRouteGeneration()
-    let output = await routeWorkerInstance().compute(input: routeInput)
     guard !Task.isCancelled, routeGenerationMatches(generation) else {
       return
     }
-    commitAtomicReflow(request: request, graph: graph, output: output, fontScale: fontScale)
+    commitAtomicReflow(request: request, plan: plan, fontScale: fontScale)
   }
 
   /// Publish the planned positions without an async route request, then hand the
@@ -83,12 +75,11 @@ extension PolicyCanvasViewport {
   @MainActor
   private func commitAtomicReflow(
     request: PolicyCanvasAtomicReflowRequest,
-    graph: PolicyCanvasReflowGraph,
-    output: PolicyCanvasRouteWorkerOutput,
+    plan: PolicyCanvasAtomicReflowRoutePlan,
     fontScale: CGFloat
   ) {
     viewModel.commitPlannedReflowGraph(
-      graph,
+      plan.graph,
       preserveManualAnchors: request.preserveManualAnchors,
       force: request.force,
       requestsRouteComputation: false
@@ -103,7 +94,7 @@ extension PolicyCanvasViewport {
         fontScale: fontScale
       ),
       pipelineIdentity: pipelineIdentity,
-      output: output,
+      output: plan.output,
       nodePositionsByID: policyCanvasNodePositionsByID(viewModel.nodes)
     )
   }

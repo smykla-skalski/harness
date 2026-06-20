@@ -93,10 +93,10 @@ public struct PolicyCanvasViewportSurface: View {
   let showsEdgeLegend: Bool
   let resizeZoomBehavior: PolicyCanvasViewportResizeZoomBehavior
   let showsQualityInspection: Bool
-  /// When true the surface re-runs the automatic layout engine on appear and after
-  /// every document load, so it reflects the algorithms rather than the
-  /// document's authored seed coordinates. The Policy Canvas Lab sets this; the
-  /// shipping canvas (PolicyCanvasView) keeps authored layouts and never does.
+  /// When true the surface re-runs the same forced reformat route plan production
+  /// uses before first paint. The Policy Canvas Lab sets this so it can work on
+  /// the production Reformat shape without compiling the full app; the shipping
+  /// canvas (PolicyCanvasView) keeps authored layouts until Reformat is invoked.
   let forcesEngineLayout: Bool
   /// Monotonic token the host bumps to request a manual reformat (toolbar
   /// button). Every change re-runs the automatic layout engine.
@@ -281,41 +281,24 @@ public struct PolicyCanvasViewportSurface: View {
       viewModel = stagedViewModel
       return
     }
-    let plannedGraph = stagedViewModel.plannedReflowGraph(
-      preserveManualAnchors: false,
-      force: true
-    )
-    let routeGraph =
-      plannedGraph
-      ?? PolicyCanvasReflowGraph(
-        nodes: stagedViewModel.nodes,
-        groups: stagedViewModel.groups,
-        edges: stagedViewModel.edges,
-        routingHints: stagedViewModel.routingHints,
-        precomputedRoutes: stagedViewModel.precomputedRoutes
+    guard
+      let plan = await policyCanvasAtomicReflowRoutePlan(
+        viewModel: stagedViewModel,
+        preserveManualAnchors: false,
+        force: true,
+        fontScale: fontScale,
+        routeWorker: PolicyCanvasRouteWorker(),
+        routesCurrentGraphWhenUnchanged: true
       )
-    let routeInput = PolicyCanvasRouteWorkerInput(
-      graphGeneration: stagedViewModel.routeComputationGeneration,
-      nodes: routeGraph.nodes,
-      groups: routeGraph.groups,
-      edges: routeGraph.edges,
-      fontScale: fontScale,
-      routingHints: routeGraph.routingHints,
-      precomputedRoutes: routeGraph.precomputedRoutes,
-      algorithmSelection: stagedViewModel.algorithmSelection
-    )
-    let output: PolicyCanvasRouteWorkerOutput
-    if let fastOutput = policyCanvasFastPrecomputedRouteOutput(input: routeInput) {
-      output = fastOutput
-    } else {
-      output = await PolicyCanvasRouteWorker().compute(input: routeInput)
+    else {
+      return
     }
     guard !Task.isCancelled else {
       return
     }
-    if let plannedGraph {
+    if plan.appliesLayoutChange {
       stagedViewModel.commitPlannedReflowGraph(
-        plannedGraph,
+        plan.graph,
         preserveManualAnchors: false,
         force: true,
         requestsRouteComputation: false
@@ -336,7 +319,7 @@ public struct PolicyCanvasViewportSurface: View {
       id: seedID,
       routeKey: routeKey,
       pipelineIdentity: stagedViewModel.pipelineIdentity,
-      output: output,
+      output: plan.output,
       nodePositionsByID: policyCanvasNodePositionsByID(stagedViewModel.nodes)
     )
     appliedSnapshot = newSnapshot

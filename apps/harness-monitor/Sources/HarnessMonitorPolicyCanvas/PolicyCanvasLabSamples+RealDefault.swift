@@ -6,9 +6,9 @@ import HarnessMonitorPolicyCanvasAlgorithms
 // (policy_pipeline_get, snake_case) - the 18-node graph this lab's layout and
 // routing work was tuned against. Embedded as base64 so the exact production
 // document round-trips byte-for-byte with no hand-transcription drift, and the
-// picker offers it independent of any running daemon. The lab force-reflows, so
-// the saved layout is replaced by the engine's arrangement - which is the point:
-// it shows how the algorithms lay out the real policy we worked on most.
+// picker offers it independent of any running daemon. The lab force-reflows
+// through the production Reformat route plan, so the saved layout is replaced by
+// the same engine arrangement and route repair contract used by the app.
 extension PolicyCanvasLabSamples {
   static let realDefault: TaskBoardPolicyPipelineDocument = decodeRealDefault()
 
