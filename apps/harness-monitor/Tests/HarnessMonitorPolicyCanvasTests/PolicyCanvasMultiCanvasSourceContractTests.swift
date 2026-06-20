@@ -466,6 +466,12 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     let commandsSource = try appSourceFile(
       at: "App/HarnessMonitorAppCommands.swift"
     )
+    let dashboardToolbarSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardWindowToolbar.swift"
+    )
+    let accessibilitySource = try previewableSourceFile(
+      at: "Support/HarnessMonitorAccessibilityIDs+PolicyCanvas.swift"
+    )
 
     XCTAssertTrue(focusSource.contains("public let inspector: PolicyCanvasInspectorFocus"))
     XCTAssertTrue(focusSource.contains("PolicyCanvasInspectorFocusDispatcher"))
@@ -476,6 +482,12 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertTrue(commandsSource.contains("Show Policy Inspector"))
     XCTAssertTrue(commandsSource.contains("Hide Policy Inspector"))
     XCTAssertFalse(focusSource.contains("harnessPolicyCanvasInspectorFocus"))
+    XCTAssertTrue(dashboardToolbarSource.contains("PolicyCanvasInspectorToolbarButton()"))
+    XCTAssertTrue(dashboardToolbarSource.contains("@FocusedValue(\\.harnessPolicyCanvasCommandFocus)"))
+    XCTAssertTrue(dashboardToolbarSource.contains("policyCanvasInspectorButtonTitle"))
+    XCTAssertTrue(dashboardToolbarSource.contains("Image(systemName: \"sidebar.trailing\")"))
+    XCTAssertTrue(dashboardToolbarSource.contains("HarnessMonitorAccessibility.policyCanvasInspectorToolbarButton"))
+    XCTAssertTrue(accessibilitySource.contains("policyCanvasInspectorToolbarButton"))
   }
 
   private func previewableSourceFile(at relativePath: String) throws -> String {

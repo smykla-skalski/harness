@@ -188,6 +188,7 @@ public struct DashboardWindowView: View {
             store: store,
             navigation: windowNavigationState,
             showsQuickActions: route == .taskBoard,
+            showsPolicyInspectorToggle: route == .policyCanvas,
             sleepPreventionPresentation: SleepPreventionToolbarPresentation(
               isEnabled: store.contentUI.toolbar.sleepPreventionEnabled
             )

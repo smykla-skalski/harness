@@ -5,6 +5,7 @@ struct DashboardWindowToolbar: ToolbarContent {
   let store: HarnessMonitorStore
   let navigation: WindowNavigationState
   let showsQuickActions: Bool
+  let showsPolicyInspectorToggle: Bool
   let sleepPreventionPresentation: SleepPreventionToolbarPresentation
 
   @ToolbarContentBuilder var body: some ToolbarContent {
@@ -26,6 +27,13 @@ struct DashboardWindowToolbar: ToolbarContent {
       ToolbarSpacer(.fixed, placement: .primaryAction)
     }
 
+    if showsPolicyInspectorToggle {
+      ToolbarItem(placement: .primaryAction) {
+        PolicyCanvasInspectorToolbarButton()
+      }
+      ToolbarSpacer(.fixed, placement: .primaryAction)
+    }
+
     ToolbarItemGroup(placement: .primaryAction) {
       SleepPreventionToolbarButton(
         store: store,
@@ -36,6 +44,52 @@ struct DashboardWindowToolbar: ToolbarContent {
       .sharedBackgroundVisibility(.hidden)
 
     GlobalPolicyEnforcementToolbarGroup(store: store)
+  }
+}
+
+private struct PolicyCanvasInspectorToolbarButton: View {
+  @FocusedValue(\.harnessPolicyCanvasCommandFocus)
+  private var policyCanvasCommandFocus
+
+  private var policyCanvasInspectorFocus: PolicyCanvasInspectorFocus? {
+    policyCanvasCommandFocus?.inspector
+  }
+
+  private var policyCanvasInspectorButtonTitle: String {
+    policyCanvasInspectorFocus?.isVisible == true
+      ? "Hide Policy Inspector"
+      : "Show Policy Inspector"
+  }
+
+  private var isToggleEnabled: Bool {
+    policyCanvasInspectorFocus?.canToggle == true
+  }
+
+  var body: some View {
+    Button {
+      policyCanvasInspectorFocus?.dispatcher.performToggleInspector()
+    } label: {
+      Label {
+        Text(policyCanvasInspectorButtonTitle)
+      } icon: {
+        Image(systemName: "sidebar.trailing")
+          .frame(width: 14, height: 14)
+      }
+    }
+    .disabled(!isToggleEnabled)
+    .help(policyCanvasInspectorButtonTitle)
+    .accessibilityLabel("Policy Inspector")
+    .accessibilityValue(policyCanvasInspectorFocus?.isVisible == true ? "Shown" : "Hidden")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasInspectorToolbarButton)
+    .harnessMCPButton(
+      HarnessMonitorAccessibility.policyCanvasInspectorToolbarButton,
+      label: "Policy Inspector",
+      value: policyCanvasInspectorFocus?.isVisible == true ? "Shown" : "Hidden",
+      hint: policyCanvasInspectorButtonTitle,
+      pressAction: {
+        policyCanvasInspectorFocus?.dispatcher.performToggleInspector()
+      }
+    )
   }
 }
 
