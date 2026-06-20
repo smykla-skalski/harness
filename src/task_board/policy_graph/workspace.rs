@@ -66,6 +66,10 @@ impl PolicyCanvasRecord {
     }
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "workspace DTO keeps independent persisted policy-canvas flags"
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolicyCanvasWorkspace {
     pub schema_version: u32,
