@@ -7,36 +7,44 @@ use super::mapping::{NodeContinuation, RepositoryLabelBundle, convert_node};
 use super::types::SearchNode;
 use super::{ReviewItem, ReviewRepositoryLabel, ReviewsQueryRequest};
 
+pub(super) struct SearchIngestState<'a> {
+    pub request: &'a ReviewsQueryRequest,
+    pub backport_detector: Option<&'a BackportDetector>,
+    pub viewer_login: Option<&'a str>,
+    pub deduped: &'a mut BTreeMap<String, ReviewItem>,
+    pub continuations: &'a mut BTreeMap<String, NodeContinuation>,
+    pub repository_labels: &'a mut BTreeMap<String, Vec<ReviewRepositoryLabel>>,
+    pub repository_label_continuation_seen: &'a mut BTreeSet<String>,
+}
+
 pub(super) fn ingest_search_node(
     node: SearchNode,
-    request: &ReviewsQueryRequest,
-    backport_detector: Option<&BackportDetector>,
-    viewer_login: Option<&str>,
-    deduped: &mut BTreeMap<String, ReviewItem>,
-    continuations: &mut BTreeMap<String, NodeContinuation>,
-    repository_labels: &mut BTreeMap<String, Vec<ReviewRepositoryLabel>>,
-    repository_label_continuation_seen: &mut BTreeSet<String>,
+    state: &mut SearchIngestState<'_>,
 ) -> Result<(), CliError> {
-    let (item, bundle, mut continuation) = convert_node(node, backport_detector, viewer_login)?;
-    if request
+    let (item, bundle, mut continuation) =
+        convert_node(node, state.backport_detector, state.viewer_login)?;
+    if state
+        .request
         .normalized_exclude_repositories()
         .contains(&item.repository)
     {
         return Ok(());
     }
     if let Some(bundle) = bundle {
-        merge_repository_label_bundle(repository_labels, bundle);
+        merge_repository_label_bundle(state.repository_labels, bundle);
     }
     if continuation.repository_labels.is_some()
-        && !repository_label_continuation_seen.insert(continuation.repository_id.clone())
+        && !state
+            .repository_label_continuation_seen
+            .insert(continuation.repository_id.clone())
     {
         continuation.repository_labels = None;
     }
     let key = format!("{}#{}", item.repository, item.number);
-    if continuation.has_work() && !continuations.contains_key(&key) {
-        continuations.insert(key.clone(), continuation);
+    if continuation.has_work() && !state.continuations.contains_key(&key) {
+        state.continuations.insert(key.clone(), continuation);
     }
-    deduped.insert(key, item);
+    state.deduped.insert(key, item);
     Ok(())
 }
 

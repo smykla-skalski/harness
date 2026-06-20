@@ -12,7 +12,7 @@ use super::client::{
     ReviewsGitHubClient, SEARCH_PAGE_CAP,
 };
 use super::coverage::log_check_details_url_coverage;
-use super::ingest::{ingest_nodes_chunk, ingest_search_node};
+use super::ingest::{SearchIngestState, ingest_nodes_chunk, ingest_search_node};
 use super::mapping::{self, NodeContinuation, next_cursor_or_scope_limit, scopes};
 use super::pagination::resolve_continuation;
 use super::queries::{NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY, SEARCH_QUERY};
@@ -96,6 +96,15 @@ impl ReviewsGitHubClient {
     ) -> Result<(), CliError> {
         let mut cursor = None;
         let mut page = 1_u32;
+        let mut ingest_state = SearchIngestState {
+            request,
+            backport_detector,
+            viewer_login,
+            deduped,
+            continuations,
+            repository_labels,
+            repository_label_continuation_seen,
+        };
         loop {
             let descriptor = search_descriptor(request);
             let response: SearchResponse = self
@@ -113,16 +122,7 @@ impl ReviewsGitHubClient {
                 .await
                 .map(|response| response.body)?;
             for node in response.search.nodes {
-                ingest_search_node(
-                    node,
-                    request,
-                    backport_detector,
-                    viewer_login,
-                    deduped,
-                    continuations,
-                    repository_labels,
-                    repository_label_continuation_seen,
-                )?;
+                ingest_search_node(node, &mut ingest_state)?;
             }
             if !response.search.page_info.has_next_page {
                 return Ok(());
