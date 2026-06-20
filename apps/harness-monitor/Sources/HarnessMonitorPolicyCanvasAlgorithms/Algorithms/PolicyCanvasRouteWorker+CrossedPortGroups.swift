@@ -17,6 +17,11 @@ struct PolicyCanvasCrossedPortRepairContext {
   let maximumTerminalSideMismatches: Int
   let router: any PolicyCanvasEdgeRouter
   let algorithms: PolicyCanvasRoutingAlgorithmSet
+  /// Built once per repair pass and reused by every candidate's body-hit
+  /// re-route. It derives only from the node index (obstacles, port anchors,
+  /// terminal slots, lane assignments), which is constant across the pass, so
+  /// rebuilding it per candidate was pure waste.
+  let passContext: PolicyCanvasDisplayedRoutePassContext
 }
 
 struct PolicyCanvasCrossedPortTerminalFanGroup {
@@ -40,7 +45,7 @@ extension PolicyCanvasPreparedRouteInput {
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> [PolicyCanvasBodyHitViolation] {
-    return policyCanvasMeasureBodyHits(
+    policyCanvasMeasureBodyHits(
       routedEdges: precomputedRoutedEdges(routes: routes),
       nodeFramesByID: nodeIndex.mapValues(\.frame),
       groupTitleFrames: policyCanvasGroupTitleFramesByID(groups)

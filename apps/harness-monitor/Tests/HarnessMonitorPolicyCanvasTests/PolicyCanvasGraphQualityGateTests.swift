@@ -42,6 +42,7 @@ struct PolicyCanvasGraphQualityGateTests {
   private struct RoutedSample {
     let report: PolicyCanvasGraphQualityReport
     let nodes: [PolicyCanvasNode]
+    let groups: [PolicyCanvasGroup]
     let edges: [PolicyCanvasEdge]
     let routes: [String: PolicyCanvasEdgeRoute]
     let portMarkerLayout: PolicyCanvasPortMarkerLayout
@@ -83,6 +84,7 @@ struct PolicyCanvasGraphQualityGateTests {
     return RoutedSample(
       report: report,
       nodes: viewModel.nodes,
+      groups: viewModel.groups,
       edges: viewModel.edges,
       routes: output.routes,
       portMarkerLayout: output.portMarkerLayout
@@ -133,6 +135,206 @@ struct PolicyCanvasGraphQualityGateTests {
         "\(sample.id): route geometry changed when node/edge input order was reversed - an unordered Set or Dictionary is leaking into routing"
       )
     }
+  }
+
+  /// Reference all-nodes scan for body hits: the implementation the spatial
+  /// index replaced. The indexed measure must return exactly this set for every
+  /// sample, so this stays as the equivalence oracle.
+  private static func bruteForceBodyHits(
+    routedEdges: [PolicyCanvasRoutedEdge],
+    nodeFramesByID: [String: CGRect],
+    groupTitleFrames: [(id: String, frame: CGRect)]
+  ) -> [PolicyCanvasBodyHitViolation] {
+    var violations: [PolicyCanvasBodyHitViolation] = []
+    let sortedNodes = nodeFramesByID.sorted { $0.key < $1.key }
+    for routed in routedEdges {
+      let endpoints: Set<String> = [routed.edge.source.nodeID, routed.edge.target.nodeID]
+      for (nodeID, frame) in sortedNodes where !endpoints.contains(nodeID) {
+        if policyCanvasRouteIntersectsObstacles(routed.route, obstacles: [frame]) {
+          violations.append(
+            PolicyCanvasBodyHitViolation(
+              edgeID: routed.edge.id, obstacle: .node, obstacleID: nodeID, frame: frame))
+        }
+      }
+      for title in groupTitleFrames
+      where policyCanvasRouteIntersectsObstacles(routed.route, obstacles: [title.frame]) {
+        violations.append(
+          PolicyCanvasBodyHitViolation(
+            edgeID: routed.edge.id, obstacle: .groupTitle, obstacleID: title.id, frame: title.frame))
+      }
+    }
+    return violations.sorted { lhs, rhs in
+      if lhs.edgeID != rhs.edgeID {
+        return lhs.edgeID < rhs.edgeID
+      }
+      if lhs.obstacle != rhs.obstacle {
+        return lhs.obstacle.rawValue < rhs.obstacle.rawValue
+      }
+      return lhs.obstacleID < rhs.obstacleID
+    }
+  }
+
+  /// Reference full per-edge scan for terminal side mismatches: the measure the
+  /// incremental baseline fold must reproduce for any candidate. Each endpoint
+  /// that routes into a side other than its resolved port side counts once.
+  private static func fullSideMismatchCount(
+    edges: [PolicyCanvasEdge], routes: [String: PolicyCanvasEdgeRoute]
+  ) -> Int {
+    var count = 0
+    for edge in edges {
+      guard let route = routes[edge.id] else { continue }
+      if policyCanvasRouteSourceSide(route) != policyCanvasResolvedPortSide(for: edge.source) {
+        count += 1
+      }
+      if policyCanvasRouteTargetSide(route) != policyCanvasResolvedPortSide(for: edge.target) {
+        count += 1
+      }
+    }
+    return count
+  }
+
+  /// The incremental repair-measurement baseline must return exactly the same
+  /// body-hit count and crossed-port violations as a full re-measure, for any
+  /// candidate that perturbs a few edges. The crossed-port repair feeds it
+  /// hundreds of small perturbations per pass; if the fold-in ever diverged from
+  /// the full measure, the repair would accept or reject the wrong candidate and
+  /// the graph-quality budgets would shift silently. Perturbations here swap and
+  /// reverse routes so terminals move sides and geometry changes, exercising the
+  /// affected-node-side recompute and the per-edge body-hit fold.
+  @Test func incrementalRepairBaselineMatchesFullMeasure() async throws {
+    var exercised: [String] = []
+    var mismatches: [String] = []
+    for sample in PolicyCanvasLabSamples.all {
+      let routed = try await routedSample(sampleID: sample.id)
+      let nodeSizes = PolicyCanvasLayout.nodeSizes(for: routed.nodes, edges: routed.edges)
+      var nodeFramesByID: [String: CGRect] = [:]
+      for node in routed.nodes {
+        nodeFramesByID[node.id] = CGRect(
+          origin: node.position,
+          size: nodeSizes[node.id] ?? PolicyCanvasLayout.nodeSize(for: node))
+      }
+      let groupTitleFrames = policyCanvasGroupTitleFramesByID(routed.groups)
+      let nodeFrameIndex = PolicyCanvasNodeFrameIndex(framesByID: nodeFramesByID)
+      let baseline = PolicyCanvasRepairMeasurementBaseline(
+        edges: routed.edges, referenceRoutes: routed.routes, nodeFramesByID: nodeFramesByID,
+        groupTitleFrames: groupTitleFrames, nodeFrameIndex: nodeFrameIndex)
+      exercised.append(sample.id)
+      let edgeIDs = routed.edges.map(\.id)
+      guard edgeIDs.count >= 2 else { continue }
+      // Deterministic perturbations: single-edge swap, single-edge reverse, and
+      // a two-edge swap, sampled across the edge list.
+      let stride = max(1, edgeIDs.count / 12)
+      for index in Swift.stride(from: 0, to: edgeIDs.count, by: stride) {
+        let otherIndex = (index + 1) % edgeIDs.count
+        let edgeA = edgeIDs[index]
+        let edgeB = edgeIDs[otherIndex]
+        guard let routeA = routed.routes[edgeA], let routeB = routed.routes[edgeB] else { continue }
+        let reversedA = PolicyCanvasEdgeRoute(
+          points: Array(routeA.points.reversed()),
+          labelPosition: PolicyCanvasVisibilityRouter.labelPosition(
+            for: Array(routeA.points.reversed())))
+        let candidates: [(routes: [String: PolicyCanvasEdgeRoute], changed: Set<String>)] = [
+          (routed.routes.merging([edgeA: routeB]) { _, new in new }, [edgeA]),
+          (routed.routes.merging([edgeA: reversedA]) { _, new in new }, [edgeA]),
+          (
+            routed.routes.merging([edgeA: routeB, edgeB: routeA]) { _, new in new },
+            [edgeA, edgeB]
+          ),
+        ]
+        for (candidateRoutes, changed) in candidates {
+          let fullRoutedEdges = routed.edges.compactMap { edge -> PolicyCanvasRoutedEdge? in
+            guard let route = candidateRoutes[edge.id], route.points.count >= 2 else { return nil }
+            return PolicyCanvasRoutedEdge(edge: edge, route: route)
+          }
+          let fullBody = policyCanvasMeasureBodyHits(
+            routedEdges: fullRoutedEdges, nodeFramesByID: nodeFramesByID,
+            groupTitleFrames: groupTitleFrames, nodeFrameIndex: nodeFrameIndex
+          ).count
+          let incrementalBody = baseline.bodyHitTotal(
+            forCandidate: candidateRoutes, changedEdges: changed)
+          if fullBody != incrementalBody {
+            mismatches.append(
+              "\(sample.id):\(changed):body full=\(fullBody) incr=\(incrementalBody)")
+          }
+          let fullHitEdges = Set(
+            policyCanvasMeasureBodyHits(
+              routedEdges: fullRoutedEdges, nodeFramesByID: nodeFramesByID,
+              groupTitleFrames: groupTitleFrames, nodeFrameIndex: nodeFrameIndex
+            ).map(\.edgeID))
+          let incrementalHitEdges = baseline.bodyHitEdges(
+            forCandidate: candidateRoutes, changedEdges: changed)
+          if fullHitEdges != incrementalHitEdges {
+            mismatches.append(
+              "\(sample.id):\(changed):hitEdges full=\(fullHitEdges.count) incr=\(incrementalHitEdges.count)")
+          }
+          let fullCrossed = policyCanvasMeasureCrossedPorts(
+            routedEdges: fullRoutedEdges, nodeFramesByID: nodeFramesByID)
+          let incrementalCrossed = baseline.crossedViolations(
+            forCandidate: candidateRoutes, changedEdges: changed)
+          if fullCrossed != incrementalCrossed {
+            mismatches.append(
+              "\(sample.id):\(changed):crossed full=\(fullCrossed.count) incr=\(incrementalCrossed.count)")
+          }
+          let fullSide = Self.fullSideMismatchCount(
+            edges: routed.edges, routes: candidateRoutes)
+          let incrementalSide = baseline.sideMismatchTotal(
+            forCandidate: candidateRoutes, changedEdges: changed)
+          if fullSide != incrementalSide {
+            mismatches.append(
+              "\(sample.id):\(changed):side full=\(fullSide) incr=\(incrementalSide)")
+          }
+        }
+      }
+    }
+    #expect(
+      exercised.contains("extreme-galaxy"),
+      "the largest sample must exercise the incremental baseline; got \(exercised)")
+    #expect(
+      mismatches.isEmpty,
+      "incremental repair measurement must equal the full measure: \(mismatches.prefix(20))")
+  }
+
+  /// The spatial-index body-hit measure must return exactly the violations the
+  /// brute-force all-nodes scan returns, for every lab sample including the
+  /// largest. The repair chain calls the measure hundreds of times, so the index
+  /// is the performance lever; this gate proves it only changes speed, never the
+  /// measured set, so no graph-quality budget can shift underneath it.
+  @Test func indexedBodyHitsMatchBruteForceScan() async throws {
+    var exercised: [String] = []
+    var mismatches: [String] = []
+    for sample in PolicyCanvasLabSamples.all {
+      let routed = try await routedSample(sampleID: sample.id)
+      let nodeSizes = PolicyCanvasLayout.nodeSizes(for: routed.nodes, edges: routed.edges)
+      var nodeFramesByID: [String: CGRect] = [:]
+      for node in routed.nodes {
+        nodeFramesByID[node.id] = CGRect(
+          origin: node.position,
+          size: nodeSizes[node.id] ?? PolicyCanvasLayout.nodeSize(for: node))
+      }
+      let groupTitleFrames = policyCanvasGroupTitleFramesByID(routed.groups)
+      let routedEdges = routed.edges.compactMap { edge -> PolicyCanvasRoutedEdge? in
+        guard let route = routed.routes[edge.id], route.points.count >= 2 else {
+          return nil
+        }
+        return PolicyCanvasRoutedEdge(edge: edge, route: route)
+      }
+      let indexed = policyCanvasMeasureBodyHits(
+        routedEdges: routedEdges, nodeFramesByID: nodeFramesByID,
+        groupTitleFrames: groupTitleFrames)
+      let brute = Self.bruteForceBodyHits(
+        routedEdges: routedEdges, nodeFramesByID: nodeFramesByID,
+        groupTitleFrames: groupTitleFrames)
+      exercised.append(sample.id)
+      if indexed != brute {
+        mismatches.append("\(sample.id): indexed=\(indexed.count) brute=\(brute.count)")
+      }
+    }
+    #expect(
+      exercised.contains("extreme-galaxy"),
+      "the largest sample must exercise the body-hit equivalence gate; got \(exercised)")
+    #expect(
+      mismatches.isEmpty,
+      "indexed body-hit measure must equal the brute-force scan exactly: \(mismatches)")
   }
 
   /// Per-sample regression gate across the routine lab samples: each gated
@@ -998,6 +1200,88 @@ struct PolicyCanvasGraphQualityGateTests {
     }
     writeReport(lines.joined(separator: "\n"), name: "extreme-galaxy-module10-routes.txt")
     #expect(output.routes.count == viewModel.edges.count)
+  }
+
+  /// Every lab and shipping-canvas render goes through `policyCanvasAtomicReflow`
+  /// `RoutePlan`. Its port markers must land where the canvas draws them: on the
+  /// wire end and inside the node body. The canvas positions every dot at the
+  /// declaration-order anchor (`portY(declarationIndex) + axisOffset`), so the
+  /// route computation has to measure that offset from the declaration anchor too.
+  /// Measuring it from the crossing-minimal optimized anchor instead desyncs the
+  /// dot by `(declarationIndex - optimizedIndex) * spacing`, which on a reordered
+  /// gate node pushes ports above or below the card and off their wires - the
+  /// extreme-galaxy regression where gate outputs rendered outside the node when a
+  /// separate large-graph route path diverged from the main one. Drives the real
+  /// reflow-route plan against every sample, including the largest, so a divergent
+  /// or size-gated path can never reintroduce the bug.
+  @Test func reflowRoutePlanKeepsPortMarkersOnWiresInsideNodes() async throws {
+    var exercised: [String] = []
+    var offenders: [String] = []
+    for sample in PolicyCanvasLabSamples.all {
+      let viewModel = PolicyCanvasViewModel.sample()
+      viewModel.load(document: sample.document, simulation: nil, audit: nil)
+      guard
+        let plan = await policyCanvasAtomicReflowRoutePlan(
+          viewModel: viewModel,
+          preserveManualAnchors: false,
+          force: true,
+          fontScale: 1,
+          routeWorker: PolicyCanvasRouteWorker(),
+          routesCurrentGraphWhenUnchanged: true
+        )
+      else {
+        continue
+      }
+      exercised.append(sample.id)
+      let nodes = plan.graph.nodes
+      let nodesByID = Self.nodesByID(nodes)
+      let nodeSizes = PolicyCanvasLayout.nodeSizes(for: nodes, edges: plan.graph.edges)
+      for edge in plan.graph.edges {
+        for (role, endpoint, point) in [
+          (
+            PolicyCanvasRouteEndpointRole.source, edge.source,
+            plan.output.routes[edge.id]?.points.first
+          ),
+          (
+            PolicyCanvasRouteEndpointRole.target, edge.target,
+            plan.output.routes[edge.id]?.points.last
+          ),
+        ] {
+          guard
+            let point,
+            let terminal = plan.output.portMarkerLayout.terminal(edgeID: edge.id, role: role),
+            let node = nodesByID[endpoint.nodeID],
+            let center = policyCanvasPortMarkerCenter(
+              endpoint: endpoint, terminal: terminal,
+              nodesByID: nodesByID, nodeSizes: nodeSizes)
+          else {
+            continue
+          }
+          let frame = CGRect(
+            origin: node.position,
+            size: nodeSizes[node.id] ?? PolicyCanvasLayout.nodeSize(for: node))
+          if center.y < frame.minY || center.y > frame.maxY
+            || center.x < frame.minX || center.x > frame.maxX
+          {
+            offenders.append(
+              "\(sample.id):\(edge.id):\(role):\(terminal.side.rawValue):outside center=\(center) frame=\(frame)")
+          }
+          let gap = hypot(point.x - center.x, point.y - center.y)
+          if gap > 0.5 {
+            offenders.append(
+              "\(sample.id):\(edge.id):\(role):\(terminal.side.rawValue):offwire gap=\(gap)")
+          }
+        }
+      }
+    }
+    #expect(
+      exercised.contains("extreme-galaxy"),
+      "the largest sample must exercise the reflow route plan; got \(exercised)"
+    )
+    #expect(
+      offenders.isEmpty,
+      "reflow-route-plan port markers must stay on their wires inside their nodes: \(offenders.count) - \(offenders.prefix(20))"
+    )
   }
 
   /// Every crossed-port the measure flags on a real lab sample must be a genuine

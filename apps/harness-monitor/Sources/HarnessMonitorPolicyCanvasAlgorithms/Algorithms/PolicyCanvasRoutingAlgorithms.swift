@@ -17,6 +17,27 @@ struct PolicyCanvasRouteSelectionInput: Sendable {
   let router: any PolicyCanvasEdgeRouter
   let portMarkerLayout: PolicyCanvasPortMarkerLayout?
   let passContext: PolicyCanvasDisplayedRoutePassContext?
+  /// When set, only these edge IDs are routed; the rest are skipped. Each edge
+  /// routes independently against the shared obstacle/terminal/lane context, so
+  /// the routes returned for the filtered edges are identical to routing the
+  /// whole set. Callers that apply only a subset of the result (the body-hit and
+  /// crossed-port repairs re-route just the offending edges) pass that subset
+  /// here to avoid re-routing the hundreds of edges they would discard anyway.
+  let edgeIDFilter: Set<String>?
+
+  init(
+    prepared: PolicyCanvasPreparedRouteInput,
+    router: any PolicyCanvasEdgeRouter,
+    portMarkerLayout: PolicyCanvasPortMarkerLayout?,
+    passContext: PolicyCanvasDisplayedRoutePassContext?,
+    edgeIDFilter: Set<String>? = nil
+  ) {
+    self.prepared = prepared
+    self.router = router
+    self.portMarkerLayout = portMarkerLayout
+    self.passContext = passContext
+    self.edgeIDFilter = edgeIDFilter
+  }
 }
 
 struct PolicyCanvasRoutePostProcessingInput: Sendable {
@@ -97,12 +118,15 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       passContext: input.passContext,
       router: input.router
     )
-    if prepared.edges.count >= parallelEdgeThreshold,
+    let routableEdges =
+      input.edgeIDFilter.map { filter in prepared.edges.filter { filter.contains($0.id) } }
+      ?? prepared.edges
+    if routableEdges.count >= parallelEdgeThreshold,
       ProcessInfo.processInfo.activeProcessorCount > 1
     {
-      return parallelRoutes(edges: prepared.edges, context: context)
+      return parallelRoutes(edges: routableEdges, context: context)
     }
-    return serialRoutes(edges: prepared.edges, context: context)
+    return serialRoutes(edges: routableEdges, context: context)
   }
 
   private func serialRoutes(

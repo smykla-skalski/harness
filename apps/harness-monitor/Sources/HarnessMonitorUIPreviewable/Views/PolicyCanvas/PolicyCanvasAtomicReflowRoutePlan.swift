@@ -38,26 +38,19 @@ func policyCanvasAtomicReflowRoutePlan(
     precomputedRoutes: routeGraph.precomputedRoutes,
     algorithmSelection: viewModel.algorithmSelection
   )
-  let output: PolicyCanvasRouteWorkerOutput
-  if policyCanvasCanUseFastAtomicReflowRoutes(routeInput),
-    let fastOutput = policyCanvasFastPrecomputedRouteOutput(input: routeInput)
-  {
-    output = fastOutput
-  } else {
-    output = await routeWorker.compute(input: routeInput)
-  }
+  // One route path for every policy size. A separate large-graph shortcut used to
+  // skip the route worker's repair and marker passes for speed, but it drew port
+  // markers from the crossing-minimal optimized anchor while the canvas positions
+  // each dot at the declaration-order anchor - so on reordered gate nodes the dots
+  // desynced and rendered outside the card. The single `compute` path keeps the
+  // declaration-order marker layout that the canvas actually draws, so no size
+  // threshold can reintroduce that divergence.
+  let output = await routeWorker.compute(input: routeInput)
   return PolicyCanvasAtomicReflowRoutePlan(
     graph: routeGraph,
     appliesLayoutChange: plannedGraph != nil,
     output: output
   )
-}
-
-private func policyCanvasCanUseFastAtomicReflowRoutes(
-  _ input: PolicyCanvasRouteWorkerInput
-) -> Bool {
-  input.precomputedRoutes != nil
-    && (input.nodes.count >= 300 || input.edges.count >= 500)
 }
 
 @MainActor

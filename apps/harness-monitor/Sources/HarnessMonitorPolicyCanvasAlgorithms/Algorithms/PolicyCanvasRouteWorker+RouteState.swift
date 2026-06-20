@@ -235,7 +235,8 @@ extension PolicyCanvasPreparedRouteInput {
   func policyCanvasSelectedRoutes(
     phase: String,
     portMarkerLayout: PolicyCanvasPortMarkerLayout?,
-    context: PolicyCanvasRouteStateContext
+    context: PolicyCanvasRouteStateContext,
+    edgeIDFilter: Set<String>? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
     let signpostID = policyCanvasRouteComputationSignposter.makeSignpostID()
     let markerState = portMarkerLayout == nil ? "none" : "layout"
@@ -249,7 +250,8 @@ extension PolicyCanvasPreparedRouteInput {
         prepared: context.prepared,
         router: context.router,
         portMarkerLayout: portMarkerLayout,
-        passContext: context.passContext
+        passContext: context.passContext,
+        edgeIDFilter: edgeIDFilter
       )
     )
     policyCanvasRouteComputationSignposter.endInterval(

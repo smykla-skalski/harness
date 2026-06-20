@@ -4,7 +4,7 @@ import CoreGraphics
 /// along the side, `point` in content space) plus the full route, so a pair of
 /// terminals on one side can be tested for an actual crossing rather than an
 /// inferred one.
-private struct PolicyCanvasSideTerminal {
+struct PolicyCanvasSideTerminal {
   let edgeID: String
   let offset: CGFloat
   let point: CGPoint
@@ -16,14 +16,14 @@ private struct PolicyCanvasSideTerminal {
   let isMonotonic: Bool
 }
 
-/// One route terminal awaiting resolution onto a node side: the wire end point,
-/// its full route, and the node and edge it belongs to.
-private struct PolicyCanvasCrossedPortTerminal {
-  let point: CGPoint
-  let route: PolicyCanvasEdgeRoute
+/// A node side, used to key the crossed-port terminal groups. Crossed-port
+/// violations are computed independently per node side, so the incremental
+/// repair measurement recomputes only the sides whose terminals changed.
+struct PolicyCanvasCrossedPortNodeSide: Hashable {
   let nodeID: String
-  let edgeID: String
+  let side: PolicyCanvasPortSide
 }
+
 
 /// Measure wires that picked the wrong port: two edges meeting one node side -
 /// inputs on a leading/top side, outputs on a trailing/bottom side - whose routes
@@ -45,82 +45,136 @@ func policyCanvasMeasureCrossedPorts(
   nodeFramesByID: [String: CGRect]
 ) -> [PolicyCanvasCrossedPortsViolation] {
   let tolerance = PolicyCanvasLayout.portDiameter
-  var byNodeSide: [String: [PolicyCanvasPortSide: [PolicyCanvasSideTerminal]]] = [:]
+  let registration = policyCanvasCrossedPortTerminalsByNodeSide(
+    routedEdges: routedEdges,
+    nodeFramesByID: nodeFramesByID,
+    tolerance: tolerance
+  )
+  var violations: [PolicyCanvasCrossedPortsViolation] = []
+  for (nodeSide, terminals) in registration.terminalsByNodeSide {
+    violations.append(
+      contentsOf: policyCanvasCrossedPortViolationsForSide(
+        nodeSide, terminals: terminals, tolerance: tolerance))
+  }
+  return violations.sorted(by: policyCanvasCrossedPortsOrder)
+}
+
+/// Per-node-side terminal groups for the crossed-port metric, plus the sides
+/// each edge contributed a terminal to. Crossed-port violations are computed
+/// independently per node side, so the incremental repair measurement reuses
+/// these groups and recomputes only the sides whose terminals a candidate moved.
+struct PolicyCanvasCrossedPortRegistration {
+  var terminalsByNodeSide: [PolicyCanvasCrossedPortNodeSide: [PolicyCanvasSideTerminal]]
+  var nodeSidesByEdge: [String: [PolicyCanvasCrossedPortNodeSide]]
+}
+
+func policyCanvasCrossedPortTerminalsByNodeSide(
+  routedEdges: [PolicyCanvasRoutedEdge],
+  nodeFramesByID: [String: CGRect],
+  tolerance: CGFloat
+) -> PolicyCanvasCrossedPortRegistration {
+  var terminalsByNodeSide: [PolicyCanvasCrossedPortNodeSide: [PolicyCanvasSideTerminal]] = [:]
+  var nodeSidesByEdge: [String: [PolicyCanvasCrossedPortNodeSide]] = [:]
   for routed in routedEdges {
     guard let first = routed.route.points.first, let last = routed.route.points.last else {
       continue
     }
-    policyCanvasRegisterSideTerminal(
-      terminal: PolicyCanvasCrossedPortTerminal(
-        point: first,
-        route: routed.route,
-        nodeID: routed.edge.source.nodeID,
-        edgeID: routed.edge.id
-      ),
-      nodeFramesByID: nodeFramesByID,
-      tolerance: tolerance,
-      byNodeSide: &byNodeSide
-    )
-    policyCanvasRegisterSideTerminal(
-      terminal: PolicyCanvasCrossedPortTerminal(
-        point: last,
-        route: routed.route,
-        nodeID: routed.edge.target.nodeID,
-        edgeID: routed.edge.id
-      ),
-      nodeFramesByID: nodeFramesByID,
-      tolerance: tolerance,
-      byNodeSide: &byNodeSide
-    )
-  }
-  var violations: [PolicyCanvasCrossedPortsViolation] = []
-  for (nodeID, sideMap) in byNodeSide {
-    for (side, terminals) in sideMap where terminals.count >= 2 {
-      let horizontalSide = side == .leading || side == .trailing
-      let sorted = terminals.sorted {
-        abs($0.offset - $1.offset) > 0.5 ? $0.offset < $1.offset : $0.edgeID < $1.edgeID
+    for (point, nodeID) in [
+      (first, routed.edge.source.nodeID), (last, routed.edge.target.nodeID),
+    ] {
+      guard
+        let resolved = policyCanvasResolveCrossedPortSideTerminal(
+          point: point, route: routed.route, nodeID: nodeID, edgeID: routed.edge.id,
+          nodeFramesByID: nodeFramesByID, tolerance: tolerance)
+      else {
+        continue
       }
-      for index in 0..<sorted.count {
-        for jndex in (index + 1)..<sorted.count {
-          let lower = sorted[index]
-          let upper = sorted[jndex]
-          // Two ways two ports read as crossed: their direct routes properly
-          // intersect between the ports (a clean X, only trusted when neither wire
-          // detours), or they share one channel and attach in swapped order (a
-          // collinear swap the intersection test cannot see). Either counts.
-          let properCross =
-            lower.isMonotonic && upper.isMonotonic
-            && policyCanvasRoutesCrossNearTerminals(lower, upper, tolerance: tolerance)
-          let channelSwap = policyCanvasRoutesSwapInSharedChannel(
-            lower, upper, horizontalSide: horizontalSide, tolerance: tolerance
-          )
-          guard abs(lower.offset - upper.offset) > 0.5, properCross || channelSwap else {
-            continue
-          }
-          let spansPort = sorted.contains {
-            $0.offset > lower.offset + 0.5 && $0.offset < upper.offset - 0.5
-          }
-          violations.append(
-            PolicyCanvasCrossedPortsViolation(
-              nodeID: nodeID,
-              side: side,
-              edgeA: lower.edgeID,
-              edgeB: upper.edgeID,
-              pointA: lower.point,
-              pointB: upper.point,
-              markPoint: policyCanvasCrossedPortMark(
-                lower.point,
-                upper.point,
-                side: side,
-                spansPort: spansPort
-              )
-            )
-          )
-        }
-      }
+      terminalsByNodeSide[resolved.nodeSide, default: []].append(resolved.terminal)
+      nodeSidesByEdge[routed.edge.id, default: []].append(resolved.nodeSide)
     }
   }
-  return violations.sorted(by: policyCanvasCrossedPortsOrder)
+  return PolicyCanvasCrossedPortRegistration(
+    terminalsByNodeSide: terminalsByNodeSide, nodeSidesByEdge: nodeSidesByEdge)
+}
+
+/// Resolve one edge terminal onto its node side. Nil when the point is not on
+/// any side of its node frame.
+func policyCanvasResolveCrossedPortSideTerminal(
+  point: CGPoint,
+  route: PolicyCanvasEdgeRoute,
+  nodeID: String,
+  edgeID: String,
+  nodeFramesByID: [String: CGRect],
+  tolerance: CGFloat
+) -> (nodeSide: PolicyCanvasCrossedPortNodeSide, terminal: PolicyCanvasSideTerminal)? {
+  guard
+    let frame = nodeFramesByID[nodeID],
+    let side = policyCanvasMarkerSide(point: point, frame: frame, tolerance: tolerance)
+  else {
+    return nil
+  }
+  let horizontalSide = side == .leading || side == .trailing
+  let terminal = PolicyCanvasSideTerminal(
+    edgeID: edgeID,
+    offset: horizontalSide ? point.y : point.x,
+    point: point,
+    points: route.points,
+    isMonotonic: policyCanvasRoutePerpendicularlyMonotonic(route, horizontalSide: horizontalSide)
+  )
+  return (PolicyCanvasCrossedPortNodeSide(nodeID: nodeID, side: side), terminal)
+}
+
+/// Crossed-port violations within one node side. Self-contained per side so the
+/// driver and the incremental repair measurement share identical logic.
+func policyCanvasCrossedPortViolationsForSide(
+  _ nodeSide: PolicyCanvasCrossedPortNodeSide,
+  terminals: [PolicyCanvasSideTerminal],
+  tolerance: CGFloat
+) -> [PolicyCanvasCrossedPortsViolation] {
+  guard terminals.count >= 2 else {
+    return []
+  }
+  let side = nodeSide.side
+  let horizontalSide = side == .leading || side == .trailing
+  let sorted = terminals.sorted {
+    abs($0.offset - $1.offset) > 0.5 ? $0.offset < $1.offset : $0.edgeID < $1.edgeID
+  }
+  var violations: [PolicyCanvasCrossedPortsViolation] = []
+  for index in 0..<sorted.count {
+    for jndex in (index + 1)..<sorted.count {
+      let lower = sorted[index]
+      let upper = sorted[jndex]
+      // Two ways two ports read as crossed: their direct routes properly
+      // intersect between the ports (a clean X, only trusted when neither wire
+      // detours), or they share one channel and attach in swapped order (a
+      // collinear swap the intersection test cannot see). Either counts.
+      let properCross =
+        lower.isMonotonic && upper.isMonotonic
+        && policyCanvasRoutesCrossNearTerminals(lower, upper, tolerance: tolerance)
+      let channelSwap = policyCanvasRoutesSwapInSharedChannel(
+        lower, upper, horizontalSide: horizontalSide, tolerance: tolerance
+      )
+      guard abs(lower.offset - upper.offset) > 0.5, properCross || channelSwap else {
+        continue
+      }
+      let spansPort = sorted.contains {
+        $0.offset > lower.offset + 0.5 && $0.offset < upper.offset - 0.5
+      }
+      violations.append(
+        PolicyCanvasCrossedPortsViolation(
+          nodeID: nodeSide.nodeID,
+          side: side,
+          edgeA: lower.edgeID,
+          edgeB: upper.edgeID,
+          pointA: lower.point,
+          pointB: upper.point,
+          markPoint: policyCanvasCrossedPortMark(
+            lower.point, upper.point, side: side, spansPort: spansPort)
+        )
+      )
+    }
+  }
+  return violations
 }
 
 /// The point where the overlay draws the crossing X. Two adjacent crossed ports
@@ -152,30 +206,6 @@ private func policyCanvasCrossedPortMark(
   }
 }
 
-private func policyCanvasRegisterSideTerminal(
-  terminal: PolicyCanvasCrossedPortTerminal,
-  nodeFramesByID: [String: CGRect],
-  tolerance: CGFloat,
-  byNodeSide: inout [String: [PolicyCanvasPortSide: [PolicyCanvasSideTerminal]]]
-) {
-  let point = terminal.point
-  let route = terminal.route
-  guard
-    let frame = nodeFramesByID[terminal.nodeID],
-    let side = policyCanvasMarkerSide(point: point, frame: frame, tolerance: tolerance)
-  else {
-    return
-  }
-  let horizontalSide = side == .leading || side == .trailing
-  let resolved = PolicyCanvasSideTerminal(
-    edgeID: terminal.edgeID,
-    offset: horizontalSide ? point.y : point.x,
-    point: point,
-    points: route.points,
-    isMonotonic: policyCanvasRoutePerpendicularlyMonotonic(route, horizontalSide: horizontalSide)
-  )
-  byNodeSide[terminal.nodeID, default: [:]][side, default: []].append(resolved)
-}
 
 /// True when the two terminals funnel through one shared channel and attach in
 /// swapped order. Two wires sharing a collinear channel run (same x for a vertical
@@ -347,7 +377,7 @@ private func policyCanvasRoutePerpendicularlyMonotonic(
   return true
 }
 
-private func policyCanvasCrossedPortsOrder(
+func policyCanvasCrossedPortsOrder(
   _ lhs: PolicyCanvasCrossedPortsViolation,
   _ rhs: PolicyCanvasCrossedPortsViolation
 ) -> Bool {

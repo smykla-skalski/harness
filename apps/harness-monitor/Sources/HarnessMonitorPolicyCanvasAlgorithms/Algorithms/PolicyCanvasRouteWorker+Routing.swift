@@ -321,9 +321,12 @@ extension PolicyCanvasPreparedRouteInput {
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode],
     router selectedRouter: any PolicyCanvasEdgeRouter,
-    algorithms: PolicyCanvasRoutingAlgorithmSet
+    algorithms: PolicyCanvasRoutingAlgorithmSet,
+    passContext: PolicyCanvasDisplayedRoutePassContext? = nil,
+    precomputedHitEdgeIDs: Set<String>? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
-    let hitEdgeIDs = precomputedBodyHitEdgeIDs(routes: routes, nodeIndex: nodeIndex)
+    let hitEdgeIDs =
+      precomputedHitEdgeIDs ?? precomputedBodyHitEdgeIDs(routes: routes, nodeIndex: nodeIndex)
     guard !hitEdgeIDs.isEmpty else {
       return routes
     }
@@ -334,14 +337,15 @@ extension PolicyCanvasPreparedRouteInput {
     let context = PolicyCanvasRouteStateContext(
       prepared: self,
       nodeIndex: nodeIndex,
-      passContext: displayedRoutePassContext(nodeIndex: nodeIndex),
+      passContext: passContext ?? displayedRoutePassContext(nodeIndex: nodeIndex),
       router: selectedRouter,
       algorithms: algorithms
     )
     let selectedRoutes = policyCanvasSelectedRoutes(
       phase: "precomputed-repair",
       portMarkerLayout: precomputedMarkerLayout,
-      context: context
+      context: context,
+      edgeIDFilter: hitEdgeIDs
     )
     var repaired = routes
     for edge in edges where hitEdgeIDs.contains(edge.id) {
