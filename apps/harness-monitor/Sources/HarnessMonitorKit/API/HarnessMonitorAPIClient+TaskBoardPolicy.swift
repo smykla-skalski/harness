@@ -167,6 +167,16 @@ extension HarnessMonitorAPIClient {
     )
   }
 
+  public func replayTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineReplayRequest
+  ) async throws -> TaskBoardPolicyPipelineReplayResult {
+    try await post(
+      "/v1/task-board/policy/replay",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
   public func taskBoardPolicyPipelineAudit(
     canvasId: String? = nil
   ) async throws -> TaskBoardPolicyPipelineAuditSummary {

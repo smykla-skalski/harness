@@ -117,6 +117,34 @@ let samplePolicyAuditText =
   }
   """
 
+let samplePolicyReplayText =
+  """
+  {
+    "sample_size": 2,
+    "changed_count": 1,
+    "decisions": [
+      {
+        "id": "policy-decision-1",
+        "recorded_at": "2026-06-20T10:00:00Z",
+        "action": "merge_pr",
+        "historical_decision": {
+          "decision": "allow",
+          "reason_code": "auto_merge_allowed",
+          "policy_version": "task-board-policy-v1"
+        },
+        "draft_decision": {
+          "decision": "deny",
+          "reason_code": "checks_not_green",
+          "policy_version": "task-board-policy-v1"
+        },
+        "visited_node_ids": ["node-merge"],
+        "changed": true,
+        "insufficient_evidence": false
+      }
+    ]
+  }
+  """
+
 let samplePolicyCanvasWorkspaceText =
   """
   {

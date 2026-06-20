@@ -47,3 +47,10 @@ public typealias PolicyInput = HarnessMonitorPolicyModels.PolicyInput
 // generated `PolicyPipelineGoLiveDiffEntry`, resolved from the models module.
 public typealias TaskBoardPolicyPipelineGoLiveDiff =
   HarnessMonitorPolicyModels.PolicyPipelineGoLiveDiff
+
+// The replay result, re-exported so the client/store/runtime can name it without
+// importing the models module, and so view files that import BOTH modules avoid a
+// lookup clash against the generated `PolicyPipelineReplayResult`. Its `decisions`
+// entries stay the generated `PolicyPipelineReplayDecision`.
+public typealias TaskBoardPolicyPipelineReplayResult =
+  HarnessMonitorPolicyModels.PolicyPipelineReplayResult

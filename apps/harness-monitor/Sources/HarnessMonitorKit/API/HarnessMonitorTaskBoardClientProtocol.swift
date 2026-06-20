@@ -109,6 +109,9 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func goLiveDiffTaskBoardPolicyPipeline(
     request: TaskBoardPolicyPipelineGoLiveDiffRequest
   ) async throws -> TaskBoardPolicyPipelineGoLiveDiff
+  func replayTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineReplayRequest
+  ) async throws -> TaskBoardPolicyPipelineReplayResult
   func taskBoardPolicyPipelineAudit(canvasId: String?) async throws
     -> TaskBoardPolicyPipelineAuditSummary
   func exportTaskBoardPolicy(

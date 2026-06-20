@@ -1592,3 +1592,73 @@ public struct PolicyScenario: Codable, Equatable, Sendable {
     case seeded
   }
 }
+
+public struct PolicyPipelineReplayDecision: Codable, Equatable, Sendable {
+  public var id: String
+  public var recordedAt: String
+  public var action: PolicyAction
+  public var historicalDecision: PolicyDecision
+  public var draftDecision: PolicyDecision
+  public var visitedNodeIds: [String]
+  public var changed: Bool
+  public var insufficientEvidence: Bool
+
+  public init(id: String, recordedAt: String, action: PolicyAction, historicalDecision: PolicyDecision, draftDecision: PolicyDecision, visitedNodeIds: [String] = [], changed: Bool, insufficientEvidence: Bool) {
+    self.id = id
+    self.recordedAt = recordedAt
+    self.action = action
+    self.historicalDecision = historicalDecision
+    self.draftDecision = draftDecision
+    self.visitedNodeIds = visitedNodeIds
+    self.changed = changed
+    self.insufficientEvidence = insufficientEvidence
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    recordedAt = try container.decode(String.self, forKey: .recordedAt)
+    action = try container.decode(PolicyAction.self, forKey: .action)
+    historicalDecision = try container.decode(PolicyDecision.self, forKey: .historicalDecision)
+    draftDecision = try container.decode(PolicyDecision.self, forKey: .draftDecision)
+    visitedNodeIds = try container.decodeIfPresent([String].self, forKey: .visitedNodeIds) ?? []
+    changed = try container.decode(Bool.self, forKey: .changed)
+    insufficientEvidence = try container.decode(Bool.self, forKey: .insufficientEvidence)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case recordedAt = "recorded_at"
+    case action
+    case historicalDecision = "historical_decision"
+    case draftDecision = "draft_decision"
+    case visitedNodeIds = "visited_node_ids"
+    case changed
+    case insufficientEvidence = "insufficient_evidence"
+  }
+}
+
+public struct PolicyPipelineReplayResult: Codable, Equatable, Sendable {
+  public var sampleSize: UInt
+  public var changedCount: UInt
+  public var decisions: [PolicyPipelineReplayDecision]
+
+  public init(sampleSize: UInt, changedCount: UInt, decisions: [PolicyPipelineReplayDecision] = []) {
+    self.sampleSize = sampleSize
+    self.changedCount = changedCount
+    self.decisions = decisions
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    sampleSize = try container.decode(UInt.self, forKey: .sampleSize)
+    changedCount = try container.decode(UInt.self, forKey: .changedCount)
+    decisions = try container.decodeIfPresent([PolicyPipelineReplayDecision].self, forKey: .decisions) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case sampleSize = "sample_size"
+    case changedCount = "changed_count"
+    case decisions
+  }
+}

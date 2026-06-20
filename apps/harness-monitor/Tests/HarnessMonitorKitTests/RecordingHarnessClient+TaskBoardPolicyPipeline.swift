@@ -315,6 +315,12 @@ extension RecordingHarnessClient {
     TaskBoardPolicyPipelineGoLiveDiff(hasLivePolicy: false, changedCount: 0, diffs: [])
   }
 
+  func replayTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineReplayRequest
+  ) async throws -> TaskBoardPolicyPipelineReplayResult {
+    TaskBoardPolicyPipelineReplayResult(sampleSize: 0, changedCount: 0, decisions: [])
+  }
+
   func taskBoardPolicyPipelineAudit(
     canvasId: String? = nil
   ) async throws -> TaskBoardPolicyPipelineAuditSummary {

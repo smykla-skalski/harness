@@ -178,6 +178,7 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/task-board/policy/pipeline", method: "PUT"): samplePolicySaveDraftText,
     Route("/v1/task-board/policy/simulate"): samplePolicySimulationText,
     Route("/v1/task-board/policy/promote"): samplePolicyPromotionText,
+    Route("/v1/task-board/policy/replay"): samplePolicyReplayText,
     Route("/v1/task-board/policy/audit"): samplePolicyAuditText,
     Route("/v1/reviews/repositories"):
       sampleDepsCatalogResponseText,

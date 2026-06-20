@@ -69,6 +69,12 @@ extension HarnessMonitorTaskBoardClientProtocol {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
   }
 
+  public func replayTaskBoardPolicyPipeline(
+    request _: TaskBoardPolicyPipelineReplayRequest
+  ) async throws -> TaskBoardPolicyPipelineReplayResult {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
+  }
+
   public func taskBoardPolicyPipelineAudit() async throws -> TaskBoardPolicyPipelineAuditSummary {
     try await taskBoardPolicyPipelineAudit(canvasId: nil)
   }

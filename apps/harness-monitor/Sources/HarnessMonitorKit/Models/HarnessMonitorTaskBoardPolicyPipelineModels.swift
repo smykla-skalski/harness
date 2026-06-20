@@ -216,6 +216,16 @@ public struct TaskBoardPolicyPipelineSimulateRequest: Codable, Equatable, Sendab
   }
 }
 
+public struct TaskBoardPolicyPipelineReplayRequest: Codable, Equatable, Sendable {
+  public var canvasId: String?
+  public var limit: UInt32?
+
+  public init(canvasId: String? = nil, limit: UInt32? = nil) {
+    self.canvasId = canvasId
+    self.limit = limit
+  }
+}
+
 public struct TaskBoardPolicyPipelinePromoteRequest: Codable, Equatable, Sendable {
   public var canvasId: String?
   public var revision: UInt64
