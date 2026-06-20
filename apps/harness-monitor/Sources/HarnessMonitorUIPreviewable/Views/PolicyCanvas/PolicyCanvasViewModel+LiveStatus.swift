@@ -44,4 +44,29 @@ extension PolicyCanvasViewModel {
     }
     return .live(revision: audit.activeRevision)
   }
+
+  /// Whether the draft can be made the live, enforced policy right now.
+  var canMakeLive: Bool {
+    makeLiveDisabledReason == nil
+  }
+
+  /// First reason make-live is blocked, or nil when it is allowed. Make-live no
+  /// longer carries the old promote bookkeeping (saved-matching-simulation /
+  /// run-simulation-for-revision): autosave keeps the draft current and the
+  /// daemon re-simulates inside `apply_make_live`, so the only real gates are a
+  /// validation error, a not-yet-saved canvas, and an in-flight save. The chrome
+  /// surfaces this string as the disabled button's help text.
+  var makeLiveDisabledReason: String? {
+    let errors = validationErrorCount
+    if errors > 0 {
+      return errors == 1 ? "Fix 1 validation error first" : "Fix \(errors) validation errors first"
+    }
+    guard backingDocument != nil else {
+      return "Save a draft before making it live"
+    }
+    if isSavingDraft {
+      return "Finish saving before making live"
+    }
+    return nil
+  }
 }

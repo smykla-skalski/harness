@@ -61,8 +61,8 @@ extension PolicyCanvasViewModel {
     // On document-preserving paths (nil incoming doc, same-revision republish)
     // only overwrite latestSimulation when the incoming payload actually
     // carries one. A nil-republish must not nil out a sim that still matches
-    // the current revision — otherwise promoteDisabledReason flips back to
-    // "Run simulation first" after a harmless audit-only push.
+    // the current revision — otherwise the confidence panel's decision matrix
+    // blanks to its empty state after a harmless audit-only push.
     guard let document else {
       if let incoming = simulation ?? audit?.latestSimulation {
         latestSimulation = incoming

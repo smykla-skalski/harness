@@ -7,7 +7,7 @@ public struct PolicyCanvasView: View {
   static let missingStoreRemoteActionDisabledReason =
     "Unavailable without a live policy store"
   @State private var viewModelState: PolicyCanvasViewModel
-  @State private var isShowingPromoteConfirmationState = false
+  @State private var goLiveRequestState: PolicyCanvasGoLiveRequest?
   @State private var pendingDeletionRequestState: PolicyCanvasDeletionRequest?
   @State private var statusLineState: String = "No pending changes"
   @State private var searchPaletteVisibleState: Bool = false
@@ -92,9 +92,9 @@ public struct PolicyCanvasView: View {
     nonmutating set { pendingDeletionRequestState = newValue }
   }
 
-  var isShowingPromoteConfirmation: Bool {
-    get { isShowingPromoteConfirmationState }
-    nonmutating set { isShowingPromoteConfirmationState = newValue }
+  var goLiveRequest: PolicyCanvasGoLiveRequest? {
+    get { goLiveRequestState }
+    nonmutating set { goLiveRequestState = newValue }
   }
 
   var searchPaletteVisible: Bool {
@@ -211,6 +211,36 @@ public struct PolicyCanvasView: View {
 
   public var body: some View {
     let _ = HarnessMonitorPerfTrace.countBodyEval("PolicyCanvasView")
+    // Split from the long modifier chain below so the body type-checks in
+    // reasonable time: the go-live sheet's multi-closure builder plus the
+    // deletion dialog tip the single-expression chain over the solver budget.
+    policyCanvasCoreBody
+      .sheet(item: $goLiveRequestState) { request in
+        PolicyCanvasGoLiveSheet(
+          viewModel: viewModel,
+          liveStatus: viewModel.liveStatus,
+          loadDiff: loadGoLiveDiff,
+          confirm: { confirmMakeLive(revision: request.revision) },
+          dismiss: { goLiveRequest = nil }
+        )
+      }
+      .confirmationDialog(
+        pendingDeletionRequest?.title ?? "Delete policy component?",
+        isPresented: deletionConfirmationPresented,
+        titleVisibility: .visible,
+        presenting: pendingDeletionRequest
+      ) { request in
+        Button(request.confirmationTitle, role: .destructive) {
+          viewModel.confirmDelete(request)
+          pendingDeletionRequest = nil
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: { request in
+        Text(request.message)
+      }
+  }
+
+  private var policyCanvasCoreBody: some View {
     policyCanvasSplitLayout
       // Root focus powers canvas keyboard shortcuts; components draw their own
       // visible focus (selected node borders, etc.), so the system focus ring on
@@ -341,32 +371,6 @@ public struct PolicyCanvasView: View {
         {
           flushPendingAutosaveBeforeBackground()
         }
-      }
-      .confirmationDialog(
-        "Promote policy pipeline?",
-        isPresented: $isShowingPromoteConfirmationState,
-        titleVisibility: .visible
-      ) {
-        Button("Promote", role: .destructive) {
-          confirmPromote()
-        }
-        Button("Cancel", role: .cancel) {}
-      } message: {
-        Text("The saved revision will become the enforced automation policy")
-      }
-      .confirmationDialog(
-        pendingDeletionRequest?.title ?? "Delete policy component?",
-        isPresented: deletionConfirmationPresented,
-        titleVisibility: .visible,
-        presenting: pendingDeletionRequest
-      ) { request in
-        Button(request.confirmationTitle, role: .destructive) {
-          viewModel.confirmDelete(request)
-          pendingDeletionRequest = nil
-        }
-        Button("Cancel", role: .cancel) {}
-      } message: { request in
-        Text(request.message)
       }
   }
 

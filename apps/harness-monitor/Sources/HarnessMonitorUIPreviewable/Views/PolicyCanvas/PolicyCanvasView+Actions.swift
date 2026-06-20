@@ -122,37 +122,40 @@ extension PolicyCanvasView {
     )
   }
 
-  func requestPromote() {
+  func requestMakeLive() {
     guard remoteActionsEnabled else {
       statusLine = remoteActionDisabledReason
       return
     }
-    guard viewModel.canPromote, let revision = viewModel.backingDocument?.revision else {
-      statusLine = "Promote requires a saved matching simulation"
+    guard viewModel.canMakeLive, let revision = viewModel.backingDocument?.revision else {
+      statusLine = viewModel.makeLiveDisabledReason ?? "Save a draft before making it live"
       return
     }
-    statusLine = "Confirm promotion for revision \(revision)"
-    isShowingPromoteConfirmation = true
+    statusLine = "Review go-live changes for revision \(revision)"
+    goLiveRequest = PolicyCanvasGoLiveRequest(revision: revision)
   }
 
-  func confirmPromote() {
+  /// Load the read-only live-vs-draft decision diff for the go-live sheet. Sends
+  /// the active canvas id so the preview reflects the saved revision make-live
+  /// will enforce, not any unsaved in-editor edits.
+  func loadGoLiveDiff() async -> TaskBoardPolicyPipelineGoLiveDiff? {
+    await runtime?.goLiveDiffPolicyCanvas(canvasId: runtime?.policyCanvasSnapshot.activeCanvasId)
+  }
+
+  func confirmMakeLive(revision: UInt64) {
     guard remoteActionsEnabled else {
       statusLine = remoteActionDisabledReason
       return
     }
-    guard viewModel.canPromote, let revision = viewModel.backingDocument?.revision else {
-      statusLine = "Promote requires a saved matching simulation"
-      return
-    }
-    viewModel.isPromoting = true
+    viewModel.isMakingLive = true
     Task { @MainActor in
-      defer { viewModel.isPromoting = false }
-      let promoted = await runtime?.promotePolicyCanvas(revision: revision) ?? false
-      if promoted {
+      defer { viewModel.isMakingLive = false }
+      let madeLive = await runtime?.makeLivePolicyCanvas(revision: revision) ?? false
+      if madeLive {
         enforceCanvasAutomationPolicies()
         await forceReloadPolicyPipeline()
       } else {
-        statusLine = "Promotion blocked"
+        statusLine = "Make live blocked"
       }
     }
   }

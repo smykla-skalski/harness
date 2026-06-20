@@ -26,7 +26,7 @@ struct PolicyCanvasDecisionMatrixRow: View {
 
   private var rowContent: some View {
     HStack(spacing: 10) {
-      verdictPill
+      PolicyCanvasVerdictPill(verdict: model.verdict)
 
       VStack(alignment: .leading, spacing: 2) {
         Text(model.actionTitle)
@@ -62,19 +62,5 @@ struct PolicyCanvasDecisionMatrixRow: View {
         .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
     }
     .contentShape(Rectangle())
-  }
-
-  private var verdictPill: some View {
-    Label(model.verdict.label, systemImage: model.verdict.systemImage)
-      .scaledFont(.caption2.weight(.semibold))
-      .lineLimit(1)
-      .foregroundStyle(model.verdict.tone.tint)
-      .padding(.horizontal, 8)
-      .padding(.vertical, 4)
-      .background(model.verdict.tone.background, in: .capsule)
-      .overlay {
-        Capsule().strokeBorder(model.verdict.tone.border, lineWidth: 1)
-      }
-      .fixedSize()
   }
 }

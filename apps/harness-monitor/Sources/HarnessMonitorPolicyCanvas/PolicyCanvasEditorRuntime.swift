@@ -16,7 +16,8 @@ public protocol PolicyCanvasEditorRuntime: PolicyCanvasLabRuntime {
   func simulatePolicyCanvas(document: TaskBoardPolicyPipelineDocument) async -> Bool
   func savePolicyCanvasDraft(document: TaskBoardPolicyPipelineDocument) async
     -> TaskBoardPolicyPipelineDocument?
-  func promotePolicyCanvas(revision: UInt64) async -> Bool
+  func makeLivePolicyCanvas(revision: UInt64) async -> Bool
+  func goLiveDiffPolicyCanvas(canvasId: String?) async -> TaskBoardPolicyPipelineGoLiveDiff?
 }
 
 extension HarnessMonitorStore: PolicyCanvasEditorRuntime {
@@ -54,7 +55,13 @@ extension HarnessMonitorStore: PolicyCanvasEditorRuntime {
     await saveTaskBoardPolicyPipelineDraft(document: document)
   }
 
-  public func promotePolicyCanvas(revision: UInt64) async -> Bool {
-    await promoteTaskBoardPolicyPipeline(revision: revision)
+  public func makeLivePolicyCanvas(revision: UInt64) async -> Bool {
+    await makeLiveTaskBoardPolicyPipeline(revision: revision)
+  }
+
+  public func goLiveDiffPolicyCanvas(canvasId: String?) async
+    -> TaskBoardPolicyPipelineGoLiveDiff?
+  {
+    await goLiveDiffTaskBoardPolicyPipeline(canvasId: canvasId)
   }
 }

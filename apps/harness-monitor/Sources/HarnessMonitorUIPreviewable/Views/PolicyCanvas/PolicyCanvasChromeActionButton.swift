@@ -1,9 +1,11 @@
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
-/// Bordered action button used by `PolicyCanvasTopBar` (Save, Simulate,
-/// Promote). Split out of `PolicyCanvasChromeViews.swift` on touch during
-/// Wave 4L fix-up so the chrome file lands under the 420-line cap.
+/// Action button used by `PolicyCanvasTopBar` (Reformat, Make live). Split out
+/// of `PolicyCanvasChromeViews.swift` on touch during Wave 4L fix-up so the
+/// chrome file lands under the 420-line cap. Defaults to the bordered glass
+/// variant; the single primary call-to-action (Make live) passes `.prominent`
+/// for the `.glassProminent` treatment.
 ///
 /// While a daemon round-trip is in flight (`isBusy == true`) the leading
 /// icon swaps for a small spinner; the title text stays so keyboard
@@ -11,6 +13,7 @@ import SwiftUI
 struct PolicyCanvasActionButton: View {
   let title: String
   let systemImage: String
+  var variant: HarnessMonitorActionButtonVariant = .bordered
   var tint = PolicyCanvasVisualStyle.activeTint
   var isDisabled = false
   var disabledReason: String?
@@ -39,7 +42,10 @@ struct PolicyCanvasActionButton: View {
     }
     .accessibilityIdentifier(accessibilityIdentifier)
     .accessibilityLabel(title)
-    .harnessActionButtonStyle(variant: .bordered, tint: tint.opacity(0.85))
+    .harnessActionButtonStyle(
+      variant: variant,
+      tint: variant == .prominent ? tint : tint.opacity(0.85)
+    )
     .controlSize(.small)
     .disabled(isDisabled || isBusy)
     .help(helpText)

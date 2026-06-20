@@ -11,7 +11,9 @@ extension HarnessMonitorAccessibility {
   public static let policyCanvasEditSheet = "harness.policy-canvas.edit-sheet"
   public static let policyCanvasEditDoneButton = "harness.policy-canvas.edit-sheet.done"
   public static let policyCanvasReformatButton = "harness.policy-canvas.action.reformat"
-  public static let policyCanvasPromoteButton = "harness.policy-canvas.action.promote"
+  public static let policyCanvasMakeLiveButton = "harness.policy-canvas.action.make-live"
+  public static let policyCanvasGoLiveSheet = "harness.policy-canvas.go-live.sheet"
+  public static let policyCanvasGoLiveDiff = "harness.policy-canvas.go-live.diff"
   public static let policyCanvasGlobalEnforcementButton =
     "harness.policy-canvas.action.global-enforcement"
   public static let policyCanvasReloadButton = "harness.policy-canvas.action.reload"

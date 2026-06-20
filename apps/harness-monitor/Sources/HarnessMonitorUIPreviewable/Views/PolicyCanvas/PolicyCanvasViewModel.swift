@@ -186,14 +186,14 @@ public final class PolicyCanvasViewModel {
   /// interaction path. Only the newest worker result may update the cache.
   @ObservationIgnored var automationCompilationGeneration: UInt64
 
-  /// In-flight async-save state surfaced to the chrome so Save / Simulate /
-  /// Promote buttons can flip into a busy presentation (disabled +
-  /// `ProgressView`) without losing the toast-on-reject path. Reads from a
-  /// view body redraw on flip, so writes must be paired with a corresponding
-  /// false-write in `defer` blocks on every async exit.
+  /// In-flight async-save state surfaced to the chrome so the Save and Make-live
+  /// buttons can flip into a busy presentation (disabled + `ProgressView`)
+  /// without losing the toast-on-reject path. Reads from a view body redraw on
+  /// flip, so writes must be paired with a corresponding false-write in `defer`
+  /// blocks on every async exit.
   var isSavingDraft: Bool
   var isSimulating: Bool
-  var isPromoting: Bool
+  var isMakingLive: Bool
 
   /// User-facing save progress cue the bottom-right status pill reads (see
   /// `PolicyCanvasSaveActivity`). Distinct from `lastAutosaveOutcome`, which
@@ -321,7 +321,7 @@ public final class PolicyCanvasViewModel {
     self.marqueeSelection = nil
     self.isSavingDraft = false
     self.isSimulating = false
-    self.isPromoting = false
+    self.isMakingLive = false
     self.saveActivity = .idle
     self.autosaveSuppressed = false
     self.lastAutosaveOutcome = .idle
@@ -371,28 +371,6 @@ public final class PolicyCanvasViewModel {
 
   var policySummary: String {
     "\(nodes.count) nodes - \(edges.count) edges - \(groups.count) groups"
-  }
-  var canPromote: Bool {
-    promoteDisabledReason == nil
-  }
-
-  var promoteDisabledReason: String? {
-    guard let backingDocument else {
-      return "Save a draft first"
-    }
-    if documentDirty {
-      return "Save draft changes first"
-    }
-    guard let latestSimulation else {
-      return "Run simulation first"
-    }
-    guard latestSimulation.succeeded else {
-      return "Fix validation before promotion"
-    }
-    guard latestSimulation.revision == backingDocument.revision else {
-      return "Run simulation for saved revision"
-    }
-    return nil
   }
 
   /// Single funnel that mutation sites use to mark the document dirty on live,

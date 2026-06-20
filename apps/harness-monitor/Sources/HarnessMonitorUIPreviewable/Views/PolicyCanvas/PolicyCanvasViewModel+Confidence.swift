@@ -44,6 +44,24 @@ enum PolicyCanvasDecisionVerdict: Equatable {
     }
   }
 
+  /// Map the generated `PolicyDecision` tagged enum straight to a verdict. Used by
+  /// the go-live diff, which carries `PolicyDecision` directly rather than the
+  /// flattened `TaskBoardPolicyDecision` the simulate result uses.
+  init(decision: PolicyDecision) {
+    switch decision {
+    case .allow:
+      self = .allow
+    case .deny:
+      self = .deny
+    case .requireHuman:
+      self = .needsHuman
+    case .requireConsensus:
+      self = .consensus
+    case .dryRunOnly:
+      self = .dryRun
+    }
+  }
+
   var label: String {
     switch self {
     case .allow:

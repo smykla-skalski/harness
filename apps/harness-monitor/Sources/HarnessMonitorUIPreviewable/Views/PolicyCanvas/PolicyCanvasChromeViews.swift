@@ -7,7 +7,7 @@ struct PolicyCanvasTopBar: View {
   @Bindable var viewModel: PolicyCanvasViewModel
   /// Resolved persistent LIVE/DRAFT anchor rendered in the leading slot.
   let liveStatus: PolicyCanvasLiveState
-  let canPromote: Bool
+  let canMakeLive: Bool
   let remoteActionsEnabled: Bool
   let remoteActionDisabledReason: String
   /// True when there is a simulation payload to visualize. The toggle is
@@ -19,7 +19,7 @@ struct PolicyCanvasTopBar: View {
   let simulationOverlayVisible: Bool
   let toggleSimulationOverlay: @MainActor () -> Void
   let reflowLayout: @MainActor () -> Void
-  let promote: @MainActor () -> Void
+  let makeLive: @MainActor () -> Void
 
   var body: some View {
     VStack(spacing: 0) {
@@ -66,16 +66,17 @@ struct PolicyCanvasTopBar: View {
       )
 
       PolicyCanvasActionButton(
-        title: "Promote",
-        systemImage: "arrow.up.right.circle",
+        title: "Make live",
+        systemImage: "checkmark.seal",
+        variant: .prominent,
         tint: PolicyCanvasVisualStyle.readyTint,
-        isDisabled: !remoteActionsEnabled || !canPromote,
+        isDisabled: !remoteActionsEnabled || !canMakeLive,
         disabledReason: remoteActionsEnabled
-          ? viewModel.promoteDisabledReason
+          ? viewModel.makeLiveDisabledReason
           : remoteActionDisabledReason,
-        isBusy: viewModel.isPromoting,
-        accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasPromoteButton,
-        action: promote
+        isBusy: viewModel.isMakingLive,
+        accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasMakeLiveButton,
+        action: makeLive
       )
     }
   }

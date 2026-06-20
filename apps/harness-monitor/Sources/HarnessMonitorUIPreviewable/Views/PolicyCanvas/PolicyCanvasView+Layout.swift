@@ -22,7 +22,7 @@ extension PolicyCanvasView {
       PolicyCanvasTopBar(
         viewModel: viewModel,
         liveStatus: viewModel.liveStatus,
-        canPromote: viewModel.canPromote,
+        canMakeLive: viewModel.canMakeLive,
         remoteActionsEnabled: remoteActionsEnabled,
         remoteActionDisabledReason: remoteActionDisabledReason,
         simulationOverlayAvailable: simulationOverlayAvailable,
@@ -31,7 +31,7 @@ extension PolicyCanvasView {
         reflowLayout: {
           viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
         },
-        promote: requestPromote
+        makeLive: requestMakeLive
       )
 
       ZStack(alignment: .top) {
