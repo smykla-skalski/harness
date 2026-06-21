@@ -19,36 +19,19 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasComponentLibrary).exists)
     XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasZoomControls).exists)
     XCTAssertFalse(element(in: app, identifier: Accessibility.policyCanvasInspector).exists)
-    XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasEditButton).exists)
     XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasReformatButton).exists)
   }
 
-  func testPolicyCanvasEditButtonOpensSheet() throws {
+  func testPolicyCanvasNodeDoubleClickOpensSheet() throws {
     let app = openPolicyCanvasSessionRoute()
 
     let node = element(in: app, identifier: Accessibility.policyCanvasNode("risk:merge"))
     XCTAssertTrue(node.waitForExistence(timeout: Self.actionTimeout))
-    let root = element(in: app, identifier: Accessibility.policyCanvasRoot)
-    let viewport = element(in: app, identifier: Accessibility.policyCanvasViewport)
-    let window = mainWindow(in: app)
-    node.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
 
-    let editButton = element(in: app, identifier: Accessibility.policyCanvasEditButton)
-    XCTAssertTrue(editButton.waitForExistence(timeout: Self.actionTimeout))
-    XCTAssertTrue(
-      waitUntil(timeout: Self.actionTimeout) {
-        editButton.isEnabled
-      },
-      """
-      Selecting a policy node should enable the Edit action.
-      node=\(node.frame)
-      root=\(root.frame)
-      viewport=\(viewport.frame)
-      window=\(window.frame)
-      editButton=\(editButton.frame) enabled=\(editButton.isEnabled)
-      """
-    )
-    editButton.click()
+    // The on-canvas Edit button was removed as a duplicate of the node context
+    // menu, so the surviving pointer path opens the editor: a double-click on a
+    // node routes through the canvas (clickCount >= 2) to the edit sheet.
+    node.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).doubleClick()
 
     let sheet = element(in: app, identifier: Accessibility.policyCanvasEditSheet)
     XCTAssertTrue(sheet.waitForExistence(timeout: Self.actionTimeout))

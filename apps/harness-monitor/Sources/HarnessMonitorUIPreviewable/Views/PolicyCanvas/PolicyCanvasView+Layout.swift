@@ -83,13 +83,6 @@ extension PolicyCanvasView {
       toggleInspector: togglePolicyCanvasInspector
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .overlay(alignment: .topTrailing) {
-      PolicyCanvasSelectionEditButton(
-        isDisabled: currentEditSheet == nil,
-        open: presentCurrentEditSheet
-      )
-      .padding(14)
-    }
   }
 
   var currentEditSheet: PolicyCanvasEditSheet? {
@@ -120,24 +113,6 @@ extension PolicyCanvasView {
       viewModel.select(primarySelection)
     }
     presentedEditSheet = sheet
-  }
-}
-
-private struct PolicyCanvasSelectionEditButton: View {
-  let isDisabled: Bool
-  let open: @MainActor () -> Void
-
-  var body: some View {
-    Button(action: open) {
-      Label("Edit", systemImage: "square.and.pencil")
-        .scaledFont(.caption.weight(.semibold))
-        .lineLimit(1)
-    }
-    .harnessActionButtonStyle(variant: .bordered, tint: PolicyCanvasVisualStyle.activeTint)
-    .controlSize(.small)
-    .disabled(isDisabled)
-    .help(isDisabled ? "Select a policy component to edit" : "Edit selected policy component")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEditButton)
   }
 }
 

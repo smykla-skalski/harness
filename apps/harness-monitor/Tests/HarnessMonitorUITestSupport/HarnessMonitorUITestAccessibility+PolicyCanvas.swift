@@ -7,7 +7,6 @@ extension HarnessMonitorUITestAccessibility {
   static let policyCanvasViewport = "harness.policy-canvas.viewport"
   static let policyCanvasToolRail = "harness.policy-canvas.tool-rail"
   static let policyCanvasComponentLibrary = "harness.policy-canvas.component-library"
-  static let policyCanvasEditButton = "harness.policy-canvas.action.edit"
   static let policyCanvasEditSheet = "harness.policy-canvas.edit-sheet"
   static let policyCanvasEditDoneButton = "harness.policy-canvas.edit-sheet.done"
   static let policyCanvasReformatButton = "harness.policy-canvas.action.reformat"
