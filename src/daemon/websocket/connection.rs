@@ -18,6 +18,7 @@ use tracing::{debug, info, warn};
 use crate::daemon::http::{self, DaemonHttpState};
 #[cfg(test)]
 use crate::daemon::protocol::StreamEvent;
+use crate::daemon::remote_identity::RemoteStoredClient;
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
 
 use super::config::build_config_push_frame;
@@ -27,6 +28,7 @@ use super::relay::relay_broadcast;
 pub(crate) struct ConnectionState {
     pub(crate) global_subscription: bool,
     pub(crate) session_subscriptions: HashSet<String>,
+    remote_client: Option<RemoteStoredClient>,
     /// Highest broadcast `seq` this connection has relayed. On a `Lagged`
     /// overflow the relay replays the buffer from here before falling back to a
     /// full recovery snapshot.
@@ -34,12 +36,27 @@ pub(crate) struct ConnectionState {
 }
 
 impl ConnectionState {
+    #[cfg(test)]
     pub(crate) fn new() -> Self {
+        Self::new_with_remote_client(None)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_remote(remote_client: RemoteStoredClient) -> Self {
+        Self::new_with_remote_client(Some(remote_client))
+    }
+
+    fn new_with_remote_client(remote_client: Option<RemoteStoredClient>) -> Self {
         Self {
             global_subscription: false,
             session_subscriptions: HashSet::new(),
+            remote_client,
             last_relayed_seq: 0,
         }
+    }
+
+    pub(crate) fn remote_client(&self) -> Option<&RemoteStoredClient> {
+        self.remote_client.as_ref()
     }
 
     #[cfg(test)]
@@ -208,14 +225,18 @@ pub async fn ws_upgrade_handler(
     metadata.record_on_span(&connection_span);
     let baggage = apply_parent_context_from_headers(&connection_span, &headers);
     record_trace_id_on_span(&connection_span);
-    if let Err(response) = http::require_auth(&headers, &state) {
-        record_rejected_connection(&connection_span, &client_label);
-        return *response;
-    }
+    let remote_client = match http::websocket_remote_client(&headers, &state) {
+        Ok(client) => client,
+        Err(response) => {
+            record_rejected_connection(&connection_span, &client_label);
+            return *response;
+        }
+    };
     ws.on_upgrade(move |socket| async move {
         with_active_baggage(
             baggage,
-            handle_connection(socket, state, client_label).instrument(connection_span.clone()),
+            handle_connection(socket, state, client_label, remote_client)
+                .instrument(connection_span.clone()),
         )
         .await;
     })
@@ -263,10 +284,17 @@ fn websocket_connection_span(request_id: &str) -> tracing::Span {
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
-async fn handle_connection(socket: WebSocket, state: DaemonHttpState, client_label: String) {
+async fn handle_connection(
+    socket: WebSocket,
+    state: DaemonHttpState,
+    client_label: String,
+    remote_client: Option<RemoteStoredClient>,
+) {
     tracing::info!(client = %client_label, "websocket connection opened");
     let (mut sender, mut receiver) = socket.split();
-    let connection = Arc::new(Mutex::new(ConnectionState::new()));
+    let connection = Arc::new(Mutex::new(ConnectionState::new_with_remote_client(
+        remote_client,
+    )));
 
     let (priority_tx, mut priority_rx) = mpsc::channel::<Message>(64);
     let (bulk_tx, mut bulk_rx) = mpsc::channel::<Message>(256);

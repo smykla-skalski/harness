@@ -52,6 +52,22 @@ pub(crate) fn require_auth(
     }
 }
 
+pub(crate) fn websocket_remote_client(
+    headers: &HeaderMap,
+    state: &DaemonHttpState,
+) -> Result<Option<RemoteStoredClient>, Box<Response>> {
+    match state.auth_mode {
+        DaemonHttpAuthMode::Local => require_local_auth(headers, state).map(|()| None),
+        DaemonHttpAuthMode::Remote => {
+            if let Some(client) = scoped_remote_client() {
+                Ok(Some(client))
+            } else {
+                verify_remote_client(headers, state).map(Some)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 pub(crate) fn authorize_http_route(
     headers: &HeaderMap,
@@ -144,6 +160,10 @@ fn verify_and_authorize_http_route(
     authorize_remote_http_route(&client, route)
         .map(|_| client)
         .map_err(|error| Box::new(remote_auth_error_response(error)))
+}
+
+fn scoped_remote_client() -> Option<RemoteStoredClient> {
+    REMOTE_HTTP_CLIENT.try_with(Clone::clone).ok()
 }
 
 fn has_scoped_remote_client() -> bool {

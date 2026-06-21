@@ -1,15 +1,20 @@
 use std::thread;
 
 use axum::extract::State;
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
+use axum::http::{HeaderMap, HeaderValue, Request, StatusCode, header::AUTHORIZATION};
 use axum::{Router, middleware, routing::get};
+use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use rusqlite::Connection;
 use serde_json::json;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
+use tokio::time::{Duration, timeout};
+use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message};
 
 use crate::daemon::http::auth::{DaemonHttpAuthMode, authorize_http_route, require_auth};
-use crate::daemon::protocol::{HTTP_API_CONTRACT, HttpApiRouteContract, http_paths};
+use crate::daemon::protocol::{HTTP_API_CONTRACT, HttpApiRouteContract, http_paths, ws_methods};
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 use crate::daemon::remote_identity::RemoteClientRegistration;
@@ -248,6 +253,55 @@ async fn remote_http_authz_treats_head_as_get_scope() {
 }
 
 #[tokio::test]
+async fn remote_ws_handshake_denies_missing_credentials_with_401() {
+    let mut state = test_http_state_with_db();
+    state.auth_mode = DaemonHttpAuthMode::Remote;
+    let (base_url, server) = serve_http(state).await;
+
+    let status = match connect_async(ws_url(&base_url)).await {
+        Ok(_) => panic!("missing remote credentials connected"),
+        Err(WebSocketError::Http(response)) => response.status(),
+        Err(error) => panic!("unexpected websocket error: {error}"),
+    };
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    server.abort();
+    let _ = server.await;
+}
+
+#[tokio::test]
+async fn remote_ws_connection_enforces_persisted_client_scope() {
+    let mut state = test_http_state_with_db();
+    state.auth_mode = DaemonHttpAuthMode::Remote;
+    register_remote_client(
+        &state,
+        "viewer",
+        RemoteRole::Viewer,
+        &[RemoteAccessScope::Read],
+    );
+    let (base_url, server) = serve_http(state).await;
+    let request = remote_ws_request(&base_url, "viewer");
+    let (mut socket, _) = connect_async(request).await.expect("connect websocket");
+
+    let ping = ws_rpc(&mut socket, "req-ping", ws_methods::PING).await;
+    assert_eq!(ping["error"], serde_json::Value::Null);
+    assert_eq!(ping["result"]["pong"], true);
+
+    let denied = ws_rpc(&mut socket, "req-write", ws_methods::SESSION_START).await;
+    assert_eq!(denied["result"], serde_json::Value::Null);
+    assert_eq!(denied["error"]["code"], "REMOTE_AUTH");
+    assert_eq!(
+        denied["error"]["message"],
+        "remote client scope is insufficient"
+    );
+    assert_eq!(denied["error"]["status_code"], 403);
+
+    let _ = socket.close(None).await;
+    server.abort();
+    let _ = server.await;
+}
+
+#[tokio::test]
 async fn remote_http_authz_redacts_poisoned_store_errors() {
     let mut state = test_http_state_with_db();
     state.auth_mode = DaemonHttpAuthMode::Remote;
@@ -332,6 +386,61 @@ fn remote_headers(client_id: &str) -> HeaderMap {
 
 fn remote_token(client_id: &str) -> String {
     format!("remote-token-secret-{client_id}")
+}
+
+fn ws_url(base_url: &str) -> String {
+    format!(
+        "{}{}",
+        base_url.replacen("http://", "ws://", 1),
+        http_paths::WS
+    )
+}
+
+fn remote_ws_request(base_url: &str, client_id: &str) -> Request<()> {
+    let mut request = ws_url(base_url)
+        .into_client_request()
+        .expect("websocket request");
+    request.headers_mut().insert(
+        REMOTE_CLIENT_ID_HEADER,
+        HeaderValue::from_str(client_id).expect("client id header"),
+    );
+    request.headers_mut().insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {}", remote_token(client_id)))
+            .expect("authorization header"),
+    );
+    request
+}
+
+async fn ws_rpc<S>(socket: &mut S, id: &str, method: &str) -> serde_json::Value
+where
+    S: Sink<Message, Error = WebSocketError>
+        + Stream<Item = Result<Message, WebSocketError>>
+        + Unpin,
+{
+    timeout(Duration::from_secs(5), async {
+        socket
+            .send(Message::Text(
+                json!({ "id": id, "method": method, "params": {} })
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .expect("send websocket request");
+        while let Some(frame) = socket.next().await {
+            let frame = frame.expect("read websocket frame");
+            let Message::Text(text) = frame else {
+                continue;
+            };
+            let value = serde_json::from_str::<serde_json::Value>(&text).expect("websocket json");
+            if value["id"].as_str() == Some(id) {
+                return value;
+            }
+        }
+        panic!("missing websocket response for {id}");
+    })
+    .await
+    .expect("timed out waiting for websocket response")
 }
 
 async fn serve_http(state: crate::daemon::http::DaemonHttpState) -> (String, JoinHandle<()>) {
