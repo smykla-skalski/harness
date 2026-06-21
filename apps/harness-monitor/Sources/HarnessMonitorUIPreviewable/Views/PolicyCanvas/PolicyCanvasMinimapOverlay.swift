@@ -26,76 +26,22 @@ struct PolicyCanvasMinimapOverlay: View {
         snapshot: snapshot,
         minimapSize: proxy.size
       )
-      let projectedContentBounds = projection.rect(forCanvasRect: snapshot.worldBounds)
-      let projectedGroups = snapshot.groupFrames.map(projection.rect(forCanvasRect:))
-      let projectedNodes = snapshot.nodeFrames.map(projection.rect(forCanvasRect:))
-      let projectedViewport = projection.rect(forCanvasRect: snapshot.viewportRect)
-      let nodeStroke = PolicyCanvasVisualStyle.primaryText.opacity(
-        colorScheme == .dark ? 0.72 : 0.58
+      let projectedViewport = policyCanvasMinimapClampedViewportIndicator(
+        projection.rect(forCanvasRect: snapshot.viewportRect),
+        in: proxy.size
       )
       ZStack(alignment: .topLeading) {
-        Canvas { context, _ in
-          let contentPlateFrame = projectedContentBounds.insetBy(dx: 0.5, dy: 0.5)
-          var contentPlatePath = Path()
-          contentPlatePath.addRoundedRect(
-            in: contentPlateFrame,
-            cornerSize: CGSize(width: 8, height: 8)
-          )
-          context.fill(
-            contentPlatePath,
-            with: .color(PolicyCanvasVisualStyle.canvasBackground)
-          )
-          context.stroke(
-            contentPlatePath,
-            with: .color(PolicyCanvasVisualStyle.subtleBorder),
-            lineWidth: 1
-          )
-
-          if !projectedGroups.isEmpty {
-            var groupFillPath = Path()
-            var groupStrokePath = Path()
-            for frame in projectedGroups {
-              let groupFrame = frame.insetBy(dx: 0.5, dy: 0.5)
-              groupFillPath.addRoundedRect(
-                in: groupFrame,
-                cornerSize: CGSize(width: 6, height: 6)
-              )
-              groupStrokePath.addRoundedRect(
-                in: groupFrame,
-                cornerSize: CGSize(width: 6, height: 6)
-              )
-            }
-            context.fill(
-              groupFillPath,
-              with: .color(PolicyCanvasVisualStyle.secondaryText.opacity(0.14))
-            )
-            context.stroke(
-              groupStrokePath,
-              with: .color(PolicyCanvasVisualStyle.border.opacity(0.9)),
-              lineWidth: 1
-            )
-          }
-
-          if !projectedNodes.isEmpty {
-            var nodePath = Path()
-            for frame in projectedNodes {
-              let nodeFrame = frame.insetBy(dx: 0.5, dy: 0.5)
-              nodePath.addRoundedRect(
-                in: nodeFrame,
-                cornerSize: CGSize(width: 4, height: 4)
-              )
-            }
-            context.fill(
-              nodePath,
-              with: .color(PolicyCanvasVisualStyle.minimapNodeFill(colorScheme))
-            )
-            context.stroke(
-              nodePath,
-              with: .color(nodeStroke.opacity(0.18)),
-              lineWidth: 0.75
-            )
-          }
-        }
+        // Stable graph thumbnail. Keyed on the graph geometry only, so a viewport
+        // change (scroll, or the inspector pane resizing the canvas) cannot re-run
+        // this Canvas draw - only the viewport indicator below updates.
+        PolicyCanvasMinimapGraphCanvas(
+          worldBounds: snapshot.worldBounds,
+          nodeFrames: snapshot.nodeFrames,
+          groupFrames: snapshot.groupFrames,
+          minimapSize: proxy.size,
+          colorScheme: colorScheme
+        )
+        .equatable()
 
         RoundedRectangle(cornerRadius: 6, style: .continuous)
           .fill(Color.accentColor.opacity(0.08))
@@ -108,8 +54,8 @@ struct PolicyCanvasMinimapOverlay: View {
               }
           }
           .frame(
-            width: max(18, projectedViewport.width),
-            height: max(18, projectedViewport.height)
+            width: projectedViewport.width,
+            height: projectedViewport.height
           )
           .position(
             x: projectedViewport.midX,
@@ -212,6 +158,106 @@ struct PolicyCanvasMinimapOverlay: View {
         minimapVisible = false
       } label: {
         Label("Hide minimap", systemImage: "eye.slash")
+      }
+    }
+  }
+}
+
+/// The minimap's graph thumbnail (content plate, group rects, node rects). It is
+/// `Equatable` on the graph geometry plus the minimap size and color scheme, and
+/// is rendered through `.equatable()`, so SwiftUI skips this whole `Canvas` draw
+/// whenever only the live viewport changed. That keeps the inspector toggle (and
+/// every scroll frame) from redrawing the thumbnail - only the viewport indicator
+/// overlaid on top of it moves.
+struct PolicyCanvasMinimapGraphCanvas: View, Equatable {
+  let worldBounds: CGRect
+  let nodeFrames: [CGRect]
+  let groupFrames: [CGRect]
+  let minimapSize: CGSize
+  let colorScheme: ColorScheme
+
+  nonisolated static func == (
+    lhs: PolicyCanvasMinimapGraphCanvas,
+    rhs: PolicyCanvasMinimapGraphCanvas
+  ) -> Bool {
+    lhs.worldBounds == rhs.worldBounds
+      && lhs.minimapSize == rhs.minimapSize
+      && lhs.colorScheme == rhs.colorScheme
+      && lhs.groupFrames == rhs.groupFrames
+      && lhs.nodeFrames == rhs.nodeFrames
+  }
+
+  var body: some View {
+    let projection = policyCanvasMinimapProjection(
+      worldBounds: worldBounds,
+      minimapSize: minimapSize
+    )
+    let projectedContentBounds = projection.rect(forCanvasRect: worldBounds)
+    let projectedGroups = groupFrames.map(projection.rect(forCanvasRect:))
+    let projectedNodes = nodeFrames.map(projection.rect(forCanvasRect:))
+    let nodeStroke = PolicyCanvasVisualStyle.primaryText.opacity(
+      colorScheme == .dark ? 0.72 : 0.58
+    )
+    Canvas { context, _ in
+      let contentPlateFrame = projectedContentBounds.insetBy(dx: 0.5, dy: 0.5)
+      var contentPlatePath = Path()
+      contentPlatePath.addRoundedRect(
+        in: contentPlateFrame,
+        cornerSize: CGSize(width: 8, height: 8)
+      )
+      context.fill(
+        contentPlatePath,
+        with: .color(PolicyCanvasVisualStyle.canvasBackground)
+      )
+      context.stroke(
+        contentPlatePath,
+        with: .color(PolicyCanvasVisualStyle.subtleBorder),
+        lineWidth: 1
+      )
+
+      if !projectedGroups.isEmpty {
+        var groupFillPath = Path()
+        var groupStrokePath = Path()
+        for frame in projectedGroups {
+          let groupFrame = frame.insetBy(dx: 0.5, dy: 0.5)
+          groupFillPath.addRoundedRect(
+            in: groupFrame,
+            cornerSize: CGSize(width: 6, height: 6)
+          )
+          groupStrokePath.addRoundedRect(
+            in: groupFrame,
+            cornerSize: CGSize(width: 6, height: 6)
+          )
+        }
+        context.fill(
+          groupFillPath,
+          with: .color(PolicyCanvasVisualStyle.secondaryText.opacity(0.14))
+        )
+        context.stroke(
+          groupStrokePath,
+          with: .color(PolicyCanvasVisualStyle.border.opacity(0.9)),
+          lineWidth: 1
+        )
+      }
+
+      if !projectedNodes.isEmpty {
+        var nodePath = Path()
+        for frame in projectedNodes {
+          let nodeFrame = frame.insetBy(dx: 0.5, dy: 0.5)
+          nodePath.addRoundedRect(
+            in: nodeFrame,
+            cornerSize: CGSize(width: 4, height: 4)
+          )
+        }
+        context.fill(
+          nodePath,
+          with: .color(PolicyCanvasVisualStyle.minimapNodeFill(colorScheme))
+        )
+        context.stroke(
+          nodePath,
+          with: .color(nodeStroke.opacity(0.18)),
+          lineWidth: 0.75
+        )
       }
     }
   }

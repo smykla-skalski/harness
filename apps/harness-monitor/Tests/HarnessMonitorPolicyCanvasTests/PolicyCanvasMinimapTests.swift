@@ -7,35 +7,94 @@ import Testing
 
 @Suite("Policy canvas minimap")
 struct PolicyCanvasMinimapTests {
-  @Test("minimap world bounds include viewport excursions outside the routed graph")
-  func minimapWorldBoundsIncludeViewportExcursionsOutsideTheRoutedGraph() {
-    let snapshot = policyCanvasMinimapSnapshot(
-      contentBounds: CGRect(x: 200, y: 100, width: 800, height: 500),
+  @Test("minimap world bounds stay pinned to the policy content regardless of the viewport")
+  func minimapWorldBoundsStayPinnedToPolicyContentRegardlessOfTheViewport() {
+    let content = CGRect(x: 200, y: 100, width: 800, height: 500)
+    let viewportInside = policyCanvasMinimapSnapshot(
+      contentBounds: content,
+      viewportRect: CGRect(x: 300, y: 150, width: 200, height: 120),
+      nodeFrames: [],
+      groupFrames: []
+    )
+    let viewportOutside = policyCanvasMinimapSnapshot(
+      contentBounds: content,
       viewportRect: CGRect(x: -120, y: 140, width: 400, height: 240),
       nodeFrames: [],
       groupFrames: []
     )
 
-    #expect(snapshot.contentBounds == CGRect(x: 200, y: 100, width: 800, height: 500))
-    #expect(snapshot.worldBounds == CGRect(x: -120, y: 100, width: 1_120, height: 500))
+    // The world is the content alone - it never expands to include the viewport,
+    // so resizing or panning the viewport leaves the thumbnail projection
+    // untouched. Toggling the inspector pane therefore cannot rescale the graph.
+    #expect(viewportInside.contentBounds == content)
+    #expect(viewportInside.worldBounds == content)
+    #expect(viewportOutside.worldBounds == viewportInside.worldBounds)
   }
 
-  @Test("minimap projection preserves the real policy bounds inside a larger world")
-  func minimapProjectionPreservesRealPolicyBoundsInsideALargerWorld() {
-    let snapshot = policyCanvasMinimapSnapshot(
-      contentBounds: CGRect(x: 200, y: 50, width: 600, height: 400),
+  @Test("minimap graph projection ignores the viewport so the thumbnail never rescales")
+  func minimapGraphProjectionIgnoresViewportSoThumbnailNeverRescales() {
+    let content = CGRect(x: 200, y: 50, width: 600, height: 400)
+    let wideViewport = policyCanvasMinimapSnapshot(
+      contentBounds: content,
       viewportRect: CGRect(x: -100, y: 0, width: 1_000, height: 500),
       nodeFrames: [],
       groupFrames: []
     )
-    let projection = policyCanvasMinimapProjection(
-      snapshot: snapshot,
-      minimapSize: CGSize(width: 200, height: 100)
+    let narrowViewport = policyCanvasMinimapSnapshot(
+      contentBounds: content,
+      viewportRect: CGRect(x: 250, y: 80, width: 200, height: 150),
+      nodeFrames: [],
+      groupFrames: []
+    )
+    let minimapSize = CGSize(width: 200, height: 100)
+    let wideProjection = policyCanvasMinimapProjection(
+      snapshot: wideViewport,
+      minimapSize: minimapSize
+    )
+    let narrowProjection = policyCanvasMinimapProjection(
+      snapshot: narrowViewport,
+      minimapSize: minimapSize
     )
 
+    // Same content + same minimap size => identical projected content frame, no
+    // matter how the viewport differs. scale = min(200/600, 100/400) = 0.25, so
+    // the 600x400 content fits to 150x100 centered in the 200x100 minimap.
     #expect(
-      projection.rect(forCanvasRect: snapshot.contentBounds)
-        == CGRect(x: 60, y: 10, width: 120, height: 80)
+      wideProjection.rect(forCanvasRect: content)
+        == narrowProjection.rect(forCanvasRect: content)
+    )
+    #expect(
+      wideProjection.rect(forCanvasRect: content)
+        == CGRect(x: 25, y: 0, width: 150, height: 100)
+    )
+  }
+
+  @Test("minimap viewport indicator clamps to the minimap bounds when it leaves the content")
+  func minimapViewportIndicatorClampsToMinimapBoundsWhenItLeavesTheContent() {
+    let minimapSize = CGSize(width: 200, height: 100)
+
+    // Fully inside the minimap -> returned unchanged.
+    #expect(
+      policyCanvasMinimapClampedViewportIndicator(
+        CGRect(x: 40, y: 30, width: 60, height: 40),
+        in: minimapSize
+      ) == CGRect(x: 40, y: 30, width: 60, height: 40)
+    )
+
+    // Larger than the minimap -> capped to the minimap and centered.
+    #expect(
+      policyCanvasMinimapClampedViewportIndicator(
+        CGRect(x: -40, y: -20, width: 300, height: 160),
+        in: minimapSize
+      ) == CGRect(x: 0, y: 0, width: 200, height: 100)
+    )
+
+    // Panned off the right edge -> stuck against the edge, size preserved.
+    #expect(
+      policyCanvasMinimapClampedViewportIndicator(
+        CGRect(x: 320, y: 20, width: 40, height: 30),
+        in: minimapSize
+      ) == CGRect(x: 160, y: 20, width: 40, height: 30)
     )
   }
 
