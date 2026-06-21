@@ -36,8 +36,6 @@ pub mod ordering;
 pub mod protocol;
 pub mod remote;
 pub mod remote_acme;
-#[cfg(test)]
-mod remote_acme_tests;
 pub mod service;
 pub mod snapshot;
 pub mod state;

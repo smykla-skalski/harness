@@ -1,10 +1,10 @@
 use std::error::Error;
 
-use super::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
-use super::remote_acme::{
+use super::{
     AcmeHttp01ChallengeStore, Dns01ProviderAction, RemoteAcmeRuntimeState, RemoteCertificateBundle,
     RemoteCertificateSlot, RemoteRenewalOutcome, build_remote_acme_runtime_plan,
 };
+use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
 
 fn tls_alpn_config() -> RemoteDaemonServeConfig {
     RemoteDaemonServeConfig {

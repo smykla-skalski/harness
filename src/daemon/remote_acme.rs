@@ -10,6 +10,10 @@ use super::remote::{
     validate_remote_serve_config,
 };
 
+#[cfg(test)]
+#[path = "remote_acme_tests.rs"]
+mod tests;
+
 const HTTPS_ALPN_PROTOCOLS: &[&[u8]] = &[b"h2", b"http/1.1"];
 const TLS_ALPN_CHALLENGE_PROTOCOLS: &[&[u8]] = &[b"acme-tls/1"];
 const NO_CHALLENGE_ALPN_PROTOCOLS: &[&[u8]] = &[];
