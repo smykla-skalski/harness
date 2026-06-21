@@ -3,9 +3,13 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
 use super::{
     REMOTE_CLIENT_ID_HEADER, RemoteAuthError, RemoteAuthTarget, RemoteBearerCredentials,
     authorize_remote_http_route, authorize_remote_ws_handshake, authorize_remote_ws_method,
+    remote_ws_handshake_scope,
 };
-use crate::daemon::protocol::{HTTP_API_CONTRACT, http_paths, ws_methods};
-use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
+use crate::daemon::protocol::{
+    HTTP_API_CONTRACT, HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths,
+    ws_methods,
+};
+use crate::daemon::remote::{RemoteAccessScope, RemoteRole, remote_http_scopes};
 use crate::daemon::remote_identity::{RemoteStoredClient, RemoteTokenHash};
 
 #[test]
@@ -112,6 +116,30 @@ fn remote_http_authz_allows_role_scoped_routes() {
 }
 
 #[test]
+fn remote_http_authz_accepts_borrowed_route_contracts() {
+    let route = HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::STREAM,
+        parity: HttpRouteParity::Exempt {
+            reason: "stack-local test route",
+        },
+        swift_client_exposed: false,
+    };
+    let viewer = remote_client("viewer", RemoteRole::Viewer, &[RemoteAccessScope::Read]);
+
+    let decision = authorize_remote_http_route(&viewer, &route).expect("borrowed route");
+
+    assert_eq!(
+        decision.target,
+        RemoteAuthTarget::Http {
+            method: "GET",
+            path: http_paths::STREAM,
+        }
+    );
+    assert_eq!(decision.required_scope, RemoteAccessScope::Read);
+}
+
+#[test]
 fn remote_http_authz_denies_insufficient_scope_with_403() {
     let viewer = remote_client("viewer", RemoteRole::Viewer, &[RemoteAccessScope::Read]);
     let telemetry = http_route(http_paths::DAEMON_TELEMETRY);
@@ -154,6 +182,19 @@ fn remote_ws_authz_covers_handshake_and_per_message_scope() {
         authorize_remote_ws_method(&viewer, ws_methods::SESSION_START)
             .expect_err("viewer cannot start session"),
         RemoteAuthError::InsufficientScope
+    );
+}
+
+#[test]
+fn remote_ws_handshake_scope_uses_http_route_contract() {
+    let ws_route = http_route(http_paths::WS);
+    let expected_scope = remote_http_scopes(ws_route)
+        .and_then(|scopes| scopes.first().copied())
+        .expect("websocket HTTP route scope");
+
+    assert_eq!(
+        remote_ws_handshake_scope().expect("websocket handshake scope"),
+        expected_scope
     );
 }
 
