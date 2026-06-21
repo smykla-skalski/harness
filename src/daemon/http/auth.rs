@@ -13,6 +13,8 @@ use crate::daemon::remote_identity::RemoteStoredClient;
 
 use super::DaemonHttpState;
 
+const REMOTE_AUTH_STORE_UNAVAILABLE_MESSAGE: &str = "remote authentication store is unavailable";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DaemonHttpAuthMode {
     #[default]
@@ -93,9 +95,14 @@ fn require_local_auth(headers: &HeaderMap, state: &DaemonHttpState) -> Result<()
 }
 
 fn http_route_contract(method: &Method, route_path: &str) -> Option<&'static HttpApiRouteContract> {
+    let method = if *method == Method::HEAD {
+        Method::GET.as_str()
+    } else {
+        method.as_str()
+    };
     HTTP_API_CONTRACT
         .iter()
-        .find(|route| route.method.as_str() == method.as_str() && route.path == route_path)
+        .find(|route| route.method.as_str() == method && route.path == route_path)
 }
 
 fn verify_remote_client(
@@ -108,13 +115,11 @@ fn verify_remote_client(
         .db
         .get()
         .ok_or_else(|| Box::new(remote_store_unavailable_response()))?;
-    let db = db.lock().map_err(|error| {
-        Box::new(remote_service_error_response(format!(
-            "remote client store lock poisoned: {error}"
-        )))
-    })?;
+    let db = db
+        .lock()
+        .map_err(|_| Box::new(remote_store_unavailable_response()))?;
     db.verify_remote_client_token(credentials.client_id(), credentials.token())
-        .map_err(|error| Box::new(remote_service_error_response(error.to_string())))?
+        .map_err(|_| Box::new(remote_store_unavailable_response()))?
         .ok_or_else(|| {
             Box::new(remote_auth_error_response(
                 RemoteAuthError::InvalidBearerToken,
@@ -149,16 +154,12 @@ fn remote_auth_error_response(error: RemoteAuthError) -> Response {
 }
 
 fn remote_store_unavailable_response() -> Response {
-    remote_service_error_response("remote client store is unavailable")
-}
-
-fn remote_service_error_response(message: impl Into<String>) -> Response {
     (
         StatusCode::SERVICE_UNAVAILABLE,
         Json(serde_json::json!({
             "error": {
                 "code": "REMOTE_AUTH_STORE",
-                "message": message.into(),
+                "message": REMOTE_AUTH_STORE_UNAVAILABLE_MESSAGE,
             }
         })),
     )

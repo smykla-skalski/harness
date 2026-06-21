@@ -1,4 +1,7 @@
+use std::thread;
+
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
+use rusqlite::Connection;
 use serde_json::json;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
@@ -182,6 +185,79 @@ async fn remote_http_authz_preserves_not_found_for_unmatched_routes() {
     let _ = server.await;
 }
 
+#[tokio::test]
+async fn remote_http_authz_treats_head_as_get_scope() {
+    let mut state = test_http_state_with_db();
+    state.auth_mode = DaemonHttpAuthMode::Remote;
+    register_remote_client(
+        &state,
+        "viewer",
+        RemoteRole::Viewer,
+        &[RemoteAccessScope::Read],
+    );
+    let (base_url, server) = serve_http(state).await;
+
+    let response = reqwest::Client::new()
+        .head(format!("{base_url}{}", http_paths::HEALTH))
+        .header(REMOTE_CLIENT_ID_HEADER, "viewer")
+        .bearer_auth(remote_token("viewer"))
+        .send()
+        .await
+        .expect("send health head request");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    server.abort();
+    let _ = server.await;
+}
+
+#[tokio::test]
+async fn remote_http_authz_redacts_poisoned_store_errors() {
+    let mut state = test_http_state_with_db();
+    state.auth_mode = DaemonHttpAuthMode::Remote;
+    let db_slot = state.db.clone();
+    let _ = thread::spawn(move || {
+        let _guard = db_slot.get().expect("db slot").lock().expect("db lock");
+        panic!("poison remote client store");
+    })
+    .join();
+
+    let response = authorize_http_route(
+        &remote_headers("viewer"),
+        &state,
+        http_route(http_paths::STREAM),
+    )
+    .expect_err("poisoned store rejected");
+    assert_redacted_store_error(*response).await;
+}
+
+#[tokio::test]
+async fn remote_http_authz_redacts_token_verification_store_errors() {
+    let mut state = test_http_state_with_db();
+    state.auth_mode = DaemonHttpAuthMode::Remote;
+    register_remote_client(
+        &state,
+        "viewer",
+        RemoteRole::Viewer,
+        &[RemoteAccessScope::Read],
+    );
+    let db_path = state.db_path.as_ref().expect("db path");
+    Connection::open(db_path)
+        .expect("open db")
+        .execute(
+            "UPDATE remote_clients SET token_hash = 'not-a-valid-token-hash' WHERE client_id = 'viewer'",
+            [],
+        )
+        .expect("corrupt token hash");
+
+    let response = authorize_http_route(
+        &remote_headers("viewer"),
+        &state,
+        http_route(http_paths::STREAM),
+    )
+    .expect_err("store error rejected");
+    assert_redacted_store_error(*response).await;
+}
+
 fn register_remote_client(
     state: &crate::daemon::http::DaemonHttpState,
     client_id: &str,
@@ -238,4 +314,14 @@ fn http_route(path: &str) -> &'static HttpApiRouteContract {
         .iter()
         .find(|route| route.path == path)
         .expect("http route contract")
+}
+
+async fn assert_redacted_store_error(response: axum::response::Response) {
+    let (status, body) = response_json(response).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["error"]["code"], "REMOTE_AUTH_STORE");
+    assert_eq!(
+        body["error"]["message"],
+        "remote authentication store is unavailable"
+    );
 }
