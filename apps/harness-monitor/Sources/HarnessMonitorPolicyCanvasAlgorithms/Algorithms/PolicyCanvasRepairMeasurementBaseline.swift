@@ -137,12 +137,13 @@ struct PolicyCanvasRepairMeasurementBaseline {
       else {
         continue
       }
-      total += policyCanvasMeasureBodyHits(
-        routedEdges: [PolicyCanvasRoutedEdge(edge: edge, route: route)],
-        nodeFramesByID: nodeFramesByID,
-        groupTitleFrames: groupTitleFrames,
-        nodeFrameIndex: nodeFrameIndex
-      ).count
+      total +=
+        policyCanvasMeasureBodyHits(
+          routedEdges: [PolicyCanvasRoutedEdge(edge: edge, route: route)],
+          nodeFramesByID: nodeFramesByID,
+          groupTitleFrames: groupTitleFrames,
+          nodeFrameIndex: nodeFrameIndex
+        ).count
     }
     return total
   }
@@ -217,8 +218,11 @@ struct PolicyCanvasRepairMeasurementBaseline {
       ] {
         guard let point,
           let resolved = policyCanvasResolveCrossedPortSideTerminal(
-            point: point, route: route, nodeID: nodeID, edgeID: edgeID,
-            nodeFramesByID: nodeFramesByID, tolerance: tolerance)
+            point: point,
+            routedEdge: PolicyCanvasRoutedEdge(edge: edge, route: route),
+            nodeID: nodeID,
+            nodeFramesByID: nodeFramesByID,
+            tolerance: tolerance)
         else {
           continue
         }
@@ -228,7 +232,8 @@ struct PolicyCanvasRepairMeasurementBaseline {
     }
 
     var result: [PolicyCanvasCrossedPortsViolation] = []
-    for (nodeSide, violations) in crossedViolationsByNodeSide where !affectedSides.contains(nodeSide) {
+    for (nodeSide, violations) in crossedViolationsByNodeSide
+    where !affectedSides.contains(nodeSide) {
       result.append(contentsOf: violations)
     }
     for nodeSide in affectedSides {

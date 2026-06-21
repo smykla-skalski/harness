@@ -375,44 +375,6 @@ public final class PolicyCanvasViewModel {
     refreshAutomationPolicyCompilation()
   }
 
-  var selectedNode: PolicyCanvasNode? {
-    guard case .node(let id) = selection else {
-      return nil
-    }
-    return node(id)
-  }
-
-  var selectedGroup: PolicyCanvasGroup? {
-    guard case .group(let id) = selection else {
-      return nil
-    }
-    return group(id)
-  }
-
-  var selectedEdge: PolicyCanvasEdge? {
-    guard case .edge(let id) = selection else {
-      return nil
-    }
-    return edges.first { $0.id == id }
-  }
-
-  var selectedTitle: String {
-    if let selectedNode {
-      return selectedNode.title
-    }
-    if let selectedGroup {
-      return selectedGroup.title
-    }
-    if let selectedEdge {
-      return selectedEdge.label
-    }
-    return "Canvas"
-  }
-
-  var policySummary: String {
-    "\(nodes.count) nodes - \(edges.count) edges - \(groups.count) groups"
-  }
-
   /// Single funnel that mutation sites use to mark the document dirty on live,
   /// tick-rate preview paths. Sets `documentDirty = true` and fires the autosave
   /// trigger on the clean→dirty edge. Coalescing to the edge is load-bearing on

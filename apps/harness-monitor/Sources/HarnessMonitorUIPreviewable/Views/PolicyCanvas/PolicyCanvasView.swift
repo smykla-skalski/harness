@@ -15,7 +15,8 @@ public struct PolicyCanvasView: View {
   @State private var scenarioEditRequestState: PolicyCanvasScenarioEditRequest?
   @State private var selectionFocusRequestState: PolicyCanvasViewportSelectionFocusRequest?
   @State private var selectionFocusRequestIDState: UInt64 = 0
-  @AppStorage("policyCanvas.inspectorVisible") private var policyCanvasInspectorVisibleState = true
+  @AppStorage("policyCanvas.inspectorVisible")
+  private var policyCanvasInspectorVisibleState = true
   @FocusState var canvasKeyboardFocusedState: Bool
   @FocusState var focusedFieldState: PolicyCanvasFocusedField?
   /// VoiceOver focus anchor for the canvas surface. The search palette writes

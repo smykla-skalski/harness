@@ -24,7 +24,6 @@ struct PolicyCanvasCrossedPortNodeSide: Hashable {
   let side: PolicyCanvasPortSide
 }
 
-
 /// Measure wires that picked the wrong port: two edges meeting one node side -
 /// inputs on a leading/top side, outputs on a trailing/bottom side - whose routes
 /// actually cross between their ports. Swapping the two ports would untangle them.
@@ -84,7 +83,7 @@ func policyCanvasCrossedPortTerminalsByNodeSide(
     ] {
       guard
         let resolved = policyCanvasResolveCrossedPortSideTerminal(
-          point: point, route: routed.route, nodeID: nodeID, edgeID: routed.edge.id,
+          point: point, routedEdge: routed, nodeID: nodeID,
           nodeFramesByID: nodeFramesByID, tolerance: tolerance)
       else {
         continue
@@ -101,9 +100,8 @@ func policyCanvasCrossedPortTerminalsByNodeSide(
 /// any side of its node frame.
 func policyCanvasResolveCrossedPortSideTerminal(
   point: CGPoint,
-  route: PolicyCanvasEdgeRoute,
+  routedEdge: PolicyCanvasRoutedEdge,
   nodeID: String,
-  edgeID: String,
   nodeFramesByID: [String: CGRect],
   tolerance: CGFloat
 ) -> (nodeSide: PolicyCanvasCrossedPortNodeSide, terminal: PolicyCanvasSideTerminal)? {
@@ -115,11 +113,12 @@ func policyCanvasResolveCrossedPortSideTerminal(
   }
   let horizontalSide = side == .leading || side == .trailing
   let terminal = PolicyCanvasSideTerminal(
-    edgeID: edgeID,
+    edgeID: routedEdge.edge.id,
     offset: horizontalSide ? point.y : point.x,
     point: point,
-    points: route.points,
-    isMonotonic: policyCanvasRoutePerpendicularlyMonotonic(route, horizontalSide: horizontalSide)
+    points: routedEdge.route.points,
+    isMonotonic: policyCanvasRoutePerpendicularlyMonotonic(
+      routedEdge.route, horizontalSide: horizontalSide)
   )
   return (PolicyCanvasCrossedPortNodeSide(nodeID: nodeID, side: side), terminal)
 }
@@ -205,7 +204,6 @@ private func policyCanvasCrossedPortMark(
     return CGPoint(x: mid.x, y: mid.y + bow)
   }
 }
-
 
 /// True when the two terminals funnel through one shared channel and attach in
 /// swapped order. Two wires sharing a collinear channel run (same x for a vertical

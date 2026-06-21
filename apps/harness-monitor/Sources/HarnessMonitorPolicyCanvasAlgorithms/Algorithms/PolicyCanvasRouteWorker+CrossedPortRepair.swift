@@ -192,7 +192,9 @@ extension PolicyCanvasPreparedRouteInput {
     let candidateChangesRoutes =
       candidateChanged.map { !$0.isEmpty } ?? (candidateRoutes != originalRoutes)
     let candidateSideMismatches =
-      baseline.map { $0.sideMismatchTotal(forCandidate: candidateRoutes, changedEdges: candidateChanged ?? []) }
+      baseline.map {
+        $0.sideMismatchTotal(forCandidate: candidateRoutes, changedEdges: candidateChanged ?? [])
+      }
       ?? precomputedTerminalSideMismatchCount(routes: candidateRoutes)
     guard candidateChangesRoutes,
       candidateSideMismatches <= context.maximumTerminalSideMismatches
@@ -201,13 +203,17 @@ extension PolicyCanvasPreparedRouteInput {
     }
     let candidateViolations =
       explicitCandidateViolations
-      ?? baseline.map { $0.crossedViolations(forCandidate: candidateRoutes, changedEdges: candidateChanged ?? []) }
+      ?? baseline.map {
+        $0.crossedViolations(forCandidate: candidateRoutes, changedEdges: candidateChanged ?? [])
+      }
       ?? precomputedCrossedPortViolations(routes: candidateRoutes, nodeIndex: context.nodeIndex)
     guard candidateViolations.count < originalViolations.count else {
       return nil
     }
     let candidateBodyHits =
-      baseline.map { $0.bodyHitTotal(forCandidate: candidateRoutes, changedEdges: candidateChanged ?? []) }
+      baseline.map {
+        $0.bodyHitTotal(forCandidate: candidateRoutes, changedEdges: candidateChanged ?? [])
+      }
       ?? precomputedBodyHits(routes: candidateRoutes, nodeIndex: context.nodeIndex).count
     guard candidateBodyHits > context.maximumBodyHits else {
       return PolicyCanvasCrossedPortRepairCandidate(
@@ -228,10 +234,14 @@ extension PolicyCanvasPreparedRouteInput {
     )
     let repairedChanged = baseline?.changedEdges(forCandidate: bodyRepairedRoutes)
     let repairedBodyHits =
-      baseline.map { $0.bodyHitTotal(forCandidate: bodyRepairedRoutes, changedEdges: repairedChanged ?? []) }
+      baseline.map {
+        $0.bodyHitTotal(forCandidate: bodyRepairedRoutes, changedEdges: repairedChanged ?? [])
+      }
       ?? precomputedBodyHits(routes: bodyRepairedRoutes, nodeIndex: context.nodeIndex).count
     let repairedSideMismatches =
-      baseline.map { $0.sideMismatchTotal(forCandidate: bodyRepairedRoutes, changedEdges: repairedChanged ?? []) }
+      baseline.map {
+        $0.sideMismatchTotal(forCandidate: bodyRepairedRoutes, changedEdges: repairedChanged ?? [])
+      }
       ?? precomputedTerminalSideMismatchCount(routes: bodyRepairedRoutes)
     guard repairedBodyHits <= context.maximumBodyHits,
       repairedSideMismatches <= context.maximumTerminalSideMismatches
@@ -239,7 +249,9 @@ extension PolicyCanvasPreparedRouteInput {
       return nil
     }
     let bodyRepairedViolations =
-      baseline.map { $0.crossedViolations(forCandidate: bodyRepairedRoutes, changedEdges: repairedChanged ?? []) }
+      baseline.map {
+        $0.crossedViolations(forCandidate: bodyRepairedRoutes, changedEdges: repairedChanged ?? [])
+      }
       ?? precomputedCrossedPortViolations(routes: bodyRepairedRoutes, nodeIndex: context.nodeIndex)
     guard bodyRepairedViolations.count < originalViolations.count else {
       return nil
