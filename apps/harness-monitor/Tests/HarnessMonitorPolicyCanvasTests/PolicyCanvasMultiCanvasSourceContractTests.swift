@@ -252,8 +252,15 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
 
     XCTAssertTrue(layoutSource.contains("ZStack(alignment: .top) {"))
     XCTAssertTrue(layoutSource.contains("PolicyCanvasChromeBannerOverlay("))
-    XCTAssertTrue(viewSource.contains(".inspector(isPresented: $policyCanvasInspectorVisibleState)"))
-    XCTAssertTrue(viewSource.contains("@State private var policyCanvasInspectorVisibleState = true"))
+    XCTAssertFalse(
+      viewSource.contains(".inspector(isPresented:"),
+      "Confidence content moved to an in-layout trailing pane; a native inspector promotes a third NavigationSplitView column that splits the toolbar and underlaps the sidebar."
+    )
+    XCTAssertTrue(
+      viewSource.contains(
+        "@AppStorage(\"policyCanvas.inspectorVisible\") private var policyCanvasInspectorVisibleState = true"
+      )
+    )
     XCTAssertFalse(layoutSource.contains("PolicyCanvasConfidencePanel("))
     XCTAssertFalse(layoutSource.contains("PolicyCanvasValidationPanel("))
     XCTAssertTrue(layoutSource.contains("policyCanvasViewportPane"))
@@ -262,21 +269,34 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(chromeSource.contains("PolicyCanvasRecoveryBanner("))
   }
 
-  func testPolicyCanvasConfidencePanelLivesInNativeInspector() throws {
+  func testPolicyCanvasConfidencePanelLivesInTrailingPane() throws {
     let layoutSource = try previewableSourceFile(
       at: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
     )
     let inspectorSource = try previewableSourceFile(
       at: "Views/PolicyCanvas/PolicyCanvasConfidenceInspector.swift"
     )
+    let matrixSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasDecisionMatrixView.swift"
+    )
 
     XCTAssertFalse(
       layoutSource.contains("PolicyCanvasConfidencePanel("),
       "Confidence content should not take vertical space from the viewport."
     )
+    XCTAssertTrue(layoutSource.contains("policyCanvasConfidencePane"))
+    XCTAssertTrue(layoutSource.contains("if policyCanvasInspectorVisible"))
     XCTAssertTrue(inspectorSource.contains("PolicyCanvasConfidencePanel("))
-    XCTAssertTrue(inspectorSource.contains(".inspectorColumnWidth(min: 300, ideal: 380, max: 520)"))
+    XCTAssertFalse(
+      inspectorSource.contains("inspectorColumnWidth"),
+      "The confidence pane is an in-layout column, not a native SwiftUI inspector."
+    )
+    XCTAssertTrue(inspectorSource.contains(".frame(width: 380)"))
     XCTAssertTrue(inspectorSource.contains("HarnessMonitorAccessibility.policyCanvasConfidencePanel"))
+    XCTAssertFalse(
+      matrixSource.contains("min(CGFloat(rows.count) * 46, 220)"),
+      "The decision list scrolls with the confidence pane; a fixed 220pt cap clipped rows while the pane had room."
+    )
   }
 
   func testPolicyCanvasChromeBannersFollowCanvasThemeMode() throws {

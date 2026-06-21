@@ -3,16 +3,23 @@ import SwiftUI
 
 extension PolicyCanvasView {
   @ViewBuilder var policyCanvasSplitLayout: some View {
-    // Fixed two-pane layout: the component library hugs its own content width
-    // (see `PolicyCanvasComponentLibraryPane`) and the detail pane takes the
-    // rest. The library is intentionally not user-resizable — it shows a fixed
-    // set of palette actions, so a draggable divider could only add or waste
-    // horizontal space.
+    // Fixed-width side columns around a flexible detail pane: the component
+    // library hugs its own content width (see `PolicyCanvasComponentLibraryPane`)
+    // and the confidence pane is a fixed trailing column (see
+    // `policyCanvasConfidencePane`). Both are deliberately in-layout rather than
+    // a SwiftUI `.inspector`: presenting a native inspector here promoted a
+    // third NavigationSplitView column, which split the window toolbar and let
+    // the detail underlap the translucent sidebar (hiding this very library).
+    // The detail pane takes the remaining width.
     HStack(spacing: 0) {
       PolicyCanvasComponentLibraryPane(viewModel: viewModel)
 
       policyCanvasDetailPane
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+      if policyCanvasInspectorVisible {
+        policyCanvasConfidencePane
+      }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }

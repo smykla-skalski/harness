@@ -20,16 +20,14 @@ struct PolicyCanvasDecisionMatrixView: View {
       if rows.isEmpty {
         emptyState
       } else {
-        // Sizes to content for a handful of rows; a full 13-action simulation
-        // scrolls past ~220pt instead of pushing the canvas viewport down.
-        ScrollView {
-          VStack(spacing: 6) {
-            ForEach(rows) { row in
-              PolicyCanvasDecisionMatrixRow(model: row, focusDecision: focusDecision)
-            }
+        // No inner scroll or fixed cap: the confidence pane owns one scroll view,
+        // so the full simulation flows with scenarios and replay instead of
+        // clipping past ~220pt while the tall pane has room to spare.
+        VStack(spacing: 6) {
+          ForEach(rows) { row in
+            PolicyCanvasDecisionMatrixRow(model: row, focusDecision: focusDecision)
           }
         }
-        .frame(maxHeight: min(CGFloat(rows.count) * 46, 220))
       }
     }
     .padding(.horizontal, 14)

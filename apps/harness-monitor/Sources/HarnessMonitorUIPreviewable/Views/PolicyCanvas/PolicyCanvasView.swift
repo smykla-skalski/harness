@@ -15,7 +15,7 @@ public struct PolicyCanvasView: View {
   @State private var scenarioEditRequestState: PolicyCanvasScenarioEditRequest?
   @State private var selectionFocusRequestState: PolicyCanvasViewportSelectionFocusRequest?
   @State private var selectionFocusRequestIDState: UInt64 = 0
-  @State private var policyCanvasInspectorVisibleState = true
+  @AppStorage("policyCanvas.inspectorVisible") private var policyCanvasInspectorVisibleState = true
   @FocusState var canvasKeyboardFocusedState: Bool
   @FocusState var focusedFieldState: PolicyCanvasFocusedField?
   /// VoiceOver focus anchor for the canvas surface. The search palette writes
@@ -211,9 +211,6 @@ public struct PolicyCanvasView: View {
     // reasonable time: the go-live sheet's multi-closure builder plus the
     // deletion dialog tip the single-expression chain over the solver budget.
     policyCanvasCoreBody
-      .inspector(isPresented: $policyCanvasInspectorVisibleState) {
-        policyCanvasConfidenceInspector
-      }
       .sheet(item: $goLiveRequestState) { request in
         PolicyCanvasGoLiveSheet(
           viewModel: viewModel,
