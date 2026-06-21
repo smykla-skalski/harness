@@ -349,7 +349,7 @@ pub async fn serve(
         })
 }
 
-fn daemon_http_router(state: DaemonHttpState) -> Router {
+fn daemon_http_router(state: DaemonHttpState) -> Router<()> {
     Router::new()
         .merge(core::core_routes())
         .merge(sessions::session_routes())

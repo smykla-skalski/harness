@@ -64,11 +64,14 @@ pub(crate) async fn authorize_remote_http_request(
     if state.auth_mode == DaemonHttpAuthMode::Local {
         return next.run(request).await;
     }
-    let route_path = request.extensions().get::<MatchedPath>().map_or_else(
-        || request.uri().path().to_string(),
-        |matched| matched.as_str().to_string(),
-    );
-    let Some(route) = http_route_contract(request.method(), &route_path) else {
+    let Some(route_path) = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str)
+    else {
+        return next.run(request).await;
+    };
+    let Some(route) = http_route_contract(request.method(), route_path) else {
         return remote_auth_error_response(RemoteAuthError::MissingScopeContract);
     };
     if let Err(response) = authorize_http_route(request.headers(), &state, route) {

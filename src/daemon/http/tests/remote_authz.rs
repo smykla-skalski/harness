@@ -165,6 +165,23 @@ async fn remote_http_authz_router_enforces_route_scope_before_handler() {
     let _ = server.await;
 }
 
+#[tokio::test]
+async fn remote_http_authz_preserves_not_found_for_unmatched_routes() {
+    let mut state = test_http_state_with_db();
+    state.auth_mode = DaemonHttpAuthMode::Remote;
+    let (base_url, server) = serve_http(state).await;
+
+    let response = reqwest::Client::new()
+        .get(format!("{base_url}/v1/not-a-real-route"))
+        .send()
+        .await
+        .expect("send unmatched request");
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    server.abort();
+    let _ = server.await;
+}
+
 fn register_remote_client(
     state: &crate::daemon::http::DaemonHttpState,
     client_id: &str,
