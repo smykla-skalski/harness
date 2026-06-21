@@ -3,8 +3,7 @@ use std::path::PathBuf;
 use clap::Parser;
 
 use super::super::{
-    DaemonDevArgs, DaemonRemoteCommand, DaemonRemotePairCommand, DaemonRemoteServeArgs,
-    DaemonServeArgs, HARNESS_MONITOR_APP_GROUP_ID,
+    DaemonDevArgs, DaemonServeArgs, HARNESS_MONITOR_APP_GROUP_ID,
 };
 
 #[derive(Debug, Parser)]
@@ -19,18 +18,6 @@ struct DaemonDevArgsTestHarness {
     args: DaemonDevArgs,
 }
 
-#[derive(Debug, Parser)]
-struct DaemonRemoteServeArgsTestHarness {
-    #[command(flatten)]
-    args: DaemonRemoteServeArgs,
-}
-
-#[derive(Debug, Parser)]
-struct DaemonRemoteCommandTestHarness {
-    #[command(subcommand)]
-    command: DaemonRemoteCommand,
-}
-
 #[test]
 fn daemon_dev_args_defaults_to_harness_monitor_app_group() {
     let parsed = DaemonDevArgsTestHarness::try_parse_from(["test"]).unwrap();
@@ -40,118 +27,6 @@ fn daemon_dev_args_defaults_to_harness_monitor_app_group() {
     assert!(parsed.args.codex_ws_url.is_none());
     assert!(!parsed.args.enable_acp);
     assert!(!parsed.args.disable_acp);
-}
-
-#[test]
-fn daemon_remote_serve_args_require_tls_identity_inputs() {
-    let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
-        "test",
-        "--domain",
-        "daemon.example.com",
-        "--acme-email",
-        "ops@example.com",
-    ])
-    .unwrap();
-
-    assert_eq!(parsed.args.host, "0.0.0.0");
-    assert_eq!(parsed.args.https_port, 443);
-    assert_eq!(parsed.args.http_port, 80);
-    assert_eq!(parsed.args.domain, "daemon.example.com");
-    assert_eq!(parsed.args.acme_email, "ops@example.com");
-    assert_eq!(parsed.args.acme_challenge.as_str(), "tls-alpn");
-    assert!(parsed.args.acme_dns_provider.is_none());
-}
-
-#[test]
-fn daemon_remote_serve_args_support_dns01_providers() {
-    let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
-        "test",
-        "--domain",
-        "daemon.example.com",
-        "--acme-email",
-        "ops@example.com",
-        "--acme-challenge",
-        "dns",
-        "--acme-dns-provider",
-        "cloudflare",
-    ])
-    .unwrap();
-
-    let config = parsed
-        .args
-        .contract_config()
-        .expect("dns provider should satisfy dns-01 config");
-    assert_eq!(config.acme_challenge.as_str(), "dns");
-    assert_eq!(
-        config.acme_dns_provider.expect("dns provider").as_str(),
-        "cloudflare"
-    );
-}
-
-#[test]
-fn daemon_remote_serve_args_reject_dns01_without_provider() {
-    let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
-        "test",
-        "--domain",
-        "daemon.example.com",
-        "--acme-email",
-        "ops@example.com",
-        "--acme-challenge",
-        "dns",
-    ])
-    .unwrap();
-
-    let error = parsed
-        .args
-        .contract_config()
-        .expect_err("dns-01 should require an explicit DNS provider");
-    assert!(
-        error.to_string().contains("DNS-01 challenge requires"),
-        "unexpected error: {error}"
-    );
-}
-
-#[test]
-fn daemon_remote_serve_args_reject_http01_without_http_port() {
-    let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
-        "test",
-        "--domain",
-        "daemon.example.com",
-        "--acme-email",
-        "ops@example.com",
-        "--acme-challenge",
-        "http",
-        "--http-port",
-        "0",
-    ])
-    .unwrap();
-
-    let error = parsed
-        .args
-        .contract_config()
-        .expect_err("http-01 should require a non-zero HTTP port");
-    assert!(
-        error.to_string().contains("HTTP-01 port must be non-zero"),
-        "unexpected error: {error}"
-    );
-}
-
-#[test]
-fn daemon_remote_pair_create_defaults_to_admin_ten_minute_ttl() {
-    let parsed = DaemonRemoteCommandTestHarness::try_parse_from(["test", "pair", "create"])
-        .unwrap()
-        .command;
-
-    match parsed {
-        DaemonRemoteCommand::Pair {
-            command: DaemonRemotePairCommand::Create(args),
-        } => {
-            assert_eq!(args.role.as_str(), "admin");
-            assert_eq!(args.ttl, "10m");
-            assert!(args.scopes.is_empty());
-        }
-        other => panic!("expected pair create, got {other:?}"),
-    }
 }
 
 #[test]

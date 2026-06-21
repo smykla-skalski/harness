@@ -69,7 +69,7 @@ fn every_http_route_has_remote_scope_contract() {
 
 #[test]
 fn every_declared_ws_method_has_remote_scope_contract() {
-    for method in declared_ws_method_literals() {
+    for method in ws_methods::ALL {
         assert!(
             remote_ws_scopes(method).is_some(),
             "{method} should declare remote auth scopes"
@@ -85,19 +85,6 @@ fn remote_viewer_scope_is_read_only() {
     assert!(viewer_scopes.contains(&RemoteAccessScope::Read));
     assert!(!viewer_scopes.contains(&RemoteAccessScope::Write));
     assert!(!viewer_scopes.contains(&RemoteAccessScope::Admin));
-}
-
-fn declared_ws_method_literals() -> BTreeSet<&'static str> {
-    include_str!("ws_methods.rs")
-        .split("pub const ")
-        .skip(1)
-        .filter_map(|line| {
-            let (_, rhs) = line.split_once('=')?;
-            let (_, value) = rhs.split_once('"')?;
-            let (value, _) = value.split_once('"')?;
-            Some(value)
-        })
-        .collect()
 }
 
 #[test]

@@ -1,9 +1,11 @@
+use std::{num::NonZeroU64, str::FromStr};
+
 use clap::{Args, Subcommand, ValueEnum};
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::remote::{
-    RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, RemoteRole,
-    validate_remote_serve_config,
+    RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider,
+    RemoteRole, validate_remote_serve_config,
 };
 use crate::errors::{CliError, CliErrorKind};
 
@@ -106,11 +108,11 @@ pub struct DaemonRemotePairCreateArgs {
     #[arg(long, value_enum, default_value = "admin")]
     pub role: DaemonRemoteRole,
     /// Optional explicit scopes. Defaults to the selected role's scopes.
-    #[arg(long, value_delimiter = ',')]
-    pub scopes: Vec<String>,
+    #[arg(long, value_enum, value_delimiter = ',')]
+    pub scopes: Vec<DaemonRemoteScope>,
     /// Pairing code time-to-live.
     #[arg(long, default_value = "10m")]
-    pub ttl: String,
+    pub ttl: DaemonRemotePairTtl,
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -235,5 +237,78 @@ impl From<DaemonRemoteRole> for RemoteRole {
             DaemonRemoteRole::Operator => Self::Operator,
             DaemonRemoteRole::Viewer => Self::Viewer,
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum DaemonRemoteScope {
+    #[value(name = "read")]
+    Read,
+    #[value(name = "write")]
+    Write,
+    #[value(name = "admin")]
+    Admin,
+}
+
+impl DaemonRemoteScope {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Read => "read",
+            Self::Write => "write",
+            Self::Admin => "admin",
+        }
+    }
+}
+
+impl From<DaemonRemoteScope> for RemoteAccessScope {
+    fn from(value: DaemonRemoteScope) -> Self {
+        match value {
+            DaemonRemoteScope::Read => Self::Read,
+            DaemonRemoteScope::Write => Self::Write,
+            DaemonRemoteScope::Admin => Self::Admin,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DaemonRemotePairTtl {
+    seconds: NonZeroU64,
+}
+
+impl DaemonRemotePairTtl {
+    #[must_use]
+    pub const fn as_secs(self) -> u64 {
+        self.seconds.get()
+    }
+}
+
+impl FromStr for DaemonRemotePairTtl {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let (digits, multiplier) = if let Some(digits) = value.strip_suffix('s') {
+            (digits, 1)
+        } else if let Some(digits) = value.strip_suffix('m') {
+            (digits, 60)
+        } else if let Some(digits) = value.strip_suffix('h') {
+            (digits, 60 * 60)
+        } else {
+            return Err("pairing ttl must end with s, m, or h".to_string());
+        };
+
+        if digits.is_empty() || !digits.chars().all(|character| character.is_ascii_digit()) {
+            return Err("pairing ttl must start with a positive integer".to_string());
+        }
+
+        let count = digits
+            .parse::<u64>()
+            .map_err(|_| "pairing ttl value is too large".to_string())?;
+        let seconds = count
+            .checked_mul(multiplier)
+            .and_then(NonZeroU64::new)
+            .ok_or_else(|| "pairing ttl must be greater than zero".to_string())?;
+
+        Ok(Self { seconds })
     }
 }
