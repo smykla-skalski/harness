@@ -59,6 +59,22 @@ fn remote_client_registration_derives_role_bounded_scopes() {
 }
 
 #[test]
+fn remote_client_registration_redacts_short_token_hints() {
+    let registration = RemoteClientRegistration::new_for_tests(
+        "client-short",
+        "MacBook Air",
+        "macos",
+        RemoteRole::Viewer,
+        &[],
+        "short",
+        "2026-06-21T12:30:30Z",
+    )
+    .expect("registration");
+
+    assert_eq!(registration.token_hint(), "<redacted>");
+}
+
+#[test]
 fn remote_audit_event_redacts_secret_error_detail() {
     let event = RemoteAuditEvent::new(
         "event-1",

@@ -1,4 +1,10 @@
-#![allow(dead_code)]
+#![cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "remote identity storage is wired by the auth middleware phase"
+    )
+)]
 
 use rusqlite::{params, types::Type};
 
@@ -7,7 +13,7 @@ use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration,
     RemoteStoredAuditEvent, RemoteStoredClient, RemoteTokenHash, parse_remote_role,
-    parse_remote_scope,
+    parse_remote_scope, remote_token_hint,
 };
 
 const INSERT_REMOTE_CLIENT_SQL: &str = "
@@ -124,7 +130,7 @@ impl DaemonDb {
                 params![
                     client_id,
                     token_hash.as_storage_value(),
-                    token_hint(token),
+                    remote_token_hint(token),
                     rotated_at,
                 ],
             )
@@ -305,13 +311,4 @@ fn parse_outcome_at_column(label: &str, column: usize) -> rusqlite::Result<Remot
             format!("unknown remote audit outcome '{label}'").into(),
         )),
     }
-}
-
-fn token_hint(token: &str) -> String {
-    let chars = token.chars().collect::<Vec<_>>();
-    chars
-        .iter()
-        .skip(chars.len().saturating_sub(6))
-        .copied()
-        .collect()
 }

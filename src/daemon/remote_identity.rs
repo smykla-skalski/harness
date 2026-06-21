@@ -16,6 +16,7 @@ const TOKEN_RANDOM_BYTES: usize = 32;
 const TOKEN_HINT_CHARS: usize = 6;
 const TOKEN_HASH_PREFIX: &str = "sha256:";
 const TOKEN_HASH_HEX_LEN: usize = 64;
+const REDACTED_TOKEN_HINT: &str = "<redacted>";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RemoteIdentityError {
@@ -172,7 +173,7 @@ impl RemoteClientRegistration {
             role,
             scopes: expand_client_scopes(role, requested_scopes)?,
             token_hash: RemoteTokenHash::from_token(token),
-            token_hint: token_hint(token),
+            token_hint: remote_token_hint(token),
             created_at: created_at.into(),
         })
     }
@@ -394,8 +395,11 @@ fn constant_time_eq(left: &[u8; 32], right: &[u8; 32]) -> bool {
     diff == 0
 }
 
-fn token_hint(token: &str) -> String {
+pub(crate) fn remote_token_hint(token: &str) -> String {
     let chars = token.chars().collect::<Vec<_>>();
+    if chars.len() <= TOKEN_HINT_CHARS {
+        return REDACTED_TOKEN_HINT.to_owned();
+    }
     chars
         .iter()
         .skip(chars.len().saturating_sub(TOKEN_HINT_CHARS))

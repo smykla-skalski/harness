@@ -120,11 +120,27 @@ fn remote_clients_persist_hashed_tokens_and_support_revoke_rotate() {
             .expect("valid token remains accepted after rejected rotation")
             .is_some()
     );
+    db.rotate_remote_client_token("client-1", "short", "2026-06-21T12:41:45Z")
+        .expect("rotate to short token");
+    let rotated_hint: String = db
+        .conn
+        .query_row(
+            "SELECT token_hint FROM remote_clients WHERE client_id = 'client-1'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("rotated token hint");
+    assert_eq!(rotated_hint, "<redacted>");
+    assert!(
+        db.verify_remote_client_token("client-1", "short")
+            .expect("short token accepted after redacted hint rotation")
+            .is_some()
+    );
 
     db.revoke_remote_client("client-1", "2026-06-21T12:42:00Z")
         .expect("revoke client");
     assert!(
-        db.verify_remote_client_token("client-1", "rotated-token-secret")
+        db.verify_remote_client_token("client-1", "short")
             .expect("revoked token rejected")
             .is_none()
     );
