@@ -298,9 +298,16 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(auditView.contains("HarnessMonitorJSONCodeBlock(rawJSON: payload)"))
     #expect(!auditView.contains("DashboardAuditTextBlock(title: \"Payload\", text: payload)"))
-    #expect(auditView.contains(".harnessFocusedSceneValue(\\.dashboardAuditCopyCommand"))
+    #expect(auditView.contains(".harnessFocusedSceneValue("))
+    #expect(auditView.contains("\\.dashboardAuditCopyCommand"))
     #expect(!auditView.contains(".focusedSceneValue(\\.dashboardAuditCopyCommand"))
     #expect(auditView.contains("DashboardAuditCopyFocus("))
+    #expect(auditView.contains("@FocusState private var focusedFilterField"))
+    #expect(auditView.contains("focusedField: $focusedFilterField"))
+    #expect(auditView.contains("focusedFilterField == nil"))
+    #expect(auditView.contains(".focused(focusedField, equals: .actionKey)"))
+    #expect(auditView.contains(".focused(focusedField, equals: .subject)"))
+    #expect(auditView.contains(".focused(focusedField, equals: .searchText)"))
     #expect(auditView.contains("selectedEvent?.clipboardJSONString"))
     #expect(auditView.contains(".contextMenu {"))
     #expect(auditView.contains("Button(\"Copy Event\")"))
@@ -308,8 +315,19 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let commandsSource = try sourceFile(named: "HarnessMonitorAppCommands.swift")
     #expect(commandsSource.contains("@FocusedValue(\\.dashboardAuditCopyCommand)"))
     #expect(commandsSource.contains("Copy Audit Event"))
-    #expect(commandsSource.contains(".keyboardShortcut(\"c\", modifiers: .command)"))
-    #expect(commandsSource.contains("dashboardAuditCopyFocus?.copy()"))
+    let auditCopyCommandsRange = try #require(
+      commandsSource.range(of: "private var dashboardAuditCopyCommands: some Commands")
+    )
+    let viewCommandsRange = try #require(
+      commandsSource.range(of: "private var viewCommands: some Commands")
+    )
+    let auditCopyCommandsSource =
+      commandsSource[auditCopyCommandsRange.lowerBound..<viewCommandsRange.lowerBound]
+    #expect(auditCopyCommandsSource.contains("CommandGroup(replacing: .pasteboard)"))
+    #expect(!auditCopyCommandsSource.contains("CommandGroup(after: .pasteboard)"))
+    #expect(auditCopyCommandsSource.contains(".keyboardShortcut(\"c\", modifiers: .command)"))
+    #expect(auditCopyCommandsSource.contains("dashboardAuditCopyFocus.canCopy"))
+    #expect(auditCopyCommandsSource.contains("dashboardAuditCopyFocus.copy()"))
   }
 
   private func dashboardAuditSource() throws -> String {

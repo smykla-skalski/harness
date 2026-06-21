@@ -69,6 +69,7 @@ private struct DashboardAuditMetric: View {
 struct DashboardAuditFilterBar: View {
   @Binding var filters: DashboardAuditFilters
   let events: [HarnessMonitorAuditEvent]
+  let focusedField: FocusState<DashboardAuditFilterField?>.Binding
   let exportVisibleRows: () -> Void
 
   var body: some View {
@@ -102,14 +103,17 @@ struct DashboardAuditFilterBar: View {
 
       TextField("Action key", text: $filters.actionKey)
         .textFieldStyle(.roundedBorder)
+        .focused(focusedField, equals: .actionKey)
         .frame(width: 150)
 
       TextField("Subject", text: $filters.subject)
         .textFieldStyle(.roundedBorder)
+        .focused(focusedField, equals: .subject)
         .frame(width: 150)
 
       TextField("Search", text: $filters.searchText)
         .textFieldStyle(.roundedBorder)
+        .focused(focusedField, equals: .searchText)
         .frame(minWidth: 180)
 
       Button {

@@ -146,18 +146,18 @@ struct HarnessMonitorAppCommands: Commands {
   }
 
   @CommandsBuilder private var dashboardAuditCopyCommands: some Commands {
-    CommandGroup(after: .pasteboard) {
-      if let dashboardAuditCopyFocus {
+    if let dashboardAuditCopyFocus, dashboardAuditCopyFocus.canCopy {
+      CommandGroup(replacing: .pasteboard) {
+        Button("Cut") {}
+          .keyboardShortcut("x", modifiers: .command)
+          .disabled(true)
         Button("Copy Audit Event") {
           dashboardAuditCopyFocus.copy()
         }
         .keyboardShortcut("c", modifiers: .command)
-        .disabled(!dashboardAuditCopyFocus.canCopy)
-      } else {
-        Button("Copy Audit Event") {
-          dashboardAuditCopyFocus?.copy()
-        }
-        .disabled(true)
+        Button("Paste") {}
+          .keyboardShortcut("v", modifiers: .command)
+          .disabled(true)
       }
     }
   }

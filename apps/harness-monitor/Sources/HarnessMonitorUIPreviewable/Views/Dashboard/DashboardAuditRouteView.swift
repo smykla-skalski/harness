@@ -18,6 +18,7 @@ struct DashboardAuditRouteView: View {
   @State private var selectedEventID: String?
   @State private var visibleEventLimit = DashboardAuditPaging.pageSize
   @State private var copyDispatcher = DashboardAuditCopyDispatcher()
+  @FocusState private var focusedFilterField: DashboardAuditFilterField?
 
   private var events: [HarnessMonitorAuditEvent] {
     dashboardUI.auditEvents
@@ -60,6 +61,7 @@ struct DashboardAuditRouteView: View {
         DashboardAuditFilterBar(
           filters: $filters,
           events: events,
+          focusedField: $focusedFilterField,
           exportVisibleRows: copyVisibleRows
         )
         .padding(.horizontal, 16)
@@ -82,7 +84,7 @@ struct DashboardAuditRouteView: View {
       .harnessFocusedSceneValue(
         \.dashboardAuditCopyCommand,
         DashboardAuditCopyFocus(
-          canCopy: selectedEvent != nil,
+          canCopy: selectedEvent != nil && focusedFilterField == nil,
           dispatcher: copyDispatcher
         )
       )
@@ -318,6 +320,12 @@ struct DashboardAuditFilters: Equatable {
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
   }
+}
+
+enum DashboardAuditFilterField: Hashable {
+  case actionKey
+  case subject
+  case searchText
 }
 
 enum DashboardAuditFilterConstants {
