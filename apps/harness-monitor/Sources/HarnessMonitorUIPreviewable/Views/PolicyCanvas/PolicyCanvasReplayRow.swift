@@ -43,6 +43,7 @@ struct PolicyCanvasReplayRow: View {
       Image(systemName: "arrow.right")
         .scaledFont(.caption2)
         .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
+        .accessibilityHidden(true)
       PolicyCanvasVerdictPill(verdict: row.draftVerdict)
     }
     .fixedSize()

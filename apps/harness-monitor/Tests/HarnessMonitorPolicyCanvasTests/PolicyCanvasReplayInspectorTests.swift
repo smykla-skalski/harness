@@ -44,7 +44,7 @@ struct PolicyCanvasReplayInspectorTests {
     #expect(rows.count == 3)
 
     #expect(rows[0].id == "d1")
-    #expect(rows[0].actionTitle == "merge pr")
+    #expect(rows[0].actionTitle == "Merge PR")
     #expect(rows[0].historicalVerdict == .allow)
     #expect(rows[0].draftVerdict == .deny)
     #expect(rows[0].changed)

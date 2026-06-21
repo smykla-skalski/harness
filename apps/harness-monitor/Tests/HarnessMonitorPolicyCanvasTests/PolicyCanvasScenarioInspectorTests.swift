@@ -32,7 +32,7 @@ struct PolicyCanvasScenarioInspectorTests {
     #expect(rows.count == 2)
     #expect(rows[0].id == "s1")
     #expect(rows[0].name == "Merge - green")
-    #expect(rows[0].actionTitle == "merge pr")
+    #expect(rows[0].actionTitle == "Merge PR")
     #expect(rows[0].verdict == .allow)
     #expect(rows[0].visitedNodeIds == ["a", "b"])
     #expect(rows[1].id == "s2")
@@ -55,7 +55,7 @@ struct PolicyCanvasScenarioInspectorTests {
     let rows = viewModel.scenarioRows
     #expect(rows.count == 1)
     #expect(rows[0].id == "|merge_pr")
-    #expect(rows[0].name == "merge pr")
+    #expect(rows[0].name == "Merge PR")
   }
 
   @Test("A failed simulation yields no scenario rows")

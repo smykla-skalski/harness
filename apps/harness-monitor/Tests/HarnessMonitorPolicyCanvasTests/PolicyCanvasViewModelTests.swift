@@ -299,7 +299,7 @@ struct PolicyCanvasViewModelTests {
     let row = PolicyCanvasGoLiveDiffRowModel(entry: entry)
 
     #expect(row.id == "scenario-merge.merge_pr")
-    #expect(row.actionTitle == "merge pr")
+    #expect(row.actionTitle == "Merge PR")
     #expect(row.scenarioName == "Merge - checks green")
     #expect(row.liveVerdict == .allow)
     #expect(row.draftVerdict == .needsHuman)

@@ -21,6 +21,22 @@ struct PolicyCanvasDecisionMatrixTests {
     #expect(PolicyCanvasDecisionVerdict(decisionString: "weird") == .unknown("weird"))
   }
 
+  @Test("Reason text hides verdict restatements and humanizes the rest")
+  func reasonExplanation() {
+    #expect(PolicyCanvasDecisionReason.explanation(reasonCode: "default_allow") == nil)
+    #expect(PolicyCanvasDecisionReason.explanation(reasonCode: "human_required") == nil)
+    #expect(PolicyCanvasDecisionReason.explanation(reasonCode: "dry_run_required") == nil)
+    #expect(
+      PolicyCanvasDecisionReason.explanation(reasonCode: "checks_not_green") == "Checks not green"
+    )
+    #expect(
+      PolicyCanvasDecisionReason.explanation(reasonCode: "auto_merge_allowed")
+        == "Auto-merge rule passed"
+    )
+    #expect(PolicyCanvasDecisionReason.explanation(reasonCode: "some_new_code") == "some new code")
+    #expect(PolicyCanvasDecisionReason.explanation(reasonCode: "") == nil)
+  }
+
   @Test("Decision matrix rows project from the latest simulation")
   func rowsProjectFromSimulation() {
     let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [])
@@ -59,7 +75,7 @@ struct PolicyCanvasDecisionMatrixTests {
     #expect(rows[0].id == "scenario-merge.merge_pr")
     #expect(rows[0].scenarioName == "Merge - checks green")
     #expect(rows[0].actionRaw == "merge_pr")
-    #expect(rows[0].actionTitle == "merge pr")
+    #expect(rows[0].actionTitle == "Merge PR")
     #expect(rows[0].verdict == .allow)
     #expect(rows[0].reasonCode == "default_allow")
     #expect(rows[0].visitedNodeIds == ["a", "b"])

@@ -81,8 +81,22 @@ struct PolicyCanvasInspectorRow: View {
 }
 
 extension PolicyAction {
+  /// Sentence-case display title with the known acronyms upper-cased, so raw
+  /// values like `merge_pr` and `destructive_fs` read as "Merge PR" and
+  /// "Destructive FS" instead of lowercase machine tokens.
   var policyCanvasTitle: String {
-    rawValue.replacingOccurrences(of: "_", with: " ")
+    let acronyms: Set<String> = ["pr", "fs"]
+    return rawValue.split(separator: "_").enumerated().map { index, part in
+      let word = String(part)
+      if acronyms.contains(word) {
+        return word.uppercased()
+      }
+      if index == 0 {
+        return "\(word.prefix(1).uppercased())\(word.dropFirst())"
+      }
+      return word
+    }
+    .joined(separator: " ")
   }
 }
 

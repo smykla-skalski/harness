@@ -20,6 +20,7 @@ struct PolicyCanvasDecisionMatrixView: View {
       if rows.isEmpty {
         emptyState
       } else {
+        caption
         // No inner scroll or fixed cap: the confidence pane owns one scroll view,
         // so the full simulation flows with scenarios and replay instead of
         // clipping past ~220pt while the tall pane has room to spare.
@@ -28,6 +29,9 @@ struct PolicyCanvasDecisionMatrixView: View {
             PolicyCanvasDecisionMatrixRow(model: row, focusDecision: focusDecision)
           }
         }
+        // Dim the prior verdicts while a fresh simulation is in flight so a
+        // stale row is never read as current.
+        .opacity(isEvaluating ? 0.55 : 1)
       }
     }
     .padding(.horizontal, 14)
@@ -59,15 +63,33 @@ struct PolicyCanvasDecisionMatrixView: View {
         Text(summary)
           .scaledFont(.caption2.weight(.medium))
           .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
+          .help(
+            "Gated actions need a human, consensus, or dry run, or are denied - "
+              + "they will not run automatically."
+          )
       }
     }
   }
 
+  private var caption: some View {
+    Text(
+      "Read-only preview of how your draft decides each action. "
+        + "Tap a row to trace it on the canvas."
+    )
+    .scaledFont(.caption2)
+    .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
+    .fixedSize(horizontal: false, vertical: true)
+  }
+
   private var emptyState: some View {
-    Text("Waiting for confidence evaluation.")
-      .scaledFont(.caption)
-      .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
-      .fixedSize(horizontal: false, vertical: true)
+    Text(
+      isEvaluating
+        ? "Evaluating how each action resolves\u{2026}"
+        : "Edit the policy to preview how each action will be decided."
+    )
+    .scaledFont(.caption)
+    .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+    .fixedSize(horizontal: false, vertical: true)
   }
 
   private var summary: String {

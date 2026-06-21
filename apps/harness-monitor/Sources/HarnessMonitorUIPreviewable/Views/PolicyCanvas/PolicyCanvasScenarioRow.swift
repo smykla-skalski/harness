@@ -14,9 +14,7 @@ struct PolicyCanvasScenarioRow: View {
 
   var body: some View {
     HStack(spacing: 8) {
-      Button {
-        focusDecision(row.visitedNodeIds)
-      } label: {
+      Button(action: trace) {
         HStack(spacing: 8) {
           VStack(alignment: .leading, spacing: 2) {
             Text(row.name)
@@ -34,6 +32,9 @@ struct PolicyCanvasScenarioRow: View {
         .contentShape(Rectangle())
       }
       .harnessPlainButtonStyle()
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel("\(row.name), \(row.actionTitle): \(row.verdict.label)")
+      .accessibilityHint(row.visitedNodeIds.isEmpty ? "" : "Traces this scenario on the canvas")
 
       Button {
         editScenario(row.id)
@@ -57,5 +58,14 @@ struct PolicyCanvasScenarioRow: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
+  }
+
+  /// Announce the navigation for VoiceOver, then trace on the canvas - the
+  /// visible effect lands elsewhere, so without this the tap is silent.
+  private func trace() {
+    if !row.visitedNodeIds.isEmpty {
+      AccessibilityNotification.Announcement("Tracing \(row.name) on the canvas").post()
+    }
+    focusDecision(row.visitedNodeIds)
   }
 }
