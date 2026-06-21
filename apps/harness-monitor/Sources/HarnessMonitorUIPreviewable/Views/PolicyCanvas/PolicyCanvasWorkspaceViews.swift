@@ -135,11 +135,13 @@ struct PolicyCanvasViewport: View {
       let appliedRouteKey = resolvedRouteCache.appliedRouteKey
       let routeKeyIsStale = appliedRouteKey != routeKey
       // During a drag the cache trails the cursor by at most one coalesced
-      // recompute; this projects the last routed output onto the current node
-      // positions so the wires track the node until the real routes land. Once
-      // the recompute commits, the delta is zero and this returns the routed
-      // output verbatim. The projection only ever fills the gap - it is never
-      // committed to the cache, so it cannot diverge from the router on drop.
+      // recompute. Rather than show a translated approximation (which can slice a
+      // wire through a node body until the async route lands), route the dragged
+      // node's incident edges through the real selective router synchronously this
+      // frame, reusing the cached routes for everything else. The displayed wires
+      // are the router's true output every tick, so dropping a node changes
+      // nothing. The projection result is kept only for its shape/accessibility
+      // bookkeeping; when no drag is active its routes equal the cache verbatim.
       let projectedRouteResult = policyCanvasProjectedRouteResult(
         input: PolicyCanvasProjectedRouteInput(
           cachedOutput: cachedOutput,
@@ -150,7 +152,19 @@ struct PolicyCanvasViewport: View {
           fontScale: fontScale
         )
       )
-      let routeOutput = projectedRouteResult.output
+      let liveDragRoutedOutput =
+        projectedRouteResult.canCommitAsCurrentGraph
+        ? policyCanvasLiveDragRoutedOutput(
+          nodes: nodes,
+          groups: groups,
+          edges: edges,
+          fontScale: fontScale,
+          algorithmSelection: viewModel.algorithmSelection,
+          movedNodeIDs: viewModel.liveDragAffectedNodeIDs,
+          previous: cachedOutput
+        )
+        : nil
+      let routeOutput = liveDragRoutedOutput ?? projectedRouteResult.output
       let routeOutputMatchesCurrentGraph =
         !viewModel.isEmpty
         && projectedRouteResult.matchesCurrentGraphShape

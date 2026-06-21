@@ -20,6 +20,62 @@ func policyCanvasNodePositionsByID(_ nodes: [PolicyCanvasNode]) -> [String: CGPo
   Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
 }
 
+/// Route the edges incident to the dragged nodes through the real selective
+/// router synchronously, reusing `previous` for the untouched edges. This is the
+/// drag-frame replacement for the geometric projection: the displayed wires are
+/// the router's true output (body-clean, port-correct) every tick instead of a
+/// translated approximation, so dropping a node changes nothing. A position drag
+/// leaves node labels, connect targets, and accessibility entries untouched, so
+/// those maps are carried from `previous` rather than recomputed. Returns `nil`
+/// when selective routing does not apply (topology changed, or no moved edge);
+/// the caller then falls back to the previous output.
+func policyCanvasLiveDragRoutedOutput(
+  nodes: [PolicyCanvasNode],
+  groups: [PolicyCanvasGroup],
+  edges: [PolicyCanvasEdge],
+  fontScale: CGFloat,
+  algorithmSelection: PolicyCanvasAlgorithmSelection,
+  movedNodeIDs: Set<String>,
+  previous: PolicyCanvasRouteWorkerOutput
+) -> PolicyCanvasRouteWorkerOutput? {
+  guard !movedNodeIDs.isEmpty, !previous.routes.isEmpty else {
+    return nil
+  }
+  let prepared = PolicyCanvasPreparedRouteInput(
+    input: PolicyCanvasRouteWorkerInput(
+      nodes: nodes,
+      groups: groups,
+      edges: edges,
+      fontScale: fontScale,
+      algorithmSelection: algorithmSelection
+    )
+  )
+  guard
+    let computation = prepared.selectiveRouteComputation(
+      router: policyCanvasDefaultEdgeRouter(),
+      algorithmSelection: algorithmSelection,
+      movedNodeIDs: movedNodeIDs,
+      previousRoutes: previous.routes,
+      previousPortMarkerLayout: previous.portMarkerLayout
+    )
+  else {
+    return nil
+  }
+  return PolicyCanvasRouteWorkerOutput(
+    routes: computation.routes,
+    labelPositions: computation.labelPositions,
+    portVisibility: computation.portVisibility,
+    portMarkerLayout: computation.portMarkerLayout,
+    visibleBounds: computation.visibleBounds,
+    contentSize: policyCanvasVisibleContentSize(visibleBounds: computation.visibleBounds),
+    accessibilityEdgeLabelsByID: previous.accessibilityEdgeLabelsByID,
+    accessibilityNodeEntries: previous.accessibilityNodeEntries,
+    accessibilityEdgeEntries: previous.accessibilityEdgeEntries,
+    nodeAccessibilityValuesByID: previous.nodeAccessibilityValuesByID,
+    connectTargetsByNodeID: previous.connectTargetsByNodeID
+  )
+}
+
 func policyCanvasProjectedRouteOutput(
   input: PolicyCanvasProjectedRouteInput
 ) -> PolicyCanvasRouteWorkerOutput {
