@@ -129,18 +129,42 @@ extension PolicyCanvasPreparedRouteInput {
     else {
       return nil
     }
-    let affectedEdgeIDs = Set(
+    let incidentEdgeIDs = Set(
       edges
         .filter {
           movedNodeIDs.contains($0.source.nodeID) || movedNodeIDs.contains($0.target.nodeID)
         }
         .map(\.id)
     )
-    guard !affectedEdgeIDs.isEmpty else {
+    guard !incidentEdgeIDs.isEmpty else {
       return nil
     }
 
     let nodeIndex = nodeIndex
+    // A move can drop the node onto an edge that is not incident to it. That edge
+    // would otherwise stay frozen at its previous geometry and the moved body
+    // would slice through it - the wire-behind-node the user sees mid-drag. Fold
+    // every edge whose previous route now intersects a moved node's body into the
+    // affected set so it re-routes from scratch through the same convergence the
+    // incident edges use, matching a full reconverge. (The give-up body-hit repair
+    // in the chain keeps a crossing route when its one-shot detour still hits, so
+    // routing these edges fresh up front is what actually clears them.)
+    let movedFrames = movedNodeIDs.compactMap { nodeIndex[$0]?.frame }
+    let crossedEdgeIDs = Set(
+      edges
+        .filter { edge in
+          guard !incidentEdgeIDs.contains(edge.id),
+            let route = previousRoutes[edge.id]
+          else {
+            return false
+          }
+          return movedFrames.contains { frame in
+            policyCanvasRouteIntersectsObstacles(route, obstacles: [frame])
+          }
+        }
+        .map(\.id)
+    )
+    let affectedEdgeIDs = incidentEdgeIDs.union(crossedEdgeIDs)
     let algorithms = PolicyCanvasAlgorithmRegistry.routingAlgorithms(for: algorithmSelection)
     let selectedRouter: any PolicyCanvasEdgeRouter =
       algorithmSelection.algorithmID(for: .edgeRouting)
@@ -188,12 +212,32 @@ extension PolicyCanvasPreparedRouteInput {
     // paint uses, but scoped to the affected edges: body-hit repair folds in any
     // unrelated edge the moved node now crosses, then crossed-port / terminal-
     // order / reach passes finish them while every other edge stays frozen.
-    return repairedRouteComputation(
+    let selective = repairedRouteComputation(
       seedRoutes: routes,
       nodeIndex: nodeIndex,
       router: selectedRouter,
       algorithms: algorithms,
       affectedEdgeIDs: affectedEdgeIDs
     )
+
+    // Correctness backstop. The scoped reroute matches a full reconverge for the
+    // moved node's incident edges and for the edges it lands on - but the chain's
+    // give-up body-hit repair keeps a crossing route when its one-shot detour
+    // still hits, so a moved body can still slice through a non-incident wire that
+    // a full reconverge would route clear (port-marker rebalancing across every
+    // edge gives the full pass detour freedom the scoped pass lacks). When that
+    // happens the selective output no longer represents the final routing, so
+    // fall back to the full route for this frame: the drag must show the same
+    // body-clean geometry the drop will. A moved node as a body-hit obstacle is
+    // only possible for a non-incident edge (the metric excludes endpoints), so
+    // this never fires for an ordinary open-space drag - only when the node is
+    // dropped onto a wire the scoped pass could not clear.
+    let movedBodyStillCrossed = precomputedBodyHits(
+      routes: selective.routes, nodeIndex: nodeIndex
+    ).contains { movedNodeIDs.contains($0.obstacleID) }
+    guard movedBodyStillCrossed else {
+      return selective
+    }
+    return routeComputation(router: defaultRouter, algorithmSelection: algorithmSelection)
   }
 }
