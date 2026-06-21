@@ -3,10 +3,12 @@ use std::{num::NonZeroU64, str::FromStr};
 use clap::{Args, Subcommand, ValueEnum};
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::remote::{
-    RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider,
-    RemoteRole, validate_remote_serve_config,
+    RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, RemoteRole,
+    validate_remote_serve_config,
 };
+use crate::daemon::service::DaemonServeConfig;
 use crate::errors::{CliError, CliErrorKind};
 
 #[derive(Debug, Clone, Subcommand)]
@@ -41,7 +43,7 @@ pub enum DaemonRemoteCommand {
 impl Execute for DaemonRemoteCommand {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         if let Self::Serve(args) = self {
-            args.contract_config()?;
+            args.daemon_serve_config()?;
         }
         Err(CliErrorKind::workflow_parse(
             "remote daemon execution is reserved for the next implementation phase",
@@ -93,6 +95,20 @@ impl DaemonRemoteServeArgs {
         validate_remote_serve_config(&config)
             .map_err(|error| CliError::from(CliErrorKind::workflow_parse(error.to_string())))?;
         Ok(config)
+    }
+
+    /// Build the daemon service config for remote serve execution.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the remote TLS or ACME contract is invalid.
+    pub fn daemon_serve_config(&self) -> Result<DaemonServeConfig, CliError> {
+        let remote_config = self.contract_config()?;
+        Ok(DaemonServeConfig {
+            host: remote_config.host,
+            port: remote_config.https_port,
+            auth_mode: DaemonHttpAuthMode::Remote,
+            ..DaemonServeConfig::default()
+        })
     }
 }
 

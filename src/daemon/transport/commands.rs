@@ -182,6 +182,7 @@ impl DaemonServeArgs {
         DaemonServeConfig {
             host: self.host.clone(),
             port: self.port,
+            auth_mode: super::super::http::DaemonHttpAuthMode::Local,
             poll_interval: Duration::from_secs(self.refresh_seconds.max(1)),
             observe_interval: Duration::from_secs(self.observe_seconds.max(1)),
             sandboxed,
@@ -277,6 +278,7 @@ impl DaemonDevArgs {
             serve_config: DaemonServeConfig {
                 host: self.host.clone(),
                 port: self.port,
+                auth_mode: super::super::http::DaemonHttpAuthMode::Local,
                 poll_interval: Duration::from_secs(2),
                 observe_interval: Duration::from_secs(5),
                 sandboxed: false,
