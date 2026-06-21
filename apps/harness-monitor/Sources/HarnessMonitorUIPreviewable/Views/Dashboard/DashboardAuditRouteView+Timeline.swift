@@ -142,6 +142,7 @@ struct DashboardAuditTimelinePane: View {
   let configuration: HarnessMonitorDateTimeConfiguration
   let hasMoreEvents: Bool
   let loadMoreEvents: () -> Void
+  let copyDispatcher: DashboardAuditCopyDispatcher
 
   private var rows: [DashboardAuditTimelineRow] {
     DashboardAuditTimelineRow.rows(for: events, configuration: configuration)
@@ -169,7 +170,8 @@ struct DashboardAuditTimelinePane: View {
             }
             DashboardAuditTimelineRowView(
               row: row,
-              isSelected: row.event.id == selectedEventID
+              isSelected: row.event.id == selectedEventID,
+              copyDispatcher: copyDispatcher
             ) {
               selectedEventID = row.event.id
             }
@@ -295,6 +297,7 @@ private enum DashboardAuditTimelineRowLayout {
 private struct DashboardAuditTimelineRowView: View {
   let row: DashboardAuditTimelineRow
   let isSelected: Bool
+  let copyDispatcher: DashboardAuditCopyDispatcher
   let select: () -> Void
 
   var body: some View {
@@ -321,7 +324,15 @@ private struct DashboardAuditTimelineRowView: View {
     }
     .harnessPlainButtonStyle()
     .accessibilityLabel(row.accessibilityLabel)
+    .accessibilityAction(named: Text("Copy Event")) {
+      copyEvent(row.event)
+    }
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAuditRow(row.event.id))
+    .contextMenu {
+      Button("Copy Event") {
+        copyEvent(row.event)
+      }
+    }
   }
 
   private var titleRow: some View {
@@ -366,6 +377,10 @@ private struct DashboardAuditTimelineRowView: View {
     )
     .opacity(0.86)
     .accessibilityHidden(true)
+  }
+
+  private func copyEvent(_ event: HarnessMonitorAuditEvent) {
+    copyDispatcher.copy(event: event)
   }
 }
 

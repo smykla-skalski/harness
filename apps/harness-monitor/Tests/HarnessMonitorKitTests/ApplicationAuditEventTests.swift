@@ -112,6 +112,43 @@ struct ApplicationAuditEventTests {
     #expect(object["relatedUrls"] != nil)
   }
 
+  @Test("Audit event clipboard JSON contains the complete event")
+  func auditEventClipboardJSONStringContainsCompleteEvent() throws {
+    let recordedAt = try #require(
+      HarnessMonitorAuditEvent.parseDate("2026-06-01T10:00:00.000Z")
+    )
+    let event = HarnessMonitorAuditEvent(
+      id: "audit-copy-1",
+      recordedAt: recordedAt,
+      source: "github",
+      category: "githubMutation",
+      kind: "reviews.approve",
+      severity: "info",
+      outcome: "success",
+      title: "Approve pull request",
+      summary: "Approve pull request succeeded",
+      subject: "kong/kuma#12",
+      actor: "Harness Monitor",
+      correlationID: "corr-copy-1",
+      actionKey: "reviews.approve",
+      payloadJSON: .object([
+        "count": .number(1),
+        "message": .string("approved"),
+      ]),
+      legacyMessage: "legacy audit row",
+      relatedURLs: ["https://github.com/kong/kuma/pull/12"]
+    )
+
+    let text = try event.clipboardJSONString()
+    let decoded = try JSONDecoder().decode(HarnessMonitorAuditEvent.self, from: Data(text.utf8))
+
+    #expect(decoded == event)
+    #expect(text.contains("\n"))
+    #expect(text.contains(#""payloadJson""#))
+    #expect(text.contains(#""relatedUrls""#))
+    #expect(text.contains(#""correlationId""#))
+  }
+
   @Test("Notification history rows map into notification-sourced audit rows")
   func notificationHistoryMapsToAuditRow() throws {
     let recordedAt = try #require(

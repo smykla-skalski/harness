@@ -17,6 +17,7 @@ struct DashboardAuditRouteView: View {
   @State private var filters = DashboardAuditFilters()
   @State private var selectedEventID: String?
   @State private var visibleEventLimit = DashboardAuditPaging.pageSize
+  @State private var copyDispatcher = DashboardAuditCopyDispatcher()
 
   private var events: [HarnessMonitorAuditEvent] {
     dashboardUI.auditEvents
@@ -78,7 +79,18 @@ struct DashboardAuditRouteView: View {
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAuditRoot)
+      .harnessFocusedSceneValue(
+        \.dashboardAuditCopyCommand,
+        DashboardAuditCopyFocus(
+          canCopy: selectedEvent != nil,
+          dispatcher: copyDispatcher
+        )
+      )
+      .onAppear {
+        configureCopyDispatcher()
+      }
       .task {
+        configureCopyDispatcher()
         await refreshAudit(limit: visibleEventLimit)
         selectFirstEventIfNeeded()
       }
@@ -86,9 +98,14 @@ struct DashboardAuditRouteView: View {
         resetVisibleEventLimit()
         selectedEventID = nil
         selectFirstEventIfNeeded()
+        configureCopyDispatcher()
       }
       .onChange(of: filteredEvents) { _, _ in
         selectFirstEventIfNeeded()
+        configureCopyDispatcher()
+      }
+      .onChange(of: selectedEventID) { _, _ in
+        configureCopyDispatcher()
       }
     }
   }
@@ -99,7 +116,8 @@ struct DashboardAuditRouteView: View {
       selectedEventID: $selectedEventID,
       configuration: dateTimeConfiguration,
       hasMoreEvents: hasMoreEvents,
-      loadMoreEvents: loadMoreEvents
+      loadMoreEvents: loadMoreEvents,
+      copyDispatcher: copyDispatcher
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
@@ -142,19 +160,106 @@ struct DashboardAuditRouteView: View {
   }
 
   private func copyVisibleRows() {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
-    let lines = visibleEvents.compactMap { event -> String? in
-      guard let data = try? encoder.encode(event) else { return nil }
-      return String(data: data, encoding: .utf8)
+    do {
+      let lines = try visibleEvents.map { event in
+        try event.clipboardJSONString(prettyPrinted: false)
+      }
+      writeClipboardText(
+        lines.joined(separator: "\n"),
+        failureMessage: "Could not copy visible audit rows to the clipboard."
+      )
+    } catch {
+      store.presentFailureFeedback("Could not copy visible audit rows: \(error.localizedDescription)")
     }
+  }
+
+  private func configureCopyDispatcher() {
+    copyDispatcher.copySelectedEventHandler = {
+      copySelectedEvent()
+    }
+    copyDispatcher.copyEventHandler = { event in
+      copyEvent(event)
+    }
+  }
+
+  private func copySelectedEvent() {
+    do {
+      guard let text = try selectedEvent?.clipboardJSONString() else { return }
+      writeClipboardText(
+        text,
+        failureMessage: "Could not copy the selected audit event to the clipboard."
+      )
+    } catch {
+      store.presentFailureFeedback("Could not copy audit event: \(error.localizedDescription)")
+    }
+  }
+
+  private func copyEvent(_ event: HarnessMonitorAuditEvent) {
+    do {
+      let text = try event.clipboardJSONString()
+      writeClipboardText(
+        text,
+        failureMessage: "Could not copy audit event to the clipboard."
+      )
+    } catch {
+      store.presentFailureFeedback("Could not copy audit event: \(error.localizedDescription)")
+    }
+  }
+
+  private func writeClipboardText(_ text: String, failureMessage: String) {
     NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
+    guard NSPasteboard.general.setString(text, forType: .string) else {
+      store.presentFailureFeedback(failureMessage)
+      return
+    }
   }
 }
 
 private enum DashboardAuditPaging {
   static let pageSize = 40
+}
+
+@MainActor
+public final class DashboardAuditCopyDispatcher {
+  var copySelectedEventHandler: (() -> Void)?
+  var copyEventHandler: ((HarnessMonitorAuditEvent) -> Void)?
+
+  public init() {}
+
+  public func copySelectedEvent() {
+    copySelectedEventHandler?()
+  }
+
+  public func copy(event: HarnessMonitorAuditEvent) {
+    copyEventHandler?(event)
+  }
+}
+
+public struct DashboardAuditCopyFocus: Equatable {
+  public let canCopy: Bool
+  public let dispatcher: DashboardAuditCopyDispatcher
+
+  public init(
+    canCopy: Bool,
+    dispatcher: DashboardAuditCopyDispatcher
+  ) {
+    self.canCopy = canCopy
+    self.dispatcher = dispatcher
+  }
+
+  @MainActor
+  public func copy() {
+    dispatcher.copySelectedEvent()
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.canCopy == rhs.canCopy
+      && lhs.dispatcher === rhs.dispatcher
+  }
+}
+
+extension FocusedValues {
+  @Entry public var dashboardAuditCopyCommand: DashboardAuditCopyFocus?
 }
 
 struct DashboardAuditFilters: Equatable {

@@ -143,10 +143,31 @@ public struct HarnessMonitorAuditEvent: Identifiable, Codable, Equatable, Sendab
   }
 }
 
+public enum HarnessMonitorAuditEventClipboardError: LocalizedError, Sendable {
+  case encodedJSONIsNotUTF8
+
+  public var errorDescription: String? {
+    switch self {
+    case .encodedJSONIsNotUTF8:
+      "The encoded audit event JSON was not valid UTF-8."
+    }
+  }
+}
+
 extension HarnessMonitorAuditEvent {
   private static let notificationIDPrefix = "notification:"
   private static let supervisorIDPrefix = "supervisor:"
   private static let githubReviewActionIDPrefix = "github-review-action:"
+
+  public func clipboardJSONString(prettyPrinted: Bool = true) throws -> String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = prettyPrinted ? [.prettyPrinted, .sortedKeys] : [.sortedKeys]
+    let data = try encoder.encode(self)
+    guard let text = String(data: data, encoding: .utf8) else {
+      throw HarnessMonitorAuditEventClipboardError.encodedJSONIsNotUTF8
+    }
+    return text
+  }
 
   public static func notification(_ entry: NotificationHistoryEntry) -> Self {
     Self(

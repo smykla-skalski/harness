@@ -298,6 +298,18 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(auditView.contains("HarnessMonitorJSONCodeBlock(rawJSON: payload)"))
     #expect(!auditView.contains("DashboardAuditTextBlock(title: \"Payload\", text: payload)"))
+    #expect(auditView.contains(".harnessFocusedSceneValue(\\.dashboardAuditCopyCommand"))
+    #expect(!auditView.contains(".focusedSceneValue(\\.dashboardAuditCopyCommand"))
+    #expect(auditView.contains("DashboardAuditCopyFocus("))
+    #expect(auditView.contains("selectedEvent?.clipboardJSONString"))
+    #expect(auditView.contains(".contextMenu {"))
+    #expect(auditView.contains("Button(\"Copy Event\")"))
+    #expect(auditView.contains("copyEvent(row.event)"))
+    let commandsSource = try sourceFile(named: "HarnessMonitorAppCommands.swift")
+    #expect(commandsSource.contains("@FocusedValue(\\.dashboardAuditCopyCommand)"))
+    #expect(commandsSource.contains("Copy Audit Event"))
+    #expect(commandsSource.contains(".keyboardShortcut(\"c\", modifiers: .command)"))
+    #expect(commandsSource.contains("dashboardAuditCopyFocus?.copy()"))
   }
 
   private func dashboardAuditSource() throws -> String {

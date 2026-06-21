@@ -17,6 +17,8 @@ struct HarnessMonitorAppCommands: Commands {
   private var searchFocusAction
   @FocusedValue(\.harnessSessionSidebarSelection)
   private var sidebarSelectionFocus
+  @FocusedValue(\.dashboardAuditCopyCommand)
+  private var dashboardAuditCopyFocus
   @FocusedValue(\.harnessPolicyCanvasCommandFocus)
   private var policyCanvasCommandFocus
   let store: HarnessMonitorStore
@@ -76,6 +78,7 @@ struct HarnessMonitorAppCommands: Commands {
   var body: some Commands {
     systemCommands
     fileAndEditCommands
+    dashboardAuditCopyCommands
     viewCommands
     policyCanvasZoomCommands
     policyCanvasLayoutCommands
@@ -139,6 +142,23 @@ struct HarnessMonitorAppCommands: Commands {
       }
       .keyboardShortcut(.delete, modifiers: [])
       .disabled(sidebarSelectionFocus?.canDelete != true)
+    }
+  }
+
+  @CommandsBuilder private var dashboardAuditCopyCommands: some Commands {
+    CommandGroup(after: .pasteboard) {
+      if let dashboardAuditCopyFocus {
+        Button("Copy Audit Event") {
+          dashboardAuditCopyFocus.copy()
+        }
+        .keyboardShortcut("c", modifiers: .command)
+        .disabled(!dashboardAuditCopyFocus.canCopy)
+      } else {
+        Button("Copy Audit Event") {
+          dashboardAuditCopyFocus?.copy()
+        }
+        .disabled(true)
+      }
     }
   }
 

@@ -149,14 +149,18 @@ struct DashboardAuditDetailPane: View {
   }
 
   private func copyEvent(_ event: HarnessMonitorAuditEvent) {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-    guard
-      let data = try? encoder.encode(event),
-      let text = String(data: data, encoding: .utf8)
-    else { return }
+    let text: String
+    do {
+      text = try event.clipboardJSONString()
+    } catch {
+      store.presentFailureFeedback("Could not copy audit event: \(error.localizedDescription)")
+      return
+    }
     NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(text, forType: .string)
+    guard NSPasteboard.general.setString(text, forType: .string) else {
+      store.presentFailureFeedback("Could not copy audit event to the clipboard.")
+      return
+    }
   }
 }
 
