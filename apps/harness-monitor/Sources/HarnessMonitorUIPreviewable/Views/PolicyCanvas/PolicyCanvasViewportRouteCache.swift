@@ -65,6 +65,54 @@ struct PolicyCanvasViewportRouteCache {
   }
 }
 
+/// The cache state to adopt after `pipelineIdentity` changes, plus whether the
+/// caller must kick a fresh route recompute to refill it.
+struct PolicyCanvasRouteCacheIdentityTransition {
+  var cache: PolicyCanvasViewportRouteCache
+  let schedulesRecompute: Bool
+}
+
+/// Resolve the route cache when the canvas identity flips. The blank-canvas-on-
+/// restart bug came from this transition: the document's first policy trace id
+/// seeds the cache and routes commit under it, then `activeCanvasId` resolves and
+/// flips `pipelineIdentity` to the daemon canvas id. The graph is unchanged, so
+/// the route key never moves and nothing else re-routes - yet the old handler
+/// cleared the cache here and never rescheduled, leaving `hasRenderableRouteOutput`
+/// false for the new identity forever. Three outcomes:
+///
+/// 1. A per-identity output already exists for the new id - adopt it.
+/// 2. The live cache still holds this exact route key with non-empty routes -
+///    re-point it to the new identity so the canvas never blanks (same graph).
+/// 3. Otherwise clear for the new identity and tell the caller to recompute, so
+///    the now-empty cache refills instead of staying blank.
+func policyCanvasRouteCacheAfterIdentityChange(
+  cache: PolicyCanvasViewportRouteCache,
+  newIdentity: String?,
+  routeKey: PolicyCanvasRouteWorkerKey,
+  layoutGeneration: UInt64
+) -> PolicyCanvasRouteCacheIdentityTransition {
+  var next = cache
+  if let newIdentity, let stored = cache.outputsByCanvasIdentity[newIdentity] {
+    next.appliedRouteKey = routeKey
+    next.cachedOutput = stored.output
+    next.cachedNodePositionsByID = stored.nodePositionsByID
+    next.cachedCanvasIdentity = newIdentity
+    next.cachedLayoutGeneration = layoutGeneration
+    return PolicyCanvasRouteCacheIdentityTransition(cache: next, schedulesRecompute: false)
+  }
+  if cache.appliedRouteKey == routeKey, !cache.cachedOutput.routes.isEmpty {
+    next.cachedCanvasIdentity = newIdentity
+    if let newIdentity {
+      next.outputsByCanvasIdentity[newIdentity] = (
+        cache.cachedOutput, cache.cachedNodePositionsByID
+      )
+    }
+    return PolicyCanvasRouteCacheIdentityTransition(cache: next, schedulesRecompute: false)
+  }
+  next.clear(pipelineIdentity: newIdentity)
+  return PolicyCanvasRouteCacheIdentityTransition(cache: next, schedulesRecompute: true)
+}
+
 func policyCanvasViewportResolvedRouteCache(
   routeCache: PolicyCanvasViewportRouteCache,
   routeKey: PolicyCanvasRouteWorkerKey,

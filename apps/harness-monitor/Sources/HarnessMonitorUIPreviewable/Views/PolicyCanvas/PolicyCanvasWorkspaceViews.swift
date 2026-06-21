@@ -299,15 +299,15 @@ struct PolicyCanvasViewport: View {
         bindCommandFocus()
       }
       .onChange(of: viewModel.pipelineIdentity, initial: false) { _, newIdentity in
-        if let newIdentity, let cachedRouteOutput = routeCache.outputsByCanvasIdentity[newIdentity]
-        {
-          routeCache.appliedRouteKey = routeKey
-          routeCache.cachedOutput = cachedRouteOutput.output
-          routeCache.cachedNodePositionsByID = cachedRouteOutput.nodePositionsByID
-          routeCache.cachedCanvasIdentity = newIdentity
-          routeCache.cachedLayoutGeneration = viewModel.layoutGeneration
-        } else {
-          clearCachedRouteOutput()
+        let transition = policyCanvasRouteCacheAfterIdentityChange(
+          cache: routeCache,
+          newIdentity: newIdentity,
+          routeKey: routeKey,
+          layoutGeneration: viewModel.layoutGeneration
+        )
+        routeCache = transition.cache
+        if transition.schedulesRecompute {
+          scheduleLiveRouteRecompute(fontScale: fontScale, routeSeed: routeSeed)
         }
         hasAppliedRestoredSceneZoom = false
       }
