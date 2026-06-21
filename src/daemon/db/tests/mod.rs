@@ -18,6 +18,7 @@ mod performance;
 mod projects;
 mod reconcile;
 mod remote_identity;
+mod remote_pairing;
 mod runtime;
 mod schema;
 mod schema_backfill;
