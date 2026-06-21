@@ -257,6 +257,41 @@ struct PolicyCanvasAutosaveTests {
     #expect(saveCalls == 1)
   }
 
+  @Test("autosave is held for the whole position drag and fires once after release")
+  func autosaveHeldDuringDragFiresAfterRelease() async {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: policyDocument(revision: 11), simulation: nil, audit: nil)
+    viewModel.autosaveDebounceMilliseconds = 400
+    viewModel.createNode(kind: .condition, at: CGPoint(x: 100, y: 100))
+    let nodeID = viewModel.nodes.last!.id
+    // createNode marked the canvas dirty; reset so the drag arms the autosave
+    // on its own clean->dirty edge, exactly like a real gesture start.
+    viewModel.documentDirty = false
+    var saveCalls = 0
+    let saveClosure: @MainActor () async -> Void = { saveCalls += 1 }
+
+    // Gesture start: a tick-rate write makes the drag active, then the dirty
+    // edge arms the autosave the way the trigger funnel does.
+    viewModel.dragNode(nodeID, translation: CGSize(width: 20, height: 0))
+    viewModel.scheduleAutosave(performSave: saveClosure)
+    #expect(viewModel.hasActivePositionDrag)
+
+    // Keep dragging well past the full debounce ceiling. No save may fire while
+    // the gesture is live - the window must stay open until the user releases.
+    for offset in stride(from: 40, through: 220, by: 20) {
+      try? await Task.sleep(for: .milliseconds(120))
+      viewModel.dragNode(nodeID, translation: CGSize(width: Double(offset), height: 0))
+    }
+    #expect(saveCalls == 0)
+
+    // Release: the held window now applies the quiet window from the release
+    // point and fires exactly one save.
+    viewModel.endNodeDrag(nodeID, translation: CGSize(width: 220, height: 0))
+    #expect(viewModel.hasActivePositionDrag == false)
+    try? await Task.sleep(for: .milliseconds(1_500))
+    #expect(saveCalls == 1)
+  }
+
   @Test("three consecutive failures flip outcome to disabled")
   func threeFailuresFlipToDisabled() {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -436,9 +471,12 @@ struct PolicyCanvasAutosaveTests {
   @Test("background flush is not gated on a pending autosave task")
   func backgroundFlushIsNotGatedOnPendingAutosaveTask() throws {
     let source = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
+    // The scenePhase onChange is the last modifier in the body, so scope the
+    // extraction to its own closing braces rather than a trailing modifier
+    // (the prior `.confirmationDialog(` end marker drifted above this handler).
     let scenePhaseHandler = try sourceClosure(
       marker: ".onChange(of: scenePhase)",
-      endMarker: "\n      .confirmationDialog(",
+      endMarker: "\n      }\n  }",
       in: source
     )
 

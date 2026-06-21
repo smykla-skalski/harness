@@ -119,6 +119,17 @@ extension PolicyCanvasViewModel {
     var observedGeneration = scheduledGeneration
     var elapsedMilliseconds: UInt64 = 0
     while !Task.isCancelled {
+      // Hold the window open for the whole gesture while a position drag is in
+      // flight. A drag bumps `documentGeneration` every tick, so the normal
+      // path would burn through the ceiling and fire a save mid-drag. Sleep in
+      // quiet-window beats without advancing `elapsed` until the user releases,
+      // then fall through and apply the quiet window from the release point so
+      // exactly one save lands after the drag stops.
+      if hasActivePositionDrag {
+        try? await Task.sleep(for: .milliseconds(Int(quietWindowMilliseconds)))
+        observedGeneration = documentGeneration
+        continue
+      }
       let remainingMilliseconds =
         maximumWindowMilliseconds > elapsedMilliseconds
         ? maximumWindowMilliseconds - elapsedMilliseconds
