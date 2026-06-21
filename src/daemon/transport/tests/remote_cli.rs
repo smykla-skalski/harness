@@ -51,8 +51,8 @@ fn daemon_remote_serve_args_select_remote_http_auth_mode() {
 
     let serve_config = parsed
         .args
-        .daemon_serve_config()
-        .expect("remote serve config");
+        .remote_auth_scaffold_config()
+        .expect("remote auth scaffold config");
     assert_eq!(serve_config.host, "0.0.0.0");
     assert_eq!(serve_config.port, 443);
     assert_eq!(

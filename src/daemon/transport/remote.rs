@@ -43,7 +43,7 @@ pub enum DaemonRemoteCommand {
 impl Execute for DaemonRemoteCommand {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         if let Self::Serve(args) = self {
-            args.daemon_serve_config()?;
+            args.remote_auth_scaffold_config()?;
         }
         Err(CliErrorKind::workflow_parse(
             "remote daemon execution is reserved for the next implementation phase",
@@ -97,11 +97,16 @@ impl DaemonRemoteServeArgs {
         Ok(config)
     }
 
-    /// Build the daemon service config for remote serve execution.
+    /// Build the remote-auth scaffold config for the future remote serve path.
+    ///
+    /// This selects [`DaemonHttpAuthMode::Remote`] and preserves the public
+    /// remote bind host from the remote contract. It is not passed to the
+    /// current local [`crate::daemon::service::serve`] path, whose validation
+    /// intentionally remains loopback-only.
     ///
     /// # Errors
     /// Returns [`CliError`] when the remote TLS or ACME contract is invalid.
-    pub fn daemon_serve_config(&self) -> Result<DaemonServeConfig, CliError> {
+    pub fn remote_auth_scaffold_config(&self) -> Result<DaemonServeConfig, CliError> {
         let remote_config = self.contract_config()?;
         Ok(DaemonServeConfig {
             host: remote_config.host,
