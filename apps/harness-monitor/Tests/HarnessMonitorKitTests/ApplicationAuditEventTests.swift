@@ -149,6 +149,37 @@ struct ApplicationAuditEventTests {
     #expect(text.contains(#""correlationId""#))
   }
 
+  @Test("Audit event clipboard JSON renders empty related URLs inline")
+  func auditEventClipboardJSONStringRendersEmptyRelatedURLsInline() throws {
+    let recordedAt = try #require(
+      HarnessMonitorAuditEvent.parseDate("2026-06-01T10:00:00.000Z")
+    )
+    let event = HarnessMonitorAuditEvent(
+      id: "audit-copy-empty-related-urls",
+      recordedAt: recordedAt,
+      source: "taskBoard",
+      category: "taskBoardMutation",
+      kind: "task_board.orchestrator_github_tokens_sync",
+      severity: "info",
+      outcome: "success",
+      title: "Sync task-board GitHub tokens",
+      summary: "Sync task-board GitHub tokens succeeded",
+      actor: "Harness Monitor",
+      actionKey: "task_board.orchestrator_github_tokens_sync",
+      payloadJSON: .object([
+        "global_token_configured": .bool(true),
+        "repository_token_count": .number(0),
+      ])
+    )
+
+    let text = try event.clipboardJSONString()
+    let decoded = try JSONDecoder().decode(HarnessMonitorAuditEvent.self, from: Data(text.utf8))
+
+    #expect(decoded == event)
+    #expect(text.contains(#""relatedUrls" : []"#))
+    #expect(!text.contains(#""relatedUrls" : ["# + "\n\n" + #"  ]"#))
+  }
+
   @Test("Notification history rows map into notification-sourced audit rows")
   func notificationHistoryMapsToAuditRow() throws {
     let recordedAt = try #require(

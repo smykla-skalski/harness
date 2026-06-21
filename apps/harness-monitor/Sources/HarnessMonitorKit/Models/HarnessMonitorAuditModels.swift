@@ -166,7 +166,21 @@ extension HarnessMonitorAuditEvent {
     guard let text = String(data: data, encoding: .utf8) else {
       throw HarnessMonitorAuditEventClipboardError.encodedJSONIsNotUTF8
     }
-    return text
+    return prettyPrinted ? Self.collapsePrettyPrintedEmptyArrays(in: text) : text
+  }
+
+  private static func collapsePrettyPrintedEmptyArrays(in text: String) -> String {
+    let pattern = #"\[\n[ \t]*\n[ \t]*\]"#
+    guard let regex = try? NSRegularExpression(pattern: pattern) else {
+      preconditionFailure("Empty-array JSON formatting pattern must compile")
+    }
+    let range = NSRange(text.startIndex..<text.endIndex, in: text)
+    return regex.stringByReplacingMatches(
+      in: text,
+      options: [],
+      range: range,
+      withTemplate: "[]"
+    )
   }
 
   public static func notification(_ entry: NotificationHistoryEntry) -> Self {
