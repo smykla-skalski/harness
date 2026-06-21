@@ -181,7 +181,7 @@ services:
       - pyroscope
 
   grafana-init:
-    image: alpine/curl:8.19.0@sha256:16ed43d4038dd824e3b935d16d6763cac68aca3e7c5b4248f38409a85a13547c
+    image: alpine/curl:8.19.0@sha256:c103daf2dbf75dbaee86c278f45be6c82acd86eef27e17521d0992bf90031d81
     restart: "no"
     environment:
       GRAFANA_URL: http://grafana:3000
