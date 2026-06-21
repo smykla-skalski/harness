@@ -40,7 +40,6 @@ extension PolicyCanvasView {
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasConfidencePanel)
     }
     .frame(width: 380)
-    .policyCanvasConfidenceFontScaleBoost()
   }
 
   @MainActor
@@ -70,34 +69,6 @@ extension PolicyCanvasView {
     selectionFocusRequest = PolicyCanvasViewportSelectionFocusRequest(
       id: selectionFocusRequestID,
       selection: .node(terminal)
-    )
-  }
-}
-
-private enum PolicyCanvasConfidencePaneMetrics {
-  /// The confidence pane leans on caption/caption2 copy, which reads a touch
-  /// small at the standard app text size. Nudge the pane's base size up a notch.
-  static let fontScaleBoost: CGFloat = 1.15
-}
-
-extension View {
-  /// Multiplies the inherited `\.fontScale` for the confidence pane so its base
-  /// text is a little larger by default while still tracking the app text-size
-  /// setting (the boost is proportional at every size). Scoped to the pane, so
-  /// the canvas viewport - a sibling outside this subtree - is unaffected.
-  fileprivate func policyCanvasConfidenceFontScaleBoost() -> some View {
-    modifier(PolicyCanvasConfidenceFontScaleBoostModifier())
-  }
-}
-
-private struct PolicyCanvasConfidenceFontScaleBoostModifier: ViewModifier {
-  @Environment(\.fontScale)
-  private var fontScale
-
-  func body(content: Content) -> some View {
-    content.environment(
-      \.fontScale,
-      fontScale * PolicyCanvasConfidencePaneMetrics.fontScaleBoost
     )
   }
 }

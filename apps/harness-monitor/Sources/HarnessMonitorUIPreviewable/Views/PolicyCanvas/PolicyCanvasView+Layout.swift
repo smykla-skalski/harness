@@ -13,12 +13,14 @@ extension PolicyCanvasView {
     // The detail pane takes the remaining width.
     HStack(spacing: 0) {
       PolicyCanvasComponentLibraryPane(viewModel: viewModel)
+        .policyCanvasPaneFontScaleBoost()
 
       policyCanvasDetailPane
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
       if policyCanvasInspectorVisible {
         policyCanvasConfidencePane
+          .policyCanvasPaneFontScaleBoost()
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -136,5 +138,34 @@ private struct PolicyCanvasSelectionEditButton: View {
     .disabled(isDisabled)
     .help(isDisabled ? "Select a policy component to edit" : "Edit selected policy component")
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEditButton)
+  }
+}
+
+private enum PolicyCanvasSidePaneMetrics {
+  /// The component-library and confidence side panes lean on caption/caption2
+  /// copy, which reads a touch small at the standard app text size. Nudge their
+  /// base size up a notch.
+  static let fontScaleBoost: CGFloat = 1.15
+}
+
+extension View {
+  /// Multiplies the inherited `\.fontScale` for a canvas side pane so its base
+  /// text is a little larger by default while still tracking the app text-size
+  /// setting (proportional at every size). Scoped to the pane it wraps, so the
+  /// detail canvas - a sibling outside the subtree - is unaffected.
+  fileprivate func policyCanvasPaneFontScaleBoost() -> some View {
+    modifier(PolicyCanvasSidePaneFontScaleBoostModifier())
+  }
+}
+
+private struct PolicyCanvasSidePaneFontScaleBoostModifier: ViewModifier {
+  @Environment(\.fontScale)
+  private var fontScale
+
+  func body(content: Content) -> some View {
+    content.environment(
+      \.fontScale,
+      fontScale * PolicyCanvasSidePaneMetrics.fontScaleBoost
+    )
   }
 }

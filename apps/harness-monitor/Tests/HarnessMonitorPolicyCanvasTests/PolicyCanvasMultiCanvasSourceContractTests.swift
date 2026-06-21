@@ -293,9 +293,12 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     )
     XCTAssertTrue(inspectorSource.contains(".frame(width: 380)"))
     XCTAssertTrue(inspectorSource.contains("HarnessMonitorAccessibility.policyCanvasConfidencePanel"))
-    XCTAssertTrue(
-      inspectorSource.contains("policyCanvasConfidenceFontScaleBoost"),
-      "The pane nudges its base font size up so default inspector text is not too small."
+    let sidePaneFontBoostCount =
+      layoutSource.components(separatedBy: ".policyCanvasPaneFontScaleBoost()").count - 1
+    XCTAssertGreaterThanOrEqual(
+      sidePaneFontBoostCount,
+      2,
+      "Both side panes (component library + confidence) nudge their base font size up so default text is not too small."
     )
     XCTAssertFalse(
       matrixSource.contains("min(CGFloat(rows.count) * 46, 220)"),
