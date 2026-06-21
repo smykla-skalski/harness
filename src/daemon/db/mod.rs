@@ -56,6 +56,7 @@ mod diagnostics;
 mod imports;
 mod policy;
 mod rebuild;
+mod remote_identity;
 mod review_writes;
 mod runtime;
 mod schema;
@@ -79,6 +80,7 @@ mod schema_v23;
 mod schema_v24;
 mod schema_v25;
 mod schema_v26;
+mod schema_v27;
 mod session_data;
 mod signals;
 mod summaries;
@@ -270,7 +272,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "26";
+pub(crate) const SCHEMA_VERSION: &str = "27";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

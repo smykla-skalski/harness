@@ -42,6 +42,10 @@ pub(super) fn current_schema_shape_needs_repair(
         "policy_groups",
         "policy_group_nodes",
         "audit_events",
+        "remote_acme_state",
+        "remote_audit_events",
+        "remote_clients",
+        "remote_pairing_codes",
         "policy_decisions",
     ] {
         if !table_exists(conn, table)? {
@@ -79,6 +83,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v24::run(&db.conn)?;
     super::schema_v25::run(&db.conn)?;
     super::schema_v26::run(&db.conn)?;
+    super::schema_v27::run(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
