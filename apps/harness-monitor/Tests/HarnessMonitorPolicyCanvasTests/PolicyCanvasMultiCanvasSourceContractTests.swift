@@ -293,6 +293,10 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     )
     XCTAssertTrue(inspectorSource.contains(".frame(width: 380)"))
     XCTAssertTrue(inspectorSource.contains("HarnessMonitorAccessibility.policyCanvasConfidencePanel"))
+    XCTAssertTrue(
+      inspectorSource.contains("policyCanvasConfidenceFontScaleBoost"),
+      "The pane nudges its base font size up so default inspector text is not too small."
+    )
     XCTAssertFalse(
       matrixSource.contains("min(CGFloat(rows.count) * 46, 220)"),
       "The decision list scrolls with the confidence pane; a fixed 220pt cap clipped rows while the pane had room."
