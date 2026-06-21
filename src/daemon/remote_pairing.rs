@@ -138,7 +138,8 @@ impl RemotePairingCodeHash {
     /// # Errors
     /// Returns [`RemotePairingError::EmptyCode`] when the pairing code is blank.
     pub fn from_code(code: &str) -> Result<Self, RemotePairingError> {
-        if code.trim().is_empty() {
+        let code = code.trim();
+        if code.is_empty() {
             return Err(RemotePairingError::EmptyCode);
         }
         Ok(Self {
@@ -168,7 +169,7 @@ impl RemotePairingCodeHash {
 
     #[must_use]
     pub fn verify(&self, code: &str) -> bool {
-        verify_sha256_storage_value(&self.storage_value, code)
+        verify_sha256_storage_value(&self.storage_value, code.trim())
     }
 }
 
@@ -338,10 +339,19 @@ pub struct RemotePairingRateLimiter {
     attempt_order: VecDeque<RemotePairingAttemptKey>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct RemotePairingAttemptKey {
     remote_addr: String,
     code_fingerprint: String,
+}
+
+impl fmt::Debug for RemotePairingAttemptKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RemotePairingAttemptKey")
+            .field("remote_addr", &self.remote_addr)
+            .field("code_fingerprint", &"<redacted>")
+            .finish()
+    }
 }
 
 impl RemotePairingAttemptKey {

@@ -1,6 +1,6 @@
 use super::{
-    validate_pairing_domain, RemotePairingClaimRequest, RemotePairingCode,
-    RemotePairingRateLimiter, RemotePairingRecord,
+    RemotePairingAttemptKey, RemotePairingClaimRequest, RemotePairingCode, RemotePairingCodeHash,
+    RemotePairingRateLimiter, RemotePairingRecord, validate_pairing_domain,
 };
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 
@@ -18,15 +18,31 @@ fn remote_pairing_code_hashes_secret_and_redacts_debug() {
     .expect("pairing record");
 
     assert!(!format!("{code:?}").contains("pairing-secret-value"));
-    assert!(!record
-        .code_hash
-        .as_storage_value()
-        .contains("pairing-secret-value"));
+    assert!(
+        !record
+            .code_hash
+            .as_storage_value()
+            .contains("pairing-secret-value")
+    );
     assert!(record.code_hash.verify(code.expose()));
     assert_eq!(
         record.scopes,
         vec![RemoteAccessScope::Read, RemoteAccessScope::Write]
     );
+}
+
+#[test]
+fn remote_pairing_code_hash_normalizes_surrounding_whitespace() {
+    let trimmed_hash =
+        RemotePairingCodeHash::from_code("pairing-secret-value").expect("trimmed hash");
+    let padded_hash =
+        RemotePairingCodeHash::from_code(" \tpairing-secret-value\n").expect("padded hash");
+
+    assert_eq!(
+        padded_hash.as_storage_value(),
+        trimmed_hash.as_storage_value()
+    );
+    assert!(trimmed_hash.verify(" \tpairing-secret-value\n"));
 }
 
 #[test]
@@ -121,6 +137,16 @@ fn remote_pairing_rate_limiter_uses_tuple_keys_without_delimiter_collisions() {
         "distinct address/code tuples must not collide"
     );
     assert!(limiter.record_attempt("addr\0part", "code").is_err());
+}
+
+#[test]
+fn remote_pairing_attempt_key_debug_redacts_code_fingerprint() {
+    let key = RemotePairingAttemptKey::new("203.0.113.10", "raw-secret-code");
+    let debug = format!("{key:?}");
+
+    assert!(debug.contains("203.0.113.10"));
+    assert!(!debug.contains("raw-secret-code"));
+    assert!(debug.contains("<redacted>"));
 }
 
 #[test]
