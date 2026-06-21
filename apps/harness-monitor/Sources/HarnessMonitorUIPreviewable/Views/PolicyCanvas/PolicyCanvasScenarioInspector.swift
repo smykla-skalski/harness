@@ -61,7 +61,7 @@ struct PolicyCanvasScenarioInspector: View {
     .padding(.vertical, 8)
     .accessibilityLabel("Scenarios, \(rows.count)")
     .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-    .accessibilityHint("Test inputs that show how your policy decides each action")
+    .accessibilityHint("Add or review test inputs for your policy")
   }
 
   @ViewBuilder private var content: some View {

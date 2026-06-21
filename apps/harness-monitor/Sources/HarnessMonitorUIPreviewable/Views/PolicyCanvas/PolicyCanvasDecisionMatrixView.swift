@@ -13,6 +13,11 @@ struct PolicyCanvasDecisionMatrixView: View {
   let isEvaluating: Bool
   let focusDecision: @MainActor ([String]) -> Void
 
+  /// The last row the user traced, kept so the panel holds a persistent marker
+  /// of which decision is shown on the canvas - the tap effect lands elsewhere,
+  /// so without this the user has nothing to reorient against.
+  @State private var activeRowID: String?
+
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       header
@@ -26,7 +31,14 @@ struct PolicyCanvasDecisionMatrixView: View {
         // clipping past ~220pt while the tall pane has room to spare.
         VStack(spacing: 6) {
           ForEach(rows) { row in
-            PolicyCanvasDecisionMatrixRow(model: row, focusDecision: focusDecision)
+            PolicyCanvasDecisionMatrixRow(
+              model: row,
+              isActive: row.id == activeRowID,
+              focusDecision: { visitedNodeIds in
+                activeRowID = row.id
+                focusDecision(visitedNodeIds)
+              }
+            )
           }
         }
         // Dim the prior verdicts while a fresh simulation is in flight so a
@@ -63,10 +75,7 @@ struct PolicyCanvasDecisionMatrixView: View {
         Text(summary)
           .scaledFont(.caption2.weight(.medium))
           .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
-          .help(
-            "Gated actions need a human, consensus, or dry run, or are denied - "
-              + "they will not run automatically."
-          )
+          .lineLimit(1)
       }
     }
   }
@@ -93,9 +102,22 @@ struct PolicyCanvasDecisionMatrixView: View {
   }
 
   private var summary: String {
-    let allowed = rows.filter { $0.verdict == .allow }.count
-    let gated = rows.count - allowed
-    return "\(allowed) allow \u{00b7} \(gated) gated"
+    // Break the verdicts out instead of flattening every non-allow into one
+    // "gated" count - a deny and a dry run are operationally nothing alike.
+    let order: [(PolicyCanvasDecisionVerdict, String)] = [
+      (.allow, "allow"),
+      (.deny, "deny"),
+      (.needsHuman, "needs human"),
+      (.consensus, "consensus"),
+      (.dryRun, "dry run"),
+    ]
+    return
+      order
+      .compactMap { verdict, label in
+        let count = rows.filter { $0.verdict == verdict }.count
+        return count > 0 ? "\(count) \(label)" : nil
+      }
+      .joined(separator: " \u{00b7} ")
   }
 }
 

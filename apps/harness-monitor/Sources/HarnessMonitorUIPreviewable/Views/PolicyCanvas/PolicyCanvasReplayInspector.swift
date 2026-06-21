@@ -59,7 +59,7 @@ struct PolicyCanvasReplayInspector: View {
     .padding(.vertical, 8)
     .accessibilityLabel(accessibilityLabel)
     .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-    .accessibilityHint("Compares your draft against decisions on real recorded traffic")
+    .accessibilityHint("Compare your draft against recorded traffic")
   }
 
   @ViewBuilder private var content: some View {
@@ -81,11 +81,13 @@ struct PolicyCanvasReplayInspector: View {
       }
 
       if rows.isEmpty {
-        Text(emptyMessage)
-          .scaledFont(.caption)
-          .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
-          .fixedSize(horizontal: false, vertical: true)
-          .frame(maxWidth: .infinity, alignment: .leading)
+        if let emptyMessage {
+          Text(emptyMessage)
+            .scaledFont(.caption)
+            .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
       } else {
         ScrollView {
           VStack(alignment: .leading, spacing: 0) {
@@ -101,19 +103,21 @@ struct PolicyCanvasReplayInspector: View {
     .padding(.bottom, 10)
   }
 
-  private var emptyMessage: String {
+  private var emptyMessage: String? {
     if isLoading {
       return "Replaying recorded decisions\u{2026}"
     }
     if summary == nil {
-      return "Load a replay to compare the draft against recorded decisions."
+      // The caption above plus the Load button already say what to do; a third
+      // restatement here is the redundancy this section was dinged for.
+      return nil
     }
     return "No decisions recorded yet. Replay fills in once a live policy sees real traffic."
   }
 
   private var accessibilityLabel: String {
     guard let summary else {
-      return "Replay"
+      return "Replay, not yet loaded"
     }
     return "Replay, \(summary.changedCount) of \(summary.sampleSize) decisions changed"
   }

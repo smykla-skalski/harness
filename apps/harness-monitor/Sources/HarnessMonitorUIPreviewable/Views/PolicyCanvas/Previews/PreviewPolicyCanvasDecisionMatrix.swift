@@ -7,7 +7,7 @@ import SwiftUI
         id: "scenario-merge.merge_pr",
         scenarioName: "Merge - checks green",
         actionRaw: "merge_pr",
-        actionTitle: "merge pr",
+        actionTitle: "Merge PR",
         verdict: .allow,
         reasonCode: "default_allow",
         visitedNodeIds: ["n1"]
@@ -16,7 +16,7 @@ import SwiftUI
         id: "scenario-mutate.mutate_repo",
         scenarioName: "Mutate repo",
         actionRaw: "mutate_repo",
-        actionTitle: "mutate repo",
+        actionTitle: "Mutate repo",
         verdict: .dryRun,
         reasonCode: "dry_run_required",
         visitedNodeIds: ["n2"]
@@ -25,7 +25,7 @@ import SwiftUI
         id: "scenario-secret.access_secret",
         scenarioName: "Access secret",
         actionRaw: "access_secret",
-        actionTitle: "access secret",
+        actionTitle: "Access secret",
         verdict: .deny,
         reasonCode: "checks_not_green",
         visitedNodeIds: ["n3"]
@@ -34,7 +34,7 @@ import SwiftUI
         id: "scenario-agent.spawn_agent",
         scenarioName: "Spawn agent",
         actionRaw: "spawn_agent",
-        actionTitle: "spawn agent",
+        actionTitle: "Spawn agent",
         verdict: .needsHuman,
         reasonCode: "human_required",
         visitedNodeIds: []

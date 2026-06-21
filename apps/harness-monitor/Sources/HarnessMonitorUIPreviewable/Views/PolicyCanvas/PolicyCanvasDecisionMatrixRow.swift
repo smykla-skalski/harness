@@ -2,12 +2,16 @@ import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
-/// One decision-matrix row: the action name, a tone-coded verdict pill, the
-/// humanized reason (shown only when it adds something the verdict does not),
-/// and a tap target that traces the decision's path on the canvas. A separate
-/// struct so a row tap never invalidates its siblings.
+/// One decision-matrix row: the action name on the leading edge (so every row's
+/// name shares a left axis and the list scans as a column), the humanized reason
+/// when it adds something the verdict does not, a trailing tone-coded verdict
+/// pill, and a trace affordance. A separate struct so a row tap never
+/// invalidates its siblings.
 struct PolicyCanvasDecisionMatrixRow: View {
   let model: PolicyCanvasDecisionMatrixRowModel
+  /// True when this is the row the user last traced, so it keeps a persistent
+  /// accent after the tap effect lands on the canvas elsewhere.
+  let isActive: Bool
   let focusDecision: @MainActor ([String]) -> Void
 
   @State private var isHovering = false
@@ -59,8 +63,6 @@ struct PolicyCanvasDecisionMatrixRow: View {
 
   private var rowContent: some View {
     HStack(spacing: 10) {
-      PolicyCanvasVerdictPill(verdict: model.verdict)
-
       VStack(alignment: .leading, spacing: 2) {
         Text(model.actionTitle)
           .scaledFont(.callout.weight(.semibold))
@@ -82,13 +84,17 @@ struct PolicyCanvasDecisionMatrixRow: View {
         }
       }
 
-      Spacer(minLength: 0)
+      Spacer(minLength: 8)
+
+      PolicyCanvasVerdictPill(verdict: model.verdict)
+        .accessibilityHidden(true)
 
       if isInteractive {
-        Image(systemName: "location.viewfinder")
+        Image(systemName: "point.3.connected.trianglepath.dotted")
           .scaledFont(.caption)
           .foregroundStyle(
-            isHovering ? PolicyCanvasVisualStyle.activeTint : PolicyCanvasVisualStyle.tertiaryText
+            isHovering || isActive
+              ? PolicyCanvasVisualStyle.activeTint : PolicyCanvasVisualStyle.tertiaryText
           )
       }
     }
@@ -96,18 +102,29 @@ struct PolicyCanvasDecisionMatrixRow: View {
     .padding(.vertical, 8)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
-      isInteractive && isHovering
-        ? PolicyCanvasVisualStyle.controlHoverSurface : PolicyCanvasVisualStyle.surface,
+      rowBackground,
       in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius, style: .continuous)
     )
     .overlay {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius, style: .continuous)
-        .stroke(
-          isInteractive && isHovering
-            ? PolicyCanvasVisualStyle.border : PolicyCanvasVisualStyle.subtleBorder,
-          lineWidth: 1
-        )
+        .stroke(rowBorderColor, lineWidth: isActive ? 1.5 : 1)
     }
     .contentShape(Rectangle())
+  }
+
+  private var rowBackground: Color {
+    if isActive {
+      return PolicyCanvasVisualStyle.activeTint.opacity(0.12)
+    }
+    return isInteractive && isHovering
+      ? PolicyCanvasVisualStyle.controlHoverSurface : PolicyCanvasVisualStyle.surface
+  }
+
+  private var rowBorderColor: Color {
+    if isActive {
+      return PolicyCanvasVisualStyle.activeTint
+    }
+    return isInteractive && isHovering
+      ? PolicyCanvasVisualStyle.border : PolicyCanvasVisualStyle.subtleBorder
   }
 }

@@ -11,9 +11,7 @@ struct PolicyCanvasReplayRow: View {
   let focusDecision: @MainActor ([String]) -> Void
 
   var body: some View {
-    Button {
-      focusDecision(row.visitedNodeIds)
-    } label: {
+    Button(action: trace) {
       HStack(spacing: 8) {
         VStack(alignment: .leading, spacing: 2) {
           Text(row.actionTitle)
@@ -37,14 +35,27 @@ struct PolicyCanvasReplayRow: View {
     .accessibilityLabel(accessibilityLabel)
   }
 
+  /// Announce the navigation for VoiceOver, then trace on the canvas - the
+  /// visible effect lands elsewhere, so without this the tap is silent. Guarded
+  /// because a replay row with no recorded path is a read-only comparison.
+  private func trace() {
+    guard !row.visitedNodeIds.isEmpty else {
+      return
+    }
+    AccessibilityNotification.Announcement("Tracing \(row.actionTitle) on the canvas").post()
+    focusDecision(row.visitedNodeIds)
+  }
+
   private var transition: some View {
     HStack(spacing: 6) {
       PolicyCanvasVerdictPill(verdict: row.historicalVerdict)
+        .accessibilityHidden(true)
       Image(systemName: "arrow.right")
         .scaledFont(.caption2)
         .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
         .accessibilityHidden(true)
       PolicyCanvasVerdictPill(verdict: row.draftVerdict)
+        .accessibilityHidden(true)
     }
     .fixedSize()
   }
