@@ -13,14 +13,24 @@ extension PolicyCanvasView {
       statusLine = remoteActionDisabledReason
       return
     }
-    Task { @MainActor in
-      viewModel.isReplaying = true
-      defer { viewModel.isReplaying = false }
-      guard let result = await runtime?.replayPolicyCanvas(canvasId: nil, limit: nil) else {
-        statusLine = "Could not load replay"
-        return
+    viewModel.isReplaying = true
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      HarnessMonitorAsyncWorkQueue.WorkItem(title: "Replaying policy decisions") {
+        let result = await replayPolicyCanvasRuntime()
+        await MainActor.run {
+          defer { viewModel.isReplaying = false }
+          guard let result else {
+            statusLine = "Could not load replay"
+            return
+          }
+          viewModel.latestReplay = result
+        }
       }
-      viewModel.latestReplay = result
-    }
+    )
+  }
+
+  @MainActor
+  private func replayPolicyCanvasRuntime() async -> TaskBoardPolicyPipelineReplayResult? {
+    await runtime?.replayPolicyCanvas(canvasId: nil, limit: nil)
   }
 }
