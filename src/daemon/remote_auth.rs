@@ -46,14 +46,14 @@ impl RemoteBearerCredentials {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .ok_or(RemoteAuthError::MissingBearerToken)?;
-        let (scheme, token) = authorization
-            .split_once(char::is_whitespace)
+        let mut authorization_parts = authorization.split_whitespace();
+        let scheme = authorization_parts
+            .next()
             .ok_or(RemoteAuthError::InvalidBearerToken)?;
-        if !scheme.eq_ignore_ascii_case("Bearer") {
-            return Err(RemoteAuthError::InvalidBearerToken);
-        }
-        let token = token.trim();
-        if token.is_empty() {
+        let token = authorization_parts
+            .next()
+            .ok_or(RemoteAuthError::InvalidBearerToken)?;
+        if !scheme.eq_ignore_ascii_case("Bearer") || authorization_parts.next().is_some() {
             return Err(RemoteAuthError::InvalidBearerToken);
         }
         Ok(Self {

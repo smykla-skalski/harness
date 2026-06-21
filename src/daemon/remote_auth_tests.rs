@@ -52,6 +52,20 @@ fn remote_bearer_credentials_require_client_id_and_bearer_token() {
         RemoteBearerCredentials::from_headers(&blank_bearer).expect_err("blank bearer"),
         RemoteAuthError::InvalidBearerToken
     );
+
+    let mut extra_parts = HeaderMap::new();
+    extra_parts.insert(
+        REMOTE_CLIENT_ID_HEADER,
+        HeaderValue::from_static("client-1"),
+    );
+    extra_parts.insert(
+        AUTHORIZATION,
+        HeaderValue::from_static("Bearer remote-token-secret extra"),
+    );
+    assert_eq!(
+        RemoteBearerCredentials::from_headers(&extra_parts).expect_err("extra bearer parts"),
+        RemoteAuthError::InvalidBearerToken
+    );
 }
 
 #[test]
