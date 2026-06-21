@@ -167,3 +167,14 @@ fn remote_renewal_failure_status_is_reported_without_secret_detail() {
     assert!(outcome.report().contains("dns token"));
     assert!(!outcome.report().contains("super-secret-token"));
 }
+
+#[test]
+fn remote_renewal_failure_redacts_embedded_secret_values() {
+    let outcome = RemoteRenewalOutcome::failure(
+        "dns https://issuer.example/renew?token=url-secret-token&retry=1 error=secret=nested-secret",
+    );
+
+    assert!(outcome.report().contains("retry=1"));
+    assert!(!outcome.report().contains("url-secret-token"));
+    assert!(!outcome.report().contains("nested-secret"));
+}
