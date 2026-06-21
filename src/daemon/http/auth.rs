@@ -15,6 +15,10 @@ use super::DaemonHttpState;
 
 const REMOTE_AUTH_STORE_UNAVAILABLE_MESSAGE: &str = "remote authentication store is unavailable";
 
+tokio::task_local! {
+    static REMOTE_HTTP_CLIENT: RemoteStoredClient;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DaemonHttpAuthMode {
     #[default]
@@ -38,10 +42,17 @@ pub(crate) fn require_auth(
 ) -> Result<(), Box<Response>> {
     match state.auth_mode {
         DaemonHttpAuthMode::Local => require_local_auth(headers, state),
-        DaemonHttpAuthMode::Remote => verify_remote_client(headers, state).map(|_| ()),
+        DaemonHttpAuthMode::Remote => {
+            if has_scoped_remote_client() {
+                Ok(())
+            } else {
+                verify_remote_client(headers, state).map(|_| ())
+            }
+        }
     }
 }
 
+#[cfg(test)]
 pub(crate) fn authorize_http_route(
     headers: &HeaderMap,
     state: &DaemonHttpState,
@@ -50,10 +61,7 @@ pub(crate) fn authorize_http_route(
     match state.auth_mode {
         DaemonHttpAuthMode::Local => require_local_auth(headers, state),
         DaemonHttpAuthMode::Remote => {
-            let client = verify_remote_client(headers, state)?;
-            authorize_remote_http_route(&client, route)
-                .map(|_| ())
-                .map_err(|error| Box::new(remote_auth_error_response(error)))
+            verify_and_authorize_http_route(headers, state, route).map(|_| ())
         }
     }
 }
@@ -76,10 +84,10 @@ pub(crate) async fn authorize_remote_http_request(
     let Some(route) = http_route_contract(request.method(), route_path) else {
         return remote_auth_error_response(RemoteAuthError::MissingScopeContract);
     };
-    if let Err(response) = authorize_http_route(request.headers(), &state, route) {
-        return *response;
+    match verify_and_authorize_http_route(request.headers(), &state, route) {
+        Ok(client) => REMOTE_HTTP_CLIENT.scope(client, next.run(request)).await,
+        Err(response) => *response,
     }
-    next.run(request).await
 }
 
 fn require_local_auth(headers: &HeaderMap, state: &DaemonHttpState) -> Result<(), Box<Response>> {
@@ -125,6 +133,21 @@ fn verify_remote_client(
                 RemoteAuthError::InvalidBearerToken,
             ))
         })
+}
+
+fn verify_and_authorize_http_route(
+    headers: &HeaderMap,
+    state: &DaemonHttpState,
+    route: &HttpApiRouteContract,
+) -> Result<RemoteStoredClient, Box<Response>> {
+    let client = verify_remote_client(headers, state)?;
+    authorize_remote_http_route(&client, route)
+        .map(|_| client)
+        .map_err(|error| Box::new(remote_auth_error_response(error)))
+}
+
+fn has_scoped_remote_client() -> bool {
+    REMOTE_HTTP_CLIENT.try_with(|_| ()).is_ok()
 }
 
 fn local_auth_response() -> Response {

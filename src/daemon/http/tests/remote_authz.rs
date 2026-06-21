@@ -1,6 +1,8 @@
 use std::thread;
 
+use axum::extract::State;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
+use axum::{Router, middleware, routing::get};
 use rusqlite::Connection;
 use serde_json::json;
 use tokio::net::TcpListener;
@@ -169,6 +171,41 @@ async fn remote_http_authz_router_enforces_route_scope_before_handler() {
 }
 
 #[tokio::test]
+async fn remote_http_authz_reuses_middleware_client_for_handler_auth() {
+    let mut state = test_http_state_with_db();
+    state.auth_mode = DaemonHttpAuthMode::Remote;
+    register_remote_client(
+        &state,
+        "viewer",
+        RemoteRole::Viewer,
+        &[RemoteAccessScope::Read],
+    );
+    let app = Router::new()
+        .route(
+            http_paths::HEALTH,
+            get(poison_store_then_require_handler_auth),
+        )
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            super::super::auth::authorize_remote_http_request,
+        ))
+        .with_state(state);
+    let (base_url, server) = serve_router(app).await;
+
+    let response = reqwest::Client::new()
+        .get(format!("{base_url}{}", http_paths::HEALTH))
+        .header(REMOTE_CLIENT_ID_HEADER, "viewer")
+        .bearer_auth(remote_token("viewer"))
+        .send()
+        .await
+        .expect("send health request");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    server.abort();
+    let _ = server.await;
+}
+
+#[tokio::test]
 async fn remote_http_authz_preserves_not_found_for_unmatched_routes() {
     let mut state = test_http_state_with_db();
     state.auth_mode = DaemonHttpAuthMode::Remote;
@@ -299,6 +336,10 @@ fn remote_token(client_id: &str) -> String {
 
 async fn serve_http(state: crate::daemon::http::DaemonHttpState) -> (String, JoinHandle<()>) {
     let app = super::super::daemon_http_router(state);
+    serve_router(app).await
+}
+
+async fn serve_router(app: Router) -> (String, JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind listener");
@@ -307,6 +348,22 @@ async fn serve_http(state: crate::daemon::http::DaemonHttpState) -> (String, Joi
         axum::serve(listener, app).await.expect("serve router");
     });
     (format!("http://{addr}"), server)
+}
+
+async fn poison_store_then_require_handler_auth(
+    State(state): State<crate::daemon::http::DaemonHttpState>,
+    headers: HeaderMap,
+) -> StatusCode {
+    let db_slot = state.db.clone();
+    let _ = thread::spawn(move || {
+        let _guard = db_slot.get().expect("db slot").lock().expect("db lock");
+        panic!("poison remote client store");
+    })
+    .join();
+    match require_auth(&headers, &state) {
+        Ok(()) => StatusCode::OK,
+        Err(response) => response.status(),
+    }
 }
 
 fn http_route(path: &str) -> &'static HttpApiRouteContract {
