@@ -2,14 +2,14 @@ use std::collections::{BTreeMap, VecDeque};
 use std::error::Error;
 use std::fmt;
 
-use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine as _;
 use rand_core06::{OsRng, RngCore};
 use sha2::{Digest, Sha256};
 
 use super::remote::{RemoteAccessScope, RemoteRole};
 use super::remote_identity::{
-    RemoteBearerToken, RemoteIdentityError, RemoteStoredClient, expand_client_scopes,
+    expand_client_scopes, RemoteBearerToken, RemoteIdentityError, RemoteStoredClient,
 };
 
 #[cfg(test)]
@@ -29,6 +29,7 @@ pub enum RemotePairingError {
     EmptyDomain,
     EmptyDisplayName,
     EmptyPlatform,
+    EmptyAuditEventId,
     InvalidStoredCodeHash,
     WrongDomain { expected: String, actual: String },
     RateLimited,
@@ -47,6 +48,7 @@ impl fmt::Display for RemotePairingError {
             Self::EmptyDomain => write!(f, "remote pairing domain is required"),
             Self::EmptyDisplayName => write!(f, "remote pairing display name is required"),
             Self::EmptyPlatform => write!(f, "remote pairing platform is required"),
+            Self::EmptyAuditEventId => write!(f, "remote pairing audit event id is required"),
             Self::InvalidStoredCodeHash => write!(f, "remote pairing code hash is invalid"),
             Self::WrongDomain { expected, actual } => write!(
                 f,
@@ -71,6 +73,7 @@ impl Error for RemotePairingError {
             | Self::EmptyDomain
             | Self::EmptyDisplayName
             | Self::EmptyPlatform
+            | Self::EmptyAuditEventId
             | Self::InvalidStoredCodeHash
             | Self::WrongDomain { .. }
             | Self::RateLimited
@@ -266,7 +269,7 @@ impl RemotePairingClaimRequest {
     ///
     /// # Errors
     /// Returns [`RemotePairingError`] when the domains, client id, display name,
-    /// or platform are blank.
+    /// platform, or audit event id are blank.
     pub fn new(
         expected_domain: impl Into<String>,
         claimed_domain: impl Into<String>,
@@ -281,6 +284,7 @@ impl RemotePairingClaimRequest {
         let client_id = client_id.into();
         let display_name = display_name.into();
         let platform = platform.into();
+        let audit_event_id = audit_event_id.into();
         if expected_domain.trim().is_empty() || claimed_domain.trim().is_empty() {
             return Err(RemotePairingError::EmptyDomain);
         }
@@ -293,6 +297,7 @@ impl RemotePairingClaimRequest {
         if platform.trim().is_empty() {
             return Err(RemotePairingError::EmptyPlatform);
         }
+        validate_pairing_audit_event_id(&audit_event_id)?;
         Ok(Self {
             expected_domain,
             claimed_domain,
@@ -300,7 +305,7 @@ impl RemotePairingClaimRequest {
             display_name,
             platform,
             remote_addr: remote_addr.map(ToOwned::to_owned),
-            audit_event_id: audit_event_id.into(),
+            audit_event_id,
         })
     }
 
@@ -436,6 +441,17 @@ pub fn validate_pairing_domain(expected: &str, actual: &str) -> Result<(), Remot
             expected: expected.to_string(),
             actual: actual.to_string(),
         });
+    }
+    Ok(())
+}
+
+/// Validate the audit event id used by remote pairing persistence.
+///
+/// # Errors
+/// Returns [`RemotePairingError::EmptyAuditEventId`] when the id is blank.
+pub fn validate_pairing_audit_event_id(value: &str) -> Result<(), RemotePairingError> {
+    if value.trim().is_empty() {
+        return Err(RemotePairingError::EmptyAuditEventId);
     }
     Ok(())
 }

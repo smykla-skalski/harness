@@ -315,6 +315,110 @@ fn remote_pairing_create_rolls_back_pairing_when_audit_fails() {
 }
 
 #[test]
+fn remote_pairing_create_rejects_blank_audit_event_id_before_writes() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let code = RemotePairingCode::from_value_for_tests("blank-create-audit-secret");
+    let record = RemotePairingRecord::new_for_tests(
+        "pairing-create-blank-audit",
+        RemoteRole::Viewer,
+        &[],
+        code.expose(),
+        "2026-06-21T13:40:00Z",
+        "2026-06-21T13:50:00Z",
+    )
+    .expect("pairing record");
+
+    assert!(
+        db.create_remote_pairing_code(&record, " \t").is_err(),
+        "blank audit event ids must be rejected before pairing creation"
+    );
+    let pairing_count: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM remote_pairing_codes
+              WHERE pairing_id = 'pairing-create-blank-audit'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("pairing count");
+    let audit_count: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM remote_audit_events WHERE event_id = ''",
+            [],
+            |row| row.get(0),
+        )
+        .expect("blank audit count");
+
+    assert_eq!(pairing_count, 0);
+    assert_eq!(audit_count, 0);
+}
+
+#[test]
+fn remote_pairing_claim_rejects_blank_audit_event_id_before_writes() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let code = RemotePairingCode::from_value_for_tests("blank-claim-audit-secret");
+    let record = RemotePairingRecord::new_for_tests(
+        "pairing-claim-blank-audit",
+        RemoteRole::Operator,
+        &[RemoteAccessScope::Read],
+        code.expose(),
+        "2026-06-21T13:40:00Z",
+        "2026-06-21T13:50:00Z",
+    )
+    .expect("pairing record");
+    db.create_remote_pairing_code(&record, "audit-create-blank-claim")
+        .expect("create pairing");
+    let mut claim = RemotePairingClaimRequest::new_for_tests(
+        "daemon.example.com",
+        "daemon.example.com",
+        "client-blank-audit",
+        "MacBook Pro",
+        "macos",
+        Some("203.0.113.60"),
+        "audit-claim-blank-placeholder",
+    )
+    .expect("claim request");
+    claim.audit_event_id = " \t".to_string();
+
+    assert!(
+        db.claim_remote_pairing_code(code.expose(), &claim, "2026-06-21T13:41:00Z")
+            .is_err(),
+        "blank claim audit event ids must be rejected before claim writes"
+    );
+    let client_count: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM remote_clients
+              WHERE client_id = 'client-blank-audit'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("client count");
+    let claimed_at: Option<String> = db
+        .conn
+        .query_row(
+            "SELECT claimed_at FROM remote_pairing_codes
+              WHERE pairing_id = 'pairing-claim-blank-audit'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("claimed at");
+    let audit_count: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM remote_audit_events WHERE event_id = ''",
+            [],
+            |row| row.get(0),
+        )
+        .expect("blank audit count");
+
+    assert_eq!(client_count, 0);
+    assert!(claimed_at.is_none());
+    assert_eq!(audit_count, 0);
+}
+
+#[test]
 fn remote_pairing_claim_audits_invalid_and_unknown_code_routes() {
     let db = DaemonDb::open_in_memory().expect("open db");
     let claim = RemotePairingClaimRequest::new_for_tests(

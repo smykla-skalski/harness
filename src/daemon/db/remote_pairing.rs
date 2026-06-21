@@ -16,8 +16,9 @@ use crate::daemon::remote_identity::{
     RemoteAuditScopeDecision, RemoteBearerToken, RemoteClientRegistration, RemoteStoredClient,
 };
 use crate::daemon::remote_pairing::{
-    validate_pairing_domain, RemotePairingClaimRequest, RemotePairingClaimedClient,
-    RemotePairingCodeHash, RemotePairingError, RemotePairingRecord, RemoteStoredPairing,
+    validate_pairing_audit_event_id, validate_pairing_domain, RemotePairingClaimRequest,
+    RemotePairingClaimedClient, RemotePairingCodeHash, RemotePairingError, RemotePairingRecord,
+    RemoteStoredPairing,
 };
 
 const INSERT_REMOTE_PAIRING_SQL: &str = "
@@ -62,6 +63,8 @@ impl DaemonDb {
         record: &RemotePairingRecord,
         audit_event_id: &str,
     ) -> Result<RemoteStoredPairing, CliError> {
+        validate_pairing_audit_event_id(audit_event_id)
+            .map_err(|error| db_error(error.to_string()))?;
         let scopes_json = scopes_to_json(&record.scopes)?;
         let transaction = self
             .conn
@@ -120,6 +123,8 @@ impl DaemonDb {
         claim: &RemotePairingClaimRequest,
         now: &str,
     ) -> Result<RemotePairingClaimedClient, CliError> {
+        validate_pairing_audit_event_id(claim.audit_event_id.as_str())
+            .map_err(|error| db_error(error.to_string()))?;
         if let Err(error) = validate_pairing_domain(&claim.expected_domain, &claim.claimed_domain) {
             let error_detail = error.to_string();
             self.record_pairing_claim_failure(

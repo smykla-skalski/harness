@@ -1,6 +1,6 @@
 use super::{
-    RemotePairingClaimRequest, RemotePairingCode, RemotePairingRateLimiter, RemotePairingRecord,
-    validate_pairing_domain,
+    validate_pairing_domain, RemotePairingClaimRequest, RemotePairingCode,
+    RemotePairingRateLimiter, RemotePairingRecord,
 };
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 
@@ -18,12 +18,10 @@ fn remote_pairing_code_hashes_secret_and_redacts_debug() {
     .expect("pairing record");
 
     assert!(!format!("{code:?}").contains("pairing-secret-value"));
-    assert!(
-        !record
-            .code_hash
-            .as_storage_value()
-            .contains("pairing-secret-value")
-    );
+    assert!(!record
+        .code_hash
+        .as_storage_value()
+        .contains("pairing-secret-value"));
     assert!(record.code_hash.verify(code.expose()));
     assert_eq!(
         record.scopes,
@@ -83,6 +81,23 @@ fn remote_pairing_claim_request_rejects_blank_display_name_and_platform() {
         )
         .is_err(),
         "platform is required for pairing metadata"
+    );
+}
+
+#[test]
+fn remote_pairing_claim_request_rejects_blank_audit_event_id() {
+    assert!(
+        RemotePairingClaimRequest::new_for_tests(
+            "daemon.example.com",
+            "daemon.example.com",
+            "client-1",
+            "MacBook Pro",
+            "macos",
+            Some("203.0.113.10"),
+            " \t",
+        )
+        .is_err(),
+        "audit event id is required for deterministic pairing audit writes"
     );
 }
 
