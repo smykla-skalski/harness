@@ -514,7 +514,7 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertTrue(dashboardToolbarSource.contains("@FocusedValue(\\.harnessPolicyCanvasCommandFocus)"))
     XCTAssertTrue(dashboardToolbarSource.contains("policyCanvasInspectorButtonTitle"))
     XCTAssertTrue(dashboardToolbarSource.contains("Image(systemName: \"sidebar.trailing\")"))
-    XCTAssertFalse(
+    XCTAssertTrue(
       dashboardToolbarSource.contains(
         """
         ToolbarItem(placement: .primaryAction) {
@@ -522,7 +522,7 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
         """
       )
     )
-    XCTAssertTrue(
+    XCTAssertFalse(
       dashboardToolbarSource.contains(
         """
         ToolbarItem(placement: .automatic) {

@@ -28,12 +28,6 @@ struct DashboardWindowToolbar: ToolbarContent {
       ToolbarSpacer(.fixed, placement: .primaryAction)
     }
 
-    if showsPolicyInspectorToggle {
-      ToolbarItem(placement: .automatic) {
-        PolicyCanvasInspectorToolbarButton()
-      }
-    }
-
     ToolbarItemGroup(placement: .primaryAction) {
       SleepPreventionToolbarButton(
         store: store,
@@ -44,6 +38,17 @@ struct DashboardWindowToolbar: ToolbarContent {
       .sharedBackgroundVisibility(.hidden)
 
     GlobalPolicyEnforcementToolbarGroup(store: store)
+
+    if showsPolicyInspectorToggle {
+      // Sits to the right of the kill switch as its own platter: the hidden
+      // spacer breaks the shared glass background so the inspector toggle reads
+      // as a separate group, not part of the enforcement control.
+      ToolbarSpacer(.fixed, placement: .primaryAction)
+        .sharedBackgroundVisibility(.hidden)
+      ToolbarItem(placement: .primaryAction) {
+        PolicyCanvasInspectorToolbarButton()
+      }
+    }
   }
 }
 
