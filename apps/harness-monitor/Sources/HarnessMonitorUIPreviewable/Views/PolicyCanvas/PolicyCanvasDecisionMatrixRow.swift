@@ -6,15 +6,17 @@ import SwiftUI
 /// name shares a left axis and the list scans as a column), the humanized reason
 /// when it adds something the verdict does not, a trailing tone-coded verdict
 /// pill, and a trace affordance. A separate struct so a row tap never
-/// invalidates its siblings.
+/// invalidates its siblings. No per-row hover state: an `onHover` on every row
+/// fires its tracking area as the rows translate under a stationary cursor
+/// during a scroll, invalidating row bodies and making the list choppy - the
+/// persistent active accent and the always-visible trace icon carry the
+/// affordance instead.
 struct PolicyCanvasDecisionMatrixRow: View {
   let model: PolicyCanvasDecisionMatrixRowModel
   /// True when this is the row the user last traced, so it keeps a persistent
   /// accent after the tap effect lands on the canvas elsewhere.
   let isActive: Bool
   let focusDecision: @MainActor ([String]) -> Void
-
-  @State private var isHovering = false
 
   /// A row can trace a path only when the simulation recorded the nodes it
   /// visited; otherwise the row is a plain read-only readout.
@@ -26,7 +28,6 @@ struct PolicyCanvasDecisionMatrixRow: View {
     }
     .harnessPlainButtonStyle()
     .disabled(!isInteractive)
-    .onHover { isHovering = $0 }
     .help(isInteractive ? "Show this decision's path on the canvas" : "")
     .accessibilityElement(children: .combine)
     .accessibilityLabel(accessibilityLabel)
@@ -93,7 +94,7 @@ struct PolicyCanvasDecisionMatrixRow: View {
         Image(systemName: "point.3.connected.trianglepath.dotted")
           .scaledFont(.caption)
           .foregroundStyle(
-            isHovering || isActive
+            isActive
               ? PolicyCanvasVisualStyle.activeTint : PolicyCanvasVisualStyle.tertiaryText
           )
       }
@@ -113,18 +114,11 @@ struct PolicyCanvasDecisionMatrixRow: View {
   }
 
   private var rowBackground: Color {
-    if isActive {
-      return PolicyCanvasVisualStyle.activeTint.opacity(0.12)
-    }
-    return isInteractive && isHovering
-      ? PolicyCanvasVisualStyle.controlHoverSurface : PolicyCanvasVisualStyle.surface
+    isActive
+      ? PolicyCanvasVisualStyle.activeTint.opacity(0.12) : PolicyCanvasVisualStyle.surface
   }
 
   private var rowBorderColor: Color {
-    if isActive {
-      return PolicyCanvasVisualStyle.activeTint
-    }
-    return isInteractive && isHovering
-      ? PolicyCanvasVisualStyle.border : PolicyCanvasVisualStyle.subtleBorder
+    isActive ? PolicyCanvasVisualStyle.activeTint : PolicyCanvasVisualStyle.subtleBorder
   }
 }
