@@ -5,7 +5,8 @@ extension PolicyCanvasPreparedRouteInput {
   func precomputedRoutesNormalizingTerminalStubs(
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode],
-    portMarkerLayout explicitLayout: PolicyCanvasPortMarkerLayout? = nil
+    portMarkerLayout explicitLayout: PolicyCanvasPortMarkerLayout? = nil,
+    affectedEdgeIDs: Set<String>? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
     let markerLayout =
       explicitLayout
@@ -15,7 +16,7 @@ extension PolicyCanvasPreparedRouteInput {
       nodeIndex: nodeIndex
     )
     var normalized = routes
-    for edge in edges {
+    for edge in edges where policyCanvasEdgeInRepairScope(edge.id, affectedEdgeIDs) {
       guard var route = normalized[edge.id] else {
         continue
       }
@@ -107,14 +108,15 @@ extension PolicyCanvasPreparedRouteInput {
   func routesRestoringTerminalLeadSides(
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode],
-    preservingInterior: Bool = false
+    preservingInterior: Bool = false,
+    affectedEdgeIDs: Set<String>? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
     var repaired = routes
     let markerLayout = precomputedRouteTerminalPortMarkerLayout(
       routes: routes,
       nodeIndex: nodeIndex
     )
-    for edge in edges {
+    for edge in edges where policyCanvasEdgeInRepairScope(edge.id, affectedEdgeIDs) {
       guard var route = repaired[edge.id] else {
         continue
       }

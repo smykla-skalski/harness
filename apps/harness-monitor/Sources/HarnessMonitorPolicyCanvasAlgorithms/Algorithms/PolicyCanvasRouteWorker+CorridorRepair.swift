@@ -2,7 +2,52 @@ import OSLog
 import SwiftUI
 
 extension PolicyCanvasPreparedRouteInput {
+  /// Restore every out-of-scope edge to its frozen input geometry. A corridor
+  /// pass works over the whole route set; when the live drag scopes it to the
+  /// affected edges, this keeps the splitter's incidental changes to unaffected
+  /// edges out of the result so they hold the geometry the prior reconverge
+  /// settled. A `nil` scope returns the result untouched.
+  func policyCanvasRoutesFreezingOutOfScope(
+    result: [String: PolicyCanvasEdgeRoute],
+    input: [String: PolicyCanvasEdgeRoute],
+    affectedEdgeIDs: Set<String>?
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    guard let affectedEdgeIDs else {
+      return result
+    }
+    var frozen = input
+    for id in affectedEdgeIDs where result[id] != nil {
+      frozen[id] = result[id]
+    }
+    return frozen
+  }
+
+  /// Keep only corridor violations that involve an in-scope edge. A `nil` scope
+  /// returns the list unchanged, so the existing full repair is identical.
+  func policyCanvasCorridorViolationsInScope(
+    _ violations: [PolicyCanvasCorridorViolation],
+    _ scope: Set<String>?
+  ) -> [PolicyCanvasCorridorViolation] {
+    guard let scope else {
+      return violations
+    }
+    return violations.filter { scope.contains($0.edgeA) || scope.contains($0.edgeB) }
+  }
+
   func routesClearingCorridorReuse(
+    routes: [String: PolicyCanvasEdgeRoute],
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet,
+    affectedEdgeIDs: Set<String>? = nil
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    let cleared = policyCanvasRoutesClearingCorridorReuse(
+      routes: routes, nodeIndex: nodeIndex, router: selectedRouter, algorithms: algorithms)
+    return policyCanvasRoutesFreezingOutOfScope(
+      result: cleared, input: routes, affectedEdgeIDs: affectedEdgeIDs)
+  }
+
+  private func policyCanvasRoutesClearingCorridorReuse(
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode],
     router selectedRouter: any PolicyCanvasEdgeRouter,
@@ -74,38 +119,45 @@ extension PolicyCanvasPreparedRouteInput {
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode],
     router selectedRouter: any PolicyCanvasEdgeRouter,
-    algorithms: PolicyCanvasRoutingAlgorithmSet
+    algorithms: PolicyCanvasRoutingAlgorithmSet,
+    affectedEdgeIDs: Set<String>? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
     var currentRoutes = routesRestoringTerminalLeadSides(
       routes: routes,
-      nodeIndex: nodeIndex
+      nodeIndex: nodeIndex,
+      affectedEdgeIDs: affectedEdgeIDs
     )
     for _ in 0..<5 {
       let corridorRoutes = routesClearingCorridorReuse(
         routes: currentRoutes,
         nodeIndex: nodeIndex,
         router: selectedRouter,
-        algorithms: algorithms
+        algorithms: algorithms,
+        affectedEdgeIDs: affectedEdgeIDs
       )
       let terminalRoutes = routesRestoringTerminalLeadSides(
         routes: corridorRoutes,
         nodeIndex: nodeIndex,
-        preservingInterior: true
+        preservingInterior: true,
+        affectedEdgeIDs: affectedEdgeIDs
       )
       guard terminalRoutes != currentRoutes else {
         return terminalRoutes
       }
       currentRoutes = terminalRoutes
     }
-    return routesRepairingResidualCorridorReuse(routes: currentRoutes, nodeIndex: nodeIndex)
+    return routesRepairingResidualCorridorReuse(
+      routes: currentRoutes, nodeIndex: nodeIndex, affectedEdgeIDs: affectedEdgeIDs)
   }
 
   func routesRepairingResidualCorridorReuse(
     routes: [String: PolicyCanvasEdgeRoute],
-    nodeIndex: [String: PolicyCanvasRouteNode]
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    affectedEdgeIDs: Set<String>? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
     var currentRoutes = routes
-    var currentViolations = precomputedCorridorReuseViolations(routes: currentRoutes)
+    var currentViolations = policyCanvasCorridorViolationsInScope(
+      precomputedCorridorReuseViolations(routes: currentRoutes), affectedEdgeIDs)
     var currentScore = residualCorridorReuseScore(currentViolations)
     let repairLimit = min(16, max(2, currentViolations.count * 4))
     for _ in 0..<repairLimit {
@@ -114,7 +166,8 @@ extension PolicyCanvasPreparedRouteInput {
       }
       let currentBodyHits = precomputedBodyHits(routes: currentRoutes, nodeIndex: nodeIndex).count
       var accepted: ([String: PolicyCanvasEdgeRoute], [PolicyCanvasCorridorViolation])?
-      for edgeID in [violation.edgeB, violation.edgeA] {
+      for edgeID in [violation.edgeB, violation.edgeA]
+      where policyCanvasEdgeInRepairScope(edgeID, affectedEdgeIDs) {
         guard let route = currentRoutes[edgeID] else {
           continue
         }
@@ -136,7 +189,8 @@ extension PolicyCanvasPreparedRouteInput {
           else {
             continue
           }
-          let candidateViolations = precomputedCorridorReuseViolations(routes: candidateRoutes)
+          let candidateViolations = policyCanvasCorridorViolationsInScope(
+            precomputedCorridorReuseViolations(routes: candidateRoutes), affectedEdgeIDs)
           let candidateScore = residualCorridorReuseScore(candidateViolations)
           guard residualCorridorReuseScore(candidateScore, improves: currentScore) else {
             continue

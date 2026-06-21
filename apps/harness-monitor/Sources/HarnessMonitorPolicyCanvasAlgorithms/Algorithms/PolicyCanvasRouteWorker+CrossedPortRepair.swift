@@ -6,7 +6,8 @@ extension PolicyCanvasPreparedRouteInput {
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode],
     router selectedRouter: any PolicyCanvasEdgeRouter,
-    algorithms: PolicyCanvasRoutingAlgorithmSet
+    algorithms: PolicyCanvasRoutingAlgorithmSet,
+    affectedEdgeIDs: Set<String>? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
     let originalBodyHits = precomputedBodyHits(routes: routes, nodeIndex: nodeIndex).count
     let originalTerminalSideMismatches = precomputedTerminalSideMismatchCount(routes: routes)
@@ -20,9 +21,9 @@ extension PolicyCanvasPreparedRouteInput {
       passContext: sharedPassContext
     )
     var currentRoutes = routes
-    var currentViolations = precomputedCrossedPortViolations(
-      routes: currentRoutes,
-      nodeIndex: nodeIndex
+    var currentViolations = policyCanvasCrossedPortViolationsInScope(
+      precomputedCrossedPortViolations(routes: currentRoutes, nodeIndex: nodeIndex),
+      affectedEdgeIDs
     )
     // The node frames are fixed across the pass, so the broad-phase index is
     // built once. Each iteration's measurement baseline is rebuilt for the
@@ -55,7 +56,8 @@ extension PolicyCanvasPreparedRouteInput {
         baseline: baseline
       ) {
         currentRoutes = acceptedGroupedCandidate.routes
-        currentViolations = acceptedGroupedCandidate.violations
+        currentViolations = policyCanvasCrossedPortViolationsInScope(
+          acceptedGroupedCandidate.violations, affectedEdgeIDs)
         continue
       }
       guard
@@ -69,9 +71,22 @@ extension PolicyCanvasPreparedRouteInput {
         break
       }
       currentRoutes = singleGroupCandidate.routes
-      currentViolations = singleGroupCandidate.violations
+      currentViolations = policyCanvasCrossedPortViolationsInScope(
+        singleGroupCandidate.violations, affectedEdgeIDs)
     }
     return currentRoutes
+  }
+
+  /// Keep only crossed-port violations that involve an in-scope edge. A `nil`
+  /// scope returns the list unchanged, so the existing full repair is identical.
+  func policyCanvasCrossedPortViolationsInScope(
+    _ violations: [PolicyCanvasCrossedPortsViolation],
+    _ scope: Set<String>?
+  ) -> [PolicyCanvasCrossedPortsViolation] {
+    guard let scope else {
+      return violations
+    }
+    return violations.filter { scope.contains($0.edgeA) || scope.contains($0.edgeB) }
   }
 
   func crossedPortSingleGroupRepairCandidate(
@@ -239,12 +254,13 @@ extension PolicyCanvasPreparedRouteInput {
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode],
     router selectedRouter: any PolicyCanvasEdgeRouter,
-    algorithms: PolicyCanvasRoutingAlgorithmSet
+    algorithms: PolicyCanvasRoutingAlgorithmSet,
+    affectedEdgeIDs: Set<String>? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
     var currentRoutes = routes
-    var currentViolations = precomputedCrossedPortViolations(
-      routes: currentRoutes,
-      nodeIndex: nodeIndex
+    var currentViolations = policyCanvasCrossedPortViolationsInScope(
+      precomputedCrossedPortViolations(routes: currentRoutes, nodeIndex: nodeIndex),
+      affectedEdgeIDs
     )
     let sharedPassContext = displayedRoutePassContext(nodeIndex: nodeIndex)
     for _ in 0..<6 {
@@ -255,9 +271,9 @@ extension PolicyCanvasPreparedRouteInput {
         routes: currentRoutes,
         violations: currentViolations
       )
-      let untangledViolations = precomputedCrossedPortViolations(
-        routes: untangled,
-        nodeIndex: nodeIndex
+      let untangledViolations = policyCanvasCrossedPortViolationsInScope(
+        precomputedCrossedPortViolations(routes: untangled, nodeIndex: nodeIndex),
+        affectedEdgeIDs
       )
       let repairContext = PolicyCanvasCrossedPortRepairContext(
         nodeIndex: nodeIndex,
@@ -279,7 +295,8 @@ extension PolicyCanvasPreparedRouteInput {
         break
       }
       currentRoutes = acceptedUntangled.routes
-      currentViolations = acceptedUntangled.violations
+      currentViolations = policyCanvasCrossedPortViolationsInScope(
+        acceptedUntangled.violations, affectedEdgeIDs)
     }
     for _ in 0..<3 {
       guard !currentViolations.isEmpty else {
@@ -292,9 +309,9 @@ extension PolicyCanvasPreparedRouteInput {
         router: selectedRouter,
         algorithms: algorithms
       )
-      let repairedViolations = precomputedCrossedPortViolations(
-        routes: repaired,
-        nodeIndex: nodeIndex
+      let repairedViolations = policyCanvasCrossedPortViolationsInScope(
+        precomputedCrossedPortViolations(routes: repaired, nodeIndex: nodeIndex),
+        affectedEdgeIDs
       )
       guard repairedViolations.count < currentViolations.count else {
         break

@@ -234,66 +234,11 @@ extension PolicyCanvasPreparedRouteInput {
     else {
       return nil
     }
-    let bodySafeRoutes = precomputedRoutesRepairingBodyHits(
-      routes: precomputedRoutes.routes,
+    return repairedRouteComputation(
+      seedRoutes: precomputedRoutes.routes,
       nodeIndex: nodeIndex,
       router: selectedRouter,
       algorithms: algorithms
-    )
-    let terminalSafeRoutes = precomputedRoutesNormalizingTerminalStubs(
-      routes: bodySafeRoutes,
-      nodeIndex: nodeIndex
-    )
-    let repairedRoutes = routesRepairingCrossedPorts(
-      routes: terminalSafeRoutes,
-      nodeIndex: nodeIndex,
-      router: selectedRouter,
-      algorithms: algorithms
-    )
-    let terminalState = routesBalancingPrecomputedPortMarkers(
-      routes: repairedRoutes,
-      nodeIndex: nodeIndex,
-      router: selectedRouter,
-      algorithms: algorithms
-    )
-    let routes = routesClearingCorridorReuse(
-      routes: terminalState.routes,
-      nodeIndex: nodeIndex,
-      router: selectedRouter,
-      algorithms: algorithms
-    )
-    let portMarkerLayout = terminalState.portMarkerLayout
-    let crossedPortRoutes = routesRepairingFinalTerminalOrder(
-      routes: routes,
-      nodeIndex: nodeIndex,
-      router: selectedRouter,
-      algorithms: algorithms,
-      portMarkerLayout: portMarkerLayout
-    )
-    let leadRestoredRoutes = routesClearingCorridorsAndRestoringTerminalLeads(
-      routes: crossedPortRoutes,
-      nodeIndex: nodeIndex,
-      router: selectedRouter,
-      algorithms: algorithms
-    )
-    let finalRoutes = routesReachingRenderedPorts(
-      routes: leadRestoredRoutes,
-      nodeIndex: nodeIndex
-    )
-    let finalPortMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
-      routes: finalRoutes,
-      nodeIndex: nodeIndex,
-      usesDeclarationOrderAnchor: true
-    )
-    let labelPositions = PolicyCanvasPolylineMidpointLabelPlacement().placeLabels(
-      input: PolicyCanvasLabelPlacementInput(prepared: self, routes: finalRoutes)
-    )
-    return PolicyCanvasPreparedRouteComputation(
-      routes: finalRoutes,
-      labelPositions: labelPositions,
-      portVisibility: portVisibility(routes: finalRoutes, nodeIndex: nodeIndex),
-      portMarkerLayout: finalPortMarkerLayout,
-      visibleBounds: visibleBounds(routes: finalRoutes, labelPositions: labelPositions)
     )
   }
 
@@ -302,18 +247,21 @@ extension PolicyCanvasPreparedRouteInput {
     nodeIndex: [String: PolicyCanvasRouteNode],
     router selectedRouter: any PolicyCanvasEdgeRouter,
     algorithms: PolicyCanvasRoutingAlgorithmSet,
-    portMarkerLayout: PolicyCanvasPortMarkerLayout? = nil
+    portMarkerLayout: PolicyCanvasPortMarkerLayout? = nil,
+    affectedEdgeIDs: Set<String>? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
     let terminalSafeRoutes = precomputedRoutesNormalizingTerminalStubs(
       routes: routes,
       nodeIndex: nodeIndex,
-      portMarkerLayout: portMarkerLayout
+      portMarkerLayout: portMarkerLayout,
+      affectedEdgeIDs: affectedEdgeIDs
     )
     return routesRepairingCrossedPortOrder(
       routes: terminalSafeRoutes,
       nodeIndex: nodeIndex,
       router: selectedRouter,
-      algorithms: algorithms
+      algorithms: algorithms,
+      affectedEdgeIDs: affectedEdgeIDs
     )
   }
 

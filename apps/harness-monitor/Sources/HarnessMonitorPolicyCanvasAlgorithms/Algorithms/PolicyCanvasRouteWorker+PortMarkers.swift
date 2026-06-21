@@ -31,20 +31,25 @@ extension PolicyCanvasPreparedRouteInput {
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode],
     router selectedRouter: any PolicyCanvasEdgeRouter,
-    algorithms: PolicyCanvasRoutingAlgorithmSet
+    algorithms: PolicyCanvasRoutingAlgorithmSet,
+    affectedEdgeIDs: Set<String>? = nil
   ) -> PolicyCanvasRouteComputationState {
     let precomputedLayout = precomputedRouteTerminalPortMarkerLayout(
       routes: routes,
       nodeIndex: nodeIndex
     )
-    guard precomputedRoutesHavePortSpacingViolations(routes: routes, nodeIndex: nodeIndex) else {
+    guard
+      precomputedRoutesHavePortSpacingViolations(
+        routes: routes, nodeIndex: nodeIndex, affectedEdgeIDs: affectedEdgeIDs)
+    else {
       return PolicyCanvasRouteComputationState(routes: routes, portMarkerLayout: precomputedLayout)
     }
     let balancedLayout = portMarkerLayout(routes: routes, nodeIndex: nodeIndex)
     let snappedRoutes = routesSnappingTerminals(
       routes: routes,
       portMarkerLayout: balancedLayout,
-      nodeIndex: nodeIndex
+      nodeIndex: nodeIndex,
+      affectedEdgeIDs: affectedEdgeIDs
     )
     guard precomputedBodyHits(routes: snappedRoutes, nodeIndex: nodeIndex).isEmpty else {
       return routesReroutingBalancedPortMarkers(
@@ -60,22 +65,32 @@ extension PolicyCanvasPreparedRouteInput {
 
   func precomputedRoutesHavePortSpacingViolations(
     routes: [String: PolicyCanvasEdgeRoute],
-    nodeIndex: [String: PolicyCanvasRouteNode]
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    affectedEdgeIDs: Set<String>? = nil
   ) -> Bool {
-    !policyCanvasMeasurePortSpacing(
+    let violations = policyCanvasMeasurePortSpacing(
       routedEdges: precomputedRoutedEdges(routes: routes),
       nodeFramesByID: nodeIndex.mapValues(\.frame),
       thresholds: .default
-    ).isEmpty
+    )
+    guard let affectedEdgeIDs else {
+      return !violations.isEmpty
+    }
+    // Only an affected edge can have moved, so a spacing violation that touches
+    // no affected edge is a pre-existing residual - leave it frozen.
+    return violations.contains { violation in
+      violation.edgeIDs.contains { affectedEdgeIDs.contains($0) }
+    }
   }
 
   func routesSnappingTerminals(
     routes: [String: PolicyCanvasEdgeRoute],
     portMarkerLayout: PolicyCanvasPortMarkerLayout,
-    nodeIndex: [String: PolicyCanvasRouteNode]
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    affectedEdgeIDs: Set<String>? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
     var snapped = routes
-    for edge in edges {
+    for edge in edges where policyCanvasEdgeInRepairScope(edge.id, affectedEdgeIDs) {
       guard var route = snapped[edge.id] else {
         continue
       }

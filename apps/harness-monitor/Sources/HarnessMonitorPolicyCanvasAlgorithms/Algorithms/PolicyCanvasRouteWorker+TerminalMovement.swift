@@ -258,7 +258,8 @@ extension PolicyCanvasPreparedRouteInput {
   /// the interior run and trips the body-hit guard; the minimal stub does not.
   func routesReachingRenderedPorts(
     routes: [String: PolicyCanvasEdgeRoute],
-    nodeIndex: [String: PolicyCanvasRouteNode]
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    affectedEdgeIDs: Set<String>? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
     let markerLayout = precomputedRouteTerminalPortMarkerLayout(
       routes: routes,
@@ -266,7 +267,7 @@ extension PolicyCanvasPreparedRouteInput {
       usesDeclarationOrderAnchor: true
     )
     var reached = routes
-    for edge in edges {
+    for edge in edges where policyCanvasEdgeInRepairScope(edge.id, affectedEdgeIDs) {
       guard let original = reached[edge.id] else {
         continue
       }
