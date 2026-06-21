@@ -21,8 +21,8 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 uuid = { version = "1.18.1", features = ["v4"] }
 
 [dev-dependencies]
-tempfile = "3.27.0"
-wiremock = "0.6.5"
+tempfile = "=3.27.0"
+wiremock = "=0.6.5"
 
 [[bin]]
 name = "harness-openrouter-agent"

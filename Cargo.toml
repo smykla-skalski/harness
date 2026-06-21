@@ -109,7 +109,7 @@ tempfile = "=3.27.0"
 insta = "=1.46.3"
 harness-testkit = { path = "testkit" }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
-syn = { version = "2", features = ["full"] }
+syn = { version = "=2.0.117", features = ["full"] }
 
 [features]
 default = ["all-adapters"]
