@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use super::super::{DaemonDevArgs, DaemonServeArgs, HARNESS_MONITOR_APP_GROUP_ID};
+use super::super::{
+    DaemonDevArgs, DaemonServeArgs, HARNESS_MONITOR_APP_GROUP_ID,
+};
 
 #[derive(Debug, Parser)]
 struct DaemonServeArgsTestHarness {

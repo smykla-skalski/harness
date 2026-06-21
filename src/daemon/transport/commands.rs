@@ -18,8 +18,9 @@ use super::control::{
     adopt_daemon_root_for_transport_command, print_daemon_control_response, print_json,
     restart_daemon, stop_daemon,
 };
+use super::remote::DaemonRemoteCommand;
 
-/// Local daemon commands used by the macOS Harness app.
+/// Local daemon operations and remote-daemon scaffolding.
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum DaemonCommand {
@@ -28,6 +29,11 @@ pub enum DaemonCommand {
     /// Serve an unsandboxed dev daemon whose manifest the sandboxed Harness
     /// Monitor app can read. Thin wrapper over `serve` with dev defaults.
     Dev(DaemonDevArgs),
+    /// Serve and manage an internet-reachable remote daemon.
+    Remote {
+        #[command(subcommand)]
+        command: DaemonRemoteCommand,
+    },
     /// Show daemon manifest and project/session counts.
     Status,
     /// Stop the local daemon.
@@ -49,6 +55,7 @@ impl Execute for DaemonCommand {
         match self {
             Self::Serve(args) => args.execute(context),
             Self::Dev(args) => args.execute(context),
+            Self::Remote { command } => command.execute(context),
             Self::Status => {
                 adopt_daemon_root_for_transport_command("daemon-status");
                 let report = service::status_report()?;
