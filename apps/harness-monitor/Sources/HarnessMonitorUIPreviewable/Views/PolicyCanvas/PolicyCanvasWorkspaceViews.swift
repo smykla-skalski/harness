@@ -169,8 +169,6 @@ struct PolicyCanvasViewport: View {
       let centeringRouteState = PolicyCanvasViewportCenteringRouteState(
         currentRouteKey: routeKey,
         appliedRouteKey: appliedRouteKey,
-        routeOutputSignature: routeOutput.signature,
-        routeOutputMatchesCurrentGraph: routeOutputMatchesCurrentGraph,
         viewportCenteringGeneration: viewModel.viewportCenteringGeneration
       )
       let hostedSnapshot = policyCanvasViewportHostedSnapshot(
