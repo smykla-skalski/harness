@@ -40,6 +40,18 @@ fn remote_tls_acme_plan_rejects_blank_persisted_account_id() {
 }
 
 #[test]
+fn remote_tls_acme_plan_rejects_blank_persisted_certificate_material() {
+    let state = RemoteAcmeRuntimeState::with_account_and_certificate(
+        "acct-1",
+        RemoteCertificateBundle::new_for_tests("   ", "\n\t"),
+    );
+    let error = build_remote_acme_runtime_plan(&tls_alpn_config(), &state)
+        .expect_err("blank TLS certificate material should fail closed");
+
+    assert!(error.to_string().contains("persisted TLS certificate"));
+}
+
+#[test]
 fn remote_tls_acme_plan_exposes_invalid_config_error_source() {
     let mut config = tls_alpn_config();
     config.domain.clear();

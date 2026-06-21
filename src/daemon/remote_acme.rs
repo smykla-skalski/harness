@@ -139,6 +139,9 @@ pub fn build_remote_acme_runtime_plan(
         .certificate
         .clone()
         .ok_or(RemoteAcmeRuntimeError::MissingCertificate)?;
+    if !certificate.has_material() {
+        return Err(RemoteAcmeRuntimeError::MissingCertificate);
+    }
 
     Ok(RemoteAcmeRuntimePlan {
         domain: config.domain.trim().to_string(),
@@ -252,6 +255,11 @@ impl RemoteCertificateBundle {
     #[must_use]
     pub fn fingerprint(&self) -> &str {
         &self.fingerprint
+    }
+
+    #[must_use]
+    pub fn has_material(&self) -> bool {
+        !self.certificate_pem.trim().is_empty() && !self.private_key_pem.trim().is_empty()
     }
 }
 
