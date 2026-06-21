@@ -117,9 +117,10 @@ extension PolicyCanvasPreparedRouteInput {
       nodeIndex: nodeIndex
     )
     for edge in edges where policyCanvasEdgeInRepairScope(edge.id, affectedEdgeIDs) {
-      guard var route = repaired[edge.id] else {
+      guard let original = repaired[edge.id] else {
         continue
       }
+      var route = original
       if let sourcePoint = portMarkerPoint(
         edgeID: edge.id,
         role: .source,
@@ -149,6 +150,16 @@ extension PolicyCanvasPreparedRouteInput {
           point: targetPoint.point,
           preservingInterior: preservingInterior
         )
+      }
+      // Restoring the rendered terminal side is cosmetic; it must never drive the
+      // wire through a foreign node body to get there. Keep the restored route
+      // only when it does not add body hits over the route we started with, so a
+      // lead that would have to cross a node simply stays on its clear approach.
+      if route != original,
+        precomputedBodyHits(edge: edge, route: route, nodeIndex: nodeIndex).count
+          > precomputedBodyHits(edge: edge, route: original, nodeIndex: nodeIndex).count
+      {
+        continue
       }
       repaired[edge.id] = route
     }
