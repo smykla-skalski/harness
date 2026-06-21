@@ -11,7 +11,12 @@ fn remote_token_hash_does_not_store_raw_token_and_verifies_constant_width_digest
     assert!(!hash.as_storage_value().contains("remote-token-secret"));
     assert!(hash.verify("remote-token-secret"));
     assert!(!hash.verify("remote-token-wrong"));
-    assert!(!RemoteTokenHash::from_storage_value_for_tests("sha256:abc").verify("anything"));
+    assert!(RemoteTokenHash::try_from_storage_value_for_tests(hash.as_storage_value()).is_ok());
+    assert!(RemoteTokenHash::try_from_storage_value_for_tests("sha256:abc").is_err());
+    assert!(
+        RemoteTokenHash::try_from_storage_value_for_tests("remote-token-secret").is_err(),
+        "clear-text token strings must not be accepted as stored hashes"
+    );
 }
 
 #[test]

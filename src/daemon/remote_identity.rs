@@ -22,6 +22,7 @@ const REDACTED_TOKEN_HINT: &str = "<redacted>";
 pub enum RemoteIdentityError {
     EmptyClientId,
     EmptyToken,
+    InvalidStoredTokenHash,
     ScopeNotAllowed {
         role: RemoteRole,
         scope: RemoteAccessScope,
@@ -33,6 +34,7 @@ impl fmt::Display for RemoteIdentityError {
         match self {
             Self::EmptyClientId => write!(f, "remote client id is required"),
             Self::EmptyToken => write!(f, "remote client token is required"),
+            Self::InvalidStoredTokenHash => write!(f, "remote client token hash is invalid"),
             Self::ScopeNotAllowed { role, scope } => write!(
                 f,
                 "remote role '{}' cannot request '{}' scope",
@@ -65,17 +67,26 @@ impl RemoteTokenHash {
         Self::from_token(token)
     }
 
-    #[must_use]
-    pub fn from_storage_value(value: impl Into<String>) -> Self {
-        Self {
-            storage_value: value.into(),
+    /// Build a hash wrapper from persisted storage after validating its format.
+    ///
+    /// # Errors
+    /// Returns [`RemoteIdentityError::InvalidStoredTokenHash`] when the value is
+    /// not a `sha256:`-prefixed 32-byte digest encoded as 64 hex characters.
+    pub(crate) fn try_from_storage_value(
+        value: impl Into<String>,
+    ) -> Result<Self, RemoteIdentityError> {
+        let storage_value = value.into();
+        if parse_storage_digest(&storage_value).is_none() {
+            return Err(RemoteIdentityError::InvalidStoredTokenHash);
         }
+        Ok(Self { storage_value })
     }
 
     #[cfg(test)]
-    #[must_use]
-    pub fn from_storage_value_for_tests(value: impl Into<String>) -> Self {
-        Self::from_storage_value(value)
+    pub fn try_from_storage_value_for_tests(
+        value: impl Into<String>,
+    ) -> Result<Self, RemoteIdentityError> {
+        Self::try_from_storage_value(value)
     }
 
     #[must_use]

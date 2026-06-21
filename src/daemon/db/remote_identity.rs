@@ -1,6 +1,6 @@
 #![cfg_attr(
     not(test),
-    expect(
+    allow(
         dead_code,
         reason = "remote identity storage is wired by the auth middleware phase"
     )
@@ -220,13 +220,17 @@ fn remote_client_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteSto
     })?;
     let scopes = scopes_from_json(&scopes_json)
         .map_err(|error| rusqlite::Error::FromSqlConversionFailure(4, Type::Text, error.into()))?;
+    let token_hash =
+        RemoteTokenHash::try_from_storage_value(row.get::<_, String>(5)?).map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(5, Type::Text, error.into())
+        })?;
     Ok(RemoteStoredClient {
         client_id: row.get(0)?,
         display_name: row.get(1)?,
         platform: row.get(2)?,
         role,
         scopes,
-        token_hash: RemoteTokenHash::from_storage_value(row.get::<_, String>(5)?),
+        token_hash,
         token_hint: row.get(6)?,
         created_at: row.get(7)?,
         last_seen_at: row.get(8)?,

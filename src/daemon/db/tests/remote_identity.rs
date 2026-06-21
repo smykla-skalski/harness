@@ -136,11 +136,32 @@ fn remote_clients_persist_hashed_tokens_and_support_revoke_rotate() {
             .expect("short token accepted after redacted hint rotation")
             .is_some()
     );
+    db.conn
+        .execute(
+            "UPDATE remote_clients SET token_hash = 'short' WHERE client_id = 'client-1'",
+            [],
+        )
+        .expect("corrupt stored token hash");
+    assert!(
+        db.verify_remote_client_token("client-1", "short").is_err(),
+        "clear-text stored hash must fail row loading instead of silently denying auth"
+    );
+    db.rotate_remote_client_token(
+        "client-1",
+        "final-token-secret",
+        "2026-06-21T12:41:50Z",
+    )
+    .expect("restore valid token hash");
+    assert!(
+        db.verify_remote_client_token("client-1", "final-token-secret")
+            .expect("restored token accepted")
+            .is_some()
+    );
 
     db.revoke_remote_client("client-1", "2026-06-21T12:42:00Z")
         .expect("revoke client");
     assert!(
-        db.verify_remote_client_token("client-1", "short")
+        db.verify_remote_client_token("client-1", "final-token-secret")
             .expect("revoked token rejected")
             .is_none()
     );
