@@ -2,14 +2,14 @@ use std::collections::{BTreeMap, VecDeque};
 use std::error::Error;
 use std::fmt;
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use rand_core06::{OsRng, RngCore};
 use sha2::{Digest, Sha256};
 
 use super::remote::{RemoteAccessScope, RemoteRole};
 use super::remote_identity::{
-    expand_client_scopes, RemoteBearerToken, RemoteIdentityError, RemoteStoredClient,
+    RemoteBearerToken, RemoteIdentityError, RemoteStoredClient, expand_client_scopes,
 };
 
 #[cfg(test)]
@@ -259,7 +259,10 @@ pub struct RemotePairingClaimRequest {
 }
 
 impl RemotePairingClaimRequest {
-    /// Build a pairing claim request from public claim endpoint fields.
+    /// Build a pairing claim request.
+    ///
+    /// `expected_domain` must come from daemon-side remote configuration.
+    /// `claimed_domain` is the domain sent by the public claim endpoint.
     ///
     /// # Errors
     /// Returns [`RemotePairingError`] when the domains, client id, display name,

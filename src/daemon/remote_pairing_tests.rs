@@ -1,6 +1,6 @@
 use super::{
-    validate_pairing_domain, RemotePairingClaimRequest, RemotePairingCode,
-    RemotePairingRateLimiter, RemotePairingRecord,
+    RemotePairingClaimRequest, RemotePairingCode, RemotePairingRateLimiter, RemotePairingRecord,
+    validate_pairing_domain,
 };
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 
@@ -18,10 +18,12 @@ fn remote_pairing_code_hashes_secret_and_redacts_debug() {
     .expect("pairing record");
 
     assert!(!format!("{code:?}").contains("pairing-secret-value"));
-    assert!(!record
-        .code_hash
-        .as_storage_value()
-        .contains("pairing-secret-value"));
+    assert!(
+        !record
+            .code_hash
+            .as_storage_value()
+            .contains("pairing-secret-value")
+    );
     assert!(record.code_hash.verify(code.expose()));
     assert_eq!(
         record.scopes,
@@ -35,6 +37,23 @@ fn remote_pairing_rejects_wrong_claim_domain() {
         .expect_err("wrong domain rejected");
 
     assert!(error.to_string().contains("wrong remote pairing domain"));
+}
+
+#[test]
+fn remote_pairing_claim_request_separates_config_and_claim_domains() {
+    let claim = RemotePairingClaimRequest::new_for_tests(
+        "daemon.example.com",
+        "claimed.example.com",
+        "client-1",
+        "MacBook Pro",
+        "macos",
+        Some("203.0.113.10"),
+        "audit-claim",
+    )
+    .expect("claim request");
+
+    assert_eq!(claim.expected_domain, "daemon.example.com");
+    assert_eq!(claim.claimed_domain, "claimed.example.com");
 }
 
 #[test]
