@@ -532,6 +532,29 @@ struct PolicyCanvasCommandScrollTests {
     #expect(overlayModifierSource.contains("storedPipelineStateRaw: storedPipelineStateRaw"))
   }
 
+  @Test("frame-resize preservation republishes the settled viewport for the minimap")
+  func frameResizePreservationRepublishesSettledViewport() throws {
+    let nativeScrollViewSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNativeScrollView.swift"
+    )
+    let centeringClipSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasCenteringClipView.swift"
+    )
+    let endPreservation = try sourceFunction(
+      named: "func endViewportFrameResizePreservation()",
+      in: nativeScrollViewSource
+    )
+
+    // Regression guard: the default top-left-pin resize path suppresses viewport
+    // reports for the whole preservation window, then settles. Without a final
+    // report when preservation ends, the minimap viewport indicator keeps the
+    // pre-resize rect, so toggling a side inspector leaves a stale box matching
+    // neither the collapsed nor the expanded pane.
+    #expect(endPreservation.contains("reportViewportStateIfNeeded()"))
+    #expect(centeringClipSource.contains("beginViewportFrameResizePreservation()"))
+    #expect(centeringClipSource.contains("endViewportFrameResizePreservation()"))
+  }
+
   @Test("background deselection lives on the grid layer so component taps win")
   func viewportBackgroundDeselectionLivesOnGridLayer() throws {
     let coordinatorSource = try previewableSourceFile(

@@ -277,6 +277,15 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
 
   func endViewportFrameResizePreservation() {
     isPreservingViewportFrameResize = false
+    // A frame resize - a side inspector opening or closing, a window resize -
+    // changes the visible content rect, but reflectScrolledClipView suppresses
+    // viewport reports for the whole preservation window so the graph does not
+    // jitter mid-resize. The proportional-zoom path re-reports itself; the default
+    // top-left-pin path did not, so the minimap viewport indicator kept rendering
+    // the pre-resize rect - a stale box that matched neither the collapsed nor the
+    // expanded inspector and never tracked the toggle. Publish the settled
+    // viewport now that the new bounds and preserved scroll origin are final.
+    reportViewportStateIfNeeded()
   }
 
   func applyViewportFrameResizeZoomIfNeeded(
