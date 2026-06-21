@@ -20,7 +20,7 @@ use super::control::{
 };
 use super::remote::DaemonRemoteCommand;
 
-/// Local daemon commands used by the macOS Harness app.
+/// Local daemon operations and remote-daemon scaffolding.
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum DaemonCommand {

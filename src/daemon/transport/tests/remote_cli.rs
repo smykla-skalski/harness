@@ -17,7 +17,7 @@ struct DaemonRemoteCommandTestHarness {
 }
 
 #[test]
-fn daemon_remote_serve_args_require_tls_identity_inputs() {
+fn daemon_remote_serve_args_default_tls_alpn_config_is_valid() {
     let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
         "test",
         "--domain",

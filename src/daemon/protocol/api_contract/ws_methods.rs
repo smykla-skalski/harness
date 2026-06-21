@@ -161,6 +161,8 @@ pub const VOICE_APPEND_AUDIO: &str = "voice.append_audio";
 pub const VOICE_APPEND_TRANSCRIPT: &str = "voice.append_transcript";
 pub const VOICE_FINISH_SESSION: &str = "voice.finish_session";
 
+// Keep this slice in sync with every public websocket method constant above.
+// Remote scope coverage iterates this list directly.
 pub const ALL: &[&str] = &[
     PING,
     HEALTH,
