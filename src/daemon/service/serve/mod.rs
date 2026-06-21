@@ -104,6 +104,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let _bridge_watcher = bridge::spawn_manifest_watcher();
     let app_state = DaemonHttpState {
         token,
+        auth_mode: http::DaemonHttpAuthMode::Local,
         sender,
         prepared_sender,
         manifest,

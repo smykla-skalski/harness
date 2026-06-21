@@ -112,6 +112,7 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
 
     DaemonHttpState {
         token: "token".into(),
+        auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
         manifest: sample_manifest("18.2.3", "2026-04-04T00:00:00Z"),
@@ -187,6 +188,7 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
 
     DaemonHttpState {
         token: "token".into(),
+        auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
         sender,
         prepared_sender: broadcast::channel(8).0,
         manifest: sample_manifest(version, started_at),

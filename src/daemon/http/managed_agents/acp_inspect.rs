@@ -72,6 +72,7 @@ mod tests {
         .expect("manifest");
         DaemonHttpState {
             token: "token".into(),
+            auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
             sender: sender.clone(),
             prepared_sender: broadcast::channel(8).0,
             manifest,

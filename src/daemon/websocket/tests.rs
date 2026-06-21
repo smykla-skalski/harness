@@ -61,6 +61,7 @@ pub(super) async fn test_websocket_state_with_empty_async_db(db_path: &Path) -> 
 
     DaemonHttpState {
         token: "token".into(),
+        auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
         manifest,
@@ -120,6 +121,7 @@ pub(super) fn test_websocket_state_with_sync_db_only(db_path: &Path) -> DaemonHt
 
     DaemonHttpState {
         token: "token".into(),
+        auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
         manifest,
