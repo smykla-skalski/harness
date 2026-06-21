@@ -17,6 +17,7 @@ mod mutations;
 mod performance;
 mod projects;
 mod reconcile;
+mod remote_identity;
 mod runtime;
 mod schema;
 mod schema_backfill;
