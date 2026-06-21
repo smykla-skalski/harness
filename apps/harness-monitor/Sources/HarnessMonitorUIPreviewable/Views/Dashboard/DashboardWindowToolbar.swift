@@ -29,10 +29,9 @@ struct DashboardWindowToolbar: ToolbarContent {
     }
 
     if showsPolicyInspectorToggle {
-      ToolbarItem(placement: .primaryAction) {
+      ToolbarItem(placement: .automatic) {
         PolicyCanvasInspectorToolbarButton()
       }
-      ToolbarSpacer(.fixed, placement: .primaryAction)
     }
 
     ToolbarItemGroup(placement: .primaryAction) {
@@ -70,12 +69,8 @@ private struct PolicyCanvasInspectorToolbarButton: View {
     Button {
       policyCanvasInspectorFocus?.dispatcher.performToggleInspector()
     } label: {
-      Label {
-        Text(policyCanvasInspectorButtonTitle)
-      } icon: {
-        Image(systemName: "sidebar.trailing")
-          .frame(width: 14, height: 14)
-      }
+      Image(systemName: "sidebar.trailing")
+        .frame(width: 14, height: 14)
     }
     .disabled(!isToggleEnabled)
     .help(policyCanvasInspectorButtonTitle)
