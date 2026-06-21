@@ -177,8 +177,8 @@ struct PolicyCanvasMinimapGraphCanvas: View, Equatable {
   let colorScheme: ColorScheme
 
   nonisolated static func == (
-    lhs: PolicyCanvasMinimapGraphCanvas,
-    rhs: PolicyCanvasMinimapGraphCanvas
+    lhs: Self,
+    rhs: Self
   ) -> Bool {
     lhs.worldBounds == rhs.worldBounds
       && lhs.minimapSize == rhs.minimapSize
