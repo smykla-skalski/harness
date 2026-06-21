@@ -160,8 +160,9 @@ fn remote_client_for_connection(
 ) -> Option<RemoteStoredClient> {
     connection
         .lock()
-        .ok()
-        .and_then(|connection| connection.remote_client().cloned())
+        .expect("connection lock")
+        .remote_client()
+        .cloned()
 }
 
 fn remote_ws_auth_error_response(request_id: &str, error: RemoteAuthError) -> WsResponse {

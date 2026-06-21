@@ -43,7 +43,7 @@ pub(crate) fn require_auth(
     match state.auth_mode {
         DaemonHttpAuthMode::Local => require_local_auth(headers, state),
         DaemonHttpAuthMode::Remote => {
-            if scoped_remote_client().is_some() {
+            if has_scoped_remote_client() {
                 Ok(())
             } else {
                 verify_remote_client(headers, state).map(|_| ())
@@ -164,6 +164,10 @@ fn verify_and_authorize_http_route(
 
 fn scoped_remote_client() -> Option<RemoteStoredClient> {
     REMOTE_HTTP_CLIENT.try_with(Clone::clone).ok()
+}
+
+fn has_scoped_remote_client() -> bool {
+    REMOTE_HTTP_CLIENT.try_with(|_| ()).is_ok()
 }
 
 fn local_auth_response() -> Response {

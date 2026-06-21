@@ -8,6 +8,7 @@ use rusqlite::Connection;
 use serde_json::json;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
+use tokio::time::{Duration, timeout};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message};
@@ -417,25 +418,29 @@ where
         + Stream<Item = Result<Message, WebSocketError>>
         + Unpin,
 {
-    socket
-        .send(Message::Text(
-            json!({ "id": id, "method": method, "params": {} })
-                .to_string()
-                .into(),
-        ))
-        .await
-        .expect("send websocket request");
-    while let Some(frame) = socket.next().await {
-        let frame = frame.expect("read websocket frame");
-        let Message::Text(text) = frame else {
-            continue;
-        };
-        let value = serde_json::from_str::<serde_json::Value>(&text).expect("websocket json");
-        if value["id"].as_str() == Some(id) {
-            return value;
+    timeout(Duration::from_secs(5), async {
+        socket
+            .send(Message::Text(
+                json!({ "id": id, "method": method, "params": {} })
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .expect("send websocket request");
+        while let Some(frame) = socket.next().await {
+            let frame = frame.expect("read websocket frame");
+            let Message::Text(text) = frame else {
+                continue;
+            };
+            let value = serde_json::from_str::<serde_json::Value>(&text).expect("websocket json");
+            if value["id"].as_str() == Some(id) {
+                return value;
+            }
         }
-    }
-    panic!("missing websocket response for {id}");
+        panic!("missing websocket response for {id}");
+    })
+    .await
+    .expect("timed out waiting for websocket response")
 }
 
 async fn serve_http(state: crate::daemon::http::DaemonHttpState) -> (String, JoinHandle<()>) {

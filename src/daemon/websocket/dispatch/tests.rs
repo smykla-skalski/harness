@@ -5,6 +5,7 @@ use crate::daemon::protocol::ws_methods;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::{RemoteStoredClient, RemoteTokenHash};
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 #[test]
 fn websocket_activity_logging_uses_debug_level() {
@@ -93,6 +94,22 @@ async fn remote_ws_dispatch_preserves_unknown_method_errors() {
     assert_eq!(error.code, "UNKNOWN_METHOD");
     assert!(error.message.contains("remote.unscoped"));
     assert_eq!(error.status_code, None);
+}
+
+#[test]
+#[should_panic(expected = "connection lock")]
+fn remote_ws_dispatch_panics_on_poisoned_connection_lock() {
+    let connection = Arc::new(Mutex::new(ConnectionState::new()));
+    let poisoned_connection = Arc::clone(&connection);
+    let _ = thread::spawn(move || {
+        let _guard = poisoned_connection
+            .lock()
+            .expect("poison test connection lock");
+        panic!("poison websocket connection state");
+    })
+    .join();
+
+    let _ = remote_client_for_connection(&connection);
 }
 
 fn ws_request(id: &str, method: &str) -> WsRequest {
