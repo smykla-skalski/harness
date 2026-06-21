@@ -27,11 +27,22 @@ fn remote_bearer_credentials_require_client_id_and_bearer_token() {
         RemoteAuthError::MissingBearerToken
     );
 
-    let mut non_bearer = missing_bearer;
+    let mut non_bearer = missing_bearer.clone();
     non_bearer.insert(AUTHORIZATION, HeaderValue::from_static("Basic abc"));
     assert_eq!(
+        RemoteBearerCredentials::from_headers(&non_bearer).expect_err("non-bearer").status_code(),
+        401
+    );
+    assert_eq!(
         RemoteBearerCredentials::from_headers(&non_bearer).expect_err("non-bearer"),
-        RemoteAuthError::MissingBearerToken
+        RemoteAuthError::InvalidBearerToken
+    );
+
+    let mut blank_bearer = missing_bearer;
+    blank_bearer.insert(AUTHORIZATION, HeaderValue::from_static("Bearer "));
+    assert_eq!(
+        RemoteBearerCredentials::from_headers(&blank_bearer).expect_err("blank bearer"),
+        RemoteAuthError::InvalidBearerToken
     );
 }
 

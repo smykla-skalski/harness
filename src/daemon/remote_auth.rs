@@ -40,13 +40,22 @@ impl RemoteBearerCredentials {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .ok_or(RemoteAuthError::MissingClientId)?;
-        let token = headers
+        let authorization = headers
             .get(AUTHORIZATION)
             .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.strip_prefix("Bearer "))
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .ok_or(RemoteAuthError::MissingBearerToken)?;
+        let (scheme, token) = authorization
+            .split_once(char::is_whitespace)
+            .ok_or(RemoteAuthError::InvalidBearerToken)?;
+        if !scheme.eq_ignore_ascii_case("Bearer") {
+            return Err(RemoteAuthError::InvalidBearerToken);
+        }
+        let token = token.trim();
+        if token.is_empty() {
+            return Err(RemoteAuthError::InvalidBearerToken);
+        }
         Ok(Self {
             client_id: client_id.to_string(),
             token: token.to_string(),
