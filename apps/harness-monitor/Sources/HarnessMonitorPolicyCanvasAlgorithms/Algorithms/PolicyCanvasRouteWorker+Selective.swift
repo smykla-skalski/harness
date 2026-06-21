@@ -1,5 +1,10 @@
 import SwiftUI
 
+// NOTE 2026-06-21: the live drag display crossing the user reported was NOT a
+// drag-path defect. The full converged routeComputation (the drop geometry)
+// itself leaves non-incident wires through a node dropped into a dense bundle;
+// body-hit repair now runs in the full path too (see routeComputationRepaired
+// Terminals). The selective backstop below stays as a guard for the live frame.
 extension PolicyCanvasPreparedRouteInput {
   /// True when `edgeID` is in repair scope. A `nil` scope means the whole graph
   /// is in scope (first paint, drop, and every existing caller), so the repair

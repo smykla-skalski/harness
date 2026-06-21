@@ -203,8 +203,21 @@ extension PolicyCanvasPreparedRouteInput {
       router: selectedRouter,
       algorithms: algorithms
     )
-    let finalRoutes = routesReachingRenderedPorts(
+    // Clear any wire left crossing a node body. The converged pass trusts the
+    // per-edge router to avoid obstacles, but a node dropped into a dense wire
+    // bundle can leave non-incident edges cutting through its body - the router
+    // could not thread them on the first solve. Re-route just the hitting edges
+    // against the settled markers and full obstacle set; this early-returns on a
+    // clean graph (no body hits), so first paint and ordinary layouts pay
+    // nothing.
+    let bodySafeRoutes = precomputedRoutesRepairingBodyHits(
       routes: leadRestoredRoutes,
+      nodeIndex: nodeIndex,
+      router: selectedRouter,
+      algorithms: algorithms
+    )
+    let finalRoutes = routesReachingRenderedPorts(
+      routes: bodySafeRoutes,
       nodeIndex: nodeIndex
     )
     let portMarkerLayout = precomputedRouteTerminalPortMarkerLayout(
@@ -297,12 +310,26 @@ extension PolicyCanvasPreparedRouteInput {
     )
     var repaired = routes
     for edge in edges where hitEdgeIDs.contains(edge.id) {
-      guard let route = selectedRoutes[edge.id],
+      if let route = selectedRoutes[edge.id],
         precomputedBodyHits(edge: edge, route: route, nodeIndex: nodeIndex).isEmpty
-      else {
+      {
+        repaired[edge.id] = route
         continue
       }
-      repaired[edge.id] = route
+      // The standard re-route still cuts through a body. Escalate to a
+      // guaranteed orthogonal go-around before giving up: the visibility A* can
+      // miss the clear path that exists when a node is dropped onto an open-lane
+      // wire, and keeping the crossing route leaves the wire behind the body
+      // even after the drop. Prefer the re-routed candidate as the go-around
+      // seed (it carries the settled port sides); fall back to the existing
+      // crossing route's terminals when the re-route is absent.
+      let crossing = selectedRoutes[edge.id] ?? repaired[edge.id]
+      if let crossing,
+        let detoured = policyCanvasBodyHitGoAroundRoute(
+          edge: edge, crossingRoute: crossing, nodeIndex: nodeIndex)
+      {
+        repaired[edge.id] = detoured
+      }
     }
     return repaired
   }
