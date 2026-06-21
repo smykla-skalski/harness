@@ -15,7 +15,7 @@ extension PolicyCanvasNativeScrollView {
     expandAdaptiveWorkspaceIfNeeded()
   }
 
-  func visibleContentCenterToPreserve() -> CGPoint? {
+  func visibleContentTopLeftToPreserve() -> CGPoint? {
     guard
       let adaptiveWorkspaceLayout,
       contentView.bounds.width > 1,
@@ -24,25 +24,24 @@ extension PolicyCanvasNativeScrollView {
     else {
       return nil
     }
-    return visibleContentCenter(in: adaptiveWorkspaceLayout)
+    return visibleContentTopLeft(in: adaptiveWorkspaceLayout)
   }
 
-  func visibleContentCenter(
+  func visibleContentTopLeft(
     in workspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout
   ) -> CGPoint {
-    let visibleContentRect = workspaceLayout.contentRect(forWorkspaceRect: visibleWorkspaceRect)
-    return CGPoint(x: visibleContentRect.midX, y: visibleContentRect.midY)
+    workspaceLayout.contentRect(forWorkspaceRect: visibleWorkspaceRect).origin
   }
 
-  func scrollToPreserveContentCenter(
-    _ contentCenter: CGPoint,
+  // Pin the visible top-left content point across a viewport resize or document
+  // rebuild rather than the center: the canvas pane shrinks/grows from its
+  // bottom-right edge, so anchoring the center slides the graph sideways when a
+  // side pane toggles. Anchoring the top-left keeps it visually still.
+  func scrollToPreserveContentTopLeft(
+    _ contentTopLeft: CGPoint,
     in workspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout
   ) {
-    let workspaceCenter = workspaceLayout.workspacePoint(forContentPoint: contentCenter)
-    let targetOrigin = CGPoint(
-      x: workspaceCenter.x - (contentView.bounds.width / 2),
-      y: workspaceCenter.y - (contentView.bounds.height / 2)
-    )
+    let targetOrigin = workspaceLayout.workspacePoint(forContentPoint: contentTopLeft)
     guard
       abs(contentView.bounds.origin.x - targetOrigin.x) > 0.5
         || abs(contentView.bounds.origin.y - targetOrigin.y) > 0.5
@@ -55,11 +54,11 @@ extension PolicyCanvasNativeScrollView {
     isPreservingViewportCenter = false
   }
 
-  func scrollToPreserveContentCenterIfPossible(_ contentCenter: CGPoint) {
+  func scrollToPreserveContentTopLeftIfPossible(_ contentTopLeft: CGPoint) {
     guard let adaptiveWorkspaceLayout else {
       return
     }
-    scrollToPreserveContentCenter(contentCenter, in: adaptiveWorkspaceLayout)
+    scrollToPreserveContentTopLeft(contentTopLeft, in: adaptiveWorkspaceLayout)
   }
 
   func scrollToPreserveContentAnchor(

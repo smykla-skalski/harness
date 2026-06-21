@@ -292,8 +292,8 @@ extension PolicyCanvasCommandScrollTests {
   }
 
   @MainActor
-  @Test("native scroll view preserves the visible center when the viewport size changes")
-  func nativeScrollViewPreservesTheVisibleCenterWhenTheViewportSizeChanges() {
+  @Test("native scroll view preserves the visible top-left when the viewport size changes")
+  func nativeScrollViewPreservesTheVisibleTopLeftWhenTheViewportSizeChanges() {
     let initialFrame = CGRect(x: 0, y: 0, width: 640, height: 480)
     let resizedFrame = CGRect(x: 0, y: 0, width: 860, height: 620)
     let rootView = NSView(frame: initialFrame)
@@ -324,16 +324,18 @@ extension PolicyCanvasCommandScrollTests {
 
     let initialResult = scrollView.applyScrollRequest(CGPoint(x: 900, y: 700))
     #expect(initialResult == .applied(true))
-    let initialCenter = scrollView.visibleDocumentCenter
+    let initialOrigin = scrollView.visibleWorkspaceRect.origin
     let initialZoom = scrollView.magnification
 
     window.setContentSize(resizedFrame.size)
     window.layoutIfNeeded()
     rootView.layoutSubtreeIfNeeded()
 
-    let resizedCenter = scrollView.visibleDocumentCenter
-    #expect(abs(resizedCenter.x - initialCenter.x) < 1.5)
-    #expect(abs(resizedCenter.y - initialCenter.y) < 1.5)
+    // The pane grows from its bottom-right edge, so the visible top-left stays
+    // put; preserving the center would slide the document sideways.
+    let resizedOrigin = scrollView.visibleWorkspaceRect.origin
+    #expect(abs(resizedOrigin.x - initialOrigin.x) < 1.5)
+    #expect(abs(resizedOrigin.y - initialOrigin.y) < 1.5)
     #expect(scrollView.magnification == initialZoom)
   }
 
@@ -393,8 +395,8 @@ extension PolicyCanvasCommandScrollTests {
   }
 
   @MainActor
-  @Test("hosted policy canvas preserves the visible content center when the window resizes")
-  func hostedPolicyCanvasPreservesTheVisibleContentCenterWhenTheWindowResizes() async throws {
+  @Test("hosted policy canvas preserves the visible content top-left when the window resizes")
+  func hostedPolicyCanvasPreservesTheVisibleContentTopLeftWhenTheWindowResizes() async throws {
     let initialFrame = CGRect(x: 0, y: 0, width: 940, height: 660)
     let resizedFrame = CGRect(x: 0, y: 0, width: 1_320, height: 920)
     let viewModel = PolicyCanvasViewModel.liveStartupState(
@@ -441,7 +443,7 @@ extension PolicyCanvasCommandScrollTests {
     host.layoutSubtreeIfNeeded()
 
     let initialViewportSize = scrollView.contentView.bounds.size
-    let initialContentCenter = try visibleContentCenter(in: scrollView)
+    let initialContentTopLeft = try visibleContentTopLeft(in: scrollView)
 
     window.setContentSize(resizedFrame.size)
     #expect(
@@ -453,20 +455,20 @@ extension PolicyCanvasCommandScrollTests {
       }
     )
 
-    let resizedContentCenter = try visibleContentCenter(in: scrollView)
+    let resizedContentTopLeft = try visibleContentTopLeft(in: scrollView)
     #expect(
-      abs(resizedContentCenter.x - initialContentCenter.x) < 1.5,
-      "Expected x center \(initialContentCenter.x), got \(resizedContentCenter.x)"
+      abs(resizedContentTopLeft.x - initialContentTopLeft.x) < 1.5,
+      "Expected x top-left \(initialContentTopLeft.x), got \(resizedContentTopLeft.x)"
     )
     #expect(
-      abs(resizedContentCenter.y - initialContentCenter.y) < 1.5,
-      "Expected y center \(initialContentCenter.y), got \(resizedContentCenter.y)"
+      abs(resizedContentTopLeft.y - initialContentTopLeft.y) < 1.5,
+      "Expected y top-left \(initialContentTopLeft.y), got \(resizedContentTopLeft.y)"
     )
   }
 
   @MainActor
-  @Test("adaptive hosted scroll view preserves content center during first viewport growth")
-  func adaptiveHostedScrollViewPreservesContentCenterDuringFirstViewportGrowth() throws {
+  @Test("adaptive hosted scroll view preserves content top-left during first viewport growth")
+  func adaptiveHostedScrollViewPreservesContentTopLeftDuringFirstViewportGrowth() throws {
     let initialFrame = CGRect(x: 0, y: 0, width: 640, height: 480)
     let resizedFrame = CGRect(x: 0, y: 0, width: 1_600, height: 1_120)
     let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
@@ -498,28 +500,28 @@ extension PolicyCanvasCommandScrollTests {
         forContentPoint: CGPoint(x: 700, y: 520)
       )
     )
-    let initialContentCenter = try visibleContentCenter(in: scrollView)
+    let initialContentTopLeft = try visibleContentTopLeft(in: scrollView)
 
     window.setContentSize(resizedFrame.size)
     window.layoutIfNeeded()
     scrollView.layoutSubtreeIfNeeded()
     scrollView.ensureDocumentRoot(state: state, size: state.snapshot.contentSize)
 
-    let resizedContentCenter = try visibleContentCenter(in: scrollView)
+    let resizedContentTopLeft = try visibleContentTopLeft(in: scrollView)
     let documentView = try #require(scrollView.documentView as? PolicyCanvasNativeDocumentView)
     let workspaceLayout = documentView.hostedState.workspaceLayout
     let debugMessage = """
-      initialCenter=\(initialContentCenter) resizedCenter=\(resizedContentCenter) \
+      initialTopLeft=\(initialContentTopLeft) resizedTopLeft=\(resizedContentTopLeft) \
       clipBounds=\(scrollView.contentView.bounds) \
       contentOrigin=\(workspaceLayout.contentOrigin) workspaceSize=\(workspaceLayout.workspaceSize)
       """
     #expect(
-      abs(resizedContentCenter.x - initialContentCenter.x) < 1.5,
-      "Expected x center \(initialContentCenter.x), got \(resizedContentCenter.x); \(debugMessage)"
+      abs(resizedContentTopLeft.x - initialContentTopLeft.x) < 1.5,
+      "Expected x top-left \(initialContentTopLeft.x), got \(resizedContentTopLeft.x); \(debugMessage)"
     )
     #expect(
-      abs(resizedContentCenter.y - initialContentCenter.y) < 1.5,
-      "Expected y center \(initialContentCenter.y), got \(resizedContentCenter.y); \(debugMessage)"
+      abs(resizedContentTopLeft.y - initialContentTopLeft.y) < 1.5,
+      "Expected y top-left \(initialContentTopLeft.y), got \(resizedContentTopLeft.y); \(debugMessage)"
     )
   }
 
@@ -1244,9 +1246,8 @@ private func waitForNativeScrollView(
 }
 
 @MainActor
-private func visibleContentCenter(in scrollView: PolicyCanvasNativeScrollView) throws -> CGPoint {
-  let rect = try visibleContentRect(in: scrollView)
-  return CGPoint(x: rect.midX, y: rect.midY)
+private func visibleContentTopLeft(in scrollView: PolicyCanvasNativeScrollView) throws -> CGPoint {
+  try visibleContentRect(in: scrollView).origin
 }
 
 @MainActor

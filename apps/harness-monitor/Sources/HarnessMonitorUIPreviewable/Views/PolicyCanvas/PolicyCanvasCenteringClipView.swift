@@ -28,10 +28,13 @@ final class PolicyCanvasCenteringClipView: NSClipView {
 
   override func setFrameSize(_ newSize: NSSize) {
     let previousFrameSize = frame.size
+    let preservedOrigin: CGPoint?
     let preservedCenter: CGPoint?
     if bounds.width > 1, bounds.height > 1, documentView != nil {
+      preservedOrigin = bounds.origin
       preservedCenter = CGPoint(x: bounds.midX, y: bounds.midY)
     } else {
+      preservedOrigin = nil
       preservedCenter = nil
     }
 
@@ -43,28 +46,34 @@ final class PolicyCanvasCenteringClipView: NSClipView {
 
     super.setFrameSize(newSize)
 
-    guard let preservedCenter else {
-      return
-    }
-    if scrollView?.applyViewportFrameResizeZoomIfNeeded(
-      from: previousFrameSize,
-      to: newSize,
-      centeredAt: preservedCenter
-    ) == true {
+    // Proportional-scale viewports (the minimap preview) zoom the content around
+    // the preserved center and own the post-resize scroll themselves.
+    if let preservedCenter,
+      scrollView?.applyViewportFrameResizeZoomIfNeeded(
+        from: previousFrameSize,
+        to: newSize,
+        centeredAt: preservedCenter
+      ) == true
+    {
       return
     }
 
-    let targetOrigin = CGPoint(
-      x: preservedCenter.x - (bounds.width / 2),
-      y: preservedCenter.y - (bounds.height / 2)
-    )
+    // Default canvas: pin the visible top-left, not the center. The pane is
+    // anchored at its top-left and only changes size from the bottom-right edge
+    // (a side inspector opening, a window resize), so preserving the center slid
+    // the whole graph sideways every time the pane width changed. Holding the
+    // origin keeps the graph visually still; constrainBoundsRect still clamps it
+    // back inside the document when the viewport overhangs the content.
+    guard let preservedOrigin else {
+      return
+    }
     guard
-      abs(bounds.origin.x - targetOrigin.x) > 0.5
-        || abs(bounds.origin.y - targetOrigin.y) > 0.5
+      abs(bounds.origin.x - preservedOrigin.x) > 0.5
+        || abs(bounds.origin.y - preservedOrigin.y) > 0.5
     else {
       return
     }
-    scroll(to: targetOrigin)
+    scroll(to: preservedOrigin)
   }
 
   override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {

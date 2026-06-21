@@ -118,8 +118,8 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
       && documentView != nil
     let canPreserveVisibleContent =
       hadStableViewport && adaptiveWorkspaceLayout?.contentSize == size
-    let preservedContentCenter =
-      canPreserveVisibleContent ? visibleContentCenterToPreserve() : nil
+    let preservedContentTopLeft =
+      canPreserveVisibleContent ? visibleContentTopLeftToPreserve() : nil
     let wasAdaptiveExpansionArmed = adaptiveExpansionArmed
     let workspaceLayout = policyCanvasAdaptiveWorkspaceLayout(
       current: adaptiveWorkspaceLayoutForCurrentViewport(
@@ -143,16 +143,16 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
       hostedDocumentView = newDocumentView
     }
     hostedDocumentView.updateSize(workspaceLayout.workspaceSize)
-    if let preservedContentCenter {
-      scrollToPreserveContentCenter(preservedContentCenter, in: workspaceLayout)
+    if let preservedContentTopLeft {
+      scrollToPreserveContentTopLeft(preservedContentTopLeft, in: workspaceLayout)
     }
-    if preservedContentCenter != nil {
+    if preservedContentTopLeft != nil {
       adaptiveExpansionArmed = false
     }
     reflectDocumentRootUpdate(
-      shouldExpand: wasAdaptiveExpansionArmed && preservedContentCenter == nil)
-    if let preservedContentCenter {
-      scrollToPreserveContentCenterIfPossible(preservedContentCenter)
+      shouldExpand: wasAdaptiveExpansionArmed && preservedContentTopLeft == nil)
+    if let preservedContentTopLeft {
+      scrollToPreserveContentTopLeftIfPossible(preservedContentTopLeft)
     }
     markDocumentRootLaidOutIfPossible()
     reportViewportStateIfNeeded()
