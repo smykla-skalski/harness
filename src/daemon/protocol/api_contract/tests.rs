@@ -1,4 +1,5 @@
 use super::*;
+use crate::daemon::remote::{RemoteAccessScope, remote_http_scopes, remote_ws_scopes};
 use std::collections::BTreeSet;
 
 #[test]
@@ -52,6 +53,51 @@ fn config_route_is_swift_exposed_rpc() {
         HttpRouteParity::Rpc { ws_method } => assert_eq!(ws_method, ws_methods::CONFIG),
         HttpRouteParity::Exempt { .. } => panic!("config route must use websocket parity"),
     }
+}
+
+#[test]
+fn every_http_route_has_remote_scope_contract() {
+    for route in HTTP_API_CONTRACT.iter() {
+        assert!(
+            remote_http_scopes(route).is_some(),
+            "{} {} should declare remote auth scopes",
+            route.method.as_str(),
+            route.path
+        );
+    }
+}
+
+#[test]
+fn every_declared_ws_method_has_remote_scope_contract() {
+    for method in declared_ws_method_literals() {
+        assert!(
+            remote_ws_scopes(method).is_some(),
+            "{method} should declare remote auth scopes"
+        );
+    }
+}
+
+#[test]
+fn remote_viewer_scope_is_read_only() {
+    let viewer_scopes =
+        crate::daemon::remote::scopes_for_role(crate::daemon::remote::RemoteRole::Viewer);
+
+    assert!(viewer_scopes.contains(&RemoteAccessScope::Read));
+    assert!(!viewer_scopes.contains(&RemoteAccessScope::Write));
+    assert!(!viewer_scopes.contains(&RemoteAccessScope::Admin));
+}
+
+fn declared_ws_method_literals() -> BTreeSet<&'static str> {
+    include_str!("ws_methods.rs")
+        .split("pub const ")
+        .skip(1)
+        .filter_map(|line| {
+            let (_, rhs) = line.split_once('=')?;
+            let (_, value) = rhs.split_once('"')?;
+            let (value, _) = value.split_once('"')?;
+            Some(value)
+        })
+        .collect()
 }
 
 #[test]

@@ -33,6 +33,35 @@ fn parse_daemon_dev() {
 }
 
 #[test]
+fn parse_daemon_remote_serve() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "daemon",
+        "remote",
+        "serve",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+    ])
+    .unwrap();
+
+    match cli.command {
+        Command::Daemon {
+            command: DaemonCommand::Remote { command },
+        } => match command {
+            crate::daemon::transport::DaemonRemoteCommand::Serve(args) => {
+                assert_eq!(args.domain, "daemon.example.com");
+                assert_eq!(args.host, "0.0.0.0");
+                assert_eq!(args.https_port, 443);
+            }
+            other => panic!("expected daemon remote serve, got {other:?}"),
+        },
+        _ => panic!("expected daemon remote command"),
+    }
+}
+
+#[test]
 fn parse_daemon_restart_json_flag() {
     for (argv, expected_json) in [
         (vec!["harness", "daemon", "restart"], false),
