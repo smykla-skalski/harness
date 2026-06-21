@@ -40,6 +40,15 @@ fn remote_tls_acme_plan_rejects_blank_persisted_account_id() {
 }
 
 #[test]
+fn remote_tls_acme_plan_reports_missing_certificate_after_account_state_loads() {
+    let state = RemoteAcmeRuntimeState::with_account("acct-1");
+    let error = build_remote_acme_runtime_plan(&tls_alpn_config(), &state)
+        .expect_err("account-only ACME state should fail on missing certificate");
+
+    assert!(error.to_string().contains("persisted TLS certificate"));
+}
+
+#[test]
 fn remote_tls_acme_plan_rejects_blank_persisted_certificate_material() {
     let state = RemoteAcmeRuntimeState::with_account_and_certificate(
         "acct-1",

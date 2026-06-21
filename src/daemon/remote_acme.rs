@@ -53,6 +53,14 @@ pub struct RemoteAcmeRuntimeState {
 
 impl RemoteAcmeRuntimeState {
     #[must_use]
+    pub fn with_account(account_id: impl Into<String>) -> Self {
+        Self {
+            acme_account_id: Some(account_id.into()),
+            certificate: None,
+        }
+    }
+
+    #[must_use]
     pub fn with_account_and_certificate(
         account_id: impl Into<String>,
         certificate: RemoteCertificateBundle,
