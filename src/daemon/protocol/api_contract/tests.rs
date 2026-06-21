@@ -88,6 +88,14 @@ fn remote_viewer_scope_is_read_only() {
 }
 
 #[test]
+fn reviews_files_patch_remote_scope_is_read_only() {
+    let scopes = remote_ws_scopes(ws_methods::REVIEWS_FILES_PATCH)
+        .expect("reviews files patch should declare remote scopes");
+
+    assert_eq!(scopes, &[RemoteAccessScope::Read]);
+}
+
+#[test]
 fn audit_events_route_is_swift_exposed_rpc() {
     let route = HTTP_API_CONTRACT
         .iter()
