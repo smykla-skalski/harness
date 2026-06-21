@@ -1,6 +1,6 @@
 use std::{error::Error, fmt};
 
-use axum::http::{HeaderMap, header::AUTHORIZATION};
+use axum::http::{HeaderMap, StatusCode, header::AUTHORIZATION};
 
 use super::protocol::{HttpApiRouteContract, http_paths};
 use super::remote::{RemoteAccessScope, remote_http_scopes, remote_ws_scopes};
@@ -84,10 +84,12 @@ pub enum RemoteAuthError {
 
 impl RemoteAuthError {
     #[must_use]
-    pub const fn status_code(self) -> u16 {
+    pub const fn status_code(self) -> StatusCode {
         match self {
-            Self::MissingClientId | Self::MissingBearerToken | Self::InvalidBearerToken => 401,
-            Self::MissingScopeContract | Self::InsufficientScope => 403,
+            Self::MissingClientId | Self::MissingBearerToken | Self::InvalidBearerToken => {
+                StatusCode::UNAUTHORIZED
+            }
+            Self::MissingScopeContract | Self::InsufficientScope => StatusCode::FORBIDDEN,
         }
     }
 }

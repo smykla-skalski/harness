@@ -1,4 +1,4 @@
-use axum::http::{HeaderMap, HeaderValue, header::AUTHORIZATION};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
 
 use super::{
     REMOTE_CLIENT_ID_HEADER, RemoteAuthError, RemoteAuthTarget, RemoteBearerCredentials,
@@ -30,8 +30,12 @@ fn remote_bearer_credentials_require_client_id_and_bearer_token() {
     let mut non_bearer = missing_bearer.clone();
     non_bearer.insert(AUTHORIZATION, HeaderValue::from_static("Basic abc"));
     assert_eq!(
-        RemoteBearerCredentials::from_headers(&non_bearer).expect_err("non-bearer").status_code(),
-        401
+        typed_status(
+            RemoteBearerCredentials::from_headers(&non_bearer)
+                .expect_err("non-bearer")
+                .status_code()
+        ),
+        StatusCode::UNAUTHORIZED
     );
     assert_eq!(
         RemoteBearerCredentials::from_headers(&non_bearer).expect_err("non-bearer"),
@@ -116,7 +120,7 @@ fn remote_http_authz_denies_insufficient_scope_with_403() {
         authorize_remote_http_route(&viewer, telemetry).expect_err("viewer cannot write telemetry");
 
     assert_eq!(error, RemoteAuthError::InsufficientScope);
-    assert_eq!(error.status_code(), 403);
+    assert_eq!(typed_status(error.status_code()), StatusCode::FORBIDDEN);
 }
 
 #[test]
@@ -169,7 +173,11 @@ fn remote_authz_fails_closed_when_scope_contract_is_missing() {
         authorize_remote_ws_method(&admin, "remote.unscoped").expect_err("unscoped method denied");
 
     assert_eq!(error, RemoteAuthError::MissingScopeContract);
-    assert_eq!(error.status_code(), 403);
+    assert_eq!(typed_status(error.status_code()), StatusCode::FORBIDDEN);
+}
+
+fn typed_status(status: StatusCode) -> StatusCode {
+    status
 }
 
 fn http_route(path: &str) -> &'static crate::daemon::protocol::HttpApiRouteContract {
