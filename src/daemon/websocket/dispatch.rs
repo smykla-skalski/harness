@@ -1,7 +1,12 @@
 use super::connection::ConnectionState;
-use super::frames::{error_response, serialize_error_response_frames, serialize_response_frames};
-use crate::daemon::http::DaemonHttpState;
-use crate::daemon::protocol::{WsRequest, WsResponse};
+use super::frames::{
+    error_response, error_response_with_payload, serialize_error_response_frames,
+    serialize_response_frames,
+};
+use crate::daemon::http::{DaemonHttpAuthMode, DaemonHttpState};
+use crate::daemon::protocol::{WsErrorPayload, WsRequest, WsResponse, ws_methods};
+use crate::daemon::remote_auth::{RemoteAuthError, authorize_remote_ws_method};
+use crate::daemon::remote_identity::RemoteStoredClient;
 use crate::telemetry::{
     TelemetryBaggage, apply_parent_context_from_text_map, current_trace_id, with_active_baggage,
 };
@@ -114,6 +119,9 @@ async fn dispatch_inner(
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> WsResponse {
+    if let Some(response) = authorize_remote_ws_request(request, state, connection) {
+        return response;
+    }
     if let Some(response) = routing::dispatch_known_method(request, state, connection).await {
         return response;
     }
@@ -121,6 +129,51 @@ async fn dispatch_inner(
         &request.id,
         "UNKNOWN_METHOD",
         &format!("unknown method: {}", request.method),
+    )
+}
+
+fn authorize_remote_ws_request(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> Option<WsResponse> {
+    if state.auth_mode == DaemonHttpAuthMode::Local || !is_declared_ws_method(&request.method) {
+        return None;
+    }
+    let Some(client) = remote_client_for_connection(connection) else {
+        return Some(remote_ws_auth_error_response(
+            &request.id,
+            RemoteAuthError::MissingClientId,
+        ));
+    };
+    authorize_remote_ws_method(&client, &request.method)
+        .err()
+        .map(|error| remote_ws_auth_error_response(&request.id, error))
+}
+
+fn is_declared_ws_method(method: &str) -> bool {
+    ws_methods::ALL.contains(&method)
+}
+
+fn remote_client_for_connection(
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> Option<RemoteStoredClient> {
+    connection
+        .lock()
+        .ok()
+        .and_then(|connection| connection.remote_client().cloned())
+}
+
+fn remote_ws_auth_error_response(request_id: &str, error: RemoteAuthError) -> WsResponse {
+    error_response_with_payload(
+        request_id,
+        WsErrorPayload {
+            code: "REMOTE_AUTH".to_string(),
+            message: error.to_string(),
+            details: Vec::new(),
+            status_code: Some(error.status_code().as_u16()),
+            data: None,
+        },
     )
 }
 

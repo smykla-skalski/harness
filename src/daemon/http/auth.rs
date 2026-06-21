@@ -43,10 +43,26 @@ pub(crate) fn require_auth(
     match state.auth_mode {
         DaemonHttpAuthMode::Local => require_local_auth(headers, state),
         DaemonHttpAuthMode::Remote => {
-            if has_scoped_remote_client() {
+            if scoped_remote_client().is_some() {
                 Ok(())
             } else {
                 verify_remote_client(headers, state).map(|_| ())
+            }
+        }
+    }
+}
+
+pub(crate) fn websocket_remote_client(
+    headers: &HeaderMap,
+    state: &DaemonHttpState,
+) -> Result<Option<RemoteStoredClient>, Box<Response>> {
+    match state.auth_mode {
+        DaemonHttpAuthMode::Local => require_local_auth(headers, state).map(|()| None),
+        DaemonHttpAuthMode::Remote => {
+            if let Some(client) = scoped_remote_client() {
+                Ok(Some(client))
+            } else {
+                verify_remote_client(headers, state).map(Some)
             }
         }
     }
@@ -146,8 +162,8 @@ fn verify_and_authorize_http_route(
         .map_err(|error| Box::new(remote_auth_error_response(error)))
 }
 
-fn has_scoped_remote_client() -> bool {
-    REMOTE_HTTP_CLIENT.try_with(|_| ()).is_ok()
+fn scoped_remote_client() -> Option<RemoteStoredClient> {
+    REMOTE_HTTP_CLIENT.try_with(Clone::clone).ok()
 }
 
 fn local_auth_response() -> Response {
