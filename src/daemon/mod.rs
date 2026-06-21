@@ -37,6 +37,7 @@ pub mod protocol;
 pub mod remote;
 pub mod remote_acme;
 pub mod remote_identity;
+pub mod remote_pairing;
 pub mod service;
 pub mod snapshot;
 pub mod state;

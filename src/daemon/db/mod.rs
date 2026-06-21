@@ -57,6 +57,7 @@ mod imports;
 mod policy;
 mod rebuild;
 mod remote_identity;
+mod remote_pairing;
 mod review_writes;
 mod runtime;
 mod schema;
