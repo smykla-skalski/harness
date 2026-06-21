@@ -171,7 +171,9 @@ struct DashboardAuditRouteView: View {
         failureMessage: "Could not copy visible audit rows to the clipboard."
       )
     } catch {
-      store.presentFailureFeedback("Could not copy visible audit rows: \(error.localizedDescription)")
+      store.presentFailureFeedback(
+        "Could not copy visible audit rows: \(error.localizedDescription)"
+      )
     }
   }
 
