@@ -335,8 +335,17 @@ extension PolicyCanvasViewModel {
     guard documentGeneration == saveGeneration else {
       // Edited mid-round-trip: a follow-up save is queued, so leave the pill on
       // its in-flight `.saving` state (the re-arm flips it to `.pending`).
-      // Flashing "Saved" here would lie about the diverged live graph. Record
-      // the daemon's bumped revision so its echo is not read as a remote change.
+      // Flashing "Saved" here would lie about the diverged live graph. Adopt the
+      // saved document as the new clean baseline at the daemon's bumped revision:
+      // the queued follow-up exports its `if_revision` from `backingDocument`, so
+      // without advancing it the next save carries the pre-save revision and the
+      // daemon rejects it as a concurrent edit (WORKFLOW_CONCURRENT - the error a
+      // continuous node drag hits within a couple of save windows). Recording the
+      // revision also keeps the daemon's echo from reading as a remote change.
+      // `documentDirty` stays true: the live graph diverged from this baseline,
+      // so the follow-up still has real edits to persist.
+      backingDocument = savedDocument
+      markLoadedDocumentRevision(savedDocument.revision)
       lastSelfSavedRevision = savedDocument.revision
       return true
     }

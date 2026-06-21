@@ -111,6 +111,28 @@ struct PolicyCanvasSaveAdoptionTests {
     #expect(viewModel.lastSelfSavedRevision == 6)
   }
 
+  @Test("a concurrent edit advances the backing revision so the follow-up if_revision is current")
+  func concurrentEditAdvancesBackingRevision() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: policyDocument(revision: 5), simulation: nil, audit: nil)
+    let sent = viewModel.exportDocument()
+    let saveGeneration = viewModel.documentGeneration
+    var daemonSaved = sent
+    daemonSaved.revision = 6
+    // User keeps editing during the round-trip (a continuous node drag bumps the
+    // generation every tick), so the save lands diverged.
+    viewModel.createNode(kind: .condition, at: CGPoint(x: 300, y: 300))
+
+    _ = viewModel.resolveSuccessfulSave(saveGeneration: saveGeneration, savedDocument: daemonSaved)
+
+    // The re-armed follow-up save exports at backingDocument.revision for its
+    // if_revision. It must be the daemon's bumped revision (6), not the stale
+    // pre-save revision (5) - otherwise the daemon rejects the queued follow-up
+    // as a concurrent edit (WORKFLOW_CONCURRENT: expected 5, found 6).
+    #expect(viewModel.backingDocument?.revision == 6)
+    #expect(viewModel.exportDocument().revision == 6)
+  }
+
   @Test("the daemon's bumped echo after a concurrent-edit save is not a remote change")
   func bumpedEchoAfterConcurrentEditDoesNotBanner() {
     let viewModel = PolicyCanvasViewModel.sample()
