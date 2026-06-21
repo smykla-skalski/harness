@@ -48,10 +48,11 @@ fn remote_pairing_create_claim_rejects_replay_and_audits() {
     assert_eq!(claimed.client.client_id, "client-1");
     assert_eq!(claimed.client.role, RemoteRole::Operator);
     assert!(!claimed.bearer_token.expose().is_empty());
-    assert!(db
-        .verify_remote_client_token("client-1", claimed.bearer_token.expose())
-        .expect("verify paired client")
-        .is_some());
+    assert!(
+        db.verify_remote_client_token("client-1", claimed.bearer_token.expose())
+            .expect("verify paired client")
+            .is_some()
+    );
     let replay_claim = RemotePairingClaimRequest::new_for_tests(
         "daemon.example.com",
         "daemon.example.com",
@@ -127,14 +128,56 @@ fn remote_pairing_claim_rejects_expiry_and_wrong_domain_with_audit() {
         "wrong-domain pairing claim must be denied"
     );
 
-    let routes: Vec<_> = db
+    let events = db.load_remote_audit_events(10).expect("audit events");
+    let routes: Vec<_> = events
+        .iter()
+        .map(|event| event.route_or_method.clone())
+        .collect();
+    let expired_event = events
+        .iter()
+        .find(|event| event.route_or_method == "remote.pair.expire")
+        .expect("expiry audit event");
+    let domain_event = events
+        .iter()
+        .find(|event| event.route_or_method == "remote.pair.domain")
+        .expect("domain audit event");
+
+    assert_eq!(expired_event.client_id.as_deref(), Some("client-expired"));
+    assert_eq!(
+        domain_event.client_id.as_deref(),
+        Some("client-wrong-domain")
+    );
+    assert!(routes.contains(&"remote.pair.expire".to_string()));
+    assert!(routes.contains(&"remote.pair.domain".to_string()));
+}
+
+#[test]
+fn remote_pairing_claim_failures_record_claimed_client_id() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let claim = RemotePairingClaimRequest::new_for_tests(
+        "daemon.example.com",
+        "daemon.example.com",
+        "client-invalid",
+        "MacBook Pro",
+        "macos",
+        Some("203.0.113.50"),
+        "audit-client-invalid",
+    )
+    .expect("claim request");
+    assert!(
+        db.claim_remote_pairing_code(" ", &claim, "2026-06-21T13:41:00Z")
+            .is_err(),
+        "blank code must fail"
+    );
+
+    let invalid_event = db
         .load_remote_audit_events(10)
         .expect("audit events")
         .into_iter()
-        .map(|event| event.route_or_method)
-        .collect();
-    assert!(routes.contains(&"remote.pair.expire".to_string()));
-    assert!(routes.contains(&"remote.pair.domain".to_string()));
+        .find(|event| event.route_or_method == "remote.pair.invalid")
+        .expect("invalid audit event");
+
+    assert_eq!(invalid_event.client_id.as_deref(), Some("client-invalid"));
 }
 
 #[test]
@@ -199,12 +242,13 @@ fn remote_pairing_claim_rejects_lost_claim_race() {
         )
         .expect("client count");
     assert_eq!(client_count, 0);
-    assert!(!db
-        .load_remote_audit_events(10)
-        .expect("audit events")
-        .iter()
-        .any(|event| event.event_id == "audit-claim-race"
-            && event.outcome == RemoteAuditOutcome::Success));
+    assert!(
+        !db.load_remote_audit_events(10)
+            .expect("audit events")
+            .iter()
+            .any(|event| event.event_id == "audit-claim-race"
+                && event.outcome == RemoteAuditOutcome::Success)
+    );
 }
 
 #[test]

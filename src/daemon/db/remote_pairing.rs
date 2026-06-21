@@ -9,16 +9,16 @@
 use chrono::{DateTime, Utc};
 use rusqlite::{params, types::Type};
 
-use super::{db_error, CliError, Connection, DaemonDb, OptionalExtension};
+use super::{CliError, Connection, DaemonDb, OptionalExtension, db_error};
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
-    parse_remote_role, parse_remote_scope, RemoteAuditEvent, RemoteAuditOutcome,
-    RemoteAuditScopeDecision, RemoteBearerToken, RemoteClientRegistration, RemoteStoredClient,
+    RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteBearerToken,
+    RemoteClientRegistration, RemoteStoredClient, parse_remote_role, parse_remote_scope,
 };
 use crate::daemon::remote_pairing::{
-    validate_pairing_audit_event_id, validate_pairing_domain, RemotePairingClaimRequest,
-    RemotePairingClaimedClient, RemotePairingCodeHash, RemotePairingError, RemotePairingRecord,
-    RemoteStoredPairing,
+    RemotePairingClaimRequest, RemotePairingClaimedClient, RemotePairingCodeHash,
+    RemotePairingError, RemotePairingRecord, RemoteStoredPairing, validate_pairing_audit_event_id,
+    validate_pairing_domain,
 };
 
 const INSERT_REMOTE_PAIRING_SQL: &str = "
@@ -175,7 +175,7 @@ impl DaemonDb {
                 claim.audit_event_id.as_str(),
                 now,
                 None,
-                None,
+                Some(claim.client_id.as_str()),
                 ROUTE_REMOTE_PAIR_EXPIRE,
                 RemoteAccessScope::Read,
                 RemoteAuditScopeDecision::Denied,
@@ -286,7 +286,7 @@ impl DaemonDb {
             claim.audit_event_id.as_str(),
             now,
             None,
-            None,
+            Some(claim.client_id.as_str()),
             route_or_method,
             RemoteAccessScope::Read,
             RemoteAuditScopeDecision::Denied,

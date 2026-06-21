@@ -4,9 +4,11 @@ use std::fmt;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use rand_core06::{OsRng, RngCore};
-use sha2::{Digest, Sha256};
 
 use super::remote::{RemoteAccessScope, RemoteRole, scopes_for_role};
+use super::remote_crypto::{
+    parse_sha256_storage_digest, sha256_storage_value, verify_sha256_storage_value,
+};
 
 #[cfg(test)]
 #[path = "remote_identity_tests.rs"]
@@ -14,8 +16,6 @@ mod tests;
 
 const TOKEN_RANDOM_BYTES: usize = 32;
 const TOKEN_HINT_CHARS: usize = 6;
-const TOKEN_HASH_PREFIX: &str = "sha256:";
-const TOKEN_HASH_HEX_LEN: usize = 64;
 const REDACTED_TOKEN_HINT: &str = "<redacted>";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,9 +55,8 @@ pub struct RemoteTokenHash {
 impl RemoteTokenHash {
     #[must_use]
     pub fn from_token(token: &str) -> Self {
-        let digest = token_digest(token);
         Self {
-            storage_value: format!("{TOKEN_HASH_PREFIX}{}", hex::encode(digest)),
+            storage_value: sha256_storage_value(token),
         }
     }
 
@@ -76,7 +75,7 @@ impl RemoteTokenHash {
         value: impl Into<String>,
     ) -> Result<Self, RemoteIdentityError> {
         let storage_value = value.into();
-        if parse_storage_digest(&storage_value).is_none() {
+        if parse_sha256_storage_digest(&storage_value).is_none() {
             return Err(RemoteIdentityError::InvalidStoredTokenHash);
         }
         Ok(Self { storage_value })
@@ -96,13 +95,7 @@ impl RemoteTokenHash {
 
     #[must_use]
     pub fn verify(&self, token: &str) -> bool {
-        let Some(expected) = parse_storage_digest(&self.storage_value) else {
-            let candidate = token_digest(token);
-            let _ = constant_time_eq(&[0_u8; 32], &candidate);
-            return false;
-        };
-        let candidate = token_digest(token);
-        constant_time_eq(&expected, &candidate)
+        verify_sha256_storage_value(&self.storage_value, token)
     }
 }
 
@@ -382,28 +375,6 @@ pub fn parse_remote_role(value: &str) -> Option<RemoteRole> {
         "viewer" => Some(RemoteRole::Viewer),
         _ => None,
     }
-}
-
-fn token_digest(token: &str) -> [u8; 32] {
-    Sha256::digest(token.as_bytes()).into()
-}
-
-fn parse_storage_digest(value: &str) -> Option<[u8; 32]> {
-    let hex_value = value.strip_prefix(TOKEN_HASH_PREFIX)?;
-    if hex_value.len() != TOKEN_HASH_HEX_LEN {
-        return None;
-    }
-    let mut digest = [0_u8; 32];
-    hex::decode_to_slice(hex_value, &mut digest).ok()?;
-    Some(digest)
-}
-
-fn constant_time_eq(left: &[u8; 32], right: &[u8; 32]) -> bool {
-    let diff = left
-        .iter()
-        .zip(right.iter())
-        .fold(0_u8, |acc, (&left, &right)| acc | (left ^ right));
-    diff == 0
 }
 
 pub(crate) fn remote_token_hint(token: &str) -> String {

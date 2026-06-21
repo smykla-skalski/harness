@@ -2,14 +2,16 @@ use std::collections::{BTreeMap, VecDeque};
 use std::error::Error;
 use std::fmt;
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use rand_core06::{OsRng, RngCore};
-use sha2::{Digest, Sha256};
 
 use super::remote::{RemoteAccessScope, RemoteRole};
+use super::remote_crypto::{
+    parse_sha256_storage_digest, sha256_storage_value, verify_sha256_storage_value,
+};
 use super::remote_identity::{
-    expand_client_scopes, RemoteBearerToken, RemoteIdentityError, RemoteStoredClient,
+    RemoteBearerToken, RemoteIdentityError, RemoteStoredClient, expand_client_scopes,
 };
 
 #[cfg(test)]
@@ -17,8 +19,6 @@ use super::remote_identity::{
 mod tests;
 
 const PAIRING_RANDOM_BYTES: usize = 32;
-const PAIRING_HASH_PREFIX: &str = "sha256:";
-const PAIRING_HASH_HEX_LEN: usize = 64;
 const DEFAULT_RATE_LIMITER_MAX_ENTRIES: usize = 4096;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -141,9 +141,8 @@ impl RemotePairingCodeHash {
         if code.trim().is_empty() {
             return Err(RemotePairingError::EmptyCode);
         }
-        let digest = pairing_digest(code);
         Ok(Self {
-            storage_value: format!("{PAIRING_HASH_PREFIX}{}", hex::encode(digest)),
+            storage_value: sha256_storage_value(code),
         })
     }
 
@@ -156,7 +155,7 @@ impl RemotePairingCodeHash {
         value: impl Into<String>,
     ) -> Result<Self, RemotePairingError> {
         let storage_value = value.into();
-        if parse_pairing_storage_digest(&storage_value).is_none() {
+        if parse_sha256_storage_digest(&storage_value).is_none() {
             return Err(RemotePairingError::InvalidStoredCodeHash);
         }
         Ok(Self { storage_value })
@@ -169,13 +168,7 @@ impl RemotePairingCodeHash {
 
     #[must_use]
     pub fn verify(&self, code: &str) -> bool {
-        let Some(expected) = parse_pairing_storage_digest(&self.storage_value) else {
-            let candidate = pairing_digest(code);
-            let _ = constant_time_eq(&[0_u8; 32], &candidate);
-            return false;
-        };
-        let candidate = pairing_digest(code);
-        constant_time_eq(&expected, &candidate)
+        verify_sha256_storage_value(&self.storage_value, code)
     }
 }
 
@@ -454,26 +447,4 @@ pub fn validate_pairing_audit_event_id(value: &str) -> Result<(), RemotePairingE
         return Err(RemotePairingError::EmptyAuditEventId);
     }
     Ok(())
-}
-
-fn pairing_digest(code: &str) -> [u8; 32] {
-    Sha256::digest(code.as_bytes()).into()
-}
-
-fn parse_pairing_storage_digest(value: &str) -> Option<[u8; 32]> {
-    let hex_value = value.strip_prefix(PAIRING_HASH_PREFIX)?;
-    if hex_value.len() != PAIRING_HASH_HEX_LEN {
-        return None;
-    }
-    let mut digest = [0_u8; 32];
-    hex::decode_to_slice(hex_value, &mut digest).ok()?;
-    Some(digest)
-}
-
-fn constant_time_eq(left: &[u8; 32], right: &[u8; 32]) -> bool {
-    let diff = left
-        .iter()
-        .zip(right.iter())
-        .fold(0_u8, |acc, (&left, &right)| acc | (left ^ right));
-    diff == 0
 }
