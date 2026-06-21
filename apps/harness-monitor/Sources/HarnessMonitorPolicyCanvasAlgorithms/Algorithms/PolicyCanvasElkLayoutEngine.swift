@@ -64,8 +64,34 @@ private struct PolicyCanvasElkLayoutEngine {
     else {
       return nil
     }
-    let nodePositions = policyCanvasResolveNodeOverlaps(
+    let basePositions = policyCanvasResolveNodeOverlaps(
       nodePositions: rawNodePositions,
+      nodeSizes: nodeSizes
+    )
+    let normalizedGroups = PolicyCanvasLayeredLayoutEngine(mode: mode).normalizedGroups(for: graph)
+    let layoutGroupIDByNodeID = Dictionary(
+      uniqueKeysWithValues: normalizedGroups.flatMap { group in
+        group.nodeIDs.map { ($0, group.layoutID) }
+      }
+    )
+    // ELK lays out a flat node list, so a group frame - the bounding box of its
+    // members - can swallow a foreign node and drop it under that group's title
+    // band. The title then renders over the node and any wire reaching the node's
+    // port crosses the title. The automatic-layout paths already clear this; run
+    // the same clearance here so ELK layouts keep foreign nodes out of title
+    // bands. Done before routing so the routes track the cleared positions.
+    let prelimGroupFramesByLayoutID = policyCanvasRebuiltGroupFramesByLayoutID(
+      normalizedGroups: normalizedGroups,
+      layoutGroupIDByNodeID: layoutGroupIDByNodeID,
+      nodePositions: basePositions,
+      nodeSizes: nodeSizes
+    )
+    let nodePositions = policyCanvasResolveNodeAndForeignTitleOverlaps(
+      nodePositions: basePositions,
+      layoutGroupIDByNodeID: layoutGroupIDByNodeID,
+      groupTitleFramesByID: prelimGroupFramesByLayoutID.mapValues {
+        policyCanvasGroupTitleFrame(in: $0)
+      },
       nodeSizes: nodeSizes
     )
     guard
@@ -74,12 +100,6 @@ private struct PolicyCanvasElkLayoutEngine {
     else {
       return nil
     }
-    let normalizedGroups = PolicyCanvasLayeredLayoutEngine(mode: mode).normalizedGroups(for: graph)
-    let layoutGroupIDByNodeID = Dictionary(
-      uniqueKeysWithValues: normalizedGroups.flatMap { group in
-        group.nodeIDs.map { ($0, group.layoutID) }
-      }
-    )
     let groupFramesByLayoutID = policyCanvasRebuiltGroupFramesByLayoutID(
       normalizedGroups: normalizedGroups,
       layoutGroupIDByNodeID: layoutGroupIDByNodeID,
