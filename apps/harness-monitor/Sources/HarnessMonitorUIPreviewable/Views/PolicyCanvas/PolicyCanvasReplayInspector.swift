@@ -103,14 +103,17 @@ struct PolicyCanvasReplayInspector: View {
         if isStale {
           staleHint
         }
-        // No inner scroll or fixed cap: the confidence pane owns one scroll view
-        // (see the decision matrix), so the replay list flows with it instead of
-        // scrolling inside a 180pt window while the pane has room to spare.
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(rows) { row in
-            PolicyCanvasReplayRow(row: row, focusDecision: focusDecision)
+        // Scrolls within the section's share of the pane, like Scenarios, so an
+        // expanded Replay shares the available room instead of running off the
+        // bottom of the pane.
+        ScrollView {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(rows) { row in
+              PolicyCanvasReplayRow(row: row, focusDecision: focusDecision)
+            }
           }
         }
+        .frame(maxHeight: .infinity)
         // Dim a stale comparison so an old draft verdict is never read as current.
         .opacity(isStale ? 0.5 : 1)
       }

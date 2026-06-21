@@ -6,7 +6,10 @@ import SwiftUI
 /// validation panel over the decision matrix so the user sees "is it correct"
 /// and "what will it decide" in one place - replacing the bare validation panel
 /// the three-mode chrome used to gate behind a Simulation tab. The matrix takes
-/// a resolved rows value, so it skips its body when only validation changes.
+/// a resolved rows value, so it skips its body when only validation changes. The
+/// panel fills the pane height: validation is fixed, and the decisions, scenario,
+/// and replay lists each take a share of the remaining height and scroll inside
+/// it, so no one section pushes the others (or the Replay anchor) off-screen.
 struct PolicyCanvasConfidencePanel: View {
   let viewModel: PolicyCanvasViewModel
   let focusIssue: PolicyCanvasIssueFocusAction
@@ -43,6 +46,7 @@ struct PolicyCanvasConfidencePanel: View {
         loadReplay: loadReplay
       )
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasConfidencePanel)
   }

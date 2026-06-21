@@ -26,21 +26,24 @@ struct PolicyCanvasDecisionMatrixView: View {
         emptyState
       } else {
         caption
-        // No inner scroll or fixed cap: the confidence pane owns one scroll view,
-        // so the full simulation flows with scenarios and replay instead of
-        // clipping past ~220pt while the tall pane has room to spare.
-        VStack(spacing: 6) {
-          ForEach(rows) { row in
-            PolicyCanvasDecisionMatrixRow(
-              model: row,
-              isActive: row.id == activeRowID,
-              focusDecision: { visitedNodeIds in
-                activeRowID = row.id
-                focusDecision(visitedNodeIds)
-              }
-            )
+        // Each list section scrolls within its share of the pane height so the
+        // 13-row matrix shares space with the scenario and replay sections
+        // instead of pushing them (and the Replay anchor) below the fold.
+        ScrollView {
+          VStack(spacing: 6) {
+            ForEach(rows) { row in
+              PolicyCanvasDecisionMatrixRow(
+                model: row,
+                isActive: row.id == activeRowID,
+                focusDecision: { visitedNodeIds in
+                  activeRowID = row.id
+                  focusDecision(visitedNodeIds)
+                }
+              )
+            }
           }
         }
+        .frame(maxHeight: .infinity)
         // Dim the prior verdicts while a fresh simulation is in flight so a
         // stale row is never read as current.
         .opacity(isEvaluating ? 0.55 : 1)

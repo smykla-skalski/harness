@@ -8,9 +8,11 @@ extension PolicyCanvasView {
   /// inspector here promoted a third NavigationSplitView column, which split the
   /// window toolbar and let the detail underlap the translucent sidebar (hiding
   /// the component library). A fixed-width in-layout column keeps full geometry
-  /// control and leaves the toolbar and sidebar untouched. A single ScrollView
-  /// owns the whole panel so the decision list, scenarios, and replay scroll
-  /// together rather than each clipping behind its own fixed height.
+  /// control and leaves the toolbar and sidebar untouched. The panel fills the
+  /// pane height and each list section scrolls within its own share, so the
+  /// Replay anchor and every section header stay visible instead of one long
+  /// section (a 13-row decisions matrix, or an expanded scenario list) pushing
+  /// the others below the fold.
   var policyCanvasConfidencePane: some View {
     HStack(spacing: 0) {
       Rectangle()
@@ -18,23 +20,21 @@ extension PolicyCanvasView {
         .frame(width: 1)
         .frame(maxHeight: .infinity)
 
-      ScrollView {
-        PolicyCanvasConfidencePanel(
-          viewModel: viewModel,
-          focusIssue: focusPolicyCanvasIssue,
-          focusDecision: focusPolicyCanvasDecision,
-          addScenario: addScenario,
-          editScenario: { id in
-            editScenario(id: id)
-          },
-          deleteScenario: { id in
-            deleteScenario(id: id)
-          },
-          resetScenarios: resetScenarios,
-          loadReplay: loadReplay
-        )
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      PolicyCanvasConfidencePanel(
+        viewModel: viewModel,
+        focusIssue: focusPolicyCanvasIssue,
+        focusDecision: focusPolicyCanvasDecision,
+        addScenario: addScenario,
+        editScenario: { id in
+          editScenario(id: id)
+        },
+        deleteScenario: { id in
+          deleteScenario(id: id)
+        },
+        resetScenarios: resetScenarios,
+        loadReplay: loadReplay
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
       .background(PolicyCanvasVisualStyle.panelBackground)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasConfidencePanel)

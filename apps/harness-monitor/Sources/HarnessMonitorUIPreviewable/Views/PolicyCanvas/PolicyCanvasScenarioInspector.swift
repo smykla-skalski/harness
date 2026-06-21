@@ -78,19 +78,22 @@ struct PolicyCanvasScenarioInspector: View {
           .scaledFont(.caption)
           .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
       } else {
-        // No inner scroll or fixed cap: the confidence pane owns one scroll view,
-        // so a long scenario list flows with the decisions and replay instead of
-        // scrolling inside a 180pt window while the pane has empty room below.
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(rows) { row in
-            PolicyCanvasScenarioRow(
-              row: row,
-              focusDecision: focusDecision,
-              editScenario: editScenario,
-              deleteScenario: deleteScenario
-            )
+        // Scrolls within the section's share of the pane: expanding Scenarios
+        // fills the room left by the other sections without pushing Replay off
+        // the bottom, and the list scrolls only once it outgrows that room.
+        ScrollView {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(rows) { row in
+              PolicyCanvasScenarioRow(
+                row: row,
+                focusDecision: focusDecision,
+                editScenario: editScenario,
+                deleteScenario: deleteScenario
+              )
+            }
           }
         }
+        .frame(maxHeight: .infinity)
       }
     }
     .padding(.horizontal, 12)
