@@ -36,7 +36,14 @@ impl fmt::Display for RemoteAcmeRuntimeError {
     }
 }
 
-impl Error for RemoteAcmeRuntimeError {}
+impl Error for RemoteAcmeRuntimeError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::InvalidConfig(error) => Some(error),
+            Self::MissingPersistedAcmeState | Self::MissingCertificate => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RemoteAcmeRuntimeState {
@@ -123,6 +130,7 @@ pub fn build_remote_acme_runtime_plan(
         .acme_account_id
         .as_deref()
         .unwrap_or_default()
+        .trim()
         .is_empty()
     {
         return Err(RemoteAcmeRuntimeError::MissingPersistedAcmeState);

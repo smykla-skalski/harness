@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use super::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
 use super::remote_acme::{
     AcmeHttp01ChallengeStore, Dns01ProviderAction, RemoteAcmeRuntimeState, RemoteCertificateBundle,
@@ -23,6 +25,33 @@ fn remote_tls_acme_plan_requires_persisted_state() {
             .expect_err("remote mode should fail closed without persisted ACME state");
 
     assert!(error.to_string().contains("persisted ACME state"));
+}
+
+#[test]
+fn remote_tls_acme_plan_rejects_blank_persisted_account_id() {
+    let state = RemoteAcmeRuntimeState::with_account_and_certificate(
+        "   ",
+        RemoteCertificateBundle::new_for_tests("cert-a", "key-a"),
+    );
+    let error = build_remote_acme_runtime_plan(&tls_alpn_config(), &state)
+        .expect_err("blank ACME account id should fail closed");
+
+    assert!(error.to_string().contains("persisted ACME state"));
+}
+
+#[test]
+fn remote_tls_acme_plan_exposes_invalid_config_error_source() {
+    let mut config = tls_alpn_config();
+    config.domain.clear();
+    let error = build_remote_acme_runtime_plan(&config, &RemoteAcmeRuntimeState::default())
+        .expect_err("invalid config should fail before state checks");
+
+    assert!(
+        error
+            .source()
+            .is_some_and(|source| source.to_string().contains("domain is required")),
+        "expected invalid config source, got: {error:?}"
+    );
 }
 
 #[test]
