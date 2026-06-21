@@ -4,10 +4,11 @@ import HarnessMonitorPolicyCanvasAlgorithms
 extension PolicyCanvasView {
   /// Replay the active draft over the recorded real-decision feed and store the
   /// result for the confidence panel's replay section. Read-only: it never
-  /// mutates the draft or the pipeline, so there is no reload afterwards. The
-  /// next edit clears the result (see `markDocumentDirty`), so a shown replay
-  /// always matches the draft on screen. Remote-action gated like the other
-  /// canvas daemon calls.
+  /// mutates the draft or the pipeline, so there is no reload afterwards. A later
+  /// edit keeps the result but marks it stale (see `captureReplayResult` and
+  /// `replayIsStale`), so the comparison stays on screen with a refresh prompt
+  /// instead of vanishing. Remote-action gated like the other canvas daemon
+  /// calls.
   func loadReplay() {
     guard remoteActionsEnabled else {
       statusLine = remoteActionDisabledReason
@@ -23,7 +24,7 @@ extension PolicyCanvasView {
             statusLine = "Could not load replay"
             return
           }
-          viewModel.latestReplay = result
+          viewModel.captureReplayResult(result)
         }
       }
     )

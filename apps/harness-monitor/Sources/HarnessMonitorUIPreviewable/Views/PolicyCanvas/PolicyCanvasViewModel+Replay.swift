@@ -26,6 +26,25 @@ struct PolicyCanvasReplaySummary: Equatable {
 }
 
 extension PolicyCanvasViewModel {
+  /// Store a freshly loaded replay alongside the document generation it ran
+  /// against, so the panel can later tell whether the draft has moved on without
+  /// blanking the comparison the user just asked for.
+  func captureReplayResult(_ result: TaskBoardPolicyPipelineReplayResult) {
+    latestReplay = result
+    replayGeneration = documentGeneration
+  }
+
+  /// True when a replay is loaded but the draft has been edited since, so the
+  /// history-vs-draft comparison on screen no longer reflects the current draft.
+  /// Nil generation (no replay yet, or a preview that injects a result directly)
+  /// reads as not stale.
+  var replayIsStale: Bool {
+    guard latestReplay != nil, let loadedGeneration = replayGeneration else {
+      return false
+    }
+    return loadedGeneration != documentGeneration
+  }
+
   /// Replay rows projected from the latest replay result, in the daemon's
   /// recorded-at-descending order (most recent first). Empty until a replay has
   /// loaded, or when no real decisions have been recorded yet. The verdict

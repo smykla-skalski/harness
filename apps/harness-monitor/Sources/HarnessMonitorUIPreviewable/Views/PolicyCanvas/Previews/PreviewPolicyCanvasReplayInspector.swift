@@ -38,6 +38,20 @@ private let sampleReplayRows: [PolicyCanvasReplayRowModel] = [
     rows: sampleReplayRows,
     summary: PolicyCanvasReplaySummary(sampleSize: 3, changedCount: 1),
     isLoading: false,
+    isStale: false,
+    focusDecision: { _ in },
+    loadReplay: {}
+  )
+  .frame(width: 380)
+  .padding(24)
+}
+
+#Preview("Policy canvas replay inspector - stale") {
+  PolicyCanvasReplayInspector(
+    rows: sampleReplayRows,
+    summary: PolicyCanvasReplaySummary(sampleSize: 3, changedCount: 1),
+    isLoading: false,
+    isStale: true,
     focusDecision: { _ in },
     loadReplay: {}
   )

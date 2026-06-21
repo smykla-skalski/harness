@@ -38,6 +38,7 @@ struct PolicyCanvasConfidencePanel: View {
         rows: viewModel.replayRows,
         summary: viewModel.replaySummary,
         isLoading: viewModel.isReplaying,
+        isStale: viewModel.replayIsStale,
         focusDecision: focusDecision,
         loadReplay: loadReplay
       )

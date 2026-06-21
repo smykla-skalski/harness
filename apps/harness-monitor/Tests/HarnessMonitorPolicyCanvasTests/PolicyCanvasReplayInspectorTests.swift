@@ -1,9 +1,9 @@
 import Foundation
+import HarnessMonitorPolicyModels
 import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
-import HarnessMonitorPolicyModels
 
 /// Phase 6 replay inspector: the per-decision row projection over the latest
 /// replay result, plus the header summary. The mapping is deterministic (wire
@@ -75,6 +75,22 @@ struct PolicyCanvasReplayInspectorTests {
     viewModel.latestReplay = result(sampleSize: 0, changedCount: 0, decisions: [])
     #expect(viewModel.replayRows.isEmpty)
     #expect(viewModel.replaySummary == PolicyCanvasReplaySummary(sampleSize: 0, changedCount: 0))
+  }
+
+  @Test("A captured replay is fresh until an edit, then kept but marked stale")
+  func capturedReplayGoesStaleOnEdit() {
+    let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [])
+    #expect(!viewModel.replayIsStale)
+
+    viewModel.captureReplayResult(result(sampleSize: 1, changedCount: 0, decisions: []))
+    #expect(!viewModel.replayIsStale)
+
+    // An edit bumps the document generation: the comparison now predates the
+    // draft, so it is flagged stale - but the result is kept, not cleared, so the
+    // user keeps the comparison until they refresh.
+    viewModel.markDocumentDirty()
+    #expect(viewModel.replayIsStale)
+    #expect(viewModel.latestReplay != nil)
   }
 
   private func decision(

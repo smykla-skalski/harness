@@ -57,10 +57,15 @@ public final class PolicyCanvasViewModel {
   /// snapshot arrives so the badge does not parse dates in its body.
   var livePublishedAt: Date?
   /// Most recent replay result: the active draft re-run over the recorded
-  /// real-decision feed. Written only by the replay action and cleared on the
-  /// next edit (a draft change makes a loaded replay stale), so the panel shows
-  /// a load prompt until the user replays the current draft.
+  /// real-decision feed. Written only by the replay action. A later edit no
+  /// longer clears it; `replayGeneration` records the document generation it was
+  /// loaded at so the panel can flag the result stale (see `replayIsStale`) while
+  /// keeping the comparison on screen until the user refreshes.
   var latestReplay: TaskBoardPolicyPipelineReplayResult?
+  /// `documentGeneration` captured when `latestReplay` loaded, nil before the
+  /// first replay. Any edit bumps `documentGeneration`, so a mismatch means the
+  /// shown replay predates the current draft and the panel marks it stale.
+  var replayGeneration: UInt64?
   public internal(set) var documentDirty: Bool
   var viewportDirty: Bool
   var hasRequestedInitialRemoteLoad: Bool
@@ -333,6 +338,7 @@ public final class PolicyCanvasViewModel {
     self.globalPolicyEnforcementEnabled = true
     self.livePublishedAt = nil
     self.latestReplay = nil
+    self.replayGeneration = nil
     self.documentDirty = false
     self.viewportDirty = false
     self.hasRequestedInitialRemoteLoad = false
@@ -421,9 +427,9 @@ public final class PolicyCanvasViewModel {
     let wasClean = !documentDirty
     documentGeneration = documentGeneration &+ 1
     documentDirty = true
-    if latestReplay != nil {
-      latestReplay = nil
-    }
+    // A loaded replay is intentionally kept across edits: the panel marks it
+    // stale off `replayGeneration` rather than blanking the comparison the user
+    // just loaded on every stray edit (including position-only drags).
     if wasClean {
       autosaveTrigger?()
       confidenceTrigger?()
