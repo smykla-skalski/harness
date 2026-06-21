@@ -110,6 +110,16 @@ fn remote_clients_persist_hashed_tokens_and_support_revoke_rotate() {
             .expect("new token accepted")
             .is_some()
     );
+    assert!(
+        db.rotate_remote_client_token("client-1", "   ", "2026-06-21T12:41:30Z")
+            .is_err(),
+        "blank rotated token should be rejected"
+    );
+    assert!(
+        db.verify_remote_client_token("client-1", "rotated-token-secret")
+            .expect("valid token remains accepted after rejected rotation")
+            .is_some()
+    );
 
     db.revoke_remote_client("client-1", "2026-06-21T12:42:00Z")
         .expect("revoke client");

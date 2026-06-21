@@ -94,9 +94,17 @@ impl RemoteTokenHash {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct RemoteBearerToken {
     value: String,
+}
+
+impl fmt::Debug for RemoteBearerToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RemoteBearerToken")
+            .field("value", &"<redacted>")
+            .finish()
+    }
 }
 
 impl RemoteBearerToken {
@@ -106,6 +114,14 @@ impl RemoteBearerToken {
         OsRng.fill_bytes(&mut bytes);
         Self {
             value: URL_SAFE_NO_PAD.encode(bytes),
+        }
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub fn from_value_for_tests(value: impl Into<String>) -> Self {
+        Self {
+            value: value.into(),
         }
     }
 

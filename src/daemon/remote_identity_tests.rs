@@ -1,6 +1,6 @@
 use super::{
-    RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration,
-    RemoteTokenHash, expand_client_scopes,
+    RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteBearerToken,
+    RemoteClientRegistration, RemoteTokenHash, expand_client_scopes,
 };
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 
@@ -12,6 +12,13 @@ fn remote_token_hash_does_not_store_raw_token_and_verifies_constant_width_digest
     assert!(hash.verify("remote-token-secret"));
     assert!(!hash.verify("remote-token-wrong"));
     assert!(!RemoteTokenHash::from_storage_value_for_tests("sha256:abc").verify("anything"));
+}
+
+#[test]
+fn remote_bearer_token_debug_redacts_raw_value() {
+    let token = RemoteBearerToken::from_value_for_tests("raw-remote-token-secret");
+
+    assert!(!format!("{token:?}").contains("raw-remote-token-secret"));
 }
 
 #[test]

@@ -111,6 +111,9 @@ impl DaemonDb {
         token: &str,
         rotated_at: &str,
     ) -> Result<bool, CliError> {
+        if token.trim().is_empty() {
+            return Err(db_error("remote client token is required"));
+        }
         let token_hash = RemoteTokenHash::from_token(token);
         let changed = self
             .conn
