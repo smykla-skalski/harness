@@ -306,7 +306,8 @@ impl FromStr for DaemonRemotePairTtl {
             .map_err(|_| "pairing ttl value is too large".to_string())?;
         let seconds = count
             .checked_mul(multiplier)
-            .and_then(NonZeroU64::new)
+            .ok_or_else(|| "pairing ttl value is too large".to_string())?;
+        let seconds = NonZeroU64::new(seconds)
             .ok_or_else(|| "pairing ttl must be greater than zero".to_string())?;
 
         Ok(Self { seconds })

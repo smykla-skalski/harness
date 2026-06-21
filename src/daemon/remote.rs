@@ -137,6 +137,7 @@ pub enum RemoteDaemonConfigError {
     MissingHttpsPort,
     MissingHttpPort,
     MissingDnsProvider,
+    UnexpectedDnsProvider,
 }
 
 impl fmt::Display for RemoteDaemonConfigError {
@@ -148,6 +149,12 @@ impl fmt::Display for RemoteDaemonConfigError {
             Self::MissingHttpPort => write!(f, "remote daemon HTTP-01 port must be non-zero"),
             Self::MissingDnsProvider => {
                 write!(f, "remote daemon DNS-01 challenge requires a DNS provider")
+            }
+            Self::UnexpectedDnsProvider => {
+                write!(
+                    f,
+                    "remote daemon DNS provider is only valid with DNS-01 challenge"
+                )
             }
         }
     }
@@ -171,6 +178,11 @@ pub fn validate_remote_serve_config(
     }
     if config.https_port == 0 {
         return Err(RemoteDaemonConfigError::MissingHttpsPort);
+    }
+    if !matches!(config.acme_challenge, RemoteAcmeChallenge::Dns)
+        && config.acme_dns_provider.is_some()
+    {
+        return Err(RemoteDaemonConfigError::UnexpectedDnsProvider);
     }
     match config.acme_challenge {
         RemoteAcmeChallenge::Http if config.http_port == 0 => {

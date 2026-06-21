@@ -136,6 +136,54 @@ fn daemon_remote_serve_args_reject_http01_without_http_port() {
 }
 
 #[test]
+fn daemon_remote_serve_args_reject_tls_alpn_with_dns_provider() {
+    let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+        "--acme-dns-provider",
+        "cloudflare",
+    ])
+    .unwrap();
+
+    let error = parsed
+        .args
+        .contract_config()
+        .expect_err("dns provider should require DNS-01 challenge");
+    assert!(
+        error.to_string().contains("only valid with DNS-01"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn daemon_remote_serve_args_reject_http01_with_dns_provider() {
+    let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+        "--acme-challenge",
+        "http",
+        "--acme-dns-provider",
+        "cloudflare",
+    ])
+    .unwrap();
+
+    let error = parsed
+        .args
+        .contract_config()
+        .expect_err("dns provider should require DNS-01 challenge");
+    assert!(
+        error.to_string().contains("only valid with DNS-01"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn daemon_remote_pair_create_defaults_to_admin_ten_minute_ttl() {
     let parsed = DaemonRemoteCommandTestHarness::try_parse_from(["test", "pair", "create"])
         .unwrap()
@@ -201,5 +249,42 @@ fn daemon_remote_pair_create_rejects_invalid_ttl() {
             "tomorrow",
         ])
         .is_err()
+    );
+}
+
+#[test]
+fn daemon_remote_pair_create_reports_zero_ttl() {
+    let error = DaemonRemoteCommandTestHarness::try_parse_from([
+        "test",
+        "pair",
+        "create",
+        "--ttl",
+        "0m",
+    ])
+    .expect_err("zero ttl should be rejected");
+    assert!(
+        error.to_string().contains("greater than zero"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn daemon_remote_pair_create_reports_ttl_overflow_as_too_large() {
+    let error = DaemonRemoteCommandTestHarness::try_parse_from([
+        "test",
+        "pair",
+        "create",
+        "--ttl",
+        "18446744073709551615h",
+    ])
+    .expect_err("overflowing ttl should be rejected");
+    let message = error.to_string();
+    assert!(
+        message.contains("too large"),
+        "overflow should report too large, got: {message}"
+    );
+    assert!(
+        !message.contains("greater than zero"),
+        "overflow should not report zero ttl, got: {message}"
     );
 }
