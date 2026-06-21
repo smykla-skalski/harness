@@ -59,7 +59,7 @@ pub struct DaemonRemoteServeArgs {
     /// HTTPS/WSS listener port.
     #[arg(long, default_value_t = 443)]
     pub https_port: u16,
-    /// HTTP listener port for HTTP-01 challenges and redirects.
+    /// HTTP listener port used when issuing certificates with HTTP-01.
     #[arg(long, default_value_t = 80)]
     pub http_port: u16,
     /// ACME account email address.

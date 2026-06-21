@@ -89,6 +89,54 @@ fn daemon_remote_serve_args_support_dns01_providers() {
 }
 
 #[test]
+fn daemon_remote_serve_args_reject_dns01_without_provider() {
+    let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+        "--acme-challenge",
+        "dns",
+    ])
+    .unwrap();
+
+    let error = parsed
+        .args
+        .contract_config()
+        .expect_err("dns-01 should require an explicit DNS provider");
+    assert!(
+        error.to_string().contains("DNS-01 challenge requires"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn daemon_remote_serve_args_reject_http01_without_http_port() {
+    let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+        "--acme-challenge",
+        "http",
+        "--http-port",
+        "0",
+    ])
+    .unwrap();
+
+    let error = parsed
+        .args
+        .contract_config()
+        .expect_err("http-01 should require a non-zero HTTP port");
+    assert!(
+        error.to_string().contains("HTTP-01 port must be non-zero"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn daemon_remote_pair_create_defaults_to_admin_ten_minute_ttl() {
     let parsed = DaemonRemoteCommandTestHarness::try_parse_from(["test", "pair", "create"])
         .unwrap()
