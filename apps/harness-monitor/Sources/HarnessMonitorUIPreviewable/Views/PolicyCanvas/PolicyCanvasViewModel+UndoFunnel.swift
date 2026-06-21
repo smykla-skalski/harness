@@ -2,6 +2,21 @@ import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
 
+/// The nodes a change repositions, or an empty set when the change is not a pure
+/// position move. A non-empty result keeps the live recompute selective; an empty
+/// one routes the whole graph from scratch. Group moves report their member
+/// nodes; bulk arrow-nudges route fully (they are not a smooth drag).
+func policyCanvasMovedNodeIDs(_ change: PolicyCanvasChange) -> Set<String> {
+  switch change {
+  case .moveNode(let id, _, _, _, _):
+    [id]
+  case .moveGroup(_, _, _, _, let memberDestinations):
+    Set(memberDestinations.keys)
+  default:
+    []
+  }
+}
+
 private func policyCanvasChangeInvalidatesRoutingHints(
   _ change: PolicyCanvasChange
 ) -> Bool {
@@ -87,6 +102,10 @@ extension PolicyCanvasViewModel {
     if policyCanvasChangeInvalidatesRoutingHints(change) || change.isReflowLayout {
       precomputedRoutes = nil
     }
+    // A position move keeps the live recompute selective (re-route only incident
+    // edges) through its post-drop recompute; any other change clears the scope
+    // so the topology change routes from scratch.
+    liveDragAffectedNodeIDs = policyCanvasMovedNodeIDs(change)
     let inverse = applyChange(change)
     if let manager = undoManager {
       // Delegate grouping to the AppKit runloop event group

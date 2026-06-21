@@ -75,6 +75,14 @@ public final class PolicyCanvasViewModel {
   /// route-worker key): positions must trigger a recompute without changing the
   /// cache identity the projection gap-filler is measured against.
   var layoutGeneration: UInt64
+  /// The nodes whose position a node/group move changed, tracked so the live
+  /// route recompute can re-route only the incident edges (libavoid-style
+  /// `SelectiveReroute`) instead of reconverging the whole graph. Set by the
+  /// per-tick drag writes and by `mutate(_:)` on a position move; cleared by
+  /// `mutate(_:)` on any structural change, so a move stays selective through its
+  /// post-drop recompute while a topology change still routes from scratch. When
+  /// empty the recompute runs the full converge.
+  var liveDragAffectedNodeIDs: Set<String> = []
   /// Raised by `requestAtomicReflow(...)` and serviced by the hosting viewport,
   /// which routes the planned layout off-main before committing (atomic reveal).
   var atomicReflowRequest: PolicyCanvasAtomicReflowRequest?

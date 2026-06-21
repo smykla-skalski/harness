@@ -51,6 +51,32 @@ actor PolicyCanvasRouteWorker {
     return cachedOutput
   }
 
+  /// Re-route only the edges incident to the moved nodes, reusing `previous` for
+  /// the rest. Used by the live drag recompute so a node drag routes a handful of
+  /// edges per tick instead of reconverging the whole graph. Falls back to a full
+  /// `compute` when selective routing does not apply (topology changed, or no
+  /// edge is incident to the moved nodes).
+  func computeSelective(
+    input: PolicyCanvasRouteWorkerInput,
+    movedNodeIDs: Set<String>,
+    previous: PolicyCanvasRouteWorkerOutput
+  ) -> PolicyCanvasRouteWorkerOutput {
+    let prepared = PolicyCanvasPreparedRouteInput(input: input)
+    let nodeIndex = prepared.nodeIndex
+    guard
+      let computation = prepared.selectiveRouteComputation(
+        router: router,
+        algorithmSelection: input.algorithmSelection,
+        movedNodeIDs: movedNodeIDs,
+        previousRoutes: previous.routes,
+        previousPortMarkerLayout: previous.portMarkerLayout
+      )
+    else {
+      return compute(input: input)
+    }
+    return output(prepared: prepared, nodeIndex: nodeIndex, computation: computation)
+  }
+
   func waitForIdle() async {}
 
   static func edgeLabelsByID(

@@ -29,6 +29,7 @@ extension PolicyCanvasViewModel {
     if nodes[index].position != nextPosition {
       nodes[index].position = nextPosition
       markDocumentDirty()
+      liveDragAffectedNodeIDs = [nodeID]
       bumpLayoutGeneration()
     }
     let nextHighlightedGroupID =
@@ -110,6 +111,7 @@ extension PolicyCanvasViewModel {
     }
     moveNodes(in: groupID, by: delta)
     if delta != .zero {
+      liveDragAffectedNodeIDs = Set(nodes.filter { $0.groupID == groupID }.map(\.id))
       bumpLayoutGeneration()
     }
     reconcileGroupFrame(id: groupID)

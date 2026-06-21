@@ -10,7 +10,9 @@ struct PolicyCanvasViewportRouteRebuildResult {
 func policyCanvasViewportRouteRebuildResult(
   worker: PolicyCanvasRouteWorker,
   viewModel: PolicyCanvasViewModel,
-  fontScale: CGFloat
+  fontScale: CGFloat,
+  movedNodeIDs: Set<String>? = nil,
+  previousOutput: PolicyCanvasRouteWorkerOutput? = nil
 ) async -> PolicyCanvasViewportRouteRebuildResult {
   let input = PolicyCanvasRouteWorkerInput(
     graphGeneration: viewModel.routeComputationGeneration,
@@ -22,7 +24,16 @@ func policyCanvasViewportRouteRebuildResult(
     precomputedRoutes: viewModel.precomputedRoutes,
     algorithmSelection: viewModel.algorithmSelection
   )
-  let output = await worker.compute(input: input)
+  let output: PolicyCanvasRouteWorkerOutput
+  if let movedNodeIDs, let previousOutput {
+    output = await worker.computeSelective(
+      input: input,
+      movedNodeIDs: movedNodeIDs,
+      previous: previousOutput
+    )
+  } else {
+    output = await worker.compute(input: input)
+  }
   return PolicyCanvasViewportRouteRebuildResult(
     output: output,
     nodePositionsByID: policyCanvasNodePositionsByID(input.nodes)

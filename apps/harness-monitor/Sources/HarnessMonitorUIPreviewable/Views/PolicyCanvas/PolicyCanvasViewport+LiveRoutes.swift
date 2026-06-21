@@ -52,10 +52,13 @@ extension PolicyCanvasViewport {
       return
     }
     let generation = nextRouteGeneration()
+    let movedNodeIDs = selectiveLiveRouteNodeIDs(pipelineIdentity: pipelineIdentity)
     let result = await policyCanvasViewportRouteRebuildResult(
       worker: routeWorkerInstance(),
       viewModel: viewModel,
-      fontScale: fontScale
+      fontScale: fontScale,
+      movedNodeIDs: movedNodeIDs,
+      previousOutput: movedNodeIDs == nil ? nil : bridgeRouteCache.cachedOutput
     )
     guard !Task.isCancelled, routeGenerationMatches(generation) else {
       return
@@ -66,6 +69,23 @@ extension PolicyCanvasViewport {
       output: result.output,
       nodePositionsByID: result.nodePositionsByID
     )
+  }
+
+  /// The moved-node set a selective recompute should re-route, or `nil` to route
+  /// the whole graph. Selective applies only when a position move tagged the
+  /// nodes and the cache already holds a routed output for this canvas to reuse
+  /// for the untouched edges; otherwise (first paint, structural change, restored
+  /// cache for another canvas) the recompute routes from scratch.
+  @MainActor
+  func selectiveLiveRouteNodeIDs(pipelineIdentity: String?) -> Set<String>? {
+    let moved = viewModel.liveDragAffectedNodeIDs
+    guard !moved.isEmpty,
+      bridgeRouteCache.cachedCanvasIdentity == pipelineIdentity,
+      !bridgeRouteCache.cachedOutput.routes.isEmpty
+    else {
+      return nil
+    }
+    return moved
   }
 
   /// True when the cache already holds the routed output for this exact route key
