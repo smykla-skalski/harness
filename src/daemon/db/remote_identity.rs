@@ -55,7 +55,7 @@ impl DaemonDb {
             .map_err(|error| {
                 db_error(format!(
                     "insert remote client {}: {error}",
-                    registration.client_id
+                    registration.client_id.as_str()
                 ))
             })?;
         self.remote_client(&registration.client_id)?
@@ -156,7 +156,7 @@ impl DaemonDb {
             .map_err(|error| {
                 db_error(format!(
                     "insert remote audit event {}: {error}",
-                    event.event_id
+                    event.event_id.as_str()
                 ))
             })?;
         Ok(())
@@ -306,5 +306,9 @@ fn parse_outcome_at_column(label: &str, column: usize) -> rusqlite::Result<Remot
 
 fn token_hint(token: &str) -> String {
     let chars = token.chars().collect::<Vec<_>>();
-    chars.iter().skip(chars.len().saturating_sub(6)).collect()
+    chars
+        .iter()
+        .skip(chars.len().saturating_sub(6))
+        .copied()
+        .collect()
 }

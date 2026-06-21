@@ -374,7 +374,7 @@ fn constant_time_eq(left: &[u8; 32], right: &[u8; 32]) -> bool {
     let diff = left
         .iter()
         .zip(right.iter())
-        .fold(0_u8, |acc, (left, right)| acc | (left ^ right));
+        .fold(0_u8, |acc, (&left, &right)| acc | (left ^ right));
     diff == 0
 }
 
@@ -383,6 +383,7 @@ fn token_hint(token: &str) -> String {
     chars
         .iter()
         .skip(chars.len().saturating_sub(TOKEN_HINT_CHARS))
+        .copied()
         .collect()
 }
 
