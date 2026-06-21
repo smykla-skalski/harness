@@ -44,6 +44,14 @@ INSERT INTO remote_audit_events (
     scope_decision, outcome, remote_addr, error_detail, metadata_json
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '{}')";
 
+const ROUTE_REMOTE_PAIR_CREATE: &str = "remote.pair.create";
+const ROUTE_REMOTE_PAIR_CLAIM: &str = "remote.pair.claim";
+const ROUTE_REMOTE_PAIR_DOMAIN: &str = "remote.pair.domain";
+const ROUTE_REMOTE_PAIR_EXPIRE: &str = "remote.pair.expire";
+const ROUTE_REMOTE_PAIR_INVALID: &str = "remote.pair.invalid";
+const ROUTE_REMOTE_PAIR_REPLAY: &str = "remote.pair.replay";
+const ROUTE_REMOTE_PAIR_UNKNOWN: &str = "remote.pair.unknown";
+
 impl DaemonDb {
     /// Persist a one-time remote pairing code hash.
     ///
@@ -55,7 +63,11 @@ impl DaemonDb {
         audit_event_id: &str,
     ) -> Result<RemoteStoredPairing, CliError> {
         let scopes_json = scopes_to_json(&record.scopes)?;
-        self.conn
+        let transaction = self
+            .conn
+            .unchecked_transaction()
+            .map_err(|error| db_error(format!("begin remote pairing create: {error}")))?;
+        transaction
             .execute(
                 INSERT_REMOTE_PAIRING_SQL,
                 params![
@@ -73,20 +85,28 @@ impl DaemonDb {
                     record.pairing_id.as_str()
                 ))
             })?;
-        self.record_remote_audit_event(&RemoteAuditEvent::new(
-            audit_event_id,
-            record.created_at.as_str(),
-            None,
-            None,
-            "remote.pair.create",
-            RemoteAccessScope::Admin,
-            RemoteAuditScopeDecision::Allowed,
-            RemoteAuditOutcome::Success,
-            None,
-            None,
-        ))?;
-        self.remote_pairing_by_hash(record.code_hash.as_storage_value())?
-            .ok_or_else(|| db_error("remote pairing insert did not persist row"))
+        record_remote_audit_event_for_pairing(
+            &transaction,
+            &RemoteAuditEvent::new(
+                audit_event_id,
+                record.created_at.as_str(),
+                None,
+                None,
+                ROUTE_REMOTE_PAIR_CREATE,
+                RemoteAccessScope::Admin,
+                RemoteAuditScopeDecision::Allowed,
+                RemoteAuditOutcome::Success,
+                None,
+                None,
+            ),
+        )?;
+        let stored =
+            load_remote_pairing_by_hash(&transaction, record.code_hash.as_storage_value())?
+                .ok_or_else(|| db_error("remote pairing insert did not persist row"))?;
+        transaction
+            .commit()
+            .map_err(|error| db_error(format!("commit remote pairing create: {error}")))?;
+        Ok(stored)
     }
 
     /// Claim a valid one-time remote pairing code and create a remote client.
@@ -102,20 +122,46 @@ impl DaemonDb {
     ) -> Result<RemotePairingClaimedClient, CliError> {
         if let Err(error) = validate_pairing_domain(&claim.expected_domain, &claim.claimed_domain) {
             let error_detail = error.to_string();
-            self.record_pairing_claim_failure(claim, now, error_detail.as_str())?;
+            self.record_pairing_claim_failure(
+                claim,
+                now,
+                ROUTE_REMOTE_PAIR_DOMAIN,
+                error_detail.as_str(),
+            )?;
             return Err(db_error(error_detail));
         }
 
-        let code_hash =
-            RemotePairingCodeHash::from_code(code).map_err(|error| db_error(error.to_string()))?;
+        let code_hash = match RemotePairingCodeHash::from_code(code) {
+            Ok(code_hash) => code_hash,
+            Err(error) => {
+                let error_detail = error.to_string();
+                self.record_pairing_claim_failure(
+                    claim,
+                    now,
+                    ROUTE_REMOTE_PAIR_INVALID,
+                    error_detail.as_str(),
+                )?;
+                return Err(db_error(error_detail));
+            }
+        };
         let Some(pairing) = self.remote_pairing_by_hash(code_hash.as_storage_value())? else {
             let error_detail = RemotePairingError::UnknownCode.to_string();
-            self.record_pairing_claim_failure(claim, now, error_detail.as_str())?;
+            self.record_pairing_claim_failure(
+                claim,
+                now,
+                ROUTE_REMOTE_PAIR_UNKNOWN,
+                error_detail.as_str(),
+            )?;
             return Err(db_error(error_detail));
         };
         if pairing.claimed_at.is_some() {
             let error_detail = RemotePairingError::AlreadyClaimed.to_string();
-            self.record_pairing_claim_failure(claim, now, error_detail.as_str())?;
+            self.record_pairing_claim_failure(
+                claim,
+                now,
+                ROUTE_REMOTE_PAIR_REPLAY,
+                error_detail.as_str(),
+            )?;
             return Err(db_error(error_detail));
         }
         if pairing_is_expired(&pairing.expires_at, now)? {
@@ -125,7 +171,7 @@ impl DaemonDb {
                 now,
                 None,
                 None,
-                "remote.pair.expire",
+                ROUTE_REMOTE_PAIR_EXPIRE,
                 RemoteAccessScope::Read,
                 RemoteAuditScopeDecision::Denied,
                 RemoteAuditOutcome::Failure,
@@ -185,7 +231,12 @@ impl DaemonDb {
             transaction.rollback().map_err(|error| {
                 db_error(format!("rollback lost remote pairing claim: {error}"))
             })?;
-            self.record_pairing_claim_failure(claim, now, error_detail.as_str())?;
+            self.record_pairing_claim_failure(
+                claim,
+                now,
+                ROUTE_REMOTE_PAIR_REPLAY,
+                error_detail.as_str(),
+            )?;
             return Err(db_error(error_detail));
         }
         record_remote_audit_event_for_pairing(
@@ -195,7 +246,7 @@ impl DaemonDb {
                 now,
                 None,
                 Some(claim.client_id.as_str()),
-                "remote.pair.claim",
+                ROUTE_REMOTE_PAIR_CLAIM,
                 RemoteAccessScope::Read,
                 RemoteAuditScopeDecision::Allowed,
                 RemoteAuditOutcome::Success,
@@ -216,20 +267,14 @@ impl DaemonDb {
         &self,
         code_hash: &str,
     ) -> Result<Option<RemoteStoredPairing>, CliError> {
-        self.conn
-            .query_row(
-                SELECT_REMOTE_PAIRING_BY_HASH_SQL,
-                [code_hash],
-                remote_pairing_from_row,
-            )
-            .optional()
-            .map_err(|error| db_error(format!("load remote pairing by hash: {error}")))
+        load_remote_pairing_by_hash(&self.conn, code_hash)
     }
 
     fn record_pairing_claim_failure(
         &self,
         claim: &RemotePairingClaimRequest,
         now: &str,
+        route_or_method: &str,
         error_detail: &str,
     ) -> Result<(), CliError> {
         self.record_remote_audit_event(&RemoteAuditEvent::new(
@@ -237,7 +282,7 @@ impl DaemonDb {
             now,
             None,
             None,
-            "remote.pair.claim",
+            route_or_method,
             RemoteAccessScope::Read,
             RemoteAuditScopeDecision::Denied,
             RemoteAuditOutcome::Failure,
@@ -312,6 +357,19 @@ fn record_remote_audit_event_for_pairing(
         ))
     })?;
     Ok(())
+}
+
+fn load_remote_pairing_by_hash(
+    conn: &Connection,
+    code_hash: &str,
+) -> Result<Option<RemoteStoredPairing>, CliError> {
+    conn.query_row(
+        SELECT_REMOTE_PAIRING_BY_HASH_SQL,
+        [code_hash],
+        remote_pairing_from_row,
+    )
+    .optional()
+    .map_err(|error| db_error(format!("load remote pairing by hash: {error}")))
 }
 
 fn remote_pairing_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteStoredPairing> {

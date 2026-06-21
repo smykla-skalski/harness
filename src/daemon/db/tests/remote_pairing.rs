@@ -52,8 +52,18 @@ fn remote_pairing_create_claim_rejects_replay_and_audits() {
         .verify_remote_client_token("client-1", claimed.bearer_token.expose())
         .expect("verify paired client")
         .is_some());
+    let replay_claim = RemotePairingClaimRequest::new_for_tests(
+        "daemon.example.com",
+        "daemon.example.com",
+        "client-1",
+        "MacBook Pro",
+        "macos",
+        Some("203.0.113.10"),
+        "audit-claim-replay",
+    )
+    .expect("replay claim request");
     assert!(
-        db.claim_remote_pairing_code(code.expose(), &claim, "2026-06-21T13:42:00Z")
+        db.claim_remote_pairing_code(code.expose(), &replay_claim, "2026-06-21T13:42:00Z")
             .is_err(),
         "pairing code must be single use"
     );
@@ -66,6 +76,7 @@ fn remote_pairing_create_claim_rejects_replay_and_audits() {
         .collect();
     assert!(routes.contains(&"remote.pair.create".to_string()));
     assert!(routes.contains(&"remote.pair.claim".to_string()));
+    assert!(routes.contains(&"remote.pair.replay".to_string()));
 }
 
 #[test]
@@ -123,7 +134,7 @@ fn remote_pairing_claim_rejects_expiry_and_wrong_domain_with_audit() {
         .map(|event| event.route_or_method)
         .collect();
     assert!(routes.contains(&"remote.pair.expire".to_string()));
-    assert!(routes.contains(&"remote.pair.claim".to_string()));
+    assert!(routes.contains(&"remote.pair.domain".to_string()));
 }
 
 #[test]
@@ -258,4 +269,91 @@ fn remote_pairing_claim_rolls_back_client_and_pairing_when_audit_fails() {
 
     assert_eq!(client_count, 0);
     assert!(claimed_at.is_none());
+}
+
+#[test]
+fn remote_pairing_create_rolls_back_pairing_when_audit_fails() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    db.conn
+        .execute_batch(
+            "
+            CREATE TRIGGER fail_remote_pairing_create_audit
+            BEFORE INSERT ON remote_audit_events
+            WHEN NEW.event_id = 'audit-create-fail'
+            BEGIN
+                SELECT RAISE(FAIL, 'simulated create audit failure');
+            END;",
+        )
+        .expect("install audit failure trigger");
+    let code = RemotePairingCode::from_value_for_tests("create-rollback-secret");
+    let record = RemotePairingRecord::new_for_tests(
+        "pairing-create-rollback",
+        RemoteRole::Viewer,
+        &[],
+        code.expose(),
+        "2026-06-21T13:40:00Z",
+        "2026-06-21T13:50:00Z",
+    )
+    .expect("pairing record");
+
+    assert!(
+        db.create_remote_pairing_code(&record, "audit-create-fail")
+            .is_err(),
+        "create audit failure must reject pairing creation"
+    );
+    let pairing_count: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM remote_pairing_codes
+              WHERE pairing_id = 'pairing-create-rollback'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("pairing count");
+
+    assert_eq!(pairing_count, 0);
+}
+
+#[test]
+fn remote_pairing_claim_audits_invalid_and_unknown_code_routes() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let claim = RemotePairingClaimRequest::new_for_tests(
+        "daemon.example.com",
+        "daemon.example.com",
+        "client-invalid",
+        "MacBook Pro",
+        "macos",
+        Some("203.0.113.50"),
+        "audit-claim-blank",
+    )
+    .expect("claim request");
+    assert!(
+        db.claim_remote_pairing_code(" ", &claim, "2026-06-21T13:41:00Z")
+            .is_err(),
+        "blank code must fail"
+    );
+    let claim = RemotePairingClaimRequest::new_for_tests(
+        "daemon.example.com",
+        "daemon.example.com",
+        "client-unknown",
+        "MacBook Pro",
+        "macos",
+        Some("203.0.113.51"),
+        "audit-claim-unknown",
+    )
+    .expect("claim request");
+    assert!(
+        db.claim_remote_pairing_code("unknown-code", &claim, "2026-06-21T13:42:00Z")
+            .is_err(),
+        "unknown code must fail"
+    );
+
+    let routes: Vec<_> = db
+        .load_remote_audit_events(10)
+        .expect("audit events")
+        .into_iter()
+        .map(|event| event.route_or_method)
+        .collect();
+    assert!(routes.contains(&"remote.pair.invalid".to_string()));
+    assert!(routes.contains(&"remote.pair.unknown".to_string()));
 }
