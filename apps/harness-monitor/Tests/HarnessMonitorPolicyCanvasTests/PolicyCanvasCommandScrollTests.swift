@@ -234,6 +234,15 @@ struct PolicyCanvasCommandScrollTests {
     let scrollCoordinatorSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
     )
+    let liveRoutesSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewport+LiveRoutes.swift"
+    )
+    let coalescerSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasLiveRouteCoalescer.swift"
+    )
+    let viewportControlSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ViewportControl.swift"
+    )
 
     #expect(source.contains("@State private var routeCache = PolicyCanvasViewportRouteCache()"))
     #expect(
@@ -243,7 +252,7 @@ struct PolicyCanvasCommandScrollTests {
     )
     #expect(source.contains(".task(id: centeringRouteState)"))
     #expect(source.contains("await centerViewportAfterRouteStateSettles("))
-    #expect(source.contains("await Task.yield()"))
+    #expect(viewportControlSource.contains("await Task.yield()"))
     #expect(source.contains("guard !Task.isCancelled else"))
     #expect(source.contains("currentRouteKey: routeKey"))
     #expect(source.contains("let resolvedRouteCache = policyCanvasViewportResolvedRouteCache("))
@@ -269,44 +278,42 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("hasRenderableRouteOutput: hasRenderableRouteOutput"))
     #expect(source.contains("var routeSeed: PolicyCanvasViewportRouteSeed?"))
     #expect(source.contains("onFinalRouteOutputReady()"))
-    #expect(source.contains(".task(id: routeSeed?.id)"))
+    #expect(source.contains(".onChange(of: routeSeed?.id, initial: false)"))
     #expect(routeCacheSource.contains("updateCachedRoutes("))
     #expect(
       hostedContentSource.contains(
         "isEnabled: showsQualityInspection && snapshot.hasRenderableRouteOutput"))
     #expect(
-      scrollCoordinatorSource.contains("if snapshot.hasRenderableRouteOutput {"))
+      scrollCoordinatorSource.contains("hasRenderableRouteOutput: hasRenderableRouteOutput"))
     #expect(source.contains("routeCache.outputsByCanvasIdentity"))
     #expect(
       source.contains("let cachedRouteOutput = routeCache.outputsByCanvasIdentity[newIdentity]"))
     #expect(source.contains(".onChange(of: viewModel.routeComputationRequestGeneration"))
-    #expect(source.contains("await rebuildRoutes("))
     #expect(source.contains("pipelineIdentity: routeCacheIdentity"))
     #expect(source.contains("fontScale: fontScale"))
-    #expect(source.contains("PolicyCanvasViewportRouteRefreshKey("))
     #expect(source.contains("let routeKeyIsStale = appliedRouteKey != routeKey"))
-    #expect(source.contains("let hasActivePositionDrag = viewModel.hasActivePositionDrag"))
     #expect(source.contains("let projectedRouteResult = policyCanvasProjectedRouteResult("))
-    #expect(!source.contains("suppressesProjection: hasActivePositionDrag"))
-    #expect(!source.contains("let routeProjectionSuppressed"))
+    // Live real-router architecture: a single coalesced commit path drives the
+    // routes during a drag, so dropping a node changes nothing. The old per-frame
+    // projection-commit task, the refresh task, and the drag-suppressed rebuild
+    // are gone - they produced the post-drop reroute and the
+    // multiple-updates-per-frame onChange faults.
+    #expect(source.contains(".onChange(of: routeKey, initial: true)"))
+    #expect(source.contains(".onChange(of: viewModel.layoutGeneration, initial: false)"))
     #expect(
-      source.contains(
-        "let routeProjectionCanCommit ="
-      )
-    )
-    #expect(source.contains("routeKeyIsStale && projectedRouteResult.canCommitAsCurrentGraph"))
-    #expect(
-      source.contains(
-        "!hasActivePositionDrag"
-          + "\n        && (routeOutputIsCurrentGraphMissing || (routeKeyIsStale && !routeProjectionCanCommit))"
-      )
-    )
-    #expect(source.contains("PolicyCanvasViewportRouteProjectionCommitKey("))
-    #expect(source.contains("guard routeProjectionCanCommit else { return }"))
-    #expect(source.contains("nodePositionsByID: policyCanvasNodePositionsByID(nodes)"))
-    #expect(source.contains("!viewModel.hasActivePositionDrag"))
-    #expect(source.contains("needsRefresh: routeOutputNeedsRefresh"))
-    #expect(source.contains("guard routeOutputNeedsRefresh else { return }"))
+      source.contains("scheduleLiveRouteRecompute(fontScale: fontScale, routeSeed: routeSeed)"))
+    #expect(liveRoutesSource.contains("func scheduleLiveRouteRecompute("))
+    #expect(liveRoutesSource.contains("await recomputeLiveRoutes("))
+    #expect(liveRoutesSource.contains("func liveRouteCacheIsCurrent("))
+    #expect(coalescerSource.contains("final class PolicyCanvasLiveRouteCoalescer"))
+    #expect(coalescerSource.contains("private var hasPending"))
+    #expect(!source.contains("await rebuildRoutes("))
+    #expect(!source.contains("PolicyCanvasViewportRouteRefreshKey("))
+    #expect(!source.contains("PolicyCanvasViewportRouteProjectionCommitKey("))
+    #expect(!source.contains("let hasActivePositionDrag = viewModel.hasActivePositionDrag"))
+    #expect(!source.contains("let routeProjectionCanCommit ="))
+    #expect(!source.contains("let routeOutputNeedsRefresh ="))
+    #expect(!source.contains("guard routeOutputNeedsRefresh else { return }"))
     #expect(!surfaceSource.contains("forcesAutoArrange"))
     #expect(!surfaceSource.contains("viewModel.reflowLayout("))
     #expect(

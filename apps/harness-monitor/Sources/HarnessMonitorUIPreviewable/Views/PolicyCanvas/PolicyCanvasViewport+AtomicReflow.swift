@@ -9,29 +9,6 @@ extension PolicyCanvasViewport {
     clearRouteCache(pipelineIdentity: viewModel.pipelineIdentity)
   }
 
-  @MainActor
-  func rebuildRoutes(
-    for routeKey: PolicyCanvasRouteWorkerKey,
-    pipelineIdentity: String?,
-    fontScale: CGFloat
-  ) async {
-    let generation = nextRouteGeneration()
-    let result = await policyCanvasViewportRouteRebuildResult(
-      worker: routeWorkerInstance(),
-      viewModel: viewModel,
-      fontScale: fontScale
-    )
-    guard !Task.isCancelled, routeGenerationMatches(generation) else {
-      return
-    }
-    updateCachedRoutes(
-      routeKey: routeKey,
-      pipelineIdentity: pipelineIdentity,
-      output: result.output,
-      nodePositionsByID: result.nodePositionsByID
-    )
-  }
-
   /// Service a `requestAtomicReflow(...)`: route the planned layout off-main,
   /// then commit node positions and publish the precomputed routes in the same
   /// MainActor tick. Until the routes are ready the model is untouched, so the

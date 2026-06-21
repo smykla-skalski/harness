@@ -24,6 +24,10 @@ struct PolicyCanvasViewportRouteCache {
     [String: (output: PolicyCanvasRouteWorkerOutput, nodePositionsByID: [String: CGPoint])] = [:]
   var cachedNodePositionsByID: [String: CGPoint] = [:]
   var cachedCanvasIdentity: String?
+  /// The view model's `layoutGeneration` at the last commit. The live recompute
+  /// gate skips work when this still matches and the route key is unchanged, so a
+  /// restored cache or precomputed seed is not needlessly re-routed.
+  var cachedLayoutGeneration: UInt64 = 0
 
   mutating func clear(pipelineIdentity: String?) {
     appliedRouteKey = nil
@@ -45,10 +49,12 @@ struct PolicyCanvasViewportRouteCache {
     routeKey: PolicyCanvasRouteWorkerKey?,
     pipelineIdentity: String?,
     output: PolicyCanvasRouteWorkerOutput,
-    nodePositionsByID: [String: CGPoint]
+    nodePositionsByID: [String: CGPoint],
+    layoutGeneration: UInt64
   ) {
     cachedCanvasIdentity = pipelineIdentity
     cachedNodePositionsByID = nodePositionsByID
+    cachedLayoutGeneration = layoutGeneration
     if cachedOutput.signature != output.signature {
       cachedOutput = output
     }
@@ -65,7 +71,15 @@ func policyCanvasViewportResolvedRouteCache(
   pipelineIdentity: String?,
   routeSeed: PolicyCanvasViewportRouteSeed?
 ) -> PolicyCanvasViewportResolvedRouteCache {
-  if let routeSeed,
+  let cacheHasRoutedThisKey =
+    routeCache.cachedCanvasIdentity == pipelineIdentity
+    && routeCache.appliedRouteKey == routeKey
+  // Once the live recompute has committed the routed output for this exact key,
+  // the cache is authoritative - it tracks node drags, whereas the seed is a
+  // first-paint snapshot at the loaded positions. Preferring the seed here would
+  // pin a seeded canvas to its original layout and ignore every live recompute.
+  if !cacheHasRoutedThisKey,
+    let routeSeed,
     routeSeed.routeKey == routeKey,
     routeSeed.pipelineIdentity == pipelineIdentity
   {

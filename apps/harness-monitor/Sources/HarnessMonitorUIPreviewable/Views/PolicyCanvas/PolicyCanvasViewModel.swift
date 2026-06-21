@@ -67,6 +67,14 @@ public final class PolicyCanvasViewModel {
   var viewportCenteringGeneration: UInt64
   var routeComputationGeneration: UInt64
   var routeComputationRequestGeneration: UInt64
+  /// Bumped on every node/group position write, including the per-tick writes a
+  /// drag gesture makes that never enter `mutate(_:)`. The viewport drives its
+  /// coalesced live route recompute off this so dragging shows the real router
+  /// output, not a projected approximation, and dropping changes nothing. It is
+  /// deliberately separate from `routeComputationGeneration` (which feeds the
+  /// route-worker key): positions must trigger a recompute without changing the
+  /// cache identity the projection gap-filler is measured against.
+  var layoutGeneration: UInt64
   /// Raised by `requestAtomicReflow(...)` and serviced by the hosting viewport,
   /// which routes the planned layout off-main before committing (atomic reveal).
   var atomicReflowRequest: PolicyCanvasAtomicReflowRequest?
@@ -324,6 +332,7 @@ public final class PolicyCanvasViewModel {
     self.viewportCenteringBehavior = .document
     self.routeComputationGeneration = 0
     self.routeComputationRequestGeneration = 0
+    self.layoutGeneration = 0
     self.validationPresentation = .empty
     self.cachedAutomationPolicyCompilation = .empty
     self.routingHints = nil

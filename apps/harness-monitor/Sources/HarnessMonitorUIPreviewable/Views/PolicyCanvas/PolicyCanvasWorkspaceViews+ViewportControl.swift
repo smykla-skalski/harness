@@ -159,7 +159,8 @@ extension PolicyCanvasViewport {
       routeKey: routeKey,
       pipelineIdentity: pipelineIdentity,
       output: output,
-      nodePositionsByID: nodePositionsByID
+      nodePositionsByID: nodePositionsByID,
+      layoutGeneration: viewModel.layoutGeneration
     )
   }
   func routeWorkerInstance() -> PolicyCanvasRouteWorker { bridgeRouteCache.worker }

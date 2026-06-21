@@ -34,6 +34,9 @@ struct PolicyCanvasViewport: View {
   @State private var scrollApplicatorRequest: PolicyCanvasViewportScrollRequest?
   @State private var scrollApplicatorRequestID: UInt64 = 0
   @State private var routeCache = PolicyCanvasViewportRouteCache()
+  /// Coalesces the live route recompute so a node drag routes the latest geometry
+  /// once per settle instead of queueing a stale compute per gesture tick.
+  @State private var liveRouteCoalescer = PolicyCanvasLiveRouteCoalescer()
   @State private var validationWorker = PolicyCanvasValidationWorker()
   @State private var validationGeneration: UInt64 = 0
   /// Live scroll/zoom viewport rect, stored off-view so panning only refreshes
@@ -71,6 +74,9 @@ struct PolicyCanvasViewport: View {
   var bridgeRouteCache: PolicyCanvasViewportRouteCache {
     get { routeCache }
     nonmutating set { routeCache = newValue }
+  }
+  var bridgeLiveRouteCoalescer: PolicyCanvasLiveRouteCoalescer {
+    liveRouteCoalescer
   }
   var bridgeValidationWorker: PolicyCanvasValidationWorker {
     validationWorker
@@ -128,7 +134,12 @@ struct PolicyCanvasViewport: View {
       let cachedNodePositionsByID = resolvedRouteCache.nodePositionsByID
       let appliedRouteKey = resolvedRouteCache.appliedRouteKey
       let routeKeyIsStale = appliedRouteKey != routeKey
-      let hasActivePositionDrag = viewModel.hasActivePositionDrag
+      // During a drag the cache trails the cursor by at most one coalesced
+      // recompute; this projects the last routed output onto the current node
+      // positions so the wires track the node until the real routes land. Once
+      // the recompute commits, the delta is zero and this returns the routed
+      // output verbatim. The projection only ever fills the gap - it is never
+      // committed to the cache, so it cannot diverge from the router on drop.
       let projectedRouteResult = policyCanvasProjectedRouteResult(
         input: PolicyCanvasProjectedRouteInput(
           cachedOutput: cachedOutput,
@@ -139,10 +150,6 @@ struct PolicyCanvasViewport: View {
           fontScale: fontScale
         )
       )
-      let routeProjectionCanCommit =
-        routeKeyIsStale && projectedRouteResult.canCommitAsCurrentGraph
-      let routeOutputIsCurrentGraphMissing =
-        !viewModel.isEmpty && projectedRouteResult.output.signature == .empty
       let routeOutput = projectedRouteResult.output
       let routeOutputMatchesCurrentGraph =
         !viewModel.isEmpty
@@ -153,9 +160,6 @@ struct PolicyCanvasViewport: View {
       let hasRenderableRouteOutput =
         viewModel.isEmpty || finalRouteOutputReady
         || (routeKeyIsStale && routeOutputMatchesCurrentGraph)
-      let routeOutputNeedsRefresh =
-        !hasActivePositionDrag
-        && (routeOutputIsCurrentGraphMissing || (routeKeyIsStale && !routeProjectionCanCommit))
       let validationKey = policyCanvasValidationWorkerKey(
         viewModel: viewModel,
         nodes: nodes,
@@ -258,50 +262,18 @@ struct PolicyCanvasViewport: View {
           routeOutput: routeOutput
         )
       }
-      .task(
-        id: PolicyCanvasViewportRouteRefreshKey(
-          routeKey: routeKey,
-          pipelineIdentity: routeCacheIdentity,
-          needsRefresh: routeOutputNeedsRefresh
-        )
-      ) {
-        guard routeOutputNeedsRefresh else { return }
-        await rebuildRoutes(
-          for: routeKey,
-          pipelineIdentity: routeCacheIdentity,
-          fontScale: fontScale
-        )
+      .onChange(of: routeKey, initial: true) {
+        scheduleLiveRouteRecompute(fontScale: fontScale, routeSeed: routeSeed)
       }
-      .task(
-        id: PolicyCanvasViewportRouteProjectionCommitKey(
-          routeKey: routeKey,
-          pipelineIdentity: routeCacheIdentity,
-          outputSignature: routeOutput.signature,
-          canCommit: routeProjectionCanCommit
-        )
-      ) {
-        guard routeProjectionCanCommit else { return }
-        updateCachedRoutes(
-          routeKey: routeKey,
-          pipelineIdentity: routeCacheIdentity,
-          output: routeOutput,
-          nodePositionsByID: policyCanvasNodePositionsByID(nodes)
-        )
+      .onChange(of: viewModel.layoutGeneration, initial: false) {
+        scheduleLiveRouteRecompute(fontScale: fontScale, routeSeed: routeSeed)
       }
-      .task(id: routeSeed?.id) {
-        guard
-          let routeSeed,
-          routeSeed.routeKey == routeKey,
-          routeSeed.pipelineIdentity == routeCacheIdentity
-        else {
-          return
-        }
-        updateCachedRoutes(
-          routeKey: routeSeed.routeKey,
-          pipelineIdentity: routeSeed.pipelineIdentity,
-          output: routeSeed.output,
-          nodePositionsByID: routeSeed.nodePositionsByID
-        )
+      .onChange(of: viewModel.routeComputationRequestGeneration, initial: false) {
+        guard viewModel.routeComputationRequestGeneration > 0 else { return }
+        scheduleLiveRouteRecompute(fontScale: fontScale, routeSeed: routeSeed)
+      }
+      .onChange(of: routeSeed?.id, initial: false) {
+        scheduleLiveRouteRecompute(fontScale: fontScale, routeSeed: routeSeed)
       }
       .task(id: finalRouteOutputReady) {
         guard finalRouteOutputReady else {
@@ -335,25 +307,11 @@ struct PolicyCanvasViewport: View {
           routeCache.cachedOutput = cachedRouteOutput.output
           routeCache.cachedNodePositionsByID = cachedRouteOutput.nodePositionsByID
           routeCache.cachedCanvasIdentity = newIdentity
+          routeCache.cachedLayoutGeneration = viewModel.layoutGeneration
         } else {
           clearCachedRouteOutput()
         }
         hasAppliedRestoredSceneZoom = false
-      }
-      .onChange(of: viewModel.routeComputationRequestGeneration, initial: false) {
-        guard
-          viewModel.routeComputationRequestGeneration > 0,
-          !viewModel.hasActivePositionDrag
-        else {
-          return
-        }
-        Task { @MainActor in
-          await rebuildRoutes(
-            for: routeKey,
-            pipelineIdentity: routeCacheIdentity,
-            fontScale: fontScale
-          )
-        }
       }
       .onChange(of: viewModel.atomicReflowRequest?.id, initial: false) {
         Task { @MainActor in

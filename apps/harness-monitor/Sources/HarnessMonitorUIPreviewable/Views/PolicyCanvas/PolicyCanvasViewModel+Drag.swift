@@ -29,6 +29,7 @@ extension PolicyCanvasViewModel {
     if nodes[index].position != nextPosition {
       nodes[index].position = nextPosition
       markDocumentDirty()
+      bumpLayoutGeneration()
     }
     let nextHighlightedGroupID =
       containingGroupID(for: nodeCenter(nodes[index]), excluding: nodes[index].groupID)
@@ -108,6 +109,9 @@ extension PolicyCanvasViewModel {
       groups[index].frame.origin = nextOrigin
     }
     moveNodes(in: groupID, by: delta)
+    if delta != .zero {
+      bumpLayoutGeneration()
+    }
     reconcileGroupFrame(id: groupID)
     if highlightedGroupID != groupID {
       highlightedGroupID = groupID

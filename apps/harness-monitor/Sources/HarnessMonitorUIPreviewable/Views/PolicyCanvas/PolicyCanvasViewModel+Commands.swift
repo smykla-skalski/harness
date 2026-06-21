@@ -150,6 +150,27 @@ extension PolicyCanvasViewModel {
     routeComputationRequestGeneration &+= 1
   }
 
+  /// Signal that node/group positions changed without a `mutate(_:)` commit, so
+  /// the viewport recomputes live routes for the new geometry. Called from the
+  /// per-tick drag writes (the gesture funnels into `mutate` only on release).
+  ///
+  /// Dropping the layout engine's routing hints and precomputed routes here
+  /// matches what `mutate(.moveNode)`/`.moveGroup` do on release: both invalidate
+  /// the hints, so the router solves the same problem mid-drag as it does on
+  /// drop. Without this the live routes would be computed from a hint-seeded
+  /// solve and then jump to a from-scratch solve when the drag commits - exactly
+  /// the post-drop reroute we are removing. Guarded so an already-cleared canvas
+  /// does not churn observation every gesture tick.
+  func bumpLayoutGeneration() {
+    layoutGeneration &+= 1
+    if routingHints != nil {
+      routingHints = nil
+    }
+    if precomputedRoutes != nil {
+      precomputedRoutes = nil
+    }
+  }
+
   var hasPendingViewportCenteringRequest: Bool {
     centeredViewportGeneration != viewportCenteringGeneration
   }
