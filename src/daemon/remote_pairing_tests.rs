@@ -1,5 +1,6 @@
 use super::{
-    validate_pairing_domain, RemotePairingCode, RemotePairingRateLimiter, RemotePairingRecord,
+    validate_pairing_domain, RemotePairingClaimRequest, RemotePairingCode,
+    RemotePairingRateLimiter, RemotePairingRecord,
 };
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 
@@ -34,6 +35,36 @@ fn remote_pairing_rejects_wrong_claim_domain() {
         .expect_err("wrong domain rejected");
 
     assert!(error.to_string().contains("wrong remote pairing domain"));
+}
+
+#[test]
+fn remote_pairing_claim_request_rejects_blank_display_name_and_platform() {
+    assert!(
+        RemotePairingClaimRequest::new_for_tests(
+            "daemon.example.com",
+            "daemon.example.com",
+            "client-1",
+            " ",
+            "macos",
+            Some("203.0.113.10"),
+            "audit-claim",
+        )
+        .is_err(),
+        "display name is required for pairing metadata"
+    );
+    assert!(
+        RemotePairingClaimRequest::new_for_tests(
+            "daemon.example.com",
+            "daemon.example.com",
+            "client-1",
+            "MacBook Pro",
+            "\t",
+            Some("203.0.113.10"),
+            "audit-claim",
+        )
+        .is_err(),
+        "platform is required for pairing metadata"
+    );
 }
 
 #[test]

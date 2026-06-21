@@ -1,5 +1,6 @@
 use super::*;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
+use crate::daemon::remote_identity::RemoteAuditOutcome;
 use crate::daemon::remote_pairing::{
     RemotePairingClaimRequest, RemotePairingCode, RemotePairingRecord,
 };
@@ -123,4 +124,74 @@ fn remote_pairing_claim_rejects_expiry_and_wrong_domain_with_audit() {
         .collect();
     assert!(routes.contains(&"remote.pair.expire".to_string()));
     assert!(routes.contains(&"remote.pair.claim".to_string()));
+}
+
+#[test]
+fn remote_pairing_claim_rejects_lost_claim_race() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let code = RemotePairingCode::from_value_for_tests("race-pairing-secret");
+    let record = RemotePairingRecord::new_for_tests(
+        "pairing-race",
+        RemoteRole::Operator,
+        &[RemoteAccessScope::Read],
+        code.expose(),
+        "2026-06-21T13:40:00Z",
+        "2026-06-21T13:50:00Z",
+    )
+    .expect("pairing record");
+    db.create_remote_pairing_code(&record, "audit-create-race")
+        .expect("create pairing");
+    db.conn
+        .execute_batch(
+            "
+            CREATE TRIGGER simulate_remote_pairing_claim_race
+            BEFORE UPDATE OF claimed_at ON remote_pairing_codes
+            WHEN OLD.pairing_id = 'pairing-race'
+                 AND OLD.claimed_at IS NULL
+                 AND NEW.claimed_client_id = 'client-race'
+                 AND NEW.claimed_at IS NOT NULL
+            BEGIN
+                UPDATE remote_pairing_codes
+                   SET claimed_at = '2026-06-21T13:40:30Z',
+                       claimed_client_id = NULL,
+                       claim_remote_addr = '203.0.113.99'
+                 WHERE pairing_id = OLD.pairing_id;
+                SELECT RAISE(IGNORE);
+            END;",
+        )
+        .expect("install race trigger");
+
+    let claim = RemotePairingClaimRequest::new_for_tests(
+        "daemon.example.com",
+        "daemon.example.com",
+        "client-race",
+        "MacBook Pro",
+        "macos",
+        Some("203.0.113.30"),
+        "audit-claim-race",
+    )
+    .expect("claim request");
+    let error = db
+        .claim_remote_pairing_code(code.expose(), &claim, "2026-06-21T13:41:00Z")
+        .expect_err("lost claim race must fail");
+
+    assert!(
+        error.to_string().contains("already claimed"),
+        "unexpected race error: {error}"
+    );
+    let client_count: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM remote_clients WHERE client_id = 'client-race'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("client count");
+    assert_eq!(client_count, 0);
+    assert!(!db
+        .load_remote_audit_events(10)
+        .expect("audit events")
+        .iter()
+        .any(|event| event.event_id == "audit-claim-race"
+            && event.outcome == RemoteAuditOutcome::Success));
 }

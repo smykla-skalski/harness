@@ -135,7 +135,8 @@ impl DaemonDb {
         )
         .map_err(|error| db_error(error.to_string()))?;
         let client = self.register_remote_client(&registration)?;
-        self.conn
+        let changed = self
+            .conn
             .execute(
                 "UPDATE remote_pairing_codes
                  SET claimed_at = ?2, claimed_client_id = ?3, claim_remote_addr = ?4
@@ -153,6 +154,12 @@ impl DaemonDb {
                     pairing.pairing_id.as_str()
                 ))
             })?;
+        if changed == 0 {
+            let error_detail = RemotePairingError::AlreadyClaimed.to_string();
+            self.delete_lost_pairing_claim_client(claim.client_id.as_str(), now)?;
+            self.record_pairing_claim_failure(claim, now, error_detail.as_str())?;
+            return Err(db_error(error_detail));
+        }
         self.record_remote_audit_event(&RemoteAuditEvent::new(
             claim.audit_event_id.as_str(),
             now,
@@ -203,6 +210,29 @@ impl DaemonDb {
             claim.remote_addr.as_deref(),
             Some(error_detail),
         ))
+    }
+
+    fn delete_lost_pairing_claim_client(
+        &self,
+        client_id: &str,
+        created_at: &str,
+    ) -> Result<(), CliError> {
+        self.conn
+            .execute(
+                "DELETE FROM remote_clients
+                 WHERE client_id = ?1
+                   AND created_at = ?2
+                   AND last_seen_at IS NULL
+                   AND revoked_at IS NULL
+                   AND rotated_at IS NULL",
+                params![client_id, created_at],
+            )
+            .map_err(|error| {
+                db_error(format!(
+                    "delete lost remote pairing claim client {client_id}: {error}"
+                ))
+            })?;
+        Ok(())
     }
 }
 

@@ -26,6 +26,8 @@ pub enum RemotePairingError {
     EmptyCode,
     EmptyClientId,
     EmptyDomain,
+    EmptyDisplayName,
+    EmptyPlatform,
     InvalidStoredCodeHash,
     WrongDomain { expected: String, actual: String },
     RateLimited,
@@ -42,6 +44,8 @@ impl fmt::Display for RemotePairingError {
             Self::EmptyCode => write!(f, "remote pairing code is required"),
             Self::EmptyClientId => write!(f, "remote pairing client id is required"),
             Self::EmptyDomain => write!(f, "remote pairing domain is required"),
+            Self::EmptyDisplayName => write!(f, "remote pairing display name is required"),
+            Self::EmptyPlatform => write!(f, "remote pairing platform is required"),
             Self::InvalidStoredCodeHash => write!(f, "remote pairing code hash is invalid"),
             Self::WrongDomain { expected, actual } => write!(
                 f,
@@ -64,6 +68,8 @@ impl Error for RemotePairingError {
             | Self::EmptyCode
             | Self::EmptyClientId
             | Self::EmptyDomain
+            | Self::EmptyDisplayName
+            | Self::EmptyPlatform
             | Self::InvalidStoredCodeHash
             | Self::WrongDomain { .. }
             | Self::RateLimited
@@ -255,7 +261,8 @@ impl RemotePairingClaimRequest {
     /// Build a pairing claim request from public claim endpoint fields.
     ///
     /// # Errors
-    /// Returns [`RemotePairingError`] when required claim fields are blank.
+    /// Returns [`RemotePairingError`] when the domains, client id, display name,
+    /// or platform are blank.
     pub fn new(
         expected_domain: impl Into<String>,
         claimed_domain: impl Into<String>,
@@ -268,18 +275,26 @@ impl RemotePairingClaimRequest {
         let expected_domain = expected_domain.into();
         let claimed_domain = claimed_domain.into();
         let client_id = client_id.into();
+        let display_name = display_name.into();
+        let platform = platform.into();
         if expected_domain.trim().is_empty() || claimed_domain.trim().is_empty() {
             return Err(RemotePairingError::EmptyDomain);
         }
         if client_id.trim().is_empty() {
             return Err(RemotePairingError::EmptyClientId);
         }
+        if display_name.trim().is_empty() {
+            return Err(RemotePairingError::EmptyDisplayName);
+        }
+        if platform.trim().is_empty() {
+            return Err(RemotePairingError::EmptyPlatform);
+        }
         Ok(Self {
             expected_domain,
             claimed_domain,
             client_id,
-            display_name: display_name.into(),
-            platform: platform.into(),
+            display_name,
+            platform,
             remote_addr: remote_addr.map(ToOwned::to_owned),
             audit_event_id: audit_event_id.into(),
         })
