@@ -83,7 +83,7 @@ struct PolicyCanvasDecisionMatrixView: View {
   private var caption: some View {
     Text(
       "Read-only preview of how your draft decides each action. "
-        + "Tap a row to trace it on the canvas."
+        + "Tap a row to trace it on the canvas"
     )
     .scaledFont(.caption2)
     .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
@@ -94,7 +94,7 @@ struct PolicyCanvasDecisionMatrixView: View {
     Text(
       isEvaluating
         ? "Evaluating how each action resolves\u{2026}"
-        : "Edit the policy to preview how each action will be decided."
+        : "Edit the policy to preview how each action will be decided"
     )
     .scaledFont(.caption)
     .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)

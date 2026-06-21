@@ -66,7 +66,7 @@ struct PolicyCanvasScenarioInspector: View {
 
   @ViewBuilder private var content: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Text("Test inputs that show how your policy decides a specific case.")
+      Text("Test inputs that show how your policy decides a specific case")
         .scaledFont(.caption2)
         .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
         .fixedSize(horizontal: false, vertical: true)
@@ -74,23 +74,23 @@ struct PolicyCanvasScenarioInspector: View {
       actions
 
       if rows.isEmpty {
-        Text(isEvaluating ? "Evaluating scenarios\u{2026}" : "No scenarios yet - add one to start.")
+        Text(isEvaluating ? "Evaluating scenarios\u{2026}" : "No scenarios yet - add one to start")
           .scaledFont(.caption)
           .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
       } else {
-        ScrollView {
-          VStack(alignment: .leading, spacing: 0) {
-            ForEach(rows) { row in
-              PolicyCanvasScenarioRow(
-                row: row,
-                focusDecision: focusDecision,
-                editScenario: editScenario,
-                deleteScenario: deleteScenario
-              )
-            }
+        // No inner scroll or fixed cap: the confidence pane owns one scroll view,
+        // so a long scenario list flows with the decisions and replay instead of
+        // scrolling inside a 180pt window while the pane has empty room below.
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(rows) { row in
+            PolicyCanvasScenarioRow(
+              row: row,
+              focusDecision: focusDecision,
+              editScenario: editScenario,
+              deleteScenario: deleteScenario
+            )
           }
         }
-        .frame(maxHeight: 180)
       }
     }
     .padding(.horizontal, 12)
@@ -98,20 +98,24 @@ struct PolicyCanvasScenarioInspector: View {
   }
 
   private var actions: some View {
-    HStack(spacing: 14) {
+    HStack(spacing: 8) {
+      // Bordered chips, not bare tinted text: a flat colored word reads as a
+      // label, so the round-2 panel left "Add scenario"/"Reset" looking
+      // unclickable. The bezel is the affordance.
       Button("Add scenario", action: addScenario)
-        .scaledFont(.caption2.weight(.semibold))
-        .buttonStyle(.borderless)
-        .foregroundStyle(PolicyCanvasVisualStyle.readyTint)
+        .scaledFont(.caption.weight(.semibold))
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .tint(PolicyCanvasVisualStyle.readyTint)
         .help("Add a scenario to test how the policy decides a specific case")
         .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasScenarioAddButton)
 
       Button("Reset") {
         isConfirmingReset = true
       }
-      .scaledFont(.caption2.weight(.medium))
-      .buttonStyle(.borderless)
-      .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+      .scaledFont(.caption.weight(.medium))
+      .buttonStyle(.bordered)
+      .controlSize(.small)
       .help("Remove your scenarios and restore the default set")
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasScenarioResetButton)
 
@@ -125,7 +129,7 @@ struct PolicyCanvasScenarioInspector: View {
       Button("Reset scenarios", role: .destructive, action: resetScenarios)
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("This removes any scenarios you added and restores the seeded set.")
+      Text("This removes any scenarios you added and restores the seeded set")
     }
   }
 }
