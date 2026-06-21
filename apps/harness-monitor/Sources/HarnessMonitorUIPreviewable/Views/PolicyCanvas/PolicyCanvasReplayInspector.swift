@@ -76,9 +76,8 @@ struct PolicyCanvasReplayInspector: View {
   private var loadButton: some View {
     Button(summary == nil ? "Load" : "Refresh", action: loadReplay)
       .scaledFont(.caption.weight(.semibold))
-      .buttonStyle(.bordered)
+      .harnessActionButtonStyle(variant: .bordered, tint: loadButtonTint)
       .controlSize(.small)
-      .tint(loadButtonTint)
       .disabled(isLoading)
       .help("Replay the draft over the recorded decision feed")
       .accessibilityHint(isStale ? "Draft changed - refresh to update the comparison" : "")

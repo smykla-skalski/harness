@@ -104,9 +104,8 @@ struct PolicyCanvasScenarioInspector: View {
       // unclickable. The bezel is the affordance.
       Button("Add scenario", action: addScenario)
         .scaledFont(.caption.weight(.semibold))
-        .buttonStyle(.bordered)
+        .harnessActionButtonStyle(variant: .bordered, tint: PolicyCanvasVisualStyle.readyTint)
         .controlSize(.small)
-        .tint(PolicyCanvasVisualStyle.readyTint)
         .help("Add a scenario to test how the policy decides a specific case")
         .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasScenarioAddButton)
 
@@ -114,7 +113,7 @@ struct PolicyCanvasScenarioInspector: View {
         isConfirmingReset = true
       }
       .scaledFont(.caption.weight(.medium))
-      .buttonStyle(.bordered)
+      .harnessActionButtonStyle(variant: .bordered)
       .controlSize(.small)
       .help("Remove your scenarios and restore the default set")
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasScenarioResetButton)
