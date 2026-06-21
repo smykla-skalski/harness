@@ -195,3 +195,67 @@ fn remote_pairing_claim_rejects_lost_claim_race() {
         .any(|event| event.event_id == "audit-claim-race"
             && event.outcome == RemoteAuditOutcome::Success));
 }
+
+#[test]
+fn remote_pairing_claim_rolls_back_client_and_pairing_when_audit_fails() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let code = RemotePairingCode::from_value_for_tests("atomic-pairing-secret");
+    let record = RemotePairingRecord::new_for_tests(
+        "pairing-atomic",
+        RemoteRole::Operator,
+        &[RemoteAccessScope::Read],
+        code.expose(),
+        "2026-06-21T13:40:00Z",
+        "2026-06-21T13:50:00Z",
+    )
+    .expect("pairing record");
+    db.create_remote_pairing_code(&record, "audit-create-atomic")
+        .expect("create pairing");
+    db.conn
+        .execute_batch(
+            "
+            CREATE TRIGGER fail_remote_pairing_claim_audit
+            BEFORE INSERT ON remote_audit_events
+            WHEN NEW.event_id = 'audit-claim-atomic'
+            BEGIN
+                SELECT RAISE(FAIL, 'simulated audit failure');
+            END;",
+        )
+        .expect("install audit failure trigger");
+
+    let claim = RemotePairingClaimRequest::new_for_tests(
+        "daemon.example.com",
+        "daemon.example.com",
+        "client-atomic",
+        "MacBook Pro",
+        "macos",
+        Some("203.0.113.40"),
+        "audit-claim-atomic",
+    )
+    .expect("claim request");
+    assert!(
+        db.claim_remote_pairing_code(code.expose(), &claim, "2026-06-21T13:41:00Z")
+            .is_err(),
+        "audit failure must reject the claim"
+    );
+
+    let client_count: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM remote_clients WHERE client_id = 'client-atomic'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("client count");
+    let claimed_at: Option<String> = db
+        .conn
+        .query_row(
+            "SELECT claimed_at FROM remote_pairing_codes WHERE pairing_id = 'pairing-atomic'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("claimed at");
+
+    assert_eq!(client_count, 0);
+    assert!(claimed_at.is_none());
+}

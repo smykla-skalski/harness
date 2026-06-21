@@ -76,3 +76,30 @@ fn remote_pairing_rate_limits_ip_and_code_attempts() {
     assert!(limiter.record_attempt("203.0.113.10", "code-1").is_err());
     assert!(limiter.record_attempt("203.0.113.11", "code-1").is_ok());
 }
+
+#[test]
+fn remote_pairing_rate_limiter_uses_tuple_keys_without_delimiter_collisions() {
+    let mut limiter = RemotePairingRateLimiter::new_for_tests(1);
+
+    assert!(limiter.record_attempt("addr\0part", "code").is_ok());
+    assert!(
+        limiter.record_attempt("addr", "part\0code").is_ok(),
+        "distinct address/code tuples must not collide"
+    );
+    assert!(limiter.record_attempt("addr\0part", "code").is_err());
+}
+
+#[test]
+fn remote_pairing_rate_limiter_bounds_tracked_attempts() {
+    let mut limiter = RemotePairingRateLimiter::new_bounded_for_tests(1, 2);
+
+    assert!(limiter.record_attempt("203.0.113.1", "code").is_ok());
+    assert!(limiter.record_attempt("203.0.113.2", "code").is_ok());
+    assert!(limiter.record_attempt("203.0.113.3", "code").is_ok());
+
+    assert_eq!(limiter.tracked_attempts_for_tests(), 2);
+    assert!(
+        limiter.record_attempt("203.0.113.1", "code").is_ok(),
+        "oldest entries are evicted when the limiter reaches its bound"
+    );
+}

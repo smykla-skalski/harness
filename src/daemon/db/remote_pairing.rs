@@ -9,11 +9,11 @@
 use chrono::{DateTime, Utc};
 use rusqlite::{params, types::Type};
 
-use super::{db_error, CliError, DaemonDb, OptionalExtension};
+use super::{db_error, CliError, Connection, DaemonDb, OptionalExtension};
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
     parse_remote_role, parse_remote_scope, RemoteAuditEvent, RemoteAuditOutcome,
-    RemoteAuditScopeDecision, RemoteBearerToken, RemoteClientRegistration,
+    RemoteAuditScopeDecision, RemoteBearerToken, RemoteClientRegistration, RemoteStoredClient,
 };
 use crate::daemon::remote_pairing::{
     validate_pairing_domain, RemotePairingClaimRequest, RemotePairingClaimedClient,
@@ -31,6 +31,18 @@ SELECT pairing_id, code_hash, role, scopes_json, created_at, expires_at,
        claimed_at, claimed_client_id, claim_remote_addr
 FROM remote_pairing_codes
 WHERE code_hash = ?1";
+
+const INSERT_PAIRING_REMOTE_CLIENT_SQL: &str = "
+INSERT INTO remote_clients (
+    client_id, display_name, platform, role, scopes_json, token_hash, token_hint,
+    created_at, last_seen_at, revoked_at, rotated_at, metadata_json
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, NULL, NULL, '{}')";
+
+const INSERT_PAIRING_REMOTE_AUDIT_EVENT_SQL: &str = "
+INSERT INTO remote_audit_events (
+    event_id, recorded_at, request_id, client_id, route_or_method, scope,
+    scope_decision, outcome, remote_addr, error_detail, metadata_json
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '{}')";
 
 impl DaemonDb {
     /// Persist a one-time remote pairing code hash.
@@ -134,9 +146,23 @@ impl DaemonDb {
             now,
         )
         .map_err(|error| db_error(error.to_string()))?;
-        let client = self.register_remote_client(&registration)?;
-        let changed = self
+        self.claim_remote_pairing_in_transaction(&pairing, &registration, bearer_token, claim, now)
+    }
+
+    fn claim_remote_pairing_in_transaction(
+        &self,
+        pairing: &RemoteStoredPairing,
+        registration: &RemoteClientRegistration,
+        bearer_token: RemoteBearerToken,
+        claim: &RemotePairingClaimRequest,
+        now: &str,
+    ) -> Result<RemotePairingClaimedClient, CliError> {
+        let transaction = self
             .conn
+            .unchecked_transaction()
+            .map_err(|error| db_error(format!("begin remote pairing claim: {error}")))?;
+        let client = insert_remote_client_for_pairing(&transaction, registration)?;
+        let changed = transaction
             .execute(
                 "UPDATE remote_pairing_codes
                  SET claimed_at = ?2, claimed_client_id = ?3, claim_remote_addr = ?4
@@ -156,22 +182,30 @@ impl DaemonDb {
             })?;
         if changed == 0 {
             let error_detail = RemotePairingError::AlreadyClaimed.to_string();
-            self.delete_lost_pairing_claim_client(claim.client_id.as_str(), now)?;
+            transaction.rollback().map_err(|error| {
+                db_error(format!("rollback lost remote pairing claim: {error}"))
+            })?;
             self.record_pairing_claim_failure(claim, now, error_detail.as_str())?;
             return Err(db_error(error_detail));
         }
-        self.record_remote_audit_event(&RemoteAuditEvent::new(
-            claim.audit_event_id.as_str(),
-            now,
-            None,
-            Some(claim.client_id.as_str()),
-            "remote.pair.claim",
-            RemoteAccessScope::Read,
-            RemoteAuditScopeDecision::Allowed,
-            RemoteAuditOutcome::Success,
-            claim.remote_addr.as_deref(),
-            None,
-        ))?;
+        record_remote_audit_event_for_pairing(
+            &transaction,
+            &RemoteAuditEvent::new(
+                claim.audit_event_id.as_str(),
+                now,
+                None,
+                Some(claim.client_id.as_str()),
+                "remote.pair.claim",
+                RemoteAccessScope::Read,
+                RemoteAuditScopeDecision::Allowed,
+                RemoteAuditOutcome::Success,
+                claim.remote_addr.as_deref(),
+                None,
+            ),
+        )?;
+        transaction
+            .commit()
+            .map_err(|error| db_error(format!("commit remote pairing claim: {error}")))?;
         Ok(RemotePairingClaimedClient {
             client,
             bearer_token,
@@ -211,29 +245,73 @@ impl DaemonDb {
             Some(error_detail),
         ))
     }
+}
 
-    fn delete_lost_pairing_claim_client(
-        &self,
-        client_id: &str,
-        created_at: &str,
-    ) -> Result<(), CliError> {
-        self.conn
-            .execute(
-                "DELETE FROM remote_clients
-                 WHERE client_id = ?1
-                   AND created_at = ?2
-                   AND last_seen_at IS NULL
-                   AND revoked_at IS NULL
-                   AND rotated_at IS NULL",
-                params![client_id, created_at],
-            )
-            .map_err(|error| {
-                db_error(format!(
-                    "delete lost remote pairing claim client {client_id}: {error}"
-                ))
-            })?;
-        Ok(())
-    }
+fn insert_remote_client_for_pairing(
+    conn: &Connection,
+    registration: &RemoteClientRegistration,
+) -> Result<RemoteStoredClient, CliError> {
+    let scopes_json = scopes_to_json(&registration.scopes)?;
+    conn.execute(
+        INSERT_PAIRING_REMOTE_CLIENT_SQL,
+        params![
+            registration.client_id,
+            registration.display_name,
+            registration.platform,
+            registration.role.as_str(),
+            scopes_json,
+            registration.token_hash.as_storage_value(),
+            registration.token_hint,
+            registration.created_at,
+        ],
+    )
+    .map_err(|error| {
+        db_error(format!(
+            "insert remote client {}: {error}",
+            registration.client_id.as_str()
+        ))
+    })?;
+    Ok(RemoteStoredClient {
+        client_id: registration.client_id.clone(),
+        display_name: registration.display_name.clone(),
+        platform: registration.platform.clone(),
+        role: registration.role,
+        scopes: registration.scopes.clone(),
+        token_hash: registration.token_hash.clone(),
+        token_hint: registration.token_hint.clone(),
+        created_at: registration.created_at.clone(),
+        last_seen_at: None,
+        revoked_at: None,
+        rotated_at: None,
+    })
+}
+
+fn record_remote_audit_event_for_pairing(
+    conn: &Connection,
+    event: &RemoteAuditEvent,
+) -> Result<(), CliError> {
+    conn.execute(
+        INSERT_PAIRING_REMOTE_AUDIT_EVENT_SQL,
+        params![
+            event.event_id,
+            event.recorded_at,
+            event.request_id,
+            event.client_id,
+            event.route_or_method,
+            event.scope.as_str(),
+            event.scope_decision.as_str(),
+            event.outcome.as_str(),
+            event.remote_addr,
+            event.error_detail,
+        ],
+    )
+    .map_err(|error| {
+        db_error(format!(
+            "insert remote audit event {}: {error}",
+            event.event_id.as_str()
+        ))
+    })?;
+    Ok(())
 }
 
 fn remote_pairing_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteStoredPairing> {

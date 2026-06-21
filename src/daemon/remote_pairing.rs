@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::error::Error;
 use std::fmt;
 
@@ -19,6 +19,7 @@ mod tests;
 const PAIRING_RANDOM_BYTES: usize = 32;
 const PAIRING_HASH_PREFIX: &str = "sha256:";
 const PAIRING_HASH_HEX_LEN: usize = 64;
+const DEFAULT_RATE_LIMITER_MAX_ENTRIES: usize = 4096;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RemotePairingError {
@@ -331,15 +332,38 @@ pub struct RemotePairingClaimedClient {
 #[derive(Debug, Clone)]
 pub struct RemotePairingRateLimiter {
     max_attempts: u32,
-    attempts: BTreeMap<String, u32>,
+    max_entries: usize,
+    attempts: BTreeMap<RemotePairingAttemptKey, u32>,
+    attempt_order: VecDeque<RemotePairingAttemptKey>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct RemotePairingAttemptKey {
+    remote_addr: String,
+    code_fingerprint: String,
+}
+
+impl RemotePairingAttemptKey {
+    fn new(remote_addr: &str, code_fingerprint: &str) -> Self {
+        Self {
+            remote_addr: remote_addr.to_string(),
+            code_fingerprint: code_fingerprint.to_string(),
+        }
+    }
 }
 
 impl RemotePairingRateLimiter {
     #[must_use]
     pub fn new(max_attempts: u32) -> Self {
+        Self::new_bounded(max_attempts, DEFAULT_RATE_LIMITER_MAX_ENTRIES)
+    }
+
+    fn new_bounded(max_attempts: u32, max_entries: usize) -> Self {
         Self {
             max_attempts: max_attempts.max(1),
+            max_entries: max_entries.max(1),
             attempts: BTreeMap::new(),
+            attempt_order: VecDeque::new(),
         }
     }
 
@@ -347,6 +371,18 @@ impl RemotePairingRateLimiter {
     #[must_use]
     pub fn new_for_tests(max_attempts: u32) -> Self {
         Self::new(max_attempts)
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub fn new_bounded_for_tests(max_attempts: u32, max_entries: usize) -> Self {
+        Self::new_bounded(max_attempts, max_entries)
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub fn tracked_attempts_for_tests(&self) -> usize {
+        self.attempts.len()
     }
 
     /// Record one failed/suspicious pairing attempt for an address/code tuple.
@@ -358,13 +394,27 @@ impl RemotePairingRateLimiter {
         remote_addr: &str,
         code_fingerprint: &str,
     ) -> Result<(), RemotePairingError> {
-        let key = format!("{remote_addr}\0{code_fingerprint}");
+        let key = RemotePairingAttemptKey::new(remote_addr, code_fingerprint);
+        if !self.attempts.contains_key(&key) {
+            self.evict_until_room();
+            self.attempt_order.push_back(key.clone());
+        }
         let count = self.attempts.entry(key).or_insert(0);
         if *count >= self.max_attempts {
             return Err(RemotePairingError::RateLimited);
         }
         *count += 1;
         Ok(())
+    }
+
+    fn evict_until_room(&mut self) {
+        while self.attempts.len() >= self.max_entries {
+            let Some(oldest) = self.attempt_order.pop_front() else {
+                self.attempts.clear();
+                return;
+            };
+            self.attempts.remove(&oldest);
+        }
     }
 }
 
