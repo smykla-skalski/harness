@@ -1,8 +1,6 @@
 use clap::Parser;
 
-use super::super::{
-    DaemonRemoteCommand, DaemonRemotePairCommand, DaemonRemoteServeArgs,
-};
+use super::super::{DaemonRemoteCommand, DaemonRemotePairCommand, DaemonRemoteServeArgs};
 
 #[derive(Debug, Parser)]
 struct DaemonRemoteServeArgsTestHarness {
@@ -38,6 +36,29 @@ fn daemon_remote_serve_args_default_tls_alpn_config_is_valid() {
         .args
         .contract_config()
         .expect("default remote serve inputs should satisfy the contract");
+}
+
+#[test]
+fn daemon_remote_serve_args_select_remote_http_auth_mode() {
+    let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+    ])
+    .unwrap();
+
+    let serve_config = parsed
+        .args
+        .remote_auth_scaffold_config()
+        .expect("remote auth scaffold config");
+    assert_eq!(serve_config.host, "0.0.0.0");
+    assert_eq!(serve_config.port, 443);
+    assert_eq!(
+        serve_config.auth_mode,
+        crate::daemon::http::DaemonHttpAuthMode::Remote
+    );
 }
 
 #[test]
@@ -264,11 +285,7 @@ fn daemon_remote_pair_create_rejects_unknown_scope() {
 fn daemon_remote_pair_create_rejects_invalid_ttl() {
     assert!(
         DaemonRemoteCommandTestHarness::try_parse_from([
-            "test",
-            "pair",
-            "create",
-            "--ttl",
-            "tomorrow",
+            "test", "pair", "create", "--ttl", "tomorrow",
         ])
         .is_err()
     );
@@ -276,14 +293,9 @@ fn daemon_remote_pair_create_rejects_invalid_ttl() {
 
 #[test]
 fn daemon_remote_pair_create_reports_zero_ttl() {
-    let error = DaemonRemoteCommandTestHarness::try_parse_from([
-        "test",
-        "pair",
-        "create",
-        "--ttl",
-        "0m",
-    ])
-    .expect_err("zero ttl should be rejected");
+    let error =
+        DaemonRemoteCommandTestHarness::try_parse_from(["test", "pair", "create", "--ttl", "0m"])
+            .expect_err("zero ttl should be rejected");
     assert!(
         error.to_string().contains("greater than zero"),
         "unexpected error: {error}"

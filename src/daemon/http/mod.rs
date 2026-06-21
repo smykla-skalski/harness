@@ -57,6 +57,7 @@ mod tasks;
 mod tests;
 mod voice;
 
+pub use auth::DaemonHttpAuthMode;
 pub(crate) use auth::require_auth;
 pub(crate) use managed_agents::{
     acp_inspect_response, acp_transcript_response, ensure_acp_agent, ensure_acp_enabled,
@@ -161,6 +162,7 @@ pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDae
 #[derive(Clone)]
 pub struct DaemonHttpState {
     pub token: String,
+    pub auth_mode: DaemonHttpAuthMode,
     pub sender: broadcast::Sender<StreamEvent>,
     /// Fan-out channel carrying events serialized once into a shared
     /// [`PreparedBroadcast`]. Connection relays and SSE streams subscribe here
@@ -326,7 +328,7 @@ pub async fn serve(
         }
     });
 
-    let app = daemon_http_router().with_state(state);
+    let app = daemon_http_router(state);
 
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
@@ -347,7 +349,7 @@ pub async fn serve(
         })
 }
 
-fn daemon_http_router() -> Router<DaemonHttpState> {
+fn daemon_http_router(state: DaemonHttpState) -> Router<()> {
     Router::new()
         .merge(core::core_routes())
         .merge(sessions::session_routes())
@@ -360,7 +362,12 @@ fn daemon_http_router() -> Router<DaemonHttpState> {
         .merge(openrouter_models::openrouter_model_routes())
         .merge(signals::signal_routes())
         .merge(voice::voice_routes())
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::authorize_remote_http_request,
+        ))
         .layer(middleware::from_fn(trace_http_request))
+        .with_state(state)
 }
 
 async fn trace_http_request(request: Request<Body>, next: Next) -> Response {

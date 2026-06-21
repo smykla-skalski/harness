@@ -3,10 +3,12 @@ use std::{num::NonZeroU64, str::FromStr};
 use clap::{Args, Subcommand, ValueEnum};
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::remote::{
-    RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider,
-    RemoteRole, validate_remote_serve_config,
+    RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, RemoteRole,
+    validate_remote_serve_config,
 };
+use crate::daemon::service::DaemonServeConfig;
 use crate::errors::{CliError, CliErrorKind};
 
 #[derive(Debug, Clone, Subcommand)]
@@ -41,7 +43,7 @@ pub enum DaemonRemoteCommand {
 impl Execute for DaemonRemoteCommand {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         if let Self::Serve(args) = self {
-            args.contract_config()?;
+            args.remote_auth_scaffold_config()?;
         }
         Err(CliErrorKind::workflow_parse(
             "remote daemon execution is reserved for the next implementation phase",
@@ -93,6 +95,25 @@ impl DaemonRemoteServeArgs {
         validate_remote_serve_config(&config)
             .map_err(|error| CliError::from(CliErrorKind::workflow_parse(error.to_string())))?;
         Ok(config)
+    }
+
+    /// Build the remote-auth scaffold config for the future remote serve path.
+    ///
+    /// This selects [`DaemonHttpAuthMode::Remote`] and preserves the public
+    /// remote bind host from the remote contract. It is not passed to the
+    /// current local [`crate::daemon::service::serve`] path, whose validation
+    /// intentionally remains loopback-only.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the remote TLS or ACME contract is invalid.
+    pub fn remote_auth_scaffold_config(&self) -> Result<DaemonServeConfig, CliError> {
+        let remote_config = self.contract_config()?;
+        Ok(DaemonServeConfig {
+            host: remote_config.host,
+            port: remote_config.https_port,
+            auth_mode: DaemonHttpAuthMode::Remote,
+            ..DaemonServeConfig::default()
+        })
     }
 }
 

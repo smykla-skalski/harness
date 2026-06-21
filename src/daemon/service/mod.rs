@@ -34,7 +34,7 @@ use super::agent_tui::AgentTuiManagerHandle;
 use super::bridge;
 use super::codex_controller::CodexControllerHandle;
 use super::codex_transport::{self, CodexTransportKind};
-use super::http::{self, DaemonHttpState};
+use super::http::{self, DaemonHttpAuthMode, DaemonHttpState};
 use super::index::{self, ResolvedSession};
 use super::launchd::{self, LaunchAgentStatus};
 #[cfg(test)]
@@ -148,6 +148,7 @@ pub struct DaemonStatusReport {
 pub struct DaemonServeConfig {
     pub host: String,
     pub port: u16,
+    pub auth_mode: DaemonHttpAuthMode,
     pub poll_interval: Duration,
     pub observe_interval: Duration,
     /// Whether the daemon is running inside the macOS App Sandbox.
@@ -167,6 +168,7 @@ impl Default for DaemonServeConfig {
         Self {
             host: "127.0.0.1".into(),
             port: 0,
+            auth_mode: DaemonHttpAuthMode::Local,
             poll_interval: Duration::from_secs(2),
             observe_interval: Duration::from_secs(5),
             sandboxed: false,

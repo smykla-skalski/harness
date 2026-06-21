@@ -10,6 +10,22 @@ fn daemon_serve_config_default_is_unsandboxed() {
     let config = DaemonServeConfig::default();
     assert!(!config.sandboxed);
     assert_eq!(config.codex_transport, CodexTransportKind::Stdio);
+    assert_eq!(
+        config.auth_mode,
+        crate::daemon::http::DaemonHttpAuthMode::Local
+    );
+}
+
+#[test]
+fn daemon_serve_config_can_select_remote_http_auth_mode() {
+    let config = DaemonServeConfig {
+        auth_mode: crate::daemon::http::DaemonHttpAuthMode::Remote,
+        ..DaemonServeConfig::default()
+    };
+    assert_eq!(
+        super::super::serve::http_auth_mode(&config),
+        crate::daemon::http::DaemonHttpAuthMode::Remote
+    );
 }
 
 fn with_isolated_transport_env<F: FnOnce()>(ws_url: Option<&str>, f: F) {

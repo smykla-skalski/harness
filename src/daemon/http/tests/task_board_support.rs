@@ -78,7 +78,7 @@ pub(super) async fn join_leader(
 pub(super) async fn serve_http(
     state: crate::daemon::http::DaemonHttpState,
 ) -> (String, JoinHandle<()>) {
-    let app = super::super::daemon_http_router().with_state(state);
+    let app = super::super::daemon_http_router(state);
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind listener");

@@ -95,6 +95,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
     );
     let state = DaemonHttpState {
         token: token.clone(),
+        auth_mode: harness::daemon::http::DaemonHttpAuthMode::Local,
         sender: sender.clone(),
         manifest,
         daemon_epoch: harness::workspace::utc_now(),
