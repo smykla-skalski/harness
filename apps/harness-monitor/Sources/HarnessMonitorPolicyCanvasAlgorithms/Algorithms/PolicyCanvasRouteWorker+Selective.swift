@@ -92,7 +92,7 @@ extension PolicyCanvasPreparedRouteInput {
       nodeIndex: nodeIndex,
       usesDeclarationOrderAnchor: true
     )
-    let labelPositions = PolicyCanvasPolylineMidpointLabelPlacement().placeLabels(
+    let labelPositions = algorithms.labelPlacement.placeLabels(
       input: PolicyCanvasLabelPlacementInput(prepared: self, routes: finalRoutes)
     )
     return PolicyCanvasPreparedRouteComputation(
