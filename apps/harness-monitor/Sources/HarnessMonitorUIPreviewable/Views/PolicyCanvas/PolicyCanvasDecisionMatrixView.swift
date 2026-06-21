@@ -21,14 +21,20 @@ struct PolicyCanvasDecisionMatrixView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       header
+        .padding(.horizontal, 14)
 
       if rows.isEmpty {
         emptyState
+          .padding(.horizontal, 14)
       } else {
         caption
+          .padding(.horizontal, 14)
         // Each list section scrolls within its share of the pane height so the
         // 13-row matrix shares space with the scenario and replay sections
-        // instead of pushing them (and the Replay anchor) below the fold.
+        // instead of pushing them (and the Replay anchor) below the fold. The
+        // scroll view spans the section full-bleed and the rows carry the inset,
+        // so a focused row's keyboard ring clears the scroll clip on every edge
+        // instead of being sliced off at the top or sides.
         ScrollView {
           VStack(spacing: 6) {
             ForEach(rows) { row in
@@ -42,6 +48,8 @@ struct PolicyCanvasDecisionMatrixView: View {
               )
             }
           }
+          .padding(.horizontal, 14)
+          .padding(.vertical, 4)
         }
         .frame(maxHeight: .infinity)
         // Dim the prior verdicts while a fresh simulation is in flight so a
@@ -49,7 +57,6 @@ struct PolicyCanvasDecisionMatrixView: View {
         .opacity(isEvaluating ? 0.55 : 1)
       }
     }
-    .padding(.horizontal, 14)
     .padding(.vertical, 10)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(PolicyCanvasVisualStyle.dashboardHostBackground)

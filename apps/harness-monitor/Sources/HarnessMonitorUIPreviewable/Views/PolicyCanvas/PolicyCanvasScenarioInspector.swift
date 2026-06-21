@@ -70,17 +70,22 @@ struct PolicyCanvasScenarioInspector: View {
         .scaledFont(.caption2)
         .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
         .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 12)
 
       actions
+        .padding(.horizontal, 12)
 
       if rows.isEmpty {
         Text(isEvaluating ? "Evaluating scenarios\u{2026}" : "No scenarios yet - add one to start")
           .scaledFont(.caption)
           .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
+          .padding(.horizontal, 12)
       } else {
         // Scrolls within the section's share of the pane: expanding Scenarios
         // fills the room left by the other sections without pushing Replay off
-        // the bottom, and the list scrolls only once it outgrows that room.
+        // the bottom, and the list scrolls only once it outgrows that room. The
+        // scroll view is full-bleed and the rows carry the inset, so a focused
+        // row's keyboard ring clears the scroll clip instead of being sliced.
         ScrollView {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(rows) { row in
@@ -92,11 +97,12 @@ struct PolicyCanvasScenarioInspector: View {
               )
             }
           }
+          .padding(.horizontal, 12)
+          .padding(.vertical, 4)
         }
         .frame(maxHeight: .infinity)
       }
     }
-    .padding(.horizontal, 12)
     .padding(.bottom, 10)
   }
 

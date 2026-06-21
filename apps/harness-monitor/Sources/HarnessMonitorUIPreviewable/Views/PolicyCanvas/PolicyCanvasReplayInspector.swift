@@ -90,6 +90,7 @@ struct PolicyCanvasReplayInspector: View {
         .scaledFont(.caption2)
         .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
         .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 12)
 
       if rows.isEmpty {
         if let emptyMessage {
@@ -98,27 +99,31 @@ struct PolicyCanvasReplayInspector: View {
             .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
         }
       } else {
         if isStale {
           staleHint
+            .padding(.horizontal, 12)
         }
         // Scrolls within the section's share of the pane, like Scenarios, so an
         // expanded Replay shares the available room instead of running off the
-        // bottom of the pane.
+        // bottom of the pane. Full-bleed scroll with inset rows keeps a focused
+        // row's keyboard ring clear of the scroll clip on every edge.
         ScrollView {
           VStack(alignment: .leading, spacing: 0) {
             ForEach(rows) { row in
               PolicyCanvasReplayRow(row: row, focusDecision: focusDecision)
             }
           }
+          .padding(.horizontal, 12)
+          .padding(.vertical, 4)
         }
         .frame(maxHeight: .infinity)
         // Dim a stale comparison so an old draft verdict is never read as current.
         .opacity(isStale ? 0.5 : 1)
       }
     }
-    .padding(.horizontal, 12)
     .padding(.bottom, 10)
   }
 
