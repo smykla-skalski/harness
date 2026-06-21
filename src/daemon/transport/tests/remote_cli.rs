@@ -41,6 +41,28 @@ fn daemon_remote_serve_args_default_tls_alpn_config_is_valid() {
 }
 
 #[test]
+fn daemon_remote_serve_args_trim_identity_fields() {
+    let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
+        "test",
+        "--domain",
+        " daemon.example.com ",
+        "--host",
+        " 0.0.0.0 ",
+        "--acme-email",
+        " ops@example.com ",
+    ])
+    .unwrap();
+
+    let config = parsed
+        .args
+        .contract_config()
+        .expect("trimmed identity inputs should satisfy the contract");
+    assert_eq!(config.domain, "daemon.example.com");
+    assert_eq!(config.host, "0.0.0.0");
+    assert_eq!(config.acme_email, "ops@example.com");
+}
+
+#[test]
 fn daemon_remote_serve_args_reject_empty_domain_contract() {
     let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
         "test",

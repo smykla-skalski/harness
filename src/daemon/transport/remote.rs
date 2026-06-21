@@ -82,11 +82,11 @@ impl DaemonRemoteServeArgs {
     /// Returns [`CliError`] when required remote TLS or ACME settings are absent.
     pub fn contract_config(&self) -> Result<RemoteDaemonServeConfig, CliError> {
         let config = RemoteDaemonServeConfig {
-            domain: self.domain.clone(),
-            host: self.host.clone(),
+            domain: self.domain.trim().to_string(),
+            host: self.host.trim().to_string(),
             https_port: self.https_port,
             http_port: self.http_port,
-            acme_email: self.acme_email.clone(),
+            acme_email: self.acme_email.trim().to_string(),
             acme_challenge: self.acme_challenge.into(),
             acme_dns_provider: self.acme_dns_provider.map(Into::into),
         };

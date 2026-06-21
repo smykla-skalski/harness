@@ -78,6 +78,18 @@ fn every_declared_ws_method_has_remote_scope_contract() {
 }
 
 #[test]
+fn every_mapped_ws_method_is_listed_in_ws_methods_all() {
+    let declared_methods: BTreeSet<_> = ws_methods::ALL.iter().copied().collect();
+
+    for method in mapped_ws_methods() {
+        assert!(
+            declared_methods.contains(method),
+            "{method} should be listed in ws_methods::ALL"
+        );
+    }
+}
+
+#[test]
 fn remote_viewer_scope_is_read_only() {
     let viewer_scopes =
         crate::daemon::remote::scopes_for_role(crate::daemon::remote::RemoteRole::Viewer);
