@@ -247,10 +247,8 @@ pub(crate) struct DaemonRemotePairCreateResponse {
 }
 
 fn open_remote_daemon_db() -> Result<DaemonDb, CliError> {
-    let daemon_root = state::daemon_root();
-    fs_err::create_dir_all(&daemon_root)
-        .map_err(|error| CliErrorKind::workflow_io(format!("create daemon root: {error}")))?;
-    DaemonDb::open(&daemon_root.join("harness.db"))
+    state::ensure_daemon_dirs()?;
+    DaemonDb::open(&state::daemon_root().join("harness.db"))
 }
 
 fn expires_at_from_ttl(created_at: &str, ttl_seconds: u64) -> Result<String, CliError> {
