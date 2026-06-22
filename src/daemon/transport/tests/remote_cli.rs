@@ -1,4 +1,10 @@
 use clap::Parser;
+use harness_testkit::with_isolated_harness_env;
+
+use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::db::DaemonDb;
+use crate::daemon::remote_pairing::RemotePairingCode;
+use crate::daemon::state;
 
 use super::super::{DaemonRemoteCommand, DaemonRemotePairCommand, DaemonRemoteServeArgs};
 
@@ -269,26 +275,22 @@ fn daemon_remote_pair_create_accepts_fixed_scope_values() {
 
 #[test]
 fn daemon_remote_pair_create_rejects_unknown_scope() {
-    assert!(
-        DaemonRemoteCommandTestHarness::try_parse_from([
-            "test",
-            "pair",
-            "create",
-            "--scopes",
-            "read,root",
-        ])
-        .is_err()
-    );
+    assert!(DaemonRemoteCommandTestHarness::try_parse_from([
+        "test",
+        "pair",
+        "create",
+        "--scopes",
+        "read,root",
+    ])
+    .is_err());
 }
 
 #[test]
 fn daemon_remote_pair_create_rejects_invalid_ttl() {
-    assert!(
-        DaemonRemoteCommandTestHarness::try_parse_from([
-            "test", "pair", "create", "--ttl", "tomorrow",
-        ])
-        .is_err()
-    );
+    assert!(DaemonRemoteCommandTestHarness::try_parse_from([
+        "test", "pair", "create", "--ttl", "tomorrow",
+    ])
+    .is_err());
 }
 
 #[test]
@@ -321,4 +323,99 @@ fn daemon_remote_pair_create_reports_ttl_overflow_as_too_large() {
         !message.contains("greater than zero"),
         "overflow should not report zero ttl, got: {message}"
     );
+}
+
+#[test]
+fn daemon_remote_pair_create_builds_persisted_record_and_response() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let parsed = DaemonRemoteCommandTestHarness::try_parse_from([
+        "test", "pair", "create", "--role", "operator", "--scopes", "read", "--ttl", "2m",
+    ])
+    .unwrap()
+    .command;
+    let DaemonRemoteCommand::Pair {
+        command: DaemonRemotePairCommand::Create(args),
+    } = parsed
+    else {
+        panic!("expected pair create");
+    };
+
+    let code = RemotePairingCode::from_value_for_tests("manual-code-value");
+    let response = args
+        .create_pairing_with(
+            &db,
+            "pairing-test",
+            "audit-pairing-test",
+            &code,
+            "2026-06-21T13:40:00Z",
+        )
+        .expect("create pairing response");
+
+    assert_eq!(response.pairing_id, "pairing-test");
+    assert_eq!(response.code, "manual-code-value");
+    assert_eq!(response.role, "operator");
+    assert_eq!(response.scopes, vec!["read"]);
+    assert_eq!(response.ttl_seconds, 120);
+    assert_eq!(response.created_at, "2026-06-21T13:40:00Z");
+    assert_eq!(response.expires_at, "2026-06-21T13:42:00Z");
+
+    let stored: (String, String) = db
+        .connection()
+        .query_row(
+            "SELECT pairing_id, code_hash FROM remote_pairing_codes",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("stored pairing");
+    assert_eq!(stored.0, "pairing-test");
+    assert_ne!(stored.1, "manual-code-value");
+    assert!(stored.1.starts_with("sha256:"));
+
+    let audit_routes: Vec<_> = db
+        .load_remote_audit_events(10)
+        .expect("load audit events")
+        .into_iter()
+        .map(|event| event.route_or_method)
+        .collect();
+    assert_eq!(audit_routes, vec!["remote.pair.create"]);
+}
+
+#[test]
+fn daemon_remote_pair_create_execute_persists_pairing_in_daemon_db() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    with_isolated_harness_env(temp.path(), || {
+        state::ensure_daemon_dirs().expect("daemon dirs");
+        let daemon_root = state::daemon_root();
+        let _lock = state::acquire_singleton_lock().expect("hold daemon lock");
+
+        let command = DaemonRemoteCommandTestHarness::try_parse_from([
+            "test", "pair", "create", "--role", "viewer", "--ttl", "30s",
+        ])
+        .unwrap()
+        .command;
+
+        let exit = command.execute(&AppContext).expect("execute pair create");
+        assert_eq!(exit, 0);
+
+        let db = DaemonDb::open(&daemon_root.join("harness.db")).expect("open daemon db");
+        let stored_count: i64 = db
+            .connection()
+            .query_row("SELECT COUNT(*) FROM remote_pairing_codes", [], |row| {
+                row.get(0)
+            })
+            .expect("stored pairing count");
+        assert_eq!(stored_count, 1);
+
+        let (role, scopes_json, code_hash): (String, String, String) = db
+            .connection()
+            .query_row(
+                "SELECT role, scopes_json, code_hash FROM remote_pairing_codes",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("stored pairing row");
+        assert_eq!(role, "viewer");
+        assert_eq!(scopes_json, "[\"read\"]");
+        assert!(code_hash.starts_with("sha256:"));
+    });
 }
