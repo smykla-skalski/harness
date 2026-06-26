@@ -71,7 +71,7 @@ impl CodexRunWorker {
         self.run_with_transport(transport).await
     }
 
-    async fn run_with_transport(
+    pub(super) async fn run_with_transport(
         &mut self,
         transport: Box<dyn CodexTransport>,
     ) -> Result<(), CliError> {

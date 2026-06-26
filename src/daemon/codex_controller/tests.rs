@@ -8,6 +8,7 @@ use super::{
 use crate::daemon::protocol::CodexRunStatus;
 use crate::session::types::AgentStatus;
 
+mod golden_path;
 mod request_validation;
 mod test_support;
 
