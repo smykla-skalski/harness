@@ -81,7 +81,12 @@ At every transition harness flips state and emits a *signal*, but whether an age
 
 > Builds on the existing seam: the injectable `CodexTransport` trait (`send`/`next_frame`/`shutdown`) and `CodexRunWorker::run_with_transport`, which already has a minimal inline `FakeTransport` in `worker_tests.rs`. We grow that into a reusable scripted app-server plus stage-by-stage golden tests. All verifiable headless via `cargo test` (no real `codex` binary, no Mac).
 
-- **Slice 1 — Scripted fake Codex app-server + start/dispatch golden test.** A reusable `ScriptedCodexServer` test double that *responds* to JSON-RPC requests (initialize → thread/start → turn/start → events → turn complete) instead of replaying a fixed queue. One golden test asserts the worker completes the handshake and the *task prompt* reaches `turn/start` and the run ends `Completed`. _Implemented_ in `src/daemon/codex_controller/tests/golden_path.rs` (+ widened `run_with_transport` to `pub(super)`, registered the module in `tests.rs`). Verification: `cargo test daemon::codex_controller::tests::golden_path`. **Status: verified by inspection, not by execution** — the crate does not compile on the Linux remote (depends on the macOS-only `security_framework`; `crate::sandbox`/`warn` are macOS-gated). Run the test on macOS to green it. The test reuses the existing `controller_with_session_state` / `codex_run_snapshot` fixtures and real wire constants, mirroring sibling tests that already pass.
+- **Slice 1 — Scripted Codex app-server + turn-lifecycle golden tests.** _Done & VERIFIED._ A reusable, request-aware `ScriptedCodexServer` test double (responds to initialize → thread/start|resume → turn/start, then enqueues scripted trailing notifications) drives the real `CodexRunWorker::run_with_transport` headless — no `codex` binary, no Mac, no network. Four passing tests in `src/daemon/codex_controller/tests/golden_path.rs` (+ widened `run_with_transport` to `pub(super)`, registered the module in `tests.rs`):
+  - `golden_path_delivers_task_prompt_to_turn_start` — the assigned task prompt reaches `turn/start`; run ends `Completed`.
+  - `failed_turn_lands_failed_status_and_surfaces_error` — a failed turn lands `Failed` with the error on the snapshot.
+  - `agent_final_message_is_captured_from_item_completed` — deltas + `item/completed` final_answer populate `final_message`.
+  - `existing_thread_resumes_instead_of_starting` — a run with a thread resumes, never sends `thread/start`.
+  **Verified by real compile + run on the Linux remote** (`4 passed; 0 failed`) using temporary, *reverted* macOS shims (see Environment note). Re-confirm on macOS with `cargo test daemon::codex_controller::tests::golden_path`.
 - **Slice 2 — M2 spec for delivery (Gaps B + C).** _Done._ Root-caused the defect (`steer` overloaded for steering vs. task delivery; wake-route fires it without awaiting the ack) and wrote the precise M2 spec — decision table, change sites, and acceptance tests T-B1/T-C1/T-C2 — in "M2 spec — reliable Codex task delivery" below. Delivered as a spec rather than red tests so the shared branch / macOS CI stays green; the tests get added and run on macOS during M2 implementation.
 - **Slice 3 — Session-level scenario.** Drive session service + controller together: session start → register Codex worker → drop task → assert prompt delivery, using the scripted server. Bridges the worker-level net to the session-level golden path (M1+M2 acceptance).
 - **Slice 4 — Review + land stubs in the harness.** Add scripted reviewer behavior and a worktree-commit fixture so M3/M4 work has a regression target before we touch them.
@@ -115,7 +120,15 @@ At every transition harness flips state and emits a *signal*, but whether an age
 
 ## Environment note (verification)
 
-The Rust crate is **macOS-targeted**: it depends on `security_framework` (Keychain) and has macOS-gated daemon/sandbox code, so it does **not** compile on a Linux remote. Any Rust change made from a Linux session is therefore "verified by inspection" only; `cargo test`/`cargo build` must run on macOS to truly green it. The Monitor app (Swift/Xcode) is macOS-only by nature. Plan for Mac-side verification of every Rust/Swift increment.
+The Rust crate is **macOS-targeted**: it depends on `security_framework` (Keychain) and has macOS-gated daemon/sandbox code, so a stock `cargo test` does **not** compile on a Linux remote. The Monitor app (Swift/Xcode) is macOS-only by nature.
+
+**However, Rust tests CAN be verified on Linux** via a small set of temporary, *uncommitted* shims that get reverted before commit. The macOS-only blockers are few and localized:
+- `src/setup/secrets.rs` — `cfg`-gate the `security_framework` imports and add a tiny non-macOS `SecError`/`*_generic_password` stub module (must `derive(Clone, Copy)` on `SecError`).
+- `src/daemon/websocket/parity.rs`, `src/daemon/http/sessions_adopt.rs`, `src/sandbox/migration.rs` — `#[cfg_attr(not(target_os = "macos"), allow(unused_imports))]` on the macOS-only imports.
+- `src/mcp/transport.rs` — `#[cfg_attr(not(target_os = "macos"), allow(dead_code))]` on `map_io_error`.
+- `src/sandbox/project_input.rs`, `src/daemon/http/sessions_adopt.rs` — gate their `#[cfg(test)] mod tests;` with `#[cfg(all(test, target_os = "macos"))]` (those test modules use macOS-only bookmark helpers).
+
+Process: apply shims → `cargo test --lib <module>` → iterate → `git restore` the shim files → confirm no shim residue → commit only the real test code. Slice 1 was verified exactly this way. Still re-run on macOS as the source of truth, but this gives genuine green/red signal from Linux.
 
 ## Cut / defer list (behind flags, not deleted)
 
