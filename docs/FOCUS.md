@@ -82,9 +82,36 @@ At every transition harness flips state and emits a *signal*, but whether an age
 > Builds on the existing seam: the injectable `CodexTransport` trait (`send`/`next_frame`/`shutdown`) and `CodexRunWorker::run_with_transport`, which already has a minimal inline `FakeTransport` in `worker_tests.rs`. We grow that into a reusable scripted app-server plus stage-by-stage golden tests. All verifiable headless via `cargo test` (no real `codex` binary, no Mac).
 
 - **Slice 1 — Scripted fake Codex app-server + start/dispatch golden test.** A reusable `ScriptedCodexServer` test double that *responds* to JSON-RPC requests (initialize → thread/start → turn/start → events → turn complete) instead of replaying a fixed queue. One golden test asserts the worker completes the handshake and the *task prompt* reaches `turn/start` and the run ends `Completed`. _Implemented_ in `src/daemon/codex_controller/tests/golden_path.rs` (+ widened `run_with_transport` to `pub(super)`, registered the module in `tests.rs`). Verification: `cargo test daemon::codex_controller::tests::golden_path`. **Status: verified by inspection, not by execution** — the crate does not compile on the Linux remote (depends on the macOS-only `security_framework`; `crate::sandbox`/`warn` are macOS-gated). Run the test on macOS to green it. The test reuses the existing `controller_with_session_state` / `codex_run_snapshot` fixtures and real wire constants, mirroring sibling tests that already pass.
-- **Slice 2 — Delivery-ack assertion.** Extend the harness to assert that a task dropped on an idle vs. mid-turn run is delivered as a clean follow-up turn and that a failed steer is observable (not silently dropped). Encodes Gaps B and C as explicit expectations (initially failing = the spec for M2).
+- **Slice 2 — M2 spec for delivery (Gaps B + C).** _Done._ Root-caused the defect (`steer` overloaded for steering vs. task delivery; wake-route fires it without awaiting the ack) and wrote the precise M2 spec — decision table, change sites, and acceptance tests T-B1/T-C1/T-C2 — in "M2 spec — reliable Codex task delivery" below. Delivered as a spec rather than red tests so the shared branch / macOS CI stays green; the tests get added and run on macOS during M2 implementation.
 - **Slice 3 — Session-level scenario.** Drive session service + controller together: session start → register Codex worker → drop task → assert prompt delivery, using the scripted server. Bridges the worker-level net to the session-level golden path (M1+M2 acceptance).
 - **Slice 4 — Review + land stubs in the harness.** Add scripted reviewer behavior and a worktree-commit fixture so M3/M4 work has a regression target before we touch them.
+
+## M2 spec — reliable Codex task delivery (Gaps B + C)
+
+> This is slice 2's deliverable: the precise spec that defines "M2 done." Written as a spec rather than committed-but-failing tests, because a red test on the shared branch breaks macOS CI and cannot be compile-verified from the Linux session anyway. The acceptance tests below get added and run on macOS as M2 is implemented.
+
+**Defect (root cause).** `CodexControllerHandle::steer` (`src/daemon/codex_controller/handle_control.rs`) is overloaded for two different jobs: (1) genuine *same-turn steering* (a human adds context to the turn in flight), and (2) *task delivery* (the wake-route hands a worker its assigned task). It routes by run liveness: `active_run(run_id)` Ok → `CodexControlMessage::Steer` (same-turn inject); else → `start_follow_up_turn` (a clean new turn). The wake-route (`src/daemon/service/mutations_async/mod.rs::try_wake_started_workers_async` and the sync twin in `signals.rs`, `WakeRoute::Codex` arm) calls `steer` for task delivery and only `tracing::warn!`s on failure — fire-and-forget, unlike the TUI arm which awaits `wait_for_task_start_ack_async`.
+
+- **Gap B** — a task dropped on a worker that is still mid-initial-turn is injected as same-turn steering instead of being worked as its own clean turn.
+- **Gap C** — if that delivery fails, the task is silently dropped (Codex agents have no signal-file polling fallback); nothing retries or marks it undelivered.
+
+**Target decision table (task delivery, distinct from user steering).**
+
+| Run state at delivery | Required behavior |
+|---|---|
+| Idle / Queued / Completed (has thread) | Start a clean follow-up turn carrying the task prompt. *(existing good behavior — keep)* |
+| Active (mid-turn) | Do NOT same-turn inject. Queue the task; start a clean turn when the current turn completes. |
+| Genuine user "steer" (add context now) | Stays same-turn `Steer` — keep as a separate, explicitly-named path/verb. |
+| Any delivery failure | Surface it: persist the task as undelivered and/or retry. Never silently drop. |
+
+**Change sites.**
+- Separate "deliver task" from "steer" at the controller: a delivery entry point that never same-turn-injects (route active → queue-until-idle → clean turn), leaving `steer` for genuine mid-turn context.
+- Wake-route Codex arm: await the delivery ack (mirror the TUI `wait_for_task_start_ack_async` contract); on failure, record the task as undelivered / re-drop, do not just log.
+
+**Acceptance tests to add (run on macOS), extending the golden-path harness.**
+- **T-B1** — dropping a task on an *active* Codex run yields exactly one new `turn/start` carrying the task prompt *after* the active turn completes, and no same-turn steer frame containing the task prompt.
+- **T-C1** — when delivery fails, the wake path marks the task undelivered / retries; it is observable, not a no-op log line.
+- **T-C2** — an idle run receiving a task starts a clean turn with the task prompt (regression-guards the existing good path; natural extension of slice 1's test).
 
 ## Environment note (verification)
 
