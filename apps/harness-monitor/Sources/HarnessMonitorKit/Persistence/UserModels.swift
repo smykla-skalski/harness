@@ -337,9 +337,9 @@ extension CachedReviewsSnapshot {
 }
 
 @Model
-public final class CachedPolicyDocument {
-  #Unique<CachedPolicyDocument>([\.canvasId])
-  #Index<CachedPolicyDocument>([\.cachedAt])
+public final class CachedTaskBoardPolicyDocument {
+  #Unique<CachedTaskBoardPolicyDocument>([\.canvasId])
+  #Index<CachedTaskBoardPolicyDocument>([\.cachedAt])
 
   public var canvasId: String
   public var cachedAt: Date
@@ -352,7 +352,12 @@ public final class CachedPolicyDocument {
   }
 }
 
-extension CachedPolicyDocument {
+/// Code-facing alias for the policy document cache. The underlying model class
+/// keeps its historical name because SwiftData uses `@Model` class names for
+/// persistent entity identity in existing V24/V25 stores.
+public typealias CachedPolicyDocument = CachedTaskBoardPolicyDocument
+
+extension CachedTaskBoardPolicyDocument {
   func decodedDocument() throws -> PolicyPipelineDocument {
     try Codecs.decoder.decode(PolicyPipelineDocument.self, from: documentData)
   }
