@@ -201,6 +201,10 @@ pub enum PolicyEvidenceField {
     ReviewHasMergeConflicts,
     ReviewPolicyBlocked,
     ReviewViewerCanUpdate,
+    ReviewHasConflictMarkers,
+    ReviewViewerHasActiveApproval,
+    ReviewAutoMergeEnabled,
+    ReviewRequiredApprovalsSatisfiedAfterViewerApproval,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -5,6 +5,7 @@ use std::sync::Arc;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::observe_async_db;
 use crate::daemon::service::reviews::policy_audit::record_policy_run_start_result;
+use crate::daemon::service::reviews::policy_enrichment::enrich_policy_target_for_execution;
 use crate::daemon::service::reviews::policy_executor::{
     build_policy_provider_registry, daemon_policy_executor_with_audit,
 };
@@ -102,11 +103,16 @@ pub(crate) async fn start_reviews_policy_run_with_audit_db(
     request: &ReviewsPolicyRunStartRequest,
     audit_db: Option<Arc<AsyncDaemonDb>>,
 ) -> Result<ReviewsPolicyRunResponse, CliError> {
+    let target = enrich_policy_target_for_execution(&request.target).await;
+    let request = ReviewsPolicyRunStartRequest {
+        target,
+        ..request.clone()
+    };
     let executor = daemon_policy_executor_with_audit(&request.target.repository, audit_db.clone())?;
     start_reviews_policy_run_with_executor_and_audit_db(
         default_board_root(),
         executor,
-        request,
+        &request,
         audit_db,
     )
     .await
@@ -142,7 +148,7 @@ fn log_started_background_runs(started_runs: usize) {
 /// Returns `true` only when a run was actually started; resolve and start
 /// failures are logged and reported as `false`.
 async fn start_background_reviews_policy_run_for_item(item: &ReviewItem) -> bool {
-    let target = item.target();
+    let target = enrich_policy_target_for_execution(&item.target()).await;
     let audit_db = observe_async_db();
     let Some(executor) = resolve_background_run_executor(&target, audit_db.clone()) else {
         return false;

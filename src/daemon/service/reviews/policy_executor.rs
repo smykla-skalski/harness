@@ -332,6 +332,10 @@ mod tests {
             viewer_can_merge_as_admin: false,
             required_failed_check_names: Vec::new(),
             check_suite_ids: vec!["check-suite-1".to_owned()],
+            has_conflict_markers: Some(false),
+            viewer_has_active_approval: Some(false),
+            auto_merge_enabled: Some(false),
+            approval_requirement_satisfied_after_viewer_approval: Some(true),
         }
     }
 }

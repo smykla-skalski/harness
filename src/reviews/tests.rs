@@ -45,6 +45,11 @@ fn sample_item(
             .expect("date")
             .with_timezone(&Utc),
         required_failed_check_names: Vec::new(),
+        required_approving_review_count: None,
+        has_conflict_markers: None,
+        viewer_has_active_approval: None,
+        auto_merge_enabled: None,
+        approval_requirement_satisfied_after_viewer_approval: None,
     }
 }
 
@@ -199,6 +204,10 @@ fn comment_request_rejects_empty_body() {
             viewer_can_merge_as_admin: false,
             required_failed_check_names: Vec::new(),
             check_suite_ids: Vec::new(),
+            has_conflict_markers: None,
+            viewer_has_active_approval: None,
+            auto_merge_enabled: None,
+            approval_requirement_satisfied_after_viewer_approval: None,
         }],
         body: "   ".into(),
     };
@@ -236,6 +245,10 @@ fn comment_request_accepts_well_formed_payload() {
             viewer_can_merge_as_admin: false,
             required_failed_check_names: Vec::new(),
             check_suite_ids: Vec::new(),
+            has_conflict_markers: None,
+            viewer_has_active_approval: None,
+            auto_merge_enabled: None,
+            approval_requirement_satisfied_after_viewer_approval: None,
         }],
         body: "@renovatebot rebase".into(),
     };

@@ -13,7 +13,9 @@ use super::client::{
 };
 use super::coverage::log_check_details_url_coverage;
 use super::ingest::{SearchIngestState, ingest_nodes_chunk, ingest_search_node};
-use super::mapping::{self, NodeContinuation, next_cursor_or_scope_limit, scopes};
+use super::mapping::{
+    self, NodeContinuation, apply_policy_review_metadata, next_cursor_or_scope_limit, scopes,
+};
 use super::pagination::resolve_continuation;
 use super::queries::{NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY, SEARCH_QUERY};
 use super::types::{NodesResponse, OrganizationRepositoriesResponse, SearchResponse};
@@ -71,7 +73,8 @@ impl ReviewsGitHubClient {
                     .await?;
             }
         }
-        let items = deduped.into_values().collect::<Vec<_>>();
+        let mut items = deduped.into_values().collect::<Vec<_>>();
+        apply_policy_review_metadata(&mut items, viewer_login);
         log_check_details_url_coverage(&items);
         Ok(ReviewsFetch {
             items,
@@ -196,6 +199,7 @@ impl ReviewsGitHubClient {
                     .await?;
             }
         }
+        apply_policy_review_metadata(&mut items, viewer_login);
         log_check_details_url_coverage(&items);
         Ok(ReviewsFetchByIds {
             items,

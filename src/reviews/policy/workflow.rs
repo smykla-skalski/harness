@@ -1,16 +1,17 @@
 //! The default `reviews_auto` workflow graph.
 //!
 //! Reviews Auto is a policy template, not an execution fallback. This module
-//! defines the authored `reviews_auto` workflow (gate, approve, wait for
-//! checks, merge) for explicit policy documents that choose to include it.
-//! Runtime planners must still require an active enforced policy canvas.
+//! defines the authored `reviews_auto` workflow for explicit policy documents
+//! that choose to include it. Runtime planners must still require an active
+//! enforced policy canvas.
 
 use crate::task_board::policy::PolicyReasonCode;
 use crate::task_board::policy_graph::{
-    PORT_DEFAULT, PORT_FAIL, PORT_IN, PORT_MISSING, PORT_PASS, PolicyActionStep, PolicyEventWait,
-    PolicyEvidenceCheck, PolicyEvidenceField, PolicyEvidencePredicate, PolicyFinishNode,
-    PolicyGraph, PolicyGraphDecision, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphNode,
-    PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyWorkflowEntry,
+    PORT_DEFAULT, PORT_ELSE, PORT_FAIL, PORT_IN, PORT_MISSING, PORT_PASS, PORT_THEN,
+    PolicyActionStep, PolicyEventWait, PolicyEvidenceCheck, PolicyEvidenceField,
+    PolicyEvidencePredicate, PolicyFinishNode, PolicyGraph, PolicyGraphDecision, PolicyGraphEdge,
+    PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
+    PolicyIfThenElseCondition, PolicyWorkflowEntry,
 };
 
 use super::events::REVIEWS_CHECKS_PASSED_EVENT;
@@ -18,8 +19,14 @@ use super::events::REVIEWS_CHECKS_PASSED_EVENT;
 pub(crate) const REVIEWS_AUTO_WORKFLOW_ID: &str = "reviews_auto";
 
 const ENTRY_ID: &str = "reviews-auto-entry";
-const GATE_ID: &str = "reviews-auto-approve-gate";
+const CONFLICT_GATE_ID: &str = "reviews-auto-conflict-gate";
+const NOTIFY_CONFLICT_ID: &str = "reviews-auto-notify-conflicts";
+const CONFLICT_NOTIFIED_ID: &str = "reviews-auto-conflicts-notified";
+const ELIGIBILITY_GATE_ID: &str = "reviews-auto-eligibility-gate";
+const APPROVAL_CHECK_ID: &str = "reviews-auto-approval-check";
 const APPROVE_ID: &str = "reviews-auto-approve";
+const AUTO_MERGE_GATE_ID: &str = "reviews-auto-auto-merge-gate";
+const APPROVAL_COUNT_GATE_ID: &str = "reviews-auto-approval-count-gate";
 const WAIT_ID: &str = "reviews-auto-wait";
 const MERGE_ID: &str = "reviews-auto-merge";
 const ALLOW_ID: &str = "reviews-auto-allow";
@@ -73,13 +80,51 @@ fn reviews_auto_nodes() -> Vec<PolicyGraphNode> {
             &[PORT_DEFAULT],
         ),
         node(
-            GATE_ID,
-            "Approvable",
+            CONFLICT_GATE_ID,
+            "No conflicts",
             PolicyGraphNodeKind::EvidenceCheck {
-                checks: approve_checks(),
+                checks: conflict_checks(),
             },
             &[PORT_IN],
             &[PORT_PASS, PORT_FAIL, PORT_MISSING],
+        ),
+        node(
+            NOTIFY_CONFLICT_ID,
+            "Notify conflicts",
+            PolicyGraphNodeKind::ActionStep(PolicyActionStep {
+                action_id: "notification.emit".to_owned(),
+            }),
+            &[PORT_IN],
+            &[PORT_DEFAULT],
+        ),
+        node(
+            CONFLICT_NOTIFIED_ID,
+            "Conflicts notified",
+            PolicyGraphNodeKind::Finish(PolicyFinishNode {
+                decision: PolicyGraphDecision::Allow,
+                reason_code: PolicyReasonCode::HumanRequired,
+            }),
+            &[PORT_IN],
+            &[],
+        ),
+        node(
+            ELIGIBILITY_GATE_ID,
+            "Eligible",
+            PolicyGraphNodeKind::EvidenceCheck {
+                checks: eligibility_checks(),
+            },
+            &[PORT_IN],
+            &[PORT_PASS, PORT_FAIL, PORT_MISSING],
+        ),
+        node(
+            APPROVAL_CHECK_ID,
+            "Approved by me?",
+            PolicyGraphNodeKind::IfThenElse(PolicyIfThenElseCondition {
+                field: PolicyEvidenceField::ReviewViewerHasActiveApproval,
+                predicate: PolicyEvidencePredicate::IsTrue,
+            }),
+            &[PORT_IN],
+            &[PORT_THEN, PORT_ELSE],
         ),
         node(
             APPROVE_ID,
@@ -89,6 +134,24 @@ fn reviews_auto_nodes() -> Vec<PolicyGraphNode> {
             }),
             &[PORT_IN],
             &[PORT_DEFAULT],
+        ),
+        node(
+            AUTO_MERGE_GATE_ID,
+            "Auto-merge absent",
+            PolicyGraphNodeKind::EvidenceCheck {
+                checks: auto_merge_absent_checks(),
+            },
+            &[PORT_IN],
+            &[PORT_PASS, PORT_FAIL, PORT_MISSING],
+        ),
+        node(
+            APPROVAL_COUNT_GATE_ID,
+            "Approvals enough",
+            PolicyGraphNodeKind::EvidenceCheck {
+                checks: approval_count_checks(),
+            },
+            &[PORT_IN],
+            &[PORT_PASS, PORT_FAIL, PORT_MISSING],
         ),
         node(
             WAIT_ID,
@@ -110,7 +173,7 @@ fn reviews_auto_nodes() -> Vec<PolicyGraphNode> {
         ),
         node(
             ALLOW_ID,
-            "Merged",
+            "Done",
             PolicyGraphNodeKind::Finish(PolicyFinishNode {
                 decision: PolicyGraphDecision::Allow,
                 reason_code: PolicyReasonCode::AutoMergeAllowed,
@@ -131,19 +194,73 @@ fn reviews_auto_nodes() -> Vec<PolicyGraphNode> {
     ]
 }
 
-fn approve_checks() -> Vec<PolicyEvidenceCheck> {
-    [
-        PolicyEvidenceField::ReviewIsOpen,
-        PolicyEvidenceField::ReviewViewerCanUpdate,
+fn conflict_checks() -> Vec<PolicyEvidenceCheck> {
+    vec![
+        evidence_check(
+            PolicyEvidenceField::ReviewHasMergeConflicts,
+            PolicyEvidencePredicate::IsFalse,
+            PolicyReasonCode::HumanRequired,
+        ),
+        evidence_check(
+            PolicyEvidenceField::ReviewHasConflictMarkers,
+            PolicyEvidencePredicate::IsFalse,
+            PolicyReasonCode::HumanRequired,
+        ),
     ]
-    .into_iter()
-    .map(|field| PolicyEvidenceCheck {
+}
+
+fn eligibility_checks() -> Vec<PolicyEvidenceCheck> {
+    vec![
+        evidence_check(
+            PolicyEvidenceField::ReviewIsOpen,
+            PolicyEvidencePredicate::IsTrue,
+            PolicyReasonCode::HumanRequired,
+        ),
+        evidence_check(
+            PolicyEvidenceField::ReviewViewerCanUpdate,
+            PolicyEvidencePredicate::IsTrue,
+            PolicyReasonCode::HumanRequired,
+        ),
+        evidence_check(
+            PolicyEvidenceField::ReviewIsDraft,
+            PolicyEvidencePredicate::IsFalse,
+            PolicyReasonCode::HumanRequired,
+        ),
+        evidence_check(
+            PolicyEvidenceField::ReviewPolicyBlocked,
+            PolicyEvidencePredicate::IsFalse,
+            PolicyReasonCode::HumanRequired,
+        ),
+    ]
+}
+
+fn auto_merge_absent_checks() -> Vec<PolicyEvidenceCheck> {
+    vec![evidence_check(
+        PolicyEvidenceField::ReviewAutoMergeEnabled,
+        PolicyEvidencePredicate::IsFalse,
+        PolicyReasonCode::AutoMergeAllowed,
+    )]
+}
+
+fn approval_count_checks() -> Vec<PolicyEvidenceCheck> {
+    vec![evidence_check(
+        PolicyEvidenceField::ReviewRequiredApprovalsSatisfiedAfterViewerApproval,
+        PolicyEvidencePredicate::IsTrue,
+        PolicyReasonCode::ReviewerNotApproved,
+    )]
+}
+
+fn evidence_check(
+    field: PolicyEvidenceField,
+    pass: PolicyEvidencePredicate,
+    fail_reason_code: PolicyReasonCode,
+) -> PolicyEvidenceCheck {
+    PolicyEvidenceCheck {
         field,
-        pass: PolicyEvidencePredicate::IsTrue,
-        fail_reason_code: PolicyReasonCode::HumanRequired,
+        pass,
+        fail_reason_code,
         missing_reason_code: PolicyReasonCode::HumanRequired,
-    })
-    .collect()
+    }
 }
 
 fn edge(
@@ -167,22 +284,52 @@ fn edge(
 fn reviews_auto_edges() -> Vec<PolicyGraphEdge> {
     vec![
         edge(
-            "reviews-auto-entry-gate",
+            "reviews-auto-entry-conflict",
             ENTRY_ID,
             PORT_DEFAULT,
-            GATE_ID,
+            CONFLICT_GATE_ID,
             PolicyGraphEdgeCondition::Always,
         ),
         edge(
-            "reviews-auto-gate-approve",
-            GATE_ID,
+            "reviews-auto-conflict-eligible",
+            CONFLICT_GATE_ID,
             PORT_PASS,
-            APPROVE_ID,
+            ELIGIBILITY_GATE_ID,
             PolicyGraphEdgeCondition::EvidencePass,
         ),
         edge(
-            "reviews-auto-gate-blocked",
-            GATE_ID,
+            "reviews-auto-conflict-notify",
+            CONFLICT_GATE_ID,
+            PORT_FAIL,
+            NOTIFY_CONFLICT_ID,
+            PolicyGraphEdgeCondition::EvidenceFailure {
+                reason_code: PolicyReasonCode::HumanRequired,
+            },
+        ),
+        edge(
+            "reviews-auto-conflict-missing",
+            CONFLICT_GATE_ID,
+            PORT_MISSING,
+            BLOCKED_ID,
+            PolicyGraphEdgeCondition::EvidenceMissing,
+        ),
+        edge(
+            "reviews-auto-notify-conflict-done",
+            NOTIFY_CONFLICT_ID,
+            PORT_DEFAULT,
+            CONFLICT_NOTIFIED_ID,
+            PolicyGraphEdgeCondition::Always,
+        ),
+        edge(
+            "reviews-auto-eligibility-approval",
+            ELIGIBILITY_GATE_ID,
+            PORT_PASS,
+            APPROVAL_CHECK_ID,
+            PolicyGraphEdgeCondition::EvidencePass,
+        ),
+        edge(
+            "reviews-auto-eligibility-blocked",
+            ELIGIBILITY_GATE_ID,
             PORT_FAIL,
             BLOCKED_ID,
             PolicyGraphEdgeCondition::EvidenceFailure {
@@ -190,18 +337,78 @@ fn reviews_auto_edges() -> Vec<PolicyGraphEdge> {
             },
         ),
         edge(
-            "reviews-auto-gate-missing",
-            GATE_ID,
+            "reviews-auto-eligibility-missing",
+            ELIGIBILITY_GATE_ID,
             PORT_MISSING,
             BLOCKED_ID,
             PolicyGraphEdgeCondition::EvidenceMissing,
         ),
         edge(
-            "reviews-auto-approve-wait",
+            "reviews-auto-approval-present-auto-merge",
+            APPROVAL_CHECK_ID,
+            PORT_THEN,
+            AUTO_MERGE_GATE_ID,
+            PolicyGraphEdgeCondition::ConditionTrue,
+        ),
+        edge(
+            "reviews-auto-approval-missing-approve",
+            APPROVAL_CHECK_ID,
+            PORT_ELSE,
+            APPROVE_ID,
+            PolicyGraphEdgeCondition::ConditionFalse,
+        ),
+        edge(
+            "reviews-auto-approve-auto-merge",
             APPROVE_ID,
             PORT_DEFAULT,
-            WAIT_ID,
+            AUTO_MERGE_GATE_ID,
             PolicyGraphEdgeCondition::Always,
+        ),
+        edge(
+            "reviews-auto-auto-merge-absent-count",
+            AUTO_MERGE_GATE_ID,
+            PORT_PASS,
+            APPROVAL_COUNT_GATE_ID,
+            PolicyGraphEdgeCondition::EvidencePass,
+        ),
+        edge(
+            "reviews-auto-auto-merge-present-allow",
+            AUTO_MERGE_GATE_ID,
+            PORT_FAIL,
+            ALLOW_ID,
+            PolicyGraphEdgeCondition::EvidenceFailure {
+                reason_code: PolicyReasonCode::AutoMergeAllowed,
+            },
+        ),
+        edge(
+            "reviews-auto-auto-merge-missing",
+            AUTO_MERGE_GATE_ID,
+            PORT_MISSING,
+            BLOCKED_ID,
+            PolicyGraphEdgeCondition::EvidenceMissing,
+        ),
+        edge(
+            "reviews-auto-approval-count-wait",
+            APPROVAL_COUNT_GATE_ID,
+            PORT_PASS,
+            WAIT_ID,
+            PolicyGraphEdgeCondition::EvidencePass,
+        ),
+        edge(
+            "reviews-auto-approval-count-stop",
+            APPROVAL_COUNT_GATE_ID,
+            PORT_FAIL,
+            ALLOW_ID,
+            PolicyGraphEdgeCondition::EvidenceFailure {
+                reason_code: PolicyReasonCode::ReviewerNotApproved,
+            },
+        ),
+        edge(
+            "reviews-auto-approval-count-missing",
+            APPROVAL_COUNT_GATE_ID,
+            PORT_MISSING,
+            BLOCKED_ID,
+            PolicyGraphEdgeCondition::EvidenceMissing,
         ),
         edge(
             "reviews-auto-wait-merge",
@@ -224,7 +431,19 @@ fn reviews_auto_layout() -> Vec<PolicyGraphNodeLayout> {
     // Placed below the seeded gate graph so the two sub-graphs never overlap
     // if the merged document is ever rendered on the canvas.
     [
-        ENTRY_ID, GATE_ID, APPROVE_ID, WAIT_ID, MERGE_ID, ALLOW_ID, BLOCKED_ID,
+        ENTRY_ID,
+        CONFLICT_GATE_ID,
+        NOTIFY_CONFLICT_ID,
+        CONFLICT_NOTIFIED_ID,
+        ELIGIBILITY_GATE_ID,
+        APPROVAL_CHECK_ID,
+        APPROVE_ID,
+        AUTO_MERGE_GATE_ID,
+        APPROVAL_COUNT_GATE_ID,
+        WAIT_ID,
+        MERGE_ID,
+        ALLOW_ID,
+        BLOCKED_ID,
     ]
     .iter()
     .enumerate()

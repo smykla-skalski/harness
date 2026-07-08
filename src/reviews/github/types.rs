@@ -62,6 +62,8 @@ pub(super) struct SearchNode {
     pub(super) viewer_can_merge_as_admin: Option<bool>,
     #[serde(rename = "reviewDecision")]
     pub(super) review_decision: Option<String>,
+    #[serde(rename = "autoMergeRequest", default)]
+    pub(super) auto_merge_request: Option<AutoMergeRequestNode>,
     #[serde(rename = "headRefOid")]
     pub(super) head_ref_oid: Option<String>,
     #[serde(rename = "baseRefName", default)]
@@ -95,6 +97,12 @@ pub(super) struct LoginNode {
 }
 
 #[derive(Debug, Deserialize)]
+pub(super) struct AutoMergeRequestNode {
+    #[serde(rename = "enabledAt", default)]
+    pub(super) _enabled_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(super) struct RepositoryNode {
     pub(super) id: String,
     #[serde(rename = "nameWithOwner")]
@@ -118,6 +126,10 @@ pub(super) struct RefNode {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct BranchProtectionRuleNode {
+    #[serde(rename = "requiresApprovingReviews", default)]
+    pub(super) requires_approving_reviews: Option<bool>,
+    #[serde(rename = "requiredApprovingReviewCount", default)]
+    pub(super) required_approving_review_count: Option<u32>,
     #[serde(rename = "requiredStatusCheckContexts", default)]
     pub(super) required_status_check_contexts: Vec<String>,
     #[serde(rename = "requiredStatusChecks", default)]

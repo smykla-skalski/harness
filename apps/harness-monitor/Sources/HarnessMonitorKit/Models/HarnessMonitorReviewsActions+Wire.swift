@@ -33,7 +33,12 @@ extension ReviewTargetWire {
       viewerCanUpdate: model.viewerCanUpdate,
       viewerCanMergeAsAdmin: model.viewerCanMergeAsAdmin,
       requiredFailedCheckNames: model.requiredFailedCheckNames,
-      checkSuiteIds: model.checkSuiteIDs
+      checkSuiteIds: model.checkSuiteIDs,
+      hasConflictMarkers: model.hasConflictMarkers,
+      viewerHasActiveApproval: model.viewerHasActiveApproval,
+      autoMergeEnabled: model.autoMergeEnabled,
+      approvalRequirementSatisfiedAfterViewerApproval:
+        model.approvalsSatisfiedAfterViewerApproval
     )
   }
 }

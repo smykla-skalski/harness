@@ -51,6 +51,11 @@ fn item(
         created_at: parsed("2026-05-20T12:00:00Z"),
         updated_at: parsed("2026-05-20T12:00:00Z"),
         required_failed_check_names: Vec::new(),
+        required_approving_review_count: None,
+        has_conflict_markers: None,
+        viewer_has_active_approval: None,
+        auto_merge_enabled: None,
+        approval_requirement_satisfied_after_viewer_approval: None,
     }
 }
 
@@ -277,6 +282,11 @@ fn one_repo_item(repository: &str, pr_id: &str) -> ReviewItem {
         created_at: parsed("2026-05-20T12:00:00Z"),
         updated_at: parsed("2026-05-20T12:00:00Z"),
         required_failed_check_names: Vec::new(),
+        required_approving_review_count: None,
+        has_conflict_markers: None,
+        viewer_has_active_approval: None,
+        auto_merge_enabled: None,
+        approval_requirement_satisfied_after_viewer_approval: None,
     }
 }
 

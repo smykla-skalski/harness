@@ -90,6 +90,14 @@ pub struct PolicyEvidence {
     pub review_policy_blocked: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review_viewer_can_update: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_has_conflict_markers: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_viewer_has_active_approval: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_auto_merge_enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_required_approvals_satisfied_after_viewer_approval: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

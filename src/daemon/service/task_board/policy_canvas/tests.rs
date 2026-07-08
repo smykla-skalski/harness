@@ -47,7 +47,10 @@ async fn legacy_promote_alias_enables_global_enforcement() {
     assert_eq!(response.document.revision, revision);
     assert!(loaded.global_policy_enforcement_enabled);
     assert_eq!(
-        loaded.active_live_document().expect("live document").revision,
+        loaded
+            .active_live_document()
+            .expect("live document")
+            .revision,
         revision,
     );
 }

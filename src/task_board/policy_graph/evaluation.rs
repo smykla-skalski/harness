@@ -368,6 +368,20 @@ fn evidence_value(field: PolicyEvidenceField, input: &PolicyInput) -> Option<u32
         PolicyEvidenceField::ReviewViewerCanUpdate => {
             input.evidence.review_viewer_can_update.map(u32::from)
         }
+        PolicyEvidenceField::ReviewHasConflictMarkers => {
+            input.evidence.review_has_conflict_markers.map(u32::from)
+        }
+        PolicyEvidenceField::ReviewViewerHasActiveApproval => input
+            .evidence
+            .review_viewer_has_active_approval
+            .map(u32::from),
+        PolicyEvidenceField::ReviewAutoMergeEnabled => {
+            input.evidence.review_auto_merge_enabled.map(u32::from)
+        }
+        PolicyEvidenceField::ReviewRequiredApprovalsSatisfiedAfterViewerApproval => input
+            .evidence
+            .review_required_approvals_satisfied_after_viewer_approval
+            .map(u32::from),
     }
 }
 

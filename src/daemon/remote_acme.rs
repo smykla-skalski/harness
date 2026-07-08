@@ -363,8 +363,5 @@ fn redact_secret_detail(detail: &str) -> String {
 
 fn is_secret_value_terminator(value_char: char) -> bool {
     value_char.is_whitespace()
-        || matches!(
-            value_char,
-            '&' | ';' | ',' | ')' | ']' | '}' | '"' | '\''
-        )
+        || matches!(value_char, '&' | ';' | ',' | ')' | ']' | '}' | '"' | '\'')
 }

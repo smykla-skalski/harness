@@ -224,8 +224,13 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
   public var createdAt: String
   public var updatedAt: String
   public var requiredFailedCheckNames: [String]
+  public var requiredApprovingReviewCount: UInt32?
+  public var hasConflictMarkers: Bool?
+  public var viewerHasActiveApproval: Bool?
+  public var autoMergeEnabled: Bool?
+  public var approvalRequirementSatisfiedAfterViewerApproval: Bool?
 
-  public init(pullRequestId: String, repositoryId: String, repository: String, number: UInt64, title: String, url: String, baseRefName: String? = nil, defaultBranchName: String? = nil, backportSource: ReviewBackportSource? = nil, authorLogin: String, authorAvatarUrl: String? = nil, authorAssociation: ReviewAuthorAssociation, state: ReviewPullRequestState, mergeable: ReviewMergeableState, reviewStatus: ReviewReviewStatus, checkStatus: ReviewCheckStatus, isDraft: Bool = false, policyBlocked: Bool = false, viewerCanUpdate: Bool = true, viewerIsRequestedReviewer: Bool = false, viewerCanMergeAsAdmin: Bool = false, headSha: String, labels: [String] = [], checks: [ReviewCheckWire] = [], reviews: [PullRequestReviewWire] = [], additions: UInt64, deletions: UInt64, createdAt: String, updatedAt: String, requiredFailedCheckNames: [String] = []) {
+  public init(pullRequestId: String, repositoryId: String, repository: String, number: UInt64, title: String, url: String, baseRefName: String? = nil, defaultBranchName: String? = nil, backportSource: ReviewBackportSource? = nil, authorLogin: String, authorAvatarUrl: String? = nil, authorAssociation: ReviewAuthorAssociation, state: ReviewPullRequestState, mergeable: ReviewMergeableState, reviewStatus: ReviewReviewStatus, checkStatus: ReviewCheckStatus, isDraft: Bool = false, policyBlocked: Bool = false, viewerCanUpdate: Bool = true, viewerIsRequestedReviewer: Bool = false, viewerCanMergeAsAdmin: Bool = false, headSha: String, labels: [String] = [], checks: [ReviewCheckWire] = [], reviews: [PullRequestReviewWire] = [], additions: UInt64, deletions: UInt64, createdAt: String, updatedAt: String, requiredFailedCheckNames: [String] = [], requiredApprovingReviewCount: UInt32? = nil, hasConflictMarkers: Bool? = nil, viewerHasActiveApproval: Bool? = nil, autoMergeEnabled: Bool? = nil, approvalRequirementSatisfiedAfterViewerApproval: Bool? = nil) {
     self.pullRequestId = pullRequestId
     self.repositoryId = repositoryId
     self.repository = repository
@@ -256,6 +261,11 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
     self.createdAt = createdAt
     self.updatedAt = updatedAt
     self.requiredFailedCheckNames = requiredFailedCheckNames
+    self.requiredApprovingReviewCount = requiredApprovingReviewCount
+    self.hasConflictMarkers = hasConflictMarkers
+    self.viewerHasActiveApproval = viewerHasActiveApproval
+    self.autoMergeEnabled = autoMergeEnabled
+    self.approvalRequirementSatisfiedAfterViewerApproval = approvalRequirementSatisfiedAfterViewerApproval
   }
 
   public init(from decoder: Decoder) throws {
@@ -290,6 +300,11 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
     createdAt = try container.decode(String.self, forKey: .createdAt)
     updatedAt = try container.decode(String.self, forKey: .updatedAt)
     requiredFailedCheckNames = try container.decodeIfPresent([String].self, forKey: .requiredFailedCheckNames) ?? []
+    requiredApprovingReviewCount = try container.decodeIfPresent(UInt32.self, forKey: .requiredApprovingReviewCount)
+    hasConflictMarkers = try container.decodeIfPresent(Bool.self, forKey: .hasConflictMarkers)
+    viewerHasActiveApproval = try container.decodeIfPresent(Bool.self, forKey: .viewerHasActiveApproval)
+    autoMergeEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoMergeEnabled)
+    approvalRequirementSatisfiedAfterViewerApproval = try container.decodeIfPresent(Bool.self, forKey: .approvalRequirementSatisfiedAfterViewerApproval)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -323,6 +338,11 @@ public struct ReviewItemWire: Codable, Equatable, Sendable {
     case createdAt = "created_at"
     case updatedAt = "updated_at"
     case requiredFailedCheckNames = "required_failed_check_names"
+    case requiredApprovingReviewCount = "required_approving_review_count"
+    case hasConflictMarkers = "has_conflict_markers"
+    case viewerHasActiveApproval = "viewer_has_active_approval"
+    case autoMergeEnabled = "auto_merge_enabled"
+    case approvalRequirementSatisfiedAfterViewerApproval = "approval_requirement_satisfied_after_viewer_approval"
   }
 }
 
@@ -813,8 +833,12 @@ public struct ReviewTargetWire: Codable, Equatable, Sendable {
   public var viewerCanMergeAsAdmin: Bool
   public var requiredFailedCheckNames: [String]
   public var checkSuiteIds: [String]
+  public var hasConflictMarkers: Bool?
+  public var viewerHasActiveApproval: Bool?
+  public var autoMergeEnabled: Bool?
+  public var approvalRequirementSatisfiedAfterViewerApproval: Bool?
 
-  public init(pullRequestId: String, repositoryId: String, repository: String, number: UInt64, url: String, state: ReviewPullRequestState = .`open`, headSha: String, mergeable: ReviewMergeableState, reviewStatus: ReviewReviewStatus, checkStatus: ReviewCheckStatus, isDraft: Bool = false, policyBlocked: Bool = false, viewerCanUpdate: Bool = true, viewerCanMergeAsAdmin: Bool = false, requiredFailedCheckNames: [String] = [], checkSuiteIds: [String] = []) {
+  public init(pullRequestId: String, repositoryId: String, repository: String, number: UInt64, url: String, state: ReviewPullRequestState = .`open`, headSha: String, mergeable: ReviewMergeableState, reviewStatus: ReviewReviewStatus, checkStatus: ReviewCheckStatus, isDraft: Bool = false, policyBlocked: Bool = false, viewerCanUpdate: Bool = true, viewerCanMergeAsAdmin: Bool = false, requiredFailedCheckNames: [String] = [], checkSuiteIds: [String] = [], hasConflictMarkers: Bool? = nil, viewerHasActiveApproval: Bool? = nil, autoMergeEnabled: Bool? = nil, approvalRequirementSatisfiedAfterViewerApproval: Bool? = nil) {
     self.pullRequestId = pullRequestId
     self.repositoryId = repositoryId
     self.repository = repository
@@ -831,6 +855,10 @@ public struct ReviewTargetWire: Codable, Equatable, Sendable {
     self.viewerCanMergeAsAdmin = viewerCanMergeAsAdmin
     self.requiredFailedCheckNames = requiredFailedCheckNames
     self.checkSuiteIds = checkSuiteIds
+    self.hasConflictMarkers = hasConflictMarkers
+    self.viewerHasActiveApproval = viewerHasActiveApproval
+    self.autoMergeEnabled = autoMergeEnabled
+    self.approvalRequirementSatisfiedAfterViewerApproval = approvalRequirementSatisfiedAfterViewerApproval
   }
 
   public init(from decoder: Decoder) throws {
@@ -851,6 +879,10 @@ public struct ReviewTargetWire: Codable, Equatable, Sendable {
     viewerCanMergeAsAdmin = try container.decodeIfPresent(Bool.self, forKey: .viewerCanMergeAsAdmin) ?? false
     requiredFailedCheckNames = try container.decodeIfPresent([String].self, forKey: .requiredFailedCheckNames) ?? []
     checkSuiteIds = try container.decodeIfPresent([String].self, forKey: .checkSuiteIds) ?? []
+    hasConflictMarkers = try container.decodeIfPresent(Bool.self, forKey: .hasConflictMarkers)
+    viewerHasActiveApproval = try container.decodeIfPresent(Bool.self, forKey: .viewerHasActiveApproval)
+    autoMergeEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoMergeEnabled)
+    approvalRequirementSatisfiedAfterViewerApproval = try container.decodeIfPresent(Bool.self, forKey: .approvalRequirementSatisfiedAfterViewerApproval)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -870,6 +902,10 @@ public struct ReviewTargetWire: Codable, Equatable, Sendable {
     case viewerCanMergeAsAdmin = "viewer_can_merge_as_admin"
     case requiredFailedCheckNames = "required_failed_check_names"
     case checkSuiteIds = "check_suite_ids"
+    case hasConflictMarkers = "has_conflict_markers"
+    case viewerHasActiveApproval = "viewer_has_active_approval"
+    case autoMergeEnabled = "auto_merge_enabled"
+    case approvalRequirementSatisfiedAfterViewerApproval = "approval_requirement_satisfied_after_viewer_approval"
   }
 }
 
