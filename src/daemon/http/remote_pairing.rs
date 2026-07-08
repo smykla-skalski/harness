@@ -22,7 +22,7 @@ use crate::daemon::remote_pairing::{
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
-use super::response::{extract_request_id, timed_json};
+use super::response::{extract_request_id, timed_json, timed_response};
 use super::DaemonHttpState;
 
 pub(super) fn remote_pairing_routes() -> Router<DaemonHttpState> {
@@ -66,7 +66,13 @@ async fn post_remote_pair_claim(
             start,
             Ok(response),
         ),
-        Err(error) => error.into_response(),
+        Err(error) => timed_response(
+            "POST",
+            http_paths::REMOTE_PAIR_CLAIM,
+            request_id.as_str(),
+            start,
+            error.into_response(),
+        ),
     }
 }
 
@@ -262,12 +268,13 @@ impl IntoResponse for RemotePairClaimHttpError {
             ),
             Self::Pairing(error) => {
                 let status = pairing_error_status(&error);
+                let message = pairing_error_message(&error);
                 return (
                     status,
                     Json(serde_json::json!({
                         "error": {
                             "code": "REMOTE_PAIRING",
-                            "message": error.to_string(),
+                            "message": message,
                         }
                     })),
                 )
@@ -303,5 +310,24 @@ fn pairing_error_status(error: &RemotePairingError) -> StatusCode {
         | RemotePairingError::InvalidStoredCodeHash
         | RemotePairingError::UnknownCode
         | RemotePairingError::Identity(_) => StatusCode::BAD_REQUEST,
+    }
+}
+
+fn pairing_error_message(error: &RemotePairingError) -> &'static str {
+    match error {
+        RemotePairingError::AlreadyClaimed => "remote pairing code already claimed",
+        RemotePairingError::Expired => "remote pairing code expired",
+        RemotePairingError::WrongDomain { .. } => "remote pairing domain is not allowed",
+        RemotePairingError::RateLimited => "remote pairing attempts are rate limited",
+        RemotePairingError::EmptyPairingId => "remote pairing id is required",
+        RemotePairingError::EmptyCode => "remote pairing code is required",
+        RemotePairingError::EmptyClientId => "remote pairing client id is required",
+        RemotePairingError::EmptyDomain => "remote pairing domain is required",
+        RemotePairingError::EmptyDisplayName => "remote pairing display name is required",
+        RemotePairingError::EmptyPlatform => "remote pairing platform is required",
+        RemotePairingError::EmptyAuditEventId => "remote pairing audit event id is required",
+        RemotePairingError::InvalidStoredCodeHash => "remote pairing code is invalid",
+        RemotePairingError::UnknownCode => "remote pairing code is unknown",
+        RemotePairingError::Identity(_) => "remote pairing client identity is invalid",
     }
 }

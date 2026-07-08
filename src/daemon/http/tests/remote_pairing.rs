@@ -208,6 +208,50 @@ async fn remote_pair_claim_fails_closed_without_remote_domain_config() {
 }
 
 #[tokio::test]
+async fn remote_pair_claim_wrong_domain_is_redacted() {
+    let state = remote_pairing_state();
+    let code = seed_pairing_code(
+        &state,
+        "pairing-http-wrong-domain",
+        RemoteRole::Viewer,
+        &[],
+        "http-wrong-domain-secret",
+        "2026-06-21T18:00:00Z",
+        "2099-06-21T18:10:00Z",
+    );
+    let (base_url, server) = serve_http(state).await;
+
+    let response = reqwest::Client::new()
+        .post(format!("{base_url}{}", http_paths::REMOTE_PAIR_CLAIM))
+        .json(&serde_json::json!({
+            "code": code.expose(),
+            "domain": "attacker.example.com",
+            "client_id": "ios-wrong-domain",
+            "display_name": "iPhone",
+            "platform": "ios",
+        }))
+        .send()
+        .await
+        .expect("send wrong-domain claim");
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let body = response.json::<serde_json::Value>().await.expect("json body");
+    assert_eq!(body["error"]["code"], "REMOTE_PAIRING");
+    assert_eq!(
+        body["error"]["message"],
+        "remote pairing domain is not allowed"
+    );
+    let body = body.to_string();
+    assert!(!body.contains("daemon.example.com"));
+    assert!(!body.contains("attacker.example.com"));
+    assert!(!body.contains("expected"));
+    assert!(!body.contains("got"));
+
+    server.abort();
+    let _ = server.await;
+}
+
+#[tokio::test]
 async fn remote_pair_claim_redacts_store_failures() {
     let state = remote_pairing_state();
     let code = seed_pairing_code(

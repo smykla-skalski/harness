@@ -100,23 +100,25 @@ pub(super) fn timed_json<T: serde::Serialize>(
     start: Instant,
     result: Result<T, CliError>,
 ) -> Response {
+    timed_response(method, path, request_id, start, map_json(result))
+}
+
+pub(super) fn timed_response(
+    method: &str,
+    path: &str,
+    request_id: &str,
+    start: Instant,
+    response: Response,
+) -> Response {
     let elapsed = start.elapsed().as_millis();
     let duration_ms = u64::try_from(elapsed).unwrap_or(u64::MAX);
-    let status: u16 = match &result {
-        Ok(_) => 200,
-        Err(error) if error.code() == "SANDBOX001" => 501,
-        Err(error) if error.code() == "CODEX001" => 503,
-        Err(error) if error.code() == "KSRCLI092" => 409,
-        Err(error) if error.code() == "ACP_DISABLED" => 503,
-        Err(error) if error.code() == "SESSION_SCOPE_DENIED" => 403,
-        Err(_) => 400,
-    };
+    let status = response.status().as_u16();
     record_daemon_http_metrics(method, path, status, duration_ms);
     let span = tracing::Span::current();
     span.record("http_status_code", display(status));
     span.record("duration_ms", display(duration_ms));
     log_request(method, path, status, duration_ms, request_id);
-    map_json(result)
+    response
 }
 
 #[expect(

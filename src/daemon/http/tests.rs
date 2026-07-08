@@ -1,9 +1,17 @@
+use std::io;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
 use crate::daemon::protocol::{ObserveSessionRequest, SessionEndRequest};
 use crate::errors::CliErrorKind;
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
+use axum::Json;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
+use axum::response::IntoResponse;
 use serde_json::Value;
+use tracing_subscriber::fmt::writer::MakeWriter;
+use tracing_subscriber::prelude::*;
 
 use super::DaemonHttpState;
 use super::agents::{post_remove_agent, post_role_change, post_transfer_leader};
@@ -12,7 +20,7 @@ use super::core::{
     RuntimeSessionResolutionQuery, get_diagnostics, get_health, get_ready,
     get_runtime_session_resolution,
 };
-use super::response::{extract_request_id, request_activity_log_level};
+use super::response::{extract_request_id, request_activity_log_level, timed_response};
 use super::runtime_session::post_runtime_session;
 use super::sessions::{
     SessionScopeQuery, get_timeline, post_end_session, post_observe_session, post_session_join,
@@ -84,6 +92,38 @@ async fn map_json_maps_session_scope_denied_to_403() {
 #[test]
 fn request_logging_uses_debug_activity_level() {
     assert_eq!(request_activity_log_level(), tracing::Level::DEBUG);
+}
+
+#[test]
+fn timed_response_observes_custom_error_responses() {
+    let output = capture_response_logs(|| {
+        let response = (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({
+                "error": {
+                    "code": "CUSTOM_FORBIDDEN",
+                    "message": "custom forbidden",
+                }
+            })),
+        )
+            .into_response();
+
+        let response = timed_response(
+            "POST",
+            "/v1/remote/pair/claim",
+            "req-custom-response",
+            Instant::now(),
+            response,
+        );
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    });
+
+    assert!(output.contains("daemon request"));
+    assert!(output.contains("method=\"POST\""));
+    assert!(output.contains("path=\"/v1/remote/pair/claim\""));
+    assert!(output.contains("status=403"));
+    assert!(output.contains("request_id=\"req-custom-response\""));
 }
 
 #[test]
@@ -185,6 +225,49 @@ async fn map_json_maps_session_agent_conflict_to_409() {
 
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(body["error"]["code"], "KSRCLI092");
+}
+
+fn capture_response_logs(action: impl FnOnce()) -> String {
+    let output = SharedOutput::default();
+    let subscriber = tracing_subscriber::registry().with(
+        tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .with_target(false)
+            .with_writer(output.clone()),
+    );
+
+    tracing::subscriber::with_default(subscriber, action);
+    output.contents()
+}
+
+#[derive(Clone, Default)]
+struct SharedOutput(Arc<Mutex<Vec<u8>>>);
+
+impl SharedOutput {
+    fn contents(&self) -> String {
+        String::from_utf8(self.0.lock().expect("buffer lock").clone()).expect("utf8 output")
+    }
+}
+
+impl<'a> MakeWriter<'a> for SharedOutput {
+    type Writer = SharedOutputWriter;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        SharedOutputWriter(Arc::clone(&self.0))
+    }
+}
+
+struct SharedOutputWriter(Arc<Mutex<Vec<u8>>>);
+
+impl io::Write for SharedOutputWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.lock().expect("buffer lock").extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 #[tokio::test]
