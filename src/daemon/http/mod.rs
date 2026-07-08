@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::Instant;
@@ -22,6 +23,7 @@ use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
+use crate::daemon::remote_pairing::RemotePairingRateLimiter;
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service::{
     WakeDispatch, register_local_clone_progress_sender, run_local_clone_gc,
@@ -38,6 +40,7 @@ mod core;
 mod improver;
 mod managed_agents;
 mod openrouter_models;
+mod remote_pairing;
 mod response;
 mod reviews;
 mod reviews_files;
@@ -163,6 +166,8 @@ pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDae
 pub struct DaemonHttpState {
     pub token: String,
     pub auth_mode: DaemonHttpAuthMode,
+    pub remote_domain: Option<String>,
+    pub remote_pairing_limiter: Arc<Mutex<RemotePairingRateLimiter>>,
     pub sender: broadcast::Sender<StreamEvent>,
     /// Fan-out channel carrying events serialized once into a shared
     /// [`PreparedBroadcast`]. Connection relays and SSE streams subscribe here
@@ -183,6 +188,10 @@ pub struct DaemonHttpState {
     /// rebuild the same snapshot; holding this lock across the rebuild
     /// collapses the herd into one build per change generation.
     pub recovery_snapshot: Arc<AsyncMutex<RecoverySnapshotCache>>,
+}
+
+pub(crate) fn default_remote_pairing_limiter() -> Arc<Mutex<RemotePairingRateLimiter>> {
+    Arc::new(Mutex::new(RemotePairingRateLimiter::new(5)))
 }
 
 /// Cached global `sessions_updated` recovery snapshot keyed by the change
@@ -330,7 +339,7 @@ pub async fn serve(
 
     let app = daemon_http_router(state);
 
-    axum::serve(listener, app)
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
         .with_graceful_shutdown(async move {
             if *shutdown_rx.borrow() {
                 return;
@@ -360,6 +369,7 @@ fn daemon_http_router(state: DaemonHttpState) -> Router<()> {
         .merge(agents::agent_routes())
         .merge(managed_agents::managed_agent_routes())
         .merge(openrouter_models::openrouter_model_routes())
+        .merge(remote_pairing::remote_pairing_routes())
         .merge(signals::signal_routes())
         .merge(voice::voice_routes())
         .layer(middleware::from_fn_with_state(

@@ -134,6 +134,7 @@ impl DaemonRemoteServeArgs {
             host: remote_config.host,
             port: remote_config.https_port,
             auth_mode: DaemonHttpAuthMode::Remote,
+            remote_domain: Some(remote_config.domain),
             ..DaemonServeConfig::default()
         })
     }

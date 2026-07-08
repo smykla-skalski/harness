@@ -149,6 +149,7 @@ pub struct DaemonServeConfig {
     pub host: String,
     pub port: u16,
     pub auth_mode: DaemonHttpAuthMode,
+    pub remote_domain: Option<String>,
     pub poll_interval: Duration,
     pub observe_interval: Duration,
     /// Whether the daemon is running inside the macOS App Sandbox.
@@ -169,6 +170,7 @@ impl Default for DaemonServeConfig {
             host: "127.0.0.1".into(),
             port: 0,
             auth_mode: DaemonHttpAuthMode::Local,
+            remote_domain: None,
             poll_interval: Duration::from_secs(2),
             observe_interval: Duration::from_secs(5),
             sandboxed: false,

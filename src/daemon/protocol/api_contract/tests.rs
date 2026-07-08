@@ -20,12 +20,13 @@ fn every_non_exempt_http_route_has_a_ws_mapping() {
 #[test]
 fn explicit_non_rpc_exemptions_are_documented_and_stable() {
     let exemptions = explicit_exemptions();
-    assert_eq!(exemptions.len(), 6, "unexpected exemption count");
+    assert_eq!(exemptions.len(), 7, "unexpected exemption count");
     let exempt_paths: BTreeSet<_> = exemptions.iter().map(|route| route.path).collect();
     assert_eq!(
         exempt_paths,
         BTreeSet::from([
             http_paths::DAEMON_TELEMETRY,
+            http_paths::REMOTE_PAIR_CLAIM,
             http_paths::WS,
             http_paths::STREAM,
             http_paths::SESSION_STREAM,
@@ -39,6 +40,22 @@ fn explicit_non_rpc_exemptions_are_documented_and_stable() {
             .exemption_reason()
             .is_some_and(|reason| !reason.is_empty())
     }));
+}
+
+#[test]
+fn remote_pair_claim_route_is_public_exemption_with_scope() {
+    let route = HTTP_API_CONTRACT
+        .iter()
+        .find(|route| route.path == http_paths::REMOTE_PAIR_CLAIM)
+        .expect("remote pair claim route should be registered");
+
+    assert_eq!(route.method, HttpRouteMethod::Post);
+    assert!(!route.swift_client_exposed);
+    assert!(route.parity.exemption_reason().is_some());
+    assert_eq!(
+        remote_http_scopes(route),
+        Some(&[RemoteAccessScope::Read][..])
+    );
 }
 
 #[test]

@@ -62,6 +62,8 @@ pub(super) async fn test_websocket_state_with_empty_async_db(db_path: &Path) -> 
     DaemonHttpState {
         token: "token".into(),
         auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
+        remote_domain: None,
+        remote_pairing_limiter: crate::daemon::http::default_remote_pairing_limiter(),
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
         manifest,
@@ -122,6 +124,8 @@ pub(super) fn test_websocket_state_with_sync_db_only(db_path: &Path) -> DaemonHt
     DaemonHttpState {
         token: "token".into(),
         auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
+        remote_domain: None,
+        remote_pairing_limiter: crate::daemon::http::default_remote_pairing_limiter(),
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
         manifest,

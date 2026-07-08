@@ -3,6 +3,7 @@ mod acp_inspect_publisher;
 mod audit;
 mod background_tasks;
 mod binary_stamp;
+mod config;
 mod legacy_migration;
 mod machine_heartbeat_loop;
 mod manifest;
@@ -11,13 +12,14 @@ mod policy_bootstrap;
 mod shutdown_signals;
 mod task_board_orchestrator_loop;
 
+pub(crate) use config::{http_auth_mode, validate_serve_config};
 pub(crate) use open_db::{open_daemon_async_db, open_daemon_db};
 
 use super::{
-    AgentTuiManagerHandle, Arc, CliError, CliErrorKind, CodexControllerHandle, CodexTransportKind,
-    DaemonHttpState, DaemonObserveRuntime, DaemonServeConfig, Duration, Mutex, OBSERVE_RUNTIME,
-    OnceLock, Path, ReplayBuffer, SHUTDOWN_SIGNAL, SessionStatus, TcpListener, bridge, broadcast,
-    http, index, log_sandbox_startup, process_id, state, tokio_watch, watch,
+    AgentTuiManagerHandle, Arc, CliError, CliErrorKind, CodexControllerHandle, DaemonHttpState,
+    DaemonObserveRuntime, DaemonServeConfig, Duration, Mutex, OBSERVE_RUNTIME, OnceLock, Path,
+    ReplayBuffer, SHUTDOWN_SIGNAL, SessionStatus, TcpListener, bridge, broadcast, http, index,
+    log_sandbox_startup, process_id, state, tokio_watch, watch,
 };
 use crate::agents::acp::probe::schedule_probe_cache_refresh;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
@@ -105,6 +107,8 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let app_state = DaemonHttpState {
         token,
         auth_mode: http_auth_mode(&config),
+        remote_domain: config.remote_domain.clone(),
+        remote_pairing_limiter: http::default_remote_pairing_limiter(),
         sender,
         prepared_sender,
         manifest,
@@ -135,30 +139,6 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         (Err(error), _, _) | (Ok(()), Err(error), _) | (Ok(()), Ok(()), Err(error)) => Err(error),
         (Ok(()), Ok(()), Ok(())) => Ok(()),
     }
-}
-
-pub(crate) const fn http_auth_mode(config: &DaemonServeConfig) -> http::DaemonHttpAuthMode {
-    config.auth_mode
-}
-
-pub(crate) fn validate_serve_config(config: &DaemonServeConfig) -> Result<(), CliError> {
-    if !super::is_loopback_host(&config.host) {
-        return Err(CliErrorKind::workflow_parse(format!(
-            "daemon host must be loopback-only: {}",
-            config.host
-        ))
-        .into());
-    }
-    if let CodexTransportKind::WebSocket { endpoint } = &config.codex_transport
-        && config.sandboxed
-        && !super::is_local_websocket_endpoint(endpoint)
-    {
-        return Err(CliErrorKind::workflow_parse(format!(
-            "sandboxed Codex websocket endpoint must be loopback-only: {endpoint}"
-        ))
-        .into());
-    }
-    Ok(())
 }
 
 #[expect(

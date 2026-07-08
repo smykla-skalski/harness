@@ -5,7 +5,9 @@ use axum::http::{HeaderMap, Method, Request, StatusCode, header::AUTHORIZATION};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 
-use crate::daemon::protocol::{ControlPlaneActorRequest, HTTP_API_CONTRACT, HttpApiRouteContract};
+use crate::daemon::protocol::{
+    ControlPlaneActorRequest, HTTP_API_CONTRACT, HttpApiRouteContract, http_paths,
+};
 use crate::daemon::remote_auth::{
     RemoteAuthError, RemoteBearerCredentials, authorize_remote_http_route,
 };
@@ -97,6 +99,9 @@ pub(crate) async fn authorize_remote_http_request(
     else {
         return next.run(request).await;
     };
+    if is_public_remote_http_route(request.method(), route_path) {
+        return next.run(request).await;
+    }
     let Some(route) = http_route_contract(request.method(), route_path) else {
         return remote_auth_error_response(RemoteAuthError::MissingScopeContract);
     };
@@ -127,6 +132,10 @@ fn http_route_contract(method: &Method, route_path: &str) -> Option<&'static Htt
     HTTP_API_CONTRACT
         .iter()
         .find(|route| route.method.as_str() == method && route.path == route_path)
+}
+
+fn is_public_remote_http_route(method: &Method, route_path: &str) -> bool {
+    *method == Method::POST && route_path == http_paths::REMOTE_PAIR_CLAIM
 }
 
 fn verify_remote_client(
