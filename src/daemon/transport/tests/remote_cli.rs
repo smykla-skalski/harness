@@ -275,22 +275,26 @@ fn daemon_remote_pair_create_accepts_fixed_scope_values() {
 
 #[test]
 fn daemon_remote_pair_create_rejects_unknown_scope() {
-    assert!(DaemonRemoteCommandTestHarness::try_parse_from([
-        "test",
-        "pair",
-        "create",
-        "--scopes",
-        "read,root",
-    ])
-    .is_err());
+    assert!(
+        DaemonRemoteCommandTestHarness::try_parse_from([
+            "test",
+            "pair",
+            "create",
+            "--scopes",
+            "read,root",
+        ])
+        .is_err()
+    );
 }
 
 #[test]
 fn daemon_remote_pair_create_rejects_invalid_ttl() {
-    assert!(DaemonRemoteCommandTestHarness::try_parse_from([
-        "test", "pair", "create", "--ttl", "tomorrow",
-    ])
-    .is_err());
+    assert!(
+        DaemonRemoteCommandTestHarness::try_parse_from([
+            "test", "pair", "create", "--ttl", "tomorrow",
+        ])
+        .is_err()
+    );
 }
 
 #[test]

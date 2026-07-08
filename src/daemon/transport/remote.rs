@@ -9,8 +9,8 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::remote::{
-    validate_remote_serve_config, RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig,
-    RemoteDnsProvider, RemoteRole,
+    RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, RemoteRole,
+    validate_remote_serve_config,
 };
 use crate::daemon::remote_pairing::{RemotePairingCode, RemotePairingRecord};
 use crate::daemon::service::DaemonServeConfig;
@@ -53,12 +53,12 @@ impl Execute for DaemonRemoteCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
             Self::Pair { command } => command.execute(context),
+            Self::Clients { command } => command.execute(context),
             Self::Serve(args) => {
                 args.remote_auth_scaffold_config()?;
                 Err(remote_execution_reserved_error())
             }
-            Self::Clients { .. }
-            | Self::Acme { .. }
+            Self::Acme { .. }
             | Self::Doctor
             | Self::InstallSystemd(_)
             | Self::UninstallSystemd(_)
@@ -246,7 +246,7 @@ pub(crate) struct DaemonRemotePairCreateResponse {
     pub ttl_seconds: u64,
 }
 
-fn open_remote_daemon_db() -> Result<DaemonDb, CliError> {
+pub(super) fn open_remote_daemon_db() -> Result<DaemonDb, CliError> {
     state::ensure_daemon_dirs()?;
     DaemonDb::open(&state::daemon_root().join("harness.db"))
 }
