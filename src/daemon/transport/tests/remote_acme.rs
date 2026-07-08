@@ -91,6 +91,9 @@ fn daemon_remote_acme_renew_records_missing_state_failure_and_audit() {
     let state = db.load_remote_acme_state().expect("load acme state");
     assert_eq!(state.renewal_status.as_str(), "failed");
     assert_eq!(state.updated_at, "2026-06-21T15:12:00Z");
+    let json = serde_json::to_string(&response).expect("serialize renew response");
+    assert!(json.contains("\"updated_at\""));
+    assert!(!json.contains("\"renewed_at\""));
 
     let events = db.load_remote_audit_events(10).expect("audit events");
     assert!(events.iter().any(|event| {

@@ -128,7 +128,7 @@ pub(crate) struct DaemonRemoteAcmeRenewResponse {
     pub certificate_fingerprint: Option<String>,
     pub renewal_status: String,
     pub renewal_error: Option<String>,
-    pub renewed_at: String,
+    pub updated_at: String,
 }
 
 impl DaemonRemoteAcmeRenewResponse {
@@ -139,7 +139,7 @@ impl DaemonRemoteAcmeRenewResponse {
             certificate_fingerprint: state.certificate_fingerprint.clone(),
             renewal_status: state.renewal_status.as_str().to_string(),
             renewal_error: state.renewal_error.clone(),
-            renewed_at: state.updated_at.clone(),
+            updated_at: state.updated_at.clone(),
         }
     }
 }
