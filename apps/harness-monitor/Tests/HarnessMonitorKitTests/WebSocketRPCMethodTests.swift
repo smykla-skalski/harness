@@ -102,6 +102,18 @@ struct WebSocketRPCMethodTests {
         == "task_board.policy_pipeline_promote"
     )
     #expect(
+      WebSocketRPCMethod.taskBoardPolicyPipelineMakeLive.rawValue
+        == "task_board.policy_pipeline_make_live"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardPolicyPipelineGoLiveDiff.rawValue
+        == "task_board.policy_pipeline_go_live_diff"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardPolicyPipelineReplay.rawValue
+        == "task_board.policy_pipeline_replay"
+    )
+    #expect(
       WebSocketRPCMethod.taskBoardPolicyPipelineAudit.rawValue
         == "task_board.policy_pipeline_audit"
     )

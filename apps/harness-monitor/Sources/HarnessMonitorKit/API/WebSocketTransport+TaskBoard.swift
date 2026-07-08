@@ -355,6 +355,30 @@ extension WebSocketTransport {
     return try decodePolicyWire(value)
   }
 
+  public func makeLiveTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineMakeLiveRequest
+  ) async throws -> TaskBoardPolicyPipelineMakeLiveResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyPipelineMakeLive, params: params)
+    return try decodePolicyWire(value)
+  }
+
+  public func goLiveDiffTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineGoLiveDiffRequest
+  ) async throws -> TaskBoardPolicyPipelineGoLiveDiff {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyPipelineGoLiveDiff, params: params)
+    return try decodePolicyWire(value)
+  }
+
+  public func replayTaskBoardPolicyPipeline(
+    request: TaskBoardPolicyPipelineReplayRequest
+  ) async throws -> TaskBoardPolicyPipelineReplayResult {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyPipelineReplay, params: params)
+    return try decodePolicyWire(value)
+  }
+
   public func taskBoardPolicyPipelineAudit(
     canvasId: String? = nil
   ) async throws -> TaskBoardPolicyPipelineAuditSummary {

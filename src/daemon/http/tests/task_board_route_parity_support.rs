@@ -471,6 +471,7 @@ fn replace_dynamic_policy_fields(value: &mut Value) {
                     key.as_str(),
                     "active_revision"
                         | "latest_trace_id"
+                        | "live_updated_at"
                         | "revision"
                         | "simulated_at"
                         | "trace_id"

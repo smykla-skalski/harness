@@ -28,10 +28,19 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     let promotion = try await client.promoteTaskBoardPolicyPipeline(
       request: TaskBoardPolicyPipelinePromoteRequest(canvasId: "canvas-primary", revision: 7)
     )
+    let makeLive = try await client.makeLiveTaskBoardPolicyPipeline(
+      request: TaskBoardPolicyPipelineMakeLiveRequest(canvasId: "canvas-primary", revision: 7)
+    )
+    let goLiveDiff = try await client.goLiveDiffTaskBoardPolicyPipeline(
+      request: TaskBoardPolicyPipelineGoLiveDiffRequest(canvasId: "canvas-primary")
+    )
+    let replay = try await client.replayTaskBoardPolicyPipeline(
+      request: TaskBoardPolicyPipelineReplayRequest(canvasId: "canvas-primary", limit: 25)
+    )
     let audit = try await client.taskBoardPolicyPipelineAudit(canvasId: "canvas-primary")
 
     let records = TaskBoardURLProtocol.records
-    #expect(records.map(\.method) == ["GET", "PUT", "POST", "POST", "GET"])
+    #expect(records.map(\.method) == ["GET", "PUT", "POST", "POST", "POST", "POST", "POST", "GET"])
     #expect(
       records.map(\.path)
         == [
@@ -39,6 +48,9 @@ struct TaskBoardPolicyPipelineAPIClientTests {
           "/v1/task-board/policy/pipeline",
           "/v1/task-board/policy/simulate",
           "/v1/task-board/policy/promote",
+          "/v1/task-board/policy/make-live",
+          "/v1/task-board/policy/go-live-diff",
+          "/v1/task-board/policy/replay",
           "/v1/task-board/policy/audit",
         ]
     )
@@ -61,13 +73,22 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     #expect(simulatedDocument?["revision"] as? Int == 7)
     #expect(records[3].body?["canvas_id"] as? String == "canvas-primary")
     #expect(records[3].body?["revision"] as? Int == 7)
-    #expect(records[4].query == "canvas_id=canvas-primary")
+    #expect(records[4].body?["canvas_id"] as? String == "canvas-primary")
+    #expect(records[4].body?["revision"] as? Int == 7)
+    #expect(records[5].body?["canvas_id"] as? String == "canvas-primary")
+    #expect(records[6].body?["canvas_id"] as? String == "canvas-primary")
+    #expect(records[6].body?["limit"] as? Int == 25)
+    #expect(records[7].query == "canvas_id=canvas-primary")
 
     #expect(get.schemaVersion == 2)
     #expect(save.validation.isValid)
     #expect(simulation.decisions.first?.decision.decision == "allow")
     #expect(simulation.decisions.first?.visitedNodeIds.isEmpty == true)
     #expect(promotion.document.mode == .enforced)
+    #expect(makeLive.globalPolicyEnforcementEnabled)
+    #expect(makeLive.workspace.activeCanvasId == "canvas-primary")
+    #expect(goLiveDiff.changedCount == 0)
+    #expect(replay.sampleSize == 2)
     #expect(audit.latestTraceId == "trace-policy-1")
   }
 
@@ -103,6 +124,15 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     let promotion = try await transport.promoteTaskBoardPolicyPipeline(
       request: TaskBoardPolicyPipelinePromoteRequest(canvasId: "canvas-primary", revision: 7)
     )
+    let makeLive = try await transport.makeLiveTaskBoardPolicyPipeline(
+      request: TaskBoardPolicyPipelineMakeLiveRequest(canvasId: "canvas-primary", revision: 7)
+    )
+    let goLiveDiff = try await transport.goLiveDiffTaskBoardPolicyPipeline(
+      request: TaskBoardPolicyPipelineGoLiveDiffRequest(canvasId: "canvas-primary")
+    )
+    let replay = try await transport.replayTaskBoardPolicyPipeline(
+      request: TaskBoardPolicyPipelineReplayRequest(canvasId: "canvas-primary", limit: 25)
+    )
     let audit = try await transport.taskBoardPolicyPipelineAudit(canvasId: "canvas-primary")
 
     let calls = await probe.calls
@@ -113,6 +143,9 @@ struct TaskBoardPolicyPipelineAPIClientTests {
           .taskBoardPolicyPipelineSaveDraft,
           .taskBoardPolicyPipelineSimulate,
           .taskBoardPolicyPipelinePromote,
+          .taskBoardPolicyPipelineMakeLive,
+          .taskBoardPolicyPipelineGoLiveDiff,
+          .taskBoardPolicyPipelineReplay,
           .taskBoardPolicyPipelineAudit,
         ]
     )
@@ -143,13 +176,22 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     #expect(objectValue(calls[2].params, key: "canvas_id") == .string("canvas-primary"))
     #expect(objectValue(calls[3].params, key: "canvas_id") == .string("canvas-primary"))
     #expect(objectValue(calls[3].params, key: "revision") == .number(7))
-    #expect(calls[4].params == .object(["canvas_id": .string("canvas-primary")]))
+    #expect(objectValue(calls[4].params, key: "canvas_id") == .string("canvas-primary"))
+    #expect(objectValue(calls[4].params, key: "revision") == .number(7))
+    #expect(calls[5].params == .object(["canvas_id": .string("canvas-primary")]))
+    #expect(objectValue(calls[6].params, key: "canvas_id") == .string("canvas-primary"))
+    #expect(objectValue(calls[6].params, key: "limit") == .number(25))
+    #expect(calls[7].params == .object(["canvas_id": .string("canvas-primary")]))
 
     #expect(get.revision == 7)
     #expect(save.document.nodes.count == 2)
     #expect(simulation.policyTraceIds == ["trace-policy-1"])
     #expect(simulation.decisions.first?.visitedNodeIds.isEmpty == true)
     #expect(promotion.traceId == "trace-policy-2")
+    #expect(makeLive.globalPolicyEnforcementEnabled)
+    #expect(makeLive.workspace.activeCanvasId == "canvas-primary")
+    #expect(goLiveDiff.changedCount == 0)
+    #expect(replay.sampleSize == 2)
     #expect(audit.mode == .draft)
   }
 

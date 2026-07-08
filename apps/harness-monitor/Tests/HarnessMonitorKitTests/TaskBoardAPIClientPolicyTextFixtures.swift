@@ -106,6 +106,24 @@ let samplePolicyPromotionText =
   }
   """
 
+let samplePolicyGoLiveDiffText =
+  """
+  {
+    "has_live_policy": true,
+    "changed_count": 0,
+    "diffs": []
+  }
+  """
+
+let samplePolicyExportText =
+  """
+  {
+    "canvas_id": "canvas-primary",
+    "title": "Primary canvas",
+    "document": \(samplePolicyPipelineText)
+  }
+  """
+
 let samplePolicyAuditText =
   """
   {
@@ -175,6 +193,25 @@ let samplePolicyCanvasWorkspaceText =
         "updated_at": "2026-05-14T11:10:05Z"
       }
     ]
+  }
+  """
+
+let samplePolicyMakeLiveText =
+  """
+  {
+    "document": {
+      "schema_version": 2,
+      "revision": 7,
+      "mode": "enforced",
+      "nodes": [],
+      "edges": [],
+      "groups": [],
+      "layout": { "nodes": [] },
+      "policy_trace_ids": ["trace-policy-2"]
+    },
+    "trace_id": "trace-policy-2",
+    "global_policy_enforcement_enabled": true,
+    "workspace": \(samplePolicyCanvasWorkspaceText)
   }
   """
 

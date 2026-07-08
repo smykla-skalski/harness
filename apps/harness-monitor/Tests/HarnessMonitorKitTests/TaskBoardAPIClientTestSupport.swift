@@ -90,7 +90,12 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardPolicyPipelineSaveDraft: .object(samplePolicySaveDraftJSON),
   .taskBoardPolicyPipelineSimulate: .object(samplePolicySimulationJSON),
   .taskBoardPolicyPipelinePromote: .object(samplePolicyPromotionJSON),
+  .taskBoardPolicyPipelineMakeLive: .object(samplePolicyMakeLiveJSON),
+  .taskBoardPolicyPipelineGoLiveDiff: .object(samplePolicyGoLiveDiffJSON),
+  .taskBoardPolicyPipelineReplay: fixtureJSONValue(samplePolicyReplayText),
   .taskBoardPolicyPipelineAudit: .object(samplePolicyAuditJSON),
+  .taskBoardPolicyExport: .object(samplePolicyExportJSON),
+  .taskBoardPolicyImport: .object(samplePolicyCanvasWorkspaceJSON),
   .reviewsRepositoryCatalog:
     fixtureJSONValue(sampleDepsCatalogResponseText),
   .reviewsCapabilities: fixtureJSONValue(sampleReviewsCapabilitiesResponseText),
@@ -178,8 +183,12 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/task-board/policy/pipeline", method: "PUT"): samplePolicySaveDraftText,
     Route("/v1/task-board/policy/simulate"): samplePolicySimulationText,
     Route("/v1/task-board/policy/promote"): samplePolicyPromotionText,
+    Route("/v1/task-board/policy/make-live"): samplePolicyMakeLiveText,
+    Route("/v1/task-board/policy/go-live-diff"): samplePolicyGoLiveDiffText,
     Route("/v1/task-board/policy/replay"): samplePolicyReplayText,
     Route("/v1/task-board/policy/audit"): samplePolicyAuditText,
+    Route("/v1/task-board/policy/export"): samplePolicyExportText,
+    Route("/v1/task-board/policy/import"): samplePolicyCanvasWorkspaceText,
     Route("/v1/reviews/repositories"):
       sampleDepsCatalogResponseText,
     Route("/v1/reviews/capabilities", method: "GET"):

@@ -87,6 +87,18 @@ let samplePolicyPromotionJSON: [String: JSONValue] = [
   "trace_id": .string("trace-policy-2"),
 ]
 
+let samplePolicyGoLiveDiffJSON: [String: JSONValue] = [
+  "has_live_policy": .bool(true),
+  "changed_count": .number(0),
+  "diffs": .array([]),
+]
+
+let samplePolicyExportJSON: [String: JSONValue] = [
+  "canvas_id": .string("canvas-primary"),
+  "title": .string("Primary canvas"),
+  "document": .object(samplePolicyPipelineJSON),
+]
+
 let samplePolicyAuditJSON: [String: JSONValue] = [
   "active_revision": .number(7),
   "mode": .string("draft"),
@@ -289,3 +301,12 @@ let samplePolicyCanvasWorkspaceDeletedJSON = makeSamplePolicyCanvasWorkspaceJSON
     ),
   ]
 )
+
+let samplePolicyMakeLiveJSON: [String: JSONValue] = [
+  "document": .object(
+    samplePolicyPipelineJSON.merging(["mode": .string("enforced")]) { _, new in new }
+  ),
+  "trace_id": .string("trace-policy-2"),
+  "global_policy_enforcement_enabled": .bool(true),
+  "workspace": .object(samplePolicyCanvasWorkspaceJSON),
+]
