@@ -52,6 +52,7 @@ pub struct HttpApiRouteContract {
 
 pub mod http_paths;
 mod routes;
+mod routes_remote;
 mod routes_reviews;
 mod routes_sessions_infra;
 mod routes_task_board;

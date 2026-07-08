@@ -14,6 +14,7 @@ fn daemon_serve_config_default_is_unsandboxed() {
         config.auth_mode,
         crate::daemon::http::DaemonHttpAuthMode::Local
     );
+    assert!(config.remote_domain.is_none());
 }
 
 #[test]

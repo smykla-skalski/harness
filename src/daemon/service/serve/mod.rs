@@ -107,7 +107,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let app_state = DaemonHttpState {
         token,
         auth_mode: http_auth_mode(&config),
-        remote_domain: None,
+        remote_domain: config.remote_domain.clone(),
         remote_pairing_limiter: http::default_remote_pairing_limiter(),
         sender,
         prepared_sender,

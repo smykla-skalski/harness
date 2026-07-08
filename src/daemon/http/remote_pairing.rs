@@ -1,6 +1,7 @@
+use std::net::SocketAddr;
 use std::time::Instant;
 
-use axum::extract::State;
+use axum::extract::{ConnectInfo, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
@@ -8,6 +9,7 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::daemon::db::RemotePairingClaimCodeError;
 use crate::daemon::protocol::http_paths;
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
@@ -49,13 +51,14 @@ pub(crate) struct RemotePairClaimHttpResponse {
 }
 
 async fn post_remote_pair_claim(
+    ConnectInfo(peer_addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<RemotePairClaimHttpRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    match claim_remote_pairing(&headers, &state, &request, request_id.as_str()) {
+    match claim_remote_pairing(peer_addr, &state, &request, request_id.as_str()) {
         Ok(response) => timed_json(
             "POST",
             http_paths::REMOTE_PAIR_CLAIM,
@@ -68,12 +71,12 @@ async fn post_remote_pair_claim(
 }
 
 fn claim_remote_pairing(
-    headers: &HeaderMap,
+    peer_addr: SocketAddr,
     state: &DaemonHttpState,
     request: &RemotePairClaimHttpRequest,
     request_id: &str,
 ) -> Result<RemotePairClaimHttpResponse, RemotePairClaimHttpError> {
-    let remote_addr = remote_addr(headers);
+    let remote_addr = remote_addr(peer_addr);
     claim_remote_pairing_for_addr(state, request, request_id, remote_addr.as_str())
 }
 
@@ -131,7 +134,7 @@ fn build_pairing_claim(
         Some(remote_addr),
         audit_event_id,
     )
-    .map_err(|error| RemotePairClaimHttpError::Pairing(error.to_string()))
+    .map_err(RemotePairClaimHttpError::Pairing)
 }
 
 fn claim_pairing_client(
@@ -148,7 +151,7 @@ fn claim_pairing_client(
         .map_err(|_| RemotePairClaimHttpError::StoreUnavailable)?;
     let claimed = db
         .claim_remote_pairing_code(code, claim, now.as_str())
-        .map_err(|error| RemotePairClaimHttpError::Pairing(error.to_string()))?;
+        .map_err(RemotePairClaimHttpError::from_claim_error)?;
     Ok(claimed)
 }
 
@@ -192,7 +195,7 @@ fn check_claim_rate_limit(
                 let _ = record_rate_limit_audit(state, remote_addr);
                 RemotePairClaimHttpError::RateLimited
             }
-            other => RemotePairClaimHttpError::Pairing(other.to_string()),
+            other => RemotePairClaimHttpError::Pairing(other),
         })
 }
 
@@ -218,15 +221,8 @@ fn record_rate_limit_audit(state: &DaemonHttpState, remote_addr: &str) -> Result
     ))
 }
 
-fn remote_addr(headers: &HeaderMap) -> String {
-    headers
-        .get("x-forwarded-for")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(',').next())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .unwrap_or("unknown")
-        .to_string()
+fn remote_addr(peer_addr: SocketAddr) -> String {
+    peer_addr.ip().to_string()
 }
 
 #[derive(Debug)]
@@ -234,7 +230,16 @@ enum RemotePairClaimHttpError {
     MissingRemoteDomain,
     StoreUnavailable,
     RateLimited,
-    Pairing(String),
+    Pairing(RemotePairingError),
+}
+
+impl RemotePairClaimHttpError {
+    fn from_claim_error(error: RemotePairingClaimCodeError) -> Self {
+        match error {
+            RemotePairingClaimCodeError::Pairing(error) => Self::Pairing(error),
+            RemotePairingClaimCodeError::Store(_) => Self::StoreUnavailable,
+        }
+    }
 }
 
 impl IntoResponse for RemotePairClaimHttpError {
@@ -255,14 +260,14 @@ impl IntoResponse for RemotePairClaimHttpError {
                 "REMOTE_PAIRING_RATE_LIMIT",
                 "remote pairing attempts are rate limited",
             ),
-            Self::Pairing(message) => {
-                let status = pairing_error_status(message.as_str());
+            Self::Pairing(error) => {
+                let status = pairing_error_status(&error);
                 return (
                     status,
                     Json(serde_json::json!({
                         "error": {
                             "code": "REMOTE_PAIRING",
-                            "message": message,
+                            "message": error.to_string(),
                         }
                     })),
                 )
@@ -282,14 +287,21 @@ impl IntoResponse for RemotePairClaimHttpError {
     }
 }
 
-fn pairing_error_status(message: &str) -> StatusCode {
-    if message.contains("already claimed") {
-        StatusCode::CONFLICT
-    } else if message.contains("expired") {
-        StatusCode::GONE
-    } else if message.contains("wrong remote pairing domain") {
-        StatusCode::FORBIDDEN
-    } else {
-        StatusCode::BAD_REQUEST
+fn pairing_error_status(error: &RemotePairingError) -> StatusCode {
+    match error {
+        RemotePairingError::AlreadyClaimed => StatusCode::CONFLICT,
+        RemotePairingError::Expired => StatusCode::GONE,
+        RemotePairingError::WrongDomain { .. } => StatusCode::FORBIDDEN,
+        RemotePairingError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
+        RemotePairingError::EmptyPairingId
+        | RemotePairingError::EmptyCode
+        | RemotePairingError::EmptyClientId
+        | RemotePairingError::EmptyDomain
+        | RemotePairingError::EmptyDisplayName
+        | RemotePairingError::EmptyPlatform
+        | RemotePairingError::EmptyAuditEventId
+        | RemotePairingError::InvalidStoredCodeHash
+        | RemotePairingError::UnknownCode
+        | RemotePairingError::Identity(_) => StatusCode::BAD_REQUEST,
     }
 }

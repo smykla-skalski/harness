@@ -23,6 +23,7 @@ fn serve_helpers_round_trip_smoke_covers_public_surface() {
             host: "127.0.0.1".into(),
             port: 0,
             auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
+            remote_domain: None,
             poll_interval: Duration::from_secs(2),
             observe_interval: Duration::from_secs(5),
             sandboxed: false,

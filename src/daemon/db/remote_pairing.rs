@@ -6,6 +6,9 @@
     )
 )]
 
+use std::error::Error;
+use std::fmt;
+
 use chrono::{DateTime, Utc};
 use rusqlite::{params, types::Type};
 
@@ -52,6 +55,40 @@ const ROUTE_REMOTE_PAIR_EXPIRE: &str = "remote.pair.expire";
 const ROUTE_REMOTE_PAIR_INVALID: &str = "remote.pair.invalid";
 const ROUTE_REMOTE_PAIR_REPLAY: &str = "remote.pair.replay";
 const ROUTE_REMOTE_PAIR_UNKNOWN: &str = "remote.pair.unknown";
+
+#[derive(Debug)]
+pub(crate) enum RemotePairingClaimCodeError {
+    Pairing(RemotePairingError),
+    Store(CliError),
+}
+
+impl RemotePairingClaimCodeError {
+    fn pairing(error: RemotePairingError) -> Self {
+        Self::Pairing(error)
+    }
+
+    fn store(error: CliError) -> Self {
+        Self::Store(error)
+    }
+}
+
+impl fmt::Display for RemotePairingClaimCodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pairing(error) => write!(f, "{error}"),
+            Self::Store(error) => write!(f, "{error}"),
+        }
+    }
+}
+
+impl Error for RemotePairingClaimCodeError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Pairing(error) => Some(error),
+            Self::Store(error) => Some(error),
+        }
+    }
+}
 
 impl DaemonDb {
     /// Persist a one-time remote pairing code hash.
@@ -122,9 +159,9 @@ impl DaemonDb {
         code: &str,
         claim: &RemotePairingClaimRequest,
         now: &str,
-    ) -> Result<RemotePairingClaimedClient, CliError> {
+    ) -> Result<RemotePairingClaimedClient, RemotePairingClaimCodeError> {
         validate_pairing_audit_event_id(claim.audit_event_id.as_str())
-            .map_err(|error| db_error(error.to_string()))?;
+            .map_err(RemotePairingClaimCodeError::pairing)?;
         if let Err(error) = validate_pairing_domain(&claim.expected_domain, &claim.claimed_domain) {
             let error_detail = error.to_string();
             self.record_pairing_claim_failure(
@@ -132,8 +169,9 @@ impl DaemonDb {
                 now,
                 ROUTE_REMOTE_PAIR_DOMAIN,
                 error_detail.as_str(),
-            )?;
-            return Err(db_error(error_detail));
+            )
+            .map_err(RemotePairingClaimCodeError::store)?;
+            return Err(RemotePairingClaimCodeError::pairing(error));
         }
 
         let code_hash = match RemotePairingCodeHash::from_code(code) {
@@ -145,32 +183,43 @@ impl DaemonDb {
                     now,
                     ROUTE_REMOTE_PAIR_INVALID,
                     error_detail.as_str(),
-                )?;
-                return Err(db_error(error_detail));
+                )
+                .map_err(RemotePairingClaimCodeError::store)?;
+                return Err(RemotePairingClaimCodeError::pairing(error));
             }
         };
-        let Some(pairing) = self.remote_pairing_by_hash(code_hash.as_storage_value())? else {
-            let error_detail = RemotePairingError::UnknownCode.to_string();
+        let Some(pairing) = self
+            .remote_pairing_by_hash(code_hash.as_storage_value())
+            .map_err(RemotePairingClaimCodeError::store)?
+        else {
+            let error = RemotePairingError::UnknownCode;
+            let error_detail = error.to_string();
             self.record_pairing_claim_failure(
                 claim,
                 now,
                 ROUTE_REMOTE_PAIR_UNKNOWN,
                 error_detail.as_str(),
-            )?;
-            return Err(db_error(error_detail));
+            )
+            .map_err(RemotePairingClaimCodeError::store)?;
+            return Err(RemotePairingClaimCodeError::pairing(error));
         };
         if pairing.claimed_at.is_some() {
-            let error_detail = RemotePairingError::AlreadyClaimed.to_string();
+            let error = RemotePairingError::AlreadyClaimed;
+            let error_detail = error.to_string();
             self.record_pairing_claim_failure(
                 claim,
                 now,
                 ROUTE_REMOTE_PAIR_REPLAY,
                 error_detail.as_str(),
-            )?;
-            return Err(db_error(error_detail));
+            )
+            .map_err(RemotePairingClaimCodeError::store)?;
+            return Err(RemotePairingClaimCodeError::pairing(error));
         }
-        if pairing_is_expired(&pairing.expires_at, now)? {
-            let error_detail = RemotePairingError::Expired.to_string();
+        if pairing_is_expired(&pairing.expires_at, now)
+            .map_err(RemotePairingClaimCodeError::store)?
+        {
+            let error = RemotePairingError::Expired;
+            let error_detail = error.to_string();
             self.record_remote_audit_event(&RemoteAuditEvent::new(
                 claim.audit_event_id.as_str(),
                 now,
@@ -182,8 +231,9 @@ impl DaemonDb {
                 RemoteAuditOutcome::Failure,
                 claim.remote_addr.as_deref(),
                 Some(error_detail.as_str()),
-            ))?;
-            return Err(db_error(error_detail));
+            ))
+            .map_err(RemotePairingClaimCodeError::store)?;
+            return Err(RemotePairingClaimCodeError::pairing(error));
         }
 
         let bearer_token = RemoteBearerToken::generate();
@@ -196,7 +246,7 @@ impl DaemonDb {
             bearer_token.expose(),
             now,
         )
-        .map_err(|error| db_error(error.to_string()))?;
+        .map_err(|error| RemotePairingClaimCodeError::pairing(error.into()))?;
         self.claim_remote_pairing_in_transaction(&pairing, &registration, bearer_token, claim, now)
     }
 
@@ -207,12 +257,14 @@ impl DaemonDb {
         bearer_token: RemoteBearerToken,
         claim: &RemotePairingClaimRequest,
         now: &str,
-    ) -> Result<RemotePairingClaimedClient, CliError> {
+    ) -> Result<RemotePairingClaimedClient, RemotePairingClaimCodeError> {
         let transaction = self
             .conn
             .unchecked_transaction()
-            .map_err(|error| db_error(format!("begin remote pairing claim: {error}")))?;
-        let client = insert_remote_client_for_pairing(&transaction, registration)?;
+            .map_err(|error| db_error(format!("begin remote pairing claim: {error}")))
+            .map_err(RemotePairingClaimCodeError::store)?;
+        let client = insert_remote_client_for_pairing(&transaction, registration)
+            .map_err(RemotePairingClaimCodeError::store)?;
         let changed = transaction
             .execute(
                 "UPDATE remote_pairing_codes
@@ -230,19 +282,23 @@ impl DaemonDb {
                     "claim remote pairing {}: {error}",
                     pairing.pairing_id.as_str()
                 ))
-            })?;
+            })
+            .map_err(RemotePairingClaimCodeError::store)?;
         if changed == 0 {
-            let error_detail = RemotePairingError::AlreadyClaimed.to_string();
-            transaction.rollback().map_err(|error| {
-                db_error(format!("rollback lost remote pairing claim: {error}"))
-            })?;
+            let error = RemotePairingError::AlreadyClaimed;
+            let error_detail = error.to_string();
+            transaction
+                .rollback()
+                .map_err(|error| db_error(format!("rollback lost remote pairing claim: {error}")))
+                .map_err(RemotePairingClaimCodeError::store)?;
             self.record_pairing_claim_failure(
                 claim,
                 now,
                 ROUTE_REMOTE_PAIR_REPLAY,
                 error_detail.as_str(),
-            )?;
-            return Err(db_error(error_detail));
+            )
+            .map_err(RemotePairingClaimCodeError::store)?;
+            return Err(RemotePairingClaimCodeError::pairing(error));
         }
         record_remote_audit_event_for_pairing(
             &transaction,
@@ -258,10 +314,12 @@ impl DaemonDb {
                 claim.remote_addr.as_deref(),
                 None,
             ),
-        )?;
+        )
+        .map_err(RemotePairingClaimCodeError::store)?;
         transaction
             .commit()
-            .map_err(|error| db_error(format!("commit remote pairing claim: {error}")))?;
+            .map_err(|error| db_error(format!("commit remote pairing claim: {error}")))
+            .map_err(RemotePairingClaimCodeError::store)?;
         Ok(RemotePairingClaimedClient {
             client,
             bearer_token,

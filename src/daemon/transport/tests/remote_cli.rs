@@ -65,6 +65,10 @@ fn daemon_remote_serve_args_select_remote_http_auth_mode() {
         serve_config.auth_mode,
         crate::daemon::http::DaemonHttpAuthMode::Remote
     );
+    assert_eq!(
+        serve_config.remote_domain.as_deref(),
+        Some("daemon.example.com")
+    );
 }
 
 #[test]
