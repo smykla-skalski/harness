@@ -1,15 +1,24 @@
 use std::{num::NonZeroU64, str::FromStr};
 
+use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use clap::{Args, Subcommand, ValueEnum};
+use serde::Serialize;
+use uuid::Uuid;
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::db::DaemonDb;
 use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::remote::{
-    RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, RemoteRole,
-    validate_remote_serve_config,
+    validate_remote_serve_config, RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig,
+    RemoteDnsProvider, RemoteRole,
 };
+use crate::daemon::remote_pairing::{RemotePairingCode, RemotePairingRecord};
 use crate::daemon::service::DaemonServeConfig;
+use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
+use crate::workspace::utc_now;
+
+use super::control::{adopt_daemon_root_for_transport_command, print_json};
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum DaemonRemoteCommand {
@@ -41,15 +50,28 @@ pub enum DaemonRemoteCommand {
 }
 
 impl Execute for DaemonRemoteCommand {
-    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        if let Self::Serve(args) = self {
-            args.remote_auth_scaffold_config()?;
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
+        match self {
+            Self::Pair { command } => command.execute(context),
+            Self::Serve(args) => {
+                args.remote_auth_scaffold_config()?;
+                Err(remote_execution_reserved_error())
+            }
+            Self::Clients { .. }
+            | Self::Acme { .. }
+            | Self::Doctor
+            | Self::InstallSystemd(_)
+            | Self::UninstallSystemd(_)
+            | Self::Status(_) => Err(remote_execution_reserved_error()),
         }
-        Err(CliErrorKind::workflow_parse(
-            "remote daemon execution is reserved for the next implementation phase",
-        )
-        .into())
     }
+}
+
+fn remote_execution_reserved_error() -> CliError {
+    CliErrorKind::workflow_parse(
+        "remote daemon execution is reserved for the next implementation phase",
+    )
+    .into()
 }
 
 #[derive(Debug, Clone, Args)]
@@ -123,6 +145,14 @@ pub enum DaemonRemotePairCommand {
     Create(DaemonRemotePairCreateArgs),
 }
 
+impl Execute for DaemonRemotePairCommand {
+    fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
+        match self {
+            Self::Create(args) => args.execute(context),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Args)]
 pub struct DaemonRemotePairCreateArgs {
     /// Role granted to the paired client.
@@ -134,6 +164,103 @@ pub struct DaemonRemotePairCreateArgs {
     /// Pairing code time-to-live.
     #[arg(long, default_value = "10m")]
     pub ttl: DaemonRemotePairTtl,
+}
+
+impl Execute for DaemonRemotePairCreateArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        adopt_daemon_root_for_transport_command("daemon-remote-pair-create");
+        let db = open_remote_daemon_db()?;
+        let code = RemotePairingCode::generate();
+        let pairing_id = format!("pairing-{}", Uuid::new_v4());
+        let audit_event_id = format!("remote-pair-create-{}", Uuid::new_v4());
+        let created_at = utc_now();
+        let response = self.create_pairing_with(
+            &db,
+            pairing_id.as_str(),
+            audit_event_id.as_str(),
+            &code,
+            created_at.as_str(),
+        )?;
+        print_json(&response)?;
+        Ok(0)
+    }
+}
+
+impl DaemonRemotePairCreateArgs {
+    /// Create a durable pairing record and return the one-time operator
+    /// response containing the raw code.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when scope expansion, expiry calculation, or
+    /// persistence fails.
+    pub(crate) fn create_pairing_with(
+        &self,
+        db: &DaemonDb,
+        pairing_id: &str,
+        audit_event_id: &str,
+        code: &RemotePairingCode,
+        created_at: &str,
+    ) -> Result<DaemonRemotePairCreateResponse, CliError> {
+        let role = RemoteRole::from(self.role);
+        let requested_scopes = self
+            .scopes
+            .iter()
+            .copied()
+            .map(RemoteAccessScope::from)
+            .collect::<Vec<_>>();
+        let expires_at = expires_at_from_ttl(created_at, self.ttl.as_secs())?;
+        let record = RemotePairingRecord::new(
+            pairing_id,
+            role,
+            &requested_scopes,
+            code.expose(),
+            created_at,
+            expires_at.as_str(),
+        )
+        .map_err(|error| CliErrorKind::workflow_parse(error.to_string()))?;
+        let stored = db.create_remote_pairing_code(&record, audit_event_id)?;
+        Ok(DaemonRemotePairCreateResponse {
+            pairing_id: stored.pairing_id,
+            code: code.expose().to_string(),
+            role: stored.role.as_str().to_string(),
+            scopes: stored
+                .scopes
+                .iter()
+                .map(|scope| scope.as_str().to_string())
+                .collect(),
+            created_at: stored.created_at,
+            expires_at: stored.expires_at,
+            ttl_seconds: self.ttl.as_secs(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub(crate) struct DaemonRemotePairCreateResponse {
+    pub pairing_id: String,
+    pub code: String,
+    pub role: String,
+    pub scopes: Vec<String>,
+    pub created_at: String,
+    pub expires_at: String,
+    pub ttl_seconds: u64,
+}
+
+fn open_remote_daemon_db() -> Result<DaemonDb, CliError> {
+    state::ensure_daemon_dirs()?;
+    DaemonDb::open(&state::daemon_root().join("harness.db"))
+}
+
+fn expires_at_from_ttl(created_at: &str, ttl_seconds: u64) -> Result<String, CliError> {
+    let created_at = DateTime::parse_from_rfc3339(created_at)
+        .map_err(|error| CliErrorKind::workflow_parse(format!("parse pairing time: {error}")))?
+        .with_timezone(&Utc);
+    let ttl_seconds = i64::try_from(ttl_seconds)
+        .map_err(|_| CliErrorKind::workflow_parse("pairing ttl value is too large"))?;
+    let expires_at = created_at
+        .checked_add_signed(ChronoDuration::seconds(ttl_seconds))
+        .ok_or_else(|| CliErrorKind::workflow_parse("pairing ttl value is too large"))?;
+    Ok(expires_at.format("%Y-%m-%dT%H:%M:%SZ").to_string())
 }
 
 #[derive(Debug, Clone, Subcommand)]
