@@ -1,6 +1,7 @@
 mod cli;
 mod lifecycle;
 mod remote_cli;
+mod remote_clients;
 
 use std::path::{Path, PathBuf};
 

@@ -1,6 +1,7 @@
 mod commands;
 mod control;
 mod remote;
+mod remote_clients;
 #[cfg(test)]
 mod tests;
 
