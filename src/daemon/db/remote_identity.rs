@@ -8,12 +8,12 @@
 
 use rusqlite::{params, types::Type};
 
-use super::{CliError, DaemonDb, OptionalExtension, db_error};
+use super::{db_error, CliError, DaemonDb, OptionalExtension};
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
-    RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration,
-    RemoteStoredAuditEvent, RemoteStoredClient, RemoteTokenHash, parse_remote_role,
-    parse_remote_scope, remote_token_hint,
+    parse_remote_role, parse_remote_scope, remote_token_hint, RemoteAuditEvent, RemoteAuditOutcome,
+    RemoteAuditScopeDecision, RemoteClientRegistration, RemoteStoredAuditEvent, RemoteStoredClient,
+    RemoteTokenHash,
 };
 
 const INSERT_REMOTE_CLIENT_SQL: &str = "
@@ -27,6 +27,12 @@ SELECT client_id, display_name, platform, role, scopes_json, token_hash, token_h
        created_at, last_seen_at, revoked_at, rotated_at
 FROM remote_clients
 WHERE client_id = ?1";
+
+const SELECT_REMOTE_CLIENTS_SQL: &str = "
+SELECT client_id, display_name, platform, role, scopes_json, token_hash, token_hint,
+       created_at, last_seen_at, revoked_at, rotated_at
+FROM remote_clients
+ORDER BY created_at ASC, client_id ASC";
 
 const INSERT_REMOTE_AUDIT_EVENT_SQL: &str = "
 INSERT INTO remote_audit_events (
@@ -66,6 +72,22 @@ impl DaemonDb {
             })?;
         self.remote_client(&registration.client_id)?
             .ok_or_else(|| db_error("remote client insert did not persist row"))
+    }
+
+    /// Load paired remote clients in stable creation order.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or row parsing failures.
+    pub(crate) fn list_remote_clients(&self) -> Result<Vec<RemoteStoredClient>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(SELECT_REMOTE_CLIENTS_SQL)
+            .map_err(|error| db_error(format!("prepare remote clients list: {error}")))?;
+        let rows = statement
+            .query_map([], remote_client_from_row)
+            .map_err(|error| db_error(format!("query remote clients: {error}")))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|error| db_error(format!("read remote client row: {error}")))
     }
 
     /// Verify a non-revoked remote client's bearer token.
@@ -220,10 +242,8 @@ fn remote_client_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteSto
     })?;
     let scopes = scopes_from_json(&scopes_json)
         .map_err(|error| rusqlite::Error::FromSqlConversionFailure(4, Type::Text, error.into()))?;
-    let token_hash =
-        RemoteTokenHash::try_from_storage_value(row.get::<_, String>(5)?).map_err(|error| {
-            rusqlite::Error::FromSqlConversionFailure(5, Type::Text, error.into())
-        })?;
+    let token_hash = RemoteTokenHash::try_from_storage_value(row.get::<_, String>(5)?)
+        .map_err(|error| rusqlite::Error::FromSqlConversionFailure(5, Type::Text, error.into()))?;
     Ok(RemoteStoredClient {
         client_id: row.get(0)?,
         display_name: row.get(1)?,
