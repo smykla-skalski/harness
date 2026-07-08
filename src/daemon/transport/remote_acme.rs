@@ -155,11 +155,8 @@ impl DaemonRemoteAcmeRenewResponse {
         let detail = self
             .renewal_error
             .as_deref()
-            .unwrap_or("remote ACME renewal did not succeed");
-        Err(CliErrorKind::workflow_parse(format!(
-            "remote ACME renewal did not succeed: {detail}"
-        ))
-        .into())
+            .unwrap_or("remote ACME renewal failed");
+        Err(CliErrorKind::workflow_parse(detail.to_string()).into())
     }
 }
 

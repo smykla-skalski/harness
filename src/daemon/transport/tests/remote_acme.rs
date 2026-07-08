@@ -98,6 +98,7 @@ fn daemon_remote_acme_renew_records_missing_state_failure_and_audit() {
         .ensure_success()
         .expect_err("failure renewal response must produce a command error");
     assert!(error.to_string().contains("persisted ACME state"));
+    assert!(!error.to_string().contains("did not succeed"));
 
     let events = db.load_remote_audit_events(10).expect("audit events");
     assert!(events.iter().any(|event| {
