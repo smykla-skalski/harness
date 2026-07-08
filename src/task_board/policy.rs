@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+// Keep the historical task-board identifier for persisted decisions, replay
+// history, and comparisons written before the public policy API rename.
 pub const POLICY_VERSION: &str = "task-board-policy-v1";
 pub const DEFAULT_AUTO_MERGE_RISK_THRESHOLD: u8 = 40;
 
