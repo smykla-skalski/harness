@@ -94,6 +94,10 @@ fn daemon_remote_acme_renew_records_missing_state_failure_and_audit() {
     let json = serde_json::to_string(&response).expect("serialize renew response");
     assert!(json.contains("\"updated_at\""));
     assert!(!json.contains("\"renewed_at\""));
+    let error = response
+        .ensure_success()
+        .expect_err("failure renewal response must produce a command error");
+    assert!(error.to_string().contains("persisted ACME state"));
 
     let events = db.load_remote_audit_events(10).expect("audit events");
     assert!(events.iter().any(|event| {

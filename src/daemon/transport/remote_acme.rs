@@ -27,6 +27,7 @@ impl Execute for DaemonRemoteAcmeCommand {
             Self::Renew => {
                 let response = self.renew_with(&db, audit_event_id.as_str(), now.as_str())?;
                 print_json(&response)?;
+                response.ensure_success()?;
             }
         }
         Ok(0)
@@ -141,6 +142,24 @@ impl DaemonRemoteAcmeRenewResponse {
             renewal_error: state.renewal_error.clone(),
             updated_at: state.updated_at.clone(),
         }
+    }
+
+    /// Return an error for renewal attempts that recorded a failure state.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the renewal status is not successful.
+    pub(crate) fn ensure_success(&self) -> Result<(), CliError> {
+        if self.renewal_status == "succeeded" {
+            return Ok(());
+        }
+        let detail = self
+            .renewal_error
+            .as_deref()
+            .unwrap_or("remote ACME renewal did not succeed");
+        Err(CliErrorKind::workflow_parse(format!(
+            "remote ACME renewal did not succeed: {detail}"
+        ))
+        .into())
     }
 }
 
