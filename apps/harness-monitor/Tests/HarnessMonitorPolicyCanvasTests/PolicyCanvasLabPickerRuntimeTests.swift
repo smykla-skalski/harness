@@ -408,9 +408,9 @@ struct PolicyCanvasLabPickerRuntimeTests {
 }
 
 private struct PolicyCanvasLabPickerRenderedSnapshot: Equatable {
-  let document: TaskBoardPolicyPipelineDocument?
-  let simulation: TaskBoardPolicyPipelineSimulationResult?
-  let audit: TaskBoardPolicyPipelineAuditSummary?
+  let document: PolicyPipelineDocument?
+  let simulation: PolicyPipelineSimulationResult?
+  let audit: PolicyPipelineAuditSummary?
 }
 
 private struct PolicyCanvasLabPickerHarness: View {

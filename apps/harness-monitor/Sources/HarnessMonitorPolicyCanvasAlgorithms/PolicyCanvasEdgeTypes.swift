@@ -136,7 +136,7 @@ public struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
   public var label: String
   /// Free-form condition string surfaced by the inspector for user editing.
   /// Defaults to `"always"` to match the daemon's wire shape; the document
-  /// round-trip preserves any other `TaskBoardPolicyPipelineEdgeCondition`
+  /// round-trip preserves any other `PolicyPipelineEdgeCondition`
   /// fields (actions, reasonCode) through the `originalEdgeConditions` cache
   /// on `exportDocument()`, overriding only the `condition` string the user
   /// edited here.

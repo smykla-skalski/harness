@@ -113,7 +113,7 @@ fn seeded_workspace_adds_review_canvases_without_activating_them() {
     assert_eq!(
         default_canvas.document,
         PolicyGraph::seeded_v2(),
-        "default canvas should remain the unchanged task-board policy seed"
+        "default canvas should remain the unchanged policy seed"
     );
     assert!(
         default_canvas

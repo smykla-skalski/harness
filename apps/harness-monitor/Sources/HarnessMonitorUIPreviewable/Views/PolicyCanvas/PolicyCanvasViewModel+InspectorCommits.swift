@@ -62,7 +62,7 @@ extension PolicyCanvasViewModel {
     for kind: PolicyCanvasNodeKind,
     preserving existing: PolicyGraphNodeKind?
   ) -> PolicyGraphNodeKind {
-    let defaultPolicyKind = taskBoardPolicyNodeKind(for: kind)
+    let defaultPolicyKind = policyNodeKind(for: kind)
     if let existing, existing.discriminator == defaultPolicyKind.discriminator {
       return existing
     }
@@ -394,7 +394,7 @@ extension PolicyCanvasViewModel {
     else {
       return
     }
-    let previous = node.policyKind ?? taskBoardPolicyNodeKind(for: node.kind)
+    let previous = node.policyKind ?? policyNodeKind(for: node.kind)
     var next = previous
     mutator(&next)
     guard previous != next else {

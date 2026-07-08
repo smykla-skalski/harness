@@ -8,7 +8,7 @@ import HarnessMonitorPolicyModels
 // failures are already absent from the wire; PolicyDecision/PolicyReasonCode come from
 // HarnessMonitorPolicyModels.
 
-extension TaskBoardPolicyDecision {
+extension PolicySimulationDecision {
   public init(wire: PolicyDecision) {
     switch wire {
     case .allow(let reasonCode, let policyVersion):
@@ -54,7 +54,7 @@ extension TaskBoardDispatchBlockReason {
         kind: "policy",
         workItemId: nil,
         reason: nil,
-        decision: TaskBoardPolicyDecision(wire: decision),
+        decision: PolicySimulationDecision(wire: decision),
         status: nil
       )
     case .status(let status):
@@ -132,7 +132,7 @@ extension TaskBoardDispatchPlan {
       worker: TaskBoardWorkerIntent(wire: wire.worker),
       reviewer: TaskBoardReviewerIntent(wire: wire.reviewer),
       evaluator: TaskBoardEvaluatorIntent(wire: wire.evaluator),
-      policy: TaskBoardPolicyDecision(wire: wire.policy)
+      policy: PolicySimulationDecision(wire: wire.policy)
     )
   }
 }

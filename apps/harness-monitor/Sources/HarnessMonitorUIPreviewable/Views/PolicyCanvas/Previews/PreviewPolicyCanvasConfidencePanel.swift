@@ -20,18 +20,18 @@ import SwiftUI
 @MainActor
 private func confidencePanelPreviewViewModel() -> PolicyCanvasViewModel {
   let viewModel = PolicyCanvasViewModel.sample()
-  viewModel.latestSimulation = TaskBoardPolicyPipelineSimulationResult(
+  viewModel.latestSimulation = PolicyPipelineSimulationResult(
     revision: 7,
     traceId: "trace-preview-confidence",
     simulatedAt: "2026-06-20T10:00:00Z",
     succeeded: true,
-    validation: TaskBoardPolicyPipelineValidation(isValid: true),
+    validation: PolicyPipelineValidation(isValid: true),
     decisions: [
       confidencePanelPreviewDecision(
         scenarioId: "scenario-merge",
         scenarioName: "Merge - checks green",
         action: .mergePr,
-        decision: TaskBoardPolicyDecision(
+        decision: PolicySimulationDecision(
           decision: "allow",
           reasonCode: "auto_merge_allowed",
           policyVersion: "v1"
@@ -42,7 +42,7 @@ private func confidencePanelPreviewViewModel() -> PolicyCanvasViewModel {
         scenarioId: "scenario-secret",
         scenarioName: "Access secret",
         action: .accessSecret,
-        decision: TaskBoardPolicyDecision(
+        decision: PolicySimulationDecision(
           decision: "deny",
           reasonCode: "risk_above_threshold",
           policyVersion: "v1"
@@ -74,10 +74,10 @@ private func confidencePanelPreviewDecision(
   scenarioId: String,
   scenarioName: String,
   action: PolicyAction,
-  decision: TaskBoardPolicyDecision,
+  decision: PolicySimulationDecision,
   visitedNodeIds: [String]
-) -> TaskBoardPolicyPipelineSimulatedDecision {
-  TaskBoardPolicyPipelineSimulatedDecision(
+) -> PolicyPipelineSimulatedDecision {
+  PolicyPipelineSimulatedDecision(
     scenarioId: scenarioId,
     scenarioName: scenarioName,
     action: action,

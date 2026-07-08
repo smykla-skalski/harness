@@ -4,8 +4,8 @@ import SwiftUI
 
 extension View {
   public func dashboardAutomationPolicyRuntimeSync(
-    workspace: TaskBoardPolicyCanvasWorkspace?,
-    activeDocument: TaskBoardPolicyPipelineDocument?,
+    workspace: PolicyCanvasWorkspace?,
+    activeDocument: PolicyPipelineDocument?,
     policyCenter: AutomationPolicyCenter = .shared
   ) -> some View {
     modifier(
@@ -22,8 +22,8 @@ extension View {
 enum DashboardAutomationPolicyRuntimeSynchronizer {
   static func synchronizeEnforcedCanvasAutomationPolicies(
     policyCenter: AutomationPolicyCenter,
-    workspace: TaskBoardPolicyCanvasWorkspace?,
-    activeDocument: TaskBoardPolicyPipelineDocument?
+    workspace: PolicyCanvasWorkspace?,
+    activeDocument: PolicyPipelineDocument?
   ) {
     let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
       workspace: workspace,
@@ -41,8 +41,8 @@ enum DashboardAutomationPolicyRuntimeSynchronizer {
 }
 
 private struct DashboardAutomationPolicyRuntimeSyncModifier: ViewModifier {
-  let workspace: TaskBoardPolicyCanvasWorkspace?
-  let activeDocument: TaskBoardPolicyPipelineDocument?
+  let workspace: PolicyCanvasWorkspace?
+  let activeDocument: PolicyPipelineDocument?
   let policyCenter: AutomationPolicyCenter
 
   private var syncID: DashboardAutomationPolicyRuntimeSyncID {
@@ -72,8 +72,8 @@ private struct DashboardAutomationPolicyRuntimeSyncID: Equatable {
   let activeDocumentFingerprint: DocumentFingerprint?
 
   init(
-    workspace: TaskBoardPolicyCanvasWorkspace?,
-    activeDocument: TaskBoardPolicyPipelineDocument?
+    workspace: PolicyCanvasWorkspace?,
+    activeDocument: PolicyPipelineDocument?
   ) {
     activeCanvasId = workspace?.activeCanvasId
     globalPolicyEnforcementEnabled = workspace?.globalPolicyEnforcementEnabled ?? true
@@ -87,11 +87,11 @@ private struct DashboardAutomationPolicyRuntimeSyncID: Equatable {
   struct CanvasFingerprint: Equatable {
     let canvasId: String
     let revision: UInt64
-    let mode: TaskBoardPolicyPipelineMode
+    let mode: PolicyPipelineMode
     let embeddedDocumentFingerprint: DocumentFingerprint?
     let liveDocumentFingerprint: DocumentFingerprint?
 
-    init(summary: TaskBoardPolicyCanvasSummary) {
+    init(summary: PolicyCanvasSummary) {
       canvasId = summary.canvasId
       revision = summary.revision
       mode = summary.mode
@@ -105,12 +105,12 @@ private struct DashboardAutomationPolicyRuntimeSyncID: Equatable {
   struct DocumentFingerprint: Equatable {
     let policyTraceIds: [String]
     let revision: UInt64
-    let mode: TaskBoardPolicyPipelineMode
+    let mode: PolicyPipelineMode
     let nodeCount: Int
     let edgeCount: Int
     let groupCount: Int
 
-    init(document: TaskBoardPolicyPipelineDocument) {
+    init(document: PolicyPipelineDocument) {
       policyTraceIds = document.policyTraceIds
       revision = document.revision
       mode = document.mode

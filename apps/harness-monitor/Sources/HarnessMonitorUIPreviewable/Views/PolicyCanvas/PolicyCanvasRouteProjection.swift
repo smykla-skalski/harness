@@ -16,6 +16,16 @@ struct PolicyCanvasProjectedRouteResult {
   let canCommitAsCurrentGraph: Bool
 }
 
+struct PolicyCanvasLiveDragRouteInput {
+  let nodes: [PolicyCanvasNode]
+  let groups: [PolicyCanvasGroup]
+  let edges: [PolicyCanvasEdge]
+  let fontScale: CGFloat
+  let algorithmSelection: PolicyCanvasAlgorithmSelection
+  let movedNodeIDs: Set<String>
+  let previous: PolicyCanvasRouteWorkerOutput
+}
+
 func policyCanvasNodePositionsByID(_ nodes: [PolicyCanvasNode]) -> [String: CGPoint] {
   Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
 }
@@ -30,33 +40,27 @@ func policyCanvasNodePositionsByID(_ nodes: [PolicyCanvasNode]) -> [String: CGPo
 /// when selective routing does not apply (topology changed, or no moved edge);
 /// the caller then falls back to the previous output.
 func policyCanvasLiveDragRoutedOutput(
-  nodes: [PolicyCanvasNode],
-  groups: [PolicyCanvasGroup],
-  edges: [PolicyCanvasEdge],
-  fontScale: CGFloat,
-  algorithmSelection: PolicyCanvasAlgorithmSelection,
-  movedNodeIDs: Set<String>,
-  previous: PolicyCanvasRouteWorkerOutput
+  input: PolicyCanvasLiveDragRouteInput
 ) -> PolicyCanvasRouteWorkerOutput? {
-  guard !movedNodeIDs.isEmpty, !previous.routes.isEmpty else {
+  guard !input.movedNodeIDs.isEmpty, !input.previous.routes.isEmpty else {
     return nil
   }
   let prepared = PolicyCanvasPreparedRouteInput(
     input: PolicyCanvasRouteWorkerInput(
-      nodes: nodes,
-      groups: groups,
-      edges: edges,
-      fontScale: fontScale,
-      algorithmSelection: algorithmSelection
+      nodes: input.nodes,
+      groups: input.groups,
+      edges: input.edges,
+      fontScale: input.fontScale,
+      algorithmSelection: input.algorithmSelection
     )
   )
   guard
     let computation = prepared.selectiveRouteComputation(
       router: policyCanvasDefaultEdgeRouter(),
-      algorithmSelection: algorithmSelection,
-      movedNodeIDs: movedNodeIDs,
-      previousRoutes: previous.routes,
-      previousPortMarkerLayout: previous.portMarkerLayout
+      algorithmSelection: input.algorithmSelection,
+      movedNodeIDs: input.movedNodeIDs,
+      previousRoutes: input.previous.routes,
+      previousPortMarkerLayout: input.previous.portMarkerLayout
     )
   else {
     return nil
@@ -68,11 +72,11 @@ func policyCanvasLiveDragRoutedOutput(
     portMarkerLayout: computation.portMarkerLayout,
     visibleBounds: computation.visibleBounds,
     contentSize: policyCanvasVisibleContentSize(visibleBounds: computation.visibleBounds),
-    accessibilityEdgeLabelsByID: previous.accessibilityEdgeLabelsByID,
-    accessibilityNodeEntries: previous.accessibilityNodeEntries,
-    accessibilityEdgeEntries: previous.accessibilityEdgeEntries,
-    nodeAccessibilityValuesByID: previous.nodeAccessibilityValuesByID,
-    connectTargetsByNodeID: previous.connectTargetsByNodeID
+    accessibilityEdgeLabelsByID: input.previous.accessibilityEdgeLabelsByID,
+    accessibilityNodeEntries: input.previous.accessibilityNodeEntries,
+    accessibilityEdgeEntries: input.previous.accessibilityEdgeEntries,
+    nodeAccessibilityValuesByID: input.previous.nodeAccessibilityValuesByID,
+    connectTargetsByNodeID: input.previous.connectTargetsByNodeID
   )
 }
 

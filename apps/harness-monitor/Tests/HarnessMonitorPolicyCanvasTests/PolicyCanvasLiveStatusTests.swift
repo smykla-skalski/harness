@@ -115,29 +115,29 @@ struct PolicyCanvasLiveStatusTests {
     #expect(viewModel.latestAudit != nil)
   }
 
-  private func draftDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  private func draftDocument(revision: UInt64) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
       nodes: [],
       edges: [],
       groups: [],
-      layout: TaskBoardPolicyPipelineLayout(nodes: []),
+      layout: PolicyPipelineLayout(nodes: []),
       policyTraceIds: []
     )
   }
 
   private func liveAudit(
     revision: UInt64,
-    mode: TaskBoardPolicyPipelineMode,
+    mode: PolicyPipelineMode,
     globalPolicyEnforcementEnabled: Bool = true
-  ) -> TaskBoardPolicyPipelineAuditSummary {
-    TaskBoardPolicyPipelineAuditSummary(
+  ) -> PolicyPipelineAuditSummary {
+    PolicyPipelineAuditSummary(
       activeRevision: revision,
       mode: mode,
       globalPolicyEnforcementEnabled: globalPolicyEnforcementEnabled,
-      validation: TaskBoardPolicyPipelineValidation(isValid: true)
+      validation: PolicyPipelineValidation(isValid: true)
     )
   }
 
@@ -146,12 +146,12 @@ struct PolicyCanvasLiveStatusTests {
     revision: UInt64,
     liveUpdatedAt: String? = nil,
     updatedAt: String
-  ) -> TaskBoardPolicyCanvasWorkspace {
-    TaskBoardPolicyCanvasWorkspace(
+  ) -> PolicyCanvasWorkspace {
+    PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: canvasId,
       canvases: [
-        TaskBoardPolicyCanvasSummary(
+        PolicyCanvasSummary(
           canvasId: canvasId,
           title: "Live",
           revision: revision,

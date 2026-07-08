@@ -10,7 +10,7 @@ import HarnessMonitorPolicyModels
 /// and three more terminals - widening every group and creating extra shared
 /// fan-ins so the layout engine has long cross-group edges to route.
 extension PolicyCanvasLabSamples {
-  static let extremeDepthNodes: [TaskBoardPolicyPipelineNode] = [
+  static let extremeDepthNodes: [PolicyPipelineNode] = [
     node(
       "x-evidence2", "Verify evidence",
       .evidenceCheck(checks: [

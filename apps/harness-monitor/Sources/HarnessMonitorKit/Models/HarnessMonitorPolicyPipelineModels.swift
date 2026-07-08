@@ -1,12 +1,12 @@
 import Foundation
 
-public struct TaskBoardPolicyCanvasSummary: Codable, Equatable, Identifiable, Sendable {
+public struct PolicyCanvasSummary: Codable, Equatable, Identifiable, Sendable {
   public var canvasId: String
   public var title: String
   public var revision: UInt64
-  public var mode: TaskBoardPolicyPipelineMode
-  public var document: TaskBoardPolicyPipelineDocument?
-  public var liveDocument: TaskBoardPolicyPipelineDocument?
+  public var mode: PolicyPipelineMode
+  public var document: PolicyPipelineDocument?
+  public var liveDocument: PolicyPipelineDocument?
   public var liveUpdatedAt: String?
   public var nodeCount: Int
   public var edgeCount: Int
@@ -22,9 +22,9 @@ public struct TaskBoardPolicyCanvasSummary: Codable, Equatable, Identifiable, Se
     canvasId: String,
     title: String,
     revision: UInt64,
-    mode: TaskBoardPolicyPipelineMode,
-    document: TaskBoardPolicyPipelineDocument? = nil,
-    liveDocument: TaskBoardPolicyPipelineDocument? = nil,
+    mode: PolicyPipelineMode,
+    document: PolicyPipelineDocument? = nil,
+    liveDocument: PolicyPipelineDocument? = nil,
     liveUpdatedAt: String? = nil,
     nodeCount: Int,
     edgeCount: Int,
@@ -68,10 +68,10 @@ public struct TaskBoardPolicyCanvasSummary: Codable, Equatable, Identifiable, Se
   }
 }
 
-public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
+public struct PolicyCanvasWorkspace: Codable, Equatable, Sendable {
   public var schemaVersion: UInt64
   public var activeCanvasId: String
-  public var canvases: [TaskBoardPolicyCanvasSummary]
+  public var canvases: [PolicyCanvasSummary]
   public var globalPolicyEnforcementEnabled: Bool
   public var scenarios: [PolicyScenario]
 
@@ -86,7 +86,7 @@ public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
   public init(
     schemaVersion: UInt64,
     activeCanvasId: String,
-    canvases: [TaskBoardPolicyCanvasSummary],
+    canvases: [PolicyCanvasSummary],
     globalPolicyEnforcementEnabled: Bool = true,
     scenarios: [PolicyScenario] = []
   ) {
@@ -101,7 +101,7 @@ public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.schemaVersion = try container.decode(UInt64.self, forKey: .schemaVersion)
     self.activeCanvasId = try container.decode(String.self, forKey: .activeCanvasId)
-    self.canvases = try container.decode([TaskBoardPolicyCanvasSummary].self, forKey: .canvases)
+    self.canvases = try container.decode([PolicyCanvasSummary].self, forKey: .canvases)
     self.globalPolicyEnforcementEnabled =
       try container.decodeIfPresent(Bool.self, forKey: .globalPolicyEnforcementEnabled)
       ?? true
@@ -110,7 +110,7 @@ public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardPolicyCanvasCreateRequest: Codable, Equatable, Sendable {
+public struct PolicyCanvasCreateRequest: Codable, Equatable, Sendable {
   public var title: String?
 
   public init(title: String? = nil) {
@@ -118,7 +118,7 @@ public struct TaskBoardPolicyCanvasCreateRequest: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardPolicyCanvasDuplicateRequest: Codable, Equatable, Sendable {
+public struct PolicyCanvasDuplicateRequest: Codable, Equatable, Sendable {
   public var canvasId: String
   public var title: String?
 
@@ -128,7 +128,7 @@ public struct TaskBoardPolicyCanvasDuplicateRequest: Codable, Equatable, Sendabl
   }
 }
 
-public struct TaskBoardPolicyCanvasRenameRequest: Codable, Equatable, Sendable {
+public struct PolicyCanvasRenameRequest: Codable, Equatable, Sendable {
   public var canvasId: String
   public var title: String
 
@@ -138,19 +138,19 @@ public struct TaskBoardPolicyCanvasRenameRequest: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardPolicyCanvasActivateRequest: Codable, Equatable, Sendable {
+public struct PolicyCanvasActivateRequest: Codable, Equatable, Sendable {
   public var canvasId: String
 
   public init(canvasId: String) { self.canvasId = canvasId }
 }
 
-public struct TaskBoardPolicyCanvasDeleteRequest: Codable, Equatable, Sendable {
+public struct PolicyCanvasDeleteRequest: Codable, Equatable, Sendable {
   public var canvasId: String
 
   public init(canvasId: String) { self.canvasId = canvasId }
 }
 
-public struct TaskBoardPolicyCanvasSetGlobalEnforcementRequest: Codable, Equatable, Sendable {
+public struct PolicyCanvasSetGlobalEnforcementRequest: Codable, Equatable, Sendable {
   public var enabled: Bool
 
   public init(enabled: Bool) {
@@ -158,7 +158,7 @@ public struct TaskBoardPolicyCanvasSetGlobalEnforcementRequest: Codable, Equatab
   }
 }
 
-public struct TaskBoardPolicyScenarioCreateRequest: Codable, Equatable, Sendable {
+public struct PolicyScenarioCreateRequest: Codable, Equatable, Sendable {
   public var name: String
   public var input: PolicyInput
 
@@ -168,7 +168,7 @@ public struct TaskBoardPolicyScenarioCreateRequest: Codable, Equatable, Sendable
   }
 }
 
-public struct TaskBoardPolicyScenarioUpdateRequest: Codable, Equatable, Sendable {
+public struct PolicyScenarioUpdateRequest: Codable, Equatable, Sendable {
   public var id: String
   public var name: String
   public var input: PolicyInput
@@ -180,22 +180,22 @@ public struct TaskBoardPolicyScenarioUpdateRequest: Codable, Equatable, Sendable
   }
 }
 
-public struct TaskBoardPolicyScenarioDeleteRequest: Codable, Equatable, Sendable {
+public struct PolicyScenarioDeleteRequest: Codable, Equatable, Sendable {
   public var id: String
 
   public init(id: String) { self.id = id }
 }
 
-public struct TaskBoardPolicyScenarioResetRequest: Codable, Equatable, Sendable {
+public struct PolicyScenarioResetRequest: Codable, Equatable, Sendable {
   public init() {}
 }
 
-public struct TaskBoardPolicyPipelineSaveDraftRequest: Codable, Equatable, Sendable {
+public struct PolicyPipelineSaveDraftRequest: Codable, Equatable, Sendable {
   public var canvasId: String
-  public var document: TaskBoardPolicyPipelineDocument
+  public var document: PolicyPipelineDocument
   public var ifRevision: UInt64
   public init(
-    canvasId: String, document: TaskBoardPolicyPipelineDocument, ifRevision: UInt64? = nil
+    canvasId: String, document: PolicyPipelineDocument, ifRevision: UInt64? = nil
   ) {
     self.canvasId = canvasId
     self.document = document
@@ -203,28 +203,28 @@ public struct TaskBoardPolicyPipelineSaveDraftRequest: Codable, Equatable, Senda
   }
 }
 
-public struct TaskBoardPolicyPipelineSaveDraftResponse: Codable, Equatable, Sendable {
-  public var document: TaskBoardPolicyPipelineDocument
-  public var validation: TaskBoardPolicyPipelineValidation
+public struct PolicyPipelineSaveDraftResponse: Codable, Equatable, Sendable {
+  public var document: PolicyPipelineDocument
+  public var validation: PolicyPipelineValidation
   public init(
-    document: TaskBoardPolicyPipelineDocument, validation: TaskBoardPolicyPipelineValidation
+    document: PolicyPipelineDocument, validation: PolicyPipelineValidation
   ) {
     self.document = document
     self.validation = validation
   }
 }
 
-public struct TaskBoardPolicyPipelineSimulateRequest: Codable, Equatable, Sendable {
+public struct PolicyPipelineSimulateRequest: Codable, Equatable, Sendable {
   public var canvasId: String?
-  public var document: TaskBoardPolicyPipelineDocument?
+  public var document: PolicyPipelineDocument?
 
-  public init(canvasId: String? = nil, document: TaskBoardPolicyPipelineDocument? = nil) {
+  public init(canvasId: String? = nil, document: PolicyPipelineDocument? = nil) {
     self.canvasId = canvasId
     self.document = document
   }
 }
 
-public struct TaskBoardPolicyPipelineReplayRequest: Codable, Equatable, Sendable {
+public struct PolicyPipelineReplayRequest: Codable, Equatable, Sendable {
   public var canvasId: String?
   public var limit: UInt32?
 
@@ -234,7 +234,7 @@ public struct TaskBoardPolicyPipelineReplayRequest: Codable, Equatable, Sendable
   }
 }
 
-public struct TaskBoardPolicyPipelinePromoteRequest: Codable, Equatable, Sendable {
+public struct PolicyPipelinePromoteRequest: Codable, Equatable, Sendable {
   public var canvasId: String?
   public var revision: UInt64
   public var actor: String?
@@ -246,11 +246,11 @@ public struct TaskBoardPolicyPipelinePromoteRequest: Codable, Equatable, Sendabl
   }
 }
 
-public struct TaskBoardPolicyPipelinePromoteResponse: Codable, Equatable, Sendable {
-  public var document: TaskBoardPolicyPipelineDocument
+public struct PolicyPipelinePromoteResponse: Codable, Equatable, Sendable {
+  public var document: PolicyPipelineDocument
   public var traceId: String
 
-  public init(document: TaskBoardPolicyPipelineDocument, traceId: String) {
+  public init(document: PolicyPipelineDocument, traceId: String) {
     self.document = document
     self.traceId = traceId
   }
@@ -261,7 +261,7 @@ public struct TaskBoardPolicyPipelinePromoteResponse: Codable, Equatable, Sendab
   }
 }
 
-public struct TaskBoardPolicyPipelineMakeLiveRequest: Codable, Equatable, Sendable {
+public struct PolicyPipelineMakeLiveRequest: Codable, Equatable, Sendable {
   public var canvasId: String?
   public var revision: UInt64
   public var actor: String?
@@ -281,20 +281,20 @@ public struct TaskBoardPolicyPipelineMakeLiveRequest: Codable, Equatable, Sendab
 
 /// Hand-authored because the make-live response carries the post-promotion
 /// workspace snapshot the generated `PolicyPipelineMakeLiveResponse` does not
-/// model (and types `document` as the hand `TaskBoardPolicyPipelineDocument`,
+/// model (and types `document` as the hand `PolicyPipelineDocument`,
 /// not the bare generated `PolicyGraph`). The workspace lets the store run one
-/// deterministic `syncTaskBoardPolicyCanvasWorkspace` instead of re-fetching.
-public struct TaskBoardPolicyPipelineMakeLiveResponse: Codable, Equatable, Sendable {
-  public var document: TaskBoardPolicyPipelineDocument
+/// deterministic `syncPolicyCanvasWorkspace` instead of re-fetching.
+public struct PolicyPipelineMakeLiveResponse: Codable, Equatable, Sendable {
+  public var document: PolicyPipelineDocument
   public var traceId: String
   public var globalPolicyEnforcementEnabled: Bool
-  public var workspace: TaskBoardPolicyCanvasWorkspace
+  public var workspace: PolicyCanvasWorkspace
 
   public init(
-    document: TaskBoardPolicyPipelineDocument,
+    document: PolicyPipelineDocument,
     traceId: String,
     globalPolicyEnforcementEnabled: Bool,
-    workspace: TaskBoardPolicyCanvasWorkspace
+    workspace: PolicyCanvasWorkspace
   ) {
     self.document = document
     self.traceId = traceId
@@ -313,11 +313,11 @@ public struct TaskBoardPolicyPipelineMakeLiveResponse: Codable, Equatable, Senda
 /// Candidate selector for the read-only go-live decision diff. `document` lets a
 /// caller diff an unsaved draft; the go-live sheet sends only `canvasId` so the
 /// preview matches the saved revision make-live will actually enforce.
-public struct TaskBoardPolicyPipelineGoLiveDiffRequest: Codable, Equatable, Sendable {
+public struct PolicyPipelineGoLiveDiffRequest: Codable, Equatable, Sendable {
   public var canvasId: String?
-  public var document: TaskBoardPolicyPipelineDocument?
+  public var document: PolicyPipelineDocument?
 
-  public init(canvasId: String? = nil, document: TaskBoardPolicyPipelineDocument? = nil) {
+  public init(canvasId: String? = nil, document: PolicyPipelineDocument? = nil) {
     self.canvasId = canvasId
     self.document = document
   }
@@ -328,21 +328,21 @@ public struct TaskBoardPolicyPipelineGoLiveDiffRequest: Codable, Equatable, Send
   }
 }
 
-public struct TaskBoardPolicyPipelineAuditSummary: Codable, Equatable, Sendable {
+public struct PolicyPipelineAuditSummary: Codable, Equatable, Sendable {
   public var activeRevision: UInt64
-  public var mode: TaskBoardPolicyPipelineMode
+  public var mode: PolicyPipelineMode
   public var globalPolicyEnforcementEnabled: Bool
   public var latestTraceId: String?
-  public var latestSimulation: TaskBoardPolicyPipelineSimulationResult?
-  public var validation: TaskBoardPolicyPipelineValidation
+  public var latestSimulation: PolicyPipelineSimulationResult?
+  public var validation: PolicyPipelineValidation
 
   public init(
     activeRevision: UInt64,
-    mode: TaskBoardPolicyPipelineMode,
+    mode: PolicyPipelineMode,
     globalPolicyEnforcementEnabled: Bool = true,
     latestTraceId: String? = nil,
-    latestSimulation: TaskBoardPolicyPipelineSimulationResult? = nil,
-    validation: TaskBoardPolicyPipelineValidation
+    latestSimulation: PolicyPipelineSimulationResult? = nil,
+    validation: PolicyPipelineValidation
   ) {
     self.activeRevision = activeRevision
     self.mode = mode
@@ -364,31 +364,31 @@ public struct TaskBoardPolicyPipelineAuditSummary: Codable, Equatable, Sendable 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     activeRevision = try container.decode(UInt64.self, forKey: .activeRevision)
-    mode = try container.decode(TaskBoardPolicyPipelineMode.self, forKey: .mode)
+    mode = try container.decode(PolicyPipelineMode.self, forKey: .mode)
     globalPolicyEnforcementEnabled =
       try container.decodeIfPresent(Bool.self, forKey: .globalPolicyEnforcementEnabled) ?? true
     latestTraceId = try container.decodeIfPresent(String.self, forKey: .latestTraceId)
     latestSimulation = try container.decodeIfPresent(
-      TaskBoardPolicyPipelineSimulationResult.self,
+      PolicyPipelineSimulationResult.self,
       forKey: .latestSimulation
     )
-    validation = try container.decode(TaskBoardPolicyPipelineValidation.self, forKey: .validation)
+    validation = try container.decode(PolicyPipelineValidation.self, forKey: .validation)
   }
 }
 
-extension TaskBoardPolicyPipelineAuditSummary {
+extension PolicyPipelineAuditSummary {
   /// Map the generated audit wire type to the rich app summary. `mode` shares its
   /// raw values with the wire `PolicyGraphMode`; the nested simulation and
   /// validation reuse their own wire mappings, which fix the dropped issue ids.
   public init(wire: PolicyPipelineAuditSummaryWire) {
     self.init(
       activeRevision: wire.activeRevision,
-      mode: TaskBoardPolicyPipelineMode(rawValue: wire.mode.rawValue) ?? .draft,
+      mode: PolicyPipelineMode(rawValue: wire.mode.rawValue) ?? .draft,
       globalPolicyEnforcementEnabled: wire.globalPolicyEnforcementEnabled,
       latestTraceId: wire.latestTraceId,
       latestSimulation: wire.latestSimulation.map(
-        TaskBoardPolicyPipelineSimulationResult.init(wire:)),
-      validation: TaskBoardPolicyPipelineValidation(wire: wire.validation)
+        PolicyPipelineSimulationResult.init(wire:)),
+      validation: PolicyPipelineValidation(wire: wire.validation)
     )
   }
 }

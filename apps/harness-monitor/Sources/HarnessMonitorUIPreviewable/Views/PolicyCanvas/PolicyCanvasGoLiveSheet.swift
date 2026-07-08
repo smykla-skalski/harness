@@ -18,11 +18,11 @@ struct PolicyCanvasGoLiveRequest: Identifiable, Equatable {
 struct PolicyCanvasGoLiveSheet: View {
   let viewModel: PolicyCanvasViewModel
   let liveStatus: PolicyCanvasLiveState
-  let loadDiff: @MainActor () async -> TaskBoardPolicyPipelineGoLiveDiff?
+  let loadDiff: @MainActor () async -> PolicyPipelineGoLiveDiff?
   let confirm: @MainActor () -> Void
   let dismiss: @MainActor () -> Void
 
-  @State private var diff: TaskBoardPolicyPipelineGoLiveDiff?
+  @State private var diff: PolicyPipelineGoLiveDiff?
   @State private var isLoadingDiff = true
 
   private var canConfirm: Bool {

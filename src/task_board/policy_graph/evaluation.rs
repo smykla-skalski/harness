@@ -8,7 +8,7 @@ use super::{
     PolicyGraphNode, PolicyGraphNodeId, PolicyGraphNodeKind, PolicyIfThenElseCondition,
     PolicyReasonCode, PolicyRuntimeBoundary, PolicySwitchArm, PolicySwitchNode,
 };
-use crate::task_board::policy::{PolicyAction, PolicyInput, TASK_BOARD_POLICY_VERSION};
+use crate::task_board::policy::{PolicyAction, PolicyInput, POLICY_VERSION};
 
 enum EvaluationStep {
     Continue(Vec<String>),
@@ -491,34 +491,34 @@ fn supervisor_decision(
 fn allow(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::Allow {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 
 fn deny(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::Deny {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 
 fn require_human(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::RequireHuman {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 
 fn require_consensus(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::RequireConsensus {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 
 fn dry_run_only(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::DryRunOnly {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }

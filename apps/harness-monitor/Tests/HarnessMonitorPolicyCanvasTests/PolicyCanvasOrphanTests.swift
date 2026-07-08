@@ -64,52 +64,52 @@ struct PolicyCanvasOrphanTests {
   // MARK: - Helpers
 
   /// A document where a group references one real node and one missing id.
-  private func makeOrphanGroupDocument() -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  private func makeOrphanGroupDocument() -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: 7,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-real",
           title: "Real",
           kind: .actionGate(actions: [.spawnAgent]),
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+          inputs: [PolicyPipelinePort(id: "in", title: "in")],
+          outputs: [PolicyPipelinePort(id: "out", title: "out")]
         )
       ],
       edges: [],
       groups: [
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "group-orphan",
           title: "Orphan group",
           nodeIds: ["node-real", "node-missing"]
         )
       ],
-      layout: TaskBoardPolicyPipelineLayout(
-        nodes: [TaskBoardPolicyPipelineNodeLayout(nodeId: "node-real", x: 80, y: 80)]
+      layout: PolicyPipelineLayout(
+        nodes: [PolicyPipelineNodeLayout(nodeId: "node-real", x: 80, y: 80)]
       )
     )
   }
 
   /// A document with one valid node plus an edge whose target node id does
   /// not appear in nodes.
-  private func makeOrphanEdgeDocument() -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  private func makeOrphanEdgeDocument() -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: 8,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-real",
           title: "Real",
           kind: .trigger(workflow: "default-task"),
           inputs: [],
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+          outputs: [PolicyPipelinePort(id: "out", title: "out")]
         )
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge-dead-target",
           fromNodeId: "node-real",
           fromPort: "out",
@@ -118,8 +118,8 @@ struct PolicyCanvasOrphanTests {
         )
       ],
       groups: [],
-      layout: TaskBoardPolicyPipelineLayout(
-        nodes: [TaskBoardPolicyPipelineNodeLayout(nodeId: "node-real", x: 60, y: 80)]
+      layout: PolicyPipelineLayout(
+        nodes: [PolicyPipelineNodeLayout(nodeId: "node-real", x: 60, y: 80)]
       )
     )
   }

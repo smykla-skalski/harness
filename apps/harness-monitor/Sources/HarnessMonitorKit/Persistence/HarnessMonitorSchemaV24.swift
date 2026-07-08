@@ -37,7 +37,7 @@ public enum HarnessMonitorSchemaV24: VersionedSchema {
       HarnessMonitorSchemaV8.CachedTaskReviewMetadata.self,
       HarnessMonitorSchemaV10.CachedSessionWindowState.self,
       HarnessMonitorSchemaV12.CachedSessionTranscriptEntry.self,
-      CachedTaskBoardPolicyDocument.self,
+      CachedPolicyDocument.self,
     ]
   }
 }

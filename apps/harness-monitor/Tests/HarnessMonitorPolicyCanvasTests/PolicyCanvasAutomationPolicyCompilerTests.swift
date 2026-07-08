@@ -113,7 +113,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     )
     document.nodes.append(badSink)
     document.edges.append(
-      TaskBoardPolicyPipelineEdge(
+      PolicyPipelineEdge(
         id: "edge:manual-ocr-paste:bad-review-sink",
         fromNodeId: "automation:manual-ocr-paste:hub",
         fromPort: "out_3",
@@ -179,7 +179,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
 
   @Test("policy compiler rejects incompatible dynamic payload edges")
   func policyCompilerRejectsIncompatibleDynamicPayloadEdges() {
-    let document = TaskBoardPolicyPipelineDocument(
+    let document = PolicyPipelineDocument(
       revision: 1,
       mode: .enforced,
       nodes: [
@@ -201,7 +201,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
         ),
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge:review-screenshot:copy",
           fromNodeId: "automation:review-screenshot:source",
           fromPort: "image",
@@ -487,7 +487,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
 
   @Test("pipeline document compiles pasted PR dry run policy")
   func pipelineDocumentCompilesPastedPRDryRunPolicy() throws {
-    let document = TaskBoardPolicyPipelineDocument(
+    let document = PolicyPipelineDocument(
       revision: 1,
       mode: .enforced,
       nodes: [
@@ -508,7 +508,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
         ),
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge:review-text-paste:dry-run",
           fromNodeId: "automation:review-text-paste:source",
           fromPort: "default",

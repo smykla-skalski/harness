@@ -10,11 +10,11 @@ fn task_board_http_and_ws_policy_io_routes_match() {
     let sandbox = tempdir().expect("tempdir");
     harness_testkit::with_isolated_harness_env(sandbox.path(), || {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
-        runtime.block_on(run_task_board_policy_io_parity());
+        runtime.block_on(run_policy_io_parity());
     });
 }
 
-async fn run_task_board_policy_io_parity() {
+async fn run_policy_io_parity() {
     let state = super::test_http_state_with_db();
     let test_db = state.async_db.get().expect("test async db").clone();
     let (base_url, server) = serve_http(state).await;
@@ -25,7 +25,7 @@ async fn run_task_board_policy_io_parity() {
     let http_export = post_json(
         &client,
         &base_url,
-        http_paths::TASK_BOARD_POLICY_EXPORT,
+        http_paths::POLICY_CANVAS_EXPORT,
         json!({ "canvas_id": http_canvas_id }),
     )
     .await;
@@ -35,7 +35,7 @@ async fn run_task_board_policy_io_parity() {
     let ws_export = ws_result(
         &base_url,
         "req-task-board-policy-export",
-        ws_methods::TASK_BOARD_POLICY_EXPORT,
+        ws_methods::POLICY_CANVAS_EXPORT,
         json!({ "canvas_id": ws_canvas_id }),
     )
     .await;
@@ -52,7 +52,7 @@ async fn run_task_board_policy_io_parity() {
     let http_import = post_json(
         &client,
         &base_url,
-        http_paths::TASK_BOARD_POLICY_IMPORT,
+        http_paths::POLICY_CANVAS_IMPORT,
         import_payload.clone(),
     )
     .await;
@@ -60,7 +60,7 @@ async fn run_task_board_policy_io_parity() {
     let ws_import = ws_result(
         &base_url,
         "req-task-board-policy-import",
-        ws_methods::TASK_BOARD_POLICY_IMPORT,
+        ws_methods::POLICY_CANVAS_IMPORT,
         import_payload,
     )
     .await;

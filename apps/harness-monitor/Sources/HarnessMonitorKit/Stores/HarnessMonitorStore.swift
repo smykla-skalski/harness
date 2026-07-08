@@ -93,21 +93,21 @@ public final class HarnessMonitorStore {
   public var globalTaskBoardMachines: [TaskBoardMachineSummary]? {
     didSet { if oldValue != globalTaskBoardMachines { scheduleUISync([.contentDashboard]) } }
   }
-  public var globalTaskBoardPolicyCanvasWorkspace: TaskBoardPolicyCanvasWorkspace? {
+  public var globalPolicyCanvasWorkspace: PolicyCanvasWorkspace? {
     didSet {
-      if oldValue != globalTaskBoardPolicyCanvasWorkspace { scheduleUISync([.contentDashboard]) }
+      if oldValue != globalPolicyCanvasWorkspace { scheduleUISync([.contentDashboard]) }
     }
   }
-  public var globalTaskBoardPolicyPipeline: TaskBoardPolicyPipelineDocument? {
-    didSet { if oldValue != globalTaskBoardPolicyPipeline { scheduleUISync([.contentDashboard]) } }
+  public var globalPolicyPipeline: PolicyPipelineDocument? {
+    didSet { if oldValue != globalPolicyPipeline { scheduleUISync([.contentDashboard]) } }
   }
-  public var globalTaskBoardPolicySimulation: TaskBoardPolicyPipelineSimulationResult? {
+  public var globalPolicySimulation: PolicyPipelineSimulationResult? {
     didSet {
-      if oldValue != globalTaskBoardPolicySimulation { scheduleUISync([.contentDashboard]) }
+      if oldValue != globalPolicySimulation { scheduleUISync([.contentDashboard]) }
     }
   }
-  public var globalTaskBoardPolicyAudit: TaskBoardPolicyPipelineAuditSummary? {
-    didSet { if oldValue != globalTaskBoardPolicyAudit { scheduleUISync([.contentDashboard]) } }
+  public var globalPolicyAudit: PolicyPipelineAuditSummary? {
+    didSet { if oldValue != globalPolicyAudit { scheduleUISync([.contentDashboard]) } }
   }
   public var notificationHistoryEntries: [NotificationHistoryEntry] = [] {
     didSet { if oldValue != notificationHistoryEntries { scheduleUISync([.contentDashboard]) } }

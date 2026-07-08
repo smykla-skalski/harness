@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::super::dispatch::DispatchExecutionSummary;
 use super::super::evaluation::TaskBoardEvaluationSummary;
-use super::super::policy::TASK_BOARD_POLICY_VERSION;
+use super::super::policy::POLICY_VERSION;
 use super::super::summary::{TaskBoardAuditSummary, TaskBoardSyncSummary};
 use super::super::types::{TaskBoardStatus, TaskBoardWorkflowStatus};
 
@@ -231,7 +231,7 @@ const fn default_dry_run_default() -> bool {
 }
 
 fn default_policy_version() -> String {
-    TASK_BOARD_POLICY_VERSION.to_string()
+    POLICY_VERSION.to_string()
 }
 
 const fn default_state_schema_version() -> u32 {

@@ -93,7 +93,7 @@ let samplePolicyGoLiveDiffJSON: [String: JSONValue] = [
   "diffs": .array([]),
 ]
 
-let samplePolicyExportJSON: [String: JSONValue] = [
+let samplePolicyCanvasExportJSON: [String: JSONValue] = [
   "canvas_id": .string("canvas-primary"),
   "title": .string("Primary canvas"),
   "document": .object(samplePolicyPipelineJSON),

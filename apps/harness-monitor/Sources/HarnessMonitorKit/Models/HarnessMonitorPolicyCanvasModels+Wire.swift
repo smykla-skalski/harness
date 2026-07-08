@@ -1,19 +1,19 @@
 import Foundation
 
-// Map the generated task-board policy-canvas wire types to the rich app models.
+// Map the generated policy-canvas wire types to the rich app models.
 // The wire types own the daemon snake_case decode through the plain decoder; the
 // hand models keep their app shape (Int counts, optional document, the renamed
-// TaskBoardPolicyPipelineMode). `mode` shares its raw values with the wire
+// PolicyPipelineMode). `mode` shares its raw values with the wire
 // PolicyGraphMode, and `document` already decodes through the plain-decoder-safe
-// hand TaskBoardPolicyPipelineDocument, so it passes straight through.
+// hand PolicyPipelineDocument, so it passes straight through.
 
-extension TaskBoardPolicyCanvasSummary {
-  public init(wire: TaskBoardPolicyCanvasSummaryWire) {
+extension PolicyCanvasSummary {
+  public init(wire: PolicyCanvasSummaryWire) {
     self.init(
       canvasId: wire.canvasId,
       title: wire.title,
       revision: wire.revision,
-      mode: TaskBoardPolicyPipelineMode(rawValue: wire.mode.rawValue) ?? .draft,
+      mode: PolicyPipelineMode(rawValue: wire.mode.rawValue) ?? .draft,
       document: wire.document,
       liveDocument: wire.liveDocument,
       liveUpdatedAt: wire.liveUpdatedAt,
@@ -28,20 +28,20 @@ extension TaskBoardPolicyCanvasSummary {
   }
 }
 
-extension TaskBoardPolicyCanvasWorkspace {
-  public init(wire: TaskBoardPolicyCanvasWorkspaceResponseWire) {
+extension PolicyCanvasWorkspace {
+  public init(wire: PolicyCanvasWorkspaceResponseWire) {
     self.init(
       schemaVersion: UInt64(wire.schemaVersion),
       activeCanvasId: wire.activeCanvasId,
-      canvases: wire.canvases.map(TaskBoardPolicyCanvasSummary.init(wire:)),
+      canvases: wire.canvases.map(PolicyCanvasSummary.init(wire:)),
       globalPolicyEnforcementEnabled: wire.globalPolicyEnforcementEnabled,
       scenarios: wire.scenarios
     )
   }
 }
 
-extension TaskBoardPolicyExportResponse {
-  public init(wire: TaskBoardPolicyExportResponseWire) {
+extension PolicyCanvasExportResponse {
+  public init(wire: PolicyCanvasExportResponseWire) {
     self.init(
       canvasId: wire.canvasId,
       title: wire.title,

@@ -92,7 +92,7 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     )
 
     XCTAssertTrue(
-      dashboardPolicySource.contains("fallbackDocument: dashboardUI.taskBoardPolicyPipeline")
+      dashboardPolicySource.contains("fallbackDocument: dashboardUI.policyPipeline")
     )
     XCTAssertTrue(dashboardFooterSource.contains("fallbackActiveCanvasSummary"))
     XCTAssertFalse(dashboardFooterSource.contains("document.nodes.first?.title"))
@@ -113,7 +113,7 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertTrue(dashboardPolicySource.contains("await store.savePolicyCanvasDraft("))
     XCTAssertFalse(dashboardPolicySource.contains("policyCanvasViewModel.draftSaveRequest("))
     XCTAssertFalse(dashboardPolicySource.contains("policyCanvasViewModel.adoptSuccessfulManualDraftSave("))
-    XCTAssertFalse(dashboardPolicySource.contains("saveTaskBoardPolicyPipelineDraft("))
+    XCTAssertFalse(dashboardPolicySource.contains("savePolicyPipelineDraft("))
     XCTAssertFalse(dashboardPolicySource.contains("policyCanvasViewModel.documentGeneration"))
     XCTAssertFalse(dashboardPolicySource.contains("policyCanvasViewModel.resolveSuccessfulSave("))
     XCTAssertFalse(dashboardPolicySource.contains("policyCanvasViewModel.markManualSaveSucceeded()"))
@@ -407,12 +407,12 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertTrue(dashboardPolicySource.contains("if workspace == nil {"))
     XCTAssertFalse(
       dashboardPolicySource.contains(
-        "needsInitialRefresh: workspace == nil && dashboardUI.taskBoardPolicyPipeline == nil"
+        "needsInitialRefresh: workspace == nil && dashboardUI.policyPipeline == nil"
       )
     )
     XCTAssertFalse(
       dashboardPolicySource.contains(
-        "if workspace == nil && dashboardUI.taskBoardPolicyPipeline == nil {"
+        "if workspace == nil && dashboardUI.policyPipeline == nil {"
       )
     )
   }

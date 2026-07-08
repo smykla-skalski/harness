@@ -68,10 +68,10 @@ struct PolicyCanvasNodeLookup {
 }
 
 struct PolicyCanvasDocumentLayoutLookup {
-  private let nodeLayoutsByID: [String: TaskBoardPolicyPipelineNodeLayout]
+  private let nodeLayoutsByID: [String: PolicyPipelineNodeLayout]
 
-  init(layout: TaskBoardPolicyPipelineLayout) {
-    var nodeLayoutsByID: [String: TaskBoardPolicyPipelineNodeLayout] = [:]
+  init(layout: PolicyPipelineLayout) {
+    var nodeLayoutsByID: [String: PolicyPipelineNodeLayout] = [:]
     for node in layout.nodes where nodeLayoutsByID[node.nodeId.rawValue] == nil {
       nodeLayoutsByID[node.nodeId.rawValue] = node
     }
@@ -80,12 +80,12 @@ struct PolicyCanvasDocumentLayoutLookup {
 
   func nodeLayout(
     for nodeID: String
-  ) -> (position: TaskBoardPolicyCanvasPoint, source: PolicyGraphNodeLayoutSource?)? {
+  ) -> (position: HarnessMonitorKit.PolicyCanvasPoint, source: PolicyGraphNodeLayoutSource?)? {
     guard let node = nodeLayoutsByID[nodeID] else {
       return nil
     }
     return (
-      position: TaskBoardPolicyCanvasPoint(x: Double(node.x), y: Double(node.y)),
+      position: HarnessMonitorKit.PolicyCanvasPoint(x: Double(node.x), y: Double(node.y)),
       source: node.source
     )
   }
@@ -93,7 +93,7 @@ struct PolicyCanvasDocumentLayoutLookup {
 
 func synthesizedGroupFrame(
   offset: Int,
-  group: TaskBoardPolicyPipelineGroup,
+  group: PolicyPipelineGroup,
   nodes: [PolicyCanvasNode]
 ) -> CGRect {
   let memberIDs = Set(group.nodeIds.map(\.rawValue))
@@ -109,33 +109,33 @@ func synthesizedGroupFrame(
   return policyCanvasGroupFrame(containing: bounds)
 }
 
-extension TaskBoardPolicyPipelineLayout {
+extension PolicyPipelineLayout {
   func nodeLayout(
     for nodeID: String
-  ) -> (position: TaskBoardPolicyCanvasPoint, source: PolicyGraphNodeLayoutSource?)? {
+  ) -> (position: HarnessMonitorKit.PolicyCanvasPoint, source: PolicyGraphNodeLayoutSource?)? {
     guard let node = nodes.first(where: { $0.nodeId.rawValue == nodeID }) else {
       return nil
     }
     return (
-      position: TaskBoardPolicyCanvasPoint(x: Double(node.x), y: Double(node.y)),
+      position: HarnessMonitorKit.PolicyCanvasPoint(x: Double(node.x), y: Double(node.y)),
       source: node.source
     )
   }
 }
 
-extension TaskBoardPolicyCanvasRect {
+extension HarnessMonitorKit.PolicyCanvasRect {
   var isEmpty: Bool {
     width <= 0 || height <= 0
   }
 }
 
-func taskBoardPolicyNodeKind(
+func policyNodeKind(
   for kind: PolicyCanvasNodeKind
 ) -> PolicyGraphNodeKind {
   kind.defaultPolicyKind
 }
 
-func policyCanvasEdgeLabel(_ edge: TaskBoardPolicyPipelineEdge) -> String {
+func policyCanvasEdgeLabel(_ edge: PolicyPipelineEdge) -> String {
   if let label = edge.label?.trimmingCharacters(in: .whitespacesAndNewlines),
     !label.isEmpty
   {

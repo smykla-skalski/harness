@@ -111,7 +111,7 @@ struct PolicyPipelineSimulationWireDecodingTests {
       PolicyPipelineSimulationResultWire.self,
       from: Data(json.utf8)
     )
-    let model = TaskBoardPolicyPipelineSimulationResult(wire: wire)
+    let model = PolicyPipelineSimulationResult(wire: wire)
 
     #expect(model.traceId == "trace-2")
     #expect(model.validation.isValid == false)

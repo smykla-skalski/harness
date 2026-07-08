@@ -151,7 +151,7 @@ struct DashboardPolicyCanvasFooterTab: View {
   @ScaledMetric(relativeTo: .callout)
   private var tabMaxWidth = 220.0
 
-  let canvas: TaskBoardPolicyCanvasSummary
+  let canvas: PolicyCanvasSummary
   let isSelected: Bool
   let isActive: Bool
   let isEditing: Bool

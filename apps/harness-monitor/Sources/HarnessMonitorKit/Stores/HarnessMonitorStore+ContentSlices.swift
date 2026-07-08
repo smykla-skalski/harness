@@ -326,10 +326,10 @@ extension HarnessMonitorStore {
     public var taskBoardItemAuditSummary: TaskBoardAuditSummary?
     public var taskBoardProjects: [TaskBoardProjectSummary]?
     public var taskBoardMachines: [TaskBoardMachineSummary]?
-    public var taskBoardPolicyCanvasWorkspace: TaskBoardPolicyCanvasWorkspace?
-    public var taskBoardPolicyPipeline: TaskBoardPolicyPipelineDocument?
-    public var taskBoardPolicySimulation: TaskBoardPolicyPipelineSimulationResult?
-    public var taskBoardPolicyAudit: TaskBoardPolicyPipelineAuditSummary?
+    public var policyCanvasWorkspace: PolicyCanvasWorkspace?
+    public var policyPipeline: PolicyPipelineDocument?
+    public var policySimulation: PolicyPipelineSimulationResult?
+    public var policyAudit: PolicyPipelineAuditSummary?
 
     public init() {}
 
@@ -349,10 +349,10 @@ extension HarnessMonitorStore {
       Self.assign(&taskBoardItemAuditSummary, state.taskBoardItemAuditSummary)
       Self.assign(&taskBoardProjects, state.taskBoardProjects)
       Self.assign(&taskBoardMachines, state.taskBoardMachines)
-      Self.assign(&taskBoardPolicyCanvasWorkspace, state.taskBoardPolicyCanvasWorkspace)
-      Self.assign(&taskBoardPolicyPipeline, state.taskBoardPolicyPipeline)
-      Self.assign(&taskBoardPolicySimulation, state.taskBoardPolicySimulation)
-      Self.assign(&taskBoardPolicyAudit, state.taskBoardPolicyAudit)
+      Self.assign(&policyCanvasWorkspace, state.policyCanvasWorkspace)
+      Self.assign(&policyPipeline, state.policyPipeline)
+      Self.assign(&policySimulation, state.policySimulation)
+      Self.assign(&policyAudit, state.policyAudit)
     }
 
     private static func assign<Value: Equatable>(_ current: inout Value, _ next: Value) {

@@ -115,12 +115,12 @@ extension PolicyCanvasViewModel {
     else {
       return nil
     }
-    var policyKind = node.policyKind ?? taskBoardPolicyNodeKind(for: node.kind)
+    var policyKind = node.policyKind ?? policyNodeKind(for: node.kind)
     guard policyKind.discriminator == PolicyCanvasNodeKind.switch.rawValue else {
       return nil
     }
     if policyKind.arms.isEmpty {
-      policyKind = taskBoardPolicyNodeKind(for: .switch)
+      policyKind = policyNodeKind(for: .switch)
     }
     return SelectedSwitchNodeContext(id: id, node: node, policyKind: policyKind)
   }

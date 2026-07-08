@@ -15,8 +15,8 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
     }
   }
 
-  private var policyWorkspace: TaskBoardPolicyCanvasWorkspace? {
-    store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace
+  private var policyWorkspace: PolicyCanvasWorkspace? {
+    store.contentUI.dashboard.policyCanvasWorkspace
   }
 
   private var globalPolicyEnforcementEnabled: Bool {
@@ -80,7 +80,7 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
       return
     }
     Task { @MainActor in
-      guard await store.setTaskBoardPolicyCanvasGlobalEnforcement(enabled: enabled) else {
+      guard await store.setPolicyCanvasGlobalEnforcement(enabled: enabled) else {
         return
       }
       syncCanvasAutomationPolicies()
@@ -91,8 +91,8 @@ public struct GlobalPolicyEnforcementToolbarGroup: ToolbarContent {
   private func syncCanvasAutomationPolicies() {
     let policyCenter = AutomationPolicyCenter.shared
     let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
-      workspace: store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace,
-      activeDocument: store.contentUI.dashboard.taskBoardPolicyPipeline
+      workspace: store.contentUI.dashboard.policyCanvasWorkspace,
+      activeDocument: store.contentUI.dashboard.policyPipeline
     )
     let compiledPolicies = compilation.policies.map(AutomationPolicy.init)
     guard !compiledPolicies.isEmpty || policyCenter.document.hasCanvasPolicies else {

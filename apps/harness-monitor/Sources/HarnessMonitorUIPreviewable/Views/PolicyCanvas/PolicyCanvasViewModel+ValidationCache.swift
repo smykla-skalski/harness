@@ -154,11 +154,11 @@ actor PolicyCanvasValidationWorker {
 
   private static func validateGraph(
     input: PolicyCanvasPreparedValidationInput
-  ) -> [TaskBoardPolicyPipelineValidationIssue] {
-    var issues: [TaskBoardPolicyPipelineValidationIssue] = []
+  ) -> [PolicyPipelineValidationIssue] {
+    var issues: [PolicyPipelineValidationIssue] = []
     if let cycle = detectCycle(input: input) {
       issues.append(
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "cycle",
           message: "Cycle detected across \(cycle.joined(separator: ", "))",
           nodeIds: cycle
@@ -167,7 +167,7 @@ actor PolicyCanvasValidationWorker {
     }
     for orphan in detectOrphanNodes(input: input) {
       issues.append(
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "orphan_node",
           message: "Node \(orphan) has no connections and is not in a group",
           nodeId: orphan
@@ -176,7 +176,7 @@ actor PolicyCanvasValidationWorker {
     }
     for duplicate in detectDuplicateTitles(input: input) {
       issues.append(
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "duplicate_label",
           message: "\(duplicate.nodeIds.count) nodes share the title \"\(duplicate.title)\"",
           nodeIds: duplicate.nodeIds
@@ -185,7 +185,7 @@ actor PolicyCanvasValidationWorker {
     }
     for mismatch in detectErrorIntoAllowEdges(input: input) {
       issues.append(
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "error_into_allow",
           message:
             "Error edge \"\(mismatch.edgeLabel)\" terminates at "
@@ -289,7 +289,7 @@ actor PolicyCanvasValidationWorker {
   }
 
   private static func resolvedIssue(
-    issue: TaskBoardPolicyPipelineValidationIssue,
+    issue: PolicyPipelineValidationIssue,
     origin: String,
     index: Int,
     input: PolicyCanvasPreparedValidationInput,

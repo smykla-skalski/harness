@@ -116,31 +116,31 @@ struct PolicyCanvasDocumentRoundTripOrphansTests {
   /// A small document with one group, two nodes both in the group, and one
   /// edge between them. No orphans — used as the clean-baseline harness for
   /// stability tests.
-  private func makeCleanDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  private func makeCleanDocument(revision: UInt64) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-alpha",
           title: "Alpha",
           kind: .trigger(workflow: "default-task"),
           groupId: "group-clean",
           inputs: [],
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+          outputs: [PolicyPipelinePort(id: "out", title: "out")]
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-beta",
           title: "Beta",
           kind: .actionGate(actions: [.spawnAgent]),
           groupId: "group-clean",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-          outputs: [TaskBoardPolicyPipelinePort(id: "default", title: "default")]
+          inputs: [PolicyPipelinePort(id: "in", title: "in")],
+          outputs: [PolicyPipelinePort(id: "default", title: "default")]
         ),
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge-alpha-beta",
           fromNodeId: "node-alpha",
           fromPort: "out",
@@ -149,16 +149,16 @@ struct PolicyCanvasDocumentRoundTripOrphansTests {
         )
       ],
       groups: [
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "group-clean",
           title: "Clean group",
           nodeIds: ["node-alpha", "node-beta"]
         )
       ],
-      layout: TaskBoardPolicyPipelineLayout(
+      layout: PolicyPipelineLayout(
         nodes: [
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-alpha", x: 40, y: 60),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-beta", x: 320, y: 60),
+          PolicyPipelineNodeLayout(nodeId: "node-alpha", x: 40, y: 60),
+          PolicyPipelineNodeLayout(nodeId: "node-beta", x: 320, y: 60),
         ]
       )
     )
@@ -167,52 +167,52 @@ struct PolicyCanvasDocumentRoundTripOrphansTests {
   /// A document where a group references one real node and one missing id.
   /// Same shape as wave 1C's PolicyCanvasOrphanTests fixture so multi-pass
   /// stability tests use a familiar baseline.
-  private func makeOrphanGroupDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  private func makeOrphanGroupDocument(revision: UInt64) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-real",
           title: "Real",
           kind: .actionGate(actions: [.spawnAgent]),
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+          inputs: [PolicyPipelinePort(id: "in", title: "in")],
+          outputs: [PolicyPipelinePort(id: "out", title: "out")]
         )
       ],
       edges: [],
       groups: [
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "group-orphan",
           title: "Orphan group",
           nodeIds: ["node-real", "node-missing"]
         )
       ],
-      layout: TaskBoardPolicyPipelineLayout(
-        nodes: [TaskBoardPolicyPipelineNodeLayout(nodeId: "node-real", x: 80, y: 80)]
+      layout: PolicyPipelineLayout(
+        nodes: [PolicyPipelineNodeLayout(nodeId: "node-real", x: 80, y: 80)]
       )
     )
   }
 
   /// A document with one valid node plus an edge whose target node id does
   /// not appear in nodes.
-  private func makeOrphanEdgeDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  private func makeOrphanEdgeDocument(revision: UInt64) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-real",
           title: "Real",
           kind: .trigger(workflow: "default-task"),
           inputs: [],
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+          outputs: [PolicyPipelinePort(id: "out", title: "out")]
         )
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge-dead-target",
           fromNodeId: "node-real",
           fromPort: "out",
@@ -221,8 +221,8 @@ struct PolicyCanvasDocumentRoundTripOrphansTests {
         )
       ],
       groups: [],
-      layout: TaskBoardPolicyPipelineLayout(
-        nodes: [TaskBoardPolicyPipelineNodeLayout(nodeId: "node-real", x: 60, y: 80)]
+      layout: PolicyPipelineLayout(
+        nodes: [PolicyPipelineNodeLayout(nodeId: "node-real", x: 60, y: 80)]
       )
     )
   }
@@ -230,40 +230,40 @@ struct PolicyCanvasDocumentRoundTripOrphansTests {
   /// A document with a node that is not referenced by any group's nodeIds.
   /// The mapping layer treats it as ungrouped and exportDocument should not
   /// magically attach it.
-  private func makeUngroupedNodeDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  private func makeUngroupedNodeDocument(revision: UInt64) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-grouped",
           title: "Grouped",
           kind: .trigger(workflow: "default-task"),
           groupId: "group-anchor",
           inputs: [],
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+          outputs: [PolicyPipelinePort(id: "out", title: "out")]
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-loose",
           title: "Loose",
           kind: .actionGate(actions: [.spawnAgent]),
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
+          inputs: [PolicyPipelinePort(id: "in", title: "in")],
           outputs: []
         ),
       ],
       edges: [],
       groups: [
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "group-anchor",
           title: "Anchor group",
           nodeIds: ["node-grouped"]
         )
       ],
-      layout: TaskBoardPolicyPipelineLayout(
+      layout: PolicyPipelineLayout(
         nodes: [
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-grouped", x: 40, y: 60),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-loose", x: 400, y: 60),
+          PolicyPipelineNodeLayout(nodeId: "node-grouped", x: 40, y: 60),
+          PolicyPipelineNodeLayout(nodeId: "node-loose", x: 400, y: 60),
         ]
       )
     )

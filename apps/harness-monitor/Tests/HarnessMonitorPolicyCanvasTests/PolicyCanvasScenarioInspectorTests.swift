@@ -80,26 +80,26 @@ struct PolicyCanvasScenarioInspectorTests {
     verdict: String,
     reason: String,
     visited: [String]
-  ) -> TaskBoardPolicyPipelineSimulatedDecision {
-    TaskBoardPolicyPipelineSimulatedDecision(
+  ) -> PolicyPipelineSimulatedDecision {
+    PolicyPipelineSimulatedDecision(
       scenarioId: id,
       scenarioName: name,
       action: action,
-      decision: TaskBoardPolicyDecision(decision: verdict, reasonCode: reason, policyVersion: "v1"),
+      decision: PolicySimulationDecision(decision: verdict, reasonCode: reason, policyVersion: "v1"),
       visitedNodeIds: visited
     )
   }
 
   private func simulation(
     succeeded: Bool,
-    decisions: [TaskBoardPolicyPipelineSimulatedDecision]
-  ) -> TaskBoardPolicyPipelineSimulationResult {
-    TaskBoardPolicyPipelineSimulationResult(
+    decisions: [PolicyPipelineSimulatedDecision]
+  ) -> PolicyPipelineSimulationResult {
+    PolicyPipelineSimulationResult(
       revision: 1,
       traceId: "trace-test",
       simulatedAt: "2026-06-19T00:00:00Z",
       succeeded: succeeded,
-      validation: TaskBoardPolicyPipelineValidation(isValid: succeeded),
+      validation: PolicyPipelineValidation(isValid: succeeded),
       decisions: decisions
     )
   }

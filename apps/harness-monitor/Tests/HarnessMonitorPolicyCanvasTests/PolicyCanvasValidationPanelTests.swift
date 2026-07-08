@@ -14,17 +14,17 @@ struct PolicyCanvasValidationPanelTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "cycle",
           message: "cycle across two nodes",
           nodeIds: ["risk-score", "review-gate"]
         ),
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "dangling_edge",
           message: "edge points at missing port",
           edgeId: "edge-intake-risk"
         ),
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "soft_warning",
           message: "policy heuristic",
           nodeId: "risk-score"
@@ -54,7 +54,7 @@ struct PolicyCanvasValidationPanelTests {
     viewModel.select(nil)
     viewModel.latestSimulation = makeSimulation(
       issues: [
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "invalid_port",
           message: "bad port",
           nodeId: "risk-score",
@@ -77,7 +77,7 @@ struct PolicyCanvasValidationPanelTests {
     viewModel.select(nil)
     viewModel.latestSimulation = makeSimulation(
       issues: [
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "dangling_edge",
           message: "edge points at missing port",
           edgeId: "edge-intake-risk"
@@ -98,7 +98,7 @@ struct PolicyCanvasValidationPanelTests {
     viewModel.select(.group("group-evaluation"))
     viewModel.latestSimulation = makeSimulation(
       issues: [
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "duplicate_id",
           message: "id collision",
           nodeId: "node-that-does-not-exist"
@@ -132,12 +132,12 @@ struct PolicyCanvasValidationPanelTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "cycle",
           message: "cycle across two nodes",
           nodeIds: ["risk-score", "review-gate"]
         ),
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "dangling_edge",
           message: "edge points at missing port",
           edgeId: "edge-intake-risk"
@@ -170,12 +170,12 @@ struct PolicyCanvasValidationPanelTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "duplicate_id",
           message: "collision",
           nodeId: "risk-score"
         ),
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "cycle",
           message: "cycle",
           nodeIds: ["context-map", "promote-release"]
@@ -195,7 +195,7 @@ struct PolicyCanvasValidationPanelTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "dangling_edge",
           message: "dead",
           edgeId: "edge-intake-risk"
@@ -213,17 +213,17 @@ struct PolicyCanvasValidationPanelTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "invalid_port",
           message: "bad port",
           nodeId: "risk-score"
         ),
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "duplicate_id",
           message: "duplicate node",
           nodeId: "context-map"
         ),
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "dangling_edge",
           message: "dead edge",
           edgeId: "edge-intake-risk"
@@ -249,12 +249,12 @@ struct PolicyCanvasValidationPanelTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "cycle",
           message: "cycle",
           nodeIds: ["risk-score", "review-gate"]
         ),
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "duplicate_id",
           message: "dup",
           nodeId: "context-map"
@@ -273,14 +273,14 @@ struct PolicyCanvasValidationPanelTests {
   // MARK: - Helpers
 
   private func makeSimulation(
-    issues: [TaskBoardPolicyPipelineValidationIssue]
-  ) -> TaskBoardPolicyPipelineSimulationResult {
-    TaskBoardPolicyPipelineSimulationResult(
+    issues: [PolicyPipelineValidationIssue]
+  ) -> PolicyPipelineSimulationResult {
+    PolicyPipelineSimulationResult(
       revision: 1,
       traceId: "trace-test",
       simulatedAt: "2026-05-14T00:00:00Z",
       succeeded: issues.isEmpty,
-      validation: TaskBoardPolicyPipelineValidation(
+      validation: PolicyPipelineValidation(
         isValid: issues.isEmpty,
         issues: issues
       )

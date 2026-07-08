@@ -118,7 +118,7 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
       }
       """.data(using: .utf8)!
 
-    let workspace = try JSONDecoder().decode(TaskBoardPolicyCanvasWorkspace.self, from: data)
+    let workspace = try JSONDecoder().decode(PolicyCanvasWorkspace.self, from: data)
     let extraction = try #require(
       workspace.canvases[2].document?.nodes[0].automation?.reviewPullRequestExtraction
     )
@@ -134,7 +134,7 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
 
   @Test("workspace compilation includes inactive enforced canvas documents")
   func workspaceCompilationIncludesInactiveEnforcedCanvasDocuments() throws {
-    let defaultDocument = TaskBoardPolicyPipelineDocument(
+    let defaultDocument = PolicyPipelineDocument(
       revision: 1,
       mode: .draft,
       nodes: [],
@@ -142,7 +142,7 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
       groups: []
     )
     let pastedPRDocument = policyCanvasPastedPRDryRunDocument()
-    let workspace = TaskBoardPolicyCanvasWorkspace(
+    let workspace = PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: "default-canvas",
       canvases: [
@@ -175,7 +175,7 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
 
   @Test("workspace compilation includes enforced review screenshot extraction canvas")
   func workspaceCompilationIncludesReviewScreenshotExtractionCanvas() throws {
-    let defaultDocument = TaskBoardPolicyPipelineDocument(
+    let defaultDocument = PolicyPipelineDocument(
       revision: 1,
       mode: .draft,
       nodes: [],
@@ -183,7 +183,7 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
       groups: []
     )
     let screenshotDocument = policyCanvasReviewScreenshotExtractionDocument()
-    let workspace = TaskBoardPolicyCanvasWorkspace(
+    let workspace = PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: "default-canvas",
       canvases: [
@@ -218,7 +218,7 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
 
   @Test("workspace compilation includes enforced manual OCR paste canvas")
   func workspaceCompilationIncludesManualOCRPasteCanvas() throws {
-    let defaultDocument = TaskBoardPolicyPipelineDocument(
+    let defaultDocument = PolicyPipelineDocument(
       revision: 1,
       mode: .draft,
       nodes: [],
@@ -226,7 +226,7 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
       groups: []
     )
     let manualOCRDocument = policyCanvasManualOCRPasteDocument()
-    let workspace = TaskBoardPolicyCanvasWorkspace(
+    let workspace = PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: "default-canvas",
       canvases: [
@@ -266,14 +266,14 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
 
   @Test("workspace compilation uses live document when the active document is draft")
   func workspaceCompilationUsesLiveDocumentWhenActiveDocumentIsDraft() throws {
-    let draftDocument = TaskBoardPolicyPipelineDocument(
+    let draftDocument = PolicyPipelineDocument(
       revision: 2,
       mode: .draft,
       nodes: [],
       edges: [],
       groups: []
     )
-    let workspace = TaskBoardPolicyCanvasWorkspace(
+    let workspace = PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: "manual-ocr-canvas",
       canvases: [
@@ -299,14 +299,14 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
 
   @Test("workspace compilation assigns stable priorities across multiple enforced canvases")
   func workspaceCompilationAssignsStablePrioritiesAcrossMultipleEnforcedCanvases() throws {
-    let defaultDocument = TaskBoardPolicyPipelineDocument(
+    let defaultDocument = PolicyPipelineDocument(
       revision: 1,
       mode: .draft,
       nodes: [],
       edges: [],
       groups: []
     )
-    let workspace = TaskBoardPolicyCanvasWorkspace(
+    let workspace = PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: "default-canvas",
       canvases: [
@@ -344,14 +344,14 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
 
   @Test("workspace compilation stops when global enforcement is disabled")
   func workspaceCompilationStopsWhenGlobalEnforcementIsDisabled() throws {
-    let defaultDocument = TaskBoardPolicyPipelineDocument(
+    let defaultDocument = PolicyPipelineDocument(
       revision: 1,
       mode: .draft,
       nodes: [],
       edges: [],
       groups: []
     )
-    let workspace = TaskBoardPolicyCanvasWorkspace(
+    let workspace = PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: "default-canvas",
       canvases: [
@@ -375,7 +375,7 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
   @Test("workspace compilation does not request the active document")
   func workspaceCompilationDoesNotRequestTheActiveDocument() {
     var activeDocumentWasRequested = false
-    let workspace = TaskBoardPolicyCanvasWorkspace(
+    let workspace = PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: "default-canvas",
       canvases: []
@@ -385,7 +385,7 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
       workspace: workspace,
       activeDocument: {
         activeDocumentWasRequested = true
-        return TaskBoardPolicyPipelineDocument(
+        return PolicyPipelineDocument(
           revision: 1,
           mode: .enforced,
           nodes: [],
@@ -400,8 +400,8 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
   }
 }
 
-func policyCanvasPastedPRDryRunDocument() -> TaskBoardPolicyPipelineDocument {
-  TaskBoardPolicyPipelineDocument(
+func policyCanvasPastedPRDryRunDocument() -> PolicyPipelineDocument {
+  PolicyPipelineDocument(
     revision: 1,
     mode: .enforced,
     nodes: [
@@ -422,7 +422,7 @@ func policyCanvasPastedPRDryRunDocument() -> TaskBoardPolicyPipelineDocument {
       ),
     ],
     edges: [
-      TaskBoardPolicyPipelineEdge(
+      PolicyPipelineEdge(
         id: "edge:review-text-paste:dry-run",
         fromNodeId: "automation:review-text-paste:source",
         fromPort: "default",
@@ -434,8 +434,8 @@ func policyCanvasPastedPRDryRunDocument() -> TaskBoardPolicyPipelineDocument {
   )
 }
 
-func policyCanvasManualOCRPasteDocument() -> TaskBoardPolicyPipelineDocument {
-  TaskBoardPolicyPipelineDocument(
+func policyCanvasManualOCRPasteDocument() -> PolicyPipelineDocument {
+  PolicyPipelineDocument(
     revision: 1,
     mode: .enforced,
     nodes: [
@@ -483,28 +483,28 @@ func policyCanvasManualOCRPasteDocument() -> TaskBoardPolicyPipelineDocument {
       ),
     ],
     edges: [
-      TaskBoardPolicyPipelineEdge(
+      PolicyPipelineEdge(
         id: "edge:manual-ocr-paste:ocr",
         fromNodeId: "automation:manual-ocr-paste:source",
         fromPort: "image",
         toNodeId: "automation:manual-ocr-paste:ocr",
         toPort: "in"
       ),
-      TaskBoardPolicyPipelineEdge(
+      PolicyPipelineEdge(
         id: "edge:manual-ocr-paste:hub",
         fromNodeId: "automation:manual-ocr-paste:ocr",
         fromPort: "text",
         toNodeId: "automation:manual-ocr-paste:hub",
         toPort: "in"
       ),
-      TaskBoardPolicyPipelineEdge(
+      PolicyPipelineEdge(
         id: "edge:manual-ocr-paste:debug",
         fromNodeId: "automation:manual-ocr-paste:hub",
         fromPort: "out_1",
         toNodeId: "automation:manual-ocr-paste:debug",
         toPort: "in"
       ),
-      TaskBoardPolicyPipelineEdge(
+      PolicyPipelineEdge(
         id: "edge:manual-ocr-paste:persist",
         fromNodeId: "automation:manual-ocr-paste:hub",
         fromPort: "out_2",
@@ -516,8 +516,8 @@ func policyCanvasManualOCRPasteDocument() -> TaskBoardPolicyPipelineDocument {
   )
 }
 
-func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipelineDocument {
-  TaskBoardPolicyPipelineDocument(
+func policyCanvasReviewScreenshotExtractionDocument() -> PolicyPipelineDocument {
+  PolicyPipelineDocument(
     revision: 1,
     mode: .enforced,
     nodes: [
@@ -565,28 +565,28 @@ func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipeline
       ),
     ],
     edges: [
-      TaskBoardPolicyPipelineEdge(
+      PolicyPipelineEdge(
         id: "edge:review-screenshot:ocr",
         fromNodeId: "automation:review-screenshot:source",
         fromPort: "image",
         toNodeId: "automation:review-screenshot:ocr",
         toPort: "in"
       ),
-      TaskBoardPolicyPipelineEdge(
+      PolicyPipelineEdge(
         id: "edge:review-screenshot:hub",
         fromNodeId: "automation:review-screenshot:ocr",
         fromPort: "text",
         toNodeId: "automation:review-screenshot:hub",
         toPort: "in"
       ),
-      TaskBoardPolicyPipelineEdge(
+      PolicyPipelineEdge(
         id: "edge:review-screenshot:resolve",
         fromNodeId: "automation:review-screenshot:hub",
         fromPort: "out_1",
         toNodeId: "automation:review-screenshot:resolve",
         toPort: "in"
       ),
-      TaskBoardPolicyPipelineEdge(
+      PolicyPipelineEdge(
         id: "edge:review-screenshot:copy",
         fromNodeId: "automation:review-screenshot:hub",
         fromPort: "out_2",
@@ -601,10 +601,10 @@ func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipeline
 private func policyCanvasSummary(
   canvasId: String,
   title: String,
-  document: TaskBoardPolicyPipelineDocument,
-  liveDocument: TaskBoardPolicyPipelineDocument? = nil
-) -> TaskBoardPolicyCanvasSummary {
-  TaskBoardPolicyCanvasSummary(
+  document: PolicyPipelineDocument,
+  liveDocument: PolicyPipelineDocument? = nil
+) -> PolicyCanvasSummary {
+  PolicyCanvasSummary(
     canvasId: canvasId,
     title: title,
     revision: document.revision,
@@ -625,13 +625,13 @@ private func policyCanvasPipelineNode(
   automation: PolicyGraphAutomationBinding? = nil,
   inputs: [String],
   outputs: [String]
-) -> TaskBoardPolicyPipelineNode {
-  TaskBoardPolicyPipelineNode(
+) -> PolicyPipelineNode {
+  PolicyPipelineNode(
     id: PolicyGraphNodeId(id),
     title: title,
     kind: kind,
     automation: automation,
-    inputs: inputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) },
-    outputs: outputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
+    inputs: inputs.map { PolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) },
+    outputs: outputs.map { PolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
   )
 }

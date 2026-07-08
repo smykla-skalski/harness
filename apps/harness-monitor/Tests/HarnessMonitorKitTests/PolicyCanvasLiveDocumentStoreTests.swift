@@ -5,10 +5,10 @@ import XCTest
 @testable import HarnessMonitorKit
 
 @MainActor
-final class TaskBoardPolicyCanvasLiveDocumentStoreTests: XCTestCase {
+final class PolicyCanvasLiveDocumentStoreTests: XCTestCase {
   func testSupervisorOverridesUseLiveDocumentWhenActiveCanvasIsDraft() async throws {
     let client = RecordingHarnessClient()
-    let draftDocument = client.sampleTaskBoardPolicyPipeline(
+    let draftDocument = client.samplePolicyPipeline(
       canvasId: "canvas-active",
       title: "Draft Canvas",
       mode: .draft,
@@ -19,17 +19,17 @@ final class TaskBoardPolicyCanvasLiveDocumentStoreTests: XCTestCase {
       ruleID: "rule-live",
       decision: .deny
     )
-    client.taskBoardPolicyPipelinesByCanvasID = [
+    client.policyPipelinesByCanvasID = [
       "canvas-active": draftDocument
     ]
-    client.taskBoardPolicyAuditByCanvasID = [
-      "canvas-active": client.sampleTaskBoardPolicyPipelineAudit(for: draftDocument)
+    client.policyAuditByCanvasID = [
+      "canvas-active": client.samplePolicyPipelineAudit(for: draftDocument)
     ]
-    client.taskBoardPolicyCanvasWorkspaceStorage = TaskBoardPolicyCanvasWorkspace(
+    client.policyCanvasWorkspaceStorage = PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: "canvas-active",
       canvases: [
-        TaskBoardPolicyCanvasSummary(
+        PolicyCanvasSummary(
           canvasId: "canvas-active",
           title: "Draft Canvas",
           revision: draftDocument.revision,
@@ -49,7 +49,7 @@ final class TaskBoardPolicyCanvasLiveDocumentStoreTests: XCTestCase {
     await store.startSupervisor()
     addTeardownBlock { await store.stopSupervisor() }
 
-    await store.refreshTaskBoardPolicyPipeline()
+    await store.refreshPolicyPipeline()
     let overrides = try await liveDocumentOverrideState(for: store)
 
     XCTAssertEqual(overrides, ["rule-live": false])
@@ -60,12 +60,12 @@ private func supervisorPolicyDocument(
   revision: UInt64,
   ruleID: String,
   decision: PolicyGraphDecision
-) -> TaskBoardPolicyPipelineDocument {
-  TaskBoardPolicyPipelineDocument(
+) -> PolicyPipelineDocument {
+  PolicyPipelineDocument(
     revision: revision,
     mode: .enforced,
     nodes: [
-      TaskBoardPolicyPipelineNode(
+      PolicyPipelineNode(
         id: PolicyGraphNodeId(ruleID),
         title: "Supervisor \(ruleID)",
         kind: .supervisorRule(decision: decision, reasonCodes: [])

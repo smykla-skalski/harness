@@ -29,7 +29,7 @@ extension PolicyCanvasViewModel {
   /// Store a freshly loaded replay alongside the document generation it ran
   /// against, so the panel can later tell whether the draft has moved on without
   /// blanking the comparison the user just asked for.
-  func captureReplayResult(_ result: TaskBoardPolicyPipelineReplayResult) {
+  func captureReplayResult(_ result: PolicyPipelineReplayResult) {
     latestReplay = result
     replayGeneration = documentGeneration
   }

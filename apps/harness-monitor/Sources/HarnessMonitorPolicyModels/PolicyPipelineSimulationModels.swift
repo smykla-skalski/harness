@@ -1,10 +1,10 @@
 import Foundation
 
-public struct TaskBoardPolicyPipelineValidation: Codable, Equatable, Sendable {
+public struct PolicyPipelineValidation: Codable, Equatable, Sendable {
   public var isValid: Bool
-  public var issues: [TaskBoardPolicyPipelineValidationIssue]
+  public var issues: [PolicyPipelineValidationIssue]
 
-  public init(isValid: Bool, issues: [TaskBoardPolicyPipelineValidationIssue] = []) {
+  public init(isValid: Bool, issues: [PolicyPipelineValidationIssue] = []) {
     self.isValid = isValid
     self.issues = issues
   }
@@ -17,13 +17,13 @@ public struct TaskBoardPolicyPipelineValidation: Codable, Equatable, Sendable {
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     issues =
-      try container.decodeIfPresent([TaskBoardPolicyPipelineValidationIssue].self, forKey: .issues)
+      try container.decodeIfPresent([PolicyPipelineValidationIssue].self, forKey: .issues)
       ?? []
     isValid = try container.decodeIfPresent(Bool.self, forKey: .isValid) ?? issues.isEmpty
   }
 }
 
-public struct TaskBoardPolicyPipelineValidationIssue: Codable, Equatable, Sendable {
+public struct PolicyPipelineValidationIssue: Codable, Equatable, Sendable {
   public var code: String
   public var message: String
   public var id: String?
@@ -147,7 +147,7 @@ public struct TaskBoardPolicyPipelineValidationIssue: Codable, Equatable, Sendab
   }
 }
 
-public struct TaskBoardPolicyDecision: Codable, Equatable, Sendable {
+public struct PolicySimulationDecision: Codable, Equatable, Sendable {
   public let decision: String
   public let reasonCode: String
   public let policyVersion: String
@@ -163,11 +163,11 @@ public struct TaskBoardPolicyDecision: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardPolicyPipelineSimulatedDecision: Codable, Equatable, Sendable {
+public struct PolicyPipelineSimulatedDecision: Codable, Equatable, Sendable {
   public var scenarioId: String
   public var scenarioName: String
   public var action: PolicyAction
-  public var decision: TaskBoardPolicyDecision
+  public var decision: PolicySimulationDecision
   public var visitedNodeIds: [String]
   public var policyTraceIds: [String]
 
@@ -175,7 +175,7 @@ public struct TaskBoardPolicyPipelineSimulatedDecision: Codable, Equatable, Send
     scenarioId: String = "",
     scenarioName: String = "",
     action: PolicyAction,
-    decision: TaskBoardPolicyDecision,
+    decision: PolicySimulationDecision,
     visitedNodeIds: [String] = [],
     policyTraceIds: [String] = []
   ) {
@@ -201,7 +201,7 @@ public struct TaskBoardPolicyPipelineSimulatedDecision: Codable, Equatable, Send
     scenarioId = try container.decodeIfPresent(String.self, forKey: .scenarioId) ?? ""
     scenarioName = try container.decodeIfPresent(String.self, forKey: .scenarioName) ?? ""
     action = try container.decode(PolicyAction.self, forKey: .action)
-    decision = try container.decode(TaskBoardPolicyDecision.self, forKey: .decision)
+    decision = try container.decode(PolicySimulationDecision.self, forKey: .decision)
     visitedNodeIds = try container.decodeIfPresent([String].self, forKey: .visitedNodeIds) ?? []
     policyTraceIds = try container.decodeIfPresent([String].self, forKey: .policyTraceIds) ?? []
   }
@@ -217,13 +217,13 @@ public struct TaskBoardPolicyPipelineSimulatedDecision: Codable, Equatable, Send
   }
 }
 
-public struct TaskBoardPolicyPipelineSimulationResult: Codable, Equatable, Sendable {
+public struct PolicyPipelineSimulationResult: Codable, Equatable, Sendable {
   public var revision: UInt64
   public var traceId: String
   public var simulatedAt: String
   public var succeeded: Bool
-  public var validation: TaskBoardPolicyPipelineValidation
-  public var decisions: [TaskBoardPolicyPipelineSimulatedDecision]
+  public var validation: PolicyPipelineValidation
+  public var decisions: [PolicyPipelineSimulatedDecision]
   public var policyTraceIds: [String]
 
   public init(
@@ -231,8 +231,8 @@ public struct TaskBoardPolicyPipelineSimulationResult: Codable, Equatable, Senda
     traceId: String,
     simulatedAt: String,
     succeeded: Bool,
-    validation: TaskBoardPolicyPipelineValidation,
-    decisions: [TaskBoardPolicyPipelineSimulatedDecision] = [],
+    validation: PolicyPipelineValidation,
+    decisions: [PolicyPipelineSimulatedDecision] = [],
     policyTraceIds: [String] = []
   ) {
     self.revision = revision
@@ -247,7 +247,7 @@ public struct TaskBoardPolicyPipelineSimulationResult: Codable, Equatable, Senda
 
 // MARK: - Wire mapping
 
-extension TaskBoardPolicyDecision {
+extension PolicySimulationDecision {
   /// Flatten the generated `PolicyDecision` tagged enum into the app's flat
   /// decision/reasonCode/policyVersion shape, keeping the daemon's snake_case
   /// discriminator the consumers already match on.
@@ -279,7 +279,7 @@ extension TaskBoardPolicyDecision {
   }
 }
 
-extension TaskBoardPolicyPipelineValidationIssue {
+extension PolicyPipelineValidationIssue {
   /// Flatten one generated `PolicyGraphValidationIssue` variant into the app's
   /// flat issue. Decoding through the generated enum (plain decoder) is what
   /// recovers node_id/edge_id/node_ids; the message the daemon never sends is
@@ -345,37 +345,37 @@ extension TaskBoardPolicyPipelineValidationIssue {
   }
 }
 
-extension TaskBoardPolicyPipelineValidation {
+extension PolicyPipelineValidation {
   public init(wire: PolicyGraphValidationReport) {
     self.init(
       isValid: wire.issues.isEmpty,
-      issues: wire.issues.map(TaskBoardPolicyPipelineValidationIssue.init(wire:))
+      issues: wire.issues.map(PolicyPipelineValidationIssue.init(wire:))
     )
   }
 }
 
-extension TaskBoardPolicyPipelineSimulatedDecision {
+extension PolicyPipelineSimulatedDecision {
   public init(wire: PolicyPipelineSimulatedDecisionWire) {
     self.init(
       scenarioId: wire.scenarioId,
       scenarioName: wire.scenarioName,
       action: wire.action,
-      decision: TaskBoardPolicyDecision(wire: wire.decision),
+      decision: PolicySimulationDecision(wire: wire.decision),
       visitedNodeIds: wire.visitedNodeIds,
       policyTraceIds: wire.policyTraceIds
     )
   }
 }
 
-extension TaskBoardPolicyPipelineSimulationResult {
+extension PolicyPipelineSimulationResult {
   public init(wire: PolicyPipelineSimulationResultWire) {
     self.init(
       revision: wire.revision,
       traceId: wire.traceId,
       simulatedAt: wire.simulatedAt,
       succeeded: wire.succeeded,
-      validation: TaskBoardPolicyPipelineValidation(wire: wire.validation),
-      decisions: wire.decisions.map(TaskBoardPolicyPipelineSimulatedDecision.init(wire:)),
+      validation: PolicyPipelineValidation(wire: wire.validation),
+      decisions: wire.decisions.map(PolicyPipelineSimulatedDecision.init(wire:)),
       policyTraceIds: wire.policyTraceIds
     )
   }

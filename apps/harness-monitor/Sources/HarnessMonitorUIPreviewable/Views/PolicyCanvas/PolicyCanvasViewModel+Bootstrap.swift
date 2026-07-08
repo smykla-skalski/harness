@@ -8,11 +8,11 @@ extension PolicyCanvasViewModel {
   /// arrives.
   @MainActor
   public static func liveStartupState(
-    document: TaskBoardPolicyPipelineDocument?,
-    simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?,
+    document: PolicyPipelineDocument?,
+    simulation: PolicyPipelineSimulationResult?,
+    audit: PolicyPipelineAuditSummary?,
     activeCanvasId: String? = nil,
-    workspace: TaskBoardPolicyCanvasWorkspace? = nil,
+    workspace: PolicyCanvasWorkspace? = nil,
     algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
     policyGroupTitle: String? = nil
   ) -> PolicyCanvasViewModel {

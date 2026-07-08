@@ -16,30 +16,30 @@ func waitForPolicyCanvasDirtyReconciliation(_ viewModel: PolicyCanvasViewModel) 
 }
 
 extension PolicyCanvasViewModelTests {
-  func policyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  func policyDocument(revision: UInt64) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-intake",
           title: "Ready for dispatch",
           kind: .actionGate(actions: [.spawnAgent]),
           groupId: "group-dispatch",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-          outputs: [TaskBoardPolicyPipelinePort(id: "default", title: "default")]
+          inputs: [PolicyPipelinePort(id: "in", title: "in")],
+          outputs: [PolicyPipelinePort(id: "default", title: "default")]
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "stuck-agent",
           title: "Stuck agent rule",
           kind: .supervisorRule(decision: .allow, reasonCodes: [.defaultAllow]),
           groupId: "group-dispatch",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
+          inputs: [PolicyPipelinePort(id: "in", title: "in")]
         ),
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge-intake-supervisor",
           fromNodeId: "node-intake",
           fromPort: "default",
@@ -48,29 +48,29 @@ extension PolicyCanvasViewModelTests {
         )
       ],
       groups: [
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "group-dispatch",
           title: "Dispatch",
           nodeIds: ["node-intake", "stuck-agent"]
         )
       ],
-      layout: TaskBoardPolicyPipelineLayout(
+      layout: PolicyPipelineLayout(
         nodes: [
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-intake", x: 20, y: 40),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "stuck-agent", x: 280, y: 40),
+          PolicyPipelineNodeLayout(nodeId: "node-intake", x: 20, y: 40),
+          PolicyPipelineNodeLayout(nodeId: "stuck-agent", x: 280, y: 40),
         ]
       ),
       policyTraceIds: ["trace-policy-11"]
     )
   }
 
-  func richPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  func richPolicyDocument(revision: UInt64) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-evidence",
           title: "Check evidence",
           kind: .evidenceCheck(checks: [
@@ -82,91 +82,91 @@ extension PolicyCanvasViewModelTests {
             )
           ]),
           groupId: "group-rich",
-          inputs: [TaskBoardPolicyPipelinePort(id: "input-event", title: "event")],
+          inputs: [PolicyPipelinePort(id: "input-event", title: "event")],
           outputs: [
-            TaskBoardPolicyPipelinePort(id: "output-pass", title: "pass"),
-            TaskBoardPolicyPipelinePort(id: "output-fail", title: "fail"),
+            PolicyPipelinePort(id: "output-pass", title: "pass"),
+            PolicyPipelinePort(id: "output-fail", title: "fail"),
           ]
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-risk",
           title: "Risk score",
           kind: .riskClassifier(field: .riskScore, threshold: 74, highRiskReasonCode: .riskAboveThreshold, missingReasonCode: .humanRequired),
           groupId: "group-rich",
-          inputs: [TaskBoardPolicyPipelinePort(id: "input-event", title: "event")],
+          inputs: [PolicyPipelinePort(id: "input-event", title: "event")],
           outputs: [
-            TaskBoardPolicyPipelinePort(id: "output-high", title: "high"),
-            TaskBoardPolicyPipelinePort(id: "output-low", title: "low"),
+            PolicyPipelinePort(id: "output-high", title: "high"),
+            PolicyPipelinePort(id: "output-low", title: "low"),
           ]
         ),
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge-evidence-risk-fail",
           fromNodeId: "node-evidence",
           fromPort: "output-fail",
           toNodeId: "node-risk",
           toPort: "input-event",
-          condition: TaskBoardPolicyPipelineEdgeCondition(
+          condition: PolicyPipelineEdgeCondition(
             condition: "evidence_failure",
             reasonCode: "checks_not_green"
           )
         )
       ],
       groups: [
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "group-rich",
           title: "Rich policy",
           nodeIds: ["node-evidence", "node-risk"]
         )
       ],
-      layout: TaskBoardPolicyPipelineLayout(
+      layout: PolicyPipelineLayout(
         nodes: [
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-evidence", x: 20, y: 40),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-risk", x: 300, y: 40),
+          PolicyPipelineNodeLayout(nodeId: "node-evidence", x: 20, y: 40),
+          PolicyPipelineNodeLayout(nodeId: "node-risk", x: 300, y: 40),
         ]
       ),
       policyTraceIds: ["trace-rich-policy"]
     )
   }
 
-  func overlappingDefaultPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
+  func overlappingDefaultPolicyDocument(revision: UInt64) -> PolicyPipelineDocument {
     let nodes = defaultPolicyNodeSpecs.map { spec in
-      TaskBoardPolicyPipelineNode(
+      PolicyPipelineNode(
         id: PolicyGraphNodeId(spec.id),
         title: spec.title,
         kind: spec.kind,
         groupId: PolicyGraphGroupId(spec.groupID),
-        inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-        outputs: spec.outputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
+        inputs: [PolicyPipelinePort(id: "in", title: "in")],
+        outputs: spec.outputs.map { PolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
       )
     }
-    return TaskBoardPolicyPipelineDocument(
+    return PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
       nodes: nodes,
       edges: [],
       groups: [
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "entry",
           title: "Action routing",
           nodeIds: ["action:router"]
         ),
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "merge",
           title: "Merge checks",
           nodeIds: ["evidence:merge", "risk:merge"]
         ),
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "terminal",
           title: "Terminal decisions",
           nodeIds: defaultPolicyNodeSpecs.filter { $0.groupID == "terminal" }.map { PolicyGraphNodeId($0.id) }
         ),
       ],
-      layout: TaskBoardPolicyPipelineLayout(
+      layout: PolicyPipelineLayout(
         nodes: nodes.enumerated().map { index, node in
-          TaskBoardPolicyPipelineNodeLayout(
+          PolicyPipelineNodeLayout(
             nodeId: node.id,
             x: (index % 4) * 260,
             y: (index / 4) * 140

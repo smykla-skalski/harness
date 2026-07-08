@@ -3,21 +3,21 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-/// Wire-contract for the task-board policy-canvas read cluster, generated from
+/// Wire-contract for the policy-canvas read cluster, generated from
 /// src/daemon/protocol/task_board.rs. The workspace response nests the per-canvas
 /// summaries (each carrying a full pipeline document), and the export response is
 /// the single-canvas document payload. These prove the daemon snake_case envelope
 /// decodes through the plain decoder into the wire types and maps to the rich hand
 /// models: the mode bridges by raw value, the usize counts narrow to Int, and the
 /// document passes straight through the plain-decoder-safe hand type. generate-only.
-@Suite("Task board policy canvas wire types")
-struct TaskBoardPolicyCanvasWireDecodingTests {
+@Suite("Policy canvas wire types")
+struct PolicyCanvasWireDecodingTests {
   private let decoder = PolicyWireCoding.decoder
 
   @Test("decodes a workspace response and maps to the hand model")
   func decodesWorkspaceResponse() throws {
     let wire = try decoder.decode(
-      TaskBoardPolicyCanvasWorkspaceResponseWire.self,
+      PolicyCanvasWorkspaceResponseWire.self,
       from: Data(canvasWorkspacePayloadFixture.utf8)
     )
 
@@ -33,7 +33,7 @@ struct TaskBoardPolicyCanvasWireDecodingTests {
     #expect(summaryWire.latestSimulationSucceeded == true)
     #expect(summaryWire.document.revision == 5)
 
-    let workspace = TaskBoardPolicyCanvasWorkspace(wire: wire)
+    let workspace = PolicyCanvasWorkspace(wire: wire)
     #expect(workspace.schemaVersion == 3)
     #expect(workspace.globalPolicyEnforcementEnabled == false)
 
@@ -51,13 +51,13 @@ struct TaskBoardPolicyCanvasWireDecodingTests {
   @Test("defaults the enforcement flag and canvases when absent")
   func defaultsWorkspaceOptionalFields() throws {
     let wire = try decoder.decode(
-      TaskBoardPolicyCanvasWorkspaceResponseWire.self,
+      PolicyCanvasWorkspaceResponseWire.self,
       from: Data(#"{"schema_version": 1, "active_canvas_id": "c0"}"#.utf8)
     )
     #expect(wire.canvases.isEmpty)
     #expect(wire.globalPolicyEnforcementEnabled == true)
 
-    let workspace = TaskBoardPolicyCanvasWorkspace(wire: wire)
+    let workspace = PolicyCanvasWorkspace(wire: wire)
     #expect(workspace.activeCanvasId == "c0")
     #expect(workspace.globalPolicyEnforcementEnabled == true)
   }
@@ -65,13 +65,13 @@ struct TaskBoardPolicyCanvasWireDecodingTests {
   @Test("decodes an export response and maps to the hand model")
   func decodesExportResponse() throws {
     let wire = try decoder.decode(
-      TaskBoardPolicyExportResponseWire.self, from: Data(canvasExportPayloadFixture.utf8)
+      PolicyCanvasExportResponseWire.self, from: Data(canvasExportPayloadFixture.utf8)
     )
     #expect(wire.canvasId == "canvas-7")
     #expect(wire.title == "Exported")
     #expect(wire.document.revision == 12)
 
-    let response = TaskBoardPolicyExportResponse(wire: wire)
+    let response = PolicyCanvasExportResponse(wire: wire)
     #expect(response.canvasId == "canvas-7")
     #expect(response.document.mode == .dryRun)
   }

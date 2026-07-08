@@ -4,21 +4,21 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-@Suite("Task-board policy replay client", .serialized)
-struct TaskBoardPolicyReplayClientTests {
+@Suite("Policy replay client", .serialized)
+struct PolicyReplayClientTests {
   @Test("HTTP client posts the replay route and decodes the nested result")
   func httpClientReplaysOverRecordedFeed() async throws {
     TaskBoardURLProtocol.reset()
     let client = try makeClient()
 
-    let result = try await client.replayTaskBoardPolicyPipeline(
-      request: TaskBoardPolicyPipelineReplayRequest(limit: 25)
+    let result = try await client.replayPolicyPipeline(
+      request: PolicyPipelineReplayRequest(limit: 25)
     )
 
     let records = TaskBoardURLProtocol.records
     #expect(records.count == 1)
     #expect(records[0].method == "POST")
-    #expect(records[0].path == "/v1/task-board/policy/replay")
+    #expect(records[0].path == "/v1/policy-pipeline/replay")
     #expect(records[0].body?["limit"] as? Int == 25)
 
     #expect(result.sampleSize == 2)

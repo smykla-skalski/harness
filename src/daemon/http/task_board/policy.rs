@@ -6,15 +6,15 @@ use axum::response::Response;
 use axum::routing::{get, post};
 
 use crate::daemon::protocol::{
-    TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
-    TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
-    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
-    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
-    TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineMakeLiveRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineReplayRequest,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardPolicyScenarioCreateRequest, TaskBoardPolicyScenarioDeleteRequest,
-    TaskBoardPolicyScenarioUpdateRequest, http_paths,
+    PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest,
+    PolicyCanvasDuplicateRequest, PolicyCanvasRenameRequest,
+    PolicyCanvasSetActiveRequest, PolicyCanvasSetGlobalEnforcementRequest,
+    PolicyPipelineAuditRequest, PolicyPipelineGetRequest,
+    PolicyPipelineGoLiveDiffRequest, PolicyPipelineMakeLiveRequest,
+    PolicyPipelinePromoteRequest, PolicyPipelineReplayRequest,
+    PolicyPipelineSaveDraftRequest, PolicyPipelineSimulateRequest,
+    PolicyScenarioCreateRequest, PolicyScenarioDeleteRequest,
+    PolicyScenarioUpdateRequest, http_paths,
 };
 
 use super::super::response::timed_json;
@@ -24,83 +24,83 @@ use super::authenticated_request;
 pub(super) fn merge_policy_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
     router
         .route(
-            http_paths::TASK_BOARD_POLICY_CANVASES,
-            get(get_task_board_policy_canvas_workspace),
+            http_paths::POLICY_CANVASES,
+            get(get_policy_canvas_workspace),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_CANVASES_CREATE,
-            post(post_task_board_policy_canvas_create),
+            http_paths::POLICY_CANVASES_CREATE,
+            post(post_policy_canvas_create),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_CANVASES_DUPLICATE,
-            post(post_task_board_policy_canvas_duplicate),
+            http_paths::POLICY_CANVASES_DUPLICATE,
+            post(post_policy_canvas_duplicate),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_CANVASES_RENAME,
-            post(post_task_board_policy_canvas_rename),
+            http_paths::POLICY_CANVASES_RENAME,
+            post(post_policy_canvas_rename),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_CANVASES_ACTIVE,
-            post(post_task_board_policy_canvas_set_active),
+            http_paths::POLICY_CANVASES_ACTIVE,
+            post(post_policy_canvas_set_active),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_CANVASES_DELETE,
-            post(post_task_board_policy_canvas_delete),
+            http_paths::POLICY_CANVASES_DELETE,
+            post(post_policy_canvas_delete),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_CANVASES_GLOBAL_ENFORCEMENT,
-            post(post_task_board_policy_canvas_set_global_enforcement),
+            http_paths::POLICY_CANVASES_GLOBAL_ENFORCEMENT,
+            post(post_policy_canvas_set_global_enforcement),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_PIPELINE,
-            get(get_task_board_policy_pipeline).put(put_task_board_policy_pipeline_draft),
+            http_paths::POLICY_PIPELINE,
+            get(get_policy_pipeline).put(put_policy_pipeline_draft),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_SIMULATE,
-            post(post_task_board_policy_simulate),
+            http_paths::POLICY_SIMULATE,
+            post(post_policy_simulate),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_PROMOTE,
-            post(post_task_board_policy_promote),
+            http_paths::POLICY_PROMOTE,
+            post(post_policy_promote),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_MAKE_LIVE,
-            post(post_task_board_policy_make_live),
+            http_paths::POLICY_MAKE_LIVE,
+            post(post_policy_make_live),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_GO_LIVE_DIFF,
-            post(post_task_board_policy_go_live_diff),
+            http_paths::POLICY_GO_LIVE_DIFF,
+            post(post_policy_go_live_diff),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_REPLAY,
-            post(post_task_board_policy_replay),
+            http_paths::POLICY_REPLAY,
+            post(post_policy_replay),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_AUDIT,
-            get(get_task_board_policy_audit),
+            http_paths::POLICY_AUDIT,
+            get(get_policy_audit),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_SCENARIOS_CREATE,
-            post(post_task_board_policy_scenario_create),
+            http_paths::POLICY_SCENARIOS_CREATE,
+            post(post_policy_scenario_create),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_SCENARIOS_UPDATE,
-            post(post_task_board_policy_scenario_update),
+            http_paths::POLICY_SCENARIOS_UPDATE,
+            post(post_policy_scenario_update),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_SCENARIOS_DELETE,
-            post(post_task_board_policy_scenario_delete),
+            http_paths::POLICY_SCENARIOS_DELETE,
+            post(post_policy_scenario_delete),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_SCENARIOS_RESET,
-            post(post_task_board_policy_scenario_reset),
+            http_paths::POLICY_SCENARIOS_RESET,
+            post(post_policy_scenario_reset),
         )
 }
 
-pub(super) async fn get_task_board_policy_pipeline(
+pub(super) async fn get_policy_pipeline(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Query(request): Query<TaskBoardPolicyPipelineGetRequest>,
+    Query(request): Query<PolicyPipelineGetRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -112,14 +112,14 @@ pub(super) async fn get_task_board_policy_pipeline(
     };
     timed_json(
         "GET",
-        http_paths::TASK_BOARD_POLICY_PIPELINE,
+        http_paths::POLICY_PIPELINE,
         &request_id,
         start,
         pipeline,
     )
 }
 
-pub(super) async fn get_task_board_policy_canvas_workspace(
+pub(super) async fn get_policy_canvas_workspace(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -133,17 +133,17 @@ pub(super) async fn get_task_board_policy_canvas_workspace(
     };
     timed_json(
         "GET",
-        http_paths::TASK_BOARD_POLICY_CANVASES,
+        http_paths::POLICY_CANVASES,
         &request_id,
         start,
         workspace,
     )
 }
 
-pub(super) async fn post_task_board_policy_canvas_create(
+pub(super) async fn post_policy_canvas_create(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyCanvasCreateRequest>,
+    Json(request): Json<PolicyCanvasCreateRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -155,17 +155,17 @@ pub(super) async fn post_task_board_policy_canvas_create(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_CANVASES_CREATE,
+        http_paths::POLICY_CANVASES_CREATE,
         &request_id,
         start,
         workspace,
     )
 }
 
-pub(super) async fn post_task_board_policy_canvas_duplicate(
+pub(super) async fn post_policy_canvas_duplicate(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyCanvasDuplicateRequest>,
+    Json(request): Json<PolicyCanvasDuplicateRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -177,17 +177,17 @@ pub(super) async fn post_task_board_policy_canvas_duplicate(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_CANVASES_DUPLICATE,
+        http_paths::POLICY_CANVASES_DUPLICATE,
         &request_id,
         start,
         workspace,
     )
 }
 
-pub(super) async fn post_task_board_policy_canvas_rename(
+pub(super) async fn post_policy_canvas_rename(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyCanvasRenameRequest>,
+    Json(request): Json<PolicyCanvasRenameRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -199,17 +199,17 @@ pub(super) async fn post_task_board_policy_canvas_rename(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_CANVASES_RENAME,
+        http_paths::POLICY_CANVASES_RENAME,
         &request_id,
         start,
         workspace,
     )
 }
 
-pub(super) async fn post_task_board_policy_canvas_set_active(
+pub(super) async fn post_policy_canvas_set_active(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyCanvasSetActiveRequest>,
+    Json(request): Json<PolicyCanvasSetActiveRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -221,17 +221,17 @@ pub(super) async fn post_task_board_policy_canvas_set_active(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_CANVASES_ACTIVE,
+        http_paths::POLICY_CANVASES_ACTIVE,
         &request_id,
         start,
         workspace,
     )
 }
 
-pub(super) async fn post_task_board_policy_canvas_delete(
+pub(super) async fn post_policy_canvas_delete(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyCanvasDeleteRequest>,
+    Json(request): Json<PolicyCanvasDeleteRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -243,17 +243,17 @@ pub(super) async fn post_task_board_policy_canvas_delete(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_CANVASES_DELETE,
+        http_paths::POLICY_CANVASES_DELETE,
         &request_id,
         start,
         workspace,
     )
 }
 
-pub(super) async fn post_task_board_policy_canvas_set_global_enforcement(
+pub(super) async fn post_policy_canvas_set_global_enforcement(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyCanvasSetGlobalEnforcementRequest>,
+    Json(request): Json<PolicyCanvasSetGlobalEnforcementRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -267,17 +267,17 @@ pub(super) async fn post_task_board_policy_canvas_set_global_enforcement(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_CANVASES_GLOBAL_ENFORCEMENT,
+        http_paths::POLICY_CANVASES_GLOBAL_ENFORCEMENT,
         &request_id,
         start,
         workspace,
     )
 }
 
-pub(super) async fn put_task_board_policy_pipeline_draft(
+pub(super) async fn put_policy_pipeline_draft(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyPipelineSaveDraftRequest>,
+    Json(request): Json<PolicyPipelineSaveDraftRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -289,17 +289,17 @@ pub(super) async fn put_task_board_policy_pipeline_draft(
     };
     timed_json(
         "PUT",
-        http_paths::TASK_BOARD_POLICY_PIPELINE,
+        http_paths::POLICY_PIPELINE,
         &request_id,
         start,
         pipeline,
     )
 }
 
-pub(super) async fn post_task_board_policy_simulate(
+pub(super) async fn post_policy_simulate(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyPipelineSimulateRequest>,
+    Json(request): Json<PolicyPipelineSimulateRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -311,17 +311,17 @@ pub(super) async fn post_task_board_policy_simulate(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_SIMULATE,
+        http_paths::POLICY_SIMULATE,
         &request_id,
         start,
         pipeline,
     )
 }
 
-pub(super) async fn post_task_board_policy_promote(
+pub(super) async fn post_policy_promote(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyPipelinePromoteRequest>,
+    Json(request): Json<PolicyPipelinePromoteRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -333,17 +333,17 @@ pub(super) async fn post_task_board_policy_promote(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_PROMOTE,
+        http_paths::POLICY_PROMOTE,
         &request_id,
         start,
         pipeline,
     )
 }
 
-pub(super) async fn post_task_board_policy_make_live(
+pub(super) async fn post_policy_make_live(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyPipelineMakeLiveRequest>,
+    Json(request): Json<PolicyPipelineMakeLiveRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -355,17 +355,17 @@ pub(super) async fn post_task_board_policy_make_live(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_MAKE_LIVE,
+        http_paths::POLICY_MAKE_LIVE,
         &request_id,
         start,
         pipeline,
     )
 }
 
-pub(super) async fn post_task_board_policy_go_live_diff(
+pub(super) async fn post_policy_go_live_diff(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyPipelineGoLiveDiffRequest>,
+    Json(request): Json<PolicyPipelineGoLiveDiffRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -377,17 +377,17 @@ pub(super) async fn post_task_board_policy_go_live_diff(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_GO_LIVE_DIFF,
+        http_paths::POLICY_GO_LIVE_DIFF,
         &request_id,
         start,
         diff,
     )
 }
 
-pub(super) async fn post_task_board_policy_replay(
+pub(super) async fn post_policy_replay(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyPipelineReplayRequest>,
+    Json(request): Json<PolicyPipelineReplayRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -399,17 +399,17 @@ pub(super) async fn post_task_board_policy_replay(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_REPLAY,
+        http_paths::POLICY_REPLAY,
         &request_id,
         start,
         replay,
     )
 }
 
-pub(super) async fn get_task_board_policy_audit(
+pub(super) async fn get_policy_audit(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Query(request): Query<TaskBoardPolicyPipelineAuditRequest>,
+    Query(request): Query<PolicyPipelineAuditRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -421,17 +421,17 @@ pub(super) async fn get_task_board_policy_audit(
     };
     timed_json(
         "GET",
-        http_paths::TASK_BOARD_POLICY_AUDIT,
+        http_paths::POLICY_AUDIT,
         &request_id,
         start,
         audit,
     )
 }
 
-pub(super) async fn post_task_board_policy_scenario_create(
+pub(super) async fn post_policy_scenario_create(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyScenarioCreateRequest>,
+    Json(request): Json<PolicyScenarioCreateRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -443,17 +443,17 @@ pub(super) async fn post_task_board_policy_scenario_create(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_SCENARIOS_CREATE,
+        http_paths::POLICY_SCENARIOS_CREATE,
         &request_id,
         start,
         workspace,
     )
 }
 
-pub(super) async fn post_task_board_policy_scenario_update(
+pub(super) async fn post_policy_scenario_update(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyScenarioUpdateRequest>,
+    Json(request): Json<PolicyScenarioUpdateRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -465,17 +465,17 @@ pub(super) async fn post_task_board_policy_scenario_update(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_SCENARIOS_UPDATE,
+        http_paths::POLICY_SCENARIOS_UPDATE,
         &request_id,
         start,
         workspace,
     )
 }
 
-pub(super) async fn post_task_board_policy_scenario_delete(
+pub(super) async fn post_policy_scenario_delete(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyScenarioDeleteRequest>,
+    Json(request): Json<PolicyScenarioDeleteRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -487,14 +487,14 @@ pub(super) async fn post_task_board_policy_scenario_delete(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_SCENARIOS_DELETE,
+        http_paths::POLICY_SCENARIOS_DELETE,
         &request_id,
         start,
         workspace,
     )
 }
 
-pub(super) async fn post_task_board_policy_scenario_reset(
+pub(super) async fn post_policy_scenario_reset(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -508,7 +508,7 @@ pub(super) async fn post_task_board_policy_scenario_reset(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_SCENARIOS_RESET,
+        http_paths::POLICY_SCENARIOS_RESET,
         &request_id,
         start,
         workspace,

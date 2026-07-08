@@ -6,14 +6,14 @@ use crate::task_board::{
     AgentMode, DispatchExecutionSummary, ExternalProvider, ExternalRef, ExternalSyncConflictPolicy,
     ExternalSyncDirection, Machine, PlanningState, PolicyGraphMode, PolicyInput,
     PolicyPipelineAuditSummary, PolicyPipelineDocument, PolicyPipelineGoLiveDiff,
-    PolicyPipelineMakeLiveRequest, PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse,
     PolicyPipelineReplayResult, PolicyPipelineSaveResponse, PolicyPipelineSimulationResult,
-    PolicyScenario, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
-    TaskBoardGitIdentityDefaults, TaskBoardItem, TaskBoardMachineSummary, TaskBoardPriority,
-    TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary,
+    PolicyScenario, TaskBoardAuditSummary, TaskBoardEvaluationSummary, TaskBoardGitIdentityDefaults,
+    TaskBoardItem, TaskBoardMachineSummary, TaskBoardPriority, TaskBoardProjectSummary,
+    TaskBoardStatus, TaskBoardSyncSummary,
 };
 
 pub use crate::task_board::{
+    PolicyPipelineMakeLiveRequest, PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse,
     TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitHubTokensSyncResponse as TaskBoardGitHubTokensSyncOutcome,
     TaskBoardGitRuntimeConfig, TaskBoardOpenRouterTokenSyncRequest,
@@ -221,7 +221,7 @@ pub struct TaskBoardAuditRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardPolicyPipelineSaveDraftRequest {
+pub struct PolicyPipelineSaveDraftRequest {
     pub document: PolicyPipelineDocument,
     #[serde(default)]
     pub if_revision: u64,
@@ -230,13 +230,13 @@ pub struct TaskBoardPolicyPipelineSaveDraftRequest {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TaskBoardPolicyPipelineGetRequest {
+pub struct PolicyPipelineGetRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TaskBoardPolicyPipelineSimulateRequest {
+pub struct PolicyPipelineSimulateRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub document: Option<PolicyPipelineDocument>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -244,7 +244,7 @@ pub struct TaskBoardPolicyPipelineSimulateRequest {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TaskBoardPolicyPipelineGoLiveDiffRequest {
+pub struct PolicyPipelineGoLiveDiffRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub document: Option<PolicyPipelineDocument>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -252,13 +252,13 @@ pub struct TaskBoardPolicyPipelineGoLiveDiffRequest {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TaskBoardPolicyPipelineAuditRequest {
+pub struct PolicyPipelineAuditRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TaskBoardPolicyPipelineReplayRequest {
+pub struct PolicyPipelineReplayRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -266,7 +266,7 @@ pub struct TaskBoardPolicyPipelineReplayRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TaskBoardPolicyCanvasSummary {
+pub struct PolicyCanvasSummary {
     pub canvas_id: String,
     pub title: String,
     pub revision: u64,
@@ -289,11 +289,11 @@ pub struct TaskBoardPolicyCanvasSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TaskBoardPolicyCanvasWorkspaceResponse {
+pub struct PolicyCanvasWorkspaceResponse {
     pub schema_version: u32,
     pub active_canvas_id: String,
     #[serde(default)]
-    pub canvases: Vec<TaskBoardPolicyCanvasSummary>,
+    pub canvases: Vec<PolicyCanvasSummary>,
     #[serde(default = "default_global_policy_enforcement_enabled")]
     pub global_policy_enforcement_enabled: bool,
     #[serde(default)]
@@ -305,67 +305,67 @@ const fn default_global_policy_enforcement_enabled() -> bool {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardPolicyPipelineMakeLiveResponse {
+pub struct PolicyPipelineMakeLiveResponse {
     pub document: PolicyPipelineDocument,
     pub trace_id: String,
     pub global_policy_enforcement_enabled: bool,
-    pub workspace: TaskBoardPolicyCanvasWorkspaceResponse,
+    pub workspace: PolicyCanvasWorkspaceResponse,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TaskBoardPolicyCanvasCreateRequest {
+pub struct PolicyCanvasCreateRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TaskBoardPolicyCanvasDuplicateRequest {
+pub struct PolicyCanvasDuplicateRequest {
     pub canvas_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardPolicyCanvasRenameRequest {
+pub struct PolicyCanvasRenameRequest {
     pub canvas_id: String,
     pub title: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardPolicyCanvasSetActiveRequest {
+pub struct PolicyCanvasSetActiveRequest {
     pub canvas_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardPolicyCanvasDeleteRequest {
+pub struct PolicyCanvasDeleteRequest {
     pub canvas_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardPolicyCanvasSetGlobalEnforcementRequest {
+pub struct PolicyCanvasSetGlobalEnforcementRequest {
     pub enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardPolicyScenarioCreateRequest {
+pub struct PolicyScenarioCreateRequest {
     pub name: String,
     pub input: PolicyInput,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardPolicyScenarioUpdateRequest {
+pub struct PolicyScenarioUpdateRequest {
     pub id: String,
     pub name: String,
     pub input: PolicyInput,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardPolicyScenarioDeleteRequest {
+pub struct PolicyScenarioDeleteRequest {
     pub id: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TaskBoardPolicyScenarioResetRequest {}
+pub struct PolicyScenarioResetRequest {}
 
 pub type TaskBoardSyncResponse = TaskBoardSyncSummary;
 pub type TaskBoardProjectsResponse = Vec<TaskBoardProjectSummary>;
@@ -430,37 +430,34 @@ pub struct TaskBoardGitRuntimeDrainSecretsResponse {
 pub type TaskBoardGitHubTokensSyncResponse = TaskBoardGitHubTokensSyncOutcome;
 pub type TaskBoardTodoistTokenSyncResponse = TaskBoardTodoistTokenSyncOutcome;
 pub type TaskBoardOpenRouterTokenSyncResponse = TaskBoardOpenRouterTokenSyncOutcome;
-pub type TaskBoardPolicyPipelineResponse = PolicyPipelineDocument;
-pub type TaskBoardPolicyPipelineSaveDraftResponse = PolicyPipelineSaveResponse;
-pub type TaskBoardPolicyPipelineSimulationResponse = PolicyPipelineSimulationResult;
-pub type TaskBoardPolicyPipelinePromoteResponse = PolicyPipelinePromoteResponse;
-pub type TaskBoardPolicyPipelineAuditResponse = PolicyPipelineAuditSummary;
-pub type TaskBoardPolicyPipelinePromoteRequest = PolicyPipelinePromoteRequest;
-pub type TaskBoardPolicyPipelineMakeLiveRequest = PolicyPipelineMakeLiveRequest;
-pub type TaskBoardPolicyPipelineGoLiveDiffResponse = PolicyPipelineGoLiveDiff;
-pub type TaskBoardPolicyPipelineReplayResponse = PolicyPipelineReplayResult;
+pub type PolicyPipelineResponse = PolicyPipelineDocument;
+pub type PolicyPipelineSaveDraftResponse = PolicyPipelineSaveResponse;
+pub type PolicyPipelineSimulationResponse = PolicyPipelineSimulationResult;
+pub type PolicyPipelineAuditResponse = PolicyPipelineAuditSummary;
+pub type PolicyPipelineGoLiveDiffResponse = PolicyPipelineGoLiveDiff;
+pub type PolicyPipelineReplayResponse = PolicyPipelineReplayResult;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TaskBoardPolicyExportRequest {
+pub struct PolicyCanvasExportRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardPolicyExportResponse {
+pub struct PolicyCanvasExportResponse {
     pub canvas_id: String,
     pub title: String,
     pub document: PolicyPipelineDocument,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskBoardPolicyImportRequest {
+pub struct PolicyCanvasImportRequest {
     pub document: PolicyPipelineDocument,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
 }
 
-pub type TaskBoardPolicyImportResponse = TaskBoardPolicyCanvasWorkspaceResponse;
+pub type PolicyCanvasImportResponse = PolicyCanvasWorkspaceResponse;
 
 const fn default_sync_dry_run() -> bool {
     true

@@ -66,15 +66,15 @@ struct PolicyCanvasMergedFanInTests {
     }
     #expect(merged.isMerged)
 
-    viewModel.latestSimulation = TaskBoardPolicyPipelineSimulationResult(
+    viewModel.latestSimulation = PolicyPipelineSimulationResult(
       revision: 1,
       traceId: "trace-fold",
       simulatedAt: "2026-05-30T00:00:00Z",
       succeeded: false,
-      validation: TaskBoardPolicyPipelineValidation(
+      validation: PolicyPipelineValidation(
         isValid: false,
         issues: [
-          TaskBoardPolicyPipelineValidationIssue(
+          PolicyPipelineValidationIssue(
             code: "dangling_edge",
             message: "branch points at missing port",
             edgeId: branchDaemonID

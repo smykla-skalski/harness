@@ -10,7 +10,7 @@ struct DashboardPolicyCanvasSelectionPreviewTests {
   func cachedInactiveCanvasUsesImmediateSnapshot() {
     let active = makeCanvasSummary(canvasId: "active", document: makeDocument(revision: 1))
     let cached = makeCanvasSummary(canvasId: "cached", document: makeDocument(revision: 7))
-    let workspace = TaskBoardPolicyCanvasWorkspace(
+    let workspace = PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: active.canvasId,
       canvases: [active, cached]
@@ -30,7 +30,7 @@ struct DashboardPolicyCanvasSelectionPreviewTests {
   func uncachedInactiveCanvasShowsLoadingPlaceholder() {
     let active = makeCanvasSummary(canvasId: "active", document: makeDocument(revision: 1))
     let uncached = makeCanvasSummary(canvasId: "uncached", document: nil)
-    let workspace = TaskBoardPolicyCanvasWorkspace(
+    let workspace = PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: active.canvasId,
       canvases: [active, uncached]
@@ -49,7 +49,7 @@ struct DashboardPolicyCanvasSelectionPreviewTests {
   @Test("active canvas selection does not create an override preview")
   func activeCanvasSelectionSkipsPreview() {
     let active = makeCanvasSummary(canvasId: "active", document: makeDocument(revision: 1))
-    let workspace = TaskBoardPolicyCanvasWorkspace(
+    let workspace = PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: active.canvasId,
       canvases: [active]
@@ -65,9 +65,9 @@ struct DashboardPolicyCanvasSelectionPreviewTests {
 
   private func makeCanvasSummary(
     canvasId: String,
-    document: TaskBoardPolicyPipelineDocument?
-  ) -> TaskBoardPolicyCanvasSummary {
-    TaskBoardPolicyCanvasSummary(
+    document: PolicyPipelineDocument?
+  ) -> PolicyCanvasSummary {
+    PolicyCanvasSummary(
       canvasId: canvasId,
       title: canvasId,
       revision: document?.revision ?? 0,
@@ -80,8 +80,8 @@ struct DashboardPolicyCanvasSelectionPreviewTests {
     )
   }
 
-  private func makeDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  private func makeDocument(revision: UInt64) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,

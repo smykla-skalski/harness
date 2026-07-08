@@ -115,7 +115,7 @@ let samplePolicyGoLiveDiffText =
   }
   """
 
-let samplePolicyExportText =
+let samplePolicyCanvasExportText =
   """
   {
     "canvas_id": "canvas-primary",

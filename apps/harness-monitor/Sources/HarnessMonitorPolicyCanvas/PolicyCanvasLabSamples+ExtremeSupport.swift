@@ -5,7 +5,7 @@ extension PolicyCanvasLabSamples {
   static func extremeStressActionGateNode(
     id: PolicyCanvasExtremeStressModuleID,
     group: String
-  ) -> TaskBoardPolicyPipelineNode {
+  ) -> PolicyPipelineNode {
     node(
       id.node("action-gate"), "Action gate \(id.index)",
       .actionGate(actions: PolicyAction.allCases),
@@ -17,7 +17,7 @@ extension PolicyCanvasLabSamples {
   static func extremeStressEvidenceNode(
     id: PolicyCanvasExtremeStressModuleID,
     group: String
-  ) -> TaskBoardPolicyPipelineNode {
+  ) -> PolicyPipelineNode {
     node(
       id.node("evidence"), "Evidence braid \(id.index)",
       .evidenceCheck(checks: [
@@ -32,7 +32,7 @@ extension PolicyCanvasLabSamples {
   static func extremeStressSwitchNode(
     id: PolicyCanvasExtremeStressModuleID,
     group: String
-  ) -> TaskBoardPolicyPipelineNode {
+  ) -> PolicyPipelineNode {
     node(
       id.node("switch"), "Ordered switch \(id.index)",
       .switch(
@@ -52,7 +52,7 @@ extension PolicyCanvasLabSamples {
     from source: (node: String, port: String),
     toNode: String,
     label: String
-  ) -> TaskBoardPolicyPipelineEdge {
+  ) -> PolicyPipelineEdge {
     edge(
       id.edge(edgeID),
       id.node(source.node),
@@ -127,9 +127,9 @@ extension PolicyCanvasLabSamples {
 }
 
 struct PolicyCanvasExtremeStressModule {
-  let nodes: [TaskBoardPolicyPipelineNode]
-  let edges: [TaskBoardPolicyPipelineEdge]
-  let groups: [TaskBoardPolicyPipelineGroup]
+  let nodes: [PolicyPipelineNode]
+  let edges: [PolicyPipelineEdge]
+  let groups: [PolicyPipelineGroup]
 }
 
 struct PolicyCanvasExtremeStressModuleID {

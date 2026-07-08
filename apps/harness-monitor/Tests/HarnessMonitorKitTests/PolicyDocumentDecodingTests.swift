@@ -11,7 +11,7 @@ import Testing
 /// Decoding it with `.convertFromSnakeCase` drops the generated keys and throws -
 /// the regression this guards against.
 @Suite("Policy document snake_case decoding")
-struct TaskBoardPolicyDocumentDecodingTests {
+struct PolicyDocumentDecodingTests {
   private static let snakeDocument = """
     {
       "schema_version": 2,
@@ -78,7 +78,7 @@ struct TaskBoardPolicyDocumentDecodingTests {
   func decodesSnakeWire() throws {
     let data = Data(Self.snakeDocument.utf8)
     let document = try PolicyWireCoding.decoder.decode(
-      TaskBoardPolicyPipelineDocument.self,
+      PolicyPipelineDocument.self,
       from: data
     )
 

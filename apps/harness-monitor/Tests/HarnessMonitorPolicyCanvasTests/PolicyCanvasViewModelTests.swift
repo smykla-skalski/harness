@@ -264,12 +264,12 @@ struct PolicyCanvasViewModelTests {
     #expect(viewModel.makeLiveDisabledReason == "Save a draft before making it live")
 
     let document = policyDocument(revision: 11)
-    let simulation = TaskBoardPolicyPipelineSimulationResult(
+    let simulation = PolicyPipelineSimulationResult(
       revision: 11,
       traceId: "trace-policy-11",
       simulatedAt: "2026-05-14T11:00:05Z",
       succeeded: true,
-      validation: TaskBoardPolicyPipelineValidation(isValid: true)
+      validation: PolicyPipelineValidation(isValid: true)
     )
 
     viewModel.load(document: document, simulation: simulation, audit: nil)
@@ -378,31 +378,31 @@ struct PolicyCanvasViewModelTests {
 
   @Test("if then else export derives branch conditions from then and else ports")
   func ifThenElseExportDerivesBranchConditions() {
-    let document = TaskBoardPolicyPipelineDocument(
+    let document = PolicyPipelineDocument(
       revision: 14,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-entry",
           label: "Entry",
           kind: .workflowEntry(PolicyWorkflowEntry(workflowId: "reviews_auto")),
           inputPorts: [],
           outputPorts: ["out"]
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-if",
           label: "Checks green?",
           kind: .ifThenElse(PolicyIfThenElseCondition(field: .checksGreen, predicate: .isTrue)),
           inputPorts: ["in"],
           outputPorts: ["then", "else"]
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-allow",
           label: "Allow",
           kind: .finish(PolicyFinishNode(decision: .allow, reasonCode: .defaultAllow)),
           inputPorts: ["in"]
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-deny",
           label: "Deny",
           kind: .finish(PolicyFinishNode(decision: .deny, reasonCode: .checksNotGreen)),
@@ -410,21 +410,21 @@ struct PolicyCanvasViewModelTests {
         ),
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge-entry-if",
           fromNodeId: "node-entry",
           fromPort: "out",
           toNodeId: "node-if",
           toPort: "in"
         ),
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge-if-then",
           fromNodeId: "node-if",
           fromPort: "then",
           toNodeId: "node-allow",
           toPort: "in"
         ),
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge-if-else",
           fromNodeId: "node-if",
           fromPort: "else",
@@ -433,12 +433,12 @@ struct PolicyCanvasViewModelTests {
         ),
       ],
       groups: [],
-      layout: TaskBoardPolicyPipelineLayout(
+      layout: PolicyPipelineLayout(
         nodes: [
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-entry", x: 20, y: 40),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-if", x: 280, y: 40),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-allow", x: 540, y: 0),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-deny", x: 540, y: 120),
+          PolicyPipelineNodeLayout(nodeId: "node-entry", x: 20, y: 40),
+          PolicyPipelineNodeLayout(nodeId: "node-if", x: 280, y: 40),
+          PolicyPipelineNodeLayout(nodeId: "node-allow", x: 540, y: 0),
+          PolicyPipelineNodeLayout(nodeId: "node-deny", x: 540, y: 120),
         ]
       ),
       policyTraceIds: []
@@ -462,7 +462,7 @@ struct PolicyCanvasViewModelTests {
 
   @Test("generic policy edge labels are hidden")
   func genericPolicyEdgeLabelsAreHidden() {
-    let edge = TaskBoardPolicyPipelineEdge(
+    let edge = PolicyPipelineEdge(
       id: "edge-policy-label",
       fromNodeId: "source",
       fromPort: "policy",
@@ -480,18 +480,18 @@ struct PolicyCanvasViewModelTests {
     // declared node port. Terminal port markers are seeded from the edges
     // themselves, so an edge between two existing nodes must always map even
     // when the wire carried no ports (e.g. a casing-stripped decode).
-    let document = TaskBoardPolicyPipelineDocument(
+    let document = PolicyPipelineDocument(
       revision: 1,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "source",
           label: "Source",
           kind: .workflowEntry(PolicyWorkflowEntry(workflowId: "reviews_auto")),
           inputPorts: [],
           outputPorts: []
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "target",
           label: "Target",
           kind: .finish(PolicyFinishNode(decision: .allow, reasonCode: .defaultAllow)),
@@ -500,7 +500,7 @@ struct PolicyCanvasViewModelTests {
         ),
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge-source-target",
           fromNodeId: "source",
           fromPort: "out",
@@ -509,7 +509,7 @@ struct PolicyCanvasViewModelTests {
         )
       ],
       groups: [],
-      layout: TaskBoardPolicyPipelineLayout(nodes: []),
+      layout: PolicyPipelineLayout(nodes: []),
       policyTraceIds: []
     )
 
@@ -521,21 +521,21 @@ struct PolicyCanvasViewModelTests {
 
   @Test("if then else branch labels prefer the source port over condition tokens")
   func ifThenElseBranchLabelsPreferPorts() {
-    let thenEdge = TaskBoardPolicyPipelineEdge(
+    let thenEdge = PolicyPipelineEdge(
       id: "edge-if-then",
       fromNodeId: "node-if",
       fromPort: "then",
       toNodeId: "node-allow",
       toPort: "in",
-      condition: TaskBoardPolicyPipelineEdgeCondition(condition: "condition_true")
+      condition: PolicyPipelineEdgeCondition(condition: "condition_true")
     )
-    let elseEdge = TaskBoardPolicyPipelineEdge(
+    let elseEdge = PolicyPipelineEdge(
       id: "edge-if-else",
       fromNodeId: "node-if",
       fromPort: "else",
       toNodeId: "node-deny",
       toPort: "in",
-      condition: TaskBoardPolicyPipelineEdgeCondition(condition: "condition_false")
+      condition: PolicyPipelineEdgeCondition(condition: "condition_false")
     )
 
     #expect(policyCanvasEdge(thenEdge)?.label == "then")
@@ -590,7 +590,7 @@ struct PolicyCanvasViewModelTests {
       """.utf8
     )
 
-    let validation = try JSONDecoder().decode(TaskBoardPolicyPipelineValidation.self, from: payload)
+    let validation = try JSONDecoder().decode(PolicyPipelineValidation.self, from: payload)
 
     #expect(!validation.isValid)
     #expect(validation.issues[0].expected == 2)

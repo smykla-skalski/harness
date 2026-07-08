@@ -4,11 +4,11 @@ import SwiftUI
 
 public struct PolicyCanvasLabStandaloneView: View {
   private let initialSelection: PolicyCanvasLabSelection
-  private let fixtureDocument: TaskBoardPolicyPipelineDocument?
+  private let fixtureDocument: PolicyPipelineDocument?
 
   public init(
     initialSelection: PolicyCanvasLabSelection = .sample(PolicyCanvasLabSamples.defaultSelectionID),
-    fixtureDocument: TaskBoardPolicyPipelineDocument? =
+    fixtureDocument: PolicyPipelineDocument? =
       PolicyCanvasLabSnapshotSupport.fixtureDocument()
   ) {
     self.initialSelection = initialSelection

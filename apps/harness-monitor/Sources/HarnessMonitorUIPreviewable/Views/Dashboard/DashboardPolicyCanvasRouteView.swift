@@ -29,15 +29,15 @@ struct DashboardPolicyCanvasRouteView: View {
     self.isRouteVisible = isRouteVisible
     _policyCanvasViewModelStore = StateObject(
       wrappedValue: DashboardPolicyCanvasViewModelStore(
-        document: dashboardUI.taskBoardPolicyPipeline,
-        simulation: dashboardUI.taskBoardPolicySimulation,
-        audit: dashboardUI.taskBoardPolicyAudit,
-        activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId,
-        workspace: dashboardUI.taskBoardPolicyCanvasWorkspace
+        document: dashboardUI.policyPipeline,
+        simulation: dashboardUI.policySimulation,
+        audit: dashboardUI.policyAudit,
+        activeCanvasId: dashboardUI.policyCanvasWorkspace?.activeCanvasId,
+        workspace: dashboardUI.policyCanvasWorkspace
       )
     )
     _selectedCanvasId = State(
-      initialValue: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId)
+      initialValue: dashboardUI.policyCanvasWorkspace?.activeCanvasId)
   }
 
   var policyCanvasViewModel: PolicyCanvasViewModel {
@@ -45,7 +45,7 @@ struct DashboardPolicyCanvasRouteView: View {
     nonmutating set { policyCanvasViewModelStore.viewModel = newValue }
   }
 
-  var workspace: TaskBoardPolicyCanvasWorkspace? { dashboardUI.taskBoardPolicyCanvasWorkspace }
+  var workspace: PolicyCanvasWorkspace? { dashboardUI.policyCanvasWorkspace }
 
   var currentCanvasSelectionPreview: DashboardPolicyCanvasSelectionPreview? {
     selectedCanvasPreview
@@ -59,9 +59,9 @@ struct DashboardPolicyCanvasRouteView: View {
     if selectedCanvasPreview?.showsLoadingPlaceholder == true {
       return false
     }
-    return dashboardUI.taskBoardPolicyPipeline != nil
+    return dashboardUI.policyPipeline != nil
       || selectedCanvasPreview?.snapshot.document != nil
-      || dashboardUI.taskBoardPolicyCanvasWorkspace != nil
+      || dashboardUI.policyCanvasWorkspace != nil
   }
 
   private var isCanvasMutationDisabled: Bool { dashboardUI.isBusy || store.isDaemonActionInFlight }
@@ -107,7 +107,7 @@ struct DashboardPolicyCanvasRouteView: View {
       footer: {
         DashboardPolicyCanvasFooterBar(
           workspace: workspace,
-          fallbackDocument: dashboardUI.taskBoardPolicyPipeline,
+          fallbackDocument: dashboardUI.policyPipeline,
           selectedCanvasId: selectedCanvasId,
           policyCanvasViewModel: policyCanvasViewModel,
           isCanvasMutationDisabled: isCanvasMutationDisabled,
@@ -135,7 +135,7 @@ struct DashboardPolicyCanvasRouteView: View {
       }
       syncCanvasSelectionToActiveCanvas()
     }
-    .onChange(of: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId) { _, _ in
+    .onChange(of: dashboardUI.policyCanvasWorkspace?.activeCanvasId) { _, _ in
       clearCanvasSelectionPreview()
       syncCanvasSelectionToActiveCanvas()
     }
@@ -229,7 +229,7 @@ struct DashboardPolicyCanvasRouteView: View {
       return
     }
     await store.bootstrapIfNeeded()
-    await store.refreshTaskBoardPolicyPipeline()
+    await store.refreshPolicyPipeline()
   }
 
   private func requestCreateCanvas() {
@@ -238,14 +238,14 @@ struct DashboardPolicyCanvasRouteView: View {
     )
   }
 
-  private func requestDuplicateCanvas(_ canvas: TaskBoardPolicyCanvasSummary) {
+  private func requestDuplicateCanvas(_ canvas: PolicyCanvasSummary) {
     pendingNameRequest = DashboardPolicyCanvasNameRequest.duplicate(
       source: canvas,
       initialTitle: "\(canvas.title) Copy"
     )
   }
 
-  private func requestRenameCanvas(_ canvas: TaskBoardPolicyCanvasSummary) {
+  private func requestRenameCanvas(_ canvas: PolicyCanvasSummary) {
     editingCanvasId = canvas.canvasId
   }
 
@@ -287,7 +287,7 @@ struct DashboardPolicyCanvasRouteView: View {
   }
 
   private func submitRenameCanvasFromTab(
-    _ canvas: TaskBoardPolicyCanvasSummary,
+    _ canvas: PolicyCanvasSummary,
     title: String
   ) {
     let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -299,7 +299,7 @@ struct DashboardPolicyCanvasRouteView: View {
       return
     }
     Task {
-      _ = await store.renameTaskBoardPolicyCanvas(
+      _ = await store.renamePolicyCanvas(
         canvasId: canvas.canvasId,
         title: trimmedTitle
       )
@@ -343,14 +343,14 @@ struct DashboardPolicyCanvasRouteView: View {
     switch mutation {
     case .activate(let canvas):
       applyCanvasSelectionPreview(for: canvas)
-      _ = await store.activateTaskBoardPolicyCanvas(canvasId: canvas.canvasId)
+      _ = await store.activatePolicyCanvas(canvasId: canvas.canvasId)
       clearCanvasSelectionPreview()
     case .create(let title):
       clearCanvasSelectionPreview()
-      _ = await store.createTaskBoardPolicyCanvas(title: title)
+      _ = await store.createPolicyCanvas(title: title)
     case .duplicate(let source, let title):
       clearCanvasSelectionPreview()
-      _ = await store.duplicateTaskBoardPolicyCanvas(
+      _ = await store.duplicatePolicyCanvas(
         canvasId: source.canvasId,
         title: title
       )
@@ -358,7 +358,7 @@ struct DashboardPolicyCanvasRouteView: View {
     syncCanvasSelectionToActiveCanvas()
   }
 
-  private func requestDeleteCanvas(_ canvas: TaskBoardPolicyCanvasSummary) {
+  private func requestDeleteCanvas(_ canvas: PolicyCanvasSummary) {
     pendingDeleteRequest = DashboardPolicyCanvasDeleteRequest(
       canvas: canvas,
       requiresDirtyResolution: canvas.canvasId == workspace?.activeCanvasId
@@ -367,7 +367,7 @@ struct DashboardPolicyCanvasRouteView: View {
   }
 
   @MainActor
-  private func saveThenDeleteCanvas(_ canvas: TaskBoardPolicyCanvasSummary) async {
+  private func saveThenDeleteCanvas(_ canvas: PolicyCanvasSummary) async {
     guard await saveCurrentCanvasEdits() else {
       return
     }
@@ -376,16 +376,16 @@ struct DashboardPolicyCanvasRouteView: View {
   }
 
   @MainActor
-  private func discardThenDeleteCanvas(_ canvas: TaskBoardPolicyCanvasSummary) async {
+  private func discardThenDeleteCanvas(_ canvas: PolicyCanvasSummary) async {
     discardCurrentCanvasEdits()
     pendingDeleteRequest = nil
     await deleteCanvas(canvas)
   }
 
   @MainActor
-  private func deleteCanvas(_ canvas: TaskBoardPolicyCanvasSummary) async {
+  private func deleteCanvas(_ canvas: PolicyCanvasSummary) async {
     policyCanvasViewModel.cancelAutosave()
-    _ = await store.deleteTaskBoardPolicyCanvas(canvasId: canvas.canvasId)
+    _ = await store.deletePolicyCanvas(canvasId: canvas.canvasId)
     syncCanvasSelectionToActiveCanvas()
   }
 
@@ -408,11 +408,11 @@ struct DashboardPolicyCanvasRouteView: View {
   private func discardCurrentCanvasEdits() {
     policyCanvasViewModel.cancelAutosave()
     policyCanvasViewModel.applyPersistedDocument(
-      document: dashboardUI.taskBoardPolicyPipeline,
-      simulation: dashboardUI.taskBoardPolicySimulation,
-      audit: dashboardUI.taskBoardPolicyAudit,
-      activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId,
-      workspace: dashboardUI.taskBoardPolicyCanvasWorkspace
+      document: dashboardUI.policyPipeline,
+      simulation: dashboardUI.policySimulation,
+      audit: dashboardUI.policyAudit,
+      activeCanvasId: dashboardUI.policyCanvasWorkspace?.activeCanvasId,
+      workspace: dashboardUI.policyCanvasWorkspace
     )
   }
 

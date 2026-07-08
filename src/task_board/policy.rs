@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub const TASK_BOARD_POLICY_VERSION: &str = "task-board-policy-v1";
+pub const POLICY_VERSION: &str = "task-board-policy-v1";
 pub const DEFAULT_AUTO_MERGE_RISK_THRESHOLD: u8 = 40;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -253,35 +253,35 @@ impl PolicyGate for BuiltInPolicyGate {
 fn allow(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::Allow {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 
 fn deny(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::Deny {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 
 fn require_human(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::RequireHuman {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 
 fn require_consensus(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::RequireConsensus {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 
 fn dry_run_only(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::DryRunOnly {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 

@@ -70,7 +70,7 @@ extension PolicyCanvasView {
   func performSave(reason: SaveReason) {
     let transaction = viewModel.beginDraftSaveTransaction()
     let canvasIdentifier = runtime?.policyCanvasSnapshot.activeCanvasId ?? "missing"
-    // Deferred (tracking-id P3I.3): saveTaskBoardPolicyPipelineDraft now returns
+    // Deferred (tracking-id P3I.3): savePolicyPipelineDraft now returns
     // the saved document (or nil), so the daemon's bumped revision is adopted
     // below — but nil still conflates transport failure (IPC error / daemon
     // process died) with semantic rejection (daemon parsed and said no). Both
@@ -151,7 +151,7 @@ extension PolicyCanvasView {
   /// Load the read-only live-vs-draft decision diff for the go-live sheet. Sends
   /// the active canvas id so the preview reflects the saved revision make-live
   /// will enforce, not any unsaved in-editor edits.
-  func loadGoLiveDiff() async -> TaskBoardPolicyPipelineGoLiveDiff? {
+  func loadGoLiveDiff() async -> PolicyPipelineGoLiveDiff? {
     await runtime?.goLiveDiffPolicyCanvas(canvasId: runtime?.policyCanvasSnapshot.activeCanvasId)
   }
 
@@ -182,7 +182,7 @@ extension PolicyCanvasView {
   }
 
   @MainActor
-  private func runPolicyCanvasSimulation(document: TaskBoardPolicyPipelineDocument) async -> Bool {
+  private func runPolicyCanvasSimulation(document: PolicyPipelineDocument) async -> Bool {
     await runtime?.simulatePolicyCanvas(document: document) ?? false
   }
 
@@ -269,8 +269,8 @@ extension PolicyCanvasView {
   }
 
   @MainActor
-  private func saveExportedPolicyCanvasDraft(_ document: TaskBoardPolicyPipelineDocument) async
-    -> TaskBoardPolicyPipelineDocument?
+  private func saveExportedPolicyCanvasDraft(_ document: PolicyPipelineDocument) async
+    -> PolicyPipelineDocument?
   {
     await runtime?.savePolicyCanvasDraft(document: document)
   }

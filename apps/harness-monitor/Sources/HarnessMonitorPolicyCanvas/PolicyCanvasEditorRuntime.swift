@@ -13,28 +13,28 @@ public protocol PolicyCanvasLabRuntime: AnyObject {
 public protocol PolicyCanvasEditorRuntime: PolicyCanvasLabRuntime {
   var policyCanvasActionInFlight: Bool { get set }
 
-  func simulatePolicyCanvas(document: TaskBoardPolicyPipelineDocument) async -> Bool
-  func savePolicyCanvasDraft(document: TaskBoardPolicyPipelineDocument) async
-    -> TaskBoardPolicyPipelineDocument?
+  func simulatePolicyCanvas(document: PolicyPipelineDocument) async -> Bool
+  func savePolicyCanvasDraft(document: PolicyPipelineDocument) async
+    -> PolicyPipelineDocument?
   func makeLivePolicyCanvas(revision: UInt64) async -> Bool
-  func goLiveDiffPolicyCanvas(canvasId: String?) async -> TaskBoardPolicyPipelineGoLiveDiff?
+  func goLiveDiffPolicyCanvas(canvasId: String?) async -> PolicyPipelineGoLiveDiff?
   func createPolicyScenario(name: String, input: PolicyInput) async -> Bool
   func updatePolicyScenario(id: String, name: String, input: PolicyInput) async -> Bool
   func deletePolicyScenario(id: String) async -> Bool
   func resetPolicyScenarios() async -> Bool
   func replayPolicyCanvas(canvasId: String?, limit: UInt32?) async
-    -> TaskBoardPolicyPipelineReplayResult?
+    -> PolicyPipelineReplayResult?
 }
 
 extension HarnessMonitorStore: PolicyCanvasEditorRuntime {
   public var policyCanvasSnapshot: PolicyCanvasHostSnapshot {
     let dashboard = contentUI.dashboard
     return PolicyCanvasHostSnapshot(
-      activeCanvasId: dashboard.taskBoardPolicyCanvasWorkspace?.activeCanvasId,
-      document: dashboard.taskBoardPolicyPipeline,
-      simulation: dashboard.taskBoardPolicySimulation,
-      audit: dashboard.taskBoardPolicyAudit,
-      workspace: dashboard.taskBoardPolicyCanvasWorkspace
+      activeCanvasId: dashboard.policyCanvasWorkspace?.activeCanvasId,
+      document: dashboard.policyPipeline,
+      simulation: dashboard.policySimulation,
+      audit: dashboard.policyAudit,
+      workspace: dashboard.policyCanvasWorkspace
     )
   }
 
@@ -48,48 +48,32 @@ extension HarnessMonitorStore: PolicyCanvasEditorRuntime {
   }
 
   public func refreshPolicyCanvas() async {
-    await refreshTaskBoardPolicyPipeline()
+    await refreshPolicyPipeline()
   }
 
-  public func simulatePolicyCanvas(document: TaskBoardPolicyPipelineDocument) async -> Bool {
-    await simulateTaskBoardPolicyPipeline(document: document)
+  public func simulatePolicyCanvas(document: PolicyPipelineDocument) async -> Bool {
+    await simulatePolicyPipeline(document: document)
   }
 
-  public func savePolicyCanvasDraft(document: TaskBoardPolicyPipelineDocument) async
-    -> TaskBoardPolicyPipelineDocument?
+  public func savePolicyCanvasDraft(document: PolicyPipelineDocument) async
+    -> PolicyPipelineDocument?
   {
-    await saveTaskBoardPolicyPipelineDraft(document: document)
+    await savePolicyPipelineDraft(document: document)
   }
 
   public func makeLivePolicyCanvas(revision: UInt64) async -> Bool {
-    await makeLiveTaskBoardPolicyPipeline(revision: revision)
+    await makeLivePolicyPipeline(revision: revision)
   }
 
   public func goLiveDiffPolicyCanvas(canvasId: String?) async
-    -> TaskBoardPolicyPipelineGoLiveDiff?
+    -> PolicyPipelineGoLiveDiff?
   {
-    await goLiveDiffTaskBoardPolicyPipeline(canvasId: canvasId)
-  }
-
-  public func createPolicyScenario(name: String, input: PolicyInput) async -> Bool {
-    await createTaskBoardPolicyScenario(name: name, input: input)
-  }
-
-  public func updatePolicyScenario(id: String, name: String, input: PolicyInput) async -> Bool {
-    await updateTaskBoardPolicyScenario(id: id, name: name, input: input)
-  }
-
-  public func deletePolicyScenario(id: String) async -> Bool {
-    await deleteTaskBoardPolicyScenario(id: id)
-  }
-
-  public func resetPolicyScenarios() async -> Bool {
-    await resetTaskBoardPolicyScenarios()
+    await goLiveDiffPolicyPipeline(canvasId: canvasId)
   }
 
   public func replayPolicyCanvas(canvasId: String?, limit: UInt32?) async
-    -> TaskBoardPolicyPipelineReplayResult?
+    -> PolicyPipelineReplayResult?
   {
-    await replayTaskBoardPolicyPipeline(canvasId: canvasId, limit: limit)
+    await replayPolicyPipeline(canvasId: canvasId, limit: limit)
   }
 }

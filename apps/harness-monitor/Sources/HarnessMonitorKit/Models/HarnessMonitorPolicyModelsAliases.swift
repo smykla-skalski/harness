@@ -6,15 +6,15 @@ import HarnessMonitorPolicyModels
 // `ValidationIssue` that also represents client-local preflight codes, and the
 // simulate response envelope). They are surfaced into the Kit namespace here so
 // callers reach them without importing the models module directly.
-public typealias TaskBoardPolicyPipelineValidation =
-  HarnessMonitorPolicyModels.TaskBoardPolicyPipelineValidation
-public typealias TaskBoardPolicyPipelineValidationIssue =
-  HarnessMonitorPolicyModels.TaskBoardPolicyPipelineValidationIssue
-public typealias TaskBoardPolicyDecision = HarnessMonitorPolicyModels.TaskBoardPolicyDecision
-public typealias TaskBoardPolicyPipelineSimulatedDecision =
-  HarnessMonitorPolicyModels.TaskBoardPolicyPipelineSimulatedDecision
-public typealias TaskBoardPolicyPipelineSimulationResult =
-  HarnessMonitorPolicyModels.TaskBoardPolicyPipelineSimulationResult
+public typealias PolicyPipelineValidation =
+  HarnessMonitorPolicyModels.PolicyPipelineValidation
+public typealias PolicyPipelineValidationIssue =
+  HarnessMonitorPolicyModels.PolicyPipelineValidationIssue
+public typealias PolicySimulationDecision = HarnessMonitorPolicyModels.PolicySimulationDecision
+public typealias PolicyPipelineSimulatedDecision =
+  HarnessMonitorPolicyModels.PolicyPipelineSimulatedDecision
+public typealias PolicyPipelineSimulationResult =
+  HarnessMonitorPolicyModels.PolicyPipelineSimulationResult
 
 // The generated simulate/audit wire types own the daemon snake_case decode; the
 // API client and audit mapping decode these through the plain decoder then map to
@@ -27,7 +27,7 @@ public typealias PolicyPipelineAuditSummaryWire =
 
 // The generated task-board canvas wire types name PolicyGraphMode as a stored
 // property type, so it must resolve from the Kit namespace. The mode rawValue
-// bridges to the hand TaskBoardPolicyPipelineMode in the +Wire mapping.
+// bridges to the hand PolicyPipelineMode in the +Wire mapping.
 public typealias PolicyGraphMode = HarnessMonitorPolicyModels.PolicyGraphMode
 
 // The generated canvas workspace wire type names PolicyScenario in its scenarios
@@ -45,12 +45,12 @@ public typealias PolicyInput = HarnessMonitorPolicyModels.PolicyInput
 // view files that import BOTH modules can name it without a lookup clash against
 // the generated `PolicyPipelineGoLiveDiff`. Its `diffs` entries stay the
 // generated `PolicyPipelineGoLiveDiffEntry`, resolved from the models module.
-public typealias TaskBoardPolicyPipelineGoLiveDiff =
+public typealias PolicyPipelineGoLiveDiff =
   HarnessMonitorPolicyModels.PolicyPipelineGoLiveDiff
 
 // The replay result, re-exported so the client/store/runtime can name it without
 // importing the models module, and so view files that import BOTH modules avoid a
 // lookup clash against the generated `PolicyPipelineReplayResult`. Its `decisions`
 // entries stay the generated `PolicyPipelineReplayDecision`.
-public typealias TaskBoardPolicyPipelineReplayResult =
+public typealias PolicyPipelineReplayResult =
   HarnessMonitorPolicyModels.PolicyPipelineReplayResult

@@ -6,11 +6,11 @@ import HarnessMonitorPolicyCanvasAlgorithms
 /// invokes `applyPendingUpdate()` (typically after a user-driven "reload"
 /// affordance in the canvas chrome).
 struct PolicyCanvasPendingUpdate: Equatable {
-  let document: TaskBoardPolicyPipelineDocument?
-  let simulation: TaskBoardPolicyPipelineSimulationResult?
-  let audit: TaskBoardPolicyPipelineAuditSummary?
+  let document: PolicyPipelineDocument?
+  let simulation: PolicyPipelineSimulationResult?
+  let audit: PolicyPipelineAuditSummary?
   let activeCanvasId: String?
-  let workspace: TaskBoardPolicyCanvasWorkspace?
+  let workspace: PolicyCanvasWorkspace?
 }
 
 struct PolicyCanvasLoadedGraph {
@@ -20,7 +20,7 @@ struct PolicyCanvasLoadedGraph {
 }
 
 func policyCanvasLoadedGraph(
-  from document: TaskBoardPolicyPipelineDocument,
+  from document: PolicyPipelineDocument,
   policyGroupTitle: String?
 ) -> PolicyCanvasLoadedGraph {
   let layoutLookup = PolicyCanvasDocumentLayoutLookup(layout: document.layout)
@@ -70,7 +70,7 @@ func policyCanvasLoadedGraph(
 }
 
 func policyCanvasPrewarmLabSampleLayouts(
-  document: TaskBoardPolicyPipelineDocument,
+  document: PolicyPipelineDocument,
   policyGroupTitle: String?
 ) {
   let graph = policyCanvasLoadedGraph(from: document, policyGroupTitle: policyGroupTitle)
@@ -151,7 +151,7 @@ extension PolicyCanvasViewModel {
     return true
   }
 
-  func shouldApplyExternalDocument(_ document: TaskBoardPolicyPipelineDocument?) -> Bool {
+  func shouldApplyExternalDocument(_ document: PolicyPipelineDocument?) -> Bool {
     guard let document else {
       return false
     }
@@ -166,7 +166,7 @@ extension PolicyCanvasViewModel {
   }
 
   func policyCanvasGraph(
-    from document: TaskBoardPolicyPipelineDocument
+    from document: PolicyPipelineDocument
   ) -> PolicyCanvasLoadedGraph {
     policyCanvasLoadedGraph(from: document, policyGroupTitle: policyGroupTitle)
   }
@@ -177,7 +177,7 @@ extension PolicyCanvasViewModel {
     policyCanvasResolvedContainerGroupTitle(policyGroupTitle)
   }
 
-  func incomingDocumentMatchesBacking(_ document: TaskBoardPolicyPipelineDocument) -> Bool {
+  func incomingDocumentMatchesBacking(_ document: PolicyPipelineDocument) -> Bool {
     guard let backing = backingDocument else {
       return false
     }
@@ -194,7 +194,7 @@ extension PolicyCanvasViewModel {
   /// remote change. Unknown revisions read as 0 so the first genuine bump still
   /// surfaces.
   func incomingDocumentIsNewerRemoteRevision(
-    _ document: TaskBoardPolicyPipelineDocument
+    _ document: PolicyPipelineDocument
   ) -> Bool {
     document.revision > max(loadedDocumentRevision ?? 0, lastSelfSavedRevision ?? 0)
   }
@@ -204,9 +204,9 @@ extension PolicyCanvasViewModel {
   /// revision arrives while the document is dirty so local edits survive the
   /// republish.
   func absorbExternalSimulationAudit(
-    simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?,
-    workspace: TaskBoardPolicyCanvasWorkspace? = nil,
+    simulation: PolicyPipelineSimulationResult?,
+    audit: PolicyPipelineAuditSummary?,
+    workspace: PolicyCanvasWorkspace? = nil,
     activeCanvasId: String? = nil
   ) {
     captureLiveAudit(audit)
@@ -218,7 +218,7 @@ extension PolicyCanvasViewModel {
   }
 
   private func assignGroupMembership(
-    from groups: [TaskBoardPolicyPipelineGroup],
+    from groups: [PolicyPipelineGroup],
     to nodes: inout [PolicyCanvasNode]
   ) {
     for group in groups {

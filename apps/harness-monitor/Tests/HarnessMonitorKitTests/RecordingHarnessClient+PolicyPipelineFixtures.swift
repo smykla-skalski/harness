@@ -3,42 +3,42 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
-  func sampleTaskBoardPolicyPipeline(
+  func samplePolicyPipeline(
     canvasId: String = "canvas-1",
     title: String = "Policy Canvas 1",
-    mode: TaskBoardPolicyPipelineMode = .draft,
+    mode: PolicyPipelineMode = .draft,
     revision: UInt64 = 7
-  ) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  ) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: mode,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-intake",
           title: title,
           kind: .trigger(workflow: "default-task"),
-          position: TaskBoardPolicyCanvasPoint(x: 20, y: 40),
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+          position: PolicyCanvasPoint(x: 20, y: 40),
+          outputs: [PolicyPipelinePort(id: "out", title: "out")]
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-allow",
           title: "Allow spawn",
           kind: .actionGate(actions: [.spawnAgent]),
-          position: TaskBoardPolicyCanvasPoint(x: 280, y: 40),
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+          position: PolicyCanvasPoint(x: 280, y: 40),
+          inputs: [PolicyPipelinePort(id: "in", title: "in")],
+          outputs: [PolicyPipelinePort(id: "out", title: "out")]
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "node-human",
           title: "Allow",
           kind: .humanGate(reasonCode: .humanRequired),
-          position: TaskBoardPolicyCanvasPoint(x: 520, y: 40),
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
+          position: PolicyCanvasPoint(x: 520, y: 40),
+          inputs: [PolicyPipelinePort(id: "in", title: "in")]
         ),
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge-intake-allow",
           fromNodeId: "node-intake",
           fromPort: "out",
@@ -48,14 +48,14 @@ extension RecordingHarnessClient {
         )
       ],
       groups: [
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "group-dispatch",
           title: "Dispatch",
           color: "#6aa8ff",
-          frame: TaskBoardPolicyCanvasRect(x: 0, y: 0, width: 720, height: 180)
+          frame: PolicyCanvasRect(x: 0, y: 0, width: 720, height: 180)
         )
       ],
-      layout: TaskBoardPolicyPipelineLayout(
+      layout: PolicyPipelineLayout(
         zoom: 1,
         offset: .zero
       ),
@@ -63,10 +63,10 @@ extension RecordingHarnessClient {
     )
   }
 
-  func sampleTaskBoardPolicyDecision() -> TaskBoardPolicyPipelineSimulatedDecision {
-    TaskBoardPolicyPipelineSimulatedDecision(
+  func samplePolicySimulationDecision() -> PolicyPipelineSimulatedDecision {
+    PolicyPipelineSimulatedDecision(
       action: .spawnAgent,
-      decision: TaskBoardPolicyDecision(
+      decision: PolicySimulationDecision(
         decision: "allow",
         reasonCode: "default_allow",
         policyVersion: "task-board-policy-v2:rev-7"
@@ -74,22 +74,22 @@ extension RecordingHarnessClient {
     )
   }
 
-  func sampleTaskBoardPolicyPipelineAudit(
-    for document: TaskBoardPolicyPipelineDocument
-  ) -> TaskBoardPolicyPipelineAuditSummary {
+  func samplePolicyPipelineAudit(
+    for document: PolicyPipelineDocument
+  ) -> PolicyPipelineAuditSummary {
     let validation =
-      taskBoardPolicyValidationOverride
-      ?? TaskBoardPolicyPipelineValidation(isValid: true)
-    let succeeded = taskBoardPolicySimulationOverride ?? true
-    let simulation = TaskBoardPolicyPipelineSimulationResult(
+      policyValidationOverride
+      ?? PolicyPipelineValidation(isValid: true)
+    let succeeded = policySimulationOverride ?? true
+    let simulation = PolicyPipelineSimulationResult(
       revision: document.revision,
       traceId: "trace-policy-1",
       simulatedAt: "2026-05-14T11:00:05Z",
       succeeded: succeeded,
       validation: validation,
-      decisions: [sampleTaskBoardPolicyDecision()]
+      decisions: [samplePolicySimulationDecision()]
     )
-    return TaskBoardPolicyPipelineAuditSummary(
+    return PolicyPipelineAuditSummary(
       activeRevision: document.revision,
       mode: document.mode,
       latestTraceId: simulation.traceId,
@@ -98,13 +98,13 @@ extension RecordingHarnessClient {
     )
   }
 
-  func taskBoardPolicyCanvasSummary(
+  func policyCanvasSummary(
     canvasId: String,
     title: String,
-    document: TaskBoardPolicyPipelineDocument,
-    latestSimulation: TaskBoardPolicyPipelineSimulationResult?
-  ) -> TaskBoardPolicyCanvasSummary {
-    TaskBoardPolicyCanvasSummary(
+    document: PolicyPipelineDocument,
+    latestSimulation: PolicyPipelineSimulationResult?
+  ) -> PolicyCanvasSummary {
+    PolicyCanvasSummary(
       canvasId: canvasId,
       title: title,
       revision: document.revision,
@@ -120,23 +120,23 @@ extension RecordingHarnessClient {
     )
   }
 
-  func ensureTaskBoardPolicyWorkspaceStateLocked() -> TaskBoardPolicyCanvasWorkspace {
-    if let workspace = taskBoardPolicyCanvasWorkspaceStorage {
+  func ensurePolicyWorkspaceStateLocked() -> PolicyCanvasWorkspace {
+    if let workspace = policyCanvasWorkspaceStorage {
       return workspace
     }
     let canvasID = "canvas-1"
     let title = "Policy Canvas 1"
-    let document = sampleTaskBoardPolicyPipeline(
+    let document = samplePolicyPipeline(
       canvasId: canvasID,
       title: title,
       mode: .draft
     )
-    let audit = sampleTaskBoardPolicyPipelineAudit(for: document)
-    let workspace = TaskBoardPolicyCanvasWorkspace(
+    let audit = samplePolicyPipelineAudit(for: document)
+    let workspace = PolicyCanvasWorkspace(
       schemaVersion: 1,
       activeCanvasId: canvasID,
       canvases: [
-        taskBoardPolicyCanvasSummary(
+        policyCanvasSummary(
           canvasId: canvasID,
           title: title,
           document: document,
@@ -144,36 +144,36 @@ extension RecordingHarnessClient {
         )
       ]
     )
-    taskBoardPolicyCanvasWorkspaceStorage = workspace
-    taskBoardPolicyPipelinesByCanvasID[canvasID] = document
-    taskBoardPolicyAuditByCanvasID[canvasID] = audit
-    taskBoardPolicyCanvasIDCounter = 2
+    policyCanvasWorkspaceStorage = workspace
+    policyPipelinesByCanvasID[canvasID] = document
+    policyAuditByCanvasID[canvasID] = audit
+    policyCanvasIDCounter = 2
     return workspace
   }
 
-  func nextTaskBoardPolicyCanvasIDLocked() -> String {
-    defer { taskBoardPolicyCanvasIDCounter += 1 }
-    return "canvas-\(taskBoardPolicyCanvasIDCounter)"
+  func nextPolicyCanvasIDLocked() -> String {
+    defer { policyCanvasIDCounter += 1 }
+    return "canvas-\(policyCanvasIDCounter)"
   }
 
-  func updateTaskBoardPolicyCanvasSummaryLocked(
+  func updatePolicyCanvasSummaryLocked(
     canvasId: String,
     title: String?,
-    document: TaskBoardPolicyPipelineDocument,
-    latestSimulation: TaskBoardPolicyPipelineSimulationResult?
+    document: PolicyPipelineDocument,
+    latestSimulation: PolicyPipelineSimulationResult?
   ) {
-    guard var workspace = taskBoardPolicyCanvasWorkspaceStorage,
+    guard var workspace = policyCanvasWorkspaceStorage,
       let index = workspace.canvases.firstIndex(where: { $0.canvasId == canvasId })
     else {
       return
     }
     let existingTitle = workspace.canvases[index].title
-    workspace.canvases[index] = taskBoardPolicyCanvasSummary(
+    workspace.canvases[index] = policyCanvasSummary(
       canvasId: canvasId,
       title: title ?? existingTitle,
       document: document,
       latestSimulation: latestSimulation
     )
-    taskBoardPolicyCanvasWorkspaceStorage = workspace
+    policyCanvasWorkspaceStorage = workspace
   }
 }

@@ -1,12 +1,12 @@
 use crate::daemon::protocol::{
-    TaskBoardPolicyCanvasSummary, TaskBoardPolicyCanvasWorkspaceResponse,
+    PolicyCanvasSummary, PolicyCanvasWorkspaceResponse,
 };
 use crate::task_board::policy_graph::{PolicyCanvasRecord, PolicyCanvasWorkspace};
 
 pub(super) fn policy_canvas_workspace_response(
     workspace: &PolicyCanvasWorkspace,
-) -> TaskBoardPolicyCanvasWorkspaceResponse {
-    TaskBoardPolicyCanvasWorkspaceResponse {
+) -> PolicyCanvasWorkspaceResponse {
+    PolicyCanvasWorkspaceResponse {
         schema_version: workspace.schema_version,
         active_canvas_id: workspace.active_canvas_id.clone(),
         global_policy_enforcement_enabled: workspace.global_policy_enforcement_enabled,
@@ -19,8 +19,8 @@ pub(super) fn policy_canvas_workspace_response(
     }
 }
 
-fn policy_canvas_summary(canvas: &PolicyCanvasRecord) -> TaskBoardPolicyCanvasSummary {
-    TaskBoardPolicyCanvasSummary {
+fn policy_canvas_summary(canvas: &PolicyCanvasRecord) -> PolicyCanvasSummary {
+    PolicyCanvasSummary {
         canvas_id: canvas.id.clone(),
         title: canvas.title.clone(),
         revision: canvas.document.revision,

@@ -78,28 +78,28 @@ pub const TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC: &str =
 pub const TASK_BOARD_GIT_IDENTITY_DEFAULTS: &str = "task_board.git_identity_defaults";
 pub const TASK_BOARD_GIT_SIGNING_VERIFY: &str = "task_board.git_signing_verify";
 pub const TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS: &str = "task_board.git_runtime_drain_secrets";
-pub const TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET: &str = "task_board.policy_canvas_workspace_get";
-pub const TASK_BOARD_POLICY_CANVAS_CREATE: &str = "task_board.policy_canvas_create";
-pub const TASK_BOARD_POLICY_CANVAS_DUPLICATE: &str = "task_board.policy_canvas_duplicate";
-pub const TASK_BOARD_POLICY_CANVAS_RENAME: &str = "task_board.policy_canvas_rename";
-pub const TASK_BOARD_POLICY_CANVAS_SET_ACTIVE: &str = "task_board.policy_canvas_set_active";
-pub const TASK_BOARD_POLICY_CANVAS_DELETE: &str = "task_board.policy_canvas_delete";
-pub const TASK_BOARD_POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT: &str =
-    "task_board.policy_canvas_set_global_enforcement";
-pub const TASK_BOARD_POLICY_PIPELINE_GET: &str = "task_board.policy_pipeline_get";
-pub const TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT: &str = "task_board.policy_pipeline_save_draft";
-pub const TASK_BOARD_POLICY_PIPELINE_SIMULATE: &str = "task_board.policy_pipeline_simulate";
-pub const TASK_BOARD_POLICY_PIPELINE_PROMOTE: &str = "task_board.policy_pipeline_promote";
-pub const TASK_BOARD_POLICY_PIPELINE_MAKE_LIVE: &str = "task_board.policy_pipeline_make_live";
-pub const TASK_BOARD_POLICY_PIPELINE_GO_LIVE_DIFF: &str = "task_board.policy_pipeline_go_live_diff";
-pub const TASK_BOARD_POLICY_PIPELINE_REPLAY: &str = "task_board.policy_pipeline_replay";
-pub const TASK_BOARD_POLICY_PIPELINE_AUDIT: &str = "task_board.policy_pipeline_audit";
-pub const TASK_BOARD_POLICY_EXPORT: &str = "task_board.policy_export";
-pub const TASK_BOARD_POLICY_IMPORT: &str = "task_board.policy_import";
-pub const TASK_BOARD_POLICY_SCENARIO_CREATE: &str = "task_board.policy_scenario_create";
-pub const TASK_BOARD_POLICY_SCENARIO_UPDATE: &str = "task_board.policy_scenario_update";
-pub const TASK_BOARD_POLICY_SCENARIO_DELETE: &str = "task_board.policy_scenario_delete";
-pub const TASK_BOARD_POLICY_SCENARIO_RESET: &str = "task_board.policy_scenario_reset";
+pub const POLICY_CANVAS_WORKSPACE_GET: &str = "policy_canvas.workspace_get";
+pub const POLICY_CANVAS_CREATE: &str = "policy_canvas.create";
+pub const POLICY_CANVAS_DUPLICATE: &str = "policy_canvas.duplicate";
+pub const POLICY_CANVAS_RENAME: &str = "policy_canvas.rename";
+pub const POLICY_CANVAS_SET_ACTIVE: &str = "policy_canvas.set_active";
+pub const POLICY_CANVAS_DELETE: &str = "policy_canvas.delete";
+pub const POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT: &str =
+    "policy_canvas.set_global_enforcement";
+pub const POLICY_PIPELINE_GET: &str = "policy_pipeline.get";
+pub const POLICY_PIPELINE_SAVE_DRAFT: &str = "policy_pipeline.save_draft";
+pub const POLICY_PIPELINE_SIMULATE: &str = "policy_pipeline.simulate";
+pub const POLICY_PIPELINE_PROMOTE: &str = "policy_pipeline.promote";
+pub const POLICY_PIPELINE_MAKE_LIVE: &str = "policy_pipeline.make_live";
+pub const POLICY_PIPELINE_GO_LIVE_DIFF: &str = "policy_pipeline.go_live_diff";
+pub const POLICY_PIPELINE_REPLAY: &str = "policy_pipeline.replay";
+pub const POLICY_PIPELINE_AUDIT: &str = "policy_pipeline.audit";
+pub const POLICY_CANVAS_EXPORT: &str = "policy_canvas.export";
+pub const POLICY_CANVAS_IMPORT: &str = "policy_canvas.import";
+pub const POLICY_SCENARIO_CREATE: &str = "policy_scenario.create";
+pub const POLICY_SCENARIO_UPDATE: &str = "policy_scenario.update";
+pub const POLICY_SCENARIO_DELETE: &str = "policy_scenario.delete";
+pub const POLICY_SCENARIO_RESET: &str = "policy_scenario.reset";
 pub const REVIEWS_REPOSITORY_CATALOG: &str = "reviews.repository_catalog";
 pub const REVIEWS_CAPABILITIES: &str = "reviews.capabilities";
 pub const REVIEWS_QUERY: &str = "reviews.query";
@@ -239,27 +239,27 @@ pub const ALL: &[&str] = &[
     TASK_BOARD_GIT_IDENTITY_DEFAULTS,
     TASK_BOARD_GIT_SIGNING_VERIFY,
     TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
-    TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET,
-    TASK_BOARD_POLICY_CANVAS_CREATE,
-    TASK_BOARD_POLICY_CANVAS_DUPLICATE,
-    TASK_BOARD_POLICY_CANVAS_RENAME,
-    TASK_BOARD_POLICY_CANVAS_SET_ACTIVE,
-    TASK_BOARD_POLICY_CANVAS_DELETE,
-    TASK_BOARD_POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT,
-    TASK_BOARD_POLICY_PIPELINE_GET,
-    TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
-    TASK_BOARD_POLICY_PIPELINE_SIMULATE,
-    TASK_BOARD_POLICY_PIPELINE_PROMOTE,
-    TASK_BOARD_POLICY_PIPELINE_MAKE_LIVE,
-    TASK_BOARD_POLICY_PIPELINE_GO_LIVE_DIFF,
-    TASK_BOARD_POLICY_PIPELINE_REPLAY,
-    TASK_BOARD_POLICY_PIPELINE_AUDIT,
-    TASK_BOARD_POLICY_EXPORT,
-    TASK_BOARD_POLICY_IMPORT,
-    TASK_BOARD_POLICY_SCENARIO_CREATE,
-    TASK_BOARD_POLICY_SCENARIO_UPDATE,
-    TASK_BOARD_POLICY_SCENARIO_DELETE,
-    TASK_BOARD_POLICY_SCENARIO_RESET,
+    POLICY_CANVAS_WORKSPACE_GET,
+    POLICY_CANVAS_CREATE,
+    POLICY_CANVAS_DUPLICATE,
+    POLICY_CANVAS_RENAME,
+    POLICY_CANVAS_SET_ACTIVE,
+    POLICY_CANVAS_DELETE,
+    POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT,
+    POLICY_PIPELINE_GET,
+    POLICY_PIPELINE_SAVE_DRAFT,
+    POLICY_PIPELINE_SIMULATE,
+    POLICY_PIPELINE_PROMOTE,
+    POLICY_PIPELINE_MAKE_LIVE,
+    POLICY_PIPELINE_GO_LIVE_DIFF,
+    POLICY_PIPELINE_REPLAY,
+    POLICY_PIPELINE_AUDIT,
+    POLICY_CANVAS_EXPORT,
+    POLICY_CANVAS_IMPORT,
+    POLICY_SCENARIO_CREATE,
+    POLICY_SCENARIO_UPDATE,
+    POLICY_SCENARIO_DELETE,
+    POLICY_SCENARIO_RESET,
     REVIEWS_REPOSITORY_CATALOG,
     REVIEWS_CAPABILITIES,
     REVIEWS_QUERY,

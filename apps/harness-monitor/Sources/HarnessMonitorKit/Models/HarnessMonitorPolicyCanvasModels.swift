@@ -1,7 +1,7 @@
 import Foundation
 import HarnessMonitorPolicyModels
 
-public struct TaskBoardPolicyPipelinePort: Codable, Equatable, Identifiable, Sendable {
+public struct PolicyPipelinePort: Codable, Equatable, Identifiable, Sendable {
   public var id: PolicyGraphPortId
   public var title: String
 
@@ -11,13 +11,13 @@ public struct TaskBoardPolicyPipelinePort: Codable, Equatable, Identifiable, Sen
   }
 }
 
-public struct TaskBoardPolicyPipelineEdge: Codable, Equatable, Identifiable, Sendable {
+public struct PolicyPipelineEdge: Codable, Equatable, Identifiable, Sendable {
   public var id: PolicyGraphEdgeId
   public var fromNode: PolicyGraphNodeId
   public var fromPort: PolicyGraphPortId
   public var toNode: PolicyGraphNodeId
   public var toPort: PolicyGraphPortId
-  public var condition: TaskBoardPolicyPipelineEdgeCondition
+  public var condition: PolicyPipelineEdgeCondition
   public var label: String?
 
   public var fromNodeId: PolicyGraphNodeId { fromNode }
@@ -30,7 +30,7 @@ public struct TaskBoardPolicyPipelineEdge: Codable, Equatable, Identifiable, Sen
     toNodeId: PolicyGraphNodeId,
     toPort: PolicyGraphPortId,
     label: String? = nil,
-    condition: TaskBoardPolicyPipelineEdgeCondition = .always
+    condition: PolicyPipelineEdgeCondition = .always
   ) {
     self.id = id
     self.fromNode = fromNodeId
@@ -59,13 +59,13 @@ public struct TaskBoardPolicyPipelineEdge: Codable, Equatable, Identifiable, Sen
     toNode = try container.decode(PolicyGraphNodeId.self, forKey: .toNode)
     toPort = try container.decode(PolicyGraphPortId.self, forKey: .toPort)
     condition =
-      try container.decodeIfPresent(TaskBoardPolicyPipelineEdgeCondition.self, forKey: .condition)
+      try container.decodeIfPresent(PolicyPipelineEdgeCondition.self, forKey: .condition)
       ?? .always
     label = try container.decodeIfPresent(String.self, forKey: .label)
   }
 }
 
-public struct TaskBoardPolicyPipelineEdgeCondition: Codable, Equatable, Sendable {
+public struct PolicyPipelineEdgeCondition: Codable, Equatable, Sendable {
   public static let always = Self(condition: "always")
 
   public var condition: String
@@ -105,12 +105,12 @@ public struct TaskBoardPolicyPipelineEdgeCondition: Codable, Equatable, Sendable
   }
 }
 
-public struct TaskBoardPolicyPipelineGroup: Codable, Equatable, Identifiable, Sendable {
+public struct PolicyPipelineGroup: Codable, Equatable, Identifiable, Sendable {
   public var id: PolicyGraphGroupId
   public var label: String
   public var nodeIds: [PolicyGraphNodeId]
   public var color: String
-  public var frame: TaskBoardPolicyCanvasRect
+  public var frame: PolicyCanvasRect
 
   public var title: String {
     get { label }
@@ -121,7 +121,7 @@ public struct TaskBoardPolicyPipelineGroup: Codable, Equatable, Identifiable, Se
     id: PolicyGraphGroupId,
     title: String,
     color: String = "#6aa8ff",
-    frame: TaskBoardPolicyCanvasRect = .zero,
+    frame: PolicyCanvasRect = .zero,
     nodeIds: [PolicyGraphNodeId] = []
   ) {
     self.id = id
@@ -145,23 +145,23 @@ public struct TaskBoardPolicyPipelineGroup: Codable, Equatable, Identifiable, Se
     label = try container.decode(String.self, forKey: .label)
     color = try container.decodeIfPresent(String.self, forKey: .color) ?? "#6aa8ff"
     frame =
-      try container.decodeIfPresent(TaskBoardPolicyCanvasRect.self, forKey: .frame)
+      try container.decodeIfPresent(PolicyCanvasRect.self, forKey: .frame)
       ?? .zero
     nodeIds = try container.decodeIfPresent([PolicyGraphNodeId].self, forKey: .nodeIds) ?? []
   }
 }
 
-public struct TaskBoardPolicyPipelineLayout: Codable, Equatable, Sendable {
+public struct PolicyPipelineLayout: Codable, Equatable, Sendable {
   public var zoom: Double
-  public var offset: TaskBoardPolicyCanvasPoint
-  public var nodes: [TaskBoardPolicyPipelineNodeLayout]
-  public var routingHints: [TaskBoardPolicyPipelineEdgeRoutingHint]
+  public var offset: PolicyCanvasPoint
+  public var nodes: [PolicyPipelineNodeLayout]
+  public var routingHints: [PolicyPipelineEdgeRoutingHint]
 
   public init(
     zoom: Double = 1,
-    offset: TaskBoardPolicyCanvasPoint = .zero,
-    nodes: [TaskBoardPolicyPipelineNodeLayout] = [],
-    routingHints: [TaskBoardPolicyPipelineEdgeRoutingHint] = []
+    offset: PolicyCanvasPoint = .zero,
+    nodes: [PolicyPipelineNodeLayout] = [],
+    routingHints: [PolicyPipelineEdgeRoutingHint] = []
   ) {
     self.zoom = zoom
     self.offset = offset
@@ -180,13 +180,13 @@ public struct TaskBoardPolicyPipelineLayout: Codable, Equatable, Sendable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     zoom = try container.decodeIfPresent(Double.self, forKey: .zoom) ?? 1
     offset =
-      try container.decodeIfPresent(TaskBoardPolicyCanvasPoint.self, forKey: .offset)
+      try container.decodeIfPresent(PolicyCanvasPoint.self, forKey: .offset)
       ?? .zero
     nodes =
-      try container.decodeIfPresent([TaskBoardPolicyPipelineNodeLayout].self, forKey: .nodes) ?? []
+      try container.decodeIfPresent([PolicyPipelineNodeLayout].self, forKey: .nodes) ?? []
     routingHints =
       try container.decodeIfPresent(
-        [TaskBoardPolicyPipelineEdgeRoutingHint].self,
+        [PolicyPipelineEdgeRoutingHint].self,
         forKey: .routingHints
       ) ?? []
   }
@@ -202,7 +202,7 @@ public struct TaskBoardPolicyPipelineLayout: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardPolicyPipelineNodeLayout: Codable, Equatable, Sendable {
+public struct PolicyPipelineNodeLayout: Codable, Equatable, Sendable {
   public var nodeId: PolicyGraphNodeId
   public var x: Int
   public var y: Int
@@ -228,7 +228,7 @@ public struct TaskBoardPolicyPipelineNodeLayout: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardPolicyPipelineEdgeRoutingHint: Codable, Equatable, Sendable {
+public struct PolicyPipelineEdgeRoutingHint: Codable, Equatable, Sendable {
   public var edgeId: String
   public var sourceScopeId: String
   public var targetScopeId: String
@@ -278,7 +278,7 @@ public struct TaskBoardPolicyPipelineEdgeRoutingHint: Codable, Equatable, Sendab
   }
 }
 
-public struct TaskBoardPolicyExportRequest: Codable, Equatable, Sendable {
+public struct PolicyCanvasExportRequest: Codable, Equatable, Sendable {
   public var canvasId: String?
 
   public init(canvasId: String? = nil) {
@@ -286,12 +286,12 @@ public struct TaskBoardPolicyExportRequest: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardPolicyExportResponse: Codable, Equatable, Sendable {
+public struct PolicyCanvasExportResponse: Codable, Equatable, Sendable {
   public var canvasId: String
   public var title: String
-  public var document: TaskBoardPolicyPipelineDocument
+  public var document: PolicyPipelineDocument
 
-  public init(canvasId: String, title: String, document: TaskBoardPolicyPipelineDocument) {
+  public init(canvasId: String, title: String, document: PolicyPipelineDocument) {
     self.canvasId = canvasId
     self.title = title
     self.document = document
@@ -304,17 +304,17 @@ public struct TaskBoardPolicyExportResponse: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardPolicyImportRequest: Codable, Equatable, Sendable {
-  public var document: TaskBoardPolicyPipelineDocument
+public struct PolicyCanvasImportRequest: Codable, Equatable, Sendable {
+  public var document: PolicyPipelineDocument
   public var title: String?
 
-  public init(document: TaskBoardPolicyPipelineDocument, title: String? = nil) {
+  public init(document: PolicyPipelineDocument, title: String? = nil) {
     self.document = document
     self.title = title
   }
 }
 
-public struct TaskBoardPolicyCanvasPoint: Codable, Equatable, Sendable {
+public struct PolicyCanvasPoint: Codable, Equatable, Sendable {
   public static let zero = Self(x: 0, y: 0)
 
   public var x: Double
@@ -343,7 +343,7 @@ public struct TaskBoardPolicyCanvasPoint: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardPolicyCanvasRect: Codable, Equatable, Sendable {
+public struct PolicyCanvasRect: Codable, Equatable, Sendable {
   public static let zero = Self(x: 0, y: 0, width: 0, height: 0)
 
   public var x: Double

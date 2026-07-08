@@ -6,8 +6,8 @@
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
-    TaskBoardPolicyExportRequest, TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest,
-    TaskBoardPolicyImportResponse,
+    PolicyCanvasExportRequest, PolicyCanvasExportResponse, PolicyCanvasImportRequest,
+    PolicyCanvasImportResponse,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::policy_graph;
@@ -21,10 +21,10 @@ use super::policy_canvas_response::policy_canvas_workspace_response;
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be loaded or when the
 /// requested canvas does not exist.
-pub(crate) async fn export_task_board_policy(
+pub(crate) async fn export_policy(
     db: &AsyncDaemonDb,
-    request: &TaskBoardPolicyExportRequest,
-) -> Result<TaskBoardPolicyExportResponse, CliError> {
+    request: &PolicyCanvasExportRequest,
+) -> Result<PolicyCanvasExportResponse, CliError> {
     let workspace = load_or_seed_workspace(db).await?;
     let canvas = if let Some(canvas_id) = request.canvas_id.as_deref() {
         workspace.canvas(canvas_id).ok_or_else(|| {
@@ -39,7 +39,7 @@ pub(crate) async fn export_task_board_policy(
             ))
         })?
     };
-    Ok(TaskBoardPolicyExportResponse {
+    Ok(PolicyCanvasExportResponse {
         canvas_id: canvas.id.clone(),
         title: canvas.title.clone(),
         document: canvas.document.clone(),
@@ -52,10 +52,10 @@ pub(crate) async fn export_task_board_policy(
 /// # Errors
 /// Returns `CliError` when the document fails validation or the database
 /// cannot be written.
-pub(crate) async fn import_task_board_policy(
+pub(crate) async fn import_policy(
     db: &AsyncDaemonDb,
-    request: &TaskBoardPolicyImportRequest,
-) -> Result<TaskBoardPolicyImportResponse, CliError> {
+    request: &PolicyCanvasImportRequest,
+) -> Result<PolicyCanvasImportResponse, CliError> {
     let document = request.document.clone();
     let title = request.title.clone();
     let (workspace, _new_canvas) = db

@@ -1,30 +1,30 @@
 import Foundation
 import HarnessMonitorPolicyModels
 
-public enum TaskBoardPolicyPipelineMode: String, Codable, CaseIterable, Sendable {
+public enum PolicyPipelineMode: String, Codable, CaseIterable, Sendable {
   case draft
   case dryRun = "dry_run"
   case enforced
 }
 
-public struct TaskBoardPolicyPipelineDocument: Codable, Equatable, Sendable {
+public struct PolicyPipelineDocument: Codable, Equatable, Sendable {
   public var schemaVersion: UInt16
   public var revision: UInt64
-  public var mode: TaskBoardPolicyPipelineMode
-  public var nodes: [TaskBoardPolicyPipelineNode]
-  public var edges: [TaskBoardPolicyPipelineEdge]
-  public var groups: [TaskBoardPolicyPipelineGroup]
-  public var layout: TaskBoardPolicyPipelineLayout
+  public var mode: PolicyPipelineMode
+  public var nodes: [PolicyPipelineNode]
+  public var edges: [PolicyPipelineEdge]
+  public var groups: [PolicyPipelineGroup]
+  public var layout: PolicyPipelineLayout
   public var policyTraceIds: [String]
 
   public init(
     schemaVersion: UInt16 = 2,
     revision: UInt64,
-    mode: TaskBoardPolicyPipelineMode,
-    nodes: [TaskBoardPolicyPipelineNode],
-    edges: [TaskBoardPolicyPipelineEdge],
-    groups: [TaskBoardPolicyPipelineGroup],
-    layout: TaskBoardPolicyPipelineLayout = TaskBoardPolicyPipelineLayout(),
+    mode: PolicyPipelineMode,
+    nodes: [PolicyPipelineNode],
+    edges: [PolicyPipelineEdge],
+    groups: [PolicyPipelineGroup],
+    layout: PolicyPipelineLayout = PolicyPipelineLayout(),
     policyTraceIds: [String] = []
   ) {
     self.schemaVersion = schemaVersion
@@ -70,7 +70,7 @@ public struct TaskBoardPolicyPipelineDocument: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sendable {
+public struct PolicyPipelineNode: Codable, Equatable, Identifiable, Sendable {
   public var id: PolicyGraphNodeId
   public var label: String
   public var kind: PolicyGraphNodeKind
@@ -78,19 +78,19 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
   public var inputPorts: [PolicyGraphPortId]
   public var outputPorts: [PolicyGraphPortId]
   public var groupId: PolicyGraphGroupId?
-  public var position: TaskBoardPolicyCanvasPoint
+  public var position: PolicyCanvasPoint
 
   public var title: String {
     get { label }
     set { label = newValue }
   }
 
-  public var inputs: [TaskBoardPolicyPipelinePort] {
-    inputPorts.map { TaskBoardPolicyPipelinePort(id: $0, title: $0.rawValue) }
+  public var inputs: [PolicyPipelinePort] {
+    inputPorts.map { PolicyPipelinePort(id: $0, title: $0.rawValue) }
   }
 
-  public var outputs: [TaskBoardPolicyPipelinePort] {
-    outputPorts.map { TaskBoardPolicyPipelinePort(id: $0, title: $0.rawValue) }
+  public var outputs: [PolicyPipelinePort] {
+    outputPorts.map { PolicyPipelinePort(id: $0, title: $0.rawValue) }
   }
 
   public init(
@@ -98,10 +98,10 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
     title: String,
     kind: PolicyGraphNodeKind,
     automation: PolicyGraphAutomationBinding? = nil,
-    position: TaskBoardPolicyCanvasPoint = .zero,
+    position: PolicyCanvasPoint = .zero,
     groupId: PolicyGraphGroupId? = nil,
-    inputs: [TaskBoardPolicyPipelinePort] = [],
-    outputs: [TaskBoardPolicyPipelinePort] = []
+    inputs: [PolicyPipelinePort] = [],
+    outputs: [PolicyPipelinePort] = []
   ) {
     self.id = id
     self.label = title

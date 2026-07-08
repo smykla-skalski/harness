@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
 import HarnessMonitorPolicyModels
 
-func taskBoardPolicyPersistedPortTitle(
+func policyPersistedPortTitle(
   _ portID: String,
   kind: PolicyCanvasPortKind
 ) -> String {
@@ -21,10 +21,10 @@ func policyCanvasPortID(
 }
 
 func policyCanvasUsesSwitchPortNormalization(_ node: PolicyCanvasNode) -> Bool {
-  node.kind == .switch || taskBoardPolicyUsesSwitchPortNormalization(node.policyKind)
+  node.kind == .switch || policyUsesSwitchPortNormalization(node.policyKind)
 }
 
-func taskBoardPolicyUsesSwitchPortNormalization(
+func policyUsesSwitchPortNormalization(
   _ nodeKind: PolicyGraphNodeKind?
 ) -> Bool {
   nodeKind?.discriminator == PolicyCanvasNodeKind.switch.rawValue

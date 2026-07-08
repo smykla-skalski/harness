@@ -6,17 +6,17 @@ extension HarnessMonitorStore {
   /// returns where it would now decide differently than history. Returns `nil`
   /// when there is no client or the request fails. The replay panel passes the
   /// active canvas id so the sample matches the canvas on screen.
-  public func replayTaskBoardPolicyPipeline(
+  public func replayPolicyPipeline(
     canvasId: String? = nil,
     limit: UInt32? = nil
-  ) async -> TaskBoardPolicyPipelineReplayResult? {
+  ) async -> PolicyPipelineReplayResult? {
     guard let client else {
       return nil
     }
     do {
-      return try await client.replayTaskBoardPolicyPipeline(
-        request: TaskBoardPolicyPipelineReplayRequest(
-          canvasId: canvasId ?? globalTaskBoardPolicyCanvasWorkspace?.activeCanvasId,
+      return try await client.replayPolicyPipeline(
+        request: PolicyPipelineReplayRequest(
+          canvasId: canvasId ?? globalPolicyCanvasWorkspace?.activeCanvasId,
           limit: limit
         )
       )

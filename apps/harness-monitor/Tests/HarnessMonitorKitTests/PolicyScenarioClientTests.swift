@@ -4,29 +4,29 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-@Suite("Task-board policy scenario client", .serialized)
-struct TaskBoardPolicyScenarioClientTests {
+@Suite("Policy scenario client", .serialized)
+struct PolicyScenarioClientTests {
   @Test("HTTP client uses scenario route contract")
   func httpClientUsesScenarioRoutes() async throws {
     TaskBoardURLProtocol.reset()
     let client = try makeClient()
     let input = PolicyInput(action: .mergePr)
 
-    _ = try await client.createTaskBoardPolicyScenario(
-      request: TaskBoardPolicyScenarioCreateRequest(name: "Merge", input: input)
+    _ = try await client.createPolicyScenario(
+      request: PolicyScenarioCreateRequest(name: "Merge", input: input)
     )
-    _ = try await client.updateTaskBoardPolicyScenario(
-      request: TaskBoardPolicyScenarioUpdateRequest(
+    _ = try await client.updatePolicyScenario(
+      request: PolicyScenarioUpdateRequest(
         id: "scenario-1",
         name: "Merge red",
         input: input
       )
     )
-    _ = try await client.deleteTaskBoardPolicyScenario(
-      request: TaskBoardPolicyScenarioDeleteRequest(id: "scenario-1")
+    _ = try await client.deletePolicyScenario(
+      request: PolicyScenarioDeleteRequest(id: "scenario-1")
     )
-    _ = try await client.resetTaskBoardPolicyScenarios(
-      request: TaskBoardPolicyScenarioResetRequest()
+    _ = try await client.resetPolicyScenarios(
+      request: PolicyScenarioResetRequest()
     )
 
     let records = TaskBoardURLProtocol.records
@@ -34,10 +34,10 @@ struct TaskBoardPolicyScenarioClientTests {
     #expect(
       records.map(\.path)
         == [
-          "/v1/task-board/policy/scenarios/create",
-          "/v1/task-board/policy/scenarios/update",
-          "/v1/task-board/policy/scenarios/delete",
-          "/v1/task-board/policy/scenarios/reset",
+          "/v1/policy-scenarios/create",
+          "/v1/policy-scenarios/update",
+          "/v1/policy-scenarios/delete",
+          "/v1/policy-scenarios/reset",
         ]
     )
     #expect(records[0].body?["name"] as? String == "Merge")
@@ -64,31 +64,31 @@ struct TaskBoardPolicyScenarioClientTests {
     )
     let input = PolicyInput(action: .mergePr)
 
-    _ = try await transport.createTaskBoardPolicyScenario(
-      request: TaskBoardPolicyScenarioCreateRequest(name: "Merge", input: input)
+    _ = try await transport.createPolicyScenario(
+      request: PolicyScenarioCreateRequest(name: "Merge", input: input)
     )
-    _ = try await transport.updateTaskBoardPolicyScenario(
-      request: TaskBoardPolicyScenarioUpdateRequest(
+    _ = try await transport.updatePolicyScenario(
+      request: PolicyScenarioUpdateRequest(
         id: "scenario-1",
         name: "Merge red",
         input: input
       )
     )
-    _ = try await transport.deleteTaskBoardPolicyScenario(
-      request: TaskBoardPolicyScenarioDeleteRequest(id: "scenario-1")
+    _ = try await transport.deletePolicyScenario(
+      request: PolicyScenarioDeleteRequest(id: "scenario-1")
     )
-    _ = try await transport.resetTaskBoardPolicyScenarios(
-      request: TaskBoardPolicyScenarioResetRequest()
+    _ = try await transport.resetPolicyScenarios(
+      request: PolicyScenarioResetRequest()
     )
 
     let calls = await probe.calls
     #expect(
       calls.map(\.method)
         == [
-          .taskBoardPolicyScenarioCreate,
-          .taskBoardPolicyScenarioUpdate,
-          .taskBoardPolicyScenarioDelete,
-          .taskBoardPolicyScenarioReset,
+          .policyScenarioCreate,
+          .policyScenarioUpdate,
+          .policyScenarioDelete,
+          .policyScenarioReset,
         ]
     )
     #expect(objectValue(calls[0].params, key: "name") == .string("Merge"))

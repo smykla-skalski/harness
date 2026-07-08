@@ -97,8 +97,8 @@ extension DashboardReviewsRouteView {
   ) {
     DashboardAutomationPolicyRuntimeSynchronizer.synchronizeEnforcedCanvasAutomationPolicies(
       policyCenter: policyCenter,
-      workspace: store.globalTaskBoardPolicyCanvasWorkspace,
-      activeDocument: store.globalTaskBoardPolicyPipeline
+      workspace: store.globalPolicyCanvasWorkspace,
+      activeDocument: store.globalPolicyPipeline
     )
   }
 

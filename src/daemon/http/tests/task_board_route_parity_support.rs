@@ -260,7 +260,7 @@ pub(super) async fn save_simulate_and_promote_http(
     let save = put_json(
         client,
         base_url,
-        http_paths::TASK_BOARD_POLICY_PIPELINE,
+        http_paths::POLICY_PIPELINE,
         json!({
             "canvas_id": canvas_id,
             "document": pipeline,
@@ -270,7 +270,7 @@ pub(super) async fn save_simulate_and_promote_http(
     let simulation = post_json(
         client,
         base_url,
-        http_paths::TASK_BOARD_POLICY_SIMULATE,
+        http_paths::POLICY_SIMULATE,
         json!({
             "canvas_id": canvas_id,
             "document": save["document"].clone(),
@@ -281,7 +281,7 @@ pub(super) async fn save_simulate_and_promote_http(
     post_json(
         client,
         base_url,
-        http_paths::TASK_BOARD_POLICY_PROMOTE,
+        http_paths::POLICY_PROMOTE,
         json!({
             "canvas_id": canvas_id,
             "revision": save["document"]["revision"].clone(),
@@ -298,7 +298,7 @@ pub(super) async fn save_simulate_and_promote_ws(
     let save = ws_result(
         base_url,
         "req-task-board-policy-save",
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
+        ws_methods::POLICY_PIPELINE_SAVE_DRAFT,
         json!({
             "canvas_id": canvas_id,
             "document": pipeline,
@@ -308,7 +308,7 @@ pub(super) async fn save_simulate_and_promote_ws(
     let simulation = ws_result(
         base_url,
         "req-task-board-policy-simulate",
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE,
+        ws_methods::POLICY_PIPELINE_SIMULATE,
         json!({
             "canvas_id": canvas_id,
             "document": save["document"].clone(),
@@ -319,7 +319,7 @@ pub(super) async fn save_simulate_and_promote_ws(
     ws_result(
         base_url,
         "req-task-board-policy-promote",
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE,
+        ws_methods::POLICY_PIPELINE_PROMOTE,
         json!({
             "canvas_id": canvas_id,
             "revision": save["document"]["revision"].clone(),
@@ -336,7 +336,7 @@ pub(super) async fn reset_policy_workspace(db: &AsyncDaemonDb) {
 }
 
 pub(super) async fn active_policy_canvas_id(client: &reqwest::Client, base_url: &str) -> String {
-    let workspace = get_json(client, base_url, http_paths::TASK_BOARD_POLICY_CANVASES).await;
+    let workspace = get_json(client, base_url, http_paths::POLICY_CANVASES).await;
     workspace["active_canvas_id"]
         .as_str()
         .expect("active_canvas_id in workspace")
@@ -347,7 +347,7 @@ pub(super) async fn seed_policy_canvas_pair(
     client: &reqwest::Client,
     base_url: &str,
 ) -> (String, String) {
-    let workspace = get_json(client, base_url, http_paths::TASK_BOARD_POLICY_CANVASES).await;
+    let workspace = get_json(client, base_url, http_paths::POLICY_CANVASES).await;
     let primary_canvas_id = workspace["active_canvas_id"]
         .as_str()
         .expect("primary canvas id")
@@ -355,7 +355,7 @@ pub(super) async fn seed_policy_canvas_pair(
     let new_workspace = post_json(
         client,
         base_url,
-        http_paths::TASK_BOARD_POLICY_CANVASES_CREATE,
+        http_paths::POLICY_CANVASES_CREATE,
         json!({ "title": "Secondary canvas" }),
     )
     .await;

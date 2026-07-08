@@ -119,7 +119,7 @@ public struct TaskBoardDispatchPlan: Codable, Equatable, Identifiable, Sendable 
   public let worker: TaskBoardWorkerIntent
   public let reviewer: TaskBoardReviewerIntent
   public let evaluator: TaskBoardEvaluatorIntent
-  public let policy: TaskBoardPolicyDecision?
+  public let policy: PolicySimulationDecision?
 
   public var id: String { boardItemId }
 }
@@ -149,7 +149,7 @@ public struct TaskBoardDispatchBlockReason: Codable, Equatable, Sendable {
   public let kind: String
   public let workItemId: String?
   public let reason: TaskBoardPlanApprovalBlockReason?
-  public let decision: TaskBoardPolicyDecision?
+  public let decision: PolicySimulationDecision?
   public let status: TaskBoardStatus?
 }
 

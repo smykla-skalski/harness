@@ -7,52 +7,52 @@ import HarnessMonitorPolicyModels
 // on the stored workspace; the daemon's seeding/persistence is covered by the Rust
 // Phase-4 tests, so reset here just restores the mock baseline (no scenarios).
 extension RecordingHarnessClient {
-  func createTaskBoardPolicyScenario(
-    request: TaskBoardPolicyScenarioCreateRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+  func createPolicyScenario(
+    request: PolicyScenarioCreateRequest
+  ) async throws -> PolicyCanvasWorkspace {
     lock.withLock {
-      var workspace = ensureTaskBoardPolicyWorkspaceStateLocked()
+      var workspace = ensurePolicyWorkspaceStateLocked()
       let id = "scenario-\(workspace.scenarios.count + 1)"
       workspace.scenarios.append(
         PolicyScenario(id: id, name: request.name, input: request.input, seeded: false)
       )
-      taskBoardPolicyCanvasWorkspaceStorage = workspace
+      policyCanvasWorkspaceStorage = workspace
       return workspace
     }
   }
 
-  func updateTaskBoardPolicyScenario(
-    request: TaskBoardPolicyScenarioUpdateRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+  func updatePolicyScenario(
+    request: PolicyScenarioUpdateRequest
+  ) async throws -> PolicyCanvasWorkspace {
     lock.withLock {
-      var workspace = ensureTaskBoardPolicyWorkspaceStateLocked()
+      var workspace = ensurePolicyWorkspaceStateLocked()
       if let index = workspace.scenarios.firstIndex(where: { $0.id == request.id }) {
         workspace.scenarios[index].name = request.name
         workspace.scenarios[index].input = request.input
       }
-      taskBoardPolicyCanvasWorkspaceStorage = workspace
+      policyCanvasWorkspaceStorage = workspace
       return workspace
     }
   }
 
-  func deleteTaskBoardPolicyScenario(
-    request: TaskBoardPolicyScenarioDeleteRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+  func deletePolicyScenario(
+    request: PolicyScenarioDeleteRequest
+  ) async throws -> PolicyCanvasWorkspace {
     lock.withLock {
-      var workspace = ensureTaskBoardPolicyWorkspaceStateLocked()
+      var workspace = ensurePolicyWorkspaceStateLocked()
       workspace.scenarios.removeAll { $0.id == request.id }
-      taskBoardPolicyCanvasWorkspaceStorage = workspace
+      policyCanvasWorkspaceStorage = workspace
       return workspace
     }
   }
 
-  func resetTaskBoardPolicyScenarios(
-    request _: TaskBoardPolicyScenarioResetRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+  func resetPolicyScenarios(
+    request _: PolicyScenarioResetRequest
+  ) async throws -> PolicyCanvasWorkspace {
     lock.withLock {
-      var workspace = ensureTaskBoardPolicyWorkspaceStateLocked()
+      var workspace = ensurePolicyWorkspaceStateLocked()
       workspace.scenarios = []
-      taskBoardPolicyCanvasWorkspaceStorage = workspace
+      policyCanvasWorkspaceStorage = workspace
       return workspace
     }
   }

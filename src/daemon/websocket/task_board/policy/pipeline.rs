@@ -1,20 +1,20 @@
 use crate::daemon::http::{DaemonHttpState, require_async_db, task_board_route_executor};
 use crate::daemon::protocol::{
-    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
-    TaskBoardPolicyPipelineGoLiveDiffRequest, TaskBoardPolicyPipelineMakeLiveRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineReplayRequest,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest, WsRequest,
+    PolicyPipelineAuditRequest, PolicyPipelineGetRequest,
+    PolicyPipelineGoLiveDiffRequest, PolicyPipelineMakeLiveRequest,
+    PolicyPipelinePromoteRequest, PolicyPipelineReplayRequest,
+    PolicyPipelineSaveDraftRequest, PolicyPipelineSimulateRequest, WsRequest,
     WsResponse,
 };
 use crate::daemon::websocket::mutations::dispatch_query_result;
 
 use super::super::{invalid_params, parse_params, parse_params_or_default};
 
-pub(super) async fn dispatch_task_board_policy_pipeline_get(
+pub(super) async fn dispatch_policy_pipeline_get(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params_or_default::<TaskBoardPolicyPipelineGetRequest>(request) else {
+    let Ok(body) = parse_params_or_default::<PolicyPipelineGetRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy pipeline") {
@@ -27,11 +27,11 @@ pub(super) async fn dispatch_task_board_policy_pipeline_get(
     )
 }
 
-pub(super) async fn dispatch_task_board_policy_pipeline_save_draft(
+pub(super) async fn dispatch_policy_pipeline_save_draft(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyPipelineSaveDraftRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyPipelineSaveDraftRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy pipeline save draft") {
@@ -41,7 +41,7 @@ pub(super) async fn dispatch_task_board_policy_pipeline_save_draft(
     let result = task_board_route_executor::save_policy_pipeline_draft(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_pipeline_save_draft",
+        "policy_pipeline.save_draft",
         "Save policy pipeline draft",
         body.canvas_id.as_deref(),
         serde_json::json!({
@@ -54,11 +54,11 @@ pub(super) async fn dispatch_task_board_policy_pipeline_save_draft(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_pipeline_simulate(
+pub(super) async fn dispatch_policy_pipeline_simulate(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyPipelineSimulateRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyPipelineSimulateRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy pipeline simulate") {
@@ -68,7 +68,7 @@ pub(super) async fn dispatch_task_board_policy_pipeline_simulate(
     let result = task_board_route_executor::simulate_policy_pipeline(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_pipeline_simulate",
+        "policy_pipeline.simulate",
         "Simulate policy pipeline",
         body.canvas_id.as_deref(),
         serde_json::json!({
@@ -81,11 +81,11 @@ pub(super) async fn dispatch_task_board_policy_pipeline_simulate(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_pipeline_promote(
+pub(super) async fn dispatch_policy_pipeline_promote(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyPipelinePromoteRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyPipelinePromoteRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy pipeline make live") {
@@ -95,7 +95,7 @@ pub(super) async fn dispatch_task_board_policy_pipeline_promote(
     let result = task_board_route_executor::promote_policy_pipeline(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_pipeline_promote",
+        "policy_pipeline.promote",
         "Make policy pipeline live (legacy promote alias)",
         body.canvas_id.as_deref(),
         serde_json::json!({ "canvas_id": &body.canvas_id }),
@@ -105,11 +105,11 @@ pub(super) async fn dispatch_task_board_policy_pipeline_promote(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_pipeline_make_live(
+pub(super) async fn dispatch_policy_pipeline_make_live(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyPipelineMakeLiveRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyPipelineMakeLiveRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy pipeline make live") {
@@ -119,7 +119,7 @@ pub(super) async fn dispatch_task_board_policy_pipeline_make_live(
     let result = task_board_route_executor::make_live_policy_pipeline(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_pipeline_make_live",
+        "policy_pipeline.make_live",
         "Make policy pipeline live",
         body.canvas_id.as_deref(),
         serde_json::json!({ "canvas_id": &body.canvas_id, "revision": body.revision }),
@@ -129,11 +129,11 @@ pub(super) async fn dispatch_task_board_policy_pipeline_make_live(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_pipeline_go_live_diff(
+pub(super) async fn dispatch_policy_pipeline_go_live_diff(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params_or_default::<TaskBoardPolicyPipelineGoLiveDiffRequest>(request)
+    let Ok(body) = parse_params_or_default::<PolicyPipelineGoLiveDiffRequest>(request)
     else {
         return invalid_params(request);
     };
@@ -147,11 +147,11 @@ pub(super) async fn dispatch_task_board_policy_pipeline_go_live_diff(
     )
 }
 
-pub(super) async fn dispatch_task_board_policy_pipeline_replay(
+pub(super) async fn dispatch_policy_pipeline_replay(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params_or_default::<TaskBoardPolicyPipelineReplayRequest>(request) else {
+    let Ok(body) = parse_params_or_default::<PolicyPipelineReplayRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy pipeline replay") {
@@ -164,11 +164,11 @@ pub(super) async fn dispatch_task_board_policy_pipeline_replay(
     )
 }
 
-pub(super) async fn dispatch_task_board_policy_pipeline_audit(
+pub(super) async fn dispatch_policy_pipeline_audit(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params_or_default::<TaskBoardPolicyPipelineAuditRequest>(request) else {
+    let Ok(body) = parse_params_or_default::<PolicyPipelineAuditRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy pipeline audit") {

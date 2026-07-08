@@ -7,7 +7,7 @@ import HarnessMonitorPolicyModels
 import SwiftUI
 
 func policyCanvasPort(
-  _ port: TaskBoardPolicyPipelinePort,
+  _ port: HarnessMonitorKit.PolicyPipelinePort,
   nodeKind: PolicyGraphNodeKind,
   kind: PolicyCanvasPortKind
 ) -> PolicyCanvasPort {
@@ -19,14 +19,14 @@ func policyCanvasPort(
   )
 }
 
-func taskBoardPolicyPort(
+func policyPort(
   _ port: PolicyCanvasPort,
   nodeKind: PolicyGraphNodeKind,
   kind: PolicyCanvasPortKind
-) -> TaskBoardPolicyPipelinePort {
-  return TaskBoardPolicyPipelinePort(
+) -> HarnessMonitorKit.PolicyPipelinePort {
+  return HarnessMonitorKit.PolicyPipelinePort(
     id: PolicyGraphPortId(
-      taskBoardPolicyPersistedPortID(port.id, title: port.title, nodeKind: nodeKind, kind: kind)
+      policyPersistedPortID(port.id, title: port.title, nodeKind: nodeKind, kind: kind)
     ),
     title: port.title
   )
@@ -45,7 +45,7 @@ func policyCanvasImportedPortID(
     return policyCanvasPortID(title: title, kind: kind)
   }
   return policyCanvasPortID(
-    title: taskBoardPolicyPersistedPortTitle(portID, kind: kind),
+    title: policyPersistedPortTitle(portID, kind: kind),
     kind: kind
   )
 }
@@ -56,7 +56,7 @@ func policyCanvasImportedPortID(
   nodeKind: PolicyGraphNodeKind,
   kind: PolicyCanvasPortKind
 ) -> String {
-  guard taskBoardPolicyUsesSwitchPortNormalization(nodeKind) else {
+  guard policyUsesSwitchPortNormalization(nodeKind) else {
     return portID
   }
   return policyCanvasPortID(title: title, kind: kind)
@@ -67,12 +67,12 @@ func policyCanvasImportedPortTitle(
   nodeKind: PolicyGraphNodeKind,
   kind: PolicyCanvasPortKind
 ) -> String {
-  taskBoardPolicyUsesSwitchPortNormalization(nodeKind)
-    ? taskBoardPolicyPersistedPortTitle(title, kind: kind)
+  policyUsesSwitchPortNormalization(nodeKind)
+    ? policyPersistedPortTitle(title, kind: kind)
     : title
 }
 
-func taskBoardPolicyPersistedPortID(
+func policyPersistedPortID(
   _ portID: String,
   node: PolicyCanvasNode?,
   kind: PolicyCanvasPortKind
@@ -82,16 +82,16 @@ func taskBoardPolicyPersistedPortID(
   }
   let ports = kind == .input ? node.inputPorts : node.outputPorts
   return ports.first(where: { $0.id == portID })?.title
-    ?? taskBoardPolicyPersistedPortTitle(portID, kind: kind)
+    ?? policyPersistedPortTitle(portID, kind: kind)
 }
 
-func taskBoardPolicyPersistedPortID(
+func policyPersistedPortID(
   _ portID: String,
   title: String,
   nodeKind: PolicyGraphNodeKind,
   kind: PolicyCanvasPortKind
 ) -> String {
-  guard taskBoardPolicyUsesSwitchPortNormalization(nodeKind) else {
+  guard policyUsesSwitchPortNormalization(nodeKind) else {
     return portID
   }
   return title

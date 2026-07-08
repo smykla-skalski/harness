@@ -26,7 +26,7 @@ public struct PolicyCanvasDraftSaveTransaction: Sendable {
     await exportPayload.runLocalPreflight()
   }
 
-  public func exportDocument() -> TaskBoardPolicyPipelineDocument {
+  public func exportDocument() -> PolicyPipelineDocument {
     exportPayload.exportDocument()
   }
 }
@@ -260,7 +260,7 @@ extension PolicyCanvasViewModel {
   @discardableResult
   public func finishDraftSaveTransaction(
     _ transaction: PolicyCanvasDraftSaveTransaction,
-    savedDocument: TaskBoardPolicyPipelineDocument?,
+    savedDocument: PolicyPipelineDocument?,
     reason: PolicyCanvasDraftSaveReason
   ) -> Bool {
     defer { endForegroundSave() }
@@ -317,7 +317,7 @@ extension PolicyCanvasViewModel {
   /// never mistaken for a remote change), and clears the dirty flags. Unlike
   /// `applyDocument` it does not recenter the viewport or clear the undo stack —
   /// a save is not a reload.
-  func markSavedDocument(_ document: TaskBoardPolicyPipelineDocument) {
+  func markSavedDocument(_ document: PolicyPipelineDocument) {
     backingDocument = document
     markLoadedDocumentRevision(document.revision)
     lastSelfSavedRevision = document.revision
@@ -341,7 +341,7 @@ extension PolicyCanvasViewModel {
   /// re-arms one follow-up save for the in-flight edits.
   func resolveSuccessfulSave(
     saveGeneration: UInt64,
-    savedDocument: TaskBoardPolicyPipelineDocument
+    savedDocument: PolicyPipelineDocument
   ) -> Bool {
     guard documentGeneration == saveGeneration else {
       // Edited mid-round-trip: a follow-up save is queued, so leave the pill on

@@ -306,7 +306,7 @@ async fn policy_save_draft_tool_proxies_to_running_daemon() {
         "document": PolicyPipelineDocument::default(),
     });
     let (result, captured) = call_task_board_tool(
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
+        ws_methods::POLICY_PIPELINE_SAVE_DRAFT,
         arguments.clone(),
         json!({ "revision": 2 }),
     )
@@ -315,7 +315,7 @@ async fn policy_save_draft_tool_proxies_to_running_daemon() {
     assert_eq!(text_result_json(&result), json!({ "revision": 2 }));
     assert_eq!(
         captured.request.method,
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT
+        ws_methods::POLICY_PIPELINE_SAVE_DRAFT
     );
     assert_eq!(captured.request.params, arguments);
 }
@@ -449,9 +449,9 @@ fn update_schema_uses_strict_additional_properties() {
 #[test]
 fn policy_pipeline_schemas_advertise_protocol_fields() {
     for tool_name in [
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
-        ws_methods::TASK_BOARD_POLICY_EXPORT,
+        ws_methods::POLICY_PIPELINE_GET,
+        ws_methods::POLICY_PIPELINE_AUDIT,
+        ws_methods::POLICY_CANVAS_EXPORT,
     ] {
         assert_schema_covers_fields(
             &task_board_tool_schema(tool_name),
@@ -461,8 +461,8 @@ fn policy_pipeline_schemas_advertise_protocol_fields() {
     }
 
     for tool_name in [
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE,
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_GO_LIVE_DIFF,
+        ws_methods::POLICY_PIPELINE_SIMULATE,
+        ws_methods::POLICY_PIPELINE_GO_LIVE_DIFF,
     ] {
         let schema = task_board_tool_schema(tool_name);
         assert_schema_covers_fields(&schema, tool_name, &["canvas_id", "document"]);
@@ -470,36 +470,36 @@ fn policy_pipeline_schemas_advertise_protocol_fields() {
     }
 
     let save_draft_schema =
-        task_board_tool_schema(ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT);
+        task_board_tool_schema(ws_methods::POLICY_PIPELINE_SAVE_DRAFT);
     assert_schema_covers_fields(
         &save_draft_schema,
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
+        ws_methods::POLICY_PIPELINE_SAVE_DRAFT,
         &["canvas_id", "if_revision", "document"],
     );
     assert_schema_requires_fields(
         &save_draft_schema,
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
+        ws_methods::POLICY_PIPELINE_SAVE_DRAFT,
         &["document"],
     );
 
     for tool_name in [
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE,
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_MAKE_LIVE,
+        ws_methods::POLICY_PIPELINE_PROMOTE,
+        ws_methods::POLICY_PIPELINE_MAKE_LIVE,
     ] {
         let schema = task_board_tool_schema(tool_name);
         assert_schema_covers_fields(&schema, tool_name, &["canvas_id", "revision", "actor"]);
         assert_schema_requires_fields(&schema, tool_name, &["revision"]);
     }
 
-    let import_schema = task_board_tool_schema(ws_methods::TASK_BOARD_POLICY_IMPORT);
+    let import_schema = task_board_tool_schema(ws_methods::POLICY_CANVAS_IMPORT);
     assert_schema_covers_fields(
         &import_schema,
-        ws_methods::TASK_BOARD_POLICY_IMPORT,
+        ws_methods::POLICY_CANVAS_IMPORT,
         &["document", "title"],
     );
     assert_schema_requires_fields(
         &import_schema,
-        ws_methods::TASK_BOARD_POLICY_IMPORT,
+        ws_methods::POLICY_CANVAS_IMPORT,
         &["document"],
     );
 }

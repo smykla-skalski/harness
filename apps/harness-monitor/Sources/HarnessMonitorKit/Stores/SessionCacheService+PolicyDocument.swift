@@ -4,17 +4,17 @@ import SwiftData
 extension SessionCacheService {
   struct CachedPolicyDocumentSnapshot: Sendable {
     let canvasId: String
-    let document: TaskBoardPolicyPipelineDocument
+    let document: PolicyPipelineDocument
   }
 
-  func cacheTaskBoardPolicyDocument(
+  func cachePolicyDocument(
     canvasId: String,
-    document: TaskBoardPolicyPipelineDocument
+    document: PolicyPipelineDocument
   ) async -> WriteResult {
     let context = makeContext()
     do {
       let data = try Codecs.encoder.encode(document)
-      var descriptor = FetchDescriptor<CachedTaskBoardPolicyDocument>(
+      var descriptor = FetchDescriptor<CachedPolicyDocument>(
         predicate: #Predicate { $0.canvasId == canvasId }
       )
       descriptor.fetchLimit = 1
@@ -22,7 +22,7 @@ extension SessionCacheService {
         existing.documentData = data
         existing.cachedAt = .now
       } else {
-        context.insert(CachedTaskBoardPolicyDocument(canvasId: canvasId, documentData: data))
+        context.insert(CachedPolicyDocument(canvasId: canvasId, documentData: data))
       }
     } catch {
       HarnessMonitorLogger.store.warning(
@@ -34,11 +34,11 @@ extension SessionCacheService {
     return WriteResult(didPersist: didPersist, metadataUpdate: .none)
   }
 
-  func loadTaskBoardPolicyDocument(
+  func loadPolicyDocument(
     canvasId: String
-  ) -> TaskBoardPolicyPipelineDocument? {
+  ) -> PolicyPipelineDocument? {
     let context = makeContext()
-    var descriptor = FetchDescriptor<CachedTaskBoardPolicyDocument>(
+    var descriptor = FetchDescriptor<CachedPolicyDocument>(
       predicate: #Predicate { $0.canvasId == canvasId }
     )
     descriptor.fetchLimit = 1
@@ -48,13 +48,13 @@ extension SessionCacheService {
     return try? cached.decodedDocument()
   }
 
-  func loadMostRecentTaskBoardPolicyDocument() -> TaskBoardPolicyPipelineDocument? {
-    loadMostRecentTaskBoardPolicyDocumentSnapshot()?.document
+  func loadMostRecentPolicyDocument() -> PolicyPipelineDocument? {
+    loadMostRecentPolicyDocumentSnapshot()?.document
   }
 
-  func loadMostRecentTaskBoardPolicyDocumentSnapshot() -> CachedPolicyDocumentSnapshot? {
+  func loadMostRecentPolicyDocumentSnapshot() -> CachedPolicyDocumentSnapshot? {
     let context = makeContext()
-    var descriptor = FetchDescriptor<CachedTaskBoardPolicyDocument>(
+    var descriptor = FetchDescriptor<CachedPolicyDocument>(
       sortBy: [SortDescriptor(\.cachedAt, order: .reverse)]
     )
     descriptor.fetchLimit = 1

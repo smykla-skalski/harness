@@ -6,7 +6,7 @@ use axum::response::Response;
 use axum::routing::post;
 
 use crate::daemon::protocol::{
-    TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest, http_paths,
+    PolicyCanvasExportRequest, PolicyCanvasImportRequest, http_paths,
 };
 
 use super::super::response::timed_json;
@@ -16,19 +16,19 @@ use super::authenticated_request;
 pub(super) fn merge_policy_io_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
     router
         .route(
-            http_paths::TASK_BOARD_POLICY_EXPORT,
-            post(post_task_board_policy_export),
+            http_paths::POLICY_CANVAS_EXPORT,
+            post(post_policy_export),
         )
         .route(
-            http_paths::TASK_BOARD_POLICY_IMPORT,
-            post(post_task_board_policy_import),
+            http_paths::POLICY_CANVAS_IMPORT,
+            post(post_policy_import),
         )
 }
 
-pub(super) async fn post_task_board_policy_export(
+pub(super) async fn post_policy_export(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyExportRequest>,
+    Json(request): Json<PolicyCanvasExportRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -40,17 +40,17 @@ pub(super) async fn post_task_board_policy_export(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_EXPORT,
+        http_paths::POLICY_CANVAS_EXPORT,
         &request_id,
         start,
         export,
     )
 }
 
-pub(super) async fn post_task_board_policy_import(
+pub(super) async fn post_policy_import(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardPolicyImportRequest>,
+    Json(request): Json<PolicyCanvasImportRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -62,7 +62,7 @@ pub(super) async fn post_task_board_policy_import(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_POLICY_IMPORT,
+        http_paths::POLICY_CANVAS_IMPORT,
         &request_id,
         start,
         import,

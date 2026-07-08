@@ -152,14 +152,14 @@ struct PolicyCanvasLayoutMigrationTests {
 
   @Test("pipeline layout JSON round-trips viewport and node positions")
   func pipelineLayoutJSONRoundTripsViewportAndNodePositions() throws {
-    let layout = TaskBoardPolicyPipelineLayout(
+    let layout = PolicyPipelineLayout(
       zoom: 1.25,
-      offset: TaskBoardPolicyCanvasPoint(x: 320.4, y: 180.6),
+      offset: PolicyCanvasPoint(x: 320.4, y: 180.6),
       nodes: [
-        TaskBoardPolicyPipelineNodeLayout(nodeId: "node-a", x: 40, y: 60, source: .manual)
+        PolicyPipelineNodeLayout(nodeId: "node-a", x: 40, y: 60, source: .manual)
       ],
       routingHints: [
-        TaskBoardPolicyPipelineEdgeRoutingHint(
+        PolicyPipelineEdgeRoutingHint(
           edgeId: "edge-a",
           sourceScopeId: "source-scope",
           targetScopeId: "target-scope",
@@ -175,10 +175,10 @@ struct PolicyCanvasLayoutMigrationTests {
     )
 
     let data = try JSONEncoder().encode(layout)
-    let decoded = try JSONDecoder().decode(TaskBoardPolicyPipelineLayout.self, from: data)
+    let decoded = try JSONDecoder().decode(PolicyPipelineLayout.self, from: data)
 
     #expect(decoded.zoom == 1.25)
-    #expect(decoded.offset == TaskBoardPolicyCanvasPoint(x: 320, y: 181))
+    #expect(decoded.offset == PolicyCanvasPoint(x: 320, y: 181))
     #expect(decoded.nodes == layout.nodes)
     #expect(decoded.routingHints == layout.routingHints)
   }
@@ -189,13 +189,13 @@ struct PolicyCanvasLayoutMigrationTests {
       {"nodes":[{"nodeId":"node-a","x":40,"y":60,"source":"manual"}]}
       """.utf8)
 
-    let decoded = try JSONDecoder().decode(TaskBoardPolicyPipelineLayout.self, from: data)
+    let decoded = try JSONDecoder().decode(PolicyPipelineLayout.self, from: data)
 
     #expect(decoded.zoom == 1)
     #expect(decoded.offset == .zero)
     #expect(
       decoded.nodes == [
-        TaskBoardPolicyPipelineNodeLayout(nodeId: "node-a", x: 40, y: 60, source: .manual)
+        PolicyPipelineNodeLayout(nodeId: "node-a", x: 40, y: 60, source: .manual)
       ]
     )
     #expect(decoded.routingHints.isEmpty)

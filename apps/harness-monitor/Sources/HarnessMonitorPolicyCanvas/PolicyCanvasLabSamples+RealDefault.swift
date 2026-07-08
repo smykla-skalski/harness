@@ -10,12 +10,12 @@ import HarnessMonitorPolicyCanvasAlgorithms
 // through the production Reformat route plan, so the saved layout is replaced by
 // the same engine arrangement and route repair contract used by the app.
 extension PolicyCanvasLabSamples {
-  static let realDefault: TaskBoardPolicyPipelineDocument = decodeRealDefault()
+  static let realDefault: PolicyPipelineDocument = decodeRealDefault()
 
-  private static func decodeRealDefault() -> TaskBoardPolicyPipelineDocument {
+  private static func decodeRealDefault() -> PolicyPipelineDocument {
     guard let data = Data(base64Encoded: realDefaultBase64.joined()),
       let decoded = try? PolicyWireCoding.decoder.decode(
-        TaskBoardPolicyPipelineDocument.self,
+        PolicyPipelineDocument.self,
         from: data
       )
     else {

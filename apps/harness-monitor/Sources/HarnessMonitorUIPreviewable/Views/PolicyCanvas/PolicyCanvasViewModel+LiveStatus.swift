@@ -26,14 +26,14 @@ extension PolicyCanvasViewModel {
   /// Store the daemon audit so the live anchor can compare the active enforced
   /// revision against the draft. Mirrors the `latestSimulation` preserve rule:
   /// a nil audit (e.g. a document-only push) never blanks the anchor.
-  func captureLiveAudit(_ audit: TaskBoardPolicyPipelineAuditSummary?) {
+  func captureLiveAudit(_ audit: PolicyPipelineAuditSummary?) {
     if let audit {
       latestAudit = audit
       globalPolicyEnforcementEnabled = audit.globalPolicyEnforcementEnabled
     }
   }
 
-  func captureLiveWorkspace(_ workspace: TaskBoardPolicyCanvasWorkspace?, activeCanvasId: String?) {
+  func captureLiveWorkspace(_ workspace: PolicyCanvasWorkspace?, activeCanvasId: String?) {
     guard let workspace else {
       livePublishedAt = nil
       return

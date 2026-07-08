@@ -11,7 +11,7 @@ extension PolicyCanvasLabSamples {
   /// and wait / event-wait steps, plus several cross-group long edges. It
   /// exercises every node kind in the catalog except `action_gate` (covered by
   /// the workflow-entry intake fan-out) - poke the layout engine hard.
-  static let extreme: TaskBoardPolicyPipelineDocument = {
+  static let extreme: PolicyPipelineDocument = {
     document(
       nodes: extremeNodes, edges: extremeEdges, groups: extremeGroups
     )
@@ -163,7 +163,7 @@ extension PolicyCanvasLabSamples {
     ),
   ]
 
-  static let extremeNodes: [TaskBoardPolicyPipelineNode] =
+  static let extremeNodes: [PolicyPipelineNode] =
     extremeIntakeNodes + extremeChecksNodes + extremeOrchestrationNodes
     + extremeAgentNodes + extremeGateNodes + extremeTerminalNodes
     + extremeDepthNodes
