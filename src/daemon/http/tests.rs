@@ -33,6 +33,7 @@ mod async_signal_mutations;
 mod async_stream;
 mod decode_failure_telemetry;
 mod remote_authz;
+mod remote_pairing;
 mod reviews_policy_writes;
 mod session_archive_tests;
 mod shutdown;
