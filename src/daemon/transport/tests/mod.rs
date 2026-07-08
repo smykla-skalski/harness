@@ -1,5 +1,6 @@
 mod cli;
 mod lifecycle;
+mod remote_acme;
 mod remote_cli;
 mod remote_clients;
 

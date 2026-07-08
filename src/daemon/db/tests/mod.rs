@@ -17,6 +17,7 @@ mod mutations;
 mod performance;
 mod projects;
 mod reconcile;
+mod remote_acme;
 mod remote_identity;
 mod remote_pairing;
 mod runtime;
