@@ -447,7 +447,7 @@ fn update_schema_uses_strict_additional_properties() {
 }
 
 #[test]
-fn policy_pipeline_schemas_advertise_protocol_fields() {
+fn policy_schemas_advertise_protocol_fields() {
     for tool_name in [
         ws_methods::POLICY_PIPELINE_GET,
         ws_methods::POLICY_PIPELINE_AUDIT,
@@ -469,8 +469,7 @@ fn policy_pipeline_schemas_advertise_protocol_fields() {
         assert_schema_omits_field(&schema, tool_name, "if_revision");
     }
 
-    let save_draft_schema =
-        task_board_tool_schema(ws_methods::POLICY_PIPELINE_SAVE_DRAFT);
+    let save_draft_schema = task_board_tool_schema(ws_methods::POLICY_PIPELINE_SAVE_DRAFT);
     assert_schema_covers_fields(
         &save_draft_schema,
         ws_methods::POLICY_PIPELINE_SAVE_DRAFT,

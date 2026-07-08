@@ -5,7 +5,9 @@ use std::sync::Arc;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::observe_async_db;
 use crate::daemon::service::reviews::policy_audit::record_policy_run_start_result;
-use crate::daemon::service::reviews::policy_enrichment::enrich_policy_target_for_execution;
+use crate::daemon::service::reviews::policy_enrichment::{
+    enrich_policy_target_for_execution, enrich_policy_targets_for_execution,
+};
 use crate::daemon::service::reviews::policy_executor::{
     build_policy_provider_registry, daemon_policy_executor_with_audit,
 };
@@ -122,9 +124,11 @@ pub(crate) async fn start_background_reviews_policy_runs(items: &[ReviewItem]) {
     if !background_reviews_policy_runs_enabled() {
         return;
     }
+    let targets = items.iter().map(ReviewItem::target).collect::<Vec<_>>();
+    let targets = enrich_policy_targets_for_execution(&targets).await;
     let mut started_runs = 0usize;
-    for item in items {
-        if start_background_reviews_policy_run_for_item(item).await {
+    for target in targets {
+        if start_background_reviews_policy_run_for_target(&target).await {
             started_runs += 1;
         }
     }
@@ -147,21 +151,20 @@ fn log_started_background_runs(started_runs: usize) {
 /// Resolve the executor for one review item and attempt a background policy run.
 /// Returns `true` only when a run was actually started; resolve and start
 /// failures are logged and reported as `false`.
-async fn start_background_reviews_policy_run_for_item(item: &ReviewItem) -> bool {
-    let target = enrich_policy_target_for_execution(&item.target()).await;
+async fn start_background_reviews_policy_run_for_target(target: &ReviewTarget) -> bool {
     let audit_db = observe_async_db();
-    let Some(executor) = resolve_background_run_executor(&target, audit_db.clone()) else {
+    let Some(executor) = resolve_background_run_executor(target, audit_db.clone()) else {
         return false;
     };
     maybe_start_background_reviews_policy_run_with_executor_and_audit_db(
         default_board_root(),
         executor,
-        &target,
+        target,
         GitHubMergeMethod::default(),
         audit_db,
     )
     .await
-    .inspect_err(|error| log_background_run_start_error(&target, error))
+    .inspect_err(|error| log_background_run_start_error(target, error))
     .is_ok_and(|started| started.is_some())
 }
 

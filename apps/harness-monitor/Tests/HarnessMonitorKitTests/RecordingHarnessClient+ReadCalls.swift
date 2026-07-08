@@ -116,11 +116,11 @@ extension RecordingHarnessClient.ReadCall {
     case .taskBoardGitRuntimeConfig:
       "task-board-git-runtime-config"
     case .policyCanvasWorkspace:
-      "task-board-policy-canvas-workspace"
+      "policy-canvas-workspace"
     case .policyPipeline:
-      "task-board-policy-pipeline"
+      "policy-pipeline"
     case .policyPipelineAudit:
-      "task-board-policy-pipeline-audit"
+      "policy-pipeline-audit"
     }
   }
 }
