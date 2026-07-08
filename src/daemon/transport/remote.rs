@@ -54,12 +54,12 @@ impl Execute for DaemonRemoteCommand {
         match self {
             Self::Pair { command } => command.execute(context),
             Self::Clients { command } => command.execute(context),
+            Self::Acme { command } => command.execute(context),
             Self::Serve(args) => {
                 args.remote_auth_scaffold_config()?;
                 Err(remote_execution_reserved_error())
             }
-            Self::Acme { .. }
-            | Self::Doctor
+            Self::Doctor
             | Self::InstallSystemd(_)
             | Self::UninstallSystemd(_)
             | Self::Status(_) => Err(remote_execution_reserved_error()),

@@ -56,6 +56,7 @@ mod diagnostics;
 mod imports;
 mod policy;
 mod rebuild;
+mod remote_acme;
 mod remote_identity;
 mod remote_pairing;
 mod review_writes;
@@ -100,6 +101,7 @@ use conversation::{
 };
 #[allow(unused_imports)]
 use diagnostics::import_daemon_events;
+pub(crate) use remote_acme::RemoteAcmeStoredState;
 pub(crate) use runtime::ensure_shared_db;
 #[cfg(test)]
 pub(crate) use schema::set_schema_init_hook;
