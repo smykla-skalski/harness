@@ -450,3 +450,7 @@ pub(super) fn next_cursor_or_scope_limit(
 pub(super) struct ScopeQuery {
     pub(super) query: String,
 }
+
+#[cfg(test)]
+#[path = "mapping_tests.rs"]
+mod tests;

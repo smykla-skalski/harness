@@ -1,5 +1,7 @@
 use crate::reviews::files::patch_rest::fetch_patches;
-use crate::reviews::{ReviewTarget, ReviewsGitHubClient, ReviewsRefreshRequest};
+use crate::reviews::{
+    ReviewMergeableState, ReviewTarget, ReviewsGitHubClient, ReviewsRefreshRequest,
+};
 
 use super::token::github_token;
 
@@ -13,10 +15,19 @@ pub(super) async fn enrich_policy_target_for_execution(target: &ReviewTarget) ->
     let mut enriched = refresh_policy_target(&client, target)
         .await
         .unwrap_or_else(|| target.clone());
-    if let Some(has_conflict_markers) = scan_conflict_markers(&client, &enriched).await {
+    if should_scan_conflict_markers(enriched.mergeable, enriched.has_conflict_markers)
+        && let Some(has_conflict_markers) = scan_conflict_markers(&client, &enriched).await
+    {
         enriched.has_conflict_markers = Some(has_conflict_markers);
     }
     enriched
+}
+
+fn should_scan_conflict_markers(
+    mergeable: ReviewMergeableState,
+    has_conflict_markers: Option<bool>,
+) -> bool {
+    mergeable != ReviewMergeableState::Conflicting && has_conflict_markers.is_none()
 }
 
 async fn refresh_policy_target(
@@ -80,7 +91,9 @@ fn added_line_is_conflict_marker(line: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::patch_has_added_conflict_marker;
+    use crate::reviews::ReviewMergeableState;
+
+    use super::{patch_has_added_conflict_marker, should_scan_conflict_markers};
 
     #[test]
     fn detects_added_conflict_marker_lines() {
@@ -92,5 +105,29 @@ mod tests {
     fn ignores_patch_headers_and_removed_markers() {
         let patch = "+++ b/src/lib.rs\n-<<<<<<< HEAD\n context\n";
         assert!(!patch_has_added_conflict_marker(patch));
+    }
+
+    #[test]
+    fn skips_marker_scan_when_conflicts_or_marker_evidence_are_known() {
+        assert!(should_scan_conflict_markers(
+            ReviewMergeableState::Mergeable,
+            None
+        ));
+        assert!(should_scan_conflict_markers(
+            ReviewMergeableState::Unknown,
+            None
+        ));
+        assert!(!should_scan_conflict_markers(
+            ReviewMergeableState::Conflicting,
+            None
+        ));
+        assert!(!should_scan_conflict_markers(
+            ReviewMergeableState::Mergeable,
+            Some(false)
+        ));
+        assert!(!should_scan_conflict_markers(
+            ReviewMergeableState::Mergeable,
+            Some(true)
+        ));
     }
 }
