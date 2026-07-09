@@ -156,6 +156,20 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     )
   }
 
+  func testDashboardPolicyFooterMarksLiveCanvasTabs() throws {
+    let dashboardFooterComponentsSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterComponents.swift"
+    )
+
+    XCTAssertTrue(dashboardFooterComponentsSource.contains("private var liveIndicator: some View"))
+    XCTAssertTrue(dashboardFooterComponentsSource.contains("canvas.mode == .enforced"))
+    XCTAssertTrue(
+      dashboardFooterComponentsSource.contains("Image(systemName: \"checkmark.seal.fill\")")
+    )
+    XCTAssertTrue(dashboardFooterComponentsSource.contains("isLive ? \"Live\" : \"Draft\""))
+    XCTAssertTrue(dashboardFooterComponentsSource.contains(".accessibilityHidden(true)"))
+  }
+
   func testDashboardPolicyRouteIntegratesCreateCanvasControlIntoTabStrip() throws {
     let dashboardFooterSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"

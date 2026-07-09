@@ -206,39 +206,56 @@ struct DashboardPolicyCanvasFooterTab: View {
   }
 
   private var titleButton: some View {
-    Text(canvas.title)
-      .font(.callout.weight(.medium))
-      .lineLimit(1)
-      .truncationMode(.tail)
-      .padding(.horizontal, tabHorizontalPadding)
-      .frame(maxWidth: tabMaxWidth, alignment: .leading)
-      .frame(maxHeight: .infinity, alignment: .leading)
-      .contentShape(Rectangle())
-      .dashboardPolicyCanvasFooterTabChrome(
-        isSelected: isSelected,
-        isHovering: isHovering,
-        isPressed: false,
-        showsLeadingSeparator: showsLeadingSeparator && isSelected
+    HStack(spacing: 6) {
+      liveIndicator
+
+      Text(canvas.title)
+        .lineLimit(1)
+        .truncationMode(.tail)
+    }
+    .font(.callout.weight(.medium))
+    .padding(.horizontal, tabHorizontalPadding)
+    .frame(maxWidth: tabMaxWidth, alignment: .leading)
+    .frame(maxHeight: .infinity, alignment: .leading)
+    .contentShape(Rectangle())
+    .dashboardPolicyCanvasFooterTabChrome(
+      isSelected: isSelected,
+      isHovering: isHovering,
+      isPressed: false,
+      showsLeadingSeparator: showsLeadingSeparator && isSelected
+    )
+    .overlay {
+      DashboardPolicyCanvasFooterTabClickTarget(
+        onHover: { hovering in
+          isHovering = hovering
+        },
+        singleClick: select,
+        doubleClick: {
+          guard canRename else { return }
+          beginRename()
+        }
       )
-      .overlay {
-        DashboardPolicyCanvasFooterTabClickTarget(
-          onHover: { hovering in
-            isHovering = hovering
-          },
-          singleClick: select,
-          doubleClick: {
-            guard canRename else { return }
-            beginRename()
-          }
-        )
+      .accessibilityHidden(true)
+    }
+    .accessibilityLabel(canvas.title)
+    .accessibilityValue(accessibilityValue)
+    .accessibilityAddTraits(.isButton)
+    .accessibilityAction {
+      select()
+    }
+  }
+
+  @ViewBuilder private var liveIndicator: some View {
+    if isLive {
+      Image(systemName: "checkmark.seal.fill")
+        .imageScale(.small)
+        .foregroundStyle(Color.accentColor)
         .accessibilityHidden(true)
-      }
-      .accessibilityLabel(canvas.title)
-      .accessibilityValue(accessibilityValue)
-      .accessibilityAddTraits(.isButton)
-      .accessibilityAction {
-        select()
-      }
+    }
+  }
+
+  private var isLive: Bool {
+    canvas.mode == .enforced
   }
 
   private var helpText: String {
@@ -259,6 +276,7 @@ struct DashboardPolicyCanvasFooterTab: View {
 
   private var metadataText: String {
     var parts = [
+      isLive ? "Live" : "Draft",
       "revision \(canvas.revision)",
       "\(canvas.nodeCount) nodes",
       "\(canvas.groupCount) groups",
