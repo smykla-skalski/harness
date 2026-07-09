@@ -19,6 +19,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::control::{adopt_daemon_root_for_transport_command, print_json};
+use super::remote_doctor::execute_remote_doctor;
 use super::remote_serve::execute_remote_serve;
 use super::remote_systemd::{DaemonRemoteSystemdArgs, DaemonRemoteSystemdInstallArgs};
 
@@ -61,16 +62,9 @@ impl Execute for DaemonRemoteCommand {
             Self::InstallSystemd(args) => args.execute(context),
             Self::UninstallSystemd(args) => args.uninstall(context),
             Self::Status(args) => args.status(context),
-            Self::Doctor => Err(remote_execution_reserved_error()),
+            Self::Doctor => execute_remote_doctor(),
         }
     }
-}
-
-fn remote_execution_reserved_error() -> CliError {
-    CliErrorKind::workflow_parse(
-        "remote daemon execution is reserved for the next implementation phase",
-    )
-    .into()
 }
 
 #[derive(Debug, Clone, Args)]
