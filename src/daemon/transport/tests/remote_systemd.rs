@@ -4,7 +4,9 @@ use clap::Parser;
 use tempfile::tempdir;
 
 use super::super::remote::DaemonRemoteCommand;
-use super::super::remote_systemd::{DaemonRemoteSystemdInstallArgs, RemoteSystemdInstallPlan};
+use super::super::remote_systemd::{
+    DaemonRemoteSystemdInstallArgs, RemoteSystemdInstallPlan, default_env_path_for_tests,
+};
 use super::super::remote_systemd_lifecycle::{
     RemoteSystemdCommandOutput,
     install_remote_systemd_with, uninstall_remote_systemd_with,
@@ -220,6 +222,36 @@ fn remote_systemd_high_ports_omit_bind_capability() {
 }
 
 #[test]
+fn remote_systemd_default_env_path_strips_service_suffix() {
+    assert_eq!(
+        default_env_path_for_tests("harness-remote-daemon"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env")
+    );
+    assert_eq!(
+        default_env_path_for_tests("harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env")
+    );
+}
+
+#[test]
+fn remote_systemd_status_rejects_unsafe_unit_name() {
+    let parsed = DaemonRemoteCommandTestHarness::try_parse_from([
+        "test",
+        "status",
+        "--unit",
+        "../harness-remote-daemon",
+    ])
+    .expect("parse status")
+    .command;
+
+    let DaemonRemoteCommand::Status(args) = parsed else {
+        panic!("expected status");
+    };
+
+    assert!(args.validate_for_tests().is_err());
+}
+
+#[test]
 fn remote_systemd_uninstall_reports_disable_failure() {
     let temp = tempdir().expect("temp dir");
     let unit_path = temp.path().join("systemd").join("remote.service");
@@ -262,6 +294,10 @@ fn remote_systemd_install_writes_files_with_secret_permissions_idempotently() {
         .join("systemd")
         .join("harness-remote-daemon.service");
     let env_path = temp.path().join("harness").join("remote-daemon.env");
+    std::fs::create_dir_all(unit_path.parent().expect("unit parent")).expect("unit dir");
+    std::fs::create_dir_all(env_path.parent().expect("env parent")).expect("env dir");
+    std::fs::write(&unit_path, "stale unit").expect("write stale unit");
+    std::fs::write(&env_path, "stale env").expect("write stale env");
     let args = install_args([
         "test",
         "--domain",

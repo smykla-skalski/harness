@@ -1,4 +1,5 @@
 use std::io::ErrorKind;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -158,14 +159,40 @@ fn write_if_changed(path: &Path, contents: &str, mode: u32) -> Result<bool, CliE
             )))
         })?;
     }
-    fs::write(path, contents).map_err(|error| {
+    write_atomic(path, contents, mode)?;
+    Ok(true)
+}
+
+fn write_atomic(path: &Path, contents: &str, mode: u32) -> Result<(), CliError> {
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
         CliError::from(CliErrorKind::workflow_io(format!(
-            "write {}: {error}",
+            "create temp file for {}: {error}",
             path.display()
         )))
     })?;
-    set_file_mode(path, mode)?;
-    Ok(true)
+    set_file_mode(temp.path(), mode)?;
+    temp.write_all(contents.as_bytes()).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "write temp file for {}: {error}",
+            path.display()
+        )))
+    })?;
+    temp.flush().map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "flush temp file for {}: {error}",
+            path.display()
+        )))
+    })?;
+    temp.persist(path)
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "persist {}: {}",
+                path.display(),
+                error.error
+            )))
+        })
+        .map(|_| ())
 }
 
 fn remove_if_exists(path: &Path) -> Result<bool, CliError> {

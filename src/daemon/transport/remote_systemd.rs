@@ -110,6 +110,7 @@ impl DaemonRemoteSystemdArgs {
     /// # Errors
     /// Returns [`CliError`] when Linux systemd is unavailable or status execution fails.
     pub fn status(&self, _context: &AppContext) -> Result<i32, CliError> {
+        self.validate()?;
         ensure_linux_systemd()?;
         let output = run_systemctl(&["status".to_string(), unit_service_name(&self.unit)])?;
         let response = RemoteSystemdStatusResponse {
@@ -130,10 +131,19 @@ impl DaemonRemoteSystemdArgs {
 }
 
 impl DaemonRemoteSystemdArgs {
+    fn validate(&self) -> Result<(), CliError> {
+        validate_unit_name(&self.unit)
+    }
+
     fn env_path(&self) -> PathBuf {
         self.env_file
             .clone()
             .unwrap_or_else(|| default_env_path(&self.unit))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn validate_for_tests(&self) -> Result<(), CliError> {
+        self.validate()
     }
 }
 
@@ -342,7 +352,13 @@ fn default_unit_path(unit: &str) -> PathBuf {
 }
 
 fn default_env_path(unit: &str) -> PathBuf {
+    let unit = unit.strip_suffix(".service").unwrap_or(unit);
     Path::new(SYSTEMD_ENV_DIR).join(format!("{unit}.env"))
+}
+
+#[cfg(test)]
+pub(crate) fn default_env_path_for_tests(unit: &str) -> PathBuf {
+    default_env_path(unit)
 }
 
 fn ensure_linux_systemd() -> Result<(), CliError> {
