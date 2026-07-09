@@ -237,6 +237,14 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(large.pillVerticalPadding > regular.pillVerticalPadding)
   }
 
+  @Test("Lane metrics expose a rounded top accent cap")
+  func laneMetricsExposeRoundedTopAccentCap() {
+    let metrics = TaskBoardLaneMetrics(fontScale: 1)
+
+    #expect(metrics.laneAccentHeight >= 12)
+    #expect(metrics.laneAccentCornerRadius == metrics.cardCornerRadius)
+  }
+
   @Test("Overview metrics share scaled board spacing and padding")
   func overviewMetricsShareScaledBoardSpacingAndPadding() {
     let regular = TaskBoardOverviewMetrics(fontScale: 1)

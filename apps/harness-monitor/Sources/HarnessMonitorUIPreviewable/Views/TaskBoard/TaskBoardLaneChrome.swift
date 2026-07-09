@@ -91,10 +91,7 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
           .strokeBorder(laneStrokeColor, lineWidth: laneStrokeWidth)
       }
       .overlay(alignment: .top) {
-        Rectangle()
-          .fill(laneAccentColor)
-          .padding(.horizontal, metrics.laneInnerPadding)
-          .frame(height: max(2, laneStrokeWidth + 1))
+        TaskBoardLaneAccentCap(color: laneAccentColor, metrics: metrics)
       }
   }
 
@@ -116,13 +113,49 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
 
   private var laneAccentColor: Color {
     if isDropTargeted {
-      return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.88 : 0.64)
+      return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 1 : 0.96)
     }
-    return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.72 : 0.48)
+    return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.96 : 0.9)
   }
 
   private var laneStrokeWidth: CGFloat {
     colorSchemeContrast == .increased ? 2 : 1
+  }
+}
+
+private struct TaskBoardLaneAccentCap: View {
+  let color: Color
+  let metrics: TaskBoardLaneMetrics
+
+  var body: some View {
+    TaskBoardLaneAccentCapShape(cornerRadius: metrics.laneAccentCornerRadius)
+      .fill(color)
+      .frame(height: metrics.laneAccentHeight)
+      .accessibilityHidden(true)
+      .allowsHitTesting(false)
+  }
+}
+
+private struct TaskBoardLaneAccentCapShape: Shape {
+  let cornerRadius: CGFloat
+
+  func path(in rect: CGRect) -> Path {
+    let radius = min(cornerRadius, rect.width / 2, rect.height)
+    var path = Path()
+    path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+    path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + radius))
+    path.addQuadCurve(
+      to: CGPoint(x: rect.minX + radius, y: rect.minY),
+      control: CGPoint(x: rect.minX, y: rect.minY)
+    )
+    path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.minY))
+    path.addQuadCurve(
+      to: CGPoint(x: rect.maxX, y: rect.minY + radius),
+      control: CGPoint(x: rect.maxX, y: rect.minY)
+    )
+    path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+    path.closeSubpath()
+    return path
   }
 }
 
