@@ -1,8 +1,8 @@
 use std::error::Error;
 
 use super::{
-    AcmeHttp01ChallengeStore, Dns01ExecHookOperation, Dns01ProviderAction, RemoteAcmeRuntimeState,
-    RemoteCertificateBundle, RemoteCertificateSlot, RemoteRenewalOutcome,
+    AcmeHttp01ChallengeStore, Dns01ChangeOperation, Dns01ExecHookOperation, Dns01ProviderAction,
+    RemoteAcmeRuntimeState, RemoteCertificateBundle, RemoteCertificateSlot, RemoteRenewalOutcome,
     build_remote_acme_runtime_plan,
 };
 use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
@@ -154,6 +154,91 @@ fn remote_dns01_providers_report_required_operations() {
     assert!(
         exec.command_preview()
             .contains("_acme-challenge.daemon.example.com")
+    );
+}
+
+#[test]
+fn remote_dns01_cloudflare_builds_present_and_cleanup_requests() {
+    let action = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Cloudflare,
+        "_acme-challenge.daemon.example.com",
+        "digest-value",
+    );
+
+    let present = action
+        .cloudflare_change_request("zone-123", Dns01ChangeOperation::Present)
+        .expect("cloudflare present request");
+    let cleanup = action
+        .cloudflare_change_request("zone-123", Dns01ChangeOperation::Cleanup)
+        .expect("cloudflare cleanup request");
+
+    assert_eq!(present.zone_id(), "zone-123");
+    assert_eq!(present.record_type(), "TXT");
+    assert_eq!(present.name(), "_acme-challenge.daemon.example.com");
+    assert_eq!(present.content(), "digest-value");
+    assert_eq!(present.ttl_seconds(), 120);
+    assert_eq!(present.operation().as_str(), "present");
+    assert_eq!(cleanup.operation().as_str(), "cleanup");
+}
+
+#[test]
+fn remote_dns01_route53_builds_present_and_cleanup_change_batches() {
+    let action = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Route53,
+        "_acme-challenge.daemon.example.com",
+        "digest-value",
+    );
+
+    let present = action
+        .route53_change_batch("Z123456", Dns01ChangeOperation::Present)
+        .expect("route53 present change");
+    let cleanup = action
+        .route53_change_batch("Z123456", Dns01ChangeOperation::Cleanup)
+        .expect("route53 cleanup change");
+
+    assert_eq!(present.hosted_zone_id(), "Z123456");
+    assert_eq!(present.record_type(), "TXT");
+    assert_eq!(present.name(), "_acme-challenge.daemon.example.com.");
+    assert_eq!(present.quoted_value(), "\"digest-value\"");
+    assert_eq!(present.ttl_seconds(), 60);
+    assert_eq!(present.action(), "UPSERT");
+    assert_eq!(cleanup.action(), "DELETE");
+}
+
+#[test]
+fn remote_dns01_native_provider_requests_validate_provider_and_zone_ids() {
+    let cloudflare = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Cloudflare,
+        "_acme-challenge.daemon.example.com",
+        "digest-value",
+    );
+    let route53 = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Route53,
+        "_acme-challenge.daemon.example.com",
+        "digest-value",
+    );
+
+    let missing_zone = cloudflare
+        .cloudflare_change_request("  ", Dns01ChangeOperation::Present)
+        .expect_err("cloudflare zone id is required");
+    assert!(missing_zone.to_string().contains("zone id is required"));
+
+    let wrong_provider = route53
+        .cloudflare_change_request("zone-123", Dns01ChangeOperation::Present)
+        .expect_err("route53 cannot build cloudflare requests");
+    assert!(
+        wrong_provider
+            .to_string()
+            .contains("cloudflare DNS provider")
+    );
+
+    let missing_hosted_zone = route53
+        .route53_change_batch("  ", Dns01ChangeOperation::Present)
+        .expect_err("route53 hosted zone id is required");
+    assert!(
+        missing_hosted_zone
+            .to_string()
+            .contains("hosted zone id is required")
     );
 }
 

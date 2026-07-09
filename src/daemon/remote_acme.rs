@@ -10,7 +10,9 @@ use super::remote::{
     validate_remote_serve_config,
 };
 pub use super::remote_acme_dns::{
-    Dns01ExecHookError, Dns01ExecHookInvocation, Dns01ExecHookOperation,
+    CloudflareDns01ChangeRequest, Dns01ChangeOperation, Dns01ExecHookError,
+    Dns01ExecHookInvocation, Dns01ExecHookOperation, Dns01ProviderChangeError,
+    Route53Dns01ChangeBatch,
 };
 
 #[cfg(test)]
@@ -236,6 +238,48 @@ impl Dns01ProviderAction {
                 )
             }
         }
+    }
+
+    /// Build the Cloudflare DNS-01 change request for this provider action.
+    ///
+    /// # Errors
+    /// Returns [`Dns01ProviderChangeError`] when this action is not for the
+    /// Cloudflare provider or the zone id is blank.
+    pub fn cloudflare_change_request(
+        &self,
+        zone_id: &str,
+        operation: Dns01ChangeOperation,
+    ) -> Result<CloudflareDns01ChangeRequest, Dns01ProviderChangeError> {
+        if self.provider != RemoteDnsProvider::Cloudflare {
+            return Err(Dns01ProviderChangeError::wrong_provider("cloudflare"));
+        }
+        CloudflareDns01ChangeRequest::new(
+            zone_id,
+            self.fqdn.as_str(),
+            self.digest.as_str(),
+            operation,
+        )
+    }
+
+    /// Build the Route53 DNS-01 change batch for this provider action.
+    ///
+    /// # Errors
+    /// Returns [`Dns01ProviderChangeError`] when this action is not for the
+    /// Route53 provider or the hosted zone id is blank.
+    pub fn route53_change_batch(
+        &self,
+        hosted_zone_id: &str,
+        operation: Dns01ChangeOperation,
+    ) -> Result<Route53Dns01ChangeBatch, Dns01ProviderChangeError> {
+        if self.provider != RemoteDnsProvider::Route53 {
+            return Err(Dns01ProviderChangeError::wrong_provider("route53"));
+        }
+        Route53Dns01ChangeBatch::new(
+            hosted_zone_id,
+            self.fqdn.as_str(),
+            self.digest.as_str(),
+            operation,
+        )
     }
 
     /// Run the generic DNS-01 exec hook for this provider action.
