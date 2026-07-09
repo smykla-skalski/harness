@@ -7,7 +7,7 @@ use crate::errors::{CliError, CliErrorKind};
 use super::control::adopt_daemon_root_for_transport_command;
 use super::remote::{DaemonRemoteServeArgs, open_remote_daemon_db};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct RemoteDaemonServeExecutionPlan {
     pub(crate) service_config: DaemonServeConfig,
     pub(crate) acme_plan: RemoteAcmeRuntimePlan,
