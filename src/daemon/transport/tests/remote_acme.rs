@@ -1,6 +1,9 @@
 use clap::Parser;
 
 use crate::daemon::db::DaemonDb;
+use crate::daemon::remote_acme::{
+    RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest, RemoteCertificateBundle,
+};
 
 use super::super::remote::{DaemonRemoteAcmeCommand, DaemonRemoteCommand};
 
@@ -104,4 +107,116 @@ fn daemon_remote_acme_renew_records_missing_state_failure_and_audit() {
     assert!(events.iter().any(|event| {
         event.route_or_method == "remote.acme.renew" && event.outcome.as_str() == "failure"
     }));
+}
+
+#[test]
+fn daemon_remote_acme_renew_preserves_missing_certificate_failure() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    db.connection()
+        .execute(
+            "UPDATE remote_acme_state
+             SET account_id = 'acct-1',
+                 certificate_pem = NULL,
+                 private_key_pem = NULL,
+                 certificate_fingerprint = NULL,
+                 renewal_status = 'unknown',
+                 renewal_error = NULL,
+                 updated_at = '2026-06-21T15:10:00Z'
+             WHERE singleton = 1",
+            [],
+        )
+        .expect("seed account-only acme state");
+
+    let response = DaemonRemoteAcmeCommand::Renew
+        .renew_with(&db, "audit-acme-renew", "2026-06-21T15:12:00Z")
+        .expect("renew response");
+
+    assert_eq!(response.renewal_status, "failed");
+    assert!(
+        response
+            .renewal_error
+            .as_deref()
+            .is_some_and(|error| error.contains("persisted TLS certificate"))
+    );
+    assert!(
+        !response
+            .renewal_error
+            .as_deref()
+            .is_some_and(|error| error.contains("not implemented"))
+    );
+}
+
+#[test]
+fn daemon_remote_acme_renew_persists_success_from_issuer_and_audits() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    db.connection()
+        .execute(
+            "UPDATE remote_acme_state
+             SET account_id = 'acct-1',
+                 certificate_pem = 'old-cert-pem',
+                 private_key_pem = 'old-key-secret',
+                 certificate_fingerprint = 'old-fp',
+                 renewal_status = 'failed',
+                 renewal_error = 'renewal failed: old error',
+                 updated_at = '2026-06-21T15:10:00Z'
+             WHERE singleton = 1",
+            [],
+        )
+        .expect("seed acme state");
+    let issuer = FakeRenewalIssuer {
+        expected_account_id: "acct-1",
+        bundle: RemoteCertificateBundle::new_for_tests("new-cert-pem", "new-key-secret"),
+    };
+
+    let response = DaemonRemoteAcmeCommand::Renew
+        .renew_with_issuer(&db, "audit-acme-renew", "2026-06-21T15:12:00Z", &issuer)
+        .expect("renew response");
+
+    assert!(response.account_configured);
+    assert!(response.certificate_configured);
+    assert_eq!(response.renewal_status, "succeeded");
+    assert_eq!(response.renewal_error, None);
+    assert_eq!(
+        response.certificate_fingerprint.as_deref(),
+        Some(issuer.bundle.fingerprint())
+    );
+    response.ensure_success().expect("renewal should succeed");
+
+    let json = serde_json::to_string(&response).expect("serialize renew response");
+    assert!(!json.contains("new-key-secret"));
+    assert!(!json.contains("new-cert-pem"));
+    assert!(!json.contains("old-key-secret"));
+
+    let state = db.load_remote_acme_state().expect("load acme state");
+    assert_eq!(state.renewal_status.as_str(), "succeeded");
+    assert_eq!(state.renewal_error, None);
+    assert_eq!(
+        state.certificate_fingerprint.as_deref(),
+        Some(issuer.bundle.fingerprint())
+    );
+
+    let events = db.load_remote_audit_events(10).expect("audit events");
+    assert!(events.iter().any(|event| {
+        event.route_or_method == "remote.acme.renew" && event.outcome.as_str() == "success"
+    }));
+}
+
+struct FakeRenewalIssuer {
+    expected_account_id: &'static str,
+    bundle: RemoteCertificateBundle,
+}
+
+impl RemoteAcmeRenewalIssuer for FakeRenewalIssuer {
+    fn supports_initial_certificate(&self) -> bool {
+        true
+    }
+
+    fn renew_certificate(
+        &self,
+        request: &RemoteAcmeRenewalRequest,
+    ) -> Result<RemoteCertificateBundle, String> {
+        assert_eq!(request.account_id(), self.expected_account_id);
+        assert_eq!(request.previous_certificate_fingerprint(), Some("old-fp"));
+        Ok(self.bundle.clone())
+    }
 }

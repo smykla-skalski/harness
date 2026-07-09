@@ -236,6 +236,49 @@ impl Dns01ProviderAction {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteAcmeRenewalRequest {
+    account_id: String,
+    previous_certificate_fingerprint: Option<String>,
+}
+
+impl RemoteAcmeRenewalRequest {
+    #[must_use]
+    pub fn new(account_id: impl Into<String>, previous_fingerprint: Option<&str>) -> Self {
+        Self {
+            account_id: account_id.into(),
+            previous_certificate_fingerprint: previous_fingerprint.map(ToOwned::to_owned),
+        }
+    }
+
+    #[must_use]
+    pub fn account_id(&self) -> &str {
+        &self.account_id
+    }
+
+    #[must_use]
+    pub fn previous_certificate_fingerprint(&self) -> Option<&str> {
+        self.previous_certificate_fingerprint.as_deref()
+    }
+}
+
+pub trait RemoteAcmeRenewalIssuer {
+    #[must_use]
+    fn supports_initial_certificate(&self) -> bool {
+        false
+    }
+
+    /// Issue or renew the remote daemon certificate for the supplied account.
+    ///
+    /// # Errors
+    /// Returns a redaction-ready operator detail when the issuer cannot produce
+    /// a certificate bundle.
+    fn renew_certificate(
+        &self,
+        request: &RemoteAcmeRenewalRequest,
+    ) -> Result<RemoteCertificateBundle, String>;
+}
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct RemoteCertificateBundle {
     certificate_pem: String,
