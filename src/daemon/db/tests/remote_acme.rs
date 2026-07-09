@@ -69,10 +69,26 @@ fn remote_acme_state_persists_serve_config_for_issuance() {
     assert_eq!(state.updated_at, "2026-06-21T15:03:00Z");
 
     let loaded = db
-        .load_remote_acme_serve_config()
-        .expect("load remote acme serve config")
+        .load_remote_acme_state()
+        .expect("load remote acme state")
+        .serve_config
         .expect("stored remote acme serve config");
     assert_eq!(loaded, *stored);
+}
+
+#[test]
+fn remote_acme_serve_config_rejects_blank_host_before_persisting() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let mut config = remote_serve_config();
+    config.host = "   ".to_string();
+
+    let error = db
+        .record_remote_acme_serve_config(&config, "2026-06-21T15:03:00Z")
+        .expect_err("blank host should not be persisted");
+
+    assert!(error.to_string().contains("bind host"));
+    let state = db.load_remote_acme_state().expect("load acme state");
+    assert_eq!(state.serve_config, None);
 }
 
 #[test]
@@ -129,10 +145,11 @@ fn migrates_v27_remote_acme_state_to_serve_config_columns() {
             .expect("query remote acme column");
         assert_eq!(count, 1, "missing remote_acme_state column: {column}");
     }
-    assert!(
-        db.load_remote_acme_serve_config()
-            .expect("load migrated serve config")
-            .is_none()
+    assert_eq!(
+        db.load_remote_acme_state()
+            .expect("load migrated acme state")
+            .serve_config,
+        None
     );
 }
 

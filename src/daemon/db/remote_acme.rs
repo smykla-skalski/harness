@@ -83,18 +83,6 @@ impl DaemonDb {
             .ok_or_else(|| db_error("remote acme singleton state row is missing"))
     }
 
-    /// Load the persisted remote ACME serve config used by certificate issuance.
-    ///
-    /// # Errors
-    /// Returns [`CliError`] when the singleton state row is missing, SQL loading
-    /// fails, or the stored config is internally invalid.
-    pub(crate) fn load_remote_acme_serve_config(
-        &self,
-    ) -> Result<Option<RemoteDaemonServeConfig>, CliError> {
-        self.load_remote_acme_state()
-            .map(|state| state.serve_config)
-    }
-
     /// Persist the remote serve config needed for later ACME issuance.
     ///
     /// # Errors

@@ -95,9 +95,8 @@ impl DaemonRemoteAcmeCommand {
             return Err(CliErrorKind::workflow_parse("remote acme command must be renew").into());
         };
         let state = db.load_remote_acme_state()?;
-        let serve_config = db.load_remote_acme_serve_config()?;
         let outcome =
-            renew_remote_acme_certificate(db, &state, serve_config.as_ref(), issuer, now)?;
+            renew_remote_acme_certificate(db, &state, state.serve_config.as_ref(), issuer, now)?;
         let state = db.load_remote_acme_state()?;
         record_remote_acme_audit(
             db,
