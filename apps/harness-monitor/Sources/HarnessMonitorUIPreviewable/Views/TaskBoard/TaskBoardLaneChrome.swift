@@ -91,7 +91,6 @@ private struct TaskBoardLaneToggleFeedback: ViewModifier {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
           .strokeBorder(taskBoardLaneColor(for: lane).opacity(strokeOpacity), lineWidth: 1)
       }
-      .scaleEffect(isPressed ? 0.985 : 1)
       .onHover { hovering in
         isHovered = hovering
       }
