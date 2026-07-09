@@ -323,6 +323,7 @@ pub use reviews_files::{
 pub use reviews_thread_resolve::set_review_thread_resolved;
 pub use reviews_timeline::{clear_reviews_caches_with_timeline, fetch_review_timeline};
 pub use serve::serve;
+pub(crate) use serve::serve_remote_https;
 pub use sessions::{
     list_projects, list_sessions, session_detail, session_detail_core, session_extensions,
     session_timeline,

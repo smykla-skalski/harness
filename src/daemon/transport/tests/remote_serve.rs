@@ -7,7 +7,7 @@ use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::state;
 
 use super::super::remote::{DaemonRemoteCommand, DaemonRemoteServeArgs};
-use super::super::remote_serve::build_remote_serve_execution_plan;
+use super::super::remote_serve::{build_remote_serve_execution_plan, execute_remote_serve_with};
 
 #[derive(Debug, Parser)]
 struct DaemonRemoteServeArgsTestHarness {
@@ -75,22 +75,27 @@ fn daemon_remote_serve_execution_plan_uses_remote_auth_and_tls() {
 }
 
 #[test]
-fn daemon_remote_serve_execute_reports_explicit_unimplemented_listener() {
-    let temp = tempfile::tempdir().expect("temp dir");
-    with_isolated_harness_env(temp.path(), || {
-        state::ensure_daemon_dirs().expect("daemon dirs");
-        let db = DaemonDb::open(&state::daemon_root().join("harness.db")).expect("open daemon db");
-        seed_acme_state(&db);
-        let command = DaemonRemoteCommand::Serve(remote_serve_args());
+fn daemon_remote_serve_execute_invokes_https_runner_after_preflight() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    seed_acme_state(&db);
 
-        let error = command
-            .execute(&AppContext)
-            .expect_err("remote serve should fail before listener implementation");
-        let message = error.to_string();
+    let exit = execute_remote_serve_with(
+        &remote_serve_args(),
+        || Ok(db),
+        |plan| {
+            assert_eq!(plan.service_config.host, "0.0.0.0");
+            assert_eq!(plan.service_config.port, 443);
+            assert_eq!(
+                plan.acme_plan.public_https_origin(),
+                "https://daemon.example.com"
+            );
+            assert!(plan.acme_plan.certificate().has_material());
+            Ok(0)
+        },
+    )
+    .expect("remote serve should invoke https runner after preflight");
 
-        assert!(message.contains("not implemented yet"));
-        assert!(message.contains("TLS preflight passed"));
-    });
+    assert_eq!(exit, 0);
 }
 
 fn remote_serve_args() -> DaemonRemoteServeArgs {

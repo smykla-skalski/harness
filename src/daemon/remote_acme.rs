@@ -236,11 +236,21 @@ impl Dns01ProviderAction {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct RemoteCertificateBundle {
     certificate_pem: String,
     private_key_pem: String,
     fingerprint: String,
+}
+
+impl fmt::Debug for RemoteCertificateBundle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RemoteCertificateBundle")
+            .field("certificate_pem", &"<redacted>")
+            .field("private_key_pem", &"<redacted>")
+            .field("fingerprint", &self.fingerprint)
+            .finish()
+    }
 }
 
 impl RemoteCertificateBundle {
@@ -267,6 +277,16 @@ impl RemoteCertificateBundle {
     #[must_use]
     pub fn fingerprint(&self) -> &str {
         &self.fingerprint
+    }
+
+    #[must_use]
+    pub(crate) fn certificate_pem(&self) -> &str {
+        &self.certificate_pem
+    }
+
+    #[must_use]
+    pub(crate) fn private_key_pem(&self) -> &str {
+        &self.private_key_pem
     }
 
     #[must_use]

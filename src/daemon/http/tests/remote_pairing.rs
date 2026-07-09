@@ -349,7 +349,7 @@ async fn serve_http(state: crate::daemon::http::DaemonHttpState) -> (String, Joi
         .expect("bind listener");
     let addr = listener.local_addr().expect("listener addr");
     let app = super::super::daemon_http_router(state)
-        .into_make_service_with_connect_info::<std::net::SocketAddr>();
+        .into_make_service_with_connect_info::<crate::daemon::http::DaemonConnectInfo>();
     let server = tokio::spawn(async move {
         axum::serve(listener, app).await.expect("serve router");
     });

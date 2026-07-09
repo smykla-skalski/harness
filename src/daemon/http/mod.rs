@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
@@ -7,9 +8,11 @@ use std::time::Instant;
 use axum::Router;
 use axum::body::Body;
 use axum::extract::MatchedPath;
+use axum::extract::connect_info::Connected;
 use axum::http::Request;
 use axum::middleware::{self, Next};
 use axum::response::Response;
+use axum::serve::{IncomingStream, Listener};
 use tokio::net::TcpListener;
 #[cfg(test)]
 use tokio::runtime::{Handle, RuntimeFlavor};
@@ -23,8 +26,8 @@ use crate::daemon::agent_acp::AcpAgentManagerHandle;
 use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
-use crate::daemon::remote_pairing::RemotePairingRateLimiter;
 use crate::daemon::protocol::StreamEvent;
+use crate::daemon::remote_pairing::RemotePairingRateLimiter;
 use crate::daemon::service::{
     WakeDispatch, register_local_clone_progress_sender, run_local_clone_gc,
 };
@@ -104,6 +107,29 @@ pub(crate) fn require_async_db<'a>(
         .get()
         .map(AsRef::as_ref)
         .ok_or_else(|| canonical_db_unavailable(operation))
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct DaemonConnectInfo {
+    remote_addr: SocketAddr,
+}
+
+impl DaemonConnectInfo {
+    #[must_use]
+    pub(crate) const fn new(remote_addr: SocketAddr) -> Self {
+        Self { remote_addr }
+    }
+
+    #[must_use]
+    pub const fn remote_addr(self) -> SocketAddr {
+        self.remote_addr
+    }
+}
+
+impl Connected<IncomingStream<'_, TcpListener>> for DaemonConnectInfo {
+    fn connect_info(stream: IncomingStream<'_, TcpListener>) -> Self {
+        Self::new(*stream.remote_addr())
+    }
 }
 
 #[cfg(test)]
@@ -304,11 +330,16 @@ fn recover_poisoned_mutation_lock_map(
 ///
 /// # Errors
 /// Returns `CliError` on listener failures.
-pub async fn serve(
-    listener: TcpListener,
+pub(crate) async fn serve<L>(
+    listener: L,
     state: DaemonHttpState,
     mut shutdown_rx: watch::Receiver<bool>,
-) -> Result<(), CliError> {
+) -> Result<(), CliError>
+where
+    L: Listener<Addr = SocketAddr>,
+    L::Addr: Debug,
+    for<'a> DaemonConnectInfo: Connected<IncomingStream<'a, L>>,
+{
     // Hand the broadcast sender to the reviews files module so
     // local-clone progress events surface on the same WS push channel.
     register_local_clone_progress_sender(state.sender.clone());
@@ -339,23 +370,26 @@ pub async fn serve(
 
     let app = daemon_http_router(state);
 
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-        .with_graceful_shutdown(async move {
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<DaemonConnectInfo>(),
+    )
+    .with_graceful_shutdown(async move {
+        if *shutdown_rx.borrow() {
+            return;
+        }
+        while shutdown_rx.changed().await.is_ok() {
             if *shutdown_rx.borrow() {
-                return;
+                break;
             }
-            while shutdown_rx.changed().await.is_ok() {
-                if *shutdown_rx.borrow() {
-                    break;
-                }
-            }
-        })
-        .await
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "serve daemon http api: {error}"
-            )))
-        })
+        }
+    })
+    .await
+    .map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "serve daemon http api: {error}"
+        )))
+    })
 }
 
 fn daemon_http_router(state: DaemonHttpState) -> Router<()> {

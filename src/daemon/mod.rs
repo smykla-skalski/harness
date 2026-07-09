@@ -40,6 +40,7 @@ pub mod remote_auth;
 pub(crate) mod remote_crypto;
 pub mod remote_identity;
 pub mod remote_pairing;
+pub mod remote_tls;
 pub mod service;
 pub mod snapshot;
 pub mod state;
