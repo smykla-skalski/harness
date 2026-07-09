@@ -137,6 +137,64 @@ fn migrates_v27_remote_acme_state_to_serve_config_columns() {
 }
 
 #[test]
+fn repairs_partially_applied_v28_remote_acme_config_columns() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let path = tmp.path().join("harness.db");
+    {
+        let db = DaemonDb::open(&path).expect("open current db");
+        db.conn
+            .execute_batch(
+                "CREATE TABLE remote_acme_state_v27 (
+                     singleton               INTEGER PRIMARY KEY CHECK (singleton = 1),
+                     account_id              TEXT,
+                     certificate_pem         TEXT,
+                     private_key_pem         TEXT,
+                     certificate_fingerprint TEXT,
+                     renewal_status          TEXT NOT NULL DEFAULT 'unknown',
+                     renewal_error           TEXT,
+                     updated_at              TEXT NOT NULL,
+                     domain                  TEXT
+                 ) WITHOUT ROWID;
+                 INSERT INTO remote_acme_state_v27 (
+                     singleton, account_id, certificate_pem, private_key_pem,
+                     certificate_fingerprint, renewal_status, renewal_error, updated_at, domain
+                 )
+                 SELECT singleton, account_id, certificate_pem, private_key_pem,
+                        certificate_fingerprint, renewal_status, renewal_error, updated_at,
+                        'daemon.example.com'
+                 FROM remote_acme_state;
+                 DROP TABLE remote_acme_state;
+                 ALTER TABLE remote_acme_state_v27 RENAME TO remote_acme_state;
+                 UPDATE schema_meta SET value = '27' WHERE key = 'version';",
+            )
+            .expect("simulate partial v28 remote acme state");
+    }
+
+    let db = DaemonDb::open(&path).expect("open repaired db");
+
+    assert_eq!(db.schema_version().expect("version"), SCHEMA_VERSION);
+    for column in [
+        "domain",
+        "host",
+        "https_port",
+        "http_port",
+        "acme_email",
+        "acme_challenge",
+        "acme_dns_provider",
+    ] {
+        let count: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('remote_acme_state') WHERE name = ?1",
+                [column],
+                |row| row.get(0),
+            )
+            .expect("query remote acme column");
+        assert_eq!(count, 1, "missing remote_acme_state column: {column}");
+    }
+}
+
+#[test]
 fn remote_acme_runtime_state_loads_certificate_material_for_serve() {
     let db = DaemonDb::open_in_memory().expect("open db");
     db.conn
