@@ -11,8 +11,8 @@ use crate::errors::{CliError, CliErrorKind};
 use super::control::print_json;
 use super::remote::DaemonRemoteServeArgs;
 use super::remote_systemd_lifecycle::{
-    RemoteSystemdInstallReport, install_remote_systemd_with, run_systemctl, unit_service_name,
-    uninstall_remote_systemd_with, validate_unit_name,
+    RemoteSystemdInstallReport, install_remote_systemd_with, normalize_unit_name, run_systemctl,
+    unit_service_name, uninstall_remote_systemd_with, validate_unit_name,
 };
 
 const DEFAULT_UNIT: &str = "harness-remote-daemon";
@@ -184,19 +184,20 @@ impl RemoteSystemdInstallPlan {
         unit_path: PathBuf,
         env_path: PathBuf,
     ) -> Result<Self, CliError> {
-        validate_unit_name(&args.systemd.unit)?;
+        let unit = normalize_unit_name(&args.systemd.unit);
+        validate_unit_name(unit)?;
         let serve_config = args.serve.contract_config()?;
         let needs_bind_capability = serve_config.https_port < 1024 || serve_config.http_port < 1024;
         let unit_contents = render_unit(
-            &args.systemd.unit,
+            unit,
             &binary_path,
             &env_path,
             &serve_config,
             needs_bind_capability,
         );
-        let env_contents = render_env_file(&args.systemd.unit);
+        let env_contents = render_env_file(unit);
         Ok(Self {
-            unit: args.systemd.unit.clone(),
+            unit: unit.to_string(),
             binary_path,
             unit_path,
             env_path,
@@ -352,7 +353,7 @@ fn default_unit_path(unit: &str) -> PathBuf {
 }
 
 fn default_env_path(unit: &str) -> PathBuf {
-    let unit = unit.strip_suffix(".service").unwrap_or(unit);
+    let unit = normalize_unit_name(unit);
     Path::new(SYSTEMD_ENV_DIR).join(format!("{unit}.env"))
 }
 

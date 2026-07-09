@@ -132,6 +132,10 @@ pub(super) fn unit_service_name(unit: &str) -> String {
     }
 }
 
+pub(super) fn normalize_unit_name(unit: &str) -> &str {
+    unit.strip_suffix(".service").unwrap_or(unit)
+}
+
 pub(super) fn validate_unit_name(unit: &str) -> Result<(), CliError> {
     if !unit.is_empty()
         && !unit.contains('/')

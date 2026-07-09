@@ -223,6 +223,33 @@ fn remote_systemd_high_ports_omit_bind_capability() {
 
 #[test]
 fn remote_systemd_default_env_path_strips_service_suffix() {
+    let args = install_args([
+        "test",
+        "--unit",
+        "harness-remote-daemon.service",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+    ]);
+    let plan = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        default_env_path_for_tests("harness-remote-daemon.service"),
+    )
+    .expect("systemd install plan");
+
+    assert_eq!(plan.unit, "harness-remote-daemon");
+    assert!(
+        plan.unit_contents
+            .contains("Environment=HARNESS_DAEMON_DATA_HOME=%S/harness-remote-daemon")
+    );
+    assert!(
+        plan.unit_contents
+            .contains("StateDirectory=harness-remote-daemon")
+    );
+    assert!(!plan.unit_contents.contains("StateDirectory=harness-remote-daemon.service"));
     assert_eq!(
         default_env_path_for_tests("harness-remote-daemon"),
         PathBuf::from("/etc/harness/harness-remote-daemon.env")
