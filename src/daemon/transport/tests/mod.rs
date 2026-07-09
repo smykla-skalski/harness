@@ -3,6 +3,7 @@ mod lifecycle;
 mod remote_acme;
 mod remote_cli;
 mod remote_clients;
+mod remote_systemd;
 
 use std::path::{Path, PathBuf};
 
