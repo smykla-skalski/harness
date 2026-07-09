@@ -43,6 +43,8 @@ pub(crate) struct RemoteSystemdUninstallReport {
     pub unit_removed: bool,
     pub env_removed: bool,
     pub disabled: bool,
+    pub disable_exit_code: Option<i32>,
+    pub disable_error: Option<String>,
     pub daemon_reloaded: bool,
 }
 
@@ -86,17 +88,20 @@ where
 {
     validate_unit_name(unit)?;
     let service = unit_service_name(unit);
-    let _ = run_systemctl(&["disable".to_string(), "--now".to_string(), service]);
+    let disable_result = run_systemctl(&["disable".to_string(), "--now".to_string(), service]);
     let unit_removed = remove_if_exists(unit_path)?;
     let env_removed = remove_if_exists(env_path)?;
     run_checked(run_systemctl, &["daemon-reload".to_string()])?;
+    let (disabled, disable_exit_code, disable_error) = disable_report(disable_result);
     Ok(RemoteSystemdUninstallReport {
         unit: unit.to_string(),
         unit_path: unit_path.to_path_buf(),
         env_path: env_path.to_path_buf(),
         unit_removed,
         env_removed,
-        disabled: true,
+        disabled,
+        disable_exit_code,
+        disable_error,
         daemon_reloaded: true,
     })
 }
@@ -170,6 +175,22 @@ fn remove_if_exists(path: &Path) -> Result<bool, CliError> {
         Err(error) => {
             Err(CliErrorKind::workflow_io(format!("remove {}: {error}", path.display())).into())
         }
+    }
+}
+
+fn disable_report(
+    result: Result<RemoteSystemdCommandOutput, CliError>,
+) -> (bool, Option<i32>, Option<String>) {
+    match result {
+        Ok(output) => {
+            let error = if output.exit_code == 0 {
+                None
+            } else {
+                Some(output.stderr.trim().to_string())
+            };
+            (output.exit_code == 0, Some(output.exit_code), error)
+        }
+        Err(error) => (false, None, Some(error.to_string())),
     }
 }
 

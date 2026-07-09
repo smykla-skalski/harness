@@ -52,6 +52,51 @@ fn daemon_remote_install_systemd_parses_remote_serve_contract() {
 }
 
 #[test]
+fn daemon_remote_systemd_lifecycle_parses_custom_env_file() {
+    let parsed = DaemonRemoteCommandTestHarness::try_parse_from([
+        "test",
+        "uninstall-systemd",
+        "--unit",
+        "harness-remote",
+        "--env-file",
+        "/srv/harness/remote.env",
+        "--json",
+    ])
+    .expect("parse uninstall-systemd")
+    .command;
+
+    match parsed {
+        DaemonRemoteCommand::UninstallSystemd(args) => {
+            assert_eq!(args.unit, "harness-remote");
+            assert_eq!(args.env_file, Some(PathBuf::from("/srv/harness/remote.env")));
+            assert!(args.json);
+        }
+        other => panic!("expected uninstall-systemd, got {other:?}"),
+    }
+
+    let parsed = DaemonRemoteCommandTestHarness::try_parse_from([
+        "test",
+        "status",
+        "--unit",
+        "harness-remote",
+        "--env-file",
+        "/srv/harness/remote.env",
+        "--json",
+    ])
+    .expect("parse status")
+    .command;
+
+    match parsed {
+        DaemonRemoteCommand::Status(args) => {
+            assert_eq!(args.unit, "harness-remote");
+            assert_eq!(args.env_file, Some(PathBuf::from("/srv/harness/remote.env")));
+            assert!(args.json);
+        }
+        other => panic!("expected status, got {other:?}"),
+    }
+}
+
+#[test]
 fn remote_systemd_unit_is_hardened_and_runs_remote_serve() {
     let args = install_args([
         "test",
@@ -113,6 +158,34 @@ fn remote_systemd_unit_is_hardened_and_runs_remote_serve() {
 }
 
 #[test]
+fn remote_systemd_execstart_uses_trimmed_remote_serve_config() {
+    let args = install_args([
+        "test",
+        "--domain",
+        " daemon.example.com ",
+        "--host",
+        " 0.0.0.0 ",
+        "--acme-email",
+        " ops@example.com ",
+    ]);
+    let plan = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+    )
+    .expect("systemd install plan");
+
+    assert!(
+        plan.unit_contents
+            .contains("--domain daemon.example.com --host 0.0.0.0")
+    );
+    assert!(plan.unit_contents.contains("--acme-email ops@example.com"));
+    assert!(!plan.unit_contents.contains("' daemon.example.com '"));
+    assert!(!plan.unit_contents.contains("' ops@example.com '"));
+}
+
+#[test]
 fn remote_systemd_high_ports_omit_bind_capability() {
     let args = install_args([
         "test",
@@ -144,6 +217,41 @@ fn remote_systemd_high_ports_omit_bind_capability() {
             .unit_contents
             .contains("CapabilityBoundingSet=CAP_NET_BIND_SERVICE")
     );
+}
+
+#[test]
+fn remote_systemd_uninstall_reports_disable_failure() {
+    let temp = tempdir().expect("temp dir");
+    let unit_path = temp.path().join("systemd").join("remote.service");
+    let env_path = temp.path().join("harness").join("remote.env");
+    std::fs::create_dir_all(unit_path.parent().expect("unit parent")).expect("unit dir");
+    std::fs::create_dir_all(env_path.parent().expect("env parent")).expect("env dir");
+    std::fs::write(&unit_path, "unit").expect("write unit");
+    std::fs::write(&env_path, "env").expect("write env");
+    let runner = |args: &[String]| {
+        if args.first().map(String::as_str) == Some("disable") {
+            return Ok(RemoteSystemdCommandOutput {
+                exit_code: 5,
+                stdout: String::new(),
+                stderr: "unit not loaded".to_string(),
+            });
+        }
+        Ok(RemoteSystemdCommandOutput {
+            exit_code: 0,
+            stdout: String::new(),
+            stderr: String::new(),
+        })
+    };
+
+    let report = uninstall_remote_systemd_with("remote", &unit_path, &env_path, &runner)
+        .expect("uninstall continues after disable failure");
+
+    assert!(!report.disabled);
+    assert_eq!(report.disable_exit_code, Some(5));
+    assert_eq!(report.disable_error.as_deref(), Some("unit not loaded"));
+    assert!(report.unit_removed);
+    assert!(report.env_removed);
+    assert!(report.daemon_reloaded);
 }
 
 #[test]

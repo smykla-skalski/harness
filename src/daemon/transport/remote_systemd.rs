@@ -5,6 +5,7 @@ use clap::Args;
 use serde::Serialize;
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::remote::RemoteDaemonServeConfig;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::control::print_json;
@@ -30,6 +31,9 @@ pub struct DaemonRemoteSystemdArgs {
     /// systemd unit name.
     #[arg(long, default_value = DEFAULT_UNIT)]
     pub unit: String,
+    /// Path for the `EnvironmentFile` referenced by the service unit.
+    #[arg(long)]
+    pub env_file: Option<PathBuf>,
     /// Output as JSON.
     #[arg(long)]
     pub json: bool,
@@ -88,7 +92,7 @@ impl DaemonRemoteSystemdArgs {
     pub fn uninstall(&self, _context: &AppContext) -> Result<i32, CliError> {
         ensure_linux_systemd()?;
         let unit_path = default_unit_path(&self.unit);
-        let env_path = default_env_path(&self.unit);
+        let env_path = self.env_path();
         let report =
             uninstall_remote_systemd_with(&self.unit, &unit_path, &env_path, &run_systemctl)?;
         if self.json {
@@ -110,6 +114,7 @@ impl DaemonRemoteSystemdArgs {
         let output = run_systemctl(&["status".to_string(), unit_service_name(&self.unit)])?;
         let response = RemoteSystemdStatusResponse {
             unit: self.unit.clone(),
+            env_path: self.env_path(),
             exit_code: output.exit_code,
             stdout: output.stdout,
             stderr: output.stderr,
@@ -121,6 +126,14 @@ impl DaemonRemoteSystemdArgs {
             eprint!("{}", response.stderr);
         }
         Ok(response.exit_code)
+    }
+}
+
+impl DaemonRemoteSystemdArgs {
+    fn env_path(&self) -> PathBuf {
+        self.env_file
+            .clone()
+            .unwrap_or_else(|| default_env_path(&self.unit))
     }
 }
 
@@ -168,7 +181,7 @@ impl RemoteSystemdInstallPlan {
             &args.systemd.unit,
             &binary_path,
             &env_path,
-            args,
+            &serve_config,
             needs_bind_capability,
         );
         let env_contents = render_env_file(&args.systemd.unit);
@@ -207,6 +220,7 @@ struct RemoteSystemdInstallResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct RemoteSystemdStatusResponse {
     unit: String,
+    env_path: PathBuf,
     exit_code: i32,
     stdout: String,
     stderr: String,
@@ -255,10 +269,10 @@ fn render_unit(
     unit: &str,
     binary_path: &Path,
     env_path: &Path,
-    args: &DaemonRemoteSystemdInstallArgs,
+    serve_config: &RemoteDaemonServeConfig,
     needs_bind_capability: bool,
 ) -> String {
-    let exec_start = shell_words::join(remote_serve_command(binary_path, &args.serve));
+    let exec_start = shell_words::join(remote_serve_command(binary_path, serve_config));
     let mut contents = format!(
         "[Unit]\n\
          Description=Harness remote daemon\n\
@@ -293,26 +307,26 @@ fn render_unit(
     contents
 }
 
-fn remote_serve_command(binary_path: &Path, args: &DaemonRemoteServeArgs) -> Vec<String> {
+fn remote_serve_command(binary_path: &Path, config: &RemoteDaemonServeConfig) -> Vec<String> {
     let mut command = vec![
         binary_path.display().to_string(),
         "daemon".to_string(),
         "remote".to_string(),
         "serve".to_string(),
         "--domain".to_string(),
-        args.domain.clone(),
+        config.domain.clone(),
         "--host".to_string(),
-        args.host.clone(),
+        config.host.clone(),
         "--https-port".to_string(),
-        args.https_port.to_string(),
+        config.https_port.to_string(),
         "--http-port".to_string(),
-        args.http_port.to_string(),
+        config.http_port.to_string(),
         "--acme-email".to_string(),
-        args.acme_email.clone(),
+        config.acme_email.clone(),
         "--acme-challenge".to_string(),
-        args.acme_challenge.as_str().to_string(),
+        config.acme_challenge.as_str().to_string(),
     ];
-    if let Some(provider) = args.acme_dns_provider {
+    if let Some(provider) = config.acme_dns_provider {
         command.push("--acme-dns-provider".to_string());
         command.push(provider.as_str().to_string());
     }
