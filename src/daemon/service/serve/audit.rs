@@ -26,6 +26,32 @@ pub(super) async fn record_daemon_started(
     .await;
 }
 
+pub(super) async fn record_remote_daemon_bound(
+    async_db: Option<&Arc<AsyncDaemonDb>>,
+    endpoint: &str,
+    sandboxed: bool,
+) {
+    record_daemon_lifecycle_event(
+        async_db,
+        "daemon.started",
+        "info",
+        "success",
+        "Remote daemon started",
+        &remote_daemon_bound_summary(endpoint),
+        serde_json::json!({
+            "endpoint": endpoint,
+            "sandboxed": sandboxed,
+            "pid": id(),
+            "state": "https_socket_bound",
+        }),
+    )
+    .await;
+}
+
+pub(super) fn remote_daemon_bound_summary(endpoint: &str) -> String {
+    format!("Remote daemon bound HTTPS socket for {endpoint}")
+}
+
 pub(super) async fn record_daemon_stopped(
     async_db: Option<&Arc<AsyncDaemonDb>>,
     serve_result: &Result<(), CliError>,

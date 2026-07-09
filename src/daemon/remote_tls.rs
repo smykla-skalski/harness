@@ -26,7 +26,6 @@ use super::remote_acme::RemoteCertificateBundle;
 mod tests;
 
 static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
-const TLS_HANDSHAKE_FAILURE_RETRY_DELAY: Duration = Duration::from_millis(250);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RemoteTlsConfigError {
@@ -112,7 +111,7 @@ impl Listener for RemoteTlsListener {
             };
             match self.acceptor.accept(stream).await {
                 Ok(tls_stream) => return (tls_stream, addr),
-                Err(error) => handle_tls_handshake_error(addr, error).await,
+                Err(error) => handle_tls_handshake_error(addr, &error),
             }
         }
     }
@@ -181,13 +180,12 @@ fn is_transient_accept_error(error: &io::Error) -> bool {
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
-async fn handle_tls_handshake_error(addr: SocketAddr, error: io::Error) {
+fn handle_tls_handshake_error(addr: SocketAddr, error: &io::Error) {
     tracing::debug!(
         remote_addr = %addr,
         %error,
         "remote TLS handshake failed"
     );
-    sleep(TLS_HANDSHAKE_FAILURE_RETRY_DELAY).await;
 }
 
 fn ensure_rustls_provider() {

@@ -80,7 +80,7 @@ pub async fn serve_remote_https(
     let async_db_slot_for_audit = async_db.clone();
 
     initialize_startup_state(&db, &async_db, sender.clone(), config.poll_interval).await?;
-    super::audit::record_daemon_started(async_db.get(), &endpoint, config.sandboxed).await;
+    super::audit::record_remote_daemon_bound(async_db.get(), &endpoint, config.sandboxed).await;
     schedule_probe_cache_refresh();
 
     let codex_controller = CodexControllerHandle::new_with_async_db(
@@ -180,11 +180,18 @@ fn remote_bound_event_message(endpoint: &str) -> String {
 }
 
 #[cfg(test)]
+fn remote_audit_bound_summary(endpoint: &str) -> String {
+    super::audit::remote_daemon_bound_summary(endpoint)
+}
+
+#[cfg(test)]
 mod tests {
     use crate::daemon::http::DaemonHttpAuthMode;
     use crate::daemon::service::DaemonServeConfig;
 
-    use super::{remote_bound_event_message, validate_remote_https_config};
+    use super::{
+        remote_audit_bound_summary, remote_bound_event_message, validate_remote_https_config,
+    };
 
     #[test]
     fn remote_bound_event_message_does_not_claim_service_is_listening() {
@@ -192,6 +199,15 @@ mod tests {
 
         assert!(message.contains("https://daemon.example.com"));
         assert!(!message.contains("listening"));
+    }
+
+    #[test]
+    fn remote_audit_bound_summary_does_not_claim_service_is_listening() {
+        let summary = remote_audit_bound_summary("https://daemon.example.com");
+
+        assert!(summary.contains("https://daemon.example.com"));
+        assert!(summary.contains("bound HTTPS socket"));
+        assert!(!summary.contains("listening"));
     }
 
     #[test]
