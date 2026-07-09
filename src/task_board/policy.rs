@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-pub const TASK_BOARD_POLICY_VERSION: &str = "task-board-policy-v1";
+// Keep the historical task-board identifier for persisted decisions, replay
+// history, and comparisons written before the public policy API rename.
+pub const POLICY_VERSION: &str = "task-board-policy-v1";
 pub const DEFAULT_AUTO_MERGE_RISK_THRESHOLD: u8 = 40;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,6 +92,14 @@ pub struct PolicyEvidence {
     pub review_policy_blocked: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review_viewer_can_update: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_has_conflict_markers: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_viewer_has_active_approval: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_auto_merge_enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_required_approvals_satisfied_after_viewer_approval: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -245,35 +255,35 @@ impl PolicyGate for BuiltInPolicyGate {
 fn allow(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::Allow {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 
 fn deny(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::Deny {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 
 fn require_human(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::RequireHuman {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 
 fn require_consensus(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::RequireConsensus {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 
 fn dry_run_only(reason_code: PolicyReasonCode) -> PolicyDecision {
     PolicyDecision::DryRunOnly {
         reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     }
 }
 

@@ -259,169 +259,169 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
-        path: http_paths::TASK_BOARD_POLICY_CANVASES,
+        path: http_paths::POLICY_CANVASES,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET,
+            ws_method: ws_methods::POLICY_CANVAS_WORKSPACE_GET,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_CANVASES_CREATE,
+        path: http_paths::POLICY_CANVASES_CREATE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_CREATE,
+            ws_method: ws_methods::POLICY_CANVAS_CREATE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_CANVASES_DUPLICATE,
+        path: http_paths::POLICY_CANVASES_DUPLICATE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_DUPLICATE,
+            ws_method: ws_methods::POLICY_CANVAS_DUPLICATE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_CANVASES_RENAME,
+        path: http_paths::POLICY_CANVASES_RENAME,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_RENAME,
+            ws_method: ws_methods::POLICY_CANVAS_RENAME,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_CANVASES_ACTIVE,
+        path: http_paths::POLICY_CANVASES_ACTIVE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_SET_ACTIVE,
+            ws_method: ws_methods::POLICY_CANVAS_SET_ACTIVE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_CANVASES_DELETE,
+        path: http_paths::POLICY_CANVASES_DELETE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_DELETE,
+            ws_method: ws_methods::POLICY_CANVAS_DELETE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_CANVASES_GLOBAL_ENFORCEMENT,
+        path: http_paths::POLICY_CANVASES_GLOBAL_ENFORCEMENT,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT,
+            ws_method: ws_methods::POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
-        path: http_paths::TASK_BOARD_POLICY_PIPELINE,
+        path: http_paths::POLICY_PIPELINE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
+            ws_method: ws_methods::POLICY_PIPELINE_GET,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Put,
-        path: http_paths::TASK_BOARD_POLICY_PIPELINE,
+        path: http_paths::POLICY_PIPELINE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
+            ws_method: ws_methods::POLICY_PIPELINE_SAVE_DRAFT,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_SIMULATE,
+        path: http_paths::POLICY_SIMULATE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE,
+            ws_method: ws_methods::POLICY_PIPELINE_SIMULATE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_PROMOTE,
+        path: http_paths::POLICY_PROMOTE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE,
+            ws_method: ws_methods::POLICY_PIPELINE_PROMOTE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
-        path: http_paths::TASK_BOARD_POLICY_AUDIT,
+        path: http_paths::POLICY_AUDIT,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
+            ws_method: ws_methods::POLICY_PIPELINE_AUDIT,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_EXPORT,
+        path: http_paths::POLICY_CANVAS_EXPORT,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_EXPORT,
+            ws_method: ws_methods::POLICY_CANVAS_EXPORT,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_IMPORT,
+        path: http_paths::POLICY_CANVAS_IMPORT,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_IMPORT,
+            ws_method: ws_methods::POLICY_CANVAS_IMPORT,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_SCENARIOS_CREATE,
+        path: http_paths::POLICY_SCENARIOS_CREATE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_SCENARIO_CREATE,
+            ws_method: ws_methods::POLICY_SCENARIO_CREATE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_SCENARIOS_UPDATE,
+        path: http_paths::POLICY_SCENARIOS_UPDATE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_SCENARIO_UPDATE,
+            ws_method: ws_methods::POLICY_SCENARIO_UPDATE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_SCENARIOS_DELETE,
+        path: http_paths::POLICY_SCENARIOS_DELETE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_SCENARIO_DELETE,
+            ws_method: ws_methods::POLICY_SCENARIO_DELETE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_SCENARIOS_RESET,
+        path: http_paths::POLICY_SCENARIOS_RESET,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_SCENARIO_RESET,
+            ws_method: ws_methods::POLICY_SCENARIO_RESET,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_MAKE_LIVE,
+        path: http_paths::POLICY_MAKE_LIVE,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_MAKE_LIVE,
+            ws_method: ws_methods::POLICY_PIPELINE_MAKE_LIVE,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_GO_LIVE_DIFF,
+        path: http_paths::POLICY_GO_LIVE_DIFF,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_GO_LIVE_DIFF,
+            ws_method: ws_methods::POLICY_PIPELINE_GO_LIVE_DIFF,
         },
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_POLICY_REPLAY,
+        path: http_paths::POLICY_REPLAY,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_REPLAY,
+            ws_method: ws_methods::POLICY_PIPELINE_REPLAY,
         },
         swift_client_exposed: true,
     },

@@ -118,8 +118,8 @@ struct PolicyCanvasReplayInspectorTests {
     sampleSize: UInt,
     changedCount: UInt,
     decisions: [PolicyPipelineReplayDecision]
-  ) -> TaskBoardPolicyPipelineReplayResult {
-    TaskBoardPolicyPipelineReplayResult(
+  ) -> PolicyPipelineReplayResult {
+    PolicyPipelineReplayResult(
       sampleSize: sampleSize,
       changedCount: changedCount,
       decisions: decisions

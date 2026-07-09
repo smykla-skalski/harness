@@ -200,7 +200,12 @@ extension MobileCommandRecord {
       requiredFailedCheckNames: csvPayload("requiredFailedCheckNames"),
       viewerCanMergeAsAdmin: try optionalBoolPayload("viewerCanMergeAsAdmin") ?? false,
       checkSuiteIDs: csvPayload("checkSuiteIDs"),
-      viewerCanUpdate: try optionalBoolPayload("viewerCanUpdate") ?? true
+      viewerCanUpdate: try optionalBoolPayload("viewerCanUpdate") ?? true,
+      hasConflictMarkers: try optionalBoolPayload("hasConflictMarkers"),
+      viewerHasActiveApproval: try optionalBoolPayload("viewerHasActiveApproval"),
+      autoMergeEnabled: try optionalBoolPayload("autoMergeEnabled"),
+      approvalsSatisfiedAfterViewerApproval:
+        try optionalBoolPayload("approvalRequirementSatisfiedAfterViewerApproval")
     )
   }
 

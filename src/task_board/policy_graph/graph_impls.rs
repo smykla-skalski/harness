@@ -1,6 +1,6 @@
 use crate::task_board::policy::{
     BuiltInPolicyGate, DEFAULT_AUTO_MERGE_RISK_THRESHOLD, PolicyGate, PolicyInput,
-    TASK_BOARD_POLICY_VERSION,
+    POLICY_VERSION,
 };
 
 use super::{
@@ -47,7 +47,7 @@ impl PolicyGraph {
             layout: seed::layout_for(&nodes),
             nodes,
             policy_trace_ids: vec![
-                TASK_BOARD_POLICY_VERSION.to_string(),
+                POLICY_VERSION.to_string(),
                 "task-board-policy-graph-v2".to_string(),
             ],
         }

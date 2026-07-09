@@ -275,21 +275,21 @@ fn task_board_http_and_ws_policy_pipeline_routes_match() {
     let sandbox = tempdir().expect("tempdir");
     harness_testkit::with_isolated_harness_env(sandbox.path(), || {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
-        runtime.block_on(run_task_board_policy_pipeline_parity());
+        runtime.block_on(run_policy_pipeline_parity());
     });
 }
 
-async fn run_task_board_policy_pipeline_parity() {
+async fn run_policy_pipeline_parity() {
     let state = super::test_http_state_with_db();
     let test_db = state.async_db.get().expect("test async db").clone();
     let (base_url, server) = serve_http(state).await;
     let client = reqwest::Client::new();
 
-    let workspace = get_json(&client, &base_url, http_paths::TASK_BOARD_POLICY_CANVASES).await;
+    let workspace = get_json(&client, &base_url, http_paths::POLICY_CANVASES).await;
     let ws_workspace = ws_result(
         &base_url,
         "req-task-board-policy-canvas-workspace",
-        ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET,
+        ws_methods::POLICY_CANVAS_WORKSPACE_GET,
         json!({}),
     )
     .await;
@@ -304,14 +304,14 @@ async fn run_task_board_policy_pipeline_parity() {
         &base_url,
         &format!(
             "{}?canvas_id={active_canvas_id}",
-            http_paths::TASK_BOARD_POLICY_PIPELINE
+            http_paths::POLICY_PIPELINE
         ),
     )
     .await;
     let ws_pipeline = ws_result(
         &base_url,
         "req-task-board-policy-get",
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
+        ws_methods::POLICY_PIPELINE_GET,
         json!({ "canvas_id": active_canvas_id.clone() }),
     )
     .await;
@@ -330,14 +330,14 @@ async fn run_task_board_policy_pipeline_parity() {
         &base_url,
         &format!(
             "{}?canvas_id={active_canvas_id}",
-            http_paths::TASK_BOARD_POLICY_AUDIT
+            http_paths::POLICY_AUDIT
         ),
     )
     .await;
     let ws_audit = ws_result(
         &base_url,
         "req-task-board-policy-audit",
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
+        ws_methods::POLICY_PIPELINE_AUDIT,
         json!({ "canvas_id": active_canvas_id }),
     )
     .await;
@@ -358,7 +358,7 @@ async fn assert_policy_canvas_routes_match(
     let http_create = post_json(
         client,
         base_url,
-        http_paths::TASK_BOARD_POLICY_CANVASES_CREATE,
+        http_paths::POLICY_CANVASES_CREATE,
         json!({ "title": "Secondary canvas" }),
     )
     .await;
@@ -366,7 +366,7 @@ async fn assert_policy_canvas_routes_match(
     let ws_create = ws_result(
         base_url,
         "req-task-board-policy-canvas-create",
-        ws_methods::TASK_BOARD_POLICY_CANVAS_CREATE,
+        ws_methods::POLICY_CANVAS_CREATE,
         json!({ "title": "Secondary canvas" }),
     )
     .await;
@@ -380,7 +380,7 @@ async fn assert_policy_canvas_routes_match(
     let http_duplicate = post_json(
         client,
         base_url,
-        http_paths::TASK_BOARD_POLICY_CANVASES_DUPLICATE,
+        http_paths::POLICY_CANVASES_DUPLICATE,
         json!({
             "canvas_id": http_canvas_id,
             "title": "Copied canvas",
@@ -392,7 +392,7 @@ async fn assert_policy_canvas_routes_match(
     let ws_duplicate = ws_result(
         base_url,
         "req-task-board-policy-canvas-duplicate",
-        ws_methods::TASK_BOARD_POLICY_CANVAS_DUPLICATE,
+        ws_methods::POLICY_CANVAS_DUPLICATE,
         json!({
             "canvas_id": ws_canvas_id,
             "title": "Copied canvas",
@@ -409,7 +409,7 @@ async fn assert_policy_canvas_routes_match(
     let http_rename = post_json(
         client,
         base_url,
-        http_paths::TASK_BOARD_POLICY_CANVASES_RENAME,
+        http_paths::POLICY_CANVASES_RENAME,
         json!({
             "canvas_id": http_rename_canvas_id,
             "title": "Renamed canvas",
@@ -421,7 +421,7 @@ async fn assert_policy_canvas_routes_match(
     let ws_rename = ws_result(
         base_url,
         "req-task-board-policy-canvas-rename",
-        ws_methods::TASK_BOARD_POLICY_CANVAS_RENAME,
+        ws_methods::POLICY_CANVAS_RENAME,
         json!({
             "canvas_id": ws_rename_canvas_id,
             "title": "Renamed canvas",
@@ -439,7 +439,7 @@ async fn assert_policy_canvas_routes_match(
     let http_set_active = post_json(
         client,
         base_url,
-        http_paths::TASK_BOARD_POLICY_CANVASES_ACTIVE,
+        http_paths::POLICY_CANVASES_ACTIVE,
         json!({ "canvas_id": http_primary_canvas_id }),
     )
     .await;
@@ -449,7 +449,7 @@ async fn assert_policy_canvas_routes_match(
     let ws_set_active = ws_result(
         base_url,
         "req-task-board-policy-canvas-set-active",
-        ws_methods::TASK_BOARD_POLICY_CANVAS_SET_ACTIVE,
+        ws_methods::POLICY_CANVAS_SET_ACTIVE,
         json!({ "canvas_id": ws_primary_canvas_id }),
     )
     .await;
@@ -464,7 +464,7 @@ async fn assert_policy_canvas_routes_match(
     let http_delete = post_json(
         client,
         base_url,
-        http_paths::TASK_BOARD_POLICY_CANVASES_DELETE,
+        http_paths::POLICY_CANVASES_DELETE,
         json!({ "canvas_id": http_secondary_canvas_id }),
     )
     .await;
@@ -474,7 +474,7 @@ async fn assert_policy_canvas_routes_match(
     let ws_delete = ws_result(
         base_url,
         "req-task-board-policy-canvas-delete",
-        ws_methods::TASK_BOARD_POLICY_CANVAS_DELETE,
+        ws_methods::POLICY_CANVAS_DELETE,
         json!({ "canvas_id": ws_secondary_canvas_id }),
     )
     .await;

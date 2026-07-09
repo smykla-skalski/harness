@@ -2,13 +2,19 @@ use std::collections::{HashSet, VecDeque};
 
 use tracing::warn;
 
+mod decisions;
+
 use super::{
     PORT_DEFAULT, PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField,
     PolicyEvidencePredicate, PolicyGraph, PolicyGraphDecision, PolicyGraphEdgeCondition,
     PolicyGraphNode, PolicyGraphNodeId, PolicyGraphNodeKind, PolicyIfThenElseCondition,
     PolicyReasonCode, PolicyRuntimeBoundary, PolicySwitchArm, PolicySwitchNode,
 };
-use crate::task_board::policy::{PolicyAction, PolicyInput, TASK_BOARD_POLICY_VERSION};
+use crate::task_board::policy::{PolicyAction, PolicyInput};
+
+use decisions::{
+    dry_run_only, require_consensus, require_human, supervisor_decision, supervisor_reason_code,
+};
 
 enum EvaluationStep {
     Continue(Vec<String>),
@@ -368,6 +374,20 @@ fn evidence_value(field: PolicyEvidenceField, input: &PolicyInput) -> Option<u32
         PolicyEvidenceField::ReviewViewerCanUpdate => {
             input.evidence.review_viewer_can_update.map(u32::from)
         }
+        PolicyEvidenceField::ReviewHasConflictMarkers => {
+            input.evidence.review_has_conflict_markers.map(u32::from)
+        }
+        PolicyEvidenceField::ReviewViewerHasActiveApproval => input
+            .evidence
+            .review_viewer_has_active_approval
+            .map(u32::from),
+        PolicyEvidenceField::ReviewAutoMergeEnabled => {
+            input.evidence.review_auto_merge_enabled.map(u32::from)
+        }
+        PolicyEvidenceField::ReviewRequiredApprovalsSatisfiedAfterViewerApproval => input
+            .evidence
+            .review_required_approvals_satisfied_after_viewer_approval
+            .map(u32::from),
     }
 }
 
@@ -455,56 +475,4 @@ fn warn_safety_cap(visited: &[String], safety_cap: usize) {
         safety_cap,
         "policy graph evaluation exceeded safety cap; bailing to human review",
     );
-}
-
-fn supervisor_reason_code(reason_codes: &[PolicyReasonCode]) -> PolicyReasonCode {
-    reason_codes
-        .first()
-        .copied()
-        .unwrap_or(PolicyReasonCode::DefaultAllow)
-}
-
-fn supervisor_decision(
-    decision: PolicyGraphDecision,
-    reason_code: PolicyReasonCode,
-) -> PolicyDecision {
-    match decision {
-        PolicyGraphDecision::Allow => allow(reason_code),
-        PolicyGraphDecision::Deny => deny(reason_code),
-    }
-}
-
-fn allow(reason_code: PolicyReasonCode) -> PolicyDecision {
-    PolicyDecision::Allow {
-        reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
-    }
-}
-
-fn deny(reason_code: PolicyReasonCode) -> PolicyDecision {
-    PolicyDecision::Deny {
-        reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
-    }
-}
-
-fn require_human(reason_code: PolicyReasonCode) -> PolicyDecision {
-    PolicyDecision::RequireHuman {
-        reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
-    }
-}
-
-fn require_consensus(reason_code: PolicyReasonCode) -> PolicyDecision {
-    PolicyDecision::RequireConsensus {
-        reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
-    }
-}
-
-fn dry_run_only(reason_code: PolicyReasonCode) -> PolicyDecision {
-    PolicyDecision::DryRunOnly {
-        reason_code,
-        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
-    }
 }

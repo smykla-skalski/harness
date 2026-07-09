@@ -15,7 +15,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
   @FocusState.Binding var focusedField: PolicyCanvasFocusedField?
 
   var body: some View {
-    let policyKind = node.policyKind ?? taskBoardPolicyNodeKind(for: node.kind)
+    let policyKind = node.policyKind ?? policyNodeKind(for: node.kind)
     let fields = PolicyCanvasInspectorFieldSchema.fields(for: policyKind)
     if fields.isEmpty {
       PolicyCanvasInspectorRow(label: "Binding", value: policyKind.discriminator)
@@ -242,7 +242,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
       viewModel: viewModel,
       field: field,
       checks: policyKind.checks.isEmpty
-        ? taskBoardPolicyNodeKind(for: .evidenceCheck).checks
+        ? policyNodeKind(for: .evidenceCheck).checks
         : policyKind.checks
     )
   }
@@ -317,7 +317,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
     PolicyCanvasInspectorSwitchCasesControl(
       viewModel: viewModel,
       field: field,
-      arms: policyKind.arms.isEmpty ? taskBoardPolicyNodeKind(for: .switch).arms : policyKind.arms
+      arms: policyKind.arms.isEmpty ? policyNodeKind(for: .switch).arms : policyKind.arms
     )
   }
 

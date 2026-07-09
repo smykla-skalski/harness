@@ -80,10 +80,10 @@ struct HarnessMonitorStoreNavigationStartupLogTests {
     )
     let dashboardUI = store.contentUI.dashboard
     let viewModel = PolicyCanvasViewModel.liveStartupState(
-      document: dashboardUI.taskBoardPolicyPipeline,
-      simulation: dashboardUI.taskBoardPolicySimulation,
-      audit: dashboardUI.taskBoardPolicyAudit,
-      activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId
+      document: dashboardUI.policyPipeline,
+      simulation: dashboardUI.policySimulation,
+      audit: dashboardUI.policyAudit,
+      activeCanvasId: dashboardUI.policyCanvasWorkspace?.activeCanvasId
     )
     let view = PolicyCanvasView(
       viewModel: viewModel,
@@ -92,15 +92,15 @@ struct HarnessMonitorStoreNavigationStartupLogTests {
       suppressesSceneStorage: true
     )
 
-    #expect(dashboardUI.taskBoardPolicyPipeline == nil)
+    #expect(dashboardUI.policyPipeline == nil)
 
     await view.loadPolicyPipeline()
 
     #expect(store.connectionState == .online)
-    #expect(dashboardUI.taskBoardPolicyPipeline != nil)
-    #expect(dashboardUI.taskBoardPolicyAudit != nil)
-    #expect(client.readCallCount(.taskBoardPolicyPipeline) == 1)
-    #expect(client.readCallCount(.taskBoardPolicyPipelineAudit) == 1)
+    #expect(dashboardUI.policyPipeline != nil)
+    #expect(dashboardUI.policyAudit != nil)
+    #expect(client.readCallCount(.policyPipeline) == 1)
+    #expect(client.readCallCount(.policyPipelineAudit) == 1)
   }
 
   @Test(

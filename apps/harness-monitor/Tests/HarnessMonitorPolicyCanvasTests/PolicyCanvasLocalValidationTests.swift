@@ -180,15 +180,15 @@ struct PolicyCanvasLocalValidationTests {
       ("a", "b"),
       ("b", "a"),
     ])
-    viewModel.latestSimulation = TaskBoardPolicyPipelineSimulationResult(
+    viewModel.latestSimulation = PolicyPipelineSimulationResult(
       revision: 1,
       traceId: "trace-test",
       simulatedAt: "2026-05-14T00:00:00Z",
       succeeded: false,
-      validation: TaskBoardPolicyPipelineValidation(
+      validation: PolicyPipelineValidation(
         isValid: false,
         issues: [
-          TaskBoardPolicyPipelineValidationIssue(
+          PolicyPipelineValidationIssue(
             code: "dangling_edge",
             message: "edge points at missing port",
             edgeId: "edge-aa"

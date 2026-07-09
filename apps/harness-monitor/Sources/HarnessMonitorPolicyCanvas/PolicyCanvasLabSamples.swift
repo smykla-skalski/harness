@@ -4,7 +4,7 @@ import HarnessMonitorPolicyModels
 
 /// A named, compiled-in sample policy for the Policy Canvas Lab picker.
 ///
-/// Each sample is a self-contained `TaskBoardPolicyPipelineDocument` whose
+/// Each sample is a self-contained `PolicyPipelineDocument` whose
 /// nodes carry the right ports for their kind, whose edges connect real ports,
 /// and whose groups list their member node ids. Layout seeds are rough
 /// left-to-right positions; the lab force-arranges so seeds only need to be
@@ -12,7 +12,7 @@ import HarnessMonitorPolicyModels
 public struct PolicyCanvasLabSample: Identifiable, Equatable, Sendable {
   public let id: String
   public let name: String
-  public let document: TaskBoardPolicyPipelineDocument
+  public let document: PolicyPipelineDocument
 
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.id == rhs.id
@@ -54,7 +54,7 @@ public enum PolicyCanvasLabSamples {
 // MARK: - Minimal
 
 extension PolicyCanvasLabSamples {
-  private static let minimal: TaskBoardPolicyPipelineDocument = {
+  private static let minimal: PolicyPipelineDocument = {
     let nodes = [
       node(
         "entry", "Workflow entry",
@@ -80,7 +80,7 @@ extension PolicyCanvasLabSamples {
 // MARK: - Linear
 
 extension PolicyCanvasLabSamples {
-  private static let linear: TaskBoardPolicyPipelineDocument = {
+  private static let linear: PolicyPipelineDocument = {
     let nodes = [
       node(
         "trigger", "Trigger",
@@ -132,7 +132,7 @@ extension PolicyCanvasLabSamples {
 // MARK: - Branching
 
 extension PolicyCanvasLabSamples {
-  private static let branching: TaskBoardPolicyPipelineDocument = {
+  private static let branching: PolicyPipelineDocument = {
     let nodes = [
       node(
         "router", "Action gate",

@@ -267,146 +267,146 @@ extension WebSocketTransport {
     return TaskBoardGitRuntimeDrainSecretsResponse(wire: wire)
   }
 
-  public func taskBoardPolicyCanvasWorkspace() async throws -> TaskBoardPolicyCanvasWorkspace {
-    let value = try await rpc(method: .taskBoardPolicyCanvasWorkspaceGet)
+  public func policyCanvasWorkspace() async throws -> PolicyCanvasWorkspace {
+    let value = try await rpc(method: .policyCanvasWorkspaceGet)
     return try decodePolicyWire(value)
   }
 
-  public func createTaskBoardPolicyCanvas(
-    request: TaskBoardPolicyCanvasCreateRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+  public func createPolicyCanvas(
+    request: PolicyCanvasCreateRequest
+  ) async throws -> PolicyCanvasWorkspace {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyCanvasCreate, params: params)
+    let value = try await rpc(method: .policyCanvasCreate, params: params)
     return try decodePolicyWire(value)
   }
 
-  public func duplicateTaskBoardPolicyCanvas(
-    request: TaskBoardPolicyCanvasDuplicateRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+  public func duplicatePolicyCanvas(
+    request: PolicyCanvasDuplicateRequest
+  ) async throws -> PolicyCanvasWorkspace {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyCanvasDuplicate, params: params)
+    let value = try await rpc(method: .policyCanvasDuplicate, params: params)
     return try decodePolicyWire(value)
   }
 
-  public func renameTaskBoardPolicyCanvas(
-    request: TaskBoardPolicyCanvasRenameRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+  public func renamePolicyCanvas(
+    request: PolicyCanvasRenameRequest
+  ) async throws -> PolicyCanvasWorkspace {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyCanvasRename, params: params)
+    let value = try await rpc(method: .policyCanvasRename, params: params)
     return try decodePolicyWire(value)
   }
 
-  public func activateTaskBoardPolicyCanvas(
-    request: TaskBoardPolicyCanvasActivateRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+  public func activatePolicyCanvas(
+    request: PolicyCanvasActivateRequest
+  ) async throws -> PolicyCanvasWorkspace {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyCanvasSetActive, params: params)
+    let value = try await rpc(method: .policyCanvasSetActive, params: params)
     return try decodePolicyWire(value)
   }
 
-  public func deleteTaskBoardPolicyCanvas(
-    request: TaskBoardPolicyCanvasDeleteRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+  public func deletePolicyCanvas(
+    request: PolicyCanvasDeleteRequest
+  ) async throws -> PolicyCanvasWorkspace {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyCanvasDelete, params: params)
+    let value = try await rpc(method: .policyCanvasDelete, params: params)
     return try decodePolicyWire(value)
   }
 
-  public func setTaskBoardPolicyCanvasGlobalEnforcement(
-    request: TaskBoardPolicyCanvasSetGlobalEnforcementRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+  public func setPolicyCanvasGlobalEnforcement(
+    request: PolicyCanvasSetGlobalEnforcementRequest
+  ) async throws -> PolicyCanvasWorkspace {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyCanvasSetEnforcement, params: params)
+    let value = try await rpc(method: .policyCanvasSetEnforcement, params: params)
     return try decodePolicyWire(value)
   }
 
-  public func taskBoardPolicyPipeline(
+  public func policyPipeline(
     canvasId: String? = nil
-  ) async throws -> TaskBoardPolicyPipelineDocument {
+  ) async throws -> PolicyPipelineDocument {
     let value = try await rpc(
-      method: .taskBoardPolicyPipelineGet,
-      params: taskBoardPolicyCanvasRPCParams(canvasId: canvasId)
+      method: .policyPipelineGet,
+      params: policyCanvasRPCParams(canvasId: canvasId)
     )
     return try decodePolicyWire(value)
   }
 
-  public func saveTaskBoardPolicyPipelineDraft(
-    request: TaskBoardPolicyPipelineSaveDraftRequest
-  ) async throws -> TaskBoardPolicyPipelineSaveDraftResponse {
+  public func savePolicyPipelineDraft(
+    request: PolicyPipelineSaveDraftRequest
+  ) async throws -> PolicyPipelineSaveDraftResponse {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyPipelineSaveDraft, params: params)
+    let value = try await rpc(method: .policyPipelineSaveDraft, params: params)
     return try decodePolicyWire(value)
   }
 
-  public func simulateTaskBoardPolicyPipeline(
-    request: TaskBoardPolicyPipelineSimulateRequest
-  ) async throws -> TaskBoardPolicyPipelineSimulationResult {
+  public func simulatePolicyPipeline(
+    request: PolicyPipelineSimulateRequest
+  ) async throws -> PolicyPipelineSimulationResult {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyPipelineSimulate, params: params)
+    let value = try await rpc(method: .policyPipelineSimulate, params: params)
     let wire: PolicyPipelineSimulationResultWire = try decodePolicyWire(value)
-    return TaskBoardPolicyPipelineSimulationResult(wire: wire)
+    return PolicyPipelineSimulationResult(wire: wire)
   }
 
-  public func promoteTaskBoardPolicyPipeline(
-    request: TaskBoardPolicyPipelinePromoteRequest
-  ) async throws -> TaskBoardPolicyPipelinePromoteResponse {
+  public func promotePolicyPipeline(
+    request: PolicyPipelinePromoteRequest
+  ) async throws -> PolicyPipelinePromoteResponse {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyPipelinePromote, params: params)
+    let value = try await rpc(method: .policyPipelinePromote, params: params)
     return try decodePolicyWire(value)
   }
 
-  public func makeLiveTaskBoardPolicyPipeline(
-    request: TaskBoardPolicyPipelineMakeLiveRequest
-  ) async throws -> TaskBoardPolicyPipelineMakeLiveResponse {
+  public func makeLivePolicyPipeline(
+    request: PolicyPipelineMakeLiveRequest
+  ) async throws -> PolicyPipelineMakeLiveResponse {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyPipelineMakeLive, params: params)
+    let value = try await rpc(method: .policyPipelineMakeLive, params: params)
     return try decodePolicyWire(value)
   }
 
-  public func goLiveDiffTaskBoardPolicyPipeline(
-    request: TaskBoardPolicyPipelineGoLiveDiffRequest
-  ) async throws -> TaskBoardPolicyPipelineGoLiveDiff {
+  public func goLiveDiffPolicyPipeline(
+    request: PolicyPipelineGoLiveDiffRequest
+  ) async throws -> PolicyPipelineGoLiveDiff {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyPipelineGoLiveDiff, params: params)
+    let value = try await rpc(method: .policyPipelineGoLiveDiff, params: params)
     return try decodePolicyWire(value)
   }
 
-  public func replayTaskBoardPolicyPipeline(
-    request: TaskBoardPolicyPipelineReplayRequest
-  ) async throws -> TaskBoardPolicyPipelineReplayResult {
+  public func replayPolicyPipeline(
+    request: PolicyPipelineReplayRequest
+  ) async throws -> PolicyPipelineReplayResult {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyPipelineReplay, params: params)
+    let value = try await rpc(method: .policyPipelineReplay, params: params)
     return try decodePolicyWire(value)
   }
 
-  public func taskBoardPolicyPipelineAudit(
+  public func policyPipelineAudit(
     canvasId: String? = nil
-  ) async throws -> TaskBoardPolicyPipelineAuditSummary {
+  ) async throws -> PolicyPipelineAuditSummary {
     let value = try await rpc(
-      method: .taskBoardPolicyPipelineAudit,
-      params: taskBoardPolicyCanvasRPCParams(canvasId: canvasId)
+      method: .policyPipelineAudit,
+      params: policyCanvasRPCParams(canvasId: canvasId)
     )
     let wire: PolicyPipelineAuditSummaryWire = try decodePolicyWire(value)
-    return TaskBoardPolicyPipelineAuditSummary(wire: wire)
+    return PolicyPipelineAuditSummary(wire: wire)
   }
 
-  public func exportTaskBoardPolicy(
-    request: TaskBoardPolicyExportRequest
-  ) async throws -> TaskBoardPolicyExportResponse {
+  public func exportPolicyCanvas(
+    request: PolicyCanvasExportRequest
+  ) async throws -> PolicyCanvasExportResponse {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyExport, params: params)
+    let value = try await rpc(method: .policyCanvasExport, params: params)
     return try decodePolicyWire(value)
   }
 
-  public func importTaskBoardPolicy(
-    request: TaskBoardPolicyImportRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+  public func importPolicyCanvas(
+    request: PolicyCanvasImportRequest
+  ) async throws -> PolicyCanvasWorkspace {
     let params = try encodeParams(request, extra: [:])
-    let value = try await rpc(method: .taskBoardPolicyImport, params: params)
+    let value = try await rpc(method: .policyCanvasImport, params: params)
     return try decodePolicyWire(value)
   }
 
-  private func taskBoardPolicyCanvasRPCParams(canvasId: String?) -> JSONValue? {
+  private func policyCanvasRPCParams(canvasId: String?) -> JSONValue? {
     guard let canvasId else {
       return nil
     }

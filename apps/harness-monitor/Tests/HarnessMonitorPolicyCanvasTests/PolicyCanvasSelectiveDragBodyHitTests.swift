@@ -166,13 +166,15 @@ struct PolicyCanvasSelectiveDragBodyHitTests {
         let live =
           projection.canCommitAsCurrentGraph
           ? policyCanvasLiveDragRoutedOutput(
-            nodes: moved,
-            groups: viewModel.groups,
-            edges: viewModel.edges,
-            fontScale: 1,
-            algorithmSelection: viewModel.algorithmSelection,
-            movedNodeIDs: [movedID],
-            previous: baseline
+            input: PolicyCanvasLiveDragRouteInput(
+              nodes: moved,
+              groups: viewModel.groups,
+              edges: viewModel.edges,
+              fontScale: 1,
+              algorithmSelection: viewModel.algorithmSelection,
+              movedNodeIDs: [movedID],
+              previous: baseline
+            )
           )
           : nil
         let displayed = live ?? projection.output
@@ -251,13 +253,15 @@ struct PolicyCanvasSelectiveDragBodyHitTests {
         moved[movedIndex].position = CGPoint(x: column, y: y)
 
         let live = policyCanvasLiveDragRoutedOutput(
-          nodes: moved,
-          groups: viewModel.groups,
-          edges: viewModel.edges,
-          fontScale: 1,
-          algorithmSelection: viewModel.algorithmSelection,
-          movedNodeIDs: [movedID],
-          previous: previous
+          input: PolicyCanvasLiveDragRouteInput(
+            nodes: moved,
+            groups: viewModel.groups,
+            edges: viewModel.edges,
+            fontScale: 1,
+            algorithmSelection: viewModel.algorithmSelection,
+            movedNodeIDs: [movedID],
+            previous: previous
+          )
         )
         let displayed = live ?? previous
         let full = await PolicyCanvasRouteWorker().compute(

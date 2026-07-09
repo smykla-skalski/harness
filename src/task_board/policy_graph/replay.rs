@@ -108,7 +108,7 @@ const fn reason_code(decision: &PolicyDecision) -> PolicyReasonCode {
 mod tests {
     use super::*;
     use crate::task_board::PolicyInput;
-    use crate::task_board::policy::TASK_BOARD_POLICY_VERSION;
+    use crate::task_board::policy::POLICY_VERSION;
 
     fn record(input: PolicyInput, decision: PolicyDecision) -> RecordedPolicyDecision {
         RecordedPolicyDecision::new(1, input, decision, vec![], "test")
@@ -117,7 +117,7 @@ mod tests {
     fn deny() -> PolicyDecision {
         PolicyDecision::Deny {
             reason_code: PolicyReasonCode::ChecksNotGreen,
-            policy_version: TASK_BOARD_POLICY_VERSION.to_owned(),
+            policy_version: POLICY_VERSION.to_owned(),
         }
     }
 
@@ -178,7 +178,7 @@ mod tests {
         // History recorded a real allow, but replay must not call this "changed".
         let historical = PolicyDecision::Allow {
             reason_code: PolicyReasonCode::AutoMergeAllowed,
-            policy_version: TASK_BOARD_POLICY_VERSION.to_owned(),
+            policy_version: POLICY_VERSION.to_owned(),
         };
         let result = apply_replay(&ws, &[record(input, historical)], None).expect("replay");
 

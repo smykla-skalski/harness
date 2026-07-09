@@ -18,7 +18,11 @@ extension ReviewItem {
       requiredFailedCheckNames: requiredFailedCheckNames,
       viewerCanMergeAsAdmin: viewerCanMergeAsAdmin,
       checkSuiteIDs: checks.compactMap(\.checkSuiteID),
-      viewerCanUpdate: viewerCanUpdate
+      viewerCanUpdate: viewerCanUpdate,
+      hasConflictMarkers: hasConflictMarkers,
+      viewerHasActiveApproval: viewerHasActiveApproval,
+      autoMergeEnabled: autoMergeEnabled,
+      approvalsSatisfiedAfterViewerApproval: approvalsSatisfiedAfterViewerApproval
     )
   }
 
@@ -39,7 +43,11 @@ extension ReviewItem {
       requiredFailedCheckNames: requiredFailedCheckNames,
       viewerCanMergeAsAdmin: viewerCanMergeAsAdmin,
       checkSuiteIDs: rerunnableCheckSuiteIDs,
-      viewerCanUpdate: viewerCanUpdate
+      viewerCanUpdate: viewerCanUpdate,
+      hasConflictMarkers: hasConflictMarkers,
+      viewerHasActiveApproval: viewerHasActiveApproval,
+      autoMergeEnabled: autoMergeEnabled,
+      approvalsSatisfiedAfterViewerApproval: approvalsSatisfiedAfterViewerApproval
     )
   }
 
@@ -191,6 +199,7 @@ extension ReviewTarget {
       && checkStatus == .success
       && (reviewStatus == .reviewRequired || reviewStatus == .none)
       && mergeable != .conflicting
+      && hasConflictMarkers != true
   }
 
   public var isAutoMergeable: Bool {
@@ -201,6 +210,7 @@ extension ReviewTarget {
       && checkStatus == .success
       && mergeable != .conflicting
       && !policyBlocked
+      && hasConflictMarkers != true
   }
 }
 
@@ -243,7 +253,12 @@ extension ReviewItem {
       requiredFailedCheckNames: requiredFailedCheckNames,
       viewerIsRequestedReviewer: viewerIsRequestedReviewer,
       viewerCanUpdate: viewerCanUpdate,
-      viewerCanMergeAsAdmin: viewerCanMergeAsAdmin
+      viewerCanMergeAsAdmin: viewerCanMergeAsAdmin,
+      requiredApprovingReviewCount: requiredApprovingReviewCount,
+      hasConflictMarkers: hasConflictMarkers,
+      viewerHasActiveApproval: viewerHasActiveApproval,
+      autoMergeEnabled: autoMergeEnabled,
+      approvalsSatisfiedAfterViewerApproval: approvalsSatisfiedAfterViewerApproval
     )
   }
 }

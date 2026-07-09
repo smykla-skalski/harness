@@ -4,11 +4,11 @@ import SwiftUI
 
 extension PolicyCanvasViewModel {
   func load(
-    document: TaskBoardPolicyPipelineDocument?,
-    simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?,
+    document: PolicyPipelineDocument?,
+    simulation: PolicyPipelineSimulationResult?,
+    audit: PolicyPipelineAuditSummary?,
     activeCanvasId: String? = nil,
-    workspace: TaskBoardPolicyCanvasWorkspace? = nil
+    workspace: PolicyCanvasWorkspace? = nil
   ) {
     // While the user has unsaved edits, an incoming daemon document is a remote
     // change worth surfacing only when its revision is strictly newer than the
@@ -58,11 +58,11 @@ extension PolicyCanvasViewModel {
   /// state if a manual `documentDirty = false` were paired with a separate
   /// `load(...)` call that early-returns mid-flight.
   public func applyDocument(
-    document: TaskBoardPolicyPipelineDocument?,
-    simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?,
+    document: PolicyPipelineDocument?,
+    simulation: PolicyPipelineSimulationResult?,
+    audit: PolicyPipelineAuditSummary?,
     activeCanvasId: String? = nil,
-    workspace: TaskBoardPolicyCanvasWorkspace? = nil,
+    workspace: PolicyCanvasWorkspace? = nil,
     forceDocumentReload: Bool = false
   ) {
     self.activeCanvasId = activeCanvasId
@@ -152,11 +152,11 @@ extension PolicyCanvasViewModel {
   }
 
   public func applyPersistedDocument(
-    document: TaskBoardPolicyPipelineDocument?,
-    simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?,
+    document: PolicyPipelineDocument?,
+    simulation: PolicyPipelineSimulationResult?,
+    audit: PolicyPipelineAuditSummary?,
     activeCanvasId: String?,
-    workspace: TaskBoardPolicyCanvasWorkspace? = nil
+    workspace: PolicyCanvasWorkspace? = nil
   ) {
     self.activeCanvasId = activeCanvasId
     captureLiveAudit(audit)
@@ -212,10 +212,10 @@ extension PolicyCanvasViewModel {
   }
 
   func loadIfChanged(
-    document: TaskBoardPolicyPipelineDocument?,
-    simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?,
-    workspace: TaskBoardPolicyCanvasWorkspace? = nil,
+    document: PolicyPipelineDocument?,
+    simulation: PolicyPipelineSimulationResult?,
+    audit: PolicyPipelineAuditSummary?,
+    workspace: PolicyCanvasWorkspace? = nil,
     force: Bool = false
   ) {
     guard force || shouldApplyExternalDocument(document) else {
@@ -322,7 +322,7 @@ extension PolicyCanvasViewModel {
     )
   }
 
-  public func exportDocument() -> TaskBoardPolicyPipelineDocument {
+  public func exportDocument() -> PolicyPipelineDocument {
     reconcileGroupFrames()
     return documentExportPayload().exportDocument()
   }

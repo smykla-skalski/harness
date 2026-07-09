@@ -20,7 +20,7 @@ struct PolicyCanvasValidationCacheTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "cycle",
           message: "cycle",
           nodeIds: ["risk-score", "review-gate"]
@@ -108,12 +108,12 @@ struct PolicyCanvasValidationCacheTests {
 
     viewModel.latestSimulation = makeSimulation(
       issues: [
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "dangling_edge",
           message: "edge points at missing port",
           edgeId: "edge-intake-risk"
         ),
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "duplicate_id",
           message: "id collision",
           nodeId: "risk-score"
@@ -138,7 +138,7 @@ struct PolicyCanvasValidationCacheTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "cycle",
           message: "cycle",
           nodeIds: ["risk-score", "review-gate"]
@@ -171,14 +171,14 @@ struct PolicyCanvasValidationCacheTests {
   // MARK: - Helpers
 
   private func makeSimulation(
-    issues: [TaskBoardPolicyPipelineValidationIssue]
-  ) -> TaskBoardPolicyPipelineSimulationResult {
-    TaskBoardPolicyPipelineSimulationResult(
+    issues: [PolicyPipelineValidationIssue]
+  ) -> PolicyPipelineSimulationResult {
+    PolicyPipelineSimulationResult(
       revision: 1,
       traceId: "trace-test",
       simulatedAt: "2026-05-14T00:00:00Z",
       succeeded: issues.isEmpty,
-      validation: TaskBoardPolicyPipelineValidation(
+      validation: PolicyPipelineValidation(
         isValid: issues.isEmpty,
         issues: issues
       )

@@ -155,13 +155,15 @@ struct PolicyCanvasViewport: View {
       let liveDragRoutedOutput =
         projectedRouteResult.canCommitAsCurrentGraph
         ? policyCanvasLiveDragRoutedOutput(
-          nodes: nodes,
-          groups: groups,
-          edges: edges,
-          fontScale: fontScale,
-          algorithmSelection: viewModel.algorithmSelection,
-          movedNodeIDs: viewModel.liveDragAffectedNodeIDs,
-          previous: cachedOutput
+          input: PolicyCanvasLiveDragRouteInput(
+            nodes: nodes,
+            groups: groups,
+            edges: edges,
+            fontScale: fontScale,
+            algorithmSelection: viewModel.algorithmSelection,
+            movedNodeIDs: viewModel.liveDragAffectedNodeIDs,
+            previous: cachedOutput
+          )
         )
         : nil
       let routeOutput = liveDragRoutedOutput ?? projectedRouteResult.output

@@ -62,60 +62,60 @@ struct WebSocketRPCMethodTests {
   @Test("WebSocket RPC catalog carries policy and review method names")
   func rpcCatalogPolicyAndReviewRawValues() {
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyCanvasWorkspaceGet.rawValue
-        == "task_board.policy_canvas_workspace_get"
+      WebSocketRPCMethod.policyCanvasWorkspaceGet.rawValue
+        == "policy_canvas.workspace_get"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyCanvasCreate.rawValue
-        == "task_board.policy_canvas_create"
+      WebSocketRPCMethod.policyCanvasCreate.rawValue
+        == "policy_canvas.create"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyCanvasDuplicate.rawValue
-        == "task_board.policy_canvas_duplicate"
+      WebSocketRPCMethod.policyCanvasDuplicate.rawValue
+        == "policy_canvas.duplicate"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyCanvasRename.rawValue
-        == "task_board.policy_canvas_rename"
+      WebSocketRPCMethod.policyCanvasRename.rawValue
+        == "policy_canvas.rename"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyCanvasSetActive.rawValue
-        == "task_board.policy_canvas_set_active"
+      WebSocketRPCMethod.policyCanvasSetActive.rawValue
+        == "policy_canvas.set_active"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyCanvasDelete.rawValue
-        == "task_board.policy_canvas_delete"
+      WebSocketRPCMethod.policyCanvasDelete.rawValue
+        == "policy_canvas.delete"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyPipelineGet.rawValue
-        == "task_board.policy_pipeline_get"
+      WebSocketRPCMethod.policyPipelineGet.rawValue
+        == "policy_pipeline.get"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyPipelineSaveDraft.rawValue
-        == "task_board.policy_pipeline_save_draft"
+      WebSocketRPCMethod.policyPipelineSaveDraft.rawValue
+        == "policy_pipeline.save_draft"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyPipelineSimulate.rawValue
-        == "task_board.policy_pipeline_simulate"
+      WebSocketRPCMethod.policyPipelineSimulate.rawValue
+        == "policy_pipeline.simulate"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyPipelinePromote.rawValue
-        == "task_board.policy_pipeline_promote"
+      WebSocketRPCMethod.policyPipelinePromote.rawValue
+        == "policy_pipeline.promote"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyPipelineMakeLive.rawValue
-        == "task_board.policy_pipeline_make_live"
+      WebSocketRPCMethod.policyPipelineMakeLive.rawValue
+        == "policy_pipeline.make_live"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyPipelineGoLiveDiff.rawValue
-        == "task_board.policy_pipeline_go_live_diff"
+      WebSocketRPCMethod.policyPipelineGoLiveDiff.rawValue
+        == "policy_pipeline.go_live_diff"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyPipelineReplay.rawValue
-        == "task_board.policy_pipeline_replay"
+      WebSocketRPCMethod.policyPipelineReplay.rawValue
+        == "policy_pipeline.replay"
     )
     #expect(
-      WebSocketRPCMethod.taskBoardPolicyPipelineAudit.rawValue
-        == "task_board.policy_pipeline_audit"
+      WebSocketRPCMethod.policyPipelineAudit.rawValue
+        == "policy_pipeline.audit"
     )
     #expect(WebSocketRPCMethod.taskSubmitForReview.rawValue == "task.submit_for_review")
     #expect(WebSocketRPCMethod.taskClaimReview.rawValue == "task.claim_review")

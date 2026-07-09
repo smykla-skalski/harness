@@ -9,7 +9,7 @@ extension DashboardPolicyCanvasRouteView {
   // MARK: - Canvas selection preview
 
   @MainActor
-  func applyCanvasSelectionPreview(for canvas: TaskBoardPolicyCanvasSummary) {
+  func applyCanvasSelectionPreview(for canvas: PolicyCanvasSummary) {
     let preview = DashboardPolicyCanvasSelectionPreview(
       workspace: workspace,
       selectedCanvasId: canvas.canvasId
@@ -71,7 +71,7 @@ extension DashboardPolicyCanvasRouteView {
     let filename =
       rawTitle.lowercased().replacingOccurrences(of: " ", with: "-") + ".json"
     guard let destination = Self.runExportSavePanel(suggestedFilename: filename) else { return }
-    guard let response = await store.exportTaskBoardPolicyCanvas(canvasId: canvasId)
+    guard let response = await store.exportPolicyCanvas(canvasId: canvasId)
     else { return }
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -85,9 +85,9 @@ extension DashboardPolicyCanvasRouteView {
     guard let data = try? Data(contentsOf: source) else { return }
     let title = source.deletingPathExtension().lastPathComponent
     guard
-      let document = try? JSONDecoder().decode(TaskBoardPolicyPipelineDocument.self, from: data)
+      let document = try? JSONDecoder().decode(PolicyPipelineDocument.self, from: data)
     else { return }
-    _ = await store.importTaskBoardPolicyCanvas(document: document, title: title)
+    _ = await store.importPolicyCanvas(document: document, title: title)
   }
 
   @MainActor

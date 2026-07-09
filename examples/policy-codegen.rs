@@ -1043,7 +1043,7 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "ReviewConsensus",
     "ArbitrationOutcome",
     // policy simulate/audit cluster (policy_graph/store.rs): the rich app models
-    // (TaskBoardPolicyPipelineSimulationResult/...AuditSummary) keep their flat
+    // (PolicyPipelineSimulationResult/...AuditSummary) keep their flat
     // shape; these *Wire types own the daemon snake_case decode (the validation
     // report nests the generated PolicyGraphValidationIssue, which fixes the
     // node_id/edge_id/node_ids drop when simulate/audit decoded via convertFromSnakeCase).
@@ -1099,12 +1099,12 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "StreamEvent",
     // task_board.rs policy-canvas read cluster: wire/model split. Summary and
     // ExportResponse own same-named Swift hand models; WorkspaceResponse maps to
-    // the hand TaskBoardPolicyCanvasWorkspace (drops "Response"). They reference
+    // the hand PolicyCanvasWorkspace (drops "Response"). They reference
     // the generated PolicyGraphMode (PolicyModels, via Kit alias) and the hand
-    // TaskBoardPolicyPipelineDocument (Rust PolicyPipelineDocument, TYPE_RENAMES).
-    "TaskBoardPolicyCanvasSummary",
-    "TaskBoardPolicyCanvasWorkspaceResponse",
-    "TaskBoardPolicyExportResponse",
+    // PolicyPipelineDocument (Rust PolicyPipelineDocument, TYPE_RENAMES).
+    "PolicyCanvasSummary",
+    "PolicyCanvasWorkspaceResponse",
+    "PolicyCanvasExportResponse",
     // task_board summary.rs audit/project/machine cluster: wire/model split. The
     // thin hand mirrors keep Int counts; these *Wire types own the daemon decode
     // (UInt counts, explicit snake CodingKeys) and reference the adopted
@@ -1337,10 +1337,10 @@ const SKIP_TYPES: &[&str] = &[
     // decoder and GraphPolicyGate is daemon-internal. Adding store.rs as a
     // policy-module source for the cluster wire types must not also emit these
     // (bare names that would clash / produce dead types). The make-live request
-    // and response are hand-authored in HarnessMonitorTaskBoardPolicyPipelineModels
+    // and response are hand-authored in HarnessMonitorPolicyPipelineModels
     // because the app response also carries the post-promotion workspace snapshot
     // the store.rs type does not model, and types `document` as the hand
-    // TaskBoardPolicyPipelineDocument rather than the bare generated PolicyGraph.
+    // PolicyPipelineDocument rather than the bare generated PolicyGraph.
     "GraphPolicyGate",
     "PolicyPipelineSaveResponse",
     "PolicyPipelinePromoteRequest",
@@ -1379,10 +1379,10 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     ("TaskBoardGitHubProjectConfig", "GitHubProjectConfigWire"),
     // task_board.rs policy-canvas read cluster: Rust PolicyPipelineDocument is a
     // type alias for PolicyGraph (policy_graph.rs:389). The Swift app re-models it
-    // as the hand TaskBoardPolicyPipelineDocument (Kit, explicit snake CodingKeys,
+    // as the hand PolicyPipelineDocument (Kit, explicit snake CodingKeys,
     // plain-decoder-safe), so the canvas wire fields point at that hand name. The
     // token only appears in task_board.rs fields, never the generated PolicyGraph.
-    ("PolicyPipelineDocument", "TaskBoardPolicyPipelineDocument"),
+    ("PolicyPipelineDocument", "PolicyPipelineDocument"),
     // task_board types.rs: the Rust AgentMode enum is adopted under the Swift hand
     // name TaskBoardAgentMode (the app owns the bare name), so the generated open
     // enum replaces the hand one in place. No generated module references AgentMode
@@ -2470,14 +2470,14 @@ const TASK_BOARD_DISPATCH_EMIT_ONLY: &[&str] = &[
     "FollowUpPhase",
     "PlanApprovalBlockReason",
 ];
-const TASK_BOARD_CANVAS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardPolicyCanvasWireTypes.generated.swift";
+const POLICY_CANVAS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/PolicyCanvasWireTypes.generated.swift";
 // The policy-canvas read types in the task_board.rs facade. The rest of that file
 // (flatten, alias and struct-variant-tagged types) is excluded by the allow-list,
 // so it never reaches the panic-prone builders.
-const TASK_BOARD_CANVAS_EMIT_ONLY: &[&str] = &[
-    "TaskBoardPolicyCanvasSummary",
-    "TaskBoardPolicyCanvasWorkspaceResponse",
-    "TaskBoardPolicyExportResponse",
+const POLICY_CANVAS_EMIT_ONLY: &[&str] = &[
+    "PolicyCanvasSummary",
+    "PolicyCanvasWorkspaceResponse",
+    "PolicyCanvasExportResponse",
 ];
 const ACP_PROBE_SOURCE: &str = include_str!("../src/agents/acp/probe.rs");
 const ACP_PROBE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpProbeWireTypes.generated.swift";
@@ -2662,7 +2662,7 @@ const ORCHESTRATOR_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKi
 // update). github_project rides the GitHubProjectConfigWire (TYPE_RENAMES on the alias); the run
 // summary nests the sync/audit/dispatch/evaluation wires; Workflow/TickPhase/RunStatus enums and
 // TaskBoardStatus/TaskBoardWorkflowStatus ride bare. policy.rs is a source so the policy_version
-// default fn resolves TASK_BOARD_POLICY_VERSION.
+// default fn resolves POLICY_VERSION.
 const ORCHESTRATOR_EMIT_ONLY: &[&str] = &[
     "TaskBoardOrchestratorSettings",
     "TaskBoardGitHubInboxConfig",
@@ -2880,8 +2880,8 @@ fn modules() -> Vec<GeneratedModule> {
             sources: &[SESSION_STATE_SOURCE, SESSION_AGENTS_SOURCE],
         },
         GeneratedModule {
-            output: TASK_BOARD_CANVAS_OUTPUT,
-            description: "the Rust task-board policy-canvas summary, workspace and export types",
+            output: POLICY_CANVAS_OUTPUT,
+            description: "the Rust policy-canvas summary, workspace and export types",
             defaults: &[TASK_BOARD_PROTOCOL_SOURCE],
             sources: &[TASK_BOARD_PROTOCOL_SOURCE],
         },
@@ -3094,7 +3094,7 @@ fn generate_module(module: &GeneratedModule) -> String {
         SUMMARIES_OUTPUT => SUMMARIES_EMIT_ONLY,
         OBSERVE_OUTPUT => OBSERVE_EMIT_ONLY,
         SESSION_STATE_OUTPUT => SESSION_STATE_EMIT_ONLY,
-        TASK_BOARD_CANVAS_OUTPUT => TASK_BOARD_CANVAS_EMIT_ONLY,
+        POLICY_CANVAS_OUTPUT => POLICY_CANVAS_EMIT_ONLY,
         TASK_BOARD_ENUMS_OUTPUT => TASK_BOARD_ENUMS_EMIT_ONLY,
         TASK_BOARD_SUMMARY_OUTPUT => TASK_BOARD_SUMMARY_EMIT_ONLY,
         TASK_BOARD_ITEM_OUTPUT => TASK_BOARD_ITEM_EMIT_ONLY,

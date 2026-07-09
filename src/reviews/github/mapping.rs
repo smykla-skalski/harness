@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::mem;
 use std::path::PathBuf;
 
@@ -14,8 +15,8 @@ use super::types::{
 };
 use super::{
     GRAPHQL_PAGE_SIZE, PullRequestReview, ReviewActionKind, ReviewActionOutcome,
-    ReviewActionResult, ReviewItem, ReviewRepositoryLabel, ReviewTarget, ReviewsQueryRequest,
-    SCOPE_QUERY_CAP,
+    ReviewActionResult, ReviewItem, ReviewRepositoryLabel, ReviewReviewEventState, ReviewTarget,
+    ReviewsQueryRequest, SCOPE_QUERY_CAP,
 };
 
 mod check_summary;
@@ -267,7 +268,76 @@ fn build_review_item(
         created_at: ctx.created_at,
         updated_at: ctx.updated_at,
         required_failed_check_names: ctx.required_failed_check_names,
+        required_approving_review_count: Some(required_approving_review_count(
+            node.base_ref.as_ref(),
+        )),
+        has_conflict_markers: None,
+        viewer_has_active_approval: None,
+        auto_merge_enabled: Some(node.auto_merge_request.is_some()),
+        approval_requirement_satisfied_after_viewer_approval: None,
     }
+}
+
+pub(super) fn apply_policy_review_metadata(items: &mut [ReviewItem], viewer_login: Option<&str>) {
+    for item in items {
+        let latest_review_by_author = latest_review_by_author(&item.reviews);
+        let active_approval_count = latest_review_by_author
+            .values()
+            .filter(|state| **state == ReviewReviewEventState::Approved)
+            .count();
+        let viewer_has_active_approval = viewer_login.is_some_and(|login| {
+            latest_review_by_author
+                .get(&login.to_ascii_lowercase())
+                .is_some_and(|state| *state == ReviewReviewEventState::Approved)
+        });
+        item.viewer_has_active_approval = viewer_login.map(|_| viewer_has_active_approval);
+        item.approval_requirement_satisfied_after_viewer_approval =
+            approval_requirement_satisfied_after_viewer_approval(
+                item.required_approving_review_count.unwrap_or(0),
+                active_approval_count,
+                viewer_login,
+                viewer_has_active_approval,
+            );
+    }
+}
+
+fn latest_review_by_author(
+    reviews: &[PullRequestReview],
+) -> BTreeMap<String, ReviewReviewEventState> {
+    let mut latest = BTreeMap::new();
+    for review in reviews {
+        let author = review.author.trim();
+        if author.is_empty() {
+            continue;
+        }
+        latest.insert(author.to_ascii_lowercase(), review.state);
+    }
+    latest
+}
+
+fn approval_requirement_satisfied_after_viewer_approval(
+    required: u32,
+    active_approval_count: usize,
+    viewer_login: Option<&str>,
+    viewer_has_active_approval: bool,
+) -> Option<bool> {
+    if required == 0 {
+        return Some(true);
+    }
+    let viewer_login = viewer_login?;
+    let viewer_addition =
+        usize::from(!viewer_login.trim().is_empty() && !viewer_has_active_approval);
+    Some(active_approval_count.saturating_add(viewer_addition) >= required as usize)
+}
+
+fn required_approving_review_count(base_ref: Option<&super::types::RefNode>) -> u32 {
+    let Some(rule) = base_ref.and_then(|base| base.branch_protection_rule.as_ref()) else {
+        return 0;
+    };
+    if rule.requires_approving_reviews == Some(false) {
+        return 0;
+    }
+    rule.required_approving_review_count.unwrap_or(0)
 }
 
 pub(super) fn append_pull_request_labels(item: &mut ReviewItem, labels: Vec<LabelNode>) {
@@ -380,3 +450,7 @@ pub(super) fn next_cursor_or_scope_limit(
 pub(super) struct ScopeQuery {
     pub(super) query: String,
 }
+
+#[cfg(test)]
+#[path = "mapping_tests.rs"]
+mod tests;

@@ -12,11 +12,11 @@ struct TaskBoardSwiftUXCorrectnessTests {
   @Test("Saving an invalid policy draft surfaces the first validation issue, not success")
   func savingInvalidPolicyDraftSurfacesFailureFeedback() async {
     let client = RecordingHarnessClient()
-    client.configureTaskBoardPolicyPipelineValidation(
-      TaskBoardPolicyPipelineValidation(
+    client.configurePolicyPipelineValidation(
+      PolicyPipelineValidation(
         isValid: false,
         issues: [
-          TaskBoardPolicyPipelineValidationIssue(
+          PolicyPipelineValidationIssue(
             code: "graph.invalid",
             message: "Graph has a dangling node"
           )
@@ -25,7 +25,7 @@ struct TaskBoardSwiftUXCorrectnessTests {
     )
     let store = await makeBootstrappedStore(client: client)
 
-    let outcome = await store.saveTaskBoardPolicyPipelineDraft(document: sampleDraftDocument())
+    let outcome = await store.savePolicyPipelineDraft(document: sampleDraftDocument())
 
     #expect(outcome == nil)
     #expect(store.currentSuccessFeedbackMessage == nil)
@@ -37,7 +37,7 @@ struct TaskBoardSwiftUXCorrectnessTests {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
 
-    let outcome = await store.saveTaskBoardPolicyPipelineDraft(document: sampleDraftDocument())
+    let outcome = await store.savePolicyPipelineDraft(document: sampleDraftDocument())
 
     #expect(outcome != nil)
     #expect(store.currentSuccessFeedbackMessage == nil)
@@ -46,21 +46,21 @@ struct TaskBoardSwiftUXCorrectnessTests {
   @Test("Simulating with invalid validation surfaces the first issue and skips success toast")
   func simulatingInvalidValidationSurfacesFailureFeedback() async {
     let client = RecordingHarnessClient()
-    client.configureTaskBoardPolicyPipelineValidation(
-      TaskBoardPolicyPipelineValidation(
+    client.configurePolicyPipelineValidation(
+      PolicyPipelineValidation(
         isValid: false,
         issues: [
-          TaskBoardPolicyPipelineValidationIssue(
+          PolicyPipelineValidationIssue(
             code: "edge.cycle",
             message: "Pipeline has a cycle"
           )
         ]
       )
     )
-    client.configureTaskBoardPolicyPipelineSimulationSucceeded(false)
+    client.configurePolicyPipelineSimulationSucceeded(false)
     let store = await makeBootstrappedStore(client: client)
 
-    let outcome = await store.simulateTaskBoardPolicyPipeline(document: sampleDraftDocument())
+    let outcome = await store.simulatePolicyPipeline(document: sampleDraftDocument())
 
     #expect(outcome == false)
     #expect(store.currentSuccessFeedbackMessage == nil)
@@ -341,15 +341,15 @@ struct TaskBoardSwiftUXCorrectnessTests {
 
   // MARK: - sample fixtures
 
-  private func sampleDraftDocument(revision: UInt64 = 7) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  private func sampleDraftDocument(revision: UInt64 = 7) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
       nodes: [],
       edges: [],
       groups: [],
-      layout: TaskBoardPolicyPipelineLayout(),
+      layout: PolicyPipelineLayout(),
       policyTraceIds: []
     )
   }

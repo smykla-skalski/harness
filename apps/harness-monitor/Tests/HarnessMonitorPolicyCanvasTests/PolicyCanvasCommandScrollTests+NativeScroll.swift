@@ -13,7 +13,7 @@ extension PolicyCanvasCommandScrollTests {
   func switchingToPastedPRDryRunCanvasRecentersTheNativeViewport() async throws {
     let frame = CGRect(x: 0, y: 0, width: 1_200, height: 800)
     let viewModel = PolicyCanvasViewModel.liveStartupState(
-      document: TaskBoardPolicyPipelineDocument(
+      document: PolicyPipelineDocument(
         revision: 1,
         mode: .draft,
         nodes: [],

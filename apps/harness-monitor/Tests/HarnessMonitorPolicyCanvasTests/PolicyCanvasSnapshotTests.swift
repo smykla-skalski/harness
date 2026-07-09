@@ -169,12 +169,12 @@ struct PolicyCanvasSnapshotTests {
   @Test("snapshot captures latest simulation")
   func snapshotCapturesLatestSimulation() {
     let viewModel = PolicyCanvasViewModel.sample()
-    let simulation = TaskBoardPolicyPipelineSimulationResult(
+    let simulation = PolicyPipelineSimulationResult(
       revision: 7,
       traceId: "trace-snap",
       simulatedAt: "2026-05-14T11:00:00Z",
       succeeded: false,
-      validation: TaskBoardPolicyPipelineValidation(isValid: false)
+      validation: PolicyPipelineValidation(isValid: false)
     )
     viewModel.latestSimulation = simulation
 
@@ -187,23 +187,23 @@ struct PolicyCanvasSnapshotTests {
   @Test("restore brings back captured simulation")
   func restoreBringsBackCapturedSimulation() {
     let viewModel = PolicyCanvasViewModel.sample()
-    let originalSimulation = TaskBoardPolicyPipelineSimulationResult(
+    let originalSimulation = PolicyPipelineSimulationResult(
       revision: 11,
       traceId: "trace-original",
       simulatedAt: "2026-05-14T11:00:00Z",
       succeeded: true,
-      validation: TaskBoardPolicyPipelineValidation(isValid: true)
+      validation: PolicyPipelineValidation(isValid: true)
     )
     viewModel.latestSimulation = originalSimulation
     let snapshot = viewModel.snapshotState()
 
     // Simulate a later sim that the daemon then rejects.
-    viewModel.latestSimulation = TaskBoardPolicyPipelineSimulationResult(
+    viewModel.latestSimulation = PolicyPipelineSimulationResult(
       revision: 12,
       traceId: "trace-rejected",
       simulatedAt: "2026-05-14T11:00:10Z",
       succeeded: false,
-      validation: TaskBoardPolicyPipelineValidation(isValid: false)
+      validation: PolicyPipelineValidation(isValid: false)
     )
 
     viewModel.restoreState(snapshot)
@@ -234,12 +234,12 @@ struct PolicyCanvasSnapshotTests {
     viewModel.latestSimulation = nil
     let snapshot = viewModel.snapshotState()
 
-    viewModel.latestSimulation = TaskBoardPolicyPipelineSimulationResult(
+    viewModel.latestSimulation = PolicyPipelineSimulationResult(
       revision: 99,
       traceId: "trace-after",
       simulatedAt: "2026-05-14T11:00:30Z",
       succeeded: false,
-      validation: TaskBoardPolicyPipelineValidation(isValid: false)
+      validation: PolicyPipelineValidation(isValid: false)
     )
 
     viewModel.restoreState(snapshot)

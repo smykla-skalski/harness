@@ -198,8 +198,8 @@ public struct DashboardWindowView: View {
       .harnessFocusedSceneValue(\.windowNavigation, windowNavigationState)
       .environment(\.globalWindowNavigationHistory, history)
       .dashboardAutomationPolicyRuntimeSync(
-        workspace: dashboardUI.taskBoardPolicyCanvasWorkspace,
-        activeDocument: dashboardUI.taskBoardPolicyPipeline
+        workspace: dashboardUI.policyCanvasWorkspace,
+        activeDocument: dashboardUI.policyPipeline
       )
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)

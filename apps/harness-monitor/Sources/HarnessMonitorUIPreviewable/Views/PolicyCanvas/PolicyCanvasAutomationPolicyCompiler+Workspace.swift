@@ -3,8 +3,8 @@ import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasAutomationPolicyCompiler {
   public static func compileEnforcedCanvases(
-    workspace: TaskBoardPolicyCanvasWorkspace?,
-    activeDocument: @autoclosure () -> TaskBoardPolicyPipelineDocument?
+    workspace: PolicyCanvasWorkspace?,
+    activeDocument: @autoclosure () -> PolicyPipelineDocument?
   ) -> PolicyCanvasAutomationPolicyCompilation {
     guard let workspace else {
       guard let activeDocument = activeDocument(), activeDocument.mode == .enforced else {
@@ -39,8 +39,8 @@ extension PolicyCanvasAutomationPolicyCompiler {
   }
 
   private static func mergeEnforcedCanvas(
-    _ canvas: TaskBoardPolicyCanvasSummary,
-    document: TaskBoardPolicyPipelineDocument?,
+    _ canvas: PolicyCanvasSummary,
+    document: PolicyPipelineDocument?,
     into merged: inout PolicyCanvasAutomationPolicyCompilation,
     usedPolicyIDs: inout Set<String>
   ) {

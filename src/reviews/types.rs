@@ -163,6 +163,16 @@ pub struct ReviewItem {
     pub updated_at: DateTime<Utc>,
     #[serde(default)]
     pub required_failed_check_names: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required_approving_review_count: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub has_conflict_markers: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub viewer_has_active_approval: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_merge_enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_requirement_satisfied_after_viewer_approval: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -3,17 +3,17 @@ import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
 
 public struct PolicyCanvasLabSeed {
-  public let document: TaskBoardPolicyPipelineDocument
-  public let simulation: TaskBoardPolicyPipelineSimulationResult?
-  public let audit: TaskBoardPolicyPipelineAuditSummary?
+  public let document: PolicyPipelineDocument
+  public let simulation: PolicyPipelineSimulationResult?
+  public let audit: PolicyPipelineAuditSummary?
   public let allowsEmptyLiveSnapshot: Bool
 }
 
 public enum PolicyCanvasLabSnapshotSupport {
   public static func initialSeed(
-    document: TaskBoardPolicyPipelineDocument?,
-    simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?
+    document: PolicyPipelineDocument?,
+    simulation: PolicyPipelineSimulationResult?,
+    audit: PolicyPipelineAuditSummary?
   ) -> PolicyCanvasLabSeed {
     if let document, hasVisibleGraph(document) {
       return PolicyCanvasLabSeed(
@@ -34,7 +34,7 @@ public enum PolicyCanvasLabSnapshotSupport {
   }
 
   public static func shouldAdoptLiveSnapshot(
-    document: TaskBoardPolicyPipelineDocument?,
+    document: PolicyPipelineDocument?,
     allowsEmptyLiveSnapshot: Bool
   ) -> Bool {
     guard let document else {
@@ -44,9 +44,9 @@ public enum PolicyCanvasLabSnapshotSupport {
   }
 
   public static func document(
-    _ document: TaskBoardPolicyPipelineDocument?,
+    _ document: PolicyPipelineDocument?,
     includesGroups: Bool
-  ) -> TaskBoardPolicyPipelineDocument? {
+  ) -> PolicyPipelineDocument? {
     guard var document else {
       return nil
     }
@@ -63,7 +63,7 @@ public enum PolicyCanvasLabSnapshotSupport {
     return document
   }
 
-  public static func hasVisibleGraph(_ document: TaskBoardPolicyPipelineDocument) -> Bool {
+  public static func hasVisibleGraph(_ document: PolicyPipelineDocument) -> Bool {
     !document.nodes.isEmpty
   }
 
@@ -84,7 +84,7 @@ public enum PolicyCanvasLabSnapshotSupport {
 
   /// Renders a fixture document when either fixture env var is set. Used to exercise
   /// the layout engine against a specific saved policy without a live daemon.
-  public static func fixtureDocument() -> TaskBoardPolicyPipelineDocument? {
+  public static func fixtureDocument() -> PolicyPipelineDocument? {
     let environment = ProcessInfo.processInfo.environment
     let data: Data?
     if let encoded = environment[fixtureBase64EnvKey], !encoded.isEmpty {
@@ -100,7 +100,7 @@ public enum PolicyCanvasLabSnapshotSupport {
     }
     do {
       let document = try PolicyWireCoding.decoder.decode(
-        TaskBoardPolicyPipelineDocument.self,
+        PolicyPipelineDocument.self,
         from: data
       )
       writeFixtureDecodeLog("OK plain nodes=\(document.nodes.count)")

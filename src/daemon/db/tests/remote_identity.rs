@@ -146,12 +146,8 @@ fn remote_clients_persist_hashed_tokens_and_support_revoke_rotate() {
         db.verify_remote_client_token("client-1", "short").is_err(),
         "clear-text stored hash must fail row loading instead of silently denying auth"
     );
-    db.rotate_remote_client_token(
-        "client-1",
-        "final-token-secret",
-        "2026-06-21T12:41:50Z",
-    )
-    .expect("restore valid token hash");
+    db.rotate_remote_client_token("client-1", "final-token-secret", "2026-06-21T12:41:50Z")
+        .expect("restore valid token hash");
     assert!(
         db.verify_remote_client_token("client-1", "final-token-secret")
             .expect("restored token accepted")

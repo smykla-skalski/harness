@@ -366,10 +366,10 @@ extension HarnessMonitorStore {
     public var taskBoardItemAuditSummary: TaskBoardAuditSummary?
     public var taskBoardProjects: [TaskBoardProjectSummary]?
     public var taskBoardMachines: [TaskBoardMachineSummary]?
-    public var taskBoardPolicyCanvasWorkspace: TaskBoardPolicyCanvasWorkspace?
-    public var taskBoardPolicyPipeline: TaskBoardPolicyPipelineDocument?
-    public var taskBoardPolicySimulation: TaskBoardPolicyPipelineSimulationResult?
-    public var taskBoardPolicyAudit: TaskBoardPolicyPipelineAuditSummary?
+    public var policyCanvasWorkspace: PolicyCanvasWorkspace?
+    public var policyPipeline: PolicyPipelineDocument?
+    public var policySimulation: PolicyPipelineSimulationResult?
+    public var policyAudit: PolicyPipelineAuditSummary?
   }
 
   public struct SidebarUIState: Equatable {

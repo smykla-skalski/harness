@@ -1,19 +1,19 @@
 use crate::daemon::http::{DaemonHttpState, require_async_db, task_board_route_executor};
 use crate::daemon::protocol::{
-    TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
-    TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
-    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSetGlobalEnforcementRequest,
-    TaskBoardPolicyPipelineGetRequest, WsRequest, WsResponse,
+    PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest,
+    PolicyCanvasDuplicateRequest, PolicyCanvasRenameRequest,
+    PolicyCanvasSetActiveRequest, PolicyCanvasSetGlobalEnforcementRequest,
+    PolicyPipelineGetRequest, WsRequest, WsResponse,
 };
 use crate::daemon::websocket::mutations::dispatch_query_result;
 
 use super::super::{invalid_params, parse_params, parse_params_or_default};
 
-pub(super) async fn dispatch_task_board_policy_canvas_workspace_get(
+pub(super) async fn dispatch_policy_canvas_workspace_get(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(_body) = parse_params_or_default::<TaskBoardPolicyPipelineGetRequest>(request) else {
+    let Ok(_body) = parse_params_or_default::<PolicyPipelineGetRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy canvas workspace") {
@@ -26,11 +26,11 @@ pub(super) async fn dispatch_task_board_policy_canvas_workspace_get(
     )
 }
 
-pub(super) async fn dispatch_task_board_policy_canvas_create(
+pub(super) async fn dispatch_policy_canvas_create(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyCanvasCreateRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyCanvasCreateRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy canvas create") {
@@ -40,7 +40,7 @@ pub(super) async fn dispatch_task_board_policy_canvas_create(
     let result = task_board_route_executor::create_policy_canvas(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_canvas_create",
+        "policy_canvas.create",
         "Create policy canvas",
         body.title.as_deref(),
         serde_json::json!({ "title": &body.title }),
@@ -50,11 +50,11 @@ pub(super) async fn dispatch_task_board_policy_canvas_create(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_canvas_duplicate(
+pub(super) async fn dispatch_policy_canvas_duplicate(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyCanvasDuplicateRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyCanvasDuplicateRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy canvas duplicate") {
@@ -64,7 +64,7 @@ pub(super) async fn dispatch_task_board_policy_canvas_duplicate(
     let result = task_board_route_executor::duplicate_policy_canvas(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_canvas_duplicate",
+        "policy_canvas.duplicate",
         "Duplicate policy canvas",
         Some(body.canvas_id.as_str()),
         serde_json::json!({
@@ -77,11 +77,11 @@ pub(super) async fn dispatch_task_board_policy_canvas_duplicate(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_canvas_rename(
+pub(super) async fn dispatch_policy_canvas_rename(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyCanvasRenameRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyCanvasRenameRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy canvas rename") {
@@ -91,7 +91,7 @@ pub(super) async fn dispatch_task_board_policy_canvas_rename(
     let result = task_board_route_executor::rename_policy_canvas(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_canvas_rename",
+        "policy_canvas.rename",
         "Rename policy canvas",
         Some(body.canvas_id.as_str()),
         serde_json::json!({
@@ -104,11 +104,11 @@ pub(super) async fn dispatch_task_board_policy_canvas_rename(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_canvas_set_active(
+pub(super) async fn dispatch_policy_canvas_set_active(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyCanvasSetActiveRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyCanvasSetActiveRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy canvas set active") {
@@ -118,7 +118,7 @@ pub(super) async fn dispatch_task_board_policy_canvas_set_active(
     let result = task_board_route_executor::set_active_policy_canvas(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_canvas_set_active",
+        "policy_canvas.set_active",
         "Set active policy canvas",
         Some(body.canvas_id.as_str()),
         serde_json::json!({ "canvas_id": &body.canvas_id }),
@@ -128,11 +128,11 @@ pub(super) async fn dispatch_task_board_policy_canvas_set_active(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_canvas_delete(
+pub(super) async fn dispatch_policy_canvas_delete(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyCanvasDeleteRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyCanvasDeleteRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy canvas delete") {
@@ -142,7 +142,7 @@ pub(super) async fn dispatch_task_board_policy_canvas_delete(
     let result = task_board_route_executor::delete_policy_canvas(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_canvas_delete",
+        "policy_canvas.delete",
         "Delete policy canvas",
         Some(body.canvas_id.as_str()),
         serde_json::json!({ "canvas_id": &body.canvas_id }),
@@ -152,11 +152,11 @@ pub(super) async fn dispatch_task_board_policy_canvas_delete(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_canvas_set_global_enforcement(
+pub(super) async fn dispatch_policy_canvas_set_global_enforcement(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyCanvasSetGlobalEnforcementRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyCanvasSetGlobalEnforcementRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy canvas global enforcement") {
@@ -166,7 +166,7 @@ pub(super) async fn dispatch_task_board_policy_canvas_set_global_enforcement(
     let result = task_board_route_executor::set_policy_canvas_global_enforcement(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_canvas_set_global_enforcement",
+        "policy_canvas.set_global_enforcement",
         "Set global policy enforcement",
         None,
         serde_json::json!({ "enabled": body.enabled }),

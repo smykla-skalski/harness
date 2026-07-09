@@ -114,6 +114,10 @@ fn serialized_target_always_emits_check_suite_ids_array() {
         viewer_can_merge_as_admin: false,
         required_failed_check_names: Vec::new(),
         check_suite_ids: Vec::new(),
+        has_conflict_markers: None,
+        viewer_has_active_approval: None,
+        auto_merge_enabled: None,
+        approval_requirement_satisfied_after_viewer_approval: None,
     };
     let value = serde_json::to_value(&target).expect("serialize");
     let object = value.as_object().expect("target is an object");

@@ -77,7 +77,11 @@ extension IntentDaemonClient {
       requiredFailedCheckNames: item.requiredFailedCheckNames,
       viewerCanMergeAsAdmin: item.viewerCanMergeAsAdmin,
       checkSuiteIDs: checkSuiteIDs,
-      viewerCanUpdate: item.viewerCanUpdate
+      viewerCanUpdate: item.viewerCanUpdate,
+      hasConflictMarkers: item.hasConflictMarkers,
+      viewerHasActiveApproval: item.viewerHasActiveApproval,
+      autoMergeEnabled: item.autoMergeEnabled,
+      approvalsSatisfiedAfterViewerApproval: item.approvalsSatisfiedAfterViewerApproval
     )
   }
 

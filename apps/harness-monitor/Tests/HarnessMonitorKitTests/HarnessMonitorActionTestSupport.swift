@@ -214,10 +214,10 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case taskBoardHostLocal
     case taskBoardHostList
     case setTaskBoardHostProjectTypes(projectTypes: [String])
-    case saveTaskBoardPolicyPipelineDraft(revision: UInt64)
-    case simulateTaskBoardPolicyPipeline
-    case promoteTaskBoardPolicyPipeline(revision: UInt64)
-    case makeLiveTaskBoardPolicyPipeline(revision: UInt64)
+    case savePolicyPipelineDraft(revision: UInt64)
+    case simulatePolicyPipeline
+    case promotePolicyPipeline(revision: UInt64)
+    case makeLivePolicyPipeline(revision: UInt64)
     case updateTaskQueuePolicy(
       sessionID: String,
       taskID: String,
@@ -248,9 +248,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case taskBoardOrchestratorStatus
     case taskBoardOrchestratorSettings
     case taskBoardGitRuntimeConfig
-    case taskBoardPolicyCanvasWorkspace
-    case taskBoardPolicyPipeline
-    case taskBoardPolicyPipelineAudit
+    case policyCanvasWorkspace
+    case policyPipeline
+    case policyPipelineAudit
   }
 
   let lock = NSLock()
@@ -289,16 +289,16 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardGitRuntimeDrainSecretsValue =
     TaskBoardGitRuntimeDrainSecretsResponse(drained: false, runtime: TaskBoardGitRuntimeConfig())
   var taskBoardGitRuntimeDrainSecretsError: (any Error)?
-  var taskBoardPolicyValidationOverride: TaskBoardPolicyPipelineValidation?
-  var taskBoardPolicySimulationOverride: Bool?
-  var taskBoardPolicyCanvasWorkspaceError: (any Error)?
-  var taskBoardPolicyCanvasWorkspaceStorage: TaskBoardPolicyCanvasWorkspace?
-  var taskBoardPolicyPipelinesByCanvasID: [String: TaskBoardPolicyPipelineDocument] = [:]
-  var taskBoardPolicyAuditByCanvasID: [String: TaskBoardPolicyPipelineAuditSummary] = [:]
-  var taskBoardPolicyCanvasIDCounter = 1
-  var savedTaskBoardPolicyCanvasIDs: [String?] = []
-  var simulatedTaskBoardPolicyCanvasIDs: [String?] = []
-  var promotedTaskBoardPolicyCanvasIDs: [String?] = []
+  var policyValidationOverride: PolicyPipelineValidation?
+  var policySimulationOverride: Bool?
+  var policyCanvasWorkspaceError: (any Error)?
+  var policyCanvasWorkspaceStorage: PolicyCanvasWorkspace?
+  var policyPipelinesByCanvasID: [String: PolicyPipelineDocument] = [:]
+  var policyAuditByCanvasID: [String: PolicyPipelineAuditSummary] = [:]
+  var policyCanvasIDCounter = 1
+  var savedPolicyCanvasIDs: [String?] = []
+  var simulatedPolicyCanvasIDs: [String?] = []
+  var promotedPolicyCanvasIDs: [String?] = []
   var sessionDetailsByID: [String: SessionDetail] = [:]
   var detailDelaysBySessionID: [String: Duration] = [:]
   var sessionDetailErrorsByID: [String: any Error] = [:]

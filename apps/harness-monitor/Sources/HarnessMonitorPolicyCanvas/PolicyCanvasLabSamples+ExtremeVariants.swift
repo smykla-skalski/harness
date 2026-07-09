@@ -14,7 +14,7 @@ extension PolicyCanvasLabSamples {
   private static func extremeStressVariant(
     prefix: String,
     moduleCount: Int
-  ) -> TaskBoardPolicyPipelineDocument {
+  ) -> PolicyPipelineDocument {
     let modules = (1...moduleCount).map { index in
       extremeStressModule(prefix: prefix, index: index)
     }
@@ -92,7 +92,7 @@ extension PolicyCanvasLabSamples {
   private static func extremeStressSourceNodes(
     id: PolicyCanvasExtremeStressModuleID,
     group: String
-  ) -> [TaskBoardPolicyPipelineNode] {
+  ) -> [PolicyPipelineNode] {
     [
       node(
         id.node("trigger"), "Trigger \(id.index)",
@@ -130,7 +130,7 @@ extension PolicyCanvasLabSamples {
   private static func extremeStressDecisionNodes(
     id: PolicyCanvasExtremeStressModuleID,
     group: String
-  ) -> [TaskBoardPolicyPipelineNode] {
+  ) -> [PolicyPipelineNode] {
     [
       extremeStressActionGateNode(id: id, group: group),
       extremeStressEvidenceNode(id: id, group: group),
@@ -189,7 +189,7 @@ extension PolicyCanvasLabSamples {
   private static func extremeStressOutcomeNodes(
     id: PolicyCanvasExtremeStressModuleID,
     group: String
-  ) -> [TaskBoardPolicyPipelineNode] {
+  ) -> [PolicyPipelineNode] {
     [
       node(
         id.node("human"), "Human gate \(id.index)",
@@ -226,7 +226,7 @@ extension PolicyCanvasLabSamples {
 
   private static func extremeStressEdges(
     id: PolicyCanvasExtremeStressModuleID
-  ) -> [TaskBoardPolicyPipelineEdge] {
+  ) -> [PolicyPipelineEdge] {
     [
       stressEdge(
         id, "trigger-gate", from: ("trigger", "event"), toNode: "action-gate", label: "event"),

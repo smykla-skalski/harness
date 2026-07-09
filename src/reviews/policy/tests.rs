@@ -33,6 +33,10 @@ fn review_target_maps_into_policy_evidence() {
     target.review_status = ReviewReviewStatus::ReviewRequired;
     target.mergeable = ReviewMergeableState::Conflicting;
     target.flags.policy_blocked = true;
+    target.has_conflict_markers = Some(true);
+    target.viewer_has_active_approval = Some(false);
+    target.auto_merge_enabled = Some(false);
+    target.approval_requirement_satisfied_after_viewer_approval = Some(true);
 
     let evidence = review_target_policy_evidence(&target);
 
@@ -43,6 +47,13 @@ fn review_target_maps_into_policy_evidence() {
     assert_eq!(evidence.review_has_merge_conflicts, Some(true));
     assert_eq!(evidence.review_policy_blocked, Some(true));
     assert_eq!(evidence.review_viewer_can_update, Some(true));
+    assert_eq!(evidence.review_has_conflict_markers, Some(true));
+    assert_eq!(evidence.review_viewer_has_active_approval, Some(false));
+    assert_eq!(evidence.review_auto_merge_enabled, Some(false));
+    assert_eq!(
+        evidence.review_required_approvals_satisfied_after_viewer_approval,
+        Some(true)
+    );
 }
 
 #[tokio::test]
@@ -180,10 +191,7 @@ fn authored_plan_does_not_synthesize_missing_reviews_auto_workflow() {
 #[test]
 fn seeded_reviews_auto_compiles_to_expected_step_shape() {
     // Compilation regression guard: the seeded `reviews_auto` workflow must
-    // compile into approve -> wait(reviews.checks_passed) -> merge, in that
-    // exact order. A future compiler or seed change that reshapes the canvas
-    // (drops a step, reorders, renames the resume event) trips this test
-    // before it can silently change what Auto executes.
+    // preserve the existing approve -> checks wait -> merge sequence.
     let temp = tempdir().expect("create tempdir");
     write_enforced_reviews_auto_policy(temp.path());
     let plan = authored_reviews_policy_plan(
@@ -218,6 +226,68 @@ fn seeded_reviews_auto_compiles_to_expected_step_shape() {
         step_kinds,
         vec![
             "action:reviews.approve".to_owned(),
+            "wait_event:reviews.checks_passed".to_owned(),
+            "action:reviews.merge".to_owned(),
+        ],
+    );
+}
+
+#[test]
+fn seeded_reviews_auto_notifies_when_conflicts_are_detected() {
+    let temp = tempdir().expect("create tempdir");
+    write_enforced_reviews_auto_policy(temp.path());
+    let mut target = review_target_fixture();
+    target.has_conflict_markers = Some(true);
+
+    let plan = authored_reviews_policy_plan(
+        temp.path(),
+        "reviews_auto",
+        &target,
+        GitHubMergeMethod::Squash,
+    )
+    .expect("plan reviews auto");
+
+    assert!(plan.actionable, "conflict branch must emit notification");
+    assert_eq!(plan.steps.len(), 1);
+    let PolicyRunStep::Action(action) = &plan.steps[0] else {
+        panic!("expected notification action");
+    };
+    assert_eq!(action.provider, "notification");
+    assert_eq!(action.action_key, "notification.emit");
+}
+
+#[test]
+fn seeded_reviews_auto_skips_redundant_approval() {
+    let temp = tempdir().expect("create tempdir");
+    write_enforced_reviews_auto_policy(temp.path());
+    let mut target = review_target_fixture();
+    target.viewer_has_active_approval = Some(true);
+
+    let plan = authored_reviews_policy_plan(
+        temp.path(),
+        "reviews_auto",
+        &target,
+        GitHubMergeMethod::Squash,
+    )
+    .expect("plan reviews auto");
+
+    assert!(plan.actionable);
+    let step_kinds = plan
+        .steps
+        .iter()
+        .map(|step| match step {
+            PolicyRunStep::Action(action) => format!("action:{}", action.action_key),
+            PolicyRunStep::Wait(PolicyWaitCondition::Event { event_key }) => {
+                format!("wait_event:{event_key}")
+            }
+            PolicyRunStep::Wait(PolicyWaitCondition::Timer { duration_seconds }) => {
+                format!("wait_timer:{duration_seconds}")
+            }
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        step_kinds,
+        vec![
             "wait_event:reviews.checks_passed".to_owned(),
             "action:reviews.merge".to_owned(),
         ],
@@ -294,6 +364,10 @@ fn review_target_fixture() -> ReviewTarget {
         viewer_can_merge_as_admin: false,
         required_failed_check_names: Vec::new(),
         check_suite_ids: vec!["check-suite-1".to_owned()],
+        has_conflict_markers: Some(false),
+        viewer_has_active_approval: Some(false),
+        auto_merge_enabled: Some(false),
+        approval_requirement_satisfied_after_viewer_approval: Some(true),
     }
 }
 

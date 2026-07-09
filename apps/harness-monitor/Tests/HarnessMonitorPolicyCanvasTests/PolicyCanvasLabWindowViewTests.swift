@@ -36,14 +36,14 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
   }
 
   func testShouldAdoptLiveSnapshotRejectsEmptyGraphUntilLiveDataArrives() {
-    let emptyDocument = TaskBoardPolicyPipelineDocument(
+    let emptyDocument = PolicyPipelineDocument(
       schemaVersion: 2,
       revision: 9,
       mode: .draft,
       nodes: [],
       edges: [],
       groups: [],
-      layout: TaskBoardPolicyPipelineLayout(nodes: []),
+      layout: PolicyPipelineLayout(nodes: []),
       policyTraceIds: ["trace-empty"]
     )
 

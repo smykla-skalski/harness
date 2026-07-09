@@ -67,7 +67,7 @@ struct DashboardPolicyCanvasNameSheet: View {
 struct DashboardPolicyCanvasNameRequest: Identifiable {
   enum Mode {
     case create
-    case duplicate(source: TaskBoardPolicyCanvasSummary)
+    case duplicate(source: PolicyCanvasSummary)
   }
 
   let id = UUID()
@@ -79,7 +79,7 @@ struct DashboardPolicyCanvasNameRequest: Identifiable {
   }
 
   static func duplicate(
-    source: TaskBoardPolicyCanvasSummary,
+    source: PolicyCanvasSummary,
     initialTitle: String
   ) -> Self {
     Self(mode: .duplicate(source: source), initialTitle: initialTitle)

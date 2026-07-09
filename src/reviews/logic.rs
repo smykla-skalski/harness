@@ -332,6 +332,11 @@ impl ReviewItem {
                 .iter()
                 .filter_map(|check| check.check_suite_id.clone())
                 .collect(),
+            has_conflict_markers: self.has_conflict_markers,
+            viewer_has_active_approval: self.viewer_has_active_approval,
+            auto_merge_enabled: self.auto_merge_enabled,
+            approval_requirement_satisfied_after_viewer_approval: self
+                .approval_requirement_satisfied_after_viewer_approval,
         }
     }
 
@@ -398,6 +403,7 @@ impl ReviewTarget {
                 ReviewReviewStatus::ReviewRequired | ReviewReviewStatus::None
             )
             && self.mergeable != ReviewMergeableState::Conflicting
+            && self.has_conflict_markers != Some(true)
     }
 
     #[must_use]
@@ -412,6 +418,7 @@ impl ReviewTarget {
             && self.check_status == ReviewCheckStatus::Success
             && self.mergeable != ReviewMergeableState::Conflicting
             && !self.flags.policy_blocked
+            && self.has_conflict_markers != Some(true)
     }
 }
 

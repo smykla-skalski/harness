@@ -1,18 +1,18 @@
 use crate::daemon::http::{DaemonHttpState, require_async_db, task_board_route_executor};
 use crate::daemon::protocol::{
-    TaskBoardPolicyScenarioCreateRequest, TaskBoardPolicyScenarioDeleteRequest,
-    TaskBoardPolicyScenarioResetRequest, TaskBoardPolicyScenarioUpdateRequest, WsRequest,
+    PolicyScenarioCreateRequest, PolicyScenarioDeleteRequest,
+    PolicyScenarioResetRequest, PolicyScenarioUpdateRequest, WsRequest,
     WsResponse,
 };
 use crate::daemon::websocket::mutations::dispatch_query_result;
 
 use super::super::{invalid_params, parse_params, parse_params_or_default};
 
-pub(super) async fn dispatch_task_board_policy_scenario_create(
+pub(super) async fn dispatch_policy_scenario_create(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyScenarioCreateRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyScenarioCreateRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy scenario create") {
@@ -22,7 +22,7 @@ pub(super) async fn dispatch_task_board_policy_scenario_create(
     let result = task_board_route_executor::create_policy_scenario(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_scenario_create",
+        "policy_scenario.create",
         "Create policy scenario",
         None,
         serde_json::json!({ "name": &body.name }),
@@ -32,11 +32,11 @@ pub(super) async fn dispatch_task_board_policy_scenario_create(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_scenario_update(
+pub(super) async fn dispatch_policy_scenario_update(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyScenarioUpdateRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyScenarioUpdateRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy scenario update") {
@@ -46,7 +46,7 @@ pub(super) async fn dispatch_task_board_policy_scenario_update(
     let result = task_board_route_executor::update_policy_scenario(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_scenario_update",
+        "policy_scenario.update",
         "Update policy scenario",
         Some(body.id.as_str()),
         serde_json::json!({ "id": &body.id, "name": &body.name }),
@@ -56,11 +56,11 @@ pub(super) async fn dispatch_task_board_policy_scenario_update(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_scenario_delete(
+pub(super) async fn dispatch_policy_scenario_delete(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyScenarioDeleteRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyScenarioDeleteRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy scenario delete") {
@@ -70,7 +70,7 @@ pub(super) async fn dispatch_task_board_policy_scenario_delete(
     let result = task_board_route_executor::delete_policy_scenario(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_scenario_delete",
+        "policy_scenario.delete",
         "Delete policy scenario",
         Some(body.id.as_str()),
         serde_json::json!({ "id": &body.id }),
@@ -80,11 +80,11 @@ pub(super) async fn dispatch_task_board_policy_scenario_delete(
     dispatch_query_result(&request.id, result)
 }
 
-pub(super) async fn dispatch_task_board_policy_scenario_reset(
+pub(super) async fn dispatch_policy_scenario_reset(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(_body) = parse_params_or_default::<TaskBoardPolicyScenarioResetRequest>(request) else {
+    let Ok(_body) = parse_params_or_default::<PolicyScenarioResetRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy scenario reset") {
@@ -94,7 +94,7 @@ pub(super) async fn dispatch_task_board_policy_scenario_reset(
     let result = task_board_route_executor::reset_policy_scenarios(db).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_scenario_reset",
+        "policy_scenario.reset",
         "Reset policy scenarios",
         None,
         serde_json::json!({}),

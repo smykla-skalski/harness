@@ -44,30 +44,30 @@ extension PolicyCanvasReflowTests {
     return PolicyCanvasReflowPrediction(routingHints: routingHints, edge: edge)
   }
 
-  func overlappingReflowDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  func overlappingReflowDocument(revision: UInt64) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "source-node",
           title: "Source",
           kind: .actionGate(actions: [.spawnAgent]),
           groupId: "group-source",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+          inputs: [PolicyPipelinePort(id: "in", title: "in")],
+          outputs: [PolicyPipelinePort(id: "out", title: "out")]
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "target-node",
           title: "Target",
           kind: .actionGate(actions: [.spawnAgent]),
           groupId: "group-target",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
+          inputs: [PolicyPipelinePort(id: "in", title: "in")]
         ),
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "source-target",
           fromNodeId: "source-node",
           fromPort: "out",
@@ -76,21 +76,21 @@ extension PolicyCanvasReflowTests {
         )
       ],
       groups: [
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "group-source",
           title: "Source group",
           nodeIds: ["source-node"]
         ),
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "group-target",
           title: "Target group",
           nodeIds: ["target-node"]
         ),
       ],
-      layout: TaskBoardPolicyPipelineLayout(
+      layout: PolicyPipelineLayout(
         nodes: [
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "source-node", x: 40, y: 60),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "target-node", x: 40, y: 60),
+          PolicyPipelineNodeLayout(nodeId: "source-node", x: 40, y: 60),
+          PolicyPipelineNodeLayout(nodeId: "target-node", x: 40, y: 60),
         ]
       ),
       policyTraceIds: ["reflow-trace-\(revision)"]
@@ -104,8 +104,8 @@ extension PolicyCanvasReflowTests {
     return PolicyCanvasPortSide.allSides.first { $0 != side } ?? side
   }
 
-  func pairedGroupOrderSeedDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  func pairedGroupOrderSeedDocument(revision: UInt64) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
@@ -117,51 +117,51 @@ extension PolicyCanvasReflowTests {
     )
   }
 
-  private func pairedGroupOrderSeedNodes() -> [TaskBoardPolicyPipelineNode] {
+  private func pairedGroupOrderSeedNodes() -> [PolicyPipelineNode] {
     [
-      TaskBoardPolicyPipelineNode(
+      PolicyPipelineNode(
         id: "source-a",
         title: "Source A",
         kind: .actionGate(actions: [.spawnAgent]),
         groupId: "group-source",
-        inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-        outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+        inputs: [PolicyPipelinePort(id: "in", title: "in")],
+        outputs: [PolicyPipelinePort(id: "out", title: "out")]
       ),
-      TaskBoardPolicyPipelineNode(
+      PolicyPipelineNode(
         id: "source-b",
         title: "Source B",
         kind: .actionGate(actions: [.spawnAgent]),
         groupId: "group-source",
-        inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-        outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+        inputs: [PolicyPipelinePort(id: "in", title: "in")],
+        outputs: [PolicyPipelinePort(id: "out", title: "out")]
       ),
-      TaskBoardPolicyPipelineNode(
+      PolicyPipelineNode(
         id: "sink-a",
         title: "Sink A",
         kind: .humanGate(reasonCode: .humanRequired),
         groupId: "group-target",
-        inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
+        inputs: [PolicyPipelinePort(id: "in", title: "in")]
       ),
-      TaskBoardPolicyPipelineNode(
+      PolicyPipelineNode(
         id: "sink-b",
         title: "Sink B",
         kind: .humanGate(reasonCode: .humanRequired),
         groupId: "group-target",
-        inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
+        inputs: [PolicyPipelinePort(id: "in", title: "in")]
       ),
     ]
   }
 
-  private func pairedGroupOrderSeedEdges() -> [TaskBoardPolicyPipelineEdge] {
+  private func pairedGroupOrderSeedEdges() -> [PolicyPipelineEdge] {
     [
-      TaskBoardPolicyPipelineEdge(
+      PolicyPipelineEdge(
         id: "edge:source-a",
         fromNodeId: "source-a",
         fromPort: "out",
         toNodeId: "sink-a",
         toPort: "in"
       ),
-      TaskBoardPolicyPipelineEdge(
+      PolicyPipelineEdge(
         id: "edge:source-b",
         fromNodeId: "source-b",
         fromPort: "out",
@@ -171,14 +171,14 @@ extension PolicyCanvasReflowTests {
     ]
   }
 
-  private func pairedGroupOrderSeedGroups() -> [TaskBoardPolicyPipelineGroup] {
+  private func pairedGroupOrderSeedGroups() -> [PolicyPipelineGroup] {
     [
-      TaskBoardPolicyPipelineGroup(
+      PolicyPipelineGroup(
         id: "group-source",
         title: "Source group",
         nodeIds: ["source-a", "source-b"]
       ),
-      TaskBoardPolicyPipelineGroup(
+      PolicyPipelineGroup(
         id: "group-target",
         title: "Target group",
         nodeIds: ["sink-a", "sink-b"]
@@ -186,13 +186,13 @@ extension PolicyCanvasReflowTests {
     ]
   }
 
-  private func pairedGroupOrderSeedLayout() -> TaskBoardPolicyPipelineLayout {
-    TaskBoardPolicyPipelineLayout(
+  private func pairedGroupOrderSeedLayout() -> PolicyPipelineLayout {
+    PolicyPipelineLayout(
       nodes: [
-        TaskBoardPolicyPipelineNodeLayout(nodeId: "source-a", x: 80, y: 300, source: .manual),
-        TaskBoardPolicyPipelineNodeLayout(nodeId: "source-b", x: 80, y: 60, source: .manual),
-        TaskBoardPolicyPipelineNodeLayout(nodeId: "sink-a", x: 520, y: 300, source: .manual),
-        TaskBoardPolicyPipelineNodeLayout(nodeId: "sink-b", x: 520, y: 60, source: .manual),
+        PolicyPipelineNodeLayout(nodeId: "source-a", x: 80, y: 300, source: .manual),
+        PolicyPipelineNodeLayout(nodeId: "source-b", x: 80, y: 60, source: .manual),
+        PolicyPipelineNodeLayout(nodeId: "sink-a", x: 520, y: 300, source: .manual),
+        PolicyPipelineNodeLayout(nodeId: "sink-b", x: 520, y: 60, source: .manual),
       ]
     )
   }

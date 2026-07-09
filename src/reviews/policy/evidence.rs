@@ -16,6 +16,11 @@ pub(crate) fn review_target_policy_evidence(target: &ReviewTarget) -> PolicyEvid
         review_has_merge_conflicts: Some(target.mergeable == ReviewMergeableState::Conflicting),
         review_policy_blocked: Some(target.flags.policy_blocked),
         review_viewer_can_update: Some(target.flags.viewer_can_update),
+        review_has_conflict_markers: target.has_conflict_markers,
+        review_viewer_has_active_approval: target.viewer_has_active_approval,
+        review_auto_merge_enabled: target.auto_merge_enabled,
+        review_required_approvals_satisfied_after_viewer_approval: target
+            .approval_requirement_satisfied_after_viewer_approval,
         ..PolicyEvidence::default()
     }
 }

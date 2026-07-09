@@ -8,9 +8,9 @@ struct PolicyCanvasDocumentExportPayload: Sendable {
   let edges: [PolicyCanvasEdge]
   let zoom: CGFloat
   let routingHints: PolicyCanvasLayoutRoutingHints?
-  let backingDocument: TaskBoardPolicyPipelineDocument?
+  let backingDocument: PolicyPipelineDocument?
 
-  func exportDocument() -> TaskBoardPolicyPipelineDocument {
+  func exportDocument() -> PolicyPipelineDocument {
     let exportNodes = policyCanvasOptimizedPortOrder(nodes: nodes, edges: edges)
     let reconciledGroups = reconciledGroups(nodes: exportNodes)
     let originalNodeKinds =
@@ -22,14 +22,14 @@ struct PolicyCanvasDocumentExportPayload: Sendable {
         Dictionary(uniqueKeysWithValues: document.edges.map { ($0.id.rawValue, $0.condition) })
       } ?? [:]
     let liveNodeIDs = Set(exportNodes.map(\.id))
-    return TaskBoardPolicyPipelineDocument(
+    return PolicyPipelineDocument(
       schemaVersion: backingDocument?.schemaVersion ?? 2,
       revision: backingDocument?.revision ?? 1,
       mode: .draft,
       nodes: exportNodes.map { node in
-        taskBoardPolicyNode(node, originalKind: originalNodeKinds[node.id])
+        policyNode(node, originalKind: originalNodeKinds[node.id])
       },
-      edges: edges.flatMap { edge -> [TaskBoardPolicyPipelineEdge] in
+      edges: edges.flatMap { edge -> [PolicyPipelineEdge] in
         guard liveNodeIDs.contains(edge.source.nodeID) else { return [] }
         return policyCanvasDaemonEdges(
           for: edge,
@@ -39,13 +39,13 @@ struct PolicyCanvasDocumentExportPayload: Sendable {
         .filter { liveNodeIDs.contains($0.toNodeId.rawValue) }
       },
       groups: reconciledGroups.map { group in
-        taskBoardPolicyGroup(group, nodes: exportNodes)
+        policyGroup(group, nodes: exportNodes)
       },
-      layout: TaskBoardPolicyPipelineLayout(
+      layout: PolicyPipelineLayout(
         zoom: Double(zoom),
         offset: backingDocument?.layout.offset ?? .zero,
-        nodes: exportNodes.map(taskBoardPolicyNodeLayout),
-        routingHints: taskBoardPolicyRoutingHints(routingHints)
+        nodes: exportNodes.map(policyNodeLayout),
+        routingHints: policyRoutingHints(routingHints)
       ),
       policyTraceIds: backingDocument?.policyTraceIds ?? []
     )

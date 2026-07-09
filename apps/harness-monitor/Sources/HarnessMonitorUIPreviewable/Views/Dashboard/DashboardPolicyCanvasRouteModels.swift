@@ -1,9 +1,9 @@
 import HarnessMonitorKit
 
 enum DashboardPolicyCanvasSwitchMutation {
-  case activate(TaskBoardPolicyCanvasSummary)
+  case activate(PolicyCanvasSummary)
   case create(title: String)
-  case duplicate(source: TaskBoardPolicyCanvasSummary, title: String)
+  case duplicate(source: PolicyCanvasSummary, title: String)
 
   var confirmationMessage: String {
     switch self {
@@ -18,7 +18,7 @@ enum DashboardPolicyCanvasSwitchMutation {
 }
 
 struct DashboardPolicyCanvasDeleteRequest {
-  let canvas: TaskBoardPolicyCanvasSummary
+  let canvas: PolicyCanvasSummary
   let requiresDirtyResolution: Bool
 
   var message: String {

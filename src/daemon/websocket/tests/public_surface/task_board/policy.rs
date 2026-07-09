@@ -3,7 +3,7 @@ use serde_json::json;
 use super::*;
 
 #[test]
-fn websocket_task_board_policy_make_live_and_go_live_diff_round_trip() {
+fn websocket_policy_make_live_and_go_live_diff_round_trip() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -15,7 +15,7 @@ fn websocket_task_board_policy_make_live_and_go_live_diff_round_trip() {
             let workspace_response = dispatch(
                 &request(
                     "req-make-live-workspace",
-                    ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET,
+                    ws_methods::POLICY_CANVAS_WORKSPACE_GET,
                     json!({}),
                 ),
                 &state,
@@ -30,7 +30,7 @@ fn websocket_task_board_policy_make_live_and_go_live_diff_round_trip() {
             let get_response = dispatch(
                 &request(
                     "req-make-live-get",
-                    ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
+                    ws_methods::POLICY_PIPELINE_GET,
                     json!({ "canvas_id": active_canvas_id.clone() }),
                 ),
                 &state,
@@ -42,7 +42,7 @@ fn websocket_task_board_policy_make_live_and_go_live_diff_round_trip() {
             let save_response = dispatch(
                 &request(
                     "req-make-live-save",
-                    ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
+                    ws_methods::POLICY_PIPELINE_SAVE_DRAFT,
                     json!({
                         "canvas_id": active_canvas_id.clone(),
                         "document": pipeline.clone(),
@@ -59,7 +59,7 @@ fn websocket_task_board_policy_make_live_and_go_live_diff_round_trip() {
             let pre_diff_response = dispatch(
                 &request(
                     "req-go-live-diff-pre",
-                    ws_methods::TASK_BOARD_POLICY_PIPELINE_GO_LIVE_DIFF,
+                    ws_methods::POLICY_PIPELINE_GO_LIVE_DIFF,
                     json!({ "canvas_id": active_canvas_id.clone() }),
                 ),
                 &state,
@@ -72,7 +72,7 @@ fn websocket_task_board_policy_make_live_and_go_live_diff_round_trip() {
             let make_live_response = dispatch(
                 &request(
                     "req-make-live",
-                    ws_methods::TASK_BOARD_POLICY_PIPELINE_MAKE_LIVE,
+                    ws_methods::POLICY_PIPELINE_MAKE_LIVE,
                     json!({
                         "canvas_id": active_canvas_id.clone(),
                         "revision": saved_revision,
@@ -97,7 +97,7 @@ fn websocket_task_board_policy_make_live_and_go_live_diff_round_trip() {
             let post_diff_response = dispatch(
                 &request(
                     "req-go-live-diff-post",
-                    ws_methods::TASK_BOARD_POLICY_PIPELINE_GO_LIVE_DIFF,
+                    ws_methods::POLICY_PIPELINE_GO_LIVE_DIFF,
                     json!({
                         "canvas_id": active_canvas_id,
                         "document": made_live["document"].clone(),
@@ -115,7 +115,7 @@ fn websocket_task_board_policy_make_live_and_go_live_diff_round_trip() {
 }
 
 #[test]
-fn websocket_task_board_policy_pipeline_replay_round_trip() {
+fn websocket_policy_pipeline_replay_round_trip() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -129,7 +129,7 @@ fn websocket_task_board_policy_pipeline_replay_round_trip() {
             let replay_response = dispatch(
                 &request(
                     "req-replay",
-                    ws_methods::TASK_BOARD_POLICY_PIPELINE_REPLAY,
+                    ws_methods::POLICY_PIPELINE_REPLAY,
                     json!({ "limit": 25 }),
                 ),
                 &state,
@@ -149,7 +149,7 @@ fn websocket_task_board_policy_pipeline_replay_round_trip() {
 }
 
 #[test]
-fn websocket_task_board_policy_pipeline_routes_round_trip() {
+fn websocket_policy_pipeline_routes_round_trip() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -161,7 +161,7 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
             let workspace_response = dispatch(
                 &request(
                     "req-policy-workspace",
-                    ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET,
+                    ws_methods::POLICY_CANVAS_WORKSPACE_GET,
                     json!({}),
                 ),
                 &state,
@@ -176,7 +176,7 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
             let get_response = dispatch(
                 &request(
                     "req-policy-get",
-                    ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
+                    ws_methods::POLICY_PIPELINE_GET,
                     json!({ "canvas_id": active_canvas_id.clone() }),
                 ),
                 &state,
@@ -189,7 +189,7 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
             let save_response = dispatch(
                 &request(
                     "req-policy-save",
-                    ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
+                    ws_methods::POLICY_PIPELINE_SAVE_DRAFT,
                     json!({
                         "canvas_id": active_canvas_id.clone(),
                         "document": pipeline.clone(),
@@ -207,7 +207,7 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
             let simulation_response = dispatch(
                 &request(
                     "req-policy-simulate",
-                    ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE,
+                    ws_methods::POLICY_PIPELINE_SIMULATE,
                     json!({
                         "canvas_id": active_canvas_id.clone(),
                         "document": save["document"].clone(),
@@ -224,7 +224,7 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
             let promote_response = dispatch(
                 &request(
                     "req-policy-promote",
-                    ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE,
+                    ws_methods::POLICY_PIPELINE_PROMOTE,
                     json!({
                         "canvas_id": active_canvas_id.clone(),
                         "revision": saved_revision,
@@ -240,7 +240,7 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
             let audit_response = dispatch(
                 &request(
                     "req-policy-audit",
-                    ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
+                    ws_methods::POLICY_PIPELINE_AUDIT,
                     json!({ "canvas_id": active_canvas_id }),
                 ),
                 &state,
@@ -258,7 +258,7 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
 }
 
 #[test]
-fn websocket_task_board_policy_optional_routes_accept_missing_params() {
+fn websocket_policy_optional_routes_accept_missing_params() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -270,7 +270,7 @@ fn websocket_task_board_policy_optional_routes_accept_missing_params() {
 
             let workspace_request: WsRequest = serde_json::from_value(json!({
                 "id": "req-policy-workspace-defaults",
-                "method": ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET,
+                "method": ws_methods::POLICY_CANVAS_WORKSPACE_GET,
             }))
             .expect("workspace request with default params");
             let workspace_response = dispatch(&workspace_request, &state, &connection).await;
@@ -291,7 +291,7 @@ fn websocket_task_board_policy_optional_routes_accept_missing_params() {
 
             let pipeline_request: WsRequest = serde_json::from_value(json!({
                 "id": "req-policy-get-defaults",
-                "method": ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
+                "method": ws_methods::POLICY_PIPELINE_GET,
             }))
             .expect("pipeline request with default params");
             let pipeline_response = dispatch(&pipeline_request, &state, &connection).await;
@@ -307,7 +307,7 @@ fn websocket_task_board_policy_optional_routes_accept_missing_params() {
 
             let audit_request: WsRequest = serde_json::from_value(json!({
                 "id": "req-policy-audit-defaults",
-                "method": ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
+                "method": ws_methods::POLICY_PIPELINE_AUDIT,
             }))
             .expect("audit request with default params");
             let audit_response = dispatch(&audit_request, &state, &connection).await;
@@ -325,7 +325,7 @@ fn websocket_task_board_policy_optional_routes_accept_missing_params() {
 }
 
 #[test]
-fn websocket_task_board_policy_scenario_crud_roundtrips() {
+fn websocket_policy_scenario_crud_roundtrips() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
@@ -337,7 +337,7 @@ fn websocket_task_board_policy_scenario_crud_roundtrips() {
 
             let workspace_request: WsRequest = serde_json::from_value(json!({
                 "id": "req-scenario-workspace",
-                "method": ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET,
+                "method": ws_methods::POLICY_CANVAS_WORKSPACE_GET,
             }))
             .expect("workspace request");
             let seeded = dispatch(&workspace_request, &state, &connection).await;
@@ -349,7 +349,7 @@ fn websocket_task_board_policy_scenario_crud_roundtrips() {
 
             let create_request: WsRequest = serde_json::from_value(json!({
                 "id": "req-scenario-create",
-                "method": ws_methods::TASK_BOARD_POLICY_SCENARIO_CREATE,
+                "method": ws_methods::POLICY_SCENARIO_CREATE,
                 "params": { "name": "Risky merge", "input": { "action": "merge_pr" } },
             }))
             .expect("scenario create request");
@@ -373,7 +373,7 @@ fn websocket_task_board_policy_scenario_crud_roundtrips() {
 
             let reset_request: WsRequest = serde_json::from_value(json!({
                 "id": "req-scenario-reset",
-                "method": ws_methods::TASK_BOARD_POLICY_SCENARIO_RESET,
+                "method": ws_methods::POLICY_SCENARIO_RESET,
             }))
             .expect("scenario reset request");
             let reset = dispatch(&reset_request, &state, &connection).await;

@@ -88,7 +88,13 @@ extension ReviewItem {
       requiredFailedCheckNames: wire.requiredFailedCheckNames,
       viewerIsRequestedReviewer: wire.viewerIsRequestedReviewer,
       viewerCanUpdate: wire.viewerCanUpdate,
-      viewerCanMergeAsAdmin: wire.viewerCanMergeAsAdmin
+      viewerCanMergeAsAdmin: wire.viewerCanMergeAsAdmin,
+      requiredApprovingReviewCount: wire.requiredApprovingReviewCount,
+      hasConflictMarkers: wire.hasConflictMarkers,
+      viewerHasActiveApproval: wire.viewerHasActiveApproval,
+      autoMergeEnabled: wire.autoMergeEnabled,
+      approvalsSatisfiedAfterViewerApproval:
+        wire.approvalRequirementSatisfiedAfterViewerApproval
     )
   }
 }

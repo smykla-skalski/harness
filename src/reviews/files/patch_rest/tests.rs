@@ -2,6 +2,8 @@
 //! collected here (rather than split per submodule) because the integration
 //! cases need both the helpers and the fetcher visible at once.
 
+mod scan;
+
 use super::fetcher::{
     ConditionalFetchOutcome, RestFetchError, fetch_patches, fetch_patches_conditional,
 };

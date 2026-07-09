@@ -5,13 +5,13 @@ import HarnessMonitorPolicyModels
 struct PolicyCanvasValidationWorkerInput: Equatable, Sendable {
   let nodes: [PolicyCanvasNode]
   let edges: [PolicyCanvasEdge]
-  let daemonIssues: [TaskBoardPolicyPipelineValidationIssue]
+  let daemonIssues: [PolicyPipelineValidationIssue]
 }
 
 struct PolicyCanvasPreparedValidationInput: Equatable, Sendable {
   let nodes: [PolicyCanvasValidationNode]
   let edges: [PolicyCanvasEdge]
-  let daemonIssues: [TaskBoardPolicyPipelineValidationIssue]
+  let daemonIssues: [PolicyPipelineValidationIssue]
   let nodeIndex: [String: PolicyCanvasValidationNode]
   let nodeIDs: Set<String>
   let edgeIDs: Set<String>

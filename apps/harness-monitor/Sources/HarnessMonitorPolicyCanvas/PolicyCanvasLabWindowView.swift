@@ -7,7 +7,7 @@ public struct PolicyCanvasLabWindowView: View {
   private let liveSnapshot: PolicyCanvasHostSnapshot
   private let runtime: (any PolicyCanvasLabRuntime)?
   private let allowsLiveBootstrap: Bool
-  private let fixtureDocument: TaskBoardPolicyPipelineDocument?
+  private let fixtureDocument: PolicyPipelineDocument?
 
   @State private var displayedSnapshot: PolicyCanvasHostSnapshot
   @State private var allowsEmptyLiveSnapshot: Bool
@@ -29,7 +29,7 @@ public struct PolicyCanvasLabWindowView: View {
     runtime: (any PolicyCanvasLabRuntime)? = nil,
     allowsLiveBootstrap: Bool = false,
     initialSelection: PolicyCanvasLabSelection = .sample(PolicyCanvasLabSamples.defaultSelectionID),
-    fixtureDocument: TaskBoardPolicyPipelineDocument? =
+    fixtureDocument: PolicyPipelineDocument? =
       PolicyCanvasLabSnapshotSupport.fixtureDocument(),
     defaults: UserDefaults = .standard
   ) {
@@ -86,7 +86,7 @@ public struct PolicyCanvasLabWindowView: View {
 
   private static func normalizedInitialSelection(
     _ selection: PolicyCanvasLabSelection,
-    fixtureDocument: TaskBoardPolicyPipelineDocument?,
+    fixtureDocument: PolicyPipelineDocument?,
     liveGraphVisible: Bool,
     allowsLiveBootstrap: Bool
   ) -> PolicyCanvasLabSelection {
@@ -117,7 +117,7 @@ public struct PolicyCanvasLabWindowView: View {
 
   private static func displayedSnapshot(
     for selection: PolicyCanvasLabSelection,
-    fixtureDocument: TaskBoardPolicyPipelineDocument?,
+    fixtureDocument: PolicyPipelineDocument?,
     liveSnapshot: PolicyCanvasHostSnapshot
   ) -> PolicyCanvasHostSnapshot {
     if let fixtureDocument {
@@ -145,7 +145,7 @@ public struct PolicyCanvasLabWindowView: View {
     fixtureDocument != nil
   }
 
-  private var renderedPolicyDocument: TaskBoardPolicyPipelineDocument? {
+  private var renderedPolicyDocument: PolicyPipelineDocument? {
     displayedSnapshot.document
   }
 

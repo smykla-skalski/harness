@@ -35,7 +35,7 @@ extension PolicyCanvasViewModel {
       )
     )
     node.groupID = containingGroupID(for: nodeCenter(node))
-    node.policyKind = taskBoardPolicyNodeKind(for: kind)
+    node.policyKind = policyNodeKind(for: kind)
     let priorSelection = selection
     mutate(.addNode(node, restoreSelection: priorSelection))
   }

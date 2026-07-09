@@ -97,7 +97,12 @@ public enum HarnessMonitorReviewsDaemonNormalizer {
       requiredFailedCheckNames: item.requiredFailedCheckNames,
       viewerIsRequestedReviewer: item.viewerIsRequestedReviewer,
       viewerCanUpdate: true,
-      viewerCanMergeAsAdmin: item.viewerCanMergeAsAdmin
+      viewerCanMergeAsAdmin: item.viewerCanMergeAsAdmin,
+      requiredApprovingReviewCount: item.requiredApprovingReviewCount,
+      hasConflictMarkers: item.hasConflictMarkers,
+      viewerHasActiveApproval: item.viewerHasActiveApproval,
+      autoMergeEnabled: item.autoMergeEnabled,
+      approvalsSatisfiedAfterViewerApproval: item.approvalsSatisfiedAfterViewerApproval
     )
   }
 }

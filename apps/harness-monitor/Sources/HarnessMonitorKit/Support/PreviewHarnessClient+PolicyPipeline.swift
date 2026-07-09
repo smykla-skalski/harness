@@ -1,38 +1,38 @@
 import Foundation
 
 extension PreviewHarnessClient {
-  public func taskBoardPolicyPipeline(
+  public func policyPipeline(
     canvasId _: String? = nil
-  ) async throws -> TaskBoardPolicyPipelineDocument {
+  ) async throws -> PolicyPipelineDocument {
     PreviewFixtures.policyCanvasPipelineDocument()
   }
 
-  public func saveTaskBoardPolicyPipelineDraft(
-    request: TaskBoardPolicyPipelineSaveDraftRequest
-  ) async throws -> TaskBoardPolicyPipelineSaveDraftResponse {
+  public func savePolicyPipelineDraft(
+    request: PolicyPipelineSaveDraftRequest
+  ) async throws -> PolicyPipelineSaveDraftResponse {
     // Mirror the daemon: every draft save bumps the revision (see
     // `policy_graph/store.rs` - `current.max(sent).saturating_add(1)`). Echoing
     // the sent revision unchanged would let the save flow look correct in the
     // lab while the real round-trip re-trips the remote-change banner.
     var saved = request.document
     saved.revision += 1
-    return TaskBoardPolicyPipelineSaveDraftResponse(
+    return PolicyPipelineSaveDraftResponse(
       document: saved,
-      validation: TaskBoardPolicyPipelineValidation(isValid: true)
+      validation: PolicyPipelineValidation(isValid: true)
     )
   }
 
-  public func simulateTaskBoardPolicyPipeline(
-    request: TaskBoardPolicyPipelineSimulateRequest
-  ) async throws -> TaskBoardPolicyPipelineSimulationResult {
+  public func simulatePolicyPipeline(
+    request: PolicyPipelineSimulateRequest
+  ) async throws -> PolicyPipelineSimulationResult {
     let document = request.document ?? PreviewFixtures.policyCanvasPipelineDocument()
     return PreviewFixtures.policyCanvasSimulation(for: document)
   }
 
-  public func promoteTaskBoardPolicyPipeline(
-    request: TaskBoardPolicyPipelinePromoteRequest
-  ) async throws -> TaskBoardPolicyPipelinePromoteResponse {
-    TaskBoardPolicyPipelinePromoteResponse(
+  public func promotePolicyPipeline(
+    request: PolicyPipelinePromoteRequest
+  ) async throws -> PolicyPipelinePromoteResponse {
+    PolicyPipelinePromoteResponse(
       document: PreviewFixtures.policyCanvasPipelineDocument(
         mode: .enforced,
         revision: request.revision
@@ -41,28 +41,28 @@ extension PreviewHarnessClient {
     )
   }
 
-  public func taskBoardPolicyPipelineAudit(
+  public func policyPipelineAudit(
     canvasId _: String? = nil
-  ) async throws -> TaskBoardPolicyPipelineAuditSummary {
+  ) async throws -> PolicyPipelineAuditSummary {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
     return PreviewFixtures.policyCanvasAudit(for: document)
   }
 
-  public func exportTaskBoardPolicy(
-    request _: TaskBoardPolicyExportRequest
-  ) async throws -> TaskBoardPolicyExportResponse {
+  public func exportPolicyCanvas(
+    request _: PolicyCanvasExportRequest
+  ) async throws -> PolicyCanvasExportResponse {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
-    return TaskBoardPolicyExportResponse(
+    return PolicyCanvasExportResponse(
       canvasId: "preview-canvas-default",
       title: "Default",
       document: document
     )
   }
 
-  public func importTaskBoardPolicy(
-    request _: TaskBoardPolicyImportRequest
-  ) async throws -> TaskBoardPolicyCanvasWorkspace {
-    let canvases = try await taskBoardPolicyCanvasWorkspace()
+  public func importPolicyCanvas(
+    request _: PolicyCanvasImportRequest
+  ) async throws -> PolicyCanvasWorkspace {
+    let canvases = try await policyCanvasWorkspace()
     return canvases
   }
 }

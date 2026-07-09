@@ -65,6 +65,11 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
   public let viewerIsRequestedReviewer: Bool
   public let viewerCanUpdate: Bool
   public let viewerCanMergeAsAdmin: Bool
+  public let requiredApprovingReviewCount: UInt32?
+  public let hasConflictMarkers: Bool?
+  public let viewerHasActiveApproval: Bool?
+  public let autoMergeEnabled: Bool?
+  public let approvalsSatisfiedAfterViewerApproval: Bool?
 
   public var id: String { pullRequestID }
 
@@ -98,7 +103,12 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     requiredFailedCheckNames: [String] = [],
     viewerIsRequestedReviewer: Bool = false,
     viewerCanUpdate: Bool = true,
-    viewerCanMergeAsAdmin: Bool = false
+    viewerCanMergeAsAdmin: Bool = false,
+    requiredApprovingReviewCount: UInt32? = nil,
+    hasConflictMarkers: Bool? = nil,
+    viewerHasActiveApproval: Bool? = nil,
+    autoMergeEnabled: Bool? = nil,
+    approvalsSatisfiedAfterViewerApproval: Bool? = nil
   ) {
     self.pullRequestID = pullRequestID
     self.repositoryID = repositoryID
@@ -130,6 +140,11 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     self.viewerIsRequestedReviewer = viewerIsRequestedReviewer
     self.viewerCanUpdate = viewerCanUpdate
     self.viewerCanMergeAsAdmin = viewerCanMergeAsAdmin
+    self.requiredApprovingReviewCount = requiredApprovingReviewCount
+    self.hasConflictMarkers = hasConflictMarkers
+    self.viewerHasActiveApproval = viewerHasActiveApproval
+    self.autoMergeEnabled = autoMergeEnabled
+    self.approvalsSatisfiedAfterViewerApproval = approvalsSatisfiedAfterViewerApproval
   }
 
   enum CodingKeys: String, CodingKey {
@@ -163,6 +178,11 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     case viewerIsRequestedReviewer
     case viewerCanUpdate
     case viewerCanMergeAsAdmin
+    case requiredApprovingReviewCount
+    case hasConflictMarkers
+    case viewerHasActiveApproval
+    case autoMergeEnabled
+    case approvalsSatisfiedAfterViewerApproval = "approvalRequirementSatisfiedAfterViewerApproval"
   }
 
   public init(from decoder: Decoder) throws {
@@ -213,6 +233,16 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     viewerCanUpdate = try container.decodeIfPresent(Bool.self, forKey: .viewerCanUpdate) ?? false
     viewerCanMergeAsAdmin =
       try container.decodeIfPresent(Bool.self, forKey: .viewerCanMergeAsAdmin) ?? false
+    requiredApprovingReviewCount =
+      try container.decodeIfPresent(UInt32.self, forKey: .requiredApprovingReviewCount)
+    hasConflictMarkers =
+      try container.decodeIfPresent(Bool.self, forKey: .hasConflictMarkers)
+    viewerHasActiveApproval =
+      try container.decodeIfPresent(Bool.self, forKey: .viewerHasActiveApproval)
+    autoMergeEnabled =
+      try container.decodeIfPresent(Bool.self, forKey: .autoMergeEnabled)
+    approvalsSatisfiedAfterViewerApproval =
+      try container.decodeIfPresent(Bool.self, forKey: .approvalsSatisfiedAfterViewerApproval)
   }
 }
 

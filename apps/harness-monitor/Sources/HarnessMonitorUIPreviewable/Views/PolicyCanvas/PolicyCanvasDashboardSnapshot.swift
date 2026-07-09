@@ -3,17 +3,17 @@ import HarnessMonitorPolicyCanvasAlgorithms
 
 public struct PolicyCanvasHostSnapshot: Equatable {
   public let activeCanvasId: String?
-  public let document: TaskBoardPolicyPipelineDocument?
-  public let simulation: TaskBoardPolicyPipelineSimulationResult?
-  public let audit: TaskBoardPolicyPipelineAuditSummary?
-  public let workspace: TaskBoardPolicyCanvasWorkspace?
+  public let document: PolicyPipelineDocument?
+  public let simulation: PolicyPipelineSimulationResult?
+  public let audit: PolicyPipelineAuditSummary?
+  public let workspace: PolicyCanvasWorkspace?
 
   public init(
     activeCanvasId: String?,
-    document: TaskBoardPolicyPipelineDocument?,
-    simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?,
-    workspace: TaskBoardPolicyCanvasWorkspace? = nil
+    document: PolicyPipelineDocument?,
+    simulation: PolicyPipelineSimulationResult?,
+    audit: PolicyPipelineAuditSummary?,
+    workspace: PolicyCanvasWorkspace? = nil
   ) {
     self.activeCanvasId = activeCanvasId
     self.document = document
@@ -30,7 +30,7 @@ public struct DashboardPolicyCanvasSelectionPreview: Equatable {
   public let showsLoadingPlaceholder: Bool
 
   public init?(
-    workspace: TaskBoardPolicyCanvasWorkspace?,
+    workspace: PolicyCanvasWorkspace?,
     selectedCanvasId: String?
   ) {
     guard let workspace,

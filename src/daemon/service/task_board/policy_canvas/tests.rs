@@ -1,10 +1,10 @@
 use tempfile::{TempDir, tempdir};
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::protocol::TaskBoardPolicyPipelinePromoteRequest;
+use crate::daemon::protocol::PolicyPipelinePromoteRequest;
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, apply_set_global_enforcement};
 
-use super::promote_task_board_policy_pipeline;
+use super::promote_policy_pipeline;
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {
     let dir = tempdir().expect("tempdir");
@@ -28,9 +28,9 @@ async fn legacy_promote_alias_enables_global_enforcement() {
         .await
         .expect("seed workspace");
 
-    let response = promote_task_board_policy_pipeline(
+    let response = promote_policy_pipeline(
         &db,
-        &TaskBoardPolicyPipelinePromoteRequest {
+        &PolicyPipelinePromoteRequest {
             revision,
             actor: None,
             canvas_id: None,
@@ -47,7 +47,10 @@ async fn legacy_promote_alias_enables_global_enforcement() {
     assert_eq!(response.document.revision, revision);
     assert!(loaded.global_policy_enforcement_enabled);
     assert_eq!(
-        loaded.active_live_document().expect("live document").revision,
+        loaded
+            .active_live_document()
+            .expect("live document")
+            .revision,
         revision,
     );
 }

@@ -164,10 +164,10 @@ extension HarnessMonitorStore {
   }
 
   func restorePersistedPolicyPipelineState() async {
-    guard globalTaskBoardPolicyPipeline == nil else { return }
+    guard globalPolicyPipeline == nil else { return }
     guard let cached = await loadCachedPolicyDocument() else { return }
     withUISyncBatch {
-      globalTaskBoardPolicyPipeline = cached.document
+      globalPolicyPipeline = cached.document
     }
   }
 

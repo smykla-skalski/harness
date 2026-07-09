@@ -31,7 +31,7 @@ extension PolicyCanvasView {
   }
 
   @MainActor
-  private func replayPolicyCanvasRuntime() async -> TaskBoardPolicyPipelineReplayResult? {
+  private func replayPolicyCanvasRuntime() async -> PolicyPipelineReplayResult? {
     await runtime?.replayPolicyCanvas(canvasId: nil, limit: nil)
   }
 }

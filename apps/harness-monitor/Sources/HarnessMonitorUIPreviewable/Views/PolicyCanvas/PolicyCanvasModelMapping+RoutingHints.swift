@@ -7,7 +7,7 @@ import HarnessMonitorPolicyModels
 import SwiftUI
 
 func policyCanvasRoutingHints(
-  from layout: TaskBoardPolicyPipelineLayout
+  from layout: PolicyPipelineLayout
 ) -> PolicyCanvasLayoutRoutingHints? {
   guard !layout.routingHints.isEmpty else {
     return nil
@@ -37,9 +37,9 @@ func policyCanvasRoutingHints(
   )
 }
 
-func taskBoardPolicyRoutingHints(
+func policyRoutingHints(
   _ routingHints: PolicyCanvasLayoutRoutingHints?
-) -> [TaskBoardPolicyPipelineEdgeRoutingHint] {
+) -> [PolicyPipelineEdgeRoutingHint] {
   guard let routingHints else {
     return []
   }
@@ -47,7 +47,7 @@ func taskBoardPolicyRoutingHints(
     guard let hint = routingHints.edgeHints[edgeID] else {
       return nil
     }
-    return TaskBoardPolicyPipelineEdgeRoutingHint(
+    return PolicyPipelineEdgeRoutingHint(
       edgeId: edgeID,
       sourceScopeId: hint.key.sourceScopeID,
       targetScopeId: hint.key.targetScopeID,

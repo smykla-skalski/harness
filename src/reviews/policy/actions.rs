@@ -16,6 +16,9 @@ use crate::task_board::policy_runtime::handoff::{HANDOFF_ACTION_KEY, HANDOFF_PRO
 use crate::task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject,
 };
+use crate::task_board::policy_runtime::notification::{
+    NOTIFICATION_ACTION_KEY, NOTIFICATION_PROVIDER,
+};
 use crate::task_board::policy_runtime::providers::{
     PolicyActionExecution, PolicyActionProvider, PolicyExecutionContext,
 };
@@ -251,6 +254,20 @@ fn handoff_action(handoff_key: &str) -> PolicyActionDescriptor {
     }
 }
 
+fn notification_action(target: &ReviewTarget) -> PolicyActionDescriptor {
+    PolicyActionDescriptor {
+        provider: NOTIFICATION_PROVIDER.to_owned(),
+        action_key: NOTIFICATION_ACTION_KEY.to_owned(),
+        payload: Some(serde_json::json!({
+            "channel": "reviews",
+            "message": format!(
+                "{}#{} has merge conflicts or conflict markers",
+                target.repository, target.number
+            ),
+        })),
+    }
+}
+
 fn workflow_action(
     action_key: &str,
     target: &ReviewTarget,
@@ -259,6 +276,7 @@ fn workflow_action(
     match action_key {
         "reviews.approve" => Ok(policy_action("reviews.approve", target, None)),
         "reviews.merge" => Ok(policy_action("reviews.merge", target, Some(method))),
+        NOTIFICATION_ACTION_KEY => Ok(notification_action(target)),
         other => Err(CliErrorKind::invalid_transition(format!(
             "unsupported reviews policy action '{other}'"
         ))

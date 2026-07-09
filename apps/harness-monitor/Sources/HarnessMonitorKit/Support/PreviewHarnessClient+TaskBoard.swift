@@ -222,7 +222,7 @@ extension TaskBoardDispatchPlan {
         requiredConsensus: 1
       ),
       evaluator: TaskBoardEvaluatorIntent(phase: "evaluate", mode: .evaluate),
-      policy: TaskBoardPolicyDecision(
+      policy: PolicySimulationDecision(
         decision: "allow",
         reasonCode: "preview_allow",
         policyVersion: "preview"

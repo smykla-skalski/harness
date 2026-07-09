@@ -25,6 +25,7 @@ mod auto_policy;
 mod body;
 pub(crate) mod policy;
 mod policy_audit;
+mod policy_enrichment;
 pub(crate) mod policy_event_inbox;
 pub(crate) mod policy_executor;
 pub(crate) mod policy_history;
@@ -50,6 +51,7 @@ use cache_internal::{
 use cache_internal::{cached_body_response, store_cached_body_response};
 pub(crate) use policy::start_reviews_policy_run_with_audit_db;
 pub use policy::{preview_reviews_policy, reviews_policy_status, start_reviews_policy_run};
+use policy_enrichment::enrich_policy_target_for_execution;
 pub use policy_history::reviews_policy_history;
 use preview::{preview_action_target, preview_action_warnings};
 use token::{github_token, missing_token_error, token_bound_requests, token_bound_targets};
@@ -387,13 +389,14 @@ pub async fn auto_reviews(request: &ReviewsAutoRequest) -> Result<ReviewsActionR
     request.validate()?;
     let mut results = Vec::new();
     for target in &request.targets {
+        let target = enrich_policy_target_for_execution(target).await;
         let preview = preview_reviews_policy(&ReviewsPolicyPreviewRequest {
             workflow_id: String::new(),
             target: target.clone(),
             method: request.method,
         })?;
         if !preview.eligible {
-            results.push(skipped_auto_policy_result(target, &preview));
+            results.push(skipped_auto_policy_result(&target, &preview));
             continue;
         }
 
@@ -405,9 +408,9 @@ pub async fn auto_reviews(request: &ReviewsAutoRequest) -> Result<ReviewsActionR
         })
         .await
         {
-            Ok(run) => results.extend(auto_policy_results_from_run(target, &preview, &run)),
+            Ok(run) => results.extend(auto_policy_results_from_run(&target, &preview, &run)),
             Err(error) => results.push(failed_auto_policy_result(
-                target,
+                &target,
                 &preview,
                 &error.to_string(),
             )),

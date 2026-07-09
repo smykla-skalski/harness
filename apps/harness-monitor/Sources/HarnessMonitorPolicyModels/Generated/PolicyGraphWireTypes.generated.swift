@@ -215,8 +215,12 @@ public struct PolicyEvidence: Codable, Equatable, Sendable {
   public var reviewHasMergeConflicts: Bool?
   public var reviewPolicyBlocked: Bool?
   public var reviewViewerCanUpdate: Bool?
+  public var reviewHasConflictMarkers: Bool?
+  public var reviewViewerHasActiveApproval: Bool?
+  public var reviewAutoMergeEnabled: Bool?
+  public var reviewRequiredApprovalsSatisfiedAfterViewerApproval: Bool?
 
-  public init(checksGreen: Bool? = nil, branchProtectionAllowsMerge: Bool? = nil, reviewerVerdictApproved: Bool? = nil, unresolvedRequestedChanges: UInt32? = nil, protectedPathTouched: Bool? = nil, riskScore: UInt8? = nil, reviewIsOpen: Bool? = nil, reviewIsDraft: Bool? = nil, reviewReviewRequired: Bool? = nil, reviewHasNoDecision: Bool? = nil, reviewHasMergeConflicts: Bool? = nil, reviewPolicyBlocked: Bool? = nil, reviewViewerCanUpdate: Bool? = nil) {
+  public init(checksGreen: Bool? = nil, branchProtectionAllowsMerge: Bool? = nil, reviewerVerdictApproved: Bool? = nil, unresolvedRequestedChanges: UInt32? = nil, protectedPathTouched: Bool? = nil, riskScore: UInt8? = nil, reviewIsOpen: Bool? = nil, reviewIsDraft: Bool? = nil, reviewReviewRequired: Bool? = nil, reviewHasNoDecision: Bool? = nil, reviewHasMergeConflicts: Bool? = nil, reviewPolicyBlocked: Bool? = nil, reviewViewerCanUpdate: Bool? = nil, reviewHasConflictMarkers: Bool? = nil, reviewViewerHasActiveApproval: Bool? = nil, reviewAutoMergeEnabled: Bool? = nil, reviewRequiredApprovalsSatisfiedAfterViewerApproval: Bool? = nil) {
     self.checksGreen = checksGreen
     self.branchProtectionAllowsMerge = branchProtectionAllowsMerge
     self.reviewerVerdictApproved = reviewerVerdictApproved
@@ -230,6 +234,10 @@ public struct PolicyEvidence: Codable, Equatable, Sendable {
     self.reviewHasMergeConflicts = reviewHasMergeConflicts
     self.reviewPolicyBlocked = reviewPolicyBlocked
     self.reviewViewerCanUpdate = reviewViewerCanUpdate
+    self.reviewHasConflictMarkers = reviewHasConflictMarkers
+    self.reviewViewerHasActiveApproval = reviewViewerHasActiveApproval
+    self.reviewAutoMergeEnabled = reviewAutoMergeEnabled
+    self.reviewRequiredApprovalsSatisfiedAfterViewerApproval = reviewRequiredApprovalsSatisfiedAfterViewerApproval
   }
 
   enum CodingKeys: String, CodingKey {
@@ -246,6 +254,10 @@ public struct PolicyEvidence: Codable, Equatable, Sendable {
     case reviewHasMergeConflicts = "review_has_merge_conflicts"
     case reviewPolicyBlocked = "review_policy_blocked"
     case reviewViewerCanUpdate = "review_viewer_can_update"
+    case reviewHasConflictMarkers = "review_has_conflict_markers"
+    case reviewViewerHasActiveApproval = "review_viewer_has_active_approval"
+    case reviewAutoMergeEnabled = "review_auto_merge_enabled"
+    case reviewRequiredApprovalsSatisfiedAfterViewerApproval = "review_required_approvals_satisfied_after_viewer_approval"
   }
 }
 
@@ -591,6 +603,10 @@ public enum PolicyEvidenceField: String, Codable, Equatable, Sendable, CaseItera
   case reviewHasMergeConflicts = "review_has_merge_conflicts"
   case reviewPolicyBlocked = "review_policy_blocked"
   case reviewViewerCanUpdate = "review_viewer_can_update"
+  case reviewHasConflictMarkers = "review_has_conflict_markers"
+  case reviewViewerHasActiveApproval = "review_viewer_has_active_approval"
+  case reviewAutoMergeEnabled = "review_auto_merge_enabled"
+  case reviewRequiredApprovalsSatisfiedAfterViewerApproval = "review_required_approvals_satisfied_after_viewer_approval"
 
   public var id: String { rawValue }
 }

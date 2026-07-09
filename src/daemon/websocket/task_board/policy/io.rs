@@ -1,16 +1,16 @@
 use crate::daemon::http::{DaemonHttpState, require_async_db, task_board_route_executor};
 use crate::daemon::protocol::{
-    TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest, WsRequest, WsResponse,
+    PolicyCanvasExportRequest, PolicyCanvasImportRequest, WsRequest, WsResponse,
 };
 use crate::daemon::websocket::mutations::dispatch_query_result;
 
 use super::super::{invalid_params, parse_params, parse_params_or_default};
 
-pub(super) async fn dispatch_task_board_policy_export(
+pub(super) async fn dispatch_policy_export(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params_or_default::<TaskBoardPolicyExportRequest>(request) else {
+    let Ok(body) = parse_params_or_default::<PolicyCanvasExportRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy export") {
@@ -23,11 +23,11 @@ pub(super) async fn dispatch_task_board_policy_export(
     )
 }
 
-pub(super) async fn dispatch_task_board_policy_import(
+pub(super) async fn dispatch_policy_import(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyImportRequest>(request) else {
+    let Ok(body) = parse_params::<PolicyCanvasImportRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy import") {
@@ -37,7 +37,7 @@ pub(super) async fn dispatch_task_board_policy_import(
     let result = task_board_route_executor::import_policy_canvas(db, &body).await;
     super::super::record_task_board_audit_result(
         state,
-        "task_board.policy_import",
+        "policy_canvas.import",
         "Import policy canvas",
         body.title.as_deref(),
         serde_json::json!({

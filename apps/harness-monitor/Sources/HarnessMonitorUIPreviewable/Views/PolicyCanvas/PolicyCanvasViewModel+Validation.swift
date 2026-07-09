@@ -11,7 +11,7 @@ import SwiftUI
 // `allValidationIssues` (see "Dedup of daemon vs local issues is deferred").
 // See plan P11.
 
-/// Severity tier for a `TaskBoardPolicyPipelineValidationIssue`. The daemon
+/// Severity tier for a `PolicyPipelineValidationIssue`. The daemon
 /// payload itself has no severity field; this mapping is local to the canvas
 /// so the panel and inline marks can render a consistent visual weight without
 /// the user having to read each issue code. Order is significant: `.error`
@@ -87,7 +87,7 @@ enum PolicyCanvasIssueSeverity: Int, Comparable, Sendable {
 /// the focus selection the click-to-jump action should apply. Stays equatable
 /// for diffing in tests.
 struct PolicyCanvasResolvedIssue: Identifiable, Equatable, Sendable {
-  let issue: TaskBoardPolicyPipelineValidationIssue
+  let issue: PolicyPipelineValidationIssue
   let severity: PolicyCanvasIssueSeverity
   let id: String
   let focusSelection: PolicyCanvasSelection?
@@ -104,7 +104,7 @@ extension PolicyCanvasViewModel {
   /// Daemon-reported validation, when a simulation has been run. The chrome
   /// panel and inline marks both read through here so the surface stays in
   /// sync with the inspector summary; nil means "no simulation yet".
-  var daemonValidationIssues: [TaskBoardPolicyPipelineValidationIssue] {
+  var daemonValidationIssues: [PolicyPipelineValidationIssue] {
     latestSimulation?.validation.issues ?? []
   }
 
@@ -210,7 +210,7 @@ extension PolicyCanvasViewModel {
   /// Returns the local error issues (warnings excluded). The view-side
   /// caller uses `isEmpty` to decide whether to emit a status warning,
   /// but never gates the daemon call on the result.
-  func runLocalPreflight() -> [TaskBoardPolicyPipelineValidationIssue] {
+  func runLocalPreflight() -> [PolicyPipelineValidationIssue] {
     let issues = validateGraph()
     let errors = issues.filter { issue in
       PolicyCanvasIssueSeverity.from(code: issue.code) == .error
@@ -318,11 +318,11 @@ extension PolicyCanvasViewModel {
   /// call; daemon-side issues are not duplicated here. Detection is pure over
   /// the in-memory graph (no IO), so this is cheap to call from a computed
   /// property.
-  func validateGraph() -> [TaskBoardPolicyPipelineValidationIssue] {
-    var issues: [TaskBoardPolicyPipelineValidationIssue] = []
+  func validateGraph() -> [PolicyPipelineValidationIssue] {
+    var issues: [PolicyPipelineValidationIssue] = []
     if let cycle = detectCycle() {
       issues.append(
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "cycle",
           message: "Cycle detected across \(cycle.joined(separator: ", "))",
           nodeIds: cycle
@@ -331,7 +331,7 @@ extension PolicyCanvasViewModel {
     }
     for orphan in detectOrphanNodes() {
       issues.append(
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "orphan_node",
           message: "Node \(orphan) has no connections and is not in a group",
           nodeId: orphan
@@ -340,7 +340,7 @@ extension PolicyCanvasViewModel {
     }
     for duplicate in detectDuplicateTitles() {
       issues.append(
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "duplicate_label",
           message: "\(duplicate.nodeIds.count) nodes share the title \"\(duplicate.title)\"",
           nodeIds: duplicate.nodeIds
@@ -349,7 +349,7 @@ extension PolicyCanvasViewModel {
     }
     for mismatch in detectErrorIntoAllowEdges() {
       issues.append(
-        TaskBoardPolicyPipelineValidationIssue(
+        PolicyPipelineValidationIssue(
           code: "error_into_allow",
           message:
             "Error edge \"\(mismatch.edgeLabel)\" terminates at "

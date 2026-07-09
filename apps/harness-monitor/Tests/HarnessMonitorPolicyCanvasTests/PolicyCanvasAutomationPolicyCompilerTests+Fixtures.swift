@@ -84,19 +84,19 @@ extension PolicyCanvasAutomationPolicyCompilerTests {
     automation: PolicyGraphAutomationBinding? = nil,
     inputs: [String],
     outputs: [String]
-  ) -> TaskBoardPolicyPipelineNode {
-    TaskBoardPolicyPipelineNode(
+  ) -> PolicyPipelineNode {
+    PolicyPipelineNode(
       id: PolicyGraphNodeId(id),
       title: title,
       kind: kind,
       automation: automation,
-      inputs: inputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) },
-      outputs: outputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
+      inputs: inputs.map { PolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) },
+      outputs: outputs.map { PolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
     )
   }
 
-  func manualOCRPasteHubDocument() -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  func manualOCRPasteHubDocument() -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       revision: 1,
       mode: .enforced,
       nodes: [
@@ -144,28 +144,28 @@ extension PolicyCanvasAutomationPolicyCompilerTests {
         ),
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge:manual-ocr-paste:ocr",
           fromNodeId: "automation:manual-ocr-paste:source",
           fromPort: "image",
           toNodeId: "automation:manual-ocr-paste:ocr",
           toPort: "in"
         ),
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge:manual-ocr-paste:hub",
           fromNodeId: "automation:manual-ocr-paste:ocr",
           fromPort: "text",
           toNodeId: "automation:manual-ocr-paste:hub",
           toPort: "in"
         ),
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge:manual-ocr-paste:debug",
           fromNodeId: "automation:manual-ocr-paste:hub",
           fromPort: "out_1",
           toNodeId: "automation:manual-ocr-paste:debug",
           toPort: "in"
         ),
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "edge:manual-ocr-paste:persist",
           fromNodeId: "automation:manual-ocr-paste:hub",
           fromPort: "out_2",

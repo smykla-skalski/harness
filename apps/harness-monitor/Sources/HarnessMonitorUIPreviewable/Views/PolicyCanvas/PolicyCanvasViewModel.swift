@@ -42,13 +42,13 @@ public final class PolicyCanvasViewModel {
   /// set by the host (lab sample name, dashboard canvas title) before a load.
   /// Nil falls back to a generic label.
   var policyGroupTitle: String?
-  var backingDocument: TaskBoardPolicyPipelineDocument?
-  var latestSimulation: TaskBoardPolicyPipelineSimulationResult?
+  var backingDocument: PolicyPipelineDocument?
+  var latestSimulation: PolicyPipelineSimulationResult?
   /// Most recent daemon audit summary (active enforced revision + mode). The
   /// persistent live anchor reads this to tell LIVE from DRAFT. Written only by
   /// `captureLiveAudit(_:)` on the document-apply paths and preserved across
   /// nil-republishes, so an audit-only push never blanks the badge.
-  var latestAudit: TaskBoardPolicyPipelineAuditSummary?
+  var latestAudit: PolicyPipelineAuditSummary?
   /// Workspace-level kill switch for the live enforcement gate. The daemon can
   /// keep a canvas in enforced mode while global enforcement is disabled, so the
   /// live badge must consider both the audit and this workspace bit.
@@ -61,7 +61,7 @@ public final class PolicyCanvasViewModel {
   /// longer clears it; `replayGeneration` records the document generation it was
   /// loaded at so the panel can flag the result stale (see `replayIsStale`) while
   /// keeping the comparison on screen until the user refreshes.
-  var latestReplay: TaskBoardPolicyPipelineReplayResult?
+  var latestReplay: PolicyPipelineReplayResult?
   /// `documentGeneration` captured when `latestReplay` loaded, nil before the
   /// first replay. Any edit bumps `documentGeneration`, so a mismatch means the
   /// shown replay predates the current draft and the panel marks it stale.

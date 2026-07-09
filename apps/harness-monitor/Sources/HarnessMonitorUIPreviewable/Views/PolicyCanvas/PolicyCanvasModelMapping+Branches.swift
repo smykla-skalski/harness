@@ -89,15 +89,15 @@ func policyCanvasMergedEdge(_ group: [PolicyCanvasEdge]) -> PolicyCanvasEdge {
 func policyCanvasDaemonEdges(
   for edge: PolicyCanvasEdge,
   nodes: [PolicyCanvasNode],
-  originalConditions: [String: TaskBoardPolicyPipelineEdgeCondition]
-) -> [TaskBoardPolicyPipelineEdge] {
+  originalConditions: [String: PolicyPipelineEdgeCondition]
+) -> [PolicyPipelineEdge] {
   let sourceNode = nodes.first { $0.id == edge.source.nodeID }
   // Non-merged: the edge's own fields are the editable truth - the inspector
   // writes edge.condition/label/target directly - so export the edge as-is via
   // the shared single-edge builder (switch-port persistence, boolean branches).
   guard edge.isMerged else {
     return [
-      taskBoardPolicyEdge(
+      policyEdge(
         edge,
         sourceNode: sourceNode,
         targetNode: nodes.first { $0.id == edge.target.nodeID },
@@ -106,7 +106,7 @@ func policyCanvasDaemonEdges(
     ]
   }
   // Merged: re-emit one daemon edge per branch, each keeping its own daemon id,
-  // condition, label, and target. Reusing taskBoardPolicyEdge means the merged
+  // condition, label, and target. Reusing policyEdge means the merged
   // expansion gets the same port persistence and condition export as any edge.
   return edge.branches.map { branch in
     let branchEdge = PolicyCanvasEdge(
@@ -120,7 +120,7 @@ func policyCanvasDaemonEdges(
       isAnimated: edge.isAnimated,
       reasonCode: branch.reasonCode
     )
-    return taskBoardPolicyEdge(
+    return policyEdge(
       branchEdge,
       sourceNode: sourceNode,
       targetNode: nodes.first { $0.id == branch.target.nodeID },
@@ -137,14 +137,14 @@ func policyCanvasDaemonEdges(
 func policyCanvasExportedEdgeCondition(
   _ edge: PolicyCanvasEdge,
   sourceNode: PolicyCanvasNode?,
-  originalCondition: TaskBoardPolicyPipelineEdgeCondition?
-) -> TaskBoardPolicyPipelineEdgeCondition {
+  originalCondition: PolicyPipelineEdgeCondition?
+) -> PolicyPipelineEdgeCondition {
   if let sourceNode, policyCanvasNodeExportsBooleanBranches(sourceNode) {
     switch edge.source.portID {
     case "then":
-      return TaskBoardPolicyPipelineEdgeCondition(condition: "condition_true")
+      return PolicyPipelineEdgeCondition(condition: "condition_true")
     case "else":
-      return TaskBoardPolicyPipelineEdgeCondition(condition: "condition_false")
+      return PolicyPipelineEdgeCondition(condition: "condition_false")
     default:
       break
     }
@@ -153,7 +153,7 @@ func policyCanvasExportedEdgeCondition(
   // wire seeds one branch per daemon edge on load; a plain edge has one branch
   // mirroring itself), so reason-code edits - including clearing to nil -
   // round-trip on export. Actions still ride the cache (no actions editor).
-  return TaskBoardPolicyPipelineEdgeCondition(
+  return PolicyPipelineEdgeCondition(
     condition: edge.condition,
     actions: originalCondition?.actions ?? [],
     reasonCode: edge.branches.first?.reasonCode
@@ -161,6 +161,6 @@ func policyCanvasExportedEdgeCondition(
 }
 
 func policyCanvasNodeExportsBooleanBranches(_ node: PolicyCanvasNode) -> Bool {
-  (node.policyKind ?? taskBoardPolicyNodeKind(for: node.kind)).discriminator
+  (node.policyKind ?? policyNodeKind(for: node.kind)).discriminator
     == PolicyCanvasNodeKind.ifThenElse.rawValue
 }

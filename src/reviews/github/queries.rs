@@ -16,6 +16,7 @@ query SearchReviews($query: String!, $after: String) {
         isDraft
         viewerCanMergeAsAdmin
         reviewDecision
+        autoMergeRequest { enabledAt }
         headRefOid
         baseRefName
         author { login avatarUrl }
@@ -70,6 +71,8 @@ query SearchReviews($query: String!, $after: String) {
         }
         baseRef {
           branchProtectionRule {
+            requiresApprovingReviews
+            requiredApprovingReviewCount
             requiredStatusCheckContexts
             requiredStatusChecks { context }
           }
@@ -125,6 +128,7 @@ query ReviewNodes($ids: [ID!]!) {
       isDraft
       viewerCanMergeAsAdmin
       reviewDecision
+      autoMergeRequest { enabledAt }
       headRefOid
       baseRefName
       author { login avatarUrl }
@@ -179,6 +183,8 @@ query ReviewNodes($ids: [ID!]!) {
       }
       baseRef {
         branchProtectionRule {
+          requiresApprovingReviews
+          requiredApprovingReviewCount
           requiredStatusCheckContexts
           requiredStatusChecks { context }
         }

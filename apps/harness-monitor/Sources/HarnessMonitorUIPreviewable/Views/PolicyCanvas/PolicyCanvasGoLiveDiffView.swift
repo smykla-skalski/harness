@@ -26,10 +26,10 @@ struct PolicyCanvasGoLiveDiffRowModel: Identifiable, Equatable {
 /// The go-live decision diff: per-scenario live -> draft verdicts for the
 /// decisions that change when the draft is made live. Renders loading, load
 /// failure, the no-live-policy first-publish state, the parity (nothing-changes)
-/// state, and the changed-rows list. Driven by a resolved `TaskBoardPolicyPipelineGoLiveDiff`
+/// state, and the changed-rows list. Driven by a resolved `PolicyPipelineGoLiveDiff`
 /// so it only redraws when the comparison itself changes.
 struct PolicyCanvasGoLiveDiffView: View {
-  let diff: TaskBoardPolicyPipelineGoLiveDiff?
+  let diff: PolicyPipelineGoLiveDiff?
   let isLoading: Bool
 
   private var changedRows: [PolicyCanvasGoLiveDiffRowModel] {
@@ -60,7 +60,7 @@ struct PolicyCanvasGoLiveDiffView: View {
   }
 
   @ViewBuilder
-  private func content(for diff: TaskBoardPolicyPipelineGoLiveDiff) -> some View {
+  private func content(for diff: PolicyPipelineGoLiveDiff) -> some View {
     if !diff.hasLivePolicy {
       message(
         icon: "sparkles",
@@ -80,7 +80,7 @@ struct PolicyCanvasGoLiveDiffView: View {
     }
   }
 
-  private func changedList(diff: TaskBoardPolicyPipelineGoLiveDiff) -> some View {
+  private func changedList(diff: PolicyPipelineGoLiveDiff) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       Text(changedSummary(diff: diff))
         .scaledFont(.caption.weight(.semibold))
@@ -97,7 +97,7 @@ struct PolicyCanvasGoLiveDiffView: View {
     }
   }
 
-  private func changedSummary(diff: TaskBoardPolicyPipelineGoLiveDiff) -> String {
+  private func changedSummary(diff: PolicyPipelineGoLiveDiff) -> String {
     let changed = changedRows.count
     let total = diff.diffs.count
     let unchanged = max(total - changed, 0)

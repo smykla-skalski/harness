@@ -122,7 +122,7 @@ struct PolicyCanvasViewModelLayoutTests {
   @Test("switching to the pasted PR dry-run graph keeps centered canvas whitespace")
   func switchingToPastedPRDryRunGraphKeepsCenteredCanvasWhitespace() {
     let viewModel = PolicyCanvasViewModel.liveStartupState(
-      document: TaskBoardPolicyPipelineDocument(
+      document: PolicyPipelineDocument(
         revision: 1,
         mode: .draft,
         nodes: [],

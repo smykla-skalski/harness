@@ -330,5 +330,10 @@ pub(super) fn sample_review_item() -> ReviewItem {
         created_at: parse_timestamp("2026-01-01T00:00:00Z").expect("created timestamp"),
         updated_at: parse_timestamp("2026-01-01T00:01:00Z").expect("updated timestamp"),
         required_failed_check_names: Vec::new(),
+        required_approving_review_count: None,
+        has_conflict_markers: None,
+        viewer_has_active_approval: None,
+        auto_merge_enabled: None,
+        approval_requirement_satisfied_after_viewer_approval: None,
     }
 }

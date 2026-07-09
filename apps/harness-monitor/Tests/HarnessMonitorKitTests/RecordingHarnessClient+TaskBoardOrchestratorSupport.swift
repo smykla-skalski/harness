@@ -251,7 +251,7 @@ extension RecordingHarnessClient {
         requiredConsensus: 1
       ),
       evaluator: TaskBoardEvaluatorIntent(phase: "evaluate", mode: .evaluate),
-      policy: TaskBoardPolicyDecision(
+      policy: PolicySimulationDecision(
         decision: "allow",
         reasonCode: "test_allow",
         policyVersion: "test"

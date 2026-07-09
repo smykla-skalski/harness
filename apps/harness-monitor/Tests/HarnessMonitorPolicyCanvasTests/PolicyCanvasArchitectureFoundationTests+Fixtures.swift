@@ -11,30 +11,30 @@ extension PolicyCanvasArchitectureFoundationTests {
     revision: UInt64,
     decisionX: Int = 320,
     decisionTitle: String = "Decision"
-  ) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  ) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "arch-node-intake",
           title: "Intake",
           kind: .actionGate(actions: [.spawnAgent]),
           groupId: "arch-group-dispatch",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-          outputs: [TaskBoardPolicyPipelinePort(id: "default", title: "default")]
+          inputs: [PolicyPipelinePort(id: "in", title: "in")],
+          outputs: [PolicyPipelinePort(id: "default", title: "default")]
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "arch-node-decision",
           title: decisionTitle,
           kind: .actionGate(actions: [.spawnAgent]),
           groupId: "arch-group-dispatch",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
+          inputs: [PolicyPipelinePort(id: "in", title: "in")]
         ),
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "arch-edge-intake-decision",
           fromNodeId: "arch-node-intake",
           fromPort: "default",
@@ -43,46 +43,46 @@ extension PolicyCanvasArchitectureFoundationTests {
         )
       ],
       groups: [
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "arch-group-dispatch",
           title: "Dispatch",
           nodeIds: ["arch-node-intake", "arch-node-decision"]
         )
       ],
-      layout: TaskBoardPolicyPipelineLayout(
+      layout: PolicyPipelineLayout(
         nodes: [
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "arch-node-intake", x: 40, y: 60),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "arch-node-decision", x: decisionX, y: 60),
+          PolicyPipelineNodeLayout(nodeId: "arch-node-intake", x: 40, y: 60),
+          PolicyPipelineNodeLayout(nodeId: "arch-node-decision", x: decisionX, y: 60),
         ]
       ),
       policyTraceIds: ["arch-trace-\(revision)"]
     )
   }
 
-  func renamedGroupFlowDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  func renamedGroupFlowDocument(revision: UInt64) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: .draft,
       nodes: [
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "custom-source",
           title: "Source",
           kind: .trigger(workflow: "default-task"),
           groupId: "custom-intake",
           inputs: [],
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+          outputs: [PolicyPipelinePort(id: "out", title: "out")]
         ),
-        TaskBoardPolicyPipelineNode(
+        PolicyPipelineNode(
           id: "custom-sink",
           title: "Sink",
           kind: .actionGate(actions: [.spawnAgent]),
           groupId: "custom-sink",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
+          inputs: [PolicyPipelinePort(id: "in", title: "in")]
         ),
       ],
       edges: [
-        TaskBoardPolicyPipelineEdge(
+        PolicyPipelineEdge(
           id: "custom-edge",
           fromNodeId: "custom-source",
           fromPort: "out",
@@ -91,33 +91,33 @@ extension PolicyCanvasArchitectureFoundationTests {
         )
       ],
       groups: [
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "custom-sink",
           title: "Sink",
           nodeIds: ["custom-sink"]
         ),
-        TaskBoardPolicyPipelineGroup(
+        PolicyPipelineGroup(
           id: "custom-intake",
           title: "Intake",
           nodeIds: ["custom-source"]
         ),
       ],
-      layout: TaskBoardPolicyPipelineLayout(
+      layout: PolicyPipelineLayout(
         nodes: [
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "custom-source", x: 0, y: 0),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "custom-sink", x: 0, y: 0),
+          PolicyPipelineNodeLayout(nodeId: "custom-source", x: 0, y: 0),
+          PolicyPipelineNodeLayout(nodeId: "custom-sink", x: 0, y: 0),
         ]
       )
     )
   }
 
-  func archSimulation(revision: UInt64) -> TaskBoardPolicyPipelineSimulationResult {
-    TaskBoardPolicyPipelineSimulationResult(
+  func archSimulation(revision: UInt64) -> PolicyPipelineSimulationResult {
+    PolicyPipelineSimulationResult(
       revision: revision,
       traceId: "arch-trace-\(revision)",
       simulatedAt: "2026-05-14T12:00:00Z",
       succeeded: true,
-      validation: TaskBoardPolicyPipelineValidation(isValid: true)
+      validation: PolicyPipelineValidation(isValid: true)
     )
   }
 }

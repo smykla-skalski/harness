@@ -211,9 +211,9 @@ public enum HarnessMonitorPreviewStoreFactory {
 
   static func seedPolicyCanvasState(store: HarnessMonitorStore) {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
-    store.globalTaskBoardPolicyPipeline = document
-    store.globalTaskBoardPolicyAudit = PreviewFixtures.policyCanvasAudit(for: document)
-    store.globalTaskBoardPolicySimulation = nil
+    store.globalPolicyPipeline = document
+    store.globalPolicyAudit = PreviewFixtures.policyCanvasAudit(for: document)
+    store.globalPolicySimulation = nil
   }
 
   static func seedAcpBridgeOutageIfNeeded(

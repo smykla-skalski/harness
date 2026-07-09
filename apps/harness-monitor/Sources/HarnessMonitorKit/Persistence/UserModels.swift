@@ -352,8 +352,13 @@ public final class CachedTaskBoardPolicyDocument {
   }
 }
 
+/// Code-facing alias for the policy document cache. The underlying model class
+/// keeps its historical name because SwiftData uses `@Model` class names for
+/// persistent entity identity in existing V24/V25 stores.
+public typealias CachedPolicyDocument = CachedTaskBoardPolicyDocument
+
 extension CachedTaskBoardPolicyDocument {
-  func decodedDocument() throws -> TaskBoardPolicyPipelineDocument {
-    try Codecs.decoder.decode(TaskBoardPolicyPipelineDocument.self, from: documentData)
+  func decodedDocument() throws -> PolicyPipelineDocument {
+    try Codecs.decoder.decode(PolicyPipelineDocument.self, from: documentData)
   }
 }

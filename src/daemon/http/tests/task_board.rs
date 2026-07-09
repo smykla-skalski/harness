@@ -175,7 +175,7 @@ async fn run_task_board_http_policy_pipeline_flow() {
     let (base_url, server) = serve_http(state).await;
     let client = reqwest::Client::new();
 
-    let workspace = get_json(&client, &base_url, http_paths::TASK_BOARD_POLICY_CANVASES).await;
+    let workspace = get_json(&client, &base_url, http_paths::POLICY_CANVASES).await;
     let active_canvas_id = workspace["active_canvas_id"]
         .as_str()
         .expect("active canvas id")
@@ -185,7 +185,7 @@ async fn run_task_board_http_policy_pipeline_flow() {
         &base_url,
         &format!(
             "{}?canvas_id={active_canvas_id}",
-            http_paths::TASK_BOARD_POLICY_PIPELINE
+            http_paths::POLICY_PIPELINE
         ),
     )
     .await;
@@ -195,7 +195,7 @@ async fn run_task_board_http_policy_pipeline_flow() {
     let save = put_json(
         &client,
         &base_url,
-        http_paths::TASK_BOARD_POLICY_PIPELINE,
+        http_paths::POLICY_PIPELINE,
         json!({
             "canvas_id": active_canvas_id.clone(),
             "document": pipeline,
@@ -214,7 +214,7 @@ async fn run_task_board_http_policy_pipeline_flow() {
     let simulation = post_json(
         &client,
         &base_url,
-        http_paths::TASK_BOARD_POLICY_SIMULATE,
+        http_paths::POLICY_SIMULATE,
         json!({
             "canvas_id": active_canvas_id.clone(),
             "document": save["document"].clone(),
@@ -232,7 +232,7 @@ async fn run_task_board_http_policy_pipeline_flow() {
     let promote = post_json(
         &client,
         &base_url,
-        http_paths::TASK_BOARD_POLICY_PROMOTE,
+        http_paths::POLICY_PROMOTE,
         json!({
             "canvas_id": active_canvas_id.clone(),
             "revision": saved_revision,
@@ -246,7 +246,7 @@ async fn run_task_board_http_policy_pipeline_flow() {
         &base_url,
         &format!(
             "{}?canvas_id={}",
-            http_paths::TASK_BOARD_POLICY_AUDIT,
+            http_paths::POLICY_AUDIT,
             active_canvas_id
         ),
     )

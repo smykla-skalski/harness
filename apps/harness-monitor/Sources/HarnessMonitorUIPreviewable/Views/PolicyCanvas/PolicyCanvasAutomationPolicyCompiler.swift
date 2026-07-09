@@ -123,7 +123,7 @@ public enum PolicyCanvasAutomationPolicyCompiler {
   }
 
   static func compile(
-    document: TaskBoardPolicyPipelineDocument
+    document: PolicyPipelineDocument
   ) -> PolicyCanvasAutomationPolicyCompilation {
     let nodes = document.nodes.map {
       policyCanvasNode($0, layout: document.layout)

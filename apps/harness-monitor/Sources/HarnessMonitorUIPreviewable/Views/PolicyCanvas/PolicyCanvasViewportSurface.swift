@@ -18,7 +18,7 @@ private struct PolicyCanvasViewportSurfaceRenderKey: Equatable {
 private struct PolicyCanvasViewportSurfaceDocumentIdentity: Equatable, Sendable {
   let schemaVersion: UInt16
   let revision: UInt64
-  let mode: TaskBoardPolicyPipelineMode
+  let mode: PolicyPipelineMode
   let nodeCount: Int
   let edgeCount: Int
   let groupCount: Int
@@ -31,7 +31,7 @@ private struct PolicyCanvasViewportSurfaceDocumentIdentity: Equatable, Sendable 
   let policyTraceCount: Int
   let lastPolicyTraceID: String?
 
-  init(_ document: TaskBoardPolicyPipelineDocument) {
+  init(_ document: PolicyPipelineDocument) {
     schemaVersion = document.schemaVersion
     revision = document.revision
     mode = document.mode
@@ -58,7 +58,7 @@ private struct PolicyCanvasViewportSurfaceSimulationIdentity: Equatable, Sendabl
   let policyTraceCount: Int
   let lastPolicyTraceID: String?
 
-  init(_ simulation: TaskBoardPolicyPipelineSimulationResult) {
+  init(_ simulation: PolicyPipelineSimulationResult) {
     revision = simulation.revision
     traceID = simulation.traceId
     simulatedAt = simulation.simulatedAt
@@ -71,11 +71,11 @@ private struct PolicyCanvasViewportSurfaceSimulationIdentity: Equatable, Sendabl
 
 private struct PolicyCanvasViewportSurfaceAuditIdentity: Equatable, Sendable {
   let activeRevision: UInt64
-  let mode: TaskBoardPolicyPipelineMode
+  let mode: PolicyPipelineMode
   let latestTraceID: String?
   let latestSimulationTraceID: String?
 
-  init(_ audit: TaskBoardPolicyPipelineAuditSummary) {
+  init(_ audit: PolicyPipelineAuditSummary) {
     activeRevision = audit.activeRevision
     mode = audit.mode
     latestTraceID = audit.latestTraceId
@@ -84,9 +84,9 @@ private struct PolicyCanvasViewportSurfaceAuditIdentity: Equatable, Sendable {
 }
 
 public struct PolicyCanvasViewportSurface: View {
-  let document: TaskBoardPolicyPipelineDocument?
-  let simulation: TaskBoardPolicyPipelineSimulationResult?
-  let audit: TaskBoardPolicyPipelineAuditSummary?
+  let document: PolicyPipelineDocument?
+  let simulation: PolicyPipelineSimulationResult?
+  let audit: PolicyPipelineAuditSummary?
   let algorithmSelection: PolicyCanvasAlgorithmSelection
   let minimapCenteringModeOverride: PolicyCanvasMinimapCenteringMode?
   let canvasColorSchemeOverride: ColorScheme?
@@ -115,9 +115,9 @@ public struct PolicyCanvasViewportSurface: View {
 
   @MainActor
   public init(
-    document: TaskBoardPolicyPipelineDocument?,
-    simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?,
+    document: PolicyPipelineDocument?,
+    simulation: PolicyPipelineSimulationResult?,
+    audit: PolicyPipelineAuditSummary?,
     algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
     minimapCenteringMode: PolicyCanvasMinimapCenteringMode? = nil,
     canvasColorScheme: ColorScheme? = nil,

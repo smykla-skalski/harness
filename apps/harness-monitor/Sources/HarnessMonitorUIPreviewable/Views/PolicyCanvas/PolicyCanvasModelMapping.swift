@@ -4,8 +4,8 @@ import HarnessMonitorPolicyModels
 import SwiftUI
 
 func policyCanvasNode(
-  _ node: TaskBoardPolicyPipelineNode,
-  layout: TaskBoardPolicyPipelineLayout
+  _ node: PolicyPipelineNode,
+  layout: PolicyPipelineLayout
 ) -> PolicyCanvasNode {
   policyCanvasNode(
     node,
@@ -14,7 +14,7 @@ func policyCanvasNode(
 }
 
 func policyCanvasNode(
-  _ node: TaskBoardPolicyPipelineNode,
+  _ node: PolicyPipelineNode,
   layoutLookup: PolicyCanvasDocumentLayoutLookup
 ) -> PolicyCanvasNode {
   let layoutNode = layoutLookup.nodeLayout(for: node.id.rawValue)
@@ -40,7 +40,7 @@ func policyCanvasNode(
 
 func policyCanvasGroup(
   offset: Int,
-  element: TaskBoardPolicyPipelineGroup,
+  element: PolicyPipelineGroup,
   nodes: [PolicyCanvasNode]
 ) -> PolicyCanvasGroup {
   let frame =
@@ -133,7 +133,7 @@ private func policyCanvasOffsetPrecomputedRoutes(
 }
 
 func policyCanvasEdge(
-  _ edge: TaskBoardPolicyPipelineEdge,
+  _ edge: PolicyPipelineEdge,
   nodes: [PolicyCanvasNode] = [],
   assignPreferredPortSides: Bool = true
 ) -> PolicyCanvasEdge? {
@@ -176,7 +176,7 @@ func policyCanvasEdge(
 }
 
 func policyCanvasEdge(
-  _ edge: TaskBoardPolicyPipelineEdge,
+  _ edge: PolicyPipelineEdge,
   nodeLookup: PolicyCanvasNodeLookup,
   assignPreferredPortSides: Bool = true
 ) -> PolicyCanvasEdge? {
@@ -227,7 +227,7 @@ func policyCanvasEdge(
 }
 
 func policyCanvasEdgeEndpointsExist(
-  _ edge: TaskBoardPolicyPipelineEdge,
+  _ edge: PolicyPipelineEdge,
   nodes: [PolicyCanvasNode]
 ) -> Bool {
   guard !nodes.isEmpty else { return true }
@@ -244,26 +244,26 @@ func policyCanvasEdgeEndpointsExist(
     && targetNode.inputPorts.contains { $0.id == targetPortID }
 }
 
-func taskBoardPolicyNode(
+func policyNode(
   _ node: PolicyCanvasNode,
   originalKind: PolicyGraphNodeKind? = nil
-) -> TaskBoardPolicyPipelineNode {
-  let exportedKind = node.policyKind ?? originalKind ?? taskBoardPolicyNodeKind(for: node.kind)
-  return TaskBoardPolicyPipelineNode(
+) -> PolicyPipelineNode {
+  let exportedKind = node.policyKind ?? originalKind ?? policyNodeKind(for: node.kind)
+  return PolicyPipelineNode(
     id: PolicyGraphNodeId(node.id),
     title: node.title,
     kind: exportedKind,
     automation: node.automationBinding,
-    position: TaskBoardPolicyCanvasPoint(
+    position: HarnessMonitorKit.PolicyCanvasPoint(
       x: Double(node.position.x),
       y: Double(node.position.y)
     ),
     groupId: node.groupID.map { PolicyGraphGroupId($0) },
     inputs: node.inputPorts.map { port in
-      taskBoardPolicyPort(port, nodeKind: exportedKind, kind: .input)
+      policyPort(port, nodeKind: exportedKind, kind: .input)
     },
     outputs: node.outputPorts.map { port in
-      taskBoardPolicyPort(port, nodeKind: exportedKind, kind: .output)
+      policyPort(port, nodeKind: exportedKind, kind: .output)
     }
   )
 }
@@ -272,29 +272,29 @@ func taskBoardPolicyNode(
 /// switch-node port persistence and the if_then_else boolean condition export.
 /// The merged fan-in expander in `PolicyCanvasModelMapping+Branches.swift` calls
 /// this once per branch so a folded wire round-trips to its N daemon edges.
-func taskBoardPolicyEdge(
+func policyEdge(
   _ edge: PolicyCanvasEdge,
   sourceNode: PolicyCanvasNode? = nil,
   targetNode: PolicyCanvasNode? = nil,
-  originalCondition: TaskBoardPolicyPipelineEdgeCondition? = nil
-) -> TaskBoardPolicyPipelineEdge {
+  originalCondition: PolicyPipelineEdgeCondition? = nil
+) -> PolicyPipelineEdge {
   let condition = policyCanvasExportedEdgeCondition(
     edge,
     sourceNode: sourceNode,
     originalCondition: originalCondition
   )
-  return TaskBoardPolicyPipelineEdge(
+  return PolicyPipelineEdge(
     id: PolicyGraphEdgeId(edge.id),
     fromNodeId: PolicyGraphNodeId(edge.source.nodeID),
     fromPort: PolicyGraphPortId(
-      taskBoardPolicyPersistedPortID(
+      policyPersistedPortID(
         edge.source.portID,
         node: sourceNode,
         kind: .output
       )),
     toNodeId: PolicyGraphNodeId(edge.target.nodeID),
     toPort: PolicyGraphPortId(
-      taskBoardPolicyPersistedPortID(
+      policyPersistedPortID(
         edge.target.portID,
         node: targetNode,
         kind: .input
@@ -304,15 +304,15 @@ func taskBoardPolicyEdge(
   )
 }
 
-func taskBoardPolicyGroup(
+func policyGroup(
   _ group: PolicyCanvasGroup,
   nodes: [PolicyCanvasNode]
-) -> TaskBoardPolicyPipelineGroup {
-  TaskBoardPolicyPipelineGroup(
+) -> PolicyPipelineGroup {
+  PolicyPipelineGroup(
     id: PolicyGraphGroupId(group.id),
     title: group.title,
     color: group.tone.hexColor,
-    frame: TaskBoardPolicyCanvasRect(
+    frame: HarnessMonitorKit.PolicyCanvasRect(
       x: Double(group.frame.minX),
       y: Double(group.frame.minY),
       width: Double(group.frame.width),
@@ -322,8 +322,8 @@ func taskBoardPolicyGroup(
   )
 }
 
-func taskBoardPolicyNodeLayout(_ node: PolicyCanvasNode) -> TaskBoardPolicyPipelineNodeLayout {
-  TaskBoardPolicyPipelineNodeLayout(
+func policyNodeLayout(_ node: PolicyCanvasNode) -> PolicyPipelineNodeLayout {
+  PolicyPipelineNodeLayout(
     nodeId: PolicyGraphNodeId(node.id),
     x: Int(node.position.x.rounded()),
     y: Int(node.position.y.rounded()),

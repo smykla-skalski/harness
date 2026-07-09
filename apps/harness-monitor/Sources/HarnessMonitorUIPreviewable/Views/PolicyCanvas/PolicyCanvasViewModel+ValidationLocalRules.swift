@@ -111,7 +111,7 @@ extension PolicyCanvasViewModel {
   }
 
   func resolvedIssue(
-    issue: TaskBoardPolicyPipelineValidationIssue,
+    issue: PolicyPipelineValidationIssue,
     origin: String,
     index: Int
   ) -> PolicyCanvasResolvedIssue {

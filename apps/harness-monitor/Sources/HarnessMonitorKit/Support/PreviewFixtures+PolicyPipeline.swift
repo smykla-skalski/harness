@@ -3,19 +3,19 @@ import HarnessMonitorPolicyModels
 
 extension PreviewFixtures {
   public static func policyCanvasPipelineDocument(
-    mode: TaskBoardPolicyPipelineMode = .draft,
+    mode: PolicyPipelineMode = .draft,
     revision: UInt64 = 1
-  ) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
+  ) -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
       mode: mode,
       nodes: policyCanvasPipelineNodes,
       edges: policyCanvasPipelineEdges,
       groups: policyCanvasPipelineGroups,
-      layout: TaskBoardPolicyPipelineLayout(
+      layout: PolicyPipelineLayout(
         nodes: policyCanvasPipelineNodes.enumerated().map { index, node in
-          TaskBoardPolicyPipelineNodeLayout(
+          PolicyPipelineNodeLayout(
             nodeId: node.id,
             x: (index % 4) * 240,
             y: (index / 4) * 120
@@ -27,18 +27,18 @@ extension PreviewFixtures {
   }
 
   public static func policyCanvasSimulation(
-    for document: TaskBoardPolicyPipelineDocument
-  ) -> TaskBoardPolicyPipelineSimulationResult {
-    TaskBoardPolicyPipelineSimulationResult(
+    for document: PolicyPipelineDocument
+  ) -> PolicyPipelineSimulationResult {
+    PolicyPipelineSimulationResult(
       revision: document.revision,
       traceId: "trace-preview-policy-simulation-\(document.revision)",
       simulatedAt: "2026-05-14T11:00:05Z",
       succeeded: true,
-      validation: TaskBoardPolicyPipelineValidation(isValid: true),
+      validation: PolicyPipelineValidation(isValid: true),
       decisions: [
-        TaskBoardPolicyPipelineSimulatedDecision(
+        PolicyPipelineSimulatedDecision(
           action: .mergePr,
-          decision: TaskBoardPolicyDecision(
+          decision: PolicySimulationDecision(
             decision: "require_human",
             reasonCode: "human_required",
             policyVersion: "task-board-policy-v2:rev-\(document.revision)"
@@ -57,20 +57,20 @@ extension PreviewFixtures {
   }
 
   public static func policyCanvasAudit(
-    for document: TaskBoardPolicyPipelineDocument
-  ) -> TaskBoardPolicyPipelineAuditSummary {
-    TaskBoardPolicyPipelineAuditSummary(
+    for document: PolicyPipelineDocument
+  ) -> PolicyPipelineAuditSummary {
+    PolicyPipelineAuditSummary(
       activeRevision: document.revision,
       mode: document.mode,
       latestTraceId: document.policyTraceIds.last,
       latestSimulation: nil,
-      validation: TaskBoardPolicyPipelineValidation(isValid: true)
+      validation: PolicyPipelineValidation(isValid: true)
     )
   }
 }
 
 extension PreviewFixtures {
-  private static let policyCanvasPipelineNodes: [TaskBoardPolicyPipelineNode] = [
+  private static let policyCanvasPipelineNodes: [PolicyPipelineNode] = [
     policyNode(
       id: "action:router",
       title: "Action gate",
@@ -197,7 +197,7 @@ extension PreviewFixtures {
     ),
   ]
 
-  private static let policyCanvasPipelineEdges: [TaskBoardPolicyPipelineEdge] = [
+  private static let policyCanvasPipelineEdges: [PolicyPipelineEdge] = [
     policyEdge(
       "edge:default",
       "action:router",
@@ -270,20 +270,20 @@ extension PreviewFixtures {
       "edge:evidence-fail:unresolved-requested-changes", reasonCode: "unresolved_requested_changes"),
   ]
 
-  private static let policyCanvasPipelineGroups: [TaskBoardPolicyPipelineGroup] = [
-    TaskBoardPolicyPipelineGroup(
+  private static let policyCanvasPipelineGroups: [PolicyPipelineGroup] = [
+    PolicyPipelineGroup(
       id: "entry",
       title: "Action routing",
       color: "#27c5f5",
       nodeIds: ["action:router"]
     ),
-    TaskBoardPolicyPipelineGroup(
+    PolicyPipelineGroup(
       id: "merge",
       title: "Merge checks",
       color: "#c13adf",
       nodeIds: ["evidence:merge", "risk:merge"]
     ),
-    TaskBoardPolicyPipelineGroup(
+    PolicyPipelineGroup(
       id: "terminal",
       title: "Terminal decisions",
       color: "#24c55e",
@@ -298,14 +298,14 @@ extension PreviewFixtures {
     groupID: String,
     inputs: [String] = [],
     outputs: [String] = []
-  ) -> TaskBoardPolicyPipelineNode {
-    TaskBoardPolicyPipelineNode(
+  ) -> PolicyPipelineNode {
+    PolicyPipelineNode(
       id: PolicyGraphNodeId(id),
       title: title,
       kind: kind,
       groupId: PolicyGraphGroupId(groupID),
-      inputs: inputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) },
-      outputs: outputs.map { TaskBoardPolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
+      inputs: inputs.map { PolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) },
+      outputs: outputs.map { PolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
     )
   }
 
@@ -315,8 +315,8 @@ extension PreviewFixtures {
     _ sourcePortID: String,
     _ targetNodeID: String,
     label: String? = nil
-  ) -> TaskBoardPolicyPipelineEdge {
-    TaskBoardPolicyPipelineEdge(
+  ) -> PolicyPipelineEdge {
+    PolicyPipelineEdge(
       id: PolicyGraphEdgeId(id),
       fromNodeId: PolicyGraphNodeId(sourceNodeID),
       fromPort: PolicyGraphPortId(sourcePortID),
@@ -332,15 +332,15 @@ extension PreviewFixtures {
   /// differ only by `reason_code` - exactly the live policy's shape, so the
   /// canvas folds them into one red merged wire whose branches carry the reason
   /// codes a failure-type policy can route on.
-  private static func failEdge(_ id: String, reasonCode: String) -> TaskBoardPolicyPipelineEdge {
-    TaskBoardPolicyPipelineEdge(
+  private static func failEdge(_ id: String, reasonCode: String) -> PolicyPipelineEdge {
+    PolicyPipelineEdge(
       id: PolicyGraphEdgeId(id),
       fromNodeId: "evidence:merge",
       fromPort: "fail",
       toNodeId: "supervisor:merge-deny",
       toPort: "in",
       label: "evidence failure",
-      condition: TaskBoardPolicyPipelineEdgeCondition(
+      condition: PolicyPipelineEdgeCondition(
         condition: "evidence_failure",
         reasonCode: reasonCode
       )

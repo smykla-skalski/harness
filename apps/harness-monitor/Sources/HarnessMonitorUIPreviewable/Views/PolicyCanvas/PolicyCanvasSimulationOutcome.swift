@@ -3,7 +3,7 @@ import HarnessMonitorPolicyCanvasAlgorithms
 import Observation
 import SwiftUI
 
-/// Per-node verdict derived from `TaskBoardPolicyPipelineSimulationResult`.
+/// Per-node verdict derived from `PolicyPipelineSimulationResult`.
 /// The decisions array carries `visitedNodeIds` per simulated action, and the
 /// terminal decision's `decision` string tells us how that branch ended.
 /// Nodes outside any decision's visited set are `.unreached`. When no
@@ -140,7 +140,7 @@ extension PolicyCanvasViewModel {
   /// territory) we map here. Returning `nil` for unrecognized strings keeps
   /// "we don't know how to classify" out of the verdict enum.
   private func outcome(
-    for decision: TaskBoardPolicyDecision
+    for decision: PolicySimulationDecision
   ) -> PolicyCanvasSimulationOutcome? {
     switch decision.decision {
     case "allow":

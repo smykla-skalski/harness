@@ -4,7 +4,7 @@ import HarnessMonitorPolicyCanvasAlgorithms
 // MARK: - Extreme edges
 
 extension PolicyCanvasLabSamples {
-  static let extremeEdges: [TaskBoardPolicyPipelineEdge] =
+  static let extremeEdges: [PolicyPipelineEdge] =
     extremeIntakeEdges + extremeChecksEdges + extremeLaneEdges + extremeCollectorEdges
     + extremeDepthEdges
 
@@ -81,8 +81,8 @@ extension PolicyCanvasLabSamples {
   /// rail), the deny terminal (every fail rail, folded into one merged red
   /// wire), and the dry-run gate. Several are long edges crossing from the
   /// checks / agent groups into the terminals and gates groups.
-  private static let extremeCollectorEdges: [TaskBoardPolicyPipelineEdge] = {
-    var edges: [TaskBoardPolicyPipelineEdge] = []
+  private static let extremeCollectorEdges: [PolicyPipelineEdge] = {
+    var edges: [PolicyPipelineEdge] = []
     // shared human-gate fan-in: every "missing" rail
     let missingSources = ["x-evidence", "x-risk-merge", "x-agent-risk"]
     for (index, source) in missingSources.enumerated() {
@@ -101,7 +101,7 @@ extension PolicyCanvasLabSamples {
       edges.append(
         edge(
           "xe:fail-\(index)", entry.0, "fail", "x-deny", label: "evidence failure",
-          condition: TaskBoardPolicyPipelineEdgeCondition(
+          condition: PolicyPipelineEdgeCondition(
             condition: "evidence_failure", reasonCode: entry.1
           )
         )

@@ -10,7 +10,7 @@ extension PolicyCanvasLabSamples {
   /// the shape that currently stresses the routing engine: every lane stage can
   /// short-circuit into one of four shared outcome terminals, so many long
   /// cross-group edges converge on the same nodes.
-  static let multiGroup: TaskBoardPolicyPipelineDocument = {
+  static let multiGroup: PolicyPipelineDocument = {
     document(
       nodes: multiGroupNodes, edges: multiGroupEdges, groups: multiGroupGroups
     )

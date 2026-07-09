@@ -8,7 +8,7 @@ import Testing
 
 /// Covers the per-node simulation-outcome map that feeds the canvas
 /// simulation overlay. Two contracts matter:
-///   1. The derivation maps `TaskBoardPolicyPipelineSimulatedDecision`
+///   1. The derivation maps `PolicyPipelineSimulatedDecision`
 ///      visited node ids onto allowed / denied / unreached, with denied
 ///      dominating allowed when a node appears in mismatched decisions.
 ///      Unclassifiable verdict strings leave their visited nodes absent
@@ -360,14 +360,14 @@ struct PolicyCanvasSimulationOutcomeTests {
   private func makeSimulation(
     revision: UInt64 = 1,
     succeeded: Bool,
-    decisions: [TaskBoardPolicyPipelineSimulatedDecision] = []
-  ) -> TaskBoardPolicyPipelineSimulationResult {
-    TaskBoardPolicyPipelineSimulationResult(
+    decisions: [PolicyPipelineSimulatedDecision] = []
+  ) -> PolicyPipelineSimulationResult {
+    PolicyPipelineSimulationResult(
       revision: revision,
       traceId: "trace-test-\(revision)",
       simulatedAt: "2026-05-14T00:00:00Z",
       succeeded: succeeded,
-      validation: TaskBoardPolicyPipelineValidation(isValid: succeeded),
+      validation: PolicyPipelineValidation(isValid: succeeded),
       decisions: decisions
     )
   }
@@ -376,10 +376,10 @@ struct PolicyCanvasSimulationOutcomeTests {
     verdict: String,
     reasonCode: String,
     visited: [String]
-  ) -> TaskBoardPolicyPipelineSimulatedDecision {
-    TaskBoardPolicyPipelineSimulatedDecision(
+  ) -> PolicyPipelineSimulatedDecision {
+    PolicyPipelineSimulatedDecision(
       action: .mergePr,
-      decision: TaskBoardPolicyDecision(
+      decision: PolicySimulationDecision(
         decision: verdict,
         reasonCode: reasonCode,
         policyVersion: "test-policy"

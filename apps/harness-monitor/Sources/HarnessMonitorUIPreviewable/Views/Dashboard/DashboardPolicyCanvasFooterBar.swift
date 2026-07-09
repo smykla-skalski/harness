@@ -6,20 +6,20 @@ struct DashboardPolicyCanvasFooterBar: View {
   @ScaledMetric(relativeTo: .callout)
   private var footerBarHeight = 44.0
 
-  let workspace: TaskBoardPolicyCanvasWorkspace?
-  let fallbackDocument: TaskBoardPolicyPipelineDocument?
+  let workspace: PolicyCanvasWorkspace?
+  let fallbackDocument: PolicyPipelineDocument?
   let selectedCanvasId: String?
   let policyCanvasViewModel: PolicyCanvasViewModel
   let isCanvasMutationDisabled: Bool
   let editingCanvasId: String?
   @Binding var isAutomationPolicySheetPresented: Bool
   let createCanvas: @MainActor () -> Void
-  let selectCanvas: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
-  let duplicateCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
-  let renameCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
-  let submitRenameCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary, String) -> Void
+  let selectCanvas: @MainActor (PolicyCanvasSummary) -> Void
+  let duplicateCanvasFromTab: @MainActor (PolicyCanvasSummary) -> Void
+  let renameCanvasFromTab: @MainActor (PolicyCanvasSummary) -> Void
+  let submitRenameCanvasFromTab: @MainActor (PolicyCanvasSummary, String) -> Void
   let cancelRenameCanvasFromTab: @MainActor () -> Void
-  let deleteCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
+  let deleteCanvasFromTab: @MainActor (PolicyCanvasSummary) -> Void
   let onExport: (@MainActor () -> Void)?
   let onImport: (@MainActor () -> Void)?
 
@@ -111,11 +111,11 @@ struct DashboardPolicyCanvasFooterBar: View {
     }
   }
 
-  private var fallbackActiveCanvasSummary: TaskBoardPolicyCanvasSummary? {
+  private var fallbackActiveCanvasSummary: PolicyCanvasSummary? {
     guard let fallbackDocument else {
       return nil
     }
-    return TaskBoardPolicyCanvasSummary(
+    return PolicyCanvasSummary(
       canvasId: "active-policy-canvas-loading",
       title: fallbackPolicyCanvasTitle(),
       revision: fallbackDocument.revision,
@@ -128,7 +128,7 @@ struct DashboardPolicyCanvasFooterBar: View {
     )
   }
 
-  private func fallbackTabStrip(_ canvas: TaskBoardPolicyCanvasSummary) -> some View {
+  private func fallbackTabStrip(_ canvas: PolicyCanvasSummary) -> some View {
     ScrollView(.horizontal, showsIndicators: false) {
       HStack(spacing: 0) {
         DashboardPolicyCanvasFooterTab(

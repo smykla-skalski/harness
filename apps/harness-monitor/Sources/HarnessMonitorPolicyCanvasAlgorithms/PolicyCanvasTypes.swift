@@ -338,7 +338,7 @@ public struct PolicyCanvasSnapshot: Sendable {
   public let groups: [PolicyCanvasGroup]
   public let edges: [PolicyCanvasEdge]
   public let selection: PolicyCanvasSelection?
-  public let latestSimulation: TaskBoardPolicyPipelineSimulationResult?
+  public let latestSimulation: PolicyPipelineSimulationResult?
   public let routingHints: PolicyCanvasLayoutRoutingHints?
 
   public init(
@@ -346,7 +346,7 @@ public struct PolicyCanvasSnapshot: Sendable {
     groups: [PolicyCanvasGroup],
     edges: [PolicyCanvasEdge],
     selection: PolicyCanvasSelection?,
-    latestSimulation: TaskBoardPolicyPipelineSimulationResult?,
+    latestSimulation: PolicyPipelineSimulationResult?,
     routingHints: PolicyCanvasLayoutRoutingHints?
   ) {
     self.nodes = nodes
