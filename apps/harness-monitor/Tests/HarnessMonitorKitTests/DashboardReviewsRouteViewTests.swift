@@ -197,6 +197,19 @@ struct DashboardReviewsRouteViewTests {
     #expect(prepareRange.lowerBound < referencesRange.lowerBound)
   }
 
+  @Test("pasted review text sheet approves selected pull requests only")
+  func pastedReviewTextSheetApprovesSelectedPullRequestsOnly() throws {
+    let source = try dashboardReviewsRouteSource(named: "DashboardReviewsTextPasteSheet.swift")
+
+    #expect(source.contains("@State private var selectedPullRequestIDs"))
+    #expect(source.contains("resetSelectedPullRequests()"))
+    #expect(source.contains("Toggle(isOn: selectionBinding(for: item))"))
+    #expect(source.contains(".toggleStyle(.checkbox)"))
+    #expect(source.contains("onApprove(selectedApprovalItems)"))
+    #expect(source.contains("selectAllApprovalItems()"))
+    #expect(source.contains("clearApprovalSelection()"))
+  }
+
   @Test("route source presents native confirmation for risky approve and merge actions")
   func routeSourcePresentsNativeConfirmationForRiskyApproveAndMergeActions() throws {
     // File-length splits pushed the confirmation routing into the pasted-text

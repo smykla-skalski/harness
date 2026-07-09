@@ -52,11 +52,6 @@ struct DashboardReviewsPastedTextReviewSheetState: Identifiable {
     self.eligibleItems = items.filter { eligibleIDs.contains($0.pullRequestID) }
   }
 
-  var approveButtonTitle: String {
-    let countText = eligibleItems.count == 1 ? "1 PR" : "\(eligibleItems.count) PRs"
-    return dryRun ? "Dry Run \(countText)" : "Approve \(countText)"
-  }
-
   var copiedCount: Int {
     extractionRows.isEmpty
       ? items.count

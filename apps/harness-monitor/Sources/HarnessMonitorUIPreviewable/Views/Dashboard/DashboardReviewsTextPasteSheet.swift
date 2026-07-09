@@ -11,6 +11,7 @@ struct DashboardReviewsPastedTextReviewSheet: View {
 
   @Environment(\.dismiss)
   private var dismiss
+  @State private var selectedPullRequestIDs: Set<String> = []
   @FocusState private var focusedControl: FocusedControl?
 
   private enum FocusedControl: Hashable {
@@ -46,8 +47,9 @@ struct DashboardReviewsPastedTextReviewSheet: View {
     .frame(minWidth: 760, idealWidth: 880, minHeight: 560, idealHeight: 700)
     .defaultFocus($focusedControl, .approve)
     .task(id: state.id) {
+      resetSelectedPullRequests()
       await Task.yield()
-      focusedControl = state.eligibleItems.isEmpty ? nil : .approve
+      focusedControl = selectedApprovalItems.isEmpty ? nil : .approve
     }
   }
 
@@ -104,6 +106,9 @@ struct DashboardReviewsPastedTextReviewSheet: View {
   private func itemCard(_ item: ReviewItem) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+        if state.allowsApprovalActions {
+          selectionToggle(for: item)
+        }
         VStack(alignment: .leading, spacing: 4) {
           Text(item.title)
             .scaledFont(.body.weight(.semibold))
@@ -213,6 +218,9 @@ struct DashboardReviewsPastedTextReviewSheet: View {
 
   private var footer: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      if state.allowsApprovalActions {
+        approvalSelectionControls
+      }
       Spacer()
       if !state.outputText.isEmpty {
         Button {
@@ -224,25 +232,25 @@ struct DashboardReviewsPastedTextReviewSheet: View {
       }
       if state.allowsApprovalActions && state.offersAutoPolicy {
         Button {
-          onAuto(state.items)
+          onAuto(selectedApprovalItems)
           dismiss()
         } label: {
           Label("Start Auto Policy", systemImage: "bolt")
         }
-        .disabled(state.items.isEmpty)
+        .disabled(selectedApprovalItems.isEmpty)
         .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       }
       if state.allowsApprovalActions {
         Button {
-          onApprove(state.eligibleItems)
+          onApprove(selectedApprovalItems)
           dismiss()
         } label: {
           Label(
-            state.approveButtonTitle,
+            selectedApproveButtonTitle,
             systemImage: state.dryRun ? "eye" : "checkmark.seal.fill"
           )
         }
-        .disabled(state.eligibleItems.isEmpty)
+        .disabled(selectedApprovalItems.isEmpty)
         .keyboardShortcut(.defaultAction)
         .focused($focusedControl, equals: .approve)
         .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
@@ -250,6 +258,93 @@ struct DashboardReviewsPastedTextReviewSheet: View {
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingXL)
     .padding(.vertical, HarnessMonitorTheme.spacingLG)
+  }
+
+  private var approvalSelectionControls: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Text("\(selectedApprovalItems.count) of \(approvalSelectableItems.count) selected")
+        .scaledFont(.caption)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .monospacedDigit()
+      Button {
+        selectAllApprovalItems()
+      } label: {
+        Label("Select All", systemImage: "checkmark.circle")
+          .labelStyle(.iconOnly)
+      }
+      .help("Select all")
+      .disabled(approvalSelectableItems.isEmpty)
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      Button {
+        clearApprovalSelection()
+      } label: {
+        Label("Clear Selection", systemImage: "xmark.circle")
+          .labelStyle(.iconOnly)
+      }
+      .help("Clear selection")
+      .disabled(selectedApprovalItems.isEmpty)
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    }
+  }
+
+  private func selectionToggle(for item: ReviewItem) -> some View {
+    Toggle(isOn: selectionBinding(for: item)) {
+      Text("Include \(item.repository) #\(item.number)")
+    }
+    .labelsHidden()
+    .toggleStyle(.checkbox)
+    .disabled(!isApprovalSelectable(item))
+    .help(isApprovalSelectable(item) ? "Include in approval" : "Not eligible for approval")
+    .accessibilityLabel("Include \(item.repository) pull request \(item.number) in approval")
+  }
+
+  private func selectionBinding(for item: ReviewItem) -> Binding<Bool> {
+    Binding(
+      get: {
+        selectedPullRequestIDs.contains(item.pullRequestID)
+      },
+      set: { isSelected in
+        guard isApprovalSelectable(item) else {
+          selectedPullRequestIDs.remove(item.pullRequestID)
+          return
+        }
+        if isSelected {
+          selectedPullRequestIDs.insert(item.pullRequestID)
+        } else {
+          selectedPullRequestIDs.remove(item.pullRequestID)
+        }
+      }
+    )
+  }
+
+  private var approvalSelectableItems: [ReviewItem] {
+    state.eligibleItems.filter(\.canAttemptManualApproval)
+  }
+
+  private var selectedApprovalItems: [ReviewItem] {
+    approvalSelectableItems.filter { selectedPullRequestIDs.contains($0.pullRequestID) }
+  }
+
+  private var selectedApproveButtonTitle: String {
+    let count = selectedApprovalItems.count
+    let countText = count == 1 ? "1 PR" : "\(count) PRs"
+    return state.dryRun ? "Dry Run \(countText)" : "Approve \(countText)"
+  }
+
+  private func isApprovalSelectable(_ item: ReviewItem) -> Bool {
+    approvalSelectableItems.contains { $0.pullRequestID == item.pullRequestID }
+  }
+
+  private func resetSelectedPullRequests() {
+    selectedPullRequestIDs = Set(approvalSelectableItems.map(\.pullRequestID))
+  }
+
+  private func selectAllApprovalItems() {
+    selectedPullRequestIDs = Set(approvalSelectableItems.map(\.pullRequestID))
+  }
+
+  private func clearApprovalSelection() {
+    selectedPullRequestIDs.removeAll()
   }
 
   private func previewTarget(for item: ReviewItem) -> ReviewActionPreviewTarget? {
