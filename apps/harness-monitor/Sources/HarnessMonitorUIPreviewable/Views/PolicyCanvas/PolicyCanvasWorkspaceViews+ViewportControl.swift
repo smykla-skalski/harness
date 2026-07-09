@@ -6,6 +6,13 @@ import SwiftUI
 
 extension PolicyCanvasViewport {
   @MainActor
+  func scheduleCommandFocusBinding() {
+    bridgeCommandFocusScheduler.schedule {
+      bindCommandFocus()
+    }
+  }
+
+  @MainActor
   func bindCommandFocus() {
     bindZoomFocusDispatcher()
     bindLayoutFocusDispatcher()
@@ -28,6 +35,24 @@ extension PolicyCanvasViewport {
     }
     bridgeCommandFocus = nextFocus
   }
+
+  @MainActor
+  func scheduleViewportCenteringAfterRouteStateSettles(
+    viewportSize: CGSize,
+    routeOutput: PolicyCanvasRouteWorkerOutput,
+    currentRouteKey: PolicyCanvasRouteWorkerKey,
+    routeOutputMatchesCurrentGraph: Bool
+  ) {
+    bridgeViewportCenteringScheduler.schedule {
+      await centerViewportAfterRouteStateSettles(
+        viewportSize: viewportSize,
+        routeOutput: routeOutput,
+        currentRouteKey: currentRouteKey,
+        routeOutputMatchesCurrentGraph: routeOutputMatchesCurrentGraph
+      )
+    }
+  }
+
   @MainActor
   func centerViewportAfterRouteStateSettles(
     viewportSize: CGSize,
@@ -101,6 +126,20 @@ extension PolicyCanvasViewport {
       viewportCenteringGenerationToConsume: viewportCenteringGeneration
     )
   }
+
+  @MainActor
+  func scheduleSelectionFocusIfNeeded(
+    request: PolicyCanvasViewportSelectionFocusRequest?,
+    routeOutput: PolicyCanvasRouteWorkerOutput
+  ) {
+    bridgeSelectionFocusScheduler.schedule {
+      focusSelectionIfNeeded(
+        request: request,
+        routeOutput: routeOutput
+      )
+    }
+  }
+
   func focusSelectionIfNeeded(
     request: PolicyCanvasViewportSelectionFocusRequest?,
     routeOutput: PolicyCanvasRouteWorkerOutput
@@ -123,18 +162,29 @@ extension PolicyCanvasViewport {
     }
   }
   func bindZoomFocusDispatcher() {
-    bridgeZoomFocusDispatcher = policyCanvasZoomFocusDispatcher(viewModel: viewModel)
+    bridgeZoomFocusDispatcher.zoomIn = {
+      viewModel.clearPinchAnchor()
+      viewModel.zoomIn()
+    }
+    bridgeZoomFocusDispatcher.zoomOut = {
+      viewModel.clearPinchAnchor()
+      viewModel.zoomOut()
+    }
+    bridgeZoomFocusDispatcher.resetZoom = {
+      viewModel.clearPinchAnchor()
+      viewModel.resetZoom()
+    }
   }
   func bindLayoutFocusDispatcher() {
-    bridgeLayoutFocusDispatcher = policyCanvasLayoutFocusDispatcher(viewModel: viewModel)
+    bridgeLayoutFocusDispatcher.reflowLayout = {
+      viewModel.requestAtomicReflow(preserveManualAnchors: false, force: true)
+    }
   }
   func bindSaveFocusDispatcher() {
-    bridgeSaveFocusDispatcher = policyCanvasSaveFocusDispatcher(saveDraft: saveDraft)
+    bridgeSaveFocusDispatcher.save = saveDraft
   }
   func bindInspectorFocusDispatcher() {
-    bridgeInspectorFocusDispatcher = policyCanvasInspectorFocusDispatcher(
-      toggleInspector: toggleInspector
-    )
+    bridgeInspectorFocusDispatcher.toggleInspector = toggleInspector
   }
   @MainActor
   func clearRouteCache(pipelineIdentity: String?) {

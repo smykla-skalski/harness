@@ -67,8 +67,13 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
   let resolvedCanvasColorScheme: ColorScheme?
 
   @State private var worker = PolicyCanvasQualityWorker()
+  @State private var scheduler = PolicyCanvasDeferredUpdateScheduler()
 
   func body(content: Content) -> some View {
+    let inspectionKey = PolicyCanvasQualityInspectionKey(
+      enabled: isEnabled,
+      signature: routeSignature
+    )
     content
       .overlay(alignment: .topTrailing) {
         if isEnabled, let report = viewModel.qualityInspectionReport {
@@ -82,34 +87,56 @@ struct PolicyCanvasQualityInspectionModifier: ViewModifier {
         }
       }
       .animation(.easeInOut(duration: 0.18), value: isEnabled)
-      .task(
-        id: PolicyCanvasQualityInspectionKey(
-          enabled: isEnabled,
-          signature: routeSignature
-        )
-      ) {
-        guard isEnabled else {
-          viewModel.qualityInspectionReport = nil
-          viewModel.qualityReportGeneration += 1
-          return
-        }
-        let input = PolicyCanvasQualityWorkerInput(
-          nodes: viewModel.nodes,
-          groups: viewModel.groups,
-          edges: viewModel.edges,
-          routes: routes,
-          labelPositions: labelPositions,
-          portMarkerLayout: portMarkerLayout
-        )
-        let computed = await worker.compute(input: input)
-        guard !Task.isCancelled, viewModel.qualityInspectionReport != computed else {
-          return
-        }
-        withAnimation(.easeInOut(duration: 0.18)) {
-          viewModel.qualityInspectionReport = computed
-        }
-        viewModel.qualityReportGeneration += 1
+      .onChange(of: inspectionKey, initial: true) { _, key in
+        scheduleQualityInspection(for: key)
       }
+      .onDisappear {
+        scheduler.cancel()
+      }
+  }
+
+  private func scheduleQualityInspection(for key: PolicyCanvasQualityInspectionKey) {
+    guard key.enabled else {
+      scheduler.schedule {
+        clearQualityInspectionReportIfNeeded()
+      }
+      return
+    }
+    let input = PolicyCanvasQualityWorkerInput(
+      nodes: viewModel.nodes,
+      groups: viewModel.groups,
+      edges: viewModel.edges,
+      routes: routes,
+      labelPositions: labelPositions,
+      portMarkerLayout: portMarkerLayout
+    )
+    scheduler.schedule {
+      let computed = await worker.compute(input: input)
+      guard !Task.isCancelled else {
+        return
+      }
+      applyQualityInspectionReportIfNeeded(computed)
+    }
+  }
+
+  private func clearQualityInspectionReportIfNeeded() {
+    guard viewModel.qualityInspectionReport != nil else {
+      return
+    }
+    viewModel.qualityInspectionReport = nil
+    viewModel.qualityReportGeneration += 1
+  }
+
+  private func applyQualityInspectionReportIfNeeded(
+    _ report: PolicyCanvasGraphQualityReport
+  ) {
+    guard viewModel.qualityInspectionReport != report else {
+      return
+    }
+    withAnimation(.easeInOut(duration: 0.18)) {
+      viewModel.qualityInspectionReport = report
+    }
+    viewModel.qualityReportGeneration += 1
   }
 }
 

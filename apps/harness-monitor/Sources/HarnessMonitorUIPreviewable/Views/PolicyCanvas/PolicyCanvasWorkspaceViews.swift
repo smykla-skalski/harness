@@ -29,6 +29,9 @@ struct PolicyCanvasViewport: View {
   @State private var layoutFocusDispatcher = PolicyCanvasLayoutFocusDispatcher()
   @State private var saveFocusDispatcher = PolicyCanvasSaveFocusDispatcher()
   @State private var inspectorFocusDispatcher = PolicyCanvasInspectorFocusDispatcher()
+  @State private var commandFocusScheduler = PolicyCanvasDeferredUpdateScheduler()
+  @State private var viewportCenteringScheduler = PolicyCanvasDeferredUpdateScheduler()
+  @State private var selectionFocusScheduler = PolicyCanvasDeferredUpdateScheduler()
   @State private var commandFocus: PolicyCanvasCommandFocus?
   @State private var hasAppliedRestoredSceneZoom = false
   @State private var scrollApplicatorRequest: PolicyCanvasViewportScrollRequest?
@@ -108,6 +111,15 @@ struct PolicyCanvasViewport: View {
   var bridgeInspectorFocusDispatcher: PolicyCanvasInspectorFocusDispatcher {
     get { inspectorFocusDispatcher }
     nonmutating set { inspectorFocusDispatcher = newValue }
+  }
+  var bridgeCommandFocusScheduler: PolicyCanvasDeferredUpdateScheduler {
+    commandFocusScheduler
+  }
+  var bridgeViewportCenteringScheduler: PolicyCanvasDeferredUpdateScheduler {
+    viewportCenteringScheduler
+  }
+  var bridgeSelectionFocusScheduler: PolicyCanvasDeferredUpdateScheduler {
+    selectionFocusScheduler
   }
 
   var body: some View {
@@ -256,8 +268,8 @@ struct PolicyCanvasViewport: View {
         )
         bindCommandFocus()
       }
-      .task(id: centeringRouteState) {
-        await centerViewportAfterRouteStateSettles(
+      .onChange(of: centeringRouteState, initial: true) {
+        scheduleViewportCenteringAfterRouteStateSettles(
           viewportSize: proxy.size,
           routeOutput: routeOutput,
           currentRouteKey: routeKey,
@@ -265,13 +277,13 @@ struct PolicyCanvasViewport: View {
         )
       }
       .onChange(of: routeOutput.signature, initial: false) {
-        focusSelectionIfNeeded(
+        scheduleSelectionFocusIfNeeded(
           request: selectionFocusRequest,
           routeOutput: routeOutput
         )
       }
       .task(id: selectionFocusRequest?.id) {
-        focusSelectionIfNeeded(
+        scheduleSelectionFocusIfNeeded(
           request: selectionFocusRequest,
           routeOutput: routeOutput
         )
@@ -306,13 +318,13 @@ struct PolicyCanvasViewport: View {
       }
 
       .onChange(of: viewModel.canReflowLayout, initial: false) {
-        bindCommandFocus()
+        scheduleCommandFocusBinding()
       }
       .onChange(of: isInspectorVisible, initial: false) {
-        bindCommandFocus()
+        scheduleCommandFocusBinding()
       }
       .onChange(of: canToggleInspector, initial: false) {
-        bindCommandFocus()
+        scheduleCommandFocusBinding()
       }
       .onChange(of: viewModel.pipelineIdentity, initial: false) { _, newIdentity in
         let transition = policyCanvasRouteCacheAfterIdentityChange(

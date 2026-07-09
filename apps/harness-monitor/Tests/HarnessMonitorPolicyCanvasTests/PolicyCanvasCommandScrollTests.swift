@@ -226,6 +226,9 @@ struct PolicyCanvasCommandScrollTests {
     let routeCacheSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewport+AtomicReflow.swift"
     )
+    let viewportRouteCacheSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewportRouteCache.swift"
+    )
     let surfaceSource =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift")
     let hostedContentSource = try previewableSourceFile(
@@ -250,8 +253,9 @@ struct PolicyCanvasCommandScrollTests {
         "let centeringRouteState = PolicyCanvasViewportCenteringRouteState("
       )
     )
-    #expect(source.contains(".task(id: centeringRouteState)"))
-    #expect(source.contains("await centerViewportAfterRouteStateSettles("))
+    #expect(source.contains(".onChange(of: centeringRouteState, initial: true)"))
+    #expect(source.contains("scheduleViewportCenteringAfterRouteStateSettles("))
+    #expect(viewportControlSource.contains("bridgeViewportCenteringScheduler.schedule"))
     #expect(viewportControlSource.contains("await Task.yield()"))
     #expect(source.contains("guard !Task.isCancelled else"))
     #expect(source.contains("currentRouteKey: routeKey"))
@@ -264,7 +268,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!source.contains("policyCanvasNodeBoundsPlaceholderOutput("))
     #expect(!source.contains("routeOutputIsCurrentGraphProvisional"))
     #expect(!source.contains("allowsProvisionalRouteOutput"))
-    #expect(source.contains("let routeOutput = projectedRouteResult.output"))
+    #expect(source.contains("let routeOutput = liveDragRoutedOutput ?? projectedRouteResult.output"))
     #expect(source.contains("let finalRouteOutputReady ="))
     #expect(
       source.contains(
@@ -285,9 +289,9 @@ struct PolicyCanvasCommandScrollTests {
         "isEnabled: showsQualityInspection && snapshot.hasRenderableRouteOutput"))
     #expect(
       scrollCoordinatorSource.contains("hasRenderableRouteOutput: hasRenderableRouteOutput"))
-    #expect(source.contains("routeCache.outputsByCanvasIdentity"))
+    #expect(viewportRouteCacheSource.contains("cache.outputsByCanvasIdentity[newIdentity]"))
     #expect(
-      source.contains("let cachedRouteOutput = routeCache.outputsByCanvasIdentity[newIdentity]"))
+      viewportRouteCacheSource.contains("next.outputsByCanvasIdentity[newIdentity]"))
     #expect(source.contains(".onChange(of: viewModel.routeComputationRequestGeneration"))
     #expect(source.contains("pipelineIdentity: routeCacheIdentity"))
     #expect(source.contains("fontScale: fontScale"))
@@ -318,6 +322,31 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!surfaceSource.contains("viewModel.reflowLayout("))
     #expect(
       !source.contains(".onChange(of: viewModel.viewportCenteringGeneration, initial: false)"))
+  }
+
+  @Test("viewport observer follow-up updates are deferred")
+  func viewportObserverFollowUpUpdatesAreDeferred() throws {
+    let source =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+    let viewportControlSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ViewportControl.swift"
+    )
+    let qualityInspectionSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasQualityInspection.swift"
+    )
+
+    #expect(source.contains("@State private var commandFocusScheduler"))
+    #expect(source.contains("@State private var viewportCenteringScheduler"))
+    #expect(source.contains("@State private var selectionFocusScheduler"))
+    #expect(source.contains("scheduleSelectionFocusIfNeeded("))
+    #expect(source.contains("scheduleCommandFocusBinding()"))
+    #expect(viewportControlSource.contains("bridgeCommandFocusScheduler.schedule"))
+    #expect(viewportControlSource.contains("bridgeSelectionFocusScheduler.schedule"))
+    #expect(!viewportControlSource.contains("bridgeZoomFocusDispatcher ="))
+    #expect(viewportControlSource.contains("bridgeZoomFocusDispatcher.zoomIn ="))
+    #expect(qualityInspectionSource.contains("@State private var scheduler"))
+    #expect(qualityInspectionSource.contains("clearQualityInspectionReportIfNeeded()"))
+    #expect(qualityInspectionSource.contains("guard viewModel.qualityInspectionReport != nil else"))
   }
 
   @Test("lab viewport surface keeps document import out of SwiftUI init")
