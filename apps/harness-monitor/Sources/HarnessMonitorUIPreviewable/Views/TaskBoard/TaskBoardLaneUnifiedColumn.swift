@@ -261,6 +261,9 @@ private struct TaskBoardCollapsedLane: View {
   private var titleFont: Font {
     HarnessMonitorTextSize.scaledFont(.title3.weight(.semibold), by: fontScale)
   }
+  private var collapsedContentWidth: CGFloat {
+    max(0, metrics.laneCollapsedWidth - (2 * metrics.laneCollapsedInnerPadding))
+  }
 
   var body: some View {
     Button(action: onExpand) {
@@ -280,9 +283,16 @@ private struct TaskBoardCollapsedLane: View {
 
         Spacer(minLength: 0)
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+      .frame(
+        minWidth: collapsedContentWidth,
+        idealWidth: collapsedContentWidth,
+        maxWidth: collapsedContentWidth,
+        maxHeight: .infinity,
+        alignment: .top
+      )
       .padding(.top, metrics.laneCollapsedContentTopPadding)
       .contentShape(Rectangle())
+      .clipped()
     }
     .harnessPlainButtonStyle()
     .taskBoardLaneToggleFeedback(lane: lane, cornerRadius: metrics.cardCornerRadius)
@@ -305,11 +315,15 @@ private struct TaskBoardCollapsedLane: View {
       .rotationEffect(.degrees(90))
       .offset(y: collapsedTitleVerticalOffset)
       .frame(
-        maxWidth: .infinity,
+        minWidth: collapsedContentWidth,
+        idealWidth: collapsedContentWidth,
+        maxWidth: collapsedContentWidth,
         minHeight: metrics.laneCollapsedTitleHeight,
+        idealHeight: metrics.laneCollapsedTitleHeight,
         maxHeight: metrics.laneCollapsedTitleHeight,
         alignment: .top
       )
+      .clipped()
   }
 
   private var collapsedTitleVerticalOffset: CGFloat {
