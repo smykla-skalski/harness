@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 
 use super::protocol::http_paths;
 use super::remote::{
-    RemoteAcmeChallenge, RemoteDaemonConfigError, RemoteDaemonServeConfig, RemoteDnsProvider,
+    RemoteAcmeChallenge, RemoteDaemonConfigError, RemoteDaemonServeConfig,
     validate_remote_serve_config,
 };
 pub use super::remote_acme_dns::{
@@ -14,7 +14,15 @@ pub use super::remote_acme_dns::{
     Dns01ExecHookInvocation, Dns01ExecHookOperation, Dns01ProviderChangeError,
     Route53Dns01ChangeBatch,
 };
+pub use super::remote_acme_dns_runner::{
+    Dns01ProviderAction, Dns01ProviderChangeRunner, Dns01ProviderExecutionConfig,
+    Dns01ProviderExecutionError,
+};
+use super::remote_redaction::redact_secret_detail;
 
+#[cfg(test)]
+#[path = "remote_acme_dns_runner_tests.rs"]
+mod dns_runner_tests;
 #[cfg(test)]
 #[path = "remote_acme_tests.rs"]
 mod tests;
@@ -195,124 +203,6 @@ impl AcmeHttp01ChallengeStore {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Dns01ProviderAction {
-    provider: RemoteDnsProvider,
-    fqdn: String,
-    digest: String,
-}
-
-impl Dns01ProviderAction {
-    #[must_use]
-    pub fn for_provider(
-        provider: RemoteDnsProvider,
-        fqdn: impl Into<String>,
-        digest: impl Into<String>,
-    ) -> Self {
-        Self {
-            provider,
-            fqdn: fqdn.into(),
-            digest: digest.into(),
-        }
-    }
-
-    #[must_use]
-    pub const fn required_secret_names(&self) -> &'static [&'static str] {
-        match self.provider {
-            RemoteDnsProvider::Cloudflare => &["CLOUDFLARE_API_TOKEN"],
-            RemoteDnsProvider::Route53 => &["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
-            RemoteDnsProvider::Exec => &["HARNESS_REMOTE_ACME_DNS_EXEC"],
-        }
-    }
-
-    #[must_use]
-    pub fn command_preview(&self) -> String {
-        match self.provider {
-            RemoteDnsProvider::Cloudflare => {
-                format!("cloudflare TXT {} {}", self.fqdn, self.digest)
-            }
-            RemoteDnsProvider::Route53 => format!("route53 TXT {} {}", self.fqdn, self.digest),
-            RemoteDnsProvider::Exec => {
-                format!(
-                    "$HARNESS_REMOTE_ACME_DNS_EXEC present {} {}",
-                    self.fqdn, self.digest
-                )
-            }
-        }
-    }
-
-    /// Build the Cloudflare DNS-01 change request for this provider action.
-    ///
-    /// # Errors
-    /// Returns [`Dns01ProviderChangeError`] when this action is not for the
-    /// Cloudflare provider or the zone id is blank.
-    pub fn cloudflare_change_request(
-        &self,
-        zone_id: &str,
-        operation: Dns01ChangeOperation,
-    ) -> Result<CloudflareDns01ChangeRequest, Dns01ProviderChangeError> {
-        if self.provider != RemoteDnsProvider::Cloudflare {
-            return Err(Dns01ProviderChangeError::wrong_provider("cloudflare"));
-        }
-        CloudflareDns01ChangeRequest::new(
-            zone_id,
-            self.fqdn.as_str(),
-            self.digest.as_str(),
-            operation,
-        )
-    }
-
-    /// Build the Route53 DNS-01 change batch for this provider action.
-    ///
-    /// # Errors
-    /// Returns [`Dns01ProviderChangeError`] when this action is not for the
-    /// Route53 provider or the hosted zone id is blank.
-    pub fn route53_change_batch(
-        &self,
-        hosted_zone_id: &str,
-        operation: Dns01ChangeOperation,
-    ) -> Result<Route53Dns01ChangeBatch, Dns01ProviderChangeError> {
-        if self.provider != RemoteDnsProvider::Route53 {
-            return Err(Dns01ProviderChangeError::wrong_provider("route53"));
-        }
-        Route53Dns01ChangeBatch::new(
-            hosted_zone_id,
-            self.fqdn.as_str(),
-            self.digest.as_str(),
-            operation,
-        )
-    }
-
-    /// Run the generic DNS-01 exec hook for this provider action.
-    ///
-    /// # Errors
-    /// Returns [`Dns01ExecHookError`] when this action is not for the exec
-    /// provider, the hook program is blank, or the injected runner fails.
-    pub fn run_exec_hook_with<Run>(
-        &self,
-        hook_program: &str,
-        operation: Dns01ExecHookOperation,
-        runner: Run,
-    ) -> Result<(), Dns01ExecHookError>
-    where
-        Run: FnOnce(&Dns01ExecHookInvocation) -> Result<(), String>,
-    {
-        if self.provider != RemoteDnsProvider::Exec {
-            return Err(Dns01ExecHookError::WrongProvider);
-        }
-        let program = hook_program.trim();
-        if program.is_empty() {
-            return Err(Dns01ExecHookError::MissingCommand);
-        }
-        let invocation = Dns01ExecHookInvocation::new(
-            program,
-            [operation.as_str(), self.fqdn.as_str(), self.digest.as_str()],
-        );
-        runner(&invocation)
-            .map_err(|detail| Dns01ExecHookError::runner_failed(redact_secret_detail(&detail)))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemoteAcmeRenewalRequest {
     account_id: String,
     previous_certificate_fingerprint: Option<String>,
@@ -470,37 +360,4 @@ impl RemoteRenewalOutcome {
             Self::Failed { report } => report,
         }
     }
-}
-
-fn redact_secret_detail(detail: &str) -> String {
-    let mut redacted = String::with_capacity(detail.len());
-    let mut offset = 0;
-
-    while offset < detail.len() {
-        let rest = &detail[offset..];
-        if let Some(key) = ["secret=", "token="]
-            .into_iter()
-            .find(|key| rest.starts_with(key))
-        {
-            redacted.push_str(key);
-            redacted.push_str("<redacted>");
-            offset += key.len();
-            while let Some(value_char) = detail[offset..].chars().next() {
-                if is_secret_value_terminator(value_char) {
-                    break;
-                }
-                offset += value_char.len_utf8();
-            }
-        } else if let Some(plain_char) = rest.chars().next() {
-            redacted.push(plain_char);
-            offset += plain_char.len_utf8();
-        }
-    }
-
-    redacted
-}
-
-fn is_secret_value_terminator(value_char: char) -> bool {
-    value_char.is_whitespace()
-        || matches!(value_char, '&' | ';' | ',' | ')' | ']' | '}' | '"' | '\'')
 }
