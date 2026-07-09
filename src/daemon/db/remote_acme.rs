@@ -75,7 +75,8 @@ impl DaemonDb {
     /// Load remote ACME account and certificate material for the TLS runtime.
     ///
     /// # Errors
-    /// Returns [`CliError`] on SQL failures.
+    /// Returns [`CliError`] when the singleton state row is missing or SQL
+    /// loading fails.
     pub(crate) fn load_remote_acme_runtime_state(
         &self,
     ) -> Result<RemoteAcmeRuntimeState, CliError> {

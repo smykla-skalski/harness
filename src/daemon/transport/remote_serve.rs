@@ -1,5 +1,4 @@
 use crate::daemon::db::DaemonDb;
-use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::remote_acme::{RemoteAcmeRuntimePlan, build_remote_acme_runtime_plan};
 use crate::daemon::service::DaemonServeConfig;
 use crate::errors::{CliError, CliErrorKind};
@@ -34,13 +33,7 @@ pub(crate) fn build_remote_serve_execution_plan(
     let acme_state = db.load_remote_acme_runtime_state()?;
     let acme_plan = build_remote_acme_runtime_plan(&remote_config, &acme_state)
         .map_err(|error| CliError::from(CliErrorKind::workflow_parse(error.to_string())))?;
-    let service_config = DaemonServeConfig {
-        host: remote_config.host,
-        port: remote_config.https_port,
-        auth_mode: DaemonHttpAuthMode::Remote,
-        remote_domain: Some(remote_config.domain),
-        ..DaemonServeConfig::default()
-    };
+    let service_config = args.remote_auth_scaffold_config()?;
     Ok(RemoteDaemonServeExecutionPlan {
         service_config,
         acme_plan,
