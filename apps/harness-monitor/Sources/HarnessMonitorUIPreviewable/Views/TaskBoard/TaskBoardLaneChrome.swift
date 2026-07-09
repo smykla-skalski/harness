@@ -93,7 +93,7 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
       .overlay(alignment: .top) {
         TaskBoardLaneAccentCap(
           color: laneAccentColor,
-          interiorStyle: laneFill,
+          interiorStyle: laneAccentInteriorStyle,
           metrics: metrics
         )
       }
@@ -104,6 +104,10 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
       return AnyShapeStyle(taskBoardLaneColor(for: lane).opacity(reduceTransparency ? 0.18 : 0.12))
     }
     return AnyShapeStyle(.background.opacity(reduceTransparency ? 0.72 : 0.6))
+  }
+
+  private var laneAccentInteriorStyle: AnyShapeStyle {
+    AnyShapeStyle(.background)
   }
 
   private var laneStrokeColor: Color {
