@@ -297,13 +297,22 @@ private struct TaskBoardCollapsedLane: View {
       .foregroundStyle(HarnessMonitorTheme.ink.opacity(0.82))
       .lineLimit(1)
       .minimumScaleFactor(0.72)
-      .frame(width: metrics.laneCollapsedTitleHeight, alignment: .leading)
-      .rotationEffect(.degrees(90), anchor: .topLeading)
-      .offset(x: metrics.laneCollapsedTextWidth)
       .frame(
-        width: metrics.laneCollapsedTextWidth,
-        height: metrics.laneCollapsedTitleHeight,
+        width: metrics.laneCollapsedTitleHeight,
+        height: metrics.laneCollapsedTextWidth,
+        alignment: .leading
+      )
+      .rotationEffect(.degrees(90))
+      .offset(y: collapsedTitleVerticalOffset)
+      .frame(
+        maxWidth: .infinity,
+        minHeight: metrics.laneCollapsedTitleHeight,
+        maxHeight: metrics.laneCollapsedTitleHeight,
         alignment: .top
       )
+  }
+
+  private var collapsedTitleVerticalOffset: CGFloat {
+    max(0, (metrics.laneCollapsedTitleHeight - metrics.laneCollapsedTextWidth) / 2)
   }
 }
