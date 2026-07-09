@@ -4,6 +4,7 @@ mod remote_acme;
 mod remote_cli;
 mod remote_clients;
 mod remote_systemd;
+mod remote_systemd_plan;
 
 use std::path::{Path, PathBuf};
 

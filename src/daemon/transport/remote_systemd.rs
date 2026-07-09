@@ -285,7 +285,7 @@ fn render_unit(
     serve_config: &RemoteDaemonServeConfig,
     needs_bind_capability: bool,
 ) -> String {
-    let exec_start = shell_words::join(remote_serve_command(binary_path, serve_config));
+    let exec_start = render_systemd_exec_start(&remote_serve_command(binary_path, serve_config));
     let mut contents = format!(
         "[Unit]\n\
          Description=Harness remote daemon\n\
@@ -348,6 +348,13 @@ fn remote_serve_command(binary_path: &Path, config: &RemoteDaemonServeConfig) ->
 }
 
 fn validate_systemd_directive_path(label: &str, path: &Path) -> Result<(), CliError> {
+    if !path.is_absolute() {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "systemd {label} path must be absolute: {}",
+            path.display()
+        ))
+        .into());
+    }
     if path
         .as_os_str()
         .to_string_lossy()
@@ -361,6 +368,38 @@ fn validate_systemd_directive_path(label: &str, path: &Path) -> Result<(), CliEr
         .into());
     }
     Ok(())
+}
+
+fn render_systemd_exec_start(command: &[String]) -> String {
+    command
+        .iter()
+        .map(|argument| render_systemd_exec_argument(argument))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn render_systemd_exec_argument(argument: &str) -> String {
+    if !argument.is_empty() && argument.chars().all(is_systemd_bare_exec_char) {
+        return argument.to_string();
+    }
+    let mut quoted = String::with_capacity(argument.len() + 2);
+    quoted.push('"');
+    for character in argument.chars() {
+        match character {
+            '"' | '\\' => {
+                quoted.push('\\');
+                quoted.push(character);
+            }
+            '%' => quoted.push_str("%%"),
+            _ => quoted.push(character),
+        }
+    }
+    quoted.push('"');
+    quoted
+}
+
+fn is_systemd_bare_exec_char(character: char) -> bool {
+    !character.is_whitespace() && !matches!(character, '"' | '\'' | '\\')
 }
 
 fn render_env_file(unit: &str) -> String {
