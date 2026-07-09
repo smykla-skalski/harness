@@ -160,10 +160,52 @@ fn remote_dns01_provider_runner_cleans_up_after_issue_failure() {
     );
 }
 
+#[test]
+fn remote_dns01_provider_runner_reports_issue_and_cleanup_failure_without_nested_prefix() {
+    let mut runner = RecordingDns01Runner {
+        cleanup_fail_detail: Some("cleanup secret=cleanup-secret failed".to_string()),
+        ..RecordingDns01Runner::default()
+    };
+    let action = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Cloudflare,
+        "_acme-challenge.daemon.example.com",
+        "cloudflare-digest",
+    );
+
+    let error = action
+        .run_challenge_with(
+            &Dns01ProviderExecutionConfig::cloudflare("zone-123"),
+            &mut runner,
+            |runner| {
+                runner.record_issue();
+                Err("issuer token=issue-secret failed".to_string())
+            },
+        )
+        .expect_err("issue and cleanup failure should surface");
+    let message = error.to_string();
+
+    assert!(message.contains("issuer"));
+    assert!(message.contains("cleanup also failed"));
+    assert!(!message.contains("issue-secret"));
+    assert!(!message.contains("cleanup-secret"));
+    assert!(!message.contains("cleanup also failed: DNS-01 provider change failed"));
+    assert_eq!(
+        runner.events,
+        vec![
+            "cloudflare:present:zone-123:_acme-challenge.daemon.example.com:cloudflare-digest"
+                .to_string(),
+            "issue".to_string(),
+            "cloudflare:cleanup:zone-123:_acme-challenge.daemon.example.com:cloudflare-digest"
+                .to_string(),
+        ]
+    );
+}
+
 #[derive(Default)]
 struct RecordingDns01Runner {
     events: Vec<String>,
     fail_detail: Option<String>,
+    cleanup_fail_detail: Option<String>,
 }
 
 impl Dns01ProviderChangeRunner for RecordingDns01Runner {
@@ -171,7 +213,7 @@ impl Dns01ProviderChangeRunner for RecordingDns01Runner {
         &mut self,
         request: &CloudflareDns01ChangeRequest,
     ) -> Result<(), String> {
-        self.maybe_fail()?;
+        let is_cleanup = request.operation() == Dns01ChangeOperation::Cleanup;
         self.events.push(format!(
             "cloudflare:{}:{}:{}:{}",
             request.operation().as_str(),
@@ -179,11 +221,12 @@ impl Dns01ProviderChangeRunner for RecordingDns01Runner {
             request.name(),
             request.content()
         ));
+        self.maybe_fail(is_cleanup)?;
         Ok(())
     }
 
     fn apply_route53_change(&mut self, batch: &Route53Dns01ChangeBatch) -> Result<(), String> {
-        self.maybe_fail()?;
+        let is_cleanup = batch.action() == "DELETE";
         self.events.push(format!(
             "route53:{}:{}:{}:{}",
             batch.action(),
@@ -191,16 +234,21 @@ impl Dns01ProviderChangeRunner for RecordingDns01Runner {
             batch.name(),
             batch.quoted_value()
         ));
+        self.maybe_fail(is_cleanup)?;
         Ok(())
     }
 
     fn run_exec_hook(&mut self, invocation: &Dns01ExecHookInvocation) -> Result<(), String> {
-        self.maybe_fail()?;
+        let is_cleanup = invocation
+            .args()
+            .first()
+            .is_some_and(|arg| arg == "cleanup");
         self.events.push(format!(
             "exec:{}:{}",
             invocation.program(),
             invocation.args().join(" ")
         ));
+        self.maybe_fail(is_cleanup)?;
         Ok(())
     }
 }
@@ -210,7 +258,10 @@ impl RecordingDns01Runner {
         self.events.push("issue".to_string());
     }
 
-    fn maybe_fail(&self) -> Result<(), String> {
+    fn maybe_fail(&self, is_cleanup: bool) -> Result<(), String> {
+        if is_cleanup && let Some(detail) = &self.cleanup_fail_detail {
+            return Err(detail.clone());
+        }
         match &self.fail_detail {
             Some(detail) => Err(detail.clone()),
             None => Ok(()),

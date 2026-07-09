@@ -87,6 +87,17 @@ impl Dns01ProviderExecutionError {
             cleanup: redact_secret_detail(cleanup),
         }
     }
+
+    fn redacted_detail(&self) -> String {
+        match self {
+            Self::RunnerFailed(detail)
+            | Self::IssueFailed(detail)
+            | Self::ExecHook(Dns01ExecHookError::RunnerFailed(detail)) => detail.clone(),
+            Self::ProviderChange(error) => error.to_string(),
+            Self::ExecHook(error) => error.to_string(),
+            Self::WrongProviderConfig(_) | Self::IssueAndCleanupFailed { .. } => self.to_string(),
+        }
+    }
 }
 
 impl fmt::Display for Dns01ProviderExecutionError {
@@ -304,9 +315,10 @@ impl Dns01ProviderAction {
             }
             (Ok(()), Err(cleanup_error)) => Err(cleanup_error),
             (Err(issue_detail), Err(cleanup_error)) => {
+                let cleanup_detail = cleanup_error.redacted_detail();
                 Err(Dns01ProviderExecutionError::issue_and_cleanup_failed(
                     &issue_detail,
-                    &cleanup_error.to_string(),
+                    &cleanup_detail,
                 ))
             }
         }
