@@ -1,5 +1,6 @@
 use std::io;
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use super::{
     RemoteTlsConfigError, TLS_HANDSHAKE_FAILURE_RETRY_DELAY, build_remote_tls_server_config,
@@ -66,6 +67,11 @@ async fn remote_tls_handshake_failures_backoff_before_retry() {
 
     tokio::time::advance(TLS_HANDSHAKE_FAILURE_RETRY_DELAY).await;
     retry.await.expect("handshake retry delay should complete");
+}
+
+#[test]
+fn remote_tls_handshake_failure_retry_delay_has_internet_facing_floor() {
+    assert!(TLS_HANDSHAKE_FAILURE_RETRY_DELAY >= Duration::from_millis(100));
 }
 
 const TEST_CERTIFICATE_PEM: &str = r#"-----BEGIN CERTIFICATE-----

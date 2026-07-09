@@ -26,7 +26,7 @@ use super::remote_acme::RemoteCertificateBundle;
 mod tests;
 
 static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
-const TLS_HANDSHAKE_FAILURE_RETRY_DELAY: Duration = Duration::from_millis(10);
+const TLS_HANDSHAKE_FAILURE_RETRY_DELAY: Duration = Duration::from_millis(250);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RemoteTlsConfigError {
@@ -182,7 +182,7 @@ fn is_transient_accept_error(error: &io::Error) -> bool {
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
 async fn handle_tls_handshake_error(addr: SocketAddr, error: io::Error) {
-    tracing::warn!(
+    tracing::debug!(
         remote_addr = %addr,
         %error,
         "remote TLS handshake failed"
