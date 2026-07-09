@@ -2,6 +2,7 @@ import SwiftUI
 
 private struct DashboardPolicyCanvasFooterTabChromeModifier: ViewModifier {
   let isSelected: Bool
+  let isLive: Bool
   let isHovering: Bool
   let isPressed: Bool
   var showsLeadingSeparator = false
@@ -21,6 +22,13 @@ private struct DashboardPolicyCanvasFooterTabChromeModifier: ViewModifier {
       return .clear
     }
     return Color.accentColor.opacity(isPressed ? 0.22 : (isHovering ? 0.18 : 0.14))
+  }
+
+  private var liveChromeColor: Color {
+    guard isEnabled, isLive else {
+      return .clear
+    }
+    return HarnessMonitorTheme.success
   }
 
   private var separatorColor: Color {
@@ -44,6 +52,9 @@ private struct DashboardPolicyCanvasFooterTabChromeModifier: ViewModifier {
     if isSelected {
       return selectedChromeColor
     }
+    if isLive {
+      return liveChromeColor.opacity(isHovering ? 0.16 : 0.11)
+    }
     if isHovering {
       return HarnessMonitorTheme.secondaryInk.opacity(isPressed ? 0.12 : 0.08)
     }
@@ -66,6 +77,12 @@ private struct DashboardPolicyCanvasFooterTabChromeModifier: ViewModifier {
           .frame(width: showsLeadingSeparator ? borderWidth : 0)
           .opacity(showsLeadingSeparator ? 1 : 0)
       }
+      .overlay(alignment: .bottom) {
+        Rectangle()
+          .fill(liveChromeColor)
+          .frame(height: isLive ? borderWidth + 1 : 0)
+          .opacity(isLive ? 1 : 0)
+      }
       .overlay(alignment: .trailing) {
         Rectangle()
           .fill(separatorColor)
@@ -80,6 +97,7 @@ private struct DashboardPolicyCanvasFooterTabChromeModifier: ViewModifier {
 extension View {
   func dashboardPolicyCanvasFooterTabChrome(
     isSelected: Bool,
+    isLive: Bool = false,
     isHovering: Bool,
     isPressed: Bool,
     showsLeadingSeparator: Bool = false,
@@ -88,6 +106,7 @@ extension View {
     modifier(
       DashboardPolicyCanvasFooterTabChromeModifier(
         isSelected: isSelected,
+        isLive: isLive,
         isHovering: isHovering,
         isPressed: isPressed,
         showsLeadingSeparator: showsLeadingSeparator,

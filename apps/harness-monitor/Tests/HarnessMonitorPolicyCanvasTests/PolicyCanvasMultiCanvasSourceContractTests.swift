@@ -160,14 +160,20 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     let dashboardFooterComponentsSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasFooterComponents.swift"
     )
+    let dashboardFooterChromeSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterTabChrome.swift"
+    )
 
-    XCTAssertTrue(dashboardFooterComponentsSource.contains("private var liveIndicator: some View"))
     XCTAssertTrue(dashboardFooterComponentsSource.contains("canvas.mode == .enforced"))
+    XCTAssertTrue(dashboardFooterComponentsSource.contains("isLive: isLive"))
+    XCTAssertTrue(dashboardFooterChromeSource.contains("let isLive: Bool"))
+    XCTAssertTrue(dashboardFooterChromeSource.contains("HarnessMonitorTheme.success"))
+    XCTAssertTrue(dashboardFooterChromeSource.contains(".overlay(alignment: .bottom)"))
     XCTAssertTrue(
-      dashboardFooterComponentsSource.contains("Image(systemName: \"checkmark.seal.fill\")")
+      dashboardFooterChromeSource.contains("liveChromeColor.opacity(isHovering ? 0.16 : 0.11)")
     )
     XCTAssertTrue(dashboardFooterComponentsSource.contains("isLive ? \"Live\" : \"Draft\""))
-    XCTAssertTrue(dashboardFooterComponentsSource.contains(".accessibilityHidden(true)"))
+    XCTAssertFalse(dashboardFooterComponentsSource.contains("checkmark.seal"))
   }
 
   func testDashboardPolicyRouteIntegratesCreateCanvasControlIntoTabStrip() throws {

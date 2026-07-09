@@ -196,6 +196,7 @@ struct DashboardPolicyCanvasFooterTab: View {
       )
       .dashboardPolicyCanvasFooterTabChrome(
         isSelected: isSelected,
+        isLive: isLive,
         isHovering: false,
         isPressed: false,
         showsLeadingSeparator: showsLeadingSeparator && isSelected
@@ -206,52 +207,40 @@ struct DashboardPolicyCanvasFooterTab: View {
   }
 
   private var titleButton: some View {
-    HStack(spacing: 6) {
-      liveIndicator
-
-      Text(canvas.title)
-        .lineLimit(1)
-        .truncationMode(.tail)
-    }
-    .font(.callout.weight(.medium))
-    .padding(.horizontal, tabHorizontalPadding)
-    .frame(maxWidth: tabMaxWidth, alignment: .leading)
-    .frame(maxHeight: .infinity, alignment: .leading)
-    .contentShape(Rectangle())
-    .dashboardPolicyCanvasFooterTabChrome(
-      isSelected: isSelected,
-      isHovering: isHovering,
-      isPressed: false,
-      showsLeadingSeparator: showsLeadingSeparator && isSelected
-    )
-    .overlay {
-      DashboardPolicyCanvasFooterTabClickTarget(
-        onHover: { hovering in
-          isHovering = hovering
-        },
-        singleClick: select,
-        doubleClick: {
-          guard canRename else { return }
-          beginRename()
-        }
+    Text(canvas.title)
+      .font(.callout.weight(.medium))
+      .lineLimit(1)
+      .truncationMode(.tail)
+      .padding(.horizontal, tabHorizontalPadding)
+      .frame(maxWidth: tabMaxWidth, alignment: .leading)
+      .frame(maxHeight: .infinity, alignment: .leading)
+      .contentShape(Rectangle())
+      .dashboardPolicyCanvasFooterTabChrome(
+        isSelected: isSelected,
+        isLive: isLive,
+        isHovering: isHovering,
+        isPressed: false,
+        showsLeadingSeparator: showsLeadingSeparator && isSelected
       )
-      .accessibilityHidden(true)
-    }
-    .accessibilityLabel(canvas.title)
-    .accessibilityValue(accessibilityValue)
-    .accessibilityAddTraits(.isButton)
-    .accessibilityAction {
-      select()
-    }
-  }
-
-  @ViewBuilder private var liveIndicator: some View {
-    if isLive {
-      Image(systemName: "checkmark.seal.fill")
-        .imageScale(.small)
-        .foregroundStyle(Color.accentColor)
+      .overlay {
+        DashboardPolicyCanvasFooterTabClickTarget(
+          onHover: { hovering in
+            isHovering = hovering
+          },
+          singleClick: select,
+          doubleClick: {
+            guard canRename else { return }
+            beginRename()
+          }
+        )
         .accessibilityHidden(true)
-    }
+      }
+      .accessibilityLabel(canvas.title)
+      .accessibilityValue(accessibilityValue)
+      .accessibilityAddTraits(.isButton)
+      .accessibilityAction {
+        select()
+      }
   }
 
   private var isLive: Bool {
@@ -294,6 +283,7 @@ struct DashboardPolicyCanvasFooterTab: View {
 
 struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
   let isSelected: Bool
+  var isLive = false
   let isHovering: Bool
   var showsLeadingSeparator = false
   var showsTrailingSeparator = true
@@ -302,6 +292,7 @@ struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
     configuration.label
       .dashboardPolicyCanvasFooterTabChrome(
         isSelected: isSelected,
+        isLive: isLive,
         isHovering: isHovering,
         isPressed: configuration.isPressed,
         showsLeadingSeparator: showsLeadingSeparator,
