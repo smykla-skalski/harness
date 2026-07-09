@@ -31,6 +31,17 @@ fn daemon_remote_serve_execution_plan_requires_persisted_acme_state() {
 
     assert!(message.contains("persisted ACME state"));
     assert!(!message.contains("reserved"));
+
+    let stored = db
+        .load_remote_acme_state()
+        .expect("load persisted remote acme state")
+        .serve_config
+        .expect("remote serve config should be persisted before ACME preflight fails");
+    assert_eq!(stored.domain, "daemon.example.com");
+    assert_eq!(stored.host, "0.0.0.0");
+    assert_eq!(stored.https_port, 443);
+    assert_eq!(stored.http_port, 80);
+    assert_eq!(stored.acme_email, "ops@example.com");
 }
 
 #[test]

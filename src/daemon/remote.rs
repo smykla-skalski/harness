@@ -134,6 +134,7 @@ pub struct RemoteDaemonServeConfig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RemoteDaemonConfigError {
     MissingDomain,
+    MissingHost,
     MissingAcmeEmail,
     MissingHttpsPort,
     MissingHttpPort,
@@ -145,6 +146,7 @@ impl fmt::Display for RemoteDaemonConfigError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingDomain => write!(f, "remote daemon domain is required"),
+            Self::MissingHost => write!(f, "remote daemon bind host is required"),
             Self::MissingAcmeEmail => write!(f, "remote daemon ACME email is required"),
             Self::MissingHttpsPort => write!(f, "remote daemon HTTPS port must be non-zero"),
             Self::MissingHttpPort => write!(f, "remote daemon HTTP-01 port must be non-zero"),
@@ -173,6 +175,9 @@ pub fn validate_remote_serve_config(
 ) -> Result<(), RemoteDaemonConfigError> {
     if config.domain.trim().is_empty() {
         return Err(RemoteDaemonConfigError::MissingDomain);
+    }
+    if config.host.trim().is_empty() {
+        return Err(RemoteDaemonConfigError::MissingHost);
     }
     if config.acme_email.trim().is_empty() {
         return Err(RemoteDaemonConfigError::MissingAcmeEmail);

@@ -31,6 +31,16 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
 const DEPRECATED_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] =
     &[("policy_workspace", "enforcement_snapshot_json")];
 
+const CURRENT_SCHEMA_REMOTE_ACME_COLUMNS: &[(&str, &str)] = &[
+    ("remote_acme_state", "domain"),
+    ("remote_acme_state", "host"),
+    ("remote_acme_state", "https_port"),
+    ("remote_acme_state", "http_port"),
+    ("remote_acme_state", "acme_email"),
+    ("remote_acme_state", "acme_challenge"),
+    ("remote_acme_state", "acme_dns_provider"),
+];
+
 pub(super) fn current_schema_shape_needs_repair(
     conn: &super::Connection,
 ) -> Result<bool, CliError> {
@@ -53,6 +63,11 @@ pub(super) fn current_schema_shape_needs_repair(
         }
     }
     for (table, column) in CURRENT_SCHEMA_POLICY_COLUMNS {
+        if !column_exists(conn, table, column)? {
+            return Ok(true);
+        }
+    }
+    for (table, column) in CURRENT_SCHEMA_REMOTE_ACME_COLUMNS {
         if !column_exists(conn, table, column)? {
             return Ok(true);
         }
@@ -84,6 +99,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v25::run(&db.conn)?;
     super::schema_v26::run(&db.conn)?;
     super::schema_v27::run(&db.conn)?;
+    super::schema_v28::run(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

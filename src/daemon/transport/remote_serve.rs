@@ -4,6 +4,7 @@ use crate::daemon::db::DaemonDb;
 use crate::daemon::remote_acme::{RemoteAcmeRuntimePlan, build_remote_acme_runtime_plan};
 use crate::daemon::service::{self, DaemonServeConfig};
 use crate::errors::{CliError, CliErrorKind};
+use crate::workspace::utc_now;
 use tokio::runtime::{Handle, Runtime};
 
 use super::control::adopt_daemon_root_for_transport_command;
@@ -45,6 +46,7 @@ pub(crate) fn build_remote_serve_execution_plan(
     db: &DaemonDb,
 ) -> Result<RemoteDaemonServeExecutionPlan, CliError> {
     let remote_config = args.contract_config()?;
+    db.record_remote_acme_serve_config(&remote_config, utc_now().as_str())?;
     let acme_state = db.load_remote_acme_runtime_state()?;
     let acme_plan = build_remote_acme_runtime_plan(&remote_config, &acme_state)
         .map_err(|error| CliError::from(CliErrorKind::workflow_parse(error.to_string())))?;

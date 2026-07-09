@@ -206,14 +206,20 @@ impl AcmeHttp01ChallengeStore {
 pub struct RemoteAcmeRenewalRequest {
     account_id: String,
     previous_certificate_fingerprint: Option<String>,
+    serve_config: RemoteDaemonServeConfig,
 }
 
 impl RemoteAcmeRenewalRequest {
     #[must_use]
-    pub fn new(account_id: impl Into<String>, previous_fingerprint: Option<&str>) -> Self {
+    pub fn new(
+        account_id: impl Into<String>,
+        previous_fingerprint: Option<&str>,
+        serve_config: &RemoteDaemonServeConfig,
+    ) -> Self {
         Self {
             account_id: account_id.into(),
             previous_certificate_fingerprint: previous_fingerprint.map(ToOwned::to_owned),
+            serve_config: serve_config.clone(),
         }
     }
 
@@ -225,6 +231,11 @@ impl RemoteAcmeRenewalRequest {
     #[must_use]
     pub fn previous_certificate_fingerprint(&self) -> Option<&str> {
         self.previous_certificate_fingerprint.as_deref()
+    }
+
+    #[must_use]
+    pub const fn serve_config(&self) -> &RemoteDaemonServeConfig {
+        &self.serve_config
     }
 }
 
