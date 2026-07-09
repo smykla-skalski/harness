@@ -264,7 +264,7 @@ private struct TaskBoardCollapsedLane: View {
 
   var body: some View {
     Button(action: onExpand) {
-      VStack(spacing: metrics.laneSpacing) {
+      VStack(spacing: metrics.laneCollapsedContentTopPadding) {
         Text("\(count)")
           .font(countFont)
           .foregroundStyle(HarnessMonitorTheme.ink)
@@ -281,11 +281,12 @@ private struct TaskBoardCollapsedLane: View {
           .foregroundStyle(HarnessMonitorTheme.ink.opacity(0.82))
           .lineLimit(1)
           .minimumScaleFactor(0.72)
-          .fixedSize(horizontal: true, vertical: false)
+          .frame(width: metrics.laneCollapsedTitleHeight, alignment: .leading)
           .rotationEffect(.degrees(90))
           .frame(
             width: metrics.laneCollapsedTextWidth,
-            height: metrics.laneCollapsedTitleHeight
+            height: metrics.laneCollapsedTitleHeight,
+            alignment: .top
           )
 
         Spacer(minLength: 0)
@@ -295,6 +296,7 @@ private struct TaskBoardCollapsedLane: View {
       .contentShape(Rectangle())
     }
     .harnessPlainButtonStyle()
+    .taskBoardLaneToggleFeedback(lane: lane, cornerRadius: metrics.cardCornerRadius)
     .help("Expand \(lane.title) board")
     .accessibilityLabel("Expand \(lane.title) board")
     .accessibilityValue("\(count) items")

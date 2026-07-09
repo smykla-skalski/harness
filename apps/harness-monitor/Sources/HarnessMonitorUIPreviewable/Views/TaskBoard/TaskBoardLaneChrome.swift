@@ -22,12 +22,15 @@ struct TaskBoardLaneHeader: View {
   var body: some View {
     Button(action: onToggleCollapse) {
       headerContent
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     .harnessPlainButtonStyle()
     .padding(.horizontal, metrics.headerHorizontalPadding)
     .padding(.vertical, metrics.headerVerticalPadding)
     .padding(.bottom, metrics.headerBottomPadding)
+    .frame(maxWidth: .infinity, alignment: .leading)
     .contentShape(Rectangle())
+    .taskBoardLaneToggleFeedback(lane: lane, cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
     .overlay(alignment: .bottom) {
       Rectangle()
         .fill(HarnessMonitorTheme.controlBorder.opacity(0.24))
@@ -69,6 +72,53 @@ struct TaskBoardLaneHeader: View {
             .stroke(taskBoardLaneColor(for: lane).opacity(0.26), lineWidth: 1)
         }
     }
+  }
+}
+
+private struct TaskBoardLaneToggleFeedback: ViewModifier {
+  let lane: TaskBoardInboxLane
+  let cornerRadius: CGFloat
+  @State private var isHovered = false
+  @GestureState private var isPressed = false
+
+  func body(content: Content) -> some View {
+    content
+      .background {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .fill(taskBoardLaneColor(for: lane).opacity(backgroundOpacity))
+      }
+      .overlay {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .strokeBorder(taskBoardLaneColor(for: lane).opacity(strokeOpacity), lineWidth: 1)
+      }
+      .scaleEffect(isPressed ? 0.985 : 1)
+      .onHover { hovering in
+        isHovered = hovering
+      }
+      .simultaneousGesture(pressGesture)
+      .animation(.easeOut(duration: 0.12), value: isHovered)
+      .animation(.easeOut(duration: 0.08), value: isPressed)
+  }
+
+  private var pressGesture: some Gesture {
+    DragGesture(minimumDistance: 0)
+      .updating($isPressed) { _, state, _ in
+        state = true
+      }
+  }
+
+  private var backgroundOpacity: Double {
+    if isPressed {
+      return 0.18
+    }
+    return isHovered ? 0.11 : 0
+  }
+
+  private var strokeOpacity: Double {
+    if isPressed {
+      return 0.34
+    }
+    return isHovered ? 0.22 : 0
   }
 }
 
@@ -230,6 +280,13 @@ private struct TaskBoardLaneBodyChrome: ViewModifier {
 }
 
 extension View {
+  func taskBoardLaneToggleFeedback(
+    lane: TaskBoardInboxLane,
+    cornerRadius: CGFloat
+  ) -> some View {
+    modifier(TaskBoardLaneToggleFeedback(lane: lane, cornerRadius: cornerRadius))
+  }
+
   func taskBoardLaneColumnChrome(
     lane: TaskBoardInboxLane,
     isCollapsed: Bool = false,
