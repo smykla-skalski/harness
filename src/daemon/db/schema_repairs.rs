@@ -39,6 +39,7 @@ const CURRENT_SCHEMA_REMOTE_ACME_COLUMNS: &[(&str, &str)] = &[
     ("remote_acme_state", "acme_email"),
     ("remote_acme_state", "acme_challenge"),
     ("remote_acme_state", "acme_dns_provider"),
+    ("remote_acme_state", "account_credentials_json"),
 ];
 
 pub(super) fn current_schema_shape_needs_repair(
@@ -100,6 +101,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v26::run(&db.conn)?;
     super::schema_v27::run(&db.conn)?;
     super::schema_v28::run(&db.conn)?;
+    super::schema_v29::run(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

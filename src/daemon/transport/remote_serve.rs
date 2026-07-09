@@ -1,14 +1,18 @@
 use std::thread;
 
 use crate::daemon::db::DaemonDb;
-use crate::daemon::remote_acme::{RemoteAcmeRuntimePlan, build_remote_acme_runtime_plan};
+use crate::daemon::remote::RemoteDaemonServeConfig;
+use crate::daemon::remote_acme::{
+    RemoteAcmeRenewalIssuer, RemoteAcmeRuntimePlan, build_remote_acme_runtime_plan,
+};
+use crate::daemon::remote_acme_issuer::SystemRemoteAcmeIssuer;
 use crate::daemon::service::{self, DaemonServeConfig};
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 use tokio::runtime::{Handle, Runtime};
 
 use super::control::adopt_daemon_root_for_transport_command;
-use super::remote::{DaemonRemoteServeArgs, open_remote_daemon_db};
+use super::remote::{DaemonRemoteAcmeCommand, DaemonRemoteServeArgs, open_remote_daemon_db};
 
 #[derive(Clone)]
 pub(crate) struct RemoteDaemonServeExecutionPlan {
@@ -29,9 +33,44 @@ where
     OpenDb: FnOnce() -> Result<DaemonDb, CliError>,
     Run: FnOnce(RemoteDaemonServeExecutionPlan) -> Result<i32, CliError>,
 {
+    let now = utc_now();
+    execute_remote_serve_with_issuer(
+        args,
+        open_db,
+        run_plan,
+        &SystemRemoteAcmeIssuer,
+        now.as_str(),
+    )
+}
+
+pub(crate) fn execute_remote_serve_with_issuer<OpenDb, Run, Issuer>(
+    args: &DaemonRemoteServeArgs,
+    open_db: OpenDb,
+    run_plan: Run,
+    issuer: &Issuer,
+    now: &str,
+) -> Result<i32, CliError>
+where
+    OpenDb: FnOnce() -> Result<DaemonDb, CliError>,
+    Run: FnOnce(RemoteDaemonServeExecutionPlan) -> Result<i32, CliError>,
+    Issuer: RemoteAcmeRenewalIssuer,
+{
     adopt_daemon_root_for_transport_command("daemon-remote-serve");
     let db = open_db()?;
-    let plan = build_remote_serve_execution_plan(args, &db)?;
+    let remote_config = args.contract_config()?;
+    let certificate_domain_matches = db
+        .load_remote_acme_state()?
+        .serve_config
+        .as_ref()
+        .is_some_and(|stored| {
+            stored
+                .domain
+                .trim()
+                .eq_ignore_ascii_case(remote_config.domain.trim())
+        });
+    db.record_remote_acme_serve_config(&remote_config, now)?;
+    ensure_remote_acme_for_serve(&db, issuer, now, certificate_domain_matches)?;
+    let plan = build_remote_serve_execution_plan_from_config(args, &db, &remote_config)?;
     run_plan(plan)
 }
 
@@ -41,20 +80,49 @@ where
 /// # Errors
 /// Returns [`CliError`] when remote config is invalid or persisted ACME TLS
 /// state is incomplete.
+#[cfg(test)]
 pub(crate) fn build_remote_serve_execution_plan(
     args: &DaemonRemoteServeArgs,
     db: &DaemonDb,
 ) -> Result<RemoteDaemonServeExecutionPlan, CliError> {
     let remote_config = args.contract_config()?;
     db.record_remote_acme_serve_config(&remote_config, utc_now().as_str())?;
+    build_remote_serve_execution_plan_from_config(args, db, &remote_config)
+}
+
+fn build_remote_serve_execution_plan_from_config(
+    args: &DaemonRemoteServeArgs,
+    db: &DaemonDb,
+    remote_config: &RemoteDaemonServeConfig,
+) -> Result<RemoteDaemonServeExecutionPlan, CliError> {
     let acme_state = db.load_remote_acme_runtime_state()?;
-    let acme_plan = build_remote_acme_runtime_plan(&remote_config, &acme_state)
+    let acme_plan = build_remote_acme_runtime_plan(remote_config, &acme_state)
         .map_err(|error| CliError::from(CliErrorKind::workflow_parse(error.to_string())))?;
     let service_config = args.remote_auth_scaffold_config()?;
     Ok(RemoteDaemonServeExecutionPlan {
         service_config,
         acme_plan,
     })
+}
+
+fn ensure_remote_acme_for_serve<I>(
+    db: &DaemonDb,
+    issuer: &I,
+    now: &str,
+    certificate_domain_matches: bool,
+) -> Result<(), CliError>
+where
+    I: RemoteAcmeRenewalIssuer,
+{
+    let state = db.load_remote_acme_state()?;
+    let issuance = db.load_remote_acme_issuance_state()?;
+    if state.certificate_configured && issuance.account.is_some() && certificate_domain_matches {
+        return Ok(());
+    }
+    let audit_event_id = format!("remote-acme-initial-{}", uuid::Uuid::new_v4());
+    DaemonRemoteAcmeCommand::Renew
+        .renew_with_issuer(db, &audit_event_id, now, issuer)?
+        .ensure_success()
 }
 
 fn run_remote_serve_plan(plan: RemoteDaemonServeExecutionPlan) -> Result<i32, CliError> {

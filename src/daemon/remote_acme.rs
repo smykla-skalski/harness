@@ -204,7 +204,7 @@ impl AcmeHttp01ChallengeStore {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemoteAcmeRenewalRequest {
-    account_id: String,
+    account: RemoteAcmeAccountCredentials,
     previous_certificate_fingerprint: Option<String>,
     serve_config: RemoteDaemonServeConfig,
 }
@@ -212,12 +212,12 @@ pub struct RemoteAcmeRenewalRequest {
 impl RemoteAcmeRenewalRequest {
     #[must_use]
     pub fn new(
-        account_id: impl Into<String>,
+        account: &RemoteAcmeAccountCredentials,
         previous_fingerprint: Option<&str>,
         serve_config: &RemoteDaemonServeConfig,
     ) -> Self {
         Self {
-            account_id: account_id.into(),
+            account: account.clone(),
             previous_certificate_fingerprint: previous_fingerprint.map(ToOwned::to_owned),
             serve_config: serve_config.clone(),
         }
@@ -225,7 +225,17 @@ impl RemoteAcmeRenewalRequest {
 
     #[must_use]
     pub fn account_id(&self) -> &str {
-        &self.account_id
+        self.account.account_id()
+    }
+
+    #[must_use]
+    pub fn account_credentials(&self) -> &str {
+        self.account.serialized()
+    }
+
+    #[must_use]
+    pub(crate) const fn account(&self) -> &RemoteAcmeAccountCredentials {
+        &self.account
     }
 
     #[must_use]
@@ -240,10 +250,14 @@ impl RemoteAcmeRenewalRequest {
 }
 
 pub trait RemoteAcmeRenewalIssuer {
-    #[must_use]
-    fn supports_initial_certificate(&self) -> bool {
-        false
-    }
+    /// Create a durable ACME account for the configured certificate authority.
+    ///
+    /// # Errors
+    /// Returns a redaction-ready operator detail when account creation fails.
+    fn create_account(
+        &self,
+        config: &RemoteDaemonServeConfig,
+    ) -> Result<RemoteAcmeAccountCredentials, String>;
 
     /// Issue or renew the remote daemon certificate for the supplied account.
     ///
@@ -254,6 +268,114 @@ pub trait RemoteAcmeRenewalIssuer {
         &self,
         request: &RemoteAcmeRenewalRequest,
     ) -> Result<RemoteCertificateBundle, String>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RemoteAcmeAccountCredentialsError {
+    MissingAccountId,
+    MissingSerializedCredentials,
+    InvalidSerializedCredentials(String),
+    AccountIdMismatch,
+}
+
+impl fmt::Display for RemoteAcmeAccountCredentialsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingAccountId => write!(f, "remote ACME account id is required"),
+            Self::MissingSerializedCredentials => {
+                write!(f, "remote ACME serialized account credentials are required")
+            }
+            Self::InvalidSerializedCredentials(error) => {
+                write!(
+                    f,
+                    "remote ACME serialized account credentials are invalid: {error}"
+                )
+            }
+            Self::AccountIdMismatch => {
+                write!(
+                    f,
+                    "remote ACME account id does not match serialized credentials"
+                )
+            }
+        }
+    }
+}
+
+impl Error for RemoteAcmeAccountCredentialsError {}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct RemoteAcmeAccountCredentials {
+    account_id: String,
+    serialized: String,
+}
+
+impl fmt::Debug for RemoteAcmeAccountCredentials {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RemoteAcmeAccountCredentials")
+            .field("account_id", &self.account_id)
+            .field("serialized", &"<redacted>")
+            .finish()
+    }
+}
+
+impl RemoteAcmeAccountCredentials {
+    /// Build validated serialized ACME account credentials.
+    ///
+    /// # Errors
+    /// Returns [`RemoteAcmeAccountCredentialsError`] when either field is
+    /// blank, the serialized value is not a JSON object, or its account id
+    /// differs from the projected id.
+    pub fn new(
+        account_id: &str,
+        serialized: &str,
+    ) -> Result<Self, RemoteAcmeAccountCredentialsError> {
+        let account_id = account_id.trim();
+        if account_id.is_empty() {
+            return Err(RemoteAcmeAccountCredentialsError::MissingAccountId);
+        }
+        let serialized = serialized.trim();
+        if serialized.is_empty() {
+            return Err(RemoteAcmeAccountCredentialsError::MissingSerializedCredentials);
+        }
+        let value = serde_json::from_str::<serde_json::Value>(serialized).map_err(|error| {
+            RemoteAcmeAccountCredentialsError::InvalidSerializedCredentials(error.to_string())
+        })?;
+        let object = value.as_object().ok_or_else(|| {
+            RemoteAcmeAccountCredentialsError::InvalidSerializedCredentials(
+                "expected a JSON object".to_string(),
+            )
+        })?;
+        if object.get("id").and_then(serde_json::Value::as_str) != Some(account_id) {
+            return Err(RemoteAcmeAccountCredentialsError::AccountIdMismatch);
+        }
+        Ok(Self {
+            account_id: account_id.to_string(),
+            serialized: serialized.to_string(),
+        })
+    }
+
+    #[must_use]
+    pub fn account_id(&self) -> &str {
+        &self.account_id
+    }
+
+    #[must_use]
+    pub fn serialized(&self) -> &str {
+        &self.serialized
+    }
+}
+
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct RemoteAcmeIssuanceState {
+    pub(crate) account: Option<RemoteAcmeAccountCredentials>,
+}
+
+impl fmt::Debug for RemoteAcmeIssuanceState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RemoteAcmeIssuanceState")
+            .field("account_configured", &self.account.is_some())
+            .finish()
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
