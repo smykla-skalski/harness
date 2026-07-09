@@ -2,18 +2,12 @@ use rusqlite::Connection;
 
 use super::{CliError, db_error};
 
-const REMOTE_ACME_CONFIG_COLUMNS: &[(&str, &str)] = &[
-    ("domain", "TEXT"),
-    ("host", "TEXT"),
-    ("https_port", "INTEGER"),
-    ("http_port", "INTEGER"),
-    ("acme_email", "TEXT"),
-    ("acme_challenge", "TEXT"),
-    ("acme_dns_provider", "TEXT"),
-];
+const REMOTE_ACME_CONFIG_DDL: &str =
+    include_str!("migrations/0022_daemon_v28_remote_acme_config.sql");
+const ADD_REMOTE_ACME_COLUMN_PREFIX: &str = "ALTER TABLE remote_acme_state ADD COLUMN ";
 
 pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
-    for (column, definition) in REMOTE_ACME_CONFIG_COLUMNS {
+    for (column, definition) in remote_acme_config_columns()? {
         if remote_acme_state_column_exists(conn, column)? {
             continue;
         }
@@ -29,6 +23,27 @@ pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
     )
     .map(|_| ())
     .map_err(|error| db_error(format!("stamp schema v28: {error}")))
+}
+
+fn remote_acme_config_columns() -> Result<Vec<(&'static str, &'static str)>, CliError> {
+    let columns = REMOTE_ACME_CONFIG_DDL
+        .lines()
+        .filter_map(remote_acme_config_column_from_ddl_line)
+        .collect::<Vec<_>>();
+    if columns.is_empty() {
+        return Err(db_error("remote acme v28 migration has no column DDL"));
+    }
+    Ok(columns)
+}
+
+fn remote_acme_config_column_from_ddl_line(
+    line: &'static str,
+) -> Option<(&'static str, &'static str)> {
+    let statement = line
+        .trim()
+        .strip_prefix(ADD_REMOTE_ACME_COLUMN_PREFIX)?
+        .strip_suffix(';')?;
+    statement.split_once(' ')
 }
 
 fn remote_acme_state_column_exists(conn: &Connection, column: &str) -> Result<bool, CliError> {

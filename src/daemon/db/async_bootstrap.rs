@@ -86,6 +86,8 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         16 => Some(("policy_workspace", "global_policy_enforcement_enabled")),
         19 => Some(("policy_workspace", "scenarios_json")),
         20 => Some(("policy_canvases", "live_document_json")),
+        21 => Some(("remote_clients", "client_id")),
+        22 => Some(("remote_acme_state", "domain")),
         _ => None,
     }
 }
@@ -114,6 +116,8 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         18 => 24,
         19 => 25,
         20 => 26,
+        21 => 27,
+        22 => 28,
         _ => u64::MAX,
     }
 }
