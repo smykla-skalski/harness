@@ -68,11 +68,24 @@ pub enum Dns01ProviderExecutionError {
     ProviderChange(Dns01ProviderChangeError),
     ExecHook(Dns01ExecHookError),
     RunnerFailed(String),
+    IssueFailed(String),
+    IssueAndCleanupFailed { issue: String, cleanup: String },
 }
 
 impl Dns01ProviderExecutionError {
     fn runner_failed(detail: &str) -> Self {
         Self::RunnerFailed(redact_secret_detail(detail))
+    }
+
+    fn issue_failed(detail: &str) -> Self {
+        Self::IssueFailed(redact_secret_detail(detail))
+    }
+
+    fn issue_and_cleanup_failed(issue: &str, cleanup: &str) -> Self {
+        Self::IssueAndCleanupFailed {
+            issue: redact_secret_detail(issue),
+            cleanup: redact_secret_detail(cleanup),
+        }
     }
 }
 
@@ -88,6 +101,13 @@ impl fmt::Display for Dns01ProviderExecutionError {
             Self::ProviderChange(error) => write!(f, "{error}"),
             Self::ExecHook(error) => write!(f, "{error}"),
             Self::RunnerFailed(detail) => write!(f, "DNS-01 provider change failed: {detail}"),
+            Self::IssueFailed(detail) => write!(f, "DNS-01 challenge issue failed: {detail}"),
+            Self::IssueAndCleanupFailed { issue, cleanup } => {
+                write!(
+                    f,
+                    "DNS-01 challenge issue failed: {issue}; cleanup also failed: {cleanup}"
+                )
+            }
         }
     }
 }
@@ -97,7 +117,10 @@ impl Error for Dns01ProviderExecutionError {
         match self {
             Self::ProviderChange(error) => Some(error),
             Self::ExecHook(error) => Some(error),
-            Self::WrongProviderConfig(_) | Self::RunnerFailed(_) => None,
+            Self::WrongProviderConfig(_)
+            | Self::RunnerFailed(_)
+            | Self::IssueFailed(_)
+            | Self::IssueAndCleanupFailed { .. } => None,
         }
     }
 }
@@ -248,6 +271,43 @@ impl Dns01ProviderAction {
                     |invocation| runner.run_exec_hook(invocation),
                 )
                 .map_err(Dns01ProviderExecutionError::from)
+            }
+        }
+    }
+
+    /// Run a complete DNS-01 provider challenge lifecycle.
+    ///
+    /// The provider TXT record is presented first, the supplied issuance step is
+    /// executed second, and cleanup is attempted even when issuance fails.
+    ///
+    /// # Errors
+    /// Returns [`Dns01ProviderExecutionError`] when present fails, the issuance
+    /// step fails, cleanup fails, or both issuance and cleanup fail.
+    pub fn run_challenge_with<Runner, Issue>(
+        &self,
+        config: &Dns01ProviderExecutionConfig,
+        runner: &mut Runner,
+        issue: Issue,
+    ) -> Result<(), Dns01ProviderExecutionError>
+    where
+        Runner: Dns01ProviderChangeRunner,
+        Issue: FnOnce(&mut Runner) -> Result<(), String>,
+    {
+        self.run_change_with(config, Dns01ChangeOperation::Present, runner)?;
+        let issue_result = issue(runner);
+        let cleanup_result = self.run_change_with(config, Dns01ChangeOperation::Cleanup, runner);
+
+        match (issue_result, cleanup_result) {
+            (Ok(()), Ok(())) => Ok(()),
+            (Err(issue_detail), Ok(())) => {
+                Err(Dns01ProviderExecutionError::issue_failed(&issue_detail))
+            }
+            (Ok(()), Err(cleanup_error)) => Err(cleanup_error),
+            (Err(issue_detail), Err(cleanup_error)) => {
+                Err(Dns01ProviderExecutionError::issue_and_cleanup_failed(
+                    &issue_detail,
+                    &cleanup_error.to_string(),
+                ))
             }
         }
     }

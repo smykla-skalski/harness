@@ -94,6 +94,72 @@ fn remote_dns01_provider_runner_rejects_wrong_config_and_redacts_runner_errors()
     assert!(!failure.to_string().contains("super-secret"));
 }
 
+#[test]
+fn remote_dns01_provider_runner_runs_present_issue_cleanup_in_order() {
+    let mut runner = RecordingDns01Runner::default();
+    let action = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Cloudflare,
+        "_acme-challenge.daemon.example.com",
+        "cloudflare-digest",
+    );
+
+    action
+        .run_challenge_with(
+            &Dns01ProviderExecutionConfig::cloudflare("zone-123"),
+            &mut runner,
+            |runner| {
+                runner.record_issue();
+                Ok(())
+            },
+        )
+        .expect("challenge lifecycle");
+
+    assert_eq!(
+        runner.events,
+        vec![
+            "cloudflare:present:zone-123:_acme-challenge.daemon.example.com:cloudflare-digest"
+                .to_string(),
+            "issue".to_string(),
+            "cloudflare:cleanup:zone-123:_acme-challenge.daemon.example.com:cloudflare-digest"
+                .to_string(),
+        ]
+    );
+}
+
+#[test]
+fn remote_dns01_provider_runner_cleans_up_after_issue_failure() {
+    let mut runner = RecordingDns01Runner::default();
+    let action = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Route53,
+        "_acme-challenge.daemon.example.com",
+        "route53-digest",
+    );
+
+    let error = action
+        .run_challenge_with(
+            &Dns01ProviderExecutionConfig::route53("Z123456"),
+            &mut runner,
+            |runner| {
+                runner.record_issue();
+                Err("issuer token=super-secret failed".to_string())
+            },
+        )
+        .expect_err("issuer failure should surface");
+
+    assert!(error.to_string().contains("issuer"));
+    assert!(!error.to_string().contains("super-secret"));
+    assert_eq!(
+        runner.events,
+        vec![
+            "route53:UPSERT:Z123456:_acme-challenge.daemon.example.com.:\"route53-digest\""
+                .to_string(),
+            "issue".to_string(),
+            "route53:DELETE:Z123456:_acme-challenge.daemon.example.com.:\"route53-digest\""
+                .to_string(),
+        ]
+    );
+}
+
 #[derive(Default)]
 struct RecordingDns01Runner {
     events: Vec<String>,
@@ -140,6 +206,10 @@ impl Dns01ProviderChangeRunner for RecordingDns01Runner {
 }
 
 impl RecordingDns01Runner {
+    fn record_issue(&mut self) {
+        self.events.push("issue".to_string());
+    }
+
     fn maybe_fail(&self) -> Result<(), String> {
         match &self.fail_detail {
             Some(detail) => Err(detail.clone()),
