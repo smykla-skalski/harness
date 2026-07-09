@@ -127,6 +127,8 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     )
 
     XCTAssertTrue(dashboardFooterSource.contains(".contextMenu {"))
+    XCTAssertTrue(dashboardFooterSource.contains("Button(\"Copy Name\")"))
+    XCTAssertTrue(dashboardFooterSource.contains("HarnessMonitorClipboard.copy(canvas.title)"))
     XCTAssertTrue(dashboardFooterSource.contains("duplicateCanvasFromTab(canvas)"))
     XCTAssertTrue(dashboardFooterSource.contains("renameCanvasFromTab(canvas)"))
     XCTAssertTrue(dashboardFooterSource.contains("deleteCanvasFromTab(canvas)"))

@@ -78,6 +78,12 @@ struct DashboardPolicyCanvasFooterBar: View {
                 cancelRename: cancelRenameCanvasFromTab
               )
               .contextMenu {
+                Button("Copy Name") {
+                  HarnessMonitorClipboard.copy(canvas.title)
+                }
+
+                Divider()
+
                 Button("Duplicate") {
                   duplicateCanvasFromTab(canvas)
                 }
