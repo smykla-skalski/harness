@@ -9,6 +9,9 @@ use super::remote::{
     RemoteAcmeChallenge, RemoteDaemonConfigError, RemoteDaemonServeConfig, RemoteDnsProvider,
     validate_remote_serve_config,
 };
+pub use super::remote_acme_dns::{
+    Dns01ExecHookError, Dns01ExecHookInvocation, Dns01ExecHookOperation,
+};
 
 #[cfg(test)]
 #[path = "remote_acme_tests.rs"]
@@ -233,6 +236,35 @@ impl Dns01ProviderAction {
                 )
             }
         }
+    }
+
+    /// Run the generic DNS-01 exec hook for this provider action.
+    ///
+    /// # Errors
+    /// Returns [`Dns01ExecHookError`] when this action is not for the exec
+    /// provider, the hook program is blank, or the injected runner fails.
+    pub fn run_exec_hook_with<Run>(
+        &self,
+        hook_program: &str,
+        operation: Dns01ExecHookOperation,
+        runner: Run,
+    ) -> Result<(), Dns01ExecHookError>
+    where
+        Run: FnOnce(&Dns01ExecHookInvocation) -> Result<(), String>,
+    {
+        if self.provider != RemoteDnsProvider::Exec {
+            return Err(Dns01ExecHookError::WrongProvider);
+        }
+        let program = hook_program.trim();
+        if program.is_empty() {
+            return Err(Dns01ExecHookError::MissingCommand);
+        }
+        let invocation = Dns01ExecHookInvocation::new(
+            program,
+            [operation.as_str(), self.fqdn.as_str(), self.digest.as_str()],
+        );
+        runner(&invocation)
+            .map_err(|detail| Dns01ExecHookError::runner_failed(redact_secret_detail(&detail)))
     }
 }
 
