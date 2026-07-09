@@ -189,6 +189,9 @@ impl RemoteSystemdInstallPlan {
         let serve_config = args.serve.contract_config()?;
         validate_systemd_directive_path("binary", &binary_path)?;
         validate_systemd_directive_path("environment", &env_path)?;
+        validate_systemd_exec_value("domain", &serve_config.domain)?;
+        validate_systemd_exec_value("host", &serve_config.host)?;
+        validate_systemd_exec_value("acme email", &serve_config.acme_email)?;
         let needs_bind_capability = serve_config.https_port < 1024 || serve_config.http_port < 1024;
         let unit_contents = render_unit(
             unit,
@@ -348,6 +351,7 @@ fn remote_serve_command(binary_path: &Path, config: &RemoteDaemonServeConfig) ->
 }
 
 fn validate_systemd_directive_path(label: &str, path: &Path) -> Result<(), CliError> {
+    let rendered = path.as_os_str().to_string_lossy();
     if !path.is_absolute() {
         return Err(CliErrorKind::workflow_parse(format!(
             "systemd {label} path must be absolute: {}",
@@ -355,15 +359,27 @@ fn validate_systemd_directive_path(label: &str, path: &Path) -> Result<(), CliEr
         ))
         .into());
     }
-    if path
-        .as_os_str()
-        .to_string_lossy()
-        .chars()
-        .any(char::is_whitespace)
-    {
+    if rendered.chars().any(char::is_whitespace) {
         return Err(CliErrorKind::workflow_parse(format!(
             "systemd {label} path contains whitespace: {}",
             path.display()
+        ))
+        .into());
+    }
+    if rendered.contains('%') {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "systemd {label} path cannot contain '%': {}",
+            path.display()
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+fn validate_systemd_exec_value(label: &str, value: &str) -> Result<(), CliError> {
+    if value.chars().any(char::is_control) {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "systemd {label} contains control characters"
         ))
         .into());
     }

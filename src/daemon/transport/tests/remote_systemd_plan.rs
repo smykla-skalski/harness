@@ -108,6 +108,67 @@ fn remote_systemd_plan_rejects_relative_env_path() {
 }
 
 #[test]
+fn remote_systemd_plan_rejects_control_characters_in_remote_values() {
+    assert_control_character_rejected(
+        install_args([
+            "test",
+            "--domain",
+            "daemon\nexample.com",
+            "--acme-email",
+            "ops@example.com",
+        ]),
+        "systemd domain contains control characters",
+    );
+    assert_control_character_rejected(
+        install_args([
+            "test",
+            "--domain",
+            "daemon.example.com",
+            "--host",
+            "0.0.\r0.0",
+            "--acme-email",
+            "ops@example.com",
+        ]),
+        "systemd host contains control characters",
+    );
+    assert_control_character_rejected(
+        install_args([
+            "test",
+            "--domain",
+            "daemon.example.com",
+            "--acme-email",
+            "ops\nteam@example.com",
+        ]),
+        "systemd acme email contains control characters",
+    );
+}
+
+#[test]
+fn remote_systemd_plan_rejects_percent_in_env_path() {
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+    ]);
+
+    let error = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/remote%daemon.env"),
+    )
+    .expect_err("reject percent in environment path");
+
+    assert!(
+        error
+            .to_string()
+            .contains("systemd environment path cannot contain '%'")
+    );
+}
+
+#[test]
 fn remote_systemd_execstart_uses_systemd_double_quotes() {
     let args = install_args([
         "test",
@@ -147,4 +208,19 @@ fn install_args<const N: usize>(args: [&str; N]) -> DaemonRemoteSystemdInstallAr
     Harness::try_parse_from(args)
         .expect("parse install args")
         .args
+}
+
+fn assert_control_character_rejected(args: DaemonRemoteSystemdInstallArgs, expected: &str) {
+    let error = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+    )
+    .expect_err("reject control characters");
+
+    assert!(
+        error.to_string().contains(expected),
+        "{expected}: {error}"
+    );
 }
