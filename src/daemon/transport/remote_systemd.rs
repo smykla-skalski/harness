@@ -187,6 +187,8 @@ impl RemoteSystemdInstallPlan {
         let unit = normalize_unit_name(&args.systemd.unit);
         validate_unit_name(unit)?;
         let serve_config = args.serve.contract_config()?;
+        validate_systemd_directive_path("binary", &binary_path)?;
+        validate_systemd_directive_path("environment", &env_path)?;
         let needs_bind_capability = serve_config.https_port < 1024 || serve_config.http_port < 1024;
         let unit_contents = render_unit(
             unit,
@@ -299,6 +301,7 @@ fn render_unit(
          Restart=on-failure\n\
          RestartSec=5s\n\
          NoNewPrivileges=true\n\
+         DynamicUser=yes\n\
          PrivateTmp=true\n\
          ProtectSystem=strict\n\
          ProtectHome=true\n\
@@ -342,6 +345,22 @@ fn remote_serve_command(binary_path: &Path, config: &RemoteDaemonServeConfig) ->
         command.push(provider.as_str().to_string());
     }
     command
+}
+
+fn validate_systemd_directive_path(label: &str, path: &Path) -> Result<(), CliError> {
+    if path
+        .as_os_str()
+        .to_string_lossy()
+        .chars()
+        .any(char::is_whitespace)
+    {
+        return Err(CliErrorKind::workflow_parse(format!(
+            "systemd {label} path contains whitespace: {}",
+            path.display()
+        ))
+        .into());
+    }
+    Ok(())
 }
 
 fn render_env_file(unit: &str) -> String {

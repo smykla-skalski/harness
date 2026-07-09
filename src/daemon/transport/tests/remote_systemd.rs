@@ -136,6 +136,7 @@ fn remote_systemd_unit_is_hardened_and_runs_remote_serve() {
             .contains("Environment=HARNESS_DAEMON_OWNERSHIP=external")
     );
     assert!(plan.unit_contents.contains("NoNewPrivileges=true"));
+    assert!(plan.unit_contents.contains("DynamicUser=yes"));
     assert!(plan.unit_contents.contains("PrivateTmp=true"));
     assert!(plan.unit_contents.contains("ProtectSystem=strict"));
     assert!(plan.unit_contents.contains("ProtectHome=true"));
@@ -218,6 +219,56 @@ fn remote_systemd_high_ports_omit_bind_capability() {
         !plan
             .unit_contents
             .contains("CapabilityBoundingSet=CAP_NET_BIND_SERVICE")
+    );
+}
+
+#[test]
+fn remote_systemd_rejects_binary_path_with_whitespace() {
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+    ]);
+
+    let error = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness remote"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+    )
+    .expect_err("reject whitespace in binary path");
+
+    assert!(
+        error
+            .to_string()
+            .contains("systemd binary path contains whitespace")
+    );
+}
+
+#[test]
+fn remote_systemd_rejects_env_path_with_whitespace() {
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+    ]);
+
+    let error = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/remote daemon.env"),
+    )
+    .expect_err("reject whitespace in environment path");
+
+    assert!(
+        error
+            .to_string()
+            .contains("systemd environment path contains whitespace")
     );
 }
 
