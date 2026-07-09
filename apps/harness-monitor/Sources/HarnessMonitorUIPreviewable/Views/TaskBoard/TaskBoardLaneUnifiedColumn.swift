@@ -305,6 +305,5 @@ private struct TaskBoardCollapsedLane: View {
         height: metrics.laneCollapsedTitleHeight,
         alignment: .top
       )
-      .clipped()
   }
 }
