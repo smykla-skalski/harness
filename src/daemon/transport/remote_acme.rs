@@ -4,6 +4,9 @@ use uuid::Uuid;
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::db::{DaemonDb, RemoteAcmeStoredState};
 use crate::daemon::remote::RemoteAccessScope;
+use crate::daemon::remote_acme::{
+    RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest, RemoteCertificateBundle,
+};
 use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision,
 };
@@ -70,19 +73,36 @@ impl DaemonRemoteAcmeCommand {
         audit_event_id: &str,
         now: &str,
     ) -> Result<DaemonRemoteAcmeRenewResponse, CliError> {
+        self.renew_with_issuer(db, audit_event_id, now, &RemoteAcmeUnavailableIssuer)
+    }
+
+    /// Renew the remote certificate through the supplied issuer and persist the
+    /// token-safe result for status/serve consumers.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when database reads/writes or audit writes fail.
+    pub(crate) fn renew_with_issuer<I>(
+        &self,
+        db: &DaemonDb,
+        audit_event_id: &str,
+        now: &str,
+        issuer: &I,
+    ) -> Result<DaemonRemoteAcmeRenewResponse, CliError>
+    where
+        I: RemoteAcmeRenewalIssuer,
+    {
         let Self::Renew = self else {
             return Err(CliErrorKind::workflow_parse("remote acme command must be renew").into());
         };
         let state = db.load_remote_acme_state()?;
-        let detail = renewal_failure_detail(&state);
-        db.record_remote_acme_renewal_failure(detail, now)?;
+        let outcome = renew_remote_acme_certificate(db, &state, issuer, now)?;
         let state = db.load_remote_acme_state()?;
         record_remote_acme_audit(
             db,
             audit_event_id,
             now,
             "remote.acme.renew",
-            RemoteAuditOutcome::Failure,
+            outcome,
             state.renewal_error.as_deref(),
         )?;
         Ok(DaemonRemoteAcmeRenewResponse::from_state(&state))
@@ -167,6 +187,44 @@ fn renewal_failure_detail(state: &RemoteAcmeStoredState) -> &'static str {
         "remote daemon requires a persisted TLS certificate"
     } else {
         "remote ACME renewal client is not implemented"
+    }
+}
+
+fn renew_remote_acme_certificate<I>(
+    db: &DaemonDb,
+    state: &RemoteAcmeStoredState,
+    issuer: &I,
+    now: &str,
+) -> Result<RemoteAuditOutcome, CliError>
+where
+    I: RemoteAcmeRenewalIssuer,
+{
+    let Some(account_id) = state.account_id.as_deref() else {
+        db.record_remote_acme_renewal_failure(renewal_failure_detail(state), now)?;
+        return Ok(RemoteAuditOutcome::Failure);
+    };
+    let request =
+        RemoteAcmeRenewalRequest::new(account_id, state.certificate_fingerprint.as_deref());
+    match issuer.renew_certificate(&request) {
+        Ok(bundle) => {
+            db.record_remote_acme_renewal_success(&bundle, now)?;
+            Ok(RemoteAuditOutcome::Success)
+        }
+        Err(detail) => {
+            db.record_remote_acme_renewal_failure(&detail, now)?;
+            Ok(RemoteAuditOutcome::Failure)
+        }
+    }
+}
+
+struct RemoteAcmeUnavailableIssuer;
+
+impl RemoteAcmeRenewalIssuer for RemoteAcmeUnavailableIssuer {
+    fn renew_certificate(
+        &self,
+        _request: &RemoteAcmeRenewalRequest,
+    ) -> Result<RemoteCertificateBundle, String> {
+        Err("remote ACME renewal client is not implemented".to_string())
     }
 }
 

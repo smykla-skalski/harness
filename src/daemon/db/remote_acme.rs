@@ -115,6 +115,41 @@ impl DaemonDb {
             .map_err(|error| db_error(format!("record remote acme renewal failure: {error}")))?;
         Ok(())
     }
+
+    /// Persist a successful ACME renewal certificate bundle.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failure or if the singleton state row is
+    /// unexpectedly missing.
+    pub(crate) fn record_remote_acme_renewal_success(
+        &self,
+        bundle: &RemoteCertificateBundle,
+        updated_at: &str,
+    ) -> Result<(), CliError> {
+        let changed = self
+            .conn
+            .execute(
+                "UPDATE remote_acme_state
+                 SET certificate_pem = ?1,
+                     private_key_pem = ?2,
+                     certificate_fingerprint = ?3,
+                     renewal_status = 'succeeded',
+                     renewal_error = NULL,
+                     updated_at = ?4
+                 WHERE singleton = 1",
+                params![
+                    bundle.certificate_pem(),
+                    bundle.private_key_pem(),
+                    bundle.fingerprint(),
+                    updated_at,
+                ],
+            )
+            .map_err(|error| db_error(format!("record remote acme renewal success: {error}")))?;
+        if changed == 0 {
+            return Err(db_error("remote acme singleton state row is missing"));
+        }
+        Ok(())
+    }
 }
 
 fn remote_acme_state_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteAcmeStoredState> {

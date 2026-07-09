@@ -1,6 +1,6 @@
 use super::*;
 use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig};
-use crate::daemon::remote_acme::build_remote_acme_runtime_plan;
+use crate::daemon::remote_acme::{RemoteCertificateBundle, build_remote_acme_runtime_plan};
 
 #[test]
 fn remote_acme_state_status_hides_private_key_and_tracks_material() {
@@ -106,6 +106,48 @@ fn remote_acme_renewal_failure_persists_redacted_report() {
         Some("renewal failed: dns token=<redacted>&retry=1 secret=<redacted>")
     );
     assert_eq!(state.updated_at, "2026-06-21T15:01:00Z");
+}
+
+#[test]
+fn remote_acme_renewal_success_persists_certificate_and_clears_error() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    db.conn
+        .execute(
+            "UPDATE remote_acme_state
+             SET account_id = 'acct-1',
+                 certificate_pem = 'old-cert',
+                 private_key_pem = 'old-key',
+                 certificate_fingerprint = 'old-fp',
+                 renewal_status = 'failed',
+                 renewal_error = 'renewal failed: old error',
+                 updated_at = '2026-06-21T15:00:00Z'
+             WHERE singleton = 1",
+            [],
+        )
+        .expect("seed failed acme state");
+    let bundle = RemoteCertificateBundle::new_for_tests("new-cert-pem", "new-key-secret");
+
+    db.record_remote_acme_renewal_success(&bundle, "2026-06-21T15:02:00Z")
+        .expect("record renewal success");
+
+    let state = db.load_remote_acme_state().expect("load acme state");
+    assert_eq!(state.renewal_status.as_str(), "succeeded");
+    assert_eq!(state.renewal_error, None);
+    assert_eq!(
+        state.certificate_fingerprint.as_deref(),
+        Some(bundle.fingerprint())
+    );
+    assert_eq!(state.updated_at, "2026-06-21T15:02:00Z");
+
+    let runtime_state = db
+        .load_remote_acme_runtime_state()
+        .expect("load acme runtime state");
+    let runtime_plan = build_remote_acme_runtime_plan(&remote_serve_config(), &runtime_state)
+        .expect("renewed certificate should be usable for remote serve");
+    assert_eq!(
+        runtime_plan.certificate().fingerprint(),
+        bundle.fingerprint()
+    );
 }
 
 fn remote_serve_config() -> RemoteDaemonServeConfig {
