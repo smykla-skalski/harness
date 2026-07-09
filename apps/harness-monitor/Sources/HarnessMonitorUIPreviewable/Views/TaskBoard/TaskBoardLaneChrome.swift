@@ -160,6 +160,7 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
         TaskBoardLaneAccentCap(
           color: laneAccentColor,
           interiorStyle: laneAccentInteriorStyle,
+          punchesInteriorThrough: isCollapsed,
           metrics: metrics
         )
       }
@@ -212,21 +213,47 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
 private struct TaskBoardLaneAccentCap: View {
   let color: Color
   let interiorStyle: AnyShapeStyle
+  let punchesInteriorThrough: Bool
   let metrics: TaskBoardLaneMetrics
 
   var body: some View {
     ZStack(alignment: .top) {
-      TaskBoardLaneTopRoundedShape(cornerRadius: metrics.laneAccentCornerRadius)
-        .fill(color)
-      TaskBoardLaneTopRoundedShape(cornerRadius: metrics.laneAccentInteriorCornerRadius)
-        .fill(interiorStyle)
-        .frame(height: metrics.laneAccentHeight)
-        .offset(y: metrics.laneAccentVisibleHeight)
+      if punchesInteriorThrough {
+        TaskBoardLanePunchedAccentShape(
+          cornerRadius: metrics.laneAccentCornerRadius,
+          interiorCornerRadius: metrics.laneAccentInteriorCornerRadius,
+          interiorOffset: metrics.laneAccentVisibleHeight
+        )
+        .fill(color, style: FillStyle(eoFill: true))
+      } else {
+        TaskBoardLaneTopRoundedShape(cornerRadius: metrics.laneAccentCornerRadius)
+          .fill(color)
+        TaskBoardLaneTopRoundedShape(cornerRadius: metrics.laneAccentInteriorCornerRadius)
+          .fill(interiorStyle)
+          .frame(height: metrics.laneAccentHeight)
+          .offset(y: metrics.laneAccentVisibleHeight)
+      }
     }
     .frame(height: metrics.laneAccentHeight)
     .clipped()
     .accessibilityHidden(true)
     .allowsHitTesting(false)
+  }
+}
+
+private struct TaskBoardLanePunchedAccentShape: Shape {
+  let cornerRadius: CGFloat
+  let interiorCornerRadius: CGFloat
+  let interiorOffset: CGFloat
+
+  func path(in rect: CGRect) -> Path {
+    var path = TaskBoardLaneTopRoundedShape(cornerRadius: cornerRadius).path(in: rect)
+    let interiorRect = rect.offsetBy(dx: 0, dy: interiorOffset)
+    path.addPath(
+      TaskBoardLaneTopRoundedShape(cornerRadius: interiorCornerRadius)
+        .path(in: interiorRect)
+    )
+    return path
   }
 }
 
