@@ -18,11 +18,29 @@ struct TaskBoardLaneHeader: View {
   private var countFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)
   }
-  private var toggleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)
-  }
 
   var body: some View {
+    Button(action: onToggleCollapse) {
+      headerContent
+    }
+    .harnessPlainButtonStyle()
+    .padding(.horizontal, metrics.headerHorizontalPadding)
+    .padding(.vertical, metrics.headerVerticalPadding)
+    .padding(.bottom, metrics.headerBottomPadding)
+    .contentShape(Rectangle())
+    .overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(HarnessMonitorTheme.controlBorder.opacity(0.24))
+        .frame(height: 1)
+    }
+    .help("Collapse \(lane.title) board")
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Collapse \(lane.title) board")
+    .accessibilityValue("\(count) items")
+    .accessibilityAddTraits(.isHeader)
+  }
+
+  private var headerContent: some View {
     HStack(spacing: metrics.laneSpacing) {
       Image(systemName: lane.systemImage)
         .font(iconFont)
@@ -50,35 +68,7 @@ struct TaskBoardLaneHeader: View {
           Capsule()
             .stroke(taskBoardLaneColor(for: lane).opacity(0.26), lineWidth: 1)
         }
-      Button(action: onToggleCollapse) {
-        Image(systemName: "chevron.left")
-          .font(toggleFont)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .frame(
-            width: metrics.headerIconWidth + HarnessMonitorTheme.spacingSM,
-            height: metrics.headerIconWidth + HarnessMonitorTheme.spacingSM
-          )
-          .contentShape(Circle())
-      }
-      .harnessPlainButtonStyle()
-      .background(.background.opacity(0.56), in: Circle())
-      .overlay {
-        Circle()
-          .stroke(HarnessMonitorTheme.controlBorder.opacity(0.36), lineWidth: 1)
-      }
-      .help("Collapse \(lane.title) board")
-      .accessibilityLabel("Collapse \(lane.title) board")
     }
-    .padding(.horizontal, metrics.headerHorizontalPadding)
-    .padding(.vertical, metrics.headerVerticalPadding)
-    .padding(.bottom, metrics.headerBottomPadding)
-    .overlay(alignment: .bottom) {
-      Rectangle()
-        .fill(HarnessMonitorTheme.controlBorder.opacity(0.24))
-        .frame(height: 1)
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityAddTraits(.isHeader)
   }
 }
 
