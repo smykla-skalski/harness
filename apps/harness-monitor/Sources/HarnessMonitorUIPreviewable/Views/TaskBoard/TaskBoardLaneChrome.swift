@@ -91,7 +91,11 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
           .strokeBorder(laneStrokeColor, lineWidth: laneStrokeWidth)
       }
       .overlay(alignment: .top) {
-        TaskBoardLaneAccentCap(color: laneAccentColor, metrics: metrics)
+        TaskBoardLaneAccentCap(
+          color: laneAccentColor,
+          interiorStyle: laneFill,
+          metrics: metrics
+        )
       }
   }
 
@@ -125,18 +129,26 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
 
 private struct TaskBoardLaneAccentCap: View {
   let color: Color
+  let interiorStyle: AnyShapeStyle
   let metrics: TaskBoardLaneMetrics
 
   var body: some View {
-    TaskBoardLaneAccentCapShape(cornerRadius: metrics.laneAccentCornerRadius)
-      .fill(color)
-      .frame(height: metrics.laneAccentHeight)
-      .accessibilityHidden(true)
-      .allowsHitTesting(false)
+    ZStack(alignment: .top) {
+      TaskBoardLaneTopRoundedShape(cornerRadius: metrics.laneAccentCornerRadius)
+        .fill(color)
+      TaskBoardLaneTopRoundedShape(cornerRadius: metrics.laneAccentInteriorCornerRadius)
+        .fill(interiorStyle)
+        .frame(height: metrics.laneAccentHeight)
+        .offset(y: metrics.laneAccentVisibleHeight)
+    }
+    .frame(height: metrics.laneAccentHeight)
+    .clipped()
+    .accessibilityHidden(true)
+    .allowsHitTesting(false)
   }
 }
 
-private struct TaskBoardLaneAccentCapShape: Shape {
+private struct TaskBoardLaneTopRoundedShape: Shape {
   let cornerRadius: CGFloat
 
   func path(in rect: CGRect) -> Path {

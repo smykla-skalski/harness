@@ -241,8 +241,10 @@ extension TaskBoardOverviewBehaviorTests {
   func laneMetricsExposeRoundedTopAccentCap() {
     let metrics = TaskBoardLaneMetrics(fontScale: 1)
 
-    #expect(metrics.laneAccentHeight >= 12)
-    #expect(metrics.laneAccentCornerRadius == metrics.cardCornerRadius)
+    #expect(metrics.laneAccentHeight == 8)
+    #expect(metrics.laneAccentVisibleHeight == 4)
+    #expect(metrics.laneAccentCornerRadius == metrics.laneAccentHeight)
+    #expect(metrics.laneAccentInteriorCornerRadius == metrics.laneAccentHeight)
   }
 
   @Test("Overview metrics share scaled board spacing and padding")

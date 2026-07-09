@@ -8,7 +8,9 @@ struct TaskBoardLaneMetrics: Equatable {
   let laneFixedHeight: CGFloat
   let laneBodyTopPadding: CGFloat
   let laneAccentHeight: CGFloat
+  let laneAccentVisibleHeight: CGFloat
   let laneAccentCornerRadius: CGFloat
+  let laneAccentInteriorCornerRadius: CGFloat
   let headerIconWidth: CGFloat
   let headerHorizontalPadding: CGFloat
   let headerVerticalPadding: CGFloat
@@ -35,7 +37,8 @@ struct TaskBoardLaneMetrics: Equatable {
     laneWidth = 420 * broadScale
     laneFixedHeight = 704 * heightScale
     laneBodyTopPadding = HarnessMonitorTheme.spacingSM * denseScale
-    laneAccentHeight = max(12, 12 * min(scale, 1.15))
+    laneAccentHeight = max(8, 8 * min(scale, 1.12))
+    laneAccentVisibleHeight = max(4, 4 * min(scale, 1.12))
     headerIconWidth = 18 * min(scale, 1.25)
     headerHorizontalPadding = 0
     headerVerticalPadding = 0
@@ -46,6 +49,7 @@ struct TaskBoardLaneMetrics: Equatable {
     cardPadding = HarnessMonitorTheme.spacingMD * denseScale
     cardCornerRadius = HarnessMonitorTheme.cornerRadiusSM
     laneAccentCornerRadius = min(cardCornerRadius, laneAccentHeight)
+    laneAccentInteriorCornerRadius = min(cardCornerRadius, laneAccentHeight)
     cardMarkerSize = 28 * min(scale, 1.15)
     cardMarkerTopPadding = 2 * denseScale
     rowTextSpacing = HarnessMonitorTheme.spacingXS * denseScale
