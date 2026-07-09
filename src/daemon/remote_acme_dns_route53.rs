@@ -163,6 +163,7 @@ where
             writeln!(&mut canonical_headers, "{name}:{}", value.trim())
                 .map_err(|error| format!("build Route53 canonical headers: {error}"))?;
         }
+        // SigV4 requires a blank separator after the newline-terminated header block.
         let canonical_request =
             format!("POST\n{path}\n\n{canonical_headers}\n{signed_headers}\n{payload_hash}");
         let scope = format!("{date}/us-east-1/route53/aws4_request");

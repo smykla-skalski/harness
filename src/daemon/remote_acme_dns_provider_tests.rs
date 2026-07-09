@@ -115,6 +115,12 @@ async fn route53_dns01_signs_upsert_and_delete_requests() {
             .body()
             .contains("<Value>\"dns-proof-value\"</Value>")
     );
+    assert_eq!(
+        requests[0].header("authorization"),
+        Some(
+            "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260709/us-east-1/route53/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-security-token, Signature=4ea0787ad4a5797fea9f06bb72201e114668208352f9cc91a80ab33f0197df29"
+        )
+    );
     assert!(!format!("{provider:?}").contains("route53-secret-key"));
 }
 
