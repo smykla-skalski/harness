@@ -5,6 +5,12 @@ struct TaskBoardLaneMetrics: Equatable {
   let laneSpacing: CGFloat
   let laneInnerPadding: CGFloat
   let laneWidth: CGFloat
+  let laneCollapsedWidth: CGFloat
+  let laneCollapsedInnerPadding: CGFloat
+  let laneCollapsedBadgeSize: CGFloat
+  let laneCollapsedTextWidth: CGFloat
+  let laneCollapsedTitleHeight: CGFloat
+  let laneCollapsedContentTopPadding: CGFloat
   let laneFixedHeight: CGFloat
   let laneBodyTopPadding: CGFloat
   let laneAccentHeight: CGFloat
@@ -35,6 +41,12 @@ struct TaskBoardLaneMetrics: Equatable {
     laneSpacing = HarnessMonitorTheme.spacingSM * denseScale
     laneInnerPadding = HarnessMonitorTheme.spacingMD * denseScale
     laneWidth = 420 * broadScale
+    laneCollapsedWidth = max(72, 72 * min(scale, 1.12))
+    laneCollapsedInnerPadding = HarnessMonitorTheme.spacingSM * denseScale
+    laneCollapsedBadgeSize = max(34, 34 * min(scale, 1.18))
+    laneCollapsedTextWidth = max(28, 28 * min(scale, 1.18))
+    laneCollapsedTitleHeight = max(210, 210 * min(scale, 1.08))
+    laneCollapsedContentTopPadding = HarnessMonitorTheme.spacingMD * denseScale
     laneFixedHeight = 704 * heightScale
     laneBodyTopPadding = HarnessMonitorTheme.spacingSM * denseScale
     laneAccentHeight = max(8, 8 * min(scale, 1.12))

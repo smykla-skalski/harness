@@ -39,6 +39,8 @@ public struct TaskBoardOverviewView: View {
   @State private var presentationWorker = TaskBoardOverviewPresentationWorker()
   @State private var cachedPresentation = TaskBoardOverviewPresentation.empty
   @State private var presentationGeneration: UInt64 = 0
+  @AppStorage(TaskBoardLaneCollapsePreferences.storageKey)
+  var laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.emptyRawValue
 
   var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
@@ -64,7 +66,8 @@ public struct TaskBoardOverviewView: View {
   var laneStripSizing: TaskBoardLaneStripSizing {
     TaskBoardLaneStripSizing(
       minColumnWidth: laneMetrics.laneWidth,
-      spacing: metrics.columnSpacing
+      spacing: metrics.columnSpacing,
+      collapsedColumnWidth: laneMetrics.laneCollapsedWidth
     )
   }
 
@@ -353,17 +356,35 @@ extension TaskBoardOverviewView {
 
   @ViewBuilder var taskBoardLaneColumns: some View {
     ForEach(TaskBoardInboxLane.allCases) { lane in
+      let apiItems = cachedPresentation.apiItems(in: lane)
+      let inboxItems = cachedPresentation.inboxItems(in: lane)
+      let decisions = decisions(in: lane)
+      let contentCount = laneContentCount(
+        apiItems: apiItems,
+        inboxItems: inboxItems,
+        decisions: decisions
+      )
+      let isCollapsed = isLaneCollapsed(lane, contentCount: contentCount)
       TaskBoardLaneUnifiedColumn(
         lane: lane,
-        apiItems: cachedPresentation.apiItems(in: lane),
-        inboxItems: cachedPresentation.inboxItems(in: lane),
-        decisions: decisions(in: lane),
+        apiItems: apiItems,
+        inboxItems: inboxItems,
+        decisions: decisions,
+        isCollapsed: isCollapsed,
         onOpenAPIItem: openTaskBoardItem,
         onOpenInboxItem: onOpenItem,
         onOpenDecision: onOpenDecision,
+        onToggleCollapse: {
+          toggleLaneCollapse(lane, contentCount: contentCount)
+        },
         onMoveAPIItem: moveTaskBoardItem,
         onMoveInboxItem: moveInboxItem
       )
+      .layoutValue(
+        key: TaskBoardLanePreferredWidthKey.self,
+        value: isCollapsed ? laneMetrics.laneCollapsedWidth : laneMetrics.laneWidth
+      )
+      .layoutValue(key: TaskBoardLaneCanExpandKey.self, value: !isCollapsed)
     }
   }
 

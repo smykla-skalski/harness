@@ -44,6 +44,35 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(sizing.resolvedWidth(for: 1_120, columnCount: 3) == 1_120)
   }
 
+  @Test("Lane strip sizing keeps collapsed rails compact")
+  func laneStripSizingKeepsCollapsedRailsCompact() {
+    let sizing = TaskBoardLaneStripSizing(
+      minColumnWidth: 288,
+      spacing: 16,
+      collapsedColumnWidth: 72
+    )
+    let widths = sizing.columnWidths(
+      for: 760,
+      preferredWidths: [288, sizing.collapsedColumnWidth, 288],
+      canExpand: [true, false, true]
+    )
+
+    #expect(widths == [328, 72, 328])
+    #expect(
+      sizing.columnWidths(
+        for: 620,
+        preferredWidths: [288, sizing.collapsedColumnWidth, 288],
+        canExpand: [true, false, true]
+      ) == [288, 72, 288]
+    )
+    #expect(
+      sizing.resolvedWidth(
+        for: 620,
+        preferredWidths: [288, sizing.collapsedColumnWidth, 288]
+      ) == 680
+    )
+  }
+
   @Test("Dispatch presentation filters host project types off main")
   func dispatchPresentationFiltersHostProjectTypes() async {
     let worker = TaskBoardOperationsDispatchPresentationWorker()
@@ -245,6 +274,16 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(metrics.laneAccentVisibleHeight == 4)
     #expect(metrics.laneAccentCornerRadius == metrics.laneAccentHeight)
     #expect(metrics.laneAccentInteriorCornerRadius == metrics.laneAccentHeight)
+  }
+
+  @Test("Lane metrics expose collapsed rail geometry")
+  func laneMetricsExposeCollapsedRailGeometry() {
+    let metrics = TaskBoardLaneMetrics(fontScale: 1)
+
+    #expect(metrics.laneCollapsedWidth == 72)
+    #expect(metrics.laneCollapsedWidth < metrics.laneWidth)
+    #expect(metrics.laneCollapsedBadgeSize > 0)
+    #expect(metrics.laneCollapsedTitleHeight > metrics.laneCollapsedWidth)
   }
 
   @Test("Overview metrics share scaled board spacing and padding")

@@ -40,6 +40,17 @@ struct TaskBoardOverviewMetrics: Equatable {
 struct TaskBoardLaneStripSizing: Equatable {
   let minColumnWidth: CGFloat
   let spacing: CGFloat
+  let collapsedColumnWidth: CGFloat
+
+  init(
+    minColumnWidth: CGFloat,
+    spacing: CGFloat,
+    collapsedColumnWidth: CGFloat = 72
+  ) {
+    self.minColumnWidth = minColumnWidth
+    self.spacing = spacing
+    self.collapsedColumnWidth = collapsedColumnWidth
+  }
 
   func minimumWidth(for columnCount: Int) -> CGFloat {
     guard columnCount > 0 else { return 0 }
@@ -59,9 +70,55 @@ struct TaskBoardLaneStripSizing: Equatable {
     )
   }
 
+  func minimumWidth(for preferredWidths: [CGFloat]) -> CGFloat {
+    guard !preferredWidths.isEmpty else { return 0 }
+    return preferredWidths.reduce(0, +) + totalSpacing(for: preferredWidths.count)
+  }
+
+  func resolvedWidth(for availableWidth: CGFloat?, preferredWidths: [CGFloat]) -> CGFloat {
+    max(availableWidth ?? 0, minimumWidth(for: preferredWidths))
+  }
+
+  func columnWidths(
+    for availableWidth: CGFloat?,
+    preferredWidths: [CGFloat],
+    canExpand: [Bool]
+  ) -> [CGFloat] {
+    guard !preferredWidths.isEmpty else { return [] }
+    let preferredWidths = preferredWidths.map { max(0, $0) }
+    let resolvedWidth = resolvedWidth(for: availableWidth, preferredWidths: preferredWidths)
+    let extraWidth = max(0, resolvedWidth - minimumWidth(for: preferredWidths))
+    guard extraWidth > 0 else {
+      return preferredWidths
+    }
+
+    let expandableIndices = preferredWidths.indices.filter { index in
+      canExpand.indices.contains(index) ? canExpand[index] : true
+    }
+    guard !expandableIndices.isEmpty else {
+      return preferredWidths
+    }
+
+    let extraPerColumn = extraWidth / CGFloat(expandableIndices.count)
+    return preferredWidths.indices.map { index in
+      if expandableIndices.contains(index) {
+        return preferredWidths[index] + extraPerColumn
+      }
+      return preferredWidths[index]
+    }
+  }
+
   private func totalSpacing(for columnCount: Int) -> CGFloat {
     spacing * CGFloat(max(columnCount - 1, 0))
   }
+}
+
+struct TaskBoardLanePreferredWidthKey: LayoutValueKey {
+  static let defaultValue: CGFloat? = nil
+}
+
+struct TaskBoardLaneCanExpandKey: LayoutValueKey {
+  static let defaultValue = true
 }
 
 /// Wraps a single subview so the dashboard task-board content reports
@@ -118,15 +175,21 @@ struct TaskBoardLaneStripLayout: Layout {
     let columnCount = subviews.count
     guard columnCount > 0 else { return .zero }
 
-    let columnWidth = sizing.columnWidth(for: proposal.width, columnCount: columnCount)
+    let preferredWidths = preferredWidths(for: subviews)
+    let canExpand = canExpandValues(for: subviews)
+    let columnWidths = sizing.columnWidths(
+      for: proposal.width,
+      preferredWidths: preferredWidths,
+      canExpand: canExpand
+    )
     let measuredHeight =
-      subviews.map { subview in
+      zip(subviews, columnWidths).map { subview, columnWidth in
         subview.sizeThatFits(ProposedViewSize(width: columnWidth, height: nil)).height
       }.max() ?? 0
     let height = max(measuredHeight, proposal.height ?? 0)
 
     return CGSize(
-      width: sizing.resolvedWidth(for: proposal.width, columnCount: columnCount),
+      width: sizing.resolvedWidth(for: proposal.width, preferredWidths: preferredWidths),
       height: height
     )
   }
@@ -140,15 +203,31 @@ struct TaskBoardLaneStripLayout: Layout {
     let columnCount = subviews.count
     guard columnCount > 0 else { return }
 
-    let columnWidth = sizing.columnWidth(for: bounds.width, columnCount: columnCount)
+    let columnWidths = sizing.columnWidths(
+      for: bounds.width,
+      preferredWidths: preferredWidths(for: subviews),
+      canExpand: canExpandValues(for: subviews)
+    )
     var x = bounds.minX
-    for subview in subviews {
+    for (subview, columnWidth) in zip(subviews, columnWidths) {
       subview.place(
         at: CGPoint(x: x, y: bounds.minY),
         anchor: .topLeading,
         proposal: ProposedViewSize(width: columnWidth, height: bounds.height)
       )
       x += columnWidth + sizing.spacing
+    }
+  }
+
+  private func preferredWidths(for subviews: Subviews) -> [CGFloat] {
+    subviews.map { subview in
+      subview[TaskBoardLanePreferredWidthKey.self] ?? sizing.minColumnWidth
+    }
+  }
+
+  private func canExpandValues(for subviews: Subviews) -> [Bool] {
+    subviews.map { subview in
+      subview[TaskBoardLaneCanExpandKey.self]
     }
   }
 }

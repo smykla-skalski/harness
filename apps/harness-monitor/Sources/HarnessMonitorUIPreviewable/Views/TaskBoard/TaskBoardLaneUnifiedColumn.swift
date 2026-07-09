@@ -8,9 +8,11 @@ struct TaskBoardLaneUnifiedColumn: View {
   let apiItems: [TaskBoardItem]
   let inboxItems: [TaskBoardInboxItem]
   let decisions: [Decision]
+  let isCollapsed: Bool
   let onOpenAPIItem: (TaskBoardItem) -> Void
   let onOpenInboxItem: (TaskBoardInboxItem) -> Void
   let onOpenDecision: (Decision) -> Void
+  let onToggleCollapse: () -> Void
   let onMoveAPIItem: (String, TaskBoardInboxLane) -> Bool
   let onMoveInboxItem: (TaskBoardInboxItemDragPayload, TaskBoardInboxLane) -> Bool
   @Environment(\.fontScale)
@@ -37,8 +39,54 @@ struct TaskBoardLaneUnifiedColumn: View {
   }
 
   var body: some View {
+    laneContent
+      .taskBoardLaneColumnChrome(
+        lane: lane,
+        isCollapsed: isCollapsed,
+        isDropTargeted: isDropTargeted
+      )
+      .dropDestination(for: TaskBoardItemDragPayload.self, action: handleAPIDrop) { targeted in
+        updateAPIDropTargeted(targeted)
+      }
+      .onDrop(
+        of: [.harnessMonitorTaskBoardItem],
+        isTargeted: nil,
+        perform: handleLegacyAPIDrop
+      )
+      .dropDestination(
+        for: TaskBoardInboxItemDragPayload.self,
+        action: handleInboxDrop
+      ) { targeted in
+        updateInboxDropTargeted(targeted)
+      }
+      .onDrop(
+        of: [.harnessMonitorTaskBoardInboxItem],
+        isTargeted: nil,
+        perform: handleLegacyInboxDrop
+      )
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier("harness.task-board.column.\(lane.rawValue)")
+  }
+
+  @ViewBuilder private var laneContent: some View {
+    if isCollapsed {
+      TaskBoardCollapsedLane(
+        lane: lane,
+        count: totalCount,
+        onExpand: onToggleCollapse
+      )
+    } else {
+      expandedLaneContent
+    }
+  }
+
+  private var expandedLaneContent: some View {
     VStack(alignment: .leading, spacing: metrics.laneSpacing) {
-      TaskBoardLaneHeader(lane: lane, count: totalCount)
+      TaskBoardLaneHeader(
+        lane: lane,
+        count: totalCount,
+        onToggleCollapse: onToggleCollapse
+      )
 
       Group {
         if isEmpty {
@@ -49,25 +97,6 @@ struct TaskBoardLaneUnifiedColumn: View {
       }
       .taskBoardLaneBodyChrome(lane: lane, isDropTargeted: isDropTargeted)
     }
-    .taskBoardLaneColumnChrome(lane: lane, isDropTargeted: isDropTargeted)
-    .dropDestination(for: TaskBoardItemDragPayload.self, action: handleAPIDrop) { targeted in
-      updateAPIDropTargeted(targeted)
-    }
-    .onDrop(
-      of: [.harnessMonitorTaskBoardItem],
-      isTargeted: nil,
-      perform: handleLegacyAPIDrop
-    )
-    .dropDestination(for: TaskBoardInboxItemDragPayload.self, action: handleInboxDrop) { targeted in
-      updateInboxDropTargeted(targeted)
-    }
-    .onDrop(
-      of: [.harnessMonitorTaskBoardInboxItem],
-      isTargeted: nil,
-      perform: handleLegacyInboxDrop
-    )
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("harness.task-board.column.\(lane.rawValue)")
   }
 
   @ViewBuilder private var laneScrollSurface: some View {
@@ -215,5 +244,59 @@ struct TaskBoardLaneUnifiedColumn: View {
     let handled = deduper.perform(signature, move: action)
     inboxDropDeduper = deduper
     return handled
+  }
+}
+
+private struct TaskBoardCollapsedLane: View {
+  let lane: TaskBoardInboxLane
+  let count: Int
+  let onExpand: () -> Void
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var countFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)
+  }
+  private var titleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.title3.weight(.semibold), by: fontScale)
+  }
+
+  var body: some View {
+    Button(action: onExpand) {
+      VStack(spacing: metrics.laneSpacing) {
+        Text("\(count)")
+          .font(countFont)
+          .foregroundStyle(HarnessMonitorTheme.ink)
+          .monospacedDigit()
+          .frame(
+            width: metrics.laneCollapsedBadgeSize,
+            height: metrics.laneCollapsedBadgeSize
+          )
+          .background(HarnessMonitorTheme.controlBorder.opacity(0.34), in: Circle())
+          .accessibilityHidden(true)
+
+        Text(lane.title)
+          .font(titleFont)
+          .foregroundStyle(HarnessMonitorTheme.ink.opacity(0.82))
+          .lineLimit(1)
+          .minimumScaleFactor(0.72)
+          .fixedSize(horizontal: true, vertical: false)
+          .rotationEffect(.degrees(90))
+          .frame(
+            width: metrics.laneCollapsedTextWidth,
+            height: metrics.laneCollapsedTitleHeight
+          )
+
+        Spacer(minLength: 0)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+      .padding(.top, metrics.laneCollapsedContentTopPadding)
+      .contentShape(Rectangle())
+    }
+    .harnessPlainButtonStyle()
+    .help("Expand \(lane.title) board")
+    .accessibilityLabel("Expand \(lane.title) board")
+    .accessibilityValue("\(count) items")
   }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 struct TaskBoardLaneHeader: View {
   let lane: TaskBoardInboxLane
   let count: Int
+  let onToggleCollapse: () -> Void
   @Environment(\.fontScale)
   private var fontScale
 
@@ -15,6 +16,9 @@ struct TaskBoardLaneHeader: View {
     HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
   }
   private var countFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)
+  }
+  private var toggleFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)
   }
 
@@ -32,6 +36,8 @@ struct TaskBoardLaneHeader: View {
       Text(lane.title)
         .font(titleFont)
         .foregroundStyle(HarnessMonitorTheme.ink)
+        .lineLimit(1)
+        .minimumScaleFactor(0.78)
       Spacer(minLength: metrics.laneSpacing)
       Text("\(count)")
         .font(countFont)
@@ -44,6 +50,24 @@ struct TaskBoardLaneHeader: View {
           Capsule()
             .stroke(taskBoardLaneColor(for: lane).opacity(0.26), lineWidth: 1)
         }
+      Button(action: onToggleCollapse) {
+        Image(systemName: "chevron.left")
+          .font(toggleFont)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .frame(
+            width: metrics.headerIconWidth + HarnessMonitorTheme.spacingSM,
+            height: metrics.headerIconWidth + HarnessMonitorTheme.spacingSM
+          )
+          .contentShape(Circle())
+      }
+      .harnessPlainButtonStyle()
+      .background(.background.opacity(0.56), in: Circle())
+      .overlay {
+        Circle()
+          .stroke(HarnessMonitorTheme.controlBorder.opacity(0.36), lineWidth: 1)
+      }
+      .help("Collapse \(lane.title) board")
+      .accessibilityLabel("Collapse \(lane.title) board")
     }
     .padding(.horizontal, metrics.headerHorizontalPadding)
     .padding(.vertical, metrics.headerVerticalPadding)
@@ -53,13 +77,14 @@ struct TaskBoardLaneHeader: View {
         .fill(HarnessMonitorTheme.controlBorder.opacity(0.24))
         .frame(height: 1)
     }
-    .accessibilityElement(children: .combine)
+    .accessibilityElement(children: .contain)
     .accessibilityAddTraits(.isHeader)
   }
 }
 
 private struct TaskBoardLaneColumnChrome: ViewModifier {
   let lane: TaskBoardInboxLane
+  let isCollapsed: Bool
   let isDropTargeted: Bool
   @Environment(\.fontScale)
   private var fontScale
@@ -72,11 +97,12 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .padding(.horizontal, metrics.laneInnerPadding)
-      .padding(.vertical, metrics.laneInnerPadding)
+      .padding(.horizontal, laneInnerPadding)
+      .padding(.vertical, laneInnerPadding)
       .frame(
-        minWidth: metrics.laneWidth,
-        maxWidth: .infinity,
+        minWidth: laneWidth,
+        idealWidth: laneWidth,
+        maxWidth: laneMaxWidth,
         minHeight: metrics.laneFixedHeight,
         idealHeight: metrics.laneFixedHeight,
         maxHeight: .infinity,
@@ -97,6 +123,18 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
           metrics: metrics
         )
       }
+  }
+
+  private var laneWidth: CGFloat {
+    isCollapsed ? metrics.laneCollapsedWidth : metrics.laneWidth
+  }
+
+  private var laneMaxWidth: CGFloat {
+    isCollapsed ? metrics.laneCollapsedWidth : .infinity
+  }
+
+  private var laneInnerPadding: CGFloat {
+    isCollapsed ? metrics.laneCollapsedInnerPadding : metrics.laneInnerPadding
   }
 
   private var laneFill: AnyShapeStyle {
@@ -204,9 +242,16 @@ private struct TaskBoardLaneBodyChrome: ViewModifier {
 extension View {
   func taskBoardLaneColumnChrome(
     lane: TaskBoardInboxLane,
+    isCollapsed: Bool = false,
     isDropTargeted: Bool = false
   ) -> some View {
-    modifier(TaskBoardLaneColumnChrome(lane: lane, isDropTargeted: isDropTargeted))
+    modifier(
+      TaskBoardLaneColumnChrome(
+        lane: lane,
+        isCollapsed: isCollapsed,
+        isDropTargeted: isDropTargeted
+      )
+    )
   }
 
   func taskBoardLaneBodyChrome(
