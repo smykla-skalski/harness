@@ -57,6 +57,27 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     XCTAssertTrue(shell.contains("openWindow.openHarnessDashboardWindow()"))
   }
 
+  func testSceneShellMountsToastStacksAtTopAndBottomTrailingEdges() throws {
+    let shell = try appSourceFile(named: "HarnessMonitorWindowSceneShell.swift")
+
+    XCTAssertTrue(shell.contains(".overlay(alignment: .topTrailing)"))
+    XCTAssertTrue(
+      shell.contains(
+        "HarnessMonitorWindowShellToastOverlay(toast: toast, position: .topTrailing)"
+      )
+    )
+    XCTAssertTrue(shell.contains(".overlay(alignment: .bottomTrailing)"))
+    XCTAssertTrue(
+      shell.contains(
+        "HarnessMonitorWindowShellToastOverlay(toast: toast, position: .bottomTrailing)"
+      )
+    )
+    XCTAssertTrue(shell.contains("!toast.activeFeedback(in: position).isEmpty"))
+    XCTAssertTrue(
+      shell.contains("HarnessMonitorFeedbackToastView(toast: toast, position: position)")
+    )
+  }
+
   func testWindowCommandTrackingPinsLogicalWindowIdentifiers() throws {
     let source = try appSourceFile(named: "HarnessMonitorAppWindowCommandSupport.swift")
 

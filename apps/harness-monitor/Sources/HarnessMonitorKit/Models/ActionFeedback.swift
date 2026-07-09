@@ -60,6 +60,11 @@ public struct ActionFeedback: Identifiable, Equatable, Hashable, Sendable {
     case undoable
   }
 
+  public enum Position: String, Codable, CaseIterable, Sendable, Hashable {
+    case topTrailing
+    case bottomTrailing
+  }
+
   public let id: UUID
   public let title: String?
   public let message: String
@@ -67,6 +72,7 @@ public struct ActionFeedback: Identifiable, Equatable, Hashable, Sendable {
   public let details: ActionFeedbackDetails?
   public let primaryAction: ActionFeedbackAction?
   public let accessibilityIdentifier: String?
+  public let position: Position
   public var repeatCount: Int
   public var issuedAt: ContinuousClock.Instant
   public var pausedRemaining: Duration?
@@ -79,6 +85,7 @@ public struct ActionFeedback: Identifiable, Equatable, Hashable, Sendable {
     details: ActionFeedbackDetails? = nil,
     primaryAction: ActionFeedbackAction? = nil,
     accessibilityIdentifier: String? = nil,
+    position: Position = .topTrailing,
     repeatCount: Int = 1,
     issuedAt: ContinuousClock.Instant,
     pausedRemaining: Duration? = nil
@@ -90,6 +97,7 @@ public struct ActionFeedback: Identifiable, Equatable, Hashable, Sendable {
     self.details = details
     self.primaryAction = primaryAction
     self.accessibilityIdentifier = accessibilityIdentifier
+    self.position = position
     self.repeatCount = repeatCount
     self.issuedAt = issuedAt
     self.pausedRemaining = pausedRemaining

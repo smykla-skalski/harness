@@ -3,17 +3,23 @@ import SwiftUI
 
 public struct HarnessMonitorFeedbackToastView: View {
   public let toast: ToastSlice
+  public let position: ActionFeedback.Position
   private let detailsInitiallyExpanded: Bool
 
-  public init(toast: ToastSlice, detailsInitiallyExpanded: Bool = false) {
+  public init(
+    toast: ToastSlice,
+    position: ActionFeedback.Position = .topTrailing,
+    detailsInitiallyExpanded: Bool = false
+  ) {
     self.toast = toast
+    self.position = position
     self.detailsInitiallyExpanded = detailsInitiallyExpanded
   }
 
   public var body: some View {
     HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.spacingXS) {
       VStack(alignment: .trailing, spacing: HarnessMonitorTheme.spacingXS) {
-        ForEach(toast.activeFeedback) { feedback in
+        ForEach(visibleFeedback) { feedback in
           HarnessMonitorFeedbackToastRow(
             feedback: feedback,
             toast: toast,
@@ -29,8 +35,13 @@ public struct HarnessMonitorFeedbackToastView: View {
     .accessibilityFrameMarker(HarnessMonitorAccessibility.actionToastFrame)
     .accessibilityTestProbe(
       HarnessMonitorAccessibility.actionToast,
-      value: "count=\(toast.activeFeedback.count)"
+      value: "count=\(visibleFeedback.count) position=\(position.rawValue)"
     )
+  }
+
+  private var visibleFeedback: [ActionFeedback] {
+    let feedback = toast.activeFeedback(in: position)
+    return position == .bottomTrailing ? Array(feedback.reversed()) : feedback
   }
 }
 

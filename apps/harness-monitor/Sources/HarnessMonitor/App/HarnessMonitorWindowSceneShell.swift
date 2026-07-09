@@ -201,7 +201,10 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     )
     .environment(\.windowSurfaceContext, surfaceContext)
     .overlay(alignment: .topTrailing) {
-      HarnessMonitorWindowShellToastOverlay(toast: toast)
+      HarnessMonitorWindowShellToastOverlay(toast: toast, position: .topTrailing)
+    }
+    .overlay(alignment: .bottomTrailing) {
+      HarnessMonitorWindowShellToastOverlay(toast: toast, position: .bottomTrailing)
     }
     .overlay { shellStateMarker }
   }
@@ -304,14 +307,24 @@ private struct OptionalMCPWindowCommandsModifier: ViewModifier {
 
 private struct HarnessMonitorWindowShellToastOverlay: View {
   let toast: ToastSlice?
+  let position: ActionFeedback.Position
 
   var body: some View {
     Group {
-      if let toast, !toast.activeFeedback.isEmpty {
-        HarnessMonitorFeedbackToastView(toast: toast)
-          .padding(.top, HarnessMonitorTheme.spacingSM)
+      if let toast, !toast.activeFeedback(in: position).isEmpty {
+        HarnessMonitorFeedbackToastView(toast: toast, position: position)
+          .padding(verticalEdge, HarnessMonitorTheme.spacingSM)
           .padding(.trailing, HarnessMonitorTheme.spacingLG)
       }
+    }
+  }
+
+  private var verticalEdge: Edge.Set {
+    switch position {
+    case .topTrailing:
+      .top
+    case .bottomTrailing:
+      .bottom
     }
   }
 }

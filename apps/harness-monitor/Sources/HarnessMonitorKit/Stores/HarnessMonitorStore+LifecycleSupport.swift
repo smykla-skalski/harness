@@ -108,12 +108,14 @@ extension HarnessMonitorStore {
   public func presentSuccessFeedback(
     _ message: String,
     accessibilityIdentifier: String? = nil,
-    rollupDuplicates: Bool = false
+    rollupDuplicates: Bool = false,
+    position: ActionFeedback.Position = .topTrailing
   ) -> UUID {
     toast.presentSuccess(
       message,
       accessibilityIdentifier: accessibilityIdentifier,
-      rollupDuplicates: rollupDuplicates
+      rollupDuplicates: rollupDuplicates,
+      position: position
     )
   }
 
@@ -121,12 +123,14 @@ extension HarnessMonitorStore {
   public func presentFailureFeedback(
     _ message: String,
     accessibilityIdentifier: String? = nil,
-    rollupDuplicates: Bool = false
+    rollupDuplicates: Bool = false,
+    position: ActionFeedback.Position = .topTrailing
   ) -> UUID {
     toast.presentFailure(
       message,
       accessibilityIdentifier: accessibilityIdentifier,
-      rollupDuplicates: rollupDuplicates
+      rollupDuplicates: rollupDuplicates,
+      position: position
     )
   }
 

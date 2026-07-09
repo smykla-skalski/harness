@@ -60,7 +60,8 @@ public final class ToastSlice {
     details: ActionFeedbackDetails? = nil,
     primaryAction: ActionFeedbackAction? = nil,
     accessibilityIdentifier: String? = nil,
-    rollupDuplicates: Bool = false
+    rollupDuplicates: Bool = false,
+    position: ActionFeedback.Position = .topTrailing
   ) -> UUID {
     present(
       title: title,
@@ -69,7 +70,8 @@ public final class ToastSlice {
       details: details,
       primaryAction: primaryAction,
       accessibilityIdentifier: accessibilityIdentifier,
-      rollupDuplicates: rollupDuplicates
+      rollupDuplicates: rollupDuplicates,
+      position: position
     )
   }
 
@@ -80,7 +82,8 @@ public final class ToastSlice {
     details: ActionFeedbackDetails? = nil,
     primaryAction: ActionFeedbackAction? = nil,
     accessibilityIdentifier: String? = nil,
-    rollupDuplicates: Bool = false
+    rollupDuplicates: Bool = false,
+    position: ActionFeedback.Position = .topTrailing
   ) -> UUID {
     present(
       title: title,
@@ -89,7 +92,8 @@ public final class ToastSlice {
       details: details,
       primaryAction: primaryAction,
       accessibilityIdentifier: accessibilityIdentifier,
-      rollupDuplicates: rollupDuplicates
+      rollupDuplicates: rollupDuplicates,
+      position: position
     )
   }
 
@@ -100,7 +104,8 @@ public final class ToastSlice {
     details: ActionFeedbackDetails? = nil,
     primaryAction: ActionFeedbackAction? = nil,
     accessibilityIdentifier: String? = nil,
-    rollupDuplicates: Bool = false
+    rollupDuplicates: Bool = false,
+    position: ActionFeedback.Position = .topTrailing
   ) -> UUID {
     present(
       title: title,
@@ -109,12 +114,17 @@ public final class ToastSlice {
       details: details,
       primaryAction: primaryAction,
       accessibilityIdentifier: accessibilityIdentifier,
-      rollupDuplicates: rollupDuplicates
+      rollupDuplicates: rollupDuplicates,
+      position: position
     )
   }
 
   @discardableResult
-  public func present(message: String, severity: ActionFeedback.Severity) -> UUID {
+  public func present(
+    message: String,
+    severity: ActionFeedback.Severity,
+    position: ActionFeedback.Position = .topTrailing
+  ) -> UUID {
     present(
       title: nil,
       message: message,
@@ -122,7 +132,8 @@ public final class ToastSlice {
       details: nil,
       primaryAction: nil,
       accessibilityIdentifier: nil,
-      rollupDuplicates: false
+      rollupDuplicates: false,
+      position: position
     )
   }
 
@@ -130,6 +141,7 @@ public final class ToastSlice {
   public func enqueueUndoable(
     _ message: String,
     accessibilityIdentifier: String? = nil,
+    position: ActionFeedback.Position = .topTrailing,
     undo: @escaping @MainActor () async -> Void
   ) -> UUID {
     present(
@@ -140,6 +152,7 @@ public final class ToastSlice {
       primaryAction: nil,
       accessibilityIdentifier: accessibilityIdentifier,
       rollupDuplicates: false,
+      position: position,
       undoAction: undo
     )
   }
@@ -158,6 +171,10 @@ public final class ToastSlice {
     pendingUndoActions[id] != nil
   }
 
+  public func activeFeedback(in position: ActionFeedback.Position) -> [ActionFeedback] {
+    activeFeedback.filter { $0.position == position }
+  }
+
   @discardableResult
   public func present(
     title: String? = nil,
@@ -167,6 +184,7 @@ public final class ToastSlice {
     primaryAction: ActionFeedbackAction? = nil,
     accessibilityIdentifier: String?,
     rollupDuplicates: Bool = false,
+    position: ActionFeedback.Position = .topTrailing,
     undoAction: (@MainActor () async -> Void)? = nil
   ) -> UUID {
     let now = clock.now
@@ -177,7 +195,8 @@ public final class ToastSlice {
         feedback.message == message,
         feedback.details == details,
         feedback.primaryAction == primaryAction,
-        feedback.accessibilityIdentifier == accessibilityIdentifier
+        feedback.accessibilityIdentifier == accessibilityIdentifier,
+        feedback.position == position
       else {
         return false
       }
@@ -214,6 +233,7 @@ public final class ToastSlice {
       details: details,
       primaryAction: primaryAction,
       accessibilityIdentifier: accessibilityIdentifier,
+      position: position,
       issuedAt: now
     )
     activeFeedback.insert(feedback, at: 0)
@@ -221,7 +241,7 @@ public final class ToastSlice {
       pendingUndoActions[feedback.id] = undoAction
     }
     rearmDismiss(for: feedback.id, severity: severity, from: now)
-    enforceMaxVisible()
+    enforceMaxVisible(in: position)
     emitHistoryEvent(
       feedback: feedback,
       kind: .presented,
@@ -322,9 +342,11 @@ public final class ToastSlice {
 
   // MARK: - Private helpers
 
-  func enforceMaxVisible() {
-    while activeFeedback.count > maxVisible {
-      guard let oldest = activeFeedback.last else { break }
+  func enforceMaxVisible(in position: ActionFeedback.Position) {
+    while activeFeedback(in: position).count > maxVisible {
+      guard let oldest = activeFeedback.last(where: { $0.position == position }) else {
+        break
+      }
       dismiss(id: oldest.id, reason: .evicted)
     }
   }
