@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt, slice};
 
 use crate::reviews::files::patch_rest::any_patch_matches;
 use crate::reviews::{
@@ -8,7 +8,7 @@ use crate::reviews::{
 use super::token::github_token;
 
 pub(super) async fn enrich_policy_target_for_execution(target: &ReviewTarget) -> ReviewTarget {
-    enrich_policy_targets_for_execution(std::slice::from_ref(target))
+    enrich_policy_targets_for_execution(slice::from_ref(target))
         .await
         .into_iter()
         .next()
@@ -122,16 +122,24 @@ async fn scan_conflict_markers(
     {
         Ok(has_conflict_markers) => Some(has_conflict_markers),
         Err(error) => {
-            tracing::warn!(
-                repository = %target.repository,
-                pull_request = target.number,
-                head_sha = %target.head_sha,
-                %error,
-                "failed to scan pull request patches for conflict markers"
-            );
+            warn_conflict_marker_scan_failure(target, error);
             None
         }
     }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
+)]
+fn warn_conflict_marker_scan_failure(target: &ReviewTarget, error: impl fmt::Display) {
+    tracing::warn!(
+        repository = %target.repository,
+        pull_request = target.number,
+        head_sha = %target.head_sha,
+        %error,
+        "failed to scan pull request patches for conflict markers"
+    );
 }
 
 fn patch_has_added_conflict_marker(patch: &str) -> bool {

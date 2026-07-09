@@ -194,6 +194,11 @@ where
         }
         visited_pages += 1;
     }
+    if next_uri.is_some() {
+        return Err(RestFetchError::Http(format!(
+            "rest patches exceeded page cap {FILES_PAGE_CAP}"
+        )));
+    }
     Ok(false)
 }
 

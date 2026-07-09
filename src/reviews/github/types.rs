@@ -97,10 +97,7 @@ pub(super) struct LoginNode {
 }
 
 #[derive(Debug, Deserialize)]
-pub(super) struct AutoMergeRequestNode {
-    #[serde(rename = "enabledAt", default)]
-    pub(super) _enabled_at: Option<String>,
-}
+pub(super) struct AutoMergeRequestNode {}
 
 #[derive(Debug, Deserialize)]
 pub(super) struct RepositoryNode {
