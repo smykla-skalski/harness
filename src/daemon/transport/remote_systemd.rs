@@ -415,7 +415,7 @@ fn render_systemd_exec_argument(argument: &str) -> String {
 }
 
 fn is_systemd_bare_exec_char(character: char) -> bool {
-    !character.is_whitespace() && !matches!(character, '"' | '\'' | '\\')
+    !character.is_whitespace() && !matches!(character, '"' | '%' | '\'' | '\\')
 }
 
 fn render_env_file(unit: &str) -> String {

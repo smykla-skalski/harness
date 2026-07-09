@@ -198,6 +198,31 @@ fn remote_systemd_execstart_uses_systemd_double_quotes() {
     assert!(!plan.unit_contents.contains("'ops team@example.com'"));
 }
 
+#[test]
+fn remote_systemd_execstart_escapes_percent_specifiers() {
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon%h.example.com",
+        "--acme-email",
+        "ops@example.com",
+    ]);
+
+    let plan = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+    )
+    .expect("systemd install plan");
+
+    assert!(
+        plan.unit_contents
+            .contains("--domain \"daemon%%h.example.com\" --host")
+    );
+    assert!(!plan.unit_contents.contains("--domain daemon%h.example.com"));
+}
+
 fn install_args<const N: usize>(args: [&str; N]) -> DaemonRemoteSystemdInstallArgs {
     #[derive(Debug, Parser)]
     struct Harness {
