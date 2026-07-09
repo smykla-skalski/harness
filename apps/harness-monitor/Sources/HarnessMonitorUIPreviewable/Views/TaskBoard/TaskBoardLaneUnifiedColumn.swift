@@ -261,8 +261,14 @@ private struct TaskBoardCollapsedLane: View {
   private var titleFont: Font {
     HarnessMonitorTextSize.scaledFont(.title3.weight(.semibold), by: fontScale)
   }
+  private var collapsedButtonWidth: CGFloat {
+    metrics.laneCollapsedWidth
+  }
   private var collapsedContentWidth: CGFloat {
     max(0, metrics.laneCollapsedWidth - (2 * metrics.laneCollapsedInnerPadding))
+  }
+  private var collapsedButtonTopPadding: CGFloat {
+    metrics.laneCollapsedInnerPadding + metrics.laneCollapsedContentTopPadding
   }
 
   var body: some View {
@@ -290,7 +296,16 @@ private struct TaskBoardCollapsedLane: View {
         maxHeight: .infinity,
         alignment: .top
       )
-      .padding(.top, metrics.laneCollapsedContentTopPadding)
+      .padding(.horizontal, metrics.laneCollapsedInnerPadding)
+      .padding(.top, collapsedButtonTopPadding)
+      .padding(.bottom, metrics.laneCollapsedInnerPadding)
+      .frame(
+        minWidth: collapsedButtonWidth,
+        idealWidth: collapsedButtonWidth,
+        maxWidth: collapsedButtonWidth,
+        maxHeight: .infinity,
+        alignment: .top
+      )
       .contentShape(Rectangle())
       .clipped()
     }

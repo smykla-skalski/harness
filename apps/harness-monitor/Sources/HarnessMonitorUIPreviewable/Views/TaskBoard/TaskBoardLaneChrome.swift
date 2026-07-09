@@ -174,7 +174,7 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
   }
 
   private var laneInnerPadding: CGFloat {
-    isCollapsed ? metrics.laneCollapsedInnerPadding : metrics.laneInnerPadding
+    isCollapsed ? 0 : metrics.laneInnerPadding
   }
 
   private var laneFill: AnyShapeStyle {
