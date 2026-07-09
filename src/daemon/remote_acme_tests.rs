@@ -247,6 +247,34 @@ fn remote_dns01_native_provider_requests_validate_provider_and_zone_ids() {
         .route53_change_batch("Z123456", Dns01ChangeOperation::Present)
         .expect_err("route53 record name is required");
     assert!(missing_name.to_string().contains("record name is required"));
+
+    let blank_cloudflare_content = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Cloudflare,
+        "_acme-challenge.daemon.example.com",
+        "   ",
+    );
+    let missing_cloudflare_content = blank_cloudflare_content
+        .cloudflare_change_request("zone-123", Dns01ChangeOperation::Present)
+        .expect_err("cloudflare record content is required");
+    assert!(
+        missing_cloudflare_content
+            .to_string()
+            .contains("record content is required")
+    );
+
+    let blank_route53_content = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Route53,
+        "_acme-challenge.daemon.example.com",
+        "   ",
+    );
+    let missing_route53_content = blank_route53_content
+        .route53_change_batch("Z123456", Dns01ChangeOperation::Present)
+        .expect_err("route53 record content is required");
+    assert!(
+        missing_route53_content
+            .to_string()
+            .contains("record content is required")
+    );
 }
 
 #[test]

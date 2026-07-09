@@ -44,6 +44,7 @@ impl CloudflareDns01ChangeRequest {
             return Err(Dns01ProviderChangeError::MissingCloudflareZoneId);
         }
         let name = dns01_record_name(name)?;
+        let content = dns01_record_content(content)?;
         Ok(Self {
             operation,
             zone_id: zone_id.to_string(),
@@ -106,7 +107,7 @@ impl Route53Dns01ChangeBatch {
             operation,
             hosted_zone_id: hosted_zone_id.to_string(),
             name: route53_record_name(name)?,
-            quoted_value: route53_txt_value(content),
+            quoted_value: route53_txt_value(dns01_record_content(content)?),
         })
     }
 
@@ -147,6 +148,7 @@ pub enum Dns01ProviderChangeError {
     MissingCloudflareZoneId,
     MissingRoute53HostedZoneId,
     MissingRecordName,
+    MissingRecordContent,
 }
 
 impl Dns01ProviderChangeError {
@@ -170,6 +172,7 @@ impl fmt::Display for Dns01ProviderChangeError {
                 write!(f, "route53 hosted zone id is required")
             }
             Self::MissingRecordName => write!(f, "DNS-01 TXT record name is required"),
+            Self::MissingRecordContent => write!(f, "DNS-01 TXT record content is required"),
         }
     }
 }
@@ -248,6 +251,14 @@ fn dns01_record_name(name: &str) -> Result<&str, Dns01ProviderChangeError> {
         return Err(Dns01ProviderChangeError::MissingRecordName);
     }
     Ok(name)
+}
+
+fn dns01_record_content(content: &str) -> Result<&str, Dns01ProviderChangeError> {
+    let content = content.trim();
+    if content.is_empty() {
+        return Err(Dns01ProviderChangeError::MissingRecordContent);
+    }
+    Ok(content)
 }
 
 fn route53_record_name(name: &str) -> Result<String, Dns01ProviderChangeError> {
