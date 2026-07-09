@@ -19,6 +19,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::control::{adopt_daemon_root_for_transport_command, print_json};
+use super::remote_systemd::{DaemonRemoteSystemdArgs, DaemonRemoteSystemdInstallArgs};
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum DaemonRemoteCommand {
@@ -42,7 +43,7 @@ pub enum DaemonRemoteCommand {
     /// Run remote daemon diagnostics.
     Doctor,
     /// Install a hardened Linux systemd service.
-    InstallSystemd(DaemonRemoteSystemdArgs),
+    InstallSystemd(DaemonRemoteSystemdInstallArgs),
     /// Remove the Linux systemd service.
     UninstallSystemd(DaemonRemoteSystemdArgs),
     /// Show Linux systemd service status.
@@ -59,10 +60,10 @@ impl Execute for DaemonRemoteCommand {
                 args.remote_auth_scaffold_config()?;
                 Err(remote_execution_reserved_error())
             }
-            Self::Doctor
-            | Self::InstallSystemd(_)
-            | Self::UninstallSystemd(_)
-            | Self::Status(_) => Err(remote_execution_reserved_error()),
+            Self::InstallSystemd(args) => args.execute(context),
+            Self::UninstallSystemd(args) => args.uninstall(context),
+            Self::Status(args) => args.status(context),
+            Self::Doctor => Err(remote_execution_reserved_error()),
         }
     }
 }
@@ -287,13 +288,6 @@ pub enum DaemonRemoteAcmeCommand {
     Status,
     /// Renew the active certificate.
     Renew,
-}
-
-#[derive(Debug, Clone, Args)]
-pub struct DaemonRemoteSystemdArgs {
-    /// systemd unit name.
-    #[arg(long, default_value = "harness-remote-daemon")]
-    pub unit: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
