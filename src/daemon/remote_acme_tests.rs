@@ -1,8 +1,9 @@
 use std::error::Error;
 
 use super::{
-    AcmeHttp01ChallengeStore, Dns01ProviderAction, RemoteAcmeRuntimeState, RemoteCertificateBundle,
-    RemoteCertificateSlot, RemoteRenewalOutcome, build_remote_acme_runtime_plan,
+    AcmeHttp01ChallengeStore, Dns01ExecHookOperation, Dns01ProviderAction, RemoteAcmeRuntimeState,
+    RemoteCertificateBundle, RemoteCertificateSlot, RemoteRenewalOutcome,
+    build_remote_acme_runtime_plan,
 };
 use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
 
@@ -154,6 +155,108 @@ fn remote_dns01_providers_report_required_operations() {
         exec.command_preview()
             .contains("_acme-challenge.daemon.example.com")
     );
+}
+
+#[test]
+fn remote_dns01_exec_hook_invokes_present_and_cleanup_commands() {
+    let action = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Exec,
+        "_acme-challenge.daemon.example.com",
+        "digest-value",
+    );
+
+    let mut invocations = Vec::new();
+    action
+        .run_exec_hook_with(
+            "/usr/local/bin/harness-acme-dns",
+            Dns01ExecHookOperation::Present,
+            |invocation| {
+                invocations.push(invocation.clone());
+                Ok(())
+            },
+        )
+        .expect("present hook");
+    action
+        .run_exec_hook_with(
+            "/usr/local/bin/harness-acme-dns",
+            Dns01ExecHookOperation::Cleanup,
+            |invocation| {
+                invocations.push(invocation.clone());
+                Ok(())
+            },
+        )
+        .expect("cleanup hook");
+
+    assert_eq!(invocations.len(), 2);
+    assert_eq!(invocations[0].program(), "/usr/local/bin/harness-acme-dns");
+    assert_eq!(
+        invocations[0].args(),
+        &[
+            "present",
+            "_acme-challenge.daemon.example.com",
+            "digest-value"
+        ]
+    );
+    assert_eq!(
+        invocations[1].args(),
+        &[
+            "cleanup",
+            "_acme-challenge.daemon.example.com",
+            "digest-value"
+        ]
+    );
+}
+
+#[test]
+fn remote_dns01_exec_hook_rejects_invalid_provider_and_blank_program() {
+    let cloudflare = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Cloudflare,
+        "_acme-challenge.daemon.example.com",
+        "digest-value",
+    );
+    let exec = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Exec,
+        "_acme-challenge.daemon.example.com",
+        "digest-value",
+    );
+
+    let wrong_provider = cloudflare
+        .run_exec_hook_with(
+            "/usr/local/bin/harness-acme-dns",
+            Dns01ExecHookOperation::Present,
+            |_| Ok(()),
+        )
+        .expect_err("cloudflare cannot run exec hook");
+    assert!(wrong_provider.to_string().contains("exec DNS provider"));
+
+    let blank_program = exec
+        .run_exec_hook_with("  ", Dns01ExecHookOperation::Present, |_| Ok(()))
+        .expect_err("blank hook program should fail");
+    assert!(
+        blank_program
+            .to_string()
+            .contains("hook command is required")
+    );
+}
+
+#[test]
+fn remote_dns01_exec_hook_redacts_runner_failure_detail() {
+    let action = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Exec,
+        "_acme-challenge.daemon.example.com",
+        "digest-value",
+    );
+
+    let error = action
+        .run_exec_hook_with(
+            "/usr/local/bin/harness-acme-dns",
+            Dns01ExecHookOperation::Present,
+            |_| Err("dns hook failed token=super-secret".to_string()),
+        )
+        .expect_err("runner failure should surface");
+
+    assert!(error.to_string().contains("dns hook failed"));
+    assert!(!error.to_string().contains("super-secret"));
 }
 
 #[test]
