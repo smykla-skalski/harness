@@ -19,6 +19,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::control::{adopt_daemon_root_for_transport_command, print_json};
+use super::remote_serve::execute_remote_serve;
 use super::remote_systemd::{DaemonRemoteSystemdArgs, DaemonRemoteSystemdInstallArgs};
 
 #[derive(Debug, Clone, Subcommand)]
@@ -56,10 +57,7 @@ impl Execute for DaemonRemoteCommand {
             Self::Pair { command } => command.execute(context),
             Self::Clients { command } => command.execute(context),
             Self::Acme { command } => command.execute(context),
-            Self::Serve(args) => {
-                args.remote_auth_scaffold_config()?;
-                Err(remote_execution_reserved_error())
-            }
+            Self::Serve(args) => execute_remote_serve(args),
             Self::InstallSystemd(args) => args.execute(context),
             Self::UninstallSystemd(args) => args.uninstall(context),
             Self::Status(args) => args.status(context),

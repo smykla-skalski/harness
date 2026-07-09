@@ -1,7 +1,9 @@
 use rusqlite::{OptionalExtension, params, types::Type};
 
 use super::{CliError, DaemonDb, db_error};
-use crate::daemon::remote_acme::RemoteRenewalOutcome;
+use crate::daemon::remote_acme::{
+    RemoteAcmeRuntimeState, RemoteCertificateBundle, RemoteRenewalOutcome,
+};
 
 const SELECT_REMOTE_ACME_STATE_SQL: &str = "
 SELECT
@@ -17,6 +19,14 @@ SELECT
     renewal_status,
     renewal_error,
     updated_at
+FROM remote_acme_state
+WHERE singleton = 1";
+
+const SELECT_REMOTE_ACME_RUNTIME_STATE_SQL: &str = "
+SELECT
+    NULLIF(TRIM(account_id), ''),
+    certificate_pem,
+    private_key_pem
 FROM remote_acme_state
 WHERE singleton = 1";
 
@@ -62,6 +72,24 @@ impl DaemonDb {
             .ok_or_else(|| db_error("remote acme singleton state row is missing"))
     }
 
+    /// Load remote ACME account and certificate material for the TLS runtime.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub(crate) fn load_remote_acme_runtime_state(
+        &self,
+    ) -> Result<RemoteAcmeRuntimeState, CliError> {
+        self.conn
+            .query_row(
+                SELECT_REMOTE_ACME_RUNTIME_STATE_SQL,
+                [],
+                remote_acme_runtime_state_from_row,
+            )
+            .optional()
+            .map_err(|error| db_error(format!("load remote acme runtime state: {error}")))?
+            .ok_or_else(|| db_error("remote acme singleton state row is missing"))
+    }
+
     /// Persist a redacted ACME renewal failure report.
     ///
     /// # Errors
@@ -99,6 +127,26 @@ fn remote_acme_state_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Remot
         renewal_error: row.get(5)?,
         updated_at: row.get(6)?,
     })
+}
+
+fn remote_acme_runtime_state_from_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<RemoteAcmeRuntimeState> {
+    let Some(account_id) = row.get::<_, Option<String>>(0)? else {
+        return Ok(RemoteAcmeRuntimeState::default());
+    };
+    let certificate_pem = row.get::<_, Option<String>>(1)?;
+    let private_key_pem = row.get::<_, Option<String>>(2)?;
+    if let (Some(certificate_pem), Some(private_key_pem)) = (certificate_pem, private_key_pem)
+        && !certificate_pem.trim().is_empty()
+        && !private_key_pem.trim().is_empty()
+    {
+        return Ok(RemoteAcmeRuntimeState::with_account_and_certificate(
+            account_id,
+            RemoteCertificateBundle::new(&certificate_pem, &private_key_pem),
+        ));
+    }
+    Ok(RemoteAcmeRuntimeState::with_account(account_id))
 }
 
 fn parse_renewal_status_at_column(
