@@ -240,6 +240,13 @@ fn remote_dns01_native_provider_requests_validate_provider_and_zone_ids() {
             .to_string()
             .contains("hosted zone id is required")
     );
+
+    let blank_route53_name =
+        Dns01ProviderAction::for_provider(RemoteDnsProvider::Route53, "   ", "digest-value");
+    let missing_name = blank_route53_name
+        .route53_change_batch("Z123456", Dns01ChangeOperation::Present)
+        .expect_err("route53 record name is required");
+    assert!(missing_name.to_string().contains("record name is required"));
 }
 
 #[test]
