@@ -263,6 +263,11 @@ impl RemoteAcmeRenewalRequest {
 }
 
 pub trait RemoteAcmeRenewalIssuer {
+    #[must_use]
+    fn supports_initial_certificate(&self) -> bool {
+        false
+    }
+
     /// Issue or renew the remote daemon certificate for the supplied account.
     ///
     /// # Errors

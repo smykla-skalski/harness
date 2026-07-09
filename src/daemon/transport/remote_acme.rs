@@ -203,6 +203,10 @@ where
         db.record_remote_acme_renewal_failure(renewal_failure_detail(state), now)?;
         return Ok(RemoteAuditOutcome::Failure);
     };
+    if !state.certificate_configured && !issuer.supports_initial_certificate() {
+        db.record_remote_acme_renewal_failure(renewal_failure_detail(state), now)?;
+        return Ok(RemoteAuditOutcome::Failure);
+    }
     let request =
         RemoteAcmeRenewalRequest::new(account_id, state.certificate_fingerprint.as_deref());
     match issuer.renew_certificate(&request) {

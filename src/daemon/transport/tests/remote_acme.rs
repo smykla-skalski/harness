@@ -110,6 +110,43 @@ fn daemon_remote_acme_renew_records_missing_state_failure_and_audit() {
 }
 
 #[test]
+fn daemon_remote_acme_renew_preserves_missing_certificate_failure() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    db.connection()
+        .execute(
+            "UPDATE remote_acme_state
+             SET account_id = 'acct-1',
+                 certificate_pem = NULL,
+                 private_key_pem = NULL,
+                 certificate_fingerprint = NULL,
+                 renewal_status = 'unknown',
+                 renewal_error = NULL,
+                 updated_at = '2026-06-21T15:10:00Z'
+             WHERE singleton = 1",
+            [],
+        )
+        .expect("seed account-only acme state");
+
+    let response = DaemonRemoteAcmeCommand::Renew
+        .renew_with(&db, "audit-acme-renew", "2026-06-21T15:12:00Z")
+        .expect("renew response");
+
+    assert_eq!(response.renewal_status, "failed");
+    assert!(
+        response
+            .renewal_error
+            .as_deref()
+            .is_some_and(|error| error.contains("persisted TLS certificate"))
+    );
+    assert!(
+        !response
+            .renewal_error
+            .as_deref()
+            .is_some_and(|error| error.contains("not implemented"))
+    );
+}
+
+#[test]
 fn daemon_remote_acme_renew_persists_success_from_issuer_and_audits() {
     let db = DaemonDb::open_in_memory().expect("open db");
     db.connection()
@@ -170,6 +207,10 @@ struct FakeRenewalIssuer {
 }
 
 impl RemoteAcmeRenewalIssuer for FakeRenewalIssuer {
+    fn supports_initial_certificate(&self) -> bool {
+        true
+    }
+
     fn renew_certificate(
         &self,
         request: &RemoteAcmeRenewalRequest,
