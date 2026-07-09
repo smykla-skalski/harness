@@ -169,6 +169,19 @@ fn remote_certificate_reload_tracks_generation_and_noops_unchanged_bundle() {
 }
 
 #[test]
+fn remote_certificate_bundle_debug_redacts_pem_material() {
+    let bundle = RemoteCertificateBundle::new_for_tests(
+        "-----BEGIN CERTIFICATE-----cert-secret",
+        "-----BEGIN PRIVATE KEY-----key-secret",
+    );
+    let debug = format!("{bundle:?}");
+
+    assert!(debug.contains("<redacted>"));
+    assert!(!debug.contains("cert-secret"));
+    assert!(!debug.contains("key-secret"));
+}
+
+#[test]
 fn remote_renewal_failure_status_is_reported_without_secret_detail() {
     let outcome = RemoteRenewalOutcome::failure("dns token secret=super-secret-token failed");
 

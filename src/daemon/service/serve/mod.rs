@@ -9,11 +9,13 @@ mod machine_heartbeat_loop;
 mod manifest;
 mod open_db;
 mod policy_bootstrap;
+mod remote;
 mod shutdown_signals;
 mod task_board_orchestrator_loop;
 
 pub(crate) use config::{http_auth_mode, validate_serve_config};
 pub(crate) use open_db::{open_daemon_async_db, open_daemon_db};
+pub(crate) use remote::serve_remote_https;
 
 use super::{
     AgentTuiManagerHandle, Arc, CliError, CliErrorKind, CodexControllerHandle, DaemonHttpState,

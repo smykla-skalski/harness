@@ -23,7 +23,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
 use super::response::{extract_request_id, timed_json, timed_response};
-use super::DaemonHttpState;
+use super::{DaemonConnectInfo, DaemonHttpState};
 
 pub(super) fn remote_pairing_routes() -> Router<DaemonHttpState> {
     Router::new().route(http_paths::REMOTE_PAIR_CLAIM, post(post_remote_pair_claim))
@@ -51,14 +51,19 @@ pub(crate) struct RemotePairClaimHttpResponse {
 }
 
 async fn post_remote_pair_claim(
-    ConnectInfo(peer_addr): ConnectInfo<SocketAddr>,
+    ConnectInfo(connect_info): ConnectInfo<DaemonConnectInfo>,
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     Json(request): Json<RemotePairClaimHttpRequest>,
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    match claim_remote_pairing(peer_addr, &state, &request, request_id.as_str()) {
+    match claim_remote_pairing(
+        connect_info.remote_addr(),
+        &state,
+        &request,
+        request_id.as_str(),
+    ) {
         Ok(response) => timed_json(
             "POST",
             http_paths::REMOTE_PAIR_CLAIM,
