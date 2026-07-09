@@ -87,6 +87,14 @@ extension HarnessMonitorStore {
     )
   }
 
+  public func ensurePolicyCanvasWorkspaceLoadedForRuntimePolicies() async {
+    guard globalPolicyCanvasWorkspace == nil else {
+      return
+    }
+    await bootstrapIfNeeded()
+    await refreshPolicyPipeline()
+  }
+
   /// Persist a draft to the daemon and return the daemon's saved document on
   /// success, `nil` on failure (no client, validation rejected, or transport
   /// error). The daemon bumps the revision on every save, so the returned

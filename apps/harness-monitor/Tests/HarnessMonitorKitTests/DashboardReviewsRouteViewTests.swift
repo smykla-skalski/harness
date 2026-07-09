@@ -180,6 +180,21 @@ struct DashboardReviewsRouteViewTests {
     #expect(refreshSource.contains("DashboardReviewsRemoteLoader.refresh("))
   }
 
+  @Test("pasted review text loads live policy workspace before evaluation")
+  func pastedReviewTextLoadsLivePolicyWorkspaceBeforeEvaluation() throws {
+    let source = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+TextPaste.swift")
+    let prepareRange = try #require(
+      source.range(of: "await preparePastedReviewTextPolicyRuntime("))
+    let referencesRange = try #require(
+      source.range(of: "let references = await Task.detached"))
+
+    #expect(source.contains("await preparePastedReviewTextPolicyRuntime("))
+    #expect(source.contains("await store.ensurePolicyCanvasWorkspaceLoadedForRuntimePolicies()"))
+    #expect(source.contains("synchronizeEnforcedCanvasAutomationPolicies(policyCenter:"))
+    #expect(prepareRange.lowerBound < referencesRange.lowerBound)
+  }
+
   @Test("route source presents native confirmation for risky approve and merge actions")
   func routeSourcePresentsNativeConfirmationForRiskyApproveAndMergeActions() throws {
     // File-length splits pushed the confirmation routing into the pasted-text

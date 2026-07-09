@@ -184,4 +184,158 @@ extension DashboardReviewsTextPastePolicyTests {
     #expect(result.reason == "No GitHub pull request links found")
     #expect(result.skippedActions == [.extractGitHubPullRequests, .approveReviewPullRequests])
   }
+
+  @Test("Reviews text paste loads live canvas workspace before policy decision")
+  func reviewsTextPasteLoadsLiveCanvasWorkspaceBeforePolicyDecision() async throws {
+    let client = RecordingHarnessClient()
+    let document = Self.pastedPRDryRunPolicyDocument()
+    let workspace = PolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: "pasted-pr-canvas",
+      canvases: [
+        Self.policyCanvasSummary(
+          canvasId: "pasted-pr-canvas",
+          title: "Pasted PR approvals",
+          document: document
+        )
+      ]
+    )
+    client.configurePolicyCanvasWorkspace(
+      workspace: workspace,
+      documentsByCanvasID: ["pasted-pr-canvas": document]
+    )
+    let store = await makeBootstrappedStore(client: client)
+    let center = AutomationPolicyCenter()
+
+    let coldDecision = center.decision(
+      for: .manualReviewTextPaste,
+      contentKinds: [.text, .url],
+      allowsPasteboardPrompt: true
+    )
+    #expect(!coldDecision.isAllowed)
+
+    await store.ensurePolicyCanvasWorkspaceLoadedForRuntimePolicies()
+    DashboardAutomationPolicyRuntimeSynchronizer.synchronizeEnforcedCanvasAutomationPolicies(
+      policyCenter: center,
+      workspace: store.globalPolicyCanvasWorkspace,
+      activeDocument: store.globalPolicyPipeline
+    )
+    let loadedDecision = center.decision(
+      for: .manualReviewTextPaste,
+      contentKinds: [.text, .url],
+      allowsPasteboardPrompt: true
+    )
+
+    #expect(loadedDecision.isAllowed)
+    #expect(loadedDecision.policy.name == "Review Text Paste")
+    #expect(loadedDecision.policy.isDryRun)
+    #expect(client.readCallCount(.policyCanvasWorkspace) == 1)
+  }
+
+  @Test("Runtime policy loader skips workspace refresh after policy canvas is loaded")
+  func runtimePolicyLoaderSkipsWorkspaceRefreshAfterPolicyCanvasIsLoaded() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    await store.refreshPolicyPipeline()
+    let baselineWorkspaceReads = client.readCallCount(.policyCanvasWorkspace)
+
+    await store.ensurePolicyCanvasWorkspaceLoadedForRuntimePolicies()
+
+    #expect(client.readCallCount(.policyCanvasWorkspace) == baselineWorkspaceReads)
+  }
+}
+
+extension DashboardReviewsTextPastePolicyTests {
+  fileprivate static func pastedPRDryRunPolicyDocument() -> PolicyPipelineDocument {
+    PolicyPipelineDocument(
+      revision: 1,
+      mode: .enforced,
+      nodes: [
+        policyCanvasPipelineNode(
+          id: "automation:review-text-paste:source",
+          title: "Review Text Paste",
+          kind: .actionStep(PolicyActionStep(actionId: "automation.review_text_paste")),
+          automation: reviewTextPasteAutomationBinding(),
+          inputs: [],
+          outputs: ["default"]
+        ),
+        policyCanvasPipelineNode(
+          id: "automation:review-text-paste:dry-run",
+          title: "Dry-run gate",
+          kind: .dryRunGate(reasonCode: .dryRunRequired),
+          inputs: ["in"],
+          outputs: []
+        ),
+      ],
+      edges: [
+        PolicyPipelineEdge(
+          id: "edge:review-text-paste:dry-run",
+          fromNodeId: "automation:review-text-paste:source",
+          fromPort: "default",
+          toNodeId: "automation:review-text-paste:dry-run",
+          toPort: "in"
+        )
+      ],
+      groups: []
+    )
+  }
+
+  fileprivate static func policyCanvasSummary(
+    canvasId: String,
+    title: String,
+    document: PolicyPipelineDocument
+  ) -> PolicyCanvasSummary {
+    PolicyCanvasSummary(
+      canvasId: canvasId,
+      title: title,
+      revision: document.revision,
+      mode: document.mode,
+      document: document,
+      nodeCount: document.nodes.count,
+      edgeCount: document.edges.count,
+      groupCount: document.groups.count,
+      updatedAt: "2026-05-30T00:00:00Z"
+    )
+  }
+
+  fileprivate static func policyCanvasPipelineNode(
+    id: String,
+    title: String,
+    kind: PolicyGraphNodeKind,
+    automation: PolicyGraphAutomationBinding? = nil,
+    inputs: [String],
+    outputs: [String]
+  ) -> PolicyPipelineNode {
+    PolicyPipelineNode(
+      id: PolicyGraphNodeId(id),
+      title: title,
+      kind: kind,
+      automation: automation,
+      inputs: inputs.map { PolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) },
+      outputs: outputs.map { PolicyPipelinePort(id: PolicyGraphPortId($0), title: $0) }
+    )
+  }
+
+  fileprivate static func reviewTextPasteAutomationBinding() -> PolicyGraphAutomationBinding {
+    PolicyGraphAutomationBinding(
+      isEnabled: true,
+      eventSource: AutomationPolicyEventSource.manualReviewTextPaste.rawValue,
+      contentKinds: [
+        AutomationClipboardContentKind.text.rawValue,
+        AutomationClipboardContentKind.url.rawValue,
+      ],
+      preprocessors: [
+        AutomationPolicyPreprocessor.normalizeGitHubPullRequestLinks.rawValue,
+        AutomationPolicyPreprocessor.dedupePullRequests.rawValue,
+      ],
+      actions: [
+        AutomationPolicyAction.extractGitHubPullRequests.rawValue,
+        AutomationPolicyAction.previewReviewApprovals.rawValue,
+        AutomationPolicyAction.promptReviewApprovals.rawValue,
+        AutomationPolicyAction.recordMetadata.rawValue,
+      ],
+      postprocessors: [AutomationPolicyPostprocessor.auditEvent.rawValue],
+      sourceAppMode: AutomationSourceAppMode.allExceptDenied.rawValue
+    )
+  }
 }

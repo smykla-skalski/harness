@@ -18,7 +18,7 @@ extension DashboardReviewsRouteView {
 
   func handlePastedReviewText(_ text: String) async {
     let policyCenter = AutomationPolicyCenter.shared
-    synchronizeEnforcedCanvasAutomationPolicies(policyCenter: policyCenter)
+    await preparePastedReviewTextPolicyRuntime(policyCenter: policyCenter)
     let references = await Task.detached(priority: .userInitiated) {
       GitHubPullRequestReferenceParser.references(in: text)
     }.value
@@ -90,6 +90,13 @@ extension DashboardReviewsRouteView {
         reviewPullRequestReferences: references
       )
     )
+  }
+
+  func preparePastedReviewTextPolicyRuntime(
+    policyCenter: AutomationPolicyCenter
+  ) async {
+    await store.ensurePolicyCanvasWorkspaceLoadedForRuntimePolicies()
+    synchronizeEnforcedCanvasAutomationPolicies(policyCenter: policyCenter)
   }
 
   func synchronizeEnforcedCanvasAutomationPolicies(
