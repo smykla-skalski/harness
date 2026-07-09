@@ -195,6 +195,15 @@ impl Dns01ExecHookOperation {
     }
 }
 
+impl From<Dns01ChangeOperation> for Dns01ExecHookOperation {
+    fn from(value: Dns01ChangeOperation) -> Self {
+        match value {
+            Dns01ChangeOperation::Present => Self::Present,
+            Dns01ChangeOperation::Cleanup => Self::Cleanup,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Dns01ExecHookInvocation {
     program: String,
