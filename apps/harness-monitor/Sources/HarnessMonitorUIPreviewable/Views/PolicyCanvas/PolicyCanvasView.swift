@@ -15,6 +15,7 @@ public struct PolicyCanvasView: View {
   @State private var scenarioEditRequestState: PolicyCanvasScenarioEditRequest?
   @State private var selectionFocusRequestState: PolicyCanvasViewportSelectionFocusRequest?
   @State private var selectionFocusRequestIDState: UInt64 = 0
+  @State private var policyCanvasDisplayModeState: PolicyCanvasDisplayMode = .canvas
   @AppStorage("policyCanvas.inspectorVisible")
   private var policyCanvasInspectorVisibleState = true
   @FocusState var canvasKeyboardFocusedState: Bool
@@ -116,6 +117,18 @@ public struct PolicyCanvasView: View {
   var policyCanvasInspectorVisible: Bool {
     get { policyCanvasInspectorVisibleState }
     nonmutating set { policyCanvasInspectorVisibleState = newValue }
+  }
+
+  var policyCanvasDisplayMode: PolicyCanvasDisplayMode {
+    get { policyCanvasDisplayModeState }
+    nonmutating set { policyCanvasDisplayModeState = newValue }
+  }
+
+  var policyCanvasDisplayModeBinding: Binding<PolicyCanvasDisplayMode> {
+    Binding(
+      get: { policyCanvasDisplayMode },
+      set: { policyCanvasDisplayMode = $0 }
+    )
   }
 
   var focusedField: PolicyCanvasFocusedField? {
@@ -289,10 +302,10 @@ public struct PolicyCanvasView: View {
       .policyCanvasPowerEditShortcuts(
         viewModel: viewModel,
         focusedField: $focusedFieldState,
-        isEnabled: sceneFocusEnabled
+        isEnabled: policyCanvasEditingShortcutsEnabled
       )
       .overlay(alignment: .topTrailing) {
-        if searchPaletteVisible {
+        if searchPaletteVisible, policyCanvasDisplayMode == .canvas {
           PolicyCanvasSearchPalette(
             viewModel: viewModel,
             isVisible: $searchPaletteVisibleState,
@@ -323,6 +336,14 @@ public struct PolicyCanvasView: View {
       }
       .onChange(of: searchPaletteVisible, initial: false) { _, newValue in
         if !newValue {
+          scheduleCanvasKeyboardFocusRestoreIfNeeded()
+        }
+      }
+      .onChange(of: policyCanvasDisplayMode, initial: false) { _, newValue in
+        if newValue == .json {
+          searchPaletteVisible = false
+          canvasKeyboardFocusedState = false
+        } else if sceneFocusEnabled {
           scheduleCanvasKeyboardFocusRestoreIfNeeded()
         }
       }

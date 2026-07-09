@@ -3,6 +3,55 @@ import Testing
 
 @Suite("Policy canvas automation policy configuration")
 struct PolicyCanvasAutomationPolicyConfigurationTests {
+  @Test("Policy canvas exposes read-only JSON display mode")
+  func policyCanvasExposesReadOnlyJSONDisplayMode() throws {
+    let viewSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView.swift"
+    )
+    let layoutSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
+    )
+    let chromeSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
+    )
+    let jsonViewSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasJSONDocumentView.swift"
+    )
+    let shortcutsSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+Shortcuts.swift"
+    )
+    let supportSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+Support.swift"
+    )
+    let accessibilitySource = try previewableSourceFile(
+      named: "Support/HarnessMonitorAccessibilityIDs+PolicyCanvas.swift"
+    )
+
+    #expect(viewSource.contains("@State private var policyCanvasDisplayModeState"))
+    #expect(viewSource.contains("policyCanvasDisplayModeBinding"))
+    #expect(viewSource.contains("isEnabled: policyCanvasEditingShortcutsEnabled"))
+    #expect(layoutSource.contains("if policyCanvasDisplayMode == .canvas"))
+    #expect(layoutSource.contains("PolicyCanvasJSONDocumentView(viewModel: viewModel)"))
+    #expect(chromeSource.contains("PolicyCanvasDisplayModePicker(selection: $displayMode)"))
+    #expect(chromeSource.contains("Picker(\"Policy view\", selection: $selection)"))
+    #expect(chromeSource.contains("PolicyCanvasDisplayMode.allCases"))
+    #expect(chromeSource.contains(".pickerStyle(.segmented)"))
+    #expect(chromeSource.contains("Switch to Canvas to reformat"))
+    #expect(jsonViewSource.contains("Text(verbatim: jsonText)"))
+    #expect(jsonViewSource.contains(".textSelection(.enabled)"))
+    #expect(jsonViewSource.contains("documentExportPayload().exportDocument()"))
+    #expect(
+      jsonViewSource.contains(
+        "encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]"))
+    #expect(jsonViewSource.contains(".onChange(of: viewModel.nodes)"))
+    #expect(jsonViewSource.contains(".onChange(of: viewModel.edges)"))
+    #expect(!jsonViewSource.contains("TextEditor("))
+    #expect(shortcutsSource.contains("policyCanvasEditingShortcutsEnabled"))
+    #expect(supportSource.contains("policyCanvasDisplayMode == .canvas"))
+    #expect(accessibilitySource.contains("policyCanvasDisplayModePicker"))
+    #expect(accessibilitySource.contains("policyCanvasJSONView"))
+  }
+
   @Test("Footer menu exposes automation policy configuration")
   func footerMenuExposesAutomationPolicyConfiguration() throws {
     let topBarSource = try previewableSourceFile(

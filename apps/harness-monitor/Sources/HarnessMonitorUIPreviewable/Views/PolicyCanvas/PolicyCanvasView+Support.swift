@@ -27,6 +27,10 @@ extension PolicyCanvasView {
     return Self.missingStoreRemoteActionDisabledReason
   }
 
+  var policyCanvasEditingShortcutsEnabled: Bool {
+    sceneFocusEnabled && policyCanvasDisplayMode == .canvas
+  }
+
   func bindStatusLine() {
     viewModel.statusCallback = { @MainActor newStatus in
       statusLine = newStatus

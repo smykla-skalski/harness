@@ -11,25 +11,31 @@ extension PolicyCanvasView {
     // third NavigationSplitView column, which split the window toolbar and let
     // the detail underlap the translucent sidebar (hiding this very library).
     // The detail pane takes the remaining width.
-    HStack(spacing: 0) {
-      PolicyCanvasComponentLibraryPane(viewModel: viewModel)
-        .policyCanvasPaneFontScaleBoost()
+    if policyCanvasDisplayMode == .canvas {
+      HStack(spacing: 0) {
+        PolicyCanvasComponentLibraryPane(viewModel: viewModel)
+          .policyCanvasPaneFontScaleBoost()
 
+        policyCanvasDetailPane
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+        if policyCanvasInspectorVisible {
+          policyCanvasConfidencePane
+            .policyCanvasPaneFontScaleBoost()
+        }
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+    } else {
       policyCanvasDetailPane
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-      if policyCanvasInspectorVisible {
-        policyCanvasConfidencePane
-          .policyCanvasPaneFontScaleBoost()
-      }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   @ViewBuilder var policyCanvasDetailPane: some View {
     VStack(spacing: 0) {
       PolicyCanvasTopBar(
         viewModel: viewModel,
+        displayMode: policyCanvasDisplayModeBinding,
         liveStatus: viewModel.liveStatus,
         canMakeLive: viewModel.canMakeLive,
         remoteActionsEnabled: remoteActionsEnabled,
@@ -42,7 +48,12 @@ extension PolicyCanvasView {
 
       ZStack(alignment: .top) {
         VStack(spacing: 0) {
-          policyCanvasViewportPane
+          switch policyCanvasDisplayMode {
+          case .canvas:
+            policyCanvasViewportPane
+          case .json:
+            PolicyCanvasJSONDocumentView(viewModel: viewModel)
+          }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
 

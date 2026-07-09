@@ -5,6 +5,7 @@ import SwiftUI
 
 struct PolicyCanvasTopBar: View {
   @Bindable var viewModel: PolicyCanvasViewModel
+  @Binding var displayMode: PolicyCanvasDisplayMode
   /// Resolved persistent LIVE/DRAFT anchor rendered in the leading slot.
   let liveStatus: PolicyCanvasLiveState
   let canMakeLive: Bool
@@ -32,6 +33,8 @@ struct PolicyCanvasTopBar: View {
 
       Spacer(minLength: 16)
 
+      PolicyCanvasDisplayModePicker(selection: $displayMode)
+
       primaryActionGroup
 
     }
@@ -45,8 +48,8 @@ struct PolicyCanvasTopBar: View {
       PolicyCanvasActionButton(
         title: "Reformat",
         systemImage: "arrow.clockwise",
-        isDisabled: !viewModel.canReflowLayout,
-        disabledReason: "Add nodes before reformatting the canvas",
+        isDisabled: displayMode == .json || !viewModel.canReflowLayout,
+        disabledReason: reformatDisabledReason,
         accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasReformatButton,
         action: reflowLayout
       )
@@ -67,6 +70,31 @@ struct PolicyCanvasTopBar: View {
     }
   }
 
+  private var reformatDisabledReason: String {
+    if displayMode == .json {
+      return "Switch to Canvas to reformat"
+    }
+    return "Add nodes before reformatting the canvas"
+  }
+
+}
+
+private struct PolicyCanvasDisplayModePicker: View {
+  @Binding var selection: PolicyCanvasDisplayMode
+
+  var body: some View {
+    Picker("Policy view", selection: $selection) {
+      ForEach(PolicyCanvasDisplayMode.allCases) { mode in
+        Text(mode.label).tag(mode)
+      }
+    }
+    .pickerStyle(.segmented)
+    .labelsHidden()
+    .frame(width: 156)
+    .accessibilityLabel("Policy view")
+    .accessibilityValue(selection.label)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasDisplayModePicker)
+  }
 }
 
 // `PolicyCanvasChromeBannerOverlay` and its banner rows live

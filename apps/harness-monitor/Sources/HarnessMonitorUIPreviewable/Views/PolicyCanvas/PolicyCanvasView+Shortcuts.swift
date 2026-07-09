@@ -26,19 +26,19 @@ extension PolicyCanvasView {
         requestDeleteSelectedComponent()
       }
       .keyboardShortcut(.delete, modifiers: [])
-      .disabled(!sceneFocusEnabled || focusedField != nil)
+      .disabled(!policyCanvasEditingShortcutsEnabled || focusedField != nil)
 
       Button("Forward delete selected policy component") {
         requestDeleteSelectedComponent()
       }
       .keyboardShortcut(.deleteForward, modifiers: [])
-      .disabled(!sceneFocusEnabled || focusedField != nil)
+      .disabled(!policyCanvasEditingShortcutsEnabled || focusedField != nil)
 
       Button("Clear policy canvas selection") {
         clearSelectionAndDragState()
       }
       .keyboardShortcut(.escape, modifiers: [])
-      .disabled(!sceneFocusEnabled || focusedField != nil)
+      .disabled(!policyCanvasEditingShortcutsEnabled || focusedField != nil)
     }
     .opacity(0)
     .frame(width: 0, height: 0)
@@ -56,7 +56,7 @@ extension PolicyCanvasView {
       searchPaletteVisible.toggle()
     }
     .keyboardShortcut("f", modifiers: .command)
-    .disabled(!sceneFocusEnabled || focusedField != nil)
+    .disabled(!policyCanvasEditingShortcutsEnabled || focusedField != nil)
     .opacity(0)
     .frame(width: 0, height: 0)
     .accessibilityHidden(true)
@@ -67,7 +67,11 @@ extension PolicyCanvasView {
       presentCurrentEditSheet()
     }
     .keyboardShortcut(.return, modifiers: [])
-    .disabled(!sceneFocusEnabled || focusedField != nil || currentEditSheet == nil)
+    .disabled(
+      !policyCanvasEditingShortcutsEnabled
+        || focusedField != nil
+        || currentEditSheet == nil
+    )
     .opacity(0)
     .frame(width: 0, height: 0)
     .accessibilityHidden(true)
