@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::db::{DaemonDb, RemoteAcmeStoredState};
-use crate::daemon::remote::RemoteAccessScope;
+use crate::daemon::remote::{RemoteAccessScope, RemoteDaemonServeConfig};
 use crate::daemon::remote_acme::{
     RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest, RemoteCertificateBundle,
 };
@@ -95,7 +95,9 @@ impl DaemonRemoteAcmeCommand {
             return Err(CliErrorKind::workflow_parse("remote acme command must be renew").into());
         };
         let state = db.load_remote_acme_state()?;
-        let outcome = renew_remote_acme_certificate(db, &state, issuer, now)?;
+        let serve_config = db.load_remote_acme_serve_config()?;
+        let outcome =
+            renew_remote_acme_certificate(db, &state, serve_config.as_ref(), issuer, now)?;
         let state = db.load_remote_acme_state()?;
         record_remote_acme_audit(
             db,
@@ -121,6 +123,13 @@ impl DaemonRemoteAcmeCommand {
 pub(crate) struct DaemonRemoteAcmeStatusResponse {
     pub account_configured: bool,
     pub account_id: Option<String>,
+    pub domain: Option<String>,
+    pub host: Option<String>,
+    pub https_port: Option<u16>,
+    pub http_port: Option<u16>,
+    pub acme_email: Option<String>,
+    pub acme_challenge: Option<String>,
+    pub acme_dns_provider: Option<String>,
     pub certificate_configured: bool,
     pub certificate_fingerprint: Option<String>,
     pub renewal_status: String,
@@ -130,9 +139,19 @@ pub(crate) struct DaemonRemoteAcmeStatusResponse {
 
 impl DaemonRemoteAcmeStatusResponse {
     fn from_state(state: &RemoteAcmeStoredState) -> Self {
+        let serve_config = state.serve_config.as_ref();
         Self {
             account_configured: state.account_configured,
             account_id: state.account_id.clone(),
+            domain: serve_config.map(|config| config.domain.clone()),
+            host: serve_config.map(|config| config.host.clone()),
+            https_port: serve_config.map(|config| config.https_port),
+            http_port: serve_config.map(|config| config.http_port),
+            acme_email: serve_config.map(|config| config.acme_email.clone()),
+            acme_challenge: serve_config.map(|config| config.acme_challenge.as_str().to_string()),
+            acme_dns_provider: serve_config
+                .and_then(|config| config.acme_dns_provider)
+                .map(|provider| provider.as_str().to_string()),
             certificate_configured: state.certificate_configured,
             certificate_fingerprint: state.certificate_fingerprint.clone(),
             renewal_status: state.renewal_status.as_str().to_string(),
@@ -190,9 +209,14 @@ fn renewal_failure_detail(state: &RemoteAcmeStoredState) -> &'static str {
     }
 }
 
+fn missing_serve_config_failure_detail() -> &'static str {
+    "remote daemon requires persisted remote ACME serve config"
+}
+
 fn renew_remote_acme_certificate<I>(
     db: &DaemonDb,
     state: &RemoteAcmeStoredState,
+    serve_config: Option<&RemoteDaemonServeConfig>,
     issuer: &I,
     now: &str,
 ) -> Result<RemoteAuditOutcome, CliError>
@@ -203,12 +227,19 @@ where
         db.record_remote_acme_renewal_failure(renewal_failure_detail(state), now)?;
         return Ok(RemoteAuditOutcome::Failure);
     };
+    let Some(serve_config) = serve_config else {
+        db.record_remote_acme_renewal_failure(missing_serve_config_failure_detail(), now)?;
+        return Ok(RemoteAuditOutcome::Failure);
+    };
     if !state.certificate_configured && !issuer.supports_initial_certificate() {
         db.record_remote_acme_renewal_failure(renewal_failure_detail(state), now)?;
         return Ok(RemoteAuditOutcome::Failure);
     }
-    let request =
-        RemoteAcmeRenewalRequest::new(account_id, state.certificate_fingerprint.as_deref());
+    let request = RemoteAcmeRenewalRequest::new(
+        account_id,
+        state.certificate_fingerprint.as_deref(),
+        serve_config,
+    );
     match issuer.renew_certificate(&request) {
         Ok(bundle) => {
             db.record_remote_acme_renewal_success(&bundle, now)?;

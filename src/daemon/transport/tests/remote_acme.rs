@@ -1,6 +1,7 @@
 use clap::Parser;
 
 use crate::daemon::db::DaemonDb;
+use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
 use crate::daemon::remote_acme::{
     RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest, RemoteCertificateBundle,
 };
@@ -39,6 +40,8 @@ fn daemon_remote_acme_cli_parses_status_and_renew() {
 #[test]
 fn daemon_remote_acme_status_reports_persisted_state_without_key() {
     let db = DaemonDb::open_in_memory().expect("open db");
+    db.record_remote_acme_serve_config(&remote_dns_serve_config(), "2026-06-21T15:09:30Z")
+        .expect("record remote acme serve config");
     db.connection()
         .execute(
             "UPDATE remote_acme_state
@@ -63,6 +66,13 @@ fn daemon_remote_acme_status_reports_persisted_state_without_key() {
     assert!(response.certificate_configured);
     assert_eq!(response.certificate_fingerprint.as_deref(), Some("fp-1"));
     assert_eq!(response.renewal_status, "succeeded");
+    assert_eq!(response.domain.as_deref(), Some("daemon.example.com"));
+    assert_eq!(response.host.as_deref(), Some("0.0.0.0"));
+    assert_eq!(response.https_port, Some(443));
+    assert_eq!(response.http_port, Some(80));
+    assert_eq!(response.acme_email.as_deref(), Some("ops@example.com"));
+    assert_eq!(response.acme_challenge.as_deref(), Some("dns"));
+    assert_eq!(response.acme_dns_provider.as_deref(), Some("cloudflare"));
     let json = serde_json::to_string(&response).expect("serialize response");
     assert!(!json.contains("key-secret"));
 
@@ -73,6 +83,18 @@ fn daemon_remote_acme_status_reports_persisted_state_without_key() {
         .map(|event| event.route_or_method)
         .collect();
     assert_eq!(routes, vec!["remote.acme.status"]);
+}
+
+fn remote_dns_serve_config() -> RemoteDaemonServeConfig {
+    RemoteDaemonServeConfig {
+        domain: "daemon.example.com".to_string(),
+        host: "0.0.0.0".to_string(),
+        https_port: 443,
+        http_port: 80,
+        acme_email: "ops@example.com".to_string(),
+        acme_challenge: RemoteAcmeChallenge::Dns,
+        acme_dns_provider: Some(RemoteDnsProvider::Cloudflare),
+    }
 }
 
 #[test]
@@ -112,6 +134,8 @@ fn daemon_remote_acme_renew_records_missing_state_failure_and_audit() {
 #[test]
 fn daemon_remote_acme_renew_preserves_missing_certificate_failure() {
     let db = DaemonDb::open_in_memory().expect("open db");
+    db.record_remote_acme_serve_config(&remote_dns_serve_config(), "2026-06-21T15:09:30Z")
+        .expect("record remote acme serve config");
     db.connection()
         .execute(
             "UPDATE remote_acme_state
@@ -147,8 +171,46 @@ fn daemon_remote_acme_renew_preserves_missing_certificate_failure() {
 }
 
 #[test]
+fn daemon_remote_acme_renew_requires_persisted_serve_config() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    db.connection()
+        .execute(
+            "UPDATE remote_acme_state
+             SET account_id = 'acct-1',
+                 certificate_pem = 'old-cert-pem',
+                 private_key_pem = 'old-key-secret',
+                 certificate_fingerprint = 'old-fp',
+                 renewal_status = 'succeeded',
+                 renewal_error = NULL,
+                 updated_at = '2026-06-21T15:10:00Z'
+             WHERE singleton = 1",
+            [],
+        )
+        .expect("seed acme state without serve config");
+
+    let response = DaemonRemoteAcmeCommand::Renew
+        .renew_with_issuer(
+            &db,
+            "audit-acme-renew",
+            "2026-06-21T15:12:00Z",
+            &PanicRenewalIssuer,
+        )
+        .expect("renew response");
+
+    assert_eq!(response.renewal_status, "failed");
+    assert!(
+        response
+            .renewal_error
+            .as_deref()
+            .is_some_and(|error| error.contains("remote ACME serve config"))
+    );
+}
+
+#[test]
 fn daemon_remote_acme_renew_persists_success_from_issuer_and_audits() {
     let db = DaemonDb::open_in_memory().expect("open db");
+    db.record_remote_acme_serve_config(&remote_dns_serve_config(), "2026-06-21T15:09:30Z")
+        .expect("record remote acme serve config");
     db.connection()
         .execute(
             "UPDATE remote_acme_state
@@ -206,6 +268,8 @@ struct FakeRenewalIssuer {
     bundle: RemoteCertificateBundle,
 }
 
+struct PanicRenewalIssuer;
+
 impl RemoteAcmeRenewalIssuer for FakeRenewalIssuer {
     fn supports_initial_certificate(&self) -> bool {
         true
@@ -217,6 +281,23 @@ impl RemoteAcmeRenewalIssuer for FakeRenewalIssuer {
     ) -> Result<RemoteCertificateBundle, String> {
         assert_eq!(request.account_id(), self.expected_account_id);
         assert_eq!(request.previous_certificate_fingerprint(), Some("old-fp"));
+        let serve_config = request.serve_config();
+        assert_eq!(serve_config.domain, "daemon.example.com");
+        assert_eq!(serve_config.acme_email, "ops@example.com");
+        assert_eq!(serve_config.acme_challenge, RemoteAcmeChallenge::Dns);
+        assert_eq!(
+            serve_config.acme_dns_provider,
+            Some(RemoteDnsProvider::Cloudflare)
+        );
         Ok(self.bundle.clone())
+    }
+}
+
+impl RemoteAcmeRenewalIssuer for PanicRenewalIssuer {
+    fn renew_certificate(
+        &self,
+        _request: &RemoteAcmeRenewalRequest,
+    ) -> Result<RemoteCertificateBundle, String> {
+        panic!("issuer must not run without persisted serve config")
     }
 }

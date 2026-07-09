@@ -1,6 +1,9 @@
 use rusqlite::{OptionalExtension, params, types::Type};
 
 use super::{CliError, DaemonDb, db_error};
+use crate::daemon::remote::{
+    RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, validate_remote_serve_config,
+};
 use crate::daemon::remote_acme::{
     RemoteAcmeRuntimeState, RemoteCertificateBundle, RemoteRenewalOutcome,
 };
@@ -18,7 +21,14 @@ SELECT
     NULLIF(TRIM(certificate_fingerprint), ''),
     renewal_status,
     renewal_error,
-    updated_at
+    updated_at,
+    NULLIF(TRIM(domain), ''),
+    NULLIF(TRIM(host), ''),
+    https_port,
+    http_port,
+    NULLIF(TRIM(acme_email), ''),
+    NULLIF(TRIM(acme_challenge), ''),
+    NULLIF(TRIM(acme_dns_provider), '')
 FROM remote_acme_state
 WHERE singleton = 1";
 
@@ -52,6 +62,7 @@ impl RemoteAcmeRenewalStatus {
 pub(crate) struct RemoteAcmeStoredState {
     pub(crate) account_configured: bool,
     pub(crate) account_id: Option<String>,
+    pub(crate) serve_config: Option<RemoteDaemonServeConfig>,
     pub(crate) certificate_configured: bool,
     pub(crate) certificate_fingerprint: Option<String>,
     pub(crate) renewal_status: RemoteAcmeRenewalStatus,
@@ -70,6 +81,61 @@ impl DaemonDb {
             .optional()
             .map_err(|error| db_error(format!("load remote acme state: {error}")))?
             .ok_or_else(|| db_error("remote acme singleton state row is missing"))
+    }
+
+    /// Load the persisted remote ACME serve config used by certificate issuance.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the singleton state row is missing, SQL loading
+    /// fails, or the stored config is internally invalid.
+    pub(crate) fn load_remote_acme_serve_config(
+        &self,
+    ) -> Result<Option<RemoteDaemonServeConfig>, CliError> {
+        self.load_remote_acme_state()
+            .map(|state| state.serve_config)
+    }
+
+    /// Persist the remote serve config needed for later ACME issuance.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the config is invalid, the singleton state row
+    /// is missing, or the write fails.
+    pub(crate) fn record_remote_acme_serve_config(
+        &self,
+        config: &RemoteDaemonServeConfig,
+        updated_at: &str,
+    ) -> Result<(), CliError> {
+        validate_remote_serve_config(config)
+            .map_err(|error| db_error(format!("validate remote acme serve config: {error}")))?;
+        let changed = self
+            .conn
+            .execute(
+                "UPDATE remote_acme_state
+                 SET domain = ?1,
+                     host = ?2,
+                     https_port = ?3,
+                     http_port = ?4,
+                     acme_email = ?5,
+                     acme_challenge = ?6,
+                     acme_dns_provider = ?7,
+                     updated_at = ?8
+                 WHERE singleton = 1",
+                params![
+                    config.domain.trim(),
+                    config.host.trim(),
+                    i64::from(config.https_port),
+                    i64::from(config.http_port),
+                    config.acme_email.trim(),
+                    config.acme_challenge.as_str(),
+                    config.acme_dns_provider.map(RemoteDnsProvider::as_str),
+                    updated_at,
+                ],
+            )
+            .map_err(|error| db_error(format!("record remote acme serve config: {error}")))?;
+        if changed == 0 {
+            return Err(db_error("remote acme singleton state row is missing"));
+        }
+        Ok(())
     }
 
     /// Load remote ACME account and certificate material for the TLS runtime.
@@ -157,12 +223,124 @@ fn remote_acme_state_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Remot
     Ok(RemoteAcmeStoredState {
         account_id: row.get(0)?,
         account_configured: row.get::<_, i64>(1)? != 0,
+        serve_config: remote_acme_serve_config_from_row(row)?,
         certificate_configured: row.get::<_, i64>(2)? != 0,
         certificate_fingerprint: row.get(3)?,
         renewal_status: parse_renewal_status_at_column(&status_label, 4)?,
         renewal_error: row.get(5)?,
         updated_at: row.get(6)?,
     })
+}
+
+fn remote_acme_serve_config_from_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<Option<RemoteDaemonServeConfig>> {
+    let domain = row.get::<_, Option<String>>(7)?;
+    let host = row.get::<_, Option<String>>(8)?;
+    let tls_listener_port = row.get::<_, Option<i64>>(9)?;
+    let challenge_listener_port = row.get::<_, Option<i64>>(10)?;
+    let acme_email = row.get::<_, Option<String>>(11)?;
+    let acme_challenge = row.get::<_, Option<String>>(12)?;
+    let acme_dns_provider = row.get::<_, Option<String>>(13)?;
+    if domain.is_none()
+        && host.is_none()
+        && tls_listener_port.is_none()
+        && challenge_listener_port.is_none()
+        && acme_email.is_none()
+        && acme_challenge.is_none()
+        && acme_dns_provider.is_none()
+    {
+        return Ok(None);
+    }
+    let config = RemoteDaemonServeConfig {
+        domain: required_acme_config_text(domain, 7, "domain")?,
+        host: required_acme_config_text(host, 8, "host")?,
+        https_port: required_acme_config_port(tls_listener_port, 9, "https_port")?,
+        http_port: required_acme_config_port(challenge_listener_port, 10, "http_port")?,
+        acme_email: required_acme_config_text(acme_email, 11, "acme_email")?,
+        acme_challenge: parse_acme_challenge_at_column(
+            &required_acme_config_text(acme_challenge, 12, "acme_challenge")?,
+            12,
+        )?,
+        acme_dns_provider: acme_dns_provider
+            .as_deref()
+            .map(|label| parse_dns_provider_at_column(label, 13))
+            .transpose()?,
+    };
+    validate_remote_serve_config(&config).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(
+            7,
+            Type::Text,
+            format!("invalid remote acme serve config: {error}").into(),
+        )
+    })?;
+    Ok(Some(config))
+}
+
+fn required_acme_config_text(
+    value: Option<String>,
+    column: usize,
+    label: &str,
+) -> rusqlite::Result<String> {
+    value
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| {
+            rusqlite::Error::FromSqlConversionFailure(
+                column,
+                Type::Text,
+                format!("remote acme serve config {label} is required").into(),
+            )
+        })
+}
+
+fn required_acme_config_port(
+    value: Option<i64>,
+    column: usize,
+    label: &str,
+) -> rusqlite::Result<u16> {
+    let value = value.ok_or_else(|| {
+        rusqlite::Error::FromSqlConversionFailure(
+            column,
+            Type::Integer,
+            format!("remote acme serve config {label} is required").into(),
+        )
+    })?;
+    u16::try_from(value).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(
+            column,
+            Type::Integer,
+            format!("invalid remote acme serve config {label}: {error}").into(),
+        )
+    })
+}
+
+fn parse_acme_challenge_at_column(
+    label: &str,
+    column: usize,
+) -> rusqlite::Result<RemoteAcmeChallenge> {
+    match label {
+        "tls-alpn" => Ok(RemoteAcmeChallenge::TlsAlpn),
+        "http" => Ok(RemoteAcmeChallenge::Http),
+        "dns" => Ok(RemoteAcmeChallenge::Dns),
+        _ => Err(rusqlite::Error::FromSqlConversionFailure(
+            column,
+            Type::Text,
+            format!("unknown remote acme challenge '{label}'").into(),
+        )),
+    }
+}
+
+fn parse_dns_provider_at_column(label: &str, column: usize) -> rusqlite::Result<RemoteDnsProvider> {
+    match label {
+        "cloudflare" => Ok(RemoteDnsProvider::Cloudflare),
+        "route53" => Ok(RemoteDnsProvider::Route53),
+        "exec" => Ok(RemoteDnsProvider::Exec),
+        _ => Err(rusqlite::Error::FromSqlConversionFailure(
+            column,
+            Type::Text,
+            format!("unknown remote DNS provider '{label}'").into(),
+        )),
+    }
 }
 
 fn remote_acme_runtime_state_from_row(
