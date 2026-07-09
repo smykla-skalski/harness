@@ -48,20 +48,7 @@ fn daemon_remote_serve_execute_requires_persisted_acme_state() {
 #[test]
 fn daemon_remote_serve_execution_plan_uses_remote_auth_and_tls() {
     let db = DaemonDb::open_in_memory().expect("open db");
-    db.connection()
-        .execute(
-            "UPDATE remote_acme_state
-             SET account_id = 'acct-1',
-                 certificate_pem = 'cert-pem',
-                 private_key_pem = 'key-secret',
-                 certificate_fingerprint = 'stored-fp',
-                 renewal_status = 'succeeded',
-                 renewal_error = NULL,
-                 updated_at = '2026-06-21T15:00:00Z'
-             WHERE singleton = 1",
-            [],
-        )
-        .expect("seed acme state");
+    seed_acme_state(&db);
 
     let plan = build_remote_serve_execution_plan(&remote_serve_args(), &db)
         .expect("remote serve should plan from persisted TLS state");
@@ -85,6 +72,25 @@ fn daemon_remote_serve_execution_plan_uses_remote_auth_and_tls() {
     assert!(plan.acme_plan.certificate().has_material());
 }
 
+#[test]
+fn daemon_remote_serve_execute_reports_explicit_unimplemented_listener() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    with_isolated_harness_env(temp.path(), || {
+        state::ensure_daemon_dirs().expect("daemon dirs");
+        let db = DaemonDb::open(&state::daemon_root().join("harness.db")).expect("open daemon db");
+        seed_acme_state(&db);
+        let command = DaemonRemoteCommand::Serve(remote_serve_args());
+
+        let error = command
+            .execute(&AppContext)
+            .expect_err("remote serve should fail before listener implementation");
+        let message = error.to_string();
+
+        assert!(message.contains("not implemented yet"));
+        assert!(message.contains("TLS preflight passed"));
+    });
+}
+
 fn remote_serve_args() -> DaemonRemoteServeArgs {
     DaemonRemoteServeArgsTestHarness::try_parse_from([
         "test",
@@ -95,4 +101,21 @@ fn remote_serve_args() -> DaemonRemoteServeArgs {
     ])
     .expect("parse remote serve args")
     .args
+}
+
+fn seed_acme_state(db: &DaemonDb) {
+    db.connection()
+        .execute(
+            "UPDATE remote_acme_state
+             SET account_id = 'acct-1',
+                 certificate_pem = 'cert-pem',
+                 private_key_pem = 'key-secret',
+                 certificate_fingerprint = 'stored-fp',
+                 renewal_status = 'succeeded',
+                 renewal_error = NULL,
+                 updated_at = '2026-06-21T15:00:00Z'
+             WHERE singleton = 1",
+            [],
+        )
+        .expect("seed acme state");
 }

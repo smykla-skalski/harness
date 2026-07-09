@@ -49,7 +49,7 @@ pub(crate) fn build_remote_serve_execution_plan(
 
 fn run_remote_serve_plan(plan: &RemoteDaemonServeExecutionPlan) -> Result<i32, CliError> {
     Err(CliErrorKind::workflow_parse(format!(
-        "remote daemon HTTPS listener is unavailable after TLS preflight for {} on {}:{}",
+        "remote daemon HTTPS listener is not implemented yet; TLS preflight passed for {} on {}:{}",
         plan.acme_plan.public_https_origin(),
         plan.service_config.host,
         plan.service_config.port
