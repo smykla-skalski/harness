@@ -23,14 +23,14 @@ struct TaskBoardLaneHeader: View {
     Button(action: onToggleCollapse) {
       headerContent
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, metrics.headerHorizontalPadding)
-        .padding(.vertical, metrics.headerVerticalPadding)
+        .padding(.horizontal, metrics.laneInnerPadding)
+        .padding(.top, metrics.laneInnerPadding)
         .padding(.bottom, metrics.headerBottomPadding)
         .contentShape(Rectangle())
     }
     .harnessPlainButtonStyle()
     .frame(maxWidth: .infinity, alignment: .leading)
-    .taskBoardLaneToggleFeedback(lane: lane, cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+    .taskBoardLaneToggleFeedback(lane: lane, cornerRadius: metrics.cardCornerRadius)
     .overlay(alignment: .bottom) {
       Rectangle()
         .fill(HarnessMonitorTheme.controlBorder.opacity(0.24))
@@ -136,8 +136,6 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .padding(.horizontal, laneInnerPadding)
-      .padding(.vertical, laneInnerPadding)
       .frame(
         minWidth: laneWidth,
         idealWidth: laneWidth,
@@ -159,7 +157,7 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
         TaskBoardLaneAccentCap(
           color: laneAccentColor,
           interiorStyle: laneAccentInteriorStyle,
-          punchesInteriorThrough: isCollapsed,
+          punchesInteriorThrough: true,
           metrics: metrics
         )
       }
@@ -171,10 +169,6 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
 
   private var laneMaxWidth: CGFloat {
     isCollapsed ? metrics.laneCollapsedWidth : .infinity
-  }
-
-  private var laneInnerPadding: CGFloat {
-    isCollapsed ? 0 : metrics.laneInnerPadding
   }
 
   private var laneFill: AnyShapeStyle {

@@ -96,6 +96,8 @@ struct TaskBoardLaneUnifiedColumn: View {
         }
       }
       .taskBoardLaneBodyChrome(lane: lane, isDropTargeted: isDropTargeted)
+      .padding(.horizontal, metrics.laneInnerPadding)
+      .padding(.bottom, metrics.laneInnerPadding)
     }
   }
 
