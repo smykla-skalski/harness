@@ -166,6 +166,9 @@ extension PolicyCanvasAutomationPolicyCompiler {
     {
       return .pullRequests
     }
+    if actions(from: node).contains(where: \.isActivityToastAction) {
+      return .unknown
+    }
     if actions(from: node).contains(.openDashboardDebugging)
       || actions(from: node).contains(.rememberRecentScan)
       || actions(from: node).contains(.showFeedback)
@@ -300,7 +303,8 @@ extension PolicyCanvasAutomationPolicyCompiler {
             return AutomationPolicyFanOutBranch(
               outputPortID: edge.source.portID,
               targetNodeID: edge.target.nodeID,
-              actions: actions(from: targetNode)
+              actions: actions(from: targetNode),
+              toastCommand: activityToastCommand(from: targetNode)
             )
           }
         guard !branches.isEmpty else {
@@ -361,6 +365,9 @@ extension PolicyCanvasAutomationPolicyCompiler {
       || node.policyKind?.isCopyReviewPullRequestList == true
     {
       return [.copyReviewPullRequestList]
+    }
+    if let toastAction = activityToastAction(from: node) {
+      return [toastAction]
     }
     return []
   }

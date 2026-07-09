@@ -153,7 +153,7 @@ extension DashboardReviewsRouteView {
         store.presentSuccessFeedback(feedback.message)
       case .failure:
         store.presentFailureFeedback(feedback.message)
-      case .warning, .undoable:
+      case .warning, .undoable, .activity:
         store.toast.presentWarning(feedback.message)
       }
       if let client {

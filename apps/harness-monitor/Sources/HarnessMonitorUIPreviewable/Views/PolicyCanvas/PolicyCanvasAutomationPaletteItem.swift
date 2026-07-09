@@ -49,6 +49,9 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
   case promptReviewApprovals
   case approveReviewPullRequests
   case runReviewPolicy
+  case showActivityToast
+  case updateActivityToast
+  case hideActivityToast
   case rememberRecentScans
   case showFeedback
   case openDebugging
@@ -71,8 +74,8 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
       .safety
     case .ocrImages, .extractGitHubPullRequests, .resolveReviewPullRequests,
       .copyReviewPullRequestList, .previewReviewApprovals, .promptReviewApprovals,
-      .approveReviewPullRequests, .runReviewPolicy, .rememberRecentScans, .showFeedback,
-      .openDebugging, .recordMetadata:
+      .approveReviewPullRequests, .runReviewPolicy, .showActivityToast, .updateActivityToast,
+      .hideActivityToast, .rememberRecentScans, .showFeedback, .openDebugging, .recordMetadata:
       .actions
     case .sourceSpecificCleanup, .persistResult, .auditEvent:
       .results
@@ -106,6 +109,9 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
     case .promptReviewApprovals: "Prompt Review Approvals"
     case .approveReviewPullRequests: "Approve Review PRs"
     case .runReviewPolicy: "Run Reviews Policy"
+    case .showActivityToast: "Show Activity Toast"
+    case .updateActivityToast: "Update Activity Toast"
+    case .hideActivityToast: "Hide Activity Toast"
     case .rememberRecentScans: "Remember Recent Scans"
     case .showFeedback: "Show Feedback"
     case .openDebugging: "Open Debugging"
@@ -143,6 +149,9 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
     case .promptReviewApprovals: "Ask before approving"
     case .approveReviewPullRequests: "Approve eligible PRs"
     case .runReviewPolicy: "Start Reviews workflow"
+    case .showActivityToast: "Processing PR URLs"
+    case .updateActivityToast: "Loading PR details"
+    case .hideActivityToast: "Dismiss spinner"
     case .rememberRecentScans: "Store in Recent"
     case .showFeedback: "Show visual feedback"
     case .openDebugging: "Route to Debugging OCR"
@@ -180,6 +189,9 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
     case .promptReviewApprovals: "questionmark.bubble"
     case .approveReviewPullRequests: "checkmark.seal"
     case .runReviewPolicy: "bolt"
+    case .showActivityToast: "hourglass"
+    case .updateActivityToast: "arrow.triangle.2.circlepath"
+    case .hideActivityToast: "xmark.circle"
     case .rememberRecentScans: "clock.arrow.circlepath"
     case .showFeedback: "sparkles"
     case .openDebugging: "wrench.and.screwdriver"
@@ -267,6 +279,12 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
       .canvasComponent(actions: [.approveReviewPullRequests])
     case .runReviewPolicy:
       .canvasComponent(actions: [.runReviewPolicy])
+    case .showActivityToast:
+      .canvasComponent(actions: [.showActivityToast])
+    case .updateActivityToast:
+      .canvasComponent(actions: [.updateActivityToast])
+    case .hideActivityToast:
+      .canvasComponent(actions: [.hideActivityToast])
     case .rememberRecentScans:
       .canvasComponent(actions: [.rememberRecentScan])
     case .showFeedback:

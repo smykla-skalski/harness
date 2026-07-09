@@ -52,6 +52,7 @@ struct AutomationPolicyExecutionResult {
   let sourceApplication: AutomationSourceApplication?
   let executedActions: [AutomationPolicyAction]
   let skippedActions: [AutomationPolicyAction]
+  let toastCommands: [AutomationPolicyToastCommand]
   let executedPostprocessors: [AutomationPolicyPostprocessor]
   let eventRecord: AutomationPolicyEventRecord?
   let imageCandidates: [DashboardOCRImageCandidate]
@@ -130,6 +131,8 @@ enum AutomationPolicyExecutionPipeline {
       case .resolveReviewPullRequests, .copyReviewPullRequestList, .previewReviewApprovals,
         .promptReviewApprovals, .approveReviewPullRequests, .runReviewPolicy:
         execution.handleReviewAction(action, request: request)
+      case .showActivityToast, .updateActivityToast, .hideActivityToast:
+        execution.handleActivityToastAction(action)
       case .recordMetadata:
         execution.executedActions.append(action)
       case .openDashboardDebugging:
@@ -141,6 +144,7 @@ enum AutomationPolicyExecutionPipeline {
     if execution.reason == nil, execution.executedActions.isEmpty {
       execution.reason = "No executable actions for matched policy"
     }
+    execution.toastCommands = executionToastCommands(for: request.decision.policy)
     return execution
   }
 
@@ -170,6 +174,7 @@ enum AutomationPolicyExecutionPipeline {
       sourceApplication: request.sourceApplication,
       executedActions: execution.executedActions,
       skippedActions: execution.skippedActions,
+      toastCommands: execution.toastCommands,
       executedPostprocessors: executedPostprocessors,
       eventRecord: eventRecord,
       imageCandidates: execution.imageCandidates,
@@ -236,6 +241,29 @@ enum AutomationPolicyExecutionPipeline {
     return actions
   }
 
+  private static func executionToastCommands(
+    for policy: AutomationPolicy
+  ) -> [AutomationPolicyToastCommand] {
+    guard let plan = policy.executionPlan, !plan.fanOuts.isEmpty else {
+      return policy.executionPlan?.steps.compactMap(\.toastCommand) ?? []
+    }
+    let branchTargetIDs = Set(
+      plan.fanOuts.flatMap { fanOut in
+        fanOut.branches.map(\.targetNodeID)
+      }
+    )
+    var commands: [AutomationPolicyToastCommand] = []
+    commands.append(
+      contentsOf: plan.steps
+        .filter { !branchTargetIDs.contains($0.nodeID) }
+        .compactMap(\.toastCommand)
+    )
+    for fanOut in plan.fanOuts {
+      commands.append(contentsOf: fanOut.branches.compactMap(\.toastCommand))
+    }
+    return commands
+  }
+
   private static func append(
     _ candidates: [AutomationPolicyAction],
     to actions: inout [AutomationPolicyAction]
@@ -249,6 +277,7 @@ enum AutomationPolicyExecutionPipeline {
 private struct AutomationPolicyActionExecution {
   var executedActions: [AutomationPolicyAction] = []
   var skippedActions: [AutomationPolicyAction] = []
+  var toastCommands: [AutomationPolicyToastCommand] = []
   var imageCandidates: [DashboardOCRImageCandidate] = []
   var reviewPullRequestReferences: [GitHubPullRequestReference] = []
   var reason: String?
@@ -299,6 +328,10 @@ private struct AutomationPolicyActionExecution {
     }
     executedActions.append(action)
     reviewPullRequestReferences = request.reviewPullRequestReferences
+  }
+
+  mutating func handleActivityToastAction(_ action: AutomationPolicyAction) {
+    executedActions.append(action)
   }
 
   mutating func handleExtractedPullRequestURLCopyAction(

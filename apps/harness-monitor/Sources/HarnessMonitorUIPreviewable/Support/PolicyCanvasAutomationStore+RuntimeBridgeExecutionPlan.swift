@@ -6,7 +6,10 @@ extension HarnessMonitorPolicyCanvas.AutomationPolicyExecutionStep {
       nodeID: step.nodeID,
       inputPayload: HarnessMonitorPolicyCanvas.AutomationPolicyPayloadKind(step.inputPayload),
       outputPayload: HarnessMonitorPolicyCanvas.AutomationPolicyPayloadKind(step.outputPayload),
-      actions: step.actions.map(HarnessMonitorPolicyCanvas.AutomationPolicyAction.init)
+      actions: step.actions.map(HarnessMonitorPolicyCanvas.AutomationPolicyAction.init),
+      toastCommand: step.toastCommand.map(
+        HarnessMonitorPolicyCanvas.AutomationPolicyToastCommand.init
+      )
     )
   }
 }
@@ -17,7 +20,8 @@ extension AutomationPolicyExecutionStep {
       nodeID: step.nodeID,
       inputPayload: AutomationPolicyPayloadKind(step.inputPayload),
       outputPayload: AutomationPolicyPayloadKind(step.outputPayload),
-      actions: step.actions.map(AutomationPolicyAction.init)
+      actions: step.actions.map(AutomationPolicyAction.init),
+      toastCommand: step.toastCommand.map(AutomationPolicyToastCommand.init)
     )
   }
 }
@@ -27,7 +31,10 @@ extension HarnessMonitorPolicyCanvas.AutomationPolicyFanOutBranch {
     self.init(
       outputPortID: branch.outputPortID,
       targetNodeID: branch.targetNodeID,
-      actions: branch.actions.map(HarnessMonitorPolicyCanvas.AutomationPolicyAction.init)
+      actions: branch.actions.map(HarnessMonitorPolicyCanvas.AutomationPolicyAction.init),
+      toastCommand: branch.toastCommand.map(
+        HarnessMonitorPolicyCanvas.AutomationPolicyToastCommand.init
+      )
     )
   }
 }
@@ -37,8 +44,59 @@ extension AutomationPolicyFanOutBranch {
     self.init(
       outputPortID: branch.outputPortID,
       targetNodeID: branch.targetNodeID,
-      actions: branch.actions.map(AutomationPolicyAction.init)
+      actions: branch.actions.map(AutomationPolicyAction.init),
+      toastCommand: branch.toastCommand.map(AutomationPolicyToastCommand.init)
     )
+  }
+}
+
+extension HarnessMonitorPolicyCanvas.AutomationPolicyToastCommand {
+  init(_ command: AutomationPolicyToastCommand) {
+    self.init(
+      key: command.key,
+      kind: HarnessMonitorPolicyCanvas.AutomationPolicyToastCommandKind(command.kind),
+      title: command.title,
+      message: command.message,
+      position: command.position
+    )
+  }
+}
+
+extension AutomationPolicyToastCommand {
+  init(_ command: HarnessMonitorPolicyCanvas.AutomationPolicyToastCommand) {
+    self.init(
+      key: command.key,
+      kind: AutomationPolicyToastCommandKind(command.kind),
+      title: command.title,
+      message: command.message,
+      position: command.position
+    )
+  }
+}
+
+extension HarnessMonitorPolicyCanvas.AutomationPolicyToastCommandKind {
+  init(_ kind: AutomationPolicyToastCommandKind) {
+    switch kind {
+    case .show:
+      self = .show
+    case .update:
+      self = .update
+    case .hide:
+      self = .hide
+    }
+  }
+}
+
+extension AutomationPolicyToastCommandKind {
+  init(_ kind: HarnessMonitorPolicyCanvas.AutomationPolicyToastCommandKind) {
+    switch kind {
+    case .show:
+      self = .show
+    case .update:
+      self = .update
+    case .hide:
+      self = .hide
+    }
   }
 }
 

@@ -223,6 +223,18 @@ extension PolicyCanvasAutomationPolicyCompiler {
     if containsAny(text, ["feedback", "haptic", "toast", "notify", "notification"]) {
       actions.insert(.showFeedback)
     }
+    if containsAny(text, ["activity toast", "progress toast", "show spinner", "show progress"]) {
+      actions.insert(.showActivityToast)
+    }
+    if containsAny(text, ["update activity toast", "update progress", "change toast"]) {
+      actions.insert(.updateActivityToast)
+    }
+    if containsAny(
+      text,
+      ["hide activity toast", "hide progress", "hide spinner", "dismiss toast"]
+    ) {
+      actions.insert(.hideActivityToast)
+    }
     if containsAny(text, ["debugging", "debug route", "open dashboard", "show dashboard"]) {
       actions.insert(.openDashboardDebugging)
     }

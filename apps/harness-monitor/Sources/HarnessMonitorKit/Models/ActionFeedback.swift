@@ -54,6 +54,7 @@ public struct ActionFeedbackDetailRow: Equatable, Hashable, Sendable {
 
 public struct ActionFeedback: Identifiable, Equatable, Hashable, Sendable {
   public enum Severity: Sendable, Hashable {
+    case activity
     case success
     case warning
     case failure

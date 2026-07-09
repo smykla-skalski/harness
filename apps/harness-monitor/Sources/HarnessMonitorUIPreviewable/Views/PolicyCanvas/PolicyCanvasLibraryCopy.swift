@@ -61,6 +61,12 @@ extension PolicyCanvasAutomationPaletteItem {
       "Approve PRs"
     case .runReviewPolicy:
       "Run Reviews policy"
+    case .showActivityToast:
+      "Show activity toast"
+    case .updateActivityToast:
+      "Update activity toast"
+    case .hideActivityToast:
+      "Hide activity toast"
     case .rememberRecentScans:
       "Remember recent scans"
     case .showFeedback:
@@ -130,6 +136,12 @@ extension PolicyCanvasAutomationPaletteItem {
       "Eligible PR approvals"
     case .runReviewPolicy:
       "Reviews workflow"
+    case .showActivityToast:
+      "Processing spinner"
+    case .updateActivityToast:
+      "Progress message"
+    case .hideActivityToast:
+      "Dismiss spinner"
     case .rememberRecentScans:
       "Recent scan storage"
     case .showFeedback:

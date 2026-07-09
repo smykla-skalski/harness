@@ -485,6 +485,69 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(!livePolicy.isDryRun)
   }
 
+  @Test("activity toast nodes compile to execution plan commands")
+  func activityToastNodesCompileToExecutionPlanCommands() throws {
+    var source = PolicyCanvasNode(
+      id: "source-review-text-paste",
+      title: "Review Text Paste",
+      kind: .source,
+      position: CGPoint(x: 20, y: 20)
+    )
+    source.automationBinding = .canvasDefault(source: .manualReviewTextPaste)
+
+    var showToast = PolicyCanvasNode(
+      id: "show-progress",
+      title: "Show Activity Toast",
+      kind: .transform,
+      position: CGPoint(x: 280, y: 20)
+    )
+    showToast.subtitle = "message: Processing PR URLs\nposition: bottomTrailing"
+    showToast.automationBinding = .canvasComponent(actions: [.showActivityToast])
+
+    var updateToast = PolicyCanvasNode(
+      id: "update-progress",
+      title: "Update Activity Toast",
+      kind: .transform,
+      position: CGPoint(x: 540, y: 20)
+    )
+    updateToast.subtitle = "message: Loading PR details"
+    updateToast.automationBinding = .canvasComponent(actions: [.updateActivityToast])
+
+    var hideToast = PolicyCanvasNode(
+      id: "hide-progress",
+      title: "Hide Activity Toast",
+      kind: .transform,
+      position: CGPoint(x: 800, y: 20)
+    )
+    hideToast.automationBinding = .canvasComponent(actions: [.hideActivityToast])
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(
+      nodes: [source, showToast, updateToast, hideToast],
+      edges: [
+        edge(id: "edge-source-show", from: source.id, to: showToast.id, label: "event"),
+        edge(id: "edge-show-update", from: showToast.id, to: updateToast.id, label: "after"),
+        edge(id: "edge-update-hide", from: updateToast.id, to: hideToast.id, label: "after"),
+      ]
+    )
+
+    let policy = try #require(compilation.policy(compiledFrom: source.id))
+    let plan = try #require(policy.executionPlan)
+
+    #expect(policy.actions.contains(.showActivityToast))
+    #expect(policy.actions.contains(.updateActivityToast))
+    #expect(policy.actions.contains(.hideActivityToast))
+    #expect(
+      plan.steps.compactMap(\.toastCommand) == [
+        AutomationPolicyToastCommand(
+          kind: .show,
+          message: "Processing PR URLs",
+          position: .bottomTrailing
+        ),
+        AutomationPolicyToastCommand(kind: .update, message: "Loading PR details"),
+        AutomationPolicyToastCommand(kind: .hide),
+      ])
+  }
+
   @Test("pipeline document compiles pasted PR dry run policy")
   func pipelineDocumentCompilesPastedPRDryRunPolicy() throws {
     let document = PolicyPipelineDocument(

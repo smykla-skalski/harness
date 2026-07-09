@@ -93,6 +93,9 @@ public enum AutomationPolicyAction: String, CaseIterable, Codable, Identifiable,
   case promptReviewApprovals
   case approveReviewPullRequests
   case runReviewPolicy
+  case showActivityToast
+  case updateActivityToast
+  case hideActivityToast
   case rememberRecentScan
   case showFeedback
   case openDashboardDebugging
@@ -111,6 +114,9 @@ public enum AutomationPolicyAction: String, CaseIterable, Codable, Identifiable,
     case .promptReviewApprovals: "Prompt before approving"
     case .approveReviewPullRequests: "Approve review PRs"
     case .runReviewPolicy: "Run Reviews policy"
+    case .showActivityToast: "Show activity toast"
+    case .updateActivityToast: "Update activity toast"
+    case .hideActivityToast: "Hide activity toast"
     case .rememberRecentScan: "Remember recent scans"
     case .showFeedback: "Show feedback"
     case .openDashboardDebugging: "Open Debugging"

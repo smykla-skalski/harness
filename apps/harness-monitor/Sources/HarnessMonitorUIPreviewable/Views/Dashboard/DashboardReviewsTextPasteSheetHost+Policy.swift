@@ -30,6 +30,14 @@ extension DashboardReviewsTextPasteSheetHost {
       store.toast.presentWarning("No GitHub pull request links found")
       return
     }
+    let toastRunner = DashboardPolicyToastCommandRunner(
+      toast: store.toast,
+      policyID: result.policyDecision.policy.id
+    )
+    toastRunner.showInitial(result.toastCommands)
+    defer {
+      toastRunner.finish(result.toastCommands)
+    }
     let configuration =
       result.policyDecision.policy.reviewPullRequestExtraction
       ?? ReviewPullRequestExtractionConfiguration(autoCopy: false)
@@ -37,6 +45,7 @@ extension DashboardReviewsTextPasteSheetHost {
       result.reviewPullRequestReferences,
       configuration: configuration
     )
+    toastRunner.updateAfterResolution(result.toastCommands)
     guard !resolution.items.isEmpty else {
       store.toast.presentWarning("No pasted pull requests matched Reviews data")
       return

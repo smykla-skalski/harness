@@ -237,7 +237,7 @@ extension DashboardReviewsRouteView {
       store.presentSuccessFeedback(feedback.message)
     case .failure:
       store.presentFailureFeedback(feedback.message)
-    case .warning, .undoable:
+    case .warning, .undoable, .activity:
       store.toast.presentWarning(feedback.message)
     }
     scheduleAffectedRefresh(for: items, using: client)
@@ -324,7 +324,7 @@ extension DashboardReviewsRouteView {
         store.presentSuccessFeedback(feedback.message)
       case .failure:
         store.presentFailureFeedback(feedback.message)
-      case .warning, .undoable:
+      case .warning, .undoable, .activity:
         store.toast.presentWarning(feedback.message)
       }
       onSuccess()

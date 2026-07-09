@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 import Observation
 
@@ -28,6 +27,7 @@ public final class ToastSlice {
 
   @ObservationIgnored var dismissTasks: [UUID: Task<Void, Never>] = [:]
   @ObservationIgnored var targetInstants: [UUID: ContinuousClock.Instant] = [:]
+  @ObservationIgnored var activityToastIDs: [String: UUID] = [:]
   @ObservationIgnored var pendingUndoActions: [UUID: @MainActor () async -> Void] = [:]
   @ObservationIgnored var pauseObservationTask: Task<Void, Never>?
   @ObservationIgnored var resumeObservationTask: Task<Void, Never>?
@@ -171,10 +171,6 @@ public final class ToastSlice {
     pendingUndoActions[id] != nil
   }
 
-  public func activeFeedback(in position: ActionFeedback.Position) -> [ActionFeedback] {
-    activeFeedback.filter { $0.position == position }
-  }
-
   @discardableResult
   public func present(
     title: String? = nil,
@@ -215,7 +211,7 @@ public final class ToastSlice {
       if let undoAction {
         pendingUndoActions[existing.id] = undoAction
       }
-      rearmDismiss(for: existing.id, severity: severity, from: now)
+      rearmDismissIfNeeded(for: existing.id, severity: severity, from: now)
       emitHistoryEvent(
         feedback: refreshed,
         kind: .refreshed,
@@ -240,7 +236,7 @@ public final class ToastSlice {
     if let undoAction {
       pendingUndoActions[feedback.id] = undoAction
     }
-    rearmDismiss(for: feedback.id, severity: severity, from: now)
+    rearmDismissIfNeeded(for: feedback.id, severity: severity, from: now)
     enforceMaxVisible(in: position)
     emitHistoryEvent(
       feedback: feedback,
@@ -274,6 +270,7 @@ public final class ToastSlice {
     dismissTasks[id]?.cancel()
     dismissTasks.removeValue(forKey: id)
     targetInstants.removeValue(forKey: id)
+    activityToastIDs = activityToastIDs.filter { $0.value != id }
     pendingUndoActions.removeValue(forKey: id)
     activeFeedback.removeAll { $0.id == id }
     if let dismissedFeedback {
@@ -351,6 +348,10 @@ public final class ToastSlice {
     }
   }
 
+  func replaceActiveFeedback(at index: Int, with feedback: ActionFeedback) {
+    activeFeedback[index] = feedback
+  }
+
   func rearmDismiss(
     for id: UUID,
     severity: ActionFeedback.Severity,
@@ -370,45 +371,4 @@ public final class ToastSlice {
     }
   }
 
-  func dismissDelay(for severity: ActionFeedback.Severity) -> Duration {
-    switch severity {
-    case .success: successDismissDelay
-    case .warning: warningDismissDelay
-    case .failure: failureDismissDelay
-    case .undoable: undoableDismissDelay
-    }
-  }
-
-  func announce(_ feedback: ActionFeedback) {
-    let prefix: String
-    switch feedback.severity {
-    case .success: prefix = "Success"
-    case .warning: prefix = "Warning"
-    case .failure: prefix = "Action failed"
-    case .undoable: prefix = "Started"
-    }
-    let repetitionNotice =
-      if feedback.repeatCount > 1 {
-        " Repeated \(feedback.repeatCount) times"
-      } else {
-        ""
-      }
-    let payload = AttributedString("\(prefix) \(feedback.announcementText)\(repetitionNotice)")
-    AccessibilityNotification.Announcement(payload).post()
-  }
-
-  func emitHistoryEvent(
-    feedback: ActionFeedback,
-    kind: ToastHistoryEvent.Kind,
-    recordedAt: Date,
-    hasUndoAction: Bool
-  ) {
-    onHistoryEvent?(
-      ToastHistoryEvent(
-        feedback: feedback,
-        recordedAt: recordedAt,
-        kind: kind,
-        hasUndoAction: hasUndoAction
-      ))
-  }
 }

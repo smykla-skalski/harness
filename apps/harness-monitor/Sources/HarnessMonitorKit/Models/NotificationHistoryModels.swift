@@ -211,6 +211,8 @@ public struct NotificationHistoryEntry: Identifiable, Codable, Equatable, Hashab
 extension NotificationHistoryEntry.Severity {
   init(_ severity: ActionFeedback.Severity) {
     switch severity {
+    case .activity:
+      self = .info
     case .success:
       self = .success
     case .warning:

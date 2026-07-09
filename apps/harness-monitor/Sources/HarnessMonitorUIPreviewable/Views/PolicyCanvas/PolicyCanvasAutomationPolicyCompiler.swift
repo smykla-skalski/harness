@@ -265,7 +265,8 @@ public enum PolicyCanvasAutomationPolicyCompiler {
           edges: reachableEdges,
           nodesByID: nodeByID
         ),
-        actions: node.id == source.node.id ? [] : actions(from: node)
+        actions: node.id == source.node.id ? [] : actions(from: node),
+        toastCommand: node.id == source.node.id ? nil : activityToastCommand(from: node)
       )
     }
     if steps.allSatisfy(\.actions.isEmpty),
