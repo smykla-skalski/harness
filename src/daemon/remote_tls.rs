@@ -26,6 +26,7 @@ use super::remote_acme::RemoteCertificateBundle;
 mod tests;
 
 static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
+const TLS_HANDSHAKE_FAILURE_RETRY_DELAY: Duration = Duration::from_millis(10);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RemoteTlsConfigError {
@@ -100,10 +101,6 @@ impl Listener for RemoteTlsListener {
     type Io = TlsStream<TcpStream>;
     type Addr = SocketAddr;
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "TLS listener accept loop handles TCP and handshake retry paths"
-    )]
     async fn accept(&mut self) -> (Self::Io, Self::Addr) {
         loop {
             let (stream, addr) = match self.listener.accept().await {
@@ -115,13 +112,7 @@ impl Listener for RemoteTlsListener {
             };
             match self.acceptor.accept(stream).await {
                 Ok(tls_stream) => return (tls_stream, addr),
-                Err(error) => {
-                    tracing::warn!(
-                        remote_addr = %addr,
-                        %error,
-                        "remote TLS handshake failed"
-                    );
-                }
+                Err(error) => handle_tls_handshake_error(addr, error).await,
             }
         }
     }
@@ -184,6 +175,19 @@ fn is_transient_accept_error(error: &io::Error) -> bool {
             | io::ErrorKind::Interrupted
             | io::ErrorKind::WouldBlock
     )
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+async fn handle_tls_handshake_error(addr: SocketAddr, error: io::Error) {
+    tracing::warn!(
+        remote_addr = %addr,
+        %error,
+        "remote TLS handshake failed"
+    );
+    sleep(TLS_HANDSHAKE_FAILURE_RETRY_DELAY).await;
 }
 
 fn ensure_rustls_provider() {

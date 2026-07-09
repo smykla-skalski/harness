@@ -79,26 +79,29 @@ fn daemon_remote_serve_execution_plan_uses_remote_auth_and_tls() {
 
 #[test]
 fn daemon_remote_serve_execute_invokes_https_runner_after_preflight() {
-    let db = DaemonDb::open_in_memory().expect("open db");
-    seed_acme_state(&db);
+    let temp = tempfile::tempdir().expect("temp dir");
+    with_isolated_harness_env(temp.path(), || {
+        let db = DaemonDb::open_in_memory().expect("open db");
+        seed_acme_state(&db);
 
-    let exit = execute_remote_serve_with(
-        &remote_serve_args(),
-        || Ok(db),
-        |plan| {
-            assert_eq!(plan.service_config.host, "0.0.0.0");
-            assert_eq!(plan.service_config.port, 443);
-            assert_eq!(
-                plan.acme_plan.public_https_origin(),
-                "https://daemon.example.com"
-            );
-            assert!(plan.acme_plan.certificate().has_material());
-            Ok(0)
-        },
-    )
-    .expect("remote serve should invoke https runner after preflight");
+        let exit = execute_remote_serve_with(
+            &remote_serve_args(),
+            || Ok(db),
+            |plan| {
+                assert_eq!(plan.service_config.host, "0.0.0.0");
+                assert_eq!(plan.service_config.port, 443);
+                assert_eq!(
+                    plan.acme_plan.public_https_origin(),
+                    "https://daemon.example.com"
+                );
+                assert!(plan.acme_plan.certificate().has_material());
+                Ok(0)
+            },
+        )
+        .expect("remote serve should invoke https runner after preflight");
 
-    assert_eq!(exit, 0);
+        assert_eq!(exit, 0);
+    });
 }
 
 #[test]

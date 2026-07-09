@@ -1,8 +1,9 @@
 use std::io;
+use std::net::SocketAddr;
 
 use super::{
-    RemoteTlsConfigError, build_remote_tls_server_config, handle_tcp_accept_error,
-    is_transient_accept_error,
+    RemoteTlsConfigError, TLS_HANDSHAKE_FAILURE_RETRY_DELAY, build_remote_tls_server_config,
+    handle_tcp_accept_error, handle_tls_handshake_error, is_transient_accept_error,
 };
 use crate::daemon::remote_acme::RemoteCertificateBundle;
 
@@ -51,6 +52,20 @@ fn remote_tls_accept_retries_transient_tcp_errors_without_backoff() {
 #[tokio::test]
 async fn remote_tls_accept_transient_errors_do_not_backoff() {
     handle_tcp_accept_error(io::Error::from(io::ErrorKind::WouldBlock)).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn remote_tls_handshake_failures_backoff_before_retry() {
+    let retry = tokio::spawn(handle_tls_handshake_error(
+        SocketAddr::from(([127, 0, 0, 1], 443)),
+        io::Error::from(io::ErrorKind::InvalidData),
+    ));
+
+    tokio::task::yield_now().await;
+    assert!(!retry.is_finished());
+
+    tokio::time::advance(TLS_HANDSHAKE_FAILURE_RETRY_DELAY).await;
+    retry.await.expect("handshake retry delay should complete");
 }
 
 const TEST_CERTIFICATE_PEM: &str = r#"-----BEGIN CERTIFICATE-----
