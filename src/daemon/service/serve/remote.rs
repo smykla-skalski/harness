@@ -181,7 +181,10 @@ fn remote_bound_event_message(endpoint: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::remote_bound_event_message;
+    use crate::daemon::http::DaemonHttpAuthMode;
+    use crate::daemon::service::DaemonServeConfig;
+
+    use super::{remote_bound_event_message, validate_remote_https_config};
 
     #[test]
     fn remote_bound_event_message_does_not_claim_service_is_listening() {
@@ -189,5 +192,45 @@ mod tests {
 
         assert!(message.contains("https://daemon.example.com"));
         assert!(!message.contains("listening"));
+    }
+
+    #[test]
+    fn validate_remote_https_config_requires_remote_auth_mode() {
+        let config = DaemonServeConfig {
+            remote_domain: Some("daemon.example.com".to_string()),
+            ..DaemonServeConfig::default()
+        };
+        let error = validate_remote_https_config(&config)
+            .expect_err("remote HTTPS should reject local auth mode");
+
+        assert!(
+            error
+                .to_string()
+                .contains("requires remote authentication mode")
+        );
+    }
+
+    #[test]
+    fn validate_remote_https_config_requires_remote_domain() {
+        let config = DaemonServeConfig {
+            auth_mode: DaemonHttpAuthMode::Remote,
+            remote_domain: Some("   ".to_string()),
+            ..DaemonServeConfig::default()
+        };
+        let error = validate_remote_https_config(&config)
+            .expect_err("remote HTTPS should reject blank domain");
+
+        assert!(error.to_string().contains("requires a remote domain"));
+    }
+
+    #[test]
+    fn validate_remote_https_config_accepts_remote_auth_and_domain() {
+        let config = DaemonServeConfig {
+            auth_mode: DaemonHttpAuthMode::Remote,
+            remote_domain: Some("daemon.example.com".to_string()),
+            ..DaemonServeConfig::default()
+        };
+
+        validate_remote_https_config(&config).expect("valid remote HTTPS config");
     }
 }

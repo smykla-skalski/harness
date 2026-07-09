@@ -1,6 +1,9 @@
 use std::io;
 
-use super::{RemoteTlsConfigError, build_remote_tls_server_config, is_transient_accept_error};
+use super::{
+    RemoteTlsConfigError, build_remote_tls_server_config, handle_tcp_accept_error,
+    is_transient_accept_error,
+};
 use crate::daemon::remote_acme::RemoteCertificateBundle;
 
 #[test]
@@ -43,6 +46,11 @@ fn remote_tls_accept_retries_transient_tcp_errors_without_backoff() {
     ] {
         assert!(is_transient_accept_error(&io::Error::from(kind)));
     }
+}
+
+#[tokio::test]
+async fn remote_tls_accept_transient_errors_do_not_backoff() {
+    handle_tcp_accept_error(io::Error::from(io::ErrorKind::WouldBlock)).await;
 }
 
 const TEST_CERTIFICATE_PEM: &str = r#"-----BEGIN CERTIFICATE-----

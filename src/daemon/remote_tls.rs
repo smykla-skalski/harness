@@ -13,6 +13,7 @@ use rustls::crypto::ring::default_provider;
 use rustls::pki_types::pem::PemObject as _;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
+use tokio::task::yield_now;
 use tokio::time::sleep;
 use tokio_rustls::TlsAcceptor;
 use tokio_rustls::server::TlsStream;
@@ -167,6 +168,7 @@ fn parse_private_key(pem: &str) -> Result<PrivateKeyDer<'static>, RemoteTlsConfi
 )]
 async fn handle_tcp_accept_error(error: io::Error) {
     if is_transient_accept_error(&error) {
+        yield_now().await;
         return;
     }
     tracing::error!(%error, "remote TLS TCP accept failed");
@@ -185,7 +187,15 @@ fn is_transient_accept_error(error: &io::Error) -> bool {
 }
 
 fn ensure_rustls_provider() {
-    RUSTLS_PROVIDER.get_or_init(|| {
-        let _ = default_provider().install_default();
-    });
+    RUSTLS_PROVIDER.get_or_init(install_remote_tls_rustls_provider);
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn install_remote_tls_rustls_provider() {
+    if default_provider().install_default().is_err() {
+        tracing::warn!("rustls crypto provider was already installed before remote TLS setup");
+    }
 }

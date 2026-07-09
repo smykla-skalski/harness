@@ -1,8 +1,10 @@
+use std::thread;
+
 use crate::daemon::db::DaemonDb;
 use crate::daemon::remote_acme::{RemoteAcmeRuntimePlan, build_remote_acme_runtime_plan};
 use crate::daemon::service::{self, DaemonServeConfig};
 use crate::errors::{CliError, CliErrorKind};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 
 use super::control::adopt_daemon_root_for_transport_command;
 use super::remote::{DaemonRemoteServeArgs, open_remote_daemon_db};
@@ -14,7 +16,6 @@ pub(crate) struct RemoteDaemonServeExecutionPlan {
 }
 
 pub(super) fn execute_remote_serve(args: &DaemonRemoteServeArgs) -> Result<i32, CliError> {
-    adopt_daemon_root_for_transport_command("daemon-remote-serve");
     execute_remote_serve_with(args, open_remote_daemon_db, run_remote_serve_plan)
 }
 
@@ -27,6 +28,7 @@ where
     OpenDb: FnOnce() -> Result<DaemonDb, CliError>,
     Run: FnOnce(RemoteDaemonServeExecutionPlan) -> Result<i32, CliError>,
 {
+    adopt_daemon_root_for_transport_command("daemon-remote-serve");
     let db = open_db()?;
     let plan = build_remote_serve_execution_plan(args, &db)?;
     run_plan(plan)
@@ -54,6 +56,44 @@ pub(crate) fn build_remote_serve_execution_plan(
 }
 
 fn run_remote_serve_plan(plan: RemoteDaemonServeExecutionPlan) -> Result<i32, CliError> {
+    match remote_serve_runtime_mode() {
+        RemoteServeRuntimeMode::ExistingTokioRuntime => run_remote_serve_plan_on_thread(plan),
+        RemoteServeRuntimeMode::NewTokioRuntime => run_remote_serve_plan_on_runtime(plan),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RemoteServeRuntimeMode {
+    ExistingTokioRuntime,
+    NewTokioRuntime,
+}
+
+pub(crate) fn remote_serve_runtime_mode() -> RemoteServeRuntimeMode {
+    if Handle::try_current().is_ok() {
+        RemoteServeRuntimeMode::ExistingTokioRuntime
+    } else {
+        RemoteServeRuntimeMode::NewTokioRuntime
+    }
+}
+
+fn run_remote_serve_plan_on_thread(plan: RemoteDaemonServeExecutionPlan) -> Result<i32, CliError> {
+    thread::Builder::new()
+        .name("harness-remote-daemon".to_string())
+        .spawn(move || run_remote_serve_plan_on_runtime(plan))
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "spawn remote daemon runtime thread: {error}"
+            )))
+        })?
+        .join()
+        .map_err(|_| {
+            CliError::from(CliErrorKind::workflow_io(
+                "remote daemon runtime thread panicked",
+            ))
+        })?
+}
+
+fn run_remote_serve_plan_on_runtime(plan: RemoteDaemonServeExecutionPlan) -> Result<i32, CliError> {
     let runtime = Runtime::new().map_err(|error| {
         CliError::from(CliErrorKind::workflow_io(format!(
             "create remote daemon tokio runtime: {error}"

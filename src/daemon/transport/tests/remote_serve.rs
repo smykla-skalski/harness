@@ -7,7 +7,10 @@ use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::state;
 
 use super::super::remote::{DaemonRemoteCommand, DaemonRemoteServeArgs};
-use super::super::remote_serve::{build_remote_serve_execution_plan, execute_remote_serve_with};
+use super::super::remote_serve::{
+    RemoteServeRuntimeMode, build_remote_serve_execution_plan, execute_remote_serve_with,
+    remote_serve_runtime_mode,
+};
 
 #[derive(Debug, Parser)]
 struct DaemonRemoteServeArgsTestHarness {
@@ -96,6 +99,29 @@ fn daemon_remote_serve_execute_invokes_https_runner_after_preflight() {
     .expect("remote serve should invoke https runner after preflight");
 
     assert_eq!(exit, 0);
+}
+
+#[test]
+fn daemon_remote_serve_runtime_mode_uses_new_runtime_without_current_runtime() {
+    assert_eq!(
+        remote_serve_runtime_mode(),
+        RemoteServeRuntimeMode::NewTokioRuntime
+    );
+}
+
+#[test]
+fn daemon_remote_serve_runtime_mode_detects_existing_tokio_runtime() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("build runtime");
+
+    runtime.block_on(async {
+        assert_eq!(
+            remote_serve_runtime_mode(),
+            RemoteServeRuntimeMode::ExistingTokioRuntime
+        );
+    });
 }
 
 fn remote_serve_args() -> DaemonRemoteServeArgs {
