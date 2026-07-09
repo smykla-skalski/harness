@@ -166,19 +166,21 @@ fn parse_private_key(pem: &str) -> Result<PrivateKeyDer<'static>, RemoteTlsConfi
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
 async fn handle_tcp_accept_error(error: io::Error) {
-    if is_connection_error(&error) {
+    if is_transient_accept_error(&error) {
         return;
     }
     tracing::error!(%error, "remote TLS TCP accept failed");
     sleep(Duration::from_secs(1)).await;
 }
 
-fn is_connection_error(error: &io::Error) -> bool {
+fn is_transient_accept_error(error: &io::Error) -> bool {
     matches!(
         error.kind(),
         io::ErrorKind::ConnectionRefused
             | io::ErrorKind::ConnectionAborted
             | io::ErrorKind::ConnectionReset
+            | io::ErrorKind::Interrupted
+            | io::ErrorKind::WouldBlock
     )
 }
 

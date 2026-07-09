@@ -1,4 +1,6 @@
-use super::{RemoteTlsConfigError, build_remote_tls_server_config};
+use std::io;
+
+use super::{RemoteTlsConfigError, build_remote_tls_server_config, is_transient_accept_error};
 use crate::daemon::remote_acme::RemoteCertificateBundle;
 
 #[test]
@@ -28,6 +30,19 @@ fn remote_tls_server_config_builds_http_alpn_from_pem_material() {
         config.alpn_protocols,
         vec![b"h2".to_vec(), b"http/1.1".to_vec()]
     );
+}
+
+#[test]
+fn remote_tls_accept_retries_transient_tcp_errors_without_backoff() {
+    for kind in [
+        io::ErrorKind::ConnectionRefused,
+        io::ErrorKind::ConnectionAborted,
+        io::ErrorKind::ConnectionReset,
+        io::ErrorKind::Interrupted,
+        io::ErrorKind::WouldBlock,
+    ] {
+        assert!(is_transient_accept_error(&io::Error::from(kind)));
+    }
 }
 
 const TEST_CERTIFICATE_PEM: &str = r#"-----BEGIN CERTIFICATE-----

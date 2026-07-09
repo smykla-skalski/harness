@@ -59,7 +59,7 @@ pub async fn serve_remote_https(
         })?;
     let endpoint = acme_plan.public_https_origin();
     let manifest = remote_daemon_manifest(&endpoint, config.sandboxed);
-    state::append_event("info", &format!("remote daemon listening on {endpoint}"))?;
+    state::append_event("info", &remote_bound_event_message(&endpoint))?;
 
     let (sender, _) = broadcast::channel(256);
     let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
@@ -173,4 +173,21 @@ fn remote_daemon_manifest(endpoint: &str, sandboxed: bool) -> DaemonManifest {
 
 fn remote_tls_config_cli_error(error: &RemoteTlsConfigError) -> CliError {
     CliErrorKind::workflow_parse(format!("build remote TLS config: {error}")).into()
+}
+
+fn remote_bound_event_message(endpoint: &str) -> String {
+    format!("remote daemon bound HTTPS socket for {endpoint}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::remote_bound_event_message;
+
+    #[test]
+    fn remote_bound_event_message_does_not_claim_service_is_listening() {
+        let message = remote_bound_event_message("https://daemon.example.com");
+
+        assert!(message.contains("https://daemon.example.com"));
+        assert!(!message.contains("listening"));
+    }
 }
