@@ -3,6 +3,7 @@ mod control;
 mod remote;
 mod remote_acme;
 mod remote_clients;
+mod remote_serve;
 mod remote_systemd;
 mod remote_systemd_lifecycle;
 #[cfg(test)]
