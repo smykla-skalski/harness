@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::reviews::files::patch_rest::fetch_patches;
+use crate::reviews::files::patch_rest::any_patch_matches;
 use crate::reviews::{
     ReviewMergeableState, ReviewTarget, ReviewsGitHubClient, ReviewsRefreshRequest,
 };
@@ -112,20 +112,26 @@ async fn scan_conflict_markers(
     client: &ReviewsGitHubClient,
     target: &ReviewTarget,
 ) -> Option<bool> {
-    fetch_patches(
+    match any_patch_matches(
         client.protected(),
         &target.repository,
         target.number,
-        &target.head_sha,
-        &[],
+        patch_has_added_conflict_marker,
     )
     .await
-    .ok()
-    .map(|patches| {
-        patches
-            .iter()
-            .any(|patch| patch_has_added_conflict_marker(&patch.patch))
-    })
+    {
+        Ok(has_conflict_markers) => Some(has_conflict_markers),
+        Err(error) => {
+            tracing::warn!(
+                repository = %target.repository,
+                pull_request = target.number,
+                head_sha = %target.head_sha,
+                %error,
+                "failed to scan pull request patches for conflict markers"
+            );
+            None
+        }
+    }
 }
 
 fn patch_has_added_conflict_marker(patch: &str) -> bool {

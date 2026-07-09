@@ -3,7 +3,8 @@
 //! cases need both the helpers and the fetcher visible at once.
 
 use super::fetcher::{
-    ConditionalFetchOutcome, RestFetchError, fetch_patches, fetch_patches_conditional,
+    ConditionalFetchOutcome, RestFetchError, any_patch_matches, fetch_patches,
+    fetch_patches_conditional,
 };
 use super::parsing::{
     RestPullFile, detect_drift, is_truncated_patch, parse_next_link, parse_rest_status,
@@ -358,6 +359,81 @@ async fn fetch_patches_stops_paging_when_requested_path_is_found() {
         .expect("fetch");
     assert_eq!(patches.len(), 1);
     assert_eq!(patches[0].path, "want.rs");
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn any_patch_matches_stops_after_matching_page() {
+    let _budget_guard = crate::github_api::acquire_global_budget_test_lock().await;
+    use axum::Router;
+    use axum::extract::Query;
+    use axum::http::HeaderValue;
+    use axum::response::IntoResponse;
+    use axum::routing::get;
+    use serde::Deserialize;
+    use serde_json::json;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::net::TcpListener;
+
+    #[derive(Deserialize)]
+    struct PageQuery {
+        page: Option<u8>,
+    }
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let route_calls = Arc::clone(&calls);
+    let app = Router::new().route(
+        "/repos/{owner}/{repo}/pulls/{number}/files",
+        get(move |Query(query): Query<PageQuery>| {
+            let calls = Arc::clone(&route_calls);
+            async move {
+                calls.fetch_add(1, Ordering::SeqCst);
+                let body = match query.page {
+                    Some(2) => json!([{
+                        "sha": "match", "filename": "match.rs", "status": "modified",
+                        "additions": 1, "deletions": 0, "changes": 1,
+                        "blob_url": "https://example.com/m",
+                        "raw_url": "https://example.com/m",
+                        "contents_url": "https://example.com/m",
+                        "patch": "@@ -1 +1 @@\n+<<<<<<< HEAD\n"
+                    }]),
+                    _ => json!([{
+                        "sha": "skip", "filename": "skip.rs", "status": "modified",
+                        "additions": 1, "deletions": 0, "changes": 1,
+                        "blob_url": "https://example.com/s",
+                        "raw_url": "https://example.com/s",
+                        "contents_url": "https://example.com/s",
+                        "patch": "@@ -1 +1 @@\n+clean\n"
+                    }]),
+                };
+                let mut response = axum::Json(body).into_response();
+                if query.page.is_none() || query.page == Some(2) {
+                    let next_page = query.page.unwrap_or(1) + 1;
+                    response.headers_mut().insert(
+                        "link",
+                        HeaderValue::from_str(&format!(
+                            "<http://127.0.0.1:{port}/repos/o/r/pulls/1/files?page={next_page}>; rel=\"next\""
+                        ))
+                        .expect("link header"),
+                    );
+                }
+                response
+            }
+        }),
+    );
+    let server = tokio::spawn(async move {
+        let _ = axum::serve(listener, app).await;
+    });
+    let client = protected_client_at(port);
+
+    let matched = any_patch_matches(&client, "o/r", 1, |patch| patch.contains("<<<<<<<"))
+        .await
+        .expect("scan");
+    assert!(matched);
     assert_eq!(calls.load(Ordering::SeqCst), 2);
     server.abort();
 }

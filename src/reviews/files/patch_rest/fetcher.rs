@@ -112,6 +112,100 @@ pub async fn fetch_patches_conditional(
     Ok(ConditionalFetchOutcome::Fetched { etag, patches })
 }
 
+/// Scan PR file patches page-by-page and stop as soon as `predicate` matches.
+///
+/// This is intentionally separate from [`fetch_patches`] so callers that only
+/// need a yes/no answer do not materialize every patch for large pull requests.
+///
+/// # Errors
+/// Returns `RestFetchError` on network / auth failures and on malformed
+/// `repo_full_name`.
+pub async fn any_patch_matches<F>(
+    client: &GitHubProtectedClient,
+    repo_full_name: &str,
+    pr_number: u64,
+    predicate: F,
+) -> Result<bool, RestFetchError>
+where
+    F: Fn(&str) -> bool + Send + Sync,
+{
+    let (owner, repo) = split_repo_full_name(repo_full_name).ok_or_else(|| {
+        RestFetchError::InvalidRequest("repo_full_name must be owner/name".into())
+    })?;
+    let route = format!("/repos/{owner}/{repo}/pulls/{pr_number}/files");
+    let response = client
+        .rest_json_with_headers::<Vec<RestPullFile>>(
+            Method::GET,
+            route,
+            None,
+            patch_descriptor("reviews.files_patch_scan"),
+            HeaderMap::new(),
+        )
+        .await
+        .map_err(|e| RestFetchError::Http(e.to_string()))?;
+    if !response.status.is_success() {
+        return Err(RestFetchError::Http(format!(
+            "rest patches status {}",
+            response.status
+        )));
+    }
+    let mut next_uri = response
+        .headers
+        .get("link")
+        .and_then(|v| v.to_str().ok())
+        .and_then(parse_next_link);
+    let first_page = response
+        .body
+        .ok_or_else(|| RestFetchError::Http("rest patches missing body".into()))?;
+    if page_has_matching_patch(&first_page, &predicate) {
+        return Ok(true);
+    }
+
+    let mut visited_pages = 1_u32;
+    while visited_pages < FILES_PAGE_CAP
+        && let Some(uri_str) = next_uri.take()
+    {
+        let response = client
+            .rest_json_with_headers::<Vec<RestPullFile>>(
+                Method::GET,
+                uri_str,
+                None,
+                patch_descriptor("reviews.files_patch_scan_page"),
+                HeaderMap::new(),
+            )
+            .await
+            .map_err(|e| RestFetchError::Http(e.to_string()))?;
+        if !response.status.is_success() {
+            return Err(RestFetchError::Http(format!(
+                "rest patches paginated status {}",
+                response.status
+            )));
+        }
+        next_uri = response
+            .headers
+            .get("link")
+            .and_then(|v| v.to_str().ok())
+            .and_then(parse_next_link);
+        let page = response
+            .body
+            .ok_or_else(|| RestFetchError::Http("paginated body missing".into()))?;
+        if page_has_matching_patch(&page, &predicate) {
+            return Ok(true);
+        }
+        visited_pages += 1;
+    }
+    Ok(false)
+}
+
+fn page_has_matching_patch<F>(files: &[RestPullFile], predicate: &F) -> bool
+where
+    F: Fn(&str) -> bool,
+{
+    files
+        .iter()
+        .any(|file| file.patch.as_deref().is_some_and(predicate))
+}
+
 async fn fetch_remaining_pages(
     client: &GitHubProtectedClient,
     first_page: Vec<RestPullFile>,
