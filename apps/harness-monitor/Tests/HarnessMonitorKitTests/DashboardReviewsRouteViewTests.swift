@@ -183,7 +183,7 @@ struct DashboardReviewsRouteViewTests {
   @Test("pasted review text loads live policy workspace before evaluation")
   func pastedReviewTextLoadsLivePolicyWorkspaceBeforeEvaluation() throws {
     let source = try dashboardReviewsRouteSource(
-      named: "DashboardReviewsRouteView+TextPaste.swift")
+      named: "DashboardReviewsTextPasteSheetHost+Policy.swift")
     let prepareRange = try #require(
       source.range(of: "await preparePastedReviewTextPolicyRuntime("))
     let referencesRange = try #require(
@@ -191,7 +191,9 @@ struct DashboardReviewsRouteViewTests {
 
     #expect(source.contains("await preparePastedReviewTextPolicyRuntime("))
     #expect(source.contains("await store.ensurePolicyCanvasWorkspaceLoadedForRuntimePolicies()"))
-    #expect(source.contains("synchronizeEnforcedCanvasAutomationPolicies(policyCenter:"))
+    #expect(
+      source.contains("DashboardAutomationPolicyRuntimeSynchronizer")
+    )
     #expect(prepareRange.lowerBound < referencesRange.lowerBound)
   }
 

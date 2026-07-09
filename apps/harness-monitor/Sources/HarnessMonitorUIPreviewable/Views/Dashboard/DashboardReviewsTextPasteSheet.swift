@@ -11,6 +11,11 @@ struct DashboardReviewsPastedTextReviewSheet: View {
 
   @Environment(\.dismiss)
   private var dismiss
+  @FocusState private var focusedControl: FocusedControl?
+
+  private enum FocusedControl: Hashable {
+    case approve
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -39,6 +44,11 @@ struct DashboardReviewsPastedTextReviewSheet: View {
       footer
     }
     .frame(minWidth: 760, idealWidth: 880, minHeight: 560, idealHeight: 700)
+    .defaultFocus($focusedControl, .approve)
+    .task(id: state.id) {
+      await Task.yield()
+      focusedControl = state.eligibleItems.isEmpty ? nil : .approve
+    }
   }
 
   private var header: some View {
@@ -234,6 +244,7 @@ struct DashboardReviewsPastedTextReviewSheet: View {
         }
         .disabled(state.eligibleItems.isEmpty)
         .keyboardShortcut(.defaultAction)
+        .focused($focusedControl, equals: .approve)
         .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
       }
     }

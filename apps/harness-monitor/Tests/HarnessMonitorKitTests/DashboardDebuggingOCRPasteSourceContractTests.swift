@@ -84,7 +84,7 @@ extension SessionWindowFlowTests {
     #expect(sceneContentSource.contains(".dashboardDebuggingOCRPasteCommand()"))
   }
 
-  @Test("Reviews PR URL paste is a scene-level paste command that routes to Reviews")
+  @Test("Reviews PR URL paste is a scene-level paste command hosted by dashboard")
   func reviewsPRURLPasteUsesSceneLevelCommandRouting() throws {
     let pasteCommandSource = try previewableSourceFile(
       named: "Views/Dashboard/DashboardReviewsTextPasteCommand.swift"
@@ -92,8 +92,11 @@ extension SessionWindowFlowTests {
     let requestSource = try previewableSourceFile(
       named: "Views/Dashboard/DashboardReviewsTextPasteboardRequests.swift"
     )
-    let routeSource = try previewableSourceFile(
-      named: "Views/Dashboard/DashboardReviewsRouteView.swift"
+    let hostSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardReviewsTextPasteSheetHost.swift"
+    )
+    let dashboardSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardWindowView.swift"
     )
     let sceneContentSource = try harnessSourceFile(
       named: "App/HarnessMonitorApp+SceneContent.swift"
@@ -107,14 +110,16 @@ extension SessionWindowFlowTests {
         "DashboardReviewsTextPasteboardRequests.requestPasteFromClipboard()"
       )
     )
-    #expect(pasteCommandSource.contains("requestDashboardRoute(.reviews)"))
+    #expect(!pasteCommandSource.contains("requestDashboardRoute(.reviews)"))
+    #expect(pasteCommandSource.contains("ensureDashboardHostAvailable()"))
     #expect(pasteCommandSource.contains("isTextEditingFirstResponder()"))
     #expect(requestSource.contains("GitHubPullRequestReferenceParser.references(in: text)"))
     #expect(requestSource.contains("DashboardReviewsTextPasteboardRequests.changed"))
-    #expect(routeSource.contains("consumePendingReviewTextPasteRequest()"))
-    #expect(routeSource.contains("DashboardReviewsTextPasteboardRequests.changedNotification"))
-    #expect(routeSource.contains("takePendingRequest("))
-    #expect(routeSource.contains("handlePastedReviewText(request.text)"))
+    #expect(hostSource.contains("consumePendingReviewTextPasteRequest()"))
+    #expect(hostSource.contains("DashboardReviewsTextPasteboardRequests.changedNotification"))
+    #expect(hostSource.contains("takePendingRequest("))
+    #expect(hostSource.contains("handlePastedReviewText(request.text)"))
+    #expect(dashboardSource.contains(".dashboardReviewsTextPasteSheetHost("))
     #expect(sceneContentSource.contains(".dashboardReviewsTextPasteCommand()"))
   }
 }

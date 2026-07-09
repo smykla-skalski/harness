@@ -36,7 +36,7 @@ private struct DashboardReviewsTextPasteCommandModifier: ViewModifier {
         guard DashboardReviewsTextPasteboardRequests.requestPaste(items) else {
           return
         }
-        routeToReviews()
+        ensureDashboardHostAvailable()
       }
   }
 
@@ -47,17 +47,12 @@ private struct DashboardReviewsTextPasteCommandModifier: ViewModifier {
     guard DashboardReviewsTextPasteboardRequests.requestPasteFromClipboard() else {
       return false
     }
-    routeToReviews()
+    ensureDashboardHostAvailable()
     return true
   }
 
-  private func routeToReviews() {
-    UserDefaults.standard.set(
-      DashboardWindowRoute.reviews.rawValue,
-      forKey: DashboardRouteRestorationDefaults.storageKey
-    )
-    if let history = GlobalWindowNavigationHistoryRegistry.current {
-      history.requestDashboardRoute(.reviews)
+  private func ensureDashboardHostAvailable() {
+    if GlobalWindowNavigationHistoryRegistry.current != nil {
       return
     }
     openWindow.openHarnessDashboardWindow()

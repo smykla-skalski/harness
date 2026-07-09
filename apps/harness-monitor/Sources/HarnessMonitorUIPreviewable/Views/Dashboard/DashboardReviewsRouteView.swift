@@ -65,7 +65,6 @@ struct DashboardReviewsRouteView: View {
 
   @State private var routeState: DashboardReviewsRouteViewState
   @State private var reviewsPreferencesStore = ReviewsPreferencesStore()
-  @State private var routeHandledTextPasteRequestID = 0
 
   init(
     store: HarnessMonitorStore,
@@ -162,15 +161,7 @@ struct DashboardReviewsRouteView: View {
       }
       .onAppear {
         applyLegacyFilterMigrationIfNeeded()
-        consumePendingReviewTextPasteRequest()
         consumePendingReviewScreenshotPasteRequest()
-      }
-      .onReceive(
-        NotificationCenter.default.publisher(
-          for: DashboardReviewsTextPasteboardRequests.changedNotification
-        )
-      ) { _ in
-        consumePendingReviewTextPasteRequest()
       }
       .onReceive(
         NotificationCenter.default.publisher(
@@ -312,19 +303,5 @@ struct DashboardReviewsRouteView: View {
         routeSelectedIDs = [pullRequestID]
       }
       .harnessFocusedSceneValue(\.dashboardReviewsCommands, reviewCommandFocus)
-  }
-}
-
-extension DashboardReviewsRouteView {
-  func consumePendingReviewTextPasteRequest() {
-    guard
-      let request = DashboardReviewsTextPasteboardRequests.takePendingRequest(
-        after: routeHandledTextPasteRequestID
-      )
-    else {
-      return
-    }
-    routeHandledTextPasteRequestID = request.id
-    trackInFlight(Task { await handlePastedReviewText(request.text) })
   }
 }

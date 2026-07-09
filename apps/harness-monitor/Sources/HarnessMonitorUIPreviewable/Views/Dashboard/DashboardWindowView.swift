@@ -201,6 +201,7 @@ public struct DashboardWindowView: View {
         workspace: dashboardUI.policyCanvasWorkspace,
         activeDocument: dashboardUI.policyPipeline
       )
+      .dashboardReviewsTextPasteSheetHost(store: store, history: history)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)
       .onChange(of: selectedRoute) { _, newRoute in
