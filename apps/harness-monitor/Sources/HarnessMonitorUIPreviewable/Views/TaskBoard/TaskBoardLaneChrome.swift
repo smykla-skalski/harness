@@ -23,13 +23,13 @@ struct TaskBoardLaneHeader: View {
     Button(action: onToggleCollapse) {
       headerContent
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, metrics.headerHorizontalPadding)
+        .padding(.vertical, metrics.headerVerticalPadding)
+        .padding(.bottom, metrics.headerBottomPadding)
+        .contentShape(Rectangle())
     }
     .harnessPlainButtonStyle()
-    .padding(.horizontal, metrics.headerHorizontalPadding)
-    .padding(.vertical, metrics.headerVerticalPadding)
-    .padding(.bottom, metrics.headerBottomPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .contentShape(Rectangle())
     .taskBoardLaneToggleFeedback(lane: lane, cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
     .overlay(alignment: .bottom) {
       Rectangle()

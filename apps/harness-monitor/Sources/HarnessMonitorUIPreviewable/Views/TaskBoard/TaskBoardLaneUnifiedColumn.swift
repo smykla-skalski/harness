@@ -276,18 +276,7 @@ private struct TaskBoardCollapsedLane: View {
           .background(HarnessMonitorTheme.controlBorder.opacity(0.34), in: Circle())
           .accessibilityHidden(true)
 
-        Text(lane.title)
-          .font(titleFont)
-          .foregroundStyle(HarnessMonitorTheme.ink.opacity(0.82))
-          .lineLimit(1)
-          .minimumScaleFactor(0.72)
-          .frame(width: metrics.laneCollapsedTitleHeight, alignment: .leading)
-          .rotationEffect(.degrees(90))
-          .frame(
-            width: metrics.laneCollapsedTextWidth,
-            height: metrics.laneCollapsedTitleHeight,
-            alignment: .top
-          )
+        collapsedTitle
 
         Spacer(minLength: 0)
       }
@@ -300,5 +289,22 @@ private struct TaskBoardCollapsedLane: View {
     .help("Expand \(lane.title) board")
     .accessibilityLabel("Expand \(lane.title) board")
     .accessibilityValue("\(count) items")
+  }
+
+  private var collapsedTitle: some View {
+    Text(lane.title)
+      .font(titleFont)
+      .foregroundStyle(HarnessMonitorTheme.ink.opacity(0.82))
+      .lineLimit(1)
+      .minimumScaleFactor(0.72)
+      .frame(width: metrics.laneCollapsedTitleHeight, alignment: .leading)
+      .rotationEffect(.degrees(90), anchor: .topLeading)
+      .offset(x: metrics.laneCollapsedTextWidth)
+      .frame(
+        width: metrics.laneCollapsedTextWidth,
+        height: metrics.laneCollapsedTitleHeight,
+        alignment: .top
+      )
+      .clipped()
   }
 }
