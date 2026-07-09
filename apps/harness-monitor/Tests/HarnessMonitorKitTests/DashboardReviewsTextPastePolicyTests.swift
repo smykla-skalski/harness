@@ -29,6 +29,55 @@ struct DashboardReviewsTextPastePolicyTests {
     #expect(references[0].canonicalURLString == "https://github.com/kong/kuma/pull/16703")
   }
 
+  @Test("Reviews PR URL text paste queues only GitHub pull request text")
+  func reviewsPRURLTextPasteQueuesOnlyGitHubPullRequestText() throws {
+    DashboardReviewsTextPasteboardRequests.resetForTesting()
+    defer { DashboardReviewsTextPasteboardRequests.resetForTesting() }
+
+    #expect(!DashboardReviewsTextPasteboardRequests.requestPaste("plain clipboard text"))
+    #expect(
+      DashboardReviewsTextPasteboardRequests.requestPaste(
+        "https://github.com/example-org/example-repo/pull/16703/files"
+      )
+    )
+    let request = try #require(
+      DashboardReviewsTextPasteboardRequests.takePendingRequest(after: 0)
+    )
+
+    #expect(request.id == 1)
+    #expect(request.text == "https://github.com/example-org/example-repo/pull/16703/files")
+    #expect(DashboardReviewsTextPasteboardRequests.takePendingRequest(after: request.id) == nil)
+  }
+
+  @Test("Reviews PR URL text paste batches pending text before route consumption")
+  func reviewsPRURLTextPasteBatchesPendingTextBeforeRouteConsumption() throws {
+    DashboardReviewsTextPasteboardRequests.resetForTesting()
+    defer { DashboardReviewsTextPasteboardRequests.resetForTesting() }
+
+    #expect(
+      DashboardReviewsTextPasteboardRequests.requestPaste(
+        "https://github.com/example-org/example-repo/pull/16703"
+      )
+    )
+    #expect(
+      DashboardReviewsTextPasteboardRequests.requestPaste(
+        "https://github.com/smykla-skalski/harness/pull/1234"
+      )
+    )
+    let request = try #require(
+      DashboardReviewsTextPasteboardRequests.takePendingRequest(after: 0)
+    )
+
+    #expect(request.id == 1)
+    #expect(
+      request.text
+        == [
+          "https://github.com/example-org/example-repo/pull/16703",
+          "https://github.com/smykla-skalski/harness/pull/1234",
+        ].joined(separator: "\n")
+    )
+  }
+
   @Test("Default document leaves manual review text paste to policy canvas")
   func defaultDocumentLeavesManualReviewTextPasteToPolicyCanvas() {
     let document = AutomationPolicyDocument()

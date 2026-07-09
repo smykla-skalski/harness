@@ -83,4 +83,38 @@ extension SessionWindowFlowTests {
     #expect(previewSource.contains("dashboardDebuggingOCRPreviewText"))
     #expect(sceneContentSource.contains(".dashboardDebuggingOCRPasteCommand()"))
   }
+
+  @Test("Reviews PR URL paste is a scene-level paste command that routes to Reviews")
+  func reviewsPRURLPasteUsesSceneLevelCommandRouting() throws {
+    let pasteCommandSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardReviewsTextPasteCommand.swift"
+    )
+    let requestSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardReviewsTextPasteboardRequests.swift"
+    )
+    let routeSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardReviewsRouteView.swift"
+    )
+    let sceneContentSource = try harnessSourceFile(
+      named: "App/HarnessMonitorApp+SceneContent.swift"
+    )
+
+    #expect(pasteCommandSource.contains(".pasteDestination("))
+    #expect(pasteCommandSource.contains("DashboardReviewsTextPasteTransferItem.self"))
+    #expect(pasteCommandSource.contains("NSEvent.addLocalMonitorForEvents"))
+    #expect(
+      pasteCommandSource.contains(
+        "DashboardReviewsTextPasteboardRequests.requestPasteFromClipboard()"
+      )
+    )
+    #expect(pasteCommandSource.contains("requestDashboardRoute(.reviews)"))
+    #expect(pasteCommandSource.contains("isTextEditingFirstResponder()"))
+    #expect(requestSource.contains("GitHubPullRequestReferenceParser.references(in: text)"))
+    #expect(requestSource.contains("DashboardReviewsTextPasteboardRequests.changed"))
+    #expect(routeSource.contains("consumePendingReviewTextPasteRequest()"))
+    #expect(routeSource.contains("DashboardReviewsTextPasteboardRequests.changedNotification"))
+    #expect(routeSource.contains("takePendingRequest("))
+    #expect(routeSource.contains("handlePastedReviewText(request.text)"))
+    #expect(sceneContentSource.contains(".dashboardReviewsTextPasteCommand()"))
+  }
 }

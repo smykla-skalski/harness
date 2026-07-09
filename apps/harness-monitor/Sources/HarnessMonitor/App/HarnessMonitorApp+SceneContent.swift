@@ -46,6 +46,7 @@ extension HarnessMonitorApp {
       .harnessTrackMCPWindow()
       .environment(appStore)
       .dashboardDebuggingOCRPasteCommand()
+      .dashboardReviewsTextPasteCommand()
     } else {
       Color.clear.accessibilityHidden(true)
     }
@@ -61,6 +62,7 @@ extension HarnessMonitorApp {
         .environment(appStore)
         .environment(\.openAnythingDashboardReviewRegistry, appOpenAnythingReviews)
         .dashboardDebuggingOCRPasteCommand()
+        .dashboardReviewsTextPasteCommand()
         .onOpenURL { url in
           handleHarnessDeepLink(url)
         }
@@ -110,6 +112,7 @@ extension HarnessMonitorApp {
       .environment(appStore)
       .environment(\.supervisorAuditTimelineDispatcher, appAuditTimelineDispatcher)
       .dashboardDebuggingOCRPasteCommand()
+      .dashboardReviewsTextPasteCommand()
     } else {
       Color.clear.accessibilityHidden(true)
     }
