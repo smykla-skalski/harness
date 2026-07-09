@@ -1,21 +1,24 @@
 use super::*;
 use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
-use crate::daemon::remote_acme::{RemoteCertificateBundle, build_remote_acme_runtime_plan};
+use crate::daemon::remote_acme::{
+    RemoteAcmeAccountCredentials, RemoteCertificateBundle, build_remote_acme_runtime_plan,
+};
 
 #[test]
 fn remote_acme_state_status_hides_private_key_and_tracks_material() {
     let db = DaemonDb::open_in_memory().expect("open db");
     db.conn
         .execute(
-            "UPDATE remote_acme_state
+            r#"UPDATE remote_acme_state
              SET account_id = 'acct-1',
+                 account_credentials_json = '{"id":"acct-1","key_pkcs8":"account-key-secret"}',
                  certificate_pem = 'cert-pem',
                  private_key_pem = 'key-secret',
                  certificate_fingerprint = 'fp-1',
                  renewal_status = 'succeeded',
                  renewal_error = NULL,
                  updated_at = '2026-06-21T15:00:00Z'
-             WHERE singleton = 1",
+             WHERE singleton = 1"#,
             [],
         )
         .expect("seed acme state");
@@ -216,15 +219,16 @@ fn remote_acme_runtime_state_loads_certificate_material_for_serve() {
     let db = DaemonDb::open_in_memory().expect("open db");
     db.conn
         .execute(
-            "UPDATE remote_acme_state
+            r#"UPDATE remote_acme_state
              SET account_id = 'acct-1',
+                 account_credentials_json = '{"id":"acct-1","key_pkcs8":"account-key-secret"}',
                  certificate_pem = 'cert-pem',
                  private_key_pem = 'key-secret',
                  certificate_fingerprint = 'stored-fp',
                  renewal_status = 'succeeded',
                  renewal_error = NULL,
                  updated_at = '2026-06-21T15:00:00Z'
-             WHERE singleton = 1",
+             WHERE singleton = 1"#,
             [],
         )
         .expect("seed acme runtime state");
@@ -245,13 +249,14 @@ fn remote_acme_runtime_state_preserves_account_only_failure() {
     let db = DaemonDb::open_in_memory().expect("open db");
     db.conn
         .execute(
-            "UPDATE remote_acme_state
+            r#"UPDATE remote_acme_state
              SET account_id = 'acct-1',
+                 account_credentials_json = '{"id":"acct-1","key_pkcs8":"account-key-secret"}',
                  certificate_pem = NULL,
                  private_key_pem = NULL,
                  certificate_fingerprint = NULL,
                  updated_at = '2026-06-21T15:00:00Z'
-             WHERE singleton = 1",
+             WHERE singleton = 1"#,
             [],
         )
         .expect("seed account-only acme state");
@@ -263,6 +268,57 @@ fn remote_acme_runtime_state_preserves_account_only_failure() {
         .expect_err("account-only state should fail without TLS material");
 
     assert!(error.to_string().contains("persisted TLS certificate"));
+}
+
+#[test]
+fn remote_acme_runtime_state_rejects_legacy_account_without_credentials() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    db.conn
+        .execute(
+            "UPDATE remote_acme_state
+             SET account_id = 'legacy-account-id',
+                 account_credentials_json = NULL,
+                 certificate_pem = 'cert-pem',
+                 private_key_pem = 'key-secret',
+                 certificate_fingerprint = 'stored-fp',
+                 updated_at = '2026-07-09T18:00:00Z'
+             WHERE singleton = 1",
+            [],
+        )
+        .expect("seed legacy acme runtime state");
+
+    let state = db
+        .load_remote_acme_runtime_state()
+        .expect("load legacy acme runtime state");
+    let error = build_remote_acme_runtime_plan(&remote_serve_config(), &state)
+        .expect_err("legacy account id must not authorize remote TLS startup");
+
+    assert!(error.to_string().contains("persisted ACME state"));
+}
+
+#[test]
+fn remote_acme_runtime_state_rejects_mismatched_account_credentials() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    db.conn
+        .execute(
+            r#"UPDATE remote_acme_state
+             SET account_id = 'acct-1',
+                 account_credentials_json = '{"id":"acct-2","key_pkcs8":"account-key-secret"}',
+                 certificate_pem = 'cert-pem',
+                 private_key_pem = 'key-secret',
+                 certificate_fingerprint = 'stored-fp',
+                 updated_at = '2026-07-09T18:00:00Z'
+             WHERE singleton = 1"#,
+            [],
+        )
+        .expect("seed mismatched acme runtime state");
+
+    let error = db
+        .load_remote_acme_runtime_state()
+        .expect_err("mismatched account credentials must fail closed");
+
+    assert!(error.to_string().contains("account id"));
+    assert!(!error.to_string().contains("account-key-secret"));
 }
 
 #[test]
@@ -289,15 +345,16 @@ fn remote_acme_renewal_success_persists_certificate_and_clears_error() {
     let db = DaemonDb::open_in_memory().expect("open db");
     db.conn
         .execute(
-            "UPDATE remote_acme_state
+            r#"UPDATE remote_acme_state
              SET account_id = 'acct-1',
+                 account_credentials_json = '{"id":"acct-1","key_pkcs8":"account-key-secret"}',
                  certificate_pem = 'old-cert',
                  private_key_pem = 'old-key',
                  certificate_fingerprint = 'old-fp',
                  renewal_status = 'failed',
                  renewal_error = 'renewal failed: old error',
                  updated_at = '2026-06-21T15:00:00Z'
-             WHERE singleton = 1",
+             WHERE singleton = 1"#,
             [],
         )
         .expect("seed failed acme state");
@@ -324,6 +381,102 @@ fn remote_acme_renewal_success_persists_certificate_and_clears_error() {
         runtime_plan.certificate().fingerprint(),
         bundle.fingerprint()
     );
+}
+
+#[test]
+fn remote_acme_account_credentials_persist_without_secret_projection() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let account = RemoteAcmeAccountCredentials::new(
+        "https://acme.test/acct/1",
+        r#"{"id":"https://acme.test/acct/1","key_pkcs8":"account-key-secret"}"#,
+    )
+    .expect("valid account credentials");
+
+    db.record_remote_acme_account(&account, "2026-07-09T18:00:00Z")
+        .expect("record account credentials");
+
+    let issuance = db
+        .load_remote_acme_issuance_state()
+        .expect("load issuance state");
+    let stored = issuance
+        .account
+        .as_ref()
+        .expect("stored account credentials");
+    assert_eq!(stored.account_id(), "https://acme.test/acct/1");
+    assert_eq!(stored.serialized(), account.serialized());
+    assert!(!format!("{issuance:?}").contains("account-key-secret"));
+
+    let status = db.load_remote_acme_state().expect("load safe status");
+    assert!(status.account_configured);
+    assert_eq!(
+        status.account_id.as_deref(),
+        Some("https://acme.test/acct/1")
+    );
+    assert!(!format!("{status:?}").contains("account-key-secret"));
+}
+
+#[test]
+fn migrates_v28_remote_acme_state_to_account_credentials() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let path = tmp.path().join("harness.db");
+    {
+        let db = DaemonDb::open(&path).expect("open current db");
+        db.conn
+            .execute(
+                "ALTER TABLE remote_acme_state DROP COLUMN account_credentials_json",
+                [],
+            )
+            .expect("remove v29 account credentials column");
+        db.conn
+            .execute(
+                "UPDATE schema_meta SET value = '28' WHERE key = 'version'",
+                [],
+            )
+            .expect("stamp v28 schema");
+    }
+
+    let db = DaemonDb::open(&path).expect("open migrated db");
+
+    assert_eq!(db.schema_version().expect("version"), SCHEMA_VERSION);
+    let count: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('remote_acme_state') \
+             WHERE name = 'account_credentials_json'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("query account credentials column");
+    assert_eq!(count, 1);
+}
+
+#[test]
+fn repairs_partially_applied_v29_account_credentials_column() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let path = tmp.path().join("harness.db");
+    {
+        let db = DaemonDb::open(&path).expect("open current db");
+        db.conn
+            .execute(
+                "UPDATE schema_meta SET value = '28' WHERE key = 'version'",
+                [],
+            )
+            .expect("simulate partial v29 migration");
+    }
+
+    let db = DaemonDb::open(&path).expect("open repaired db");
+
+    assert_eq!(db.schema_version().expect("version"), SCHEMA_VERSION);
+    let count: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('remote_acme_state') \
+             WHERE name = 'account_credentials_json'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("query account credentials column");
+    assert_eq!(count, 1);
 }
 
 fn remote_serve_config() -> RemoteDaemonServeConfig {

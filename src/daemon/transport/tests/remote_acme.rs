@@ -3,7 +3,8 @@ use clap::Parser;
 use crate::daemon::db::DaemonDb;
 use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
 use crate::daemon::remote_acme::{
-    RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest, RemoteCertificateBundle,
+    RemoteAcmeAccountCredentials, RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest,
+    RemoteCertificateBundle,
 };
 
 use super::super::remote::{DaemonRemoteAcmeCommand, DaemonRemoteCommand};
@@ -44,15 +45,16 @@ fn daemon_remote_acme_status_reports_persisted_state_without_key() {
         .expect("record remote acme serve config");
     db.connection()
         .execute(
-            "UPDATE remote_acme_state
+            r#"UPDATE remote_acme_state
              SET account_id = 'acct-1',
+                 account_credentials_json = '{"id":"acct-1","key_pkcs8":"account-key-secret"}',
                  certificate_pem = 'cert-pem',
                  private_key_pem = 'key-secret',
                  certificate_fingerprint = 'fp-1',
                  renewal_status = 'succeeded',
                  renewal_error = NULL,
                  updated_at = '2026-06-21T15:10:00Z'
-             WHERE singleton = 1",
+             WHERE singleton = 1"#,
             [],
         )
         .expect("seed acme state");
@@ -98,7 +100,7 @@ fn remote_dns_serve_config() -> RemoteDaemonServeConfig {
 }
 
 #[test]
-fn daemon_remote_acme_renew_records_missing_state_failure_and_audit() {
+fn daemon_remote_acme_renew_records_missing_serve_config_failure_and_audit() {
     let db = DaemonDb::open_in_memory().expect("open db");
 
     let response = DaemonRemoteAcmeCommand::Renew
@@ -110,7 +112,7 @@ fn daemon_remote_acme_renew_records_missing_state_failure_and_audit() {
         response
             .renewal_error
             .as_deref()
-            .is_some_and(|error| error.contains("persisted ACME state"))
+            .is_some_and(|error| error.contains("remote ACME serve config"))
     );
 
     let state = db.load_remote_acme_state().expect("load acme state");
@@ -122,7 +124,7 @@ fn daemon_remote_acme_renew_records_missing_state_failure_and_audit() {
     let error = response
         .ensure_success()
         .expect_err("failure renewal response must produce a command error");
-    assert!(error.to_string().contains("persisted ACME state"));
+    assert!(error.to_string().contains("remote ACME serve config"));
     assert!(!error.to_string().contains("did not succeed"));
 
     let events = db.load_remote_audit_events(10).expect("audit events");
@@ -132,7 +134,7 @@ fn daemon_remote_acme_renew_records_missing_state_failure_and_audit() {
 }
 
 #[test]
-fn daemon_remote_acme_renew_preserves_missing_certificate_failure() {
+fn daemon_remote_acme_renew_replaces_legacy_account_without_credentials() {
     let db = DaemonDb::open_in_memory().expect("open db");
     db.record_remote_acme_serve_config(&remote_dns_serve_config(), "2026-06-21T15:09:30Z")
         .expect("record remote acme serve config");
@@ -152,21 +154,26 @@ fn daemon_remote_acme_renew_preserves_missing_certificate_failure() {
         .expect("seed account-only acme state");
 
     let response = DaemonRemoteAcmeCommand::Renew
-        .renew_with(&db, "audit-acme-renew", "2026-06-21T15:12:00Z")
+        .renew_with_issuer(
+            &db,
+            "audit-acme-renew",
+            "2026-06-21T15:12:00Z",
+            &InitialIssuanceIssuer,
+        )
         .expect("renew response");
 
-    assert_eq!(response.renewal_status, "failed");
-    assert!(
-        response
-            .renewal_error
-            .as_deref()
-            .is_some_and(|error| error.contains("persisted TLS certificate"))
-    );
-    assert!(
-        !response
-            .renewal_error
-            .as_deref()
-            .is_some_and(|error| error.contains("not implemented"))
+    assert_eq!(response.renewal_status, "succeeded");
+    assert!(response.account_configured);
+    assert!(response.certificate_configured);
+    let issuance = db
+        .load_remote_acme_issuance_state()
+        .expect("load issuance state");
+    assert_eq!(
+        issuance
+            .account
+            .as_ref()
+            .map(|account| account.account_id()),
+        Some("https://acme.test/acct/initial")
     );
 }
 
@@ -263,6 +270,29 @@ fn daemon_remote_acme_renew_persists_success_from_issuer_and_audits() {
     }));
 }
 
+#[test]
+fn daemon_remote_acme_renew_bootstraps_account_and_initial_certificate() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    db.record_remote_acme_serve_config(&remote_dns_serve_config(), "2026-07-09T18:09:30Z")
+        .expect("record remote acme serve config");
+    let issuer = InitialIssuanceIssuer;
+
+    let response = DaemonRemoteAcmeCommand::Renew
+        .renew_with_issuer(&db, "audit-acme-initial", "2026-07-09T18:10:00Z", &issuer)
+        .expect("initial issuance response");
+
+    assert_eq!(response.renewal_status, "succeeded");
+    assert!(response.account_configured);
+    assert!(response.certificate_configured);
+    let issuance = db
+        .load_remote_acme_issuance_state()
+        .expect("load issuance state");
+    let account = issuance.account.as_ref().expect("persisted ACME account");
+    assert_eq!(account.account_id(), "https://acme.test/acct/initial");
+    assert!(account.serialized().contains("account-key-secret"));
+    assert!(!format!("{issuance:?}").contains("account-key-secret"));
+}
+
 struct FakeRenewalIssuer {
     expected_account_id: &'static str,
     bundle: RemoteCertificateBundle,
@@ -270,9 +300,21 @@ struct FakeRenewalIssuer {
 
 struct PanicRenewalIssuer;
 
+struct InitialIssuanceIssuer;
+
 impl RemoteAcmeRenewalIssuer for FakeRenewalIssuer {
-    fn supports_initial_certificate(&self) -> bool {
-        true
+    fn create_account(
+        &self,
+        _config: &RemoteDaemonServeConfig,
+    ) -> Result<RemoteAcmeAccountCredentials, String> {
+        RemoteAcmeAccountCredentials::new(
+            self.expected_account_id,
+            &format!(
+                r#"{{"id":"{}","key_pkcs8":"fake-account-key"}}"#,
+                self.expected_account_id
+            ),
+        )
+        .map_err(|error| error.to_string())
     }
 
     fn renew_certificate(
@@ -294,10 +336,44 @@ impl RemoteAcmeRenewalIssuer for FakeRenewalIssuer {
 }
 
 impl RemoteAcmeRenewalIssuer for PanicRenewalIssuer {
+    fn create_account(
+        &self,
+        _config: &RemoteDaemonServeConfig,
+    ) -> Result<RemoteAcmeAccountCredentials, String> {
+        panic!("issuer must not create an account without persisted serve config")
+    }
+
     fn renew_certificate(
         &self,
         _request: &RemoteAcmeRenewalRequest,
     ) -> Result<RemoteCertificateBundle, String> {
         panic!("issuer must not run without persisted serve config")
+    }
+}
+
+impl RemoteAcmeRenewalIssuer for InitialIssuanceIssuer {
+    fn create_account(
+        &self,
+        config: &RemoteDaemonServeConfig,
+    ) -> Result<RemoteAcmeAccountCredentials, String> {
+        assert_eq!(config.acme_email, "ops@example.com");
+        RemoteAcmeAccountCredentials::new(
+            "https://acme.test/acct/initial",
+            r#"{"id":"https://acme.test/acct/initial","key_pkcs8":"account-key-secret"}"#,
+        )
+        .map_err(|error| error.to_string())
+    }
+
+    fn renew_certificate(
+        &self,
+        request: &RemoteAcmeRenewalRequest,
+    ) -> Result<RemoteCertificateBundle, String> {
+        assert_eq!(request.account_id(), "https://acme.test/acct/initial");
+        assert!(request.account_credentials().contains("account-key-secret"));
+        assert_eq!(request.previous_certificate_fingerprint(), None);
+        Ok(RemoteCertificateBundle::new_for_tests(
+            "initial-cert-pem",
+            "initial-key-secret",
+        ))
     }
 }

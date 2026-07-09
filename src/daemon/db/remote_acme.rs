@@ -5,13 +5,18 @@ use crate::daemon::remote::{
     RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, validate_remote_serve_config,
 };
 use crate::daemon::remote_acme::{
-    RemoteAcmeRuntimeState, RemoteCertificateBundle, RemoteRenewalOutcome,
+    RemoteAcmeAccountCredentials, RemoteAcmeIssuanceState, RemoteAcmeRuntimeState,
+    RemoteCertificateBundle, RemoteRenewalOutcome,
 };
 
 const SELECT_REMOTE_ACME_STATE_SQL: &str = "
 SELECT
     NULLIF(TRIM(account_id), ''),
-    CASE WHEN COALESCE(TRIM(account_id), '') <> '' THEN 1 ELSE 0 END,
+    CASE
+        WHEN COALESCE(TRIM(account_id), '') <> ''
+         AND COALESCE(TRIM(account_credentials_json), '') <> ''
+        THEN 1 ELSE 0
+    END,
     CASE
         WHEN COALESCE(TRIM(certificate_pem), '') <> ''
          AND COALESCE(TRIM(private_key_pem), '') <> ''
@@ -32,9 +37,17 @@ SELECT
 FROM remote_acme_state
 WHERE singleton = 1";
 
+const SELECT_REMOTE_ACME_ISSUANCE_STATE_SQL: &str = "
+SELECT
+    NULLIF(TRIM(account_id), ''),
+    NULLIF(TRIM(account_credentials_json), '')
+FROM remote_acme_state
+WHERE singleton = 1";
+
 const SELECT_REMOTE_ACME_RUNTIME_STATE_SQL: &str = "
 SELECT
     NULLIF(TRIM(account_id), ''),
+    NULLIF(TRIM(account_credentials_json), ''),
     certificate_pem,
     private_key_pem
 FROM remote_acme_state
@@ -81,6 +94,51 @@ impl DaemonDb {
             .optional()
             .map_err(|error| db_error(format!("load remote acme state: {error}")))?
             .ok_or_else(|| db_error("remote acme singleton state row is missing"))
+    }
+
+    /// Load secret ACME account material for certificate issuance.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the singleton row is missing, SQL loading
+    /// fails, or persisted account credentials are incomplete or invalid.
+    pub(crate) fn load_remote_acme_issuance_state(
+        &self,
+    ) -> Result<RemoteAcmeIssuanceState, CliError> {
+        self.conn
+            .query_row(
+                SELECT_REMOTE_ACME_ISSUANCE_STATE_SQL,
+                [],
+                remote_acme_issuance_state_from_row,
+            )
+            .optional()
+            .map_err(|error| db_error(format!("load remote acme issuance state: {error}")))?
+            .ok_or_else(|| db_error("remote acme singleton state row is missing"))
+    }
+
+    /// Persist an ACME account id and its opaque serialized credentials.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failure or if the singleton row is missing.
+    pub(crate) fn record_remote_acme_account(
+        &self,
+        account: &RemoteAcmeAccountCredentials,
+        updated_at: &str,
+    ) -> Result<(), CliError> {
+        let changed = self
+            .conn
+            .execute(
+                "UPDATE remote_acme_state
+                 SET account_id = ?1,
+                     account_credentials_json = ?2,
+                     updated_at = ?3
+                 WHERE singleton = 1",
+                params![account.account_id(), account.serialized(), updated_at],
+            )
+            .map_err(|error| db_error(format!("record remote acme account: {error}")))?;
+        if changed == 0 {
+            return Err(db_error("remote acme singleton state row is missing"));
+        }
+        Ok(())
     }
 
     /// Persist the remote serve config needed for later ACME issuance.
@@ -220,6 +278,50 @@ fn remote_acme_state_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Remot
     })
 }
 
+fn remote_acme_issuance_state_from_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<RemoteAcmeIssuanceState> {
+    let account_id = row.get::<_, Option<String>>(0)?;
+    let serialized = row.get::<_, Option<String>>(1)?;
+    let account = remote_acme_account_from_columns(account_id, serialized)?;
+    Ok(RemoteAcmeIssuanceState { account })
+}
+
+fn remote_acme_account_from_columns(
+    account_id: Option<String>,
+    serialized: Option<String>,
+) -> rusqlite::Result<Option<RemoteAcmeAccountCredentials>> {
+    Ok(match (account_id, serialized) {
+        (None | Some(_), None) => None,
+        (Some(account_id), Some(serialized)) => Some(
+            RemoteAcmeAccountCredentials::new(&account_id, &serialized).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(1, Type::Text, error.into())
+            })?,
+        ),
+        (None, Some(serialized)) => {
+            let value =
+                serde_json::from_str::<serde_json::Value>(&serialized).map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(1, Type::Text, error.into())
+                })?;
+            let account_id = value
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        1,
+                        Type::Text,
+                        "remote acme serialized credentials omit account id".into(),
+                    )
+                })?;
+            Some(
+                RemoteAcmeAccountCredentials::new(account_id, &serialized).map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(1, Type::Text, error.into())
+                })?,
+            )
+        }
+    })
+}
+
 fn remote_acme_serve_config_from_row(
     row: &rusqlite::Row<'_>,
 ) -> rusqlite::Result<Option<RemoteDaemonServeConfig>> {
@@ -334,21 +436,25 @@ fn parse_dns_provider_at_column(label: &str, column: usize) -> rusqlite::Result<
 fn remote_acme_runtime_state_from_row(
     row: &rusqlite::Row<'_>,
 ) -> rusqlite::Result<RemoteAcmeRuntimeState> {
-    let Some(account_id) = row.get::<_, Option<String>>(0)? else {
+    let account = remote_acme_account_from_columns(
+        row.get::<_, Option<String>>(0)?,
+        row.get::<_, Option<String>>(1)?,
+    )?;
+    let Some(account) = account else {
         return Ok(RemoteAcmeRuntimeState::default());
     };
-    let certificate_pem = row.get::<_, Option<String>>(1)?;
-    let private_key_pem = row.get::<_, Option<String>>(2)?;
+    let certificate_pem = row.get::<_, Option<String>>(2)?;
+    let private_key_pem = row.get::<_, Option<String>>(3)?;
     if let (Some(certificate_pem), Some(private_key_pem)) = (certificate_pem, private_key_pem)
         && !certificate_pem.trim().is_empty()
         && !private_key_pem.trim().is_empty()
     {
         return Ok(RemoteAcmeRuntimeState::with_account_and_certificate(
-            account_id,
+            account.account_id(),
             RemoteCertificateBundle::new(&certificate_pem, &private_key_pem),
         ));
     }
-    Ok(RemoteAcmeRuntimeState::with_account(account_id))
+    Ok(RemoteAcmeRuntimeState::with_account(account.account_id()))
 }
 
 fn parse_renewal_status_at_column(
