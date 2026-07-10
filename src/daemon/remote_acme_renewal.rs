@@ -3,14 +3,14 @@ use std::time::Duration;
 
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use tokio::sync::watch as tokio_watch;
-use tokio::task::{JoinHandle, spawn_blocking};
+use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 use uuid::Uuid;
 
 use super::db::DaemonDb;
 use super::remote::{RemoteAccessScope, RemoteDaemonServeConfig};
 use super::remote_acme::{
-    RemoteAcmeAccountCredentials, RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest,
+    RemoteAcmeAccountCredentials, RemoteAcmeAutomaticRenewalIssuer, RemoteAcmeRenewalRequest,
     RemoteCertificateBundle, RemoteRenewalOutcome, build_remote_acme_runtime_plan,
 };
 use super::remote_acme_live::LiveRemoteAcmeIssuer;
@@ -76,7 +76,7 @@ pub(crate) fn spawn_remote_acme_renewal_loop_with<I, Now>(
     now: Now,
 ) -> JoinHandle<()>
 where
-    I: RemoteAcmeRenewalIssuer + Send + Sync + 'static,
+    I: RemoteAcmeAutomaticRenewalIssuer + 'static,
     Now: Fn() -> DateTime<Utc> + Send + Sync + 'static,
 {
     tokio::spawn(run_remote_acme_renewal_loop(
@@ -97,7 +97,7 @@ async fn run_remote_acme_renewal_loop<I, Now>(
     check_interval: Duration,
     now: Arc<Now>,
 ) where
-    I: RemoteAcmeRenewalIssuer + Send + Sync + 'static,
+    I: RemoteAcmeAutomaticRenewalIssuer + 'static,
     Now: Fn() -> DateTime<Utc> + Send + Sync + 'static,
 {
     let mut ticker = interval(check_interval);
@@ -129,10 +129,10 @@ async fn run_remote_acme_renewal_check_or_shutdown<I, Now>(
     now: Arc<Now>,
 ) -> RemoteAcmeRenewalLoopControl
 where
-    I: RemoteAcmeRenewalIssuer + Send + Sync + 'static,
+    I: RemoteAcmeAutomaticRenewalIssuer + 'static,
     Now: Fn() -> DateTime<Utc> + Send + Sync + 'static,
 {
-    let check = run_remote_acme_renewal_check_blocking(db, tls, issuer, now);
+    let check = run_remote_acme_renewal_check(&db, &tls, issuer.as_ref(), now());
     tokio::pin!(check);
     tokio::select! {
         () = wait_for_shutdown(shutdown_rx) => RemoteAcmeRenewalLoopControl::Shutdown,
@@ -152,25 +152,6 @@ async fn wait_for_shutdown(shutdown_rx: &mut tokio_watch::Receiver<bool>) {
             break;
         }
     }
-}
-
-async fn run_remote_acme_renewal_check_blocking<I, Now>(
-    db: Arc<Mutex<DaemonDb>>,
-    tls: RemoteTlsConfigHandle,
-    issuer: Arc<I>,
-    now: Arc<Now>,
-) -> Result<RemoteAcmeRenewalCheckOutcome, CliError>
-where
-    I: RemoteAcmeRenewalIssuer + Send + Sync + 'static,
-    Now: Fn() -> DateTime<Utc> + Send + Sync + 'static,
-{
-    spawn_blocking(move || run_remote_acme_renewal_check(&db, &tls, issuer.as_ref(), now()))
-        .await
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "join remote ACME renewal check: {error}"
-            )))
-        })?
 }
 
 #[expect(
@@ -197,14 +178,14 @@ fn log_renewal_check(result: &Result<RemoteAcmeRenewalCheckOutcome, CliError>) {
     }
 }
 
-pub(crate) fn run_remote_acme_renewal_check<I>(
+pub(crate) async fn run_remote_acme_renewal_check<I>(
     db: &Arc<Mutex<DaemonDb>>,
     tls: &RemoteTlsConfigHandle,
     issuer: &I,
     now: DateTime<Utc>,
 ) -> Result<RemoteAcmeRenewalCheckOutcome, CliError>
 where
-    I: RemoteAcmeRenewalIssuer,
+    I: RemoteAcmeAutomaticRenewalIssuer,
 {
     let snapshot = load_renewal_snapshot(db)?;
     let due = remote_certificate_needs_renewal(&snapshot.bundle, now).unwrap_or(true);
@@ -221,7 +202,7 @@ where
         )?;
         return Ok(RemoteAcmeRenewalCheckOutcome::Reloaded);
     }
-    renew_due_certificate(db, tls, issuer, &snapshot, now)
+    renew_due_certificate(db, tls, issuer, &snapshot, now).await
 }
 
 fn load_renewal_snapshot(db: &Arc<Mutex<DaemonDb>>) -> Result<RemoteAcmeRenewalSnapshot, CliError> {
@@ -249,7 +230,7 @@ fn load_renewal_snapshot(db: &Arc<Mutex<DaemonDb>>) -> Result<RemoteAcmeRenewalS
     })
 }
 
-fn renew_due_certificate<I>(
+async fn renew_due_certificate<I>(
     db: &Arc<Mutex<DaemonDb>>,
     tls: &RemoteTlsConfigHandle,
     issuer: &I,
@@ -257,7 +238,7 @@ fn renew_due_certificate<I>(
     now: DateTime<Utc>,
 ) -> Result<RemoteAcmeRenewalCheckOutcome, CliError>
 where
-    I: RemoteAcmeRenewalIssuer,
+    I: RemoteAcmeAutomaticRenewalIssuer,
 {
     let request = RemoteAcmeRenewalRequest::new(
         &snapshot.account,
@@ -265,7 +246,7 @@ where
         snapshot.previous_private_key_pem.as_deref(),
         &snapshot.config,
     );
-    let bundle = match issuer.renew_certificate(&request) {
+    let bundle = match issuer.renew_certificate_automatically(&request).await {
         Ok(bundle) => bundle,
         Err(detail) => return persist_renewal_failure(db, now, &detail),
     };

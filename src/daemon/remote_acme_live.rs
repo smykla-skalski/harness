@@ -4,8 +4,8 @@ use async_trait::async_trait;
 
 use super::remote::RemoteDaemonServeConfig;
 use super::remote_acme::{
-    RemoteAcmeAccountCredentials, RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest,
-    RemoteCertificateBundle,
+    RemoteAcmeAccountCredentials, RemoteAcmeAutomaticRenewalIssuer, RemoteAcmeRenewalIssuer,
+    RemoteAcmeRenewalRequest, RemoteCertificateBundle,
 };
 use super::remote_acme_challenge::{
     SystemRemoteAcmeChallengeLease, SystemRemoteAcmeChallengeProvisioner,
@@ -115,6 +115,23 @@ impl LiveRemoteAcmeIssuer {
     pub(crate) const fn new(tls: RemoteTlsConfigHandle) -> Self {
         Self { tls }
     }
+
+    async fn issue_certificate(
+        &self,
+        request: &RemoteAcmeRenewalRequest,
+    ) -> Result<RemoteCertificateBundle, String> {
+        let provisioner = LiveRemoteAcmeChallengeProvisioner::from_environment(
+            request.serve_config(),
+            self.tls.clone(),
+        )?;
+        InstantAcmeIssuer::production(provisioner)
+            .issue_certificate(
+                request.account(),
+                request.serve_config(),
+                request.previous_private_key_pem(),
+            )
+            .await
+    }
 }
 
 impl RemoteAcmeRenewalIssuer for LiveRemoteAcmeIssuer {
@@ -129,16 +146,17 @@ impl RemoteAcmeRenewalIssuer for LiveRemoteAcmeIssuer {
         &self,
         request: &RemoteAcmeRenewalRequest,
     ) -> Result<RemoteCertificateBundle, String> {
-        let provisioner = LiveRemoteAcmeChallengeProvisioner::from_environment(
-            request.serve_config(),
-            self.tls.clone(),
-        )?;
-        let issuer = InstantAcmeIssuer::production(provisioner);
-        run_acme_future(issuer.issue_certificate(
-            request.account(),
-            request.serve_config(),
-            request.previous_private_key_pem(),
-        ))
+        run_acme_future(self.issue_certificate(request))
+    }
+}
+
+#[async_trait]
+impl RemoteAcmeAutomaticRenewalIssuer for LiveRemoteAcmeIssuer {
+    async fn renew_certificate_automatically(
+        &self,
+        request: &RemoteAcmeRenewalRequest,
+    ) -> Result<RemoteCertificateBundle, String> {
+        self.issue_certificate(request).await
     }
 }
 

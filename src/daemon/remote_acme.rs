@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
+use async_trait::async_trait;
 use sha2::{Digest, Sha256};
 
 use super::protocol::http_paths;
@@ -276,6 +277,18 @@ pub trait RemoteAcmeRenewalIssuer {
     /// Returns a redaction-ready operator detail when the issuer cannot produce
     /// a certificate bundle.
     fn renew_certificate(
+        &self,
+        request: &RemoteAcmeRenewalRequest,
+    ) -> Result<RemoteCertificateBundle, String>;
+}
+
+#[async_trait]
+pub(crate) trait RemoteAcmeAutomaticRenewalIssuer: Send + Sync {
+    /// Renew a certificate without entering a nested blocking runtime.
+    ///
+    /// # Errors
+    /// Returns a redaction-ready operator detail when automatic renewal fails.
+    async fn renew_certificate_automatically(
         &self,
         request: &RemoteAcmeRenewalRequest,
     ) -> Result<RemoteCertificateBundle, String>;
