@@ -71,6 +71,16 @@ struct RemoteDaemonPairingInvitationTests {
     }
   }
 
+  @Test("Canonicalizes equivalent SPKI encodings")
+  func canonicalizesEquivalentPinEncoding() throws {
+    let pin = try RemoteDaemonSPKIPin(
+      validating: "sha256/CQ8Rnn313xPUG+5zny4xTooD6AxAsZr/\nanC/ea4bTIY"
+    )
+
+    #expect(pin.value == Self.validPin)
+    #expect(pin.digest.count == 32)
+  }
+
   @Test("Imports manual endpoint, code, and SPKI fields")
   func importsManualFields() throws {
     let now = try #require(ISO8601DateFormatter().date(from: "2026-07-10T04:00:00Z"))

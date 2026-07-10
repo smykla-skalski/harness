@@ -62,6 +62,7 @@ public struct UserDefaultsRemoteDaemonProfileStore: @unchecked Sendable,
     do {
       return try decoder.decode(RemoteDaemonProfileState.self, from: data).validated()
     } catch {
+      defaults.removeObject(forKey: storageKey)
       throw RemoteDaemonProfileError.invalidStoredProfiles
     }
   }

@@ -25,18 +25,23 @@ public struct RemoteDaemonSPKIPin: Codable, Equatable, Hashable, Sendable {
 
   public init(validating value: String) throws {
     let prefix = "sha256/"
+    let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
     guard value.hasPrefix(prefix) else {
       throw RemoteDaemonSPKIPinError.invalidFormat
     }
-    let encodedDigest = String(value.dropFirst(prefix.count))
+    let compactDigest = String(value.dropFirst(prefix.count).filter { !$0.isWhitespace })
+    let remainder = compactDigest.count % 4
+    guard remainder != 1 else {
+      throw RemoteDaemonSPKIPinError.invalidFormat
+    }
+    let encodedDigest = compactDigest + String(repeating: "=", count: (4 - remainder) % 4)
     guard
       let digest = Data(base64Encoded: encodedDigest),
-      digest.count == 32,
-      digest.base64EncodedString() == encodedDigest
+      digest.count == 32
     else {
       throw RemoteDaemonSPKIPinError.invalidFormat
     }
-    self.value = value
+    self.value = prefix + digest.base64EncodedString()
     self.digest = digest
   }
 

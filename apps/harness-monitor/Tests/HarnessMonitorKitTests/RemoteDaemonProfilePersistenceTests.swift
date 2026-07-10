@@ -30,6 +30,25 @@ struct RemoteDaemonProfilePersistenceTests {
     #expect(!storedText.contains("opaque-bearer-secret"))
   }
 
+  @Test("Corrupt stored metadata is cleared after reporting the error")
+  func corruptMetadataRecoversAfterOneFailure() throws {
+    let suite = "remote-daemon-profile-tests-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    defaults.set(Data("not-json".utf8), forKey: "profiles")
+    let repository = UserDefaultsRemoteDaemonProfileStore(
+      defaults: defaults,
+      storageKey: "profiles"
+    )
+
+    #expect(throws: RemoteDaemonProfileError.invalidStoredProfiles) {
+      try repository.load()
+    }
+
+    #expect(defaults.data(forKey: "profiles") == nil)
+    #expect(try repository.load() == RemoteDaemonProfileState())
+  }
+
   @Test("Resolves the active remote profile without a local manifest")
   func resolvesManifestIndependentConnection() throws {
     let profile = try remoteProfileFixture()
