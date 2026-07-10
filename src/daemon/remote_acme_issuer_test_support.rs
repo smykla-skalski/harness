@@ -197,7 +197,6 @@ pub(super) fn acme_happy_path() -> Vec<ScriptedResponse> {
         response(Method::POST, AUTHORIZATION_URL, AUTHORIZATION_PENDING_BODY),
         response(Method::POST, CHALLENGE_URL, CHALLENGE_PENDING_BODY),
         response(Method::POST, ORDER_URL, ORDER_READY_BODY),
-        response(Method::POST, AUTHORIZATION_URL, AUTHORIZATION_VALID_BODY),
         response(Method::POST, FINALIZE_URL, ORDER_PROCESSING_BODY),
         response(Method::POST, ORDER_URL, ORDER_VALID_BODY),
         response(Method::POST, CERTIFICATE_URL, TEST_CERTIFICATE_PEM),
@@ -299,13 +298,6 @@ const TLS_CHALLENGE_PENDING_BODY: &str = r#"{
   "token":"tls-token",
   "status":"pending",
   "error":null
-}"#;
-const AUTHORIZATION_VALID_BODY: &str = r#"{
-  "identifier":{"type":"dns","value":"daemon.example.com"},
-  "status":"valid",
-  "challenges":[
-    {"type":"http-01","url":"https://acme.test/challenge/http/1","token":"http-token","status":"valid","error":null}
-  ]
 }"#;
 const ORDER_READY_BODY: &str = r#"{
   "status":"ready",

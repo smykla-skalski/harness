@@ -40,7 +40,8 @@ WHERE singleton = 1";
 const SELECT_REMOTE_ACME_ISSUANCE_STATE_SQL: &str = "
 SELECT
     NULLIF(TRIM(account_id), ''),
-    NULLIF(TRIM(account_credentials_json), '')
+    NULLIF(TRIM(account_credentials_json), ''),
+    CASE WHEN COALESCE(TRIM(private_key_pem), '') <> '' THEN private_key_pem END
 FROM remote_acme_state
 WHERE singleton = 1";
 
@@ -284,7 +285,10 @@ fn remote_acme_issuance_state_from_row(
     let account_id = row.get::<_, Option<String>>(0)?;
     let serialized = row.get::<_, Option<String>>(1)?;
     let account = remote_acme_account_from_columns(account_id, serialized)?;
-    Ok(RemoteAcmeIssuanceState { account })
+    Ok(RemoteAcmeIssuanceState {
+        account,
+        previous_private_key_pem: row.get(2)?,
+    })
 }
 
 fn remote_acme_account_from_columns(

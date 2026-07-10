@@ -323,6 +323,7 @@ impl RemoteAcmeRenewalIssuer for FakeRenewalIssuer {
     ) -> Result<RemoteCertificateBundle, String> {
         assert_eq!(request.account_id(), self.expected_account_id);
         assert_eq!(request.previous_certificate_fingerprint(), Some("old-fp"));
+        assert_eq!(request.previous_private_key_pem(), Some("old-key-secret"));
         let serve_config = request.serve_config();
         assert_eq!(serve_config.domain, "daemon.example.com");
         assert_eq!(serve_config.acme_email, "ops@example.com");
@@ -371,6 +372,7 @@ impl RemoteAcmeRenewalIssuer for InitialIssuanceIssuer {
         assert_eq!(request.account_id(), "https://acme.test/acct/initial");
         assert!(request.account_credentials().contains("account-key-secret"));
         assert_eq!(request.previous_certificate_fingerprint(), None);
+        assert_eq!(request.previous_private_key_pem(), None);
         Ok(RemoteCertificateBundle::new_for_tests(
             "initial-cert-pem",
             "initial-key-secret",

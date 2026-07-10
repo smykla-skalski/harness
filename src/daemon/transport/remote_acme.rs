@@ -241,6 +241,7 @@ where
     let request = RemoteAcmeRenewalRequest::new(
         &account,
         state.certificate_fingerprint.as_deref(),
+        issuance.previous_private_key_pem.as_deref(),
         serve_config,
     );
     match issuer.renew_certificate(&request) {

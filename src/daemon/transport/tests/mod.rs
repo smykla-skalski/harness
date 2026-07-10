@@ -4,6 +4,7 @@ mod remote_acme;
 mod remote_cli;
 mod remote_clients;
 mod remote_doctor;
+mod remote_pairing_contract;
 mod remote_serve;
 mod remote_systemd;
 mod remote_systemd_plan;

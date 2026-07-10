@@ -1,8 +1,13 @@
+use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use clap::Parser;
 use harness_testkit::with_isolated_harness_env;
+use rcgen::{CertificateParams, KeyPair};
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::db::DaemonDb;
+use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig};
+use crate::daemon::remote_acme::{RemoteAcmeAccountCredentials, RemoteCertificateBundle};
 use crate::daemon::remote_pairing::RemotePairingCode;
 use crate::daemon::state;
 
@@ -336,6 +341,7 @@ fn daemon_remote_pair_create_reports_ttl_overflow_as_too_large() {
 #[test]
 fn daemon_remote_pair_create_builds_persisted_record_and_response() {
     let db = DaemonDb::open_in_memory().expect("open db");
+    let expected_pin = seed_remote_tls_identity(&db);
     let parsed = DaemonRemoteCommandTestHarness::try_parse_from([
         "test", "pair", "create", "--role", "operator", "--scopes", "read", "--ttl", "2m",
     ])
@@ -366,6 +372,25 @@ fn daemon_remote_pair_create_builds_persisted_record_and_response() {
     assert_eq!(response.ttl_seconds, 120);
     assert_eq!(response.created_at, "2026-06-21T13:40:00Z");
     assert_eq!(response.expires_at, "2026-06-21T13:42:00Z");
+    assert_eq!(response.endpoint, "https://daemon.example.com");
+    assert_eq!(response.server_spki_sha256, expected_pin);
+
+    let encoded_payload = response
+        .pairing_url
+        .strip_prefix("harness://remote-pair?payload=")
+        .expect("remote pairing deep link");
+    let payload = URL_SAFE_NO_PAD
+        .decode(encoded_payload)
+        .expect("decode invitation payload");
+    let payload: serde_json::Value =
+        serde_json::from_slice(&payload).expect("decode invitation JSON");
+    assert_eq!(payload["version"], 1);
+    assert_eq!(payload["endpoint"], "https://daemon.example.com");
+    assert_eq!(payload["code"], "manual-code-value");
+    assert_eq!(payload["server_spki_sha256"], expected_pin);
+    assert_eq!(payload["role"], "operator");
+    assert_eq!(payload["scopes"], serde_json::json!(["read"]));
+    assert_eq!(payload["expires_at"], "2026-06-21T13:42:00Z");
 
     let stored: (String, String) = db
         .connection()
@@ -395,6 +420,9 @@ fn daemon_remote_pair_create_execute_persists_pairing_in_daemon_db() {
         state::ensure_daemon_dirs().expect("daemon dirs");
         let daemon_root = state::daemon_root();
         let _lock = state::acquire_singleton_lock().expect("hold daemon lock");
+        let db = DaemonDb::open(&daemon_root.join("harness.db")).expect("open daemon db");
+        seed_remote_tls_identity(&db);
+        drop(db);
 
         let command = DaemonRemoteCommandTestHarness::try_parse_from([
             "test", "pair", "create", "--role", "viewer", "--ttl", "30s",
@@ -426,4 +454,36 @@ fn daemon_remote_pair_create_execute_persists_pairing_in_daemon_db() {
         assert_eq!(scopes_json, "[\"read\"]");
         assert!(code_hash.starts_with("sha256:"));
     });
+}
+
+fn seed_remote_tls_identity(db: &DaemonDb) -> String {
+    let config = RemoteDaemonServeConfig {
+        domain: "daemon.example.com".to_string(),
+        host: "0.0.0.0".to_string(),
+        https_port: 443,
+        http_port: 80,
+        acme_email: "ops@example.com".to_string(),
+        acme_challenge: RemoteAcmeChallenge::Http,
+        acme_dns_provider: None,
+    };
+    db.record_remote_acme_serve_config(&config, "2026-06-21T13:39:00Z")
+        .expect("record remote serve config");
+    let account = RemoteAcmeAccountCredentials::new(
+        "https://acme.test/acct/1",
+        r#"{"id":"https://acme.test/acct/1"}"#,
+    )
+    .expect("build account credentials");
+    db.record_remote_acme_account(&account, "2026-06-21T13:39:00Z")
+        .expect("record account credentials");
+    let key = KeyPair::generate().expect("generate TLS key");
+    let certificate = CertificateParams::new(vec!["daemon.example.com".to_string()])
+        .expect("certificate params")
+        .self_signed(&key)
+        .expect("self-sign test certificate");
+    let bundle = RemoteCertificateBundle::new(certificate.pem().as_str(), &key.serialize_pem());
+    db.record_remote_acme_renewal_success(&bundle, "2026-06-21T13:39:00Z")
+        .expect("record TLS certificate");
+    bundle
+        .spki_sha256_pin()
+        .expect("derive test certificate SPKI pin")
 }
