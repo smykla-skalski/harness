@@ -98,7 +98,11 @@ struct SettingsRemoteDaemonSection: View {
       isPresented: $confirmsForget,
       titleVisibility: .visible
     ) {
-      Button("Forget Remote Daemon", role: .destructive, action: forget)
+      Button("Forget Remote Daemon", role: .destructive) {
+        guard !actionState.isInFlight else { return }
+        forget()
+      }
+      .disabled(actionState.isInFlight)
       Button("Cancel", role: .cancel) {}
     } message: {
       Text("This removes the bearer token from Keychain and returns to the local daemon mode")
