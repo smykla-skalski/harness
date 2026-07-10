@@ -21,6 +21,11 @@ extension HarnessMonitorStore {
     pruneRepositoryLabelUsageCache()
     scheduleReviewFilesVacuumIfNeeded()
 
+    if usesRemoteDaemon {
+      await bootstrapRemoteDaemon()
+      return
+    }
+    ensureLocalManifestURL()
     switch daemonOwnership {
     case .external:
       await bootstrapExternalDaemon()
@@ -259,6 +264,22 @@ extension HarnessMonitorStore {
       )
       await restorePersistedSessionState()
       startManifestWatcher()
+    }
+  }
+
+  func bootstrapRemoteDaemon() async {
+    restorePersistedSessionStateWhileConnectingInBackground()
+    do {
+      let client = try await withBootstrapTelemetryPhase(.remoteDaemonConnect) {
+        try await daemonController.bootstrapClient()
+      }
+      await withBootstrapTelemetryPhase(.remoteInitialConnect) {
+        await connect(using: client)
+      }
+    } catch {
+      handleRemoteDaemonConnectionFailure(error)
+      markConnectionOffline(error.localizedDescription)
+      await restorePersistedSessionState()
     }
   }
 

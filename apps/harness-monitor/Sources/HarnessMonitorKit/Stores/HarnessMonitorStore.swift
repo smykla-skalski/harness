@@ -281,7 +281,6 @@ public final class HarnessMonitorStore {
   public let supervisorPolicyConfigRepository: SupervisorPolicyConfigRepository?
   public let supervisorAuditRepository: SupervisorAuditRepository?
   var client: (any HarnessMonitorClientProtocol)?
-  public var apiClient: (any HarnessMonitorClientProtocol)? { client }
   @ObservationIgnored var mobileRelayBackgroundClient: (any HarnessMonitorClientProtocol)?
   var globalStreamTask: Task<Void, Never>?
   var sessionStreamTask: Task<Void, Never>?
@@ -316,7 +315,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored let manifestWatcherStartupWorker = ManifestWatcherStartupWorker()
   @ObservationIgnored var manifestWatcherStartTask: Task<Void, Never>?
   @ObservationIgnored var externalManifestDiscoveryTask: Task<Void, Never>?
-  @ObservationIgnored var manifestURL = HarnessMonitorPaths.manifestURLWithoutLiveDiscovery()
+  @ObservationIgnored var manifestURL: URL?
   var transportLatencySamplesMs: [Int] = []
   var requestLatencySamplesMs: [Int] = []
   var trafficSampleTimes: [Date] = []
@@ -355,6 +354,7 @@ public final class HarnessMonitorStore {
     fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
     voiceCapture: any VoiceCaptureProviding,
     daemonOwnership: DaemonOwnership = .managed,
+    remoteDaemonServices: RemoteDaemonServices? = nil,
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil,
     cacheService: SessionCacheService? = nil,
@@ -362,7 +362,7 @@ public final class HarnessMonitorStore {
     reviewFilePreviewStore: ReviewFilePreviewStore = ReviewFileStoreDefaults.preview(),
     reviewFilePatchStore: ReviewFilePatchStore = ReviewFileStoreDefaults.patch()
   ) {
-    self.connection = ConnectionSlice()
+    self.connection = ConnectionSlice(remoteDaemonServices: remoteDaemonServices)
     self.sessionIndex = SessionIndexSlice()
     self.selection = SelectionSlice()
     self.userData = UserDataSlice()

@@ -7,6 +7,8 @@ enum HarnessMonitorBootstrapTelemetryPhase: String, Sendable {
   case managedInitialConnect = "managed_initial_connect"
   case externalDaemonWarmUp = "external_daemon_warm_up"
   case externalInitialConnect = "external_initial_connect"
+  case remoteDaemonConnect = "remote_daemon_connect"
+  case remoteInitialConnect = "remote_initial_connect"
 }
 
 extension HarnessMonitorStore {

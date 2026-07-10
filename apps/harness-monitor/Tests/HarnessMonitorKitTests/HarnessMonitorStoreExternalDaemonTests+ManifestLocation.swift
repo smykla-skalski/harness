@@ -67,7 +67,7 @@ extension HarnessMonitorStoreExternalDaemonTests {
     await store.bootstrap()
 
     #expect(store.connectionState == .online)
-    #expect(store.manifestURL.path == manifestPath)
+    #expect(store.manifestURL?.path == manifestPath)
   }
 
   @Test("External bootstrap rediscovers a manifest that appears after startup failure")
@@ -148,7 +148,7 @@ extension HarnessMonitorStoreExternalDaemonTests {
     }
 
     #expect(becameOnline)
-    #expect(store.manifestURL.path == liveManifestPath)
+    #expect(store.manifestURL?.path == liveManifestPath)
     #expect(await daemon.recordedWarmUpCallCount() >= 2)
     #expect(
       store.connectionEvents.contains { event in

@@ -44,7 +44,10 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     let configuration = URLSessionConfiguration.default
     configuration.timeoutIntervalForRequest = 15
     configuration.timeoutIntervalForResource = 0
-    let session = URLSession(configuration: configuration)
+    let session = HarnessMonitorURLSessionFactory.make(
+      configuration: configuration,
+      serverTrust: connection.serverTrust
+    )
     self.init(
       connection: connection,
       session: session

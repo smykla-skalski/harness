@@ -41,6 +41,11 @@ extension HarnessMonitorStore {
     await refreshBookmarkedSessionIds()
     await refreshPersistedSessionMetadata()
 
+    if usesRemoteDaemon {
+      await bootstrapRemoteDaemon()
+      return
+    }
+    ensureLocalManifestURL()
     switch daemonOwnership {
     case .external:
       await bootstrapExternalDaemon()

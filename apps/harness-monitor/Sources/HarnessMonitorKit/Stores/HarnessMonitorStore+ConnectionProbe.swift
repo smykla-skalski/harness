@@ -39,7 +39,7 @@ extension HarnessMonitorStore {
               latencySource: .transport,
               countsTowardsTraffic: false
             )
-            await refreshBridgeStateFromManifest(at: manifestURL)
+            await refreshLocalBridgeStateIfNeeded()
             continue
           }
           let sample = try await Self.measureOperation {
@@ -51,7 +51,7 @@ extension HarnessMonitorStore {
             latencySource: .request,
             countsTowardsTraffic: false
           )
-          await refreshBridgeStateFromManifest(at: manifestURL)
+          await refreshLocalBridgeStateIfNeeded()
         } catch {
           if Task.isCancelled {
             return
@@ -78,5 +78,12 @@ extension HarnessMonitorStore {
   func stopConnectionProbe() {
     connectionProbeTask?.cancel()
     connectionProbeTask = nil
+  }
+
+  private func refreshLocalBridgeStateIfNeeded() async {
+    guard let manifestURL, !usesRemoteDaemon else {
+      return
+    }
+    await refreshBridgeStateFromManifest(at: manifestURL)
   }
 }

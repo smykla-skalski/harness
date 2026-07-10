@@ -237,6 +237,10 @@ extension HarnessMonitorStore {
   }
 
   public func startDaemon() async {
+    guard !usesRemoteDaemon else {
+      presentFailureFeedback("Start Daemon is unavailable while a remote profile is active")
+      return
+    }
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
 
@@ -295,6 +299,10 @@ extension HarnessMonitorStore {
   }
 
   public func installLaunchAgent() async {
+    guard !usesRemoteDaemon else {
+      presentFailureFeedback("Install Launch Agent is unavailable while a remote profile is active")
+      return
+    }
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
 
@@ -308,6 +316,10 @@ extension HarnessMonitorStore {
   }
 
   public func removeLaunchAgent() async {
+    guard !usesRemoteDaemon else {
+      presentFailureFeedback("Remove Launch Agent is unavailable while a remote profile is active")
+      return
+    }
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
 
@@ -321,6 +333,10 @@ extension HarnessMonitorStore {
   }
 
   public func repairLaunchAgent() async {
+    guard !usesRemoteDaemon else {
+      presentFailureFeedback("Repair Launch Agent is unavailable while a remote profile is active")
+      return
+    }
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
 
@@ -338,7 +354,9 @@ extension HarnessMonitorStore {
     do {
       let status = try await daemonController.daemonStatus()
       daemonStatus = status
-      adoptManifestURL(from: status.diagnostics.manifestPath)
+      if !usesRemoteDaemon {
+        adoptManifestURL(from: status.diagnostics.manifestPath)
+      }
       clearTransientHostBridgeIssues()
     } catch {
       presentFailureFeedback(error.localizedDescription)

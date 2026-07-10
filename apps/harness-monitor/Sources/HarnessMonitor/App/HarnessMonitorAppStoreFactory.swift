@@ -132,13 +132,8 @@ enum HarnessMonitorAppStoreFactory {
     )
     switch HarnessMonitorLaunchMode(environment: environment) {
     case .live:
-      let ownership = DaemonOwnership(environment: environment)
-      return HarnessMonitorStore(
-        daemonController: DaemonController(
-          environment: environment,
-          ownership: ownership
-        ),
-        daemonOwnership: ownership,
+      return makeLiveStore(
+        environment: environment,
         modelContainer: modelContainer,
         persistenceError: persistenceError
       )
@@ -187,6 +182,38 @@ enum HarnessMonitorAppStoreFactory {
         persistenceError: persistenceError
       )
     }
+  }
+
+  private static func makeLiveStore(
+    environment: HarnessMonitorEnvironment,
+    modelContainer: ModelContainer?,
+    persistenceError: String?
+  ) -> HarnessMonitorStore {
+    let ownership = DaemonOwnership(environment: environment)
+    let remoteProfileRepository = UserDefaultsRemoteDaemonProfileStore()
+    let remoteTokenStore = RemoteDaemonKeychainTokenStore()
+    let remoteConnectionSource = StoredRemoteDaemonConnectionSource(
+      repository: remoteProfileRepository,
+      tokenStore: remoteTokenStore
+    )
+    let remoteDaemonServices = RemoteDaemonServices(
+      connectionSource: remoteConnectionSource,
+      profileCoordinator: RemoteDaemonProfileCoordinator(
+        repository: remoteProfileRepository,
+        tokenStore: remoteTokenStore
+      )
+    )
+    return HarnessMonitorStore(
+      daemonController: DaemonController(
+        environment: environment,
+        ownership: ownership,
+        remoteConnectionSource: remoteConnectionSource
+      ),
+      daemonOwnership: ownership,
+      remoteDaemonServices: remoteDaemonServices,
+      modelContainer: modelContainer,
+      persistenceError: persistenceError
+    )
   }
 
   private struct PreviewSeedOverrides {

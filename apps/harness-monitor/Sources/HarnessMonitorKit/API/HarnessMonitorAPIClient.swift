@@ -18,7 +18,10 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
       let configuration = URLSessionConfiguration.default
       configuration.timeoutIntervalForRequest = Self.requestTimeoutInterval
       configuration.timeoutIntervalForResource = Self.resourceTimeoutInterval
-      self.session = URLSession(configuration: configuration)
+      self.session = HarnessMonitorURLSessionFactory.make(
+        configuration: configuration,
+        serverTrust: connection.serverTrust
+      )
     }
 
     self.decoder = JSONDecoder()

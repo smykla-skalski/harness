@@ -8,11 +8,10 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
 
   private let defaults: UserDefaults
   private let environment: HarnessMonitorEnvironment
-  private let configuredManifestURL: URL
   private let shouldConsultRememberedManifest: Bool
   private let shouldRememberLiveManifest: Bool
   private let lock = NSLock()
-  private var activeManifestURL: URL
+  private var activeManifestURL: URL?
 
   init(
     environment: HarnessMonitorEnvironment,
@@ -21,9 +20,6 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
   ) {
     self.defaults = defaults
     self.environment = environment
-    self.configuredManifestURL = HarnessMonitorPaths.manifestURLWithoutLiveDiscovery(
-      using: environment
-    )
     self.shouldRememberLiveManifest = ownership == .external
     // Cross-lane manifest re-discovery applies to both ownership modes when
     // the app's runtime env has no lane override. The managed daemon plist
@@ -36,15 +32,17 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
     self.shouldConsultRememberedManifest =
       HarnessMonitorPaths.configuredDataHomeRoot(using: environment) == nil
       && HarnessMonitorPaths.resolvedRuntimeLane(using: environment) == nil
-    self.activeManifestURL = configuredManifestURL
-
-    if let rememberedManifestURL {
-      self.activeManifestURL = rememberedManifestURL
-    }
   }
 
   var manifestURL: URL {
-    lock.withLock { activeManifestURL }
+    lock.withLock {
+      if let activeManifestURL {
+        return activeManifestURL
+      }
+      let initialManifestURL = rememberedManifestURL ?? configuredManifestURL
+      activeManifestURL = initialManifestURL
+      return initialManifestURL
+    }
   }
 
   var daemonRoot: URL {
@@ -133,6 +131,10 @@ final class ExternalDaemonManifestLocator: @unchecked Sendable {
       return nil
     }
     return manifestURL
+  }
+
+  private var configuredManifestURL: URL {
+    HarnessMonitorPaths.manifestURLWithoutLiveDiscovery(using: environment)
   }
 
   private func appendCandidate(_ manifestURL: URL?, to manifestURLs: inout [URL]) {

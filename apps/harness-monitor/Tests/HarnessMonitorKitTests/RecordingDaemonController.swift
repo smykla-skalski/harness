@@ -15,6 +15,8 @@ actor RecordingDaemonController: DaemonControlling {
   private var warmUpCallCount = 0
   private var stopDaemonCallCount = 0
   private var deferredRefreshCallCount = 0
+  private var bootstrapCallCount = 0
+  private var launchAgentStateCallCount = 0
 
   init(
     client: any HarnessMonitorClientProtocol = PreviewHarnessClient(),
@@ -35,6 +37,7 @@ actor RecordingDaemonController: DaemonControlling {
   }
 
   func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
+    bootstrapCallCount += 1
     if let bootstrapError {
       throw bootstrapError
     }
@@ -49,6 +52,7 @@ actor RecordingDaemonController: DaemonControlling {
   }
 
   func launchAgentRegistrationState() async -> DaemonLaunchAgentRegistrationState {
+    launchAgentStateCallCount += 1
     if let registrationStateOverride {
       return registrationStateOverride
     }
@@ -169,5 +173,13 @@ actor RecordingDaemonController: DaemonControlling {
 
   func recordedDeferredManagedLaunchAgentRefreshCallCount() async -> Int {
     deferredRefreshCallCount
+  }
+
+  func recordedBootstrapCallCount() async -> Int {
+    bootstrapCallCount
+  }
+
+  func recordedLaunchAgentStateCallCount() async -> Int {
+    launchAgentStateCallCount
   }
 }
