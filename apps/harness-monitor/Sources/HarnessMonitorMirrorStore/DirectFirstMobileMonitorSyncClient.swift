@@ -15,7 +15,7 @@ public struct DirectFirstMobileMonitorSyncClient: MobileMonitorSyncClient, Senda
   }
 
   public var supportsCommands: Bool {
-    false
+    direct.supportsCommands || cloudFallback.supportsCommands
   }
 
   public func fetchLatestSnapshot(
@@ -36,7 +36,21 @@ public struct DirectFirstMobileMonitorSyncClient: MobileMonitorSyncClient, Senda
     _ command: MobileCommandRecord,
     currentRevision: Int64,
     now: Date
-  ) async throws -> MobileQueuedCommand {
+  ) async throws -> MobileCommandSubmission {
+    if direct.supportsCommands {
+      return try await direct.queueCommand(
+        command,
+        currentRevision: currentRevision,
+        now: now
+      )
+    }
+    if cloudFallback.supportsCommands {
+      return try await cloudFallback.queueCommand(
+        command,
+        currentRevision: currentRevision,
+        now: now
+      )
+    }
     throw MobileRemoteDaemonSyncError.commandsUnavailable
   }
 
@@ -45,6 +59,16 @@ public struct DirectFirstMobileMonitorSyncClient: MobileMonitorSyncClient, Senda
     currentRevision: Int64,
     now: Date
   ) async throws -> MobileCommandReceipt {
+    guard !direct.supportsCommands else {
+      throw MobileRemoteDaemonSyncError.commandsUnavailable
+    }
+    if cloudFallback.supportsCommands {
+      return try await cloudFallback.cancelCommand(
+        command,
+        currentRevision: currentRevision,
+        now: now
+      )
+    }
     throw MobileRemoteDaemonSyncError.commandsUnavailable
   }
 

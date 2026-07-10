@@ -3,6 +3,24 @@ import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import HarnessMonitorCrypto
 
+public enum MobileCommandSubmissionDisposition: Equatable, Sendable {
+  case queued
+  case completed
+}
+
+public struct MobileCommandSubmission: Equatable, Sendable {
+  public var command: MobileCommandRecord
+  public var disposition: MobileCommandSubmissionDisposition
+
+  public init(
+    command: MobileCommandRecord,
+    disposition: MobileCommandSubmissionDisposition = .queued
+  ) {
+    self.command = command
+    self.disposition = disposition
+  }
+}
+
 /// The mobile sync operations the shared store depends on. Tests inject fakes;
 /// live credentials select direct remote access, CloudMirror, or both.
 public protocol MobileMonitorSyncClient: Sendable {
@@ -12,7 +30,7 @@ public protocol MobileMonitorSyncClient: Sendable {
     _ command: MobileCommandRecord,
     currentRevision: Int64,
     now: Date
-  ) async throws -> MobileQueuedCommand
+  ) async throws -> MobileCommandSubmission
   func cancelCommand(
     _ command: MobileCommandRecord,
     currentRevision: Int64,
@@ -21,10 +39,8 @@ public protocol MobileMonitorSyncClient: Sendable {
 }
 
 extension MobileMonitorSyncClient {
-  public var supportsCommands: Bool { true }
+  public var supportsCommands: Bool { false }
 }
-
-extension MobileCloudMirrorSyncClient: MobileMonitorSyncClient {}
 
 public protocol MobileMonitorSyncClientFactory: Sendable {
   func makeSyncClient(
@@ -71,16 +87,18 @@ public struct LiveMobileMonitorSyncClientFactory: MobileMonitorSyncClientFactory
   private func makeCloudClient(
     credential: MobilePairedStationCredential,
     identity: MobileDeviceIdentity
-  ) -> MobileCloudMirrorSyncClient? {
+  ) -> CloudMirrorMobileMonitorSyncClient? {
     guard credential.hasCloudMirrorAccess else {
       return nil
     }
-    return MobileCloudMirrorSyncClient(
-      database: LiveMobileCloudMirrorDatabase(),
-      cipher: MobilePayloadCipher(rawKey: credential.symmetricKeyRawRepresentation),
-      deviceIdentity: identity,
-      actorDeviceID: actorDeviceID(identity),
-      commandKeyID: credential.commandKeyID
+    return CloudMirrorMobileMonitorSyncClient(
+      client: MobileCloudMirrorSyncClient(
+        database: LiveMobileCloudMirrorDatabase(),
+        cipher: MobilePayloadCipher(rawKey: credential.symmetricKeyRawRepresentation),
+        deviceIdentity: identity,
+        actorDeviceID: actorDeviceID(identity),
+        commandKeyID: credential.commandKeyID
+      )
     )
   }
 
@@ -119,7 +137,7 @@ private struct UnavailableMobileMonitorSyncClient: MobileMonitorSyncClient {
     _ command: MobileCommandRecord,
     currentRevision: Int64,
     now: Date
-  ) async throws -> MobileQueuedCommand {
+  ) async throws -> MobileCommandSubmission {
     throw MobileRemoteDaemonSyncError.commandsUnavailable
   }
 
@@ -129,5 +147,38 @@ private struct UnavailableMobileMonitorSyncClient: MobileMonitorSyncClient {
     now: Date
   ) async throws -> MobileCommandReceipt {
     throw MobileRemoteDaemonSyncError.commandsUnavailable
+  }
+}
+
+private struct CloudMirrorMobileMonitorSyncClient: MobileMonitorSyncClient {
+  let client: MobileCloudMirrorSyncClient
+  let supportsCommands = true
+
+  func fetchLatestSnapshot(
+    stationID: String,
+    now: Date
+  ) async throws -> MobileMirrorSnapshot? {
+    try await client.fetchLatestSnapshot(stationID: stationID, now: now)
+  }
+
+  func queueCommand(
+    _ command: MobileCommandRecord,
+    currentRevision: Int64,
+    now: Date
+  ) async throws -> MobileCommandSubmission {
+    let queued = try await client.queueCommand(
+      command,
+      currentRevision: currentRevision,
+      now: now
+    )
+    return MobileCommandSubmission(command: queued.signedCommand.command)
+  }
+
+  func cancelCommand(
+    _ command: MobileCommandRecord,
+    currentRevision: Int64,
+    now: Date
+  ) async throws -> MobileCommandReceipt {
+    try await client.cancelCommand(command, currentRevision: currentRevision, now: now)
   }
 }

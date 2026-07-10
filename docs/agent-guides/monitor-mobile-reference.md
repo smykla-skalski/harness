@@ -6,12 +6,12 @@ The macOS app itself is covered by `apps/harness-monitor/AGENTS.md` and `monitor
 
 ## Product shape
 
-Harness Monitor on the phone and watch is a read-mostly view of monitor state with two credential-driven transports:
+Harness Monitor on the phone and watch is a mobile control surface with two credential-driven transports:
 
-1. A remote-daemon profile connects directly over pinned HTTPS. The phone claims a one-time remote pairing invitation, stores the bearer credential in its Keychain, and fetches authenticated session snapshots. The watch can use the same direct path after the phone transfers that profile through WatchConnectivity.
+1. A remote-daemon profile connects directly over pinned HTTPS. The phone claims a one-time remote pairing invitation, stores the bearer credential in its Keychain, fetches authenticated session snapshots, and executes role-scoped commands against daemon HTTP routes. The watch can use the same direct path after the phone transfers that profile through WatchConnectivity.
 2. A local-relay profile uses `HarnessMonitorMacRelay` and `HarnessMonitorCloudMirror`. The Mac redacts and encrypts a full snapshot, CloudKit carries only encrypted records plus routing metadata, and the phone/watch decrypt the mirror. Signed commands return through the same relay for the Mac to validate and execute.
 
-When a credential has both transports, direct access is tried first. CloudMirror is used only for reachability/TLS failures or remote 5xx responses; remote `401` and `403` responses fail closed. The phone remains the pairing hub for the watch. The watch does not run either pairing claim itself.
+When a credential has both transports, direct snapshot access is tried first. CloudMirror snapshot fallback is used only for reachability/TLS failures or remote 5xx responses; remote `401` and `403` responses fail closed. Commands use direct execution whenever the remote profile has write scope and never fall back after a direct attempt, avoiding duplicate side effects after an ambiguous network failure. A read-only direct profile may still use an independently configured CloudMirror command channel. The phone remains the pairing hub for the watch. The watch does not run either pairing claim itself.
 
 ## Target and framework map
 
@@ -43,7 +43,7 @@ On a relay-paired device, `MobileCloudMirrorSyncClient.fetchLatestSnapshot(stati
 
 On a remote-paired device, `MobileRemoteDaemonSyncClient.fetchLatestSnapshot(stationID:now:)` sends an authenticated `GET /v1/sessions` to the pinned endpoint and maps the daemon's secret-free session fields into the shared snapshot model. `DirectFirstMobileMonitorSyncClient` applies the fail-closed fallback policy described above. The shared `MirrorStore.refresh()` aggregates every paired station through the same `MobileMonitorSyncClient` protocol.
 
-### Device to Mac (command)
+### Device command paths
 
 A command authored on the phone or watch is a `MobileCommandRecord` whose `kind` is one of a fixed `MobileCommandKind` set: resolve an ACP permission, start/stop/prompt an agent, dispatch a task or approve a task-board plan, approve/label/merge a pull request or rerun its checks, or a plain refresh. The device encrypts and signs it with the command-signing key established at pairing, then `MobileCloudMirrorSyncClient.queueCommand(_:currentRevision:now:)` writes it to the queue with the snapshot `revision` it was authored against (optimistic concurrency).
 
@@ -51,7 +51,9 @@ On the Mac, `MobileMacRelayService.executePendingCommands()` walks the pending q
 
 Commands are idempotent on the Mac: `executedCommandIDs` guards against re-running a command if a duplicate mirror pass sees it again before its terminal receipt has propagated.
 
-Direct and direct-first profiles currently expose snapshots only because the daemon snapshot has no relay revision for fresh-state validation. A CloudMirror-only relay credential still carries commands; other profiles report commands unavailable instead of queuing against an invented revision.
+For a write-scoped remote profile, `MobileRemoteDaemonSyncClient.queueCommand` executes the command immediately against the corresponding authenticated daemon route. ACP permission, task-board dispatch/plan approval, terminal/Codex/ACP start-stop-prompt, pull-request actions, and refresh scopes all use the same pinned URLSession and per-client bearer headers as snapshots. Stop and prompt first resolve the managed-agent kind so the client chooses the correct terminal, Codex, or ACP mutation. Review actions first resolve the referenced pull request through the daemon and build the mutation target from that fresh response; stale target IDs, policy flags, checks, and head SHA values from the mobile command are never trusted. A successful response becomes a terminal local receipt instead of a relay queue record, so no invented relay revision or cancellation window is needed.
+
+Remote mutation requests are attributed to a token-free structured actor principal containing the authenticated client id, platform, role, and scopes. Caller-supplied actor values are replaced for both HTTP and WebSocket mutations, including review workflow requests that preserve local agent actors. Viewer/read-only profiles do not expose direct commands. Admin profiles retain write access before local scope expansion, while operator profiles require the returned `write` scope.
 
 ## Pairing
 
@@ -104,7 +106,7 @@ The CloudKit schema must be deployed to the Production environment before TestFl
 - Remote TLS pinning. Remote pairing and snapshots require HTTPS and validate both platform trust and the invitation's SPKI SHA-256 pin. A mismatched or untrusted certificate fails the request.
 - Remote bearer isolation. Each remote client has its own opaque token and client id. The token is persisted only in the device Keychain and redacted from debug descriptions. Authentication and authorization failures never trigger CloudMirror fallback.
 - Secret redaction. The Mac redacts secrets twice: once while building the snapshot (`+Redaction`) and again on command-execution output, via `MobileMirrorSecretRedactor`. Redaction runs before encryption, so a key compromise still does not expose un-redacted secrets that were never put in the payload.
-- Command signing + fresh-state validation. Commands are signed with a command-signing key distinct from the snapshot key, and the Mac rejects any command whose authored `revision` no longer matches current state. This prevents a stale or replayed command from acting on a board that has moved on.
+- Command integrity. CloudMirror commands are signed with a command-signing key distinct from the snapshot key, and the Mac rejects any command whose authored `revision` no longer matches current state. Direct commands use pinned TLS, per-client bearer authentication, route authorization, and authenticated actor rebinding; they execute immediately and never retry through CloudMirror after a direct mutation attempt.
 - Trust is per device. Each phone/watch has its own `MobileDeviceIdentity`; unpairing one device deletes only its credential and, if no sibling credential shares the identity, its identity too.
 - Biometric gate. Both apps link `LocalAuthentication` to gate sensitive command actions behind Face ID / Touch ID / wrist-detection.
 - Privacy controls. `MobileCloudMirrorPrivacyService` lets the user inventory and delete the records mirrored for their devices; the iOS Settings tab exposes this when at least one station is mirrored.

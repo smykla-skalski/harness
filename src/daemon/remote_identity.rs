@@ -4,6 +4,7 @@ use std::fmt;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use rand_core06::{OsRng, RngCore};
+use serde::Serialize;
 
 use super::remote::{RemoteAccessScope, RemoteRole, scopes_for_role};
 use super::remote_crypto::{
@@ -227,6 +228,31 @@ pub struct RemoteStoredClient {
     pub last_seen_at: Option<String>,
     pub revoked_at: Option<String>,
     pub rotated_at: Option<String>,
+}
+
+#[derive(Serialize)]
+struct RemoteControlPlaneActor<'a> {
+    client_id: &'a str,
+    platform: &'a str,
+    role: &'static str,
+    scopes: Vec<&'static str>,
+}
+
+impl RemoteStoredClient {
+    #[must_use]
+    /// Serialize the authenticated, token-free actor identity for mutation attribution.
+    ///
+    /// # Panics
+    /// Panics only if `serde_json` cannot serialize the string-only identity fields.
+    pub fn control_plane_actor_id(&self) -> String {
+        let actor = RemoteControlPlaneActor {
+            client_id: &self.client_id,
+            platform: &self.platform,
+            role: self.role.as_str(),
+            scopes: self.scopes.iter().map(|scope| scope.as_str()).collect(),
+        };
+        serde_json::to_string(&actor).expect("remote control-plane actor serialization")
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

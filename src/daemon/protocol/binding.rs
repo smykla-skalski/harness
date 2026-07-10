@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use serde_json::Value;
 
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
@@ -20,25 +22,44 @@ pub trait ControlPlaneActorRequest {
     fn bind_control_plane_actor(&mut self);
 }
 
+tokio::task_local! {
+    static CONTROL_PLANE_ACTOR_OVERRIDE: String;
+}
+
+pub async fn with_control_plane_actor<T>(actor: String, future: impl Future<Output = T>) -> T {
+    CONTROL_PLANE_ACTOR_OVERRIDE.scope(actor, future).await
+}
+
+#[must_use]
+pub fn current_control_plane_actor_id() -> String {
+    CONTROL_PLANE_ACTOR_OVERRIDE
+        .try_with(Clone::clone)
+        .unwrap_or_else(|_| CONTROL_PLANE_ACTOR_ID.to_string())
+}
+
 pub fn bind_control_plane_actor_value(params: &mut Value) {
     let Some(object) = params.as_object_mut() else {
         return;
     };
     object.insert(
         "actor".into(),
-        Value::String(CONTROL_PLANE_ACTOR_ID.to_string()),
+        Value::String(current_control_plane_actor_id()),
     );
 }
 
 fn bind_required_control_plane_actor(actor: &mut String) {
-    *actor = CONTROL_PLANE_ACTOR_ID.to_string();
+    *actor = current_control_plane_actor_id();
 }
 
 fn bind_optional_control_plane_actor(actor: &mut Option<String>) {
-    *actor = Some(CONTROL_PLANE_ACTOR_ID.to_string());
+    *actor = Some(current_control_plane_actor_id());
 }
 
-fn preserve_required_actor(_actor: &mut String) {}
+fn preserve_required_actor(actor: &mut String) {
+    if let Ok(remote_actor) = CONTROL_PLANE_ACTOR_OVERRIDE.try_with(Clone::clone) {
+        *actor = remote_actor;
+    }
+}
 
 impl ControlPlaneActorRequest for CodexRunRequest {
     fn bind_control_plane_actor(&mut self) {
@@ -277,5 +298,51 @@ mod tests {
         };
         request.bind_control_plane_actor();
         assert_eq!(request.actor.as_deref(), Some(CONTROL_PLANE_ACTOR_ID));
+    }
+
+    #[tokio::test]
+    async fn actor_binding_uses_scoped_remote_principal() {
+        let principal = r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["read","write"]}"#;
+
+        with_control_plane_actor(principal.to_string(), async {
+            let mut request = TaskBoardDispatchRequest {
+                actor: Some("imposter".into()),
+                ..Default::default()
+            };
+            request.bind_control_plane_actor();
+
+            assert_eq!(request.actor.as_deref(), Some(principal));
+        })
+        .await;
+    }
+
+    #[test]
+    fn actor_binding_preserves_local_review_actor() {
+        let mut request = TaskSubmitForReviewRequest {
+            actor: "worker-1".into(),
+            summary: None,
+            suggested_persona: None,
+        };
+
+        request.bind_control_plane_actor();
+
+        assert_eq!(request.actor, "worker-1");
+    }
+
+    #[tokio::test]
+    async fn actor_binding_replaces_remote_review_actor() {
+        let principal = r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["read","write"]}"#;
+
+        with_control_plane_actor(principal.to_string(), async {
+            let mut request = TaskSubmitForReviewRequest {
+                actor: "spoofed-worker".into(),
+                summary: None,
+                suggested_persona: None,
+            };
+            request.bind_control_plane_actor();
+
+            assert_eq!(request.actor, principal);
+        })
+        .await;
     }
 }

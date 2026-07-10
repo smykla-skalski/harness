@@ -94,6 +94,10 @@ public struct MobileRemoteDaemonAccess: Codable, Equatable, Sendable, CustomStri
   public var canRead: Bool {
     role == .admin || scopes.contains("read")
   }
+
+  public var canWrite: Bool {
+    role == .admin || scopes.contains("write")
+  }
 }
 
 public struct MobileRemoteDaemonPairingInvitation: Codable, Equatable, Sendable {

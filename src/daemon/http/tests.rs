@@ -40,6 +40,7 @@ mod async_reads;
 mod async_signal_mutations;
 mod async_stream;
 mod decode_failure_telemetry;
+mod remote_actor;
 mod remote_authz;
 mod remote_pairing;
 mod reviews_policy_writes;

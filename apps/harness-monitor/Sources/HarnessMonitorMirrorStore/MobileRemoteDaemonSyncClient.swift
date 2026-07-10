@@ -10,6 +10,9 @@ public enum MobileRemoteDaemonSyncError: Error, Equatable, Sendable {
   case forbidden
   case serverStatus(Int)
   case commandsUnavailable
+  case commandExpired
+  case invalidCommand(String)
+  case unsupportedAgentKind(String)
 
   var allowsCloudFallback: Bool {
     if case .serverStatus(let statusCode) = self {
@@ -20,13 +23,13 @@ public enum MobileRemoteDaemonSyncError: Error, Equatable, Sendable {
 }
 
 public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
-  public let supportsCommands = false
+  public var supportsCommands: Bool { access.canWrite }
 
-  private let access: MobileRemoteDaemonAccess
-  private let stationID: String
+  let access: MobileRemoteDaemonAccess
+  let stationID: String
   private let stationName: String
   private let defaultStation: Bool
-  private let session: URLSession
+  let session: URLSession
 
   public init(
     access: MobileRemoteDaemonAccess,
@@ -66,23 +69,7 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
     return makeSnapshot(sessions: sessions, now: now)
   }
 
-  public func queueCommand(
-    _ command: MobileCommandRecord,
-    currentRevision: Int64,
-    now: Date
-  ) async throws -> MobileQueuedCommand {
-    throw MobileRemoteDaemonSyncError.commandsUnavailable
-  }
-
-  public func cancelCommand(
-    _ command: MobileCommandRecord,
-    currentRevision: Int64,
-    now: Date
-  ) async throws -> MobileCommandReceipt {
-    throw MobileRemoteDaemonSyncError.commandsUnavailable
-  }
-
-  private func validate(_ response: HTTPURLResponse) throws {
+  func validate(_ response: HTTPURLResponse) throws {
     switch response.statusCode {
     case 200..<300:
       return

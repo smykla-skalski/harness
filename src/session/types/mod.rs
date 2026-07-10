@@ -26,6 +26,7 @@ pub use identity::{
     AgentDescriptorId, HarnessSessionId, ManagedAgentId, RuntimeSessionId, SessionAgentId,
 };
 pub use policy::{AutoPromotionPolicy, LeaderJoinPolicy, LeaderRecoveryPolicy, SessionPolicy};
+pub(crate) use state::is_control_plane_actor_id;
 pub use state::{
     CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION, SessionMetrics, SessionState, SessionStatus,
 };
