@@ -73,6 +73,11 @@ public actor RemoteDaemonProfileCoordinator {
     forgottenState.activeProfileID = nil
     do {
       try tokenStore.deleteToken(profileID: activeProfileID)
+    } catch {
+      restoreToken(token, profileID: activeProfileID)
+      throw error
+    }
+    do {
       try repository.save(forgottenState)
     } catch {
       rollbackForget(state: originalState, token: token, profileID: activeProfileID)
@@ -129,13 +134,15 @@ public actor RemoteDaemonProfileCoordinator {
   ) {
     do {
       try repository.save(state)
-      if let token {
-        try? tokenStore.saveToken(token, profileID: profileID)
-      } else {
-        try? tokenStore.deleteToken(profileID: profileID)
-      }
     } catch {
-      try? tokenStore.deleteToken(profileID: profileID)
+      return
+    }
+    restoreToken(token, profileID: profileID)
+  }
+
+  private func restoreToken(_ token: String?, profileID: UUID) {
+    if let token {
+      try? tokenStore.saveToken(token, profileID: profileID)
     }
   }
 }

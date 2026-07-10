@@ -52,6 +52,32 @@ struct RemoteDaemonProfileCoordinatorForgetTests {
     #expect(try repository.load() == originalState)
     #expect(try tokenStore.loadToken(profileID: profile.id) == "server-issued-token")
   }
+
+  @Test("Token deletion failure does not retry deletion or save metadata")
+  func tokenDeletionFailureStopsBeforeMetadata() async throws {
+    let profile = try remoteProfileFixture()
+    let originalState = RemoteDaemonProfileState(
+      profiles: [profile],
+      activeProfileID: profile.id
+    )
+    let repository = SaveFailingRemoteDaemonProfileStore(state: originalState)
+    let tokenStore = DeleteFailingRemoteDaemonTokenStore(
+      profileID: profile.id,
+      token: "server-issued-token"
+    )
+    let coordinator = RemoteDaemonProfileCoordinator(
+      repository: repository,
+      tokenStore: tokenStore
+    )
+
+    await #expect(throws: RemoteDaemonForgetTestError.tokenDeletion) {
+      _ = try await coordinator.forgetActiveProfile()
+    }
+
+    #expect(repository.saveCallCount == 0)
+    #expect(tokenStore.deleteCallCount == 1)
+    #expect(try tokenStore.loadToken(profileID: profile.id) == "server-issued-token")
+  }
 }
 
 private enum RemoteDaemonForgetTestError: Error {
@@ -64,6 +90,7 @@ private final class DeleteFailingRemoteDaemonTokenStore:
 {
   private let lock = NSLock()
   private var tokens: [UUID: String]
+  private var recordedDeleteCallCount = 0
 
   init(profileID: UUID, token: String) {
     self.tokens = [profileID: token]
@@ -77,8 +104,43 @@ private final class DeleteFailingRemoteDaemonTokenStore:
     lock.withLock { tokens[profileID] = token }
   }
 
+  var deleteCallCount: Int {
+    lock.withLock { recordedDeleteCallCount }
+  }
+
   func deleteToken(profileID: UUID) throws {
-    throw RemoteDaemonForgetTestError.tokenDeletion
+    try lock.withLock {
+      recordedDeleteCallCount += 1
+      guard recordedDeleteCallCount > 1 else {
+        throw RemoteDaemonForgetTestError.tokenDeletion
+      }
+      tokens.removeValue(forKey: profileID)
+    }
+  }
+}
+
+private final class SaveFailingRemoteDaemonProfileStore:
+  RemoteDaemonProfilePersisting, @unchecked Sendable
+{
+  private let lock = NSLock()
+  private let state: RemoteDaemonProfileState
+  private var recordedSaveCallCount = 0
+
+  init(state: RemoteDaemonProfileState) {
+    self.state = state
+  }
+
+  var saveCallCount: Int {
+    lock.withLock { recordedSaveCallCount }
+  }
+
+  func load() throws -> RemoteDaemonProfileState {
+    state
+  }
+
+  func save(_ state: RemoteDaemonProfileState) throws {
+    lock.withLock { recordedSaveCallCount += 1 }
+    throw RemoteDaemonForgetTestError.metadataSave
   }
 }
 
