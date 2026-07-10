@@ -79,12 +79,11 @@ struct SettingsRemoteDaemonSection: View {
         ProgressView(actionState == .pairing ? "Pairing..." : "Forgetting...")
       } else {
         HarnessMonitorActionButton(
-          title: profile == nil ? "Pair Remote Daemon" : "Replace Remote Daemon",
+          title: pairingActionTitle,
           tint: nil,
           variant: .prominent,
-          accessibilityIdentifier: HarnessMonitorAccessibility.settingsActionButton(
-            "Pair Remote Daemon"
-          )
+          accessibilityIdentifier:
+            HarnessMonitorAccessibility.settingsActionButton(pairingActionTitle)
         ) {
           pair(pairingInput, displayName)
         }
@@ -104,6 +103,10 @@ struct SettingsRemoteDaemonSection: View {
     } message: {
       Text("This removes the bearer token from Keychain and returns to the local daemon mode")
     }
+  }
+
+  private var pairingActionTitle: String {
+    profile == nil ? "Pair Remote Daemon" : "Replace Remote Daemon"
   }
 
   @ViewBuilder

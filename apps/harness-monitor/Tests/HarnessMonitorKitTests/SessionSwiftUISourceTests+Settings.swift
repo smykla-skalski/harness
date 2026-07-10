@@ -95,6 +95,14 @@ extension SessionSwiftUISourceTests {
     #expect(sources.policiesSource.contains("PolicyCanvasThemeMode.allCases"))
   }
 
+  @Test("Remote pair button keeps its accessibility identifier aligned with its title")
+  func remotePairButtonKeepsAccessibilityIdentifierAligned() throws {
+    let source = try sourceFile(at: "Views/Settings/SettingsRemoteDaemonSection.swift")
+
+    #expect(source.contains("title: pairingActionTitle"))
+    #expect(source.contains("settingsActionButton(pairingActionTitle)"))
+  }
+
   @Test("Decision rows keep deadline churn scoped to the deadline chip")
   func decisionRowsKeepTimelineTicksOutOfTheRowBody() throws {
     let rowSource = try sourceFile(at: "Views/Decisions/DecisionRow.swift")

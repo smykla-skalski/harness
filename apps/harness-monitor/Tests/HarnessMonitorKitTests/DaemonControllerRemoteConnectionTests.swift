@@ -26,6 +26,25 @@ struct DaemonControllerRemoteConnectionTests {
     await client.shutdown()
   }
 
+  @Test("Corrupt remote profile metadata falls back to the local manifest")
+  func corruptRemoteProfileFallsBackToLocalManifest() async throws {
+    let pid = UInt32(ProcessInfo.processInfo.processIdentifier)
+    try await withTempDaemonFixture(pid: pid) { environment in
+      let controller = DaemonController(
+        environment: environment,
+        transportPreference: .http,
+        launchAgentManager: RecordingLaunchAgentManager(state: .enabled),
+        remoteConnectionSource: CorruptThenClearedRemoteDaemonConnectionSource()
+      )
+
+      let connection = try controller.loadConnection()
+
+      #expect(connection.endpoint.absoluteString == "http://127.0.0.1:65534")
+      #expect(connection.token == "test-token")
+      #expect(connection.source == .local)
+    }
+  }
+
   @Test("Remote WebSocket bootstrap performs pinned HTTP auth preflight")
   func remoteWebSocketPerformsHTTPPreflight() async throws {
     let fixture = try RemoteControllerFixture()
@@ -168,6 +187,30 @@ private final class RecordingRemoteDaemonConnectionSource:
   func markRevoked(profileID: UUID, at date: Date) throws {
     lock.withLock { revokedIDs.append(profileID) }
   }
+}
+
+private final class CorruptThenClearedRemoteDaemonConnectionSource:
+  RemoteDaemonConnectionSourcing, @unchecked Sendable
+{
+  private let lock = NSLock()
+  private var isCleared = false
+
+  func activeConnection() throws -> HarnessMonitorConnection? {
+    let shouldThrow = lock.withLock {
+      defer { isCleared = true }
+      return !isCleared
+    }
+    if shouldThrow {
+      throw RemoteDaemonProfileError.invalidStoredProfiles
+    }
+    return nil
+  }
+
+  func activeProfile() throws -> RemoteDaemonProfile? {
+    nil
+  }
+
+  func markRevoked(profileID: UUID, at date: Date) throws {}
 }
 
 private final class RemoteConnectionRecorder: @unchecked Sendable {
