@@ -117,6 +117,10 @@ pub(crate) const fn ws_activity_log_level() -> tracing::Level {
     crate::DAEMON_ACTIVITY_LOG_LEVEL
 }
 
+#[expect(
+    clippy::large_futures,
+    reason = "boxing dispatch would allocate for every websocket message"
+)]
 async fn dispatch_inner(
     request: &WsRequest,
     state: &DaemonHttpState,
@@ -125,13 +129,13 @@ async fn dispatch_inner(
     if let Some(response) = authorize_remote_ws_request(request, state, connection) {
         return response;
     }
-    let response = Box::pin(with_connection_actor(
+    if let Some(response) = with_connection_actor(
         state,
         connection,
         routing::dispatch_known_method(request, state, connection),
-    ))
-    .await;
-    if let Some(response) = response {
+    )
+    .await
+    {
         return response;
     }
     error_response(

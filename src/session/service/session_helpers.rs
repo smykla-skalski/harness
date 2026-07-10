@@ -379,6 +379,20 @@ mod remote_actor_tests {
     }
 
     #[test]
+    fn remote_admin_actor_can_mutate_with_admin_scope() {
+        let state = build_initial_state(
+            "remote session",
+            "Remote session",
+            "remote-session",
+            "2026-07-10T12:00:00Z",
+            None,
+        );
+        let actor = r#"{"client_id":"phone-1","platform":"ios","role":"admin","scopes":["admin"]}"#;
+
+        assert!(require_permission(&state, actor, SessionAction::EndSession).is_ok());
+    }
+
+    #[test]
     fn registered_agent_matching_remote_actor_keeps_agent_permissions() {
         let mut state = build_initial_state(
             "remote session",
@@ -423,6 +437,7 @@ mod remote_actor_tests {
         let invalid_actors = [
             r#"{"client_id":"phone-1","platform":"ios","role":"viewer","scopes":["read"]}"#,
             r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["read"]}"#,
+            r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["admin"]}"#,
             r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["write","unknown"]}"#,
             r#"{"client_id":"","platform":"ios","role":"operator","scopes":["write"]}"#,
             "not-json",

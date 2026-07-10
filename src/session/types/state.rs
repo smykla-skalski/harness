@@ -36,10 +36,17 @@ pub(crate) fn is_control_plane_actor_id(actor_id: &str) -> bool {
         return true;
     }
     serde_json::from_str::<RemoteControlPlaneActor>(actor_id).is_ok_and(|actor| {
+        let has_control_scope = match actor.role.as_str() {
+            "admin" => actor
+                .scopes
+                .iter()
+                .any(|scope| matches!(scope.as_str(), "write" | "admin")),
+            "operator" => actor.scopes.iter().any(|scope| scope == "write"),
+            _ => false,
+        };
         !actor.client_id.trim().is_empty()
             && !actor.platform.trim().is_empty()
-            && matches!(actor.role.as_str(), "admin" | "operator")
-            && actor.scopes.iter().any(|scope| scope == "write")
+            && has_control_scope
             && actor
                 .scopes
                 .iter()
