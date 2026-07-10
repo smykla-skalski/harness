@@ -54,17 +54,7 @@ public actor RemoteDaemonProfileCoordinator {
       revokedAt: nil
     )
     _ = try profile.validated()
-    try tokenStore.saveToken(claim.token, profileID: profileID)
-    do {
-      var state = try repository.load()
-      state.profiles.removeAll { $0.id == profileID || $0.clientID == claim.clientID }
-      state.profiles.append(profile)
-      state.activeProfileID = profileID
-      try repository.save(state)
-    } catch {
-      try? tokenStore.deleteToken(profileID: profileID)
-      throw error
-    }
+    try activate(profile, token: claim.token)
     return profile
   }
 
@@ -82,5 +72,46 @@ public actor RemoteDaemonProfileCoordinator {
     try repository.save(state)
     try tokenStore.deleteToken(profileID: activeProfileID)
     return profile
+  }
+
+  private func activate(_ profile: RemoteDaemonProfile, token: String) throws {
+    let originalState = try repository.load()
+    let replacedProfiles = originalState.profiles.filter {
+      $0.id == profile.id || $0.clientID == profile.clientID
+    }
+    let replacedTokens = try replacedProfiles.map { replacedProfile in
+      (
+        profileID: replacedProfile.id,
+        token: try tokenStore.loadToken(profileID: replacedProfile.id)
+      )
+    }
+    var activatedState = originalState
+    activatedState.profiles.removeAll {
+      $0.id == profile.id || $0.clientID == profile.clientID
+    }
+    activatedState.profiles.append(profile)
+    activatedState.activeProfileID = profile.id
+
+    do {
+      try tokenStore.saveToken(token, profileID: profile.id)
+      for replacedProfile in replacedProfiles where replacedProfile.id != profile.id {
+        try tokenStore.deleteToken(profileID: replacedProfile.id)
+      }
+      try repository.save(activatedState)
+    } catch {
+      try? tokenStore.deleteToken(profileID: profile.id)
+      restoreReplacedTokens(replacedTokens)
+      throw error
+    }
+  }
+
+  private func restoreReplacedTokens(_ replacedTokens: [(profileID: UUID, token: String?)]) {
+    for replacedToken in replacedTokens {
+      if let token = replacedToken.token {
+        try? tokenStore.saveToken(token, profileID: replacedToken.profileID)
+      } else {
+        try? tokenStore.deleteToken(profileID: replacedToken.profileID)
+      }
+    }
   }
 }

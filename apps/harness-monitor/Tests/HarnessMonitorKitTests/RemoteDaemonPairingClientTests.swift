@@ -111,6 +111,41 @@ struct RemoteDaemonPairingClientTests {
     #expect(try repository.load() == RemoteDaemonProfileState())
     #expect(try tokenStore.loadToken(profileID: profile.id) == nil)
   }
+
+  @Test("Replacing a duplicate client removes its old Keychain token")
+  func replacingDuplicateClientDeletesOldToken() async throws {
+    let existingProfile = try remoteProfileFixture()
+    let repository = InMemoryRemoteDaemonProfileStore(
+      state: RemoteDaemonProfileState(
+        profiles: [existingProfile],
+        activeProfileID: existingProfile.id
+      )
+    )
+    let tokenStore = RecordingRemoteDaemonTokenStore()
+    try tokenStore.saveToken("old-server-token", profileID: existingProfile.id)
+    let replacementID = try #require(
+      UUID(uuidString: "29F770D1-E9A1-4C52-9301-13DC6957D0A9")
+    )
+    let coordinator = RemoteDaemonProfileCoordinator(
+      repository: repository,
+      tokenStore: tokenStore,
+      claimant: StubRemoteDaemonPairingClaimant(result: .success(try claimFixture())),
+      profileIDGenerator: { replacementID },
+      clientIDGenerator: { _ in existingProfile.clientID }
+    )
+
+    let replacement = try await coordinator.pair(
+      invitation: pairingInvitationFixture(),
+      displayName: "Work Mac"
+    )
+
+    #expect(try tokenStore.loadToken(profileID: existingProfile.id) == nil)
+    #expect(try tokenStore.loadToken(profileID: replacement.id) == "server-issued-token")
+    #expect(
+      try repository.load()
+        == RemoteDaemonProfileState(profiles: [replacement], activeProfileID: replacement.id)
+    )
+  }
 }
 
 private func pairingInvitationFixture() throws -> RemoteDaemonPairingInvitation {
