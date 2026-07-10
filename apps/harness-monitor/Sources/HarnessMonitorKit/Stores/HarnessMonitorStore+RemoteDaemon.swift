@@ -41,6 +41,7 @@ extension HarnessMonitorStore {
     using input: RemoteDaemonPairingInput,
     displayName: String
   ) {
+    guard !remoteDaemonActionState.isInFlight else { return }
     guard let remoteDaemonServices else {
       remoteDaemonActionState = .failed("Remote daemon pairing is unavailable")
       return
@@ -68,6 +69,7 @@ extension HarnessMonitorStore {
   }
 
   public func forgetRemoteDaemon() {
+    guard !remoteDaemonActionState.isInFlight else { return }
     guard let remoteDaemonServices else {
       remoteDaemonActionState = .failed("Remote daemon profiles are unavailable")
       return

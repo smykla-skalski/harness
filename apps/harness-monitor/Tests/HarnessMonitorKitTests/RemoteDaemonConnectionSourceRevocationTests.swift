@@ -52,6 +52,29 @@ struct RemoteDaemonConnectionSourceRevocationTests {
     #expect(try repository.load() == originalState)
     #expect(try tokenStore.loadToken(profileID: profile.id) == "server-issued-token")
   }
+
+  @Test("Metadata rollback failure still restores the token")
+  func metadataRollbackFailureRestoresToken() throws {
+    let profile = try remoteProfileFixture()
+    let originalState = RemoteDaemonProfileState(
+      profiles: [profile],
+      activeProfileID: profile.id
+    )
+    let repository = SaveFailingRevocationProfileStore(state: originalState)
+    let tokenStore = RecordingRemoteDaemonTokenStore()
+    try tokenStore.saveToken("server-issued-token", profileID: profile.id)
+    let source = StoredRemoteDaemonConnectionSource(
+      repository: repository,
+      tokenStore: tokenStore
+    )
+
+    #expect(throws: RemoteDaemonRevocationTestError.metadataSave) {
+      try source.markRevoked(profileID: profile.id, at: .now)
+    }
+
+    #expect(try repository.load() == originalState)
+    #expect(try tokenStore.loadToken(profileID: profile.id) == "server-issued-token")
+  }
 }
 
 private enum RemoteDaemonRevocationTestError: Error {
@@ -104,5 +127,23 @@ private final class PartiallyFailingRevocationProfileStore:
       shouldFailSave = false
       throw RemoteDaemonRevocationTestError.metadataSave
     }
+  }
+}
+
+private final class SaveFailingRevocationProfileStore:
+  RemoteDaemonProfilePersisting, @unchecked Sendable
+{
+  private let state: RemoteDaemonProfileState
+
+  init(state: RemoteDaemonProfileState) {
+    self.state = state
+  }
+
+  func load() throws -> RemoteDaemonProfileState {
+    state
+  }
+
+  func save(_ state: RemoteDaemonProfileState) throws {
+    throw RemoteDaemonRevocationTestError.metadataSave
   }
 }

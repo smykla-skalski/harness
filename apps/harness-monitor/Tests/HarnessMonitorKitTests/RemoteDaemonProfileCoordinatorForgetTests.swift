@@ -53,6 +53,29 @@ struct RemoteDaemonProfileCoordinatorForgetTests {
     #expect(try tokenStore.loadToken(profileID: profile.id) == "server-issued-token")
   }
 
+  @Test("Metadata rollback failure still restores the token")
+  func metadataRollbackFailureRestoresToken() async throws {
+    let profile = try remoteProfileFixture()
+    let originalState = RemoteDaemonProfileState(
+      profiles: [profile],
+      activeProfileID: profile.id
+    )
+    let repository = SaveFailingRemoteDaemonProfileStore(state: originalState)
+    let tokenStore = RecordingRemoteDaemonTokenStore()
+    try tokenStore.saveToken("server-issued-token", profileID: profile.id)
+    let coordinator = RemoteDaemonProfileCoordinator(
+      repository: repository,
+      tokenStore: tokenStore
+    )
+
+    await #expect(throws: RemoteDaemonForgetTestError.metadataSave) {
+      _ = try await coordinator.forgetActiveProfile()
+    }
+
+    #expect(try repository.load() == originalState)
+    #expect(try tokenStore.loadToken(profileID: profile.id) == "server-issued-token")
+  }
+
   @Test("Token deletion failure does not retry deletion or save metadata")
   func tokenDeletionFailureStopsBeforeMetadata() async throws {
     let profile = try remoteProfileFixture()

@@ -91,6 +91,29 @@ struct HarnessMonitorStoreRemoteConnectionTests {
     #expect(store.remoteDaemonActionState.errorMessage != nil)
   }
 
+  @Test("Pairing does not overlap an in-flight remote action")
+  func pairingDoesNotOverlapRemoteAction() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.remoteDaemonActionState = .forgetting
+
+    store.pairRemoteDaemon(
+      using: .deepLink("harness://remote-pair"),
+      displayName: "Work Mac"
+    )
+
+    #expect(store.remoteDaemonActionState == .forgetting)
+  }
+
+  @Test("Forgetting does not overlap an in-flight remote action")
+  func forgettingDoesNotOverlapRemoteAction() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    store.remoteDaemonActionState = .pairing
+
+    store.forgetRemoteDaemon()
+
+    #expect(store.remoteDaemonActionState == .pairing)
+  }
+
   @Test("Queued pairing and forget actions switch between remote and local clients")
   func queuedPairAndForgetSwitchConnectionSources() async throws {
     let repository = InMemoryRemoteDaemonProfileStore()

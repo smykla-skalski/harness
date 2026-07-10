@@ -82,11 +82,7 @@ public struct StoredRemoteDaemonConnectionSource: RemoteDaemonConnectionSourcing
     token: String?,
     profileID: UUID
   ) {
-    do {
-      try repository.save(state)
-    } catch {
-      return
-    }
+    try? repository.save(state)
     if let token {
       try? tokenStore.saveToken(token, profileID: profileID)
     }

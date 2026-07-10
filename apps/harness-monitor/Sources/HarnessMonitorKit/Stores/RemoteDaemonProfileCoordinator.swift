@@ -132,11 +132,7 @@ public actor RemoteDaemonProfileCoordinator {
     token: String?,
     profileID: UUID
   ) {
-    do {
-      try repository.save(state)
-    } catch {
-      return
-    }
+    try? repository.save(state)
     restoreToken(token, profileID: profileID)
   }
 
