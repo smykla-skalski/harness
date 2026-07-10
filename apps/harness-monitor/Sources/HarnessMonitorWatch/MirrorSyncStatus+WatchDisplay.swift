@@ -18,6 +18,7 @@ extension MirrorSyncStatus {
     case .paired: String(localized: "Mac paired")
     case .privacy: String(localized: "Privacy")
     case .commandQueued: String(localized: "Command queued")
+    case .commandCompleted: String(localized: "Command completed")
     case .commandCancelled: String(localized: "Command cancelled")
     case .commandFailed: String(localized: "Command failed")
     }
@@ -47,6 +48,8 @@ extension MirrorSyncStatus {
       message
     case .commandQueued(let date):
       String(localized: "Signed \(date.formatted(.dateTime.hour().minute()))")
+    case .commandCompleted(let date):
+      String(localized: "Completed \(date.formatted(.dateTime.hour().minute()))")
     case .commandCancelled(let date):
       String(localized: "Cancelled \(date.formatted(.dateTime.hour().minute()))")
     }

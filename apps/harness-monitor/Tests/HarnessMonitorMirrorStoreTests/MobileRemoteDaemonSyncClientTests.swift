@@ -90,7 +90,7 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     XCTAssertEqual(snapshot, expected)
     let fetchCount = await fallback.fetchCount()
     XCTAssertEqual(fetchCount, 1)
-    XCTAssertFalse(client.supportsCommands)
+    XCTAssertTrue(client.supportsCommands)
   }
 
   func testRemoteServerFailureUsesCloudFallback() async throws {
@@ -126,26 +126,22 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     XCTAssertEqual(fetchCount, 0)
   }
 
-  func testHybridClientRejectsCommandsWithoutUsingCloudRevision() async throws {
+  func testHybridClientUsesCloudCommandsWhenDirectWriteIsUnavailable() async throws {
     let cloud = RecordingSyncClient(snapshot: snapshotFixture())
     let client = DirectFirstMobileMonitorSyncClient(
       direct: ThrowingSyncClient(error: URLError(.timedOut)),
       cloudFallback: cloud
     )
 
-    do {
-      _ = try await client.queueCommand(
-        commandFixture(),
-        currentRevision: 99,
-        now: .now
-      )
-      XCTFail("expected commands unavailable")
-    } catch let error as MobileRemoteDaemonSyncError {
-      XCTAssertEqual(error, .commandsUnavailable)
-    }
+    let submission = try await client.queueCommand(
+      commandFixture(),
+      currentRevision: 99,
+      now: .now
+    )
 
+    XCTAssertEqual(submission.command.id, "command-1")
     let commandAttempts = await cloud.commandAttemptCount()
-    XCTAssertEqual(commandAttempts, 0)
+    XCTAssertEqual(commandAttempts, 1)
   }
 
   func testFactoryBuildsDirectOnlyClientForRemoteCredential() throws {
@@ -195,7 +191,7 @@ private struct ThrowingSyncClient: MobileMonitorSyncClient {
     _ command: MobileCommandRecord,
     currentRevision: Int64,
     now: Date
-  ) async throws -> MobileQueuedCommand {
+  ) async throws -> MobileCommandSubmission {
     throw error
   }
 
@@ -209,6 +205,7 @@ private struct ThrowingSyncClient: MobileMonitorSyncClient {
 }
 
 private actor RecordingSyncClient: MobileMonitorSyncClient {
+  nonisolated let supportsCommands = true
   private let snapshot: MobileMirrorSnapshot?
   private var fetches = 0
   private var commandAttempts = 0
@@ -226,9 +223,9 @@ private actor RecordingSyncClient: MobileMonitorSyncClient {
     _ command: MobileCommandRecord,
     currentRevision: Int64,
     now: Date
-  ) async throws -> MobileQueuedCommand {
+  ) async throws -> MobileCommandSubmission {
     commandAttempts += 1
-    throw MobileRemoteDaemonSyncError.commandsUnavailable
+    return MobileCommandSubmission(command: command)
   }
 
   func cancelCommand(

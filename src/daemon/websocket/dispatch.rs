@@ -4,13 +4,16 @@ use super::frames::{
     serialize_response_frames,
 };
 use crate::daemon::http::{DaemonHttpAuthMode, DaemonHttpState};
-use crate::daemon::protocol::{WsErrorPayload, WsRequest, WsResponse, ws_methods};
+use crate::daemon::protocol::{
+    WsErrorPayload, WsRequest, WsResponse, with_control_plane_actor, ws_methods,
+};
 use crate::daemon::remote_auth::{RemoteAuthError, authorize_remote_ws_method};
 use crate::daemon::remote_identity::RemoteStoredClient;
 use crate::telemetry::{
     TelemetryBaggage, apply_parent_context_from_text_map, current_trace_id, with_active_baggage,
 };
 use axum::extract::ws::Message;
+use std::future::Future;
 use std::sync::{Arc, Mutex};
 use tokio::time::Instant;
 use tracing::Instrument as _;
@@ -114,6 +117,10 @@ pub(crate) const fn ws_activity_log_level() -> tracing::Level {
     crate::DAEMON_ACTIVITY_LOG_LEVEL
 }
 
+#[expect(
+    clippy::large_futures,
+    reason = "boxing dispatch would allocate for every websocket message"
+)]
 async fn dispatch_inner(
     request: &WsRequest,
     state: &DaemonHttpState,
@@ -122,7 +129,13 @@ async fn dispatch_inner(
     if let Some(response) = authorize_remote_ws_request(request, state, connection) {
         return response;
     }
-    if let Some(response) = routing::dispatch_known_method(request, state, connection).await {
+    if let Some(response) = with_connection_actor(
+        state,
+        connection,
+        routing::dispatch_known_method(request, state, connection),
+    )
+    .await
+    {
         return response;
     }
     error_response(
@@ -130,6 +143,22 @@ async fn dispatch_inner(
         "UNKNOWN_METHOD",
         &format!("unknown method: {}", request.method),
     )
+}
+
+async fn with_connection_actor<T>(
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+    future: impl Future<Output = T>,
+) -> T {
+    let actor = (state.auth_mode == DaemonHttpAuthMode::Remote)
+        .then(|| remote_client_for_connection(connection))
+        .flatten()
+        .map(|client| client.control_plane_actor_id());
+    if let Some(actor) = actor {
+        with_control_plane_actor(actor, future).await
+    } else {
+        future.await
+    }
 }
 
 fn authorize_remote_ws_request(

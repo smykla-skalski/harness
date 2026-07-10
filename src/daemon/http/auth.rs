@@ -7,6 +7,7 @@ use axum::response::{IntoResponse, Response};
 
 use crate::daemon::protocol::{
     ControlPlaneActorRequest, HTTP_API_CONTRACT, HttpApiRouteContract, http_paths,
+    with_control_plane_actor,
 };
 use crate::daemon::remote_auth::{
     RemoteAuthError, RemoteBearerCredentials, authorize_remote_http_route,
@@ -106,7 +107,12 @@ pub(crate) async fn authorize_remote_http_request(
         return remote_auth_error_response(RemoteAuthError::MissingScopeContract);
     };
     match verify_and_authorize_http_route(request.headers(), &state, route) {
-        Ok(client) => REMOTE_HTTP_CLIENT.scope(client, next.run(request)).await,
+        Ok(client) => {
+            let actor = client.control_plane_actor_id();
+            REMOTE_HTTP_CLIENT
+                .scope(client, with_control_plane_actor(actor, next.run(request)))
+                .await
+        }
         Err(response) => *response,
     }
 }

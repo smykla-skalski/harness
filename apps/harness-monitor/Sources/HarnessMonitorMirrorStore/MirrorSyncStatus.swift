@@ -20,6 +20,7 @@ public enum MirrorSyncStatus: Equatable, Sendable {
   case paired(String)
   case privacy(String)
   case commandQueued(Date)
+  case commandCompleted(Date)
   case commandCancelled(Date)
   case commandFailed(String)
 
@@ -36,6 +37,7 @@ public enum MirrorSyncStatus: Equatable, Sendable {
     case .paired: "key.horizontal"
     case .privacy: "checkmark.shield"
     case .commandQueued: "checkmark.seal"
+    case .commandCompleted: "checkmark.circle"
     case .commandCancelled: "xmark.seal"
     case .commandFailed: "xmark.octagon"
     }
@@ -57,7 +59,7 @@ public enum MirrorSyncStatus: Equatable, Sendable {
     case .stale, .localNetworkDenied, .iCloudAccountUnavailable:
       true
     case .unpaired, .demo, .pairing, .syncing, .live, .paired, .privacy,
-      .commandQueued, .commandCancelled, .commandFailed:
+      .commandQueued, .commandCompleted, .commandCancelled, .commandFailed:
       false
     }
   }

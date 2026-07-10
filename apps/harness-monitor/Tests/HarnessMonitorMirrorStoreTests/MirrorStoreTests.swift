@@ -26,7 +26,7 @@ private struct StubSyncClient: MobileMonitorSyncClient {
     _ command: MobileCommandRecord,
     currentRevision: Int64,
     now: Date
-  ) async throws -> MobileQueuedCommand {
+  ) async throws -> MobileCommandSubmission {
     throw StubFetchError()
   }
 
@@ -96,7 +96,7 @@ private final class GatedSyncClient: MobileMonitorSyncClient, @unchecked Sendabl
     _ command: MobileCommandRecord,
     currentRevision: Int64,
     now: Date
-  ) async throws -> MobileQueuedCommand {
+  ) async throws -> MobileCommandSubmission {
     throw StubFetchError()
   }
 
@@ -240,6 +240,38 @@ final class MirrorStoreCommandTests: XCTestCase {
     await store.queueCommand(makeRefreshDraft())
     XCTAssertTrue(store.snapshot.commands.isEmpty)
     XCTAssertTrue(store.lastAuthenticationFailed)
+  }
+
+  func testLiveDirectSubmissionReportsCompletion() async {
+    let store = MirrorStore(
+      snapshot: .empty(),
+      syncClient: RecordingCommandSyncClient(disposition: .completed),
+      demoModeEnabled: false,
+      sharedSnapshotStore: nil,
+      authenticator: StubAuthenticator(result: true)
+    )
+
+    await store.queueCommand(makeRefreshDraft())
+
+    guard case .commandCompleted = store.syncStatus else {
+      return XCTFail("expected direct command completion, got \(store.syncStatus)")
+    }
+  }
+
+  func testLiveCloudSubmissionReportsQueued() async {
+    let store = MirrorStore(
+      snapshot: .empty(),
+      syncClient: RecordingCommandSyncClient(disposition: .queued),
+      demoModeEnabled: false,
+      sharedSnapshotStore: nil,
+      authenticator: StubAuthenticator(result: true)
+    )
+
+    await store.queueCommand(makeRefreshDraft())
+
+    guard case .commandQueued = store.syncStatus else {
+      return XCTFail("expected queued command status, got \(store.syncStatus)")
+    }
   }
 }
 

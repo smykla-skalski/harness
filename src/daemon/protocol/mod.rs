@@ -15,7 +15,10 @@ mod websocket;
 
 pub use api_contract::*;
 pub use audit::*;
-pub use binding::{ControlPlaneActorRequest, bind_control_plane_actor_value};
+pub use binding::{
+    ControlPlaneActorRequest, bind_control_plane_actor_value, current_control_plane_actor_id,
+    with_control_plane_actor,
+};
 pub use codex::*;
 pub use managed_agents::*;
 pub use openrouter_models::*;

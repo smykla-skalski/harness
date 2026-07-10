@@ -13,11 +13,49 @@ pub const CURRENT_VERSION: u32 = 14;
 
 /// Server-derived principal for daemon-authenticated control-plane mutations.
 ///
-/// The monitor daemon authenticates a shared bearer token, so HTTP and
-/// websocket request payloads must not treat client-supplied actor IDs as an
-/// authenticated identity. Daemon transports rebind actor-bearing mutations to
-/// this control-plane principal server-side.
+/// Local monitor clients authenticate with a shared bearer token, while remote
+/// clients authenticate with per-client credentials. HTTP and websocket
+/// request payloads must not treat client-supplied actor IDs as authenticated.
+/// Daemon transports rebind actor-bearing mutations server-side.
 pub const CONTROL_PLANE_ACTOR_ID: &str = "harness-app";
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RemoteControlPlaneActor {
+    client_id: String,
+    platform: String,
+    role: String,
+    scopes: Vec<String>,
+}
+
+/// Recognize a transport-bound local or write-capable remote control-plane actor.
+/// Untrusted payload actors must be rebound before reaching this check.
+#[must_use]
+pub(crate) fn is_control_plane_actor_id(actor_id: &str) -> bool {
+    if actor_id == CONTROL_PLANE_ACTOR_ID {
+        return true;
+    }
+    if !actor_id.starts_with('{') || !actor_id.ends_with('}') {
+        return false;
+    }
+    serde_json::from_str::<RemoteControlPlaneActor>(actor_id).is_ok_and(|actor| {
+        let has_control_scope = match actor.role.as_str() {
+            "admin" => actor
+                .scopes
+                .iter()
+                .any(|scope| matches!(scope.as_str(), "write" | "admin")),
+            "operator" => actor.scopes.iter().any(|scope| scope == "write"),
+            _ => false,
+        };
+        !actor.client_id.trim().is_empty()
+            && !actor.platform.trim().is_empty()
+            && has_control_scope
+            && actor
+                .scopes
+                .iter()
+                .all(|scope| matches!(scope.as_str(), "read" | "write" | "admin"))
+    })
+}
 
 /// Main versioned state document for a multi-agent orchestration session.
 #[derive(Debug, Clone, Serialize, Deserialize)]

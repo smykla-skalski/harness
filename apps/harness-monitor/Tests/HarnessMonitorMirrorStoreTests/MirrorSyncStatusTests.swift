@@ -16,6 +16,7 @@ final class MirrorSyncStatusTests: XCTestCase {
       (.paired("Studio"), "key.horizontal"),
       (.privacy("done"), "checkmark.shield"),
       (.commandQueued(.distantPast), "checkmark.seal"),
+      (.commandCompleted(.distantPast), "checkmark.circle"),
       (.commandCancelled(.distantPast), "xmark.seal"),
       (.commandFailed("boom"), "xmark.octagon"),
     ]
@@ -33,8 +34,8 @@ final class MirrorSyncStatusTests: XCTestCase {
     }
     let nonFailures: [MirrorSyncStatus] = [
       .unpaired, .demo, .pairing("S"), .syncing, .live(.distantPast), .paired("S"),
-      .privacy("p"), .commandQueued(.distantPast), .commandCancelled(.distantPast),
-      .commandFailed("boom"),
+      .privacy("p"), .commandQueued(.distantPast), .commandCompleted(.distantPast),
+      .commandCancelled(.distantPast), .commandFailed("boom"),
     ]
     for status in nonFailures {
       XCTAssertFalse(status.indicatesSyncFailure, "\(status) is not a sync failure")
@@ -46,7 +47,8 @@ final class MirrorSyncStatusTests: XCTestCase {
     let others: [MirrorSyncStatus] = [
       .unpaired, .demo, .pairing("S"), .syncing, .live(.distantPast), .stale("e"),
       .iCloudAccountUnavailable, .paired("S"), .privacy("p"),
-      .commandQueued(.distantPast), .commandCancelled(.distantPast), .commandFailed("b"),
+      .commandQueued(.distantPast), .commandCompleted(.distantPast),
+      .commandCancelled(.distantPast), .commandFailed("b"),
     ]
     for status in others {
       XCTAssertFalse(status.opensAppSettingsForRecovery, "\(status) stays in-app")

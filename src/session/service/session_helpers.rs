@@ -1,12 +1,14 @@
 use std::path::PathBuf;
 
 use super::{
-    BTreeMap, CONTROL_PLANE_ACTOR_ID, CURRENT_VERSION, CliError, CliErrorKind,
-    LEAVE_SESSION_SIGNAL_COMMAND, LeaveSignalRecord, Path, SessionAction, SessionMetrics,
-    SessionState, SessionStatus, TaskStatus, agent_status_label, build_signal, fmt,
-    generate_session_id, is_permitted, promote_or_degrade, refresh_session, runtime, storage,
+    BTreeMap, CURRENT_VERSION, CliError, CliErrorKind, LEAVE_SESSION_SIGNAL_COMMAND,
+    LeaveSignalRecord, Path, SessionAction, SessionMetrics, SessionState, SessionStatus,
+    TaskStatus, agent_status_label, build_signal, fmt, generate_session_id, is_permitted,
+    promote_or_degrade, refresh_session, runtime, storage,
 };
-use crate::session::types::{AgentRegistration, SessionPolicy, SessionRole};
+use crate::session::types::{
+    AgentRegistration, SessionPolicy, SessionRole, is_control_plane_actor_id,
+};
 
 pub(crate) fn create_initial_session(
     context: &str,
@@ -171,15 +173,16 @@ pub(crate) fn require_permission(
     actor_id: &str,
     action: SessionAction,
 ) -> Result<(), CliError> {
-    if actor_id == CONTROL_PLANE_ACTOR_ID {
-        return Ok(());
-    }
-    let agent = state.agents.get(actor_id).ok_or_else(|| {
-        CliError::from(CliErrorKind::session_agent_conflict(format!(
+    let Some(agent) = state.agents.get(actor_id) else {
+        if is_control_plane_actor_id(actor_id) {
+            return Ok(());
+        }
+        return Err(CliErrorKind::session_agent_conflict(format!(
             "agent '{actor_id}' not registered in session '{}'",
             state.session_id
-        )))
-    })?;
+        ))
+        .into());
+    };
     if !agent.status.is_alive() {
         return Err(CliErrorKind::session_permission_denied(format!(
             "agent '{actor_id}' is {} in session '{}'",
@@ -355,4 +358,96 @@ pub(crate) fn require_active_worker_target_agent(
         .into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod remote_actor_tests {
+    use super::*;
+
+    #[test]
+    fn remote_control_plane_actor_can_mutate_without_agent_registration() {
+        let state = build_initial_state(
+            "remote session",
+            "Remote session",
+            "remote-session",
+            "2026-07-10T12:00:00Z",
+            None,
+        );
+        let actor = r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["read","write"]}"#;
+
+        assert!(require_permission(&state, actor, SessionAction::CreateTask).is_ok());
+    }
+
+    #[test]
+    fn remote_admin_actor_can_mutate_with_admin_scope() {
+        let state = build_initial_state(
+            "remote session",
+            "Remote session",
+            "remote-session",
+            "2026-07-10T12:00:00Z",
+            None,
+        );
+        let actor = r#"{"client_id":"phone-1","platform":"ios","role":"admin","scopes":["admin"]}"#;
+
+        assert!(require_permission(&state, actor, SessionAction::EndSession).is_ok());
+    }
+
+    #[test]
+    fn registered_agent_matching_remote_actor_keeps_agent_permissions() {
+        let mut state = build_initial_state(
+            "remote session",
+            "Remote session",
+            "remote-session",
+            "2026-07-10T12:00:00Z",
+            None,
+        );
+        let actor = r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["read","write"]}"#;
+        state.agents.insert(
+            actor.to_string(),
+            AgentRegistration {
+                agent_id: actor.to_string(),
+                name: "Colliding worker".to_string(),
+                runtime: crate::agents::kind::RuntimeKind::from("codex"),
+                role: SessionRole::Worker,
+                capabilities: Vec::new(),
+                joined_at: "2026-07-10T12:00:00Z".to_string(),
+                updated_at: "2026-07-10T12:00:00Z".to_string(),
+                status: crate::session::types::AgentStatus::Active,
+                agent_session_id: None,
+                managed_agent: None,
+                last_activity_at: None,
+                current_task_id: None,
+                runtime_capabilities: Default::default(),
+                persona: None,
+            },
+        );
+
+        assert!(require_permission(&state, actor, SessionAction::EndSession).is_err());
+    }
+
+    #[test]
+    fn invalid_remote_actors_cannot_gain_control_plane_permission() {
+        let state = build_initial_state(
+            "remote session",
+            "Remote session",
+            "remote-session",
+            "2026-07-10T12:00:00Z",
+            None,
+        );
+        let invalid_actors = [
+            r#"{"client_id":"phone-1","platform":"ios","role":"viewer","scopes":["read"]}"#,
+            r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["read"]}"#,
+            r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["admin"]}"#,
+            r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["write","unknown"]}"#,
+            r#"{"client_id":"","platform":"ios","role":"operator","scopes":["write"]}"#,
+            "not-json",
+        ];
+
+        for actor in invalid_actors {
+            assert!(
+                require_permission(&state, actor, SessionAction::CreateTask).is_err(),
+                "invalid remote actor should not gain permission: {actor}"
+            );
+        }
+    }
 }

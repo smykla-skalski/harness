@@ -79,16 +79,21 @@ extension MirrorStore {
       return
     }
     do {
-      let queued = try await syncClient.queueCommand(
+      let submission = try await syncClient.queueCommand(
         command,
         currentRevision: snapshot.revision,
         now: now
       )
-      snapshot.commands.insert(queued.signedCommand.command, at: 0)
+      snapshot.commands.insert(submission.command, at: 0)
       selectedStationID = command.stationID
       persistSharedSnapshot(snapshot)
       reconcileLiveActivity(snapshot)
-      syncStatus = .commandQueued(now)
+      let submissionStatus: MirrorSyncStatus
+      switch submission.disposition {
+      case .queued: submissionStatus = .commandQueued(now)
+      case .completed: submissionStatus = .commandCompleted(now)
+      }
+      syncStatus = submissionStatus
     } catch {
       syncStatus = .commandFailed(String(describing: error))
     }

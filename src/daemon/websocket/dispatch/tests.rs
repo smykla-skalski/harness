@@ -1,7 +1,7 @@
 use super::*;
 use crate::daemon::http::DaemonHttpAuthMode;
-use crate::daemon::protocol::WsRequest;
 use crate::daemon::protocol::ws_methods;
+use crate::daemon::protocol::{WsRequest, current_control_plane_actor_id};
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::{RemoteStoredClient, RemoteTokenHash};
 use std::sync::{Arc, Mutex};
@@ -94,6 +94,27 @@ async fn remote_ws_dispatch_preserves_unknown_method_errors() {
     assert_eq!(error.code, "UNKNOWN_METHOD");
     assert!(error.message.contains("remote.unscoped"));
     assert_eq!(error.status_code, None);
+}
+
+#[tokio::test]
+async fn remote_ws_dispatch_scopes_authenticated_actor_identity() {
+    let mut state = super::super::test_support::test_ws_state();
+    state.auth_mode = DaemonHttpAuthMode::Remote;
+    let connection = Arc::new(Mutex::new(ConnectionState::new_remote(remote_client(
+        "operator",
+        RemoteRole::Operator,
+        &[RemoteAccessScope::Read, RemoteAccessScope::Write],
+    ))));
+
+    let actor = with_connection_actor(&state, &connection, async {
+        current_control_plane_actor_id()
+    })
+    .await;
+
+    assert_eq!(
+        actor,
+        r#"{"client_id":"operator","platform":"macos","role":"operator","scopes":["read","write"]}"#
+    );
 }
 
 #[test]
