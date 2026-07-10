@@ -418,7 +418,7 @@ impl RemoteAcmeRenewalIssuer for SystemRemoteAcmeIssuer {
     }
 }
 
-fn run_acme_future<T, F>(future: F) -> Result<T, String>
+pub(crate) fn run_acme_future<T, F>(future: F) -> Result<T, String>
 where
     T: Send,
     F: Future<Output = Result<T, String>> + Send,

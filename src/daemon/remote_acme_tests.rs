@@ -8,8 +8,7 @@ use sha2::{Digest, Sha256};
 use super::{
     AcmeHttp01ChallengeStore, Dns01ChangeOperation, Dns01ExecHookOperation, Dns01ProviderAction,
     RemoteAcmeAccountCredentials, RemoteAcmeRenewalRequest, RemoteAcmeRuntimeState,
-    RemoteCertificateBundle, RemoteCertificateSlot, RemoteRenewalOutcome,
-    build_remote_acme_runtime_plan,
+    RemoteCertificateBundle, RemoteRenewalOutcome, build_remote_acme_runtime_plan,
 };
 use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
 
@@ -383,18 +382,6 @@ fn remote_dns01_exec_hook_redacts_runner_failure_detail() {
 
     assert!(error.to_string().contains("dns hook failed"));
     assert!(!error.to_string().contains("super-secret"));
-}
-
-#[test]
-fn remote_certificate_reload_tracks_generation_and_noops_unchanged_bundle() {
-    let mut slot =
-        RemoteCertificateSlot::new(RemoteCertificateBundle::new_for_tests("cert-a", "key-a"));
-
-    assert_eq!(slot.generation(), 1);
-    assert!(!slot.reload(RemoteCertificateBundle::new_for_tests("cert-a", "key-a")));
-    assert_eq!(slot.generation(), 1);
-    assert!(slot.reload(RemoteCertificateBundle::new_for_tests("cert-b", "key-b")));
-    assert_eq!(slot.generation(), 2);
 }
 
 #[test]

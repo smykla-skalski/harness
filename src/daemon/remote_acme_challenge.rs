@@ -11,11 +11,7 @@ use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::get;
-use rcgen::{CertificateParams, CustomExtension, DistinguishedName, KeyPair};
 use rustls::ServerConfig;
-use rustls::crypto::ring::default_provider;
-use rustls::crypto::ring::sign::any_supported_type;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::server::{ClientHello, ResolvesServerCert};
 use rustls::sign::CertifiedKey;
 use tokio::net::TcpListener;
@@ -27,6 +23,7 @@ use tokio_rustls::TlsAcceptor;
 use super::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig};
 use super::remote_acme_dns_provider::{SystemDns01Lease, SystemDns01Provider};
 use super::remote_acme_issuer::{RemoteAcmeChallengeMaterial, RemoteAcmeChallengeProvisioner};
+use super::remote_tls::build_remote_tls_alpn_challenge;
 
 const HTTP01_PREFIX: &str = "/.well-known/acme-challenge/";
 
@@ -193,37 +190,13 @@ fn tls_alpn01_server_config(
     digest: &[u8],
 ) -> Result<(Arc<ServerConfig>, Vec<u8>), String> {
     let domain = domain.trim();
-    if domain.is_empty() {
-        return Err("remote ACME TLS-ALPN-01 domain is required".to_string());
-    }
-    if digest.len() != 32 {
-        return Err("remote ACME TLS-ALPN-01 digest must contain 32 bytes".to_string());
-    }
-    let key = KeyPair::generate()
-        .map_err(|error| format!("generate remote ACME TLS-ALPN-01 key: {error}"))?;
-    let mut params = CertificateParams::new([domain.to_string()])
-        .map_err(|error| format!("build remote ACME TLS-ALPN-01 certificate: {error}"))?;
-    params.distinguished_name = DistinguishedName::new();
-    params
-        .custom_extensions
-        .push(CustomExtension::new_acme_identifier(digest));
-    let certificate = params
-        .self_signed(&key)
-        .map_err(|error| format!("sign remote ACME TLS-ALPN-01 certificate: {error}"))?;
-    let certificate_der = certificate.der().to_vec();
-    let private_key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key.serialize_der()));
-    let signing_key = any_supported_type(&private_key)
-        .map_err(|error| format!("load remote ACME TLS-ALPN-01 key: {error}"))?;
-    let certified_key = Arc::new(CertifiedKey::new(
-        vec![CertificateDer::from(certificate_der.clone())],
-        signing_key,
-    ));
-    let _ = default_provider().install_default();
+    let challenge = build_remote_tls_alpn_challenge(domain, digest)?;
+    let certificate_der = challenge.certificate_der();
     let mut config = ServerConfig::builder()
         .with_no_client_auth()
         .with_cert_resolver(Arc::new(TlsAlpn01CertificateResolver {
             domain: domain.to_string(),
-            certified_key,
+            certified_key: challenge.certified_key(),
         }));
     config.alpn_protocols = vec![b"acme-tls/1".to_vec()];
     Ok((Arc::new(config), certificate_der))

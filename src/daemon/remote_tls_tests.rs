@@ -2,8 +2,8 @@ use std::io;
 use std::net::SocketAddr;
 
 use super::{
-    RemoteTlsConfigError, build_remote_tls_server_config, handle_tcp_accept_error,
-    handle_tls_handshake_error, is_transient_accept_error,
+    RemoteTlsConfigError, RemoteTlsConfigHandle, build_remote_tls_server_config,
+    handle_tcp_accept_error, handle_tls_handshake_error, is_transient_accept_error,
 };
 use crate::daemon::remote_acme::RemoteCertificateBundle;
 
@@ -37,6 +37,62 @@ fn remote_tls_server_config_builds_http_alpn_from_pem_material() {
 }
 
 #[test]
+fn remote_tls_config_handle_atomically_reloads_changed_certificate_material() {
+    let initial = generated_bundle("daemon.example.com");
+    let renewed = generated_bundle("daemon.example.com");
+    let handle = RemoteTlsConfigHandle::new(initial.clone()).expect("initial TLS config");
+
+    assert_eq!(handle.generation(), 1);
+    assert_eq!(handle.certificate_fingerprint(), initial.fingerprint());
+    assert!(!handle.reload(initial).expect("unchanged reload"));
+    assert_eq!(handle.generation(), 1);
+
+    assert!(handle.reload(renewed.clone()).expect("changed reload"));
+    assert_eq!(handle.generation(), 2);
+    assert_eq!(handle.certificate_fingerprint(), renewed.fingerprint());
+}
+
+#[test]
+fn remote_tls_config_handle_rejects_invalid_reload_without_losing_active_certificate() {
+    let initial = generated_bundle("daemon.example.com");
+    let handle = RemoteTlsConfigHandle::new(initial.clone()).expect("initial TLS config");
+    let invalid = RemoteCertificateBundle::new_for_tests("not-a-certificate", "not-a-key");
+
+    let error = handle
+        .reload(invalid)
+        .expect_err("invalid renewed material must fail");
+
+    assert!(matches!(
+        error,
+        RemoteTlsConfigError::InvalidCertificatePem(_)
+    ));
+    assert_eq!(handle.generation(), 1);
+    assert_eq!(handle.certificate_fingerprint(), initial.fingerprint());
+}
+
+#[test]
+fn remote_tls_config_rejects_certificate_with_mismatched_private_key() {
+    let certificate_key = rcgen::KeyPair::generate().expect("generate certificate key");
+    let wrong_key = rcgen::KeyPair::generate().expect("generate wrong key");
+    let certificate = rcgen::CertificateParams::new(["daemon.example.com".to_string()])
+        .expect("certificate params")
+        .self_signed(&certificate_key)
+        .expect("self-sign certificate");
+    let bundle =
+        RemoteCertificateBundle::new(certificate.pem().as_str(), &wrong_key.serialize_pem());
+
+    let error = RemoteTlsConfigHandle::new(bundle)
+        .err()
+        .expect("mismatched certificate and private key must fail closed");
+
+    assert!(matches!(
+        error,
+        RemoteTlsConfigError::InvalidServerConfig(_)
+    ));
+    assert!(error.to_string().contains("key"));
+}
+
+#[test]
 fn remote_tls_accept_retries_transient_tcp_errors_without_backoff() {
     for kind in [
         io::ErrorKind::ConnectionRefused,
@@ -57,10 +113,16 @@ async fn remote_tls_accept_transient_errors_do_not_backoff() {
 #[test]
 fn remote_tls_handshake_failures_do_not_delay_accept_loop() {
     let error = io::Error::from(io::ErrorKind::InvalidData);
-    handle_tls_handshake_error(
-        SocketAddr::from(([127, 0, 0, 1], 443)),
-        &error,
-    );
+    handle_tls_handshake_error(SocketAddr::from(([127, 0, 0, 1], 443)), &error);
+}
+
+fn generated_bundle(domain: &str) -> RemoteCertificateBundle {
+    let key = rcgen::KeyPair::generate().expect("generate key");
+    let certificate = rcgen::CertificateParams::new([domain.to_string()])
+        .expect("certificate params")
+        .self_signed(&key)
+        .expect("self-sign certificate");
+    RemoteCertificateBundle::new(certificate.pem().as_str(), &key.serialize_pem())
 }
 
 const TEST_CERTIFICATE_PEM: &str = r#"-----BEGIN CERTIFICATE-----
