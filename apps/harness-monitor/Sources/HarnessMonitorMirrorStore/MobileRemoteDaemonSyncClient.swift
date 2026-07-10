@@ -25,17 +25,20 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
   private let access: MobileRemoteDaemonAccess
   private let stationID: String
   private let stationName: String
+  private let defaultStation: Bool
   private let session: URLSession
 
   public init(
     access: MobileRemoteDaemonAccess,
     stationID: String,
     stationName: String,
+    defaultStation: Bool,
     session: URLSession
   ) {
     self.access = access
     self.stationID = stationID
     self.stationName = stationName
+    self.defaultStation = defaultStation
     self.session = session
   }
 
@@ -109,7 +112,7 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
       activeSessionCount: activeSessions.count,
       needsYouCount: needsYouCount,
       commandQueueCount: 0,
-      defaultStation: true
+      defaultStation: defaultStation
     )
     return MobileMirrorSnapshot(
       revision: 0,
@@ -194,10 +197,14 @@ private enum MobileRemoteSessionStatus {
 }
 
 private enum MobileRemoteSessionDate {
+  private static let fractional =
+    Date.ISO8601FormatStyle().year().month().day()
+    .timeZone(separator: .omitted)
+    .time(includingFractionalSeconds: true)
+  private static let standard = Date.ISO8601FormatStyle()
+
   static func parse(_ value: String) -> Date? {
-    let fractional = ISO8601DateFormatter()
-    fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return fractional.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+    (try? fractional.parse(value)) ?? (try? standard.parse(value))
   }
 }
 

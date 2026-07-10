@@ -22,6 +22,7 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
       access: try remoteAccess(),
       stationID: "remote-daemon-example-com",
       stationName: "daemon.example.com",
+      defaultStation: false,
       session: makeSession()
     )
     let now = Date(timeIntervalSince1970: 1_752_124_400)
@@ -44,10 +45,16 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     XCTAssertEqual(snapshot.revision, 0)
     XCTAssertEqual(snapshot.stations.first?.state, .online)
     XCTAssertEqual(snapshot.stations.first?.activeSessionCount, 1)
+    XCTAssertEqual(snapshot.stations.first?.defaultStation, false)
     XCTAssertEqual(snapshot.sessions.first?.id, "session-1")
     XCTAssertEqual(snapshot.sessions.first?.status, "Active")
     XCTAssertEqual(snapshot.sessions.first?.activeAgentCount, 2)
     XCTAssertEqual(snapshot.sessions.first?.blockedAgentCount, 1)
+    let expectedActivity = try Date.ISO8601FormatStyle().year().month().day()
+      .timeZone(separator: .omitted)
+      .time(includingFractionalSeconds: true)
+      .parse("2026-07-10T13:01:00.250Z")
+    XCTAssertEqual(snapshot.sessions.first?.lastActivityAt, expectedActivity)
     XCTAssertFalse(snapshot.sessions.first?.summary.contains("super-secret") ?? true)
     XCTAssertFalse(client.supportsCommands)
   }
@@ -305,7 +312,7 @@ private let sessionsResponse = """
       "status": "active",
       "context": "api_key=super-secret",
       "updated_at": "2026-07-10T13:00:00Z",
-      "last_activity_at": "2026-07-10T13:01:00Z",
+      "last_activity_at": "2026-07-10T13:01:00.250Z",
       "metrics": {
         "active_agent_count": 2,
         "awaiting_review_agent_count": 1

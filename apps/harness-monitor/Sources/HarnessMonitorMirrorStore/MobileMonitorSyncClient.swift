@@ -94,6 +94,7 @@ public struct LiveMobileMonitorSyncClientFactory: MobileMonitorSyncClientFactory
       access: access,
       stationID: credential.stationID,
       stationName: credential.stationName,
+      defaultStation: credential.defaultStation,
       session: remoteSessionFactory(access.serverSPKISHA256)
     )
   }
