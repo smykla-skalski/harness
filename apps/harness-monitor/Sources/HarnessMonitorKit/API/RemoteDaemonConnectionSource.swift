@@ -61,12 +61,34 @@ public struct StoredRemoteDaemonConnectionSource: RemoteDaemonConnectionSourcing
   }
 
   public func markRevoked(profileID: UUID, at date: Date) throws {
-    var state = try repository.load()
-    guard let index = state.profiles.firstIndex(where: { $0.id == profileID }) else {
+    let originalState = try repository.load()
+    guard let index = originalState.profiles.firstIndex(where: { $0.id == profileID }) else {
       throw RemoteDaemonProfileError.profileNotFound
     }
-    state.profiles[index] = state.profiles[index].markingRevoked(at: date)
-    try repository.save(state)
+    let token = try? tokenStore.loadToken(profileID: profileID)
+    var revokedState = originalState
+    revokedState.profiles[index] = revokedState.profiles[index].markingRevoked(at: date)
     try tokenStore.deleteToken(profileID: profileID)
+    do {
+      try repository.save(revokedState)
+    } catch {
+      rollbackRevocation(state: originalState, token: token, profileID: profileID)
+      throw error
+    }
+  }
+
+  private func rollbackRevocation(
+    state: RemoteDaemonProfileState,
+    token: String?,
+    profileID: UUID
+  ) {
+    do {
+      try repository.save(state)
+    } catch {
+      return
+    }
+    if let token {
+      try? tokenStore.saveToken(token, profileID: profileID)
+    }
   }
 }

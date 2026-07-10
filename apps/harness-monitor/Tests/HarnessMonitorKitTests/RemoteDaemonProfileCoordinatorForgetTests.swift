@@ -78,11 +78,70 @@ struct RemoteDaemonProfileCoordinatorForgetTests {
     #expect(tokenStore.deleteCallCount == 1)
     #expect(try tokenStore.loadToken(profileID: profile.id) == "server-issued-token")
   }
+
+  @Test("Unreadable token does not prevent forgetting the profile")
+  func unreadableTokenCanStillBeForgotten() async throws {
+    let profile = try remoteProfileFixture()
+    let repository = InMemoryRemoteDaemonProfileStore(
+      state: RemoteDaemonProfileState(profiles: [profile], activeProfileID: profile.id)
+    )
+    let tokenStore = ReadFailingRemoteDaemonTokenStore(
+      profileID: profile.id,
+      token: "corrupted-token"
+    )
+    let coordinator = RemoteDaemonProfileCoordinator(
+      repository: repository,
+      tokenStore: tokenStore
+    )
+
+    let forgotten = try await coordinator.forgetActiveProfile()
+
+    #expect(forgotten == profile)
+    #expect(try repository.load() == RemoteDaemonProfileState())
+    #expect(tokenStore.deleteCallCount == 1)
+    #expect(tokenStore.hasToken(profileID: profile.id) == false)
+  }
 }
 
 private enum RemoteDaemonForgetTestError: Error {
   case tokenDeletion
+  case tokenRead
   case metadataSave
+}
+
+private final class ReadFailingRemoteDaemonTokenStore:
+  RemoteDaemonTokenPersisting, @unchecked Sendable
+{
+  private let lock = NSLock()
+  private var tokens: [UUID: String]
+  private var recordedDeleteCallCount = 0
+
+  init(profileID: UUID, token: String) {
+    self.tokens = [profileID: token]
+  }
+
+  var deleteCallCount: Int {
+    lock.withLock { recordedDeleteCallCount }
+  }
+
+  func hasToken(profileID: UUID) -> Bool {
+    lock.withLock { tokens[profileID] != nil }
+  }
+
+  func loadToken(profileID: UUID) throws -> String? {
+    throw RemoteDaemonForgetTestError.tokenRead
+  }
+
+  func saveToken(_ token: String, profileID: UUID) throws {
+    lock.withLock { tokens[profileID] = token }
+  }
+
+  func deleteToken(profileID: UUID) throws {
+    lock.withLock {
+      recordedDeleteCallCount += 1
+      tokens.removeValue(forKey: profileID)
+    }
+  }
 }
 
 private final class DeleteFailingRemoteDaemonTokenStore:

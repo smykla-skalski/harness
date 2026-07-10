@@ -67,7 +67,7 @@ public actor RemoteDaemonProfileCoordinator {
     guard let profile = originalState.profiles.first(where: { $0.id == activeProfileID }) else {
       throw RemoteDaemonProfileError.profileNotFound
     }
-    let token = try tokenStore.loadToken(profileID: activeProfileID)
+    let token = try? tokenStore.loadToken(profileID: activeProfileID)
     var forgottenState = originalState
     forgottenState.profiles.removeAll { $0.id == activeProfileID }
     forgottenState.activeProfileID = nil
