@@ -301,7 +301,31 @@ struct TaskBoardCardFooter<Badges: View>: View {
   }
 }
 
+enum TaskBoardLaneCardHoverID: Hashable {
+  case api(String)
+  case inbox(sessionID: String, taskID: String)
+  case decision(String)
+}
+
+struct TaskBoardLaneCardFrame: Equatable {
+  let id: TaskBoardLaneCardHoverID
+  let frame: CGRect
+}
+
+struct TaskBoardLaneCardFramePreferenceKey: PreferenceKey {
+  static let defaultValue: [TaskBoardLaneCardFrame] = []
+
+  static func reduce(
+    value: inout [TaskBoardLaneCardFrame],
+    nextValue: () -> [TaskBoardLaneCardFrame]
+  ) {
+    value.append(contentsOf: nextValue())
+  }
+}
+
 private struct TaskBoardCardChrome: ViewModifier {
+  let tint: Color
+  let isHovered: Bool
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.accessibilityReduceTransparency)
@@ -313,13 +337,13 @@ private struct TaskBoardCardChrome: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      // Lane cards live inside a scrolling column with many siblings;
-      // attaching `.onHover` to each card produces a hover-region
-      // cascade during scroll that dominates the lane-scroll hot path
-      // (see r23 cause graph + InteractiveCardHoverModifier comment).
-      // The press affordance from the button style is preserved.
+      // Lane cards live inside a scrolling column with many siblings.
+      // Keep per-card `.onHover` out of this modifier; the lane owns one
+      // hover region and passes the matching row as a lightweight hint.
       .harnessInteractiveCardButtonStyle(
         cornerRadius: metrics.cardCornerRadius,
+        tint: tint,
+        extraHoverHint: isHovered,
         respondsToHover: false
       )
       .background(
@@ -343,7 +367,29 @@ private struct TaskBoardCardChrome: ViewModifier {
 }
 
 extension View {
-  func taskBoardCardChrome() -> some View {
-    modifier(TaskBoardCardChrome())
+  func taskBoardCardChrome(
+    tint: Color = HarnessMonitorTheme.accent,
+    isHovered: Bool = false
+  ) -> some View {
+    modifier(TaskBoardCardChrome(tint: tint, isHovered: isHovered))
+  }
+
+  func taskBoardCardFrame(
+    id: TaskBoardLaneCardHoverID,
+    in coordinateSpace: String
+  ) -> some View {
+    background {
+      GeometryReader { proxy in
+        Color.clear.preference(
+          key: TaskBoardLaneCardFramePreferenceKey.self,
+          value: [
+            TaskBoardLaneCardFrame(
+              id: id,
+              frame: proxy.frame(in: .named(coordinateSpace))
+            )
+          ]
+        )
+      }
+    }
   }
 }

@@ -159,6 +159,7 @@ extension UTType {
 
 struct TaskBoardItemRow: View {
   let item: TaskBoardItem
+  let isHovered: Bool
   let onOpenItem: (TaskBoardItem) -> Void
   @Environment(\.fontScale)
   private var fontScale
@@ -205,7 +206,7 @@ struct TaskBoardItemRow: View {
         providerSymbol: item.taskBoardBackgroundProviderSymbol
       )
     }
-    .taskBoardCardChrome()
+    .taskBoardCardChrome(tint: cardGlyph.tint, isHovered: isHovered)
     .contentShape(.rect)
     .onDrag {
       dragPayload.itemProvider()
@@ -273,6 +274,7 @@ private struct TaskBoardItemDragPreviewCard: View {
 
 struct TaskBoardInboxItemRow: View {
   let item: TaskBoardInboxItem
+  let isHovered: Bool
   let onOpenItem: (TaskBoardInboxItem) -> Void
   @Environment(\.fontScale)
   private var fontScale
@@ -323,7 +325,7 @@ struct TaskBoardInboxItemRow: View {
         cornerRadius: metrics.cardCornerRadius
       )
     }
-    .taskBoardCardChrome()
+    .taskBoardCardChrome(tint: statusTint, isHovered: isHovered)
     .contentShape(.rect)
     .onDrag {
       dragPayload.itemProvider()

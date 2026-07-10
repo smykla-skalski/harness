@@ -16,6 +16,7 @@ private let taskBoardNeedsYouSuggestedActionsDecoder = JSONDecoder()
 
 struct TaskBoardDecisionRow: View {
   let decision: Decision
+  let isHovered: Bool
   let onOpenDecision: (Decision) -> Void
   private let primaryAction: SuggestedAction?
   private let metrics: TaskBoardLaneMetrics
@@ -29,9 +30,11 @@ struct TaskBoardDecisionRow: View {
   init(
     decision: Decision,
     fontScale: CGFloat,
+    isHovered: Bool = false,
     onOpenDecision: @escaping (Decision) -> Void
   ) {
     self.decision = decision
+    self.isHovered = isHovered
     self.onOpenDecision = onOpenDecision
     primaryAction = Self.resolvePrimaryAction(for: decision)
     metrics = TaskBoardLaneMetrics(fontScale: fontScale)
@@ -61,7 +64,7 @@ struct TaskBoardDecisionRow: View {
     } label: {
       cardBody
     }
-    .taskBoardCardChrome()
+    .taskBoardCardChrome(tint: severityColor, isHovered: isHovered)
     .help("Open decision")
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(accessibilityLabel)

@@ -22,9 +22,15 @@ struct TaskBoardLaneUnifiedColumn: View {
   @State private var apiDropDeduper = TaskBoardDropDeduper<TaskBoardItemDropSignature>()
   @State private var inboxDropDeduper = TaskBoardDropDeduper<TaskBoardInboxItemDropSignature>()
   @State private var perfScrollPosition = ScrollPosition()
+  @State private var cardHoverLocation: CGPoint?
+  @State private var cardHoverFrames: [TaskBoardLaneCardFrame] = []
+  @State private var hoveredCardID: TaskBoardLaneCardHoverID?
   private let perfScrollHookEnabled = HarnessMonitorPerfTaskBoardLaneScrollBus.isActive()
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var cardHoverCoordinateSpace: String {
+    "task-board-lane-card-hover-\(lane.rawValue)"
+  }
 
   private var totalCount: Int {
     apiItems.count + inboxItems.count + decisions.count
@@ -147,25 +153,85 @@ struct TaskBoardLaneUnifiedColumn: View {
         decisionRows
       }
       ForEach(apiItems) { item in
-        TaskBoardItemRow(item: item, onOpenItem: onOpenAPIItem)
+        let cardID = TaskBoardLaneCardHoverID.api(item.id)
+        TaskBoardItemRow(
+          item: item,
+          isHovered: hoveredCardID == cardID,
+          onOpenItem: onOpenAPIItem
+        )
+        .taskBoardCardFrame(id: cardID, in: cardHoverCoordinateSpace)
       }
       ForEach(inboxItems) { item in
-        TaskBoardInboxItemRow(item: item, onOpenItem: onOpenInboxItem)
+        let cardID = TaskBoardLaneCardHoverID.inbox(
+          sessionID: item.session.sessionId,
+          taskID: item.task.taskId
+        )
+        TaskBoardInboxItemRow(
+          item: item,
+          isHovered: hoveredCardID == cardID,
+          onOpenItem: onOpenInboxItem
+        )
+        .taskBoardCardFrame(id: cardID, in: cardHoverCoordinateSpace)
       }
     }
     .frame(maxWidth: .infinity)
+    .coordinateSpace(.named(cardHoverCoordinateSpace))
+    .onContinuousHover(coordinateSpace: .named(cardHoverCoordinateSpace)) { phase in
+      updateHoveredCard(phase: phase)
+    }
+    .onPreferenceChange(TaskBoardLaneCardFramePreferenceKey.self) { frames in
+      guard cardHoverFrames != frames else {
+        return
+      }
+      cardHoverFrames = frames
+      updateHoveredCard(location: cardHoverLocation, frames: frames)
+    }
   }
 
   @ViewBuilder private var decisionRows: some View {
     VStack(spacing: metrics.laneSpacing) {
       ForEach(decisions, id: \.id) { decision in
+        let cardID = TaskBoardLaneCardHoverID.decision(decision.id)
         TaskBoardDecisionRow(
           decision: decision,
           fontScale: fontScale,
+          isHovered: hoveredCardID == cardID,
           onOpenDecision: onOpenDecision
         )
+        .taskBoardCardFrame(id: cardID, in: cardHoverCoordinateSpace)
       }
     }
+  }
+
+  private func updateHoveredCard(phase: HoverPhase) {
+    switch phase {
+    case .active(let location):
+      cardHoverLocation = location
+      updateHoveredCard(location: location, frames: cardHoverFrames)
+    case .ended:
+      cardHoverLocation = nil
+      updateHoveredCard(id: nil)
+    }
+  }
+
+  private func updateHoveredCard(
+    location: CGPoint?,
+    frames: [TaskBoardLaneCardFrame]
+  ) {
+    guard let location else {
+      updateHoveredCard(id: nil)
+      return
+    }
+    updateHoveredCard(
+      id: frames.first { $0.frame.contains(location) }?.id
+    )
+  }
+
+  private func updateHoveredCard(id: TaskBoardLaneCardHoverID?) {
+    guard hoveredCardID != id else {
+      return
+    }
+    hoveredCardID = id
   }
 
   private func handleAPIDrop(_ payloads: [TaskBoardItemDragPayload], _: CGPoint) -> Bool {
