@@ -172,6 +172,7 @@ public struct MobilePairedStationCredential: Codable, Equatable, Identifiable, S
   public var pairedAt: Date
   public var lastUsedAt: Date?
   public var defaultStation: Bool
+  public var remoteDaemonAccess: MobileRemoteDaemonAccess?
 
   public init(
     stationID: String,
@@ -184,7 +185,8 @@ public struct MobilePairedStationCredential: Codable, Equatable, Identifiable, S
     symmetricKeyRawRepresentation: Data,
     pairedAt: Date,
     lastUsedAt: Date? = nil,
-    defaultStation: Bool = false
+    defaultStation: Bool = false,
+    remoteDaemonAccess: MobileRemoteDaemonAccess? = nil
   ) {
     self.stationID = stationID
     self.stationName = stationName
@@ -197,6 +199,12 @@ public struct MobilePairedStationCredential: Codable, Equatable, Identifiable, S
     self.pairedAt = pairedAt
     self.lastUsedAt = lastUsedAt
     self.defaultStation = defaultStation
+    self.remoteDaemonAccess = remoteDaemonAccess
+  }
+
+  public var hasCloudMirrorAccess: Bool {
+    !snapshotKeyID.isEmpty
+      && !symmetricKeyRawRepresentation.isEmpty
   }
 }
 

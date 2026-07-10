@@ -4,16 +4,24 @@ import HarnessMonitorCrypto
 import HarnessMonitorMirrorStore
 
 actor LiveMobileMonitorCredentialPairer: MobileMonitorCredentialPairer {
-  private let coordinator: MobilePairingCoordinator<URLSessionMobilePairingTransport>
+  private let relayCoordinator: MobilePairingCoordinator<URLSessionMobilePairingTransport>
+  private let remoteCoordinator:
+    MobileRemoteDaemonPairingCoordinator<URLSessionMobileRemoteDaemonPairingTransport>
 
   init(
     identityStore: any MobileDeviceIdentityStore,
     credentialStore: any MobilePairedStationCredentialStore
   ) {
-    coordinator = MobilePairingCoordinator(
+    relayCoordinator = MobilePairingCoordinator(
       identityStore: identityStore,
       credentialStore: credentialStore,
       transport: URLSessionMobilePairingTransport()
+    )
+    remoteCoordinator = MobileRemoteDaemonPairingCoordinator(
+      identityStore: identityStore,
+      credentialStore: credentialStore,
+      transport: URLSessionMobileRemoteDaemonPairingTransport(),
+      platform: "ios"
     )
   }
 
@@ -22,6 +30,19 @@ actor LiveMobileMonitorCredentialPairer: MobileMonitorCredentialPairer {
     deviceName: String,
     now: Date
   ) async throws -> MobilePairedStationCredential {
-    try await coordinator.pair(invitationURL: invitationURL, deviceName: deviceName, now: now)
+    switch try MobilePairingLink.decode(invitationURL, now: now) {
+    case .relay:
+      return try await relayCoordinator.pair(
+        invitationURL: invitationURL,
+        deviceName: deviceName,
+        now: now
+      )
+    case .remote:
+      return try await remoteCoordinator.pair(
+        invitationURL: invitationURL,
+        deviceName: deviceName,
+        now: now
+      )
+    }
   }
 }

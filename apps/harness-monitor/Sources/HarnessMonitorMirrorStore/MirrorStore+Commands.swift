@@ -74,6 +74,10 @@ extension MirrorStore {
       syncStatus = .unpaired
       return
     }
+    guard syncClient.supportsCommands else {
+      syncStatus = .commandFailed("Commands are unavailable for this connection.")
+      return
+    }
     do {
       let queued = try await syncClient.queueCommand(
         command,
@@ -127,6 +131,10 @@ extension MirrorStore {
     }
     guard let syncClient = syncClient(for: command.stationID) else {
       syncStatus = .unpaired
+      return
+    }
+    guard syncClient.supportsCommands else {
+      syncStatus = .commandFailed("Commands are unavailable for this connection.")
       return
     }
     do {

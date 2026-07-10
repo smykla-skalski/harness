@@ -58,9 +58,7 @@ struct HarnessMonitorMobileApp: App {
       MobileRootView(selectedTab: $selectedTab)
         .environment(store)
         .onOpenURL { url in
-          guard url.scheme == MobilePairingInvitationCodec.urlScheme,
-            url.host == MobilePairingInvitationCodec.urlHost
-          else {
+          guard MobilePairingLink.supports(url) else {
             if let tab = MobileRootTab(url: url) {
               routeToTab(tab)
             }

@@ -66,6 +66,7 @@ struct RemoteDaemonProfilePersistenceTests {
 
     #expect(connection.endpoint == profile.endpoint)
     #expect(connection.token == "opaque-bearer-secret")
+    #expect(connection.remoteClientID == profile.clientID)
     #expect(connection.serverTrust == .spkiSHA256(profile.serverSPKISHA256))
     #expect(connection.source == .remote(profileID: profile.id))
   }

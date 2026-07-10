@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorCore
 
 public enum HarnessMonitorServerTrust: Equatable, Sendable {
   case system
@@ -13,17 +14,20 @@ public enum HarnessMonitorConnectionSource: Equatable, Sendable {
 public struct HarnessMonitorConnection: Equatable, Sendable {
   public let endpoint: URL
   public let token: String
+  public let remoteClientID: String?
   public let serverTrust: HarnessMonitorServerTrust
   public let source: HarnessMonitorConnectionSource
 
   public init(
     endpoint: URL,
     token: String,
+    remoteClientID: String? = nil,
     serverTrust: HarnessMonitorServerTrust = .system,
     source: HarnessMonitorConnectionSource = .local
   ) {
     self.endpoint = endpoint
     self.token = token
+    self.remoteClientID = remoteClientID
     self.serverTrust = serverTrust
     self.source = source
   }
@@ -31,6 +35,23 @@ public struct HarnessMonitorConnection: Equatable, Sendable {
   public var isRemote: Bool {
     if case .remote = source { return true }
     return false
+  }
+
+  func applyAuthenticationHeaders(to request: inout URLRequest) {
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    guard
+      isRemote,
+      let remoteClientID = remoteClientID?.trimmingCharacters(
+        in: .whitespacesAndNewlines
+      ),
+      !remoteClientID.isEmpty
+    else {
+      return
+    }
+    request.setValue(
+      remoteClientID,
+      forHTTPHeaderField: RemoteDaemonAuthentication.clientIDHeader
+    )
   }
 }
 

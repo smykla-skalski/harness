@@ -6,13 +6,12 @@ The macOS app itself is covered by `apps/harness-monitor/AGENTS.md` and `monitor
 
 ## Product shape
 
-Harness Monitor on the phone and watch is a read-mostly mirror of the Mac's live monitor state with a narrow, audited write path back. There is no direct phone-to-daemon connection over the internet. Everything flows through three stages:
+Harness Monitor on the phone and watch is a read-mostly view of monitor state with two credential-driven transports:
 
-1. The Mac (`HarnessMonitorMacRelay`, embedded in the macOS app) reads live state from the harness daemon, redacts secrets, encrypts a snapshot, and publishes it.
-2. CloudKit (`HarnessMonitorCloudMirror`) carries opaque encrypted records between devices. Apple's servers only ever see ciphertext plus cleartext routing metadata.
-3. The phone and watch fetch and decrypt the mirror, render it, and can queue signed commands that travel back the same way for the Mac to validate and execute.
+1. A remote-daemon profile connects directly over pinned HTTPS. The phone claims a one-time remote pairing invitation, stores the bearer credential in its Keychain, and fetches authenticated session snapshots. The watch can use the same direct path after the phone transfers that profile through WatchConnectivity.
+2. A local-relay profile uses `HarnessMonitorMacRelay` and `HarnessMonitorCloudMirror`. The Mac redacts and encrypts a full snapshot, CloudKit carries only encrypted records plus routing metadata, and the phone/watch decrypt the mirror. Signed commands return through the same relay for the Mac to validate and execute.
 
-The phone is the pairing hub. You pair a phone to a Mac once over the local network, then the phone hands the resulting trust material to the watch over WatchConnectivity. The watch never runs the local-network pairing handshake itself.
+When a credential has both transports, direct access is tried first. CloudMirror is used only for reachability/TLS failures or remote 5xx responses; remote `401` and `403` responses fail closed. The phone remains the pairing hub for the watch. The watch does not run either pairing claim itself.
 
 ## Target and framework map
 
@@ -40,7 +39,9 @@ The macOS app, the iOS app, and the watch app all share the same iCloud containe
 
 `MobileMacRelayService.publishSnapshot()` runs the snapshot through a `MobileMirrorSecretRedactor`, folds in the current pending-command queue and per-station command counts, then writes it to the `MobileMirrorSnapshotSink`. The live sink (`MobileCloudMirrorRelaySnapshotSink`) encrypts the payload into a `MobileEncryptedEnvelope` and upserts it as a CloudKit record. Large snapshots are split into chunk records referenced by `chunkIDs`.
 
-On the device, `MobileCloudMirrorSyncClient.fetchLatestSnapshot(stationID:now:)` fetches the record(s), checks the `expiresAt` TTL (a stale record raises `MobileCloudMirrorSyncError.staleSnapshot`), decrypts and verifies the envelope with the per-station symmetric key, reassembles chunks, and returns a `MobileMirrorSnapshot`. The iOS `MobileMonitorStore.refresh()` aggregates across every paired station, merging each station's snapshot into one combined view via `mergingStationSnapshot`.
+On a relay-paired device, `MobileCloudMirrorSyncClient.fetchLatestSnapshot(stationID:now:)` fetches the record(s), checks the `expiresAt` TTL (a stale record raises `MobileCloudMirrorSyncError.staleSnapshot`), decrypts and verifies the envelope with the per-station symmetric key, reassembles chunks, and returns a `MobileMirrorSnapshot`.
+
+On a remote-paired device, `MobileRemoteDaemonSyncClient.fetchLatestSnapshot(stationID:now:)` sends an authenticated `GET /v1/sessions` to the pinned endpoint and maps the daemon's secret-free session fields into the shared snapshot model. `DirectFirstMobileMonitorSyncClient` applies the fail-closed fallback policy described above. The shared `MirrorStore.refresh()` aggregates every paired station through the same `MobileMonitorSyncClient` protocol.
 
 ### Device to Mac (command)
 
@@ -49,6 +50,8 @@ A command authored on the phone or watch is a `MobileCommandRecord` whose `kind`
 On the Mac, `MobileMacRelayService.executePendingCommands()` walks the pending queue. For each command it: validates the queue envelope (`validatingForQueue`), validates fresh state (`validatingFreshState` rejects a command whose authored revision no longer matches the current one), records an `accepted` then `running` receipt, runs the `MobileRelayCommandExecutor`, and records a terminal receipt (`succeeded`, `failed`, `expired`). Executor output is run back through the secret redactor. Receipts flow to the device through the same encrypted mirror, so the command tab reflects accepted → running → terminal transitions.
 
 Commands are idempotent on the Mac: `executedCommandIDs` guards against re-running a command if a duplicate mirror pass sees it again before its terminal receipt has propagated.
+
+Direct and direct-first profiles currently expose snapshots only because the daemon snapshot has no relay revision for fresh-state validation. A CloudMirror-only relay credential still carries commands; other profiles report commands unavailable instead of queuing against an invented revision.
 
 ## Pairing
 
@@ -60,9 +63,15 @@ The phone scans the QR with `MobilePairingScannerView` (VisionKit). `LiveMobileM
 
 Because the handshake uses the local network, the iOS app surfaces a dedicated `localNetworkDenied` sync state: if iOS has blocked Local Network access the QR scan cannot reach the Mac, and the app deep-links the user to Settings to grant it.
 
+### Phone to remote daemon (internet)
+
+`harness daemon remote pair create` produces a short-lived `harness://remote-pair` invitation containing the HTTPS endpoint, one-time code, requested role/scopes, expiry, and the daemon certificate's SPKI SHA-256 pin. The phone accepts the same QR, deep-link, and manual-entry flows as local pairing. `URLSessionMobileRemoteDaemonPairingTransport` claims `POST /v1/remote/pair/claim` through a pinning URLSession and binds the claim to a stable client id derived from the phone identity.
+
+The daemon returns an opaque per-client bearer token. `MobileRemoteDaemonPairingCoordinator` stores it only inside the existing Keychain-backed `MobilePairedStationCredential`, together with the endpoint, client id, role/scopes, token hint, paired time, and SPKI pin. Invitation endpoints must be plain HTTPS origins with no credentials, query, fragment, or path.
+
 ### Phone to watch (WatchConnectivity)
 
-The watch does not run the HTTP handshake. After the phone pairs, `MobileWatchPairingSessionBridge` serializes the device identities, station credentials, and an optional latest snapshot into a `MobileWatchPairingTransfer` and pushes it to the watch over WatchConnectivity. It uses all three delivery mechanisms for resilience: `sendMessage` when reachable, plus `updateApplicationContext` and `transferUserInfo` for background delivery. The watch can also pull on demand by sending a request payload, which the bridge answers from its cached or stored pairings. Payloads are capped at 60 KB. On the watch, `WatchPairingSessionReceiver` ingests the transfer and writes the same credential/identity material into the watch Keychain, so the watch can then talk to CloudMirror directly.
+The watch does not run a pairing claim. After the phone pairs, `MobileWatchPairingSessionBridge` serializes the device identities, station credentials, and an optional latest snapshot into a `MobileWatchPairingTransfer` and pushes it to the watch over WatchConnectivity. It uses all three delivery mechanisms for resilience: `sendMessage` when reachable, plus `updateApplicationContext` and `transferUserInfo` for background delivery. The watch can also pull on demand by sending a request payload, which the bridge answers from its cached or stored pairings. Payloads are capped at 60 KB. On the watch, `WatchPairingSessionReceiver` ingests the transfer and writes the same credential/identity material into the watch Keychain. Relay credentials select CloudMirror; remote credentials select the pinned direct client.
 
 ## CloudKit schema
 
@@ -92,6 +101,8 @@ The CloudKit schema must be deployed to the Production environment before TestFl
 ## Security model
 
 - End-to-end encryption. Payloads are sealed with `MobilePayloadCipher` (AEAD) under a per-station symmetric key that exists only on the paired Mac and the devices it trusts. CloudKit never holds the key.
+- Remote TLS pinning. Remote pairing and snapshots require HTTPS and validate both platform trust and the invitation's SPKI SHA-256 pin. A mismatched or untrusted certificate fails the request.
+- Remote bearer isolation. Each remote client has its own opaque token and client id. The token is persisted only in the device Keychain and redacted from debug descriptions. Authentication and authorization failures never trigger CloudMirror fallback.
 - Secret redaction. The Mac redacts secrets twice: once while building the snapshot (`+Redaction`) and again on command-execution output, via `MobileMirrorSecretRedactor`. Redaction runs before encryption, so a key compromise still does not expose un-redacted secrets that were never put in the payload.
 - Command signing + fresh-state validation. Commands are signed with a command-signing key distinct from the snapshot key, and the Mac rejects any command whose authored `revision` no longer matches current state. This prevents a stale or replayed command from acting on a board that has moved on.
 - Trust is per device. Each phone/watch has its own `MobileDeviceIdentity`; unpairing one device deletes only its credential and, if no sibling credential shares the identity, its identity too.
@@ -102,7 +113,7 @@ The CloudKit schema must be deployed to the Production environment before TestFl
 
 Entry point `HarnessMonitorMobileApp` installs a `MobileAppDelegate` (UIKit adaptor) and constructs a single `MobileMonitorStore` with Keychain-backed identity and credential stores, the live pairer, and the WatchConnectivity bridge.
 
-- State. `MobileMonitorStore` is a `@MainActor @Observable` class holding the aggregate `snapshot`, `selectedStationID`, `syncStatus`, paired credentials, and notification settings. It builds one `MobileMonitorSyncClient` per paired station through a factory, so the live path and tests can swap transports. Its extensions split by concern: `+Sync` (refresh/pairing/unpair), `+Commands`, `+Privacy`, `+Internals`.
+- State. `MobileMonitorStore` is a `@MainActor @Observable` class holding the aggregate `snapshot`, `selectedStationID`, `syncStatus`, paired credentials, and notification settings. It builds one `MobileMonitorSyncClient` per paired station through a factory, selecting direct, CloudMirror, or direct-first-with-fallback from the credential. Its extensions split by concern: `+Sync` (refresh/pairing/unpair), `+Commands`, `+Privacy`, `+Internals`.
 - Tabs. `MobileRootView` is a `TabView`: Today, Sessions, Reviews, Commands, Settings. `MobileRootTab` also parses `harness://` deep links to a tab.
 - Sync status. `MobileMonitorSyncStatus` is the single source of UI truth for connection state: `unpaired`, `demo`, `pairing`, `syncing`, `live`, `stale`, `localNetworkDenied`, `paired`, `privacy`, and the command outcomes. Each case carries a title, subtitle, and SF Symbol.
 - Demo mode. On by default in the Simulator (App Review and screenshots get `MobileDemoFixtures` data with no real Mac), off on device. Pairing a real Mac clears demo mode.
@@ -113,7 +124,7 @@ Entry point `HarnessMonitorMobileApp` installs a `MobileAppDelegate` (UIKit adap
 
 ## Watch app structure
 
-The watch app is a separate watchOS product embedded in the iOS app, not a macOS extension. It has its own `WatchMonitorStore` (do not confuse it with the iOS `MobileMonitorStore`) that builds `MobileCloudMirrorSyncClient`s directly from the credentials the phone transferred. `RootView`, `WatchCommandComposerView`, and `WatchMonitorStoreRefresh` make up the UI and refresh loop; `WatchPairingSessionReceiver` ingests the WatchConnectivity transfer.
+The watch app is a separate watchOS product embedded in the iOS app, not a macOS extension. It has its own `WatchMonitorStore` (do not confuse it with the iOS `MobileMonitorStore`) that builds direct and/or CloudMirror clients from credentials transferred by the phone. `RootView`, `WatchCommandComposerView`, and `WatchMonitorStoreRefresh` make up the UI and refresh loop; `WatchPairingSessionReceiver` ingests the WatchConnectivity transfer.
 
 ### NeedsMe vs CloudMirror
 
@@ -134,9 +145,9 @@ Shared schemes (in `Project.swift`):
 
 - `HarnessMonitorMobile` — builds the iOS app + widgets + Core/Crypto/CloudMirror; run on an iOS Simulator or device.
 - `HarnessMonitorWatch` — builds and runs the watch app on a watchOS Simulator or device.
-- `HarnessMonitorMobileFoundationTests` — runs the four shared-framework test targets together with coverage: `HarnessMonitorCoreTests`, `HarnessMonitorCryptoTests`, `HarnessMonitorCloudMirrorTests`, `HarnessMonitorMacRelayTests`. There are also per-framework test schemes (`HarnessMonitorCryptoTests`, `HarnessMonitorCloudMirrorTests`, `HarnessMonitorMacRelayTests`).
+- `HarnessMonitorMobileFoundationTests` — runs the five shared-framework test targets together with coverage: `HarnessMonitorCoreTests`, `HarnessMonitorMirrorStoreTests`, `HarnessMonitorCryptoTests`, `HarnessMonitorCloudMirrorTests`, and `HarnessMonitorMacRelayTests`. There are also per-framework test schemes.
 
-Where the logic is tested: the iOS app and watch app targets have no unit tests of their own — they are thin SwiftUI shells over the shared frameworks. The behavior lives in (and is tested through) the four framework test targets, all of which run on the macOS destination. That is why the mobile/watch test gate is a macOS test run, not a Simulator run.
+Where the logic is tested: the iOS app and watch app targets have no unit tests of their own — they are thin SwiftUI shells over the shared frameworks. The behavior lives in (and is tested through) the five framework test targets, all of which run on the macOS destination. That is why the mobile/watch test gate is a macOS test run, not a Simulator run.
 
 Run the shared-framework tests (macOS, no Simulator needed) through the xcodebuild lane wrapper from the repo root, in a dedicated build lane so you do not stomp the user's Cmd+R DerivedData:
 

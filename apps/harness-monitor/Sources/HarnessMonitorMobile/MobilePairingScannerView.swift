@@ -55,8 +55,8 @@ struct MobilePairingScannerView: View {
             }
           }
         }
-        Section("Paste pairing link") {
-          TextField("harness://pair...", text: $manualEntry, axis: .vertical)
+        Section("Paste pairing link or code") {
+          TextField("Pairing link or code", text: $manualEntry, axis: .vertical)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .lineLimit(2...4)
@@ -69,7 +69,7 @@ struct MobilePairingScannerView: View {
           .disabled(parsedManualURL == nil)
         }
       }
-      .navigationTitle("Pair Mac")
+      .navigationTitle("Pair Station")
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") {
@@ -109,14 +109,7 @@ struct MobilePairingScannerView: View {
   }
 
   static func pairingURL(from text: String) -> URL? {
-    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard let url = URL(string: trimmed),
-      url.scheme == MobilePairingInvitationCodec.urlScheme,
-      url.host == MobilePairingInvitationCodec.urlHost
-    else {
-      return nil
-    }
-    return url
+    try? MobilePairingLink.normalizedURL(from: text)
   }
 }
 
@@ -163,15 +156,15 @@ private struct MobilePairingScannerNotice: View {
     switch availability {
     case .needsPermission:
       String(
-        localized: "Allow camera access to scan the Mac pairing QR code, or paste the link below")
+        localized: "Allow camera access to scan a pairing QR code, or paste the link below")
     case .denied:
       String(
         localized:
-          "Enable camera access in iOS Settings to scan the pairing QR code, or paste the link below"
+          "Enable camera access in iOS Settings to scan a pairing QR code, or paste the link below"
       )
     case .unsupported:
       String(
-        localized: "This device cannot scan QR codes. Paste the pairing link from the Mac below")
+        localized: "This device cannot scan QR codes. Paste the pairing link below")
     case .scanning:
       ""
     }
