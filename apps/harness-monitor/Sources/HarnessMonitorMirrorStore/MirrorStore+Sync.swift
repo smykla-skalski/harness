@@ -197,9 +197,7 @@ extension MirrorStore {
   }
 
   public func handleOpenURL(_ url: URL, deviceName: String) async {
-    guard url.scheme == MobilePairingInvitationCodec.urlScheme,
-      url.host == MobilePairingInvitationCodec.urlHost
-    else {
+    guard MobilePairingLink.supports(url) else {
       return
     }
     await pair(invitationURL: url, deviceName: deviceName)
@@ -211,18 +209,19 @@ extension MirrorStore {
       return
     }
     do {
-      let invitation = try MobilePairingInvitationCodec.decode(invitationURL, now: .now)
+      let now = Date()
+      let pairingLink = try MobilePairingLink.decode(invitationURL, now: now)
       let wasDemoModeEnabled = demoModeEnabled
       demoModeEnabled = false
       if wasDemoModeEnabled {
         snapshot = .empty()
         selectedStationID = ""
       }
-      syncStatus = .pairing(invitation.stationName)
+      syncStatus = .pairing(pairingLink.stationName)
       let credential = try await pairer.pair(
         invitationURL: invitationURL,
         deviceName: deviceName,
-        now: .now
+        now: now
       )
       try await rebuildSyncClients(preferredStationID: credential.stationID)
       syncStatus = .paired(credential.stationName)

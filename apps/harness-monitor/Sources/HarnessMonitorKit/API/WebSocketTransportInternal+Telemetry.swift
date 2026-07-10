@@ -25,7 +25,7 @@ extension WebSocketTransport {
       var request = URLRequest(url: url)
       request.httpMethod = "POST"
       request.timeoutInterval = DaemonTelemetrySupport.requestTimeoutInterval
-      request.setValue("Bearer \(connection.token)", forHTTPHeaderField: "Authorization")
+      connection.applyAuthenticationHeaders(to: &request)
       request.setValue("application/json", forHTTPHeaderField: "Content-Type")
       request.setValue("application/json", forHTTPHeaderField: "Accept")
       request.httpBody = try encoder.encode(AnyEncodable(telemetryRequest))

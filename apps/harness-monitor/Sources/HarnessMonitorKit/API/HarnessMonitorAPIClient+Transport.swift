@@ -376,7 +376,7 @@ extension HarnessMonitorAPIClient {
     }
 
     var request = URLRequest(url: url)
-    request.setValue("Bearer \(connection.token)", forHTTPHeaderField: "Authorization")
+    connection.applyAuthenticationHeaders(to: &request)
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     return request
   }

@@ -87,7 +87,7 @@ extension WebSocketTransport {
   }
 
   func applyHandshakeHeaders(to request: inout URLRequest) {
-    request.setValue("Bearer \(connection.token)", forHTTPHeaderField: "Authorization")
+    connection.applyAuthenticationHeaders(to: &request)
     for (field, value) in currentClientHandshakeMetadata().headers {
       request.setValue(value, forHTTPHeaderField: field)
     }

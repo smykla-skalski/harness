@@ -55,6 +55,7 @@ public struct StoredRemoteDaemonConnectionSource: RemoteDaemonConnectionSourcing
     return HarnessMonitorConnection(
       endpoint: profile.endpoint,
       token: token,
+      remoteClientID: profile.clientID,
       serverTrust: .spkiSHA256(profile.serverSPKISHA256),
       source: .remote(profileID: profile.id)
     )

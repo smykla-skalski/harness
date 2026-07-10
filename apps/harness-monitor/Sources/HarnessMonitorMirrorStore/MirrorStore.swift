@@ -142,7 +142,7 @@ public final class MirrorStore {
   }
 
   public var canQueueCommands: Bool {
-    demoModeEnabled || syncClient(for: selectedStationID) != nil
+    demoModeEnabled || syncClient(for: selectedStationID)?.supportsCommands == true
   }
 
   public var mirroredPrivacyStationCount: Int {
@@ -154,7 +154,7 @@ public final class MirrorStore {
   }
 
   public func canQueueCommand(stationID: String) -> Bool {
-    demoModeEnabled || syncClient(for: stationID) != nil
+    demoModeEnabled || syncClient(for: stationID)?.supportsCommands == true
   }
 
   public func setDemoMode(_ enabled: Bool) {
