@@ -10,6 +10,7 @@ use instant_acme::{
     Account, AccountBuilder, AccountCredentials, AuthorizationStatus, ChallengeHandle,
     ChallengeType, Identifier, LetsEncrypt, NewAccount, NewOrder, Order, OrderStatus, RetryPolicy,
 };
+use rcgen::{CertificateParams, DistinguishedName, KeyPair};
 use tokio::runtime::{Handle, Runtime};
 
 use super::remote::{
@@ -184,6 +185,7 @@ where
         &self,
         credentials: &RemoteAcmeAccountCredentials,
         config: &RemoteDaemonServeConfig,
+        previous_private_key_pem: Option<&str>,
     ) -> Result<RemoteCertificateBundle, String> {
         validate_remote_serve_config(config).map_err(|error| error.to_string())?;
         let account = self.restore_account(credentials).await?;
@@ -193,15 +195,26 @@ where
             .await
             .map_err(|error| redacted_acme_error(&error))?;
         self.complete_authorizations(&mut order, config).await?;
-        let private_key = order
-            .finalize()
+        let private_key = previous_private_key_pem.map_or_else(
+            || KeyPair::generate().map_err(|error| error.to_string()),
+            |pem| KeyPair::from_pem(pem).map_err(|error| error.to_string()),
+        )?;
+        let private_key_pem = private_key.serialize_pem();
+        let mut params = CertificateParams::new(vec![config.domain.trim().to_string()])
+            .map_err(|error| error.to_string())?;
+        params.distinguished_name = DistinguishedName::new();
+        let csr = params
+            .serialize_request(&private_key)
+            .map_err(|error| error.to_string())?;
+        order
+            .finalize_csr(csr.der())
             .await
             .map_err(|error| redacted_acme_error(&error))?;
         let certificate = order
             .poll_certificate(&self.retry_policy)
             .await
             .map_err(|error| redacted_acme_error(&error))?;
-        Ok(RemoteCertificateBundle::new(&certificate, &private_key))
+        Ok(RemoteCertificateBundle::new(&certificate, &private_key_pem))
     }
 
     async fn restore_account(
@@ -397,7 +410,11 @@ impl RemoteAcmeRenewalIssuer for SystemRemoteAcmeIssuer {
         let provisioner =
             SystemRemoteAcmeChallengeProvisioner::from_environment(request.serve_config())?;
         let issuer = InstantAcmeIssuer::production(provisioner);
-        run_acme_future(issuer.issue_certificate(request.account(), request.serve_config()))
+        run_acme_future(issuer.issue_certificate(
+            request.account(),
+            request.serve_config(),
+            request.previous_private_key_pem(),
+        ))
     }
 }
 

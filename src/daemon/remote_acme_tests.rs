@@ -1,8 +1,14 @@
 use std::error::Error;
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
+use rcgen::{CertificateParams, KeyPair};
+use sha2::{Digest, Sha256};
+
 use super::{
     AcmeHttp01ChallengeStore, Dns01ChangeOperation, Dns01ExecHookOperation, Dns01ProviderAction,
-    RemoteAcmeRuntimeState, RemoteCertificateBundle, RemoteCertificateSlot, RemoteRenewalOutcome,
+    RemoteAcmeAccountCredentials, RemoteAcmeRenewalRequest, RemoteAcmeRuntimeState,
+    RemoteCertificateBundle, RemoteCertificateSlot, RemoteRenewalOutcome,
     build_remote_acme_runtime_plan,
 };
 use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
@@ -402,6 +408,59 @@ fn remote_certificate_bundle_debug_redacts_pem_material() {
     assert!(debug.contains("<redacted>"));
     assert!(!debug.contains("cert-secret"));
     assert!(!debug.contains("key-secret"));
+}
+
+#[test]
+fn remote_certificate_bundle_reports_standard_spki_sha256_pin() {
+    let key = KeyPair::generate().expect("generate key");
+    let certificate = CertificateParams::new(vec!["daemon.example.com".to_string()])
+        .expect("certificate params")
+        .self_signed(&key)
+        .expect("self-sign certificate");
+    let bundle = RemoteCertificateBundle::new(certificate.pem().as_str(), &key.serialize_pem());
+    let public_key_pem = key.public_key_pem();
+    let encoded_spki = public_key_pem
+        .lines()
+        .filter(|line| !line.starts_with("-----"))
+        .collect::<String>();
+    let spki = STANDARD
+        .decode(encoded_spki)
+        .expect("decode public key PEM");
+    let expected = format!("sha256/{}", STANDARD.encode(Sha256::digest(spki)));
+
+    assert_eq!(bundle.spki_sha256_pin().expect("SPKI pin"), expected);
+}
+
+#[test]
+fn remote_certificate_bundle_rejects_malformed_certificate_for_spki_pin() {
+    let bundle = RemoteCertificateBundle::new_for_tests("not-a-certificate", "redacted-key");
+
+    let error = bundle
+        .spki_sha256_pin()
+        .expect_err("malformed certificate must not produce a pin");
+
+    assert!(error.to_string().contains("certificate PEM"));
+    assert!(!error.to_string().contains("redacted-key"));
+}
+
+#[test]
+fn remote_acme_renewal_request_debug_redacts_private_key() {
+    let account = RemoteAcmeAccountCredentials::new(
+        "https://acme.test/acct/1",
+        r#"{"id":"https://acme.test/acct/1"}"#,
+    )
+    .expect("account credentials");
+    let request = RemoteAcmeRenewalRequest::new(
+        &account,
+        Some("old-fingerprint"),
+        Some("private-key-secret"),
+        &tls_alpn_config(),
+    );
+
+    let debug = format!("{request:?}");
+
+    assert!(debug.contains("<redacted>"));
+    assert!(!debug.contains("private-key-secret"));
 }
 
 #[test]

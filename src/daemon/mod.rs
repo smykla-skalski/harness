@@ -42,6 +42,7 @@ mod remote_acme_dns_provider;
 pub mod remote_acme_dns_runner;
 mod remote_acme_issuer;
 pub mod remote_auth;
+pub(crate) mod remote_certificate_identity;
 pub(crate) mod remote_crypto;
 pub mod remote_identity;
 pub mod remote_pairing;

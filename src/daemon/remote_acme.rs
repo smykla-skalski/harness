@@ -9,6 +9,7 @@ use super::remote::{
     RemoteAcmeChallenge, RemoteDaemonConfigError, RemoteDaemonServeConfig,
     validate_remote_serve_config,
 };
+use super::remote_certificate_identity::RemotePrivateKeyPem;
 pub use super::remote_acme_dns::{
     CloudflareDns01ChangeRequest, Dns01ChangeOperation, Dns01ExecHookError,
     Dns01ExecHookInvocation, Dns01ExecHookOperation, Dns01ProviderChangeError,
@@ -206,6 +207,7 @@ impl AcmeHttp01ChallengeStore {
 pub struct RemoteAcmeRenewalRequest {
     account: RemoteAcmeAccountCredentials,
     previous_certificate_fingerprint: Option<String>,
+    previous_private_key_pem: Option<RemotePrivateKeyPem>,
     serve_config: RemoteDaemonServeConfig,
 }
 
@@ -214,11 +216,13 @@ impl RemoteAcmeRenewalRequest {
     pub fn new(
         account: &RemoteAcmeAccountCredentials,
         previous_fingerprint: Option<&str>,
+        previous_private_key_pem: Option<&str>,
         serve_config: &RemoteDaemonServeConfig,
     ) -> Self {
         Self {
             account: account.clone(),
             previous_certificate_fingerprint: previous_fingerprint.map(ToOwned::to_owned),
+            previous_private_key_pem: previous_private_key_pem.map(RemotePrivateKeyPem::new),
             serve_config: serve_config.clone(),
         }
     }
@@ -241,6 +245,11 @@ impl RemoteAcmeRenewalRequest {
     #[must_use]
     pub fn previous_certificate_fingerprint(&self) -> Option<&str> {
         self.previous_certificate_fingerprint.as_deref()
+    }
+
+    #[must_use]
+    pub fn previous_private_key_pem(&self) -> Option<&str> {
+        self.previous_private_key_pem.as_ref().map(RemotePrivateKeyPem::as_str)
     }
 
     #[must_use]
@@ -368,12 +377,17 @@ impl RemoteAcmeAccountCredentials {
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct RemoteAcmeIssuanceState {
     pub(crate) account: Option<RemoteAcmeAccountCredentials>,
+    pub(crate) previous_private_key_pem: Option<String>,
 }
 
 impl fmt::Debug for RemoteAcmeIssuanceState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RemoteAcmeIssuanceState")
             .field("account_configured", &self.account.is_some())
+            .field(
+                "private_key_configured",
+                &self.previous_private_key_pem.is_some(),
+            )
             .finish()
     }
 }
@@ -429,6 +443,12 @@ impl RemoteCertificateBundle {
     #[must_use]
     pub(crate) fn private_key_pem(&self) -> &str {
         &self.private_key_pem
+    }
+
+    pub(crate) fn spki_sha256_pin(
+        &self,
+    ) -> Result<String, super::remote_certificate_identity::RemoteCertificateIdentityError> {
+        super::remote_certificate_identity::spki_sha256_pin(self)
     }
 
     #[must_use]

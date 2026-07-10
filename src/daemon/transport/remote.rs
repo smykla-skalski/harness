@@ -20,6 +20,7 @@ use crate::workspace::utc_now;
 
 use super::control::{adopt_daemon_root_for_transport_command, print_json};
 use super::remote_doctor::execute_remote_doctor;
+use super::remote_pairing_invitation::build_remote_pairing_invitation;
 use super::remote_serve::execute_remote_serve;
 use super::remote_systemd::{DaemonRemoteSystemdArgs, DaemonRemoteSystemdInstallArgs};
 
@@ -212,19 +213,31 @@ impl DaemonRemotePairCreateArgs {
             expires_at.as_str(),
         )
         .map_err(|error| CliErrorKind::workflow_parse(error.to_string()))?;
+        let role = record.role.as_str().to_string();
+        let scopes = record
+            .scopes
+            .iter()
+            .map(|scope| scope.as_str().to_string())
+            .collect::<Vec<_>>();
+        let invitation = build_remote_pairing_invitation(
+            db,
+            code.expose(),
+            role.as_str(),
+            &scopes,
+            record.expires_at.as_str(),
+        )?;
         let stored = db.create_remote_pairing_code(&record, audit_event_id)?;
         Ok(DaemonRemotePairCreateResponse {
             pairing_id: stored.pairing_id,
             code: code.expose().to_string(),
-            role: stored.role.as_str().to_string(),
-            scopes: stored
-                .scopes
-                .iter()
-                .map(|scope| scope.as_str().to_string())
-                .collect(),
+            role,
+            scopes,
             created_at: stored.created_at,
             expires_at: stored.expires_at,
             ttl_seconds: self.ttl.as_secs(),
+            endpoint: invitation.endpoint,
+            server_spki_sha256: invitation.server_spki_sha256,
+            pairing_url: invitation.pairing_url,
         })
     }
 }
@@ -238,6 +251,9 @@ pub(crate) struct DaemonRemotePairCreateResponse {
     pub created_at: String,
     pub expires_at: String,
     pub ttl_seconds: u64,
+    pub endpoint: String,
+    pub server_spki_sha256: String,
+    pub pairing_url: String,
 }
 
 pub(super) fn open_remote_daemon_db() -> Result<DaemonDb, CliError> {

@@ -79,6 +79,7 @@ http = "1.4.2"
 instant-acme = { version = "0.8.5", default-features = false, features = ["hyper-rustls", "rcgen", "ring"] }
 pathdiff = "0.2.3"
 rcgen = { version = "0.14.8", default-features = false, features = ["pem", "ring", "x509-parser"] }
+x509-parser = "=0.18.1"
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
 tar = "0.4.44"
 user_dirs = "0.2.0"
@@ -112,7 +113,6 @@ assert_cmd = "=2.2.0"
 predicates = "=3.1.4"
 tempfile = "=3.27.0"
 insta = "=1.46.3"
-x509-parser = "=0.18.1"
 harness-testkit = { path = "testkit" }
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
 syn = { version = "=2.0.117", features = ["full"] }

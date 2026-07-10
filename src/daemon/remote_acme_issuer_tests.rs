@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use instant_acme::{Account, RetryPolicy};
+use rcgen::KeyPair;
 
 #[path = "remote_acme_issuer_test_support.rs"]
 mod support;
@@ -38,7 +39,7 @@ async fn instant_acme_issuer_completes_account_order_and_http01_issuance() {
         .await
         .expect("create ACME account");
     let bundle = issuer
-        .issue_certificate(&account, &config)
+        .issue_certificate(&account, &config, None)
         .await
         .expect("issue ACME certificate");
 
@@ -68,7 +69,7 @@ async fn instant_acme_issuer_completes_account_order_and_http01_issuance() {
     assert_eq!(provisioner.cleanup_count(), 1);
 
     let requests = http.requests();
-    assert_eq!(requests.len(), 13);
+    assert_eq!(requests.len(), 12);
     assert_eq!(
         jws_payload(&requests[2])["contact"][0],
         "mailto:ops@example.com"
@@ -78,10 +79,35 @@ async fn instant_acme_issuer_completes_account_order_and_http01_issuance() {
         "daemon.example.com"
     );
     assert!(
-        jws_payload(&requests[10])["csr"]
+        jws_payload(&requests[9])["csr"]
             .as_str()
             .is_some_and(|csr| !csr.is_empty())
     );
+    http.assert_exhausted();
+}
+
+#[tokio::test]
+async fn instant_acme_issuer_reuses_persisted_private_key_for_renewal() {
+    let http = ScriptedAcmeHttp::new(acme_happy_path());
+    let provisioner = RecordingProvisioner::default();
+    let issuer = test_issuer(http.clone(), provisioner);
+    let config = http_serve_config();
+    let account = issuer
+        .create_account(config.acme_email.as_str())
+        .await
+        .expect("create ACME account");
+    let private_key_pem = KeyPair::generate()
+        .expect("generate persisted key")
+        .serialize_pem();
+
+    let bundle = issuer
+        .issue_certificate(&account, &config, Some(private_key_pem.as_str()))
+        .await
+        .expect("renew ACME certificate");
+
+    assert_eq!(bundle.private_key_pem(), private_key_pem);
+    build_remote_tls_server_config(&bundle)
+        .expect("renewed certificate must match the persisted private key");
     http.assert_exhausted();
 }
 
@@ -137,7 +163,7 @@ async fn instant_acme_issuer_cleans_challenge_after_rejected_order() {
         .expect("create ACME account");
 
     issuer
-        .issue_certificate(&account, &config)
+        .issue_certificate(&account, &config, None)
         .await
         .expect_err("rejected order must fail issuance");
 
@@ -159,7 +185,7 @@ async fn instant_acme_issuer_redacts_challenge_cleanup_failure() {
         .expect("create ACME account");
 
     let error = issuer
-        .issue_certificate(&account, &config)
+        .issue_certificate(&account, &config, None)
         .await
         .expect_err("rejected order and cleanup must fail issuance");
 
@@ -193,7 +219,7 @@ async fn issue_for_challenge(
         .await
         .expect("create ACME account");
     issuer
-        .issue_certificate(&account, &config)
+        .issue_certificate(&account, &config, None)
         .await
         .expect("issue ACME certificate");
     http.assert_exhausted();
