@@ -39,7 +39,11 @@ public struct HarnessMonitorConnection: Equatable, Sendable {
 
   func applyAuthenticationHeaders(to request: inout URLRequest) {
     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-    guard let remoteClientID = remoteClientID?.trimmingCharacters(in: .whitespacesAndNewlines),
+    guard
+      isRemote,
+      let remoteClientID = remoteClientID?.trimmingCharacters(
+        in: .whitespacesAndNewlines
+      ),
       !remoteClientID.isEmpty
     else {
       return

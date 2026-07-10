@@ -43,7 +43,8 @@ struct RemoteDaemonAuthenticationHeaderTests {
   func localRequestsOmitClientID() throws {
     let connection = HarnessMonitorConnection(
       endpoint: URL(string: "http://127.0.0.1:7777")!,
-      token: "local-token"
+      token: "local-token",
+      remoteClientID: "must-not-leak"
     )
     let client = HarnessMonitorAPIClient(
       connection: connection,
