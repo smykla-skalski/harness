@@ -91,10 +91,10 @@ public actor RemoteDaemonProfileCoordinator {
     let replacedProfiles = originalState.profiles.filter {
       $0.id == profile.id || $0.clientID == profile.clientID
     }
-    let replacedTokens = try replacedProfiles.map { replacedProfile in
+    let replacedTokens = replacedProfiles.map { replacedProfile in
       (
         profileID: replacedProfile.id,
-        token: try tokenStore.loadToken(profileID: replacedProfile.id)
+        token: try? tokenStore.loadToken(profileID: replacedProfile.id)
       )
     }
     var activatedState = originalState
