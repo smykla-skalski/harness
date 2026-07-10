@@ -30,6 +30,12 @@ pub(crate) enum RemoteAcmeRenewalCheckOutcome {
     Failed,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RemoteAcmeRenewalLoopControl {
+    Continue,
+    Shutdown,
+}
+
 struct RemoteAcmeRenewalSnapshot {
     config: RemoteDaemonServeConfig,
     account: RemoteAcmeAccountCredentials,
@@ -100,15 +106,40 @@ async fn run_remote_acme_renewal_loop<I, Now>(
         tokio::select! {
             () = wait_for_shutdown(&mut shutdown_rx) => break,
             _ = ticker.tick() => {
-                let result = run_remote_acme_renewal_check_blocking(
+                let control = run_remote_acme_renewal_check_or_shutdown(
                     Arc::clone(&db),
                     tls.clone(),
                     Arc::clone(&issuer),
+                    &mut shutdown_rx,
                     Arc::clone(&now),
                 ).await;
-                log_renewal_check(&result);
+                if control == RemoteAcmeRenewalLoopControl::Shutdown {
+                    break;
+                }
             }
         }
+    }
+}
+
+async fn run_remote_acme_renewal_check_or_shutdown<I, Now>(
+    db: Arc<Mutex<DaemonDb>>,
+    tls: RemoteTlsConfigHandle,
+    issuer: Arc<I>,
+    shutdown_rx: &mut tokio_watch::Receiver<bool>,
+    now: Arc<Now>,
+) -> RemoteAcmeRenewalLoopControl
+where
+    I: RemoteAcmeRenewalIssuer + Send + Sync + 'static,
+    Now: Fn() -> DateTime<Utc> + Send + Sync + 'static,
+{
+    let check = run_remote_acme_renewal_check_blocking(db, tls, issuer, now);
+    tokio::pin!(check);
+    tokio::select! {
+        () = wait_for_shutdown(shutdown_rx) => RemoteAcmeRenewalLoopControl::Shutdown,
+        result = &mut check => {
+            log_renewal_check(&result);
+            RemoteAcmeRenewalLoopControl::Continue
+        },
     }
 }
 

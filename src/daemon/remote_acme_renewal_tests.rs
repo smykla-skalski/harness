@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 use chrono::{DateTime, Utc};
 use rcgen::{CertificateParams, KeyPair, date_time_ymd};
@@ -243,13 +243,13 @@ async fn remote_acme_renewal_loop_checks_immediately_and_stops_on_shutdown() {
         || at("2026-07-10T00:00:00Z"),
     );
 
-    for _ in 0..50 {
-        if issuer.renewal_count() == 1 {
-            break;
+    timeout(Duration::from_secs(5), async {
+        while issuer.renewal_count() != 1 {
+            sleep(Duration::from_millis(10)).await;
         }
-        sleep(Duration::from_millis(10)).await;
-    }
-    assert_eq!(issuer.renewal_count(), 1);
+    })
+    .await
+    .expect("immediate renewal check timeout");
 
     shutdown_tx.send(true).expect("signal shutdown");
     timeout(Duration::from_secs(1), task)
@@ -258,6 +258,45 @@ async fn remote_acme_renewal_loop_checks_immediately_and_stops_on_shutdown() {
         .expect("renewal loop join");
     sleep(Duration::from_millis(30)).await;
     assert_eq!(issuer.renewal_count(), 1);
+}
+
+#[tokio::test]
+async fn remote_acme_renewal_loop_stops_while_check_is_in_flight() {
+    let fixture = RenewalFixture::new((2026, 8, 1));
+    let issuer = Arc::new(BlockingRenewalIssuer::new(certificate_bundle((
+        2026, 12, 1,
+    ))));
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+    let mut task = spawn_remote_acme_renewal_loop_with(
+        Arc::clone(&fixture.db),
+        fixture.tls.clone(),
+        Arc::clone(&issuer),
+        shutdown_rx,
+        Duration::from_secs(60),
+        || at("2026-07-10T00:00:00Z"),
+    );
+
+    timeout(Duration::from_secs(5), async {
+        while !issuer.started() {
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("renewal check start timeout");
+    shutdown_tx.send(true).expect("signal shutdown");
+
+    let stopped = timeout(Duration::from_millis(250), &mut task).await;
+    issuer.release();
+    if stopped.is_err() {
+        timeout(Duration::from_secs(5), task)
+            .await
+            .expect("renewal loop cleanup timeout")
+            .expect("renewal loop cleanup join");
+    }
+    assert!(
+        stopped.is_ok(),
+        "renewal loop did not stop while its check was in flight"
+    );
 }
 
 struct RenewalFixture {
@@ -342,6 +381,54 @@ impl RemoteAcmeRenewalIssuer for FakeRenewalIssuer {
             Ordering::SeqCst,
         );
         self.result.lock().expect("lock issuer result").clone()
+    }
+}
+
+struct BlockingRenewalIssuer {
+    started: AtomicBool,
+    release: (Mutex<bool>, Condvar),
+    result: RemoteCertificateBundle,
+}
+
+impl BlockingRenewalIssuer {
+    fn new(result: RemoteCertificateBundle) -> Self {
+        Self {
+            started: AtomicBool::new(false),
+            release: (Mutex::new(false), Condvar::new()),
+            result,
+        }
+    }
+
+    fn started(&self) -> bool {
+        self.started.load(Ordering::SeqCst)
+    }
+
+    fn release(&self) {
+        let (released, condition) = &self.release;
+        *released.lock().expect("lock renewal release") = true;
+        condition.notify_all();
+    }
+}
+
+impl RemoteAcmeRenewalIssuer for BlockingRenewalIssuer {
+    fn create_account(
+        &self,
+        _config: &RemoteDaemonServeConfig,
+    ) -> Result<RemoteAcmeAccountCredentials, String> {
+        panic!("existing remote serve state must reuse its ACME account")
+    }
+
+    fn renew_certificate(
+        &self,
+        _request: &RemoteAcmeRenewalRequest,
+    ) -> Result<RemoteCertificateBundle, String> {
+        self.started.store(true, Ordering::SeqCst);
+        let (released, condition) = &self.release;
+        let mut released = released.lock().expect("lock renewal release");
+        while !*released {
+            released = condition.wait(released).expect("wait for renewal release");
+        }
+        Ok(self.result.clone())
     }
 }
 

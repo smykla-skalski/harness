@@ -7,6 +7,7 @@ use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, Server
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, DigitallySignedStruct, Error as TlsError, SignatureScheme};
 use tokio::net::TcpStream;
+use tokio::time::{Duration, timeout};
 use tokio_rustls::TlsConnector;
 use x509_parser::parse_x509_certificate;
 
@@ -67,6 +68,56 @@ async fn remote_tls_listener_serves_acme_alpn_challenge_without_disrupting_https
     assert_eq!(normal_after_cleanup.certificate_der, normal_der);
 }
 
+#[tokio::test]
+async fn remote_tls_listener_falls_back_without_an_active_acme_challenge() {
+    let (normal, normal_der) = generated_bundle("daemon.example.com");
+    let handle = RemoteTlsConfigHandle::new(normal).expect("initial TLS config");
+    let mut listener = RemoteTlsListener::bind_reloadable(("127.0.0.1", 0), &handle)
+        .await
+        .expect("bind reloadable TLS listener");
+    let address = listener.local_addr().expect("TLS listener address");
+
+    let handshake = timeout(
+        Duration::from_secs(5),
+        connect_once_for_server_name_with_alpns(
+            &mut listener,
+            address,
+            &[b"acme-tls/1".as_slice(), b"h2".as_slice()],
+            "daemon.example.com",
+        ),
+    )
+    .await
+    .expect("normal TLS fallback handshake timeout");
+
+    assert_eq!(handshake.certificate_der, normal_der);
+    assert_eq!(handshake.negotiated_alpn.as_deref(), Some(b"h2".as_slice()));
+}
+
+#[tokio::test]
+async fn remote_tls_listener_falls_back_when_acme_challenge_sni_does_not_match() {
+    let (normal, normal_der) = generated_bundle("daemon.example.com");
+    let handle = RemoteTlsConfigHandle::new(normal).expect("initial TLS config");
+    let mut listener = RemoteTlsListener::bind_reloadable(("127.0.0.1", 0), &handle)
+        .await
+        .expect("bind reloadable TLS listener");
+    let address = listener.local_addr().expect("TLS listener address");
+    let lease = handle
+        .present_tls_alpn_challenge("challenge.example.com", &[7_u8; 32])
+        .expect("publish TLS-ALPN-01 challenge");
+
+    let handshake = timeout(
+        Duration::from_secs(5),
+        connect_once_for_server_name(&mut listener, address, b"acme-tls/1", "daemon.example.com"),
+    )
+    .await
+    .expect("normal TLS fallback handshake timeout");
+
+    assert_eq!(handshake.certificate_der, normal_der);
+    handle
+        .clear_tls_alpn_challenge(lease)
+        .expect("clear TLS-ALPN-01 challenge");
+}
+
 struct ClientHandshake {
     certificate_der: Vec<u8>,
     negotiated_alpn: Option<Vec<u8>>,
@@ -77,8 +128,26 @@ async fn connect_once(
     address: SocketAddr,
     alpn: &[u8],
 ) -> ClientHandshake {
+    connect_once_for_server_name(listener, address, alpn, "daemon.example.com").await
+}
+
+async fn connect_once_for_server_name(
+    listener: &mut RemoteTlsListener,
+    address: SocketAddr,
+    alpn: &[u8],
+    server_name: &str,
+) -> ClientHandshake {
+    connect_once_for_server_name_with_alpns(listener, address, &[alpn], server_name).await
+}
+
+async fn connect_once_for_server_name_with_alpns(
+    listener: &mut RemoteTlsListener,
+    address: SocketAddr,
+    alpn_protocols: &[&[u8]],
+    server_name: &str,
+) -> ClientHandshake {
     let server = listener.accept();
-    let client = connect_client(address, alpn);
+    let client = connect_client(address, alpn_protocols, server_name);
     let ((server_stream, _), client_stream) = tokio::join!(server, client);
     let client_stream = client_stream.expect("complete client TLS handshake");
     let certificate_der = client_stream
@@ -103,17 +172,20 @@ async fn connect_once(
 
 async fn connect_client(
     address: SocketAddr,
-    alpn: &[u8],
+    alpn_protocols: &[&[u8]],
+    server_name: &str,
 ) -> Result<tokio_rustls::client::TlsStream<TcpStream>, std::io::Error> {
     let mut config = ClientConfig::builder()
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(NoCertificateVerification))
         .with_no_client_auth();
-    config.alpn_protocols = vec![alpn.to_vec()];
+    config.alpn_protocols = alpn_protocols
+        .iter()
+        .map(|protocol| (*protocol).to_vec())
+        .collect();
     let connector = TlsConnector::from(Arc::new(config));
     let stream = TcpStream::connect(address).await?;
-    let server_name =
-        ServerName::try_from("daemon.example.com".to_string()).expect("valid TLS server name");
+    let server_name = ServerName::try_from(server_name.to_string()).expect("valid TLS server name");
     connector.connect(server_name, stream).await
 }
 
