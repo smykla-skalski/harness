@@ -68,7 +68,7 @@ let sampleTaskBoardPlanningResponseText =
     "transition": {
       "board_item_id": "board-1",
       "from_status": "planning",
-      "to_status": "plan_review",
+      "to_status": "agentic_review",
       "planning": {
         "summary": "Use the semantic plan.",
         "approved_by": null,

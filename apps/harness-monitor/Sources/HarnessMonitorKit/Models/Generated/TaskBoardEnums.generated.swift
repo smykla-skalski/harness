@@ -5,29 +5,41 @@
 import Foundation
 
 public enum TaskBoardStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
-  case new
+  case umbrella
+  case todo
   case planning
+  case inProgress
+  case agenticReview
+  case testing
+  case inReview
+  case toReview
+  case humanRequired
+  case failed
+  case done
+  case new
   case planReview
   case needsYou
-  case todo
-  case inProgress
-  case inReview
-  case done
   case blocked
   case unknown(String)
 
-  public static let allCases: [Self] = [.new, .planning, .planReview, .needsYou, .todo, .inProgress, .inReview, .done, .blocked]
+  public static let allCases: [Self] = [.umbrella, .todo, .planning, .inProgress, .agenticReview, .testing, .inReview, .toReview, .humanRequired, .failed, .done, .new, .planReview, .needsYou, .blocked]
 
   public var rawValue: String {
     switch self {
-    case .new: "new"
+    case .umbrella: "umbrella"
+    case .todo: "todo"
     case .planning: "planning"
+    case .inProgress: "in_progress"
+    case .agenticReview: "agentic_review"
+    case .testing: "testing"
+    case .inReview: "in_review"
+    case .toReview: "to_review"
+    case .humanRequired: "human_required"
+    case .failed: "failed"
+    case .done: "done"
+    case .new: "new"
     case .planReview: "plan_review"
     case .needsYou: "needs_you"
-    case .todo: "todo"
-    case .inProgress: "in_progress"
-    case .inReview: "in_review"
-    case .done: "done"
     case .blocked: "blocked"
     case .unknown(let raw): raw
     }
@@ -35,14 +47,20 @@ public enum TaskBoardStatus: TaskBoardOpenEnum, CaseIterable, Identifiable {
 
   public init(rawValue: String) {
     switch rawValue {
-    case "new": self = .new
+    case "umbrella": self = .umbrella
+    case "todo": self = .todo
     case "planning": self = .planning
+    case "in_progress": self = .inProgress
+    case "agentic_review": self = .agenticReview
+    case "testing": self = .testing
+    case "in_review": self = .inReview
+    case "to_review": self = .toReview
+    case "human_required": self = .humanRequired
+    case "failed": self = .failed
+    case "done": self = .done
+    case "new": self = .new
     case "plan_review": self = .planReview
     case "needs_you": self = .needsYou
-    case "todo": self = .todo
-    case "in_progress": self = .inProgress
-    case "in_review": self = .inReview
-    case "done": self = .done
     case "blocked": self = .blocked
     default: self = .unknown(rawValue)
     }

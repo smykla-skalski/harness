@@ -25,7 +25,7 @@ extension RecordingHarnessClient {
         id: request.id ?? "board-\(taskBoardItemsStorage.count + 1)",
         title: request.title,
         body: request.body,
-        status: .new,
+        status: .todo,
         priority: request.priority,
         tags: request.tags,
         projectId: request.projectId,
@@ -91,7 +91,7 @@ extension RecordingHarnessClient {
     calls.append(.submitTaskBoardPlan(id: id, summary: request.summary))
     return try updateTaskBoardPlanning(
       id: id,
-      toStatus: .planReview,
+      toStatus: .agenticReview,
       planning: TaskBoardPlanningState(summary: request.summary)
     )
   }
@@ -253,7 +253,7 @@ extension RecordingHarnessClient {
       return TaskBoardAuditSummary(
         total: items.count,
         ready: items.count { $0.status == .todo },
-        blocked: items.count { $0.status == .blocked },
+        blocked: items.count { $0.status == .failed },
         deleted: 0,
         byStatus: statusCounts(for: items)
       )

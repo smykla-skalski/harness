@@ -93,13 +93,13 @@ struct SessionWindowRouteContentMetricsTests {
     let readyPayload = TaskBoardItemDragPayload(itemID: "item-1", status: .todo)
 
     #expect(
-      !TaskBoardLaneDropPolicy.moveFirstPayload([], to: .ready) { itemID, lane in
+      !TaskBoardLaneDropPolicy.moveFirstPayload([], to: .todo) { itemID, lane in
         moves.append("\(itemID):\(lane.rawValue)")
         return true
       }
     )
     #expect(
-      !TaskBoardLaneDropPolicy.moveFirstPayload([readyPayload], to: .ready) { itemID, lane in
+      !TaskBoardLaneDropPolicy.moveFirstPayload([readyPayload], to: .todo) { itemID, lane in
         moves.append("\(itemID):\(lane.rawValue)")
         return true
       }
@@ -107,12 +107,12 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(moves.isEmpty)
 
     #expect(
-      TaskBoardLaneDropPolicy.moveFirstPayload([readyPayload], to: .running) { itemID, lane in
+      TaskBoardLaneDropPolicy.moveFirstPayload([readyPayload], to: .inProgress) { itemID, lane in
         moves.append("\(itemID):\(lane.rawValue)")
         return true
       }
     )
-    #expect(moves == ["item-1:running"])
+    #expect(moves == ["item-1:in_progress"])
   }
 
   @Test("Task selection renders a real detail pane")

@@ -28,7 +28,7 @@ struct TaskBoardSummaryWireDecodingTests {
     #expect(summary.ready == 5)
     #expect(summary.blocked == 2)
     #expect(summary.deleted == 1)
-    #expect(summary.byStatus[1].status == .needsYou)
+    #expect(summary.byStatus[1].status == .humanRequired)
     #expect(summary.byStatus[1].count == 4)
   }
 
@@ -72,7 +72,7 @@ private let auditSummaryPayloadFixture = """
     "deleted": 1,
     "by_status": [
       { "status": "in_review", "count": 3 },
-      { "status": "needs_you", "count": 4 }
+      { "status": "human_required", "count": 4 }
     ]
   }
   """

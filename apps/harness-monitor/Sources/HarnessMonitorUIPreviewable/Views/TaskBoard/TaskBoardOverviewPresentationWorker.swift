@@ -115,18 +115,22 @@ actor TaskBoardOverviewPresentationWorker {
       }
     let taskBoardItems = sortedTaskBoardItems(scopedTaskBoardItems)
     let apiItemsByLane = Dictionary(grouping: taskBoardItems) { item in
-      TaskBoardInboxLane(status: item.status) ?? .backlog
+      TaskBoardInboxLane(status: item.status) ?? .todo
     }
     let inboxItemsByLane = Dictionary(grouping: input.snapshot.items, by: \.lane)
     let decisionIDs = sortedOpenDecisionIDs(input.decisionItems)
     let decisionIDsByLane: [TaskBoardInboxLane: [String]] =
-      decisionIDs.isEmpty ? [:] : [.needsYou: decisionIDs]
+      decisionIDs.isEmpty ? [:] : [.humanRequired: decisionIDs]
 
-    let taskBoardNeedsYouCount = apiItemsByLane[.needsYou]?.count ?? 0
-    let taskBoardReviewCount = apiItemsByLane[.review]?.count ?? 0
-    let taskBoardBlockedCount = apiItemsByLane[.blocked]?.count ?? 0
-    let taskBoardDoneCount = apiItemsByLane[.done]?.count ?? 0
-    let taskBoardOpenCount = taskBoardItems.count - taskBoardDoneCount
+    let taskBoardNeedsYouCount = apiItemsByLane[.humanRequired]?.count ?? 0
+    let taskBoardReviewCount = reviewLanes.reduce(0) { count, lane in
+      count + (apiItemsByLane[lane]?.count ?? 0)
+    }
+    let taskBoardBlockedCount = apiItemsByLane[.failed]?.count ?? 0
+    let taskBoardDoneCount = scopedTaskBoardItems.count {
+      $0.deletedAt == nil && $0.status == .done
+    }
+    let taskBoardOpenCount = taskBoardItems.count
 
     return TaskBoardOverviewPresentation(
       taskBoardItems: taskBoardItems,
@@ -135,16 +139,26 @@ actor TaskBoardOverviewPresentationWorker {
       inboxItemsByLane: inboxItemsByLane,
       decisionIDsByLane: decisionIDsByLane,
       aggregateNeedsYouCount: taskBoardNeedsYouCount
-        + (inboxItemsByLane[.needsYou]?.count ?? 0)
+        + (inboxItemsByLane[.humanRequired]?.count ?? 0)
         + decisionIDs.count,
       aggregateOpenCount: taskBoardOpenCount
         + input.snapshot.openItemCount
         + decisionIDs.count,
-      aggregateReviewCount: taskBoardReviewCount + (inboxItemsByLane[.review]?.count ?? 0),
-      aggregateBlockedCount: taskBoardBlockedCount + (inboxItemsByLane[.blocked]?.count ?? 0),
-      aggregateDoneCount: taskBoardDoneCount + (inboxItemsByLane[.done]?.count ?? 0)
+      aggregateReviewCount: taskBoardReviewCount
+        + reviewLanes.reduce(0) { count, lane in
+          count + (inboxItemsByLane[lane]?.count ?? 0)
+        },
+      aggregateBlockedCount: taskBoardBlockedCount + (inboxItemsByLane[.failed]?.count ?? 0),
+      aggregateDoneCount: taskBoardDoneCount + input.snapshot.completedItemCount
     )
   }
+
+  private static let reviewLanes: Set<TaskBoardInboxLane> = [
+    .agenticReview,
+    .testing,
+    .inReview,
+    .toReview,
+  ]
 
   private static func sortedTaskBoardItems(_ items: [TaskBoardItem]) -> [TaskBoardItem] {
     items

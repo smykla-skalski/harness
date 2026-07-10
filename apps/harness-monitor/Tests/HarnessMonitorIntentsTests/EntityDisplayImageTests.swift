@@ -33,15 +33,17 @@ final class EntityDisplayImageTests: XCTestCase {
 
   func testTaskBoardImageMapsEachStatusToDistinctSymbol() {
     let cases: [(TaskBoardStatusEnum, String)] = [
-      (.new, "plus.circle"),
-      (.planning, "doc.text.magnifyingglass"),
-      (.planReview, "eye.circle"),
-      (.needsYou, "exclamationmark.bubble"),
-      (.todo, "circle"),
-      (.inProgress, "circle.dotted"),
-      (.inReview, "checkmark.bubble"),
+      (.umbrella, "umbrella"),
+      (.todo, "tray.and.arrow.down"),
+      (.planning, "list.clipboard"),
+      (.inProgress, "arrow.triangle.2.circlepath"),
+      (.agenticReview, "sparkles"),
+      (.testing, "checkmark.shield"),
+      (.inReview, "checkmark.seal"),
+      (.toReview, "doc.text.magnifyingglass"),
+      (.humanRequired, "person.crop.circle.badge.exclamationmark"),
+      (.failed, "exclamationmark.triangle"),
       (.done, "checkmark.circle.fill"),
-      (.blocked, "exclamationmark.octagon")
     ]
 
     let observedSymbols = cases.map { _, expected in expected }
@@ -59,8 +61,8 @@ final class EntityDisplayImageTests: XCTestCase {
 
   func testTaskBoardImageCoversEveryEnumCase() {
     let statuses: [TaskBoardStatusEnum] = [
-      .new, .planning, .planReview, .needsYou,
-      .todo, .inProgress, .inReview, .done, .blocked
+      .umbrella, .todo, .planning, .inProgress, .agenticReview, .testing,
+      .inReview, .toReview, .humanRequired, .failed, .done,
     ]
 
     for status in statuses {

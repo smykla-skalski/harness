@@ -50,7 +50,7 @@ impl TaskBoardItem {
             id,
             title,
             body,
-            status: TaskBoardStatus::New,
+            status: TaskBoardStatus::Todo,
             priority: TaskBoardPriority::Medium,
             tags: Vec::new(),
             project_id: None,
@@ -140,19 +140,30 @@ pub enum TaskBoardWorkflowStatus {
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum TaskBoardStatus {
+    Umbrella,
     #[default]
-    New,
+    Todo,
     Planning,
+    #[value(name = "in_progress", alias = "in-progress")]
+    InProgress,
+    #[value(name = "agentic_review", alias = "agentic-review")]
+    AgenticReview,
+    Testing,
+    #[value(name = "in_review", alias = "in-review")]
+    InReview,
+    #[value(name = "to_review", alias = "to-review")]
+    ToReview,
+    #[value(name = "human_required", alias = "human-required")]
+    HumanRequired,
+    Failed,
+    Done,
+    // Legacy statuses stay decodable so existing persisted task-board data and
+    // older clients can migrate into the current visible lane model.
+    New,
     #[value(name = "plan_review")]
     PlanReview,
     #[value(name = "needs_you", alias = "needs-you")]
     NeedsYou,
-    Todo,
-    #[value(name = "in_progress", alias = "in-progress")]
-    InProgress,
-    #[value(name = "in_review", alias = "in-review")]
-    InReview,
-    Done,
     Blocked,
 }
 

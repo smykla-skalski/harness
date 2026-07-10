@@ -138,7 +138,7 @@ let sampleTaskBoardPlanningResponseJSON: [String: JSONValue] = [
   "transition": .object([
     "board_item_id": .string("board-1"),
     "from_status": .string("planning"),
-    "to_status": .string("plan_review"),
+    "to_status": .string("agentic_review"),
     "planning": .object([
       "summary": .string("Use the semantic plan."),
       "approved_by": .null,

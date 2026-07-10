@@ -10,13 +10,16 @@ struct TaskBoardInboxTests {
   func inboxLanesUseGlobalBoardOrdering() {
     #expect(
       TaskBoardInboxLane.allCases == [
-        .needsYou,
-        .ready,
-        .running,
-        .review,
-        .done,
-        .blocked,
-        .backlog,
+        .umbrella,
+        .todo,
+        .planning,
+        .inProgress,
+        .agenticReview,
+        .testing,
+        .inReview,
+        .toReview,
+        .humanRequired,
+        .failed,
       ])
   }
 
@@ -79,39 +82,37 @@ struct TaskBoardInboxTests {
 
     #expect(
       snapshot.items.map { $0.task.taskId } == [
+        "backlog",
         "ready",
         "running",
         "review",
-        "done",
         "blocked",
-        "backlog",
       ])
     #expect(
       snapshot.items.map(\.lane) == [
-        .ready,
-        .running,
-        .review,
-        .done,
-        .blocked,
-        .backlog,
+        .todo,
+        .todo,
+        .inProgress,
+        .toReview,
+        .failed,
       ])
     #expect(snapshot.needsYouItemCount == 0)
     #expect(snapshot.blockedItemCount == 1)
     #expect(snapshot.reviewItemCount == 1)
-    #expect(snapshot.completedItemCount == 1)
+    #expect(snapshot.completedItemCount == 0)
     #expect(snapshot.openItemCount == 5)
-    #expect(snapshot.visibleItemCount == 6)
+    #expect(snapshot.visibleItemCount == 5)
     #expect(snapshot.sections.map(\.lane) == TaskBoardInboxLane.allCases)
   }
 
   @Test("Work item status maps to global board lanes")
   func workItemStatusMapsToGlobalBoardLanes() {
-    #expect(TaskBoardInboxLane(status: TaskStatus.blocked) == .blocked)
-    #expect(TaskBoardInboxLane(status: TaskStatus.awaitingReview) == .review)
-    #expect(TaskBoardInboxLane(status: TaskStatus.inReview) == .review)
-    #expect(TaskBoardInboxLane(status: TaskStatus.inProgress) == .running)
-    #expect(TaskBoardInboxLane(status: TaskStatus.open) == .backlog)
-    #expect(TaskBoardInboxLane(status: TaskStatus.done) == .done)
+    #expect(TaskBoardInboxLane(status: TaskStatus.blocked) == .failed)
+    #expect(TaskBoardInboxLane(status: TaskStatus.awaitingReview) == .toReview)
+    #expect(TaskBoardInboxLane(status: TaskStatus.inReview) == .inReview)
+    #expect(TaskBoardInboxLane(status: TaskStatus.inProgress) == .inProgress)
+    #expect(TaskBoardInboxLane(status: TaskStatus.open) == .todo)
+    #expect(TaskBoardInboxLane(status: TaskStatus.done) == nil)
 
     #expect(
       TaskBoardInboxLane(
@@ -122,7 +123,7 @@ struct TaskBoardInboxTests {
           updatedAt: "2026-05-14T08:00:00Z",
           assignedTo: "worker-1"
         )
-      ) == .ready
+      ) == .todo
     )
     #expect(
       TaskBoardInboxLane(
@@ -133,27 +134,36 @@ struct TaskBoardInboxTests {
           updatedAt: "2026-05-14T08:00:00Z",
           queuedAt: "2026-05-14T08:01:00Z"
         )
-      ) == .ready
+      ) == .todo
     )
   }
 
   @Test("Task board item status maps to global board lanes")
   func taskBoardItemStatusMapsToGlobalBoardLanes() {
-    #expect(TaskBoardInboxLane(status: TaskBoardStatus.planReview) == .needsYou)
-    #expect(TaskBoardInboxLane(status: TaskBoardStatus.needsYou) == .needsYou)
-    #expect(TaskBoardInboxLane(status: TaskBoardStatus.blocked) == .blocked)
-    #expect(TaskBoardInboxLane(status: TaskBoardStatus.todo) == .ready)
-    #expect(TaskBoardInboxLane(status: TaskBoardStatus.inProgress) == .running)
-    #expect(TaskBoardInboxLane(status: TaskBoardStatus.inReview) == .review)
-    #expect(TaskBoardInboxLane(status: TaskBoardStatus.new) == .backlog)
-    #expect(TaskBoardInboxLane(status: TaskBoardStatus.planning) == .backlog)
-    #expect(TaskBoardInboxLane(status: TaskBoardStatus.done) == .done)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.umbrella) == .umbrella)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.todo) == .todo)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.planning) == .planning)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.inProgress) == .inProgress)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.agenticReview) == .agenticReview)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.testing) == .testing)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.inReview) == .inReview)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.toReview) == .toReview)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.humanRequired) == .humanRequired)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.failed) == .failed)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.done) == nil)
+
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.new) == .todo)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.planReview) == .agenticReview)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.needsYou) == .humanRequired)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.blocked) == .failed)
 
     #expect(
-      TaskBoardInboxLane(taskBoardItem: makeTaskBoardItem(status: .planReview)) == .needsYou
+      TaskBoardInboxLane(taskBoardItem: makeTaskBoardItem(status: .agenticReview))
+        == .agenticReview
     )
     #expect(
-      TaskBoardInboxLane(taskBoardItem: makeTaskBoardItem(status: .needsYou)) == .needsYou
+      TaskBoardInboxLane(taskBoardItem: makeTaskBoardItem(status: .humanRequired))
+        == .humanRequired
     )
   }
 

@@ -102,7 +102,7 @@ extension TaskBoardAPIClientTests {
 
   func assertHTTPClientResults(_ result: TaskBoardHTTPContractResult) {
     #expect(result.planning.transition.boardItemId == "board-1")
-    #expect(result.planning.transition.toStatus == .planReview)
+    #expect(result.planning.transition.toStatus == .agenticReview)
     #expect(result.sync.providers.first?.provider == .gitHub)
     #expect(result.sync.operations.first?.action == .push)
     #expect(result.sync.operations.first?.boardItemId == "board-1")

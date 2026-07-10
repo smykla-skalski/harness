@@ -85,7 +85,7 @@ extension TaskBoardAPIClientTests {
         dryRun: false
       )
     )
-    _ = try await transport.auditTaskBoard(status: TaskBoardStatus.blocked)
+    _ = try await transport.auditTaskBoard(status: TaskBoardStatus.failed)
     return TaskBoardWebSocketWorkflowResult(sync: sync, dispatch: dispatch, evaluation: evaluation)
   }
 
@@ -107,7 +107,7 @@ extension TaskBoardAPIClientTests {
       request: TaskBoardOrchestratorSettingsUpdateRequest(
         enabledWorkflows: [.defaultTask, .prFix],
         dryRunDefault: false,
-        dispatchStatusFilter: .planReview,
+        dispatchStatusFilter: .agenticReview,
         projectDir: "/tmp/next",
         githubProject: TaskBoardGitHubProjectConfig(
           owner: "example",
@@ -222,7 +222,7 @@ extension TaskBoardAPIClientTests {
     #expect(objectValue(calls[7].params, key: "status") == .string("in_progress"))
     #expect(objectValue(calls[7].params, key: "item_id") == .string("board-1"))
     #expect(objectValue(calls[7].params, key: "dry_run") == .bool(false))
-    #expect(objectValue(calls[8].params, key: "status") == .string("blocked"))
+    #expect(objectValue(calls[8].params, key: "status") == .string("failed"))
     #expect(calls[9].params == nil)
     #expect(calls[10].params == nil)
     #expect(calls[11].params == nil)
@@ -235,7 +235,9 @@ extension TaskBoardAPIClientTests {
           .string("pr_fix"),
         ]))
     #expect(objectValue(calls[14].params, key: "dry_run_default") == .bool(false))
-    #expect(objectValue(calls[14].params, key: "dispatch_status_filter") == .string("plan_review"))
+    #expect(
+      objectValue(calls[14].params, key: "dispatch_status_filter") == .string("agentic_review")
+    )
     if case .object(let githubProject)? = objectValue(calls[14].params, key: "github_project") {
       #expect(githubProject["owner"] == .string("example"))
       #expect(githubProject["repo"] == .string("harness"))
@@ -282,7 +284,7 @@ extension TaskBoardAPIClientTests {
 
   func assertWebSocketResults(_ result: TaskBoardWebSocketContractResult) {
     #expect(result.planning.transition.boardItemId == "board-1")
-    #expect(result.planning.transition.toStatus == .planReview)
+    #expect(result.planning.transition.toStatus == .agenticReview)
     #expect(result.sync.providers.first?.provider == .gitHub)
     #expect(result.sync.operations.first?.action == .push)
     #expect(result.sync.operations.first?.boardItemId == "board-1")

@@ -4,7 +4,7 @@ import HarnessMonitorKit
 struct TaskBoardItemEditorDraft: Equatable {
   var title = ""
   var body = ""
-  var status: TaskBoardStatus = .new
+  var status: TaskBoardStatus = .todo
   var priority: TaskBoardPriority = .medium
   var tagsText = ""
   var projectId = ""

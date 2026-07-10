@@ -57,7 +57,7 @@ pub fn submit_plan(item: &TaskBoardItem, summary: &str) -> PlanningTransition {
         approved_by: None,
         approved_at: None,
     };
-    transition(item, TaskBoardStatus::PlanReview, planning)
+    transition(item, TaskBoardStatus::AgenticReview, planning)
 }
 
 #[must_use]
@@ -74,14 +74,14 @@ pub fn approve_plan(
     transition(item, TaskBoardStatus::Todo, planning)
 }
 
-/// Drop an existing plan approval and send the item back to plan review while
+/// Drop an existing plan approval and send the item back to agentic review while
 /// keeping the existing plan summary intact. `_actor` is accepted for parity
 /// with the approval flow even though revocation does not record a who/when.
 #[must_use]
 pub fn revoke_plan(item: &TaskBoardItem, _actor: Option<&str>) -> PlanningTransition {
     transition(
         item,
-        TaskBoardStatus::PlanReview,
+        TaskBoardStatus::AgenticReview,
         clear_approval(&item.planning),
     )
 }
@@ -150,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn submit_plan_moves_to_plan_review_and_clears_approval() {
+    fn submit_plan_moves_to_agentic_review_and_clears_approval() {
         let mut item = item();
         item.planning.approved_by = Some("lead".into());
         item.planning.approved_at = Some("2026-05-14T01:00:00Z".into());
@@ -158,7 +158,7 @@ mod tests {
         let transition = submit_plan(&item, " Implement the board flow. ");
         let updated = transition.apply_to(&item);
 
-        assert_eq!(updated.status, TaskBoardStatus::PlanReview);
+        assert_eq!(updated.status, TaskBoardStatus::AgenticReview);
         assert_eq!(
             updated.planning.summary.as_deref(),
             Some("Implement the board flow.")

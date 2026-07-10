@@ -37,16 +37,12 @@ mod policy_canvas_response;
 mod sync;
 
 pub(crate) use policy_canvas::{
-    audit_policy_pipeline, create_policy_canvas,
-    create_policy_scenario, delete_policy_canvas,
-    delete_policy_scenario, duplicate_policy_canvas,
-    go_live_diff_policy_pipeline, make_live_policy_pipeline,
-    promote_policy_pipeline, rename_policy_canvas,
-    replay_policy_pipeline, reset_policy_scenarios,
-    save_policy_pipeline_draft, set_active_policy_canvas,
-    set_policy_canvas_global_enforcement, simulate_policy_pipeline,
-    policy_canvas_workspace, policy_pipeline,
-    update_policy_scenario,
+    audit_policy_pipeline, create_policy_canvas, create_policy_scenario, delete_policy_canvas,
+    delete_policy_scenario, duplicate_policy_canvas, go_live_diff_policy_pipeline,
+    make_live_policy_pipeline, policy_canvas_workspace, policy_pipeline, promote_policy_pipeline,
+    rename_policy_canvas, replay_policy_pipeline, reset_policy_scenarios,
+    save_policy_pipeline_draft, set_active_policy_canvas, set_policy_canvas_global_enforcement,
+    simulate_policy_pipeline, update_policy_scenario,
 };
 pub(crate) use policy_canvas_io::{export_policy, import_policy};
 
@@ -160,7 +156,7 @@ pub fn approve_task_board_plan(
 }
 
 /// Revoke a previously granted plan approval and bounce the item back to
-/// `PlanReview` while keeping the plan summary intact.
+/// agentic review while keeping the plan summary intact.
 ///
 /// # Errors
 /// Returns `CliError` when the item cannot be loaded or persisted.

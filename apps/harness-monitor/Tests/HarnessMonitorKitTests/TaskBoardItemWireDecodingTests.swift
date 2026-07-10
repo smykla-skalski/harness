@@ -51,7 +51,7 @@ struct TaskBoardItemWireDecodingTests {
     )
 
     #expect(item.body.isEmpty)
-    #expect(item.status == .new)
+    #expect(item.status == .todo)
     #expect(item.priority == .medium)
     #expect(item.agentMode == .headless)
     #expect(item.tags.isEmpty)
@@ -95,7 +95,7 @@ struct TaskBoardItemWireDecodingTests {
     )
     let item = TaskBoardItem(wire: wire)
     #expect(item.workflow == nil)
-    #expect(item.status == .new)
+    #expect(item.status == .todo)
   }
 
   @Test("maps the items-list response wrapper")

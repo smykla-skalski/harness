@@ -3,15 +3,35 @@ import Foundation
 import HarnessMonitorKit
 
 public enum TaskBoardStatusEnum: String, AppEnum, Sendable {
-  case new
-  case planning
-  case planReview
-  case needsYou
+  case umbrella
   case todo
+  case planning
   case inProgress
+  case agenticReview
+  case testing
   case inReview
+  case toReview
+  case humanRequired
+  case failed
   case done
-  case blocked
+
+  private static let intentStatusByDaemonStatus: [TaskBoardStatus: Self] = [
+    .umbrella: .umbrella,
+    .todo: .todo,
+    .planning: .planning,
+    .inProgress: .inProgress,
+    .agenticReview: .agenticReview,
+    .testing: .testing,
+    .inReview: .inReview,
+    .toReview: .toReview,
+    .humanRequired: .humanRequired,
+    .failed: .failed,
+    .done: .done,
+    .new: .todo,
+    .planReview: .agenticReview,
+    .needsYou: .humanRequired,
+    .blocked: .failed,
+  ]
 
   public static var typeDisplayRepresentation: TypeDisplayRepresentation {
     .init(name: "Task Status")
@@ -19,44 +39,37 @@ public enum TaskBoardStatusEnum: String, AppEnum, Sendable {
 
   public static var caseDisplayRepresentations: [Self: DisplayRepresentation] {
     [
-      .new: DisplayRepresentation(title: "New"),
+      .umbrella: DisplayRepresentation(title: "Umbrella"),
+      .todo: DisplayRepresentation(title: "Todo"),
       .planning: DisplayRepresentation(title: "Planning"),
-      .planReview: DisplayRepresentation(title: "Plan Review"),
-      .needsYou: DisplayRepresentation(title: "Needs You"),
-      .todo: DisplayRepresentation(title: "Ready"),
       .inProgress: DisplayRepresentation(title: "In Progress"),
+      .agenticReview: DisplayRepresentation(title: "Agentic Review"),
+      .testing: DisplayRepresentation(title: "Testing"),
       .inReview: DisplayRepresentation(title: "In Review"),
+      .toReview: DisplayRepresentation(title: "To Review"),
+      .humanRequired: DisplayRepresentation(title: "Human Required"),
+      .failed: DisplayRepresentation(title: "Failed"),
       .done: DisplayRepresentation(title: "Done"),
-      .blocked: DisplayRepresentation(title: "Blocked"),
     ]
   }
 
   public init(daemonValue: TaskBoardStatus) {
-    switch daemonValue {
-    case .new: self = .new
-    case .planning: self = .planning
-    case .planReview: self = .planReview
-    case .needsYou: self = .needsYou
-    case .todo: self = .todo
-    case .inProgress: self = .inProgress
-    case .inReview: self = .inReview
-    case .done: self = .done
-    case .blocked: self = .blocked
-    case .unknown: self = .new
-    }
+    self = Self.intentStatusByDaemonStatus[daemonValue] ?? .todo
   }
 
   public var daemonValue: TaskBoardStatus {
     switch self {
-    case .new: .new
-    case .planning: .planning
-    case .planReview: .planReview
-    case .needsYou: .needsYou
+    case .umbrella: .umbrella
     case .todo: .todo
+    case .planning: .planning
     case .inProgress: .inProgress
+    case .agenticReview: .agenticReview
+    case .testing: .testing
     case .inReview: .inReview
+    case .toReview: .toReview
+    case .humanRequired: .humanRequired
+    case .failed: .failed
     case .done: .done
-    case .blocked: .blocked
     }
   }
 }

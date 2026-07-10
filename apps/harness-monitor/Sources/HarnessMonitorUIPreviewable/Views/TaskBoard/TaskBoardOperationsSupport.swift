@@ -2,14 +2,20 @@ import HarnessMonitorKit
 
 enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
   case all
-  case new
+  case umbrella
+  case todo
   case planning
+  case inProgress
+  case agenticReview
+  case testing
+  case inReview
+  case toReview
+  case humanRequired
+  case failed
+  case done
+  case new
   case planReview
   case needsYou
-  case todo
-  case inProgress
-  case inReview
-  case done
   case blocked
 
   /// Stable storage for `allCases` so `ForEach` pickers do not see a new
@@ -19,14 +25,20 @@ enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
   static let stableAllCases: [Self] = Self.allCases
 
   private static let statusChoices: [TaskBoardStatus: Self] = [
-    .new: .new,
+    .umbrella: .umbrella,
+    .todo: .todo,
     .planning: .planning,
+    .inProgress: .inProgress,
+    .agenticReview: .agenticReview,
+    .testing: .testing,
+    .inReview: .inReview,
+    .toReview: .toReview,
+    .humanRequired: .humanRequired,
+    .failed: .failed,
+    .done: .done,
+    .new: .new,
     .planReview: .planReview,
     .needsYou: .needsYou,
-    .todo: .todo,
-    .inProgress: .inProgress,
-    .inReview: .inReview,
-    .done: .done,
     .blocked: .blocked,
   ]
 
@@ -44,22 +56,34 @@ enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
     switch self {
     case .all:
       nil
-    case .new:
-      .new
+    case .umbrella:
+      .umbrella
+    case .todo:
+      .todo
     case .planning:
       .planning
+    case .inProgress:
+      .inProgress
+    case .agenticReview:
+      .agenticReview
+    case .testing:
+      .testing
+    case .inReview:
+      .inReview
+    case .toReview:
+      .toReview
+    case .humanRequired:
+      .humanRequired
+    case .failed:
+      .failed
+    case .done:
+      .done
+    case .new:
+      .new
     case .planReview:
       .planReview
     case .needsYou:
       .needsYou
-    case .todo:
-      .todo
-    case .inProgress:
-      .inProgress
-    case .inReview:
-      .inReview
-    case .done:
-      .done
     case .blocked:
       .blocked
     }

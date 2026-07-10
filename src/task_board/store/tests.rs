@@ -84,7 +84,7 @@ fn list_keeps_filter_and_sort_across_parallel_parse() {
         item.status = if index % 2 == 0 {
             TaskBoardStatus::InProgress
         } else {
-            TaskBoardStatus::New
+            TaskBoardStatus::Umbrella
         };
         item.priority = TaskBoardPriority::High;
         store
@@ -130,7 +130,7 @@ fn create_get_list_update_delete_round_trips_markdown() {
 
     let loaded = store.get("task-1").expect("load item");
     assert_eq!(loaded.body, "Implement the task board.");
-    assert_eq!(loaded.status, TaskBoardStatus::New);
+    assert_eq!(loaded.status, TaskBoardStatus::Todo);
 
     let updated = store
         .update(
@@ -231,14 +231,14 @@ fn revoke_approval_preserves_summary() {
         .update(
             "task-1",
             TaskBoardItemPatch {
-                status: Some(TaskBoardStatus::PlanReview),
+                status: Some(TaskBoardStatus::AgenticReview),
                 clear_approval: true,
                 ..TaskBoardItemPatch::default()
             },
         )
         .expect("update item");
 
-    assert_eq!(revoked.status, TaskBoardStatus::PlanReview);
+    assert_eq!(revoked.status, TaskBoardStatus::AgenticReview);
     assert_eq!(
         revoked.planning.summary.as_deref(),
         Some("Use the reviewed plan")

@@ -3,20 +3,32 @@ import Foundation
 extension TaskBoardStatus {
   public var title: String {
     switch self {
+    case .umbrella:
+      "Umbrella"
+    case .todo:
+      "Todo"
     case .new:
       "New"
     case .planning:
       "Planning"
+    case .agenticReview:
+      "Agentic Review"
     case .planReview:
       "Plan Review"
     case .needsYou:
       "Needs You"
-    case .todo:
-      "Ready"
     case .inProgress:
       "In Progress"
+    case .testing:
+      "Testing"
     case .inReview:
       "In Review"
+    case .toReview:
+      "To Review"
+    case .humanRequired:
+      "Human Required"
+    case .failed:
+      "Failed"
     case .done:
       "Done"
     case .blocked:

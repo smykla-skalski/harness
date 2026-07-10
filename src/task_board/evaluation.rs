@@ -139,7 +139,7 @@ pub fn evaluate_task_board_item(
             item,
             task,
             TaskBoardEvaluationOutcome::ReviewPending,
-            TaskBoardStatus::InReview,
+            TaskBoardStatus::ToReview,
             "review_pending",
             None,
         ),
@@ -157,7 +157,7 @@ pub fn evaluate_task_board_item(
             item,
             task,
             TaskBoardEvaluationOutcome::Blocked,
-            TaskBoardStatus::Blocked,
+            TaskBoardStatus::Failed,
             TaskBoardWorkflowStatus::Failed,
             "blocked",
             Some(
@@ -312,7 +312,7 @@ fn missing_record(
         work_item_id: item.work_item_id.clone(),
         outcome,
         task_status: None,
-        board_status: Some(TaskBoardStatus::Blocked),
+        board_status: Some(TaskBoardStatus::Failed),
         workflow_status: Some(workflow.status),
         updated: false,
         reason: Some(reason),
@@ -398,7 +398,7 @@ mod tests {
         let decision = evaluate_task_board_item(&item(), &task);
 
         assert_eq!(decision.outcome, TaskBoardEvaluationOutcome::Blocked);
-        assert_eq!(decision.status, TaskBoardStatus::Blocked);
+        assert_eq!(decision.status, TaskBoardStatus::Failed);
         assert_eq!(decision.workflow.status, TaskBoardWorkflowStatus::Failed);
         assert_eq!(
             decision.workflow.current_step_id.as_deref(),

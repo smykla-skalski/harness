@@ -62,7 +62,7 @@ extension TaskBoardAPIClientTests {
     let evaluation = try await client.evaluateTaskBoard(
       request: TaskBoardEvaluateRequest(status: .inProgress, itemId: "board-1", dryRun: false)
     )
-    _ = try await client.auditTaskBoard(status: .blocked)
+    _ = try await client.auditTaskBoard(status: .failed)
     return TaskBoardHTTPWorkflowResult(sync: sync, dispatch: dispatch, evaluation: evaluation)
   }
 
@@ -84,7 +84,7 @@ extension TaskBoardAPIClientTests {
       request: TaskBoardOrchestratorSettingsUpdateRequest(
         enabledWorkflows: [.defaultTask, .prFix],
         dryRunDefault: false,
-        dispatchStatusFilter: .planReview,
+        dispatchStatusFilter: .agenticReview,
         clearDispatchStatusFilter: false,
         projectDir: "/tmp/next",
         clearProjectDir: false,
@@ -244,11 +244,11 @@ extension TaskBoardAPIClientTests {
     #expect(records[7].body?["status"] as? String == "in_progress")
     #expect(records[7].body?["item_id"] as? String == "board-1")
     #expect(records[7].body?["dry_run"] as? Bool == false)
-    #expect(records[8].query == "status=blocked")
+    #expect(records[8].query == "status=failed")
     #expect(records[12].body?.isEmpty == true)
     #expect(records[14].body?["enabled_workflows"] as? [String] == ["default_task", "pr_fix"])
     #expect(records[14].body?["dry_run_default"] as? Bool == false)
-    #expect(records[14].body?["dispatch_status_filter"] as? String == "plan_review")
+    #expect(records[14].body?["dispatch_status_filter"] as? String == "agentic_review")
     #expect(records[14].body?["clear_dispatch_status_filter"] as? Bool == false)
     #expect(records[14].body?["project_dir"] as? String == "/tmp/next")
     #expect(records[14].body?["clear_project_dir"] as? Bool == false)

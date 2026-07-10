@@ -17,6 +17,11 @@ struct TaskBoardEnumsWireDecodingTests {
 
   @Test("decodes task board status snake_case values")
   func decodesStatus() throws {
+    #expect(try decode(TaskBoardStatus.self, "umbrella") == .umbrella)
+    #expect(try decode(TaskBoardStatus.self, "agentic_review") == .agenticReview)
+    #expect(try decode(TaskBoardStatus.self, "to_review") == .toReview)
+    #expect(try decode(TaskBoardStatus.self, "human_required") == .humanRequired)
+    #expect(try decode(TaskBoardStatus.self, "failed") == .failed)
     #expect(try decode(TaskBoardStatus.self, "in_review") == .inReview)
     #expect(try decode(TaskBoardStatus.self, "needs_you") == .needsYou)
     #expect(try decode(TaskBoardStatus.self, "plan_review") == .planReview)
@@ -26,14 +31,18 @@ struct TaskBoardEnumsWireDecodingTests {
 
   @Test("encodes status back to its snake_case wire value")
   func encodesStatus() throws {
+    #expect(try wireString(TaskBoardStatus.agenticReview) == "agentic_review")
+    #expect(try wireString(TaskBoardStatus.humanRequired) == "human_required")
     #expect(try wireString(TaskBoardStatus.inReview) == "in_review")
     #expect(try wireString(TaskBoardStatus.needsYou) == "needs_you")
   }
 
   @Test("status title extension survives adoption")
   func statusTitle() {
+    #expect(TaskBoardStatus.agenticReview.title == "Agentic Review")
+    #expect(TaskBoardStatus.humanRequired.title == "Human Required")
     #expect(TaskBoardStatus.inReview.title == "In Review")
-    #expect(TaskBoardStatus.todo.title == "Ready")
+    #expect(TaskBoardStatus.todo.title == "Todo")
     #expect(TaskBoardStatus.unknown("custom").title == "custom")
   }
 

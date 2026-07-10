@@ -88,7 +88,7 @@ extension HarnessMonitorStore {
   @discardableResult
   public func createTaskBoardItem(
     request: TaskBoardCreateItemRequest,
-    initialStatus: TaskBoardStatus = .new
+    initialStatus: TaskBoardStatus = .todo
   ) async -> Bool {
     guard let client else {
       return false

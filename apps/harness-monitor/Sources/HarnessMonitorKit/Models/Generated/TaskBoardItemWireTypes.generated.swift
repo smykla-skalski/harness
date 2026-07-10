@@ -26,7 +26,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
   public var updatedAt: String
   public var deletedAt: String?
 
-  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .new, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), createdAt: String, updatedAt: String, deletedAt: String? = nil) {
+  public init(schemaVersion: UInt32, id: String, title: String, body: String = "", status: TaskBoardStatus = .todo, priority: TaskBoardPriority = .medium, tags: [String] = [], projectId: String? = nil, targetProjectTypes: [String] = [], agentMode: TaskBoardAgentMode = .headless, externalRefs: [ExternalRefWire] = [], importedFromProvider: ExternalRefProviderWire? = nil, planning: PlanningStateWire = PlanningStateWire(), workflow: TaskBoardWorkflowStateWire? = nil, sessionId: String? = nil, workItemId: String? = nil, usage: TaskUsageWire = TaskUsageWire(), createdAt: String, updatedAt: String, deletedAt: String? = nil) {
     self.schemaVersion = schemaVersion
     self.id = id
     self.title = title
@@ -55,7 +55,7 @@ public struct TaskBoardItemWire: Codable, Equatable, Sendable {
     id = try container.decode(String.self, forKey: .id)
     title = try container.decode(String.self, forKey: .title)
     body = try container.decodeIfPresent(String.self, forKey: .body) ?? ""
-    status = try container.decodeIfPresent(TaskBoardStatus.self, forKey: .status) ?? .new
+    status = try container.decodeIfPresent(TaskBoardStatus.self, forKey: .status) ?? .todo
     priority = try container.decodeIfPresent(TaskBoardPriority.self, forKey: .priority) ?? .medium
     tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
     projectId = try container.decodeIfPresent(String.self, forKey: .projectId)

@@ -175,7 +175,7 @@ async fn sync_external_tasks_reconciles_existing_provider_ref() {
             .with_url("https://example.test/new"),
         title: "New title".to_owned(),
         body: "New body".to_owned(),
-        status: TaskBoardStatus::Blocked,
+        status: TaskBoardStatus::Failed,
         project_id: Some("provider/project".to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_string()),
     };
@@ -205,7 +205,7 @@ async fn sync_external_tasks_reconciles_existing_provider_ref() {
     let updated = board.get("local-1").expect("load reconciled task");
     assert_eq!(updated.title, "New title");
     assert_eq!(updated.body, "New body");
-    assert_eq!(updated.status, TaskBoardStatus::Blocked);
+    assert_eq!(updated.status, TaskBoardStatus::Failed);
     assert_eq!(updated.project_id.as_deref(), Some("provider/project"));
     assert!(updated.external_refs.iter().any(|reference| {
         reference.provider == ExternalRefProvider::Todoist
@@ -263,7 +263,7 @@ async fn sync_external_tasks_resolves_stale_github_review_requests() {
     let item = super::support::github_review_request_item(
         "github-owner-repo-71",
         "owner/repo#71",
-        TaskBoardStatus::PlanReview,
+        TaskBoardStatus::AgenticReview,
     );
     board
         .create("Review requested", "Please review the pull request.", item)
@@ -315,7 +315,7 @@ async fn sync_external_tasks_dry_run_reports_stale_github_review_requests_withou
     let item = super::support::github_review_request_item(
         "github-owner-repo-72",
         "owner/repo#72",
-        TaskBoardStatus::NeedsYou,
+        TaskBoardStatus::HumanRequired,
     );
     board
         .create("Review requested", "Please review the pull request.", item)
@@ -350,7 +350,7 @@ async fn sync_external_tasks_dry_run_reports_stale_github_review_requests_withou
     let unchanged = board
         .get("github-owner-repo-72")
         .expect("load unchanged review request");
-    assert_eq!(unchanged.status, TaskBoardStatus::NeedsYou);
+    assert_eq!(unchanged.status, TaskBoardStatus::HumanRequired);
 }
 
 #[tokio::test]
@@ -438,7 +438,7 @@ async fn sync_external_tasks_skips_stale_review_check_when_item_was_not_imported
         String::new(),
         "2026-05-14T00:00:00Z".to_owned(),
     );
-    item.status = TaskBoardStatus::PlanReview;
+    item.status = TaskBoardStatus::AgenticReview;
     item.project_id = Some("owner/repo".to_owned());
     let mut reference = ExternalTaskRef::new(ExternalProvider::GitHub, "owner/repo#88")
         .with_url("https://example.test/pull/88".to_owned())
@@ -446,7 +446,7 @@ async fn sync_external_tasks_skips_stale_review_check_when_item_was_not_imported
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Review requested".to_owned()),
         body: Some(String::new()),
-        status: Some(TaskBoardStatus::NeedsYou),
+        status: Some(TaskBoardStatus::HumanRequired),
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T00:00:00Z".to_owned()),
         synced_at: Some("2026-05-14T00:00:00Z".to_owned()),
@@ -479,5 +479,5 @@ async fn sync_external_tasks_skips_stale_review_check_when_item_was_not_imported
     let unchanged = board
         .get("manual-review-1")
         .expect("load manual review task");
-    assert_eq!(unchanged.status, TaskBoardStatus::PlanReview);
+    assert_eq!(unchanged.status, TaskBoardStatus::AgenticReview);
 }

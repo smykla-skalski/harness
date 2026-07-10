@@ -15,6 +15,20 @@ public struct TaskBoardItemEntity: AppEntity, Identifiable, Sendable {
   public let priority: String
   public let projectId: String?
 
+  private static let symbolByStatus: [TaskBoardStatusEnum: String] = [
+    .umbrella: "umbrella",
+    .todo: "tray.and.arrow.down",
+    .planning: "list.clipboard",
+    .inProgress: "arrow.triangle.2.circlepath",
+    .agenticReview: "sparkles",
+    .testing: "checkmark.shield",
+    .inReview: "checkmark.seal",
+    .toReview: "doc.text.magnifyingglass",
+    .humanRequired: "person.crop.circle.badge.exclamationmark",
+    .failed: "exclamationmark.triangle",
+    .done: "checkmark.circle.fill",
+  ]
+
   public init(
     id: String,
     title: String,
@@ -52,18 +66,7 @@ public struct TaskBoardItemEntity: AppEntity, Identifiable, Sendable {
   /// each row's status subtitle. The system tints the symbol based on
   /// context (light/dark/monochrome) for free
   static func image(for status: TaskBoardStatusEnum) -> DisplayRepresentation.Image {
-    let symbol: String
-    switch status {
-    case .new: symbol = "plus.circle"
-    case .planning: symbol = "doc.text.magnifyingglass"
-    case .planReview: symbol = "eye.circle"
-    case .needsYou: symbol = "exclamationmark.bubble"
-    case .todo: symbol = "circle"
-    case .inProgress: symbol = "circle.dotted"
-    case .inReview: symbol = "checkmark.bubble"
-    case .done: symbol = "checkmark.circle.fill"
-    case .blocked: symbol = "exclamationmark.octagon"
-    }
+    let symbol = symbolByStatus[status] ?? "circle"
     return DisplayRepresentation.Image(systemName: symbol)
   }
 }

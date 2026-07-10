@@ -23,7 +23,7 @@ extension TaskBoardOverviewBehaviorTests {
     )
 
     #expect(presentation.taskBoardItems.map(\.id) == ["session-item"])
-    #expect(presentation.apiItems(in: .ready).map(\.id) == ["session-item"])
+    #expect(presentation.apiItems(in: .todo).map(\.id) == ["session-item"])
   }
 
   @Test("Lane strip sizing keeps the current minimum width until the board can expand")
@@ -133,8 +133,8 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(!attributed.runs.contains(where: { $0.backgroundColor != nil }))
   }
 
-  @Test("Needs You lane preserves explicit inbox status for imported GitHub inbox items")
-  func needsYouLanePreservesImportedGitHubInboxStatus() {
+  @Test("Human Required lane applies explicit backend status for imported GitHub inbox items")
+  func humanRequiredLaneAppliesImportedGitHubInboxStatus() {
     let inboxItem = taskBoardItem(
       id: "github-example-repo-42",
       status: .todo,
@@ -148,18 +148,18 @@ extension TaskBoardOverviewBehaviorTests {
       planning: TaskBoardPlanningState()
     )
 
-    #expect(TaskBoardInboxLane.needsYou.taskBoardDropStatus(for: inboxItem) == .needsYou)
+    #expect(TaskBoardInboxLane.humanRequired.taskBoardDropStatus(for: inboxItem) == .humanRequired)
   }
 
-  @Test("Needs You lane keeps plan-review semantics for manual items")
-  func needsYouLaneKeepsPlanReviewForManualItems() {
+  @Test("Agentic Review lane applies explicit backend status for manual items")
+  func agenticReviewLaneAppliesExplicitBackendStatusForManualItems() {
     let manualItem = taskBoardItem(
       id: "board-only",
       status: .todo,
       planning: TaskBoardPlanningState(summary: "Review the plan")
     )
 
-    #expect(TaskBoardInboxLane.needsYou.taskBoardDropStatus(for: manualItem) == .planReview)
+    #expect(TaskBoardInboxLane.agenticReview.taskBoardDropStatus(for: manualItem) == .agenticReview)
   }
 
   @Test("Task board item resolves Kuma background symbol from the project owner")

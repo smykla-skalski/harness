@@ -42,7 +42,7 @@ final class TaskBoardItemQueryTests: XCTestCase {
   }
 
   func testSuggestedEntitiesBumpsRecentlyDonatedItemsToFront() async throws {
-    let donated = Self.makeItem(id: "task-42", title: "Donated", status: .needsYou)
+    let donated = Self.makeItem(id: "task-42", title: "Donated", status: .humanRequired)
     let other = Self.makeItem(id: "task-43", title: "Other", status: .todo)
     let stub = StubTaskBoardItemSource(listResult: [other, donated])
     let recorder = makeRecorder()

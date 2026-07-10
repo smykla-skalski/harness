@@ -55,7 +55,7 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
             .await;
             assert_eq!(
                 plan_submitted["transition"]["to_status"].as_str(),
-                Some("plan_review")
+                Some("agentic_review")
             );
             assert_eq!(
                 plan_submitted["item"]["planning"]["summary"].as_str(),

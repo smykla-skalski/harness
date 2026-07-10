@@ -21,7 +21,7 @@ struct PreviewHarnessClientTaskBoardTests {
         projectId: "project-preview"
       )
     )
-    #expect(created.status == .new)
+    #expect(created.status == .todo)
 
     let moved = try await client.updateTaskBoardItem(
       id: created.id,
@@ -45,7 +45,7 @@ struct PreviewHarnessClientTaskBoardTests {
     #expect(evaluation.total == 1)
     #expect(evaluation.updated == 1)
     let evaluated = try await client.taskBoardItem(id: created.id)
-    #expect(evaluated.status == .inReview)
+    #expect(evaluated.status == .toReview)
 
     let run = try await client.runTaskBoardOrchestratorOnce(
       request: TaskBoardOrchestratorRunOnceRequest(itemId: created.id)

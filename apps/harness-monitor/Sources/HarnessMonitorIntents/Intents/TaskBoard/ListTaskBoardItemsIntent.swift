@@ -8,7 +8,7 @@ public struct ListTaskBoardItemsIntent: AppIntent {
     IntentDescription(
       """
       Return Task Board items, optionally filtered to a single workflow \
-      status (Ready, In Progress, Blocked, …).
+      status (Umbrella, Todo, In Progress, …).
       """,
       categoryName: "Task Board",
       searchKeywords: ["task", "todo", "board", "list"],

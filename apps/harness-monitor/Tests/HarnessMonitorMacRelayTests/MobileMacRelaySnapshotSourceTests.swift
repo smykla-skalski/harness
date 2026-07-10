@@ -263,7 +263,7 @@ final class MobileMacRelaySnapshotSourceTests: XCTestCase {
       id: "task-1",
       title: "Approve the mobile plan",
       body: "Review the implementation plan before the agent continues.",
-      status: .planReview,
+      status: .agenticReview,
       priority: .high,
       tags: ["mobile"],
       projectId: "project",

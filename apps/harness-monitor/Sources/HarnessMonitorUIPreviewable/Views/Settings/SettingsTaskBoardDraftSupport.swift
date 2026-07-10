@@ -3,26 +3,38 @@ import HarnessMonitorKit
 
 enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
   case all
-  case new
+  case umbrella
+  case todo
   case planning
+  case inProgress
+  case agenticReview
+  case testing
+  case inReview
+  case toReview
+  case humanRequired
+  case failed
+  case done
+  case new
   case planReview
   case needsYou
-  case todo
-  case inProgress
   case blocked
-  case inReview
-  case done
 
   private static let statusChoices: [TaskBoardStatus: Self] = [
-    .new: .new,
+    .umbrella: .umbrella,
+    .todo: .todo,
     .planning: .planning,
+    .inProgress: .inProgress,
+    .agenticReview: .agenticReview,
+    .testing: .testing,
+    .inReview: .inReview,
+    .toReview: .toReview,
+    .humanRequired: .humanRequired,
+    .failed: .failed,
+    .done: .done,
+    .new: .new,
     .planReview: .planReview,
     .needsYou: .needsYou,
-    .todo: .todo,
-    .inProgress: .inProgress,
     .blocked: .blocked,
-    .inReview: .inReview,
-    .done: .done,
   ]
 
   init(status: TaskBoardStatus?) {
@@ -34,30 +46,42 @@ extension DispatchStatusFilterChoice {
   var title: String {
     switch self {
     case .all: "All Items"
-    case .new: "New"
+    case .umbrella: "Umbrella"
+    case .todo: "Todo"
     case .planning: "Planning"
+    case .inProgress: "In Progress"
+    case .agenticReview: "Agentic Review"
+    case .testing: "Testing"
+    case .inReview: "In Review"
+    case .toReview: "To Review"
+    case .humanRequired: "Human Required"
+    case .failed: "Failed"
+    case .done: "Done"
+    case .new: "New"
     case .planReview: "Plan Review"
     case .needsYou: "Needs You"
-    case .todo: "Todo"
-    case .inProgress: "In Progress"
     case .blocked: "Blocked"
-    case .inReview: "In Review"
-    case .done: "Done"
     }
   }
 
   var status: TaskBoardStatus? {
     switch self {
     case .all: nil
-    case .new: .new
+    case .umbrella: .umbrella
+    case .todo: .todo
     case .planning: .planning
+    case .inProgress: .inProgress
+    case .agenticReview: .agenticReview
+    case .testing: .testing
+    case .inReview: .inReview
+    case .toReview: .toReview
+    case .humanRequired: .humanRequired
+    case .failed: .failed
+    case .done: .done
+    case .new: .new
     case .planReview: .planReview
     case .needsYou: .needsYou
-    case .todo: .todo
-    case .inProgress: .inProgress
     case .blocked: .blocked
-    case .inReview: .inReview
-    case .done: .done
     }
   }
 }

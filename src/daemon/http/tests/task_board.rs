@@ -271,7 +271,7 @@ async fn run_task_board_http_plan_revoke_flow() {
     let path = http_paths::TASK_BOARD_PLAN_REVOKE.replace("{item_id}", "board-revoke-1");
     let response = post_json(&client, &base_url, &path, json!({})).await;
 
-    assert_eq!(response["item"]["status"].as_str(), Some("plan_review"));
+    assert_eq!(response["item"]["status"].as_str(), Some("agentic_review"));
     assert_eq!(
         response["item"]["planning"]["summary"].as_str(),
         Some("Use task dispatch.")
@@ -282,7 +282,7 @@ async fn run_task_board_http_plan_revoke_flow() {
     let stored = TaskBoardStore::new(default_board_root())
         .get("board-revoke-1")
         .expect("load board item");
-    assert_eq!(stored.status, TaskBoardStatus::PlanReview);
+    assert_eq!(stored.status, TaskBoardStatus::AgenticReview);
     assert_eq!(
         stored.planning.summary.as_deref(),
         Some("Use task dispatch.")

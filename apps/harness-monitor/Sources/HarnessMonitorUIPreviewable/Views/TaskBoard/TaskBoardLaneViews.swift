@@ -399,13 +399,15 @@ func priorityColor(for priority: TaskBoardPriority) -> Color {
 
 func taskBoardStatusColor(for status: TaskBoardStatus) -> Color {
   switch status {
-  case .blocked:
+  case .failed, .blocked:
     HarnessMonitorTheme.danger
-  case .planReview, .needsYou, .inReview:
+  case .agenticReview, .planReview, .testing, .inReview, .toReview:
     HarnessMonitorTheme.caution
+  case .humanRequired, .needsYou:
+    HarnessMonitorTheme.danger
   case .planning, .inProgress:
     HarnessMonitorTheme.warmAccent
-  case .new, .todo:
+  case .umbrella, .new, .todo:
     HarnessMonitorTheme.accent
   case .done:
     HarnessMonitorTheme.secondaryInk

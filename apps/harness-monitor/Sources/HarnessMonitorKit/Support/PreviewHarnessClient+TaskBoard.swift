@@ -137,29 +137,36 @@ extension PreviewHarnessClient {
 }
 
 extension TaskBoardStatus {
+  private static let previewTaskStatusByBoardStatus: [Self: TaskStatus] = [
+    .umbrella: .open,
+    .todo: .open,
+    .planning: .open,
+    .agenticReview: .open,
+    .testing: .open,
+    .humanRequired: .open,
+    .new: .open,
+    .planReview: .open,
+    .needsYou: .open,
+    .inProgress: .inProgress,
+    .toReview: .awaitingReview,
+    .inReview: .inReview,
+    .failed: .blocked,
+    .blocked: .blocked,
+    .done: .done,
+  ]
+
   var previewTaskStatus: TaskStatus? {
-    switch self {
-    case .new, .planning, .planReview, .needsYou, .todo:
-      .open
-    case .inProgress:
-      .inProgress
-    case .inReview:
-      .awaitingReview
-    case .done:
-      .done
-    case .blocked:
-      .blocked
-    case .unknown:
-      nil
-    }
+    Self.previewTaskStatusByBoardStatus[self]
   }
 
   var previewEvaluationStatus: TaskBoardStatus {
     switch self {
     case .inProgress:
-      .inReview
-    case .inReview:
+      .toReview
+    case .toReview, .inReview:
       .done
+    case .failed, .blocked:
+      .failed
     default:
       self
     }
@@ -169,9 +176,9 @@ extension TaskBoardStatus {
     switch previewEvaluationStatus {
     case .done:
       .completed
-    case .blocked:
+    case .failed, .blocked:
       .failed
-    case .inProgress, .inReview:
+    case .inProgress, .toReview, .inReview:
       .running
     default:
       .idle
@@ -182,9 +189,9 @@ extension TaskBoardStatus {
     switch self {
     case .done:
       .completed
-    case .blocked:
+    case .failed, .blocked:
       .blocked
-    case .inReview:
+    case .toReview, .inReview:
       .reviewPending
     case .inProgress:
       .workerRunning

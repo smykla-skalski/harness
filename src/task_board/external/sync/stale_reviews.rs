@@ -52,7 +52,10 @@ fn allows_stale_review_reconcile(options: ExternalSyncOptions) -> bool {
     options.status.is_none_or(|status| {
         matches!(
             status,
-            TaskBoardStatus::NeedsYou | TaskBoardStatus::PlanReview
+            TaskBoardStatus::HumanRequired
+                | TaskBoardStatus::AgenticReview
+                | TaskBoardStatus::NeedsYou
+                | TaskBoardStatus::PlanReview
         )
     })
 }
@@ -121,7 +124,10 @@ fn is_stale_github_review_request(
         && item.planning.summary.is_none()
         && matches!(
             item.status,
-            TaskBoardStatus::NeedsYou | TaskBoardStatus::PlanReview
+            TaskBoardStatus::HumanRequired
+                | TaskBoardStatus::AgenticReview
+                | TaskBoardStatus::NeedsYou
+                | TaskBoardStatus::PlanReview
         )
         && reference
             .url

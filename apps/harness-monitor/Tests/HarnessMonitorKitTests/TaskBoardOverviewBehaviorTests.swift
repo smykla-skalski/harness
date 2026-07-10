@@ -13,13 +13,13 @@ struct TaskBoardOverviewBehaviorTests {
     let payload = TaskBoardItemDragPayload(itemID: "board-1", status: .todo)
 
     #expect(
-      !TaskBoardLaneDropPolicy.moveFirstPayload([], to: .running) { itemID, lane in
+      !TaskBoardLaneDropPolicy.moveFirstPayload([], to: .inProgress) { itemID, lane in
         moves.append((itemID, lane))
         return true
       }
     )
     #expect(
-      !TaskBoardLaneDropPolicy.moveFirstPayload([payload], to: .ready) { itemID, lane in
+      !TaskBoardLaneDropPolicy.moveFirstPayload([payload], to: .todo) { itemID, lane in
         moves.append((itemID, lane))
         return true
       }
@@ -31,17 +31,17 @@ struct TaskBoardOverviewBehaviorTests {
   func laneDropPolicyForwardsFirstCrossLanePayloadOnly() {
     var moves: [(String, TaskBoardInboxLane)] = []
     let first = TaskBoardItemDragPayload(itemID: "board-1", status: .todo)
-    let second = TaskBoardItemDragPayload(itemID: "board-2", status: .blocked)
+    let second = TaskBoardItemDragPayload(itemID: "board-2", status: .failed)
 
     #expect(
-      TaskBoardLaneDropPolicy.moveFirstPayload([first, second], to: .running) { itemID, lane in
+      TaskBoardLaneDropPolicy.moveFirstPayload([first, second], to: .inProgress) { itemID, lane in
         moves.append((itemID, lane))
         return true
       }
     )
     #expect(moves.count == 1)
     #expect(moves.first?.0 == "board-1")
-    #expect(moves.first?.1 == .running)
+    #expect(moves.first?.1 == .inProgress)
   }
 
   @Test("Lane drop policy returns move result")
@@ -49,7 +49,7 @@ struct TaskBoardOverviewBehaviorTests {
     let payload = TaskBoardItemDragPayload(itemID: "board-1", status: .todo)
 
     #expect(
-      !TaskBoardLaneDropPolicy.moveFirstPayload([payload], to: .running) { _, _ in
+      !TaskBoardLaneDropPolicy.moveFirstPayload([payload], to: .inProgress) { _, _ in
         false
       }
     )
@@ -93,7 +93,7 @@ struct TaskBoardOverviewBehaviorTests {
       itemTitle: nil
     )
 
-    #expect(confirmation.title == "Dispatch Ready items?")
+    #expect(confirmation.title == "Dispatch Todo items?")
     #expect(confirmation.message.contains("current filter"))
   }
 
@@ -114,7 +114,7 @@ struct TaskBoardOverviewBehaviorTests {
     )
 
     #expect(
-      !TaskBoardInboxDropPolicy.moveFirstPayload([payload], to: .running) { _, _ in
+      !TaskBoardInboxDropPolicy.moveFirstPayload([payload], to: .inProgress) { _, _ in
         true
       }
     )
@@ -127,39 +127,39 @@ struct TaskBoardOverviewBehaviorTests {
       sessionID: "sess-1",
       taskID: "task-1",
       status: .open,
-      lane: .ready
+      lane: .todo
     )
     let second = TaskBoardInboxItemDragPayload(
       sessionID: "sess-2",
       taskID: "task-2",
       status: .blocked,
-      lane: .blocked
+      lane: .failed
     )
 
     #expect(
-      TaskBoardInboxDropPolicy.moveFirstPayload([first, second], to: .running) { payload, lane in
+      TaskBoardInboxDropPolicy.moveFirstPayload([first, second], to: .inProgress) { payload, lane in
         moves.append((payload.taskID, lane))
         return true
       }
     )
     #expect(moves.count == 1)
     #expect(moves.first?.0 == "task-1")
-    #expect(moves.first?.1 == .running)
+    #expect(moves.first?.1 == .inProgress)
   }
 
   @Test("Board-only Run Once and Evaluate requests carry board item identity")
   func boardOnlyRequestsCarryBoardItemIdentity() {
-    let item = taskBoardItem(id: "board-only", status: .planReview)
+    let item = taskBoardItem(id: "board-only", status: .agenticReview)
 
     let runOnce = TaskBoardOverviewItemBehavior.runOnceRequest(for: item)
     let evaluation = TaskBoardOverviewItemBehavior.evaluationRequest(for: item)
 
     #expect(runOnce.itemId == "board-only")
-    #expect(runOnce.status == .planReview)
+    #expect(runOnce.status == .agenticReview)
     #expect(runOnce.dryRun == nil)
     #expect(runOnce.projectDir == nil)
     #expect(evaluation.itemId == "board-only")
-    #expect(evaluation.status == .planReview)
+    #expect(evaluation.status == .agenticReview)
     #expect(evaluation.dryRun == false)
   }
 
@@ -168,8 +168,8 @@ struct TaskBoardOverviewBehaviorTests {
   func overviewPresentationBucketsTaskBoardLanesAndDecisions() async {
     let worker = TaskBoardOverviewPresentationWorker()
     let ready = taskBoardItem(id: "ready", status: .todo, priority: .high)
-    let needsYou = taskBoardItem(id: "needs-you", status: .needsYou, priority: .critical)
-    let deleted = taskBoardItem(id: "deleted", status: .blocked, deletedAt: "2026-05-14T11:00:00Z")
+    let needsYou = taskBoardItem(id: "needs-you", status: .humanRequired, priority: .critical)
+    let deleted = taskBoardItem(id: "deleted", status: .failed, deletedAt: "2026-05-14T11:00:00Z")
     let inbox = inboxItem(taskID: "running-inbox", status: .inProgress)
     let criticalDecision = decision(id: "decision-critical", severity: .critical)
     let dismissedDecision = decision(
@@ -184,11 +184,11 @@ struct TaskBoardOverviewBehaviorTests {
       )
     )
 
-    #expect(presentation.apiItems(in: .needsYou).map(\.id) == ["needs-you"])
-    #expect(presentation.apiItems(in: .ready).map(\.id) == ["ready"])
-    #expect(presentation.apiItems(in: .blocked).isEmpty)
-    #expect(presentation.inboxItems(in: .running).map(\.task.taskId) == ["running-inbox"])
-    #expect(presentation.decisionIDs(in: .needsYou) == ["decision-critical"])
+    #expect(presentation.apiItems(in: .humanRequired).map(\.id) == ["needs-you"])
+    #expect(presentation.apiItems(in: .todo).map(\.id) == ["ready"])
+    #expect(presentation.apiItems(in: .failed).isEmpty)
+    #expect(presentation.inboxItems(in: .inProgress).map(\.task.taskId) == ["running-inbox"])
+    #expect(presentation.decisionIDs(in: .humanRequired) == ["decision-critical"])
     #expect(presentation.aggregateNeedsYouCount == 2)
     #expect(presentation.aggregateOpenCount == 4)
   }

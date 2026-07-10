@@ -396,7 +396,7 @@ fn github_inbox_issue_status(state: &str) -> TaskBoardStatus {
     if state.eq_ignore_ascii_case("closed") {
         TaskBoardStatus::Done
     } else {
-        TaskBoardStatus::NeedsYou
+        TaskBoardStatus::HumanRequired
     }
 }
 

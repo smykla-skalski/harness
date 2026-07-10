@@ -20,10 +20,10 @@ struct TaskBoardPlanningWireDecodingTests {
 
     #expect(response.transition.boardItemId == "task-1")
     #expect(response.transition.fromStatus == .planning)
-    #expect(response.transition.toStatus == .planReview)
+    #expect(response.transition.toStatus == .agenticReview)
     #expect(response.transition.planning.approvedBy == "lead")
     #expect(response.item.id == "task-1")
-    #expect(response.item.status == .planReview)
+    #expect(response.item.status == .agenticReview)
     #expect(response.item.workflow == nil)
   }
 }
@@ -33,14 +33,14 @@ private let planningResponseFixture = """
     "transition": {
       "board_item_id": "task-1",
       "from_status": "planning",
-      "to_status": "plan_review",
+      "to_status": "agentic_review",
       "planning": { "summary": "the plan", "approved_by": "lead" }
     },
     "item": {
       "schema_version": 1,
       "id": "task-1",
       "title": "Fix the bug",
-      "status": "plan_review",
+      "status": "agentic_review",
       "created_at": "2026-06-17T08:00:00Z",
       "updated_at": "2026-06-17T11:00:00Z"
     }

@@ -10,14 +10,14 @@ struct TaskBoardLaneCollapsePreferencesTests {
   func defaultEmptyLanesCollapseAutomatically() {
     #expect(
       TaskBoardLaneCollapsePreferences.isCollapsed(
-        lane: .review,
+        lane: .inReview,
         contentCount: 0,
         rawValue: TaskBoardLaneCollapsePreferences.emptyRawValue
       )
     )
     #expect(
       !TaskBoardLaneCollapsePreferences.isCollapsed(
-        lane: .review,
+        lane: .inReview,
         contentCount: 1,
         rawValue: TaskBoardLaneCollapsePreferences.emptyRawValue
       )
@@ -33,13 +33,13 @@ struct TaskBoardLaneCollapsePreferencesTests {
     }
 
     let expandedRawValue = TaskBoardLaneCollapsePreferences.toggledRawValue(
-      lane: .review,
+      lane: .inReview,
       contentCount: 0,
       rawValue: TaskBoardLaneCollapsePreferences.emptyRawValue
     )
     #expect(
       !TaskBoardLaneCollapsePreferences.isCollapsed(
-        lane: .review,
+        lane: .inReview,
         contentCount: 0,
         rawValue: expandedRawValue
       )
@@ -49,10 +49,10 @@ struct TaskBoardLaneCollapsePreferencesTests {
       TaskBoardLaneCollapsePreferences.overrides(from: expandedRawValue),
       to: userDefaults
     )
-    #expect(TaskBoardLaneCollapsePreferences.load(from: userDefaults)[.review] == false)
+    #expect(TaskBoardLaneCollapsePreferences.load(from: userDefaults)[.inReview] == false)
 
     let collapsedRawValue = TaskBoardLaneCollapsePreferences.toggledRawValue(
-      lane: .review,
+      lane: .inReview,
       contentCount: 0,
       rawValue: expandedRawValue
     )
@@ -61,10 +61,10 @@ struct TaskBoardLaneCollapsePreferencesTests {
       to: userDefaults
     )
 
-    #expect(TaskBoardLaneCollapsePreferences.load(from: userDefaults)[.review] == true)
+    #expect(TaskBoardLaneCollapsePreferences.load(from: userDefaults)[.inReview] == true)
     #expect(
       TaskBoardLaneCollapsePreferences.isCollapsed(
-        lane: .review,
+        lane: .inReview,
         contentCount: 3,
         rawValue: userDefaults.string(forKey: TaskBoardLaneCollapsePreferences.storageKey) ?? ""
       )

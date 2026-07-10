@@ -3,19 +3,22 @@ import SwiftUI
 
 extension TaskBoardOverviewView {
   var taskBoardReviewCount: Int {
-    currentPresentation.apiItems(in: .review).count
+    currentPresentation.apiItems(in: .agenticReview).count
+      + currentPresentation.apiItems(in: .testing).count
+      + currentPresentation.apiItems(in: .inReview).count
+      + currentPresentation.apiItems(in: .toReview).count
   }
 
   var taskBoardNeedsYouCount: Int {
-    currentPresentation.apiItems(in: .needsYou).count
+    currentPresentation.apiItems(in: .humanRequired).count
   }
 
   var taskBoardBlockedCount: Int {
-    currentPresentation.apiItems(in: .blocked).count
+    currentPresentation.apiItems(in: .failed).count
   }
 
   var taskBoardDoneCount: Int {
-    currentPresentation.apiItems(in: .done).count
+    currentPresentation.aggregateDoneCount
   }
 
   var aggregateNeedsYouCount: Int {
@@ -46,9 +49,9 @@ extension TaskBoardOverviewView {
     if aggregateNeedsYouCount != 0 {
       TaskBoardSummaryPill(
         value: "\(aggregateNeedsYouCount)",
-        label: "Needs You",
-        systemImage: TaskBoardInboxLane.needsYou.systemImage,
-        tint: taskBoardLaneColor(for: .needsYou)
+        label: "Human Required",
+        systemImage: TaskBoardInboxLane.humanRequired.systemImage,
+        tint: taskBoardLaneColor(for: .humanRequired)
       )
     }
     if aggregateOpenCount != 0 {
@@ -63,24 +66,24 @@ extension TaskBoardOverviewView {
       TaskBoardSummaryPill(
         value: "\(aggregateReviewCount)",
         label: "Review",
-        systemImage: TaskBoardInboxLane.review.systemImage,
-        tint: taskBoardLaneColor(for: .review)
+        systemImage: TaskBoardInboxLane.inReview.systemImage,
+        tint: taskBoardLaneColor(for: .inReview)
       )
     }
     if aggregateBlockedCount != 0 {
       TaskBoardSummaryPill(
         value: "\(aggregateBlockedCount)",
-        label: "Blocked",
-        systemImage: TaskBoardInboxLane.blocked.systemImage,
-        tint: taskBoardLaneColor(for: .blocked)
+        label: "Failed",
+        systemImage: TaskBoardInboxLane.failed.systemImage,
+        tint: taskBoardLaneColor(for: .failed)
       )
     }
     if aggregateDoneCount != 0 {
       TaskBoardSummaryPill(
         value: "\(aggregateDoneCount)",
         label: "Done",
-        systemImage: TaskBoardInboxLane.done.systemImage,
-        tint: taskBoardLaneColor(for: .done)
+        systemImage: "checkmark.circle",
+        tint: HarnessMonitorTheme.secondaryInk
       )
     }
   }
@@ -104,8 +107,8 @@ extension TaskBoardOverviewView {
     if summary.failed + summary.blocked != 0 {
       TaskBoardSummaryPill(
         value: "\(summary.failed + summary.blocked)",
-        label: "Blocked",
-        systemImage: TaskBoardInboxLane.blocked.systemImage,
+        label: "Failed",
+        systemImage: TaskBoardInboxLane.failed.systemImage,
         tint: HarnessMonitorTheme.danger
       )
     }

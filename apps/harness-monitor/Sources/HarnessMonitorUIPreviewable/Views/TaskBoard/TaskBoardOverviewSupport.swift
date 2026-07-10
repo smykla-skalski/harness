@@ -363,48 +363,47 @@ enum TaskBoardOverviewItemBehavior {
 extension TaskBoardInboxLane {
   var taskDropStatus: TaskStatus? {
     switch self {
-    case .needsYou:
-      nil
-    case .ready, .backlog:
+    case .umbrella, .todo, .planning:
       .open
-    case .running:
+    case .inProgress:
       .inProgress
-    case .review:
+    case .toReview:
       .awaitingReview
-    case .blocked:
+    case .inReview:
+      .inReview
+    case .failed:
       .blocked
-    case .done:
-      .done
+    case .agenticReview, .testing, .humanRequired:
+      nil
     }
   }
 
   var taskBoardDropStatus: TaskBoardStatus {
     switch self {
-    case .needsYou:
-      .planReview
-    case .ready:
+    case .umbrella:
+      .umbrella
+    case .todo:
       .todo
-    case .running:
+    case .planning:
+      .planning
+    case .inProgress:
       .inProgress
-    case .review:
+    case .agenticReview:
+      .agenticReview
+    case .testing:
+      .testing
+    case .inReview:
       .inReview
-    case .blocked:
-      .blocked
-    case .done:
-      .done
-    case .backlog:
-      .new
+    case .toReview:
+      .toReview
+    case .humanRequired:
+      .humanRequired
+    case .failed:
+      .failed
     }
   }
 
-  func taskBoardDropStatus(for item: TaskBoardItem) -> TaskBoardStatus {
-    switch self {
-    case .needsYou:
-      return item.status == .needsYou || item.isImportedGitHubInboxItem ? .needsYou : .planReview
-    case .backlog:
-      return item.status == .planning ? .planning : .new
-    case .ready, .running, .review, .blocked, .done:
-      return taskBoardDropStatus
-    }
+  func taskBoardDropStatus(for _: TaskBoardItem) -> TaskBoardStatus {
+    taskBoardDropStatus
   }
 }

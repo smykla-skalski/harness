@@ -407,14 +407,14 @@ fn failure_record(
     }
     let reason = record.reason.clone().unwrap_or_else(|| step.to_string());
     let workflow = failed_workflow(item, step, reason);
-    let changed = item.status != TaskBoardStatus::Blocked || item.workflow != workflow;
+    let changed = item.status != TaskBoardStatus::Failed || item.workflow != workflow;
     if !changed {
         return Ok(record);
     }
     let updated_item = board.update(
         &item.id,
         TaskBoardItemPatch {
-            status: Some(TaskBoardStatus::Blocked),
+            status: Some(TaskBoardStatus::Failed),
             workflow: Some(workflow),
             ..TaskBoardItemPatch::default()
         },

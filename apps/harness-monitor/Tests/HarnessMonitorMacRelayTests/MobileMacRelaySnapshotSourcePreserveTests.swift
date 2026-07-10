@@ -40,7 +40,7 @@ final class MobileMacRelaySnapshotSourcePreserveTests: XCTestCase {
         agents: [session.sessionId: []],
         reviews: [],
         taskBoardItemsFixture: [
-          taskBoardItem(id: "task-plan", status: .planReview, priority: .high)
+          taskBoardItem(id: "task-plan", status: .agenticReview, priority: .high)
         ]
       )
     )
@@ -182,7 +182,7 @@ final class MobileMacRelaySnapshotSourcePreserveTests: XCTestCase {
         agents: [session.sessionId: []],
         reviews: [],
         taskBoardItemsFixture: [
-          taskBoardItem(id: "task-plan", status: .planReview, priority: .high)
+          taskBoardItem(id: "task-plan", status: .agenticReview, priority: .high)
         ]
       )
     )

@@ -118,7 +118,7 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
       sampleTaskBoardItem(
         id: "board-1", status: .todo, agentMode: .interactive, projectId: "project-1"),
       sampleTaskBoardItem(
-        id: "board-2", status: .blocked, agentMode: .planning, projectId: "project-2"),
+        id: "board-2", status: .failed, agentMode: .planning, projectId: "project-2"),
     ])
     let store = await makeBootstrappedStore(client: client)
 
@@ -174,7 +174,7 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
         projectId: "project-1",
         planning: TaskBoardPlanningState(summary: "Plan first")
       ),
-      initialStatus: .planReview
+      initialStatus: .agenticReview
     )
 
     #expect(success)
@@ -185,11 +185,11 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     )
     #expect(
       client.recordedCalls().contains(
-        .updateTaskBoardItem(id: "board-1", status: .planReview)
+        .updateTaskBoardItem(id: "board-1", status: .agenticReview)
       )
     )
     #expect(store.globalTaskBoardItems.first?.title == "New board item")
-    #expect(store.globalTaskBoardItems.first?.status == .planReview)
+    #expect(store.globalTaskBoardItems.first?.status == .agenticReview)
     #expect(store.currentSuccessFeedbackMessage == "Created task board item")
   }
 
@@ -211,7 +211,7 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
         projectId: "project-1",
         planning: TaskBoardPlanningState(summary: "Plan first")
       ),
-      initialStatus: .planReview
+      initialStatus: .agenticReview
     )
 
     #expect(success == false)
@@ -222,16 +222,16 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     )
     #expect(
       client.recordedCalls().contains(
-        .updateTaskBoardItem(id: "board-1", status: .planReview)
+        .updateTaskBoardItem(id: "board-1", status: .agenticReview)
       )
     )
     #expect(store.globalTaskBoardItems.count == 1)
     let cached = store.globalTaskBoardItems.first
     #expect(cached?.id == "board-1")
     #expect(cached?.title == "New board item")
-    #expect(cached?.status == .new)
+    #expect(cached?.status == .todo)
     #expect(store.currentFailureFeedbackMessage?.contains("Created task board item") == true)
-    #expect(store.currentFailureFeedbackMessage?.contains("plan_review") == true)
+    #expect(store.currentFailureFeedbackMessage?.contains("agentic_review") == true)
   }
 
   @Test("Edit task board item saves full editor fields")
@@ -245,7 +245,7 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
       request: TaskBoardUpdateItemRequest(
         title: "Edited",
         body: "Updated body",
-        status: .blocked,
+        status: .failed,
         priority: .low,
         agentMode: .evaluate,
         tags: ["edited", "ui"],
@@ -263,7 +263,7 @@ struct HarnessMonitorStoreTaskBoardDashboardTests {
     let item = store.globalTaskBoardItems.first
     #expect(item?.title == "Edited")
     #expect(item?.body == "Updated body")
-    #expect(item?.status == .blocked)
+    #expect(item?.status == .failed)
     #expect(item?.priority == .low)
     #expect(item?.agentMode == .evaluate)
     #expect(item?.tags == ["edited", "ui"])

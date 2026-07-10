@@ -12,7 +12,7 @@ pub(super) fn external_item_id(reference: &ExternalTaskRef) -> String {
 
 pub(super) fn imported_external_planning(task: &ExternalTask) -> Option<PlanningState> {
     match task.reference.provider {
-        ExternalProvider::GitHub if task.status != TaskBoardStatus::NeedsYou => {
+        ExternalProvider::GitHub if task.status != TaskBoardStatus::HumanRequired => {
             Some(PlanningState {
                 summary: Some(github_import_summary(task)),
                 approved_by: None,

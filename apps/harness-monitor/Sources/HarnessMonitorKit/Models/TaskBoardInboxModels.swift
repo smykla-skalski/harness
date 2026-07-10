@@ -2,88 +2,137 @@ import Foundation
 
 @frozen
 public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
-  case needsYou = "needs_you"
-  case ready
-  case running
-  case review
-  case done
-  case blocked
-  case backlog
+  case umbrella
+  case todo
+  case planning
+  case inProgress = "in_progress"
+  case agenticReview = "agentic_review"
+  case testing
+  case inReview = "in_review"
+  case toReview = "to_review"
+  case humanRequired = "human_required"
+  case failed
+
+  private static let orderedCases: [Self] = [
+    .umbrella,
+    .todo,
+    .planning,
+    .inProgress,
+    .agenticReview,
+    .testing,
+    .inReview,
+    .toReview,
+    .humanRequired,
+    .failed,
+  ]
+
+  private static let laneByTaskBoardStatus: [TaskBoardStatus: Self] = [
+    .umbrella: .umbrella,
+    .todo: .todo,
+    .planning: .planning,
+    .inProgress: .inProgress,
+    .agenticReview: .agenticReview,
+    .testing: .testing,
+    .inReview: .inReview,
+    .toReview: .toReview,
+    .humanRequired: .humanRequired,
+    .failed: .failed,
+    .new: .todo,
+    .planReview: .agenticReview,
+    .needsYou: .humanRequired,
+    .blocked: .failed,
+  ]
 
   public static var allCases: [Self] {
-    [.needsYou, .ready, .running, .review, .done, .blocked, .backlog]
+    orderedCases
   }
 
-  public static var active: Self { .running }
-  public static var open: Self { .backlog }
+  public static var active: Self { .inProgress }
+  public static var open: Self { .todo }
 
   public var id: String { rawValue }
 
   public var title: String {
     switch self {
-    case .needsYou:
-      "Needs You"
-    case .ready:
-      "Ready"
-    case .running:
-      "Running"
-    case .review:
-      "Review"
-    case .done:
-      "Done"
-    case .blocked:
-      "Blocked"
-    case .backlog:
-      "Backlog"
+    case .umbrella:
+      "Umbrella"
+    case .todo:
+      "Todo"
+    case .planning:
+      "Planning"
+    case .inProgress:
+      "In Progress"
+    case .agenticReview:
+      "Agentic Review"
+    case .testing:
+      "Testing"
+    case .inReview:
+      "In Review"
+    case .toReview:
+      "To Review"
+    case .humanRequired:
+      "Human Required"
+    case .failed:
+      "Failed"
     }
   }
 
   public var systemImage: String {
     switch self {
-    case .needsYou:
-      "person.crop.circle.badge.exclamationmark"
-    case .ready:
+    case .umbrella:
+      "umbrella"
+    case .todo:
       "tray.and.arrow.down"
-    case .running:
+    case .planning:
+      "list.clipboard"
+    case .inProgress:
       "arrow.triangle.2.circlepath"
-    case .review:
+    case .agenticReview:
+      "sparkles"
+    case .testing:
+      "checkmark.shield"
+    case .inReview:
       "checkmark.seal"
-    case .done:
-      "checkmark.circle"
-    case .blocked:
+    case .toReview:
+      "doc.text.magnifyingglass"
+    case .humanRequired:
+      "person.crop.circle.badge.exclamationmark"
+    case .failed:
       "exclamationmark.triangle"
-    case .backlog:
-      "tray"
     }
   }
 
   public init?(task: WorkItem) {
     switch task.status {
     case .blocked:
-      self = .blocked
-    case .awaitingReview, .inReview:
-      self = .review
+      self = .failed
+    case .awaitingReview:
+      self = .toReview
+    case .inReview:
+      self = .inReview
     case .inProgress:
-      self = .running
+      self = .inProgress
     case .open:
-      self = task.assignedTo != nil || task.queuedAt != nil ? .ready : .backlog
+      self = .todo
     case .done:
-      self = .done
+      return nil
     }
   }
 
   public init?(status: TaskStatus) {
     switch status {
     case .blocked:
-      self = .blocked
-    case .awaitingReview, .inReview:
-      self = .review
+      self = .failed
+    case .awaitingReview:
+      self = .toReview
+    case .inReview:
+      self = .inReview
     case .inProgress:
-      self = .running
+      self = .inProgress
     case .open:
-      self = .backlog
+      self = .todo
     case .done:
-      self = .done
+      return nil
     }
   }
 
@@ -92,24 +141,10 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
   }
 
   public init?(status: TaskBoardStatus) {
-    switch status {
-    case .planReview, .needsYou:
-      self = .needsYou
-    case .blocked:
-      self = .blocked
-    case .todo:
-      self = .ready
-    case .inProgress:
-      self = .running
-    case .inReview:
-      self = .review
-    case .new, .planning:
-      self = .backlog
-    case .done:
-      self = .done
-    case .unknown:
+    guard let lane = Self.laneByTaskBoardStatus[status] else {
       return nil
     }
+    self = lane
   }
 }
 
@@ -218,7 +253,7 @@ public struct TaskBoardInboxSnapshot: Equatable, Sendable {
   }
 
   public var openItemCount: Int {
-    items.count { $0.lane != .done }
+    items.count
   }
 
   public var visibleItemCount: Int {
@@ -226,19 +261,19 @@ public struct TaskBoardInboxSnapshot: Equatable, Sendable {
   }
 
   public var needsYouItemCount: Int {
-    items.count { $0.lane == .needsYou }
+    items.count { $0.lane == .humanRequired }
   }
 
   public var blockedItemCount: Int {
-    items.count { $0.lane == .blocked }
+    items.count { $0.lane == .failed }
   }
 
   public var reviewItemCount: Int {
-    items.count { $0.lane == .review }
+    items.count { Self.reviewLanes.contains($0.lane) }
   }
 
   public var completedItemCount: Int {
-    items.count { $0.lane == .done }
+    0
   }
 
   public var isEmpty: Bool {
@@ -272,23 +307,15 @@ public struct TaskBoardInboxSnapshot: Equatable, Sendable {
   }
 
   private static func lanePriority(_ lane: TaskBoardInboxLane) -> Int {
-    switch lane {
-    case .needsYou:
-      0
-    case .ready:
-      1
-    case .running:
-      2
-    case .review:
-      3
-    case .done:
-      4
-    case .blocked:
-      5
-    case .backlog:
-      6
-    }
+    TaskBoardInboxLane.allCases.firstIndex(of: lane) ?? Int.max
   }
+
+  private static let reviewLanes: Set<TaskBoardInboxLane> = [
+    .agenticReview,
+    .testing,
+    .inReview,
+    .toReview,
+  ]
 
   private static func severityPriority(_ severity: TaskSeverity) -> Int {
     switch severity {

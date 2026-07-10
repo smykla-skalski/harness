@@ -326,19 +326,25 @@ extension View {
 
 func taskBoardLaneColor(for lane: TaskBoardInboxLane) -> Color {
   switch lane {
-  case .needsYou:
+  case .umbrella:
     HarnessMonitorTheme.warmAccent
-  case .ready:
-    HarnessMonitorTheme.accent
-  case .blocked:
-    HarnessMonitorTheme.danger
-  case .review:
-    HarnessMonitorTheme.caution
-  case .done:
-    HarnessMonitorTheme.success
-  case .running:
-    HarnessMonitorTheme.success
-  case .backlog:
+  case .todo:
     HarnessMonitorTheme.secondaryInk
+  case .planning:
+    HarnessMonitorTheme.warmAccent
+  case .inProgress:
+    HarnessMonitorTheme.caution
+  case .agenticReview:
+    HarnessMonitorTheme.success
+  case .testing:
+    HarnessMonitorTheme.accent
+  case .inReview:
+    HarnessMonitorTheme.accent
+  case .toReview:
+    HarnessMonitorTheme.success
+  case .humanRequired:
+    HarnessMonitorTheme.danger
+  case .failed:
+    HarnessMonitorTheme.danger
   }
 }

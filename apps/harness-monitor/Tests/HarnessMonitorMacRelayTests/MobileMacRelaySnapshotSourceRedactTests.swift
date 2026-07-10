@@ -145,8 +145,8 @@ final class MobileMacRelaySnapshotSourceRedactTests: XCTestCase {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let session = mobileMirrorSession()
     let taskBoardItems = [
-      taskBoardItem(id: "task-plan", status: .planReview, priority: .high),
-      taskBoardItem(id: "task-blocked", status: .blocked, priority: .critical),
+      taskBoardItem(id: "task-plan", status: .agenticReview, priority: .high),
+      taskBoardItem(id: "task-blocked", status: .failed, priority: .critical),
     ]
     let provider = MobileMirrorClientProviderBox(
       client: FixedMobileMirrorClient(
@@ -353,7 +353,7 @@ final class MobileMacRelaySnapshotSourceRedactTests: XCTestCase {
       id: "task-board-secret",
       title: "Dispatch github_token=tasktokensecret",
       body: "password=taskbodysecret",
-      status: .needsYou,
+      status: .humanRequired,
       priority: .critical,
       tags: ["client_secret=tagsecret"],
       projectId: "project-secret=projectsecret",

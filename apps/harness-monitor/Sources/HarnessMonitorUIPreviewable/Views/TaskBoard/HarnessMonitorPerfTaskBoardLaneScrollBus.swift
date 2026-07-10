@@ -3,8 +3,8 @@ import HarnessMonitorKit
 
 /// Perf-only bus for nudging the task-board lane scroll surfaces (the inner
 /// `ScrollView` inside each `TaskBoardLaneUnifiedColumn`). The live-interact
-/// scenario uses this to exercise the "Needs You" column while the rest of the
-/// surface stays put.
+/// scenario uses this to exercise one column while the rest of the surface
+/// stays put.
 public enum HarnessMonitorPerfTaskBoardLaneScrollBus {
   public static let scrollToBottom = Notification.Name(
     "io.harnessmonitor.perf.taskBoardLaneScroll.bottom"

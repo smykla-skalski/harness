@@ -186,7 +186,7 @@ extension HarnessMonitorClientMobileMirrorSnapshotSource {
 
   func taskBoardItemNeedsYou(_ item: TaskBoardItem) -> Bool {
     switch item.status {
-    case .planReview, .needsYou, .blocked:
+    case .agenticReview, .humanRequired, .failed, .planReview, .needsYou, .blocked:
       true
     default:
       false

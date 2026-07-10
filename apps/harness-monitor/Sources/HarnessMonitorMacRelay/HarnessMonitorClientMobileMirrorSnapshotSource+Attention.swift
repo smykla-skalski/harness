@@ -128,7 +128,7 @@ extension HarnessMonitorClientMobileMirrorSnapshotSource {
   ) -> [MobileAttentionItem] {
     items.compactMap { item in
       switch item.status {
-      case .planReview:
+      case .agenticReview, .planReview:
         return MobileAttentionItem(
           id: "task-board-plan-\(item.id)",
           stationID: stationID,
@@ -145,7 +145,7 @@ extension HarnessMonitorClientMobileMirrorSnapshotSource {
           ),
           commandPayload: ["approvedBy": "mobile"]
         )
-      case .needsYou:
+      case .humanRequired, .needsYou:
         return MobileAttentionItem(
           id: "task-board-needs-you-\(item.id)",
           stationID: stationID,
@@ -166,7 +166,7 @@ extension HarnessMonitorClientMobileMirrorSnapshotSource {
             "dryRun": "false",
           ]
         )
-      case .blocked:
+      case .failed, .blocked:
         return MobileAttentionItem(
           id: "task-board-blocked-\(item.id)",
           stationID: stationID,

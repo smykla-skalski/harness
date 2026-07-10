@@ -9,17 +9,17 @@ final class TaskBoardIntentTests: XCTestCase {
   func testListTaskBoardItemsForwardsStatusFilterToSource() async throws {
     let stub = StubTaskBoardItemSource(
       listResult: [
-        Self.makeItem(id: "task-1", title: "Pick up", status: .needsYou)
+        Self.makeItem(id: "task-1", title: "Pick up", status: .humanRequired)
       ]
     )
-    let intent = ListTaskBoardItemsIntent(status: .needsYou, source: stub)
+    let intent = ListTaskBoardItemsIntent(status: .humanRequired, source: stub)
 
     let entities = try await intent.resolveEntities()
 
     XCTAssertEqual(entities.map(\.id), ["task-1"])
-    XCTAssertEqual(entities.first?.status, .needsYou)
+    XCTAssertEqual(entities.first?.status, .humanRequired)
     let recorded = await stub.recordedListFilters
-    XCTAssertEqual(recorded, [TaskBoardStatus.needsYou])
+    XCTAssertEqual(recorded, [TaskBoardStatus.humanRequired])
   }
 
   func testListTaskBoardItemsReturnsEverythingWhenStatusNil() async throws {
@@ -80,10 +80,31 @@ final class TaskBoardIntentTests: XCTestCase {
   }
 
   func testTaskBoardStatusEnumRoundTripsWithDaemonValues() {
-    for daemon in TaskBoardStatus.allCases {
+    let currentStatuses: [TaskBoardStatus] = [
+      .umbrella,
+      .todo,
+      .planning,
+      .inProgress,
+      .agenticReview,
+      .testing,
+      .inReview,
+      .toReview,
+      .humanRequired,
+      .failed,
+      .done,
+    ]
+
+    for daemon in currentStatuses {
       let wrapped = TaskBoardStatusEnum(daemonValue: daemon)
       XCTAssertEqual(wrapped.daemonValue, daemon)
     }
+  }
+
+  func testTaskBoardStatusEnumMapsLegacyDaemonValuesToCurrentStatuses() {
+    XCTAssertEqual(TaskBoardStatusEnum(daemonValue: .new).daemonValue, .todo)
+    XCTAssertEqual(TaskBoardStatusEnum(daemonValue: .planReview).daemonValue, .agenticReview)
+    XCTAssertEqual(TaskBoardStatusEnum(daemonValue: .needsYou).daemonValue, .humanRequired)
+    XCTAssertEqual(TaskBoardStatusEnum(daemonValue: .blocked).daemonValue, .failed)
   }
 
   // MARK: - helpers

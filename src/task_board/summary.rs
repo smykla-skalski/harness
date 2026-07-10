@@ -213,14 +213,20 @@ fn is_github_repo(project_id: &str) -> bool {
 
 fn status_counts(items: &[TaskBoardItem]) -> Vec<TaskBoardStatusCount> {
     let statuses = [
-        TaskBoardStatus::New,
+        TaskBoardStatus::Umbrella,
+        TaskBoardStatus::Todo,
         TaskBoardStatus::Planning,
+        TaskBoardStatus::InProgress,
+        TaskBoardStatus::AgenticReview,
+        TaskBoardStatus::Testing,
+        TaskBoardStatus::InReview,
+        TaskBoardStatus::ToReview,
+        TaskBoardStatus::HumanRequired,
+        TaskBoardStatus::Failed,
+        TaskBoardStatus::Done,
+        TaskBoardStatus::New,
         TaskBoardStatus::PlanReview,
         TaskBoardStatus::NeedsYou,
-        TaskBoardStatus::Todo,
-        TaskBoardStatus::InProgress,
-        TaskBoardStatus::InReview,
-        TaskBoardStatus::Done,
         TaskBoardStatus::Blocked,
     ];
     statuses
@@ -316,21 +322,21 @@ mod tests {
     }
 
     #[test]
-    fn audit_summary_counts_needs_you_items() {
+    fn audit_summary_counts_human_required_items() {
         let mut item = TaskBoardItem::new(
             "task-1".into(),
             "Review request".into(),
             "Needs attention".into(),
             "2026-05-14T00:00:00Z".into(),
         );
-        item.status = TaskBoardStatus::NeedsYou;
+        item.status = TaskBoardStatus::HumanRequired;
 
         let summary = build_audit_summary(&[item]);
         let count = summary
             .by_status
             .iter()
-            .find(|entry| entry.status == TaskBoardStatus::NeedsYou)
-            .expect("needs-you count");
+            .find(|entry| entry.status == TaskBoardStatus::HumanRequired)
+            .expect("human-required count");
 
         assert_eq!(count.count, 1);
     }

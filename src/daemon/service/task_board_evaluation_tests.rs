@@ -129,14 +129,14 @@ fn missing_session_marks_linked_item_blocked() {
         record.reason.as_deref(),
         Some("[WORKFLOW_IO] session unavailable")
     );
-    assert_eq!(record.board_status, Some(TaskBoardStatus::Blocked));
+    assert_eq!(record.board_status, Some(TaskBoardStatus::Failed));
     assert_eq!(
         record.workflow_status,
         Some(TaskBoardWorkflowStatus::Failed)
     );
 
     let stored = store.get("board-1").expect("load failed item");
-    assert_eq!(stored.status, TaskBoardStatus::Blocked);
+    assert_eq!(stored.status, TaskBoardStatus::Failed);
     assert_eq!(stored.workflow.status, TaskBoardWorkflowStatus::Failed);
     assert_eq!(
         stored.workflow.current_step_id.as_deref(),
@@ -168,14 +168,14 @@ fn missing_task_marks_linked_item_blocked() {
         record.reason.as_deref(),
         Some("session task 'work-1' was not found")
     );
-    assert_eq!(record.board_status, Some(TaskBoardStatus::Blocked));
+    assert_eq!(record.board_status, Some(TaskBoardStatus::Failed));
     assert_eq!(
         record.workflow_status,
         Some(TaskBoardWorkflowStatus::Failed)
     );
 
     let stored = store.get("board-1").expect("load failed item");
-    assert_eq!(stored.status, TaskBoardStatus::Blocked);
+    assert_eq!(stored.status, TaskBoardStatus::Failed);
     assert_eq!(stored.workflow.status, TaskBoardWorkflowStatus::Failed);
     assert_eq!(
         stored.workflow.current_step_id.as_deref(),
@@ -212,7 +212,7 @@ fn review_pending_update_schedules_reviewer_signal() {
     assert!(scheduled);
     assert_eq!(summary.reviewing, 1);
     let stored = store.get("board-1").expect("load updated item");
-    assert_eq!(stored.status, TaskBoardStatus::InReview);
+    assert_eq!(stored.status, TaskBoardStatus::ToReview);
     assert_eq!(
         stored.workflow.current_step_id.as_deref(),
         Some("review_pending")
