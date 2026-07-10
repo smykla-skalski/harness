@@ -151,6 +151,14 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     XCTAssertTrue(description.contains("abcd1234"))
   }
 
+  func testAdminRoleCanReadBeforeScopeExpansion() throws {
+    var access = try remoteAccess()
+    access.role = .admin
+    access.scopes = []
+
+    XCTAssertTrue(access.canRead)
+  }
+
   func testCredentialDebugDescriptionRedactsRemoteBearerToken() throws {
     let credential = MobilePairedStationCredential(
       stationID: "remote-daemon-example-com",
