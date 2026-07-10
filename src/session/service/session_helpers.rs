@@ -173,15 +173,16 @@ pub(crate) fn require_permission(
     actor_id: &str,
     action: SessionAction,
 ) -> Result<(), CliError> {
-    if is_control_plane_actor_id(actor_id) {
-        return Ok(());
-    }
-    let agent = state.agents.get(actor_id).ok_or_else(|| {
-        CliError::from(CliErrorKind::session_agent_conflict(format!(
+    let Some(agent) = state.agents.get(actor_id) else {
+        if is_control_plane_actor_id(actor_id) {
+            return Ok(());
+        }
+        return Err(CliErrorKind::session_agent_conflict(format!(
             "agent '{actor_id}' not registered in session '{}'",
             state.session_id
-        )))
-    })?;
+        ))
+        .into());
+    };
     if !agent.status.is_alive() {
         return Err(CliErrorKind::session_permission_denied(format!(
             "agent '{actor_id}' is {} in session '{}'",
@@ -375,6 +376,39 @@ mod remote_actor_tests {
         let actor = r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["read","write"]}"#;
 
         assert!(require_permission(&state, actor, SessionAction::CreateTask).is_ok());
+    }
+
+    #[test]
+    fn registered_agent_matching_remote_actor_keeps_agent_permissions() {
+        let mut state = build_initial_state(
+            "remote session",
+            "Remote session",
+            "remote-session",
+            "2026-07-10T12:00:00Z",
+            None,
+        );
+        let actor = r#"{"client_id":"phone-1","platform":"ios","role":"operator","scopes":["read","write"]}"#;
+        state.agents.insert(
+            actor.to_string(),
+            AgentRegistration {
+                agent_id: actor.to_string(),
+                name: "Colliding worker".to_string(),
+                runtime: crate::agents::kind::RuntimeKind::from("codex"),
+                role: SessionRole::Worker,
+                capabilities: Vec::new(),
+                joined_at: "2026-07-10T12:00:00Z".to_string(),
+                updated_at: "2026-07-10T12:00:00Z".to_string(),
+                status: crate::session::types::AgentStatus::Active,
+                agent_session_id: None,
+                managed_agent: None,
+                last_activity_at: None,
+                current_task_id: None,
+                runtime_capabilities: Default::default(),
+                persona: None,
+            },
+        );
+
+        assert!(require_permission(&state, actor, SessionAction::EndSession).is_err());
     }
 
     #[test]
