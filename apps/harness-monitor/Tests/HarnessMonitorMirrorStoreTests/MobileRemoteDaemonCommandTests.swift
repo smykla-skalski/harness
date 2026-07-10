@@ -46,6 +46,22 @@ final class MobileRemoteDaemonCommandTests: XCTestCase {
     )
   }
 
+  func testMissingNetworkStubFailsClosed() async throws {
+    let client = try makeClient(role: .operator, scopes: ["read", "write"])
+    let command = makeRemoteDaemonCommand(kind: .refresh, payload: ["scope": "health"])
+
+    do {
+      _ = try await client.queueCommand(
+        command,
+        currentRevision: 42,
+        now: command.createdAt
+      )
+      XCTFail("missing response stub should fail")
+    } catch let error as URLError {
+      XCTAssertEqual(error.code, .badServerResponse)
+    }
+  }
+
   func testDirectSubmissionReturnsTerminalReceipt() async throws {
     RemoteDaemonCommandURLProtocol.respond(statusCode: 200, body: #"{"status":"ok"}"#)
     let client = try makeClient(role: .operator, scopes: ["read", "write"])

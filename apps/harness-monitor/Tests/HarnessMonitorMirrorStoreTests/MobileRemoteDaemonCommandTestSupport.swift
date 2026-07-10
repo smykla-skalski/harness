@@ -40,16 +40,20 @@ final class RemoteDaemonCommandURLProtocol: URLProtocol, @unchecked Sendable {
   override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
   override func startLoading() {
-    let response: StubResponse = Self.lock.withLock {
+    let response: StubResponse? = Self.lock.withLock {
       var recordedRequest = request
       let body = request.httpBody ?? request.httpBodyStream.flatMap(Self.readBody)
       recordedRequest.httpBodyStream = nil
       recordedRequest.httpBody = body
       Self.recordedRequests.append(recordedRequest)
       guard !Self.queuedResponses.isEmpty else {
-        return StubResponse(statusCode: 200, body: Data("{}".utf8))
+        return nil
       }
       return Self.queuedResponses.removeFirst()
+    }
+    guard let response else {
+      client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+      return
     }
     guard let url = request.url,
       let httpResponse = HTTPURLResponse(
