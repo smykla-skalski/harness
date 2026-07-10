@@ -63,6 +63,34 @@ struct HarnessMonitorStoreRemoteConnectionTests {
     }
   }
 
+  @Test("Profile refresh failure clears stale remote mode")
+  func profileRefreshFailureClearsRemoteMode() throws {
+    let profile = try remoteProfileFixture()
+    let source = ToggleRemoteDaemonConnectionSource(profile: profile)
+    let repository = InMemoryRemoteDaemonProfileStore()
+    let tokenStore = RecordingRemoteDaemonTokenStore()
+    let services = RemoteDaemonServices(
+      connectionSource: source,
+      profileCoordinator: RemoteDaemonProfileCoordinator(
+        repository: repository,
+        tokenStore: tokenStore,
+        claimant: NeverRemoteDaemonPairingClaimant()
+      )
+    )
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      remoteDaemonServices: services
+    )
+    #expect(store.usesRemoteDaemon)
+
+    source.failProfileLoads()
+    store.refreshRemoteDaemonProfile()
+
+    #expect(!store.usesRemoteDaemon)
+    #expect(store.remoteDaemonProfile == nil)
+    #expect(store.remoteDaemonActionState.errorMessage != nil)
+  }
+
   @Test("Queued pairing and forget actions switch between remote and local clients")
   func queuedPairAndForgetSwitchConnectionSources() async throws {
     let repository = InMemoryRemoteDaemonProfileStore()
@@ -148,6 +176,36 @@ private struct RemoteStoreFixture {
       )
     )
   }
+}
+
+private final class ToggleRemoteDaemonConnectionSource:
+  RemoteDaemonConnectionSourcing, @unchecked Sendable
+{
+  private let lock = NSLock()
+  private let profile: RemoteDaemonProfile
+  private var shouldFailProfileLoads = false
+
+  init(profile: RemoteDaemonProfile) {
+    self.profile = profile
+  }
+
+  func failProfileLoads() {
+    lock.withLock { shouldFailProfileLoads = true }
+  }
+
+  func activeConnection() throws -> HarnessMonitorConnection? {
+    nil
+  }
+
+  func activeProfile() throws -> RemoteDaemonProfile? {
+    let shouldFail = lock.withLock { shouldFailProfileLoads }
+    if shouldFail {
+      throw RemoteDaemonProfileError.profileNotFound
+    }
+    return profile
+  }
+
+  func markRevoked(profileID: UUID, at date: Date) throws {}
 }
 
 private struct NeverRemoteDaemonPairingClaimant: RemoteDaemonPairingClaiming {

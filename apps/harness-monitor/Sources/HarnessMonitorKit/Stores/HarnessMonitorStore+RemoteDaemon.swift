@@ -93,6 +93,7 @@ extension HarnessMonitorStore {
     do {
       remoteDaemonProfile = try remoteDaemonServices.connectionSource.activeProfile()
     } catch {
+      remoteDaemonProfile = nil
       remoteDaemonActionState = .failed(error.localizedDescription)
     }
   }
