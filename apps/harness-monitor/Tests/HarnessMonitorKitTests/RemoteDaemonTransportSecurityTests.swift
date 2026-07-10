@@ -34,7 +34,7 @@ struct RemoteDaemonTransportSecurityTests {
     #expect(pin == Self.validPin)
   }
 
-  @Test("Accepts system-trusted matching SPKI and rejects pin mismatch")
+  @Test("Accepts anchored matching SPKI and rejects pin mismatch")
   func evaluatesTrustAndPin() throws {
     let trust = try makeTrust()
     let matching = RemoteDaemonServerTrustEvaluator(
@@ -84,7 +84,7 @@ struct RemoteDaemonTransportSecurityTests {
     let verifyDate = try #require(
       ISO8601DateFormatter().date(from: "2026-07-10T04:00:00Z")
     )
-    SecTrustSetVerifyDate(resolvedTrust, verifyDate as CFDate)
+    #expect(SecTrustSetVerifyDate(resolvedTrust, verifyDate as CFDate) == errSecSuccess)
     return resolvedTrust
   }
 
