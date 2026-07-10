@@ -111,9 +111,8 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
       commandQueueCount: 0,
       defaultStation: true
     )
-    let revision = Int64((now.timeIntervalSince1970 * 1_000).rounded(.down))
     return MobileMirrorSnapshot(
-      revision: revision,
+      revision: 0,
       generatedAt: now,
       expiresAt: now.addingTimeInterval(60),
       stations: [station],

@@ -41,6 +41,7 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     )
     XCTAssertEqual(snapshot.generatedAt, now)
     XCTAssertEqual(snapshot.expiresAt, now.addingTimeInterval(60))
+    XCTAssertEqual(snapshot.revision, 0)
     XCTAssertEqual(snapshot.stations.first?.state, .online)
     XCTAssertEqual(snapshot.stations.first?.activeSessionCount, 1)
     XCTAssertEqual(snapshot.sessions.first?.id, "session-1")
