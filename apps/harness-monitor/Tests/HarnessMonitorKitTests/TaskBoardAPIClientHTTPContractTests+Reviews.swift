@@ -31,7 +31,8 @@ extension TaskBoardAPIClientTests {
       refresh: policy.refresh,
       comment: policy.comment,
       avatar: policy.avatar,
-      timeline: policy.timeline
+      timeline: policy.timeline,
+      resolve: policy.resolve
     )
   }
 
@@ -133,6 +134,11 @@ extension TaskBoardAPIClientTests {
         pullRequestUpdatedAt: "2026-05-21T09:00:00Z"
       )
     )
+    let resolve = try await client.resolveReviewPullRequests(
+      request: ReviewsPullRequestResolveRequest(
+        references: [ReviewsPullRequestReference(repository: "example/harness", number: 42)]
+      )
+    )
     return ReviewsWebSocketPolicyCalls(
       policyPreview: policyPreview,
       policyRun: policyRun,
@@ -141,7 +147,8 @@ extension TaskBoardAPIClientTests {
       refresh: refresh,
       comment: comment,
       avatar: avatar,
-      timeline: timeline
+      timeline: timeline,
+      resolve: resolve
     )
   }
 }

@@ -82,6 +82,71 @@ public struct ReviewsRepositoryCatalogResponseWire: Codable, Equatable, Sendable
   }
 }
 
+public struct ReviewsPullRequestReferenceWire: Codable, Equatable, Sendable {
+  public var repository: String
+  public var number: UInt64
+
+  public init(repository: String, number: UInt64) {
+    self.repository = repository
+    self.number = number
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case repository
+    case number
+  }
+}
+
+public struct ReviewsPullRequestResolveRequestWire: Codable, Equatable, Sendable {
+  public var references: [ReviewsPullRequestReferenceWire]
+  public var backportDetectionEnabled: Bool
+  public var backportPatterns: [String]
+
+  public init(references: [ReviewsPullRequestReferenceWire] = [], backportDetectionEnabled: Bool = true, backportPatterns: [String] = []) {
+    self.references = references
+    self.backportDetectionEnabled = backportDetectionEnabled
+    self.backportPatterns = backportPatterns
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    references = try container.decodeIfPresent([ReviewsPullRequestReferenceWire].self, forKey: .references) ?? []
+    backportDetectionEnabled = try container.decodeIfPresent(Bool.self, forKey: .backportDetectionEnabled) ?? true
+    backportPatterns = try container.decodeIfPresent([String].self, forKey: .backportPatterns) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case references
+    case backportDetectionEnabled = "backport_detection_enabled"
+    case backportPatterns = "backport_patterns"
+  }
+}
+
+public struct ReviewsPullRequestResolveResponseWire: Codable, Equatable, Sendable {
+  public var fetchedAt: String
+  public var items: [ReviewItemWire]
+  public var missingReferences: [ReviewsPullRequestReferenceWire]
+
+  public init(fetchedAt: String, items: [ReviewItemWire] = [], missingReferences: [ReviewsPullRequestReferenceWire] = []) {
+    self.fetchedAt = fetchedAt
+    self.items = items
+    self.missingReferences = missingReferences
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    fetchedAt = try container.decode(String.self, forKey: .fetchedAt)
+    items = try container.decodeIfPresent([ReviewItemWire].self, forKey: .items) ?? []
+    missingReferences = try container.decodeIfPresent([ReviewsPullRequestReferenceWire].self, forKey: .missingReferences) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case fetchedAt = "fetched_at"
+    case items
+    case missingReferences = "missing_references"
+  }
+}
+
 public struct ReviewsQueryResponseWire: Codable, Equatable, Sendable {
   public var fetchedAt: String
   public var fromCache: Bool

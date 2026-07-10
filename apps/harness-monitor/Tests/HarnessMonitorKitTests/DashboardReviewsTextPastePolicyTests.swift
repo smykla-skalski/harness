@@ -107,6 +107,9 @@ struct DashboardReviewsTextPastePolicyTests {
     )
 
     for source in [routeSource, hostSource] {
+      #expect(source.contains("fetchPastedReviewPullRequests"))
+      #expect(source.contains("resolveReviewPullRequests"))
+      #expect(source.contains("ReviewsPullRequestResolveRequest"))
       #expect(source.contains("DashboardReviewsTextPasteTrace.beginFetchRepositories"))
       #expect(source.contains("forceRefresh: false"))
       #expect(!source.contains("forceRefresh: true"))
@@ -118,6 +121,7 @@ struct DashboardReviewsTextPastePolicyTests {
     #expect(traceSource.contains(#""reviews_text_paste.parse_references""#))
     #expect(traceSource.contains(#""reviews_text_paste.policy_execute""#))
     #expect(traceSource.contains(#""reviews_text_paste.resolve_references""#))
+    #expect(traceSource.contains(#""reviews_text_paste.resolve_pull_requests""#))
     #expect(traceSource.contains(#""reviews_text_paste.fetch_repositories""#))
     #expect(traceSource.contains(#""reviews_text_paste.preview_approval""#))
   }
@@ -358,7 +362,7 @@ struct DashboardReviewsTextPastePolicyTests {
     )
   }
 
-  fileprivate static func resolvedRow(
+  static func resolvedRow(
     index: Int,
     item: ReviewItem,
     visualStatus: ReviewScreenshotVisualStatus = .unknown
@@ -380,7 +384,7 @@ struct DashboardReviewsTextPastePolicyTests {
     )
   }
 
-  fileprivate static func reviewItem(
+  static func reviewItem(
     repository: String,
     number: UInt64,
     checkStatus: ReviewCheckStatus = .success

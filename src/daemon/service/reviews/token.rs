@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
 use crate::errors::{CliError, CliErrorKind};
-use crate::reviews::{ReviewTarget, ReviewsQueryRequest};
+use crate::reviews::{ReviewTarget, ReviewsPullRequestReference, ReviewsQueryRequest};
 use crate::task_board::ExternalProvider;
 
 #[derive(Clone)]
@@ -20,6 +20,12 @@ pub(super) struct TokenBoundRequest {
 pub(super) struct TokenBoundTargets {
     pub(super) token: String,
     pub(super) targets: Vec<ReviewTarget>,
+}
+
+#[derive(Clone)]
+pub(super) struct TokenBoundPullRequestReferences {
+    pub(super) token: String,
+    pub(super) references: Vec<ReviewsPullRequestReference>,
 }
 
 pub(super) fn token_bound_requests(
@@ -76,6 +82,24 @@ pub(super) fn token_bound_targets(
     Ok(grouped
         .into_iter()
         .map(|(token, targets)| TokenBoundTargets { token, targets })
+        .collect())
+}
+
+pub(super) fn token_bound_pull_request_references(
+    references: &[ReviewsPullRequestReference],
+) -> Result<Vec<TokenBoundPullRequestReferences>, CliError> {
+    let global_token = github_token(None);
+    let mut grouped = BTreeMap::<String, Vec<ReviewsPullRequestReference>>::new();
+    for reference in references {
+        let repository = reference.normalized_repository();
+        let token = github_token(Some(repository.as_str()))
+            .or_else(|| global_token.clone())
+            .ok_or_else(|| missing_token_error(Some(repository.as_str())))?;
+        grouped.entry(token).or_default().push(reference.clone());
+    }
+    Ok(grouped
+        .into_iter()
+        .map(|(token, references)| TokenBoundPullRequestReferences { token, references })
         .collect())
 }
 

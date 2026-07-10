@@ -92,6 +92,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case reviewsRepositoryCatalog = "reviews.repository_catalog"
   case reviewsCapabilities = "reviews.capabilities"
   case reviewsQuery = "reviews.query"
+  case reviewsPullRequestsResolve = "reviews.pull_requests_resolve"
   case reviewsActionPreview = "reviews.action_preview"
   case reviewsPolicyPreview = "reviews.policy_preview"
   case reviewsApprove = "reviews.approve"

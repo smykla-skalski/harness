@@ -311,8 +311,9 @@ pub use reviews::{
     add_label_to_reviews, add_review_file_comment, approve_reviews, auto_reviews,
     catalog_review_repositories, clear_reviews_cache, comment_on_reviews, fetch_review_body,
     merge_reviews, preview_review_action, preview_reviews_policy, query_reviews, refresh_reviews,
-    request_review_for_reviews, rerun_reviews_checks, reviews_capabilities, reviews_policy_history,
-    reviews_policy_status, start_reviews_policy_run, update_review_body,
+    request_review_for_reviews, rerun_reviews_checks, resolve_review_pull_requests,
+    reviews_capabilities, reviews_policy_history, reviews_policy_status, start_reviews_policy_run,
+    update_review_body,
 };
 pub(crate) use reviews_files::BlobTextProjection;
 pub use reviews_files::{

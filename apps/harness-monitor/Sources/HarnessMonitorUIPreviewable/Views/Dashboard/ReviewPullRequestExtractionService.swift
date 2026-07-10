@@ -47,12 +47,31 @@ struct ReviewPullRequestExtractionResolvedRow: Equatable, Identifiable, Sendable
 
 struct ReviewPullRequestExtractionContext: Sendable {
   typealias RepositoryFetcher = @MainActor @Sendable ([String]) async -> [ReviewItem]
+  typealias PullRequestFetcher =
+    @MainActor @Sendable ([ReviewsPullRequestReference]) async -> [ReviewItem]
 
   let currentItems: [ReviewItem]
   let configuredRepositories: [String]
   let activeReviewsRepository: String?
   let configuration: ReviewPullRequestExtractionConfiguration
+  let fetchPullRequests: PullRequestFetcher?
   let fetchRepositories: RepositoryFetcher?
+
+  init(
+    currentItems: [ReviewItem],
+    configuredRepositories: [String],
+    activeReviewsRepository: String?,
+    configuration: ReviewPullRequestExtractionConfiguration,
+    fetchPullRequests: PullRequestFetcher? = nil,
+    fetchRepositories: RepositoryFetcher? = nil
+  ) {
+    self.currentItems = currentItems
+    self.configuredRepositories = configuredRepositories
+    self.activeReviewsRepository = activeReviewsRepository
+    self.configuration = configuration
+    self.fetchPullRequests = fetchPullRequests
+    self.fetchRepositories = fetchRepositories
+  }
 }
 
 enum ReviewPullRequestExtractionService {
@@ -63,6 +82,12 @@ enum ReviewPullRequestExtractionService {
     let repositoryScope = repositories(for: context)
     var items = context.currentItems
     var resolved = resolveRows(rows, items: items, configuration: context.configuration)
+    let pullRequests = pullRequestReferencesToRefresh(rows: resolved)
+    if !pullRequests.isEmpty, let fetchPullRequests = context.fetchPullRequests {
+      let fetchedItems = await fetchPullRequests(pullRequests)
+      items = mergeItems(items, fetchedItems)
+      resolved = resolveRows(rows, items: items, configuration: context.configuration)
+    }
     let repositories = await repositoriesToRefresh(
       rows: resolved,
       repositoryScope: repositoryScope,
@@ -139,12 +164,6 @@ enum ReviewPullRequestExtractionService {
     repositoryScope: [String],
     configuration: ReviewPullRequestExtractionConfiguration
   ) async -> [String] {
-    let missingFullRefs = rows.compactMap { row -> String? in
-      guard row.status == .missing, let repository = row.row.reference.repository else {
-        return nil
-      }
-      return repository
-    }
     let bareNumbers = rows.compactMap { row -> UInt64? in
       guard row.row.reference.repository == nil && row.status != .matched else {
         return nil
@@ -164,7 +183,19 @@ enum ReviewPullRequestExtractionService {
       needsBareRefresh
       ? repositoryScope
       : []
-    return orderedUnique(missingFullRefs + rememberedRepositories + scopeRepositories)
+    return orderedUnique(rememberedRepositories + scopeRepositories)
+  }
+
+  private static func pullRequestReferencesToRefresh(
+    rows: [ReviewPullRequestExtractionResolvedRow]
+  ) -> [ReviewsPullRequestReference] {
+    let references = rows.compactMap { row -> ReviewsPullRequestReference? in
+      guard row.status == .missing, let repository = row.row.reference.repository else {
+        return nil
+      }
+      return ReviewsPullRequestReference(repository: repository, number: row.row.reference.number)
+    }
+    return orderedUniqueReferences(references)
   }
 
   private static func repositories(
@@ -222,6 +253,15 @@ enum ReviewPullRequestExtractionService {
     var seen = Set<String>()
     return repositories.filter { repository in
       seen.insert(repository.lowercased()).inserted
+    }
+  }
+
+  private static func orderedUniqueReferences(
+    _ references: [ReviewsPullRequestReference]
+  ) -> [ReviewsPullRequestReference] {
+    var seen = Set<String>()
+    return references.filter { reference in
+      seen.insert("\(reference.repository.lowercased())#\(reference.number)").inserted
     }
   }
 

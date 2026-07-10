@@ -32,6 +32,7 @@ pub(crate) mod policy_history;
 pub(crate) mod policy_mapping;
 pub(crate) mod policy_resume;
 mod preview;
+mod resolve;
 mod token;
 
 use auto_policy::{
@@ -54,6 +55,7 @@ pub use policy::{preview_reviews_policy, reviews_policy_status, start_reviews_po
 use policy_enrichment::enrich_policy_target_for_execution;
 pub use policy_history::reviews_policy_history;
 use preview::{preview_action_target, preview_action_warnings};
+pub use resolve::resolve_review_pull_requests;
 use token::{github_token, missing_token_error, token_bound_requests, token_bound_targets};
 
 /// Query dependency update pull requests through configured GitHub tokens.

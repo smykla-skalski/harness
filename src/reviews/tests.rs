@@ -156,6 +156,53 @@ fn repository_catalog_request_normalizes_organization() {
 }
 
 #[test]
+fn pull_request_resolve_request_normalizes_references() {
+    let request = ReviewsPullRequestResolveRequest {
+        references: vec![
+            ReviewsPullRequestReference {
+                repository: " Acme/API ".into(),
+                number: 42,
+            },
+            ReviewsPullRequestReference {
+                repository: "acme/api".into(),
+                number: 42,
+            },
+            ReviewsPullRequestReference {
+                repository: "acme/api".into(),
+                number: 0,
+            },
+            ReviewsPullRequestReference {
+                repository: "acme".into(),
+                number: 43,
+            },
+        ],
+        ..ReviewsPullRequestResolveRequest::default()
+    };
+
+    assert_eq!(
+        request.normalized_references(),
+        vec![ReviewsPullRequestReference {
+            repository: "acme/api".into(),
+            number: 42,
+        }]
+    );
+    assert!(request.validate().is_ok());
+}
+
+#[test]
+fn pull_request_resolve_request_rejects_empty_valid_references() {
+    let request = ReviewsPullRequestResolveRequest {
+        references: vec![ReviewsPullRequestReference {
+            repository: "acme".into(),
+            number: 42,
+        }],
+        ..ReviewsPullRequestResolveRequest::default()
+    };
+
+    assert!(request.validate().is_err());
+}
+
+#[test]
 fn auto_mode_rules_match_helper_contract() {
     let review_required = sample_item(
         ReviewReviewStatus::ReviewRequired,

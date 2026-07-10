@@ -9,9 +9,10 @@ use axum::{Json, Router};
 use crate::daemon::protocol::{
     ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest, ReviewsAvatarRequest,
     ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
-    ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
-    ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest, http_paths,
+    ReviewsMergeRequest, ReviewsPullRequestResolveRequest, ReviewsQueryRequest,
+    ReviewsRefreshRequest, ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest,
+    ReviewsRerunChecksRequest, ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest,
+    http_paths,
 };
 use crate::daemon::service;
 
@@ -30,6 +31,10 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
             get(get_review_capabilities),
         )
         .route(http_paths::REVIEWS_QUERY, post(post_query_reviews))
+        .route(
+            http_paths::REVIEWS_PULL_REQUEST_RESOLVE,
+            post(post_resolve_review_pull_requests),
+        )
         .route(
             http_paths::REVIEWS_ACTION_PREVIEW,
             post(post_review_action_preview),
@@ -122,6 +127,26 @@ async fn post_query_reviews(
     timed_json(
         "POST",
         http_paths::REVIEWS_QUERY,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_resolve_review_pull_requests(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsPullRequestResolveRequest>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = service::resolve_review_pull_requests(&request).await;
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_PULL_REQUEST_RESOLVE,
         &request_id,
         start,
         result,

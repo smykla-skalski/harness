@@ -8,6 +8,7 @@ mod ingest;
 mod mapping;
 mod pagination;
 pub(super) mod queries;
+mod resolve;
 mod types;
 
 // Lift the two constants `mapping.rs` imports via `super::{...}` back into the
@@ -39,8 +40,9 @@ pub(super) use super::{
     ReviewMergeableState, ReviewPullRequestState, ReviewRepositoryLabel, ReviewReviewEventState,
     ReviewReviewStatus, ReviewTarget, ReviewsApproveRequest, ReviewsCommentRequest,
     ReviewsFileCommentKind, ReviewsFileCommentRequest, ReviewsFileCommentResponse,
-    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
-    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, timeline,
+    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsPullRequestResolveRequest,
+    ReviewsQueryRequest, ReviewsRefreshRequest, ReviewsRequestReviewRequest,
+    ReviewsRerunChecksRequest, timeline,
 };
 
 #[cfg(test)]

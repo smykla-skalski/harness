@@ -208,6 +208,10 @@ extension DashboardReviewsRouteView {
         configuredRepositories: configuredReviewExtractionRepositories(configuration),
         activeReviewsRepository: primaryDetailItem?.repository,
         configuration: configuration,
+        fetchPullRequests: { references in
+          guard let client = store.apiClient else { return [] }
+          return await fetchPastedReviewPullRequests(references, client: client)
+        },
         fetchRepositories: { repositories in
           guard let client = store.apiClient else { return [] }
           return await fetchPastedReviewRepositories(repositories, client: client)
@@ -226,6 +230,39 @@ extension DashboardReviewsRouteView {
       extractionRows: result.rows,
       outputText: result.outputText
     )
+  }
+
+  func fetchPastedReviewPullRequests(
+    _ references: [ReviewsPullRequestReference],
+    client: any HarnessMonitorClientProtocol
+  ) async -> [ReviewItem] {
+    let references = orderedUnique(references)
+    guard !references.isEmpty else { return [] }
+    let interval = DashboardReviewsTextPasteTrace.beginResolvePullRequests(
+      referenceCount: references.count
+    )
+    defer { DashboardReviewsTextPasteTrace.end(interval) }
+    do {
+      let response = try await DashboardReviewsTimeoutRacer.race(
+        timeoutSeconds: DashboardReviewsTimeoutRacer.defaultMutationTimeoutSeconds
+      ) {
+        try await client.resolveReviewPullRequests(
+          request: ReviewsPullRequestResolveRequest(
+            references: references,
+            backportDetectionEnabled: normalizedPreferences.backportDetectionEnabled,
+            backportPatterns: normalizedPreferences.normalizedBackportPatterns
+          )
+        )
+      }
+      let normalized = HarnessMonitorReviewsDaemonNormalizer.normalize(
+        refresh: ReviewsRefreshResponse(fetchedAt: response.fetchedAt, items: response.items),
+        daemonWireVersion: store.health?.wireVersion
+      )
+      return normalized.items
+    } catch {
+      store.toast.presentWarning("Could not load pasted PRs: \(error.localizedDescription)")
+      return []
+    }
   }
 
   func fetchPastedReviewRepositories(
@@ -339,6 +376,15 @@ extension DashboardReviewsRouteView {
   private func orderedUnique(_ values: [String]) -> [String] {
     var seen = Set<String>()
     return values.filter { seen.insert($0.lowercased()).inserted }
+  }
+
+  private func orderedUnique(
+    _ values: [ReviewsPullRequestReference]
+  ) -> [ReviewsPullRequestReference] {
+    var seen = Set<String>()
+    return values.filter { value in
+      seen.insert("\(value.repository.lowercased())#\(value.number)").inserted
+    }
   }
 
   func configuredReviewExtractionRepositories(

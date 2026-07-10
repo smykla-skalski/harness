@@ -58,6 +58,38 @@ extension ReviewsActionPreviewRequestWire {
   }
 }
 
+extension ReviewsPullRequestReference {
+  init(wire: ReviewsPullRequestReferenceWire) {
+    self.init(repository: wire.repository, number: wire.number)
+  }
+}
+
+extension ReviewsPullRequestResolveResponse {
+  init(wire: ReviewsPullRequestResolveResponseWire) {
+    self.init(
+      fetchedAt: wire.fetchedAt,
+      items: wire.items.map(ReviewItem.init(wire:)),
+      missingReferences: wire.missingReferences.map(ReviewsPullRequestReference.init(wire:))
+    )
+  }
+}
+
+extension ReviewsPullRequestReferenceWire {
+  init(_ model: ReviewsPullRequestReference) {
+    self.init(repository: model.repository, number: model.number)
+  }
+}
+
+extension ReviewsPullRequestResolveRequestWire {
+  init(_ model: ReviewsPullRequestResolveRequest) {
+    self.init(
+      references: model.references.map(ReviewsPullRequestReferenceWire.init(_:)),
+      backportDetectionEnabled: model.backportDetectionEnabled,
+      backportPatterns: model.backportPatterns
+    )
+  }
+}
+
 extension ReviewsRefreshResponse {
   init(wire: ReviewsRefreshResponseWire) {
     self.init(

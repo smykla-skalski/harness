@@ -103,6 +103,7 @@ pub const POLICY_SCENARIO_RESET: &str = "policy_scenario.reset";
 pub const REVIEWS_REPOSITORY_CATALOG: &str = "reviews.repository_catalog";
 pub const REVIEWS_CAPABILITIES: &str = "reviews.capabilities";
 pub const REVIEWS_QUERY: &str = "reviews.query";
+pub const REVIEWS_PULL_REQUEST_RESOLVE: &str = "reviews.pull_requests_resolve";
 pub const REVIEWS_ACTION_PREVIEW: &str = "reviews.action_preview";
 pub const REVIEWS_POLICY_PREVIEW: &str = "reviews.policy_preview";
 pub const REVIEWS_POLICY_START: &str = "reviews.policy_start";
@@ -263,6 +264,7 @@ pub const ALL: &[&str] = &[
     REVIEWS_REPOSITORY_CATALOG,
     REVIEWS_CAPABILITIES,
     REVIEWS_QUERY,
+    REVIEWS_PULL_REQUEST_RESOLVE,
     REVIEWS_ACTION_PREVIEW,
     REVIEWS_POLICY_PREVIEW,
     REVIEWS_POLICY_START,

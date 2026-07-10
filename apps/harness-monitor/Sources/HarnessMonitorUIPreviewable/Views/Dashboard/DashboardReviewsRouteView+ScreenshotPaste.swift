@@ -172,6 +172,10 @@ extension DashboardReviewsRouteView {
         configuredRepositories: configuredReviewExtractionRepositories(configuration),
         activeReviewsRepository: primaryDetailItem?.repository,
         configuration: configuration,
+        fetchPullRequests: { references in
+          guard let client = store.apiClient else { return [] }
+          return await fetchPastedReviewPullRequests(references, client: client)
+        },
         fetchRepositories: { repositories in
           guard let client = store.apiClient else { return [] }
           return await fetchPastedReviewRepositories(repositories, client: client)

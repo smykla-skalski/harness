@@ -35,6 +35,9 @@ pub(crate) async fn dispatch_reviews_method(
             service::reviews_capabilities(),
         )),
         ws_methods::REVIEWS_QUERY => Some(dispatch_reviews_query(request).await),
+        ws_methods::REVIEWS_PULL_REQUEST_RESOLVE => {
+            Some(super::reviews_resolve::dispatch_reviews_pull_request_resolve(request).await)
+        }
         ws_methods::REVIEWS_ACTION_PREVIEW => Some(dispatch_reviews_action_preview(request)),
         ws_methods::REVIEWS_POLICY_PREVIEW => Some(dispatch_reviews_policy_preview(request)),
         ws_methods::REVIEWS_POLICY_START => {
@@ -74,9 +77,9 @@ pub(crate) async fn dispatch_reviews_method(
             &request.id,
             service::list_review_local_clones().await,
         )),
-        ws_methods::REVIEWS_FILES_LOCAL_CLONES_DELETE => {
-            Some(dispatch_reviews_files_local_clones_delete(request).await)
-        }
+        ws_methods::REVIEWS_FILES_LOCAL_CLONES_DELETE => Some(
+            super::reviews_local_clones::dispatch_reviews_files_local_clones_delete(request).await,
+        ),
         ws_methods::REVIEWS_AVATAR => Some(dispatch_reviews_avatar(request).await),
         ws_methods::REVIEWS_TIMELINE => Some(dispatch_reviews_timeline(request).await),
         ws_methods::REVIEWS_REVIEW_THREADS_RESOLVE => {
@@ -84,21 +87,6 @@ pub(crate) async fn dispatch_reviews_method(
         }
         _ => None,
     }
-}
-
-#[derive(serde::Deserialize)]
-struct DeleteLocalClonePayload {
-    repo_key_segment: String,
-}
-
-async fn dispatch_reviews_files_local_clones_delete(request: &WsRequest) -> WsResponse {
-    let Ok(payload) = parse_params::<DeleteLocalClonePayload>(request) else {
-        return invalid_params(request);
-    };
-    dispatch_query_result(
-        &request.id,
-        service::delete_review_local_clone(&payload.repo_key_segment).await,
-    )
 }
 
 fn dispatch_reviews_action_preview(request: &WsRequest) -> WsResponse {

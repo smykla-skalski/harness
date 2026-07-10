@@ -9,7 +9,7 @@ extension TaskBoardAPIClientTests {
       records.map(\.method)
         == [
           "POST", "GET", "POST", "POST", "POST", "POST", "POST", "POST", "POST", "POST",
-          "POST", "POST", "DELETE", "POST", "POST", "POST", "POST",
+          "POST", "POST", "DELETE", "POST", "POST", "POST", "POST", "POST",
         ]
     )
     #expect(
@@ -32,6 +32,7 @@ extension TaskBoardAPIClientTests {
           "/v1/reviews/comment",
           "/v1/reviews/avatar",
           "/v1/reviews/timeline",
+          "/v1/reviews/pull-requests/resolve",
         ]
     )
   }
@@ -89,6 +90,14 @@ extension TaskBoardAPIClientTests {
     )
     #expect(records[16].body?["page_size"] as? Int == 50)
     #expect(records[16].body?["direction"] as? String == "older")
+    let resolveReference = (records[17].body?["references"] as? [[String: Any]])?.first
+    #expect(resolveReference?["repository"] as? String == "example/harness")
+    #expect(resolveReference?["number"] as? Int == 42)
+    #expect(records[17].body?["backport_detection_enabled"] as? Bool == true)
+    #expect(
+      records[17].body?["backport_patterns"] as? [String]
+        == ReviewsQueryRequest.defaultBackportPatterns
+    )
   }
 
   func assertHTTPClientResults(_ result: TaskBoardHTTPContractResult) {
@@ -165,6 +174,11 @@ extension TaskBoardAPIClientTests {
     #expect(result.timeline.entries.first?.id == "IC_001")
     #expect(result.timeline.viewerCanComment)
     #expect(result.timeline.pageInfo.hasOlder)
+    #expect(result.resolve.items.first?.pullRequestID == "pr-42")
+    #expect(
+      result.resolve.missingReferences
+        == [ReviewsPullRequestReference(repository: "example/missing", number: 404)]
+    )
   }
 
   func makeClient() throws -> HarnessMonitorAPIClient {
@@ -215,4 +229,5 @@ struct ReviewsHTTPContractResult {
   let comment: ReviewsActionResponse
   let avatar: ReviewsAvatarResponse
   let timeline: ReviewsTimelineResponse
+  let resolve: ReviewsPullRequestResolveResponse
 }

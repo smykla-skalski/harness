@@ -65,6 +65,15 @@ enum DashboardReviewsTextPasteTrace {
     return Interval(name: "reviews_text_paste.fetch_repositories", state: state)
   }
 
+  static func beginResolvePullRequests(referenceCount: Int) -> Interval {
+    let state = signposter.beginInterval(
+      "reviews_text_paste.resolve_pull_requests",
+      id: signposter.makeSignpostID(),
+      "references=\(referenceCount, privacy: .public)"
+    )
+    return Interval(name: "reviews_text_paste.resolve_pull_requests", state: state)
+  }
+
   static func beginPreviewApproval(itemCount: Int) -> Interval {
     let state = signposter.beginInterval(
       "reviews_text_paste.preview_approval",

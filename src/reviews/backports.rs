@@ -2,7 +2,10 @@ use regex::Regex;
 
 use crate::errors::{CliError, CliErrorKind};
 
-use super::{ReviewBackportSource, ReviewsQueryRequest, ReviewsRefreshRequest};
+use super::{
+    ReviewBackportSource, ReviewsPullRequestResolveRequest, ReviewsQueryRequest,
+    ReviewsRefreshRequest,
+};
 
 #[derive(Debug)]
 pub(super) struct BackportDetector {
@@ -24,6 +27,15 @@ impl BackportDetector {
     }
 
     pub(super) fn from_refresh(request: &ReviewsRefreshRequest) -> Result<Option<Self>, CliError> {
+        Self::compile(
+            request.backport_detection_enabled,
+            &request.normalized_backport_patterns(),
+        )
+    }
+
+    pub(super) fn from_resolve(
+        request: &ReviewsPullRequestResolveRequest,
+    ) -> Result<Option<Self>, CliError> {
         Self::compile(
             request.backport_detection_enabled,
             &request.normalized_backport_patterns(),

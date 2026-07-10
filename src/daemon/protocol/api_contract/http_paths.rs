@@ -97,6 +97,7 @@ pub const POLICY_SCENARIOS_RESET: &str = "/v1/policy-scenarios/reset";
 pub const REVIEWS_REPOSITORIES: &str = "/v1/reviews/repositories";
 pub const REVIEWS_CAPABILITIES: &str = "/v1/reviews/capabilities";
 pub const REVIEWS_QUERY: &str = "/v1/reviews/query";
+pub const REVIEWS_PULL_REQUEST_RESOLVE: &str = "/v1/reviews/pull-requests/resolve";
 pub const REVIEWS_ACTION_PREVIEW: &str = "/v1/reviews/action-preview";
 pub const REVIEWS_POLICY_PREVIEW: &str = "/v1/reviews/policy/preview";
 pub const REVIEWS_POLICY_START: &str = "/v1/reviews/policy/start";

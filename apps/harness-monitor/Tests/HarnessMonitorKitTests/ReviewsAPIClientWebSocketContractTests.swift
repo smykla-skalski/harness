@@ -32,7 +32,8 @@ extension TaskBoardAPIClientTests {
       refresh: policy.refresh,
       comment: policy.comment,
       avatar: policy.avatar,
-      timeline: policy.timeline
+      timeline: policy.timeline,
+      resolve: policy.resolve
     )
   }
 
@@ -137,6 +138,11 @@ extension TaskBoardAPIClientTests {
         pullRequestUpdatedAt: "2026-05-21T09:00:00Z"
       )
     )
+    let resolve = try await transport.resolveReviewPullRequests(
+      request: ReviewsPullRequestResolveRequest(
+        references: [ReviewsPullRequestReference(repository: "example/harness", number: 42)]
+      )
+    )
     return ReviewsWebSocketPolicyCalls(
       policyPreview: policyPreview,
       policyRun: policyRun,
@@ -145,7 +151,8 @@ extension TaskBoardAPIClientTests {
       refresh: refresh,
       comment: comment,
       avatar: avatar,
-      timeline: timeline
+      timeline: timeline,
+      resolve: resolve
     )
   }
 
@@ -170,12 +177,13 @@ extension TaskBoardAPIClientTests {
           .reviewsComment,
           .reviewsAvatar,
           .reviewsTimeline,
+          .reviewsPullRequestsResolve,
         ]
     )
   }
 
   func assertReviewsWebSocketPayloadContract(_ calls: [RPCProbe.Call]) {
-    #expect(calls.count == 17)
+    #expect(calls.count == 18)
     #expect(objectValue(calls[0].params, key: "organization") == .string("example"))
     #expect(calls[1].params == nil)
     #expect(objectValue(calls[2].params, key: "authors") == .array([.string("renovate[bot]")]))
@@ -261,6 +269,7 @@ extension TaskBoardAPIClientTests {
     )
     #expect(objectValue(calls[16].params, key: "page_size") == .number(50))
     #expect(objectValue(calls[16].params, key: "direction") == .string("older"))
+    assertReviewsWebSocketResolvePayload(calls[17])
   }
 
   func assertReviewsWebSocketResults(_ result: ReviewsWebSocketContractResult) {
@@ -294,6 +303,7 @@ extension TaskBoardAPIClientTests {
     #expect(result.timeline.entries.first?.id == "IC_001")
     #expect(result.timeline.viewerCanComment)
     #expect(result.timeline.pageInfo.hasOlder)
+    assertReviewsResolveResult(result.resolve)
   }
 
   private func objectValue(_ value: JSONValue?, key: String) -> JSONValue? {
@@ -355,6 +365,7 @@ struct ReviewsWebSocketPolicyCalls {
   let comment: ReviewsActionResponse
   let avatar: ReviewsAvatarResponse
   let timeline: ReviewsTimelineResponse
+  let resolve: ReviewsPullRequestResolveResponse
 }
 
 struct ReviewsWebSocketContractResult {
@@ -376,6 +387,7 @@ struct ReviewsWebSocketContractResult {
   let comment: ReviewsActionResponse
   let avatar: ReviewsAvatarResponse
   let timeline: ReviewsTimelineResponse
+  let resolve: ReviewsPullRequestResolveResponse
 }
 
 private let reviewsTargetJSON: [String: JSONValue] = [

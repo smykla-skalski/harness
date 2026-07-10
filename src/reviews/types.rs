@@ -74,6 +74,34 @@ pub struct ReviewsRepositoryCatalogResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewsPullRequestReference {
+    pub repository: String,
+    pub number: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewsPullRequestResolveRequest {
+    #[serde(default)]
+    pub references: Vec<ReviewsPullRequestReference>,
+    #[serde(default = "default_backport_detection_enabled")]
+    pub backport_detection_enabled: bool,
+    #[serde(
+        default = "default_backport_patterns",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub backport_patterns: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewsPullRequestResolveResponse {
+    pub fetched_at: String,
+    #[serde(default)]
+    pub items: Vec<ReviewItem>,
+    #[serde(default)]
+    pub missing_references: Vec<ReviewsPullRequestReference>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewsQueryResponse {
     pub fetched_at: String,
     pub from_cache: bool,

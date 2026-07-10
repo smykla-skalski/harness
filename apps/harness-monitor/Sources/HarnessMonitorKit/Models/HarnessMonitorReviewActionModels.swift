@@ -43,6 +43,48 @@ public struct ReviewsCacheClearResponse: Codable, Equatable, Sendable {
   }
 }
 
+public struct ReviewsPullRequestReference: Codable, Equatable, Sendable, Hashable {
+  public let repository: String
+  public let number: UInt64
+
+  public init(repository: String, number: UInt64) {
+    self.repository = repository
+    self.number = number
+  }
+}
+
+public struct ReviewsPullRequestResolveRequest: Codable, Equatable, Sendable {
+  public let references: [ReviewsPullRequestReference]
+  public let backportDetectionEnabled: Bool
+  public let backportPatterns: [String]
+
+  public init(
+    references: [ReviewsPullRequestReference],
+    backportDetectionEnabled: Bool = true,
+    backportPatterns: [String] = ReviewsQueryRequest.defaultBackportPatterns
+  ) {
+    self.references = references
+    self.backportDetectionEnabled = backportDetectionEnabled
+    self.backportPatterns = backportPatterns
+  }
+}
+
+public struct ReviewsPullRequestResolveResponse: Codable, Equatable, Sendable {
+  public let fetchedAt: String
+  public let items: [ReviewItem]
+  public let missingReferences: [ReviewsPullRequestReference]
+
+  public init(
+    fetchedAt: String,
+    items: [ReviewItem] = [],
+    missingReferences: [ReviewsPullRequestReference] = []
+  ) {
+    self.fetchedAt = fetchedAt
+    self.items = normalizedReviewItems(items)
+    self.missingReferences = missingReferences
+  }
+}
+
 public struct ReviewsRefreshRequest: Codable, Equatable, Sendable {
   public let targets: [ReviewTarget]
   public let backportDetectionEnabled: Bool

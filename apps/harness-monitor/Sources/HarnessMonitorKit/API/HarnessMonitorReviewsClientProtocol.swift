@@ -61,6 +61,9 @@ public protocol HarnessMonitorReviewsClientProtocol: Sendable {
   func queryReviews(
     request: ReviewsQueryRequest
   ) async throws -> ReviewsQueryResponse
+  func resolveReviewPullRequests(
+    request: ReviewsPullRequestResolveRequest
+  ) async throws -> ReviewsPullRequestResolveResponse
   func previewReviewAction(
     request: ReviewsActionPreviewRequest
   ) async throws -> ReviewsActionPreviewResponse
@@ -138,6 +141,12 @@ extension HarnessMonitorReviewsClientProtocol {
   public func queryReviews(
     request _: ReviewsQueryRequest
   ) async throws -> ReviewsQueryResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
+  }
+
+  public func resolveReviewPullRequests(
+    request _: ReviewsPullRequestResolveRequest
+  ) async throws -> ReviewsPullRequestResolveResponse {
     throw HarnessMonitorAPIError.server(code: 501, message: "Reviews unavailable")
   }
 

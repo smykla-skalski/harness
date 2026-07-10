@@ -51,9 +51,11 @@ pub use types::{
     ReviewsPolicyRunResponse, ReviewsPolicyRunStartRequest, ReviewsPolicyRunStatus,
     ReviewsPolicyRunStep, ReviewsPolicyStatusRequest, ReviewsPolicyStatusResponse,
     ReviewsPolicyStepType, ReviewsPolicySubject, ReviewsPolicyTimelineEntry, ReviewsPolicyTrigger,
-    ReviewsPolicyWait, ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest,
-    ReviewsRefreshResponse, ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
-    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, ReviewsSummary,
+    ReviewsPolicyWait, ReviewsPullRequestReference, ReviewsPullRequestResolveRequest,
+    ReviewsPullRequestResolveResponse, ReviewsQueryRequest, ReviewsQueryResponse,
+    ReviewsRefreshRequest, ReviewsRefreshResponse, ReviewsRepositoryCatalogRequest,
+    ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
+    ReviewsSummary,
 };
 
 // Re-exports used by `mod tests;` via `use super::*;`. These were previously

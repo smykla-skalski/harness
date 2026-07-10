@@ -36,8 +36,10 @@ pub use crate::reviews::{
     ReviewsPolicyRunMetrics, ReviewsPolicyRunResponse, ReviewsPolicyRunStartRequest,
     ReviewsPolicyRunStatus, ReviewsPolicyRunStep, ReviewsPolicyStatusRequest,
     ReviewsPolicyStatusResponse, ReviewsPolicyStepType, ReviewsPolicySubject,
-    ReviewsPolicyTimelineEntry, ReviewsPolicyTrigger, ReviewsPolicyWait, ReviewsQueryRequest,
-    ReviewsQueryResponse, ReviewsRateLimitSnapshot, ReviewsRefreshRequest, ReviewsRefreshResponse,
+    ReviewsPolicyTimelineEntry, ReviewsPolicyTrigger, ReviewsPolicyWait,
+    ReviewsPullRequestReference, ReviewsPullRequestResolveRequest,
+    ReviewsPullRequestResolveResponse, ReviewsQueryRequest, ReviewsQueryResponse,
+    ReviewsRateLimitSnapshot, ReviewsRefreshRequest, ReviewsRefreshResponse,
     ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest,
     ReviewsRerunChecksRequest, ReviewsSummary,
 };

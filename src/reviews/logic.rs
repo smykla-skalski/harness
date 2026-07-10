@@ -13,7 +13,8 @@ use super::types::{
     ReviewItem, ReviewRepositoryLabel, ReviewTarget, ReviewTargetFlags, ReviewsActionCapabilities,
     ReviewsBodyRequest, ReviewsCapabilitiesResponse, ReviewsPolicyHistoryRequest,
     ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest, ReviewsPolicyStatusRequest,
-    ReviewsPolicySubject, ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest,
+    ReviewsPolicySubject, ReviewsPullRequestReference, ReviewsPullRequestResolveRequest,
+    ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest,
     ReviewsRepositoryCatalogRequest, ReviewsSummary,
 };
 
@@ -162,6 +163,64 @@ impl ReviewsRepositoryCatalogRequest {
     #[must_use]
     pub fn normalized_organization(&self) -> String {
         self.organization.trim().to_lowercase()
+    }
+}
+
+impl Default for ReviewsPullRequestResolveRequest {
+    fn default() -> Self {
+        Self {
+            references: Vec::new(),
+            backport_detection_enabled: default_backport_detection_enabled(),
+            backport_patterns: default_backport_patterns(),
+        }
+    }
+}
+
+impl ReviewsPullRequestReference {
+    #[must_use]
+    pub fn normalized_repository(&self) -> String {
+        self.repository.trim().to_lowercase()
+    }
+
+    #[must_use]
+    pub fn key(&self) -> String {
+        format!("{}#{}", self.normalized_repository(), self.number)
+    }
+}
+
+impl ReviewsPullRequestResolveRequest {
+    #[must_use]
+    pub fn normalized_references(&self) -> Vec<ReviewsPullRequestReference> {
+        let mut seen = std::collections::BTreeSet::new();
+        self.references
+            .iter()
+            .filter_map(|reference| {
+                let repository = reference.normalized_repository();
+                let Some((owner, name)) = repository.split_once('/') else {
+                    return None;
+                };
+                if owner.is_empty()
+                    || name.is_empty()
+                    || name.contains('/')
+                    || reference.number == 0
+                {
+                    return None;
+                }
+                let key = format!("{repository}#{}", reference.number);
+                if !seen.insert(key) {
+                    return None;
+                }
+                Some(ReviewsPullRequestReference {
+                    repository,
+                    number: reference.number,
+                })
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn normalized_backport_patterns(&self) -> Vec<String> {
+        normalized_preserving_order(&self.backport_patterns)
     }
 }
 

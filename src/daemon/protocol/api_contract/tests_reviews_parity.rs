@@ -41,6 +41,12 @@ fn review_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Post,
+                http_paths::REVIEWS_PULL_REQUEST_RESOLVE,
+                ws_methods::REVIEWS_PULL_REQUEST_RESOLVE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
                 http_paths::REVIEWS_ACTION_PREVIEW,
                 ws_methods::REVIEWS_ACTION_PREVIEW,
                 true,

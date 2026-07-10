@@ -6,8 +6,8 @@ use super::{
     ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsPolicyHistoryRequest, ReviewsPolicyPreviewRequest,
     ReviewsPolicyRunStartRequest, ReviewsPolicyStatusRequest, ReviewsPolicySubject,
-    ReviewsQueryRequest, ReviewsRefreshRequest, ReviewsRepositoryCatalogRequest,
-    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
+    ReviewsPullRequestResolveRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
+    ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
 };
 
 impl ReviewsQueryRequest {
@@ -43,6 +43,24 @@ impl ReviewsRepositoryCatalogRequest {
             )
             .into());
         }
+        Ok(())
+    }
+}
+
+impl ReviewsPullRequestResolveRequest {
+    /// Validate the focused pull request reference resolve request.
+    ///
+    /// # Errors
+    /// Returns `CliError` when no valid `owner/repo#number` references are
+    /// provided or a backport pattern cannot be compiled.
+    pub fn validate(&self) -> Result<(), CliError> {
+        if self.normalized_references().is_empty() {
+            return Err(CliErrorKind::workflow_parse(
+                "reviews pull request resolve requires at least one valid repository and number",
+            )
+            .into());
+        }
+        BackportDetector::validate_patterns(&self.normalized_backport_patterns())?;
         Ok(())
     }
 }
