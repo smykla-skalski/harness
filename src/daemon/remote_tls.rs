@@ -145,12 +145,16 @@ impl ResolvesServerCert for RemoteTlsCertificateResolver {
             .is_some_and(|mut protocols| protocols.any(|protocol| protocol == b"acme-tls/1"));
         if offers_acme_alpn {
             return self.challenge.as_ref().and_then(|challenge| {
-                (client_hello.server_name() == Some(challenge.domain.as_str()))
+                remote_tls_server_name_matches(client_hello.server_name(), &challenge.domain)
                     .then(|| Arc::clone(&challenge.certified_key))
             });
         }
         Some(Arc::clone(&self.normal))
     }
+}
+
+fn remote_tls_server_name_matches(server_name: Option<&str>, expected_domain: &str) -> bool {
+    server_name.is_some_and(|name| name.eq_ignore_ascii_case(expected_domain))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

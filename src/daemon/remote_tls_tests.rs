@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use super::{
     RemoteTlsConfigError, RemoteTlsConfigHandle, build_remote_tls_server_config,
     handle_tcp_accept_error, handle_tls_handshake_error, is_transient_accept_error,
+    remote_tls_server_name_matches,
 };
 use crate::daemon::remote_acme::RemoteCertificateBundle;
 
@@ -90,6 +91,18 @@ fn remote_tls_config_rejects_certificate_with_mismatched_private_key() {
         RemoteTlsConfigError::InvalidServerConfig(_)
     ));
     assert!(error.to_string().contains("key"));
+}
+
+#[test]
+fn remote_tls_acme_server_name_matching_is_case_insensitive() {
+    assert!(remote_tls_server_name_matches(
+        Some("DAEMON.EXAMPLE.COM"),
+        "daemon.example.com"
+    ));
+    assert!(!remote_tls_server_name_matches(
+        Some("other.example.com"),
+        "daemon.example.com"
+    ));
 }
 
 #[test]
