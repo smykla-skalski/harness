@@ -53,7 +53,11 @@ struct ManifestWatcherStartupSeed: Sendable {
 extension HarnessMonitorStore {
   func startManifestWatcher() {
     stopManifestWatcher()
-    guard maintainsLiveDaemonObservation else {
+    guard maintainsLiveDaemonObservation, !usesRemoteDaemon else {
+      return
+    }
+    ensureLocalManifestURL()
+    guard let manifestURL else {
       return
     }
     let worker = manifestWatcherStartupWorker
@@ -68,8 +72,10 @@ extension HarnessMonitorStore {
         return
       }
       self.manifestWatcherStartTask = nil
-      if self.manifestURL.standardizedFileURL != requestedManifestURL {
-        let refreshedSeed = await worker.loadSeed(manifestURL: self.manifestURL)
+      if self.manifestURL?.standardizedFileURL != requestedManifestURL,
+        let refreshedManifestURL = self.manifestURL
+      {
+        let refreshedSeed = await worker.loadSeed(manifestURL: refreshedManifestURL)
         self.installManifestWatcher(refreshedSeed)
         return
       }
@@ -114,7 +120,8 @@ extension HarnessMonitorStore {
 
   func refreshExternalManifestDiscoveryTask() {
     guard manifestWatcher != nil,
-      maintainsLiveDaemonObservation
+      maintainsLiveDaemonObservation,
+      !usesRemoteDaemon
     else {
       stopExternalManifestDiscoveryTask()
       return

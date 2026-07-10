@@ -15,6 +15,9 @@ extension HarnessMonitorStore {
   }
 
   private func makeMobileRelayBackgroundClient() async throws -> any HarnessMonitorClientProtocol {
+    if usesRemoteDaemon {
+      return try await daemonController.bootstrapClient()
+    }
     switch daemonOwnership {
     case .managed:
       let registrationState = try await ensureManagedLaunchAgentReady()

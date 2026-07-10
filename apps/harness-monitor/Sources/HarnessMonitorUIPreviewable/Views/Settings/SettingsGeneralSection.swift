@@ -18,6 +18,7 @@ public struct SettingsGeneralOverviewState: Equatable, Sendable {
   public let startedAt: String?
   public let daemonModeLabel: String
   public let isExternalDaemon: Bool
+  public let isRemoteDaemon: Bool
   public let externalDaemonManifestPath: String
   public let externalDaemonProcessSummary: String?
   public let showsLaunchAgent: Bool
@@ -49,15 +50,23 @@ public struct SettingsGeneralOverviewState: Equatable, Sendable {
         nil
       }
 
-    switch store.daemonOwnership {
-    case .managed:
-      daemonModeLabel = store.daemonOwnership.settingsLabel
+    if store.usesRemoteDaemon {
+      daemonModeLabel = "Remote"
       isExternalDaemon = false
-      showsLaunchAgent = true
-    case .external:
-      daemonModeLabel = store.daemonOwnership.settingsLabel
-      isExternalDaemon = true
+      isRemoteDaemon = true
       showsLaunchAgent = false
+    } else {
+      isRemoteDaemon = false
+      switch store.daemonOwnership {
+      case .managed:
+        daemonModeLabel = store.daemonOwnership.settingsLabel
+        isExternalDaemon = false
+        showsLaunchAgent = true
+      case .external:
+        daemonModeLabel = store.daemonOwnership.settingsLabel
+        isExternalDaemon = true
+        showsLaunchAgent = false
+      }
     }
 
     if let sandboxed = manifest?.sandboxed {
@@ -70,6 +79,7 @@ public struct SettingsGeneralOverviewState: Equatable, Sendable {
 
 public struct SettingsGeneralLiveState: Equatable, Sendable {
   public let daemonOwnership: DaemonOwnership
+  public let daemonActionAvailability: SettingsDaemonActionAvailability
   public let isLoading: Bool
   public let daemonLogLevel: String
   public let isDaemonOnline: Bool
@@ -77,6 +87,10 @@ public struct SettingsGeneralLiveState: Equatable, Sendable {
   @MainActor
   public init(store: HarnessMonitorStore) {
     daemonOwnership = store.daemonOwnership
+    daemonActionAvailability = SettingsDaemonActionAvailability(
+      daemonOwnership: store.daemonOwnership,
+      usesRemoteDaemon: store.usesRemoteDaemon
+    )
     isLoading =
       store.isDaemonActionInFlight
       || store.isDiagnosticsRefreshInFlight
@@ -124,19 +138,21 @@ public struct SettingsGeneralSection: View {
       }
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMetricCard("Daemon Mode"))
-    Picker("Startup daemon mode", selection: $preferredDaemonModeRawValue) {
-      ForEach(DaemonOwnership.allCases, id: \.rawValue) { ownership in
-        Text(ownership.settingsLabel).tag(ownership.rawValue)
+    if !overview.isRemoteDaemon {
+      Picker("Startup daemon mode", selection: $preferredDaemonModeRawValue) {
+        ForEach(DaemonOwnership.allCases, id: \.rawValue) { ownership in
+          Text(ownership.settingsLabel).tag(ownership.rawValue)
+        }
       }
-    }
-    .harnessNativeFormControl()
-    .accessibilityHint(
-      "Choose which daemon ownership mode Harness Monitor should use the next time it launches"
-    )
-    if preferredDaemonMode != liveState.daemonOwnership {
-      Text("Relaunch Harness Monitor to switch to \(preferredDaemonMode.settingsLabel)")
-        .scaledFont(.caption)
-        .foregroundStyle(.secondary)
+      .harnessNativeFormControl()
+      .accessibilityHint(
+        "Choose which daemon ownership mode Harness Monitor should use the next time it launches"
+      )
+      if preferredDaemonMode != liveState.daemonOwnership {
+        Text("Relaunch Harness Monitor to switch to \(preferredDaemonMode.settingsLabel)")
+          .scaledFont(.caption)
+          .foregroundStyle(.secondary)
+      }
     }
     if overview.isExternalDaemon {
       LabeledContent("Dev manifest") {
@@ -189,7 +205,7 @@ public struct SettingsGeneralSection: View {
 
         Section {
           SettingsActionButtons(
-            daemonOwnership: liveState.daemonOwnership,
+            availability: liveState.daemonActionAvailability,
             isLoading: liveState.isLoading,
             isRemoveLaunchAgentConfirmationPresented: $isRemoveLaunchAgentConfirmationPresented,
             reconnect: { await store.reconnect() },

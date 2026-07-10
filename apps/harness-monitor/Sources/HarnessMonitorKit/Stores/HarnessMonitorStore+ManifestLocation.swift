@@ -2,7 +2,17 @@ import Foundation
 
 extension HarnessMonitorStore {
   public var currentManifestPath: String {
-    manifestURL.path
+    if manifestURL == nil, !usesRemoteDaemon {
+      ensureLocalManifestURL()
+    }
+    return manifestURL?.path ?? "Not used for remote connections"
+  }
+
+  func ensureLocalManifestURL() {
+    guard manifestURL == nil else {
+      return
+    }
+    manifestURL = HarnessMonitorPaths.manifestURLWithoutLiveDiscovery()
   }
 
   func adoptManifestURL(from path: String) {

@@ -2,6 +2,8 @@ import Foundation
 import SwiftData
 
 extension HarnessMonitorStore {
+  public var apiClient: (any HarnessMonitorClientProtocol)? { client }
+
   public var selectedAcpInspectAgents: [AcpAgentInspectSnapshot] {
     selectedAcpInspectState?.agents ?? []
   }
@@ -23,6 +25,7 @@ extension HarnessMonitorStore {
     daemonController: any DaemonControlling,
     fileViewer: any FileViewerActivating = WorkspaceFileViewer(),
     daemonOwnership: DaemonOwnership = .managed,
+    remoteDaemonServices: RemoteDaemonServices? = nil,
     modelContainer: ModelContainer? = nil,
     persistenceError: String? = nil,
     cacheService: SessionCacheService? = nil,
@@ -34,6 +37,7 @@ extension HarnessMonitorStore {
       fileViewer: fileViewer,
       voiceCapture: NativeVoiceCaptureService(),
       daemonOwnership: daemonOwnership,
+      remoteDaemonServices: remoteDaemonServices,
       modelContainer: modelContainer,
       persistenceError: persistenceError,
       cacheService: cacheService,

@@ -100,6 +100,8 @@ struct SettingsConnectionSnapshot {
   let isDiagnosticsRefreshInFlight: Bool
   let metrics: ConnectionMetrics
   let events: [ConnectionEvent]
+  let remoteProfile: RemoteDaemonProfile?
+  let remoteActionState: RemoteDaemonActionState
 
   @MainActor
   init(store: HarnessMonitorStore) {
@@ -107,6 +109,8 @@ struct SettingsConnectionSnapshot {
     isDiagnosticsRefreshInFlight = store.isDiagnosticsRefreshInFlight
     metrics = store.connectionMetrics
     events = store.connectionEvents
+    remoteProfile = store.remoteDaemonProfile
+    remoteActionState = store.remoteDaemonActionState
   }
 }
 
@@ -171,8 +175,14 @@ struct SettingsConnectionSectionRoot: View {
             isDiagnosticsRefreshInFlight: snapshot.isDiagnosticsRefreshInFlight,
             metrics: snapshot.metrics,
             events: snapshot.events,
+            remoteProfile: snapshot.remoteProfile,
+            remoteActionState: snapshot.remoteActionState,
             reconnect: { await store.reconnect() },
-            refreshDiagnostics: { await store.refreshDiagnostics() }
+            refreshDiagnostics: { await store.refreshDiagnostics() },
+            pairRemoteDaemon: { input, displayName in
+              store.pairRemoteDaemon(using: input, displayName: displayName)
+            },
+            forgetRemoteDaemon: { store.forgetRemoteDaemon() }
           )
         } else {
           ProgressView("Loading connection...")

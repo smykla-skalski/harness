@@ -8,7 +8,10 @@ import SwiftUI
   Form {
     Section("Actions") {
       SettingsActionButtons(
-        daemonOwnership: .managed,
+        availability: SettingsDaemonActionAvailability(
+          daemonOwnership: .managed,
+          usesRemoteDaemon: false
+        ),
         isLoading: false,
         isRemoveLaunchAgentConfirmationPresented: $isConfirmationPresented,
         reconnect: {},

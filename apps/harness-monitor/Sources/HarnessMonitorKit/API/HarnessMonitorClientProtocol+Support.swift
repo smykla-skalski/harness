@@ -1,12 +1,36 @@
 import Foundation
 
+public enum HarnessMonitorServerTrust: Equatable, Sendable {
+  case system
+  case spkiSHA256(RemoteDaemonSPKIPin)
+}
+
+public enum HarnessMonitorConnectionSource: Equatable, Sendable {
+  case local
+  case remote(profileID: UUID)
+}
+
 public struct HarnessMonitorConnection: Equatable, Sendable {
   public let endpoint: URL
   public let token: String
+  public let serverTrust: HarnessMonitorServerTrust
+  public let source: HarnessMonitorConnectionSource
 
-  public init(endpoint: URL, token: String) {
+  public init(
+    endpoint: URL,
+    token: String,
+    serverTrust: HarnessMonitorServerTrust = .system,
+    source: HarnessMonitorConnectionSource = .local
+  ) {
     self.endpoint = endpoint
     self.token = token
+    self.serverTrust = serverTrust
+    self.source = source
+  }
+
+  public var isRemote: Bool {
+    if case .remote = source { return true }
+    return false
   }
 }
 

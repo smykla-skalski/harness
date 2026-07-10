@@ -283,7 +283,7 @@ extension SessionSwiftUISourceTests {
     #expect(sources.generalSource.contains("public struct SettingsGeneralLiveState"))
     #expect(sources.generalSource.contains("SettingsLoggingSection("))
     #expect(sources.generalSource.contains("daemonLogLevel: liveState.daemonLogLevel"))
-    #expect(sources.generalSource.contains("daemonOwnership: liveState.daemonOwnership"))
+    #expect(sources.generalSource.contains("availability: liveState.daemonActionAvailability"))
     #expect(!sources.loggingSource.contains("public let store: HarnessMonitorStore"))
     #expect(!sources.actionButtonsSource.contains("let store: HarnessMonitorStore"))
   }

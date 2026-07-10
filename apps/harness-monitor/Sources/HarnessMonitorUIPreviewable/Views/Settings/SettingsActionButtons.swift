@@ -2,7 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SettingsActionButtons: View {
-  let daemonOwnership: DaemonOwnership
+  let availability: SettingsDaemonActionAvailability
   let isLoading: Bool
   @Binding var isRemoveLaunchAgentConfirmationPresented: Bool
   let reconnect: @MainActor @Sendable () async -> Void
@@ -36,7 +36,7 @@ struct SettingsActionButtons: View {
           ),
           action: refreshDiagnostics
         )
-        if daemonOwnership == .managed {
+        if availability.showsManagedControls {
           HarnessMonitorAsyncActionButton(
             title: "Start Daemon",
             tint: nil,
@@ -67,7 +67,7 @@ struct SettingsActionButtons: View {
           ) {
             isRemoveLaunchAgentConfirmationPresented = true
           }
-        } else {
+        } else if availability.showsExternalDevCommand {
           HarnessMonitorActionButton(
             title: "Copy Dev Command",
             tint: .secondary,

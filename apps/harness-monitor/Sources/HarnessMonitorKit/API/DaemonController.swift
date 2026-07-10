@@ -20,6 +20,7 @@ public struct DaemonController: DaemonControlling {
   let autoTransportWebSocketGracePeriod: Duration
   let launchAgentManager: any DaemonLaunchAgentManaging
   let ownership: DaemonOwnership
+  let remoteConnectionSource: any RemoteDaemonConnectionSourcing
   let endpointProbe: @Sendable (URL) async -> Bool
   let managedStaleManifestGracePeriod: Duration
   let managedLaunchAgentBTMSettleDelay: Duration
@@ -38,6 +39,7 @@ public struct DaemonController: DaemonControlling {
     launchAgentManager: any DaemonLaunchAgentManaging =
       ServiceManagementDaemonLaunchAgentManager(),
     ownership: DaemonOwnership = .managed,
+    remoteConnectionSource: (any RemoteDaemonConnectionSourcing)? = nil,
     autoTransportWebSocketGracePeriod: Duration = .seconds(2),
     sessionFactory:
       @escaping @Sendable (HarnessMonitorConnection) -> any HarnessMonitorClientProtocol = {
@@ -92,6 +94,8 @@ public struct DaemonController: DaemonControlling {
     self.autoTransportWebSocketGracePeriod = autoTransportWebSocketGracePeriod
     self.launchAgentManager = launchAgentManager
     self.ownership = ownership
+    self.remoteConnectionSource =
+      remoteConnectionSource ?? DisabledRemoteDaemonConnectionSource()
     self.sessionFactory = sessionFactory
     self.webSocketBootstrapper = webSocketBootstrapper
     self.endpointProbe = endpointProbe
@@ -116,9 +120,16 @@ public struct DaemonController: DaemonControlling {
       "Bootstrapping daemon client for \(String(describing: ownership), privacy: .public) daemon mode"
     )
     let connection = try loadConnection()
-    let client = try await bootstrap(connection: connection)
-    externalManifestLocator.rememberActiveManifestIfNeeded()
-    return client
+    do {
+      let client = try await bootstrap(connection: connection)
+      if !connection.isRemote {
+        externalManifestLocator.rememberActiveManifestIfNeeded()
+      }
+      return client
+    } catch {
+      handleRemoteAuthorizationFailure(error, connection: connection)
+      throw error
+    }
   }
 
   public func performDeferredManagedLaunchAgentRefreshIfNeeded() async -> Bool {
@@ -144,12 +155,18 @@ public struct DaemonController: DaemonControlling {
   }
 
   func loadConnection() throws -> HarnessMonitorConnection {
-    try daemonConnection(from: loadManifest())
+    if let remoteConnection = try remoteConnectionSource.activeConnection() {
+      return remoteConnection
+    }
+    return try daemonConnection(from: loadManifest())
   }
 
   func bootstrap(
     connection: HarnessMonitorConnection
   ) async throws -> any HarnessMonitorClientProtocol {
+    if connection.isRemote {
+      return try await bootstrapRemoteConnection(connection)
+    }
     if transportPreference == .webSocket {
       if let wsClient = await webSocketBootstrapper(connection) {
         let endpoint = connection.endpoint.absoluteString
@@ -228,6 +245,7 @@ public struct DaemonController: DaemonControlling {
   }
 
   public func registerLaunchAgent() async throws -> DaemonLaunchAgentRegistrationState {
+    try requireLocalDaemonControl("Register Launch Agent")
     try launchAgentManager.register()
     let state = launchAgentManager.registrationState()
     if state == .enabled {
@@ -263,6 +281,10 @@ public struct DaemonController: DaemonControlling {
   }
 
   public func stopDaemon() async throws -> String {
+    if try remoteConnectionSource.activeProfile() != nil {
+      let client = try await bootstrapClient()
+      return try await requestDaemonStop(using: client)
+    }
     if launchAgentManager.registrationState() == .enabled {
       try launchAgentManager.unregister()
       clearManagedLaunchAgentBundleStamp()
@@ -271,8 +293,7 @@ public struct DaemonController: DaemonControlling {
     }
 
     let client = try await bootstrapClient()
-    let response = try await client.stopDaemon()
-    return response.status
+    return try await requestDaemonStop(using: client)
   }
 
   public func daemonStatus() async throws -> DaemonStatusReport {
@@ -287,6 +308,7 @@ public struct DaemonController: DaemonControlling {
   }
 
   public func installLaunchAgent() async throws -> String {
+    try requireLocalDaemonControl("Install Launch Agent")
     if ownership == .external {
       throw DaemonControlError.commandFailed(
         "Install Launch Agent is disabled in external daemon mode. "
@@ -313,6 +335,7 @@ public struct DaemonController: DaemonControlling {
   }
 
   public func removeLaunchAgent() async throws -> String {
+    try requireLocalDaemonControl("Remove Launch Agent")
     if ownership == .external {
       throw DaemonControlError.commandFailed(
         "Remove Launch Agent is disabled in external daemon mode"

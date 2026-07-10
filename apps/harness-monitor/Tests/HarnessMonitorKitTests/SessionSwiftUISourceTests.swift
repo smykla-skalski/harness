@@ -59,6 +59,7 @@ struct SessionSwiftUISourceTests {
       "Views/Settings/SettingsConnectionCard.swift",
       "Views/Settings/SettingsCodexSection.swift",
       "Views/Settings/SettingsConnectionSection.swift",
+      "Views/Settings/SettingsRemoteDaemonSection.swift",
       "Views/Settings/SettingsDiagnosticsOverview.swift",
       "Views/Settings/SettingsDiagnosticsSection.swift",
       "Views/Settings/SettingsNotificationsSection.swift",
