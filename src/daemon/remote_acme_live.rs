@@ -104,6 +104,13 @@ impl RemoteAcmeChallengeProvisioner for LiveRemoteAcmeChallengeProvisioner {
                 .map_err(|error| error.to_string()),
         }
     }
+
+    async fn wait_ready(&self, lease: &Self::Lease) -> Result<(), String> {
+        match lease {
+            LiveRemoteAcmeChallengeLease::System(lease) => self.system.wait_ready(lease).await,
+            LiveRemoteAcmeChallengeLease::TlsAlpn(_) => Ok(()),
+        }
+    }
 }
 
 #[derive(Clone)]

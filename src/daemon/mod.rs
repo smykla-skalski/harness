@@ -41,6 +41,7 @@ pub mod remote_acme_dns;
 mod remote_acme_dns_provider;
 pub mod remote_acme_dns_runner;
 mod remote_acme_issuer;
+mod remote_acme_lease_guard;
 mod remote_acme_live;
 mod remote_acme_renewal;
 pub mod remote_auth;

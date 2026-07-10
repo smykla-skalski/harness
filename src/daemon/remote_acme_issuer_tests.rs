@@ -4,6 +4,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use instant_acme::{Account, RetryPolicy};
 use rcgen::KeyPair;
+use tokio::time::timeout;
 
 #[path = "remote_acme_issuer_test_support.rs"]
 mod support;
@@ -84,6 +85,32 @@ async fn instant_acme_issuer_completes_account_order_and_http01_issuance() {
             .is_some_and(|csr| !csr.is_empty())
     );
     http.assert_exhausted();
+}
+
+#[tokio::test]
+async fn instant_acme_issuer_cleans_challenge_when_issuance_is_cancelled() {
+    let (http, blocker) =
+        ScriptedAcmeHttp::new_blocking(acme_happy_path(), "https://acme.test/order/1");
+    let provisioner = RecordingProvisioner::default();
+    let issuer = test_issuer(http, provisioner.clone());
+    let config = http_serve_config();
+    let account = issuer
+        .create_account(config.acme_email.as_str())
+        .await
+        .expect("create ACME account");
+    let task = tokio::spawn(async move { issuer.issue_certificate(&account, &config, None).await });
+
+    timeout(Duration::from_secs(5), blocker.wait_until_blocked())
+        .await
+        .expect("ACME order poll did not block");
+    task.abort();
+    let cancellation = timeout(Duration::from_secs(1), task)
+        .await
+        .expect("cancel ACME issuance timeout")
+        .expect_err("cancelled ACME issuance should not complete");
+
+    assert!(cancellation.is_cancelled());
+    assert_eq!(provisioner.cleanup_count(), 1);
 }
 
 #[tokio::test]

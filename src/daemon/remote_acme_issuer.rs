@@ -21,6 +21,7 @@ use super::remote_acme::{
     RemoteCertificateBundle,
 };
 use super::remote_acme_challenge::SystemRemoteAcmeChallengeProvisioner;
+use super::remote_acme_lease_guard::RemoteAcmeChallengeLeaseGuard;
 use super::remote_redaction::redact_secret_detail;
 
 type AccountBuilderFactory = dyn Fn() -> Result<AccountBuilder, String> + Send + Sync + 'static;
@@ -95,15 +96,19 @@ impl fmt::Debug for RemoteAcmeChallengeMaterial {
 
 #[async_trait]
 pub(crate) trait RemoteAcmeChallengeProvisioner: Send + Sync {
-    type Lease: Send;
+    type Lease: Send + 'static;
 
     async fn present(&self, material: RemoteAcmeChallengeMaterial) -> Result<Self::Lease, String>;
+
+    async fn wait_ready(&self, _lease: &Self::Lease) -> Result<(), String> {
+        Ok(())
+    }
 
     async fn cleanup(&self, lease: Self::Lease) -> Result<(), String>;
 }
 
 pub(crate) struct InstantAcmeIssuer<P> {
-    provisioner: P,
+    provisioner: Arc<P>,
     directory_url: String,
     retry_policy: RetryPolicy,
     account_builder: Arc<AccountBuilderFactory>,
@@ -111,7 +116,7 @@ pub(crate) struct InstantAcmeIssuer<P> {
 
 impl<P> InstantAcmeIssuer<P>
 where
-    P: RemoteAcmeChallengeProvisioner,
+    P: RemoteAcmeChallengeProvisioner + 'static,
 {
     pub(crate) fn with_account_builder<F>(
         provisioner: P,
@@ -123,7 +128,7 @@ where
         F: Fn() -> Result<AccountBuilder, String> + Send + Sync + 'static,
     {
         Self {
-            provisioner,
+            provisioner: Arc::new(provisioner),
             directory_url: directory_url.trim().to_string(),
             retry_policy,
             account_builder: Arc::new(account_builder),
@@ -234,12 +239,12 @@ where
         order: &mut Order,
         config: &RemoteDaemonServeConfig,
     ) -> Result<(), String> {
-        let mut leases = Vec::new();
+        let mut leases = RemoteAcmeChallengeLeaseGuard::new(Arc::clone(&self.provisioner));
         let authorization_result = self
             .present_pending_authorizations(order, config, &mut leases)
             .await;
         if let Err(error) = authorization_result {
-            return self.cleanup_after_error(leases, error).await;
+            return Self::cleanup_after_error(leases, error);
         }
         let poll_result = order
             .poll_ready(&self.retry_policy)
@@ -252,7 +257,7 @@ where
                     Err(format!("remote ACME order became {status:?}"))
                 }
             });
-        match (poll_result, self.cleanup_all(leases).await) {
+        match (poll_result, leases.cleanup()) {
             (Ok(()), Ok(())) => Ok(()),
             (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
             (Err(issue), Err(cleanup)) => Err(format!(
@@ -265,7 +270,7 @@ where
         &self,
         order: &mut Order,
         config: &RemoteDaemonServeConfig,
-        leases: &mut Vec<P::Lease>,
+        leases: &mut RemoteAcmeChallengeLeaseGuard<P>,
     ) -> Result<(), String> {
         let mut authorizations = order.authorizations();
         while let Some(result) = authorizations.next().await {
@@ -288,38 +293,23 @@ where
             })?;
             let material = challenge_material(&challenge, config)?;
             let lease = self.provisioner.present(material).await?;
-            if let Err(error) = challenge
+            leases.push(lease);
+            self.provisioner
+                .wait_ready(leases.last().expect("presented ACME challenge lease"))
+                .await?;
+            challenge
                 .set_ready()
                 .await
-                .map_err(|error| redacted_acme_error(&error))
-            {
-                return self.cleanup_after_error(vec![lease], error).await;
-            }
-            leases.push(lease);
+                .map_err(|error| redacted_acme_error(&error))?;
         }
         Ok(())
     }
 
-    async fn cleanup_all(&self, leases: Vec<P::Lease>) -> Result<(), String> {
-        let mut failures = Vec::new();
-        for lease in leases {
-            if let Err(error) = self.provisioner.cleanup(lease).await {
-                failures.push(redact_secret_detail(&error));
-            }
-        }
-        if failures.is_empty() {
-            Ok(())
-        } else {
-            Err(failures.join("; "))
-        }
-    }
-
-    async fn cleanup_after_error(
-        &self,
-        leases: Vec<P::Lease>,
+    fn cleanup_after_error(
+        leases: RemoteAcmeChallengeLeaseGuard<P>,
         issue: String,
     ) -> Result<(), String> {
-        match self.cleanup_all(leases).await {
+        match leases.cleanup() {
             Ok(()) => Err(issue),
             Err(cleanup) => Err(format!(
                 "{issue}; remote ACME challenge cleanup also failed: {cleanup}"
