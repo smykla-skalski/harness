@@ -290,6 +290,7 @@ private final class RemoteDaemonSessionsURLProtocol: URLProtocol, @unchecked Sen
         headerFields: ["Content-Type": "application/json"]
       )
     else {
+      client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
       return
     }
     client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)

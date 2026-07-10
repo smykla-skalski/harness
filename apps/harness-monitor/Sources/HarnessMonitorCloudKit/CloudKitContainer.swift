@@ -44,7 +44,9 @@ public enum CloudKitContainer {
       }
       return containers.contains(identifier)
     #else
-      true
+      // Public iOS/watchOS Security APIs cannot inspect code-signing entitlements.
+      // This macOS preflight has no mobile call site, so fail closed if one is added.
+      false
     #endif
   }
 
