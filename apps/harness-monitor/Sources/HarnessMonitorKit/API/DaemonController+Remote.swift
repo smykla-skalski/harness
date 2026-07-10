@@ -53,10 +53,29 @@ extension DaemonController {
   }
 
   func requireLocalDaemonControl(_ action: String) throws {
-    guard try remoteConnectionSource.activeProfile() == nil else {
+    let remoteProfile = try loadRemoteStateRecoveringCorruptMetadata {
+      try remoteConnectionSource.activeProfile()
+    }
+    guard remoteProfile == nil else {
       throw DaemonControlError.commandFailed(
         "\(action) is unavailable while a remote daemon profile is active"
       )
+    }
+  }
+
+  func loadRemoteStateRecoveringCorruptMetadata<Value>(
+    _ load: () throws -> Value?
+  ) throws -> Value? {
+    do {
+      return try load()
+    } catch {
+      guard error as? RemoteDaemonProfileError == .invalidStoredProfiles else {
+        throw error
+      }
+      HarnessMonitorLogger.lifecycle.notice(
+        "Discarded unreadable remote daemon profile metadata; using local daemon state"
+      )
+      return nil
     }
   }
 

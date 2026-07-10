@@ -111,6 +111,34 @@ struct DaemonControllerRemoteConnectionTests {
     #expect(fixture.launchAgent.unregisterCallCount == 0)
   }
 
+  @Test("Corrupt remote metadata still allows local launch agent controls")
+  func corruptRemoteMetadataAllowsLocalLaunchAgentControl() async throws {
+    let launchAgent = RecordingLaunchAgentManager(state: .enabled)
+    let controller = DaemonController(
+      launchAgentManager: launchAgent,
+      remoteConnectionSource: CorruptThenClearedRemoteDaemonConnectionSource()
+    )
+
+    let status = try await controller.installLaunchAgent()
+
+    #expect(status == "launch agent already installed")
+    #expect(launchAgent.unregisterCallCount == 0)
+  }
+
+  @Test("Corrupt remote metadata still allows stopping the local daemon")
+  func corruptRemoteMetadataAllowsLocalStop() async throws {
+    let launchAgent = RecordingLaunchAgentManager(state: .enabled)
+    let controller = DaemonController(
+      launchAgentManager: launchAgent,
+      remoteConnectionSource: CorruptThenClearedRemoteDaemonConnectionSource()
+    )
+
+    let status = try await controller.stopDaemon()
+
+    #expect(status == "stopped")
+    #expect(launchAgent.unregisterCallCount == 1)
+  }
+
   @Test("Remote stop closes its temporary authenticated client")
   func remoteStopShutsDownClient() async throws {
     let fixture = try RemoteControllerFixture()
@@ -207,7 +235,7 @@ private final class CorruptThenClearedRemoteDaemonConnectionSource:
   }
 
   func activeProfile() throws -> RemoteDaemonProfile? {
-    nil
+    throw RemoteDaemonProfileError.invalidStoredProfiles
   }
 
   func markRevoked(profileID: UUID, at date: Date) throws {}

@@ -155,14 +155,11 @@ public struct DaemonController: DaemonControlling {
   }
 
   func loadConnection() throws -> HarnessMonitorConnection {
-    do {
-      if let remoteConnection = try remoteConnectionSource.activeConnection() {
-        return remoteConnection
-      }
-    } catch RemoteDaemonProfileError.invalidStoredProfiles {
-      HarnessMonitorLogger.lifecycle.notice(
-        "Discarded unreadable remote daemon profile metadata; falling back to the local manifest"
-      )
+    let remoteConnection = try loadRemoteStateRecoveringCorruptMetadata {
+      try remoteConnectionSource.activeConnection()
+    }
+    if let remoteConnection {
+      return remoteConnection
     }
     return try daemonConnection(from: loadManifest())
   }
@@ -287,7 +284,10 @@ public struct DaemonController: DaemonControlling {
   }
 
   public func stopDaemon() async throws -> String {
-    if try remoteConnectionSource.activeProfile() != nil {
+    let remoteProfile = try loadRemoteStateRecoveringCorruptMetadata {
+      try remoteConnectionSource.activeProfile()
+    }
+    if remoteProfile != nil {
       let client = try await bootstrapClient()
       return try await requestDaemonStop(using: client)
     }
