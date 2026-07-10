@@ -2,6 +2,7 @@ use std::process::id as process_id;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use tokio::sync::{broadcast, watch as tokio_watch};
+use tokio::task::JoinHandle;
 
 use crate::agents::acp::probe::schedule_probe_cache_refresh;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
@@ -10,9 +11,8 @@ use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::http::{self, AsyncDaemonDbSlot, DaemonHttpAuthMode, DaemonHttpState};
 use crate::daemon::remote_acme::RemoteAcmeRuntimePlan;
-use crate::daemon::remote_tls::{
-    RemoteTlsConfigError, RemoteTlsListener, build_remote_tls_server_config,
-};
+use crate::daemon::remote_acme_renewal::spawn_remote_acme_renewal_loop;
+use crate::daemon::remote_tls::{RemoteTlsConfigError, RemoteTlsConfigHandle, RemoteTlsListener};
 use crate::daemon::state::{self, DaemonManifest, HostBridgeManifest};
 use crate::daemon::voice::cleanup_abandoned_sessions;
 use crate::daemon::websocket::ReplayBuffer;
@@ -50,13 +50,19 @@ pub async fn serve_remote_https(
     cleanup_abandoned_sessions()?;
     let daemon_lock = state::acquire_singleton_lock()?;
 
-    let tls_config = build_remote_tls_server_config(acme_plan.certificate())
+    let tls_config = RemoteTlsConfigHandle::new(acme_plan.certificate().clone())
         .map_err(|error| remote_tls_config_cli_error(&error))?;
-    let listener = RemoteTlsListener::bind((config.host.as_str(), config.port), tls_config)
-        .await
-        .map_err(|error| {
-            CliErrorKind::workflow_io(format!("bind remote HTTPS listener: {error}"))
-        })?;
+    tracing::info!(
+        tls_generation = tls_config.generation(),
+        certificate_fingerprint = %tls_config.certificate_fingerprint(),
+        "remote TLS certificate loaded",
+    );
+    let listener =
+        RemoteTlsListener::bind_reloadable((config.host.as_str(), config.port), &tls_config)
+            .await
+            .map_err(|error| {
+                CliErrorKind::workflow_io(format!("bind remote HTTPS listener: {error}"))
+            })?;
     let endpoint = acme_plan.public_https_origin();
     let manifest = remote_daemon_manifest(&endpoint, config.sandboxed);
     state::append_event("info", &remote_bound_event_message(&endpoint))?;
@@ -82,6 +88,7 @@ pub async fn serve_remote_https(
     initialize_startup_state(&db, &async_db, sender.clone(), config.poll_interval).await?;
     super::audit::record_remote_daemon_bound(async_db.get(), &endpoint, config.sandboxed).await;
     schedule_probe_cache_refresh();
+    let remote_acme_renewal = start_remote_acme_renewal(&db, tls_config, shutdown_rx.clone())?;
 
     let codex_controller = CodexControllerHandle::new_with_async_db(
         sender.clone(),
@@ -119,6 +126,12 @@ pub async fn serve_remote_https(
     let _background = spawn_background_tasks(&app_state, config.poll_interval, shutdown_rx.clone());
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;
+    let _ = shutdown_tx.send(true);
+    let renewal_result = remote_acme_renewal.await.map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "join remote ACME renewal loop: {error}"
+        )))
+    });
     super::audit::record_daemon_stopped(async_db_slot_for_audit.get(), &serve_result).await;
     let stop_event_result = if serve_result.is_ok() {
         state::append_event("info", "remote daemon stopped")
@@ -127,10 +140,23 @@ pub async fn serve_remote_https(
     };
     drop(daemon_lock);
 
-    match (serve_result, stop_event_result) {
-        (Err(error), _) | (Ok(()), Err(error)) => Err(error),
-        (Ok(()), Ok(())) => Ok(()),
+    match (serve_result, renewal_result, stop_event_result) {
+        (Err(error), _, _) | (Ok(()), Err(error), _) | (Ok(()), Ok(()), Err(error)) => Err(error),
+        (Ok(()), Ok(()), Ok(())) => Ok(()),
     }
+}
+
+fn start_remote_acme_renewal(
+    db: &Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
+    tls: RemoteTlsConfigHandle,
+    shutdown_rx: tokio_watch::Receiver<bool>,
+) -> Result<JoinHandle<()>, CliError> {
+    let renewal_db = db.get().cloned().ok_or_else(|| {
+        CliError::from(CliErrorKind::workflow_io(
+            "remote ACME renewal database was not initialized",
+        ))
+    })?;
+    Ok(spawn_remote_acme_renewal_loop(renewal_db, tls, shutdown_rx))
 }
 
 fn validate_remote_https_config(config: &DaemonServeConfig) -> Result<(), CliError> {

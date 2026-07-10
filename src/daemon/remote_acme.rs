@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
+use async_trait::async_trait;
 use sha2::{Digest, Sha256};
 
 use super::protocol::http_paths;
@@ -9,7 +10,7 @@ use super::remote::{
     RemoteAcmeChallenge, RemoteDaemonConfigError, RemoteDaemonServeConfig,
     validate_remote_serve_config,
 };
-use super::remote_certificate_identity::RemotePrivateKeyPem;
+use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 pub use super::remote_acme_dns::{
     CloudflareDns01ChangeRequest, Dns01ChangeOperation, Dns01ExecHookError,
     Dns01ExecHookInvocation, Dns01ExecHookOperation, Dns01ProviderChangeError,
@@ -19,6 +20,7 @@ pub use super::remote_acme_dns_runner::{
     Dns01ProviderAction, Dns01ProviderChangeRunner, Dns01ProviderExecutionConfig,
     Dns01ProviderExecutionError,
 };
+use super::remote_certificate_identity::RemotePrivateKeyPem;
 use super::remote_redaction::redact_secret_detail;
 
 #[cfg(test)]
@@ -249,7 +251,9 @@ impl RemoteAcmeRenewalRequest {
 
     #[must_use]
     pub fn previous_private_key_pem(&self) -> Option<&str> {
-        self.previous_private_key_pem.as_ref().map(RemotePrivateKeyPem::as_str)
+        self.previous_private_key_pem
+            .as_ref()
+            .map(RemotePrivateKeyPem::as_str)
     }
 
     #[must_use]
@@ -276,6 +280,19 @@ pub trait RemoteAcmeRenewalIssuer {
     fn renew_certificate(
         &self,
         request: &RemoteAcmeRenewalRequest,
+    ) -> Result<RemoteCertificateBundle, String>;
+}
+
+#[async_trait]
+pub(crate) trait RemoteAcmeAutomaticRenewalIssuer: Send + Sync {
+    /// Renew a certificate without entering a nested blocking runtime.
+    ///
+    /// # Errors
+    /// Returns a redaction-ready operator detail when automatic renewal fails.
+    async fn renew_certificate_automatically(
+        &self,
+        request: &RemoteAcmeRenewalRequest,
+        cleanup_tracker: &RemoteAcmeCleanupTracker,
     ) -> Result<RemoteCertificateBundle, String>;
 }
 
@@ -454,36 +471,6 @@ impl RemoteCertificateBundle {
     #[must_use]
     pub fn has_material(&self) -> bool {
         !self.certificate_pem.trim().is_empty() && !self.private_key_pem.trim().is_empty()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RemoteCertificateSlot {
-    bundle: RemoteCertificateBundle,
-    generation: u64,
-}
-
-impl RemoteCertificateSlot {
-    #[must_use]
-    pub const fn new(bundle: RemoteCertificateBundle) -> Self {
-        Self {
-            bundle,
-            generation: 1,
-        }
-    }
-
-    #[must_use]
-    pub const fn generation(&self) -> u64 {
-        self.generation
-    }
-
-    pub fn reload(&mut self, bundle: RemoteCertificateBundle) -> bool {
-        if self.bundle.fingerprint() == bundle.fingerprint() {
-            return false;
-        }
-        self.bundle = bundle;
-        self.generation += 1;
-        true
     }
 }
 

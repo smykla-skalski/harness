@@ -1,9 +1,10 @@
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use instant_acme::{Account, RetryPolicy};
 use rcgen::KeyPair;
+use tokio::time::{sleep, timeout};
 
 #[path = "remote_acme_issuer_test_support.rs"]
 mod support;
@@ -15,6 +16,7 @@ use support::{
 
 use super::{InstantAcmeIssuer, RemoteAcmeChallengeMaterial, RemoteAcmeChallengeProvisioner};
 use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider};
+use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_tls::build_remote_tls_server_config;
 
 #[tokio::test]
@@ -84,6 +86,75 @@ async fn instant_acme_issuer_completes_account_order_and_http01_issuance() {
             .is_some_and(|csr| !csr.is_empty())
     );
     http.assert_exhausted();
+}
+
+#[tokio::test]
+async fn instant_acme_issuer_cleans_challenge_when_issuance_is_cancelled() {
+    let (http, blocker) =
+        ScriptedAcmeHttp::new_blocking(acme_happy_path(), "https://acme.test/order/1");
+    let provisioner = RecordingProvisioner::with_cleanup_delay(Duration::from_secs(1));
+    let issuer = test_issuer(http, provisioner.clone());
+    let config = http_serve_config();
+    let account = issuer
+        .create_account(config.acme_email.as_str())
+        .await
+        .expect("create ACME account");
+    let cleanup_tracker = RemoteAcmeCleanupTracker::default();
+    let task_cleanup_tracker = cleanup_tracker.clone();
+    let task = tokio::spawn(async move {
+        issuer
+            .issue_certificate_with_cleanup(&account, &config, None, task_cleanup_tracker)
+            .await
+    });
+
+    timeout(Duration::from_secs(5), blocker.wait_until_blocked())
+        .await
+        .expect("ACME order poll did not block");
+    let cancel_started = Instant::now();
+    task.abort();
+    let cancellation = timeout(Duration::from_secs(2), task)
+        .await
+        .expect("cancel ACME issuance timeout")
+        .expect_err("cancelled ACME issuance should not complete");
+    let cancel_elapsed = cancel_started.elapsed();
+
+    assert!(cancellation.is_cancelled());
+    assert!(
+        cancel_elapsed < Duration::from_millis(500),
+        "cancelling ACME issuance blocked for {cancel_elapsed:?}"
+    );
+    timeout(Duration::from_secs(2), cleanup_tracker.wait_for_cleanup())
+        .await
+        .expect("cancelled ACME cleanup timeout");
+    assert_eq!(provisioner.cleanup_count(), 1);
+}
+
+#[tokio::test]
+async fn instant_acme_issuer_cleanup_does_not_block_runtime() {
+    let http = ScriptedAcmeHttp::new(acme_happy_path());
+    let provisioner = RecordingProvisioner::with_cleanup_delay(Duration::from_secs(1));
+    let issuer = test_issuer(http, provisioner.clone());
+    let config = http_serve_config();
+    let account = issuer
+        .create_account(config.acme_email.as_str())
+        .await
+        .expect("create ACME account");
+    let task = tokio::spawn(async move { issuer.issue_certificate(&account, &config, None).await });
+
+    timeout(Duration::from_millis(500), async {
+        while !provisioner.cleanup_started() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("ACME cleanup blocked the runtime worker");
+    timeout(Duration::from_secs(2), task)
+        .await
+        .expect("ACME issuance cleanup timeout")
+        .expect("join ACME issuance")
+        .expect("issue ACME certificate");
+
+    assert_eq!(provisioner.cleanup_count(), 1);
 }
 
 #[tokio::test]
@@ -249,6 +320,8 @@ struct RecordingProvisioner {
 struct RecordingProvisionerState {
     materials: Vec<RemoteAcmeChallengeMaterial>,
     cleanup_count: usize,
+    cleanup_delay: Duration,
+    cleanup_started: bool,
     cleanup_error: Option<String>,
 }
 
@@ -257,6 +330,15 @@ impl RecordingProvisioner {
         Self {
             inner: Arc::new(Mutex::new(RecordingProvisionerState {
                 cleanup_error: Some(error.to_string()),
+                ..RecordingProvisionerState::default()
+            })),
+        }
+    }
+
+    fn with_cleanup_delay(delay: Duration) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(RecordingProvisionerState {
+                cleanup_delay: delay,
                 ..RecordingProvisionerState::default()
             })),
         }
@@ -272,6 +354,10 @@ impl RecordingProvisioner {
 
     fn cleanup_count(&self) -> usize {
         self.inner.lock().expect("lock provisioner").cleanup_count
+    }
+
+    fn cleanup_started(&self) -> bool {
+        self.inner.lock().expect("lock provisioner").cleanup_started
     }
 }
 
@@ -289,6 +375,12 @@ impl RemoteAcmeChallengeProvisioner for RecordingProvisioner {
     }
 
     async fn cleanup(&self, _lease: Self::Lease) -> Result<(), String> {
+        let delay = {
+            let mut state = self.inner.lock().map_err(|error| error.to_string())?;
+            state.cleanup_started = true;
+            state.cleanup_delay
+        };
+        sleep(delay).await;
         let mut state = self.inner.lock().map_err(|error| error.to_string())?;
         state.cleanup_count += 1;
         state.cleanup_error.clone().map_or(Ok(()), Err)

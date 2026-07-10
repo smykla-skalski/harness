@@ -15,6 +15,7 @@ use rcgen::{
     DnType, IsCa, Issuer, KeyPair,
 };
 use rustls::pki_types::CertificateSigningRequestDer;
+use tokio::sync::Notify;
 
 use crate::daemon::remote::RemoteAcmeChallenge;
 
@@ -31,6 +32,13 @@ const REPLAY_NONCE: HeaderName = HeaderName::from_static("replay-nonce");
 #[derive(Clone)]
 pub(super) struct ScriptedAcmeHttp {
     inner: Arc<Mutex<ScriptedAcmeHttpState>>,
+    block_uri: Option<&'static str>,
+    blocked: Arc<Notify>,
+}
+
+#[derive(Clone)]
+pub(super) struct ScriptedAcmeHttpBlocker {
+    blocked: Arc<Notify>,
 }
 
 struct ScriptedAcmeHttpState {
@@ -47,7 +55,21 @@ impl ScriptedAcmeHttp {
                 requests: Vec::new(),
                 issued_certificate: None,
             })),
+            block_uri: None,
+            blocked: Arc::new(Notify::new()),
         }
+    }
+
+    pub(super) fn new_blocking(
+        responses: Vec<ScriptedResponse>,
+        block_uri: &'static str,
+    ) -> (Self, ScriptedAcmeHttpBlocker) {
+        let mut http = Self::new(responses);
+        http.block_uri = Some(block_uri);
+        let blocker = ScriptedAcmeHttpBlocker {
+            blocked: Arc::clone(&http.blocked),
+        };
+        (http, blocker)
     }
 
     pub(super) fn requests(&self) -> Vec<RecordedRequest> {
@@ -76,6 +98,8 @@ impl HttpClient for ScriptedAcmeHttp {
         request: Request<BodyWrapper<Bytes>>,
     ) -> Pin<Box<dyn Future<Output = Result<BytesResponse, AcmeError>> + Send>> {
         let inner = self.inner.clone();
+        let block_uri = self.block_uri;
+        let blocked = Arc::clone(&self.blocked);
         Box::pin(async move {
             let (parts, body) = request.into_parts();
             let body = body
@@ -88,6 +112,7 @@ impl HttpClient for ScriptedAcmeHttp {
                 uri: parts.uri.to_string(),
                 body: body.to_vec(),
             };
+            let should_block = block_uri == Some(recorded.uri.as_str());
             let (response, response_body) = {
                 let mut state = inner.lock().expect("lock HTTP script");
                 let response = state
@@ -108,8 +133,18 @@ impl HttpClient for ScriptedAcmeHttp {
                 state.requests.push(recorded);
                 (response, response_body)
             };
+            if should_block {
+                blocked.notify_one();
+                std::future::pending::<()>().await;
+            }
             Ok(response.into_response(response_body))
         })
+    }
+}
+
+impl ScriptedAcmeHttpBlocker {
+    pub(super) async fn wait_until_blocked(&self) {
+        self.blocked.notified().await;
     }
 }
 
