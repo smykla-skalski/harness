@@ -281,7 +281,7 @@ private struct TaskBoardLaneBodyChrome: ViewModifier {
   func body(content: Content) -> some View {
     content
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-      .padding(.top, metrics.laneBodyTopPadding)
+      .padding(.top, metrics.laneHeaderBodyTopPadding)
       .background {
         if isDropTargeted {
           RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)

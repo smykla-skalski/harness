@@ -286,6 +286,23 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(metrics.laneCollapsedTitleHeight > metrics.laneCollapsedWidth)
   }
 
+  @Test("Lane metrics align header body gap with side inset")
+  func laneMetricsAlignHeaderBodyGapWithSideInset() {
+    let regular = TaskBoardLaneMetrics(fontScale: 1)
+    let large = TaskBoardLaneMetrics(fontScale: 1.8)
+
+    #expect(
+      abs(
+        regular.headerBottomPadding + regular.laneHeaderBodyTopPadding - regular.laneInnerPadding
+      ) < 0.001
+    )
+    #expect(
+      abs(
+        large.headerBottomPadding + large.laneHeaderBodyTopPadding - large.laneInnerPadding
+      ) < 0.001
+    )
+  }
+
   @Test("Overview metrics share scaled board spacing and padding")
   func overviewMetricsShareScaledBoardSpacingAndPadding() {
     let regular = TaskBoardOverviewMetrics(fontScale: 1)

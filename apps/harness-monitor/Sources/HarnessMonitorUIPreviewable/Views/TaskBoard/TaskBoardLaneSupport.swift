@@ -19,6 +19,7 @@ struct TaskBoardLaneMetrics: Equatable {
   let laneAccentInteriorCornerRadius: CGFloat
   let headerIconWidth: CGFloat
   let headerBottomPadding: CGFloat
+  let laneHeaderBodyTopPadding: CGFloat
   let countHorizontalPadding: CGFloat
   let countVerticalPadding: CGFloat
   let emptyLaneMinHeight: CGFloat
@@ -51,6 +52,7 @@ struct TaskBoardLaneMetrics: Equatable {
     laneAccentVisibleHeight = max(4, 4 * min(scale, 1.12))
     headerIconWidth = 18 * min(scale, 1.25)
     headerBottomPadding = HarnessMonitorTheme.spacingSM * denseScale
+    laneHeaderBodyTopPadding = max(0, laneInnerPadding - headerBottomPadding)
     countHorizontalPadding = HarnessMonitorTheme.spacingSM * denseScale
     countVerticalPadding = HarnessMonitorTheme.spacingXS * min(scale, 1.2)
     emptyLaneMinHeight = 92 * heightScale

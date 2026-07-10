@@ -87,7 +87,7 @@ struct TaskBoardLaneUnifiedColumn: View {
   }
 
   private var expandedLaneContent: some View {
-    VStack(alignment: .leading, spacing: metrics.laneSpacing) {
+    VStack(alignment: .leading, spacing: 0) {
       TaskBoardLaneHeader(
         lane: lane,
         count: totalCount,

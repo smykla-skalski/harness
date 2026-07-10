@@ -22,6 +22,22 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(!needsYouRows.contains(".onHover {"))
   }
 
+  @Test("Expanded lanes do not add extra header body spacing")
+  func expandedLanesDoNotAddExtraHeaderBodySpacing() throws {
+    let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let laneChrome = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
+
+    #expect(
+      laneColumn.contains(
+        """
+        VStack(alignment: .leading, spacing: 0) {
+              TaskBoardLaneHeader(
+        """
+      )
+    )
+    #expect(laneChrome.contains(".padding(.top, metrics.laneHeaderBodyTopPadding)"))
+  }
+
   private func taskBoardSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
