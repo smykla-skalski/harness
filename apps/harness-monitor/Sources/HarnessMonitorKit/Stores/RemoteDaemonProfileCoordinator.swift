@@ -60,17 +60,24 @@ public actor RemoteDaemonProfileCoordinator {
 
   @discardableResult
   public func forgetActiveProfile() throws -> RemoteDaemonProfile? {
-    var state = try repository.load()
-    guard let activeProfileID = state.activeProfileID else {
+    let originalState = try repository.load()
+    guard let activeProfileID = originalState.activeProfileID else {
       return nil
     }
-    guard let profile = state.profiles.first(where: { $0.id == activeProfileID }) else {
+    guard let profile = originalState.profiles.first(where: { $0.id == activeProfileID }) else {
       throw RemoteDaemonProfileError.profileNotFound
     }
-    state.profiles.removeAll { $0.id == activeProfileID }
-    state.activeProfileID = nil
-    try repository.save(state)
-    try tokenStore.deleteToken(profileID: activeProfileID)
+    let token = try tokenStore.loadToken(profileID: activeProfileID)
+    var forgottenState = originalState
+    forgottenState.profiles.removeAll { $0.id == activeProfileID }
+    forgottenState.activeProfileID = nil
+    do {
+      try tokenStore.deleteToken(profileID: activeProfileID)
+      try repository.save(forgottenState)
+    } catch {
+      rollbackForget(state: originalState, token: token, profileID: activeProfileID)
+      throw error
+    }
     return profile
   }
 
@@ -112,6 +119,23 @@ public actor RemoteDaemonProfileCoordinator {
       } else {
         try? tokenStore.deleteToken(profileID: replacedToken.profileID)
       }
+    }
+  }
+
+  private func rollbackForget(
+    state: RemoteDaemonProfileState,
+    token: String?,
+    profileID: UUID
+  ) {
+    do {
+      try repository.save(state)
+      if let token {
+        try? tokenStore.saveToken(token, profileID: profileID)
+      } else {
+        try? tokenStore.deleteToken(profileID: profileID)
+      }
+    } catch {
+      try? tokenStore.deleteToken(profileID: profileID)
     }
   }
 }
