@@ -44,7 +44,7 @@ struct TaskBoardLaneMetrics: Equatable {
     laneCollapsedInnerPadding = HarnessMonitorTheme.spacingSM * denseScale
     laneCollapsedBadgeSize = max(34, 34 * min(scale, 1.18))
     laneCollapsedTextWidth = max(28, 28 * min(scale, 1.18))
-    laneCollapsedTitleHeight = max(96, 96 * min(scale, 1.08))
+    laneCollapsedTitleHeight = max(160, 160 * min(scale, 1.18))
     laneCollapsedContentTopPadding = HarnessMonitorTheme.spacingMD * denseScale
     laneFixedHeight = 704 * heightScale
     laneBodyTopPadding = HarnessMonitorTheme.spacingSM * denseScale

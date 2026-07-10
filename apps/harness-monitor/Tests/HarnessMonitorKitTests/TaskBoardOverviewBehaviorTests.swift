@@ -163,6 +163,24 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(evaluation.dryRun == false)
   }
 
+  @Test("Collapsed lane titles keep a consistent font size")
+  func collapsedLaneTitlesKeepConsistentFontSize() throws {
+    let source = try taskBoardSource("TaskBoardLaneUnifiedColumn.swift")
+    let start = try #require(
+      source.range(of: "private var collapsedTitle: some View {")?.lowerBound
+    )
+    let end = try #require(
+      source.range(
+        of: "private var collapsedTitleVerticalOffset",
+        range: start..<source.endIndex
+      )?.lowerBound
+    )
+    let collapsedTitleSource = String(source[start..<end])
+
+    #expect(collapsedTitleSource.contains(".fixedSize(horizontal: true, vertical: false)"))
+    #expect(!collapsedTitleSource.contains(".minimumScaleFactor"))
+  }
+
   @Test("Overview presentation buckets task board lanes and decisions off main")
   @MainActor
   func overviewPresentationBucketsTaskBoardLanesAndDecisions() async {
@@ -191,6 +209,22 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(presentation.decisionIDs(in: .humanRequired) == ["decision-critical"])
     #expect(presentation.aggregateNeedsYouCount == 2)
     #expect(presentation.aggregateOpenCount == 4)
+  }
+
+  private func taskBoardSource(_ filename: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent("Views/TaskBoard")
+      .appendingPathComponent(filename)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 
 }

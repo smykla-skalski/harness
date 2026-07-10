@@ -389,7 +389,7 @@ private struct TaskBoardCollapsedLane: View {
       .font(titleFont)
       .foregroundStyle(HarnessMonitorTheme.ink.opacity(0.82))
       .lineLimit(1)
-      .minimumScaleFactor(0.72)
+      .fixedSize(horizontal: true, vertical: false)
       .frame(
         width: metrics.laneCollapsedTitleHeight,
         height: metrics.laneCollapsedTextWidth,

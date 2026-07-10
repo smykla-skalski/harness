@@ -77,6 +77,8 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(large.cardPadding > regular.cardPadding)
     #expect(large.pillHorizontalPadding > regular.pillHorizontalPadding)
     #expect(large.headerIconWidth > regular.headerIconWidth)
+    #expect(regular.laneCollapsedTitleHeight >= 160)
+    #expect(large.laneCollapsedTitleHeight > regular.laneCollapsedTitleHeight)
     #expect(
       TaskBoardLaneMetrics(fontScale: 0.1)
         == TaskBoardLaneMetrics(fontScale: 0.85)
