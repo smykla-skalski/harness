@@ -17,7 +17,10 @@ use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use super::remote_acme_live::LiveRemoteAcmeIssuer;
 use super::remote_certificate_identity::{RemoteCertificateIdentityError, certificate_not_after};
 use super::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision};
-use super::remote_tls::{RemoteTlsConfigHandle, build_remote_tls_server_config};
+use super::remote_redaction::redact_secret_detail;
+use super::remote_tls::{
+    RemoteTlsConfigError, RemoteTlsConfigHandle, build_remote_tls_server_config,
+};
 use crate::errors::{CliError, CliErrorKind};
 
 const REMOTE_ACME_RENEWAL_WINDOW: ChronoDuration = ChronoDuration::days(30);
@@ -239,14 +242,26 @@ where
 {
     let snapshot = load_renewal_snapshot(db)?;
     let due = remote_certificate_needs_renewal(&snapshot.bundle, now).unwrap_or(true);
-    if !due {
-        if tls.certificate_fingerprint() == snapshot.bundle.fingerprint() {
-            return Ok(RemoteAcmeRenewalCheckOutcome::NotDue);
-        }
-        if let Ok(reloaded) = tls.reload(snapshot.bundle.clone()) {
-            if !reloaded {
-                return Ok(RemoteAcmeRenewalCheckOutcome::NotDue);
-            }
+    if !due
+        && let Some(outcome) = reload_not_due_certificate(db, tls, &snapshot.bundle, now)?
+    {
+        return Ok(outcome);
+    }
+    renew_due_certificate(db, tls, issuer, &snapshot, now, cleanup_tracker).await
+}
+
+fn reload_not_due_certificate(
+    db: &Arc<Mutex<DaemonDb>>,
+    tls: &RemoteTlsConfigHandle,
+    bundle: &RemoteCertificateBundle,
+    now: DateTime<Utc>,
+) -> Result<Option<RemoteAcmeRenewalCheckOutcome>, CliError> {
+    if tls.certificate_fingerprint() == bundle.fingerprint() {
+        return Ok(Some(RemoteAcmeRenewalCheckOutcome::NotDue));
+    }
+    match tls.reload(bundle.clone()) {
+        Ok(false) => Ok(Some(RemoteAcmeRenewalCheckOutcome::NotDue)),
+        Ok(true) => {
             record_automatic_audit(
                 db,
                 now,
@@ -254,10 +269,24 @@ where
                 RemoteAuditOutcome::Success,
                 None,
             )?;
-            return Ok(RemoteAcmeRenewalCheckOutcome::Reloaded);
+            Ok(Some(RemoteAcmeRenewalCheckOutcome::Reloaded))
+        }
+        Err(error) => {
+            log_persisted_tls_reload_failure(&error);
+            Ok(None)
         }
     }
-    renew_due_certificate(db, tls, issuer, &snapshot, now, cleanup_tracker).await
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_persisted_tls_reload_failure(error: &RemoteTlsConfigError) {
+    tracing::warn!(
+        error = %redact_secret_detail(&error.to_string()),
+        "persisted remote TLS certificate reload failed; attempting early ACME renewal"
+    );
 }
 
 fn load_renewal_snapshot(db: &Arc<Mutex<DaemonDb>>) -> Result<RemoteAcmeRenewalSnapshot, CliError> {
