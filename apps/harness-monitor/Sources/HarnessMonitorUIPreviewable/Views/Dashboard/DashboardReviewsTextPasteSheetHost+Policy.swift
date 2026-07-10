@@ -4,21 +4,39 @@ import HarnessMonitorPolicyCanvas
 
 extension DashboardReviewsTextPasteSheetHost {
   func handlePastedReviewText(_ text: String) async {
+    let handleInterval = DashboardReviewsTextPasteTrace.beginHandle(textLength: text.count)
+    defer { DashboardReviewsTextPasteTrace.end(handleInterval) }
     let policyCenter = AutomationPolicyCenter.shared
-    await preparePastedReviewTextPolicyRuntime(policyCenter: policyCenter)
+    do {
+      let interval = DashboardReviewsTextPasteTrace.beginPreparePolicyRuntime()
+      defer { DashboardReviewsTextPasteTrace.end(interval) }
+      await preparePastedReviewTextPolicyRuntime(policyCenter: policyCenter)
+    }
     guard !Task.isCancelled else { return }
-    let references = await Task.detached(priority: .userInitiated) {
-      GitHubPullRequestReferenceParser.references(in: text)
-    }.value
+    let references: [GitHubPullRequestReference]
+    do {
+      let interval = DashboardReviewsTextPasteTrace.beginParseReferences(textLength: text.count)
+      defer { DashboardReviewsTextPasteTrace.end(interval) }
+      references = await Task.detached(priority: .userInitiated) {
+        GitHubPullRequestReferenceParser.references(in: text)
+      }.value
+    }
     let sourceApplication = ClipboardAutomationSourceApplicationResolver.current(
       confidence: "manual-review-text-paste"
     )
-    let result = pastedTextPolicyResult(
-      text: text,
-      references: references,
-      sourceApplication: sourceApplication,
-      policyCenter: policyCenter
-    )
+    let result: AutomationPolicyExecutionResult
+    do {
+      let interval = DashboardReviewsTextPasteTrace.beginPolicyExecute(
+        referenceCount: references.count
+      )
+      defer { DashboardReviewsTextPasteTrace.end(interval) }
+      result = pastedTextPolicyResult(
+        text: text,
+        references: references,
+        sourceApplication: sourceApplication,
+        policyCenter: policyCenter
+      )
+    }
     if let event = result.eventRecord {
       policyCenter.recordAutomationEvent(event)
     }
@@ -41,10 +59,17 @@ extension DashboardReviewsTextPasteSheetHost {
     let configuration =
       result.policyDecision.policy.reviewPullRequestExtraction
       ?? ReviewPullRequestExtractionConfiguration(autoCopy: false)
-    let resolution = await resolvePastedReviewReferences(
-      result.reviewPullRequestReferences,
-      configuration: configuration
-    )
+    let resolution: DashboardReviewsPastedTextResolution
+    do {
+      let interval = DashboardReviewsTextPasteTrace.beginResolveReferences(
+        referenceCount: result.reviewPullRequestReferences.count
+      )
+      defer { DashboardReviewsTextPasteTrace.end(interval) }
+      resolution = await resolvePastedReviewReferences(
+        result.reviewPullRequestReferences,
+        configuration: configuration
+      )
+    }
     toastRunner.updateAfterResolution(result.toastCommands)
     guard !resolution.items.isEmpty else {
       store.toast.presentWarning("No pasted pull requests matched Reviews data")
@@ -153,7 +178,14 @@ extension DashboardReviewsTextPasteSheetHost {
     resolution: DashboardReviewsPastedTextResolution,
     offersAutoPolicy: Bool
   ) async {
-    let preview = await reviewActionPreview(.approve, items: resolution.items)
+    let preview: ReviewsActionPreviewResponse
+    do {
+      let interval = DashboardReviewsTextPasteTrace.beginPreviewApproval(
+        itemCount: resolution.items.count
+      )
+      defer { DashboardReviewsTextPasteTrace.end(interval) }
+      preview = await reviewActionPreview(.approve, items: resolution.items)
+    }
     guard !Task.isCancelled else { return }
     presentPastedTextReviewSheet(
       DashboardReviewsPastedTextReviewSheetState(
@@ -235,6 +267,10 @@ extension DashboardReviewsTextPasteSheetHost {
   ) async -> [ReviewItem] {
     let repositories = orderedUnique(repositories)
     guard !repositories.isEmpty else { return [] }
+    let interval = DashboardReviewsTextPasteTrace.beginFetchRepositories(
+      repositoryCount: repositories.count
+    )
+    defer { DashboardReviewsTextPasteTrace.end(interval) }
     do {
       let response = try await DashboardReviewsTimeoutRacer.race(
         timeoutSeconds: DashboardReviewsTimeoutRacer.defaultMutationTimeoutSeconds
@@ -242,8 +278,11 @@ extension DashboardReviewsTextPasteSheetHost {
         try await client.queryReviews(
           request: ReviewsQueryRequest(
             repositories: repositories,
-            forceRefresh: true,
-            cacheMaxAgeSeconds: 0,
+            forceRefresh: false,
+            cacheMaxAgeSeconds: max(
+              preferences.cacheMaxAgeSeconds,
+              DashboardReviewsPreferences.minimumPerRepositoryIntervalSeconds
+            ),
             backportDetectionEnabled: preferences.backportDetectionEnabled,
             backportPatterns: preferences.normalizedBackportPatterns
           )

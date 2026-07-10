@@ -94,6 +94,34 @@ struct DashboardReviewsTextPastePolicyTests {
     #expect(fallbackPolicy.actions.contains(.promptReviewApprovals))
   }
 
+  @Test("Pasted review text resolution is cache-first and traceable")
+  func pastedReviewTextResolutionIsCacheFirstAndTraceable() throws {
+    let routeSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+TextPaste.swift"
+    )
+    let hostSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsTextPasteSheetHost+Policy.swift"
+    )
+    let traceSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsTextPasteTrace.swift"
+    )
+
+    for source in [routeSource, hostSource] {
+      #expect(source.contains("DashboardReviewsTextPasteTrace.beginFetchRepositories"))
+      #expect(source.contains("forceRefresh: false"))
+      #expect(!source.contains("forceRefresh: true"))
+      #expect(!source.contains("cacheMaxAgeSeconds: 0"))
+    }
+    #expect(traceSource.contains("OSSignposter("))
+    #expect(traceSource.contains(#""reviews_text_paste.handle""#))
+    #expect(traceSource.contains(#""reviews_text_paste.prepare_policy_runtime""#))
+    #expect(traceSource.contains(#""reviews_text_paste.parse_references""#))
+    #expect(traceSource.contains(#""reviews_text_paste.policy_execute""#))
+    #expect(traceSource.contains(#""reviews_text_paste.resolve_references""#))
+    #expect(traceSource.contains(#""reviews_text_paste.fetch_repositories""#))
+    #expect(traceSource.contains(#""reviews_text_paste.preview_approval""#))
+  }
+
   @Test("Default document leaves review screenshot paste to policy canvas")
   func defaultDocumentLeavesReviewScreenshotPasteToPolicyCanvas() throws {
     let document = AutomationPolicyDocument()
