@@ -10,6 +10,7 @@ use super::remote_acme::{
 use super::remote_acme_challenge::{
     SystemRemoteAcmeChallengeLease, SystemRemoteAcmeChallengeProvisioner,
 };
+use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use super::remote_acme_issuer::{
     InstantAcmeIssuer, RemoteAcmeChallengeMaterial, RemoteAcmeChallengeProvisioner,
     SystemRemoteAcmeIssuer, run_acme_future,
@@ -126,16 +127,18 @@ impl LiveRemoteAcmeIssuer {
     async fn issue_certificate(
         &self,
         request: &RemoteAcmeRenewalRequest,
+        cleanup_tracker: RemoteAcmeCleanupTracker,
     ) -> Result<RemoteCertificateBundle, String> {
         let provisioner = LiveRemoteAcmeChallengeProvisioner::from_environment(
             request.serve_config(),
             self.tls.clone(),
         )?;
         InstantAcmeIssuer::production(provisioner)
-            .issue_certificate(
+            .issue_certificate_with_cleanup(
                 request.account(),
                 request.serve_config(),
                 request.previous_private_key_pem(),
+                cleanup_tracker,
             )
             .await
     }
@@ -153,7 +156,7 @@ impl RemoteAcmeRenewalIssuer for LiveRemoteAcmeIssuer {
         &self,
         request: &RemoteAcmeRenewalRequest,
     ) -> Result<RemoteCertificateBundle, String> {
-        run_acme_future(self.issue_certificate(request))
+        run_acme_future(self.issue_certificate(request, RemoteAcmeCleanupTracker::default()))
     }
 }
 
@@ -162,8 +165,10 @@ impl RemoteAcmeAutomaticRenewalIssuer for LiveRemoteAcmeIssuer {
     async fn renew_certificate_automatically(
         &self,
         request: &RemoteAcmeRenewalRequest,
+        cleanup_tracker: &RemoteAcmeCleanupTracker,
     ) -> Result<RemoteCertificateBundle, String> {
-        self.issue_certificate(request).await
+        self.issue_certificate(request, cleanup_tracker.clone())
+            .await
     }
 }
 

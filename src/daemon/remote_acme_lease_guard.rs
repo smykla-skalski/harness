@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use super::remote_acme_issuer::{RemoteAcmeChallengeProvisioner, run_acme_future};
+use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
+use super::remote_acme_issuer::RemoteAcmeChallengeProvisioner;
 use super::remote_redaction::redact_secret_detail;
 
 pub(crate) struct RemoteAcmeChallengeLeaseGuard<P>
@@ -8,6 +9,7 @@ where
     P: RemoteAcmeChallengeProvisioner + 'static,
 {
     provisioner: Arc<P>,
+    cleanup_tracker: RemoteAcmeCleanupTracker,
     leases: Option<Vec<P::Lease>>,
 }
 
@@ -15,9 +17,10 @@ impl<P> RemoteAcmeChallengeLeaseGuard<P>
 where
     P: RemoteAcmeChallengeProvisioner + 'static,
 {
-    pub(crate) fn new(provisioner: Arc<P>) -> Self {
+    pub(crate) fn new(provisioner: Arc<P>, cleanup_tracker: RemoteAcmeCleanupTracker) -> Self {
         Self {
             provisioner,
+            cleanup_tracker,
             leases: Some(Vec::new()),
         }
     }
@@ -33,19 +36,21 @@ where
         self.leases.as_ref().and_then(|leases| leases.last())
     }
 
-    pub(crate) fn cleanup(mut self) -> Result<(), String> {
-        self.cleanup_remaining()
-    }
-
-    fn cleanup_remaining(&mut self) -> Result<(), String> {
-        let Some(leases) = self.leases.take() else {
+    pub(crate) async fn cleanup(mut self) -> Result<(), String> {
+        let Some(cleanup) = self.take_cleanup() else {
             return Ok(());
         };
-        if leases.is_empty() {
-            return Ok(());
-        }
-        let provisioner = Arc::clone(&self.provisioner);
-        run_acme_future(cleanup_leases(provisioner, leases))
+        self.cleanup_tracker
+            .spawn_cleanup(cleanup)
+            .await
+            .map_err(|error| format!("join remote ACME challenge cleanup: {error}"))?
+    }
+
+    fn take_cleanup(
+        &mut self,
+    ) -> Option<impl Future<Output = Result<(), String>> + Send + 'static> {
+        let leases = self.leases.take().filter(|leases| !leases.is_empty())?;
+        Some(cleanup_leases(Arc::clone(&self.provisioner), leases))
     }
 }
 
@@ -54,21 +59,9 @@ where
     P: RemoteAcmeChallengeProvisioner + 'static,
 {
     fn drop(&mut self) {
-        let result = self.cleanup_remaining();
-        log_cancellation_cleanup(&result);
-    }
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion; tokio-rs/tracing#553"
-)]
-fn log_cancellation_cleanup(result: &Result<(), String>) {
-    if let Err(error) = result {
-        tracing::warn!(
-            error = %redact_secret_detail(error),
-            "remote ACME challenge cleanup after cancellation failed",
-        );
+        if let Some(cleanup) = self.take_cleanup() {
+            drop(self.cleanup_tracker.spawn_cleanup(cleanup));
+        }
     }
 }
 

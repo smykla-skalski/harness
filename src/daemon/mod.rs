@@ -37,6 +37,7 @@ pub mod protocol;
 pub mod remote;
 pub mod remote_acme;
 mod remote_acme_challenge;
+mod remote_acme_cleanup;
 pub mod remote_acme_dns;
 mod remote_acme_dns_provider;
 pub mod remote_acme_dns_runner;

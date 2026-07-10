@@ -10,6 +10,7 @@ use super::remote::{
     RemoteAcmeChallenge, RemoteDaemonConfigError, RemoteDaemonServeConfig,
     validate_remote_serve_config,
 };
+use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 pub use super::remote_acme_dns::{
     CloudflareDns01ChangeRequest, Dns01ChangeOperation, Dns01ExecHookError,
     Dns01ExecHookInvocation, Dns01ExecHookOperation, Dns01ProviderChangeError,
@@ -291,6 +292,7 @@ pub(crate) trait RemoteAcmeAutomaticRenewalIssuer: Send + Sync {
     async fn renew_certificate_automatically(
         &self,
         request: &RemoteAcmeRenewalRequest,
+        cleanup_tracker: &RemoteAcmeCleanupTracker,
     ) -> Result<RemoteCertificateBundle, String>;
 }
 

@@ -17,6 +17,7 @@ use crate::daemon::remote_acme::{
     RemoteAcmeAccountCredentials, RemoteAcmeAutomaticRenewalIssuer, RemoteAcmeRenewalRequest,
     RemoteCertificateBundle,
 };
+use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_identity::RemoteAuditOutcome;
 use crate::daemon::remote_tls::RemoteTlsConfigHandle;
 
@@ -368,6 +369,7 @@ impl RemoteAcmeAutomaticRenewalIssuer for FakeRenewalIssuer {
     async fn renew_certificate_automatically(
         &self,
         request: &RemoteAcmeRenewalRequest,
+        _cleanup_tracker: &RemoteAcmeCleanupTracker,
     ) -> Result<RemoteCertificateBundle, String> {
         self.renewals.fetch_add(1, Ordering::SeqCst);
         self.reused_previous_certificate_identity.store(
@@ -406,6 +408,7 @@ impl RemoteAcmeAutomaticRenewalIssuer for CancellableRenewalIssuer {
     async fn renew_certificate_automatically(
         &self,
         _request: &RemoteAcmeRenewalRequest,
+        _cleanup_tracker: &RemoteAcmeCleanupTracker,
     ) -> Result<RemoteCertificateBundle, String> {
         self.started.store(true, Ordering::SeqCst);
         self.active.store(true, Ordering::SeqCst);
@@ -434,6 +437,7 @@ impl RemoteAcmeAutomaticRenewalIssuer for ConcurrentRenewalIssuer {
     async fn renew_certificate_automatically(
         &self,
         _request: &RemoteAcmeRenewalRequest,
+        _cleanup_tracker: &RemoteAcmeCleanupTracker,
     ) -> Result<RemoteCertificateBundle, String> {
         self.db
             .lock()

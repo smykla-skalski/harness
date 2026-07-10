@@ -21,6 +21,7 @@ use super::remote_acme::{
     RemoteCertificateBundle,
 };
 use super::remote_acme_challenge::SystemRemoteAcmeChallengeProvisioner;
+use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use super::remote_acme_lease_guard::RemoteAcmeChallengeLeaseGuard;
 use super::remote_redaction::redact_secret_detail;
 
@@ -192,6 +193,22 @@ where
         config: &RemoteDaemonServeConfig,
         previous_private_key_pem: Option<&str>,
     ) -> Result<RemoteCertificateBundle, String> {
+        self.issue_certificate_with_cleanup(
+            credentials,
+            config,
+            previous_private_key_pem,
+            RemoteAcmeCleanupTracker::default(),
+        )
+        .await
+    }
+
+    pub(crate) async fn issue_certificate_with_cleanup(
+        &self,
+        credentials: &RemoteAcmeAccountCredentials,
+        config: &RemoteDaemonServeConfig,
+        previous_private_key_pem: Option<&str>,
+        cleanup_tracker: RemoteAcmeCleanupTracker,
+    ) -> Result<RemoteCertificateBundle, String> {
         validate_remote_serve_config(config).map_err(|error| error.to_string())?;
         let account = self.restore_account(credentials).await?;
         let identifiers = [Identifier::Dns(config.domain.trim().to_string())];
@@ -199,7 +216,8 @@ where
             .new_order(&NewOrder::new(&identifiers))
             .await
             .map_err(|error| redacted_acme_error(&error))?;
-        self.complete_authorizations(&mut order, config).await?;
+        self.complete_authorizations(&mut order, config, cleanup_tracker)
+            .await?;
         let private_key = previous_private_key_pem.map_or_else(
             || KeyPair::generate().map_err(|error| error.to_string()),
             |pem| KeyPair::from_pem(pem).map_err(|error| error.to_string()),
@@ -238,13 +256,15 @@ where
         &self,
         order: &mut Order,
         config: &RemoteDaemonServeConfig,
+        cleanup_tracker: RemoteAcmeCleanupTracker,
     ) -> Result<(), String> {
-        let mut leases = RemoteAcmeChallengeLeaseGuard::new(Arc::clone(&self.provisioner));
+        let mut leases =
+            RemoteAcmeChallengeLeaseGuard::new(Arc::clone(&self.provisioner), cleanup_tracker);
         let authorization_result = self
             .present_pending_authorizations(order, config, &mut leases)
             .await;
         if let Err(error) = authorization_result {
-            return Self::cleanup_after_error(leases, error);
+            return Self::cleanup_after_error(leases, error).await;
         }
         let poll_result = order
             .poll_ready(&self.retry_policy)
@@ -257,7 +277,7 @@ where
                     Err(format!("remote ACME order became {status:?}"))
                 }
             });
-        match (poll_result, leases.cleanup()) {
+        match (poll_result, leases.cleanup().await) {
             (Ok(()), Ok(())) => Ok(()),
             (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
             (Err(issue), Err(cleanup)) => Err(format!(
@@ -305,11 +325,11 @@ where
         Ok(())
     }
 
-    fn cleanup_after_error(
+    async fn cleanup_after_error(
         leases: RemoteAcmeChallengeLeaseGuard<P>,
         issue: String,
     ) -> Result<(), String> {
-        match leases.cleanup() {
+        match leases.cleanup().await {
             Ok(()) => Err(issue),
             Err(cleanup) => Err(format!(
                 "{issue}; remote ACME challenge cleanup also failed: {cleanup}"
