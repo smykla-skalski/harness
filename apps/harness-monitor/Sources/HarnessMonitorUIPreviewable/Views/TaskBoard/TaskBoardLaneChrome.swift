@@ -13,7 +13,7 @@ struct TaskBoardLaneHeader: View {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
   private var titleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
+    HarnessMonitorTextSize.scaledFont(.title3.weight(.semibold), by: fontScale)
   }
   private var countFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.bold), by: fontScale)

@@ -38,6 +38,16 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(laneChrome.contains(".padding(.top, metrics.laneHeaderBodyTopPadding)"))
   }
 
+  @Test("Expanded and collapsed lane titles use matching type size")
+  func expandedAndCollapsedLaneTitlesUseMatchingTypeSize() throws {
+    let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let laneChrome = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
+    let titleFontSource = ".title3.weight(.semibold)"
+
+    #expect(laneChrome.contains(titleFontSource))
+    #expect(laneColumn.contains(titleFontSource))
+  }
+
   private func taskBoardSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
