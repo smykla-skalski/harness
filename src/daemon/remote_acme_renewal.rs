@@ -29,6 +29,7 @@ pub(crate) enum RemoteAcmeRenewalCheckOutcome {
     NotDue,
     Reloaded,
     Renewed,
+    Superseded,
     Failed,
 }
 
@@ -200,6 +201,9 @@ fn log_renewal_check(result: &Result<RemoteAcmeRenewalCheckOutcome, CliError>) {
         Ok(RemoteAcmeRenewalCheckOutcome::Renewed) => {
             tracing::info!("remote ACME certificate renewed and reloaded");
         }
+        Ok(RemoteAcmeRenewalCheckOutcome::Superseded) => {
+            tracing::info!("remote ACME renewal was superseded by the active certificate");
+        }
         Ok(RemoteAcmeRenewalCheckOutcome::Failed) => {
             tracing::warn!("remote ACME automatic renewal failed; status was persisted");
         }
@@ -235,18 +239,23 @@ where
 {
     let snapshot = load_renewal_snapshot(db)?;
     let due = remote_certificate_needs_renewal(&snapshot.bundle, now).unwrap_or(true);
-    if !due && tls.certificate_fingerprint() == snapshot.bundle.fingerprint() {
-        return Ok(RemoteAcmeRenewalCheckOutcome::NotDue);
-    }
-    if !due && tls.reload(snapshot.bundle.clone()).is_ok() {
-        record_automatic_audit(
-            db,
-            now,
-            "remote.tls.reload.automatic",
-            RemoteAuditOutcome::Success,
-            None,
-        )?;
-        return Ok(RemoteAcmeRenewalCheckOutcome::Reloaded);
+    if !due {
+        if tls.certificate_fingerprint() == snapshot.bundle.fingerprint() {
+            return Ok(RemoteAcmeRenewalCheckOutcome::NotDue);
+        }
+        if let Ok(reloaded) = tls.reload(snapshot.bundle.clone()) {
+            if !reloaded {
+                return Ok(RemoteAcmeRenewalCheckOutcome::NotDue);
+            }
+            record_automatic_audit(
+                db,
+                now,
+                "remote.tls.reload.automatic",
+                RemoteAuditOutcome::Success,
+                None,
+            )?;
+            return Ok(RemoteAcmeRenewalCheckOutcome::Reloaded);
+        }
     }
     renew_due_certificate(db, tls, issuer, &snapshot, now, cleanup_tracker).await
 }
@@ -363,11 +372,14 @@ fn reload_superseding_certificate(
     now: DateTime<Utc>,
 ) -> Result<RemoteAcmeRenewalCheckOutcome, CliError> {
     let latest = load_renewal_snapshot(db)?;
-    tls.reload(latest.bundle).map_err(|error| {
+    let reloaded = tls.reload(latest.bundle).map_err(|error| {
         CliError::from(CliErrorKind::workflow_io(format!(
             "publish superseding remote TLS certificate: {error}"
         )))
     })?;
+    if !reloaded {
+        return Ok(RemoteAcmeRenewalCheckOutcome::Superseded);
+    }
     record_automatic_audit(
         db,
         now,

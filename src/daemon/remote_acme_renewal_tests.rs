@@ -199,43 +199,6 @@ async fn remote_acme_renewal_check_reloads_certificate_written_by_manual_renewal
 }
 
 #[tokio::test]
-async fn remote_acme_renewal_check_does_not_overwrite_concurrent_manual_renewal() {
-    let fixture = RenewalFixture::new((2026, 8, 1));
-    let manually_renewed = certificate_bundle((2026, 12, 1));
-    let automatic_result = certificate_bundle((2027, 1, 1));
-    let issuer = ConcurrentRenewalIssuer {
-        db: Arc::clone(&fixture.db),
-        manually_renewed: manually_renewed.clone(),
-        automatic_result,
-    };
-
-    let outcome = run_remote_acme_renewal_check(
-        &fixture.db,
-        &fixture.tls,
-        &issuer,
-        at("2026-07-10T00:00:00Z"),
-    )
-    .await
-    .expect("renewal check");
-
-    assert_eq!(outcome, RemoteAcmeRenewalCheckOutcome::Reloaded);
-    assert_eq!(
-        fixture.tls.certificate_fingerprint(),
-        manually_renewed.fingerprint()
-    );
-    let state = fixture
-        .db
-        .lock()
-        .expect("lock database")
-        .load_remote_acme_state()
-        .expect("load ACME state");
-    assert_eq!(
-        state.certificate_fingerprint.as_deref(),
-        Some(manually_renewed.fingerprint())
-    );
-}
-
-#[tokio::test]
 async fn remote_acme_renewal_loop_checks_immediately_and_stops_on_shutdown() {
     let fixture = RenewalFixture::new((2026, 8, 1));
     let issuer = Arc::new(FakeRenewalIssuer::succeed(certificate_bundle((
@@ -426,28 +389,6 @@ impl Drop for RenewalActivityGuard<'_> {
     }
 }
 
-struct ConcurrentRenewalIssuer {
-    db: Arc<Mutex<DaemonDb>>,
-    manually_renewed: RemoteCertificateBundle,
-    automatic_result: RemoteCertificateBundle,
-}
-
-#[async_trait]
-impl RemoteAcmeAutomaticRenewalIssuer for ConcurrentRenewalIssuer {
-    async fn renew_certificate_automatically(
-        &self,
-        _request: &RemoteAcmeRenewalRequest,
-        _cleanup_tracker: &RemoteAcmeCleanupTracker,
-    ) -> Result<RemoteCertificateBundle, String> {
-        self.db
-            .lock()
-            .map_err(|error| error.to_string())?
-            .record_remote_acme_renewal_success(&self.manually_renewed, "2026-07-10T00:00:00Z")
-            .map_err(|error| error.to_string())?;
-        Ok(self.automatic_result.clone())
-    }
-}
-
 fn certificate_bundle(not_after: (i32, u8, u8)) -> RemoteCertificateBundle {
     let key = KeyPair::generate().expect("generate key");
     let mut params =
@@ -475,3 +416,6 @@ fn at(value: &str) -> DateTime<Utc> {
         .expect("RFC3339 timestamp")
         .with_timezone(&Utc)
 }
+
+#[path = "remote_acme_renewal_race_tests.rs"]
+mod race_tests;
