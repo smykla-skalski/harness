@@ -31,11 +31,6 @@ struct TaskBoardLaneHeader: View {
     .harnessPlainButtonStyle()
     .frame(maxWidth: .infinity, alignment: .leading)
     .taskBoardLaneToggleFeedback(lane: lane, cornerRadius: metrics.cardCornerRadius)
-    .overlay(alignment: .bottom) {
-      Rectangle()
-        .fill(HarnessMonitorTheme.controlBorder.opacity(0.24))
-        .frame(height: 1)
-    }
     .help("Collapse \(lane.title) board")
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Collapse \(lane.title) board")
