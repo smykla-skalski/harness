@@ -71,7 +71,7 @@ async fn run_aftermarket_failed_issuance_case() -> Result<(), String> {
         visibility_poll_seconds: 2,
         visibility_stable_polls: 3,
     };
-    let failure_timeout = Duration::from_secs(aftermarket.visibility_timeout_seconds + 120);
+    let failure_timeout = aftermarket_failure_timeout(aftermarket.visibility_timeout_seconds);
     let mut daemon = RemoteDaemonProcess::spawn_aftermarket(
         &environment,
         &domain,
@@ -174,6 +174,19 @@ fn unrelated_ca_pem() -> Result<String, String> {
     )
     .map(|issuer| issuer.pem())
     .map_err(|error| format!("generate untrusted CA certificate: {error}"))
+}
+
+fn aftermarket_failure_timeout(visibility_timeout_seconds: u64) -> Duration {
+    Duration::from_secs(
+        visibility_timeout_seconds
+            .saturating_mul(2)
+            .saturating_add(120),
+    )
+}
+
+#[test]
+fn aftermarket_failure_timeout_covers_presentation_and_cleanup_windows() {
+    assert_eq!(aftermarket_failure_timeout(900), Duration::from_mins(32));
 }
 
 async fn pair_client(
