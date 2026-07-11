@@ -8,6 +8,11 @@ use crate::daemon::remote::RemoteDnsProvider;
 #[test]
 fn remote_dns01_provider_runner_dispatches_native_and_exec_operations() {
     let mut runner = RecordingDns01Runner::default();
+    let aftermarket = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Aftermarket,
+        "_acme-challenge.daemon.example.com",
+        "aftermarket-digest",
+    );
     let cloudflare = Dns01ProviderAction::for_provider(
         RemoteDnsProvider::Cloudflare,
         "_acme-challenge.daemon.example.com",
@@ -24,6 +29,13 @@ fn remote_dns01_provider_runner_dispatches_native_and_exec_operations() {
         "exec-digest",
     );
 
+    aftermarket
+        .run_change_with(
+            &Dns01ProviderExecutionConfig::aftermarket("example.com"),
+            Dns01ChangeOperation::Present,
+            &mut runner,
+        )
+        .expect("Aftermarket present");
     cloudflare
         .run_change_with(
             &Dns01ProviderExecutionConfig::cloudflare("zone-123"),
@@ -48,6 +60,8 @@ fn remote_dns01_provider_runner_dispatches_native_and_exec_operations() {
     assert_eq!(
         runner.events,
         vec![
+            "aftermarket:present:example.com:_acme-challenge.daemon.example.com:aftermarket-digest"
+                .to_string(),
             "cloudflare:present:zone-123:_acme-challenge.daemon.example.com:cloudflare-digest"
                 .to_string(),
             "route53:DELETE:Z123456:_acme-challenge.daemon.example.com.:\"route53-digest\""
@@ -209,6 +223,21 @@ struct RecordingDns01Runner {
 }
 
 impl Dns01ProviderChangeRunner for RecordingDns01Runner {
+    fn apply_aftermarket_change(
+        &mut self,
+        zone_name: &str,
+        fqdn: &str,
+        digest: &str,
+        operation: Dns01ChangeOperation,
+    ) -> Result<(), String> {
+        let is_cleanup = operation == Dns01ChangeOperation::Cleanup;
+        self.events.push(format!(
+            "aftermarket:{}:{zone_name}:{fqdn}:{digest}",
+            operation.as_str()
+        ));
+        self.maybe_fail(is_cleanup)
+    }
+
     fn apply_cloudflare_change(
         &mut self,
         request: &CloudflareDns01ChangeRequest,

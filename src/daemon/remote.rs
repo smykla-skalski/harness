@@ -104,6 +104,7 @@ impl RemoteAcmeChallenge {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoteDnsProvider {
+    Aftermarket,
     Cloudflare,
     Route53,
     Exec,
@@ -113,6 +114,7 @@ impl RemoteDnsProvider {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::Aftermarket => "aftermarket",
             Self::Cloudflare => "cloudflare",
             Self::Route53 => "route53",
             Self::Exec => "exec",
