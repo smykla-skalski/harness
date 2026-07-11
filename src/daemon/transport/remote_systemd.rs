@@ -18,6 +18,7 @@ use super::remote_systemd_lifecycle::{
 const DEFAULT_UNIT: &str = "harness-remote-daemon";
 const SYSTEMD_UNIT_DIR: &str = "/etc/systemd/system";
 const SYSTEMD_ENV_DIR: &str = "/etc/harness";
+const SYSTEMD_PRIVATE_STATE_DIR: &str = "/var/lib/private";
 
 #[derive(Debug, Clone, Args)]
 pub struct DaemonRemoteSystemdUnitArgs {
@@ -432,12 +433,27 @@ fn default_env_path(unit: &str) -> PathBuf {
     Path::new(SYSTEMD_ENV_DIR).join(format!("{unit}.env"))
 }
 
+pub(super) fn systemd_daemon_root(unit: &str) -> Result<PathBuf, CliError> {
+    let unit = normalize_unit_name(unit);
+    validate_unit_name(unit)?;
+    Ok(Path::new(SYSTEMD_PRIVATE_STATE_DIR)
+        .join(unit)
+        .join("harness")
+        .join("daemon")
+        .join("external"))
+}
+
 #[cfg(test)]
 pub(crate) fn default_env_path_for_tests(unit: &str) -> PathBuf {
     default_env_path(unit)
 }
 
-fn ensure_linux_systemd() -> Result<(), CliError> {
+#[cfg(test)]
+pub(crate) fn systemd_daemon_root_for_tests(unit: &str) -> Result<PathBuf, CliError> {
+    systemd_daemon_root(unit)
+}
+
+pub(super) fn ensure_linux_systemd() -> Result<(), CliError> {
     if cfg!(target_os = "linux") {
         Ok(())
     } else {
