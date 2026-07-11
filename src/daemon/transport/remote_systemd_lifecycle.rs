@@ -61,7 +61,11 @@ where
     run_checked(run_systemctl, &["daemon-reload".to_string()])?;
     run_checked(
         run_systemctl,
-        &["enable".to_string(), unit_service_name(&plan.unit)],
+        &[
+            "enable".to_string(),
+            "--now".to_string(),
+            unit_service_name(&plan.unit),
+        ],
     )?;
     Ok(RemoteSystemdInstallReport {
         unit_path: plan.unit_path.clone(),
@@ -70,7 +74,7 @@ where
         env_written,
         daemon_reloaded: true,
         enabled: true,
-        started: false,
+        started: true,
     })
 }
 
