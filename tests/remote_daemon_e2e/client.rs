@@ -5,9 +5,12 @@ use std::time::{Duration, Instant};
 use futures_util::{SinkExt as _, StreamExt as _};
 use http::header::{AUTHORIZATION, HeaderValue};
 use reqwest::StatusCode;
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::pki_types::pem::PemObject as _;
 use rustls::pki_types::{CertificateDer, ServerName};
-use rustls::{ClientConfig, RootCertStore};
+use rustls::{
+    ClientConfig, DigitallySignedStruct, Error as TlsError, RootCertStore, SignatureScheme,
+};
 use serde_json::{Value, json};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
@@ -28,12 +31,22 @@ pub struct RemoteDaemonClient {
     domain: String,
     port: u16,
     origin: String,
-    ca_pem: String,
+    trust: RemoteDaemonClientTrust,
     http: reqwest::Client,
+}
+
+enum RemoteDaemonClientTrust {
+    Pem(String),
+    #[allow(
+        dead_code,
+        reason = "used by the public ACME sibling integration target"
+    )]
+    UntrustedStaging,
 }
 
 impl RemoteDaemonClient {
     pub fn new(domain: &str, port: u16, ca_pem: &str) -> Result<Self, String> {
+        ensure_rustls_provider();
         let certificate = reqwest::Certificate::from_pem(ca_pem.as_bytes())
             .map_err(|error| format!("parse fake ACME CA: {error}"))?;
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
@@ -47,13 +60,39 @@ impl RemoteDaemonClient {
             domain: domain.to_string(),
             port,
             origin: format!("https://{domain}:{port}"),
-            ca_pem: ca_pem.to_string(),
+            trust: RemoteDaemonClientTrust::Pem(ca_pem.to_string()),
+            http,
+        })
+    }
+
+    #[allow(
+        dead_code,
+        reason = "used by the public ACME sibling integration target"
+    )]
+    pub fn new_untrusted_staging(domain: &str, port: u16) -> Result<Self, String> {
+        ensure_rustls_provider();
+        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
+        let http = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .resolve(domain, address)
+            .timeout(Duration::from_secs(10))
+            .build()
+            .map_err(|error| format!("build staging HTTPS client: {error}"))?;
+        Ok(Self {
+            domain: domain.to_string(),
+            port,
+            origin: format!("https://{domain}:{port}"),
+            trust: RemoteDaemonClientTrust::UntrustedStaging,
             http,
         })
     }
 
     pub async fn wait_until_listening(&self) -> Result<(), String> {
-        let deadline = Instant::now() + Duration::from_secs(15);
+        self.wait_until_listening_for(Duration::from_secs(15)).await
+    }
+
+    pub async fn wait_until_listening_for(&self, wait_timeout: Duration) -> Result<(), String> {
+        let deadline = Instant::now() + wait_timeout;
         let mut last_error = "remote HTTPS listener did not answer".to_string();
         while Instant::now() < deadline {
             match self.http.get(self.url("/v1/health")).send().await {
@@ -154,25 +193,7 @@ impl RemoteDaemonClient {
         &self,
         credentials: &RemoteCredentials,
     ) -> Result<(), String> {
-        let mut roots = RootCertStore::empty();
-        for certificate in CertificateDer::pem_slice_iter(self.ca_pem.as_bytes()) {
-            roots
-                .add(certificate.map_err(|error| format!("parse WSS root CA: {error}"))?)
-                .map_err(|error| format!("add WSS root CA: {error}"))?;
-        }
-        let mut tls_config = ClientConfig::builder()
-            .with_root_certificates(roots)
-            .with_no_client_auth();
-        tls_config.alpn_protocols = vec![b"http/1.1".to_vec()];
-        let stream = TcpStream::connect(("127.0.0.1", self.port))
-            .await
-            .map_err(|error| format!("connect WSS TCP stream: {error}"))?;
-        let server_name = ServerName::try_from(self.domain.clone())
-            .map_err(|error| format!("build WSS server name: {error}"))?;
-        let tls = TlsConnector::from(Arc::new(tls_config))
-            .connect(server_name, stream)
-            .await
-            .map_err(|error| format!("connect WSS TLS stream: {error}"))?;
+        let tls = self.connect_tls().await?;
         let mut request = format!("wss://{}:{}/v1/ws", self.domain, self.port)
             .into_client_request()
             .map_err(|error| format!("build WSS request: {error}"))?;
@@ -204,6 +225,20 @@ impl RemoteDaemonClient {
             .map_err(|error| format!("close WSS connection: {error}"))
     }
 
+    #[allow(
+        dead_code,
+        reason = "used by the public ACME sibling integration target"
+    )]
+    pub async fn leaf_certificate_der(&self) -> Result<Vec<u8>, String> {
+        let tls = self.connect_tls().await?;
+        tls.get_ref()
+            .1
+            .peer_certificates()
+            .and_then(|certificates| certificates.first())
+            .map(|certificate| certificate.to_vec())
+            .ok_or_else(|| "remote TLS handshake omitted the leaf certificate".to_string())
+    }
+
     pub async fn stop(&self, credentials: &RemoteCredentials) -> Result<(), String> {
         let response =
             Self::authenticated(self.http.post(self.url("/v1/daemon/stop")), credentials)
@@ -224,6 +259,89 @@ impl RemoteDaemonClient {
 
     fn url(&self, path: &str) -> String {
         format!("{}{path}", self.origin)
+    }
+
+    async fn connect_tls(&self) -> Result<tokio_rustls::client::TlsStream<TcpStream>, String> {
+        ensure_rustls_provider();
+        let mut tls_config = match &self.trust {
+            RemoteDaemonClientTrust::Pem(ca_pem) => {
+                let mut roots = RootCertStore::empty();
+                for certificate in CertificateDer::pem_slice_iter(ca_pem.as_bytes()) {
+                    roots
+                        .add(certificate.map_err(|error| format!("parse WSS root CA: {error}"))?)
+                        .map_err(|error| format!("add WSS root CA: {error}"))?;
+                }
+                ClientConfig::builder()
+                    .with_root_certificates(roots)
+                    .with_no_client_auth()
+            }
+            RemoteDaemonClientTrust::UntrustedStaging => ClientConfig::builder()
+                .dangerous()
+                .with_custom_certificate_verifier(Arc::new(UntrustedStagingVerifier))
+                .with_no_client_auth(),
+        };
+        tls_config.alpn_protocols = vec![b"http/1.1".to_vec()];
+        let stream = TcpStream::connect(("127.0.0.1", self.port))
+            .await
+            .map_err(|error| format!("connect WSS TCP stream: {error}"))?;
+        let server_name = ServerName::try_from(self.domain.clone())
+            .map_err(|error| format!("build WSS server name: {error}"))?;
+        TlsConnector::from(Arc::new(tls_config))
+            .connect(server_name, stream)
+            .await
+            .map_err(|error| format!("connect WSS TLS stream: {error}"))
+    }
+}
+
+fn ensure_rustls_provider() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
+#[derive(Debug)]
+struct UntrustedStagingVerifier;
+
+impl ServerCertVerifier for UntrustedStagingVerifier {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: rustls::pki_types::UnixTime,
+    ) -> Result<ServerCertVerified, TlsError> {
+        Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _certificate: &CertificateDer<'_>,
+        _signature: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _certificate: &CertificateDer<'_>,
+        _signature: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        vec![
+            SignatureScheme::ECDSA_NISTP256_SHA256,
+            SignatureScheme::ECDSA_NISTP384_SHA384,
+            SignatureScheme::ED25519,
+            SignatureScheme::RSA_PSS_SHA256,
+            SignatureScheme::RSA_PSS_SHA384,
+            SignatureScheme::RSA_PSS_SHA512,
+            SignatureScheme::RSA_PKCS1_SHA256,
+            SignatureScheme::RSA_PKCS1_SHA384,
+            SignatureScheme::RSA_PKCS1_SHA512,
+        ]
     }
 }
 
