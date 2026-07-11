@@ -194,9 +194,9 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
     switch colorScheme {
     case .dark:
       if reduceTransparency {
-        return Color(red: 0.1, green: 0.135, blue: 0.14)
+        return Color(red: 0.19, green: 0.225, blue: 0.235)
       }
-      return Color(red: 0.075, green: 0.105, blue: 0.11)
+      return Color(red: 0.155, green: 0.19, blue: 0.2)
     default:
       if reduceTransparency {
         return Color(red: 0.9, green: 0.925, blue: 0.94)

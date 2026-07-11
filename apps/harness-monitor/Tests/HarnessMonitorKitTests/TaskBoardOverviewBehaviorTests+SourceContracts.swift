@@ -45,7 +45,7 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(laneChrome.contains("private var laneSurfaceFill: Color"))
     #expect(
       laneChrome.contains(
-        "Color(red: 0.075, green: 0.105, blue: 0.11)"
+        "Color(red: 0.155, green: 0.19, blue: 0.2)"
       )
     )
     #expect(laneChrome.contains("Color(red: 0.925, green: 0.945, blue: 0.955)"))
