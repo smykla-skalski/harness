@@ -65,14 +65,20 @@ impl RemoteDaemonClient {
         let deadline = Instant::now() + wait_timeout;
         let mut last_error = "remote HTTPS listener did not answer".to_string();
         while Instant::now() < deadline {
-            match self.http.get(self.url("/v1/health")).send().await {
-                Ok(response) if response.status() == StatusCode::UNAUTHORIZED => return Ok(()),
-                Ok(response) => {
+            let request = self.http.get(self.url("/v1/health")).send();
+            match await_before_deadline(deadline, request).await {
+                Ok(Ok(response)) if response.status() == StatusCode::UNAUTHORIZED => return Ok(()),
+                Ok(Ok(response)) => {
                     last_error = format!("unexpected health status {}", response.status());
                 }
-                Err(error) => last_error = error.to_string(),
+                Ok(Err(error)) => last_error = error.to_string(),
+                Err(_) => last_error = "health request exceeded readiness deadline".to_string(),
             }
-            tokio::time::sleep(Duration::from_millis(50)).await;
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50).min(remaining)).await;
         }
         Err(format!("remote HTTPS listener not ready: {last_error}"))
     }
@@ -259,6 +265,13 @@ fn ensure_rustls_provider() {
     let _ = rustls::crypto::ring::default_provider().install_default();
 }
 
+async fn await_before_deadline<Output>(
+    deadline: Instant,
+    future: impl std::future::Future<Output = Output>,
+) -> Result<Output, tokio::time::error::Elapsed> {
+    tokio::time::timeout(deadline.saturating_duration_since(Instant::now()), future).await
+}
+
 fn parse_root_certificates(ca_pem: &str) -> Result<Vec<CertificateDer<'static>>, String> {
     let certificates = CertificateDer::pem_slice_iter(ca_pem.as_bytes())
         .map(|certificate| {
@@ -329,6 +342,8 @@ fn required_string<'a>(value: &'a Value, field: &str) -> Result<&'a str, String>
 
 #[cfg(test)]
 mod tests {
+    use std::future::pending;
+
     use super::*;
 
     #[test]
@@ -338,5 +353,16 @@ mod tests {
         };
 
         assert!(error.contains("no certificates"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn request_deadline_bounds_slow_future() {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let virtual_started = tokio::time::Instant::now();
+
+        let result = await_before_deadline(deadline, pending::<()>()).await;
+
+        assert!(result.is_err());
+        assert_eq!(virtual_started.elapsed(), Duration::from_secs(2));
     }
 }
