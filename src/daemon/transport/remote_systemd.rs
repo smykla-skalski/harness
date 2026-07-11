@@ -299,6 +299,7 @@ fn render_unit(
          Type=simple\n\
          EnvironmentFile={}\n\
          Environment=HARNESS_DAEMON_DATA_HOME=%S/{unit}\n\
+         Environment=XDG_DATA_HOME=%S/{unit}\n\
          Environment=HARNESS_DAEMON_OWNERSHIP=external\n\
          ExecStart={exec_start}\n\
          Restart=on-failure\n\
