@@ -86,6 +86,28 @@ fn get_repairs_legacy_status_on_disk() {
 }
 
 #[test]
+fn get_rejects_mismatched_frontmatter_id_before_repair() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    let path = seed_raw_item_with_frontmatter_id(&store, "file-id", "frontmatter-id", "new");
+
+    let error = store.get("file-id").expect_err("mismatched id must fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("expected 'file-id', found 'frontmatter-id'")
+    );
+    assert!(
+        !store.tasks_dir().join("frontmatter-id.md").exists(),
+        "repair must not create a second file from frontmatter id"
+    );
+    let contents = fs::read_to_string(path).expect("read source file");
+    assert!(contents.contains("status: new"));
+    assert!(!contents.contains("status: todo"));
+}
+
+#[test]
 fn list_repairs_legacy_statuses_before_filtering() {
     let temp = tempdir().expect("tempdir");
     let store = TaskBoardStore::new(temp.path().join("board"));
@@ -98,6 +120,29 @@ fn list_repairs_legacy_statuses_before_filtering() {
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].id, "legacy-needs-you");
     assert_eq!(listed[0].status, TaskBoardStatus::HumanRequired);
+}
+
+#[test]
+fn list_repairs_mismatched_frontmatter_id_at_source_path() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    let source =
+        seed_raw_item_with_frontmatter_id(&store, "source-file", "frontmatter-id", "needs_you");
+
+    let listed = store
+        .list(Some(TaskBoardStatus::HumanRequired))
+        .expect("list repaired status");
+
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].id, "frontmatter-id");
+    assert_eq!(listed[0].status, TaskBoardStatus::HumanRequired);
+    let contents = fs::read_to_string(source).expect("read repaired source file");
+    assert!(contents.contains("status: human_required"));
+    assert!(!contents.contains("status: needs_you"));
+    assert!(
+        !store.tasks_dir().join("frontmatter-id.md").exists(),
+        "list repair must write the original path, not the frontmatter id path"
+    );
 }
 
 #[test]
@@ -181,14 +226,23 @@ fn list_keeps_filter_and_sort_across_parallel_parse() {
 }
 
 fn seed_raw_item(store: &TaskBoardStore, id: &str, status: &str) -> std::path::PathBuf {
-    let path = store.tasks_dir().join(format!("{id}.md"));
+    seed_raw_item_with_frontmatter_id(store, id, id, status)
+}
+
+fn seed_raw_item_with_frontmatter_id(
+    store: &TaskBoardStore,
+    filename_id: &str,
+    frontmatter_id: &str,
+    status: &str,
+) -> std::path::PathBuf {
+    let path = store.tasks_dir().join(format!("{filename_id}.md"));
     fs::create_dir_all(store.tasks_dir()).expect("create tasks dir");
     fs::write(
         &path,
         format!(
             "---\n\
              schema_version: 1\n\
-             id: {id}\n\
+             id: {frontmatter_id}\n\
              title: Legacy status\n\
              status: {status}\n\
              priority: medium\n\
