@@ -22,6 +22,7 @@ pub(crate) fn reconcile_pull_request_snapshots(
     let candidates = board
         .list(None)?
         .into_iter()
+        .filter(is_imported_review)
         .map(|item| item.id)
         .collect::<Vec<_>>();
     let mut changed = false;

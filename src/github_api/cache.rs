@@ -170,12 +170,17 @@ impl GitHubCache {
                 )
             }),
         };
-        match (control_result, quarantine_result) {
-            (Ok(()), _) | (_, Ok(())) => Ok(()),
-            (Err(control_error), Err(quarantine_error)) => Err(Error::new(
-                control_error.kind(),
-                format!("rotate github cache control: {control_error}; {quarantine_error}"),
-            )),
+        match control_result {
+            Ok(()) => Ok(()),
+            Err(control_error) => {
+                let message = match quarantine_result {
+                    Ok(()) => format!("rotate github cache control: {control_error}"),
+                    Err(quarantine_error) => format!(
+                        "rotate github cache control: {control_error}; {quarantine_error}"
+                    ),
+                };
+                Err(Error::new(control_error.kind(), message))
+            }
         }
     }
 
