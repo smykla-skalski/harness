@@ -16,6 +16,8 @@ struct WatchRemoteDaemonPairingView: View {
       Section("Remote Daemon") {
         TextField("Pairing Link", text: $pairingLink)
           .privacySensitive()
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
           .lineLimit(1)
           .frame(height: 44)
         if isPairing {

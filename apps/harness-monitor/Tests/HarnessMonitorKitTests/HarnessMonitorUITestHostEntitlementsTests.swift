@@ -116,6 +116,8 @@ struct HarnessMonitorAppBundleMetadataTests {
     #expect(rootViewSource.contains("WatchRemoteDaemonPairingView()"))
     #expect(pairingViewSource.contains("TextField(\"Pairing Link\""))
     #expect(pairingViewSource.contains(".privacySensitive()"))
+    #expect(pairingViewSource.contains(".textInputAutocapitalization(.never)"))
+    #expect(pairingViewSource.contains(".autocorrectionDisabled()"))
     #expect(pairingViewSource.contains(".lineLimit(1)"))
     #expect(pairingViewSource.contains(".frame(height: 44)"))
     #expect(pairingViewSource.contains("pairingLink = \"\""))
