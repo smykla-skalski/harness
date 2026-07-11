@@ -16,7 +16,7 @@ struct SettingsTaskBoardLaneAppearanceSection: View {
     HarnessMonitorTextSize.scaledFont(.body.weight(.medium), by: fontScale)
   }
 
-  private var customizeFont: Font {
+  private var laneIndicatorFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 
@@ -42,17 +42,16 @@ struct SettingsTaskBoardLaneAppearanceSection: View {
 
   private func laneRow(_ lane: TaskBoardInboxLane) -> some View {
     HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      laneIndicator(for: lane)
+
       Text(lane.title)
         .font(laneTitleFont)
 
       Spacer(minLength: HarnessMonitorTheme.spacingMD)
 
-      Button {
+      Button("Customize") {
         presentedLane = lane
-      } label: {
-        customizeButtonLabel(for: lane)
       }
-      .harnessPlainButtonStyle()
       .help("Configure \(lane.title) appearance")
       .accessibilityLabel("Configure \(lane.title) appearance")
     }
@@ -62,18 +61,15 @@ struct SettingsTaskBoardLaneAppearanceSection: View {
     }
   }
 
-  private func customizeButtonLabel(for lane: TaskBoardInboxLane) -> some View {
-    HStack(spacing: HarnessMonitorTheme.spacingXS) {
-      Image(systemName: appearance.symbolName(for: lane) ?? "slash.circle")
-        .font(customizeFont)
-        .foregroundStyle(.white)
-        .frame(width: 16)
-      Text("Customize")
-        .font(customizeFont)
-        .foregroundStyle(.white)
+  private func laneIndicator(for lane: TaskBoardInboxLane) -> some View {
+    ZStack {
+      if let symbolName = appearance.symbolName(for: lane) {
+        Image(systemName: symbolName)
+          .font(laneIndicatorFont)
+          .foregroundStyle(.white)
+      }
     }
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    .frame(minHeight: 30)
+    .frame(width: 58, height: 30)
     .background(appearance.color(for: lane), in: .capsule)
     .overlay {
       Capsule(style: .continuous)
@@ -159,13 +155,16 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
             rawValue: rawValue
           )
         } label: {
-          Label("Reset Color", systemImage: "arrow.counterclockwise")
+          Label("Reset", systemImage: "arrow.counterclockwise")
         }
         .buttonStyle(.borderless)
         .disabled(!appearance.hasColorOverride(for: lane))
       }
 
-      ColorPicker("Color", selection: colorBinding, supportsOpacity: false)
+      ColorPicker(selection: colorBinding, supportsOpacity: false) {
+        EmptyView()
+      }
+      .labelsHidden()
     }
   }
 
@@ -180,7 +179,7 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
               rawValue: rawValue
             )
           } label: {
-            Label("Clear Symbol", systemImage: "slash.circle")
+            Label("Clear", systemImage: "slash.circle")
           }
           .disabled(appearance.hidesSymbol(for: lane))
 
@@ -190,7 +189,7 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
               rawValue: rawValue
             )
           } label: {
-            Label("Reset Symbol", systemImage: "arrow.counterclockwise")
+            Label("Reset", systemImage: "arrow.counterclockwise")
           }
           .disabled(!appearance.hasSymbolOverride(for: lane))
         }
@@ -289,5 +288,37 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
     "arrow.triangle.pull",
     "number.circle",
     "smallcircle.filled.circle",
+    "gearshape",
+    "wand.and.stars",
+    "checkmark.circle",
+    "xmark.circle",
+    "clock",
+    "calendar",
+    "folder",
+    "archivebox",
+    "tray",
+    "tray.full",
+    "bell",
+    "bell.badge",
+    "key",
+    "lock",
+    "lock.shield",
+    "paperplane",
+    "paperclip",
+    "link",
+    "bookmark",
+    "play.circle",
+    "pause.circle",
+    "stop.circle",
+    "terminal",
+    "curlybraces",
+    "flame",
+    "star",
+    "questionmark.circle",
+    "ellipsis.circle",
+    "target",
+    "network",
+    "server.rack",
+    "list.bullet.rectangle",
   ]
 }
