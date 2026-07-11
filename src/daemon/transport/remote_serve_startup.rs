@@ -22,7 +22,8 @@ const INITIAL_ACME_CLEANUP_TIMEOUT: Duration = Duration::from_secs(30);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RemoteInitialAcmeControl {
     Continue,
-    Shutdown,
+    ShutdownDuringIssuance,
+    ShutdownAfterIssuance,
 }
 
 #[async_trait]
@@ -176,12 +177,25 @@ where
             result = &mut initial_acme => Some(result),
         }
     };
+    initial_acme_control(outcome, &shutdown_rx, cleanup_tracker).await
+}
+
+async fn initial_acme_control(
+    outcome: Option<Result<(), CliError>>,
+    shutdown_rx: &tokio_watch::Receiver<bool>,
+    cleanup_tracker: &RemoteAcmeCleanupTracker,
+) -> Result<RemoteInitialAcmeControl, CliError> {
     if let Some(result) = outcome {
         result?;
-        Ok(RemoteInitialAcmeControl::Continue)
+        if *shutdown_rx.borrow() {
+            wait_for_cleanup(cleanup_tracker).await;
+            Ok(RemoteInitialAcmeControl::ShutdownAfterIssuance)
+        } else {
+            Ok(RemoteInitialAcmeControl::Continue)
+        }
     } else {
         wait_for_cleanup(cleanup_tracker).await;
-        Ok(RemoteInitialAcmeControl::Shutdown)
+        Ok(RemoteInitialAcmeControl::ShutdownDuringIssuance)
     }
 }
 

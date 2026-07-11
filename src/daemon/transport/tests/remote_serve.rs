@@ -4,6 +4,7 @@ use harness_testkit::with_isolated_harness_env;
 use std::future::pending;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::thread;
 use std::time::Duration;
 use tokio::sync::{Notify, watch as tokio_watch};
 use tokio::time::{sleep, timeout};
@@ -21,7 +22,7 @@ use crate::errors::CliError;
 use super::super::remote::DaemonRemoteServeArgs;
 use super::super::remote_serve::{
     RemoteServeRuntimeMode, build_remote_serve_execution_plan, execute_remote_serve_with,
-    execute_remote_serve_with_issuer, remote_serve_runtime_mode,
+    execute_remote_serve_with_issuer, remote_serve_runtime_mode, run_remote_daemon_thread,
 };
 use super::super::remote_serve_startup::{
     RemoteInitialAcmeControl, RemoteInitialAcmeIssuer, ensure_initial_remote_acme,
@@ -228,9 +229,36 @@ async fn daemon_remote_initial_acme_shutdown_waits_for_challenge_cleanup() {
     .expect("initial ACME shutdown should succeed");
     shutdown.await.expect("join shutdown request");
 
-    assert_eq!(control, RemoteInitialAcmeControl::Shutdown);
+    assert_eq!(control, RemoteInitialAcmeControl::ShutdownDuringIssuance);
     assert!(cleanup_started.load(Ordering::SeqCst));
     assert!(cleanup_completed.load(Ordering::SeqCst));
+}
+
+#[tokio::test]
+async fn daemon_remote_initial_acme_completion_observes_pending_shutdown() {
+    let cleanup_tracker = RemoteAcmeCleanupTracker::default();
+    let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
+    let issuance = async move {
+        shutdown_tx
+            .send(true)
+            .expect("request shutdown before issuance completes");
+        Ok(())
+    };
+
+    let control = run_initial_acme_until_shutdown(shutdown_rx, &cleanup_tracker, issuance)
+        .await
+        .expect("observe shutdown after issuance");
+
+    assert_eq!(control, RemoteInitialAcmeControl::ShutdownAfterIssuance);
+}
+
+#[test]
+fn daemon_remote_existing_runtime_thread_has_stable_name() {
+    let name =
+        run_remote_daemon_thread(|| Ok(thread::current().name().unwrap_or_default().to_string()))
+            .expect("run named remote daemon thread");
+
+    assert_eq!(name, "harness-remote-daemon");
 }
 
 #[tokio::test]
@@ -262,7 +290,7 @@ async fn daemon_remote_initial_acme_shutdown_persists_account_cleanup_and_failur
     record_initial_acme_shutdown(&db, "2026-07-11T10:00:01Z")
         .expect("record initial ACME shutdown");
 
-    assert_eq!(control, RemoteInitialAcmeControl::Shutdown);
+    assert_eq!(control, RemoteInitialAcmeControl::ShutdownDuringIssuance);
     assert!(issuer.cleanup_started.load(Ordering::SeqCst));
     assert!(issuer.cleanup_completed.load(Ordering::SeqCst));
     let issuance = db

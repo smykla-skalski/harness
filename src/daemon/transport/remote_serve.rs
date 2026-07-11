@@ -177,23 +177,14 @@ fn run_remote_serve_lifecycle(
     now: String,
 ) -> Result<i32, CliError> {
     match remote_serve_runtime_mode() {
-        RemoteServeRuntimeMode::ExistingTokioRuntime => thread::scope(|scope| {
-            scope
-                .spawn(move || {
-                    run_remote_serve_lifecycle_on_runtime(
-                        &args,
-                        &db,
-                        &remote_config,
-                        certificate_domain_matches,
-                        &now,
-                    )
-                })
-                .join()
-                .map_err(|_| {
-                    CliError::from(CliErrorKind::workflow_io(
-                        "remote daemon lifecycle thread panicked",
-                    ))
-                })?
+        RemoteServeRuntimeMode::ExistingTokioRuntime => run_remote_daemon_thread(move || {
+            run_remote_serve_lifecycle_on_runtime(
+                &args,
+                &db,
+                &remote_config,
+                certificate_domain_matches,
+                &now,
+            )
         }),
         RemoteServeRuntimeMode::NewTokioRuntime => run_remote_serve_lifecycle_on_runtime(
             &args,
@@ -203,6 +194,29 @@ fn run_remote_serve_lifecycle(
             &now,
         ),
     }
+}
+
+pub(crate) fn run_remote_daemon_thread<T, Run>(run: Run) -> Result<T, CliError>
+where
+    T: Send,
+    Run: FnOnce() -> Result<T, CliError> + Send,
+{
+    thread::scope(|scope| {
+        thread::Builder::new()
+            .name("harness-remote-daemon".to_string())
+            .spawn_scoped(scope, run)
+            .map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "spawn remote daemon lifecycle thread: {error}"
+                )))
+            })?
+            .join()
+            .map_err(|_| {
+                CliError::from(CliErrorKind::workflow_io(
+                    "remote daemon lifecycle thread panicked",
+                ))
+            })?
+    })
 }
 
 fn run_remote_serve_lifecycle_on_runtime(
@@ -246,9 +260,13 @@ async fn run_remote_serve_lifecycle_async(
     let control =
         run_initial_acme_until_shutdown(shutdown_rx.clone(), &cleanup_tracker, initial_acme)
             .await?;
-    if control == RemoteInitialAcmeControl::Shutdown {
-        record_initial_acme_shutdown(db, utc_now().as_str())?;
-        return Ok(0);
+    match control {
+        RemoteInitialAcmeControl::Continue => {}
+        RemoteInitialAcmeControl::ShutdownDuringIssuance => {
+            record_initial_acme_shutdown(db, utc_now().as_str())?;
+            return Ok(0);
+        }
+        RemoteInitialAcmeControl::ShutdownAfterIssuance => return Ok(0),
     }
     let plan = build_remote_serve_execution_plan_from_config(args, db, remote_config)?;
     service::serve_remote_https(
