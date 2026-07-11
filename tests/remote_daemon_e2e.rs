@@ -17,6 +17,10 @@ mod process;
 use acme::{AcmeChallenge, AcmeChallengeConfig, FakeAcmeServer};
 use client::RemoteDaemonClient;
 use process::{AftermarketDnsEnvironment, RemoteDaemonEnvironment, RemoteDaemonProcess};
+use rcgen::{
+    BasicConstraints, CertificateParams, CertifiedIssuer, DistinguishedName, DnType, IsCa, KeyPair,
+    KeyUsagePurpose,
+};
 use serde_json::Value;
 use std::env;
 use std::time::Duration;
@@ -63,10 +67,11 @@ async fn run_aftermarket_failed_issuance_case() -> Result<(), String> {
         zone_name: &zone_name,
         api_key: &api_key,
         api_secret: &api_secret,
-        visibility_timeout_seconds: 300,
+        visibility_timeout_seconds: 900,
         visibility_poll_seconds: 2,
         visibility_stable_polls: 3,
     };
+    let failure_timeout = aftermarket_failure_timeout(aftermarket.visibility_timeout_seconds);
     let mut daemon = RemoteDaemonProcess::spawn_aftermarket(
         &environment,
         &domain,
@@ -74,7 +79,7 @@ async fn run_aftermarket_failed_issuance_case() -> Result<(), String> {
         &aftermarket,
     )?;
 
-    let diagnostics = daemon.wait_for_failure(Duration::from_secs(660)).await?;
+    let diagnostics = daemon.wait_for_failure(failure_timeout).await?;
     let validation_error = acme.validation_error()?.ok_or_else(|| {
         format!("fake ACME server never received the ready DNS challenge; {diagnostics}")
     })?;
@@ -116,6 +121,7 @@ async fn run_remote_daemon_case(challenge: AcmeChallenge) -> Result<(), String> 
         .await
         .map_err(|error| format!("{error}; daemon output: {}", daemon.diagnostics()))?;
     daemon.ensure_running()?;
+    expect_untrusted_ca_rejected(environment.https_port()).await?;
 
     let viewer = pair_client(&daemon, &client, "viewer", "viewer-e2e").await?;
     client.expect_health(&viewer, 200).await?;
@@ -139,6 +145,48 @@ async fn run_remote_daemon_case(challenge: AcmeChallenge) -> Result<(), String> 
     daemon.wait_for_exit().await?;
     acme.shutdown().await?;
     Ok(())
+}
+
+async fn expect_untrusted_ca_rejected(port: u16) -> Result<(), String> {
+    let client = RemoteDaemonClient::new(DOMAIN, port, &unrelated_ca_pem()?)?;
+    client
+        .verified_leaf_certificate_der()
+        .await
+        .expect_err("untrusted certificate chain must fail");
+    Ok(())
+}
+
+fn unrelated_ca_pem() -> Result<String, String> {
+    let mut params = CertificateParams::default();
+    params.distinguished_name = DistinguishedName::new();
+    params
+        .distinguished_name
+        .push(DnType::CommonName, "Harness Untrusted E2E CA");
+    params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+    params.key_usages = vec![
+        KeyUsagePurpose::DigitalSignature,
+        KeyUsagePurpose::KeyCertSign,
+        KeyUsagePurpose::CrlSign,
+    ];
+    CertifiedIssuer::self_signed(
+        params,
+        KeyPair::generate().map_err(|error| format!("generate untrusted CA key: {error}"))?,
+    )
+    .map(|issuer| issuer.pem())
+    .map_err(|error| format!("generate untrusted CA certificate: {error}"))
+}
+
+fn aftermarket_failure_timeout(visibility_timeout_seconds: u64) -> Duration {
+    Duration::from_secs(
+        visibility_timeout_seconds
+            .saturating_mul(2)
+            .saturating_add(120),
+    )
+}
+
+#[test]
+fn aftermarket_failure_timeout_covers_presentation_and_cleanup_windows() {
+    assert_eq!(aftermarket_failure_timeout(900), Duration::from_mins(32));
 }
 
 async fn pair_client(
