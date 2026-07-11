@@ -46,14 +46,14 @@ impl TaskBoardGitRuntimeConfig {
     /// bytes from the pre-Keychain persistence format.
     #[must_use]
     pub fn contains_plaintext_secrets(&self) -> bool {
-        self.without_secrets() != *self
+        self != &self.without_secrets()
     }
 
     /// Whether the value contains either plaintext secret bytes or the old
     /// persisted `*_configured` metadata.
     #[must_use]
     pub fn contains_secret_metadata(&self) -> bool {
-        self.without_secret_metadata() != *self
+        self != &self.without_secret_metadata()
     }
 
     /// Strip both secret values and the wire-only `*_configured` indicators.
