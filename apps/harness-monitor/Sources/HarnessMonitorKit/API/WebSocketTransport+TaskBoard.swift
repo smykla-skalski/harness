@@ -1,6 +1,11 @@
 import Foundation
 
 extension WebSocketTransport {
+  public func taskBoardCapabilities() async throws -> TaskBoardCapabilities {
+    let value = try await rpc(method: .taskBoardCapabilities)
+    return try decodePolicyWire(value)
+  }
+
   public func taskBoardItems(status: TaskBoardStatus? = nil) async throws -> [TaskBoardItem] {
     let params = try encodeParams(TaskBoardListItemsRequest(status: status), extra: [:])
     let value = try await rpc(method: .taskBoardList, params: params)
@@ -257,14 +262,6 @@ extension WebSocketTransport {
     let value = try await rpc(method: .taskBoardGitSigningVerify, params: params)
     let wire: TaskBoardGitSigningVerifyResponseWire = try decodePolicyWire(value)
     return TaskBoardGitSigningVerifyResponse(wire: wire)
-  }
-
-  public func drainTaskBoardGitRuntimeSecrets() async throws
-    -> TaskBoardGitRuntimeDrainSecretsResponse
-  {
-    let value = try await rpc(method: .taskBoardGitRuntimeDrainSecrets)
-    let wire: TaskBoardGitRuntimeDrainSecretsResponseWire = try decodePolicyWire(value)
-    return TaskBoardGitRuntimeDrainSecretsResponse(wire: wire)
   }
 
   public func policyCanvasWorkspace() async throws -> PolicyCanvasWorkspace {

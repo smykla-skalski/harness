@@ -1,20 +1,20 @@
 use tokio::task::spawn_blocking;
 use tracing::warn;
 
-use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch};
+#[cfg(test)]
+use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::protocol::{
-    ManagedAgentSnapshot, TaskBoardDispatchRequest, TaskBoardDispatchResponse,
-    TaskBoardEvaluateRequest, TaskBoardEvaluationResponse, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardDispatchRequest, TaskBoardDispatchResponse, TaskBoardEvaluateRequest,
+    TaskBoardEvaluationResponse, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorRunOnceResponse,
 };
 use crate::daemon::service;
-use crate::daemon::task_board_managed_agents::{
-    start_workers_for_applied_dispatch, start_workers_for_run_once_status,
-};
+use crate::daemon::task_board_managed_agents::start_worker_for_applied_task;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{DispatchAppliedTask, DispatchFailure, DispatchFailureKind};
 
-use super::DaemonHttpState;
+use super::{DaemonHttpState, require_async_db};
 
 mod item_ops;
 mod orchestrator_ops;
@@ -41,36 +41,19 @@ pub(crate) async fn dispatch(
     state: &DaemonHttpState,
     request: TaskBoardDispatchRequest,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
-    if let Some(async_db) = state.async_db.get() {
-        let result = service::dispatch_task_board_async(&request, async_db.as_ref()).await;
-        return handle_dispatch_result(state, result, Some(async_db.as_ref())).await;
-    }
-
-    let result = {
-        let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-        let db_ref = db_guard.as_deref();
-        service::dispatch_task_board(&request, db_ref)
-    };
-    handle_dispatch_result(state, result, None).await
+    let async_db = require_async_db(state, "task board dispatch")?;
+    let result = service::dispatch_task_board_async(&request, async_db).await;
+    handle_dispatch_result(state, result, async_db).await
 }
 
 pub(crate) async fn evaluate(
     state: &DaemonHttpState,
     request: TaskBoardEvaluateRequest,
 ) -> Result<TaskBoardEvaluationResponse, CliError> {
-    if let Some(async_db) = state.async_db.get() {
-        let result = service::evaluate_task_board_async(&request, async_db.as_ref()).await;
-        if result.as_ref().is_ok_and(|response| response.updated > 0) {
-            service::broadcast_sessions_updated_async(&state.sender, Some(async_db.as_ref())).await;
-        }
-        return result;
-    }
-
-    let db_guard = state.db.get().map(|db| db.lock().expect("db lock"));
-    let db_ref = db_guard.as_deref();
-    let result = service::evaluate_task_board(&request, db_ref);
+    let async_db = require_async_db(state, "task board evaluate")?;
+    let result = service::evaluate_task_board_async(&request, async_db).await;
     if result.as_ref().is_ok_and(|response| response.updated > 0) {
-        service::broadcast_sessions_updated(&state.sender, db_ref);
+        service::broadcast_sessions_updated_async(&state.sender, Some(async_db)).await;
     }
     result
 }
@@ -79,40 +62,22 @@ pub(crate) async fn run_once(
     state: &DaemonHttpState,
     request: TaskBoardOrchestratorRunOnceRequest,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
-    if let Some(async_db) = state.async_db.get() {
-        let result =
-            service::run_task_board_orchestrator_once_async(&request, async_db.as_ref()).await;
-        return handle_run_once_result(state, result, Some(async_db.as_ref())).await;
-    }
-
-    let db = state.db.get().cloned();
-    let result = spawn_blocking(move || {
-        let db_guard = db.as_ref().map(|db| db.lock().expect("db lock"));
-        let db_ref = db_guard.as_deref();
-        service::run_task_board_orchestrator_once(&request, db_ref)
-    })
-    .await
-    .unwrap_or_else(|error| {
-        Err(
-            CliErrorKind::workflow_io(format!("run task-board orchestrator fallback: {error}"))
-                .into(),
-        )
-    });
-    handle_run_once_result(state, result, None).await
+    let async_db = require_async_db(state, "task board orchestrator run once")?;
+    let result = service::run_task_board_orchestrator_once_db(async_db, &request).await;
+    handle_run_once_result(state, result, async_db).await
 }
 
 async fn handle_dispatch_result(
     state: &DaemonHttpState,
     result: Result<TaskBoardDispatchResponse, CliError>,
-    async_db: Option<&AsyncDaemonDb>,
+    async_db: &AsyncDaemonDb,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     let mut response = result?;
     if !response.applied.is_empty() {
-        let outcomes = start_workers_for_applied_dispatch(state, &response.applied).await;
-        let (applied, failures) = partition_worker_outcomes(&response.applied, outcomes);
+        let (applied, failures) = start_claimed_workers(state, &response.applied, async_db).await;
         response.applied = applied;
         response.failures.extend(failures);
-        broadcast_sessions_updated(state, async_db).await;
+        broadcast_sessions_updated(state, Some(async_db)).await;
     }
     Ok(response)
 }
@@ -120,45 +85,86 @@ async fn handle_dispatch_result(
 async fn handle_run_once_result(
     state: &DaemonHttpState,
     result: Result<TaskBoardOrchestratorRunOnceResponse, CliError>,
-    async_db: Option<&AsyncDaemonDb>,
+    async_db: &AsyncDaemonDb,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
     let status = result?;
     if status.last_run_applied_count() > 0 {
-        let outcomes = start_workers_for_run_once_status(state, &status).await;
-        // Best-effort rollback for any worker that failed to start. The
-        // orchestrator status snapshot is read-only here so we cannot mutate the
-        // embedded `applied` list, but the board state has been compensated.
         let applied: Vec<DispatchAppliedTask> = status
             .last_run
             .as_ref()
             .and_then(|run| run.dispatch.as_ref())
             .map(|dispatch| dispatch.applied.clone())
             .unwrap_or_default();
-        compensate_failed_workers(&applied, outcomes);
-        broadcast_sessions_updated(state, async_db).await;
+        let _ = start_claimed_workers(state, &applied, async_db).await;
+        broadcast_sessions_updated(state, Some(async_db)).await;
     }
     Ok(status)
 }
 
-fn partition_worker_outcomes(
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "worker startup must keep successful claims while routing each failure through durable rollback"
+)]
+async fn start_claimed_workers(
+    state: &DaemonHttpState,
     applied: &[DispatchAppliedTask],
-    outcomes: Vec<Result<ManagedAgentSnapshot, CliError>>,
+    async_db: &AsyncDaemonDb,
 ) -> (Vec<DispatchAppliedTask>, Vec<DispatchFailure>) {
-    classify_worker_outcomes(applied, outcomes, |task, error| {
-        rollback_dispatched_link(&task.board_item_id, &error.to_string());
-    })
+    let mut kept = Vec::new();
+    let mut failures = Vec::new();
+    for task in applied {
+        let claim = match async_db
+            .claim_task_board_dispatch(&task.board_item_id)
+            .await
+        {
+            Ok(Some(claim)) => claim,
+            Ok(None) => {
+                kept.push(task.clone());
+                continue;
+            }
+            Err(error) => {
+                warn!(board_item_id = %task.board_item_id, %error, "deferred task board worker claim to recovery loop");
+                kept.push(task.clone());
+                continue;
+            }
+        };
+        match start_worker_for_applied_task(state, &claim.applied, &claim.intent_id).await {
+            Ok(_) => {
+                if let Err(error) = async_db
+                    .complete_task_board_dispatch(&claim.intent_id, &claim.claim_token)
+                    .await
+                {
+                    warn!(board_item_id = %task.board_item_id, %error, "task board worker started but intent completion failed");
+                }
+                kept.push(claim.applied);
+            }
+            Err(error) => record_worker_failure(async_db, claim, error, &mut failures).await,
+        }
+    }
+    (kept, failures)
 }
 
-fn compensate_failed_workers(
-    applied: &[DispatchAppliedTask],
-    outcomes: Vec<Result<ManagedAgentSnapshot, CliError>>,
+async fn record_worker_failure(
+    db: &AsyncDaemonDb,
+    claim: ClaimedTaskBoardDispatch,
+    error: CliError,
+    failures: &mut Vec<DispatchFailure>,
 ) {
-    let _ = partition_worker_outcomes(applied, outcomes);
+    let rollback = db
+        .fail_task_board_dispatch(&claim.intent_id, &claim.claim_token, &error.to_string())
+        .await;
+    log_rollback_outcome(&claim.applied.board_item_id, rollback.err());
+    failures.push(DispatchFailure {
+        board_item_id: claim.applied.board_item_id,
+        kind: DispatchFailureKind::WorkerSpawnFailed,
+        message: error.to_string(),
+    });
 }
 
 /// Shared classifier for worker spawn outcomes. Runs `on_failure` for each
 /// failed task so callers can choose whether to apply the rollback (production)
 /// or skip it (tests).
+#[cfg(test)]
 fn classify_worker_outcomes(
     applied: &[DispatchAppliedTask],
     outcomes: Vec<Result<ManagedAgentSnapshot, CliError>>,
@@ -180,11 +186,6 @@ fn classify_worker_outcomes(
         }
     }
     (kept, failures)
-}
-
-fn rollback_dispatched_link(board_item_id: &str, reason: &str) {
-    let undo = service::unlink_dispatched_task_board_item(board_item_id, reason);
-    log_rollback_outcome(board_item_id, undo.err());
 }
 
 #[expect(

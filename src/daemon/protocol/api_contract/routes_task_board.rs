@@ -2,6 +2,14 @@ use super::{HttpApiRouteContract, HttpRouteMethod, HttpRouteParity, http_paths, 
 
 pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_CAPABILITIES,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_CAPABILITIES,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Post,
         path: http_paths::TASK_BOARD_ITEMS,
         parity: HttpRouteParity::Rpc {
@@ -250,10 +258,26 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
-        method: HttpRouteMethod::Post,
-        path: http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+        method: HttpRouteMethod::Put,
+        path: http_paths::TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL,
         parity: HttpRouteParity::Rpc {
-            ws_method: ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+            ws_method: ws_methods::TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL_SYNC,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK,
         },
         swift_client_exposed: true,
     },

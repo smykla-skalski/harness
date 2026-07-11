@@ -1,13 +1,20 @@
-use crate::task_board::types::{PlanningState, TaskBoardStatus};
+use sha2::{Digest, Sha256};
 
 use crate::task_board::external::{ExternalProvider, ExternalTask, ExternalTaskRef};
+use crate::task_board::types::{PlanningState, TaskBoardStatus};
+
+const GITHUB_ID_DIGEST_BYTES: usize = 16;
 
 pub(super) fn external_item_id(reference: &ExternalTaskRef) -> String {
-    format!(
+    let base = format!(
         "{}-{}",
         reference.provider,
         safe_id_part(&reference.external_id)
-    )
+    );
+    match reference.provider {
+        ExternalProvider::GitHub => format!("{base}-{}", github_id_suffix(&reference.external_id)),
+        ExternalProvider::Todoist => base,
+    }
 }
 
 pub(super) fn imported_external_planning(task: &ExternalTask) -> Option<PlanningState> {
@@ -53,4 +60,9 @@ fn safe_id_part(value: &str) -> String {
         }
     }
     sanitized.trim_matches('-').to_string()
+}
+
+fn github_id_suffix(external_id: &str) -> String {
+    let digest = Sha256::digest(external_id.as_bytes());
+    hex::encode(&digest[..GITHUB_ID_DIGEST_BYTES])
 }

@@ -42,6 +42,20 @@ impl TaskBoardGitRuntimeConfig {
         }
     }
 
+    /// Whether the value still contains plaintext private-key or passphrase
+    /// bytes from the pre-Keychain persistence format.
+    #[must_use]
+    pub fn contains_plaintext_secrets(&self) -> bool {
+        self.without_secrets() != *self
+    }
+
+    /// Whether the value contains either plaintext secret bytes or the old
+    /// persisted `*_configured` metadata.
+    #[must_use]
+    pub fn contains_secret_metadata(&self) -> bool {
+        self.without_secret_metadata() != *self
+    }
+
     /// Strip both secret values and the wire-only `*_configured` indicators.
     ///
     /// Use this for disk persistence: the configured booleans are derived from

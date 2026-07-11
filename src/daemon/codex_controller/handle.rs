@@ -14,6 +14,7 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
+use crate::infra::io::validate_safe_segment;
 use crate::session::types::ManagedAgentRef;
 use crate::workspace::utc_now;
 
@@ -76,20 +77,36 @@ impl CodexControllerHandle {
     /// # Errors
     /// Returns [`CliError`] when the session cannot be resolved or the snapshot
     /// cannot be persisted.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "queueing path builds a full persisted snapshot before worker handoff"
-    )]
     pub fn start_run(
         &self,
         session_id: &str,
         request: &CodexRunRequest,
     ) -> Result<CodexRunSnapshot, CliError> {
+        self.start_run_with_id(session_id, request, format!("codex-{}", Uuid::new_v4()))
+    }
+
+    /// Start a run with a durable caller-reserved identity.
+    ///
+    /// Reusing an identity while its worker is attached returns the existing
+    /// run, which makes a reclaimed Task Board dispatch claim idempotent.
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "durable run startup coordinates persisted state, agent registration, and worker handoff"
+    )]
+    pub(crate) fn start_run_with_id(
+        &self,
+        session_id: &str,
+        request: &CodexRunRequest,
+        run_id: String,
+    ) -> Result<CodexRunSnapshot, CliError> {
+        validate_safe_segment(&run_id)?;
+        if self.state.active_runs.contains(&run_id) {
+            return self.load_run(&run_id);
+        }
         let prompt = validate_run_request(request)?;
         self.preflight_websocket_probe(session_id)?;
 
         let project_dir = self.project_dir_for_session(session_id)?;
-        let run_id = format!("codex-{}", Uuid::new_v4());
         let display_name = request.name.clone().unwrap_or_else(|| "Codex".to_string());
         let session_agent_id =
             self.register_orchestration_agent(session_id, &run_id, request, &display_name)?;

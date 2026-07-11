@@ -89,6 +89,7 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         21 => Some(("remote_clients", "client_id")),
         22 => Some(("remote_acme_state", "domain")),
         23 => Some(("remote_acme_state", "account_credentials_json")),
+        24 => Some(("task_board_items", "revision")),
         _ => None,
     }
 }
@@ -120,6 +121,7 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         21 => 27,
         22 => 28,
         23 => 29,
+        24 => 30,
         _ => u64::MAX,
     }
 }

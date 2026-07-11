@@ -175,9 +175,9 @@ impl GitHubCache {
             Err(control_error) => {
                 let message = match quarantine_result {
                     Ok(()) => format!("rotate github cache control: {control_error}"),
-                    Err(quarantine_error) => format!(
-                        "rotate github cache control: {control_error}; {quarantine_error}"
-                    ),
+                    Err(quarantine_error) => {
+                        format!("rotate github cache control: {control_error}; {quarantine_error}")
+                    }
                 };
                 Err(Error::new(control_error.kind(), message))
             }

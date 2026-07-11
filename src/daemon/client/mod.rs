@@ -1,6 +1,7 @@
 mod api;
 mod connection;
 mod http;
+mod task_board;
 
 #[cfg(test)]
 mod api_tests;
@@ -8,6 +9,8 @@ mod api_tests;
 mod basic_tests;
 #[cfg(test)]
 mod discovery_tests;
+#[cfg(test)]
+mod task_board_tests;
 #[cfg(test)]
 pub(crate) mod test_support;
 
@@ -40,3 +43,4 @@ const API_READY_TIMEOUT: Duration = Duration::from_secs(2);
 const API_READY_INTERVAL: Duration = Duration::from_millis(100);
 const MUTATION_TIMEOUT: Duration = Duration::from_secs(5);
 const SESSION_START_TIMEOUT: Duration = Duration::from_secs(30);
+const TASK_BOARD_OPERATION_TIMEOUT: Duration = Duration::from_mins(2);

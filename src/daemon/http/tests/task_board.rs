@@ -4,7 +4,7 @@ use serde_json::json;
 use tempfile::tempdir;
 
 use crate::daemon::protocol::http_paths;
-use crate::task_board::{AgentMode, TaskBoardStatus, TaskBoardStore, default_board_root};
+use crate::task_board::{AgentMode, TaskBoardStatus};
 
 use super::task_board_managed_worker_assertions::assert_codex_worker_started;
 use super::task_board_support::*;
@@ -66,8 +66,13 @@ async fn run_task_board_http_item_scope_flow(
     state: &crate::daemon::http::DaemonHttpState,
     project_dir: &Path,
 ) {
-    seed_ready_board_item("board-http-dispatch", "HTTP dispatch item");
-    seed_ready_board_item("board-http-dispatch-other", "HTTP dispatch other item");
+    seed_ready_board_item(state, "board-http-dispatch", "HTTP dispatch item").await;
+    seed_ready_board_item(
+        state,
+        "board-http-dispatch-other",
+        "HTTP dispatch other item",
+    )
+    .await;
     let dispatch = dispatch_http_item(client, base_url, "board-http-dispatch", project_dir).await;
     let applied = first_applied(&dispatch);
     let session_id = required_string(applied, "session_id");
@@ -82,7 +87,7 @@ async fn run_task_board_http_item_scope_flow(
         Some("running")
     );
     assert_codex_worker_started(state, &session_id, "board-http-dispatch", &work_item_id);
-    assert_board_item_unlinked("board-http-dispatch-other");
+    assert_board_item_unlinked(state, "board-http-dispatch-other").await;
     let other_dispatch =
         dispatch_http_item(client, base_url, "board-http-dispatch-other", project_dir).await;
     let other_applied = first_applied(&other_dispatch);
@@ -114,8 +119,13 @@ async fn run_task_board_http_item_scope_flow(
         evaluation["records"][0]["board_item_id"].as_str(),
         Some("board-http-dispatch")
     );
-    assert_board_item_status("board-http-dispatch", TaskBoardStatus::Done);
-    assert_board_item_status("board-http-dispatch-other", TaskBoardStatus::InProgress);
+    assert_board_item_status(state, "board-http-dispatch", TaskBoardStatus::Done).await;
+    assert_board_item_status(
+        state,
+        "board-http-dispatch-other",
+        TaskBoardStatus::InProgress,
+    )
+    .await;
 }
 
 async fn run_task_board_http_run_once_flow(
@@ -124,8 +134,13 @@ async fn run_task_board_http_run_once_flow(
     state: &crate::daemon::http::DaemonHttpState,
     project_dir: &Path,
 ) {
-    seed_ready_board_item("board-http-run-once", "HTTP run once item");
-    seed_ready_board_item("board-http-run-once-other", "HTTP run once other item");
+    seed_ready_board_item(state, "board-http-run-once", "HTTP run once item").await;
+    seed_ready_board_item(
+        state,
+        "board-http-run-once-other",
+        "HTTP run once other item",
+    )
+    .await;
     let run_once = post_json(
         client,
         base_url,
@@ -167,12 +182,12 @@ async fn run_task_board_http_run_once_flow(
         "board-http-run-once",
         &required_string(applied, "work_item_id"),
     );
-    assert_board_item_unlinked("board-http-run-once-other");
+    assert_board_item_unlinked(state, "board-http-run-once-other").await;
 }
 
 async fn run_task_board_http_policy_pipeline_flow() {
     let state = test_http_state_with_db();
-    let (base_url, server) = serve_http(state).await;
+    let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
 
     let workspace = get_json(&client, &base_url, http_paths::POLICY_CANVASES).await;
@@ -264,10 +279,10 @@ async fn run_task_board_http_policy_pipeline_flow() {
 
 async fn run_task_board_http_plan_revoke_flow() {
     let state = test_http_state_with_db();
-    let (base_url, server) = serve_http(state).await;
+    let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
 
-    seed_ready_board_item("board-revoke-1", "Revoke me");
+    seed_ready_board_item(&state, "board-revoke-1", "Revoke me").await;
     let path = http_paths::TASK_BOARD_PLAN_REVOKE.replace("{item_id}", "board-revoke-1");
     let response = post_json(&client, &base_url, &path, json!({})).await;
 
@@ -279,8 +294,12 @@ async fn run_task_board_http_plan_revoke_flow() {
     assert!(response["item"]["planning"]["approved_by"].is_null());
     assert!(response["item"]["planning"]["approved_at"].is_null());
 
-    let stored = TaskBoardStore::new(default_board_root())
-        .get("board-revoke-1")
+    let stored = state
+        .async_db
+        .get()
+        .expect("async db")
+        .task_board_item("board-revoke-1")
+        .await
         .expect("load board item");
     assert_eq!(stored.status, TaskBoardStatus::AgenticReview);
     assert_eq!(
@@ -296,30 +315,36 @@ async fn run_task_board_http_plan_revoke_flow() {
 
 async fn run_task_board_http_catalog_flow() {
     let state = test_http_state_with_db();
-    let (base_url, server) = serve_http(state).await;
+    let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
 
     seed_catalog_board_item(
+        &state,
         "board-http-catalog-a",
         "HTTP catalog alpha todo",
         "project-alpha",
         AgentMode::Planning,
         TaskBoardStatus::Todo,
-    );
+    )
+    .await;
     seed_catalog_board_item(
+        &state,
         "board-http-catalog-b",
         "HTTP catalog alpha running",
         "project-alpha",
         AgentMode::Planning,
         TaskBoardStatus::InProgress,
-    );
+    )
+    .await;
     seed_catalog_board_item(
+        &state,
         "board-http-catalog-c",
         "HTTP catalog beta todo",
         "project-beta",
         AgentMode::Evaluate,
         TaskBoardStatus::Todo,
-    );
+    )
+    .await;
 
     let projects = get_json(&client, &base_url, http_paths::TASK_BOARD_PROJECTS).await;
     assert_project_summary(&projects, "project-alpha", 2, 1);

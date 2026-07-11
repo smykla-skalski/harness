@@ -320,6 +320,7 @@ extension HarnessMonitorStore {
     public var auditHasOlder = false
     public var githubDataRevision: UInt64 = 0
     public var latestGitHubDataChange: GitHubDataChangedPayload?
+    public var taskBoardRevision: UInt64 = 0
     public var taskBoardItems: [TaskBoardItem] = []
     public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
     public var taskBoardSyncSummary: TaskBoardSyncSummary?

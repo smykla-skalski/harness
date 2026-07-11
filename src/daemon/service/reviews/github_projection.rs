@@ -1,23 +1,18 @@
 use std::collections::HashSet;
-use std::sync::{Mutex, OnceLock, PoisonError};
 
 use chrono::SecondsFormat;
-use tokio::task::spawn_blocking;
 
-use crate::daemon::service::{broadcast_github_data_change, observe_sender};
-use crate::errors::{CliError, CliErrorKind};
+use crate::daemon::db::AsyncDaemonDb;
+use crate::errors::CliError;
 use crate::github_api::stable_data_revision_guard;
-use crate::github_api::{GitHubDataChange, GitHubProtectedClient, GitHubPullRequestSnapshot};
+use crate::github_api::{GitHubProtectedClient, GitHubPullRequestSnapshot};
 use crate::reviews::{
     ReviewItem, ReviewPullRequestState, ReviewsPullRequestReference,
     ReviewsPullRequestResolveRequest,
 };
 use crate::task_board::{
-    TaskBoardStore, default_board_root, imported_review_pull_request_references,
-    reconcile_pull_request_snapshots,
+    imported_review_references_from_items, reconcile_review_item_from_snapshots,
 };
-
-static PROJECTION_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 pub(super) enum MissingReviewResolution {
     ExactActiveImports,
@@ -30,67 +25,47 @@ impl MissingReviewResolution {
     }
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "the projection boundary handles the changed, unchanged, and failed persistence outcomes"
-)]
 pub(super) async fn reconcile_task_board(
+    database: Option<&AsyncDaemonDb>,
     items: &[ReviewItem],
     authoritative_viewer_keys: &HashSet<String>,
     missing_review_resolution: MissingReviewResolution,
     backport_detection_enabled: bool,
     backport_patterns: &[String],
     expected_revision: u64,
-) -> bool {
-    let Some(sender) = observe_sender() else {
-        return true;
+) -> Result<bool, CliError> {
+    let Some(database) = database else {
+        return Ok(true);
     };
     let mut snapshots = items
         .iter()
         .map(|item| snapshot_from_review(item, authoritative_viewer_keys))
         .collect::<Vec<_>>();
     if missing_review_resolution.resolves_active_imports() {
-        match resolve_missing_review_snapshots(
+        let resolved = resolve_missing_review_snapshots(
+            database,
             &snapshots,
             backport_detection_enabled,
             backport_patterns,
         )
-        .await
-        {
-            Ok(resolved) => snapshots.extend(resolved),
-            Err(error) => {
-                tracing::warn!(%error, "resolve missing task-board review pull requests");
-            }
-        }
+        .await?;
+        snapshots.extend(resolved);
     }
-    let result = reconcile_snapshots(snapshots, expected_revision).await;
-    let changed = match result {
-        Ok(Some(changed)) => changed,
-        Ok(None) => return false,
-        Err(error) => {
-            tracing::warn!(%error, "reconcile reviews into task board");
-            return true;
-        }
+    let Some(_revision_guard) = stable_data_revision_guard(expected_revision).await else {
+        return Ok(false);
     };
-    let revision_stable = GitHubProtectedClient::data_revision() == expected_revision;
-    if changed && revision_stable {
-        broadcast_github_data_change(
-            &sender,
-            &GitHubDataChange {
-                revision: GitHubProtectedClient::data_revision(),
-                operation: "reviews.shared_pull_request_projection".to_string(),
-            },
-        );
-    }
-    revision_stable
+    super::super::task_board_db::reconcile_shared_review_items_db(database, items).await?;
+    reconcile_snapshots(database, snapshots).await?;
+    Ok(GitHubProtectedClient::data_revision() == expected_revision)
 }
 
 async fn resolve_missing_review_snapshots(
+    database: &AsyncDaemonDb,
     snapshots: &[GitHubPullRequestSnapshot],
     backport_detection_enabled: bool,
     backport_patterns: &[String],
 ) -> Result<Vec<GitHubPullRequestSnapshot>, CliError> {
-    let imported = load_imported_review_references().await?;
+    let imported = load_imported_review_references(database).await?;
     let references = references_missing_from_snapshots(imported, snapshots);
     if references.is_empty() {
         return Ok(Vec::new());
@@ -108,16 +83,13 @@ async fn resolve_missing_review_snapshots(
         .collect())
 }
 
-async fn load_imported_review_references() -> Result<Vec<(String, u64)>, CliError> {
-    spawn_blocking(|| {
-        imported_review_pull_request_references(&TaskBoardStore::new(default_board_root()))
-    })
-    .await
-    .map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "join task-board review reference discovery: {error}"
-        )))
-    })?
+async fn load_imported_review_references(
+    database: &AsyncDaemonDb,
+) -> Result<Vec<(String, u64)>, CliError> {
+    database
+        .list_task_board_items(None)
+        .await
+        .map(|items| imported_review_references_from_items(&items))
 }
 
 fn references_missing_from_snapshots(
@@ -140,26 +112,20 @@ fn snapshot_key(repository: &str, number: u64) -> String {
 }
 
 async fn reconcile_snapshots(
+    database: &AsyncDaemonDb,
     snapshots: Vec<GitHubPullRequestSnapshot>,
-    expected_revision: u64,
-) -> Result<Option<bool>, CliError> {
-    let Some(_revision_guard) = stable_data_revision_guard(expected_revision).await else {
-        return Ok(None);
-    };
-    spawn_blocking(move || {
-        let _guard = PROJECTION_LOCK
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        let board = TaskBoardStore::new(default_board_root());
-        reconcile_pull_request_snapshots(&board, &snapshots).map(Some)
-    })
-    .await
-    .map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "join reviews task-board reconciliation: {error}"
-        )))
-    })?
+) -> Result<bool, CliError> {
+    let items = database.list_task_board_items(None).await?;
+    let mut changed = false;
+    for item in items {
+        let mutation = database
+            .update_task_board_item(&item.id, |current| {
+                Ok(reconcile_review_item_from_snapshots(current, &snapshots))
+            })
+            .await?;
+        changed |= mutation.is_some();
+    }
+    Ok(changed)
 }
 
 fn snapshot_from_review(

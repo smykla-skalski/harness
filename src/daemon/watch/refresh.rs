@@ -4,9 +4,10 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast::Sender;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-use crate::daemon::protocol::{SessionSummary, StreamEvent};
+use crate::daemon::protocol::{SessionSummary, StreamEvent, TaskBoardUpdatedPayload};
 use crate::daemon::{service, snapshot, timeline};
 use crate::errors::{CliError, CliErrorKind};
+use crate::workspace::utc_now;
 
 use super::state::{RefreshScope, SessionDigest, WatchChanges, WatchSnapshot};
 
@@ -25,6 +26,7 @@ pub(super) fn refresh_watch_snapshot(
     let mut changes = WatchChanges {
         sessions_updated: sessions_json != snapshot.sessions_json,
         session_ids: BTreeSet::new(),
+        ..WatchChanges::default()
     };
     snapshot.sessions_json = sessions_json;
 
@@ -134,6 +136,7 @@ async fn emit_watch_changes_async(
     changes: WatchChanges,
     async_db: &Arc<AsyncDaemonDb>,
 ) {
+    emit_task_board_updated(sender, &changes);
     let session_ids: Vec<_> = changes.session_ids.into_iter().collect();
     if changes.sessions_updated {
         service::broadcast_sessions_updated_async(sender, Some(async_db.as_ref())).await;
@@ -146,6 +149,25 @@ async fn emit_watch_changes_async(
         service::broadcast_session_extensions_async(sender, &session_id, Some(async_db.as_ref()))
             .await;
     }
+}
+
+fn emit_task_board_updated(sender: &Sender<StreamEvent>, changes: &WatchChanges) {
+    let Some(revision) = changes.task_board_revision else {
+        return;
+    };
+    let payload = TaskBoardUpdatedPayload {
+        revision,
+        scopes: changes.task_board_scopes.iter().cloned().collect(),
+    };
+    let Ok(payload) = serde_json::to_value(payload) else {
+        return;
+    };
+    let _ = sender.send(StreamEvent {
+        event: "task_board_updated".to_string(),
+        recorded_at: utc_now(),
+        session_id: None,
+        payload,
+    });
 }
 
 pub(super) fn emit_watch_changes_with<SessionsUpdated, SessionUpdatedCore, SessionExtensions>(

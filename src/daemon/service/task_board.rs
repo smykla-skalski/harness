@@ -1,40 +1,58 @@
+#[cfg(test)]
 use tokio::runtime::Builder as TokioRuntimeBuilder;
+#[cfg(test)]
 use uuid::Uuid;
 
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db::AsyncDaemonDb;
+#[cfg(test)]
+use crate::daemon::db::DaemonDb;
+#[cfg(test)]
 use crate::daemon::protocol::{
     TaskBoardAuditRequest, TaskBoardAuditResponse, TaskBoardCatalogRequest,
-    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchRequest,
-    TaskBoardDispatchResponse, TaskBoardGetItemRequest, TaskBoardListItemsRequest,
-    TaskBoardListItemsResponse, TaskBoardMachinesResponse, TaskBoardPlanApproveRequest,
-    TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
-    TaskBoardPlanningResponse, TaskBoardProjectsResponse, TaskBoardSyncRequest,
-    TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
+    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardGetItemRequest,
+    TaskBoardListItemsRequest, TaskBoardListItemsResponse, TaskBoardMachinesResponse,
+    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
+    TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse, TaskBoardProjectsResponse,
+    TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
 };
-use crate::errors::{CliError, CliErrorKind};
+use crate::daemon::protocol::{TaskBoardDispatchRequest, TaskBoardDispatchResponse};
+use crate::errors::CliError;
+#[cfg(test)]
+use crate::errors::CliErrorKind;
+#[cfg(test)]
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
+#[cfg(test)]
 use crate::task_board::{
     ExternalSyncConfig, ExternalSyncOperation, TaskBoardItem, TaskBoardOrchestrator,
     TaskBoardStore, build_audit_summary, build_machine_summaries, build_project_summaries,
     configured_sync_clients, default_board_root, sync_external_tasks,
 };
+#[cfg(test)]
 use crate::task_board::{
     PlanningTransition, approve_plan, begin_planning, revoke_plan, submit_plan,
 };
+#[cfg(test)]
 use crate::workspace::utc_now;
+#[cfg(test)]
 use tokio::task::spawn_blocking;
 
-use self::sync::{
-    build_sync_response, ensure_sync_request_can_run, log_sync_completion, log_sync_request,
-    sync_options,
+#[cfg(test)]
+use self::sync::build_sync_response;
+pub(crate) use self::sync::{
+    build_sync_response_from_items, ensure_sync_request_can_run, log_sync_completion,
+    log_sync_request, sync_options,
 };
+#[cfg(test)]
 use super::task_board_runtime::external_sync_config_for_repository;
 
 mod dispatch;
+mod dispatch_preparation;
 mod policy_canvas;
 mod policy_canvas_io;
 mod policy_canvas_response;
 mod sync;
+
+pub(crate) use dispatch_preparation::prepare_claimed_task_board_dispatch;
 
 pub(crate) use policy_canvas::{
     audit_policy_pipeline, create_policy_canvas, create_policy_scenario, delete_policy_canvas,
@@ -51,6 +69,7 @@ pub(crate) use policy_canvas_io::{export_policy, import_policy};
 /// # Errors
 /// Returns `CliError` when the generated or supplied ID is unsafe, already
 /// exists, or the markdown item cannot be written.
+#[cfg(test)]
 pub fn create_task_board_item(
     request: &TaskBoardCreateItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
@@ -82,6 +101,7 @@ pub fn create_task_board_item(
 /// # Errors
 /// Returns `CliError` when the board directory cannot be read or an item cannot
 /// be parsed from markdown.
+#[cfg(test)]
 pub fn list_task_board_items(
     request: &TaskBoardListItemsRequest,
 ) -> Result<TaskBoardListItemsResponse, CliError> {
@@ -95,6 +115,7 @@ pub fn list_task_board_items(
 /// # Errors
 /// Returns `CliError` when the ID is unsafe, the item is missing, or the
 /// markdown/frontmatter payload cannot be parsed.
+#[cfg(test)]
 pub fn get_task_board_item(request: &TaskBoardGetItemRequest) -> Result<TaskBoardItem, CliError> {
     store().get(&request.id)
 }
@@ -104,6 +125,7 @@ pub fn get_task_board_item(request: &TaskBoardGetItemRequest) -> Result<TaskBoar
 /// # Errors
 /// Returns `CliError` when the item cannot be loaded or the patched item cannot
 /// be written.
+#[cfg(test)]
 pub fn update_task_board_item(
     id: &str,
     request: &TaskBoardUpdateItemRequest,
@@ -116,6 +138,7 @@ pub fn update_task_board_item(
 /// # Errors
 /// Returns `CliError` when the item cannot be loaded or the tombstone cannot be
 /// written.
+#[cfg(test)]
 pub fn delete_task_board_item(
     request: &TaskBoardDeleteItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
@@ -126,6 +149,7 @@ pub fn delete_task_board_item(
 ///
 /// # Errors
 /// Returns `CliError` when the item cannot be loaded or persisted.
+#[cfg(test)]
 pub fn begin_task_board_planning(
     request: &TaskBoardPlanBeginRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
@@ -136,6 +160,7 @@ pub fn begin_task_board_planning(
 ///
 /// # Errors
 /// Returns `CliError` when the item cannot be loaded or persisted.
+#[cfg(test)]
 pub fn submit_task_board_plan(
     request: &TaskBoardPlanSubmitRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
@@ -146,6 +171,7 @@ pub fn submit_task_board_plan(
 ///
 /// # Errors
 /// Returns `CliError` when the item cannot be loaded or persisted.
+#[cfg(test)]
 pub fn approve_task_board_plan(
     request: &TaskBoardPlanApproveRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
@@ -160,6 +186,7 @@ pub fn approve_task_board_plan(
 ///
 /// # Errors
 /// Returns `CliError` when the item cannot be loaded or persisted.
+#[cfg(test)]
 pub fn revoke_task_board_plan(
     request: &TaskBoardPlanRevokeRequest,
 ) -> Result<TaskBoardPlanningResponse, CliError> {
@@ -183,6 +210,7 @@ pub fn revoke_task_board_plan(
 ///
 /// # Errors
 /// Returns `CliError` when board items cannot be loaded or sync execution fails.
+#[cfg(test)]
 pub fn sync_task_board(request: &TaskBoardSyncRequest) -> Result<TaskBoardSyncResponse, CliError> {
     run_task_board_sync_blocking(request)
 }
@@ -192,6 +220,7 @@ pub fn sync_task_board(request: &TaskBoardSyncRequest) -> Result<TaskBoardSyncRe
 /// # Errors
 /// Returns `CliError` when board items cannot be loaded, provider clients
 /// cannot be built, or an applied provider operation fails.
+#[cfg(test)]
 pub async fn sync_task_board_async(
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
@@ -199,6 +228,7 @@ pub async fn sync_task_board_async(
     sync_task_board_async_with_config(request, config).await
 }
 
+#[cfg(test)]
 pub(crate) async fn sync_task_board_async_with_config(
     request: &TaskBoardSyncRequest,
     config: ExternalSyncConfig,
@@ -217,6 +247,7 @@ pub(crate) async fn sync_task_board_async_with_config(
 ///
 /// # Errors
 /// Returns `CliError` when board items cannot be loaded.
+#[cfg(test)]
 pub fn list_task_board_projects(
     request: &TaskBoardCatalogRequest,
 ) -> Result<TaskBoardProjectsResponse, CliError> {
@@ -228,6 +259,7 @@ pub fn list_task_board_projects(
 ///
 /// # Errors
 /// Returns `CliError` when board items cannot be loaded.
+#[cfg(test)]
 pub fn list_task_board_machines(
     request: &TaskBoardCatalogRequest,
 ) -> Result<TaskBoardMachinesResponse, CliError> {
@@ -239,6 +271,7 @@ pub fn list_task_board_machines(
 ///
 /// # Errors
 /// Returns `CliError` when board items cannot be loaded.
+#[cfg(test)]
 pub fn dispatch_task_board(
     request: &TaskBoardDispatchRequest,
     db: Option<&DaemonDb>,
@@ -256,27 +289,14 @@ pub(crate) async fn dispatch_task_board_async(
     request: &TaskBoardDispatchRequest,
     async_db: &AsyncDaemonDb,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
-    let board = store();
-    dispatch::dispatch_task_board_async(request, async_db, &board).await
-}
-
-/// Roll back the link patch applied to a dispatched item when a downstream
-/// stage (worker spawn) fails. Resets status to `Todo` + clears the session
-/// and task link so the row is not orphaned in `InProgress`.
-///
-/// # Errors
-/// Returns `CliError` when the board item cannot be reloaded or persisted.
-pub(crate) fn unlink_dispatched_task_board_item(
-    board_item_id: &str,
-    reason: &str,
-) -> Result<TaskBoardItem, CliError> {
-    dispatch::unlink_dispatched_item(&store(), board_item_id, reason)
+    dispatch::dispatch_task_board_async(request, async_db).await
 }
 
 /// Build task-board audit counts.
 ///
 /// # Errors
 /// Returns `CliError` when board items cannot be loaded.
+#[cfg(test)]
 pub fn audit_task_board(
     request: &TaskBoardAuditRequest,
 ) -> Result<TaskBoardAuditResponse, CliError> {
@@ -284,6 +304,7 @@ pub fn audit_task_board(
     Ok(build_audit_summary(&items))
 }
 
+#[cfg(test)]
 fn patch_from_request(request: &TaskBoardUpdateItemRequest) -> TaskBoardItemPatch {
     TaskBoardItemPatch {
         title: request.title.clone(),
@@ -314,6 +335,7 @@ fn patch_from_request(request: &TaskBoardUpdateItemRequest) -> TaskBoardItemPatc
     }
 }
 
+#[cfg(test)]
 fn optional_string_patch(value: Option<&String>, clear: bool) -> OptionalFieldPatch<String> {
     if clear {
         return OptionalFieldPatch::Clear;
@@ -323,6 +345,7 @@ fn optional_string_patch(value: Option<&String>, clear: bool) -> OptionalFieldPa
         .map_or(OptionalFieldPatch::Unchanged, OptionalFieldPatch::Set)
 }
 
+#[cfg(test)]
 fn apply_planning_transition(
     id: &str,
     transition_for: impl FnOnce(&TaskBoardItem) -> PlanningTransition,
@@ -341,16 +364,19 @@ fn apply_planning_transition(
     Ok(TaskBoardPlanningResponse { transition, item })
 }
 
+#[cfg(test)]
 fn store() -> TaskBoardStore {
     TaskBoardStore::new(default_board_root())
 }
 
+#[cfg(test)]
 fn run_task_board_sync_blocking(
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
     run_task_board_sync_blocking_with_config(request, active_external_sync_config())
 }
 
+#[cfg(test)]
 fn active_external_sync_config() -> ExternalSyncConfig {
     let settings = TaskBoardOrchestrator::new(default_board_root())
         .settings()
@@ -374,6 +400,7 @@ fn active_external_sync_config() -> ExternalSyncConfig {
         .with_todoist_import_project_ids_override(&todoist_projects)
 }
 
+#[cfg(test)]
 async fn active_external_sync_config_async() -> Result<ExternalSyncConfig, CliError> {
     run_task_board_service_blocking("load external sync config", || {
         Ok(active_external_sync_config())
@@ -381,6 +408,7 @@ async fn active_external_sync_config_async() -> Result<ExternalSyncConfig, CliEr
     .await
 }
 
+#[cfg(test)]
 async fn build_sync_response_async(
     board: &TaskBoardStore,
     request: &TaskBoardSyncRequest,
@@ -395,6 +423,7 @@ async fn build_sync_response_async(
     .await
 }
 
+#[cfg(test)]
 pub(crate) fn run_task_board_sync_blocking_with_config(
     request: &TaskBoardSyncRequest,
     config: ExternalSyncConfig,
@@ -408,6 +437,7 @@ pub(crate) fn run_task_board_sync_blocking_with_config(
         .block_on(sync_task_board_async_with_config(request, config))
 }
 
+#[cfg(test)]
 async fn run_task_board_service_blocking<T, F>(
     operation: &'static str,
     work: F,
@@ -424,6 +454,7 @@ where
     })
 }
 
+#[cfg(test)]
 fn new_task_id() -> String {
     format!("task-{}", Uuid::new_v4().simple())
 }

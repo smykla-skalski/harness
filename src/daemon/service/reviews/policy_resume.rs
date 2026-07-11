@@ -1,3 +1,4 @@
+#[cfg(test)]
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -9,22 +10,26 @@ use tokio::time::interval as tokio_interval;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::service::observe_async_db;
 use crate::daemon::service::reviews::policy_audit::record_policy_run_resume_result;
+#[cfg(test)]
+use crate::daemon::service::reviews::policy_executor::build_policy_provider_registry;
 use crate::daemon::service::reviews::policy_executor::{
-    build_policy_provider_registry, daemon_policy_executor_with_audit,
+    build_database_policy_provider_registry, daemon_policy_executor_with_audit,
 };
 use crate::daemon::service::reviews::policy_mapping::map_run_response;
+use crate::daemon::service::reviews::policy_plan::enforced_database_reviews_policy_active;
 use crate::errors::{CliError, CliErrorKind};
 use crate::reviews::policy::ReviewsPolicyActionExecutor;
 use crate::reviews::{ReviewsPolicyRunResponse, ReviewsPolicySubject};
+#[cfg(test)]
 use crate::task_board::policy_graph::{PolicyGraphMode, cached_gate_policy};
 use crate::task_board::policy_runtime::executor::PolicyRuntimeExecutor;
 use crate::task_board::policy_runtime::models::{
     PolicyRunTrigger, PolicyWorkflowEvent, PolicyWorkflowRun,
 };
+#[cfg(test)]
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
-use crate::task_board::store::default_board_root;
 
-use super::policy::background_reviews_policy_runs_enabled;
+use super::policy::{background_reviews_policy_runs_enabled, require_policy_runtime_db};
 
 pub(crate) async fn resume_reviews_policy_event(
     event: &PolicyWorkflowEvent,
@@ -35,18 +40,13 @@ pub(crate) async fn resume_reviews_policy_event(
             event.subject_key
         ))
     })?;
-    let audit_db = observe_async_db();
-    let executor = daemon_policy_executor_with_audit(&subject.repository, audit_db.clone())?;
-    resume_reviews_policy_event_with_executor_and_audit_db(
-        default_board_root(),
-        executor,
-        event,
-        audit_db,
-    )
-    .await
+    let audit_db = require_policy_runtime_db(observe_async_db())?;
+    let executor =
+        daemon_policy_executor_with_audit(&subject.repository, Some(Arc::clone(&audit_db)))?;
+    resume_reviews_policy_event_with_executor_and_database(executor, event, audit_db).await
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub(crate) async fn resume_reviews_policy_event_with_executor<E>(
     root: PathBuf,
     executor: E,
@@ -55,45 +55,36 @@ pub(crate) async fn resume_reviews_policy_event_with_executor<E>(
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
 {
-    let repository = PolicyRuntimeRepository::new(root.clone());
-    let ready_run_ids = repository.runs_ready_for_event(event)?;
-    resume_reviews_policy_run_ids_with_executor_and_audit_db(
-        root,
-        executor,
-        &ready_run_ids,
-        PolicyRunTrigger::Event,
-        None,
-    )
-    .await
+    let ready_run_ids = PolicyRuntimeRepository::new(root.clone()).runs_ready_for_event(event)?;
+    resume_legacy_reviews_policy_run_ids(root, executor, &ready_run_ids, PolicyRunTrigger::Event)
+        .await
 }
 
-pub(crate) async fn resume_reviews_policy_event_with_executor_and_audit_db<E>(
-    root: PathBuf,
+pub(crate) async fn resume_reviews_policy_event_with_executor_and_database<E>(
     executor: E,
     event: &PolicyWorkflowEvent,
-    audit_db: Option<Arc<AsyncDaemonDb>>,
+    database: Arc<AsyncDaemonDb>,
 ) -> Result<Vec<ReviewsPolicyRunResponse>, CliError>
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
 {
-    let repository = PolicyRuntimeRepository::new(root.clone());
-    let ready_run_ids = repository.runs_ready_for_event(event)?;
-    resume_reviews_policy_run_ids_with_executor_and_audit_db(
-        root,
+    let ready_run_ids = database.policy_run_ids_ready_for_event(event).await?;
+    resume_database_reviews_policy_run_ids(
         executor,
         &ready_run_ids,
         PolicyRunTrigger::Event,
-        audit_db,
+        database,
     )
     .await
 }
 
 pub(crate) async fn resume_due_reviews_policy_timers()
 -> Result<Vec<ReviewsPolicyRunResponse>, CliError> {
-    resume_due_reviews_policy_timers_at(default_board_root(), Utc::now()).await
+    let database = require_policy_runtime_db(observe_async_db())?;
+    resume_due_reviews_policy_timers_at(database, Utc::now()).await
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub(crate) async fn resume_due_reviews_policy_timers_with_executor_at<E>(
     root: PathBuf,
     executor: E,
@@ -107,14 +98,8 @@ where
         .into_iter()
         .map(|run| run.run_id)
         .collect::<Vec<_>>();
-    resume_reviews_policy_run_ids_with_executor_and_audit_db(
-        root,
-        executor,
-        &ready_run_ids,
-        PolicyRunTrigger::Timer,
-        None,
-    )
-    .await
+    resume_legacy_reviews_policy_run_ids(root, executor, &ready_run_ids, PolicyRunTrigger::Timer)
+        .await
 }
 
 pub(crate) fn spawn_reviews_policy_timer_loop(interval: Duration) -> JoinHandle<()> {
@@ -140,41 +125,42 @@ pub(crate) fn spawn_reviews_policy_timer_loop(interval: Duration) -> JoinHandle<
 }
 
 async fn resume_due_reviews_policy_timers_at(
-    root: PathBuf,
+    database: Arc<AsyncDaemonDb>,
     now: DateTime<Utc>,
 ) -> Result<Vec<ReviewsPolicyRunResponse>, CliError> {
-    let ready_runs = PolicyRuntimeRepository::new(root.clone()).runs_ready_for_timer(now)?;
+    let ready_runs = database.policy_runs_ready_for_timer(now).await?;
     let mut resumed_runs = Vec::with_capacity(ready_runs.len());
     for ready_run in ready_runs {
-        resumed_runs.append(&mut resume_due_reviews_policy_timer_run(&root, &ready_run).await);
+        resumed_runs.append(
+            &mut resume_due_reviews_policy_timer_run(&ready_run, Arc::clone(&database)).await,
+        );
     }
     Ok(resumed_runs)
 }
 
 async fn resume_due_reviews_policy_timer_run(
-    root: &Path,
     ready_run: &PolicyWorkflowRun,
+    database: Arc<AsyncDaemonDb>,
 ) -> Vec<ReviewsPolicyRunResponse> {
     let Some(subject) = ReviewsPolicySubject::from_subject_key(&ready_run.subject.key) else {
         log_invalid_timer_run_subject(ready_run);
         return Vec::new();
     };
-    let audit_db = observe_async_db();
-    let Some(executor) = daemon_policy_executor_with_audit(&subject.repository, audit_db.clone())
-        .inspect_err(|error| {
-            log_timer_run_executor_resolve_error(ready_run, &subject.repository, error);
-        })
-        .ok()
+    let Some(executor) =
+        daemon_policy_executor_with_audit(&subject.repository, Some(Arc::clone(&database)))
+            .inspect_err(|error| {
+                log_timer_run_executor_resolve_error(ready_run, &subject.repository, error);
+            })
+            .ok()
     else {
         return Vec::new();
     };
     let ready_run_ids = vec![ready_run.run_id.clone()];
-    resume_reviews_policy_run_ids_with_executor_and_audit_db(
-        root.to_path_buf(),
+    resume_database_reviews_policy_run_ids(
         executor,
         &ready_run_ids,
         PolicyRunTrigger::Timer,
-        audit_db,
+        database,
     )
     .await
     .inspect_err(|error| log_timer_run_resume_error(ready_run, error))
@@ -222,38 +208,88 @@ fn log_timer_run_resume_error(ready_run: &PolicyWorkflowRun, error: &CliError) {
     );
 }
 
-async fn resume_reviews_policy_run_ids_with_executor_and_audit_db<E>(
-    root: PathBuf,
+async fn resume_database_reviews_policy_run_ids<E>(
     executor: E,
     run_ids: &[String],
     trigger: PolicyRunTrigger,
-    audit_db: Option<Arc<AsyncDaemonDb>>,
+    database: Arc<AsyncDaemonDb>,
 ) -> Result<Vec<ReviewsPolicyRunResponse>, CliError>
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
 {
-    let run_ids = resumable_reviews_policy_run_ids(&root, run_ids)?;
+    let run_ids = resumable_database_reviews_policy_run_ids(&database, run_ids).await?;
+    if run_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let providers = build_database_policy_provider_registry(executor, Arc::clone(&database));
+    let runtime = PolicyRuntimeExecutor::new_database(Arc::clone(&database), providers);
+    resume_policy_run_ids(&runtime, &run_ids, trigger, Some(&database)).await
+}
+
+#[cfg(test)]
+async fn resume_legacy_reviews_policy_run_ids<E>(
+    root: PathBuf,
+    executor: E,
+    run_ids: &[String],
+    trigger: PolicyRunTrigger,
+) -> Result<Vec<ReviewsPolicyRunResponse>, CliError>
+where
+    E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
+{
+    let run_ids = resumable_legacy_reviews_policy_run_ids(&root, run_ids)?;
     if run_ids.is_empty() {
         return Ok(Vec::new());
     }
     let providers = build_policy_provider_registry(executor, root.clone());
     let runtime = PolicyRuntimeExecutor::new(PolicyRuntimeRepository::new(root), providers);
+    resume_policy_run_ids(&runtime, &run_ids, trigger, None).await
+}
+
+async fn resume_policy_run_ids(
+    runtime: &PolicyRuntimeExecutor,
+    run_ids: &[String],
+    trigger: PolicyRunTrigger,
+    database: Option<&Arc<AsyncDaemonDb>>,
+) -> Result<Vec<ReviewsPolicyRunResponse>, CliError> {
     let mut resumed_runs = Vec::with_capacity(run_ids.len());
-    for run_id in &run_ids {
+    for run_id in run_ids {
         if let Some(run) = runtime.resume(run_id, trigger).await? {
             let response = map_run_response(&run)?;
-            record_policy_run_resume_result(audit_db.as_ref(), trigger, &response).await;
+            record_policy_run_resume_result(database, trigger, &response).await;
             resumed_runs.push(response);
         }
     }
     Ok(resumed_runs)
 }
 
-fn resumable_reviews_policy_run_ids(
+async fn resumable_database_reviews_policy_run_ids(
+    database: &AsyncDaemonDb,
+    run_ids: &[String],
+) -> Result<Vec<String>, CliError> {
+    if !enforced_database_reviews_policy_active(database).await? {
+        return Ok(Vec::new());
+    }
+    if background_reviews_policy_runs_enabled() {
+        return Ok(run_ids.to_vec());
+    }
+    let mut resumable = Vec::with_capacity(run_ids.len());
+    for run_id in run_ids {
+        let Some(run) = database.policy_run_by_id(run_id).await? else {
+            continue;
+        };
+        if run.trigger != PolicyRunTrigger::Background {
+            resumable.push(run_id.clone());
+        }
+    }
+    Ok(resumable)
+}
+
+#[cfg(test)]
+fn resumable_legacy_reviews_policy_run_ids(
     root: &Path,
     run_ids: &[String],
 ) -> Result<Vec<String>, CliError> {
-    if !enforced_reviews_policy_active(root) {
+    if !enforced_legacy_reviews_policy_active(root) {
         return Ok(Vec::new());
     }
     if background_reviews_policy_runs_enabled() {
@@ -272,6 +308,7 @@ fn resumable_reviews_policy_run_ids(
     Ok(resumable)
 }
 
-fn enforced_reviews_policy_active(root: &Path) -> bool {
+#[cfg(test)]
+fn enforced_legacy_reviews_policy_active(root: &Path) -> bool {
     cached_gate_policy(root).is_some_and(|document| document.mode == PolicyGraphMode::Enforced)
 }

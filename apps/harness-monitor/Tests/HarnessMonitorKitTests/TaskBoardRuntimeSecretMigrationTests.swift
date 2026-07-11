@@ -6,192 +6,214 @@ import Testing
 @MainActor
 @Suite("Task-board runtime-secret migration")
 struct TaskBoardRuntimeSecretMigrationTests {
-  @Test("Skips drain when the managed-ownership flag is already set")
-  func skipsWhenFlagAlreadySet() async throws {
+  private let instanceID = "database-one"
+
+  @Test("Prepare remains server-authoritative across repeated connections")
+  func repeatedConnectionsQueryPrepare() async {
     let client = RecordingHarnessClient()
-    let defaults = try makeEmptyDefaults()
-    defaults.set(
-      true,
-      forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed)
-    )
     let keychain = InMemoryKeychainBundle()
 
-    let baseline = client.recordedCalls().count
-    await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
+    let first = await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
       client: client,
+      instanceID: instanceID,
       ownership: .managed,
-      userDefaults: defaults,
+      keychain: keychain.persistence
+    )
+    let second = await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
+      client: client,
+      instanceID: instanceID,
+      ownership: .managed,
       keychain: keychain.persistence
     )
 
-    let newCalls = Array(client.recordedCalls().dropFirst(baseline))
+    #expect(first)
+    #expect(second)
     #expect(
-      newCalls.contains { call in
-        if case .drainTaskBoardGitRuntimeSecrets = call { return true }
+      client.recordedCalls().filter { call in
+        if case .prepareTaskBoardSecretHandoff = call { return true }
         return false
-      } == false
-    )
-    #expect(keychain.savedSnapshots.isEmpty)
-  }
-
-  @Test("Sets the per-ownership flag without writing to Keychain when drained == false")
-  func recordsFlagWhenNothingToDrain() async throws {
-    let client = RecordingHarnessClient()
-    let defaults = try makeEmptyDefaults()
-    let keychain = InMemoryKeychainBundle()
-
-    await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
-      client: client,
-      ownership: .managed,
-      userDefaults: defaults,
-      keychain: keychain.persistence
-    )
-
-    #expect(
-      defaults.bool(
-        forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed)
-      )
-    )
-    #expect(keychain.savedSnapshots.isEmpty)
-    let calls = client.recordedCalls()
-    #expect(
-      calls.contains { call in
-        if case .drainTaskBoardGitRuntimeSecrets = call { return true }
-        return false
-      }
+      }.count == 2
     )
   }
 
-  @Test("Mirrors drained secrets into Keychain and flips the flag exactly once")
-  func mirrorsDrainedSecretsAndSetsFlag() async throws {
+  @Test("Prepared secrets are verified in the database scope before acknowledgement")
+  func verifiesPreparedSecretsThenAcknowledges() async {
     let client = RecordingHarnessClient()
-    client.taskBoardGitRuntimeDrainSecretsValue = TaskBoardGitRuntimeDrainSecretsResponse(
-      drained: true,
-      runtime: TaskBoardGitRuntimeConfig(
-        global: TaskBoardGitRuntimeProfile(
-          sshKeyPath: "/keys/id_ed25519",
-          sshPrivateKey: "global-ssh-secret",
-          sshPrivateKeyPassphrase: "global-ssh-pass",
-          signing: TaskBoardGitSigningConfig(
-            mode: .gpg,
-            gpgKeyId: "ABC123",
-            gpgPrivateKey: "global-gpg-secret",
-            gpgPrivateKeyPassphrase: "global-gpg-pass"
-          )
-        ),
-        repositoryOverrides: [
-          TaskBoardGitRepositoryOverride(
-            repository: "owner/repo",
-            profile: TaskBoardGitRuntimeProfile(
-              sshPrivateKey: "repo-ssh-secret"
+    client.taskBoardSecretHandoffPrepareValue =
+      TaskBoardGitRuntimeSecretHandoffPrepareResponse(
+        prepared: true,
+        migrationID: "migration-1",
+        digest: "digest-1",
+        runtime: TaskBoardGitRuntimeConfig(
+          global: TaskBoardGitRuntimeProfile(
+            sshKeyPath: "/keys/id_ed25519",
+            sshPrivateKey: "global-ssh-secret",
+            sshPrivateKeyPassphrase: "global-ssh-pass",
+            signing: TaskBoardGitSigningConfig(
+              mode: .gpg,
+              gpgKeyId: "ABC123",
+              gpgPrivateKey: "global-gpg-secret",
+              gpgPrivateKeyPassphrase: "global-gpg-pass"
             )
-          )
-        ]
+          ),
+          repositoryOverrides: [
+            TaskBoardGitRepositoryOverride(
+              repository: "owner/repo",
+              profile: TaskBoardGitRuntimeProfile(
+                sshPrivateKey: "repo-ssh-secret"
+              )
+            )
+          ]
+        )
       )
-    )
-    let defaults = try makeEmptyDefaults()
     let keychain = InMemoryKeychainBundle()
 
-    await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
+    let succeeded = await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
       client: client,
+      instanceID: instanceID,
       ownership: .managed,
-      userDefaults: defaults,
       keychain: keychain.persistence
     )
 
-    #expect(
-      defaults.bool(
-        forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed)
-      )
-    )
-    let globalSSH = keychain.ssh.snapshots[.global]
+    #expect(succeeded)
+    let globalSSH = keychain.ssh.snapshots[.databaseGlobal(instanceID)]
     #expect(globalSSH?.privateKey == "global-ssh-secret")
     #expect(globalSSH?.passphrase == "global-ssh-pass")
     #expect(globalSSH?.keyPath == "/keys/id_ed25519")
-    let globalGPG = keychain.gpg.snapshots[.global]
+    let globalGPG = keychain.gpg.snapshots[.databaseGlobal(instanceID)]
     #expect(globalGPG?.privateKey == "global-gpg-secret")
     #expect(globalGPG?.keyId == "ABC123")
-    let repoSSH = keychain.ssh.snapshots[.repository("owner/repo")]
+    let repoSSH = keychain.ssh.snapshots[.databaseRepository(instanceID, "owner/repo")]
     #expect(repoSSH?.privateKey == "repo-ssh-secret")
-
-    let preSecondCount = client.recordedCalls().count
-    await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
-      client: client,
-      ownership: .managed,
-      userDefaults: defaults,
-      keychain: keychain.persistence
-    )
-    #expect(client.recordedCalls().count == preSecondCount)
-  }
-
-  @Test("Drain failure leaves the flag unset so the next snapshot retries")
-  func drainFailureKeepsRetrying() async throws {
-    let client = RecordingHarnessClient()
-    client.configureTaskBoardGitRuntimeDrainSecretsError(
-      HarnessMonitorAPIError.server(code: 404, message: "older daemon")
-    )
-    let defaults = try makeEmptyDefaults()
-    let keychain = InMemoryKeychainBundle()
-
-    await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
-      client: client,
-      ownership: .managed,
-      userDefaults: defaults,
-      keychain: keychain.persistence
-    )
-
     #expect(
-      defaults.bool(forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed))
-        == false
+      client.recordedCalls().contains(
+        .ackTaskBoardSecretHandoff(
+          migrationID: "migration-1",
+          digest: "digest-1"
+        )
+      )
     )
-    #expect(keychain.savedSnapshots.isEmpty)
+
   }
 
-  @Test("Managed-side migration does not block external-side migration")
-  func managedFlagDoesNotBlockExternal() async throws {
-    let client = RecordingHarnessClient()
-    client.taskBoardGitRuntimeDrainSecretsValue = TaskBoardGitRuntimeDrainSecretsResponse(
-      drained: true,
+  @Test("Same-ownership databases use isolated Keychain scopes")
+  func databaseScopesStayIsolated() throws {
+    let keychain = InMemoryKeychainBundle()
+    try HarnessMonitorStore.persistKeyMaterial(
       runtime: TaskBoardGitRuntimeConfig(
-        global: TaskBoardGitRuntimeProfile(sshPrivateKey: "external-only-secret")
-      )
-    )
-    let defaults = try makeEmptyDefaults()
-    defaults.set(
-      true,
-      forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed)
-    )
-    let keychain = InMemoryKeychainBundle()
-
-    await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
-      client: client,
+        global: TaskBoardGitRuntimeProfile(sshPrivateKey: "first")
+      ),
+      instanceID: "database-one",
       ownership: .external,
-      userDefaults: defaults,
+      keychain: keychain.persistence
+    )
+    try HarnessMonitorStore.persistKeyMaterial(
+      runtime: TaskBoardGitRuntimeConfig(
+        global: TaskBoardGitRuntimeProfile(sshPrivateKey: "second")
+      ),
+      instanceID: "database-two",
+      ownership: .external,
       keychain: keychain.persistence
     )
 
-    #expect(
-      defaults.bool(
-        forKey: HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .external)
+    #expect(keychain.ssh.snapshots[.databaseGlobal("database-one")]?.privateKey == "first")
+    #expect(keychain.ssh.snapshots[.databaseGlobal("database-two")]?.privateKey == "second")
+  }
+
+  @Test("Read-back mismatch does not acknowledge")
+  func readBackMismatchDoesNotAcknowledge() async {
+    let client = RecordingHarnessClient()
+    client.taskBoardSecretHandoffPrepareValue =
+      TaskBoardGitRuntimeSecretHandoffPrepareResponse(
+        prepared: true,
+        migrationID: "migration-corrupt",
+        digest: "digest-corrupt",
+        runtime: TaskBoardGitRuntimeConfig(
+          global: TaskBoardGitRuntimeProfile(sshPrivateKey: "secret")
+        )
       )
+    let keychain = InMemoryKeychainBundle()
+    keychain.ssh.corruptReads = true
+
+    let succeeded = await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
+      client: client,
+      instanceID: instanceID,
+      ownership: .managed,
+      keychain: keychain.persistence
     )
-    #expect(keychain.ssh.snapshots[.global]?.privateKey == "external-only-secret")
+
+    #expect(!succeeded)
+    #expect(
+      client.recordedCalls().contains { call in
+        if case .ackTaskBoardSecretHandoff = call { return true }
+        return false
+      } == false
+    )
   }
 
-  @Test("Managed and external ownership produce distinct flag keys")
-  func keysAreDistinctPerOwnership() {
-    let managedKey = HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .managed)
-    let externalKey = HarnessMonitorStore.taskBoardRuntimeSecretsMigrationKey(for: .external)
-    #expect(managedKey != externalKey)
-    #expect(managedKey.hasSuffix(".managed"))
-    #expect(externalKey.hasSuffix(".external"))
+  @Test("Acknowledgement failure retries the same prepared handoff")
+  func acknowledgementFailureKeepsRetrying() async {
+    let client = RecordingHarnessClient()
+    client.taskBoardSecretHandoffPrepareValue =
+      TaskBoardGitRuntimeSecretHandoffPrepareResponse(
+        prepared: true,
+        migrationID: "migration-retry",
+        digest: "digest-retry",
+        runtime: TaskBoardGitRuntimeConfig(
+          global: TaskBoardGitRuntimeProfile(sshPrivateKey: "secret")
+        )
+      )
+    client.configureTaskBoardSecretHandoffAckError(
+      HarnessMonitorAPIError.server(code: 503, message: "retry")
+    )
+    let keychain = InMemoryKeychainBundle()
+
+    let first = await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
+      client: client,
+      instanceID: instanceID,
+      ownership: .managed,
+      keychain: keychain.persistence
+    )
+    client.configureTaskBoardSecretHandoffAckError(nil)
+    let second = await HarnessMonitorStore.migrateRuntimeSecretsIfNeeded(
+      client: client,
+      instanceID: instanceID,
+      ownership: .managed,
+      keychain: keychain.persistence
+    )
+
+    #expect(!first)
+    #expect(second)
+    #expect(keychain.ssh.snapshots[.databaseGlobal(instanceID)]?.privateKey == "secret")
   }
 
-  private func makeEmptyDefaults() throws -> UserDefaults {
-    let suite = "harness.migration.\(UUID().uuidString)"
-    let defaults = try #require(UserDefaults(suiteName: suite))
-    defaults.removePersistentDomain(forName: suite)
-    return defaults
+  @Test("Managed legacy material moves once and clearing cannot resurrect it")
+  func legacyMaterialMovesThenClears() throws {
+    let keychain = InMemoryKeychainBundle()
+    keychain.ssh.snapshots[.global] = TaskBoardKeyMaterialSnapshot(privateKey: "legacy")
+
+    let hydrated = HarnessMonitorStore.hydrateKeyMaterial(
+      into: TaskBoardGitRuntimeConfig(),
+      instanceID: instanceID,
+      ownership: .managed,
+      keychain: keychain.persistence
+    )
+    #expect(hydrated.global.sshPrivateKey == "legacy")
+    #expect(keychain.ssh.snapshots[.global] == nil)
+
+    try HarnessMonitorStore.persistKeyMaterial(
+      runtime: TaskBoardGitRuntimeConfig(),
+      instanceID: instanceID,
+      ownership: .managed,
+      keychain: keychain.persistence
+    )
+    let afterClear = HarnessMonitorStore.hydrateKeyMaterial(
+      into: TaskBoardGitRuntimeConfig(),
+      instanceID: instanceID,
+      ownership: .managed,
+      keychain: keychain.persistence
+    )
+    #expect(afterClear.global.sshPrivateKey == nil)
   }
 }
 
@@ -218,15 +240,21 @@ private final class InMemoryKeychainBundle {
 private final class InMemoryKeyMaterialStore: TaskBoardKeyMaterialPersisting, @unchecked Sendable {
   var snapshots: [TaskBoardKeyMaterialStore.Scope: TaskBoardKeyMaterialSnapshot] = [:]
   var recorded: [(TaskBoardKeyMaterialStore.Scope, TaskBoardKeyMaterialSnapshot)] = []
+  var corruptReads = false
 
   func load(scope: TaskBoardKeyMaterialStore.Scope) throws -> TaskBoardKeyMaterialSnapshot {
-    snapshots[scope] ?? TaskBoardKeyMaterialSnapshot()
+    if corruptReads {
+      return TaskBoardKeyMaterialSnapshot()
+    }
+    return snapshots[scope] ?? TaskBoardKeyMaterialSnapshot()
   }
 
   func save(_ snapshot: TaskBoardKeyMaterialSnapshot, scope: TaskBoardKeyMaterialStore.Scope) throws
   {
-    snapshots[scope] = snapshot
-    if !snapshot.isEmpty {
+    if snapshot.isEmpty {
+      snapshots.removeValue(forKey: scope)
+    } else {
+      snapshots[scope] = snapshot
       recorded.append((scope, snapshot))
     }
   }

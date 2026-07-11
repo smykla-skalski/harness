@@ -1,7 +1,5 @@
 use serde_json::{Value, json};
 
-use crate::task_board::{TaskBoardStore, default_board_root};
-
 use super::super::*;
 
 #[test]
@@ -330,11 +328,14 @@ fn websocket_task_board_crud_sync_audit_and_orchestrator_routes_use_real_state()
             )
             .await;
             assert!(deleted["deleted_at"].as_str().is_some());
-            assert!(
-                TaskBoardStore::new(default_board_root())
-                    .get("board-ws-crud")
-                    .is_ok()
-            );
+            let stored = state
+                .async_db
+                .get()
+                .expect("async db")
+                .task_board_item("board-ws-crud")
+                .await
+                .expect("load deleted item");
+            assert!(stored.is_deleted());
         });
     });
 }

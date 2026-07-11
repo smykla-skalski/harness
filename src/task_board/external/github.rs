@@ -27,9 +27,8 @@ mod review_projection;
 use errors::{github_sync_error_with_context, warn_github_message};
 pub use inbox::GitHubInboxSyncClient;
 pub(crate) use review_projection::{
-    imported_review_pull_request_references, reconcile_pull_request_snapshots,
+    imported_review_references_from_items, reconcile_review_item_from_snapshots,
 };
-
 #[derive(Clone)]
 pub struct GitHubSyncClient {
     client: GitHubProtectedClient,

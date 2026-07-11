@@ -9,9 +9,7 @@ use crate::daemon::protocol::SessionJoinRequest;
 use crate::daemon::service::join_session_direct_async;
 use crate::session::types::SessionRole;
 use crate::task_board::planning::{approve_plan, submit_plan};
-use crate::task_board::{
-    AgentMode, TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root,
-};
+use crate::task_board::{AgentMode, TaskBoardItem, TaskBoardStatus};
 
 pub(super) async fn dispatch_http_item(
     client: &reqwest::Client,
@@ -140,8 +138,11 @@ pub(super) async fn get_json(client: &reqwest::Client, base_url: &str, path: &st
     value
 }
 
-pub(super) fn seed_ready_board_item(id: &str, title: &str) {
-    let store = TaskBoardStore::new(default_board_root());
+pub(super) async fn seed_ready_board_item(
+    state: &crate::daemon::http::DaemonHttpState,
+    id: &str,
+    title: &str,
+) {
     let mut item = TaskBoardItem::new(
         id.to_string(),
         title.to_string(),
@@ -151,19 +152,23 @@ pub(super) fn seed_ready_board_item(id: &str, title: &str) {
     item.status = TaskBoardStatus::Todo;
     let item = submit_plan(&item, "Use task dispatch.").apply_to(&item);
     let item = approve_plan(&item, "lead", "2026-05-14T01:00:00Z").apply_to(&item);
-    let title = item.title.clone();
-    let body = item.body.clone();
-    store.create(&title, &body, item).expect("create item");
+    state
+        .async_db
+        .get()
+        .expect("async db")
+        .create_task_board_item(item)
+        .await
+        .expect("create item");
 }
 
-pub(super) fn seed_catalog_board_item(
+pub(super) async fn seed_catalog_board_item(
+    state: &crate::daemon::http::DaemonHttpState,
     id: &str,
     title: &str,
     project_id: &str,
     agent_mode: AgentMode,
     status: TaskBoardStatus,
 ) {
-    let store = TaskBoardStore::new(default_board_root());
     let mut item = TaskBoardItem::new(
         id.to_string(),
         title.to_string(),
@@ -173,9 +178,13 @@ pub(super) fn seed_catalog_board_item(
     item.status = status;
     item.project_id = Some(project_id.to_string());
     item.agent_mode = agent_mode;
-    let title = item.title.clone();
-    let body = item.body.clone();
-    store.create(&title, &body, item).expect("create item");
+    state
+        .async_db
+        .get()
+        .expect("async db")
+        .create_task_board_item(item)
+        .await
+        .expect("create item");
 }
 
 pub(super) fn assert_project_summary(
@@ -216,17 +225,32 @@ pub(super) fn first_applied(value: &Value) -> &Value {
         .expect("first applied task")
 }
 
-pub(super) fn assert_board_item_unlinked(id: &str) {
-    let item = TaskBoardStore::new(default_board_root())
-        .get(id)
+pub(super) async fn assert_board_item_unlinked(
+    state: &crate::daemon::http::DaemonHttpState,
+    id: &str,
+) {
+    let item = state
+        .async_db
+        .get()
+        .expect("async db")
+        .task_board_item(id)
+        .await
         .expect("load board item");
     assert_eq!(item.status, TaskBoardStatus::Todo);
     assert!(item.work_item_id.is_none());
 }
 
-pub(super) fn assert_board_item_status(id: &str, status: TaskBoardStatus) {
-    let item = TaskBoardStore::new(default_board_root())
-        .get(id)
+pub(super) async fn assert_board_item_status(
+    state: &crate::daemon::http::DaemonHttpState,
+    id: &str,
+    status: TaskBoardStatus,
+) {
+    let item = state
+        .async_db
+        .get()
+        .expect("async db")
+        .task_board_item(id)
+        .await
         .expect("load board item");
     assert_eq!(item.status, status);
 }

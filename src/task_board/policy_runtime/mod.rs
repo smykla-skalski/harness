@@ -1,3 +1,4 @@
+pub(crate) mod action_persistence;
 pub mod events;
 pub mod executor;
 pub mod handoff;
@@ -12,3 +13,6 @@ pub mod task_creation;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod tests_database;
