@@ -80,9 +80,24 @@ fn missing_task_board_capability_reports_upgrade_required() {
 }
 
 #[test]
-fn non_database_task_board_capability_reports_upgrade_required() {
+fn task_board_capability_preserves_non_missing_endpoint_errors() {
     let (endpoint, _request_line, handle) =
-        spawn_mock("200 OK", r#"{"storage":"files","revision":42}"#.into());
+        spawn_mock("500 Internal Server Error", "backend unavailable".into());
+
+    let error = client_with(endpoint)
+        .require_database_task_board()
+        .expect_err("daemon failure must remain diagnosable");
+    handle.join().expect("server");
+    assert!(error.to_string().contains("daemon HTTP 500"));
+    assert!(!error.to_string().contains("upgrade and restart the daemon"));
+}
+
+#[test]
+fn non_database_task_board_capability_reports_upgrade_required() {
+    let (endpoint, _request_line, handle) = spawn_mock(
+        "200 OK",
+        r#"{"storage":"files","revision":42,"instance_id":"legacy-1"}"#.into(),
+    );
 
     let error = client_with(endpoint)
         .require_database_task_board()
@@ -92,14 +107,15 @@ fn non_database_task_board_capability_reports_upgrade_required() {
 }
 
 #[test]
-fn invalid_task_board_capability_reports_upgrade_required() {
+fn invalid_task_board_capability_preserves_decode_error() {
     let (endpoint, _request_line, handle) = spawn_mock("200 OK", "{}".into());
 
     let error = client_with(endpoint)
         .require_database_task_board()
-        .expect_err("invalid capability must fail closed");
+        .expect_err("invalid capability must remain diagnosable");
     handle.join().expect("server");
-    assert!(error.to_string().contains("upgrade and restart the daemon"));
+    assert!(error.to_string().contains("daemon HTTP parse response"));
+    assert!(!error.to_string().contains("upgrade and restart the daemon"));
 }
 
 #[test]

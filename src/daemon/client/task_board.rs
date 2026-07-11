@@ -30,8 +30,10 @@ use super::DaemonClient;
 impl DaemonClient {
     pub fn require_database_task_board(&self) -> Result<i64, CliError> {
         let capability = self
-            .get_optional::<TaskBoardCapabilitiesResponse>(http_paths::TASK_BOARD_CAPABILITIES, &[])
-            .map_err(|_| task_board_upgrade_required())?
+            .get_optional::<TaskBoardCapabilitiesResponse>(
+                http_paths::TASK_BOARD_CAPABILITIES,
+                &[],
+            )?
             .ok_or_else(task_board_upgrade_required)?;
         if capability.storage != TASK_BOARD_STORAGE_DATABASE {
             return Err(task_board_upgrade_required());

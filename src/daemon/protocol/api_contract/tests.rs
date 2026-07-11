@@ -95,6 +95,25 @@ fn every_declared_ws_method_has_remote_scope_contract() {
 }
 
 #[test]
+fn database_task_board_methods_have_remote_scope_contract() {
+    for method in [
+        ws_methods::TASK_BOARD_CAPABILITIES,
+        ws_methods::TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL_SYNC,
+        ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
+        ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK,
+    ] {
+        assert!(
+            ws_methods::ALL.contains(&method),
+            "{method} should be listed in ws_methods::ALL"
+        );
+        assert!(
+            remote_ws_scopes(method).is_some(),
+            "{method} should declare remote auth scopes"
+        );
+    }
+}
+
+#[test]
 fn every_mapped_ws_method_is_listed_in_ws_methods_all() {
     let declared_methods: BTreeSet<_> = ws_methods::ALL.iter().copied().collect();
 

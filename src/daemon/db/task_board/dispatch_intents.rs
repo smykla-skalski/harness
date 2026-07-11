@@ -134,9 +134,10 @@ impl AsyncDaemonDb {
             "SELECT item_id FROM task_board_dispatch_intents
              WHERE status = 'pending'
                 OR (status = 'starting'
-                    AND datetime(claimed_at) <= datetime('now', '-30 seconds'))
+                    AND datetime(claimed_at) <= datetime('now', ?1))
              ORDER BY created_at, intent_id LIMIT 1",
         )
+        .bind(format!("-{CLAIM_LEASE_SECONDS} seconds"))
         .fetch_optional(self.pool())
         .await
         .map_err(|error| db_error(format!("load next task board dispatch: {error}")))?
