@@ -138,6 +138,10 @@ fn remote_systemd_unit_is_hardened_and_runs_remote_serve() {
     );
     assert!(
         plan.unit_contents
+            .contains("Environment=XDG_DATA_HOME=%S/harness-remote-daemon")
+    );
+    assert!(
+        plan.unit_contents
             .contains("Environment=HARNESS_DAEMON_OWNERSHIP=external")
     );
     assert!(plan.unit_contents.contains("NoNewPrivileges=true"));
