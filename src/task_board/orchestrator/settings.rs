@@ -77,28 +77,25 @@ fn normalize_enabled_workflows(document: &mut Value) -> bool {
 }
 
 fn repair_dispatch_status_filter(document: &mut Value) -> bool {
-    let Some(status) = document
+    let Some(status_value) = document
         .as_object()
         .and_then(|map| map.get("dispatch_status_filter"))
-        .and_then(Value::as_str)
+        .cloned()
     else {
         return false;
     };
-    let Some(canonical) = canonical_status_wire_value(status) else {
+    let Ok(status) = serde_json::from_value::<TaskBoardStatus>(status_value) else {
         return false;
     };
-    document["dispatch_status_filter"] = Value::String(canonical.to_owned());
-    true
-}
-
-fn canonical_status_wire_value(raw: &str) -> Option<&'static str> {
-    match raw {
-        "new" => Some("todo"),
-        "plan_review" => Some("agentic_review"),
-        "needs_you" => Some("human_required"),
-        "blocked" => Some("failed"),
-        _ => None,
+    let canonical = status.canonical_persisted_status();
+    if status == canonical {
+        return false;
     }
+    let Ok(canonical_value) = serde_json::to_value(canonical) else {
+        return false;
+    };
+    document["dispatch_status_filter"] = canonical_value;
+    true
 }
 
 pub(super) fn apply_settings_update(
