@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::future::pending;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -209,6 +210,46 @@ async fn timeout_distinguishes_a_different_txt_value_from_absence() {
     assert!(!error.contains("never-log-this-digest"));
 }
 
+#[tokio::test(start_paused = true)]
+async fn visibility_deadline_bounds_all_slow_endpoint_queries() {
+    let endpoints = authoritative_test_endpoints();
+    let waiter = AuthoritativeDnsTxtVisibilityWaiter::new_with_observer(
+        "example.com",
+        Duration::from_secs(2),
+        Duration::from_secs(1),
+        3,
+        Arc::new(HangingDnsTxtObserver {
+            endpoints: endpoints.clone(),
+        }),
+    );
+    let started = tokio::time::Instant::now();
+
+    let error = tokio::time::timeout(
+        Duration::from_secs(3),
+        waiter.wait_for(
+            "_acme-challenge.example.com",
+            "never-log-this-digest",
+            DnsTxtRecordState::Present,
+        ),
+    )
+    .await
+    .expect("waiter must honor its two-second deadline")
+    .expect_err("visibility must time out");
+
+    assert_eq!(started.elapsed(), Duration::from_secs(2));
+    assert!(
+        error.contains(
+            "ns1.example.com@192.0.2.1=error(query exceeded remaining visibility timeout)"
+        )
+    );
+    assert!(
+        error.contains(
+            "ns2.example.com@192.0.2.2=error(query exceeded remaining visibility timeout)"
+        )
+    );
+    assert!(!error.contains("never-log-this-digest"));
+}
+
 fn scripted_waiter<const N: usize>(
     observations: [Result<DnsTxtValueState, String>; N],
     stable_polls: usize,
@@ -235,10 +276,7 @@ fn scripted_waiter_with_timing<const N: usize>(
     ScriptedDnsTxtObserver,
     Vec<AuthoritativeDnsEndpoint>,
 ) {
-    let endpoints = vec![
-        AuthoritativeDnsEndpoint::new("ns1.example.com", IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1))),
-        AuthoritativeDnsEndpoint::new("ns2.example.com", IpAddr::V4(Ipv4Addr::new(192, 0, 2, 2))),
-    ];
+    let endpoints = authoritative_test_endpoints();
     let observer = ScriptedDnsTxtObserver::new(endpoints.clone(), observations);
     let waiter = AuthoritativeDnsTxtVisibilityWaiter::new_with_observer(
         "example.com",
@@ -248,6 +286,13 @@ fn scripted_waiter_with_timing<const N: usize>(
         Arc::new(observer.clone()),
     );
     (waiter, observer, endpoints)
+}
+
+fn authoritative_test_endpoints() -> Vec<AuthoritativeDnsEndpoint> {
+    vec![
+        AuthoritativeDnsEndpoint::new("ns1.example.com", IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1))),
+        AuthoritativeDnsEndpoint::new("ns2.example.com", IpAddr::V4(Ipv4Addr::new(192, 0, 2, 2))),
+    ]
 }
 
 fn repeat_endpoints(
@@ -313,5 +358,28 @@ impl AuthoritativeDnsTxtObserver for ScriptedDnsTxtObserver {
             .observations
             .pop_front()
             .ok_or_else(|| "scripted DNS observation exhausted".to_string())?
+    }
+}
+
+struct HangingDnsTxtObserver {
+    endpoints: Vec<AuthoritativeDnsEndpoint>,
+}
+
+#[async_trait]
+impl AuthoritativeDnsTxtObserver for HangingDnsTxtObserver {
+    async fn discover_endpoints(
+        &self,
+        _zone_name: &str,
+    ) -> Result<Vec<AuthoritativeDnsEndpoint>, String> {
+        Ok(self.endpoints.clone())
+    }
+
+    async fn txt_value_state(
+        &self,
+        _endpoint: &AuthoritativeDnsEndpoint,
+        _record_name: &str,
+        _record_value: &str,
+    ) -> Result<DnsTxtValueState, String> {
+        pending().await
     }
 }

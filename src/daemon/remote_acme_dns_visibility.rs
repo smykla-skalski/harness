@@ -5,12 +5,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use futures_util::future::join_all;
 use hickory_resolver::config::{NameServerConfig, ResolverConfig, ResolverOpts};
 use hickory_resolver::lookup::Lookup;
 use hickory_resolver::net::runtime::TokioRuntimeProvider;
 use hickory_resolver::proto::rr::RData;
 use hickory_resolver::{Resolver, TokioResolver};
-use tokio::time::{Instant, sleep};
+use tokio::time::{Instant, sleep, timeout};
 
 use crate::daemon::remote_redaction::redact_secret_detail;
 
@@ -123,18 +124,25 @@ impl AuthoritativeDnsTxtVisibilityWaiter {
         endpoints: &[AuthoritativeDnsEndpoint],
         record_name: &str,
         record_value: &str,
+        query_timeout: Duration,
     ) -> Vec<AuthoritativeDnsObservation> {
-        let mut observations = Vec::with_capacity(endpoints.len());
-        for endpoint in endpoints {
-            observations.push(AuthoritativeDnsObservation {
+        join_all(endpoints.iter().map(|endpoint| async move {
+            let result = match timeout(
+                query_timeout,
+                self.observer
+                    .txt_value_state(endpoint, record_name, record_value),
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => Err("query exceeded remaining visibility timeout".to_string()),
+            };
+            AuthoritativeDnsObservation {
                 endpoint: endpoint.clone(),
-                result: self
-                    .observer
-                    .txt_value_state(endpoint, record_name, record_value)
-                    .await,
-            });
-        }
-        observations
+                result,
+            }
+        }))
+        .await
     }
 }
 
@@ -156,8 +164,22 @@ impl DnsTxtVisibilityWaiter for AuthoritativeDnsTxtVisibilityWaiter {
         let fqdn = format!("{}.", record_name.trim_end_matches('.'));
         let deadline = Instant::now() + self.timeout;
         let mut stable_polls = 0;
+        let mut observations = Vec::new();
         loop {
-            let observations = self.observe(&endpoints, &fqdn, record_value).await;
+            let now = Instant::now();
+            if now >= deadline {
+                return Err(visibility_timeout_error(
+                    record_name,
+                    state,
+                    self.timeout,
+                    stable_polls,
+                    self.stable_polls,
+                    &observations,
+                ));
+            }
+            observations = self
+                .observe(&endpoints, &fqdn, record_value, deadline - now)
+                .await;
             if all_authoritative_observations_match(state, &observations) {
                 stable_polls += 1;
                 if stable_polls == self.stable_polls {
