@@ -7,7 +7,7 @@ import HarnessMonitorMirrorStore
 extension MirrorSyncStatus {
   var title: String {
     switch self {
-    case .unpaired: String(localized: "No paired Mac")
+    case .unpaired: String(localized: "Not paired")
     case .demo: String(localized: "Demo station")
     case .pairing: String(localized: "Pairing")
     case .syncing: String(localized: "Syncing")
@@ -15,7 +15,7 @@ extension MirrorSyncStatus {
     case .stale: String(localized: "Stale")
     case .localNetworkDenied: String(localized: "Network blocked")
     case .iCloudAccountUnavailable: String(localized: "iCloud needed")
-    case .paired: String(localized: "Mac paired")
+    case .paired: String(localized: "Station paired")
     case .privacy: String(localized: "Privacy")
     case .commandQueued: String(localized: "Command queued")
     case .commandCompleted: String(localized: "Command completed")
@@ -27,7 +27,7 @@ extension MirrorSyncStatus {
   var subtitle: String {
     switch self {
     case .unpaired:
-      String(localized: "Open iPhone pairing")
+      String(localized: "Open a remote link or pair on iPhone")
     case .demo:
       String(localized: "App Review demo")
     case .pairing(let stationName):

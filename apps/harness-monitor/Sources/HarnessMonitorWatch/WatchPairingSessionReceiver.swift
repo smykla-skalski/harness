@@ -8,6 +8,7 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
   private let session: WCSession?
   private let identityStore: any MobileDeviceIdentityStore
   private let credentialStore: any MobilePairedStationCredentialStore
+  private let mutationGate: MobilePairingMutationGate
   private let sharedSnapshotStore: MobileSharedSnapshotStore?
   private let lock = NSLock()
   private var didStart = false
@@ -16,11 +17,13 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
   init(
     identityStore: any MobileDeviceIdentityStore,
     credentialStore: any MobilePairedStationCredentialStore,
+    mutationGate: MobilePairingMutationGate,
     sharedSnapshotStore: MobileSharedSnapshotStore? = MobileSharedSnapshotStore()
   ) {
     session = WCSession.isSupported() ? WCSession.default : nil
     self.identityStore = identityStore
     self.credentialStore = credentialStore
+    self.mutationGate = mutationGate
     self.sharedSnapshotStore = sharedSnapshotStore
     super.init()
   }
@@ -123,33 +126,11 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
         try sharedSnapshotStore?.save(snapshot, savedAt: transfer.exportedAt)
         WidgetCenter.shared.reloadAllTimelines()
       }
-      let currentCredentials = try await credentialStore.loadAll()
-      let currentIdentities = try await loadIdentities(
-        for: Set(currentCredentials.map(\.deviceIdentityID))
-      )
-      guard
-        transfer.changesPairingMaterial(
-          currentIdentities: currentIdentities,
-          currentCredentials: currentCredentials
-        )
-      else {
-        // The iPhone re-sends the same pairing material with every relayed snapshot.
-        // Reloading here would reset the watch to "Syncing" and restart its refresh on
-        // every push, so a snapshot-only update stops at the cache save above.
+      let pairingMaterialChanged = try await mutationGate.perform { [self] in
+        try await savePairingMaterial(transfer)
+      }
+      guard pairingMaterialChanged else {
         return
-      }
-      let replacementPlan = transfer.replacementPlan(replacing: currentCredentials)
-      for stationID in replacementPlan.credentialStationIDsToDelete {
-        try await credentialStore.delete(stationID: stationID)
-      }
-      for identityID in replacementPlan.identityIDsToDelete {
-        try await identityStore.delete(id: identityID)
-      }
-      for identity in transfer.identities {
-        try await identityStore.save(identity)
-      }
-      for credential in transfer.credentials {
-        try await credentialStore.save(credential)
       }
       let onCredentialsChanged = currentOnCredentialsChanged()
       if let onCredentialsChanged {
@@ -158,6 +139,43 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
     } catch {
       // Watch can keep its last known credentials; the next iPhone sync retries this payload.
     }
+  }
+
+  private func savePairingMaterial(_ transfer: MobileWatchPairingTransfer) async throws -> Bool {
+    let currentCredentials = try await credentialStore.loadAll()
+    let currentIdentities = try await loadIdentities(
+      for: Set(currentCredentials.map(\.deviceIdentityID))
+    )
+    let reconciledTransfer = transfer.preservingLocallyPairedRemoteCredentials(
+      for: .watchOS,
+      currentIdentities: currentIdentities,
+      currentCredentials: currentCredentials
+    )
+    guard
+      reconciledTransfer.changesPairingMaterial(
+        currentIdentities: currentIdentities,
+        currentCredentials: currentCredentials
+      )
+    else {
+      // The iPhone re-sends the same pairing material with every relayed snapshot.
+      // Reloading here would reset the watch to "Syncing" and restart its refresh on
+      // every push, so a snapshot-only update stops at the cache save above.
+      return false
+    }
+    let replacementPlan = reconciledTransfer.replacementPlan(replacing: currentCredentials)
+    for stationID in replacementPlan.credentialStationIDsToDelete {
+      try await credentialStore.delete(stationID: stationID)
+    }
+    for identityID in replacementPlan.identityIDsToDelete {
+      try await identityStore.delete(id: identityID)
+    }
+    for identity in reconciledTransfer.identities {
+      try await identityStore.save(identity)
+    }
+    for credential in reconciledTransfer.credentials {
+      try await credentialStore.save(credential)
+    }
+    return true
   }
 
   private func loadIdentities(for ids: Set<String>) async throws -> [MobileDeviceIdentity] {

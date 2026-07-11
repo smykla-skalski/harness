@@ -64,6 +64,77 @@ struct HarnessMonitorAppBundleMetadataTests {
     #expect(projectSource.contains("bundleId: \"io.harnessmonitor.app.ios.watch.widgets\""))
   }
 
+  @Test("Watch app claims remote daemon pairing links directly")
+  func watchAppClaimsRemoteDaemonPairingLinksDirectly() throws {
+    let root = monitorAppRoot()
+    let infoPlist = try loadDictionaryPlist(
+      at: root.appendingPathComponent("Resources/HarnessMonitorWatch-Info.plist")
+    )
+    let urlTypes = try #require(infoPlist["CFBundleURLTypes"] as? [[String: Any]])
+    let schemes = Set(
+      urlTypes
+        .compactMap { $0["CFBundleURLSchemes"] as? [String] }
+        .flatMap { $0 }
+    )
+    #expect(schemes.contains("harness"))
+
+    let appSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorWatch/HarnessMonitorWatchApp.swift"
+      ),
+      encoding: .utf8
+    )
+    #expect(appSource.contains("LiveWatchRemoteDaemonCredentialPairer("))
+    #expect(appSource.contains("pairer: remotePairer"))
+    #expect(appSource.contains("let pairingMutationGate = MobilePairingMutationGate()"))
+    #expect(appSource.contains("pairingMutationGate: pairingMutationGate"))
+    #expect(
+      appSource.components(separatedBy: "mutationGate: pairingMutationGate").count == 3
+    )
+    #expect(appSource.contains(".onOpenURL"))
+    #expect(appSource.contains("url.host?.lowercased() == \"remote-pair\""))
+    #expect(appSource.contains("pairingReceiver.start"))
+
+    let rootViewSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorWatch/RootView.swift"
+      ),
+      encoding: .utf8
+    )
+    #expect(rootViewSource.contains("Remove Watch Pairing"))
+    #expect(rootViewSource.contains("removeDirectWatchPairing"))
+
+    let pairingViewSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorWatch/WatchRemoteDaemonPairingView.swift"
+      ),
+      encoding: .utf8
+    )
+    #expect(rootViewSource.contains("Pair Remote Daemon"))
+    #expect(rootViewSource.contains("WatchRemoteDaemonPairingView()"))
+    #expect(pairingViewSource.contains("TextField(\"Pairing Link\""))
+    #expect(pairingViewSource.contains(".privacySensitive()"))
+    #expect(pairingViewSource.contains(".lineLimit(1)"))
+    #expect(pairingViewSource.contains(".frame(height: 44)"))
+    #expect(pairingViewSource.contains("pairingLink = \"\""))
+    #expect(pairingViewSource.contains("pairDirectWatchDaemon"))
+
+    let directPairerSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorWatch/LiveWatchRemoteDaemonCredentialPairer.swift"
+      ),
+      encoding: .utf8
+    )
+    let transferReceiverSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorWatch/WatchPairingSessionReceiver.swift"
+      ),
+      encoding: .utf8
+    )
+    #expect(directPairerSource.contains("try await mutationGate.perform"))
+    #expect(transferReceiverSource.contains("try await mutationGate.perform"))
+  }
+
   @Test("Mobile widgets can refresh encrypted mirrors")
   func mobileWidgetsCanRefreshEncryptedMirrors() throws {
     let root = monitorAppRoot()

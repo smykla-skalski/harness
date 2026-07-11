@@ -155,4 +155,191 @@ final class MobileWatchPairingTransferChangesTests: XCTestCase {
 
     XCTAssertTrue(changed, "a rotated identity key must trigger a reload")
   }
+
+  func testPhoneTransferPreservesDirectWatchCredentialForSameStation() throws {
+    let phoneIdentity = makePairingIdentity(id: "default-mobile-device", now: now)
+    let watchIdentity = makePairingIdentity(
+      id: MobileRemoteDaemonPairingDevice.watchOS.identityID,
+      now: now
+    )
+    let phoneCredential = try makeRemoteCredential(
+      identityID: phoneIdentity.id,
+      platform: "ios",
+      token: "phone-token"
+    )
+    let watchCredential = try makeRemoteCredential(
+      identityID: watchIdentity.id,
+      platform: "watchos",
+      token: "watch-token"
+    )
+    let transfer = MobileWatchPairingTransfer(
+      identities: [phoneIdentity],
+      credentials: [phoneCredential],
+      snapshot: .empty(),
+      exportedAt: now
+    )
+
+    let reconciled = transfer.preservingLocallyPairedRemoteCredentials(
+      for: .watchOS,
+      currentIdentities: [watchIdentity],
+      currentCredentials: [watchCredential]
+    )
+
+    XCTAssertEqual(reconciled.credentials, [watchCredential])
+    XCTAssertEqual(reconciled.identities, [watchIdentity])
+    XCTAssertEqual(reconciled.snapshot, transfer.snapshot)
+    XCTAssertFalse(
+      reconciled.changesPairingMaterial(
+        currentIdentities: [watchIdentity],
+        currentCredentials: [watchCredential]
+      )
+    )
+  }
+
+  func testEmptyPhoneTransferPreservesDirectWatchCredential() throws {
+    let watchIdentity = makePairingIdentity(
+      id: MobileRemoteDaemonPairingDevice.watchOS.identityID,
+      now: now
+    )
+    let watchCredential = try makeRemoteCredential(
+      identityID: watchIdentity.id,
+      platform: "watchos",
+      token: "watch-token"
+    )
+    let transfer = MobileWatchPairingTransfer(
+      identities: [],
+      credentials: [],
+      snapshot: .empty(),
+      exportedAt: now
+    )
+
+    let reconciled = transfer.preservingLocallyPairedRemoteCredentials(
+      for: .watchOS,
+      currentIdentities: [watchIdentity],
+      currentCredentials: [watchCredential]
+    )
+
+    XCTAssertEqual(reconciled.credentials, [watchCredential])
+    XCTAssertEqual(reconciled.identities, [watchIdentity])
+    XCTAssertEqual(reconciled.snapshot, transfer.snapshot)
+  }
+
+  func testPhoneTransferStillReplacesStaleTransferredCredentials() throws {
+    let phoneIdentity = makePairingIdentity(id: "default-mobile-device", now: now)
+    let watchIdentity = makePairingIdentity(
+      id: MobileRemoteDaemonPairingDevice.watchOS.identityID,
+      now: now
+    )
+    let watchCredential = try makeRemoteCredential(
+      stationID: "remote-watch",
+      identityID: watchIdentity.id,
+      platform: "watchos",
+      token: "watch-token"
+    )
+    let stalePhoneCredential = makePairedStationCredential(
+      stationID: "relay-stale",
+      deviceIdentityID: phoneIdentity.id,
+      now: now
+    )
+    let replacementPhoneCredential = makePairedStationCredential(
+      stationID: "relay-current",
+      deviceIdentityID: phoneIdentity.id,
+      now: now
+    )
+    let transfer = MobileWatchPairingTransfer(
+      identities: [phoneIdentity],
+      credentials: [replacementPhoneCredential],
+      exportedAt: now
+    )
+
+    let reconciled = transfer.preservingLocallyPairedRemoteCredentials(
+      for: .watchOS,
+      currentIdentities: [phoneIdentity, watchIdentity],
+      currentCredentials: [watchCredential, stalePhoneCredential]
+    )
+    let plan = reconciled.replacementPlan(
+      replacing: [watchCredential, stalePhoneCredential]
+    )
+
+    XCTAssertEqual(
+      Set(reconciled.credentials.map(\.stationID)),
+      Set(["remote-watch", "relay-current"])
+    )
+    XCTAssertEqual(Set(reconciled.identities.map(\.id)), Set([phoneIdentity.id, watchIdentity.id]))
+    XCTAssertEqual(plan.credentialStationIDsToDelete, ["relay-stale"])
+    XCTAssertFalse(plan.credentialStationIDsToDelete.contains(watchCredential.stationID))
+  }
+
+  func testDuplicateIncomingIdentityIDsUseTheLastValue() throws {
+    let firstPhoneIdentity = makePairingIdentity(id: "default-mobile-device", now: now)
+    var latestPhoneIdentity = firstPhoneIdentity
+    latestPhoneIdentity.displayName = "Latest iPhone"
+    let watchIdentity = makePairingIdentity(
+      id: MobileRemoteDaemonPairingDevice.watchOS.identityID,
+      now: now
+    )
+    let phoneCredential = makePairedStationCredential(
+      stationID: "relay-phone",
+      deviceIdentityID: firstPhoneIdentity.id,
+      now: now
+    )
+    let watchCredential = try makeRemoteCredential(
+      stationID: "remote-watch",
+      identityID: watchIdentity.id,
+      platform: "watchos",
+      token: "watch-token"
+    )
+    let transfer = MobileWatchPairingTransfer(
+      identities: [firstPhoneIdentity, latestPhoneIdentity],
+      credentials: [phoneCredential],
+      exportedAt: now
+    )
+
+    let reconciled = transfer.preservingLocallyPairedRemoteCredentials(
+      for: .watchOS,
+      currentIdentities: [watchIdentity],
+      currentCredentials: [watchCredential]
+    )
+
+    XCTAssertEqual(
+      reconciled.identities.first(where: { $0.id == latestPhoneIdentity.id }),
+      latestPhoneIdentity
+    )
+  }
+}
+
+private func makeRemoteCredential(
+  stationID: String = "remote-daemon-example-com",
+  identityID: String,
+  platform: String,
+  token: String
+) throws -> MobilePairedStationCredential {
+  let endpoint = URL(string: "https://daemon.example.com")!
+  let pin = try MobileRemoteDaemonSPKIPin(
+    validating: "sha256/CQ8Rnn313xPUG+5zny4xTooD6AxAsZr/anC/ea4bTIY="
+  )
+  return MobilePairedStationCredential(
+    stationID: stationID,
+    stationName: "daemon.example.com",
+    endpoint: endpoint,
+    stationPublicKeyFingerprint: pin.value,
+    deviceIdentityID: identityID,
+    snapshotKeyID: "",
+    commandKeyID: "",
+    symmetricKeyRawRepresentation: Data(),
+    pairedAt: Date(timeIntervalSince1970: 1_700_000_000),
+    defaultStation: true,
+    remoteDaemonAccess: MobileRemoteDaemonAccess(
+      endpoint: endpoint,
+      clientID: "\(platform)-client",
+      displayName: platform,
+      platform: platform,
+      role: .operator,
+      scopes: ["read", "write"],
+      bearerToken: token,
+      tokenHint: String(token.suffix(4)),
+      serverSPKISHA256: pin,
+      pairedAt: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+  )
 }

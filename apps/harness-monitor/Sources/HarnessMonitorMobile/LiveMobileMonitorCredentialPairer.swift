@@ -21,7 +21,7 @@ actor LiveMobileMonitorCredentialPairer: MobileMonitorCredentialPairer {
       identityStore: identityStore,
       credentialStore: credentialStore,
       transport: URLSessionMobileRemoteDaemonPairingTransport(),
-      platform: "ios"
+      device: .iOS
     )
   }
 

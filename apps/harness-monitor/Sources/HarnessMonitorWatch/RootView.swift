@@ -1,4 +1,5 @@
 import HarnessMonitorCore
+import HarnessMonitorCrypto
 import HarnessMonitorMirrorStore
 import SwiftUI
 import WidgetKit
@@ -9,7 +10,9 @@ struct RootView: View {
   @State private var pendingAttention: MobileAttentionItem?
   @State private var pendingCancellation: MobileCommandRecord?
   @State private var pendingRetry: MobileCommandRecord?
+  @State private var pendingDirectPairingRemoval: MobilePairedStationCredential?
   @State private var composerPresented = false
+  @State private var remotePairingPresented = false
   @Namespace private var reviewZoom
   @Namespace private var sessionZoom
 
@@ -96,9 +99,37 @@ struct RootView: View {
         } message: {
           Text(pendingCancellation?.confirmationText ?? "")
         }
+        .confirmationDialog(
+          "Remove Watch Pairing",
+          isPresented: Binding(
+            get: { pendingDirectPairingRemoval != nil },
+            set: { if !$0 { pendingDirectPairingRemoval = nil } }
+          ),
+          titleVisibility: .visible
+        ) {
+          Button("Remove Pairing", role: .destructive) {
+            guard let credential = pendingDirectPairingRemoval else {
+              return
+            }
+            pendingDirectPairingRemoval = nil
+            Task {
+              await store.removeDirectWatchPairing(stationID: credential.stationID)
+            }
+          }
+          Button("Cancel", role: .cancel) {
+            pendingDirectPairingRemoval = nil
+          }
+        } message: {
+          Text("Harness will request the iPhone pairing after removing this watch credential.")
+        }
         .sheet(isPresented: $composerPresented) {
           NavigationStack {
             WatchCommandComposerView(store: store, initialStationID: store.selectedStationID)
+          }
+        }
+        .sheet(isPresented: $remotePairingPresented) {
+          NavigationStack {
+            WatchRemoteDaemonPairingView()
           }
         }
         .alert("Authentication failed", isPresented: $store.lastAuthenticationFailed) {
@@ -128,7 +159,28 @@ struct RootView: View {
   @ViewBuilder private var statusSection: some View {
     Section {
       WatchStatusRow(status: store.syncStatus)
+      if let directWatchCredential {
+        Button(role: .destructive) {
+          pendingDirectPairingRemoval = directWatchCredential
+        } label: {
+          Label("Remove Watch Pairing", systemImage: "trash")
+        }
+      } else {
+        Button {
+          remotePairingPresented = true
+        } label: {
+          Label("Pair Remote Daemon", systemImage: "link.badge.plus")
+        }
+      }
     }
+  }
+
+  private var directWatchCredential: MobilePairedStationCredential? {
+    let directCredentials = store.pairedCredentials.filter(
+      MobileRemoteDaemonPairingDevice.watchOS.owns
+    )
+    return directCredentials.first { $0.stationID == store.selectedStationID }
+      ?? directCredentials.first
   }
 
   @ViewBuilder private var needsYouSection: some View {

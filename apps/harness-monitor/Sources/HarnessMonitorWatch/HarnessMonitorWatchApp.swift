@@ -17,6 +17,12 @@ struct HarnessMonitorWatchApp: App {
   init() {
     let identityStore = KeychainMobileDeviceIdentityStore()
     let credentialStore = KeychainMobilePairedStationCredentialStore()
+    let pairingMutationGate = MobilePairingMutationGate()
+    let remotePairer = LiveWatchRemoteDaemonCredentialPairer(
+      identityStore: identityStore,
+      credentialStore: credentialStore,
+      mutationGate: pairingMutationGate
+    )
     _store = State(
       initialValue: MirrorStore(
         demoModeEnabled: Self.defaultDemoModeEnabled,
@@ -25,12 +31,15 @@ struct HarnessMonitorWatchApp: App {
         credentialStore: credentialStore,
         syncClientFactory: LiveMobileMonitorSyncClientFactory(
           actorDeviceID: { MobileCommandActorDeviceID.watchActorID(baseDeviceID: $0.id) }
-        )
+        ),
+        pairer: remotePairer,
+        pairingMutationGate: pairingMutationGate
       )
     )
     pairingReceiver = WatchPairingSessionReceiver(
       identityStore: identityStore,
-      credentialStore: credentialStore
+      credentialStore: credentialStore,
+      mutationGate: pairingMutationGate
     )
   }
 
@@ -52,6 +61,19 @@ struct HarnessMonitorWatchApp: App {
           }
           pairingReceiver.start {
             await store.loadTransferredPairings()
+          }
+        }
+        .onOpenURL { url in
+          guard MobilePairingLink.supports(url),
+            url.host?.lowercased() == "remote-pair"
+          else {
+            return
+          }
+          Task {
+            await store.handleOpenURL(
+              url,
+              deviceName: WKInterfaceDevice.current().name
+            )
           }
         }
         .onReceive(
