@@ -22,7 +22,7 @@ struct TaskBoardItemEditorDraft: Equatable {
   init(item: TaskBoardItem) {
     title = item.title
     body = item.body
-    status = item.status
+    status = item.status.canonicalPersistedStatus
     priority = item.priority
     tagsText = item.tags.joined(separator: ", ")
     projectId = item.projectId ?? ""

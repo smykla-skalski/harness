@@ -6,6 +6,7 @@ use serde_json::Value;
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::task_board::normalize_repository_slug;
+use crate::task_board::types::TaskBoardStatus;
 
 use super::types::{
     TaskBoardGitHubInboxConfig, TaskBoardOrchestratorDispatchInput,
@@ -13,10 +14,11 @@ use super::types::{
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardTodoistInboxConfig,
 };
 
-/// Rewrite legacy `enabled_workflows` entries on disk so the strict enum
-/// deserializer can load settings written before the Dependencies → Reviews
-/// rename. Idempotent: once the file holds only current variants, no write
-/// happens.
+/// Rewrite legacy persisted settings entries on disk so strict enum
+/// deserializers can load older settings files. This repairs workflow names
+/// written before the Dependencies → Reviews rename and legacy dispatch status
+/// filters from earlier task-board lanes. Idempotent: once the file holds only
+/// current variants, no write happens.
 ///
 /// Returns the parsed settings when the file exists, or `None` when it is
 /// absent. Callers can use the returned value directly to avoid a second
@@ -31,7 +33,9 @@ pub(super) fn migrate_persisted_settings(
         return Ok(None);
     }
     let mut document: Value = read_json_typed(path)?;
-    if normalize_enabled_workflows(&mut document) {
+    let workflows_changed = normalize_enabled_workflows(&mut document);
+    let status_changed = repair_dispatch_status_filter(&mut document);
+    if workflows_changed || status_changed {
         write_json_pretty(path, &document)?;
     }
     let settings: TaskBoardOrchestratorSettings =
@@ -71,6 +75,28 @@ fn normalize_enabled_workflows(document: &mut Value) -> bool {
     }
     *workflows = normalized;
     changed
+}
+
+fn repair_dispatch_status_filter(document: &mut Value) -> bool {
+    let Some(status_value) = document
+        .as_object()
+        .and_then(|map| map.get("dispatch_status_filter"))
+        .cloned()
+    else {
+        return false;
+    };
+    let Ok(status) = serde_json::from_value::<TaskBoardStatus>(status_value) else {
+        return false;
+    };
+    let canonical = status.canonical_persisted_status();
+    if status == canonical {
+        return false;
+    }
+    let Ok(canonical_value) = serde_json::to_value(canonical) else {
+        return false;
+    };
+    document["dispatch_status_filter"] = canonical_value;
+    true
 }
 
 pub(super) fn apply_settings_update(
@@ -150,7 +176,7 @@ fn apply_status_filter_update(
     if update.clear_dispatch_status_filter {
         settings.dispatch_status_filter = None;
     } else if let Some(status) = update.dispatch_status_filter {
-        settings.dispatch_status_filter = Some(status);
+        settings.dispatch_status_filter = Some(status.canonical_persisted_status());
     }
 }
 
@@ -171,7 +197,7 @@ pub(super) fn dispatch_input(
 ) -> TaskBoardOrchestratorDispatchInput {
     TaskBoardOrchestratorDispatchInput {
         item_id: request.item_id.clone(),
-        status: request.status.or(settings.dispatch_status_filter),
+        status: canonical_status_filter(request.status.or(settings.dispatch_status_filter)),
         dry_run: request.dry_run.unwrap_or(settings.dry_run_default),
         project_dir: request
             .project_dir
@@ -188,4 +214,8 @@ pub(super) fn dispatch_input(
             }),
         actor: request.actor.clone(),
     }
+}
+
+fn canonical_status_filter(status: Option<TaskBoardStatus>) -> Option<TaskBoardStatus> {
+    status.map(TaskBoardStatus::canonical_persisted_status)
 }

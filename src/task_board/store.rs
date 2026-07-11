@@ -173,6 +173,7 @@ impl TaskBoardStore {
     ) -> Result<TaskBoardItem, CliError> {
         item.title = title.to_string();
         item.body = body.to_string();
+        apply_canonical_persisted_status(&mut item);
         self.validate_new_id(&item.id)?;
         self.save(&item)?;
         Ok(item)
@@ -182,18 +183,22 @@ impl TaskBoardStore {
     ///
     /// # Errors
     /// Returns `CliError` if the ID is unsafe, the file is missing, or the
-    /// markdown/frontmatter payload cannot be parsed.
+    /// markdown/frontmatter payload cannot be parsed or repaired on disk.
     pub fn get(&self, id: &str) -> Result<TaskBoardItem, CliError> {
         let path = self.path_for(id)?;
-        read_path(&path)
+        let mut item = read_path(&path)?;
+        validate_loaded_id(id, &item)?;
+        Self::repair_legacy_status_at(&path, &mut item)?;
+        Ok(item)
     }
 
     /// List active board items, optionally filtered by status.
     ///
     /// # Errors
     /// Returns `CliError` if the tasks directory cannot be read or an item
-    /// cannot be parsed.
+    /// cannot be parsed or repaired on disk.
     pub fn list(&self, status: Option<TaskBoardStatus>) -> Result<Vec<TaskBoardItem>, CliError> {
+        let status = status.map(TaskBoardStatus::canonical_persisted_status);
         let mut items = self.read_all_items()?;
         items
             .retain(|item| !item.is_deleted() && status.is_none_or(|target| item.status == target));
@@ -249,7 +254,7 @@ impl TaskBoardStore {
                 // returned Arc has refcount >= 2. Clone outside the Mutex so
                 // the lock is held only for an atomic refcount increment rather
                 // than a full TaskBoardItem deep-clone.
-                Resolve::Hit(arc) => items.push((*arc).clone()),
+                Resolve::Hit(arc) => items.push((path, (*arc).clone())),
                 Resolve::Miss { mtime, len } => misses.push((path, mtime, len)),
             }
         }
@@ -259,12 +264,15 @@ impl TaskBoardStore {
                 .map(|(path, mtime, len)| {
                     BOARD_PARSE_CACHE
                         .parse_miss(path, *mtime, *len)
-                        .map(|arc| (*arc).clone())
+                        .map(|arc| (path.clone(), (*arc).clone()))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             items.extend(parsed);
         }
-        Ok(items)
+        for (path, item) in &mut items {
+            Self::repair_legacy_status_at(path, item)?;
+        }
+        Ok(items.into_iter().map(|(_, item)| item).collect())
     }
 
     /// Patch one board item in place.
@@ -274,6 +282,7 @@ impl TaskBoardStore {
     pub fn update(&self, id: &str, patch: TaskBoardItemPatch) -> Result<TaskBoardItem, CliError> {
         let mut item = self.get(id)?;
         apply_patch(&mut item, patch);
+        apply_canonical_persisted_status(&mut item);
         item.updated_at = utc_now();
         self.save(&item)?;
         Ok(item)
@@ -285,6 +294,7 @@ impl TaskBoardStore {
     /// Returns `CliError` if the item cannot be loaded or saved.
     pub fn delete(&self, id: &str) -> Result<TaskBoardItem, CliError> {
         let mut item = self.get(id)?;
+        apply_canonical_persisted_status(&mut item);
         let now = utc_now();
         item.deleted_at = Some(now.clone());
         item.updated_at = now;
@@ -293,6 +303,11 @@ impl TaskBoardStore {
     }
 
     fn save(&self, item: &TaskBoardItem) -> Result<(), CliError> {
+        let path = self.path_for(&item.id)?;
+        Self::save_to_path(&path, item)
+    }
+
+    fn save_to_path(path: &Path, item: &TaskBoardItem) -> Result<(), CliError> {
         if item.schema_version != CURRENT_TASK_BOARD_ITEM_VERSION {
             return Err(CliErrorKind::workflow_version(format!(
                 "task-board item '{}' uses unsupported schema v{}",
@@ -300,7 +315,6 @@ impl TaskBoardStore {
             ))
             .into());
         }
-        let path = self.path_for(&item.id)?;
         let frontmatter = TaskBoardFrontmatter::from(item);
         let yaml = serde_yml::to_string(&frontmatter).map_err(|error| {
             CliErrorKind::workflow_serialize(format!("serialize task-board item: {error}"))
@@ -308,10 +322,10 @@ impl TaskBoardStore {
         // serde_yml does not guarantee a trailing newline, so anchor the closing
         // fence on its own line rather than gluing it onto the last YAML value.
         io::write_text(
-            &path,
+            path,
             &format!("---\n{}\n---\n\n{}", yaml.trim_end(), item.body),
         )?;
-        BOARD_PARSE_CACHE.forget(&path);
+        BOARD_PARSE_CACHE.forget(path);
         Ok(())
     }
 
@@ -330,6 +344,33 @@ impl TaskBoardStore {
         }
         Ok(())
     }
+
+    fn repair_legacy_status_at(path: &Path, item: &mut TaskBoardItem) -> Result<(), CliError> {
+        if apply_canonical_persisted_status(item) {
+            Self::save_to_path(path, item)?;
+        }
+        Ok(())
+    }
+}
+
+fn validate_loaded_id(expected: &str, item: &TaskBoardItem) -> Result<(), CliError> {
+    if item.id == expected {
+        return Ok(());
+    }
+    Err(CliErrorKind::workflow_parse(format!(
+        "task-board item file id mismatch: expected '{expected}', found '{}'",
+        item.id
+    ))
+    .into())
+}
+
+fn apply_canonical_persisted_status(item: &mut TaskBoardItem) -> bool {
+    let status = item.status.canonical_persisted_status();
+    if item.status == status {
+        return false;
+    }
+    item.status = status;
+    true
 }
 
 fn apply_patch(item: &mut TaskBoardItem, patch: TaskBoardItemPatch) {

@@ -1,6 +1,34 @@
 import Foundation
 
 extension TaskBoardStatus {
+  public static let currentLaneCases: [Self] = [
+    .umbrella,
+    .todo,
+    .planning,
+    .inProgress,
+    .agenticReview,
+    .testing,
+    .inReview,
+    .toReview,
+    .humanRequired,
+    .failed,
+  ]
+
+  public var canonicalPersistedStatus: Self {
+    switch self {
+    case .new:
+      .todo
+    case .planReview:
+      .agenticReview
+    case .needsYou:
+      .humanRequired
+    case .blocked:
+      .failed
+    default:
+      self
+    }
+  }
+
   public var title: String {
     switch self {
     case .umbrella:

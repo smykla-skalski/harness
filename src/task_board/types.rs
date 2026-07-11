@@ -167,6 +167,19 @@ pub enum TaskBoardStatus {
     Blocked,
 }
 
+impl TaskBoardStatus {
+    #[must_use]
+    pub fn canonical_persisted_status(self) -> Self {
+        match self {
+            Self::New => Self::Todo,
+            Self::PlanReview => Self::AgenticReview,
+            Self::NeedsYou => Self::HumanRequired,
+            Self::Blocked => Self::Failed,
+            status => status,
+        }
+    }
+}
+
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ValueEnum,
 )]

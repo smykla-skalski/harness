@@ -12,11 +12,6 @@ enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
   case toReview
   case humanRequired
   case failed
-  case done
-  case new
-  case planReview
-  case needsYou
-  case blocked
 
   /// Stable storage for `allCases` so `ForEach` pickers do not see a new
   /// array identity on every parent body re-evaluation. CaseIterable's
@@ -35,15 +30,10 @@ enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
     .toReview: .toReview,
     .humanRequired: .humanRequired,
     .failed: .failed,
-    .done: .done,
-    .new: .new,
-    .planReview: .planReview,
-    .needsYou: .needsYou,
-    .blocked: .blocked,
   ]
 
   init(status: TaskBoardStatus?) {
-    self = status.flatMap { Self.statusChoices[$0] } ?? .all
+    self = status.flatMap { Self.statusChoices[$0.canonicalPersistedStatus] } ?? .all
   }
 
   var id: String { rawValue }
@@ -76,16 +66,6 @@ enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
       .humanRequired
     case .failed:
       .failed
-    case .done:
-      .done
-    case .new:
-      .new
-    case .planReview:
-      .planReview
-    case .needsYou:
-      .needsYou
-    case .blocked:
-      .blocked
     }
   }
 }

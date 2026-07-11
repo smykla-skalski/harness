@@ -200,7 +200,7 @@ struct TaskBoardItemManagementPanel: View {
         TaskBoardManagementPickerField(
           label: "Status",
           selection: $draft.status,
-          values: TaskBoardStatus.allCases
+          values: TaskBoardStatus.currentLaneCases
         )
         TaskBoardManagementPickerField(
           label: "Priority",
