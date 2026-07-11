@@ -18,12 +18,32 @@ pub(crate) fn apply_create_task(
     actor_id: &str,
     now: &str,
 ) -> Result<WorkItem, CliError> {
+    let task_id = next_task_id(&state.tasks);
+    apply_create_task_with_id(state, &task_id, spec, actor_id, now)
+}
+
+/// Create a work item with a caller-reserved identity.
+///
+/// Durable dispatch uses this after reserving the identity in `SQLite` so a
+/// retry can observe the same task instead of creating an orphan duplicate.
+pub(crate) fn apply_create_task_with_id(
+    state: &mut SessionState,
+    task_id: &str,
+    spec: &TaskSpec<'_>,
+    actor_id: &str,
+    now: &str,
+) -> Result<WorkItem, CliError> {
     require_task_creation_state(state)?;
     require_permission(state, actor_id, SessionAction::CreateTask)?;
-
-    let task_id = next_task_id(&state.tasks);
+    if state.tasks.contains_key(task_id) {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "task '{task_id}' already exists in session '{}'",
+            state.session_id
+        ))
+        .into());
+    }
     let item = WorkItem {
-        task_id: task_id.clone(),
+        task_id: task_id.to_string(),
         title: spec.title.to_string(),
         context: spec.context.map(ToString::to_string),
         severity: spec.severity,
@@ -50,7 +70,7 @@ pub(crate) fn apply_create_task(
         suggested_persona: None,
         deleted_at: None,
     };
-    state.tasks.insert(task_id, item.clone());
+    state.tasks.insert(task_id.to_string(), item.clone());
     touch_agent(state, actor_id, now);
     refresh_session(state, now);
     Ok(item)

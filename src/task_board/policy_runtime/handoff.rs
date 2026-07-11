@@ -1,11 +1,18 @@
+#[cfg(test)]
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::Deserialize;
 
+use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::{CliError, CliErrorKind};
 
-use super::handoff_outbox::{PolicyHandoffOutbox, handoff_record};
+use super::action_persistence::PolicyActionPersistence;
+#[cfg(test)]
+use super::handoff_outbox::PolicyHandoffOutbox;
+use super::handoff_outbox::handoff_record;
+#[cfg(test)]
 use super::inbox::PolicyEventInbox;
 use super::models::{PolicyActionDescriptor, PolicyWorkflowEvent};
 use super::providers::{PolicyActionExecution, PolicyActionProvider, PolicyExecutionContext};
@@ -31,13 +38,23 @@ struct HandoffActionPayload {
 /// publishes a wake-up event into the durable event inbox so a downstream run
 /// waiting on this handoff can resume.
 pub struct HandoffPolicyProvider {
-    root: PathBuf,
+    persistence: PolicyActionPersistence,
 }
 
 impl HandoffPolicyProvider {
     #[must_use]
+    #[cfg(test)]
     pub fn new(root: PathBuf) -> Self {
-        Self { root }
+        Self {
+            persistence: PolicyActionPersistence::legacy_files(root),
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn new_database(database: Arc<AsyncDaemonDb>) -> Self {
+        Self {
+            persistence: PolicyActionPersistence::database(database),
+        }
     }
 }
 
@@ -59,18 +76,9 @@ impl PolicyActionProvider for HandoffPolicyProvider {
             payload.handoff_key.trim()
         };
 
-        let outbox = PolicyHandoffOutbox::new(self.root.clone());
-        outbox.record(handoff_record(
-            handoff_key,
-            &ctx.workflow_id,
-            &ctx.subject.key,
-        ))?;
-
-        let inbox = PolicyEventInbox::new(self.root.clone());
-        inbox.publish(PolicyWorkflowEvent::named(
-            &format!("handoff.{handoff_key}"),
-            &ctx.subject.key,
-        ))?;
+        let record = handoff_record(handoff_key, &ctx.workflow_id, &ctx.subject.key);
+        let event = PolicyWorkflowEvent::named(&format!("handoff.{handoff_key}"), &ctx.subject.key);
+        self.persistence.record_handoff(record, event).await?;
 
         tracing::info!(
             workflow_id = %ctx.workflow_id,

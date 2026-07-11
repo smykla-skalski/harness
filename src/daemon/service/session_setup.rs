@@ -8,6 +8,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use tokio::task::spawn_blocking;
+
 use crate::errors::{CliError, CliErrorKind};
 use crate::sandbox;
 use crate::session::types::SessionState;
@@ -149,4 +151,11 @@ fn record_project_origin_for_session(canonical_origin: &Path) -> Result<(), CliE
 pub(super) fn rollback_session_artifacts(origin: &Path, layout: &SessionLayout) {
     let _ = session_storage::deregister_active(layout);
     let _ = WorktreeController::destroy(origin, layout);
+}
+
+pub(super) async fn rollback_session_artifacts_async(origin: PathBuf, layout: SessionLayout) {
+    let _ = spawn_blocking(move || {
+        rollback_session_artifacts(&origin, &layout);
+    })
+    .await;
 }

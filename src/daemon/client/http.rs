@@ -5,7 +5,7 @@ use serde_json::Value;
 use tracing::field::{Empty, display};
 use uuid::Uuid;
 
-use super::{DaemonClient, MUTATION_TIMEOUT, SESSION_START_TIMEOUT};
+use super::{DaemonClient, MUTATION_TIMEOUT, SESSION_START_TIMEOUT, TASK_BOARD_OPERATION_TIMEOUT};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::exec::RUNTIME;
 use crate::telemetry::{current_trace_headers, current_trace_id, record_daemon_client_metrics};
@@ -122,6 +122,34 @@ impl DaemonClient {
         process_response(response, "POST", path, &request_id, &start)
     }
 
+    pub(super) fn put<Req: serde::Serialize, Res: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &Req,
+    ) -> Result<Res, CliError> {
+        let request_id = Uuid::new_v4().to_string();
+        let start = Instant::now();
+        let url = format!("{}{path}", self.endpoint);
+        let span = client_request_span("PUT", path, &request_id, &self.endpoint);
+        let _guard = span.enter();
+        record_trace_id(&span);
+        let propagation_headers = current_trace_headers();
+        let response = RUNTIME.block_on(async {
+            let mut request = self
+                .http
+                .put(&url)
+                .bearer_auth(&self.token)
+                .header("x-request-id", &request_id)
+                .json(body)
+                .timeout(mutation_timeout_for_path(path));
+            for (header, value) in &propagation_headers {
+                request = request.header(header, value);
+            }
+            request.send().await
+        });
+        process_response(response, "PUT", path, &request_id, &start)
+    }
+
     pub(super) fn delete<Res: DeserializeOwned>(&self, path: &str) -> Result<Res, CliError> {
         let request_id = Uuid::new_v4().to_string();
         let start = Instant::now();
@@ -149,6 +177,14 @@ impl DaemonClient {
 pub(super) fn mutation_timeout_for_path(path: &str) -> Duration {
     if path == "/v1/sessions" {
         SESSION_START_TIMEOUT
+    } else if matches!(
+        path,
+        "/v1/task-board/sync"
+            | "/v1/task-board/dispatch"
+            | "/v1/task-board/evaluate"
+            | "/v1/task-board/orchestrator/run-once"
+    ) {
+        TASK_BOARD_OPERATION_TIMEOUT
     } else {
         MUTATION_TIMEOUT
     }

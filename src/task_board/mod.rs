@@ -3,6 +3,8 @@ pub mod evaluation;
 pub mod external;
 pub mod git_identity_defaults;
 pub mod github;
+#[allow(dead_code)]
+pub(crate) mod legacy_import;
 pub mod machines;
 pub mod orchestrator;
 pub mod planning;
@@ -18,10 +20,14 @@ pub mod types;
 pub use dispatch::{
     DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchFailure,
     DispatchFailureKind, DispatchPlan, DispatchReadiness, EvaluatorIntent, FollowUpPhase,
-    ReviewerIntent, SessionIntent, TaskCreationIntent, WorkerIntent, build_dispatch_plan,
-    build_dispatch_plans, build_dispatch_plans_with_policy_root, filter_for_local_machine,
-    machine_mismatch_plan_with_policy_root,
+    ReviewerIntent, SessionIntent, TaskCreationIntent, WorkerIntent,
 };
+#[cfg(test)]
+pub use dispatch::{
+    build_dispatch_plan, build_dispatch_plans, build_dispatch_plans_with_policy_root,
+    filter_for_local_machine, machine_mismatch_plan_with_policy_root,
+};
+pub(crate) use dispatch::{build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy};
 pub use evaluation::{
     EvaluationSignalFailure, TaskBoardEvaluationDecision, TaskBoardEvaluationOutcome,
     TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, evaluate_task_board_item,
@@ -34,21 +40,27 @@ pub use external::{
     ExternalSyncOperation, ExternalSyncOptions, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
     ExternalUpdateOutcome, GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, GitHubInboxSyncClient,
     GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV,
-    HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient, configured_sync_clients, sync_external_tasks,
+    HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient, configured_sync_clients,
 };
 pub(crate) use external::{
-    imported_review_pull_request_references, reconcile_pull_request_snapshots,
+    TaskBoardSyncStore, configured_sync_clients_without_review_requests,
+    imported_review_references_from_items, reconcile_review_item_from_snapshots,
+    sync_external_tasks,
 };
 pub use git_identity_defaults::{
     TaskBoardEnvDefaults, TaskBoardGhCliDefaults, TaskBoardGitConfigDefaults,
     TaskBoardGitIdentityDefaults, TaskBoardSshKeyDiscovery,
     discover as discover_git_identity_defaults,
 };
-pub use machines::{Machine, MachineRegistry};
+pub use machines::Machine;
+#[cfg(test)]
+pub use machines::MachineRegistry;
+#[cfg(test)]
+pub use orchestrator::TaskBoardOrchestrator;
 pub use orchestrator::{
-    TaskBoardGitHubInboxConfig, TaskBoardGitHubProjectConfig, TaskBoardOrchestrator,
-    TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardOrchestratorRunStatus, TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
+    TaskBoardGitHubInboxConfig, TaskBoardGitHubProjectConfig, TaskBoardOrchestratorDispatchInput,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunStatus,
+    TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorState,
     TaskBoardOrchestratorStatus, TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase,
     TaskBoardOrchestratorWorkflow, TaskBoardTodoistInboxConfig, TaskBoardWorkflowExecutionCount,
@@ -84,12 +96,18 @@ pub use runtime_config::{
     TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
     TaskBoardTodoistTokenSyncRequest, TaskBoardTodoistTokenSyncResponse, normalize_repository_slug,
 };
-pub use store::{TaskBoardStore, default_board_root};
+#[cfg(test)]
+pub use store::TaskBoardStore;
+pub(crate) use store::default_board_root;
+pub(crate) use summary::build_audit_summary_with_policy;
 pub use summary::{
     TaskBoardAuditSummary, TaskBoardMachineSummary, TaskBoardProjectSummary,
-    TaskBoardProviderSyncSummary, TaskBoardStatusCount, TaskBoardSyncSummary, build_audit_summary,
-    build_dispatch_summary, build_dispatch_summary_with_policy_root, build_machine_summaries,
-    build_project_summaries, build_sync_summary,
+    TaskBoardProviderSyncSummary, TaskBoardStatusCount, TaskBoardSyncSummary,
+    build_machine_summaries, build_project_summaries, build_sync_summary,
+};
+#[cfg(test)]
+pub use summary::{
+    build_audit_summary, build_dispatch_summary, build_dispatch_summary_with_policy_root,
 };
 pub use types::{
     AgentMode, ExternalRef, ExternalRefProvider, ExternalRefSyncState, PlanningState,

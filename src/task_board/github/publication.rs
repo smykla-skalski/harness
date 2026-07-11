@@ -5,13 +5,13 @@ use serde::Deserialize;
 use serde_json::json;
 use tokio::task::spawn_blocking;
 
-use crate::daemon::service::git_runtime_profile_for_repository;
 use crate::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
 use crate::sandbox;
+use crate::task_board::TaskBoardGitRuntimeConfig;
 
 use super::GitHubProjectConfig;
 pub(crate) use signing::{SigningVerifyOutcome, verify_signing_for_profile};
@@ -66,8 +66,11 @@ pub(crate) async fn publish_branch_from_worktree_async(
     worktree: &Path,
     branch: &str,
     github_token: &str,
+    runtime_config: &TaskBoardGitRuntimeConfig,
 ) -> Result<(), CliError> {
-    let snapshot = load_local_branch_snapshot(worktree, config.repository_slug()).await?;
+    let snapshot =
+        load_local_branch_snapshot(worktree, config.repository_slug(), runtime_config.clone())
+            .await?;
     let Some(mode) = publication_mode(client, config, branch, &snapshot).await? else {
         return Ok(());
     };
@@ -78,21 +81,25 @@ pub(crate) async fn publish_branch_from_worktree_async(
 async fn load_local_branch_snapshot(
     worktree: &Path,
     repository_slug: String,
+    runtime_config: TaskBoardGitRuntimeConfig,
 ) -> Result<LocalBranchSnapshot, CliError> {
     let worktree = worktree.to_path_buf();
-    spawn_blocking(move || local_branch_snapshot(&worktree, repository_slug.as_str()))
-        .await
-        .unwrap_or_else(|error| {
-            Err(CliErrorKind::workflow_io(format!(
-                "task-board github branch snapshot worker failed: {error}"
-            ))
-            .into())
-        })
+    spawn_blocking(move || {
+        local_branch_snapshot(&worktree, repository_slug.as_str(), &runtime_config)
+    })
+    .await
+    .unwrap_or_else(|error| {
+        Err(CliErrorKind::workflow_io(format!(
+            "task-board github branch snapshot worker failed: {error}"
+        ))
+        .into())
+    })
 }
 
 fn local_branch_snapshot(
     worktree: &Path,
     repository_slug: &str,
+    runtime_config: &TaskBoardGitRuntimeConfig,
 ) -> Result<LocalBranchSnapshot, CliError> {
     let worktree_scope = sandbox::resolve_project_input(worktree.to_string_lossy().as_ref())?;
     let repository = GitRepository::discover(worktree_scope.path())
@@ -103,7 +110,7 @@ fn local_branch_snapshot(
     let head = repo
         .head_commit()
         .map_err(|error| snapshot_error("read HEAD commit", error))?;
-    let profile = git_runtime_profile_for_repository(Some(repository_slug))?;
+    let profile = runtime_config.resolved_profile(Some(repository_slug));
     let commit_signature = local_commit_signature(&head)?;
     Ok(LocalBranchSnapshot {
         head_tree_sha: head

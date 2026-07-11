@@ -15,7 +15,7 @@ use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
-use super::types::{BridgeCapability, PersistedBridgeConfig};
+use super::types::{AgentTuiStartSpec, BridgeCapability, PersistedBridgeConfig};
 
 #[derive(Debug, Clone)]
 pub(super) struct ResolvedBridgeConfig {
@@ -70,6 +70,7 @@ pub(super) struct BridgeActiveTui {
     pub(super) stop_flag: Arc<AtomicBool>,
     pub(super) input_worker: AgentTuiInputWorker,
     pub(super) context: BridgeSnapshotContext,
+    pub(super) launch_spec: AgentTuiStartSpec,
     pub(super) created_at: String,
     pub(super) exit_info: Option<BridgeTuiExitInfo>,
 }

@@ -8,7 +8,7 @@ import Foundation
 ///   via `harness daemon dev`; the app only reads the manifest and
 ///   connects. Supported in development and production when the app can
 ///   resolve the daemon manifest through the shared runtime root.
-public enum DaemonOwnership: String, Equatable, Sendable, CaseIterable {
+public enum DaemonOwnership: String, Equatable, Hashable, Sendable, CaseIterable {
   public static let environmentKey = "HARNESS_MONITOR_EXTERNAL_DAEMON"
   public static let preferenceKey = "HarnessMonitor.DaemonOwnership"
 

@@ -138,6 +138,21 @@ fn all_tables_exist() {
         "signal_index",
         "task_checkpoints",
         "tasks",
+        "task_board_dispatch_intents",
+        "task_board_external_refs",
+        "task_board_imports",
+        "task_board_identity",
+        "task_board_items",
+        "task_board_local_machine",
+        "task_board_machines",
+        "task_board_orchestrator_settings",
+        "task_board_orchestrator_state",
+        "task_board_runtime_config",
+        "policy_event_inbox",
+        "policy_handoff_outbox",
+        "policy_notification_outbox",
+        "policy_task_creation_outbox",
+        "policy_workflow_runs",
     ];
     for table in expected {
         assert!(

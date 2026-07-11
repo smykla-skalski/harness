@@ -32,12 +32,13 @@ impl BridgeServer {
             )
             .into());
         }
-        if self.active_tuis()?.contains_key(&spec.tui_id) {
-            return Err(CliErrorKind::workflow_io(format!(
-                "terminal agent '{}' is already active in host bridge",
-                spec.tui_id
-            ))
-            .into());
+        let mut active_tuis = self.active_tuis()?;
+        if let Some(active) = active_tuis.get(&spec.tui_id) {
+            ensure_same_agent_tui_launch(&active.launch_spec, &spec)?;
+            drop(active_tuis);
+            let snapshot = self.get_agent_tui(&spec.tui_id)?;
+            ensure_agent_tui_running(&snapshot)?;
+            return Ok(snapshot);
         }
         let process = spawn_agent_tui_process(
             &spec.session_id,
@@ -55,26 +56,28 @@ impl BridgeServer {
         let stop_flag = Arc::new(AtomicBool::new(false));
         let input_worker = AgentTuiInputWorker::spawn(Arc::clone(&process), Arc::clone(&stop_flag));
         let context = BridgeSnapshotContext {
-            session_id: spec.session_id,
-            agent_id: spec.agent_id,
+            session_id: spec.session_id.clone(),
+            agent_id: spec.agent_id.clone(),
             tui_id: spec.tui_id.clone(),
-            profile: spec.profile,
-            project_dir: spec.project_dir,
-            transcript_path: spec.transcript_path,
+            profile: spec.profile.clone(),
+            project_dir: spec.project_dir.clone(),
+            transcript_path: spec.transcript_path.clone(),
         };
         let snapshot =
             snapshot_from_process(&context.borrowed(), &process, AgentTuiStatus::Running)?;
-        self.active_tuis()?.insert(
-            spec.tui_id,
+        active_tuis.insert(
+            spec.tui_id.clone(),
             BridgeActiveTui {
                 process,
                 stop_flag,
                 input_worker,
                 context,
+                launch_spec: spec,
                 created_at: snapshot.created_at.clone(),
                 exit_info: None,
             },
         );
+        drop(active_tuis);
         self.update_agent_tui_metadata()?;
 
         // Send PTY-delivered prompts in background so the bridge response
@@ -188,6 +191,34 @@ impl BridgeServer {
     }
 }
 
+fn ensure_same_agent_tui_launch(
+    active: &AgentTuiStartSpec,
+    requested: &AgentTuiStartSpec,
+) -> Result<(), CliError> {
+    if active == requested {
+        return Ok(());
+    }
+    Err(CliErrorKind::workflow_io(format!(
+        "terminal agent '{}' already belongs to a different host-bridge launch",
+        requested.tui_id
+    ))
+    .into())
+}
+
+fn ensure_agent_tui_running(snapshot: &AgentTuiSnapshot) -> Result<(), CliError> {
+    if matches!(
+        snapshot.status,
+        AgentTuiStatus::Starting | AgentTuiStatus::Running
+    ) {
+        return Ok(());
+    }
+    Err(CliErrorKind::workflow_io(format!(
+        "terminal agent '{}' has already completed in the host bridge",
+        snapshot.tui_id
+    ))
+    .into())
+}
+
 fn bridge_deferred_auto_join(runtime: &str, prompt: Option<String>) -> Option<String> {
     let delivery = runtime_for_name(runtime).map_or(
         InitialPromptDelivery::PtySend,
@@ -203,6 +234,7 @@ fn bridge_deferred_auto_join(runtime: &str, prompt: Option<String>) -> Option<St
 mod tests {
     use std::collections::BTreeMap;
     use std::sync::Arc;
+    use std::sync::Barrier;
     use std::sync::atomic::AtomicBool;
     use std::time::Duration;
 
@@ -212,17 +244,29 @@ mod tests {
     };
     use crate::daemon::bridge::core::{BridgeActiveTui, BridgeSnapshotContext};
     use crate::daemon::bridge::server::BridgeServer;
-    use crate::daemon::bridge::types::PersistedBridgeConfig;
+    use crate::daemon::bridge::types::{
+        AgentTuiStartSpec, BRIDGE_CAPABILITY_AGENT_TUI, PersistedBridgeConfig,
+    };
     use crate::daemon::state::HostBridgeCapabilityManifest;
 
-    use super::bridge_deferred_auto_join;
+    use super::{bridge_deferred_auto_join, ensure_same_agent_tui_launch};
 
     fn make_test_server(tmp: &std::path::Path) -> Arc<BridgeServer> {
+        let capabilities = BTreeMap::from([(
+            BRIDGE_CAPABILITY_AGENT_TUI.to_string(),
+            HostBridgeCapabilityManifest {
+                enabled: true,
+                healthy: true,
+                transport: "unix".into(),
+                endpoint: None,
+                metadata: BTreeMap::new(),
+            },
+        )]);
         Arc::new(BridgeServer::new(
             "test-token".to_string(),
             tmp.join("bridge.sock"),
             PersistedBridgeConfig::default(),
-            BTreeMap::<String, HostBridgeCapabilityManifest>::new(),
+            capabilities,
         ))
     }
 
@@ -232,16 +276,24 @@ mod tests {
             vec!["sh".to_string(), "-c".to_string(), "exit 0".to_string()],
         )
         .expect("profile");
-        let spec = AgentTuiSpawnSpec::new(
-            profile.clone(),
-            tmp.to_path_buf(),
-            BTreeMap::new(),
-            AgentTuiSize { rows: 5, cols: 40 },
-        )
-        .expect("spec");
+        let size = AgentTuiSize { rows: 5, cols: 40 };
+        let transcript_path = tmp.join("transcript.raw");
+        let launch_spec = AgentTuiStartSpec {
+            session_id: "sess".into(),
+            agent_id: String::new(),
+            tui_id: tui_id.into(),
+            profile: profile.clone(),
+            project_dir: tmp.to_path_buf(),
+            transcript_path: transcript_path.clone(),
+            size,
+            prompt: None,
+            effort: None,
+        };
+        let spec =
+            AgentTuiSpawnSpec::new(profile.clone(), tmp.to_path_buf(), BTreeMap::new(), size)
+                .expect("spec");
         let process = Arc::new(PortablePtyAgentTuiBackend.spawn(spec).expect("spawn"));
         let stop_flag = Arc::new(AtomicBool::new(false));
-        let transcript_path = tmp.join("transcript.raw");
         BridgeActiveTui {
             input_worker: AgentTuiInputWorker::spawn(Arc::clone(&process), Arc::clone(&stop_flag)),
             process,
@@ -254,6 +306,7 @@ mod tests {
                 project_dir: tmp.to_path_buf(),
                 transcript_path,
             },
+            launch_spec,
             created_at: "2026-04-22T09:00:00Z".into(),
             exit_info: None,
         }
@@ -318,6 +371,87 @@ mod tests {
         assert_eq!(
             bridge_deferred_auto_join("copilot", Some("join".into())),
             Some("join".into())
+        );
+    }
+
+    #[test]
+    fn active_bridge_tui_is_reusable_only_for_the_same_launch() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let profile =
+            AgentTuiLaunchProfile::from_argv("codex", vec!["codex".into()]).expect("profile");
+        let spec = AgentTuiStartSpec {
+            session_id: "session-1".into(),
+            agent_id: String::new(),
+            tui_id: "stable-tui".into(),
+            profile: profile.clone(),
+            project_dir: tmp.path().to_path_buf(),
+            transcript_path: tmp.path().join("transcript.raw"),
+            size: AgentTuiSize { rows: 24, cols: 80 },
+            prompt: None,
+            effort: None,
+        };
+        ensure_same_agent_tui_launch(&spec, &spec).expect("matching launch is reusable");
+
+        let mut mismatched = spec.clone();
+        mismatched.session_id = "session-2".into();
+        assert!(ensure_same_agent_tui_launch(&spec, &mismatched).is_err());
+
+        let mut changed_prompt = spec.clone();
+        changed_prompt.prompt = Some("different worker contract".into());
+        assert!(ensure_same_agent_tui_launch(&spec, &changed_prompt).is_err());
+
+        let mut changed_effort = spec.clone();
+        changed_effort.effort = Some("high".into());
+        assert!(ensure_same_agent_tui_launch(&spec, &changed_effort).is_err());
+    }
+
+    #[test]
+    fn concurrent_idempotent_starts_share_one_bridge_tui() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let server = make_test_server(tmp.path());
+        let spec = AgentTuiStartSpec {
+            session_id: "session-concurrent".into(),
+            agent_id: String::new(),
+            tui_id: "stable-concurrent-tui".into(),
+            profile: AgentTuiLaunchProfile::from_argv(
+                "codex",
+                vec!["sh".into(), "-c".into(), "cat".into()],
+            )
+            .expect("profile"),
+            project_dir: tmp.path().to_path_buf(),
+            transcript_path: tmp.path().join("concurrent-transcript.raw"),
+            size: AgentTuiSize { rows: 8, cols: 40 },
+            prompt: None,
+            effort: None,
+        };
+        let barrier = Arc::new(Barrier::new(2));
+        let start = |server: Arc<BridgeServer>, spec: AgentTuiStartSpec, barrier: Arc<Barrier>| {
+            std::thread::spawn(move || {
+                barrier.wait();
+                server.start_agent_tui(spec)
+            })
+        };
+        temp_env::with_var(
+            "HARNESS_DAEMON_DATA_HOME",
+            Some(tmp.path().to_str().expect("utf8 temp path")),
+            || {
+                let first = start(Arc::clone(&server), spec.clone(), Arc::clone(&barrier));
+                let second = start(Arc::clone(&server), spec.clone(), Arc::clone(&barrier));
+                let first = first
+                    .join()
+                    .expect("first start thread")
+                    .expect("first start");
+                let second = second
+                    .join()
+                    .expect("second start thread")
+                    .expect("second start");
+                assert_eq!(first.tui_id, spec.tui_id);
+                assert_eq!(first.created_at, second.created_at);
+                assert_eq!(server.active_tuis().expect("active map").len(), 1);
+                server
+                    .stop_agent_tui(&spec.tui_id)
+                    .expect("stop shared tui");
+            },
         );
     }
 }

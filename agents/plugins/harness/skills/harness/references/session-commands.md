@@ -36,18 +36,21 @@ Roles: `leader`, `observer`, `worker`, `reviewer`, `improver`.
 
 ## Task board
 
+Task-board commands require a running daemon with database-backed task-board
+storage. Start Harness Monitor or run `harness daemon dev` first.
+
 ```
 harness task-board create --title "..." [--body "..."] [--priority <priority>] [--agent-mode <mode>] [--project-id <id>] [--tag <tag>] [--id <id>]
 harness task-board list [--status <status>] [--json]
 harness task-board get <task-id> [--json]
 harness task-board update <task-id> [--title "..."] [--body "..."] [--status <status>] [--priority <priority>] [--agent-mode <mode>] [--project-id <id>] [--clear-project] [--tag <tag>] [--planning-summary "..."] [--approved-by <id>]
 harness task-board delete <task-id>
-harness task-board sync [--json] [--provider <provider>] [--direction <pull|push|both>] [--apply] [--board-root <path>]
-harness task-board dispatch [--json] [--dry-run] [--item-id <id>] [--status <status>] [--project-dir <path>] [--actor <agent-id>] [--board-root <path>]
-harness task-board evaluate [--json] [--dry-run] [--item-id <id>] [--status <status>] [--project-dir <path>] [--board-root <path>]
+harness task-board sync [--json] [--provider <provider>] [--direction <pull|push|both>] [--apply]
+harness task-board dispatch [--json] [--dry-run] [--item-id <id>] [--status <status>] [--project-dir <path>] [--actor <agent-id>]
+harness task-board evaluate [--json] [--dry-run] [--item-id <id>] [--status <status>] [--project-dir <path>]
 harness task-board audit [--json]
-harness task-board project [--json] [--status <status>] [--board-root <path>]
-harness task-board machine [--json] [--status <status>] [--board-root <path>]
+harness task-board project [--json] [--status <status>]
+harness task-board machine [--json] [--status <status>]
 harness task-board orchestrator status [--json]
 harness task-board orchestrator start [--json]
 harness task-board orchestrator stop [--json]

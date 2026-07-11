@@ -20,11 +20,14 @@ pub use capabilities::{
 };
 pub use github::{GitHubInboxSyncClient, GitHubSyncClient};
 pub(crate) use github::{
-    imported_review_pull_request_references, reconcile_pull_request_snapshots,
+    imported_review_references_from_items, reconcile_review_item_from_snapshots,
 };
 pub use sync::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
-    configured_sync_clients, sync_external_tasks,
+    configured_sync_clients,
+};
+pub(crate) use sync::{
+    TaskBoardSyncStore, configured_sync_clients_without_review_requests, sync_external_tasks,
 };
 pub use todoist::TodoistSyncClient;
 
@@ -322,6 +325,13 @@ pub trait ExternalSyncClient: Send + Sync {
 
     #[must_use]
     fn allows_delete(&self) -> bool {
+        false
+    }
+
+    /// Whether this client's pull result is the complete set of active GitHub
+    /// review requests and can therefore close omitted imported reviews.
+    #[must_use]
+    fn authoritative_review_inbox(&self) -> bool {
         false
     }
 

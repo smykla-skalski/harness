@@ -16,12 +16,12 @@ fn task_board_http_and_ws_workflow_routes_match() {
 }
 
 async fn run_task_board_workflow_parity() {
-    seed_ready_board_item("parity-workflow", "Parity workflow item");
     let state = super::test_http_state_with_db();
-    let (base_url, server) = serve_http(state).await;
+    seed_ready_board_item(&state, "parity-workflow", "Parity workflow item").await;
+    let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
 
-    assert_planning_routes_match(&client, &base_url).await;
+    assert_planning_routes_match(&client, &base_url, &state).await;
     assert_http_ws_post_match(
         &client,
         &base_url,
@@ -71,9 +71,13 @@ async fn run_task_board_workflow_parity() {
     let _ = server.await;
 }
 
-async fn assert_planning_routes_match(client: &reqwest::Client, base_url: &str) {
-    seed_planning_board_item("parity-plan-http");
-    seed_planning_board_item("parity-plan-ws");
+async fn assert_planning_routes_match(
+    client: &reqwest::Client,
+    base_url: &str,
+    state: &crate::daemon::http::DaemonHttpState,
+) {
+    seed_planning_board_item(state, "parity-plan-http").await;
+    seed_planning_board_item(state, "parity-plan-ws").await;
 
     let http_begin = post_json(
         client,
@@ -153,8 +157,27 @@ fn task_board_http_and_ws_orchestrator_routes_match() {
 
 async fn run_task_board_orchestrator_parity() {
     let state = super::test_http_state_with_db();
-    let (base_url, server) = serve_http(state).await;
+    let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
+
+    let capabilities = get_json(&client, &base_url, http_paths::TASK_BOARD_CAPABILITIES).await;
+    assert_eq!(capabilities["storage"], "database");
+    assert!(capabilities["revision"].as_i64().is_some());
+    assert!(
+        capabilities["instance_id"]
+            .as_str()
+            .is_some_and(|value| value.starts_with("task-board-"))
+    );
+    assert_eq!(
+        capabilities,
+        ws_result(
+            &base_url,
+            "req-task-board-capabilities",
+            ws_methods::TASK_BOARD_CAPABILITIES,
+            json!({}),
+        )
+        .await
+    );
 
     let http_status = get_json(
         &client,
@@ -179,7 +202,7 @@ async fn run_task_board_orchestrator_parity() {
         json!({}),
     )
     .await;
-    assert_run_once_routes_match(&client, &base_url).await;
+    assert_run_once_routes_match(&client, &base_url, &state).await;
     assert_settings_routes_match(&client, &base_url).await;
     assert_runtime_config_routes_match(&client, &base_url).await;
     assert_http_ws_put_match(
@@ -219,8 +242,8 @@ async fn run_task_board_orchestrator_parity() {
     assert_http_ws_post_match(
         &client,
         &base_url,
-        http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
-        ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+        http_paths::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
+        ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
         json!({}),
     )
     .await;

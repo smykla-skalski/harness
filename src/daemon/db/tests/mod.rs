@@ -29,6 +29,7 @@ mod schema_shape_repairs;
 mod signals;
 mod sync;
 mod sync_change_tracking;
+mod task_board;
 
 #[test]
 fn db_round_trip_smoke_covers_public_surface() {

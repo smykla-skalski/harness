@@ -1,3 +1,4 @@
+#[cfg(test)]
 use std::path::Path;
 
 use async_trait::async_trait;
@@ -9,9 +10,9 @@ use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy::{
     PolicyAction, PolicyDecision, PolicyInput, PolicyReasonCode, PolicySubject,
 };
-use crate::task_board::policy_graph::{
-    CompiledWorkflowStep, PolicyGraph, PolicyGraphMode, cached_gate_policy,
-};
+use crate::task_board::policy_graph::{CompiledWorkflowStep, PolicyGraph};
+#[cfg(test)]
+use crate::task_board::policy_graph::{PolicyGraphMode, cached_gate_policy};
 use crate::task_board::policy_runtime::handoff::{HANDOFF_ACTION_KEY, HANDOFF_PROVIDER};
 use crate::task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject,
@@ -112,8 +113,19 @@ where
     }
 }
 
+#[cfg(test)]
 pub(crate) fn authored_reviews_policy_plan(
     root: &Path,
+    workflow_id: &str,
+    target: &ReviewTarget,
+    method: GitHubMergeMethod,
+) -> Result<ReviewsPolicyPlan, CliError> {
+    let document = enforced_reviews_policy_document(root);
+    authored_reviews_policy_plan_from_document(document.as_ref(), workflow_id, target, method)
+}
+
+pub(crate) fn authored_reviews_policy_plan_from_document(
+    document: Option<&PolicyGraph>,
     workflow_id: &str,
     target: &ReviewTarget,
     method: GitHubMergeMethod,
@@ -121,7 +133,7 @@ pub(crate) fn authored_reviews_policy_plan(
     let workflow_id = workflow_id.trim().to_ascii_lowercase();
     let subject = PolicyRunSubject::review_pr(&format!("{}#{}", target.repository, target.number));
     let subject_fingerprint = Some(target.head_sha.clone());
-    let Some(document) = enforced_reviews_policy_document(root) else {
+    let Some(document) = document else {
         return Ok(ReviewsPolicyPlan {
             workflow_id,
             subject,
@@ -223,6 +235,7 @@ pub(crate) fn authored_reviews_policy_plan(
     })
 }
 
+#[cfg(test)]
 fn enforced_reviews_policy_document(root: &Path) -> Option<PolicyGraph> {
     let document = cached_gate_policy(root)?;
     (document.mode == PolicyGraphMode::Enforced).then(|| (**document).clone())

@@ -31,7 +31,9 @@ async fn sync_external_tasks_imports_github_tasks_with_plan_pending_approval() {
     .expect("sync external tasks");
 
     assert_eq!(operations.len(), 1);
-    let item = board.get("github-7").expect("load imported github task");
+    let item = board
+        .get("github-7-7902699be42c8a8e46fbbb4501726517")
+        .expect("load imported github task");
     assert_eq!(item.project_id.as_deref(), Some("owner/repo"));
     assert!(item.planning.approved_by.is_none());
     assert!(item.planning.approved_at.is_none());
@@ -76,7 +78,7 @@ async fn sync_external_tasks_imports_github_human_required_without_planning() {
     .expect("sync external tasks");
 
     let item = board
-        .get("github-owner-repo-19")
+        .get("github-owner-repo-19-983c1507241b6007ac5729cfcea78b64")
         .expect("load imported github inbox task");
     assert_eq!(item.status, TaskBoardStatus::HumanRequired);
     assert_eq!(item.project_id.as_deref(), Some("owner/repo"));
@@ -86,6 +88,46 @@ async fn sync_external_tasks_imports_github_human_required_without_planning() {
             && reference.external_id == "owner/repo#19"
     }));
     assert!(!build_dispatch_plan(&item).is_ready());
+}
+
+#[tokio::test]
+async fn sync_external_tasks_keeps_github_refs_with_colliding_sanitized_ids_distinct() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
+        ExternalProvider::GitHub,
+        vec![
+            github_external_task("owner/repo#42", "Slash ref", "owner/repo"),
+            github_external_task("owner-repo#42", "Dash ref", "owner/repo"),
+        ],
+    ))];
+
+    sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::GitHub),
+            direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("sync colliding sanitized GitHub refs");
+
+    let items = board.list(None).expect("list imported GitHub tasks");
+    assert_eq!(items.len(), 2);
+    assert!(
+        items
+            .iter()
+            .any(|item| { item.id == "github-owner-repo-42-9d2b21ac4ca2efd7eac0587d3a0f2ff3" })
+    );
+    assert!(
+        items
+            .iter()
+            .any(|item| { item.id == "github-owner-repo-42-3d5fc6ccd05298bb4eea8b1634c66af5" })
+    );
 }
 
 #[tokio::test]

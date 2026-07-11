@@ -1,13 +1,14 @@
 use crate::app::command_context::AppContext;
+use crate::daemon::protocol::TaskBoardCatalogRequest;
 use crate::errors::CliError;
-use crate::task_board::summary::{build_machine_summaries, build_project_summaries};
 
-use super::{TaskBoardCatalogArgs, print_json, store};
+use super::{TaskBoardCatalogArgs, daemon_client, print_json};
 
 impl TaskBoardCatalogArgs {
     pub(super) fn execute_project(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let items = store(self.board_root.clone()).list(self.status)?;
-        let summaries = build_project_summaries(&items);
+        let summaries = daemon_client()?.task_board_projects(&TaskBoardCatalogRequest {
+            status: self.status,
+        })?;
         if self.json {
             print_json(&summaries)?;
         } else {
@@ -22,8 +23,9 @@ impl TaskBoardCatalogArgs {
     }
 
     pub(super) fn execute_machine(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let items = store(self.board_root.clone()).list(self.status)?;
-        let summaries = build_machine_summaries(&items);
+        let summaries = daemon_client()?.task_board_machines(&TaskBoardCatalogRequest {
+            status: self.status,
+        })?;
         if self.json {
             print_json(&summaries)?;
         } else {

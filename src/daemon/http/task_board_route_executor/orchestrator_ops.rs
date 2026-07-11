@@ -1,7 +1,9 @@
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse,
     TaskBoardGitIdentityDefaultsResponse, TaskBoardGitRuntimeConfig,
-    TaskBoardGitRuntimeConfigResponse, TaskBoardGitRuntimeDrainSecretsResponse,
+    TaskBoardGitRuntimeConfigResponse, TaskBoardGitRuntimeKeyMaterialSyncRequest,
+    TaskBoardGitRuntimeKeyMaterialSyncResponse, TaskBoardGitRuntimeSecretHandoffAckRequest,
+    TaskBoardGitRuntimeSecretHandoffAckResponse, TaskBoardGitRuntimeSecretHandoffPrepareResponse,
     TaskBoardGitSigningVerifyRequest, TaskBoardGitSigningVerifyResponse,
     TaskBoardOpenRouterTokenSyncRequest, TaskBoardOpenRouterTokenSyncResponse,
     TaskBoardOrchestratorSettingsResponse, TaskBoardOrchestratorSettingsUpdateRequest,
@@ -11,54 +13,75 @@ use crate::daemon::protocol::{
 use crate::daemon::service;
 use crate::errors::CliError;
 
+use super::super::{DaemonHttpState, require_async_db};
 use super::run_blocking;
 
-pub(crate) async fn orchestrator_status() -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
-    run_blocking(
-        "orchestrator status",
-        service::task_board_orchestrator_status,
-    )
+pub(crate) async fn orchestrator_status(
+    state: &DaemonHttpState,
+) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
+    service::task_board_orchestrator_status_db(require_async_db(
+        state,
+        "task board orchestrator status",
+    )?)
     .await
 }
 
-pub(crate) async fn start_orchestrator() -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
-    run_blocking("orchestrator start", service::start_task_board_orchestrator).await
+pub(crate) async fn start_orchestrator(
+    state: &DaemonHttpState,
+) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
+    service::start_task_board_orchestrator_db(require_async_db(
+        state,
+        "task board orchestrator start",
+    )?)
+    .await
 }
 
-pub(crate) async fn stop_orchestrator() -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
-    run_blocking("orchestrator stop", service::stop_task_board_orchestrator).await
+pub(crate) async fn stop_orchestrator(
+    state: &DaemonHttpState,
+) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
+    service::stop_task_board_orchestrator_db(require_async_db(
+        state,
+        "task board orchestrator stop",
+    )?)
+    .await
 }
 
-pub(crate) async fn orchestrator_settings()
--> Result<TaskBoardOrchestratorSettingsResponse, CliError> {
-    run_blocking(
-        "orchestrator settings",
-        service::task_board_orchestrator_settings,
-    )
+pub(crate) async fn orchestrator_settings(
+    state: &DaemonHttpState,
+) -> Result<TaskBoardOrchestratorSettingsResponse, CliError> {
+    service::task_board_orchestrator_settings_db(require_async_db(
+        state,
+        "task board orchestrator settings",
+    )?)
     .await
 }
 
 pub(crate) async fn update_orchestrator_settings(
+    state: &DaemonHttpState,
     request: &TaskBoardOrchestratorSettingsUpdateRequest,
 ) -> Result<TaskBoardOrchestratorSettingsResponse, CliError> {
-    let request = request.clone();
-    run_blocking("orchestrator settings update", move || {
-        service::update_task_board_orchestrator_settings(&request)
-    })
+    service::update_task_board_orchestrator_settings_db(
+        require_async_db(state, "task board orchestrator settings update")?,
+        request,
+    )
     .await
 }
 
-pub(crate) async fn runtime_config() -> Result<TaskBoardGitRuntimeConfigResponse, CliError> {
-    run_blocking("runtime config", service::task_board_git_runtime_config).await
+pub(crate) async fn runtime_config(
+    state: &DaemonHttpState,
+) -> Result<TaskBoardGitRuntimeConfigResponse, CliError> {
+    service::task_board_git_runtime_config_db(require_async_db(state, "task board runtime config")?)
+        .await
 }
 
 pub(crate) async fn update_runtime_config(
+    state: &DaemonHttpState,
     request: &TaskBoardGitRuntimeConfig,
 ) -> Result<TaskBoardGitRuntimeConfigResponse, CliError> {
-    let request = request.clone();
-    run_blocking("runtime config update", move || {
-        service::update_task_board_git_runtime_config(&request)
-    })
+    service::update_task_board_git_runtime_config_db(
+        require_async_db(state, "task board runtime config update")?,
+        request,
+    )
     .await
 }
 
@@ -92,6 +115,16 @@ pub(crate) async fn sync_openrouter_token(
     .await
 }
 
+pub(crate) async fn sync_git_runtime_key_material(
+    request: &TaskBoardGitRuntimeKeyMaterialSyncRequest,
+) -> Result<TaskBoardGitRuntimeKeyMaterialSyncResponse, CliError> {
+    let request = request.clone();
+    run_blocking("Git runtime key-material sync", move || {
+        service::sync_task_board_git_runtime_key_material(&request)
+    })
+    .await
+}
+
 pub(crate) async fn git_identity_defaults() -> Result<TaskBoardGitIdentityDefaultsResponse, CliError>
 {
     run_blocking(
@@ -102,20 +135,36 @@ pub(crate) async fn git_identity_defaults() -> Result<TaskBoardGitIdentityDefaul
 }
 
 pub(crate) async fn verify_git_signing(
+    state: &DaemonHttpState,
     request: &TaskBoardGitSigningVerifyRequest,
 ) -> Result<TaskBoardGitSigningVerifyResponse, CliError> {
-    let request = request.clone();
-    run_blocking("git signing verify", move || {
-        service::verify_task_board_git_signing(&request)
-    })
+    service::verify_task_board_git_signing_db(
+        require_async_db(state, "task board git signing verify")?,
+        request,
+    )
     .await
 }
 
-pub(crate) async fn drain_git_runtime_secrets()
--> Result<TaskBoardGitRuntimeDrainSecretsResponse, CliError> {
-    run_blocking(
-        "git runtime drain secrets",
-        service::drain_task_board_git_runtime_secrets,
+pub(crate) async fn prepare_git_runtime_secret_handoff(
+    state: &DaemonHttpState,
+) -> Result<TaskBoardGitRuntimeSecretHandoffPrepareResponse, CliError> {
+    service::prepare_task_board_git_runtime_secret_handoff(require_async_db(
+        state,
+        "task board git runtime secret handoff prepare",
+    )?)
+    .await
+}
+
+pub(crate) async fn acknowledge_git_runtime_secret_handoff(
+    state: &DaemonHttpState,
+    request: &TaskBoardGitRuntimeSecretHandoffAckRequest,
+) -> Result<TaskBoardGitRuntimeSecretHandoffAckResponse, CliError> {
+    service::acknowledge_task_board_git_runtime_secret_handoff(
+        require_async_db(
+            state,
+            "task board git runtime secret handoff acknowledgement",
+        )?,
+        request,
     )
     .await
 }
