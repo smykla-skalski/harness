@@ -6,6 +6,7 @@ mod predictor;
 mod raw;
 mod recorder;
 mod response;
+mod stability;
 mod state;
 mod transport;
 mod types;
@@ -17,6 +18,7 @@ pub(crate) use budget::{
 pub(crate) use cache::GitHubCache;
 pub(crate) use client::GitHubProtectedClient;
 pub(crate) use recorder::GitHubUsageRecorder;
+pub(crate) use stability::{GitHubReadStabilityError, retry_stable_read};
 pub(crate) use state::{
     begin_external_mutation, republish_current_data_change, stable_data_revision_guard,
 };

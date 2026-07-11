@@ -230,6 +230,52 @@ async fn raw_read_started_before_mutation_retries_at_current_epoch() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn exact_and_raw_reads_stop_after_the_shared_stability_budget() {
+    let _budget_guard = super::acquire_global_budget_test_lock().await;
+    let requests = Arc::new(AtomicUsize::new(0));
+    let app = Router::new()
+        .route("/resource", get(always_mutating_response))
+        .with_state(Arc::clone(&requests));
+    let (base_url, server) = spawn_server(app).await;
+    let client =
+        GitHubProtectedClient::with_base_url("unstable-read-token", &base_url).expect("client");
+    let descriptor = |operation| {
+        GitHubRequestDescriptor::rest_core(
+            operation,
+            GitHubPriority::NormalRead,
+            GitHubCachePolicy::no_store(),
+        )
+    };
+
+    let exact_error = client
+        .rest_json::<Value>(
+            Method::GET,
+            "/resource",
+            None,
+            descriptor("reviews.never_stable"),
+        )
+        .await
+        .err()
+        .expect("exact read must exhaust its stability budget");
+    let raw_error = client
+        .rest_json_with_headers::<Value>(
+            Method::GET,
+            "/resource",
+            None,
+            descriptor("task_board.never_stable"),
+            HeaderMap::new(),
+        )
+        .await
+        .err()
+        .expect("raw read must exhaust its stability budget");
+
+    assert_eq!(exact_error.code(), "WORKFLOW_CONCURRENT");
+    assert_eq!(raw_error.code(), "WORKFLOW_CONCURRENT");
+    assert_eq!(requests.load(Ordering::SeqCst), 6);
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn stable_projection_guard_blocks_mutation_until_commit_finishes() {
     let _budget_guard = super::acquire_global_budget_test_lock().await;
     let initial_revision = GitHubProtectedClient::data_revision();
@@ -381,6 +427,14 @@ async fn delayed_first_response(State(state): State<DelayedReadState>) -> impl I
 
 async fn counted_response(requests: Arc<AtomicUsize>) -> impl IntoResponse {
     let request = requests.fetch_add(1, Ordering::SeqCst) + 1;
+    Json(json!({ "request": request }))
+}
+
+async fn always_mutating_response(State(requests): State<Arc<AtomicUsize>>) -> impl IntoResponse {
+    let request = requests.fetch_add(1, Ordering::SeqCst) + 1;
+    let mut guard = super::begin_external_mutation("test.read_instability").await;
+    guard.mark_remote_success();
+    drop(guard);
     Json(json!({ "request": request }))
 }
 

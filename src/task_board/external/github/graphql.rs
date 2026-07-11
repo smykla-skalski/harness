@@ -6,6 +6,7 @@ use serde_json::json;
 use crate::errors::{CliError, CliErrorKind};
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+    retry_stable_read,
 };
 
 use super::{GitHubRepository, assigned_issue_query, author_issue_query, warn_github_message};
@@ -121,13 +122,11 @@ pub(super) async fn search_issue_pull_requests(
     query: &str,
     context: &str,
 ) -> Result<Vec<GitHubSearchIssuePullRequestItem>, CliError> {
-    loop {
-        let revision = GitHubProtectedClient::data_revision();
-        let items = search_issue_pull_requests_at_revision(client, query, context).await?;
-        if GitHubProtectedClient::data_revision() == revision {
-            return Ok(items);
-        }
-    }
+    retry_stable_read("task_board.github.search_issues", |_| {
+        search_issue_pull_requests_at_revision(client, query, context)
+    })
+    .await
+    .map(|(items, _)| items)
 }
 
 async fn search_issue_pull_requests_at_revision(

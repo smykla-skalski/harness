@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use crate::errors::CliError;
-use crate::github_api::GitHubProtectedClient;
+use crate::github_api::retry_stable_read;
 use crate::reviews::{
     ReviewItem, ReviewRepositoryLabel, ReviewsGitHubClient, ReviewsRefreshRequest,
     ReviewsRefreshResponse,
@@ -19,14 +19,15 @@ use super::{
 ///
 /// # Errors
 /// Returns `CliError` when the request is invalid, a required token is missing,
-/// or GitHub cannot return the requested pull requests.
+/// GitHub cannot return the requested pull requests, or concurrent writes
+/// prevent a stable fetch-and-projection attempt.
 pub async fn refresh_reviews(
     request: &ReviewsRefreshRequest,
 ) -> Result<ReviewsRefreshResponse, CliError> {
     request.validate()?;
-    let fetched = loop {
-        let (fetched, revision) = fetch_reviews_refresh_stably(request).await?;
-        if github_projection::reconcile_task_board(
+    let (fetched, _) = retry_stable_read("reviews.refresh", |revision| async move {
+        let fetched = fetch_reviews_refresh_once(request).await?;
+        let _ = github_projection::reconcile_task_board(
             &fetched.items,
             &fetched.authoritative_viewer_keys,
             github_projection::MissingReviewResolution::ProvidedSnapshotsOnly,
@@ -34,11 +35,10 @@ pub async fn refresh_reviews(
             &request.backport_patterns,
             revision,
         )
-        .await
-        {
-            break fetched;
-        }
-    };
+        .await;
+        Ok::<_, CliError>(fetched)
+    })
+    .await?;
     if !fetched.repository_labels.is_empty() {
         patch_cached_repository_labels(&fetched.repository_labels);
     }
@@ -57,18 +57,6 @@ struct ReviewsRefreshFetch {
     missing: Vec<String>,
     repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>>,
     authoritative_viewer_keys: HashSet<String>,
-}
-
-async fn fetch_reviews_refresh_stably(
-    request: &ReviewsRefreshRequest,
-) -> Result<(ReviewsRefreshFetch, u64), CliError> {
-    loop {
-        let revision = GitHubProtectedClient::data_revision();
-        let fetched = fetch_reviews_refresh_once(request).await?;
-        if GitHubProtectedClient::data_revision() == revision {
-            return Ok((fetched, revision));
-        }
-    }
 }
 
 async fn fetch_reviews_refresh_once(

@@ -19,7 +19,7 @@ use super::state::{
 };
 use super::{
     GitHubCache, GitHubCachePolicy, GitHubPriority, GitHubRateLimitSnapshot, GitHubRateResource,
-    GitHubRequestDescriptor, GitHubResponseProvenance,
+    GitHubRequestDescriptor, GitHubResponseProvenance, retry_stable_read,
 };
 
 const DEFAULT_BASE_URL: &str = "https://api.github.com";
@@ -170,22 +170,39 @@ impl GitHubProtectedClient {
         descriptor: GitHubRequestDescriptor,
         mutation_guard: &mut Option<GitHubMutationGuard>,
     ) -> Result<GitHubApiResponse<Value>, CliError> {
-        loop {
+        if descriptor.priority.is_write() {
             let data_revision = self.state.data_revision();
-            let response = self
+            return self
                 .execute_json_at_revision(
-                    method.clone(),
+                    method,
                     route,
-                    body.clone(),
-                    descriptor.clone(),
+                    body,
+                    descriptor,
                     data_revision,
                     mutation_guard,
                 )
-                .await?;
-            if descriptor.priority.is_write() || self.state.data_revision() == data_revision {
-                return Ok(response);
-            }
+                .await;
         }
+        let operation = descriptor.operation.clone();
+        retry_stable_read(&operation, |data_revision| {
+            let method = method.clone();
+            let body = body.clone();
+            let descriptor = descriptor.clone();
+            async move {
+                let mut read_guard = None;
+                self.execute_json_at_revision(
+                    method,
+                    route,
+                    body,
+                    descriptor,
+                    data_revision,
+                    &mut read_guard,
+                )
+                .await
+            }
+        })
+        .await
+        .map(|(response, _)| response)
     }
 
     async fn execute_json_at_revision(

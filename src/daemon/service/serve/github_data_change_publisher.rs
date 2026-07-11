@@ -166,13 +166,17 @@ mod tests {
     #[tokio::test]
     async fn coalescer_drains_to_latest_change_after_lagging() {
         let (sender, mut receiver) = broadcast::channel(2);
-        sender
-            .send(change(1, "first"))
-            .expect("send first change");
+        sender.send(change(1, "first")).expect("send first change");
         let first = receiver.recv().await.expect("receive first change");
-        sender.send(change(2, "skipped")).expect("send skipped change");
-        sender.send(change(3, "retained")).expect("send retained change");
-        sender.send(change(4, "latest")).expect("send latest change");
+        sender
+            .send(change(2, "skipped"))
+            .expect("send skipped change");
+        sender
+            .send(change(3, "retained"))
+            .expect("send retained change");
+        sender
+            .send(change(4, "latest"))
+            .expect("send latest change");
 
         let coalesced = coalesce_changes(&mut receiver, first).await;
 

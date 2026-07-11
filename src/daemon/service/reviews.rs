@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use crate::errors::CliError;
-use crate::github_api::GitHubProtectedClient;
+use crate::github_api::retry_stable_read;
 use crate::reviews::timeline;
 use crate::reviews::{
     ReviewActionPreviewKind, ReviewItem, ReviewRepositoryLabel, ReviewsActionPreviewRequest,
@@ -68,7 +68,8 @@ use token::{github_token, missing_token_error, token_bound_requests, token_bound
 ///
 /// # Errors
 /// Returns `CliError` when the request is invalid, a required token is missing,
-/// or GitHub cannot return the requested update data.
+/// GitHub cannot return the requested update data, or concurrent writes prevent
+/// a stable fetch-and-projection attempt.
 pub async fn query_reviews(
     request: &ReviewsQueryRequest,
 ) -> Result<ReviewsQueryResponse, CliError> {
@@ -79,22 +80,22 @@ pub async fn query_reviews(
     {
         return Ok(response);
     }
-    let (response, github_data_revision) = loop {
-        let (fetched, revision) = fetch_reviews_stably(request).await?;
-        let (response, authoritative_viewer_keys) = response_from_fetch(fetched);
-        if github_projection::reconcile_task_board(
-            &response.items,
-            &authoritative_viewer_keys,
-            github_projection::MissingReviewResolution::ExactActiveImports,
-            request.backport_detection_enabled,
-            &request.backport_patterns,
-            revision,
-        )
-        .await
-        {
-            break (response, revision);
-        }
-    };
+    let (response, github_data_revision) =
+        retry_stable_read("reviews.query", |revision| async move {
+            let fetched = fetch_reviews_across_segments(request).await?;
+            let (response, authoritative_viewer_keys) = response_from_fetch(fetched);
+            let _ = github_projection::reconcile_task_board(
+                &response.items,
+                &authoritative_viewer_keys,
+                github_projection::MissingReviewResolution::ExactActiveImports,
+                request.backport_detection_enabled,
+                &request.backport_patterns,
+                revision,
+            )
+            .await;
+            Ok::<_, CliError>(response)
+        })
+        .await?;
     store_cached_query_response_at_revision(cache_key, &response, github_data_revision);
     policy_event_inbox::resume_waiting_reviews_policy_runs(&response.items).await;
     policy::start_background_reviews_policy_runs(&response.items).await;
@@ -130,18 +131,6 @@ struct ReviewsFetchAccumulator {
     repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>>,
     viewer_login: Option<String>,
     authoritative_viewer_keys: HashSet<String>,
-}
-
-async fn fetch_reviews_stably(
-    request: &ReviewsQueryRequest,
-) -> Result<(ReviewsFetchAccumulator, u64), CliError> {
-    loop {
-        let revision = GitHubProtectedClient::data_revision();
-        let fetched = fetch_reviews_across_segments(request).await?;
-        if GitHubProtectedClient::data_revision() == revision {
-            return Ok((fetched, revision));
-        }
-    }
 }
 
 /// Fetch updates for each token segment, deduplicating items by repository and

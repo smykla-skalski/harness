@@ -9,6 +9,7 @@ use serde_json::json;
 use crate::errors::{CliError, CliErrorKind};
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+    retry_stable_read,
 };
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
@@ -190,13 +191,11 @@ impl ExternalSyncClient for GitHubSyncClient {
         if !self.pull_enabled {
             return Ok(Vec::new());
         }
-        loop {
-            let revision = GitHubProtectedClient::data_revision();
-            let tasks = self.pull_tasks_at_revision().await?;
-            if GitHubProtectedClient::data_revision() == revision {
-                return Ok(tasks);
-            }
-        }
+        retry_stable_read("task_board.github.pull_tasks", |_| {
+            self.pull_tasks_at_revision()
+        })
+        .await
+        .map(|(tasks, _)| tasks)
     }
 
     async fn push_task(&self, item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {

@@ -9,7 +9,8 @@ use std::fmt;
 
 use super::parsing::{RestPullFile, parse_next_link, select_patches_by_path, split_repo_full_name};
 use crate::github_api::{
-    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubReadStabilityError,
+    GitHubRequestDescriptor, retry_stable_read,
 };
 use crate::reviews::files::{FILES_PAGE_CAP, ReviewFilePatch};
 
@@ -39,8 +40,8 @@ pub enum ConditionalFetchOutcome {
 /// with no body fetched. Without an etag the first call is unconditional.
 ///
 /// # Errors
-/// Returns `RestFetchError` on network / auth failures and on malformed
-/// `repo_full_name`.
+/// Returns `RestFetchError` on network / auth failures, malformed
+/// `repo_full_name`, or repeated concurrent GitHub data changes.
 pub async fn fetch_patches_conditional(
     client: &GitHubProtectedClient,
     repo_full_name: &str,
@@ -49,9 +50,8 @@ pub async fn fetch_patches_conditional(
     requested_paths: &[String],
     if_none_match: Option<&str>,
 ) -> Result<ConditionalFetchOutcome, RestFetchError> {
-    loop {
-        let revision = GitHubProtectedClient::data_revision();
-        let outcome = fetch_patches_conditional_at_revision(
+    retry_stable_read("reviews.files_patch", |_| {
+        fetch_patches_conditional_at_revision(
             client,
             repo_full_name,
             pr_number,
@@ -59,11 +59,9 @@ pub async fn fetch_patches_conditional(
             requested_paths,
             if_none_match,
         )
-        .await?;
-        if GitHubProtectedClient::data_revision() == revision {
-            return Ok(outcome);
-        }
-    }
+    })
+    .await
+    .map(|(outcome, _)| outcome)
 }
 
 async fn fetch_patches_conditional_at_revision(
@@ -143,8 +141,8 @@ async fn fetch_patches_conditional_at_revision(
 /// need a yes/no answer do not materialize every patch for large pull requests.
 ///
 /// # Errors
-/// Returns `RestFetchError` on network / auth failures and on malformed
-/// `repo_full_name`.
+/// Returns `RestFetchError` on network / auth failures, malformed
+/// `repo_full_name`, or repeated concurrent GitHub data changes.
 pub async fn any_patch_matches<F>(
     client: &GitHubProtectedClient,
     repo_full_name: &str,
@@ -154,14 +152,11 @@ pub async fn any_patch_matches<F>(
 where
     F: Fn(&str) -> bool + Send + Sync,
 {
-    loop {
-        let revision = GitHubProtectedClient::data_revision();
-        let matched =
-            any_patch_matches_at_revision(client, repo_full_name, pr_number, &predicate).await?;
-        if GitHubProtectedClient::data_revision() == revision {
-            return Ok(matched);
-        }
-    }
+    retry_stable_read("reviews.files_patch_scan", |_| {
+        any_patch_matches_at_revision(client, repo_full_name, pr_number, &predicate)
+    })
+    .await
+    .map(|(matched, _)| matched)
 }
 
 async fn any_patch_matches_at_revision<F>(
@@ -344,6 +339,7 @@ pub async fn fetch_patches(
 pub enum RestFetchError {
     InvalidRequest(String),
     Http(String),
+    UnstableRead(String),
 }
 
 impl fmt::Display for RestFetchError {
@@ -351,11 +347,18 @@ impl fmt::Display for RestFetchError {
         match self {
             Self::InvalidRequest(msg) => write!(f, "rest patch fetch: {msg}"),
             Self::Http(msg) => write!(f, "rest patch fetch http: {msg}"),
+            Self::UnstableRead(msg) => write!(f, "rest patch fetch unstable: {msg}"),
         }
     }
 }
 
 impl Error for RestFetchError {}
+
+impl From<GitHubReadStabilityError> for RestFetchError {
+    fn from(error: GitHubReadStabilityError) -> Self {
+        Self::UnstableRead(error.to_string())
+    }
+}
 
 fn patch_descriptor(operation: &str) -> GitHubRequestDescriptor {
     GitHubRequestDescriptor::rest_core(

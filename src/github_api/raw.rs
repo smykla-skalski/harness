@@ -10,7 +10,7 @@ use super::client::GitHubProtectedClient;
 use super::mutation::run_detached_mutation;
 use super::response::{budget_error, context_error, http_status_error, request_error};
 use super::state::GitHubMutationGuard;
-use super::{GitHubRateResource, GitHubRequestDescriptor};
+use super::{GitHubRateResource, GitHubRequestDescriptor, retry_stable_read};
 
 pub(crate) struct GitHubRestRawResponse<T> {
     pub(crate) status: StatusCode,
@@ -51,23 +51,28 @@ impl GitHubProtectedClient {
             .await;
         }
 
-        let mut mutation_guard = None;
-        loop {
-            let data_revision = self.state.data_revision();
-            let response = self
-                .rest_json_with_headers_at_revision(
-                    method.clone(),
+        let operation = descriptor.operation.clone();
+        retry_stable_read(&operation, |_| {
+            let method = method.clone();
+            let route = route.clone();
+            let body = body.clone();
+            let descriptor = descriptor.clone();
+            let extra_headers = extra_headers.clone();
+            async move {
+                let mut mutation_guard = None;
+                self.rest_json_with_headers_at_revision(
+                    method,
                     &route,
-                    body.clone(),
-                    descriptor.clone(),
-                    extra_headers.clone(),
+                    body,
+                    descriptor,
+                    extra_headers,
                     &mut mutation_guard,
                 )
-                .await?;
-            if priority.is_write() || self.state.data_revision() == data_revision {
-                return Ok(response);
+                .await
             }
-        }
+        })
+        .await
+        .map(|(response, _)| response)
     }
 
     async fn rest_json_with_headers_at_revision<T>(
