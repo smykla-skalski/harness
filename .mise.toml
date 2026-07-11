@@ -152,6 +152,10 @@ run = "./scripts/cargo-local.sh test --quiet --test integration -- --test-thread
 description = "Run ignored slow tests (fake toolchain, ENV_LOCK)"
 run = "./scripts/cargo-local.sh test --quiet --test integration -- --ignored --test-threads=1 --format terse"
 
+[tasks."remote-daemon:e2e"]
+description = "Run the real remote daemon ACME, HTTPS, WSS, pairing, and revocation proof"
+run = "./scripts/cargo-local.sh test --quiet --test remote_daemon_e2e -- --ignored --test-threads=1 --format terse"
+
 [tasks.codegen]
 description = "Regenerate every Rust -> Swift wire-type module from the Rust sources"
 run = "./scripts/cargo-local.sh run --quiet --example policy-codegen"

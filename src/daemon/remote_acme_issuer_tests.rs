@@ -19,6 +19,13 @@ use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, Remote
 use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_tls::build_remote_tls_server_config;
 
+#[test]
+fn production_acme_issuer_installs_rustls_provider_before_client_creation() {
+    let _issuer = InstantAcmeIssuer::production(RecordingProvisioner::default());
+
+    assert!(rustls::crypto::CryptoProvider::get_default().is_some());
+}
+
 #[tokio::test]
 async fn instant_acme_issuer_completes_account_order_and_http01_issuance() {
     let http = ScriptedAcmeHttp::new(acme_happy_path());

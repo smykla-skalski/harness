@@ -24,6 +24,7 @@ use super::remote_acme_challenge::SystemRemoteAcmeChallengeProvisioner;
 use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use super::remote_acme_lease_guard::RemoteAcmeChallengeLeaseGuard;
 use super::remote_redaction::redact_secret_detail;
+use super::remote_tls::ensure_rustls_provider;
 
 type AccountBuilderFactory = dyn Fn() -> Result<AccountBuilder, String> + Send + Sync + 'static;
 
@@ -137,6 +138,7 @@ where
     }
 
     pub(crate) fn production(provisioner: P) -> Self {
+        ensure_rustls_provider();
         let directory_url = env::var("HARNESS_REMOTE_ACME_DIRECTORY_URL")
             .ok()
             .filter(|value| !value.trim().is_empty())
