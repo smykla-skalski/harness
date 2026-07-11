@@ -11,7 +11,9 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
-use tracing::{info, warn};
+use tracing::info;
+#[cfg(target_os = "macos")]
+use tracing::warn;
 
 #[must_use]
 #[derive(Debug, PartialEq, Eq)]

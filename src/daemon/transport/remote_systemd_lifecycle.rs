@@ -57,7 +57,7 @@ where
     RunSystemctl: Fn(&[String]) -> Result<RemoteSystemdCommandOutput, CliError>,
 {
     let unit_written = write_if_changed(&plan.unit_path, &plan.unit_contents, 0o644)?;
-    let env_written = write_if_changed(&plan.env_path, &plan.env_contents, 0o600)?;
+    let env_written = write_if_missing(&plan.env_path, &plan.env_contents, 0o600)?;
     run_checked(run_systemctl, &["daemon-reload".to_string()])?;
     run_checked(
         run_systemctl,
@@ -165,6 +165,50 @@ fn write_if_changed(path: &Path, contents: &str, mode: u32) -> Result<bool, CliE
     }
     write_atomic(path, contents, mode)?;
     Ok(true)
+}
+
+fn write_if_missing(path: &Path, contents: &str, mode: u32) -> Result<bool, CliError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "create directory {}: {error}",
+                parent.display()
+            )))
+        })?;
+    }
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "create temp file for {}: {error}",
+            path.display()
+        )))
+    })?;
+    set_file_mode(temp.path(), mode)?;
+    temp.write_all(contents.as_bytes()).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "write temp file for {}: {error}",
+            path.display()
+        )))
+    })?;
+    temp.flush().map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "flush temp file for {}: {error}",
+            path.display()
+        )))
+    })?;
+    match temp.persist_noclobber(path) {
+        Ok(_) => Ok(true),
+        Err(error) if error.error.kind() == ErrorKind::AlreadyExists => {
+            set_file_mode(path, mode)?;
+            Ok(false)
+        }
+        Err(error) => Err(CliErrorKind::workflow_io(format!(
+            "persist {}: {}",
+            path.display(),
+            error.error
+        ))
+        .into()),
+    }
 }
 
 fn write_atomic(path: &Path, contents: &str, mode: u32) -> Result<(), CliError> {

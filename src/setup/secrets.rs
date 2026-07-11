@@ -5,25 +5,35 @@
 //! environment variable (precedence in that order), and from there the bytes
 //! ride a `SecKeychainItem*` buffer into `Security.framework` directly.
 
-use std::env;
-use std::fs;
+#[cfg(target_os = "macos")]
 use std::io::{self, Read};
+#[cfg(target_os = "macos")]
+use std::{env, fs};
 
 use clap::{Args, Subcommand, ValueEnum};
+#[cfg(target_os = "macos")]
 use security_framework::base::Error as SecError;
+#[cfg(target_os = "macos")]
 use security_framework::passwords::{
     delete_generic_password, get_generic_password, set_generic_password,
 };
+#[cfg(any(target_os = "macos", test))]
 use sha1::{Digest, Sha1};
 
 use crate::app::command_context::AppContext;
 use crate::errors::{CliError, CliErrorKind};
 
+#[cfg(any(target_os = "macos", test))]
 const SERVICE_GITHUB: &str = "io.harnessmonitor.task-board.github-credentials";
+#[cfg(any(target_os = "macos", test))]
 const SERVICE_TODOIST: &str = "io.harnessmonitor.task-board.todoist-credentials";
+#[cfg(any(target_os = "macos", test))]
 const SERVICE_SSH: &str = "io.harnessmonitor.task-board.ssh-key";
+#[cfg(any(target_os = "macos", test))]
 const SERVICE_SIGNING_SSH: &str = "io.harnessmonitor.task-board.signing-ssh-key";
+#[cfg(any(target_os = "macos", test))]
 const SERVICE_GPG: &str = "io.harnessmonitor.task-board.gpg-key";
+#[cfg(any(target_os = "macos", test))]
 const SERVICE_OPENROUTER: &str = "io.harnessmonitor.task-board.openrouter-credentials";
 
 #[derive(Debug, Clone, Args)]
@@ -38,11 +48,21 @@ impl SecretsArgs {
     /// # Errors
     /// Returns `CliError` only when the underlying subcommand returns one.
     pub fn execute(&self, _ctx: &AppContext) -> Result<i32, CliError> {
-        match &self.command {
-            SecretsCommand::List => Ok(run_list()),
-            SecretsCommand::Set(args) => run_set(args),
-            SecretsCommand::Clear(args) => run_clear(args),
-            SecretsCommand::Test(args) => run_test(args),
+        #[cfg(target_os = "macos")]
+        {
+            match &self.command {
+                SecretsCommand::List => Ok(run_list()),
+                SecretsCommand::Set(args) => run_set(args),
+                SecretsCommand::Clear(args) => run_clear(args),
+                SecretsCommand::Test(args) => run_test(args),
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            Err(
+                CliErrorKind::workflow_io("setup secrets requires the macOS Keychain".to_string())
+                    .into(),
+            )
         }
     }
 }
@@ -102,6 +122,7 @@ pub struct SecretMutateArgs {
     pub env_var: Option<String>,
 }
 
+#[cfg(target_os = "macos")]
 fn run_list() -> i32 {
     let entries = [
         ("GitHub token", SERVICE_GITHUB, "default"),
@@ -123,6 +144,7 @@ fn run_list() -> i32 {
     0
 }
 
+#[cfg(target_os = "macos")]
 fn run_set(args: &SecretMutateArgs) -> Result<i32, CliError> {
     let (service, account) = resolve_service_account(&args.scope)?;
     let secret = read_secret(args)?;
@@ -137,6 +159,7 @@ fn run_set(args: &SecretMutateArgs) -> Result<i32, CliError> {
     Ok(0)
 }
 
+#[cfg(target_os = "macos")]
 fn run_clear(args: &SecretScopeArgs) -> Result<i32, CliError> {
     let (service, account) = resolve_service_account(args)?;
     match delete_generic_password(service, account.as_str()) {
@@ -152,6 +175,7 @@ fn run_clear(args: &SecretScopeArgs) -> Result<i32, CliError> {
     }
 }
 
+#[cfg(target_os = "macos")]
 fn run_test(args: &SecretScopeArgs) -> Result<i32, CliError> {
     let (service, account) = resolve_service_account(args)?;
     if keychain_item_present(service, account.as_str()) {
@@ -163,6 +187,7 @@ fn run_test(args: &SecretScopeArgs) -> Result<i32, CliError> {
     }
 }
 
+#[cfg(target_os = "macos")]
 fn keychain_error(action: &str, service: &str, account: &str, error: SecError) -> CliError {
     CliError::from(CliErrorKind::workflow_io(format!(
         "Keychain {action} failed for {service} ({account}): {error}"
@@ -170,12 +195,15 @@ fn keychain_error(action: &str, service: &str, account: &str, error: SecError) -
 }
 
 /// errSecItemNotFound on macOS.
+#[cfg(target_os = "macos")]
 const ERR_SEC_ITEM_NOT_FOUND: i32 = -25300;
 
+#[cfg(target_os = "macos")]
 fn is_not_found(error: SecError) -> bool {
     error.code() == ERR_SEC_ITEM_NOT_FOUND
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn resolve_service_account(args: &SecretScopeArgs) -> Result<(&'static str, String), CliError> {
     let (service, global_account) = match args.kind {
         SecretKindArg::Github => (SERVICE_GITHUB, "default"),
@@ -194,6 +222,7 @@ fn resolve_service_account(args: &SecretScopeArgs) -> Result<(&'static str, Stri
     Ok((service, account))
 }
 
+#[cfg(target_os = "macos")]
 fn read_secret(args: &SecretMutateArgs) -> Result<String, CliError> {
     if let Some(path) = &args.file {
         fs::read_to_string(path)
@@ -220,6 +249,7 @@ fn read_secret(args: &SecretMutateArgs) -> Result<String, CliError> {
     }
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn normalize_repository_slug(slug: &str) -> Result<String, CliError> {
     let trimmed = slug.trim();
     if trimmed.is_empty() || !trimmed.contains('/') {
@@ -230,12 +260,14 @@ fn normalize_repository_slug(slug: &str) -> Result<String, CliError> {
     Ok(trimmed.to_lowercase())
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn sha1_hex(value: &str) -> String {
     let mut hasher = Sha1::new();
     hasher.update(value.as_bytes());
     hex::encode(hasher.finalize())
 }
 
+#[cfg(target_os = "macos")]
 fn keychain_item_present(service: &str, account: &str) -> bool {
     get_generic_password(service, account).is_ok()
 }
