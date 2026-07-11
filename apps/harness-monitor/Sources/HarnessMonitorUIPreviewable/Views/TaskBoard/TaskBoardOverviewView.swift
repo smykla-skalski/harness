@@ -43,6 +43,8 @@ public struct TaskBoardOverviewView: View {
   var laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.emptyRawValue
   @AppStorage(TaskBoardLaneAppearancePreferences.storageKey)
   var laneAppearancePreferencesRawValue = TaskBoardLaneAppearancePreferences.emptyRawValue
+  @AppStorage(TaskBoardCardPreferences.priorityBadgeVisibilityStorageKey)
+  var showsPriorityBadge = TaskBoardCardPreferences.defaultShowsPriorityBadge
   var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
@@ -56,13 +58,9 @@ public struct TaskBoardOverviewView: View {
     )
   }
 
-  var metrics: TaskBoardOverviewMetrics {
-    TaskBoardOverviewMetrics(fontScale: fontScale)
-  }
+  var metrics: TaskBoardOverviewMetrics { TaskBoardOverviewMetrics(fontScale: fontScale) }
 
-  var laneMetrics: TaskBoardLaneMetrics {
-    TaskBoardLaneMetrics(fontScale: fontScale)
-  }
+  var laneMetrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
   var laneStripSizing: TaskBoardLaneStripSizing {
     TaskBoardLaneStripSizing(
@@ -81,9 +79,7 @@ public struct TaskBoardOverviewView: View {
     )
   }
 
-  var currentPresentation: TaskBoardOverviewPresentation {
-    cachedPresentation
-  }
+  var currentPresentation: TaskBoardOverviewPresentation { cachedPresentation }
 
   public init(
     snapshot: TaskBoardInboxSnapshot,
@@ -165,6 +161,7 @@ public struct TaskBoardOverviewView: View {
       \.taskBoardLaneAppearance,
       TaskBoardLaneAppearance(rawValue: laneAppearancePreferencesRawValue)
     )
+    .environment(\.taskBoardShowsPriorityBadge, showsPriorityBadge)
     .sheet(item: taskBoardManagementSheet) { taskBoardManagementSheet in
       taskBoardManagementSheetContent(taskBoardManagementSheet)
     }

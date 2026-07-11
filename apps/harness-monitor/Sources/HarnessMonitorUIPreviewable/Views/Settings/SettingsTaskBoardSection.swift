@@ -40,6 +40,7 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
           loadingSection
         } else {
           TaskBoardWorkflowSection(store: store, taskBoardFormState: $taskBoardFormState)
+          SettingsTaskBoardCardsSection()
           SettingsTaskBoardLaneAppearanceSection()
           TaskBoardProjectSection(store: store, taskBoardFormState: $taskBoardFormState)
             .id(SettingsTaskBoardAnchor.githubProject)
