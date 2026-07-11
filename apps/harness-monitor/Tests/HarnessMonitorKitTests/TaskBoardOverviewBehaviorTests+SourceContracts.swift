@@ -38,6 +38,21 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(laneChrome.contains(".padding(.top, metrics.laneHeaderBodyTopPadding)"))
   }
 
+  @Test("Lane chrome uses a distinct neutral surface fill")
+  func laneChromeUsesDistinctNeutralSurfaceFill() throws {
+    let laneChrome = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
+
+    #expect(laneChrome.contains("private var laneSurfaceFill: Color"))
+    #expect(
+      laneChrome.contains(
+        "HarnessMonitorTheme.ink.opacity(reduceTransparency ? 0.08 : 0.055)"
+      )
+    )
+    #expect(laneChrome.contains("shape.fill(laneSurfaceFill)"))
+    #expect(laneChrome.contains("AnyShapeStyle(laneSurfaceFill)"))
+    #expect(!laneChrome.contains("AnyShapeStyle(.background.opacity"))
+  }
+
   @Test("Expanded and collapsed lane titles use matching type size")
   func expandedAndCollapsedLaneTitlesUseMatchingTypeSize() throws {
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")

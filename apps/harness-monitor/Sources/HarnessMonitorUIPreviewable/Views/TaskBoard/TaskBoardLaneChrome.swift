@@ -156,8 +156,7 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
         alignment: .topLeading
       )
       .background {
-        RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
-          .fill(laneFill)
+        laneBackground
       }
       .overlay {
         RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
@@ -181,15 +180,20 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
     isCollapsed ? metrics.laneCollapsedWidth : .infinity
   }
 
-  private var laneFill: AnyShapeStyle {
+  @ViewBuilder private var laneBackground: some View {
+    let shape = RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+    shape.fill(laneSurfaceFill)
     if isDropTargeted {
-      return AnyShapeStyle(laneColor.opacity(reduceTransparency ? 0.18 : 0.12))
+      shape.fill(laneColor.opacity(reduceTransparency ? 0.18 : 0.12))
     }
-    return AnyShapeStyle(.background.opacity(reduceTransparency ? 0.72 : 0.6))
+  }
+
+  private var laneSurfaceFill: Color {
+    HarnessMonitorTheme.ink.opacity(reduceTransparency ? 0.08 : 0.055)
   }
 
   private var laneAccentInteriorStyle: AnyShapeStyle {
-    AnyShapeStyle(.background)
+    AnyShapeStyle(laneSurfaceFill)
   }
 
   private var laneStrokeColor: Color {
