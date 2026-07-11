@@ -70,7 +70,10 @@ extension DashboardReviewsRouteView {
     HarnessMonitorIntentDonations.donateApprove(items: actionableItems)
     await performMutation("Approving", items: actionableItems) { client in
       try await client.approveReviews(
-        request: ReviewsApproveRequest(targets: actionableItems.map(\.target))
+        request: ReviewsApproveRequest(
+          targets: actionableItems.map(\.target),
+          source: .direct
+        )
       )
     }
   }

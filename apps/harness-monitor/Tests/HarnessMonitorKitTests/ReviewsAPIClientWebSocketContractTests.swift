@@ -63,7 +63,7 @@ extension TaskBoardAPIClientTests {
       )
     )
     let approve = try await transport.approveReviews(
-      request: ReviewsApproveRequest(targets: [target])
+      request: ReviewsApproveRequest(targets: [target], source: .direct)
     )
     let merge = try await transport.mergeReviews(
       request: ReviewsMergeRequest(targets: [target], method: .rebase)
@@ -211,6 +211,7 @@ extension TaskBoardAPIClientTests {
       objectValue(calls[4].params, key: "targets")
         == .array([.object(reviewsActionTargetJSON)])
     )
+    #expect(objectValue(calls[4].params, key: "source") == .string("direct"))
     #expect(
       objectValue(calls[5].params, key: "targets")
         == .array([.object(reviewsActionTargetJSON)])

@@ -17,6 +17,14 @@ use super::ReviewItem;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewsApproveRequest {
     pub targets: Vec<ReviewTarget>,
+    pub source: ReviewsApproveRequestSource,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewsApproveRequestSource {
+    Direct,
+    ReviewTextPaste,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

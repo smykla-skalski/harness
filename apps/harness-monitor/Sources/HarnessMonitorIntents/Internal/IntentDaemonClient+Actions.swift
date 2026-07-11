@@ -6,7 +6,7 @@ extension IntentDaemonClient {
     let target = try await resolveReviewTarget(pullRequestID: pullRequestID)
     try await runActionRPC(method: "reviews.approve") {
       _ = try await self.transport.approveReviews(
-        request: ReviewsApproveRequest(targets: [target])
+        request: ReviewsApproveRequest(targets: [target], source: .direct)
       )
     }
   }

@@ -58,6 +58,7 @@ extension TaskBoardAPIClientTests {
     #expect(approveTarget?["pull_request_id"] as? String == "pr-42")
     #expect(approveTarget?["repository"] as? String == "example/harness")
     #expect(approveTarget?["check_suite_ids"] as? [String] == ["suite-1"])
+    #expect(records[4].body?["source"] as? String == "direct")
 
     #expect(records[5].body?["method"] as? String == "rebase")
     #expect(records[6].body?["targets"] is [[String: Any]])

@@ -72,7 +72,7 @@ extension DashboardReviewsTextPasteSheetHost {
               timeoutSeconds: DashboardReviewsTimeoutRacer.defaultMutationTimeoutSeconds
             ) {
               try await client.approveReviews(
-                request: ReviewsApproveRequest(targets: targets)
+                request: ReviewsApproveRequest(targets: targets, source: .reviewTextPaste)
               )
             }
             completion = .success(response)

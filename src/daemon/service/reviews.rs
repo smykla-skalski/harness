@@ -15,7 +15,8 @@ use crate::reviews::{
 use crate::workspace::utc_now;
 
 use super::reviews_github_policy::{
-    ReviewsGitHubMutation, enforce_review_file_comment_policy, enforce_review_targets_policy,
+    ReviewsGitHubMutation, enforce_review_approve_request_policy,
+    enforce_review_file_comment_policy, enforce_review_targets_policy,
 };
 
 #[path = "reviews_cache.rs"]
@@ -220,7 +221,7 @@ pub async fn approve_reviews(
     request: &ReviewsApproveRequest,
 ) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
-    enforce_review_targets_policy(ReviewsGitHubMutation::Approve, &request.targets)?;
+    enforce_review_approve_request_policy(request)?;
     let mut results = Vec::new();
     for segment in token_bound_targets(&request.targets)? {
         let client = ReviewsGitHubClient::new(&segment.token)?;
@@ -228,6 +229,7 @@ pub async fn approve_reviews(
             client
                 .approve(&ReviewsApproveRequest {
                     targets: segment.targets,
+                    source: request.source,
                 })
                 .await?,
         );

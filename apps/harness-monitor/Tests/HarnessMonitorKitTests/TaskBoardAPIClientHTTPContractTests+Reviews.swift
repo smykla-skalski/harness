@@ -62,7 +62,7 @@ extension TaskBoardAPIClientTests {
       )
     )
     let approve = try await client.approveReviews(
-      request: ReviewsApproveRequest(targets: [target])
+      request: ReviewsApproveRequest(targets: [target], source: .direct)
     )
     let merge = try await client.mergeReviews(
       request: ReviewsMergeRequest(targets: [target], method: .rebase)

@@ -24,10 +24,11 @@ mod policy;
 pub use self::actions::{
     ReviewActionPreviewTarget, ReviewActionResult, ReviewTarget, ReviewTargetFlags,
     ReviewsActionCapabilities, ReviewsActionPreviewRequest, ReviewsActionPreviewResponse,
-    ReviewsActionResponse, ReviewsApproveRequest, ReviewsAutoRequest, ReviewsBodyRequest,
-    ReviewsBodyResponse, ReviewsCacheClearResponse, ReviewsCapabilitiesResponse,
-    ReviewsCommentRequest, ReviewsLabelRequest, ReviewsMergeRequest, ReviewsRefreshRequest,
-    ReviewsRefreshResponse, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
+    ReviewsActionResponse, ReviewsApproveRequest, ReviewsApproveRequestSource, ReviewsAutoRequest,
+    ReviewsBodyRequest, ReviewsBodyResponse, ReviewsCacheClearResponse,
+    ReviewsCapabilitiesResponse, ReviewsCommentRequest, ReviewsLabelRequest, ReviewsMergeRequest,
+    ReviewsRefreshRequest, ReviewsRefreshResponse, ReviewsRequestReviewRequest,
+    ReviewsRerunChecksRequest,
 };
 pub use self::policy::{
     ReviewsPolicyHistoryRequest, ReviewsPolicyHistoryResponse, ReviewsPolicyPreviewRequest,

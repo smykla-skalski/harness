@@ -174,6 +174,20 @@ impl PolicyCanvasWorkspace {
         canvas.live_document().map(|document| (canvas, document))
     }
 
+    #[must_use]
+    pub fn review_text_paste_live_canvas(&self) -> Option<(&PolicyCanvasRecord, &PolicyGraph)> {
+        if !self.global_policy_enforcement_enabled {
+            return None;
+        }
+        self.canvases.iter().find_map(|canvas| {
+            if canvas.is_review_text_paste_dry_run_canvas {
+                canvas.live_document().map(|document| (canvas, document))
+            } else {
+                None
+            }
+        })
+    }
+
     pub fn active_canvas_mut(&mut self) -> Option<&mut PolicyCanvasRecord> {
         self.canvases
             .iter_mut()

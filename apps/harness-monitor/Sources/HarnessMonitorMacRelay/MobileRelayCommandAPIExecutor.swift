@@ -320,7 +320,7 @@ public struct HarnessMonitorClientMobileRelayCommandClient: MobileRelayCommandCl
 
   public func approvePullRequest(_ target: ReviewTarget) async throws -> String {
     let response = try await client.approveReviews(
-      request: ReviewsApproveRequest(targets: [target]))
+      request: ReviewsApproveRequest(targets: [target], source: .direct))
     return response.summary
   }
 

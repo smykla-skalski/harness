@@ -473,14 +473,24 @@ public struct PullRequestReviewWire: Codable, Equatable, Sendable {
 
 public struct ReviewsApproveRequestWire: Codable, Equatable, Sendable {
   public var targets: [ReviewTargetWire]
+  public var source: ReviewsApproveRequestSource
 
-  public init(targets: [ReviewTargetWire]) {
+  public init(targets: [ReviewTargetWire], source: ReviewsApproveRequestSource) {
     self.targets = targets
+    self.source = source
   }
 
   enum CodingKeys: String, CodingKey {
     case targets
+    case source
   }
+}
+
+public enum ReviewsApproveRequestSource: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case direct = "direct"
+  case reviewTextPaste = "review_text_paste"
+
+  public var id: String { rawValue }
 }
 
 public struct ReviewsMergeRequestWire: Codable, Equatable, Sendable {

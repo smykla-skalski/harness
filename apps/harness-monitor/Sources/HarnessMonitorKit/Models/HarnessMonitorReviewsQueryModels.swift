@@ -56,9 +56,11 @@ public struct ReviewsRepositoryCatalogResponse: Codable, Equatable, Sendable {
 
 public struct ReviewsApproveRequest: Codable, Equatable, Sendable {
   public let targets: [ReviewTarget]
+  public let source: ReviewsApproveRequestSource
 
-  public init(targets: [ReviewTarget]) {
+  public init(targets: [ReviewTarget], source: ReviewsApproveRequestSource) {
     self.targets = targets
+    self.source = source
   }
 }
 

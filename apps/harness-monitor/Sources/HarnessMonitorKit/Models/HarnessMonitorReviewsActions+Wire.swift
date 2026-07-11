@@ -45,7 +45,7 @@ extension ReviewTargetWire {
 
 extension ReviewsApproveRequestWire {
   init(_ model: ReviewsApproveRequest) {
-    self.init(targets: model.targets.map { ReviewTargetWire($0) })
+    self.init(targets: model.targets.map { ReviewTargetWire($0) }, source: model.source)
   }
 }
 
