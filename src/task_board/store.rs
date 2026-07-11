@@ -183,7 +183,7 @@ impl TaskBoardStore {
     ///
     /// # Errors
     /// Returns `CliError` if the ID is unsafe, the file is missing, or the
-    /// markdown/frontmatter payload cannot be parsed.
+    /// markdown/frontmatter payload cannot be parsed or repaired on disk.
     pub fn get(&self, id: &str) -> Result<TaskBoardItem, CliError> {
         let path = self.path_for(id)?;
         let mut item = read_path(&path)?;
