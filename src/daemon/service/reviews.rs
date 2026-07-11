@@ -1,6 +1,7 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use crate::errors::CliError;
+use crate::github_api::GitHubProtectedClient;
 use crate::reviews::timeline;
 use crate::reviews::{
     ReviewActionPreviewKind, ReviewItem, ReviewRepositoryLabel, ReviewsActionPreviewRequest,
@@ -9,8 +10,8 @@ use crate::reviews::{
     ReviewsFileCommentRequest, ReviewsFileCommentResponse, ReviewsGitHubClient,
     ReviewsLabelRequest, ReviewsMergeRequest, ReviewsPolicyPreviewRequest,
     ReviewsPolicyRunStartRequest, ReviewsPolicyTrigger, ReviewsQueryRequest, ReviewsQueryResponse,
-    ReviewsRefreshRequest, ReviewsRefreshResponse, ReviewsRepositoryCatalogRequest,
-    ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
+    ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest,
+    ReviewsRerunChecksRequest,
 };
 use crate::workspace::utc_now;
 
@@ -24,6 +25,7 @@ mod cache_internal;
 
 mod auto_policy;
 mod body;
+mod github_projection;
 pub(crate) mod policy;
 mod policy_audit;
 mod policy_enrichment;
@@ -33,6 +35,7 @@ pub(crate) mod policy_history;
 pub(crate) mod policy_mapping;
 pub(crate) mod policy_resume;
 mod preview;
+mod refresh;
 mod resolve;
 mod token;
 
@@ -46,16 +49,18 @@ pub use body::{fetch_review_body, update_review_body};
 #[cfg(test)]
 pub(super) use cache_internal::apply_refresh_to_items;
 use cache_internal::{
-    body_cache, cache, cached_query_response, patch_cached_items, patch_cached_repository_labels,
-    store_cached_query_response,
+    body_cache, cache, cached_query_response, store_cached_query_response_at_revision,
 };
 #[cfg(test)]
-use cache_internal::{cached_body_response, store_cached_body_response};
+use cache_internal::{
+    cached_body_response, store_cached_body_response, store_cached_query_response,
+};
 pub(crate) use policy::start_reviews_policy_run_with_audit_db;
 pub use policy::{preview_reviews_policy, reviews_policy_status, start_reviews_policy_run};
 use policy_enrichment::enrich_policy_target_for_execution;
 pub use policy_history::reviews_policy_history;
 use preview::{preview_action_target, preview_action_warnings};
+pub use refresh::refresh_reviews;
 pub use resolve::resolve_review_pull_requests;
 use token::{github_token, missing_token_error, token_bound_requests, token_bound_targets};
 
@@ -74,13 +79,38 @@ pub async fn query_reviews(
     {
         return Ok(response);
     }
+    let (response, github_data_revision) = loop {
+        let (fetched, revision) = fetch_reviews_stably(request).await?;
+        let (response, authoritative_viewer_keys) = response_from_fetch(fetched);
+        if github_projection::reconcile_task_board(
+            &response.items,
+            &authoritative_viewer_keys,
+            github_projection::MissingReviewResolution::ExactActiveImports,
+            request.backport_detection_enabled,
+            &request.backport_patterns,
+            revision,
+        )
+        .await
+        {
+            break (response, revision);
+        }
+    };
+    store_cached_query_response_at_revision(cache_key, &response, github_data_revision);
+    policy_event_inbox::resume_waiting_reviews_policy_runs(&response.items).await;
+    policy::start_background_reviews_policy_runs(&response.items).await;
+    Ok(response)
+}
 
-    let fetched = fetch_reviews_across_segments(request).await?;
-
-    let mut items = fetched
-        .items_by_key
-        .into_values()
-        .collect::<Vec<ReviewItem>>();
+fn response_from_fetch(
+    fetched: ReviewsFetchAccumulator,
+) -> (ReviewsQueryResponse, HashSet<String>) {
+    let ReviewsFetchAccumulator {
+        items_by_key,
+        repository_labels,
+        viewer_login,
+        authoritative_viewer_keys,
+    } = fetched;
+    let mut items = items_by_key.into_values().collect::<Vec<ReviewItem>>();
     items.sort_by(|left, right| {
         right
             .updated_at
@@ -89,12 +119,9 @@ pub async fn query_reviews(
             .then_with(|| left.number.cmp(&right.number))
     });
     let mut response = ReviewsQueryResponse::new(items, utc_now());
-    response.set_repository_labels(fetched.repository_labels);
-    response.set_viewer_login(fetched.viewer_login);
-    store_cached_query_response(cache_key, &response);
-    policy_event_inbox::resume_waiting_reviews_policy_runs(&response.items).await;
-    policy::start_background_reviews_policy_runs(&response.items).await;
-    Ok(response)
+    response.set_repository_labels(repository_labels);
+    response.set_viewer_login(viewer_login);
+    (response, authoritative_viewer_keys)
 }
 
 /// Accumulated fetch results across every token segment of a reviews query.
@@ -102,10 +129,23 @@ struct ReviewsFetchAccumulator {
     items_by_key: BTreeMap<String, ReviewItem>,
     repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>>,
     viewer_login: Option<String>,
+    authoritative_viewer_keys: HashSet<String>,
+}
+
+async fn fetch_reviews_stably(
+    request: &ReviewsQueryRequest,
+) -> Result<(ReviewsFetchAccumulator, u64), CliError> {
+    loop {
+        let revision = GitHubProtectedClient::data_revision();
+        let fetched = fetch_reviews_across_segments(request).await?;
+        if GitHubProtectedClient::data_revision() == revision {
+            return Ok((fetched, revision));
+        }
+    }
 }
 
 /// Fetch updates for each token segment, deduplicating items by repository and
-/// number and resolving the viewer login once across segments.
+/// number and resolving the viewer independently for each token.
 async fn fetch_reviews_across_segments(
     request: &ReviewsQueryRequest,
 ) -> Result<ReviewsFetchAccumulator, CliError> {
@@ -113,22 +153,24 @@ async fn fetch_reviews_across_segments(
     let mut items_by_key = BTreeMap::new();
     let mut repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>> = BTreeMap::new();
     let mut viewer_login: Option<String> = None;
+    let mut authoritative_viewer_keys = HashSet::new();
     for segment in segments {
         let client = ReviewsGitHubClient::new(&segment.token)?;
+        let segment_viewer_login = client.fetch_viewer_login().await;
         if viewer_login.is_none() {
-            // Resolve the viewer once across token segments. Same-token
-            // segments share a login; cross-token splits are rare and
-            // the first resolved login matches the token whose PRs
-            // dominate the response in practice.
-            viewer_login = client.fetch_viewer_login().await;
+            viewer_login.clone_from(&segment_viewer_login);
         }
         let fetch = client
-            .fetch_updates(&segment.request, viewer_login.as_deref())
+            .fetch_updates(&segment.request, segment_viewer_login.as_deref())
             .await?;
         for item in fetch.items {
-            items_by_key
-                .entry(format!("{}#{}", item.repository, item.number))
-                .or_insert(item);
+            let key = review_item_key(&item);
+            if segment_viewer_login.is_some() {
+                authoritative_viewer_keys.insert(key.clone());
+                items_by_key.insert(key, item);
+            } else {
+                items_by_key.entry(key).or_insert(item);
+            }
         }
         merge_segment_repository_labels(&mut repository_labels, fetch.repository_labels);
     }
@@ -136,7 +178,12 @@ async fn fetch_reviews_across_segments(
         items_by_key,
         repository_labels,
         viewer_login,
+        authoritative_viewer_keys,
     })
+}
+
+fn review_item_key(item: &ReviewItem) -> String {
+    format!("{}#{}", item.repository.to_ascii_lowercase(), item.number)
 }
 
 fn merge_segment_repository_labels(
@@ -429,45 +476,6 @@ pub async fn auto_reviews(request: &ReviewsAutoRequest) -> Result<ReviewsActionR
     }
 
     Ok(action_response("Auto mode finished", results))
-}
-
-/// Re-fetch a focused list of dependency update pull requests by GraphQL ID,
-/// patching matching cache entries in place and returning the refreshed items.
-///
-/// # Errors
-/// Returns `CliError` when the request is invalid, a required token is missing,
-/// or GitHub cannot return the requested pull requests.
-pub async fn refresh_reviews(
-    request: &ReviewsRefreshRequest,
-) -> Result<ReviewsRefreshResponse, CliError> {
-    request.validate()?;
-    let mut items = Vec::new();
-    let mut missing = Vec::new();
-    for segment in token_bound_targets(&request.targets)? {
-        let ids: Vec<String> = segment
-            .targets
-            .iter()
-            .map(|target| target.pull_request_id.clone())
-            .collect();
-        let client = ReviewsGitHubClient::new(&segment.token)?;
-        let viewer_login = client.fetch_viewer_login().await;
-        let fetch = client
-            .fetch_by_ids(&ids, request, viewer_login.as_deref())
-            .await?;
-        items.extend(fetch.items);
-        missing.extend(fetch.missing);
-        if !fetch.repository_labels.is_empty() {
-            patch_cached_repository_labels(&fetch.repository_labels);
-        }
-    }
-    patch_cached_items(&items, &missing);
-    policy_event_inbox::resume_waiting_reviews_policy_runs(&items).await;
-    policy::start_background_reviews_policy_runs(&items).await;
-    Ok(ReviewsRefreshResponse {
-        fetched_at: utc_now(),
-        items,
-        missing_pull_request_ids: missing,
-    })
 }
 
 /// Clear the in-memory dependency updates query cache (list + body).

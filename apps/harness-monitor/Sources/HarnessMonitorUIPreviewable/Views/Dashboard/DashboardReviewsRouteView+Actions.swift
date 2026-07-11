@@ -3,7 +3,45 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension DashboardReviewsRouteView {
-  func reload(forceRefresh: Bool, backgroundRefresh: Bool = false) async {
+  func reloadForCurrentGitHubRevision() async {
+    let revision = store.contentUI.dashboard.githubDataRevision
+    routeStateStorage.githubMutationRefreshCoordinator.discardAcknowledgedChanges(
+      upTo: routeLoadedGitHubDataRevision
+    )
+    let forceRefresh = dashboardReviewsGitHubRevisionNeedsForceRefresh(
+      loadedRevision: routeLoadedGitHubDataRevision,
+      currentRevision: revision
+    )
+    if forceRefresh, let decision = currentGitHubChangeDecision() {
+      switch decision {
+      case .refreshAll:
+        break
+      case .waitForTargetedRefresh:
+        return
+      case .acknowledge(let acknowledgedRevision):
+        routeLoadedGitHubDataRevision = acknowledgedRevision
+        return
+      }
+    }
+    // Once accepted, forced scheduler work remains queued until a successful
+    // fetch, including across cancellation and scheduler restarts.
+    let refreshIsDurablyScheduled = await reload(
+      forceRefresh: forceRefresh,
+      backgroundRefresh: forceRefresh
+    )
+    if dashboardReviewsShouldAcknowledgeGitHubRevision(
+      refreshIsDurablyScheduled: refreshIsDurablyScheduled,
+      taskIsCancelled: Task.isCancelled
+    ) {
+      routeLoadedGitHubDataRevision = revision
+      routeStateStorage.githubMutationRefreshCoordinator.discardAcknowledgedChanges(
+        upTo: revision
+      )
+    }
+  }
+
+  @discardableResult
+  func reload(forceRefresh: Bool, backgroundRefresh: Bool = false) async -> Bool {
     let cacheApplied = hydrateReviewsFromCacheIfNeeded()
     guard store.apiClient != nil else {
       switch dashboardReviewsMissingClientState(
@@ -11,15 +49,15 @@ extension DashboardReviewsRouteView {
         connectionState: store.connectionState
       ) {
       case .ignore:
-        return
+        return false
       case .loading:
         routeIsLoading = true
         routeErrorMessage = nil
-        return
+        return false
       case .error(let message):
         routeIsLoading = false
         routeErrorMessage = message
-        return
+        return false
       }
     }
     if backgroundRefresh {
@@ -38,7 +76,7 @@ extension DashboardReviewsRouteView {
     if let client = store.apiClient {
       await loadReviewCapabilitiesIfNeeded(client: client)
     }
-    await startScheduler(
+    return await startScheduler(
       forceRefreshAll: dashboardReviewsShouldForceSchedulerRefresh(
         explicitForceRefresh: forceRefresh,
         cacheApplied: cacheApplied,
@@ -68,7 +106,15 @@ extension DashboardReviewsRouteView {
   func approve(items: [ReviewItem]) async {
     let actionableItems = items.filter(\.canAttemptManualApproval)
     HarnessMonitorIntentDonations.donateApprove(items: actionableItems)
-    await performMutation("Approving", items: actionableItems) { client in
+    await performMutation(
+      "Approving",
+      items: actionableItems,
+      githubAction: .approve,
+      githubRevisionCount: dashboardReviewsExpectedGitHubRevisionCount(
+        action: .approve,
+        items: actionableItems
+      )
+    ) { client in
       try await client.approveReviews(
         request: ReviewsApproveRequest(
           targets: actionableItems.map(\.target),
@@ -85,6 +131,11 @@ extension DashboardReviewsRouteView {
     await performMutation(
       "Merging",
       items: actionableItems,
+      githubAction: .merge,
+      githubRevisionCount: dashboardReviewsExpectedGitHubRevisionCount(
+        action: .merge,
+        items: actionableItems
+      ),
       onSuccess: {
         if let nextID {
           routeSelectedIDs = [nextID]
@@ -117,7 +168,15 @@ extension DashboardReviewsRouteView {
   func rerunChecks(items: [ReviewItem]) async {
     let actionableItems = items.filter(\.canAttemptRerunChecks)
     HarnessMonitorIntentDonations.donateRerunChecks(items: actionableItems)
-    await performMutation("Rerunning", items: actionableItems) { client in
+    await performMutation(
+      "Rerunning",
+      items: actionableItems,
+      githubAction: .rerunChecks,
+      githubRevisionCount: dashboardReviewsExpectedGitHubRevisionCount(
+        action: .rerunChecks,
+        items: actionableItems
+      )
+    ) { client in
       try await client.rerunReviewChecks(
         request: ReviewsRerunChecksRequest(targets: actionableItems.map(\.rerunTarget))
       )
@@ -156,7 +215,12 @@ extension DashboardReviewsRouteView {
       checkSuiteIDs: [checkSuiteID],
       viewerCanUpdate: item.viewerCanUpdate
     )
-    await performMutation("Rerunning \(check.name)", items: [item]) { client in
+    await performMutation(
+      "Rerunning \(check.name)",
+      items: [item],
+      githubAction: .rerunChecks,
+      githubRevisionCount: 1
+    ) { client in
       try await client.rerunReviewChecks(
         request: ReviewsRerunChecksRequest(targets: [target])
       )
@@ -174,6 +238,11 @@ extension DashboardReviewsRouteView {
     await performMutation(
       "Labeling",
       items: actionableItems,
+      githubAction: .addLabel,
+      githubRevisionCount: dashboardReviewsExpectedGitHubRevisionCount(
+        action: .addLabel,
+        items: actionableItems
+      ),
       onSuccess: { recordLabelUsage(label, items: actionableItems) },
       operation: { client in
         try await client.addReviewLabel(
@@ -189,7 +258,12 @@ extension DashboardReviewsRouteView {
   func reRequestReview(from reviewer: String, on item: ReviewItem) async {
     let trimmed = reviewer.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
-    await performMutation("Re-requesting review from @\(trimmed)", items: [item]) { client in
+    await performMutation(
+      "Re-requesting review from @\(trimmed)",
+      items: [item],
+      githubAction: .requestReview,
+      githubRevisionCount: 1
+    ) { client in
       try await client.reRequestReview(
         request: ReviewsRequestReviewRequest(
           targets: [item.target],
@@ -254,7 +328,12 @@ extension DashboardReviewsRouteView {
       )
       return
     }
-    await performMutation(bot.rebaseActionTitle, items: [item]) { client in
+    await performMutation(
+      bot.rebaseActionTitle,
+      items: [item],
+      githubAction: .comment,
+      githubRevisionCount: 1
+    ) { client in
       try await client.commentReviews(
         request: ReviewsCommentRequest(
           targets: [item.target],
@@ -265,7 +344,6 @@ extension DashboardReviewsRouteView {
   }
 
   func fixCI(item: ReviewItem) async {
-    guard let client = store.apiClient else { return }
     let request = TaskBoardCreateItemRequest(
       title: "Fix CI · \(item.repository)#\(item.number)",
       body: dashboardReviewFixCIBody(for: item, activity: activitySnapshot(for: item)),
@@ -283,58 +361,8 @@ extension DashboardReviewsRouteView {
         summary: "Repair review CI failures and restore mergeability"
       )
     )
-    do {
-      _ = try await DashboardReviewsTimeoutRacer.race(
-        timeoutSeconds: DashboardReviewsTimeoutRacer.defaultMutationTimeoutSeconds
-      ) {
-        try await client.createTaskBoardItem(request: request)
-      }
+    if await store.createTaskBoardItem(request: request) {
       selectedRoute = .taskBoard
-    } catch {
-      store.presentFailureFeedback(error.localizedDescription)
-    }
-  }
-
-  func performMutation(
-    _ title: String,
-    items: [ReviewItem],
-    onSuccess: @MainActor () -> Void = {},
-    operation:
-      @Sendable @escaping (any HarnessMonitorClientProtocol) async throws
-      -> ReviewsActionResponse
-  ) async {
-    guard !items.isEmpty else { return }
-    guard let client = store.apiClient else { return }
-    let trackedIDs = items.map(\.pullRequestID)
-    beginRefreshing(pullRequestIDs: trackedIDs, actionTitle: title)
-    defer {
-      endRefreshing(pullRequestIDs: trackedIDs)
-    }
-    do {
-      let response = try await DashboardReviewsTimeoutRacer.race(
-        timeoutSeconds: DashboardReviewsTimeoutRacer.defaultMutationTimeoutSeconds
-      ) {
-        try await operation(client)
-      }
-      recordReviewActionResponse(response, title: title, items: items)
-      let feedback = dashboardReviewsActionFeedback(
-        title: title,
-        items: items,
-        response: response
-      )
-      switch feedback.severity {
-      case .success:
-        store.presentSuccessFeedback(feedback.message)
-      case .failure:
-        store.presentFailureFeedback(feedback.message)
-      case .warning, .undoable, .activity:
-        store.toast.presentWarning(feedback.message)
-      }
-      onSuccess()
-      scheduleAffectedRefresh(for: items, using: client)
-    } catch {
-      recordReviewActionFailure(error, title: title, items: items)
-      store.presentFailureFeedback(dashboardReviewsErrorMessage(for: error))
     }
   }
 

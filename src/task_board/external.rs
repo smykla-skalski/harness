@@ -19,6 +19,9 @@ pub use capabilities::{
     ExternalTaskUpdate, ExternalUpdateOutcome,
 };
 pub use github::{GitHubInboxSyncClient, GitHubSyncClient};
+pub(crate) use github::{
+    imported_review_pull_request_references, reconcile_pull_request_snapshots,
+};
 pub use sync::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
     configured_sync_clients, sync_external_tasks,

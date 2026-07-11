@@ -80,11 +80,3 @@ fn next_search_cursor_requires_cursor_when_more_pages_exist() {
 
     assert!(error.message().contains("next page without a cursor"));
 }
-
-#[test]
-fn graphql_cache_keys_do_not_expose_token_text() {
-    let key = token_cache_key("ghp_secret");
-
-    assert_ne!(key, 0);
-    assert_eq!(token_cache_key("ghp_secret"), key);
-}

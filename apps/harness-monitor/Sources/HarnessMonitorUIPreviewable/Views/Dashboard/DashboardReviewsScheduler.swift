@@ -23,6 +23,7 @@ final class DashboardReviewsScheduler {
     var lastSyncedAt: Date?
     var lastErrorMessage: String?
     var forceRefreshRequested: Bool = false
+    fileprivate var forceRefreshGeneration: UInt64 = 0
   }
 
   /// Per-fetch upper bound. The daemon's WebSocket RPC has no resource timeout,
@@ -113,7 +114,7 @@ final class DashboardReviewsScheduler {
         states[repository]?.lastSyncedAt = hydrated
       }
       if forceRefreshAll {
-        states[repository]?.forceRefreshRequested = true
+        requestForceRefresh(repository: repository)
       }
     }
     for key in Array(states.keys) where !repositories.contains(key) {
@@ -144,7 +145,7 @@ final class DashboardReviewsScheduler {
   /// Mark every tracked repository for refresh on the next tick.
   func forceRefreshAll() {
     for key in states.keys {
-      states[key]?.forceRefreshRequested = true
+      requestForceRefresh(repository: key)
     }
   }
 
@@ -152,7 +153,7 @@ final class DashboardReviewsScheduler {
   /// repository is not tracked.
   func forceRefresh(repository: String) {
     guard let tracked = trackedRepository(matching: repository) else { return }
-    states[tracked]?.forceRefreshRequested = true
+    requestForceRefresh(repository: tracked)
   }
 
   /// Mark a repository for refresh and immediately try to dispatch it.
@@ -265,7 +266,8 @@ final class DashboardReviewsScheduler {
   private func launchFetch(for repository: String, forceRefresh: Bool) {
     guard let client, let onMerge else { return }
     repositoriesInFlight.insert(repository)
-    states[repository]?.forceRefreshRequested = false
+    let forceRefreshGeneration =
+      forceRefresh ? states[repository]?.forceRefreshGeneration : nil
     let request = preferences.perRepositoryQueryRequest(
       for: repository,
       forceRefresh: forceRefresh
@@ -283,6 +285,11 @@ final class DashboardReviewsScheduler {
           )
         }
         guard let self, self.fetchGeneration == generation else { return }
+        if let forceRefreshGeneration,
+          self.states[repository]?.forceRefreshGeneration == forceRefreshGeneration
+        {
+          self.states[repository]?.forceRefreshRequested = false
+        }
         self.states[repository]?.lastSyncedAt = Date()
         self.states[repository]?.lastErrorMessage = nil
         onMerge(repository, response)
@@ -310,6 +317,11 @@ final class DashboardReviewsScheduler {
       }
     }
     fetchTasks[repository] = task
+  }
+
+  private func requestForceRefresh(repository: String) {
+    states[repository]?.forceRefreshGeneration &+= 1
+    states[repository]?.forceRefreshRequested = true
   }
 
   private func trackedRepository(matching repository: String) -> String? {

@@ -55,7 +55,8 @@ struct SummariesWireTypesDecodingTests {
   @Test("github diagnostics decode their nested buckets and snake_case keys")
   func decodesGitHubDiagnostics() throws {
     let json = #"""
-      {"buckets":[{"resource":"core","remaining":4900,"limit":5000,"used":100,
+      {"data_revision":17,
+      "buckets":[{"resource":"core","remaining":4900,"limit":5000,"used":100,
       "reset_at":"2026-06-17T01:00:00Z"}],
       "cooling":[{"resource":"graphql","reason":"secondary_rate_limit","until_seconds_from_now":42}],
       "last_hour_network_requests":1200,"last_hour_graphql_points":850,"cache_hits":300,
@@ -64,6 +65,7 @@ struct SummariesWireTypesDecodingTests {
       """#
     let diagnostics = try decoder.decode(GitHubApiDiagnosticsWire.self, from: Data(json.utf8))
 
+    #expect(diagnostics.dataRevision == 17)
     #expect(diagnostics.lastHourNetworkRequests == 1200)
     #expect(diagnostics.lastHourGraphqlPoints == 850)
     #expect(diagnostics.cacheStaleHits == 12)

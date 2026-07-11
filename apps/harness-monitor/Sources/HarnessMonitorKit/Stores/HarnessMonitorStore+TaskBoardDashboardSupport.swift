@@ -61,6 +61,13 @@ extension HarnessMonitorStore {
   ) async {
     cancelInitialTaskBoardConfirmationRefresh()
     let snapshot = await Self.loadTaskBoardRefreshSnapshot(using: client)
+    applyTaskBoardDashboardSnapshot(snapshot, fallbackStatus: fallbackStatus)
+  }
+
+  func applyTaskBoardDashboardSnapshot(
+    _ snapshot: TaskBoardRefreshSnapshot,
+    fallbackStatus: TaskBoardOrchestratorStatus? = nil
+  ) {
     let resolvedItems = snapshot.items.value ?? globalTaskBoardItems
     let resolvedStatus =
       if let measuredStatus = snapshot.orchestratorStatus.measured {

@@ -10,6 +10,7 @@ use crate::daemon::protocol::StreamEvent;
 use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer, run_broadcast_fanout};
 
 use super::acp_inspect_publisher::spawn_acp_inspect_publisher;
+use super::github_data_change_publisher::spawn_github_data_change_publisher;
 use super::machine_heartbeat_loop::spawn_machine_heartbeat_loop;
 use super::task_board_orchestrator_loop::spawn_task_board_orchestrator_loop;
 
@@ -32,6 +33,7 @@ pub(super) fn spawn_broadcast_fanout(
 
 pub(super) struct BackgroundTaskHandles {
     pub _acp_inspect_push: JoinHandle<()>,
+    pub _github_data_change_push: JoinHandle<()>,
     pub _machine_heartbeat: JoinHandle<()>,
     pub _task_board_orchestrator_loop: Option<JoinHandle<()>>,
 }
@@ -46,6 +48,10 @@ pub(super) fn spawn_background_tasks(
             app_state.sender.clone(),
             shutdown_rx.clone(),
             app_state.acp_agent_manager.clone(),
+        ),
+        _github_data_change_push: spawn_github_data_change_publisher(
+            app_state.sender.clone(),
+            shutdown_rx.clone(),
         ),
         _machine_heartbeat: spawn_machine_heartbeat_loop(shutdown_rx.clone()),
         _task_board_orchestrator_loop: app_state.async_db.get().map(|_| {

@@ -7,7 +7,7 @@ import Testing
 @MainActor
 @Suite("Dashboard reviews scheduler timeout + race")
 struct DashboardReviewsSchedulerTimeoutTests {
-  @Test("fetch that never returns clears in-flight after the configured timeout")
+  @Test("forced fetch timeout clears in-flight and remains eligible for retry")
   func neverReturningFetchTimesOut() async throws {
     let stub = HangingStub()
     let scheduler = DashboardReviewsScheduler()
@@ -21,6 +21,7 @@ struct DashboardReviewsSchedulerTimeoutTests {
       repositories: ["acme/api"],
       preferences: prefs,
       client: stub,
+      forceRefreshAll: true,
       onMerge: { _, _ in }
     )
 
@@ -30,6 +31,7 @@ struct DashboardReviewsSchedulerTimeoutTests {
     try await waitUntilInFlightCleared(scheduler: scheduler)
     #expect(scheduler.repositoriesInFlight.isEmpty)
     #expect(scheduler.states["acme/api"]?.lastErrorMessage != nil)
+    #expect(scheduler.states["acme/api"]?.forceRefreshRequested == true)
     scheduler.stop()
     stub.release()
   }
@@ -74,6 +76,43 @@ struct DashboardReviewsSchedulerTimeoutTests {
 
     scheduler.stop()
     stub.release()
+  }
+
+  @Test("forced refresh remains queued across cancellation and restart")
+  func forcedRefreshSurvivesCancellationAndRestart() async throws {
+    let stub = HangingStub()
+    let scheduler = DashboardReviewsScheduler()
+    scheduler.fetchTimeoutSeconds = 2
+
+    var prefs = DashboardReviewsPreferences()
+    prefs.perRepositoryIntervalSeconds = 3_600
+    prefs.maxConcurrentRepositoryFetches = 1
+
+    scheduler.start(
+      repositories: ["acme/api"],
+      preferences: prefs,
+      client: stub,
+      forceRefreshAll: true,
+      onMerge: { _, _ in }
+    )
+    try await waitUntilInFlightContains(scheduler: scheduler, repo: "acme/api")
+
+    scheduler.stop()
+    #expect(scheduler.states["acme/api"]?.forceRefreshRequested == true)
+    scheduler.start(
+      repositories: ["acme/api"],
+      preferences: prefs,
+      client: stub,
+      onMerge: { _, _ in }
+    )
+    try await waitUntilInFlightContains(scheduler: scheduler, repo: "acme/api")
+    try await Task.sleep(for: .milliseconds(20))
+    #expect(scheduler.states["acme/api"]?.forceRefreshRequested == true)
+
+    stub.release()
+    try await waitUntilInFlightCleared(scheduler: scheduler)
+    #expect(scheduler.states["acme/api"]?.forceRefreshRequested == false)
+    scheduler.stop()
   }
 
   @Test("timeout error message is human-readable")

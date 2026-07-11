@@ -1,8 +1,4 @@
-use std::collections::BTreeMap;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde::Deserialize;
 use serde_json::json;
@@ -18,26 +14,7 @@ pub(super) const GITHUB_SEARCH_PAGE_CAP: u32 = 10;
 
 const GITHUB_SEARCH_PAGE_SIZE: u32 = 100;
 const AUTOMATION_ISSUE_AUTHORS: &[&str] = &["renovate[bot]"];
-const HOURS: u64 = 60 * 60;
-const DAYS: u64 = 24 * HOURS;
 const GITHUB_GRAPHQL_CACHE_TTL: Duration = Duration::from_mins(1);
-const GITHUB_GRAPHQL_CACHE_ENTRY_CAP: usize = 128;
-
-pub(super) type GitHubGraphqlCacheKey = u64;
-
-static VIEWER_CACHE: OnceLock<Mutex<BTreeMap<GitHubGraphqlCacheKey, CachedViewerLogin>>> =
-    OnceLock::new();
-static SEARCH_CACHE: OnceLock<
-    Mutex<BTreeMap<(GitHubGraphqlCacheKey, String), CachedSearchResults>>,
-> = OnceLock::new();
-
-const VIEWER_QUERY: &str = r"
-query TaskBoardViewer {
-  viewer {
-    login
-  }
-}
-";
 
 const ISSUE_SEARCH_QUERY: &str = r"
 query TaskBoardGitHubSearch($query: String!, $after: String) {
@@ -87,44 +64,6 @@ query TaskBoardIssueUpdatedAt($owner: String!, $repo: String!, $number: Int!) {
   }
 }
 ";
-
-pub(super) fn token_cache_key(token: &str) -> GitHubGraphqlCacheKey {
-    let mut hasher = DefaultHasher::new();
-    token.hash(&mut hasher);
-    hasher.finish()
-}
-
-pub(super) async fn current_user_login(
-    client: &GitHubProtectedClient,
-    cache_key: GitHubGraphqlCacheKey,
-) -> Result<String, CliError> {
-    if let Some(login) = cached_viewer_login(cache_key) {
-        return Ok(login);
-    }
-    let response: GitHubViewerResponse = client
-        .graphql(
-            GitHubRequestDescriptor::graphql(
-                "task_board.github.viewer",
-                GitHubPriority::NormalRead,
-                GitHubCachePolicy::read_through(
-                    Duration::from_secs(24 * HOURS),
-                    Duration::from_secs(7 * DAYS),
-                ),
-            ),
-            json!({ "query": VIEWER_QUERY }),
-        )
-        .await
-        .map(|response| response.body)?;
-    let login = response.viewer.login.trim();
-    if login.is_empty() {
-        return Err(CliErrorKind::workflow_io(
-            "loading authenticated GitHub viewer returned an empty login",
-        )
-        .into());
-    }
-    store_viewer_login(cache_key, login);
-    Ok(login.to_string())
-}
 
 pub(super) async fn issue_updated_at(
     client: &GitHubProtectedClient,
@@ -179,13 +118,23 @@ pub(super) fn personal_issue_queries(repository: &GitHubRepository, login: &str)
 
 pub(super) async fn search_issue_pull_requests(
     client: &GitHubProtectedClient,
-    cache_key: GitHubGraphqlCacheKey,
     query: &str,
     context: &str,
 ) -> Result<Vec<GitHubSearchIssuePullRequestItem>, CliError> {
-    if let Some(items) = cached_search_results(cache_key, query) {
-        return Ok(items);
+    loop {
+        let revision = GitHubProtectedClient::data_revision();
+        let items = search_issue_pull_requests_at_revision(client, query, context).await?;
+        if GitHubProtectedClient::data_revision() == revision {
+            return Ok(items);
+        }
     }
+}
+
+async fn search_issue_pull_requests_at_revision(
+    client: &GitHubProtectedClient,
+    query: &str,
+    context: &str,
+) -> Result<Vec<GitHubSearchIssuePullRequestItem>, CliError> {
     let mut cursor = None;
     let mut page = 1_u32;
     let mut items = Vec::new();
@@ -219,7 +168,6 @@ pub(super) async fn search_issue_pull_requests(
         page += 1;
         cursor = Some(next_cursor);
     }
-    store_search_results(cache_key, query, &items);
     Ok(items)
 }
 
@@ -243,140 +191,11 @@ fn next_search_cursor(
     })
 }
 
-fn cached_viewer_login(cache_key: GitHubGraphqlCacheKey) -> Option<String> {
-    let mut cache = VIEWER_CACHE
-        .get_or_init(|| Mutex::new(BTreeMap::new()))
-        .lock()
-        .ok()?;
-    prune_viewer_cache(&mut cache);
-    cache.get(&cache_key).map(|cached| cached.login.clone())
-}
-
-fn store_viewer_login(cache_key: GitHubGraphqlCacheKey, login: &str) {
-    if let Ok(mut cache) = VIEWER_CACHE
-        .get_or_init(|| Mutex::new(BTreeMap::new()))
-        .lock()
-    {
-        prune_viewer_cache(&mut cache);
-        cache.insert(
-            cache_key,
-            CachedViewerLogin {
-                login: login.to_owned(),
-                stored_at: Instant::now(),
-            },
-        );
-        trim_viewer_cache(&mut cache);
-    }
-}
-
-fn cached_search_results(
-    cache_key: GitHubGraphqlCacheKey,
-    query: &str,
-) -> Option<Vec<GitHubSearchIssuePullRequestItem>> {
-    let mut cache = SEARCH_CACHE
-        .get_or_init(|| Mutex::new(BTreeMap::new()))
-        .lock()
-        .ok()?;
-    prune_search_cache(&mut cache);
-    cache
-        .get(&(cache_key, query.to_owned()))
-        .map(|cached| cached.items.clone())
-}
-
-fn store_search_results(
-    cache_key: GitHubGraphqlCacheKey,
-    query: &str,
-    items: &[GitHubSearchIssuePullRequestItem],
-) {
-    if let Ok(mut cache) = SEARCH_CACHE
-        .get_or_init(|| Mutex::new(BTreeMap::new()))
-        .lock()
-    {
-        prune_search_cache(&mut cache);
-        cache.insert(
-            (cache_key, query.to_owned()),
-            CachedSearchResults {
-                items: items.to_vec(),
-                stored_at: Instant::now(),
-            },
-        );
-        trim_search_cache(&mut cache);
-    }
-}
-
-fn prune_viewer_cache(cache: &mut BTreeMap<GitHubGraphqlCacheKey, CachedViewerLogin>) {
-    cache.retain(|_, cached| cached.is_fresh());
-}
-
-fn prune_search_cache(cache: &mut BTreeMap<(GitHubGraphqlCacheKey, String), CachedSearchResults>) {
-    cache.retain(|_, cached| cached.is_fresh());
-}
-
-fn trim_viewer_cache(cache: &mut BTreeMap<GitHubGraphqlCacheKey, CachedViewerLogin>) {
-    while cache.len() > GITHUB_GRAPHQL_CACHE_ENTRY_CAP {
-        let Some(key) = cache
-            .iter()
-            .min_by_key(|(_, cached)| cached.stored_at)
-            .map(|(key, _)| *key)
-        else {
-            break;
-        };
-        cache.remove(&key);
-    }
-}
-
-fn trim_search_cache(cache: &mut BTreeMap<(GitHubGraphqlCacheKey, String), CachedSearchResults>) {
-    while cache.len() > GITHUB_GRAPHQL_CACHE_ENTRY_CAP {
-        let Some(key) = cache
-            .iter()
-            .min_by_key(|(_, cached)| cached.stored_at)
-            .map(|(key, _)| key.clone())
-        else {
-            break;
-        };
-        cache.remove(&key);
-    }
-}
-
 fn warn_search_results_truncated(context: &str) {
     warn_github_message(&format!(
         "github search results truncated at {} hits while {context}",
         GITHUB_SEARCH_PAGE_CAP * GITHUB_SEARCH_PAGE_SIZE
     ));
-}
-
-#[derive(Debug, Clone)]
-struct CachedViewerLogin {
-    login: String,
-    stored_at: Instant,
-}
-
-impl CachedViewerLogin {
-    fn is_fresh(&self) -> bool {
-        self.stored_at.elapsed() <= GITHUB_GRAPHQL_CACHE_TTL
-    }
-}
-
-#[derive(Debug, Clone)]
-struct CachedSearchResults {
-    items: Vec<GitHubSearchIssuePullRequestItem>,
-    stored_at: Instant,
-}
-
-impl CachedSearchResults {
-    fn is_fresh(&self) -> bool {
-        self.stored_at.elapsed() <= GITHUB_GRAPHQL_CACHE_TTL
-    }
-}
-
-#[derive(Debug, Deserialize)]
-struct GitHubViewerResponse {
-    viewer: GitHubViewer,
-}
-
-#[derive(Debug, Deserialize)]
-struct GitHubViewer {
-    login: String,
 }
 
 #[derive(Debug, Deserialize)]

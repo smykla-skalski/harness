@@ -2,6 +2,7 @@
 //! collected here (rather than split per submodule) because the integration
 //! cases need both the helpers and the fetcher visible at once.
 
+mod revision;
 mod scan;
 
 use super::fetcher::{

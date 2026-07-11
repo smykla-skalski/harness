@@ -1,12 +1,10 @@
 use std::sync::Arc;
-use std::time::Duration;
 
-use reqwest::header::{
-    ACCEPT, AUTHORIZATION, ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH, USER_AGENT,
-};
+use reqwest::header::{ETAG, HeaderMap};
 use reqwest::{Method, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use tokio::sync::broadcast;
 
 use crate::errors::{CliError, CliErrorKind};
 
@@ -15,23 +13,22 @@ use super::response::{
     GitHubApiResponse, budget_error, cache_state, context_error, ensure_graphql_ok, graphql_data,
     http_status_error, provenance_with_snapshot, request_error, revalidated_response, value_u32,
 };
-use super::state::{GitHubApiState, InflightGuard, InflightRole, global_state, register_inflight};
+use super::state::{
+    GitHubApiState, GitHubMutationGuard, InflightGuard, InflightRole, global_state,
+    register_inflight,
+};
 use super::{
     GitHubCache, GitHubCachePolicy, GitHubPriority, GitHubRateLimitSnapshot, GitHubRateResource,
     GitHubRequestDescriptor, GitHubResponseProvenance,
 };
 
 const DEFAULT_BASE_URL: &str = "https://api.github.com";
-const USER_AGENT_VALUE: &str = "harness-github-rate-shield";
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const READ_TIMEOUT: Duration = Duration::from_mins(1);
-
 #[derive(Clone)]
 pub(crate) struct GitHubProtectedClient {
-    token: String,
+    pub(super) token: String,
     token_hash: String,
-    base_url: String,
-    http: reqwest::Client,
+    pub(super) base_url: String,
+    pub(super) http: reqwest::Client,
     pub(super) state: Arc<GitHubApiState>,
 }
 
@@ -45,25 +42,33 @@ impl GitHubProtectedClient {
         if token.is_empty() {
             return Err(CliErrorKind::workflow_io("github token missing").into());
         }
-        let http = reqwest::Client::builder()
-            .connect_timeout(CONNECT_TIMEOUT)
-            .read_timeout(READ_TIMEOUT)
-            .build()
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!("build github http client: {error}"))
-            })?;
+        let state = global_state();
+        let http = state.http.clone().map_err(|error| {
+            CliErrorKind::workflow_io(format!("build github http client: {error}"))
+        })?;
         Ok(Self {
             token: token.to_string(),
             token_hash: GitHubCache::key(&["token", token]),
             base_url: base_url.trim_end_matches('/').to_string(),
             http,
-            state: global_state(),
+            state,
         })
+    }
+
+    pub(crate) fn data_revision() -> u64 {
+        global_state().data_revision()
+    }
+
+    pub(crate) fn data_changes() -> broadcast::Receiver<super::GitHubDataChange> {
+        global_state().data_changes()
     }
 
     pub(crate) async fn status() -> super::types::GitHubApiStatus {
         let state = global_state();
-        state.recorder.status(&state.budget).await
+        state
+            .recorder
+            .status(&state.budget, state.data_revision())
+            .await
     }
 
     pub(crate) async fn graphql<T>(
@@ -77,7 +82,7 @@ impl GitHubProtectedClient {
         let operation = descriptor.operation.clone();
         let priority = descriptor.priority;
         let raw = self
-            .execute_json(Method::POST, "/graphql", Some(body), descriptor)
+            .execute_json_with_mutation_boundary(Method::POST, "/graphql", Some(body), descriptor)
             .await?;
         let snapshot = self.observe_graphql_rate_limit(&raw).await;
         self.record_network(
@@ -106,7 +111,7 @@ impl GitHubProtectedClient {
         let operation = descriptor.operation.clone();
         let priority = descriptor.priority;
         let raw = self
-            .execute_json(Method::POST, "/graphql", Some(body), descriptor)
+            .execute_json_with_mutation_boundary(Method::POST, "/graphql", Some(body), descriptor)
             .await?;
         let snapshot = self.observe_graphql_rate_limit(&raw).await;
         self.record_network(
@@ -138,7 +143,7 @@ impl GitHubProtectedClient {
         let operation = descriptor.operation.clone();
         let priority = descriptor.priority;
         let raw = self
-            .execute_json(method, route.as_ref(), body, descriptor)
+            .execute_json_with_mutation_boundary(method, route.as_ref(), body, descriptor)
             .await?;
         self.record_network(
             &operation,
@@ -157,14 +162,42 @@ impl GitHubProtectedClient {
         })
     }
 
-    async fn execute_json(
+    pub(super) async fn execute_json(
         &self,
         method: Method,
         route: &str,
         body: Option<Value>,
         descriptor: GitHubRequestDescriptor,
+        mutation_guard: &mut Option<GitHubMutationGuard>,
     ) -> Result<GitHubApiResponse<Value>, CliError> {
-        let cache_key = self.cache_key(method.as_str(), route, body.as_ref(), &descriptor);
+        loop {
+            let data_revision = self.state.data_revision();
+            let response = self
+                .execute_json_at_revision(
+                    method.clone(),
+                    route,
+                    body.clone(),
+                    descriptor.clone(),
+                    data_revision,
+                    mutation_guard,
+                )
+                .await?;
+            if descriptor.priority.is_write() || self.state.data_revision() == data_revision {
+                return Ok(response);
+            }
+        }
+    }
+
+    async fn execute_json_at_revision(
+        &self,
+        method: Method,
+        route: &str,
+        body: Option<Value>,
+        descriptor: GitHubRequestDescriptor,
+        data_revision: u64,
+        mutation_guard: &mut Option<GitHubMutationGuard>,
+    ) -> Result<GitHubApiResponse<Value>, CliError> {
+        let cache_key = self.cache_key(method.as_str(), route, body.as_ref(), data_revision);
         if !descriptor.cache_policy.force_refresh
             && let Some(hit) = self.state.cache.get(&cache_key, descriptor.cache_policy)
         {
@@ -193,63 +226,28 @@ impl GitHubProtectedClient {
             .send_json(method, route, body, stale.as_ref())
             .await
             .map_err(|error| request_error(&descriptor.operation, &error))?;
-        self.handle_http_response(response, &cache_key, &descriptor, stale)
+        self.handle_http_response(response, &cache_key, &descriptor, stale, mutation_guard)
             .await
             .map_err(|error| context_error(&descriptor.operation, &error))
     }
 
-    pub(super) async fn send_json(
-        &self,
-        method: Method,
-        route: &str,
-        body: Option<Value>,
-        stale: Option<&super::cache::GitHubCacheHit>,
-    ) -> Result<reqwest::Response, reqwest::Error> {
-        let mut headers = self.default_headers();
-        if method == Method::GET
-            && let Some(etag) = stale.and_then(|hit| hit.etag.as_deref())
-            && let Ok(value) = HeaderValue::from_str(etag)
-        {
-            headers.insert(IF_NONE_MATCH, value);
-        }
-        let url = self.route_url(route);
-        let request = self.http.request(method, url).headers(headers);
-        match body {
-            Some(body) => request.json(&body).send().await,
-            None => request.send().await,
-        }
-    }
-
-    pub(super) async fn send_json_with_headers(
-        &self,
-        method: Method,
-        route: &str,
-        body: Option<Value>,
-        extra_headers: HeaderMap,
-    ) -> Result<reqwest::Response, reqwest::Error> {
-        let mut headers = self.default_headers();
-        for (name, value) in extra_headers {
-            if let Some(name) = name {
-                headers.insert(name, value);
-            }
-        }
-        let url = self.route_url(route);
-        let request = self.http.request(method, url).headers(headers);
-        match body {
-            Some(body) => request.json(&body).send().await,
-            None => request.send().await,
-        }
-    }
-
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "the HTTP response boundary handles cache revalidation, rate limits, and mutation certainty"
+    )]
     async fn handle_http_response(
         &self,
         response: reqwest::Response,
         cache_key: &str,
         descriptor: &GitHubRequestDescriptor,
         stale: Option<super::cache::GitHubCacheHit>,
+        mutation_guard: &mut Option<GitHubMutationGuard>,
     ) -> Result<GitHubApiResponse<Value>, CliError> {
         let status = response.status();
         let headers = response.headers().clone();
+        if status.is_success() {
+            mark_remote_success(mutation_guard);
+        }
         let snapshot = self.state.budget.observe_headers(&headers).await;
         if descriptor.resource != GitHubRateResource::Graphql {
             self.state
@@ -276,8 +274,16 @@ impl GitHubProtectedClient {
         if !status.is_success() {
             return Err(http_status_error(status, &text));
         }
-        self.finalize_success_response(cache_key, descriptor, &headers, status, &text, snapshot)
-            .await
+        self.finalize_success_response(
+            cache_key,
+            descriptor,
+            &headers,
+            status,
+            &text,
+            snapshot,
+            mutation_guard,
+        )
+        .await
     }
 
     async fn observe_secondary_limit_if_throttled(
@@ -297,6 +303,10 @@ impl GitHubProtectedClient {
         }
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the finalizer needs the exact response and cache context without cloning bodies"
+    )]
     async fn finalize_success_response(
         &self,
         cache_key: &str,
@@ -305,9 +315,13 @@ impl GitHubProtectedClient {
         status: StatusCode,
         text: &str,
         snapshot: Option<GitHubRateLimitSnapshot>,
+        mutation_guard: &mut Option<GitHubMutationGuard>,
     ) -> Result<GitHubApiResponse<Value>, CliError> {
         let body: Value = serde_json::from_str(text)
             .map_err(|error| CliErrorKind::workflow_parse(format!("parse github json: {error}")))?;
+        if descriptor.resource == GitHubRateResource::Graphql && graphql_mutation_failed(&body) {
+            mark_remote_failure(mutation_guard);
+        }
         self.observe_graphql_body_cost(descriptor, &body).await;
         let etag = headers
             .get(ETAG)
@@ -422,41 +436,42 @@ impl GitHubProtectedClient {
         method: &str,
         route: &str,
         body: Option<&Value>,
-        descriptor: &GitHubRequestDescriptor,
+        data_revision: u64,
     ) -> String {
         let body = body.map_or_else(String::new, Value::to_string);
+        let data_revision = data_revision.to_string();
+        let cache_scope = self.state.cache.scope();
         GitHubCache::key(&[
+            cache_scope.as_str(),
             &self.token_hash,
             &self.base_url,
             method,
             route,
-            descriptor.operation.as_str(),
             body.as_str(),
+            data_revision.as_str(),
         ])
-    }
-
-    fn default_headers(&self) -> HeaderMap {
-        let mut headers = HeaderMap::new();
-        headers.insert(USER_AGENT, HeaderValue::from_static(USER_AGENT_VALUE));
-        headers.insert(
-            ACCEPT,
-            HeaderValue::from_static("application/vnd.github+json"),
-        );
-        let auth = format!("Bearer {}", self.token);
-        if let Ok(value) = HeaderValue::from_str(&auth) {
-            headers.insert(AUTHORIZATION, value);
-        }
-        headers
-    }
-
-    fn route_url(&self, route: &str) -> String {
-        if route.starts_with("http://") || route.starts_with("https://") {
-            return route.to_string();
-        }
-        format!("{}/{}", self.base_url, route.trim_start_matches('/'))
     }
 }
 
 fn observed_rest_cost(status: StatusCode) -> u32 {
     u32::from(status != StatusCode::NOT_MODIFIED)
+}
+
+fn graphql_mutation_failed(body: &Value) -> bool {
+    body.get("errors")
+        .and_then(Value::as_array)
+        .is_some_and(|errors| !errors.is_empty())
+        && body.get("data").is_none_or(Value::is_null)
+}
+
+fn mark_remote_success(mutation_guard: &mut Option<GitHubMutationGuard>) {
+    if let Some(guard) = mutation_guard {
+        guard.mark_remote_success();
+    }
+}
+
+fn mark_remote_failure(mutation_guard: &mut Option<GitHubMutationGuard>) {
+    if let Some(guard) = mutation_guard {
+        guard.mark_remote_failure();
+    }
 }

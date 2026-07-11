@@ -4,7 +4,8 @@ import SwiftUI
 extension DashboardReviewsRouteView {
   func scheduleAffectedRefresh(
     for items: [ReviewItem],
-    using client: any HarnessMonitorClientProtocol
+    using client: any HarnessMonitorClientProtocol,
+    githubMutationToken: DashboardReviewsGitHubMutationRefreshCoordinator.Token? = nil
   ) {
     guard !items.isEmpty else { return }
     let targetIDs = items.map(\.pullRequestID)
@@ -27,7 +28,15 @@ extension DashboardReviewsRouteView {
             )
           }
           applyRefreshedItems(refreshed)
+          await targetedGitHubMutationRefreshFinished(
+            githubMutationToken,
+            succeeded: true
+          )
         } catch let error as DashboardReviewsSchedulerError {
+          await targetedGitHubMutationRefreshFinished(
+            githubMutationToken,
+            succeeded: false
+          )
           HarnessMonitorLogger.api.warning(
             """
             Review targeted refresh timed out: \
@@ -37,6 +46,10 @@ extension DashboardReviewsRouteView {
           )
           presentRefreshTimeoutBanner(for: items)
         } catch {
+          await targetedGitHubMutationRefreshFinished(
+            githubMutationToken,
+            succeeded: false
+          )
           HarnessMonitorLogger.api.warning(
             "Review targeted refresh failed: \(String(reflecting: error), privacy: .public)"
           )

@@ -1,4 +1,5 @@
 use crate::errors::CliError;
+use crate::github_api::GitHubProtectedClient;
 use crate::reviews::{
     ReviewsBodyRequest, ReviewsBodyResponse, ReviewsBodyUpdateOutcome, ReviewsBodyUpdateRequest,
     ReviewsBodyUpdateResponse, ReviewsGitHubClient,
@@ -8,7 +9,9 @@ use crate::workspace::utc_now;
 use super::super::reviews_github_policy::{
     ReviewsGitHubMutation, enforce_review_pull_request_policy,
 };
-use super::cache_internal::{cached_body_response, store_cached_body_response};
+use super::cache_internal::{
+    cached_body_response, store_cached_body_response, store_cached_body_response_at_revision,
+};
 use super::token::{github_token, missing_token_error};
 
 /// Fetch the description body for a single dependency update pull request.
@@ -29,6 +32,7 @@ pub async fn fetch_review_body(
     {
         return Ok(response);
     }
+    let github_data_revision = GitHubProtectedClient::data_revision();
 
     let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
     let client = ReviewsGitHubClient::new(&token)?;
@@ -40,7 +44,7 @@ pub async fn fetch_review_body(
         fetched_at: utc_now(),
         from_cache: false,
     };
-    store_cached_body_response(cache_key, &response);
+    store_cached_body_response_at_revision(cache_key, &response, github_data_revision);
     Ok(response)
 }
 

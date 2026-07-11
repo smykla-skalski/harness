@@ -2,6 +2,7 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::github_api::republish_current_data_change;
 use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
@@ -326,6 +327,7 @@ async fn create_remote_item(
         )
     })
     .await?;
+    republish_github_board_ready(client.provider());
     operations.push(operation(OperationDraft {
         provider: client.provider(),
         action: ExternalSyncAction::Push,
@@ -409,7 +411,14 @@ async fn update_linked_remote(
         )
     })
     .await?;
+    republish_github_board_ready(client.provider());
     Ok(())
+}
+
+fn republish_github_board_ready(provider: ExternalProvider) {
+    if provider == ExternalProvider::GitHub {
+        republish_current_data_change("task_board.github.local_sync_ready");
+    }
 }
 
 pub(super) async fn run_board_blocking<T, F>(

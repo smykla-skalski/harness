@@ -3,6 +3,7 @@ use std::path::Path;
 
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::errors::CliError;
+use crate::github_api::{GitHubProtectedClient, republish_current_data_change};
 use crate::task_board::github::{
     GitHubApiAutomationClient, GitHubAutomationClient, GitHubProjectConfig,
 };
@@ -95,6 +96,7 @@ async fn run_task_board_github_automation_with_client(
 ) -> Result<(), CliError> {
     let board = TaskBoardStore::new(board_root.to_path_buf());
     for item in items {
+        let revision_before = GitHubProtectedClient::data_revision();
         let workflow = automate_item(AutomationRequest {
             board_root,
             config,
@@ -114,6 +116,9 @@ async fn run_task_board_github_automation_with_client(
                     ..TaskBoardItemPatch::default()
                 },
             )?;
+            if GitHubProtectedClient::data_revision() != revision_before {
+                republish_current_data_change("task_board.github.local_automation_ready");
+            }
         }
     }
     Ok(())

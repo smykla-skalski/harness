@@ -133,4 +133,31 @@ extension WebSocketProtocolTests {
     #expect(auditEvent.source == "github")
     #expect(auditEvent.actionKey == "reviews.merge")
   }
+
+  @Test("Daemon push event decodes GitHub data changes")
+  func daemonPushEventDecodesGitHubDataChange() throws {
+    let json = #"""
+      {
+        "event": "github_data_changed",
+        "recorded_at": "2026-07-11T10:00:00Z",
+        "session_id": null,
+        "payload": {
+          "revision": 12,
+          "operation": "task_board.github.update_issue"
+        }
+      }
+      """#
+
+    let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
+    let event = try DaemonPushEvent(streamEvent: streamEvent)
+
+    guard case .githubDataChanged(let payload) = event.kind else {
+      Issue.record("Expected githubDataChanged push, got \(event.kind)")
+      return
+    }
+
+    #expect(event.sessionId == nil)
+    #expect(payload.revision == 12)
+    #expect(payload.operation == "task_board.github.update_issue")
+  }
 }

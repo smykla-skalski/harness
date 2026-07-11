@@ -23,6 +23,8 @@ final class DashboardReviewsRouteViewState {
     items: []
   )
   var responseItemsRevision: UInt64 = 0
+  var loadedGitHubDataRevision: UInt64 = 0
+  var githubMutationRefreshCoordinator = DashboardReviewsGitHubMutationRefreshCoordinator()
   var isLoading = false
   var isBackgroundRefreshing = false
   var errorMessage: String?

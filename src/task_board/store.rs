@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io;
+use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::workspace::{harness_data_root, utc_now};
 
 mod parse_cache;
@@ -171,12 +172,14 @@ impl TaskBoardStore {
         body: &str,
         mut item: TaskBoardItem,
     ) -> Result<TaskBoardItem, CliError> {
-        item.title = title.to_string();
-        item.body = body.to_string();
-        apply_canonical_persisted_status(&mut item);
-        self.validate_new_id(&item.id)?;
-        self.save(&item)?;
-        Ok(item)
+        self.with_mutation_lock(|| {
+            item.title = title.to_string();
+            item.body = body.to_string();
+            apply_canonical_persisted_status(&mut item);
+            self.validate_new_id(&item.id)?;
+            self.save(&item)?;
+            Ok(item)
+        })
     }
 
     /// Load one board item by ID.
@@ -280,7 +283,58 @@ impl TaskBoardStore {
     /// # Errors
     /// Returns `CliError` if the item cannot be loaded or saved.
     pub fn update(&self, id: &str, patch: TaskBoardItemPatch) -> Result<TaskBoardItem, CliError> {
-        let mut item = self.get(id)?;
+        self.with_mutation_lock(|| self.update_unlocked(id, patch))
+    }
+    /// Conditionally patch one board item from its latest persisted value.
+    ///
+    /// The decision and write share the board mutation lock, so a derived
+    /// update cannot overwrite a user edit made after an earlier list/get.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the item cannot be loaded, locked, or saved.
+    pub(crate) fn update_if(
+        &self,
+        id: &str,
+        patch_for: impl FnOnce(&TaskBoardItem) -> Option<TaskBoardItemPatch>,
+    ) -> Result<Option<TaskBoardItem>, CliError> {
+        self.with_mutation_lock(|| {
+            let item = self.get(id)?;
+            let Some(patch) = patch_for(&item) else {
+                return Ok(None);
+            };
+            self.update_item(item, patch).map(Some)
+        })
+    }
+    /// Tombstone one board item.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the item cannot be loaded or saved.
+    pub fn delete(&self, id: &str) -> Result<TaskBoardItem, CliError> {
+        self.with_mutation_lock(|| {
+            let mut item = self.get(id)?;
+            apply_canonical_persisted_status(&mut item);
+            let now = utc_now();
+            item.deleted_at = Some(now.clone());
+            item.updated_at = now;
+            self.save(&item)?;
+            Ok(item)
+        })
+    }
+
+    fn update_unlocked(
+        &self,
+        id: &str,
+        patch: TaskBoardItemPatch,
+    ) -> Result<TaskBoardItem, CliError> {
+        let item = self.get(id)?;
+        self.update_item(item, patch)
+    }
+
+    fn update_item(
+        &self,
+        mut item: TaskBoardItem,
+        patch: TaskBoardItemPatch,
+    ) -> Result<TaskBoardItem, CliError> {
         apply_patch(&mut item, patch);
         apply_canonical_persisted_status(&mut item);
         item.updated_at = utc_now();
@@ -288,18 +342,15 @@ impl TaskBoardStore {
         Ok(item)
     }
 
-    /// Tombstone one board item.
-    ///
-    /// # Errors
-    /// Returns `CliError` if the item cannot be loaded or saved.
-    pub fn delete(&self, id: &str) -> Result<TaskBoardItem, CliError> {
-        let mut item = self.get(id)?;
-        apply_canonical_persisted_status(&mut item);
-        let now = utc_now();
-        item.deleted_at = Some(now.clone());
-        item.updated_at = now;
-        self.save(&item)?;
-        Ok(item)
+    fn with_mutation_lock<T>(
+        &self,
+        action: impl FnOnce() -> Result<T, CliError>,
+    ) -> Result<T, CliError> {
+        with_exclusive_flock(
+            &self.root.join(".mutation.lock"),
+            FlockErrorContext::new("task board persistence"),
+            action,
+        )
     }
 
     fn save(&self, item: &TaskBoardItem) -> Result<(), CliError> {

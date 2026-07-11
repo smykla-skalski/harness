@@ -36,6 +36,9 @@ pub use external::{
     GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV,
     HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient, configured_sync_clients, sync_external_tasks,
 };
+pub(crate) use external::{
+    imported_review_pull_request_references, reconcile_pull_request_snapshots,
+};
 pub use git_identity_defaults::{
     TaskBoardEnvDefaults, TaskBoardGhCliDefaults, TaskBoardGitConfigDefaults,
     TaskBoardGitIdentityDefaults, TaskBoardSshKeyDiscovery,

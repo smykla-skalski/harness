@@ -4,6 +4,9 @@ extension HarnessMonitorStore {
   func stopGlobalStream() {
     globalStreamTask?.cancel()
     globalStreamTask = nil
+    cacheWriteSync.githubDataRefreshGeneration &+= 1
+    cacheWriteSync.githubDataTaskBoardRefreshTask?.cancel()
+    cacheWriteSync.githubDataTaskBoardRefreshTask = nil
   }
 
   func stopSessionStream(resetSubscriptions: Bool = true) {

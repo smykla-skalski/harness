@@ -49,6 +49,31 @@ pub async fn fetch_patches_conditional(
     requested_paths: &[String],
     if_none_match: Option<&str>,
 ) -> Result<ConditionalFetchOutcome, RestFetchError> {
+    loop {
+        let revision = GitHubProtectedClient::data_revision();
+        let outcome = fetch_patches_conditional_at_revision(
+            client,
+            repo_full_name,
+            pr_number,
+            head_ref_oid,
+            requested_paths,
+            if_none_match,
+        )
+        .await?;
+        if GitHubProtectedClient::data_revision() == revision {
+            return Ok(outcome);
+        }
+    }
+}
+
+async fn fetch_patches_conditional_at_revision(
+    client: &GitHubProtectedClient,
+    repo_full_name: &str,
+    pr_number: u64,
+    head_ref_oid: &str,
+    requested_paths: &[String],
+    if_none_match: Option<&str>,
+) -> Result<ConditionalFetchOutcome, RestFetchError> {
     let (owner, repo) = split_repo_full_name(repo_full_name).ok_or_else(|| {
         RestFetchError::InvalidRequest("repo_full_name must be owner/name".into())
     })?;
@@ -129,6 +154,25 @@ pub async fn any_patch_matches<F>(
 where
     F: Fn(&str) -> bool + Send + Sync,
 {
+    loop {
+        let revision = GitHubProtectedClient::data_revision();
+        let matched =
+            any_patch_matches_at_revision(client, repo_full_name, pr_number, &predicate).await?;
+        if GitHubProtectedClient::data_revision() == revision {
+            return Ok(matched);
+        }
+    }
+}
+
+async fn any_patch_matches_at_revision<F>(
+    client: &GitHubProtectedClient,
+    repo_full_name: &str,
+    pr_number: u64,
+    predicate: &F,
+) -> Result<bool, RestFetchError>
+where
+    F: Fn(&str) -> bool + Send + Sync,
+{
     let (owner, repo) = split_repo_full_name(repo_full_name).ok_or_else(|| {
         RestFetchError::InvalidRequest("repo_full_name must be owner/name".into())
     })?;
@@ -157,7 +201,7 @@ where
     let first_page = response
         .body
         .ok_or_else(|| RestFetchError::Http("rest patches missing body".into()))?;
-    if page_has_matching_patch(&first_page, &predicate) {
+    if page_has_matching_patch(&first_page, predicate) {
         return Ok(true);
     }
 
@@ -189,7 +233,7 @@ where
         let page = response
             .body
             .ok_or_else(|| RestFetchError::Http("paginated body missing".into()))?;
-        if page_has_matching_patch(&page, &predicate) {
+        if page_has_matching_patch(&page, predicate) {
             return Ok(true);
         }
         visited_pages += 1;

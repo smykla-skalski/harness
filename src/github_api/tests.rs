@@ -25,6 +25,25 @@ fn cache_key_hashes_secret_material() {
 }
 
 #[test]
+fn disk_cache_control_reuses_healthy_scope_and_rotates_during_recovery() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let first = GitHubCache::test_with_root(temp.path().to_path_buf());
+    first.persist_data_revision(7).expect("persist revision");
+    let second = GitHubCache::test_with_root(temp.path().to_path_buf());
+
+    assert_eq!(first.scope(), second.scope());
+    assert_eq!(second.data_revision(), 7);
+    let healthy_scope = second.scope();
+    second
+        .disable_disk_after_revision_failure(8)
+        .expect("rotate failed cache");
+    let recovered = GitHubCache::test_with_root(temp.path().to_path_buf());
+    assert_ne!(healthy_scope, recovered.scope());
+    assert_eq!(second.scope(), recovered.scope());
+    assert_eq!(recovered.data_revision(), 8);
+}
+
+#[test]
 fn retry_after_header_parses_seconds() {
     let mut headers = HeaderMap::new();
     headers.insert(reqwest::header::RETRY_AFTER, HeaderValue::from_static("42"));

@@ -122,6 +122,7 @@ public struct HostBridgeReconfigureRequestWire: Codable, Equatable, Sendable {
 }
 
 public struct GitHubApiDiagnosticsWire: Codable, Equatable, Sendable {
+  public var dataRevision: UInt64?
   public var buckets: [GitHubRateBucketDiagnosticsWire]
   public var cooling: [GitHubCooldownDiagnosticsWire]
   public var lastHourNetworkRequests: UInt64
@@ -132,7 +133,8 @@ public struct GitHubApiDiagnosticsWire: Codable, Equatable, Sendable {
   public var deferredBudget: UInt64
   public var topOperations: [GitHubOperationSpendDiagnosticsWire]
 
-  public init(buckets: [GitHubRateBucketDiagnosticsWire], cooling: [GitHubCooldownDiagnosticsWire], lastHourNetworkRequests: UInt64, lastHourGraphqlPoints: UInt64, cacheHits: UInt64, cacheStaleHits: UInt64, cacheDeferredHits: UInt64, deferredBudget: UInt64, topOperations: [GitHubOperationSpendDiagnosticsWire]) {
+  public init(dataRevision: UInt64? = nil, buckets: [GitHubRateBucketDiagnosticsWire], cooling: [GitHubCooldownDiagnosticsWire], lastHourNetworkRequests: UInt64, lastHourGraphqlPoints: UInt64, cacheHits: UInt64, cacheStaleHits: UInt64, cacheDeferredHits: UInt64, deferredBudget: UInt64, topOperations: [GitHubOperationSpendDiagnosticsWire]) {
+    self.dataRevision = dataRevision
     self.buckets = buckets
     self.cooling = cooling
     self.lastHourNetworkRequests = lastHourNetworkRequests
@@ -145,6 +147,7 @@ public struct GitHubApiDiagnosticsWire: Codable, Equatable, Sendable {
   }
 
   enum CodingKeys: String, CodingKey {
+    case dataRevision = "data_revision"
     case buckets
     case cooling
     case lastHourNetworkRequests = "last_hour_network_requests"

@@ -28,6 +28,11 @@ extension DashboardReviewsRouteView {
     DashboardReviewsItemsVersion(revision: routeStateStorage.responseItemsRevision)
   }
 
+  var routeLoadedGitHubDataRevision: UInt64 {
+    get { routeStateStorage.loadedGitHubDataRevision }
+    nonmutating set { routeStateStorage.loadedGitHubDataRevision = newValue }
+  }
+
   var routeErrorMessage: String? {
     get { routeStateStorage.errorMessage }
     nonmutating set { routeStateStorage.errorMessage = newValue }
