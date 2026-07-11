@@ -18,7 +18,7 @@ use crate::infra::io::validate_safe_segment;
 use crate::session::types::ManagedAgentRef;
 use crate::workspace::utc_now;
 
-use super::active_runs::ActiveRuns;
+use super::active_runs::{ActiveRunRegistration, ActiveRuns};
 use super::effort::validate_codex_effort;
 use super::transcript::codex_transcript_entries;
 use super::worker::CodexRunWorker;
@@ -89,10 +89,6 @@ impl CodexControllerHandle {
     ///
     /// Reusing an identity while its worker is attached returns the existing
     /// run, which makes a reclaimed Task Board dispatch claim idempotent.
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "durable run startup coordinates persisted state, agent registration, and worker handoff"
-    )]
     pub(crate) fn start_run_with_id(
         &self,
         session_id: &str,
@@ -100,12 +96,44 @@ impl CodexControllerHandle {
         run_id: String,
     ) -> Result<CodexRunSnapshot, CliError> {
         validate_safe_segment(&run_id)?;
-        if self.state.active_runs.contains(&run_id) {
-            return self.load_run(&run_id);
+        let reservation = match self.state.active_runs.reserve(run_id.clone())? {
+            ActiveRunRegistration::Acquired(reservation) => reservation,
+            ActiveRunRegistration::Waiting(waiter) => return waiter.wait(),
+            ActiveRunRegistration::Active => return self.load_run(&run_id),
+        };
+        let snapshot = match self.prepare_durable_run(session_id, request, run_id) {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                reservation.abort(&error);
+                return Err(error);
+            }
+        };
+        let (control_tx, control_rx) = mpsc::unbounded_channel();
+        if let Err(error) = reservation.commit(control_tx, snapshot.clone()) {
+            let failed = active_run_attach_failure(snapshot, &error);
+            let _ = self.save_and_broadcast(&failed);
+            let _ = self.sync_orchestration_status_for_run(&failed);
+            return Err(error);
         }
+        let worker = CodexRunWorker::new(self.clone(), snapshot.clone(), control_rx);
+        tokio::spawn(async move {
+            worker.run().await;
+        });
+        Ok(snapshot)
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "durable run preparation coordinates validation, agent registration, persistence, and rollback"
+    )]
+    fn prepare_durable_run(
+        &self,
+        session_id: &str,
+        request: &CodexRunRequest,
+        run_id: String,
+    ) -> Result<CodexRunSnapshot, CliError> {
         let prompt = validate_run_request(request)?;
         self.preflight_websocket_probe(session_id)?;
-
         let project_dir = self.project_dir_for_session(session_id)?;
         let display_name = request.name.clone().unwrap_or_else(|| "Codex".to_string());
         let session_agent_id =
@@ -140,24 +168,6 @@ impl CodexControllerHandle {
                 snapshot.run_id, snapshot.session_id
             ),
         );
-
-        let (control_tx, control_rx) = mpsc::unbounded_channel();
-        if let Err(error) = self
-            .state
-            .active_runs
-            .insert(snapshot.run_id.clone(), control_tx)
-        {
-            let failed = active_run_attach_failure(snapshot, &error);
-            let _ = self.save_and_broadcast(&failed);
-            let _ = self.sync_orchestration_status_for_run(&failed);
-            return Err(error);
-        }
-
-        let worker = CodexRunWorker::new(self.clone(), snapshot.clone(), control_rx);
-        tokio::spawn(async move {
-            worker.run().await;
-        });
-
         Ok(snapshot)
     }
 

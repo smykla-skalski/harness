@@ -186,7 +186,7 @@ fn run_reconciles_stale_active_codex_run() {
 }
 
 #[test]
-fn follow_up_attach_failure_marks_run_failed() {
+fn follow_up_reservation_failure_preserves_completed_run() {
     let (controller, db, _tempdir) = controller_with_db();
     let mut run = codex_run_snapshot(CodexRunStatus::Completed);
     run.thread_id = Some("thread-1".into());
@@ -215,11 +215,8 @@ fn follow_up_attach_failure_marks_run_failed() {
         .codex_run("codex-run-1")
         .expect("load persisted run")
         .expect("persisted run");
-    assert_eq!(persisted.status, CodexRunStatus::Failed);
-    assert_eq!(
-        persisted.latest_summary.as_deref(),
-        Some("Codex worker could not attach follow-up turn to daemon")
-    );
+    assert_eq!(persisted.status, CodexRunStatus::Completed);
+    assert_eq!(persisted.latest_summary.as_deref(), Some("Running"));
 }
 
 #[test]

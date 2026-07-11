@@ -112,8 +112,8 @@ pub(crate) async fn create_task_with_id_async(
             &request.actor,
         )
         .await?;
-        bump_session(async_db, session_id).await?;
     }
+    bump_session(async_db, session_id).await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
