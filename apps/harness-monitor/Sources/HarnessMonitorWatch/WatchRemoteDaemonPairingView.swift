@@ -45,7 +45,7 @@ struct WatchRemoteDaemonPairingView: View {
     isPairing = true
     didAttemptPairing = true
     pairingLink = ""
-    Task {
+    Task { @MainActor in
       let paired = await store.pairDirectWatchDaemon(
         payload: payload,
         deviceName: WKInterfaceDevice.current().name

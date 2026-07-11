@@ -119,6 +119,7 @@ struct HarnessMonitorAppBundleMetadataTests {
     #expect(pairingViewSource.contains(".lineLimit(1)"))
     #expect(pairingViewSource.contains(".frame(height: 44)"))
     #expect(pairingViewSource.contains("pairingLink = \"\""))
+    #expect(pairingViewSource.contains("Task { @MainActor in"))
     #expect(pairingViewSource.contains("pairDirectWatchDaemon"))
 
     let directPairerSource = try String(
