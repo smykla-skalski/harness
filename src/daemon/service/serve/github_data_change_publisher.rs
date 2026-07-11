@@ -50,12 +50,38 @@ async fn coalesce_changes(
     mut latest: GitHubDataChange,
 ) -> GitHubDataChange {
     sleep(Duration::from_millis(100)).await;
-    while let Ok(change) = changes.try_recv() {
-        if change.revision >= latest.revision {
-            latest = change;
-        }
-    }
+    while drain_next_change(changes, &mut latest) {}
     latest
+}
+
+fn drain_next_change(
+    changes: &mut broadcast::Receiver<GitHubDataChange>,
+    latest: &mut GitHubDataChange,
+) -> bool {
+    let change = match changes.try_recv() {
+        Ok(change) => change,
+        Err(error) => return should_continue_after_drain_error(&error),
+    };
+    if change.revision >= latest.revision {
+        *latest = change;
+    }
+    true
+}
+
+fn should_continue_after_drain_error(error: &broadcast::error::TryRecvError) -> bool {
+    let broadcast::error::TryRecvError::Lagged(skipped) = error else {
+        return false;
+    };
+    log_coalescer_lag(*skipped);
+    true
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "the tracing macro expansion exceeds the threshold without adding control flow"
+)]
+fn log_coalescer_lag(skipped: u64) {
+    tracing::warn!(skipped, "github data change coalescer lagged");
 }
 
 pub(crate) fn broadcast_github_data_change(
@@ -135,5 +161,28 @@ mod tests {
 
         assert_eq!(coalesced.revision, 7);
         assert_eq!(coalesced.operation, "task_board.github.local_sync_ready");
+    }
+
+    #[tokio::test]
+    async fn coalescer_drains_to_latest_change_after_lagging() {
+        let (sender, mut receiver) = broadcast::channel(2);
+        sender
+            .send(change(1, "first"))
+            .expect("send first change");
+        let first = receiver.recv().await.expect("receive first change");
+        sender.send(change(2, "skipped")).expect("send skipped change");
+        sender.send(change(3, "retained")).expect("send retained change");
+        sender.send(change(4, "latest")).expect("send latest change");
+
+        let coalesced = coalesce_changes(&mut receiver, first).await;
+
+        assert_eq!(coalesced, change(4, "latest"));
+    }
+
+    fn change(revision: u64, operation: &str) -> GitHubDataChange {
+        GitHubDataChange {
+            revision,
+            operation: operation.to_string(),
+        }
     }
 }
