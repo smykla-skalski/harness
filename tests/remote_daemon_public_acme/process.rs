@@ -2,7 +2,6 @@ use std::ffi::OsString;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::thread;
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
@@ -167,23 +166,15 @@ impl PublicAcmeProcess<'_> {
 
 impl Drop for PublicAcmeProcess<'_> {
     fn drop(&mut self) {
-        let poll = self.child.try_wait();
-        if !child_may_still_be_running(&poll) {
-            return;
-        }
-        let _ = Command::new("/bin/kill")
-            .args(["-TERM", &self.child.id().to_string()])
-            .status();
-        let deadline = Instant::now() + Duration::from_secs(45);
-        while Instant::now() < deadline {
-            let poll = self.child.try_wait();
-            if !child_may_still_be_running(&poll) {
-                return;
-            }
-            thread::sleep(Duration::from_millis(100));
-        }
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        terminate_child_now(&mut self.child);
+    }
+}
+
+fn terminate_child_now(child: &mut Child) {
+    let poll = child.try_wait();
+    if child_may_still_be_running(&poll) {
+        let _ = child.kill();
+        let _ = child.wait();
     }
 }
 
@@ -331,6 +322,20 @@ mod tests {
         let poll = Err(io::Error::other("poll failed"));
 
         assert!(child_may_still_be_running(&poll));
+    }
+
+    #[test]
+    fn public_acme_drop_cleanup_kills_without_grace_wait() {
+        let mut child = Command::new("/bin/sleep")
+            .arg("30")
+            .spawn()
+            .expect("spawn long-running child");
+        let started = Instant::now();
+
+        terminate_child_now(&mut child);
+
+        assert!(started.elapsed() < Duration::from_secs(2));
+        assert!(matches!(child.try_wait(), Ok(Some(_))));
     }
 
     #[test]
