@@ -364,7 +364,7 @@ fn all_authoritative_observations_match(
             observation
                 .result
                 .as_ref()
-                .is_ok_and(|present| state.matches(*present))
+                .is_ok_and(|observed| state.matches(*observed))
         })
 }
 
