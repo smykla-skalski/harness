@@ -9,6 +9,7 @@ mod remote_serve;
 mod remote_systemd;
 mod remote_systemd_lifecycle;
 mod remote_systemd_plan;
+mod remote_systemd_security;
 
 use std::path::{Path, PathBuf};
 

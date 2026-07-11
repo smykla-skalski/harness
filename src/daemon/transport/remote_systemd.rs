@@ -308,9 +308,28 @@ fn render_unit(
          NoNewPrivileges=true\n\
          DynamicUser=yes\n\
          PrivateTmp=true\n\
+         PrivateDevices=true\n\
+         PrivateMounts=true\n\
          ProtectSystem=strict\n\
          ProtectHome=true\n\
+         ProtectClock=true\n\
+         ProtectControlGroups=true\n\
+         ProtectHostname=true\n\
+         ProtectKernelLogs=true\n\
+         ProtectKernelModules=true\n\
+         ProtectKernelTunables=true\n\
+         ProtectProc=invisible\n\
+         ProcSubset=pid\n\
+         LockPersonality=true\n\
+         MemoryDenyWriteExecute=true\n\
+         RestrictNamespaces=true\n\
+         RestrictRealtime=true\n\
+         RestrictSUIDSGID=true\n\
          RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX\n\
+         SystemCallArchitectures=native\n\
+         SystemCallFilter=@system-service\n\
+         SystemCallFilter=~@privileged @resources\n\
+         SystemCallErrorNumber=EPERM\n\
          StateDirectory={unit}\n\
          StateDirectoryMode=0700\n\
          UMask=0077\n",
@@ -320,6 +339,11 @@ fn render_unit(
         contents.push_str(
             "AmbientCapabilities=CAP_NET_BIND_SERVICE\n\
              CapabilityBoundingSet=CAP_NET_BIND_SERVICE\n",
+        );
+    } else {
+        contents.push_str(
+            "CapabilityBoundingSet=\n\
+             PrivateUsers=true\n",
         );
     }
     contents.push_str("\n[Install]\nWantedBy=multi-user.target\n");

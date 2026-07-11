@@ -256,7 +256,7 @@ where
     }
 }
 
-fn record_remote_acme_audit(
+pub(super) fn record_remote_acme_audit(
     db: &DaemonDb,
     event_id: &str,
     recorded_at: &str,

@@ -114,72 +114,6 @@ fn daemon_remote_systemd_lifecycle_parses_custom_env_file() {
 }
 
 #[test]
-fn remote_systemd_unit_is_hardened_and_runs_remote_serve() {
-    let args = install_args([
-        "test",
-        "--domain",
-        "daemon.example.com",
-        "--acme-email",
-        "ops@example.com",
-    ]);
-    let plan = RemoteSystemdInstallPlan::for_tests(
-        &args,
-        PathBuf::from("/usr/local/bin/harness"),
-        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
-        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
-    )
-    .expect("systemd install plan");
-
-    assert!(plan.needs_bind_capability);
-    assert!(plan.unit_contents.contains(
-        "ExecStart=/usr/local/bin/harness daemon remote serve --domain daemon.example.com"
-    ));
-    assert!(plan.unit_contents.contains("--https-port 443"));
-    assert!(plan.unit_contents.contains("--http-port 80"));
-    assert!(plan.unit_contents.contains("--acme-email ops@example.com"));
-    assert!(plan.unit_contents.contains("--acme-challenge tls-alpn"));
-    assert!(
-        plan.unit_contents
-            .contains("EnvironmentFile=/etc/harness/harness-remote-daemon.env")
-    );
-    assert!(
-        plan.unit_contents
-            .contains("Environment=HARNESS_DAEMON_DATA_HOME=%S/harness-remote-daemon")
-    );
-    assert!(
-        plan.unit_contents
-            .contains("Environment=XDG_DATA_HOME=%S/harness-remote-daemon")
-    );
-    assert!(
-        plan.unit_contents
-            .contains("Environment=HARNESS_DAEMON_OWNERSHIP=external")
-    );
-    assert!(plan.unit_contents.contains("NoNewPrivileges=true"));
-    assert!(plan.unit_contents.contains("DynamicUser=yes"));
-    assert!(plan.unit_contents.contains("PrivateTmp=true"));
-    assert!(plan.unit_contents.contains("ProtectSystem=strict"));
-    assert!(plan.unit_contents.contains("ProtectHome=true"));
-    assert!(
-        plan.unit_contents
-            .contains("RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX")
-    );
-    assert!(
-        plan.unit_contents
-            .contains("StateDirectory=harness-remote-daemon")
-    );
-    assert!(plan.unit_contents.contains("StateDirectoryMode=0700"));
-    assert!(plan.unit_contents.contains("UMask=0077"));
-    assert!(
-        plan.unit_contents
-            .contains("AmbientCapabilities=CAP_NET_BIND_SERVICE")
-    );
-    assert!(
-        plan.unit_contents
-            .contains("CapabilityBoundingSet=CAP_NET_BIND_SERVICE")
-    );
-}
-
-#[test]
 fn remote_systemd_execstart_uses_trimmed_remote_serve_config() {
     let args = install_args([
         "test",
@@ -205,40 +139,6 @@ fn remote_systemd_execstart_uses_trimmed_remote_serve_config() {
     assert!(plan.unit_contents.contains("--acme-email ops@example.com"));
     assert!(!plan.unit_contents.contains("' daemon.example.com '"));
     assert!(!plan.unit_contents.contains("' ops@example.com '"));
-}
-
-#[test]
-fn remote_systemd_high_ports_omit_bind_capability() {
-    let args = install_args([
-        "test",
-        "--domain",
-        "daemon.example.com",
-        "--https-port",
-        "8443",
-        "--http-port",
-        "8080",
-        "--acme-email",
-        "ops@example.com",
-    ]);
-    let plan = RemoteSystemdInstallPlan::for_tests(
-        &args,
-        PathBuf::from("/usr/local/bin/harness"),
-        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
-        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
-    )
-    .expect("systemd install plan");
-
-    assert!(!plan.needs_bind_capability);
-    assert!(
-        !plan
-            .unit_contents
-            .contains("AmbientCapabilities=CAP_NET_BIND_SERVICE")
-    );
-    assert!(
-        !plan
-            .unit_contents
-            .contains("CapabilityBoundingSet=CAP_NET_BIND_SERVICE")
-    );
 }
 
 #[test]

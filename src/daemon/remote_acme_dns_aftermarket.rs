@@ -4,7 +4,7 @@ use std::sync::Arc;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use http::Method;
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use super::visibility::{
     AuthoritativeDnsTxtVisibilityWaiter, DnsTxtRecordState, DnsTxtVisibilityWaiter,
@@ -88,12 +88,12 @@ where
         let response = self
             .send(
                 "/domain/dns/add",
-                json!({
-                    "name": self.zone_name,
-                    "host": host,
-                    "type": "TXT",
-                    "value": record_value,
-                }),
+                form_body(&[
+                    ("name", self.zone_name.as_str()),
+                    ("host", host.as_str()),
+                    ("type", "TXT"),
+                    ("value", record_value),
+                ])?,
             )
             .await?;
         let entry_id = aftermarket_entry_id(&response)?;
@@ -115,13 +115,14 @@ where
     }
 
     pub(crate) async fn cleanup(&self, lease: AftermarketDns01Lease) -> Result<(), String> {
+        let entry_id = lease.entry_id.to_string();
         let response = self
             .send(
                 "/domain/dns/remove",
-                json!({
-                    "name": self.zone_name,
-                    "entryId": lease.entry_id,
-                }),
+                form_body(&[
+                    ("name", self.zone_name.as_str()),
+                    ("entryId", entry_id.as_str()),
+                ])?,
             )
             .await?;
         ensure_aftermarket_removed(&response, lease.entry_id)?;
@@ -134,13 +135,13 @@ where
             .await
     }
 
-    async fn send(&self, path: &str, body: Value) -> Result<RemoteDnsHttpResponse, String> {
+    async fn send(&self, path: &str, body: String) -> Result<RemoteDnsHttpResponse, String> {
         self.http
             .send(RemoteDnsHttpRequest::new(
                 Method::POST,
                 format!("{}{path}", self.api_base),
                 self.headers(),
-                body.to_string(),
+                body,
             ))
             .await
     }
@@ -150,7 +151,10 @@ where
             BASE64_STANDARD.encode(format!("{}:{}", self.public_key, self.secret_key));
         vec![
             ("authorization".to_string(), format!("Basic {credentials}")),
-            ("content-type".to_string(), "application/json".to_string()),
+            (
+                "content-type".to_string(),
+                "application/x-www-form-urlencoded".to_string(),
+            ),
         ]
     }
 }
@@ -228,4 +232,9 @@ fn required<'a>(label: &str, value: &'a str) -> Result<&'a str, String> {
     } else {
         Ok(value)
     }
+}
+
+fn form_body(fields: &[(&str, &str)]) -> Result<String, String> {
+    serde_urlencoded::to_string(fields)
+        .map_err(|error| format!("encode Aftermarket DNS request: {error}"))
 }

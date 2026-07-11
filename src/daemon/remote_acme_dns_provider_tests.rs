@@ -54,19 +54,24 @@ async fn aftermarket_dns01_creates_and_deletes_the_issued_record() {
         requests[0].header("authorization"),
         Some("Basic cHVibGljLWtleTpzZWNyZXQta2V5")
     );
-    let create_body = requests[0].json_body().expect("Aftermarket create JSON");
-    assert_eq!(create_body["name"], "example.com");
-    assert_eq!(create_body["host"], "_acme-challenge.daemon.example.com");
-    assert_eq!(create_body["type"], "TXT");
-    assert_eq!(create_body["value"], "dns-proof-value");
+    assert_eq!(
+        requests[0].header("content-type"),
+        Some("application/x-www-form-urlencoded")
+    );
+    assert_eq!(
+        requests[0].body(),
+        "name=example.com&host=_acme-challenge.daemon.example.com&type=TXT&value=dns-proof-value"
+    );
     assert_eq!(requests[1].method(), Method::POST);
     assert_eq!(
         requests[1].url(),
         "https://aftermarket.test/domain/dns/remove"
     );
-    let cleanup_body = requests[1].json_body().expect("Aftermarket cleanup JSON");
-    assert_eq!(cleanup_body["name"], "example.com");
-    assert_eq!(cleanup_body["entryId"], 987);
+    assert_eq!(
+        requests[1].header("content-type"),
+        Some("application/x-www-form-urlencoded")
+    );
+    assert_eq!(requests[1].body(), "name=example.com&entryId=987");
     assert_eq!(
         visibility.calls(),
         vec![
@@ -88,12 +93,13 @@ async fn aftermarket_dns01_creates_and_deletes_the_issued_record() {
 #[tokio::test]
 async fn aftermarket_dns01_rejects_records_outside_the_configured_zone() {
     let http = RecordingDnsHttpClient::new([]);
-    let provider = AftermarketDns01Provider::new(
+    let provider = AftermarketDns01Provider::new_with_visibility(
         http.clone(),
         "https://aftermarket.test",
         "example.com",
         "public-key",
         "secret-key",
+        Arc::new(RecordingDnsTxtVisibility::default()),
     )
     .expect("configure Aftermarket provider");
 
@@ -112,12 +118,13 @@ async fn aftermarket_dns01_redacts_provider_errors() {
         200,
         r#"{"ok":0,"status":500,"error":"token=super-secret failed","data":null}"#,
     )]);
-    let provider = AftermarketDns01Provider::new(
+    let provider = AftermarketDns01Provider::new_with_visibility(
         http,
         "https://aftermarket.test",
         "example.com",
         "public-key",
         "secret-key",
+        Arc::new(RecordingDnsTxtVisibility::default()),
     )
     .expect("configure Aftermarket provider");
 
@@ -142,12 +149,13 @@ async fn aftermarket_dns01_rejects_unsuccessful_cleanup_result() {
             r#"{"ok":1,"status":0,"error":"","data":false,"errtype":""}"#,
         ),
     ]);
-    let provider = AftermarketDns01Provider::new(
+    let provider = AftermarketDns01Provider::new_with_visibility(
         http,
         "https://aftermarket.test",
         "example.com",
         "public-key",
         "secret-key",
+        Arc::new(RecordingDnsTxtVisibility::default()),
     )
     .expect("configure Aftermarket provider");
 
