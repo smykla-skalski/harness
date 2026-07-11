@@ -1,32 +1,22 @@
-use crate::daemon::db::AsyncDaemonDb;
-#[cfg(test)]
-use crate::daemon::db::DaemonDb;
-#[cfg(test)]
-use crate::daemon::protocol::{SessionDetail, SessionStartRequest, TaskCreateRequest};
-use crate::daemon::protocol::{TaskBoardDispatchRequest, TaskBoardDispatchResponse};
-use crate::errors::CliError;
-#[cfg(test)]
-use crate::errors::CliErrorKind;
-#[cfg(test)]
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::protocol::{
+    SessionDetail, SessionStartRequest, TaskBoardDispatchRequest, TaskBoardDispatchResponse,
+    TaskCreateRequest,
+};
+use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
-#[cfg(test)]
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
     DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, DispatchFailureKind,
-    DispatchPlan, Machine, TaskBoardItem, build_dispatch_plans_with_policy,
-    machine_mismatch_plan_with_policy,
-};
-#[cfg(test)]
-use crate::task_board::{
-    SessionIntent, TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus,
-    build_dispatch_summary_with_policy_root, filter_for_local_machine,
+    DispatchPlan, SessionIntent, TaskBoardItem, TaskBoardStatus, TaskBoardStore,
+    TaskBoardWorkflowStatus, build_dispatch_summary_with_policy_root, filter_for_local_machine,
     machine_mismatch_plan_with_policy_root,
 };
+use tokio::task::spawn_blocking;
 
-use super::super::task_board_db::task_board_host_local_db;
-#[cfg(test)]
-use super::super::{create_task, start_session_direct};
-use super::dispatch_preparation::reserve_and_prepare_task_board_dispatch;
+use super::super::{
+    create_task, create_task_async, start_session_direct, start_session_direct_async,
+};
 
 /// Build dispatch plans for task-board items.
 ///
@@ -35,7 +25,6 @@ use super::dispatch_preparation::reserve_and_prepare_task_board_dispatch;
 ///
 /// # Errors
 /// Returns `CliError` only when board items cannot be loaded up front.
-#[cfg(test)]
 pub fn dispatch_task_board(
     request: &TaskBoardDispatchRequest,
     db: Option<&DaemonDb>,
@@ -76,15 +65,16 @@ pub fn dispatch_task_board(
 pub async fn dispatch_task_board_async(
     request: &TaskBoardDispatchRequest,
     async_db: &AsyncDaemonDb,
+    board: &TaskBoardStore,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
-    let plans = build_dispatch_plans_for_request_async(async_db, request).await?;
+    let plans = build_dispatch_plans_for_request_async(board, request).await?;
     if request.dry_run {
         return Ok(DispatchExecutionSummary::dry_run(plans));
     }
     let mut applied = Vec::new();
     let mut failures = Vec::new();
     for plan in plans.iter().filter(|plan| plan.is_ready()) {
-        match apply_dispatch_plan_async(request, async_db, plan).await {
+        match apply_dispatch_plan_async(request, async_db, board, plan).await {
             Ok(task) => applied.push(task),
             Err((kind, error)) => {
                 failures.push(DispatchFailure {
@@ -102,7 +92,6 @@ pub async fn dispatch_task_board_async(
     })
 }
 
-#[cfg(test)]
 fn build_dispatch_plans_for_request(
     board: &TaskBoardStore,
     request: &TaskBoardDispatchRequest,
@@ -116,7 +105,6 @@ fn build_dispatch_plans_for_request(
     Ok(plans)
 }
 
-#[cfg(test)]
 fn selected_items(
     board: &TaskBoardStore,
     request: &TaskBoardDispatchRequest,
@@ -127,7 +115,6 @@ fn selected_items(
     )
 }
 
-#[cfg(test)]
 fn apply_dispatch_plan(
     request: &TaskBoardDispatchRequest,
     db: Option<&DaemonDb>,
@@ -165,12 +152,40 @@ fn apply_dispatch_plan(
 async fn apply_dispatch_plan_async(
     request: &TaskBoardDispatchRequest,
     async_db: &AsyncDaemonDb,
+    board: &TaskBoardStore,
     plan: &DispatchPlan,
 ) -> Result<DispatchAppliedTask, (DispatchFailureKind, CliError)> {
-    reserve_and_prepare_task_board_dispatch(async_db, request, plan).await
+    let actor = dispatch_actor(request);
+    let session_id = dispatch_session_id_async(request, async_db, plan)
+        .await
+        .map_err(|error| (DispatchFailureKind::CreateSession, error))?;
+    let detail = create_task_async(
+        &session_id,
+        &TaskCreateRequest {
+            actor: actor.to_string(),
+            title: plan.task.title.clone(),
+            context: plan.task.context.clone(),
+            severity: plan.task.severity,
+            suggested_fix: plan.task.suggested_fix.clone(),
+        },
+        async_db,
+    )
+    .await
+    .map_err(|error| (DispatchFailureKind::CreateTask, error))?;
+    let work_item_id =
+        newest_task_id(detail).map_err(|error| (DispatchFailureKind::CreateTask, error))?;
+    let item = link_dispatched_item_async(board, plan, &session_id, &work_item_id)
+        .await
+        .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
+    Ok(DispatchAppliedTask {
+        board_item_id: plan.board_item_id.clone(),
+        session_id,
+        work_item_id,
+        lifecycle: plan.applied_lifecycle(),
+        item,
+    })
 }
 
-#[cfg(test)]
 fn dispatch_session_id(
     request: &TaskBoardDispatchRequest,
     db: Option<&DaemonDb>,
@@ -199,12 +214,39 @@ fn dispatch_session_id(
     }
 }
 
-#[cfg(test)]
+async fn dispatch_session_id_async(
+    request: &TaskBoardDispatchRequest,
+    async_db: &AsyncDaemonDb,
+    plan: &DispatchPlan,
+) -> Result<String, CliError> {
+    match &plan.session {
+        SessionIntent::Existing { session_id } => Ok(session_id.clone()),
+        SessionIntent::Create {
+            title,
+            context,
+            project_id: _,
+        } => {
+            let state = start_session_direct_async(
+                &SessionStartRequest {
+                    title: title.clone(),
+                    context: context.clone().unwrap_or_else(|| title.clone()),
+                    session_id: None,
+                    project_dir: required_dispatch_project_dir(request)?,
+                    policy_preset: None,
+                    base_ref: None,
+                },
+                async_db,
+            )
+            .await?;
+            Ok(state.session_id)
+        }
+    }
+}
+
 fn dispatch_actor(request: &TaskBoardDispatchRequest) -> &str {
     request.actor.as_deref().unwrap_or(CONTROL_PLANE_ACTOR_ID)
 }
 
-#[cfg(test)]
 fn required_dispatch_project_dir(request: &TaskBoardDispatchRequest) -> Result<String, CliError> {
     request.project_dir.clone().ok_or_else(|| {
         CliErrorKind::workflow_io(
@@ -214,7 +256,6 @@ fn required_dispatch_project_dir(request: &TaskBoardDispatchRequest) -> Result<S
     })
 }
 
-#[cfg(test)]
 fn newest_task_id(detail: SessionDetail) -> Result<String, CliError> {
     detail
         .tasks
@@ -229,7 +270,6 @@ fn newest_task_id(detail: SessionDetail) -> Result<String, CliError> {
         .ok_or_else(|| CliErrorKind::workflow_io("created empty session task list").into())
 }
 
-#[cfg(test)]
 fn link_dispatched_item(
     board: &TaskBoardStore,
     plan: &DispatchPlan,
@@ -264,7 +304,6 @@ fn link_dispatched_item(
 ///
 /// # Errors
 /// Returns `CliError` if the board update fails.
-#[cfg(test)]
 pub fn unlink_dispatched_item(
     board: &TaskBoardStore,
     board_item_id: &str,
@@ -288,55 +327,55 @@ pub fn unlink_dispatched_item(
 }
 
 async fn build_dispatch_plans_for_request_async(
-    db: &AsyncDaemonDb,
+    board: &TaskBoardStore,
     request: &TaskBoardDispatchRequest,
 ) -> Result<Vec<DispatchPlan>, CliError> {
-    let items = if let Some(item_id) = request.item_id.as_deref() {
-        vec![db.task_board_item(item_id).await?]
-    } else {
-        db.list_task_board_items(request.status).await?
-    };
-    let machine = task_board_host_local_db(db).await.ok();
-    let (kept, rejected) = filter_for_machine(items, machine.as_ref());
-    let workspace = db.load_policy_workspace().await?;
-    let policy = workspace
-        .as_ref()
-        .and_then(|workspace| workspace.active_live_canvas())
-        .map(|(canvas, document)| (canvas.id.as_str(), document));
-    let mut plans = build_dispatch_plans_with_policy(&kept, policy);
-    plans.extend(
-        rejected
-            .iter()
-            .map(|(item, machine)| machine_mismatch_plan_with_policy(item, machine, policy)),
-    );
-    Ok(plans)
+    let request = request.clone();
+    run_board_blocking(board, "build dispatch plans", move |board| {
+        build_dispatch_plans_for_request(&board, &request)
+    })
+    .await
 }
 
-fn filter_for_machine(
-    items: Vec<TaskBoardItem>,
-    machine: Option<&Machine>,
-) -> (Vec<TaskBoardItem>, Vec<(TaskBoardItem, Machine)>) {
-    let Some(machine) = machine else {
-        return (items, Vec::new());
-    };
-    let mut kept = Vec::with_capacity(items.len());
-    let mut rejected = Vec::new();
-    for item in items {
-        if machine.accepts_any(&item.target_project_types) {
-            kept.push(item);
-        } else {
-            rejected.push((item, machine.clone()));
-        }
-    }
-    (kept, rejected)
+async fn link_dispatched_item_async(
+    board: &TaskBoardStore,
+    plan: &DispatchPlan,
+    session_id: &str,
+    work_item_id: &str,
+) -> Result<TaskBoardItem, CliError> {
+    let plan = plan.clone();
+    let session_id = session_id.to_string();
+    let work_item_id = work_item_id.to_string();
+    run_board_blocking(board, "link dispatched item", move |board| {
+        link_dispatched_item(&board, &plan, &session_id, &work_item_id)
+    })
+    .await
 }
 
-#[cfg(test)]
+async fn run_board_blocking<T, F>(
+    board: &TaskBoardStore,
+    operation: &'static str,
+    work: F,
+) -> Result<T, CliError>
+where
+    T: Send + 'static,
+    F: FnOnce(TaskBoardStore) -> Result<T, CliError> + Send + 'static,
+{
+    let board = board.clone();
+    spawn_blocking(move || work(board))
+        .await
+        .unwrap_or_else(|error| {
+            Err(CliErrorKind::workflow_io(format!(
+                "task-board dispatch {operation} worker failed: {error}"
+            ))
+            .into())
+        })
+}
+
 fn new_workflow_execution_id() -> String {
     format!("workflow-{}", uuid::Uuid::new_v4().simple())
 }
 
-#[cfg(test)]
 fn new_policy_trace_id() -> String {
     format!("policy-trace-{}", uuid::Uuid::new_v4().simple())
 }

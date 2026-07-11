@@ -49,8 +49,10 @@ fn item() -> TaskBoardItem {
 
 #[test]
 fn task_board_capability_requires_database_storage_and_returns_revision() {
-    let (endpoint, request_line, handle) =
-        spawn_mock("200 OK", r#"{"storage":"database","revision":42}"#.into());
+    let (endpoint, request_line, handle) = spawn_mock(
+        "200 OK",
+        r#"{"storage":"database","revision":42,"instance_id":"database-1"}"#.into(),
+    );
 
     assert_eq!(
         client_with(endpoint)

@@ -1,23 +1,5 @@
 import Foundation
 
-public struct TaskBoardCapabilities: Codable, Equatable, Sendable {
-  public let storage: String
-  public let revision: UInt64
-  public let instanceID: String
-
-  public init(storage: String, revision: UInt64, instanceID: String) {
-    self.storage = storage
-    self.revision = revision
-    self.instanceID = instanceID
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case storage
-    case revision
-    case instanceID = "instance_id"
-  }
-}
-
 extension TaskBoardStatus {
   public static let currentLaneCases: [Self] = [
     .umbrella,

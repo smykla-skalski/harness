@@ -1,6 +1,8 @@
 use serde_json::{Value, json};
 
-use crate::task_board::{AgentMode, TaskBoardItem, TaskBoardStatus};
+use crate::task_board::{
+    AgentMode, TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root,
+};
 
 use super::*;
 
@@ -16,32 +18,26 @@ fn websocket_task_board_catalog_routes_use_real_state() {
             let connection = Arc::new(Mutex::new(ConnectionState::new()));
 
             seed_catalog_board_item(
-                &state,
                 "board-ws-catalog-a",
                 "WS catalog alpha todo",
                 "project-alpha",
                 AgentMode::Planning,
                 TaskBoardStatus::Todo,
-            )
-            .await;
+            );
             seed_catalog_board_item(
-                &state,
                 "board-ws-catalog-b",
                 "WS catalog alpha running",
                 "project-alpha",
                 AgentMode::Planning,
                 TaskBoardStatus::InProgress,
-            )
-            .await;
+            );
             seed_catalog_board_item(
-                &state,
                 "board-ws-catalog-c",
                 "WS catalog beta todo",
                 "project-beta",
                 AgentMode::Evaluate,
                 TaskBoardStatus::Todo,
-            )
-            .await;
+            );
 
             let projects_response = dispatch(
                 &request(
@@ -102,14 +98,14 @@ fn websocket_task_board_catalog_routes_use_real_state() {
     });
 }
 
-async fn seed_catalog_board_item(
-    state: &crate::daemon::http::DaemonHttpState,
+fn seed_catalog_board_item(
     id: &str,
     title: &str,
     project_id: &str,
     agent_mode: AgentMode,
     status: TaskBoardStatus,
 ) {
+    let store = TaskBoardStore::new(default_board_root());
     let mut item = TaskBoardItem::new(
         id.to_string(),
         title.to_string(),
@@ -119,13 +115,9 @@ async fn seed_catalog_board_item(
     item.status = status;
     item.project_id = Some(project_id.to_string());
     item.agent_mode = agent_mode;
-    state
-        .async_db
-        .get()
-        .expect("async db")
-        .create_task_board_item(item)
-        .await
-        .expect("create item");
+    let title = item.title.clone();
+    let body = item.body.clone();
+    store.create(&title, &body, item).expect("create item");
 }
 
 fn assert_project_summary(value: &Value, project_id: &str, item_count: u64, ready_count: u64) {

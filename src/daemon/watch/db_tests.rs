@@ -83,7 +83,6 @@ fn emit_watch_changes_releases_db_lock_before_extensions() {
         WatchChanges {
             sessions_updated: true,
             session_ids: BTreeSet::from([String::from("ae60b5c5-37cf-5a50-a816-8f454bb9e92e")]),
-            ..WatchChanges::default()
         },
         Some(&db),
         |db_ref| {
@@ -158,7 +157,6 @@ async fn emit_watch_changes_prefers_async_broadcast_builders() {
         WatchChanges {
             sessions_updated: true,
             session_ids: BTreeSet::from([String::from("ae60b5c5-37cf-5a50-a816-8f454bb9e92e")]),
-            ..WatchChanges::default()
         },
         None,
         Some(&async_db),
@@ -218,14 +216,12 @@ fn liveness_reconcile_due_runs_on_any_session_activity() {
     let global = WatchChanges {
         sessions_updated: true,
         session_ids: BTreeSet::new(),
-        ..WatchChanges::default()
     };
     assert!(liveness_reconcile_due(&global, Some(now), now));
 
     let scoped = WatchChanges {
         sessions_updated: false,
         session_ids: BTreeSet::from([String::from("ae60b5c5-37cf-5a50-a816-8f454bb9e92e")]),
-        ..WatchChanges::default()
     };
     assert!(liveness_reconcile_due(&scoped, Some(now), now));
 }

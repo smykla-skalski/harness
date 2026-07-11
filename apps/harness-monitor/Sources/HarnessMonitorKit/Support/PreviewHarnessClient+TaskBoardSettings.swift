@@ -58,27 +58,13 @@ extension PreviewHarnessClient {
     return .skipped
   }
 
-  public func syncTaskBoardGitRuntimeKeyMaterial(
-    request _: TaskBoardGitRuntimeKeyMaterialSyncRequest
-  ) async throws -> TaskBoardGitRuntimeKeyMaterialSyncResponse {
-    try await performActionDelay()
-    return TaskBoardGitRuntimeKeyMaterialSyncResponse(synchronized: true)
-  }
-
-  public func prepareTaskBoardGitRuntimeSecretHandoff() async throws
-    -> TaskBoardGitRuntimeSecretHandoffPrepareResponse
+  public func drainTaskBoardGitRuntimeSecrets() async throws
+    -> TaskBoardGitRuntimeDrainSecretsResponse
   {
     try await performActionDelay()
-    return TaskBoardGitRuntimeSecretHandoffPrepareResponse(
-      prepared: false,
+    return TaskBoardGitRuntimeDrainSecretsResponse(
+      drained: false,
       runtime: TaskBoardGitRuntimeConfig()
     )
-  }
-
-  public func acknowledgeTaskBoardGitRuntimeSecretHandoff(
-    request _: TaskBoardGitRuntimeSecretHandoffAckRequest
-  ) async throws -> TaskBoardGitRuntimeSecretHandoffAckResponse {
-    try await performActionDelay()
-    return TaskBoardGitRuntimeSecretHandoffAckResponse(acknowledged: true)
   }
 }

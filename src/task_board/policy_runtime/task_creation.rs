@@ -1,19 +1,13 @@
-#[cfg(test)]
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use async_trait::async_trait;
-#[cfg(test)]
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::{CliError, CliErrorKind};
-#[cfg(test)]
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::workspace::utc_now;
 
-use super::action_persistence::PolicyActionPersistence;
 use super::models::PolicyActionDescriptor;
 use super::providers::{PolicyActionExecution, PolicyActionProvider, PolicyExecutionContext};
 
@@ -26,7 +20,6 @@ pub const POLICY_TASK_CREATION_OUTBOX_SCHEMA_VERSION: u32 = 1;
 
 /// Records older than this are pruned on append so a task-creation trail that is
 /// never drained downstream cannot accumulate forever.
-#[cfg(test)]
 const TASK_CREATION_RETENTION_SECONDS: i64 = 3600;
 
 #[derive(Debug, Default, Deserialize)]
@@ -66,12 +59,10 @@ impl Default for PolicyTaskCreationOutboxDocument {
 /// A durable, append-only trail of tasks a policy workflow asked to create on
 /// the task board. Recording them durably means the request survives a daemon
 /// restart and a downstream creator can drain the trail on its own schedule.
-#[cfg(test)]
 pub struct PolicyTaskCreationOutbox {
     repository: VersionedJsonRepository<PolicyTaskCreationOutboxDocument>,
 }
 
-#[cfg(test)]
 impl PolicyTaskCreationOutbox {
     #[must_use]
     pub fn new(mut root: PathBuf) -> Self {
@@ -120,23 +111,13 @@ impl PolicyTaskCreationOutbox {
 /// create. It proves the registry dispatches into the task-board domain and
 /// gives a `task_board.create` step a real durable side effect.
 pub struct TaskCreationPolicyProvider {
-    persistence: PolicyActionPersistence,
+    root: PathBuf,
 }
 
 impl TaskCreationPolicyProvider {
     #[must_use]
-    #[cfg(test)]
     pub fn new(root: PathBuf) -> Self {
-        Self {
-            persistence: PolicyActionPersistence::legacy_files(root),
-        }
-    }
-
-    #[must_use]
-    pub(crate) fn new_database(database: Arc<AsyncDaemonDb>) -> Self {
-        Self {
-            persistence: PolicyActionPersistence::database(database),
-        }
+        Self { root }
     }
 }
 
@@ -164,15 +145,14 @@ impl PolicyActionProvider for TaskCreationPolicyProvider {
             .filter(|body| !body.is_empty())
             .map(str::to_owned);
 
-        self.persistence
-            .record_task_creation(TaskCreationRecord {
-                title: title.clone(),
-                body,
-                workflow_id: ctx.workflow_id.clone(),
-                subject_key: ctx.subject.key.clone(),
-                recorded_at: utc_now(),
-            })
-            .await?;
+        let outbox = PolicyTaskCreationOutbox::new(self.root.clone());
+        outbox.record(TaskCreationRecord {
+            title: title.clone(),
+            body,
+            workflow_id: ctx.workflow_id.clone(),
+            subject_key: ctx.subject.key.clone(),
+            recorded_at: utc_now(),
+        })?;
 
         tracing::info!(
             workflow_id = %ctx.workflow_id,
@@ -200,12 +180,10 @@ fn task_creation_payload(
     }
 }
 
-#[cfg(test)]
 fn prune_expired(records: &mut Vec<TaskCreationRecord>, now: DateTime<Utc>) {
     records.retain(|record| !record_is_expired(&record.recorded_at, now));
 }
 
-#[cfg(test)]
 fn record_is_expired(recorded_at: &str, now: DateTime<Utc>) -> bool {
     DateTime::parse_from_rfc3339(recorded_at).is_ok_and(|recorded| {
         now.signed_duration_since(recorded.with_timezone(&Utc))

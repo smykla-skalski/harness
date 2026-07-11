@@ -13,7 +13,6 @@ use super::token::token_bound_targets;
 use super::{
     github_projection, merge_segment_repository_labels, policy, policy_event_inbox, review_item_key,
 };
-use crate::daemon::service::observe_async_db;
 
 /// Re-fetch a focused list of dependency update pull requests by GraphQL ID,
 /// patching matching cache entries in place and returning the refreshed items.
@@ -26,33 +25,24 @@ pub async fn refresh_reviews(
     request: &ReviewsRefreshRequest,
 ) -> Result<ReviewsRefreshResponse, CliError> {
     request.validate()?;
-    let database = observe_async_db();
-    let (fetched, _) = retry_stable_read("reviews.refresh", |revision| {
-        let database = database.clone();
-        async move {
-            let fetched = fetch_reviews_refresh_once(request).await?;
-            github_projection::reconcile_task_board(
-                database.as_deref(),
-                &fetched.items,
-                &fetched.authoritative_viewer_keys,
-                github_projection::MissingReviewResolution::ProvidedSnapshotsOnly,
-                request.backport_detection_enabled,
-                &request.backport_patterns,
-                revision,
-            )
-            .await?;
-            Ok::<_, CliError>(fetched)
-        }
+    let (fetched, _) = retry_stable_read("reviews.refresh", |revision| async move {
+        let fetched = fetch_reviews_refresh_once(request).await?;
+        let _ = github_projection::reconcile_task_board(
+            &fetched.items,
+            &fetched.authoritative_viewer_keys,
+            github_projection::MissingReviewResolution::ProvidedSnapshotsOnly,
+            request.backport_detection_enabled,
+            &request.backport_patterns,
+            revision,
+        )
+        .await;
+        Ok::<_, CliError>(fetched)
     })
     .await?;
     if !fetched.repository_labels.is_empty() {
         patch_cached_repository_labels(&fetched.repository_labels);
     }
-    patch_cached_items(
-        &fetched.items,
-        &fetched.missing,
-        &fetched.authoritative_viewer_keys,
-    );
+    patch_cached_items(&fetched.items, &fetched.missing);
     policy_event_inbox::resume_waiting_reviews_policy_runs(&fetched.items).await;
     policy::start_background_reviews_policy_runs(&fetched.items).await;
     Ok(ReviewsRefreshResponse {

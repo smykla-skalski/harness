@@ -1,9 +1,5 @@
-#[cfg(test)]
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::service::observe_async_db;
 use crate::daemon::service::reviews::policy_mapping::map_run_response;
 use crate::errors::CliError;
 use crate::reviews::{
@@ -14,10 +10,8 @@ use crate::task_board::policy_runtime::models::{
     PolicyRunMetrics, PolicyWorkflowRun, PolicyWorkflowStepRecord, PolicyWorkflowStepType,
     compute_run_metrics,
 };
-#[cfg(test)]
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
-
-use super::policy::require_policy_runtime_db;
+use crate::task_board::store::default_board_root;
 
 /// How many runs the history response carries. Bounds the payload so a busy
 /// subject cannot flood the observability surface with every retained run.
@@ -30,27 +24,13 @@ const HISTORY_RUN_LIMIT: usize = 50;
 /// # Errors
 /// Returns `CliError` when the request is invalid or a stored run carries a
 /// subject key that is not a valid `<repository>#<pull_request>` pair.
-pub async fn reviews_policy_history(
+pub fn reviews_policy_history(
     request: &ReviewsPolicyHistoryRequest,
 ) -> Result<ReviewsPolicyHistoryResponse, CliError> {
-    reviews_policy_history_with_audit_db(request, observe_async_db()).await
+    reviews_policy_history_with_root(default_board_root(), request)
 }
 
-pub(crate) async fn reviews_policy_history_with_audit_db(
-    request: &ReviewsPolicyHistoryRequest,
-    database: Option<Arc<AsyncDaemonDb>>,
-) -> Result<ReviewsPolicyHistoryResponse, CliError> {
-    request.validate()?;
-    let database = require_policy_runtime_db(database)?;
-    let workflow_id = request.normalized_workflow_id();
-    let subject_key = request.subject.subject_key();
-    let stored_runs = database
-        .policy_runs_for_subject(&workflow_id, &subject_key)
-        .await?;
-    history_response(request, workflow_id, &stored_runs)
-}
-
-#[cfg(test)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn reviews_policy_history_with_root(
     root: PathBuf,
     request: &ReviewsPolicyHistoryRequest,
@@ -61,16 +41,8 @@ pub(crate) fn reviews_policy_history_with_root(
     let subject_key = request.subject.subject_key();
 
     let stored_runs = repository.runs_for_subject(&workflow_id, &subject_key)?;
-    history_response(request, workflow_id, &stored_runs)
-}
-
-fn history_response(
-    request: &ReviewsPolicyHistoryRequest,
-    workflow_id: String,
-    stored_runs: &[PolicyWorkflowRun],
-) -> Result<ReviewsPolicyHistoryResponse, CliError> {
-    let metrics = metrics_response(&compute_run_metrics(stored_runs));
-    let timeline = run_timeline(stored_runs);
+    let metrics = metrics_response(&compute_run_metrics(&stored_runs));
+    let timeline = run_timeline(&stored_runs);
 
     let runs = stored_runs
         .iter()

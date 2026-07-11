@@ -7,8 +7,6 @@ extension HarnessMonitorStore {
     cacheWriteSync.githubDataRefreshGeneration &+= 1
     cacheWriteSync.githubDataTaskBoardRefreshTask?.cancel()
     cacheWriteSync.githubDataTaskBoardRefreshTask = nil
-    cacheWriteSync.pendingTaskBoardItemsRefresh = false
-    cacheWriteSync.pendingTaskBoardOrchestratorRefresh = false
   }
 
   func stopSessionStream(resetSubscriptions: Bool = true) {
@@ -26,8 +24,6 @@ extension HarnessMonitorStore {
     stopAllStreams(resetSubscriptions: resetSubscriptions)
     let disconnectedClient = client
     client = nil
-    taskBoardDatabaseInstanceID = nil
-    lastTaskBoardCredentialSync = nil
     return disconnectedClient
   }
 

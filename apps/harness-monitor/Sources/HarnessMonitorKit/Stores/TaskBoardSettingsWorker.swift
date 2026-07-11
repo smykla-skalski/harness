@@ -16,38 +16,21 @@ public enum TaskBoardSettingsSaveOrigin: String, Sendable {
 }
 
 protocol TaskBoardGitHubCredentialPersisting: Sendable {
-  func load(scope: TaskBoardCredentialScope) throws -> TaskBoardGitHubCredentialSnapshot
-  func save(_ snapshot: TaskBoardGitHubCredentialSnapshot, scope: TaskBoardCredentialScope) throws
-  func delete(scope: TaskBoardCredentialScope) throws
+  func load() throws -> TaskBoardGitHubCredentialSnapshot
+  func save(_ snapshot: TaskBoardGitHubCredentialSnapshot) throws
+  func delete() throws
 }
 
 protocol TaskBoardTodoistCredentialPersisting: Sendable {
-  func load(scope: TaskBoardCredentialScope) throws -> TaskBoardTodoistCredentialSnapshot
-  func save(_ snapshot: TaskBoardTodoistCredentialSnapshot, scope: TaskBoardCredentialScope) throws
-  func delete(scope: TaskBoardCredentialScope) throws
+  func load() throws -> TaskBoardTodoistCredentialSnapshot
+  func save(_ snapshot: TaskBoardTodoistCredentialSnapshot) throws
+  func delete() throws
 }
 
 protocol TaskBoardOpenRouterCredentialPersisting: Sendable {
-  func load(scope: TaskBoardCredentialScope) throws -> TaskBoardOpenRouterCredentialSnapshot
-  func save(
-    _ snapshot: TaskBoardOpenRouterCredentialSnapshot,
-    scope: TaskBoardCredentialScope
-  ) throws
-  func delete(scope: TaskBoardCredentialScope) throws
-}
-
-public enum TaskBoardCredentialScope: Hashable, Sendable {
-  case legacy
-  case database(String)
-
-  var account: String {
-    switch self {
-    case .legacy:
-      "default"
-    case .database(let instanceID):
-      TaskBoardKeyMaterialStore.Scope.databaseGlobal(instanceID).account
-    }
-  }
+  func load() throws -> TaskBoardOpenRouterCredentialSnapshot
+  func save(_ snapshot: TaskBoardOpenRouterCredentialSnapshot) throws
+  func delete() throws
 }
 
 struct TaskBoardCredentialPersistence: Sendable {
@@ -69,21 +52,9 @@ struct TaskBoardCredentialPersistence: Sendable {
   }
 }
 
-private struct TaskBoardSecretHandoffOperation: Sendable {
-  let id = UUID()
-  let instanceID: String
-  let task: Task<Bool, Never>
-}
-
-private struct TaskBoardCredentialLoadContext: Sendable {
-  let scope: TaskBoardCredentialScope
-  let migratesLegacy: Bool
-}
-
 actor TaskBoardSettingsWorker {
   private let credentialPersistence: TaskBoardCredentialPersistence
   private let keyMaterialPersistence: TaskBoardKeyMaterialPersistence
-  private var secretHandoffOperation: TaskBoardSecretHandoffOperation?
 
   init(
     credentialPersistence: TaskBoardCredentialPersistence = .defaultKeychain,
@@ -93,142 +64,51 @@ actor TaskBoardSettingsWorker {
     self.keyMaterialPersistence = keyMaterialPersistence
   }
 
-  func loadStoredCredentials(
-    instanceID: String,
-    ownership: DaemonOwnership
-  ) throws -> TaskBoardStoredCredentialSnapshot {
-    let context = TaskBoardCredentialLoadContext(
-      scope: .database(instanceID),
-      migratesLegacy: ownership == .managed
-    )
-    return try TaskBoardStoredCredentialSnapshot(
-      githubCredentials: loadScopedCredential(
-        context: context,
-        empty: TaskBoardGitHubCredentialSnapshot(),
-        load: credentialPersistence.github.load,
-        save: credentialPersistence.github.save,
-        delete: credentialPersistence.github.delete
-      ),
-      todoistCredentials: loadScopedCredential(
-        context: context,
-        empty: TaskBoardTodoistCredentialSnapshot(),
-        load: credentialPersistence.todoist.load,
-        save: credentialPersistence.todoist.save,
-        delete: credentialPersistence.todoist.delete
-      ),
-      openRouterCredentials: loadScopedCredential(
-        context: context,
-        empty: TaskBoardOpenRouterCredentialSnapshot(),
-        load: credentialPersistence.openRouter.load,
-        save: credentialPersistence.openRouter.save,
-        delete: credentialPersistence.openRouter.delete
-      )
+  func loadStoredCredentials() throws -> TaskBoardStoredCredentialSnapshot {
+    try TaskBoardStoredCredentialSnapshot(
+      githubCredentials: credentialPersistence.github.load(),
+      todoistCredentials: credentialPersistence.todoist.load(),
+      openRouterCredentials: credentialPersistence.openRouter.load()
     )
   }
 
-  func hydrateKeyMaterial(
-    into runtime: TaskBoardGitRuntimeConfig,
-    instanceID: String,
-    ownership: DaemonOwnership
-  ) -> TaskBoardGitRuntimeConfig {
-    HarnessMonitorStore.hydrateKeyMaterial(
-      into: runtime,
-      instanceID: instanceID,
-      ownership: ownership,
-      keychain: keyMaterialPersistence
-    )
+  func hydrateKeyMaterial(into runtime: TaskBoardGitRuntimeConfig) -> TaskBoardGitRuntimeConfig {
+    HarnessMonitorStore.hydrateKeyMaterial(into: runtime, keychain: keyMaterialPersistence)
   }
 
   func persistLocalSecrets(
     snapshot: TaskBoardGitSettingsSnapshot,
-    origin: TaskBoardSettingsSaveOrigin,
-    instanceID: String,
-    ownership: DaemonOwnership
-  ) async throws {
-    while let operation = secretHandoffOperation {
-      _ = await operation.task.value
-      clearSecretHandoffOperation(id: operation.id)
-    }
+    origin: TaskBoardSettingsSaveOrigin
+  ) throws {
     switch origin {
     case .settingsSecretsSaveButton, .settingsRepositoriesSaveButton:
       break
     }
-    let scope = TaskBoardCredentialScope.database(instanceID)
-    try credentialPersistence.github.save(snapshot.githubCredentials, scope: scope)
-    try credentialPersistence.todoist.save(snapshot.todoistCredentials, scope: scope)
-    try credentialPersistence.openRouter.save(snapshot.openRouterCredentials, scope: scope)
-    if ownership == .managed {
-      try credentialPersistence.github.delete(scope: .legacy)
-      try credentialPersistence.todoist.delete(scope: .legacy)
-      try credentialPersistence.openRouter.delete(scope: .legacy)
-    }
+    try credentialPersistence.github.save(snapshot.githubCredentials)
+    try credentialPersistence.todoist.save(snapshot.todoistCredentials)
+    try credentialPersistence.openRouter.save(snapshot.openRouterCredentials)
     try HarnessMonitorStore.persistKeyMaterial(
       runtime: snapshot.runtimeConfig,
-      instanceID: instanceID,
-      ownership: ownership,
       keychain: keyMaterialPersistence
     )
   }
 
-  func completeRuntimeSecretHandoffIfNeeded(
-    client: any HarnessMonitorClientProtocol,
-    instanceID: String,
-    ownership: DaemonOwnership
+  private func persistKeyMaterial(runtime: TaskBoardGitRuntimeConfig) throws {
+    try HarnessMonitorStore.persistKeyMaterial(runtime: runtime, keychain: keyMaterialPersistence)
+  }
+
+  func drainRuntimeSecretsIfNeeded(
+    client: any HarnessMonitorClientProtocol
   ) async -> Bool {
-    if let operation = secretHandoffOperation {
-      let result = await operation.task.value
-      clearSecretHandoffOperation(id: operation.id)
-      if operation.instanceID == instanceID {
-        return result
+    do {
+      let response = try await client.drainTaskBoardGitRuntimeSecrets()
+      if response.drained {
+        try persistKeyMaterial(runtime: response.runtime)
       }
+      return true
+    } catch {
+      return false
     }
-    let keychain = keyMaterialPersistence
-    let task = Task {
-      await HarnessMonitorStore.completeRuntimeSecretHandoffIfNeeded(
-        client: client,
-        instanceID: instanceID,
-        ownership: ownership,
-        keychain: keychain
-      )
-    }
-    let operation = TaskBoardSecretHandoffOperation(instanceID: instanceID, task: task)
-    secretHandoffOperation = operation
-    let result = await task.value
-    clearSecretHandoffOperation(id: operation.id)
-    return result
-  }
-
-  private func clearSecretHandoffOperation(id: UUID) {
-    if secretHandoffOperation?.id == id {
-      secretHandoffOperation = nil
-    }
-  }
-
-  private func loadScopedCredential<Snapshot: Equatable>(
-    context: TaskBoardCredentialLoadContext,
-    empty: Snapshot,
-    load: (TaskBoardCredentialScope) throws -> Snapshot,
-    save: (Snapshot, TaskBoardCredentialScope) throws -> Void,
-    delete: (TaskBoardCredentialScope) throws -> Void
-  ) throws -> Snapshot {
-    let owned = try load(context.scope)
-    guard context.migratesLegacy else {
-      return owned
-    }
-    if owned != empty {
-      try delete(.legacy)
-      return owned
-    }
-    let legacy = try load(.legacy)
-    guard legacy != empty else {
-      return owned
-    }
-    try save(legacy, context.scope)
-    guard try load(context.scope) == legacy else {
-      throw TaskBoardKeyMaterialStoreError.invalidPayload
-    }
-    try delete(.legacy)
-    return legacy
   }
 
   func waitForIdle() {}

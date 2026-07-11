@@ -9,13 +9,10 @@ use crate::daemon::protocol::{
 use super::super::mutations::dispatch_query_result;
 use super::{invalid_params, parse_control_plane_params, parse_params};
 
-pub(super) async fn dispatch_task_board_orchestrator_status(
-    request: &WsRequest,
-    state: &DaemonHttpState,
-) -> WsResponse {
+pub(super) async fn dispatch_task_board_orchestrator_status(request: &WsRequest) -> WsResponse {
     dispatch_query_result(
         &request.id,
-        task_board_route_executor::orchestrator_status(state).await,
+        task_board_route_executor::orchestrator_status().await,
     )
 }
 
@@ -23,7 +20,7 @@ pub(super) async fn dispatch_task_board_orchestrator_start(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let result = task_board_route_executor::start_orchestrator(state).await;
+    let result = task_board_route_executor::start_orchestrator().await;
     super::record_task_board_audit_result(
         state,
         "task_board.orchestrator_start",
@@ -40,7 +37,7 @@ pub(super) async fn dispatch_task_board_orchestrator_stop(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let result = task_board_route_executor::stop_orchestrator(state).await;
+    let result = task_board_route_executor::stop_orchestrator().await;
     super::record_task_board_audit_result(
         state,
         "task_board.orchestrator_stop",
@@ -76,11 +73,10 @@ pub(super) async fn dispatch_task_board_orchestrator_run_once(
 
 pub(super) async fn dispatch_task_board_orchestrator_settings_get(
     request: &WsRequest,
-    state: &DaemonHttpState,
 ) -> WsResponse {
     dispatch_query_result(
         &request.id,
-        task_board_route_executor::orchestrator_settings(state).await,
+        task_board_route_executor::orchestrator_settings().await,
     )
 }
 
@@ -91,7 +87,7 @@ pub(super) async fn dispatch_task_board_orchestrator_settings_update(
     let Ok(body) = parse_params::<TaskBoardOrchestratorSettingsUpdateRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::update_orchestrator_settings(state, &body).await;
+    let result = task_board_route_executor::update_orchestrator_settings(&body).await;
     super::record_task_board_audit_result(
         state,
         "task_board.orchestrator_settings_update",
@@ -117,11 +113,10 @@ pub(super) async fn dispatch_task_board_orchestrator_settings_update(
 
 pub(super) async fn dispatch_task_board_orchestrator_runtime_config_get(
     request: &WsRequest,
-    state: &DaemonHttpState,
 ) -> WsResponse {
     dispatch_query_result(
         &request.id,
-        task_board_route_executor::runtime_config(state).await,
+        task_board_route_executor::runtime_config().await,
     )
 }
 
@@ -132,7 +127,7 @@ pub(super) async fn dispatch_task_board_orchestrator_runtime_config_update(
     let Ok(body) = parse_params::<TaskBoardGitRuntimeConfig>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::update_runtime_config(state, &body).await;
+    let result = task_board_route_executor::update_runtime_config(&body).await;
     super::record_task_board_audit_result(
         state,
         "task_board.orchestrator_runtime_config_update",

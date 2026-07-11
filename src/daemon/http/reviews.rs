@@ -168,7 +168,7 @@ async fn post_review_action_preview(
         http_paths::REVIEWS_ACTION_PREVIEW,
         &request_id,
         start,
-        service::preview_review_action_with_audit_db(&request, state.async_db.get().cloned()).await,
+        service::preview_review_action(&request),
     )
 }
 

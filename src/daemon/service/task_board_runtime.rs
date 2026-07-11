@@ -1,10 +1,7 @@
 use std::collections::BTreeSet;
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
-    TaskBoardGitRuntimeKeyMaterialSyncRequest, TaskBoardGitRuntimeKeyMaterialSyncResponse,
-    TaskBoardGitRuntimeSecretHandoffAckRequest, TaskBoardGitRuntimeSecretHandoffAckResponse,
-    TaskBoardGitRuntimeSecretHandoffPrepareResponse, TaskBoardGitSigningVerifyRequest,
+    TaskBoardGitRuntimeDrainSecretsResponse, TaskBoardGitSigningVerifyRequest,
     TaskBoardGitSigningVerifyResponse,
 };
 use crate::daemon::state;
@@ -23,19 +20,8 @@ use crate::task_board::{
 ///
 /// # Errors
 /// Returns `CliError` when the daemon runtime config cannot be read.
-#[cfg(test)]
 pub fn task_board_git_runtime_config() -> Result<TaskBoardGitRuntimeConfig, CliError> {
     state::load_task_board_git_runtime_config()
-}
-
-/// Load Task Board Git runtime configuration from the canonical daemon database.
-/// Process-only secret presence is overlaid after the durable read.
-pub(crate) async fn task_board_git_runtime_config_db(
-    db: &AsyncDaemonDb,
-) -> Result<TaskBoardGitRuntimeConfig, CliError> {
-    let mut config = db.task_board_runtime_config().await?;
-    state::overlay_task_board_git_runtime_secret_flags(&mut config);
-    Ok(config)
 }
 
 /// Discover the system-level git identity defaults (git config, gh CLI,
@@ -57,7 +43,6 @@ pub fn task_board_git_identity_defaults() -> Result<TaskBoardGitIdentityDefaults
 /// Returns `CliError` only when the requested repository slug is malformed.
 /// Signing failures are surfaced inside [`TaskBoardGitSigningVerifyResponse::Failed`]
 /// so the UI can render them as a banner without crashing the call.
-#[cfg(test)]
 pub fn verify_task_board_git_signing(
     request: &TaskBoardGitSigningVerifyRequest,
 ) -> Result<TaskBoardGitSigningVerifyResponse, CliError> {
@@ -85,93 +70,26 @@ pub fn verify_task_board_git_signing(
     })
 }
 
-pub(crate) async fn verify_task_board_git_signing_db(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardGitSigningVerifyRequest,
-) -> Result<TaskBoardGitSigningVerifyResponse, CliError> {
-    let repository = validated_repository(request.repository.as_deref())?;
-    let config = db.task_board_runtime_config().await?;
-    let mut profile = config.resolved_profile(repository);
-    state::overlay_task_board_git_runtime_profile_secrets(&mut profile, repository);
-    Ok(signing_verify_response(&profile))
-}
-
-/// Prepare a non-destructive legacy-secret handoff to the Monitor secure store.
-pub(crate) async fn prepare_task_board_git_runtime_secret_handoff(
-    db: &AsyncDaemonDb,
-) -> Result<TaskBoardGitRuntimeSecretHandoffPrepareResponse, CliError> {
-    let Some(marker) = db.pending_task_board_secret_handoff().await? else {
-        return Ok(TaskBoardGitRuntimeSecretHandoffPrepareResponse {
-            prepared: false,
-            migration_id: None,
-            digest: None,
+/// One-shot migration drain: if the on-disk daemon runtime config still
+/// carries plaintext task-board git secrets, return them so callers (the
+/// macOS app) can move them into the platform secure store, and write a
+/// stripped version back to disk.
+///
+/// # Errors
+/// Returns `CliError` when the daemon runtime config exists but cannot be
+/// parsed or the stripped version cannot be written back.
+pub fn drain_task_board_git_runtime_secrets()
+-> Result<TaskBoardGitRuntimeDrainSecretsResponse, CliError> {
+    Ok(match state::drain_task_board_git_runtime_secrets()? {
+        Some(runtime) => TaskBoardGitRuntimeDrainSecretsResponse {
+            drained: true,
+            runtime,
+        },
+        None => TaskBoardGitRuntimeDrainSecretsResponse {
+            drained: false,
             runtime: TaskBoardGitRuntimeConfig::default(),
-        });
-    };
-    let migration_id = required_handoff_field(marker.secret_handoff_id, "migration id")?;
-    let digest = required_handoff_field(marker.secret_handoff_digest, "digest")?;
-    let runtime = pending_legacy_secret_runtime(&digest)?;
-    Ok(TaskBoardGitRuntimeSecretHandoffPrepareResponse {
-        prepared: true,
-        migration_id: Some(migration_id),
-        digest: Some(digest),
-        runtime,
+        },
     })
-}
-
-/// Acknowledge a prepared handoff and retire the legacy file envelope only
-/// after the acknowledgement is durable in `SQLite`.
-pub(crate) async fn acknowledge_task_board_git_runtime_secret_handoff(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardGitRuntimeSecretHandoffAckRequest,
-) -> Result<TaskBoardGitRuntimeSecretHandoffAckResponse, CliError> {
-    let marker = db
-        .task_board_secret_handoff(&request.migration_id)
-        .await?
-        .ok_or_else(|| handoff_error("Task Board secret handoff is stale"))?;
-    if marker.secret_handoff_digest.as_deref() != Some(request.digest.as_str()) {
-        return Err(handoff_error(
-            "Task Board secret handoff digest does not match",
-        ));
-    }
-    if marker.secret_handoff_phase == "complete" {
-        return Ok(TaskBoardGitRuntimeSecretHandoffAckResponse { acknowledged: true });
-    }
-
-    if marker.secret_handoff_phase == "pending" {
-        let runtime = pending_legacy_secret_runtime(&request.digest)?;
-        db.acknowledge_task_board_secret_handoff(&request.migration_id, &request.digest)
-            .await?;
-        state::replace_task_board_git_runtime_secrets(&runtime);
-    }
-    state::remove_migrated_task_board_config_after_ack(&request.digest)?;
-    db.complete_task_board_secret_handoff(&request.migration_id)
-        .await?;
-    Ok(TaskBoardGitRuntimeSecretHandoffAckResponse { acknowledged: true })
-}
-
-fn pending_legacy_secret_runtime(digest: &str) -> Result<TaskBoardGitRuntimeConfig, CliError> {
-    let runtime = state::load_runtime_config_raw()?
-        .and_then(|config| config.task_board_git_runtime_config)
-        .ok_or_else(|| handoff_error("pending Task Board secret handoff has no legacy payload"))?;
-    let actual =
-        state::task_board_git_runtime_secret_handoff_digest(&runtime)?.ok_or_else(|| {
-            handoff_error("pending Task Board secret handoff has no plaintext secrets")
-        })?;
-    if actual != digest {
-        return Err(handoff_error(
-            "pending Task Board secret handoff payload changed",
-        ));
-    }
-    Ok(runtime)
-}
-
-fn required_handoff_field(value: Option<String>, field: &str) -> Result<String, CliError> {
-    value.ok_or_else(|| handoff_error(format!("pending Task Board secret handoff has no {field}")))
-}
-
-fn handoff_error(message: impl Into<String>) -> CliError {
-    CliError::from(CliErrorKind::workflow_parse(message.into()))
 }
 
 /// Persist the task-board git runtime config after validation and normalization.
@@ -179,7 +97,6 @@ fn handoff_error(message: impl Into<String>) -> CliError {
 /// # Errors
 /// Returns `CliError` when repository overrides are invalid/duplicated or the
 /// daemon runtime config cannot be written.
-#[cfg(test)]
 pub fn update_task_board_git_runtime_config(
     request: &TaskBoardGitRuntimeConfig,
 ) -> Result<TaskBoardGitRuntimeConfig, CliError> {
@@ -188,29 +105,6 @@ pub fn update_task_board_git_runtime_config(
     state::persist_task_board_git_runtime_config(&persisted)?;
     state::replace_task_board_git_runtime_secrets(&normalized);
     Ok(persisted)
-}
-
-pub(crate) async fn update_task_board_git_runtime_config_db(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardGitRuntimeConfig,
-) -> Result<TaskBoardGitRuntimeConfig, CliError> {
-    let retained = state::retaining_task_board_git_runtime_secrets(request);
-    let normalized = normalized_runtime_config(&retained)?;
-    let mut response = normalized.without_secrets();
-    db.replace_task_board_runtime_config(&response).await?;
-    state::replace_task_board_git_runtime_secrets(&normalized);
-    state::overlay_task_board_git_runtime_secret_flags(&mut response);
-    Ok(response)
-}
-
-/// Replace process-only runtime key material without mutating the durable
-/// database-backed Git configuration.
-pub(crate) fn sync_task_board_git_runtime_key_material(
-    request: &TaskBoardGitRuntimeKeyMaterialSyncRequest,
-) -> Result<TaskBoardGitRuntimeKeyMaterialSyncResponse, CliError> {
-    let normalized = normalized_runtime_config(&request.runtime)?;
-    state::replace_task_board_git_runtime_secrets(&normalized);
-    Ok(TaskBoardGitRuntimeKeyMaterialSyncResponse { synchronized: true })
 }
 
 /// Replace the in-memory GitHub token snapshot used by the daemon.
@@ -278,7 +172,7 @@ pub(crate) fn external_sync_config_for_repository(
     config
 }
 
-#[cfg(test)]
+#[allow(dead_code)]
 pub(crate) fn git_runtime_profile_for_repository(
     repository: Option<&str>,
 ) -> Result<TaskBoardGitRuntimeProfile, CliError> {
@@ -306,35 +200,6 @@ fn normalized_runtime_config(
         global,
         repository_overrides: overrides,
     })
-}
-
-fn validated_repository(repository: Option<&str>) -> Result<Option<&str>, CliError> {
-    if let Some(repository) = repository
-        && normalize_repository_slug(Some(repository)).is_none()
-    {
-        return Err(CliError::from(CliErrorKind::workflow_parse(format!(
-            "invalid task-board repository '{repository}', expected owner/repo"
-        ))));
-    }
-    Ok(repository)
-}
-
-fn signing_verify_response(
-    profile: &TaskBoardGitRuntimeProfile,
-) -> TaskBoardGitSigningVerifyResponse {
-    match verify_signing_for_profile(profile) {
-        SigningVerifyOutcome::Skipped => TaskBoardGitSigningVerifyResponse::Skipped,
-        SigningVerifyOutcome::Signed {
-            mode,
-            signature_kind,
-        } => TaskBoardGitSigningVerifyResponse::Signed {
-            mode,
-            signature_kind,
-        },
-        SigningVerifyOutcome::Failed { message } => {
-            TaskBoardGitSigningVerifyResponse::Failed { message }
-        }
-    }
 }
 
 fn validate_unique_overrides(overrides: &[TaskBoardGitRepositoryOverride]) -> Result<(), CliError> {

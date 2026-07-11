@@ -6,6 +6,7 @@ use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::protocol::{
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
 };
+use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::types::TaskBoardStatus;
 use crate::task_board::{
@@ -17,7 +18,7 @@ use crate::task_board::{
 use super::orchestrator_tokens::{
     TaskBoardOrchestratorGithubTokensArgs, TaskBoardOrchestratorTodoistTokenArgs,
 };
-use super::{daemon_client, print_json};
+use super::print_json;
 
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
@@ -159,17 +160,17 @@ impl Execute for TaskBoardOrchestratorCommand {
 
 impl TaskBoardOrchestratorJsonArgs {
     fn execute_status(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let status = daemon_client()?.task_board_orchestrator_status()?;
+        let status = service::task_board_orchestrator_status()?;
         print_status(&status, self.json)
     }
 
     fn execute_start(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let status = daemon_client()?.start_task_board_orchestrator()?;
+        let status = service::start_task_board_orchestrator()?;
         print_status(&status, self.json)
     }
 
     fn execute_stop(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let status = daemon_client()?.stop_task_board_orchestrator()?;
+        let status = service::stop_task_board_orchestrator()?;
         print_status(&status, self.json)
     }
 }
@@ -183,18 +184,17 @@ impl Execute for TaskBoardOrchestratorRunOnceArgs {
             project_dir: self.project_dir.clone(),
             actor: self.actor.clone(),
         };
-        let status = daemon_client()?.run_task_board_orchestrator_once(&request)?;
+        let status = service::run_task_board_orchestrator_once(&request, None)?;
         print_status(&status, self.json)
     }
 }
 
 impl Execute for TaskBoardOrchestratorSettingsArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let client = daemon_client()?;
         let settings = if self.has_update() {
-            client.update_task_board_orchestrator_settings(&self.update_request())?
+            service::update_task_board_orchestrator_settings(&self.update_request())?
         } else {
-            client.task_board_orchestrator_settings()?
+            service::task_board_orchestrator_settings()?
         };
         if self.json {
             print_json(&settings)?;
@@ -232,13 +232,12 @@ impl TaskBoardOrchestratorSettingsArgs {
 
 impl Execute for TaskBoardOrchestratorRuntimeConfigArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let client = daemon_client()?;
         let config = if self.has_update() {
-            let mut config = client.task_board_runtime_config()?;
+            let mut config = service::task_board_git_runtime_config()?;
             self.apply_update(&mut config)?;
-            client.update_task_board_runtime_config(&config)?
+            service::update_task_board_git_runtime_config(&config)?
         } else {
-            client.task_board_runtime_config()?
+            service::task_board_git_runtime_config()?
         };
         if self.json {
             print_json(&config)?;

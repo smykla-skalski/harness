@@ -2,9 +2,12 @@ use reqwest::StatusCode;
 use serde_json::{Value, json};
 use tempfile::tempdir;
 
+use crate::daemon::protocol::http_paths;
+use crate::task_board::policy_graph::store_gate_policy;
+use crate::task_board::store::default_board_root;
+
 use super::support::test_http_state_with_db;
 use super::task_board_route_parity_support::serve_http;
-use crate::daemon::protocol::http_paths;
 
 #[tokio::test]
 async fn review_write_http_routes_fail_closed_without_enforced_policy() {
@@ -17,6 +20,7 @@ async fn review_write_http_routes_fail_closed_without_enforced_policy() {
             ("CLAUDE_SESSION_ID", Some("http-review-policy-writes")),
         ],
         async {
+            store_gate_policy(&default_board_root(), None);
             let (base_url, server) = serve_http(test_http_state_with_db()).await;
             let client = reqwest::Client::new();
 
@@ -70,7 +74,7 @@ fn review_http_write_cases() -> Vec<ReviewWriteCase> {
     vec![
         ReviewWriteCase {
             path: http_paths::REVIEWS_APPROVE,
-            payload: json!({ "targets": [review_target()], "source": "direct" }),
+            payload: json!({ "targets": [review_target()] }),
             message: "reviews GitHub approve is disabled because no enforced policy canvas is active",
         },
         ReviewWriteCase {

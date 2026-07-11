@@ -58,6 +58,7 @@ pub(crate) async fn create_task_async(
 }
 
 /// Idempotently create a task with an identity reserved by durable dispatch.
+#[allow(dead_code)]
 #[expect(
     clippy::cognitive_complexity,
     reason = "idempotent task creation validates reserved state before synchronizing mirrors and audit data"
@@ -116,6 +117,7 @@ pub(crate) async fn create_task_with_id_async(
     session_detail_from_async_daemon_db(session_id, async_db).await
 }
 
+#[allow(dead_code)]
 fn ensure_reserved_task_matches(
     item: &WorkItem,
     spec: &session_service::TaskSpec<'_>,

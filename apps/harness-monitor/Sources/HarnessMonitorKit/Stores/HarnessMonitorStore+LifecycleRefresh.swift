@@ -39,18 +39,9 @@ extension HarnessMonitorStore {
       connectionState = .idle
       return
     }
-    do {
-      _ = try await requireDatabaseBackedTaskBoard(using: client)
-    } catch {
-      await client.shutdown()
-      self.client = nil
-      taskBoardDatabaseInstanceID = nil
-      markConnectionOffline(Self.describeRefreshSnapshotError(error))
-      return
-    }
     self.client = client
     await refreshPersistedSessionMetadata()
-    _ = await syncStoredTaskBoardCredentialsForNewDaemon(using: client)
+    await syncStoredTaskBoardCredentials(using: client)
 
     if maintainsLiveDaemonObservation {
       await connectLive(using: client)

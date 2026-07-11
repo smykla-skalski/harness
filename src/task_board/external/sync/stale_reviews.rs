@@ -2,26 +2,22 @@ use crate::errors::CliError;
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncField, ExternalTask, ExternalTaskRef,
 };
-use crate::task_board::store::TaskBoardItemPatch;
+use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
 
 use super::merge::{external_ref_matches, matching_ref};
-use super::{ExternalSyncAction, ExternalSyncOperation, ExternalSyncOptions, TaskBoardSyncStore};
+use super::{ExternalSyncAction, ExternalSyncOperation, ExternalSyncOptions, run_board_blocking};
 
 pub(super) async fn reconcile_stale_github_review_requests(
-    board: &dyn TaskBoardSyncStore,
+    board: &TaskBoardStore,
     options: ExternalSyncOptions,
     provider: ExternalProvider,
     board_items: &[TaskBoardItem],
     tasks: &[ExternalTask],
-    authoritative_review_inbox: bool,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
-    if provider != ExternalProvider::GitHub
-        || !authoritative_review_inbox
-        || !allows_stale_review_reconcile(options)
-    {
+    if provider != ExternalProvider::GitHub || !allows_stale_review_reconcile(options) {
         return Ok(());
     }
 
@@ -41,8 +37,12 @@ pub(super) async fn reconcile_stale_github_review_requests(
         if options.dry_run {
             continue;
         }
+        let item_id = item.id.clone();
         let patch = stale_review_request_patch(&item, &reference);
-        board.update_item(&item, patch).await?;
+        run_board_blocking(board, "reconcile stale github review", move |board| {
+            board.update(&item_id, patch)
+        })
+        .await?;
     }
 
     Ok(())

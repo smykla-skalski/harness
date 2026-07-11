@@ -1,15 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-#[cfg(test)]
 use crate::errors::CliError;
 use crate::github_api::GitHubPullRequestSnapshot;
 use crate::task_board::store::TaskBoardItemPatch;
-#[cfg(test)]
 use crate::task_board::store::TaskBoardStore;
 use crate::task_board::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
 
-#[cfg(test)]
 pub(crate) fn reconcile_pull_request_snapshots(
     board: &TaskBoardStore,
     snapshots: &[GitHubPullRequestSnapshot],
@@ -36,7 +33,6 @@ pub(crate) fn reconcile_pull_request_snapshots(
     Ok(changed)
 }
 
-#[cfg(test)]
 pub(crate) fn imported_review_pull_request_references(
     board: &TaskBoardStore,
 ) -> Result<Vec<(String, u64)>, CliError> {
@@ -56,6 +52,7 @@ pub(crate) fn imported_review_pull_request_references(
         .collect())
 }
 
+#[allow(dead_code)]
 pub(crate) fn imported_review_references_from_items(items: &[TaskBoardItem]) -> Vec<(String, u64)> {
     items
         .iter()
@@ -71,6 +68,7 @@ pub(crate) fn imported_review_references_from_items(items: &[TaskBoardItem]) -> 
         .collect()
 }
 
+#[allow(dead_code)]
 pub(crate) fn reconcile_review_item_from_snapshots(
     item: &mut TaskBoardItem,
     snapshots: &[GitHubPullRequestSnapshot],
@@ -96,7 +94,6 @@ pub(crate) fn reconcile_review_item_from_snapshots(
     true
 }
 
-#[cfg(test)]
 fn reconcile_candidate(
     board: &TaskBoardStore,
     item_id: &str,

@@ -3,10 +3,6 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
-  func taskBoardCapabilities() async throws -> TaskBoardCapabilities {
-    lock.withLock { taskBoardCapabilitiesValue }
-  }
-
   func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {
     recordReadCall(.taskBoardItems(status))
     if let error = dequeueTaskBoardItemsError() {

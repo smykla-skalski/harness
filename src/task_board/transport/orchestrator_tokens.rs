@@ -3,13 +3,14 @@ use std::env;
 use clap::Args;
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
     TaskBoardTodoistTokenSyncRequest, normalize_repository_slug,
 };
 
-use super::{daemon_client, print_json};
+use super::print_json;
 
 #[derive(Debug, Clone, Args)]
 pub struct TaskBoardOrchestratorGithubTokensArgs {
@@ -42,7 +43,7 @@ impl Execute for TaskBoardOrchestratorGithubTokensArgs {
             .into());
         }
         let request = self.sync_request()?;
-        let response = daemon_client()?.sync_task_board_github_tokens(&request)?;
+        let response = service::sync_task_board_github_tokens(&request)?;
         if self.json {
             print_json(&response)?;
         } else {
@@ -81,7 +82,7 @@ impl Execute for TaskBoardOrchestratorTodoistTokenArgs {
             return Err(CliErrorKind::workflow_parse("provide --clear or --token-env").into());
         }
         let request = self.sync_request()?;
-        let response = daemon_client()?.sync_task_board_todoist_token(&request)?;
+        let response = service::sync_task_board_todoist_token(&request)?;
         if self.json {
             print_json(&response)?;
         } else {
@@ -135,31 +136,41 @@ fn repository_token_from_env(value: &str) -> Result<TaskBoardGitHubRepositoryTok
 
 #[cfg(test)]
 mod tests {
+    use harness_testkit::with_isolated_harness_env;
+    use tempfile::tempdir;
+
     use crate::app::command_context::Execute;
+    use crate::daemon::state;
 
     use super::*;
 
     #[test]
-    fn todoist_token_sync_request_reads_env_and_clear_has_no_token() {
-        temp_env::with_var("HARNESS_TEST_TODOIST_TOKEN", Some("todoist-token"), || {
-            let request = TaskBoardOrchestratorTodoistTokenArgs {
-                json: true,
-                clear: false,
-                token_env: Some("HARNESS_TEST_TODOIST_TOKEN".into()),
-            }
-            .sync_request()
-            .expect("sync request");
-            assert_eq!(request.token.as_deref(), Some("todoist-token"));
-        });
+    fn todoist_token_sync_reads_env_and_can_clear_snapshot() {
+        let tmp = tempdir().expect("tempdir");
+        with_isolated_harness_env(tmp.path(), || {
+            temp_env::with_var("HARNESS_TEST_TODOIST_TOKEN", Some("todoist-token"), || {
+                TaskBoardOrchestratorTodoistTokenArgs {
+                    json: true,
+                    clear: false,
+                    token_env: Some("HARNESS_TEST_TODOIST_TOKEN".into()),
+                }
+                .execute(&AppContext)
+                .expect("sync token");
+            });
+            assert_eq!(
+                state::task_board_todoist_token().as_deref(),
+                Some("todoist-token")
+            );
 
-        let request = TaskBoardOrchestratorTodoistTokenArgs {
-            json: true,
-            clear: true,
-            token_env: None,
-        }
-        .sync_request()
-        .expect("clear request");
-        assert!(request.token.is_none());
+            TaskBoardOrchestratorTodoistTokenArgs {
+                json: true,
+                clear: true,
+                token_env: None,
+            }
+            .execute(&AppContext)
+            .expect("clear token");
+            assert!(state::task_board_todoist_token().is_none());
+        });
     }
 
     #[test]

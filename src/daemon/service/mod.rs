@@ -258,14 +258,10 @@ mod signals_async_send;
 mod status;
 mod sync_support;
 mod task_board;
-mod task_board_db;
 mod task_board_evaluation;
 mod task_board_github;
-#[cfg(test)]
 mod task_board_host;
-#[cfg(test)]
 mod task_board_orchestrator;
-mod task_board_orchestrator_db;
 mod task_board_runtime;
 #[cfg(test)]
 mod task_board_sync_tests;
@@ -279,9 +275,9 @@ pub use direct::{
     register_agent_runtime_session_direct, start_session_direct, update_session_title_direct,
 };
 pub(crate) use direct::{
-    delete_session_direct_async, disconnect_agent_direct_async, ensure_project_registered_async,
-    join_session_direct_async, register_agent_runtime_session_direct_async,
-    start_session_direct_async, update_session_title_direct_async,
+    delete_session_direct_async, disconnect_agent_direct_async, join_session_direct_async,
+    register_agent_runtime_session_direct_async, start_session_direct_async,
+    update_session_title_direct_async,
 };
 pub use improver_apply::improver_apply;
 pub(crate) use improver_apply::improver_apply_async;
@@ -293,9 +289,8 @@ pub use mutations::{
 };
 pub(crate) use mutations_async::{
     archive_session_async, assign_task_async, change_role_async, checkpoint_task_async,
-    create_task_async, create_task_with_id_async, delete_task_async, drop_task_async,
-    end_session_async, remove_agent_async, transfer_leader_async, update_task_async,
-    update_task_queue_policy_async,
+    create_task_async, delete_task_async, drop_task_async, end_session_async, remove_agent_async,
+    transfer_leader_async, update_task_async, update_task_queue_policy_async,
 };
 pub use observe_stream::{
     broadcast_session_extensions, broadcast_session_snapshot, broadcast_session_updated,
@@ -311,6 +306,7 @@ pub(crate) use review_mutations_async::{
     arbitrate_async as arbitrate_review_async, claim_review_async, respond_review_async,
     submit_for_review_async, submit_review_async,
 };
+pub(crate) use reviews::start_reviews_policy_run_with_audit_db;
 pub use reviews::{
     add_label_to_reviews, add_review_file_comment, approve_reviews, auto_reviews,
     catalog_review_repositories, clear_reviews_cache, comment_on_reviews, fetch_review_body,
@@ -318,11 +314,6 @@ pub use reviews::{
     request_review_for_reviews, rerun_reviews_checks, resolve_review_pull_requests,
     reviews_capabilities, reviews_policy_history, reviews_policy_status, start_reviews_policy_run,
     update_review_body,
-};
-pub(crate) use reviews::{
-    preview_review_action_with_audit_db, preview_reviews_policy_with_audit_db,
-    reviews_policy_history_with_audit_db, reviews_policy_status_with_audit_db,
-    start_reviews_policy_run_with_audit_db,
 };
 pub(crate) use reviews_files::BlobTextProjection;
 pub use reviews_files::{
@@ -333,7 +324,7 @@ pub use reviews_files::{
 pub use reviews_thread_resolve::set_review_thread_resolved;
 pub use reviews_timeline::{clear_reviews_caches_with_timeline, fetch_review_timeline};
 pub use serve::serve;
-pub(crate) use serve::{ShutdownSignalGuard, serve_remote_https};
+pub(crate) use serve::{ShutdownSignalGuard, broadcast_github_data_change, serve_remote_https};
 pub use sessions::{
     list_projects, list_sessions, session_detail, session_detail_core, session_extensions,
     session_timeline,
@@ -345,8 +336,10 @@ pub use status::{
     diagnostics_report, get_log_level, health_response, record_telemetry, request_shutdown,
     set_log_level, status_report,
 };
+#[allow(unused_imports)]
 pub(crate) use task_board::dispatch_task_board_async;
-#[cfg(test)]
+#[allow(unused_imports)]
+pub(crate) use task_board::unlink_dispatched_task_board_item;
 pub use task_board::{
     approve_task_board_plan, audit_task_board, begin_task_board_planning, create_task_board_item,
     delete_task_board_item, dispatch_task_board, get_task_board_item, list_task_board_items,
@@ -361,46 +354,26 @@ pub(crate) use task_board::{
     save_policy_pipeline_draft, set_active_policy_canvas, set_policy_canvas_global_enforcement,
     simulate_policy_pipeline, update_policy_scenario,
 };
-pub(crate) use task_board_db::{
-    approve_task_board_plan_db, audit_task_board_db, begin_task_board_planning_db,
-    create_task_board_item_db, delete_task_board_item_db, get_task_board_item_db,
-    list_task_board_items_db, list_task_board_machines_db, list_task_board_projects_db,
-    revoke_task_board_plan_db, submit_task_board_plan_db, sync_task_board_db,
-    task_board_host_list_db, task_board_host_local_db, task_board_host_set_project_types_db,
-    touch_task_board_host_local_db, update_task_board_item_db,
-};
-#[cfg(test)]
 pub use task_board_evaluation::evaluate_task_board;
+#[allow(unused_imports)]
 pub(crate) use task_board_evaluation::evaluate_task_board_async;
-#[cfg(test)]
 pub use task_board_host::{
     task_board_host_list, task_board_host_local, task_board_host_set_project_types,
 };
-#[cfg(test)]
+#[allow(unused_imports)]
+pub(crate) use task_board_orchestrator::run_task_board_orchestrator_once_async;
 pub use task_board_orchestrator::{
     run_task_board_orchestrator_once, start_task_board_orchestrator, stop_task_board_orchestrator,
     task_board_orchestrator_settings, task_board_orchestrator_status,
     update_task_board_orchestrator_settings,
 };
-pub(crate) use task_board_orchestrator_db::{
-    run_task_board_orchestrator_once_db, start_task_board_orchestrator_db,
-    stop_task_board_orchestrator_db, task_board_orchestrator_settings_db,
-    task_board_orchestrator_status_db, update_task_board_orchestrator_settings_db,
-};
-pub(crate) use task_board_runtime::{
-    acknowledge_task_board_git_runtime_secret_handoff,
-    prepare_task_board_git_runtime_secret_handoff, sync_task_board_git_runtime_key_material,
-    task_board_git_runtime_config_db, update_task_board_git_runtime_config_db,
-    verify_task_board_git_signing_db,
-};
+#[allow(unused_imports)]
+pub(crate) use task_board_runtime::git_runtime_profile_for_repository;
 pub use task_board_runtime::{
-    sync_task_board_github_tokens, sync_task_board_openrouter_token, sync_task_board_todoist_token,
-    task_board_git_identity_defaults,
-};
-#[cfg(test)]
-pub use task_board_runtime::{
-    task_board_git_runtime_config, update_task_board_git_runtime_config,
-    verify_task_board_git_signing,
+    drain_task_board_git_runtime_secrets, sync_task_board_github_tokens,
+    sync_task_board_openrouter_token, sync_task_board_todoist_token,
+    task_board_git_identity_defaults, task_board_git_runtime_config,
+    update_task_board_git_runtime_config, verify_task_board_git_signing,
 };
 pub use wake_route::WakeDispatch;
 pub(crate) use wake_route::{WakeEventLevel, record_wake_event};

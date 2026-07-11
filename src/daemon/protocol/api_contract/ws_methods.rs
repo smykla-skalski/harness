@@ -84,6 +84,7 @@ pub const TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE: &str =
     "task_board.git_runtime_secret_handoff_prepare";
 pub const TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK: &str =
     "task_board.git_runtime_secret_handoff_ack";
+pub const TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS: &str = "task_board.git_runtime_drain_secrets";
 pub const POLICY_CANVAS_WORKSPACE_GET: &str = "policy_canvas.workspace_get";
 pub const POLICY_CANVAS_CREATE: &str = "policy_canvas.create";
 pub const POLICY_CANVAS_DUPLICATE: &str = "policy_canvas.duplicate";
@@ -214,7 +215,6 @@ pub const ALL: &[&str] = &[
     TASK_ARBITRATE,
     IMPROVER_APPLY,
     TASK_BOARD_CREATE,
-    TASK_BOARD_CAPABILITIES,
     TASK_BOARD_LIST,
     TASK_BOARD_GET,
     TASK_BOARD_UPDATE,
@@ -245,8 +245,7 @@ pub const ALL: &[&str] = &[
     TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC,
     TASK_BOARD_GIT_IDENTITY_DEFAULTS,
     TASK_BOARD_GIT_SIGNING_VERIFY,
-    TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
-    TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK,
+    TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
     POLICY_CANVAS_WORKSPACE_GET,
     POLICY_CANVAS_CREATE,
     POLICY_CANVAS_DUPLICATE,

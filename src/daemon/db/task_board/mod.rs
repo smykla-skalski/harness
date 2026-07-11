@@ -11,10 +11,8 @@ mod policy_queues;
 mod policy_runs;
 mod rows;
 
-pub(crate) use dispatch_intents::ClaimedTaskBoardDispatch;
-pub(crate) use dispatch_preparations::{
-    ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
-};
+#[cfg(test)]
+pub(crate) use dispatch_preparations::ReservedTaskBoardDispatch;
 #[allow(unused_imports)]
 pub(crate) use imports::{TaskBoardImportMarker, TaskBoardImportResult};
 #[allow(unused_imports)]

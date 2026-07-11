@@ -89,10 +89,8 @@ mod schema_v29;
 mod schema_v30;
 #[allow(dead_code)]
 mod task_board;
-pub(crate) use task_board::{
-    ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
-    TaskBoardImportMarker,
-};
+#[cfg(test)]
+pub(crate) use task_board::ReservedTaskBoardDispatch;
 mod session_data;
 mod signals;
 mod summaries;

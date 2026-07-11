@@ -1,6 +1,3 @@
-use std::sync::Arc;
-
-use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::CliError;
 use crate::reviews::{
     ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewTarget, ReviewActionResult,
@@ -9,7 +6,7 @@ use crate::reviews::{
     ReviewsPolicyRunResponse, ReviewsPolicyRunStatus, ReviewsPolicyStepType, ReviewsPolicyWait,
 };
 
-use super::policy::preview_reviews_policy_with_audit_db;
+use super::policy::preview_reviews_policy;
 
 pub(super) fn action_response(
     summary_prefix: &str,
@@ -33,22 +30,17 @@ pub(super) fn action_response(
     }
 }
 
-pub(super) async fn preview_auto_review_action(
+pub(super) fn preview_auto_review_action(
     request: &ReviewsActionPreviewRequest,
-    database: Option<Arc<AsyncDaemonDb>>,
 ) -> Result<ReviewsActionPreviewResponse, CliError> {
     let mut warnings = Vec::new();
     let mut targets = Vec::with_capacity(request.targets.len());
     for target in &request.targets {
-        let preview = preview_reviews_policy_with_audit_db(
-            &ReviewsPolicyPreviewRequest {
-                workflow_id: String::new(),
-                target: target.clone(),
-                method: request.method,
-            },
-            database.clone(),
-        )
-        .await?;
+        let preview = preview_reviews_policy(&ReviewsPolicyPreviewRequest {
+            workflow_id: String::new(),
+            target: target.clone(),
+            method: request.method,
+        })?;
         extend_unique_warnings(&mut warnings, &preview.warnings);
         targets.push(ReviewActionPreviewTarget {
             pull_request_id: target.pull_request_id.clone(),

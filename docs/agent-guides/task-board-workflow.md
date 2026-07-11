@@ -6,16 +6,14 @@ dispatch readiness, and overview reporting.
 
 ## Contract
 
-- Treat the task board as daemon-owned Harness state. Read and mutate it only
-  through `harness task-board ...` commands.
-- Task-board commands require a running daemon that advertises database-backed
-  task-board storage. Start Harness Monitor or run `harness daemon dev` first.
-- Use `--json` for machine-readable reads. Do not access the daemon database
-  directly.
+- Treat the task board as Harness state. Read and mutate it only through
+  `harness task-board ...` commands.
+- Use `--json` for machine-readable reads. Do not parse board files directly.
 - Keep titles short and imperative. Put scope, constraints, acceptance
   criteria, and verification notes in `--body`.
 - Use `--project-id` when the work belongs to a known project. Use `--tag` for
   routing labels.
+- Use `--board-root <path>` only for isolated tests or recovery work.
 
 ## Command Surface
 
@@ -37,7 +35,7 @@ dispatch readiness, and overview reporting.
 | `machine` | Print worker-mode overview counts. |
 | `orchestrator` | Manage autonomous task-board ticks and durable settings. |
 
-Common read flag: `--json`.
+Common read flags: `--json`, `--board-root <path>`.
 
 ## Work Item Shape
 
@@ -200,7 +198,7 @@ again.
 
 ## Overview Integration
 
-Use overview commands for task-board summaries:
+Use overview commands instead of reading task-board files:
 
 ```bash
 harness task-board audit --json
@@ -247,10 +245,11 @@ agents:
 - `evaluator`: request an `evaluate` follow-up after worker review.
 - `policy`: include the policy decision that allowed or blocked dispatch.
 
-CLI, HTTP, WebSocket, Monitor, and autonomous orchestrator dispatch all use the
-same daemon executor. Applied plans queue managed workers through the daemon. If
-a leader needs extra capacity, use the dispatch plan plus session agent
-commands:
+The standalone CLI `dispatch` command mutates board/session state but does not
+own live runtime managers. Daemon HTTP and WebSocket dispatch, including Monitor
+and autonomous orchestrator ticks, start the managed worker for every applied
+plan. If a leader is operating from the CLI or needs extra capacity, use the
+dispatch plan plus session agent commands:
 
 ```bash
 harness session agents start terminal <session-id> --runtime <runtime> \
@@ -284,7 +283,7 @@ automation.
 ## Orchestrator
 
 `harness task-board orchestrator` persists autonomous intent and one-tick run
-state in the daemon database. Its command surface is:
+state under the task-board root. Its command surface is:
 
 ```bash
 harness task-board orchestrator status --json
@@ -363,6 +362,6 @@ Missing merge evidence requires a human. Invalid graphs also require a human.
   `in_progress`, `in_review`, `done`, or `blocked` items.
 - Do not bypass the planning/review gate by setting `todo` without
   `--planning-summary` and `--approved-by`.
-- Use `delete` for tombstones; do not mutate task-board storage directly.
+- Use `delete` for tombstones, not manual file removal.
 - Keep `audit`, `project`, `machine`, and `dispatch` output in closeout notes
   when coordinating multiple projects or worker modes.

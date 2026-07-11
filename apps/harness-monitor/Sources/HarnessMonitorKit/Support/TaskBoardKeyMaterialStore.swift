@@ -98,8 +98,6 @@ public struct TaskBoardKeyMaterialStore: TaskBoardKeyMaterialPersisting, Sendabl
   public enum Scope: Hashable, Sendable {
     case global
     case repository(String)
-    case databaseGlobal(String)
-    case databaseRepository(String, String)
 
     public var account: String {
       switch self {
@@ -107,19 +105,12 @@ public struct TaskBoardKeyMaterialStore: TaskBoardKeyMaterialPersisting, Sendabl
         "global"
       case .repository(let slug):
         "repo" + Self.hashRepository(slug)
-      case .databaseGlobal(let instanceID):
-        "db" + Self.hashValue(instanceID) + "-global"
-      case .databaseRepository(let instanceID, let slug):
-        "db" + Self.hashValue(instanceID) + "-repo" + Self.hashValue(slug)
       }
     }
 
     private static func hashRepository(_ slug: String) -> String {
-      hashValue(slug.lowercased())
-    }
-
-    private static func hashValue(_ value: String) -> String {
-      let digest = Insecure.SHA1.hash(data: Data(value.utf8))
+      let normalized = slug.lowercased()
+      let digest = Insecure.SHA1.hash(data: Data(normalized.utf8))
       return digest.map { String(format: "%02x", $0) }.joined()
     }
   }

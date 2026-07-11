@@ -22,18 +22,20 @@ mod integration {
     mod bridge_codex;
     mod bridge_discovery;
     mod bridge_lock_lifecycle;
-    mod cluster;
-    mod commands;
-    mod compact;
     mod daemon_comparison;
     mod daemon_control;
     mod daemon_perf;
     mod daemon_sandbox_mode;
     pub mod helpers;
-    mod hooks;
     mod install_workflow;
     mod mcp;
     mod policy_drift;
+    mod task_board_orchestrator_settings_migration;
+
+    mod cluster;
+    mod commands;
+    mod compact;
+    mod hooks;
     mod preflight;
     mod sandbox;
     mod universal;

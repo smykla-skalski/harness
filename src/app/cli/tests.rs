@@ -360,20 +360,6 @@ fn parse_task_board_operational_subcommands() {
 }
 
 #[test]
-fn task_board_commands_reject_removed_board_root_override() {
-    let error = Cli::try_parse_from([
-        "harness",
-        "task-board",
-        "list",
-        "--board-root",
-        "/tmp/task-board",
-    ])
-    .expect_err("task-board storage must not be caller-selectable");
-
-    assert_eq!(error.kind(), ErrorKind::UnknownArgument);
-}
-
-#[test]
 fn parse_task_board_planning_transitions() {
     let begin = Cli::try_parse_from(["harness", "task-board", "begin", "task-1"]).unwrap();
     match task_board_command(begin.command) {

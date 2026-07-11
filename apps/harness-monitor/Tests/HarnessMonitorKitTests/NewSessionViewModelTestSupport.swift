@@ -119,7 +119,6 @@ final class SpyHarnessClient: HarnessMonitorClientProtocol, @unchecked Sendable 
   }
 
   func health() async throws -> HealthResponse { throw error }
-  func taskBoardCapabilities() async throws -> TaskBoardCapabilities { throw error }
   func diagnostics() async throws -> DaemonDiagnosticsReport { throw error }
   func stopDaemon() async throws -> DaemonControlResponse { throw error }
   func projects() async throws -> [ProjectSummary] { throw error }

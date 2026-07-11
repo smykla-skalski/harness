@@ -32,7 +32,7 @@ pub async fn resolve_review_pull_requests(
     if !resolved.repository_labels.is_empty() {
         patch_cached_repository_labels(&resolved.repository_labels);
     }
-    patch_cached_items(&resolved.items, &[], &resolved.authoritative_viewer_keys);
+    patch_cached_items(&resolved.items, &[]);
     policy_event_inbox::resume_waiting_reviews_policy_runs(&resolved.items).await;
     policy::start_background_reviews_policy_runs(&resolved.items).await;
     Ok(ReviewsPullRequestResolveResponse {

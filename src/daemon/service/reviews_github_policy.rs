@@ -1,13 +1,18 @@
+use std::sync::Arc;
+
 use crate::daemon::{db::DaemonDb, state};
 use crate::errors::{CliError, CliErrorKind};
 use crate::reviews::policy::review_target_policy_evidence;
 use crate::reviews::{
     ReviewTarget, ReviewsApproveRequest, ReviewsApproveRequestSource, ReviewsFileCommentRequest,
 };
-use crate::task_board::policy_graph::{RecordedPolicyDecision, record_policy_decision};
+use crate::task_board::policy_graph::{
+    CachedGatePolicy, RecordedPolicyDecision, cached_gate_policy, record_policy_decision,
+};
+use crate::task_board::store::default_board_root;
 use crate::task_board::{
-    PolicyAction, PolicyDecision, PolicyEvidence, PolicyGraph, PolicyGraphNodeKind, PolicyInput,
-    PolicyReasonCode, PolicySubject,
+    PolicyAction, PolicyDecision, PolicyEvidence, PolicyGraph, PolicyGraphMode,
+    PolicyGraphNodeKind, PolicyInput, PolicyReasonCode, PolicySubject,
 };
 
 const REVIEW_APPROVE_ACTION_ID: &str = "reviews.approve";
@@ -17,11 +22,6 @@ const REVIEW_TEXT_PASTE_APPROVE_ACTION: &str = "approveReviewPullRequests";
 enum ReviewsPolicyInputRequirement {
     None,
     ReviewTextPasteApproves,
-}
-
-struct EnforcedReviewsPolicy {
-    canvas_id: String,
-    document: PolicyGraph,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -90,7 +90,7 @@ pub(crate) fn enforce_review_targets_policy(
             &entry.document,
             &input,
             Some(target),
-            Some(entry.canvas_id.as_str()),
+            entry.canvas_id.as_deref(),
             ReviewsPolicyInputRequirement::None,
         )?;
     }
@@ -171,7 +171,7 @@ pub(crate) fn enforce_review_pull_request_policy(
         &entry.document,
         &input,
         None,
-        Some(entry.canvas_id.as_str()),
+        entry.canvas_id.as_deref(),
         ReviewsPolicyInputRequirement::None,
     )
 }
@@ -195,24 +195,21 @@ fn enforced_review_text_paste_policy_canvas() -> Result<(String, PolicyGraph), C
 
 fn enforced_reviews_github_policy_entry(
     mutation: ReviewsGitHubMutation,
-) -> Result<EnforcedReviewsPolicy, CliError> {
-    let db = DaemonDb::open(&state::daemon_root().join("harness.db"))?;
-    let Some(workspace) = db.load_policy_workspace()? else {
+) -> Result<Arc<CachedGatePolicy>, CliError> {
+    let root = default_board_root();
+    let Some(cached) = cached_gate_policy(&root) else {
         return Err(disabled_reviews_policy_error(
             mutation,
             "no enforced policy canvas is active",
         ));
     };
-    let Some((canvas, document)) = workspace.active_live_canvas() else {
+    if cached.mode != PolicyGraphMode::Enforced {
         return Err(disabled_reviews_policy_error(
             mutation,
             "no enforced policy canvas is active",
         ));
-    };
-    Ok(EnforcedReviewsPolicy {
-        canvas_id: canvas.id.clone(),
-        document: document.clone(),
-    })
+    }
+    Ok(cached)
 }
 
 fn enforce_reviews_policy_input(

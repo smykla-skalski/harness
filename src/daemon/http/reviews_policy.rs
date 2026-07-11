@@ -63,8 +63,7 @@ async fn post_reviews_policy_preview(
         http_paths::REVIEWS_POLICY_PREVIEW,
         &request_id,
         start,
-        service::preview_reviews_policy_with_audit_db(&request, state.async_db.get().cloned())
-            .await,
+        service::preview_reviews_policy(&request),
     )
 }
 
@@ -77,9 +76,7 @@ async fn post_reviews_policy_start(
         Ok(context) => context,
         Err(response) => return *response,
     };
-    let result =
-        service::start_reviews_policy_run_with_audit_db(&request, state.async_db.get().cloned())
-            .await;
+    let result = service::start_reviews_policy_run(&request).await;
     timed_json(
         "POST",
         http_paths::REVIEWS_POLICY_START,
@@ -103,7 +100,7 @@ async fn post_reviews_policy_status(
         http_paths::REVIEWS_POLICY_STATUS,
         &request_id,
         start,
-        service::reviews_policy_status_with_audit_db(&request, state.async_db.get().cloned()).await,
+        service::reviews_policy_status(&request),
     )
 }
 
@@ -121,7 +118,6 @@ async fn post_reviews_policy_history(
         http_paths::REVIEWS_POLICY_HISTORY,
         &request_id,
         start,
-        service::reviews_policy_history_with_audit_db(&request, state.async_db.get().cloned())
-            .await,
+        service::reviews_policy_history(&request),
     )
 }

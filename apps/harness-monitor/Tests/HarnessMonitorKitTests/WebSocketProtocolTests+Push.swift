@@ -160,29 +160,4 @@ extension WebSocketProtocolTests {
     #expect(payload.revision == 12)
     #expect(payload.operation == "task_board.github.update_issue")
   }
-
-  @Test("Daemon push event decodes scoped Task Board changes")
-  func daemonPushEventDecodesTaskBoardChange() throws {
-    let json = #"""
-      {
-        "event": "task_board_updated",
-        "recorded_at": "2026-07-11T10:00:00Z",
-        "session_id": null,
-        "payload": {
-          "revision": 14,
-          "scopes": ["task_board:items", "task_board:orchestrator"]
-        }
-      }
-      """#
-
-    let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
-    let event = try DaemonPushEvent(streamEvent: streamEvent)
-
-    guard case .taskBoardUpdated(let payload) = event.kind else {
-      Issue.record("Expected taskBoardUpdated push, got \(event.kind)")
-      return
-    }
-    #expect(payload.revision == 14)
-    #expect(payload.scopes == ["task_board:items", "task_board:orchestrator"])
-  }
 }

@@ -1,13 +1,9 @@
-#[cfg(test)]
 use std::path::PathBuf;
 
-#[cfg(test)]
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[cfg(test)]
 use crate::errors::CliError;
-#[cfg(test)]
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 
 use super::models::PolicyWorkflowEvent;
@@ -16,7 +12,6 @@ pub const POLICY_EVENT_INBOX_SCHEMA_VERSION: u32 = 1;
 
 /// Pending events older than this are pruned on publish and on drain so an
 /// event that never matches a waiting run cannot accumulate forever.
-#[cfg(test)]
 const EVENT_RETENTION_SECONDS: i64 = 3600;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,12 +36,10 @@ impl Default for PolicyEventInboxDocument {
 /// calls `remove_delivered`. Delivery is decoupled from the producer so a
 /// run resumes even when the producing refresh and the consuming loop run on
 /// different schedules.
-#[cfg(test)]
 pub struct PolicyEventInbox {
     repository: VersionedJsonRepository<PolicyEventInboxDocument>,
 }
 
-#[cfg(test)]
 impl PolicyEventInbox {
     #[must_use]
     pub fn new(mut root: PathBuf) -> Self {
@@ -130,17 +123,14 @@ impl PolicyEventInbox {
     }
 }
 
-#[cfg(test)]
 fn same_slot(left: &PolicyWorkflowEvent, right: &PolicyWorkflowEvent) -> bool {
     left.event_key == right.event_key && left.subject_key == right.subject_key
 }
 
-#[cfg(test)]
 fn prune_expired(events: &mut Vec<PolicyWorkflowEvent>, now: DateTime<Utc>) {
     events.retain(|event| !event_is_expired(event, now));
 }
 
-#[cfg(test)]
 fn event_is_expired(event: &PolicyWorkflowEvent, now: DateTime<Utc>) -> bool {
     DateTime::parse_from_rfc3339(&event.occurred_at).is_ok_and(|occurred| {
         now.signed_duration_since(occurred.with_timezone(&Utc))

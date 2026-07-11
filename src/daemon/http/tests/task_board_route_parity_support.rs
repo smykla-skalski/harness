@@ -13,7 +13,7 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::task_board::planning::{approve_plan, submit_plan};
-use crate::task_board::{TaskBoardItem, TaskBoardStatus};
+use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root};
 
 pub(super) async fn serve_http(
     state: crate::daemon::http::DaemonHttpState,
@@ -141,12 +141,8 @@ pub(super) async fn assert_http_ws_get_match(
     assert_eq!(http, ws);
 }
 
-pub(super) async fn assert_run_once_routes_match(
-    client: &reqwest::Client,
-    base_url: &str,
-    state: &crate::daemon::http::DaemonHttpState,
-) {
-    seed_ready_board_item(state, "parity-run-once-http", "Run once HTTP parity item").await;
+pub(super) async fn assert_run_once_routes_match(client: &reqwest::Client, base_url: &str) {
+    seed_ready_board_item("parity-run-once-http", "Run once HTTP parity item");
     let http = post_json(
         client,
         base_url,
@@ -163,7 +159,7 @@ pub(super) async fn assert_run_once_routes_match(
     )
     .await;
 
-    seed_ready_board_item(state, "parity-run-once-ws", "Run once WS parity item").await;
+    seed_ready_board_item("parity-run-once-ws", "Run once WS parity item");
     let ws = ws_result(
         base_url,
         "req-task-board-orchestrator-run-once",
@@ -370,11 +366,8 @@ pub(super) async fn seed_policy_canvas_pair(
     (primary_canvas_id, secondary_canvas_id)
 }
 
-pub(super) async fn seed_ready_board_item(
-    state: &crate::daemon::http::DaemonHttpState,
-    id: &str,
-    title: &str,
-) {
+pub(super) fn seed_ready_board_item(id: &str, title: &str) {
+    let store = TaskBoardStore::new(default_board_root());
     let mut item = TaskBoardItem::new(
         id.to_string(),
         title.to_string(),
@@ -384,19 +377,13 @@ pub(super) async fn seed_ready_board_item(
     item.status = TaskBoardStatus::Todo;
     let item = submit_plan(&item, "Use dry-run dispatch.").apply_to(&item);
     let item = approve_plan(&item, "lead", "2026-05-14T01:00:00Z").apply_to(&item);
-    state
-        .async_db
-        .get()
-        .expect("async db")
-        .create_task_board_item(item)
-        .await
-        .expect("create item");
+    let title = item.title.clone();
+    let body = item.body.clone();
+    store.create(&title, &body, item).expect("create item");
 }
 
-pub(super) async fn seed_planning_board_item(
-    state: &crate::daemon::http::DaemonHttpState,
-    id: &str,
-) {
+pub(super) fn seed_planning_board_item(id: &str) {
+    let store = TaskBoardStore::new(default_board_root());
     let mut item = TaskBoardItem::new(
         id.to_string(),
         "Planning parity item".to_string(),
@@ -407,13 +394,9 @@ pub(super) async fn seed_planning_board_item(
     item.planning.summary = Some("Old plan".into());
     item.planning.approved_by = Some("lead".into());
     item.planning.approved_at = Some("2026-05-14T01:00:00Z".into());
-    state
-        .async_db
-        .get()
-        .expect("async db")
-        .create_task_board_item(item)
-        .await
-        .expect("create item");
+    let title = item.title.clone();
+    let body = item.body.clone();
+    store.create(&title, &body, item).expect("create item");
 }
 
 pub(super) fn planning_path(template: &str, id: &str) -> String {

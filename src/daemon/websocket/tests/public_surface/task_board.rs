@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 
 use crate::task_board::planning::{approve_plan, submit_plan};
-use crate::task_board::{TaskBoardItem, TaskBoardStatus};
+use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root};
 
 use super::super::*;
 
@@ -32,8 +32,8 @@ async fn run_websocket_task_board_item_scope_flow(
     connection: &Arc<Mutex<ConnectionState>>,
     project_dir: &std::path::Path,
 ) {
-    seed_ready_board_item(state, "board-ws-dispatch", "WS dispatch item").await;
-    seed_ready_board_item(state, "board-ws-dispatch-other", "WS dispatch other item").await;
+    seed_ready_board_item("board-ws-dispatch", "WS dispatch item");
+    seed_ready_board_item("board-ws-dispatch-other", "WS dispatch other item");
     let dispatch_response =
         dispatch_ws_item(state, connection, "board-ws-dispatch", project_dir).await;
     let applied = first_applied(response_result(&dispatch_response));
@@ -41,7 +41,7 @@ async fn run_websocket_task_board_item_scope_flow(
     let work_item_id = required_string(applied, "work_item_id");
     assert_eq!(applied["board_item_id"].as_str(), Some("board-ws-dispatch"));
     assert_eq!(applied["item"]["status"].as_str(), Some("in_progress"));
-    assert_board_item_unlinked(state, "board-ws-dispatch-other").await;
+    assert_board_item_unlinked("board-ws-dispatch-other");
 
     let other_dispatch =
         dispatch_ws_item(state, connection, "board-ws-dispatch-other", project_dir).await;
@@ -74,13 +74,8 @@ async fn run_websocket_task_board_item_scope_flow(
         evaluation_result["records"][0]["board_item_id"].as_str(),
         Some("board-ws-dispatch")
     );
-    assert_board_item_status(state, "board-ws-dispatch", TaskBoardStatus::Done).await;
-    assert_board_item_status(
-        state,
-        "board-ws-dispatch-other",
-        TaskBoardStatus::InProgress,
-    )
-    .await;
+    assert_board_item_status("board-ws-dispatch", TaskBoardStatus::Done);
+    assert_board_item_status("board-ws-dispatch-other", TaskBoardStatus::InProgress);
 }
 
 async fn run_websocket_task_board_run_once_flow(
@@ -88,8 +83,8 @@ async fn run_websocket_task_board_run_once_flow(
     connection: &Arc<Mutex<ConnectionState>>,
     project_dir: &std::path::Path,
 ) {
-    seed_ready_board_item(state, "board-ws-run-once", "WS run once item").await;
-    seed_ready_board_item(state, "board-ws-run-once-other", "WS run once other item").await;
+    seed_ready_board_item("board-ws-run-once", "WS run once item");
+    seed_ready_board_item("board-ws-run-once-other", "WS run once other item");
     let run_once_response = dispatch(
         &request(
             "req-task-board-run-once",
@@ -134,7 +129,7 @@ async fn run_websocket_task_board_run_once_flow(
             .as_array()
             .is_some_and(|trace_ids| !trace_ids.is_empty())
     );
-    assert_board_item_unlinked(state, "board-ws-run-once-other").await;
+    assert_board_item_unlinked("board-ws-run-once-other");
 }
 
 async fn dispatch_ws_item(
@@ -235,7 +230,8 @@ fn response_result(response: &WsResponse) -> &Value {
     response.result.as_ref().expect("websocket result")
 }
 
-async fn seed_ready_board_item(state: &DaemonHttpState, id: &str, title: &str) {
+fn seed_ready_board_item(id: &str, title: &str) {
+    let store = TaskBoardStore::new(default_board_root());
     let mut item = TaskBoardItem::new(
         id.to_string(),
         title.to_string(),
@@ -245,13 +241,9 @@ async fn seed_ready_board_item(state: &DaemonHttpState, id: &str, title: &str) {
     item.status = TaskBoardStatus::Todo;
     let item = submit_plan(&item, "Use task dispatch.").apply_to(&item);
     let item = approve_plan(&item, "lead", "2026-05-14T01:00:00Z").apply_to(&item);
-    state
-        .async_db
-        .get()
-        .expect("async db")
-        .create_task_board_item(item)
-        .await
-        .expect("create item");
+    let title = item.title.clone();
+    let body = item.body.clone();
+    store.create(&title, &body, item).expect("create item");
 }
 
 fn first_applied(value: &Value) -> &Value {
@@ -261,25 +253,17 @@ fn first_applied(value: &Value) -> &Value {
         .expect("first applied task")
 }
 
-async fn assert_board_item_unlinked(state: &DaemonHttpState, id: &str) {
-    let item = state
-        .async_db
-        .get()
-        .expect("async db")
-        .task_board_item(id)
-        .await
+fn assert_board_item_unlinked(id: &str) {
+    let item = TaskBoardStore::new(default_board_root())
+        .get(id)
         .expect("load board item");
     assert_eq!(item.status, TaskBoardStatus::Todo);
     assert!(item.work_item_id.is_none());
 }
 
-async fn assert_board_item_status(state: &DaemonHttpState, id: &str, status: TaskBoardStatus) {
-    let item = state
-        .async_db
-        .get()
-        .expect("async db")
-        .task_board_item(id)
-        .await
+fn assert_board_item_status(id: &str, status: TaskBoardStatus) {
+    let item = TaskBoardStore::new(default_board_root())
+        .get(id)
         .expect("load board item");
     assert_eq!(item.status, status);
 }

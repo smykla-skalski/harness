@@ -78,6 +78,7 @@ pub const TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE: &str =
     "/v1/task-board/git/runtime/secret-handoff/prepare";
 pub const TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK: &str =
     "/v1/task-board/git/runtime/secret-handoff/ack";
+pub const TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS: &str = "/v1/task-board/git/runtime/drain-secrets";
 pub const POLICY_CANVASES: &str = "/v1/policy-canvases";
 pub const POLICY_CANVASES_CREATE: &str = "/v1/policy-canvases/create";
 pub const POLICY_CANVASES_DUPLICATE: &str = "/v1/policy-canvases/duplicate";

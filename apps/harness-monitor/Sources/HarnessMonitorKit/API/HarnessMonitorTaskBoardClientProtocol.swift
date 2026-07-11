@@ -1,7 +1,6 @@
 import Foundation
 
 public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
-  func taskBoardCapabilities() async throws -> TaskBoardCapabilities
   func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem]
   func taskBoardItem(id: String) async throws -> TaskBoardItem
   func createTaskBoardItem(request: TaskBoardCreateItemRequest) async throws -> TaskBoardItem
@@ -62,14 +61,7 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func verifyTaskBoardGitSigning(
     request: TaskBoardGitSigningVerifyRequest
   ) async throws -> TaskBoardGitSigningVerifyResponse
-  func syncTaskBoardGitRuntimeKeyMaterial(
-    request: TaskBoardGitRuntimeKeyMaterialSyncRequest
-  ) async throws -> TaskBoardGitRuntimeKeyMaterialSyncResponse
-  func prepareTaskBoardGitRuntimeSecretHandoff() async throws
-    -> TaskBoardGitRuntimeSecretHandoffPrepareResponse
-  func acknowledgeTaskBoardGitRuntimeSecretHandoff(
-    request: TaskBoardGitRuntimeSecretHandoffAckRequest
-  ) async throws -> TaskBoardGitRuntimeSecretHandoffAckResponse
+  func drainTaskBoardGitRuntimeSecrets() async throws -> TaskBoardGitRuntimeDrainSecretsResponse
   func policyCanvasWorkspace() async throws -> PolicyCanvasWorkspace
   func createPolicyCanvas(
     request: PolicyCanvasCreateRequest
@@ -131,13 +123,6 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
 }
 
 extension HarnessMonitorTaskBoardClientProtocol {
-  public func taskBoardCapabilities() async throws -> TaskBoardCapabilities {
-    throw HarnessMonitorAPIError.server(
-      code: 501,
-      message: "Database-backed task board unavailable"
-    )
-  }
-
   public func taskBoardItems(status _: TaskBoardStatus?) async throws -> [TaskBoardItem] {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable")
   }
@@ -330,21 +315,9 @@ extension HarnessMonitorTaskBoardClientProtocol {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable")
   }
 
-  public func syncTaskBoardGitRuntimeKeyMaterial(
-    request _: TaskBoardGitRuntimeKeyMaterialSyncRequest
-  ) async throws -> TaskBoardGitRuntimeKeyMaterialSyncResponse {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable")
-  }
-
-  public func prepareTaskBoardGitRuntimeSecretHandoff() async throws
-    -> TaskBoardGitRuntimeSecretHandoffPrepareResponse
+  public func drainTaskBoardGitRuntimeSecrets() async throws
+    -> TaskBoardGitRuntimeDrainSecretsResponse
   {
-    throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable")
-  }
-
-  public func acknowledgeTaskBoardGitRuntimeSecretHandoff(
-    request _: TaskBoardGitRuntimeSecretHandoffAckRequest
-  ) async throws -> TaskBoardGitRuntimeSecretHandoffAckResponse {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board unavailable")
   }
 

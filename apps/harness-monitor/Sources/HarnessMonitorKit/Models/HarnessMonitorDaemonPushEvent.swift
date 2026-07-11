@@ -40,16 +40,6 @@ public struct GitHubDataChangedPayload: Codable, Equatable, Sendable {
   }
 }
 
-public struct TaskBoardUpdatedPayload: Codable, Equatable, Sendable {
-  public let revision: UInt64
-  public let scopes: [String]
-
-  public init(revision: UInt64, scopes: [String]) {
-    self.revision = revision
-    self.scopes = scopes
-  }
-}
-
 public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
   public enum Kind: Equatable, Sendable {
     case ready
@@ -70,7 +60,6 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case acpPermissionBatch(AcpPermissionBatch)
     case acpPermissionBatchRemoved(AcpPermissionBatchRemovedPayload)
     case githubDataChanged(GitHubDataChangedPayload)
-    case taskBoardUpdated(TaskBoardUpdatedPayload)
     case reviewsLocalCloneProgress(ReviewLocalCloneProgress)
     case auditEvent(HarnessMonitorAuditEvent)
     case unknown(eventName: String, payload: JSONValue)
@@ -155,14 +144,6 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         sessionId: nil,
         kind: .githubDataChanged(
           try streamEvent.decodePayloadWire(as: GitHubDataChangedPayload.self)
-        )
-      )
-    case "task_board_updated":
-      return Self(
-        recordedAt: at,
-        sessionId: nil,
-        kind: .taskBoardUpdated(
-          try streamEvent.decodePayloadWire(as: TaskBoardUpdatedPayload.self)
         )
       )
     case "audit_event":

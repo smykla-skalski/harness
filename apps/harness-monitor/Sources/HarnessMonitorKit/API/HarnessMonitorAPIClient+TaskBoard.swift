@@ -1,10 +1,6 @@
 import Foundation
 
 extension HarnessMonitorAPIClient {
-  public func taskBoardCapabilities() async throws -> TaskBoardCapabilities {
-    try await get("/v1/task-board/capabilities", decoder: PolicyWireCoding.decoder)
-  }
-
   public func taskBoardItems(status: TaskBoardStatus? = nil) async throws -> [TaskBoardItem] {
     let response: TaskBoardListItemsResponseWire = try await get(
       "/v1/task-board/items",
@@ -283,35 +279,15 @@ extension HarnessMonitorAPIClient {
     return TaskBoardGitSigningVerifyResponse(wire: wire)
   }
 
-  public func syncTaskBoardGitRuntimeKeyMaterial(
-    request: TaskBoardGitRuntimeKeyMaterialSyncRequest
-  ) async throws -> TaskBoardGitRuntimeKeyMaterialSyncResponse {
-    try await put(
-      "/v1/task-board/git/runtime/key-material",
-      body: request,
-      decoder: PolicyWireCoding.decoder
-    )
-  }
-
-  public func prepareTaskBoardGitRuntimeSecretHandoff() async throws
-    -> TaskBoardGitRuntimeSecretHandoffPrepareResponse
+  public func drainTaskBoardGitRuntimeSecrets() async throws
+    -> TaskBoardGitRuntimeDrainSecretsResponse
   {
-    let wire: TaskBoardGitRuntimeSecretHandoffPrepareResponseWire = try await post(
-      "/v1/task-board/git/runtime/secret-handoff/prepare",
-      body: TaskBoardGitRuntimeSecretHandoffPrepareRequest(),
+    let wire: TaskBoardGitRuntimeDrainSecretsResponseWire = try await post(
+      "/v1/task-board/git/runtime/drain-secrets",
+      body: TaskBoardGitRuntimeDrainSecretsRequest(),
       decoder: PolicyWireCoding.decoder
     )
-    return TaskBoardGitRuntimeSecretHandoffPrepareResponse(wire: wire)
-  }
-
-  public func acknowledgeTaskBoardGitRuntimeSecretHandoff(
-    request: TaskBoardGitRuntimeSecretHandoffAckRequest
-  ) async throws -> TaskBoardGitRuntimeSecretHandoffAckResponse {
-    try await post(
-      "/v1/task-board/git/runtime/secret-handoff/ack",
-      body: request,
-      decoder: PolicyWireCoding.decoder
-    )
+    return TaskBoardGitRuntimeDrainSecretsResponse(wire: wire)
   }
 
   private func taskBoardQueryItems(status: TaskBoardStatus?) -> [URLQueryItem] {

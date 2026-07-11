@@ -5,11 +5,9 @@ use axum::routing::{get, post, put};
 use axum::{Json, Router};
 
 use crate::daemon::protocol::{
-    TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
-    TaskBoardGitRuntimeKeyMaterialSyncRequest, TaskBoardGitRuntimeSecretHandoffAckRequest,
-    TaskBoardGitSigningVerifyRequest, TaskBoardOpenRouterTokenSyncRequest,
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
-    TaskBoardTodoistTokenSyncRequest, http_paths,
+    TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig, TaskBoardGitSigningVerifyRequest,
+    TaskBoardOpenRouterTokenSyncRequest, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardTodoistTokenSyncRequest, http_paths,
 };
 
 use super::DaemonHttpState;
@@ -70,16 +68,8 @@ pub(super) fn merge_orchestrator_routes(
             post(post_task_board_git_signing_verify),
         )
         .route(
-            http_paths::TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL,
-            put(put_task_board_git_runtime_key_material),
-        )
-        .route(
-            http_paths::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
-            post(post_task_board_git_runtime_secret_handoff_prepare),
-        )
-        .route(
-            http_paths::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK,
-            post(post_task_board_git_runtime_secret_handoff_ack),
+            http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+            post(post_task_board_git_runtime_drain_secrets),
         )
 }
 
@@ -96,7 +86,7 @@ async fn get_task_board_orchestrator_status(
         http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
         &request_id,
         start,
-        task_board_route_executor::orchestrator_status(&state).await,
+        task_board_route_executor::orchestrator_status().await,
     )
 }
 
@@ -113,7 +103,7 @@ async fn post_task_board_orchestrator_start(
         http_paths::TASK_BOARD_ORCHESTRATOR_START,
         &request_id,
         start,
-        task_board_route_executor::start_orchestrator(&state).await,
+        task_board_route_executor::start_orchestrator().await,
     )
 }
 
@@ -130,7 +120,7 @@ async fn post_task_board_orchestrator_stop(
         http_paths::TASK_BOARD_ORCHESTRATOR_STOP,
         &request_id,
         start,
-        task_board_route_executor::stop_orchestrator(&state).await,
+        task_board_route_executor::stop_orchestrator().await,
     )
 }
 
@@ -167,7 +157,7 @@ async fn get_task_board_orchestrator_settings(
         http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
         &request_id,
         start,
-        task_board_route_executor::orchestrator_settings(&state).await,
+        task_board_route_executor::orchestrator_settings().await,
     )
 }
 
@@ -185,7 +175,7 @@ async fn put_task_board_orchestrator_settings(
         http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
         &request_id,
         start,
-        task_board_route_executor::update_orchestrator_settings(&state, &request).await,
+        task_board_route_executor::update_orchestrator_settings(&request).await,
     )
 }
 
@@ -202,7 +192,7 @@ async fn get_task_board_orchestrator_runtime_config(
         http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
         &request_id,
         start,
-        task_board_route_executor::runtime_config(&state).await,
+        task_board_route_executor::runtime_config().await,
     )
 }
 
@@ -220,7 +210,7 @@ async fn put_task_board_orchestrator_runtime_config(
         http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
         &request_id,
         start,
-        task_board_route_executor::update_runtime_config(&state, &request).await,
+        task_board_route_executor::update_runtime_config(&request).await,
     )
 }
 
@@ -309,29 +299,11 @@ async fn post_task_board_git_signing_verify(
         http_paths::TASK_BOARD_GIT_SIGNING_VERIFY,
         &request_id,
         start,
-        task_board_route_executor::verify_git_signing(&state, &request).await,
+        task_board_route_executor::verify_git_signing(&request).await,
     )
 }
 
-async fn put_task_board_git_runtime_key_material(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardGitRuntimeKeyMaterialSyncRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "PUT",
-        http_paths::TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL,
-        &request_id,
-        start,
-        task_board_route_executor::sync_git_runtime_key_material(&request).await,
-    )
-}
-
-async fn post_task_board_git_runtime_secret_handoff_prepare(
+async fn post_task_board_git_runtime_drain_secrets(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
@@ -341,27 +313,9 @@ async fn post_task_board_git_runtime_secret_handoff_prepare(
     };
     timed_json(
         "POST",
-        http_paths::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
+        http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
         &request_id,
         start,
-        task_board_route_executor::prepare_git_runtime_secret_handoff(&state).await,
-    )
-}
-
-async fn post_task_board_git_runtime_secret_handoff_ack(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardGitRuntimeSecretHandoffAckRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "POST",
-        http_paths::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK,
-        &request_id,
-        start,
-        task_board_route_executor::acknowledge_git_runtime_secret_handoff(&state, &request).await,
+        task_board_route_executor::drain_git_runtime_secrets().await,
     )
 }

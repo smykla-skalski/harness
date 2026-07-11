@@ -26,7 +26,6 @@ extension TaskBoardAPIClientTests {
     let todoistTokenSync = try await performWebSocketTodoistTokenCalls(transport)
     try await performWebSocketDiscoveryCalls(transport)
     let planning = try await performWebSocketPlanningCalls(transport)
-    try await performWebSocketSecretHandoffCalls(transport)
 
     let calls = await probe.calls
     return TaskBoardWebSocketContractResult(
@@ -173,24 +172,6 @@ extension TaskBoardAPIClientTests {
     )
   }
 
-  private func performWebSocketSecretHandoffCalls(_ transport: WebSocketTransport) async throws {
-    let prepared = try await transport.prepareTaskBoardGitRuntimeSecretHandoff()
-    #expect(prepared.migrationID == "migration-1")
-    _ = try await transport.acknowledgeTaskBoardGitRuntimeSecretHandoff(
-      request: TaskBoardGitRuntimeSecretHandoffAckRequest(
-        migrationID: "migration-1",
-        digest: "digest-1"
-      )
-    )
-    let capabilities = try await transport.taskBoardCapabilities()
-    #expect(capabilities.instanceID == "task-board-instance-1")
-    _ = try await transport.syncTaskBoardGitRuntimeKeyMaterial(
-      request: TaskBoardGitRuntimeKeyMaterialSyncRequest(
-        runtime: taskBoardRuntimeConfigUpdateRequest()
-      )
-    )
-  }
-
   func assertWebSocketRPCContract(_ calls: [RPCProbe.Call]) {
     #expect(
       calls.map(\.method)
@@ -219,10 +200,6 @@ extension TaskBoardAPIClientTests {
           .taskBoardPlanBegin,
           .taskBoardPlanSubmit,
           .taskBoardPlanApprove,
-          .taskBoardGitRuntimeSecretHandoffPrepare,
-          .taskBoardGitRuntimeSecretHandoffAck,
-          .taskBoardCapabilities,
-          .taskBoardGitRuntimeKeyMaterialSync,
         ]
     )
   }
@@ -303,11 +280,6 @@ extension TaskBoardAPIClientTests {
     #expect(objectValue(calls[23].params, key: "id") == .string("board-1"))
     #expect(objectValue(calls[23].params, key: "approved_by") == .string("lead"))
     #expect(objectValue(calls[23].params, key: "approved_at") == .string("2026-05-14T02:00:00Z"))
-    #expect(calls[24].params == nil)
-    #expect(objectValue(calls[25].params, key: "migration_id") == .string("migration-1"))
-    #expect(objectValue(calls[25].params, key: "digest") == .string("digest-1"))
-    #expect(calls[26].params == nil)
-    #expect(objectValue(calls[27].params, key: "runtime") != nil)
   }
 
   func assertWebSocketResults(_ result: TaskBoardWebSocketContractResult) {

@@ -1,23 +1,48 @@
 use crate::daemon::agent_tui::AgentTuiStartRequest;
 use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking, run_terminal_agent_blocking};
-use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, ManagedAgentSnapshot};
+use crate::daemon::protocol::{
+    CodexRunMode, CodexRunRequest, ManagedAgentSnapshot, TaskBoardOrchestratorRunOnceResponse,
+};
 use crate::errors::CliError;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::{AgentMode, DispatchAppliedTask, TaskBoardItem};
 
 const DEFAULT_INTERACTIVE_RUNTIME: &str = "codex";
 
-pub(crate) async fn start_worker_for_applied_task(
+/// Spawn workers for every applied dispatch, returning per-task outcomes so the
+/// caller can roll back the board link patch when a worker fails to start.
+pub(crate) async fn start_workers_for_applied_dispatch(
+    state: &DaemonHttpState,
+    applied: &[DispatchAppliedTask],
+) -> Vec<Result<ManagedAgentSnapshot, CliError>> {
+    let mut results = Vec::with_capacity(applied.len());
+    for applied_task in applied {
+        results.push(start_worker_for_applied_task(state, applied_task).await);
+    }
+    results
+}
+
+pub(crate) async fn start_workers_for_run_once_status(
+    state: &DaemonHttpState,
+    status: &TaskBoardOrchestratorRunOnceResponse,
+) -> Vec<Result<ManagedAgentSnapshot, CliError>> {
+    let applied = status
+        .last_run
+        .as_ref()
+        .and_then(|run| run.dispatch.as_ref())
+        .map(|dispatch| dispatch.applied.as_slice())
+        .unwrap_or_default();
+    start_workers_for_applied_dispatch(state, applied).await
+}
+
+async fn start_worker_for_applied_task(
     state: &DaemonHttpState,
     applied: &DispatchAppliedTask,
-    dispatch_intent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
     match applied.item.agent_mode {
-        AgentMode::Interactive => {
-            start_interactive_worker(state, applied, dispatch_intent_id).await
-        }
+        AgentMode::Interactive => start_interactive_worker(state, applied).await,
         AgentMode::Headless | AgentMode::Planning | AgentMode::Evaluate => {
-            start_codex_worker(state, applied, dispatch_intent_id).await
+            start_codex_worker(state, applied).await
         }
     }
 }
@@ -25,18 +50,16 @@ pub(crate) async fn start_worker_for_applied_task(
 async fn start_codex_worker(
     state: &DaemonHttpState,
     applied: &DispatchAppliedTask,
-    dispatch_intent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
     let request = codex_worker_request(applied);
     let session_id = applied.session_id.clone();
-    let run_id = codex_worker_id(dispatch_intent_id);
     let _guard = state
         .managed_agent_mutation_locks
         .lock(&session_id, "task-board:codex-worker")
         .await;
     run_codex_agent_blocking(state, "task-board worker start", move |controller| {
         controller
-            .start_run_with_id(&session_id, &request, run_id)
+            .start_run(&session_id, &request)
             .map(ManagedAgentSnapshot::Codex)
     })
     .await
@@ -45,18 +68,16 @@ async fn start_codex_worker(
 async fn start_interactive_worker(
     state: &DaemonHttpState,
     applied: &DispatchAppliedTask,
-    dispatch_intent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
     let session_id = applied.session_id.clone();
     let request = terminal_worker_request(applied);
-    let tui_id = terminal_worker_id(dispatch_intent_id);
     let _guard = state
         .managed_agent_mutation_locks
         .lock(&session_id, "task-board:terminal-worker")
         .await;
     run_terminal_agent_blocking(state, "task-board worker start", move |manager| {
         manager
-            .start_with_id(&session_id, &request, tui_id)
+            .start(&session_id, &request)
             .map(ManagedAgentSnapshot::Terminal)
     })
     .await
@@ -112,14 +133,6 @@ fn terminal_worker_request(applied: &DispatchAppliedTask) -> AgentTuiStartReques
 
 fn worker_name(item: &TaskBoardItem) -> String {
     format!("Task Board: {}", item.title)
-}
-
-fn codex_worker_id(dispatch_intent_id: &str) -> String {
-    format!("codex-{dispatch_intent_id}")
-}
-
-fn terminal_worker_id(dispatch_intent_id: &str) -> String {
-    format!("agent-tui-{dispatch_intent_id}")
 }
 
 fn worker_capabilities(item: &TaskBoardItem) -> Vec<String> {
@@ -192,10 +205,7 @@ mod tests {
     };
     use crate::workspace::utc_now;
 
-    use super::{
-        codex_worker_id, codex_worker_request, start_interactive_worker, terminal_worker_id,
-        terminal_worker_request,
-    };
+    use super::{codex_worker_request, start_interactive_worker, terminal_worker_request};
 
     #[test]
     fn codex_worker_request_carries_task_board_identity() {
@@ -227,22 +237,6 @@ mod tests {
         assert_eq!(request.cols, 80);
     }
 
-    #[test]
-    fn worker_identity_is_stable_for_reclaimed_dispatch_claims() {
-        assert_eq!(
-            codex_worker_id("dispatch-intent-1"),
-            codex_worker_id("dispatch-intent-1")
-        );
-        assert_eq!(
-            terminal_worker_id("dispatch-intent-1"),
-            terminal_worker_id("dispatch-intent-1")
-        );
-        assert_ne!(
-            codex_worker_id("dispatch-intent-1"),
-            codex_worker_id("dispatch-intent-2")
-        );
-    }
-
     #[tokio::test]
     async fn start_interactive_worker_waits_for_terminal_lane_guard() {
         let state = test_http_state();
@@ -252,7 +246,7 @@ mod tests {
             .lock(&applied.session_id, "task-board:terminal-worker")
             .await;
 
-        let future = start_interactive_worker(&state, &applied, "dispatch-intent-test");
+        let future = start_interactive_worker(&state, &applied);
         tokio::pin!(future);
 
         assert!(

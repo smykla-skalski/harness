@@ -2,10 +2,9 @@ use serde_json::{Value, json};
 
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
-    TaskBoardGitRuntimeSecretHandoffAckRequest, TaskBoardGitRuntimeSecretHandoffPrepareRequest,
-    TaskBoardGitSigningVerifyRequest, TaskBoardOpenRouterTokenSyncRequest,
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
-    TaskBoardTodoistTokenSyncRequest, ws_methods,
+    TaskBoardGitRuntimeDrainSecretsRequest, TaskBoardGitSigningVerifyRequest,
+    TaskBoardOpenRouterTokenSyncRequest, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardTodoistTokenSyncRequest, ws_methods,
 };
 use crate::mcp::tool::ToolRegistry;
 
@@ -96,16 +95,10 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 normalize: validate_params::<TaskBoardGitSigningVerifyRequest>,
             },
             TaskBoardToolDescriptor {
-                name: ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
-                description: "Prepare a non-destructive handoff of legacy task-board git secrets to a secure store.",
+                name: ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+                description: "One-shot migration that returns on-disk task-board git secrets so the caller can persist them in a secure store.",
                 input_schema: empty_schema,
-                normalize: validate_params::<TaskBoardGitRuntimeSecretHandoffPrepareRequest>,
-            },
-            TaskBoardToolDescriptor {
-                name: ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK,
-                description: "Acknowledge a verified task-board git secret handoff and retire its legacy envelope.",
-                input_schema: secret_handoff_ack_schema,
-                normalize: validate_params::<TaskBoardGitRuntimeSecretHandoffAckRequest>,
+                normalize: validate_params::<TaskBoardGitRuntimeDrainSecretsRequest>,
             },
         ],
     );
@@ -117,18 +110,6 @@ fn signing_verify_schema() -> Value {
         "properties": {
             "repository": { "type": "string" }
         },
-        "additionalProperties": false
-    })
-}
-
-fn secret_handoff_ack_schema() -> Value {
-    json!({
-        "type": "object",
-        "properties": {
-            "migration_id": { "type": "string" },
-            "digest": { "type": "string" }
-        },
-        "required": ["migration_id", "digest"],
         "additionalProperties": false
     })
 }

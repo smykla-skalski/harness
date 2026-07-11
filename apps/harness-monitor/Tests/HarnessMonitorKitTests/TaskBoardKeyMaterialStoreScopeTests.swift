@@ -25,24 +25,4 @@ struct TaskBoardKeyMaterialStoreScopeTests {
     let two = TaskBoardKeyMaterialStore.Scope.repository("acme/gizmos").account
     #expect(one != two)
   }
-
-  @Test("Database scopes cannot collide")
-  func databaseScopesAreDistinct() {
-    #expect(
-      TaskBoardKeyMaterialStore.Scope.databaseGlobal("database-a").account
-        != TaskBoardKeyMaterialStore.Scope.databaseGlobal("database-b").account
-    )
-    #expect(
-      TaskBoardKeyMaterialStore.Scope.databaseGlobal("database-a").account
-        != TaskBoardKeyMaterialStore.Scope.databaseGlobal("DATABASE-A").account
-    )
-    #expect(
-      TaskBoardKeyMaterialStore.Scope.databaseRepository("database-a", "owner/repo").account
-        != TaskBoardKeyMaterialStore.Scope.databaseRepository("database-b", "owner/repo").account
-    )
-    #expect(
-      TaskBoardKeyMaterialStore.Scope.databaseGlobal("database-a").account
-        != TaskBoardKeyMaterialStore.Scope.databaseRepository("database-a", "owner/repo").account
-    )
-  }
 }

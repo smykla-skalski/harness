@@ -193,7 +193,6 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
       clearDispatchStatusFilter: Bool
     )
     case updateTaskBoardGitRuntimeConfig(overrideCount: Int)
-    case syncTaskBoardGitRuntimeKeyMaterial(overrideCount: Int)
     case syncTaskBoardGitHubTokens(
       globalTokenConfigured: Bool,
       repositoryTokenCount: Int
@@ -202,8 +201,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case syncTaskBoardOpenRouterToken(tokenConfigured: Bool)
     case taskBoardGitIdentityDefaults
     case verifyTaskBoardGitSigning(repository: String?)
-    case prepareTaskBoardSecretHandoff
-    case ackTaskBoardSecretHandoff(migrationID: String, digest: String)
+    case drainTaskBoardGitRuntimeSecrets
     case syncTaskBoard(
       direction: TaskBoardExternalSyncDirection,
       dryRun: Bool,
@@ -275,11 +273,6 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var projectSummariesStorage: [ProjectSummary]?
   var sessionSummariesStorage: [SessionSummary]?
   var taskBoardItemsStorage: [TaskBoardItem] = []
-  var taskBoardCapabilitiesValue = TaskBoardCapabilities(
-    storage: "database",
-    revision: 0,
-    instanceID: "recording-task-board"
-  )
   var queuedTaskBoardItemSnapshots: [[TaskBoardItem]] = []
   var taskBoardItemsAfterSyncStorage: [TaskBoardItem]?
   var taskBoardSyncSummaryStorage = TaskBoardSyncSummary(total: 0, providers: [])
@@ -293,7 +286,9 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardTodoistTokenSyncError: (any Error)?
   var taskBoardGitIdentityDefaultsValue = TaskBoardGitIdentityDefaults()
   var taskBoardGitSigningVerifyValue: TaskBoardGitSigningVerifyResponse = .skipped
-  var taskBoardSecretHandoffStub = RecordingTaskBoardSecretHandoffStub()
+  var taskBoardGitRuntimeDrainSecretsValue =
+    TaskBoardGitRuntimeDrainSecretsResponse(drained: false, runtime: TaskBoardGitRuntimeConfig())
+  var taskBoardGitRuntimeDrainSecretsError: (any Error)?
   var policyValidationOverride: PolicyPipelineValidation?
   var policySimulationOverride: Bool?
   var policyCanvasWorkspaceError: (any Error)?

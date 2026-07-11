@@ -1,11 +1,8 @@
-#[cfg(test)]
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::dispatch::{DispatchPlan, build_dispatch_plans_with_policy};
-#[cfg(test)]
-use super::dispatch::{build_dispatch_plans, build_dispatch_plans_with_policy_root};
+use super::dispatch::{DispatchPlan, build_dispatch_plans, build_dispatch_plans_with_policy_root};
 use super::external::{ExternalProvider, ExternalSyncConfig, ExternalSyncOperation};
 use super::types::{AgentMode, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
@@ -57,22 +54,8 @@ pub struct TaskBoardMachineSummary {
 }
 
 #[must_use]
-#[cfg(test)]
 pub fn build_audit_summary(items: &[TaskBoardItem]) -> TaskBoardAuditSummary {
     let plans = build_dispatch_plans(items);
-    audit_summary(items, &plans)
-}
-
-#[must_use]
-pub(crate) fn build_audit_summary_with_policy(
-    items: &[TaskBoardItem],
-    policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
-) -> TaskBoardAuditSummary {
-    let plans = build_dispatch_plans_with_policy(items, policy);
-    audit_summary(items, &plans)
-}
-
-fn audit_summary(items: &[TaskBoardItem], plans: &[DispatchPlan]) -> TaskBoardAuditSummary {
     TaskBoardAuditSummary {
         total: items.iter().filter(|item| !item.is_deleted()).count(),
         ready: plans.iter().filter(|plan| plan.is_ready()).count(),
@@ -99,13 +82,11 @@ pub fn build_sync_summary(
 }
 
 #[must_use]
-#[cfg(test)]
 pub fn build_dispatch_summary(items: &[TaskBoardItem]) -> Vec<DispatchPlan> {
     build_dispatch_plans(items)
 }
 
 #[must_use]
-#[cfg(test)]
 pub fn build_dispatch_summary_with_policy_root(
     items: &[TaskBoardItem],
     policy_root: &Path,

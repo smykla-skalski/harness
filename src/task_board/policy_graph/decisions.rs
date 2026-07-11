@@ -92,7 +92,8 @@ type DecisionSink = Box<dyn Fn(RecordedPolicyDecision) + Send + Sync>;
 static DECISION_SINK: OnceLock<DecisionSink> = OnceLock::new();
 
 /// Install the process-global decision sink. Called once at daemon boot; a
-/// second call is ignored so tests and re-entrant boots stay safe.
+/// second call is ignored so tests and re-entrant boots stay safe, matching
+/// `install_gate_coldfill`.
 pub(crate) fn install_decision_sink(sink: DecisionSink) {
     let _ = DECISION_SINK.set(sink);
 }

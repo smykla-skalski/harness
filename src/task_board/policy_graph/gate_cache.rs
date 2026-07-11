@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc, LazyLock, OnceLock};
 
 use arc_swap::ArcSwap;
 
@@ -52,11 +52,21 @@ impl Deref for CachedGatePolicy {
 
 type GatePolicyMap = HashMap<PathBuf, Arc<CachedGatePolicy>>;
 
+/// Cold-read hook installed at daemon boot. When the warm cache misses, the
+/// gating path falls through to this seam, which reads the active canvas
+/// document from the database. Dependency injection keeps `task_board` free of
+/// a `crate::daemon` dependency.
+type GateColdfill = Box<dyn Fn() -> Option<PolicyGraph> + Send + Sync>;
+
 static ACTIVE_GATE_POLICY: LazyLock<ArcSwap<GatePolicyMap>> =
     LazyLock::new(|| ArcSwap::from_pointee(GatePolicyMap::new()));
 
-fn database_policy_key() -> &'static Path {
-    Path::new("__harness_database_policy__")
+static GATE_COLDFILL: OnceLock<GateColdfill> = OnceLock::new();
+
+/// Install the database-backed cold-read hook. Called once at daemon boot; a
+/// second call is ignored so tests and re-entrant boots stay safe.
+pub(crate) fn install_gate_coldfill(hook: GateColdfill) {
+    let _ = GATE_COLDFILL.set(hook);
 }
 
 /// Load the cached active gating policy for `root`, if the cache holds one.
@@ -67,14 +77,6 @@ fn database_policy_key() -> &'static Path {
 #[must_use]
 pub(crate) fn cached_gate_policy(root: &Path) -> Option<Arc<CachedGatePolicy>> {
     ACTIVE_GATE_POLICY.load().get(root).cloned()
-}
-
-/// Load the daemon database's active policy projection without using a board
-/// filesystem path as an identity key.
-#[must_use]
-#[cfg(test)]
-pub(crate) fn cached_database_gate_policy() -> Option<Arc<CachedGatePolicy>> {
-    cached_gate_policy(database_policy_key())
 }
 
 /// Test-only convenience: cache a bare gating policy with no canvas identity.
@@ -112,17 +114,18 @@ pub(crate) fn store_gate_policy_entry(root: &Path, entry: Option<CachedGatePolic
     });
 }
 
-/// Refresh the daemon database's active policy projection.
-pub(crate) fn store_database_gate_policy_entry(entry: Option<CachedGatePolicy>) {
-    store_gate_policy_entry(database_policy_key(), entry);
-}
-
 /// Resolve the active gating policy for `root`: the warm process cache when
 /// present, otherwise a cold read from the durable store. The cold read does
 /// not populate the cache; the policy write path keeps the cache current.
-#[cfg(test)]
 pub(crate) fn resolve_gate_policy(root: &Path) -> Option<Arc<CachedGatePolicy>> {
-    cached_gate_policy(root)
+    cached_gate_policy(root).or_else(|| {
+        GATE_COLDFILL.get().and_then(|hook| hook()).map(|document| {
+            Arc::new(CachedGatePolicy {
+                canvas_id: None,
+                document,
+            })
+        })
+    })
 }
 
 #[cfg(test)]
@@ -175,27 +178,5 @@ mod tests {
         assert!(cached_gate_policy(&a).is_some());
         assert!(cached_gate_policy(&b).is_none());
         store_gate_policy(&a, None);
-    }
-
-    #[test]
-    fn database_projection_does_not_alias_a_legacy_root() {
-        let root = key("database-isolation");
-        store_gate_policy(&root, Some(PolicyGraph::seeded_v2()));
-        store_database_gate_policy_entry(None);
-        assert!(cached_database_gate_policy().is_none());
-
-        store_database_gate_policy_entry(Some(CachedGatePolicy::for_canvas(
-            "canvas-db",
-            PolicyGraph::seeded_v2(),
-        )));
-        assert_eq!(
-            cached_database_gate_policy()
-                .expect("database policy cached")
-                .canvas_id
-                .as_deref(),
-            Some("canvas-db")
-        );
-        store_database_gate_policy_entry(None);
-        store_gate_policy(&root, None);
     }
 }

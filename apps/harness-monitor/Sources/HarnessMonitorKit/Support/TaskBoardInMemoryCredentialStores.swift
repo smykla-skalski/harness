@@ -7,11 +7,13 @@ final class InMemoryTaskBoardGitHubCredentialStore:
   TaskBoardGitHubCredentialPersisting, @unchecked Sendable
 {
   private let lock = NSLock()
-  private var snapshotsValue: [TaskBoardCredentialScope: TaskBoardGitHubCredentialSnapshot] = [:]
+  private var snapshotValue = TaskBoardGitHubCredentialSnapshot()
   private var savedSnapshotsValue: [TaskBoardGitHubCredentialSnapshot] = []
 
   var snapshot: TaskBoardGitHubCredentialSnapshot {
-    (try? load(scope: .legacy)) ?? TaskBoardGitHubCredentialSnapshot()
+    lock.lock()
+    defer { lock.unlock() }
+    return snapshotValue
   }
 
   var savedSnapshots: [TaskBoardGitHubCredentialSnapshot] {
@@ -20,32 +22,23 @@ final class InMemoryTaskBoardGitHubCredentialStore:
     return savedSnapshotsValue
   }
 
-  func load(
-    scope: TaskBoardCredentialScope = .legacy
-  ) throws -> TaskBoardGitHubCredentialSnapshot {
+  func load() throws -> TaskBoardGitHubCredentialSnapshot {
     lock.lock()
     defer { lock.unlock() }
-    return snapshotsValue[scope] ?? TaskBoardGitHubCredentialSnapshot()
+    return snapshotValue
   }
 
-  func save(
-    _ snapshot: TaskBoardGitHubCredentialSnapshot,
-    scope: TaskBoardCredentialScope = .legacy
-  ) throws {
+  func save(_ snapshot: TaskBoardGitHubCredentialSnapshot) throws {
     lock.lock()
     defer { lock.unlock() }
-    if snapshot.isEmpty {
-      snapshotsValue.removeValue(forKey: scope)
-    } else {
-      snapshotsValue[scope] = snapshot
-    }
+    snapshotValue = snapshot
     savedSnapshotsValue.append(snapshot)
   }
 
-  func delete(scope: TaskBoardCredentialScope = .legacy) throws {
+  func delete() throws {
     lock.lock()
     defer { lock.unlock() }
-    snapshotsValue.removeValue(forKey: scope)
+    snapshotValue = TaskBoardGitHubCredentialSnapshot()
   }
 }
 
@@ -53,37 +46,30 @@ final class InMemoryTaskBoardTodoistCredentialStore:
   TaskBoardTodoistCredentialPersisting, @unchecked Sendable
 {
   private let lock = NSLock()
-  private var snapshotsValue: [TaskBoardCredentialScope: TaskBoardTodoistCredentialSnapshot] = [:]
+  private var snapshotValue = TaskBoardTodoistCredentialSnapshot()
 
   var snapshot: TaskBoardTodoistCredentialSnapshot {
-    (try? load(scope: .legacy)) ?? TaskBoardTodoistCredentialSnapshot()
-  }
-
-  func load(
-    scope: TaskBoardCredentialScope = .legacy
-  ) throws -> TaskBoardTodoistCredentialSnapshot {
     lock.lock()
     defer { lock.unlock() }
-    return snapshotsValue[scope] ?? TaskBoardTodoistCredentialSnapshot()
+    return snapshotValue
   }
 
-  func save(
-    _ snapshot: TaskBoardTodoistCredentialSnapshot,
-    scope: TaskBoardCredentialScope = .legacy
-  ) throws {
+  func load() throws -> TaskBoardTodoistCredentialSnapshot {
     lock.lock()
     defer { lock.unlock() }
-    if snapshot.isEmpty {
-      snapshotsValue.removeValue(forKey: scope)
-    } else {
-      snapshotsValue[scope] = snapshot
-    }
+    return snapshotValue
   }
 
-  func delete(scope: TaskBoardCredentialScope = .legacy) throws {
+  func save(_ snapshot: TaskBoardTodoistCredentialSnapshot) throws {
     lock.lock()
     defer { lock.unlock() }
-    snapshotsValue.removeValue(forKey: scope)
+    snapshotValue = snapshot
+  }
+
+  func delete() throws {
+    lock.lock()
+    defer { lock.unlock() }
+    snapshotValue = TaskBoardTodoistCredentialSnapshot()
   }
 }
 
@@ -91,38 +77,30 @@ final class InMemoryTaskBoardOpenRouterCredentialStore:
   TaskBoardOpenRouterCredentialPersisting, @unchecked Sendable
 {
   private let lock = NSLock()
-  private var snapshotsValue: [TaskBoardCredentialScope: TaskBoardOpenRouterCredentialSnapshot] =
-    [:]
+  private var snapshotValue = TaskBoardOpenRouterCredentialSnapshot()
 
   var snapshot: TaskBoardOpenRouterCredentialSnapshot {
-    (try? load(scope: .legacy)) ?? TaskBoardOpenRouterCredentialSnapshot()
-  }
-
-  func load(
-    scope: TaskBoardCredentialScope = .legacy
-  ) throws -> TaskBoardOpenRouterCredentialSnapshot {
     lock.lock()
     defer { lock.unlock() }
-    return snapshotsValue[scope] ?? TaskBoardOpenRouterCredentialSnapshot()
+    return snapshotValue
   }
 
-  func save(
-    _ snapshot: TaskBoardOpenRouterCredentialSnapshot,
-    scope: TaskBoardCredentialScope = .legacy
-  ) throws {
+  func load() throws -> TaskBoardOpenRouterCredentialSnapshot {
     lock.lock()
     defer { lock.unlock() }
-    if snapshot.isEmpty {
-      snapshotsValue.removeValue(forKey: scope)
-    } else {
-      snapshotsValue[scope] = snapshot
-    }
+    return snapshotValue
   }
 
-  func delete(scope: TaskBoardCredentialScope = .legacy) throws {
+  func save(_ snapshot: TaskBoardOpenRouterCredentialSnapshot) throws {
     lock.lock()
     defer { lock.unlock() }
-    snapshotsValue.removeValue(forKey: scope)
+    snapshotValue = snapshot
+  }
+
+  func delete() throws {
+    lock.lock()
+    defer { lock.unlock() }
+    snapshotValue = TaskBoardOpenRouterCredentialSnapshot()
   }
 }
 

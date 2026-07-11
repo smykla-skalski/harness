@@ -1,7 +1,8 @@
 use tempfile::tempdir;
 
 use crate::daemon::db::{AsyncDaemonDb, ReservedTaskBoardDispatch};
-use crate::task_board::{TaskBoardItem, TaskBoardStatus, build_dispatch_plans_with_policy};
+use crate::task_board::dispatch::build_dispatch_plan_with_policy_root;
+use crate::task_board::{TaskBoardItem, TaskBoardStatus};
 
 #[tokio::test]
 async fn task_board_dispatch_intents_survive_until_worker_outcome() {
@@ -23,9 +24,7 @@ async fn task_board_dispatch_intents_survive_until_worker_outcome() {
         .task_board_item("task-dispatch-ok")
         .await
         .expect("load item");
-    let lifecycle = build_dispatch_plans_with_policy(&[item], None)
-        .remove(0)
-        .applied_lifecycle();
+    let lifecycle = build_dispatch_plan_with_policy_root(&item, dir.path()).applied_lifecycle();
     let applied = db
         .link_and_enqueue_task_board_dispatch("task-dispatch-ok", "session-1", "work-1", &lifecycle)
         .await
@@ -64,9 +63,8 @@ async fn task_board_dispatch_intents_survive_until_worker_outcome() {
         .task_board_item("task-dispatch-failed")
         .await
         .expect("load failed item");
-    let failed_lifecycle = build_dispatch_plans_with_policy(&[failed], None)
-        .remove(0)
-        .applied_lifecycle();
+    let failed_lifecycle =
+        build_dispatch_plan_with_policy_root(&failed, dir.path()).applied_lifecycle();
     db.link_and_enqueue_task_board_dispatch(
         "task-dispatch-failed",
         "session-2",
@@ -118,7 +116,7 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
         .task_board_item("task-dispatch-reserved")
         .await
         .expect("load item");
-    let plan = build_dispatch_plans_with_policy(&[item], None).remove(0);
+    let plan = build_dispatch_plan_with_policy_root(&item, dir.path());
     let first = db
         .reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"))
         .await

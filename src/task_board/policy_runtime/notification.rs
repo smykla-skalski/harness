@@ -1,19 +1,13 @@
-#[cfg(test)]
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use async_trait::async_trait;
-#[cfg(test)]
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::{CliError, CliErrorKind};
-#[cfg(test)]
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 use crate::workspace::utc_now;
 
-use super::action_persistence::PolicyActionPersistence;
 use super::models::PolicyActionDescriptor;
 use super::providers::{PolicyActionExecution, PolicyActionProvider, PolicyExecutionContext};
 
@@ -26,7 +20,6 @@ pub const POLICY_NOTIFICATION_OUTBOX_SCHEMA_VERSION: u32 = 1;
 
 /// Records older than this are pruned on append so a notification trail that is
 /// never delivered downstream cannot accumulate forever.
-#[cfg(test)]
 const NOTIFICATION_RETENTION_SECONDS: i64 = 3600;
 
 #[derive(Debug, Default, Deserialize)]
@@ -65,12 +58,10 @@ impl Default for PolicyNotificationOutboxDocument {
 /// A durable, append-only trail of notifications a policy workflow asked to
 /// emit. Recording them durably means a notification survives a daemon restart
 /// and a downstream sender can drain the trail on its own schedule.
-#[cfg(test)]
 pub struct PolicyNotificationOutbox {
     repository: VersionedJsonRepository<PolicyNotificationOutboxDocument>,
 }
 
-#[cfg(test)]
 impl PolicyNotificationOutbox {
     #[must_use]
     pub fn new(mut root: PathBuf) -> Self {
@@ -119,23 +110,13 @@ impl PolicyNotificationOutbox {
 /// workflow asked to emit. It proves the registry dispatches beyond the reviews
 /// and handoff domains and gives notification steps a real durable side effect.
 pub struct NotificationPolicyProvider {
-    persistence: PolicyActionPersistence,
+    root: PathBuf,
 }
 
 impl NotificationPolicyProvider {
     #[must_use]
-    #[cfg(test)]
     pub fn new(root: PathBuf) -> Self {
-        Self {
-            persistence: PolicyActionPersistence::legacy_files(root),
-        }
-    }
-
-    #[must_use]
-    pub(crate) fn new_database(database: Arc<AsyncDaemonDb>) -> Self {
-        Self {
-            persistence: PolicyActionPersistence::database(database),
-        }
+        Self { root }
     }
 }
 
@@ -154,15 +135,14 @@ impl PolicyActionProvider for NotificationPolicyProvider {
         let channel = nonempty_or(&payload.channel, "default");
         let message = nonempty_or(&payload.message, "(empty)");
 
-        self.persistence
-            .record_notification(NotificationRecord {
-                channel: channel.to_owned(),
-                message: message.to_owned(),
-                workflow_id: ctx.workflow_id.clone(),
-                subject_key: ctx.subject.key.clone(),
-                recorded_at: utc_now(),
-            })
-            .await?;
+        let outbox = PolicyNotificationOutbox::new(self.root.clone());
+        outbox.record(NotificationRecord {
+            channel: channel.to_owned(),
+            message: message.to_owned(),
+            workflow_id: ctx.workflow_id.clone(),
+            subject_key: ctx.subject.key.clone(),
+            recorded_at: utc_now(),
+        })?;
 
         tracing::info!(
             workflow_id = %ctx.workflow_id,
@@ -198,12 +178,10 @@ fn notification_payload(
     }
 }
 
-#[cfg(test)]
 fn prune_expired(records: &mut Vec<NotificationRecord>, now: DateTime<Utc>) {
     records.retain(|record| !record_is_expired(&record.recorded_at, now));
 }
 
-#[cfg(test)]
 fn record_is_expired(recorded_at: &str, now: DateTime<Utc>) -> bool {
     DateTime::parse_from_rfc3339(recorded_at).is_ok_and(|recorded| {
         now.signed_duration_since(recorded.with_timezone(&Utc))

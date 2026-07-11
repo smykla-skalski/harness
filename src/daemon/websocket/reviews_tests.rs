@@ -1,9 +1,12 @@
 use serde_json::{Value, json};
 use tempfile::tempdir;
 
+use crate::daemon::protocol::{WsRequest, ws_methods};
+use crate::task_board::policy_graph::store_gate_policy;
+use crate::task_board::store::default_board_root;
+
 use super::super::test_support::test_http_state_with_db;
 use super::dispatch_reviews_method;
-use crate::daemon::protocol::{WsRequest, ws_methods};
 
 #[tokio::test]
 async fn review_write_websocket_routes_fail_closed_without_enforced_policy() {
@@ -16,6 +19,7 @@ async fn review_write_websocket_routes_fail_closed_without_enforced_policy() {
             ("CLAUDE_SESSION_ID", Some("ws-review-policy-writes")),
         ],
         async {
+            store_gate_policy(&default_board_root(), None);
             let state = test_http_state_with_db();
 
             for case in review_websocket_write_cases() {
@@ -51,7 +55,7 @@ fn review_websocket_write_cases() -> Vec<ReviewWriteCase> {
     vec![
         ReviewWriteCase {
             method: ws_methods::REVIEWS_APPROVE,
-            payload: json!({ "targets": [review_target()], "source": "direct" }),
+            payload: json!({ "targets": [review_target()] }),
             message: "reviews GitHub approve is disabled because no enforced policy canvas is active",
         },
         ReviewWriteCase {

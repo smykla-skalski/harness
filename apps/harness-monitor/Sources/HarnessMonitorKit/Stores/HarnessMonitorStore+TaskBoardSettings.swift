@@ -3,53 +3,23 @@ import Foundation
 private let taskBoardCredentialSyncRepeatInterval: TimeInterval = 30 * 60
 
 struct TaskBoardCredentialSyncState: Sendable {
-  let instanceID: String
   let credentials: TaskBoardStoredCredentialSnapshot
   let syncedAt: Date
 }
 
-struct TaskBoardConnectionState: Sendable {
-  var databaseInstanceID: String?
-  var credentialSync: TaskBoardCredentialSyncState?
-}
-
 extension HarnessMonitorStore {
-  var taskBoardDatabaseInstanceID: String? {
-    get { taskBoardConnectionState.databaseInstanceID }
-    set { taskBoardConnectionState.databaseInstanceID = newValue }
-  }
-
-  var lastTaskBoardCredentialSync: TaskBoardCredentialSyncState? {
-    get { taskBoardConnectionState.credentialSync }
-    set { taskBoardConnectionState.credentialSync = newValue }
-  }
-
   public func taskBoardGitSettingsSnapshot() async throws -> TaskBoardGitSettingsSnapshot {
     let client = try await taskBoardSettingsClient()
-    guard let instanceID = taskBoardDatabaseInstanceID else {
-      throw HarnessMonitorAPIError.server(code: 503, message: "Task Board database unavailable")
-    }
 
-    await migrateRuntimeSecretsUsingWorkerIfNeeded(
-      client: client,
-      instanceID: instanceID,
-      ownership: daemonOwnership
-    )
+    await migrateRuntimeSecretsUsingWorkerIfNeeded(client: client, ownership: daemonOwnership)
 
     async let orchestratorSettings = client.taskBoardOrchestratorSettings()
     async let runtimeConfig = client.taskBoardGitRuntimeConfig()
     async let identityDefaults = Self.fetchIdentityDefaults(client: client)
-    async let storedCredentials = taskBoardSettingsWorker.loadStoredCredentials(
-      instanceID: instanceID,
-      ownership: daemonOwnership
-    )
+    async let storedCredentials = taskBoardSettingsWorker.loadStoredCredentials()
 
     let baseRuntime = try await runtimeConfig
-    let hydratedRuntime = await taskBoardSettingsWorker.hydrateKeyMaterial(
-      into: baseRuntime,
-      instanceID: instanceID,
-      ownership: daemonOwnership
-    )
+    let hydratedRuntime = await taskBoardSettingsWorker.hydrateKeyMaterial(into: baseRuntime)
     let credentials = try await storedCredentials
 
     return await TaskBoardGitSettingsSnapshot(
@@ -64,14 +34,17 @@ extension HarnessMonitorStore {
 
   private func migrateRuntimeSecretsUsingWorkerIfNeeded(
     client: any HarnessMonitorClientProtocol,
-    instanceID: String,
-    ownership: DaemonOwnership
+    ownership: DaemonOwnership,
+    userDefaults: UserDefaults = .standard
   ) async {
-    _ = await taskBoardSettingsWorker.completeRuntimeSecretHandoffIfNeeded(
-      client: client,
-      instanceID: instanceID,
-      ownership: ownership
-    )
+    let flagKey = Self.taskBoardRuntimeSecretsMigrationKey(for: ownership)
+    guard !userDefaults.bool(forKey: flagKey) else {
+      return
+    }
+    let succeeded = await taskBoardSettingsWorker.drainRuntimeSecretsIfNeeded(client: client)
+    if succeeded {
+      userDefaults.set(true, forKey: flagKey)
+    }
   }
 
   public func authorizeTaskBoardPath(
@@ -97,9 +70,6 @@ extension HarnessMonitorStore {
 
     do {
       let client = try await taskBoardSettingsClient()
-      guard let instanceID = taskBoardDatabaseInstanceID else {
-        throw HarnessMonitorAPIError.server(code: 503, message: "Task Board database unavailable")
-      }
       let materializedSnapshot = try await materializeTaskBoardGitSettings(snapshot)
 
       let orchestratorSettings: TaskBoardOrchestratorSettings
@@ -127,22 +97,14 @@ extension HarnessMonitorStore {
         return false
       }
 
-      guard
-        await applyTaskBoardTokenSync(
-          client: client,
-          snapshot: materializedSnapshot,
-          instanceID: instanceID
-        )
-      else {
+      guard await applyTaskBoardTokenSync(client: client, snapshot: materializedSnapshot) else {
         return false
       }
 
       do {
         try await taskBoardSettingsWorker.persistLocalSecrets(
           snapshot: materializedSnapshot,
-          origin: origin,
-          instanceID: instanceID,
-          ownership: daemonOwnership
+          origin: origin
         )
       } catch {
         presentFailureFeedback(
@@ -218,8 +180,7 @@ extension HarnessMonitorStore {
 
   private func applyTaskBoardTokenSync(
     client: any HarnessMonitorClientProtocol,
-    snapshot: TaskBoardGitSettingsSnapshot,
-    instanceID: String
+    snapshot: TaskBoardGitSettingsSnapshot
   ) async -> Bool {
     do {
       async let githubTokens = client.syncTaskBoardGitHubTokens(
@@ -233,7 +194,6 @@ extension HarnessMonitorStore {
       )
       _ = try await (githubTokens, todoistToken, openRouterToken)
       lastTaskBoardCredentialSync = TaskBoardCredentialSyncState(
-        instanceID: instanceID,
         credentials: TaskBoardStoredCredentialSnapshot(
           githubCredentials: snapshot.githubCredentials,
           todoistCredentials: snapshot.todoistCredentials,
@@ -255,52 +215,23 @@ extension HarnessMonitorStore {
 
   private func taskBoardSettingsClient() async throws -> any HarnessMonitorClientProtocol {
     if let client {
-      _ = try await requireDatabaseBackedTaskBoard(using: client)
       return client
     }
     await bootstrapIfNeeded()
     if let client {
-      _ = try await requireDatabaseBackedTaskBoard(using: client)
       return client
     }
 
     let bootstrappedClient = try await daemonController.bootstrapClient()
-    _ = try await requireDatabaseBackedTaskBoard(using: bootstrappedClient)
     self.client = bootstrappedClient
     return bootstrappedClient
   }
 
   func syncStoredTaskBoardCredentials(using client: any HarnessMonitorClientProtocol) async {
-    guard let instanceID = taskBoardDatabaseInstanceID else {
-      HarnessMonitorLogger.store.error("task-board credential sync skipped: database unavailable")
-      return
-    }
-    await migrateRuntimeSecretsUsingWorkerIfNeeded(
-      client: client,
-      instanceID: instanceID,
-      ownership: daemonOwnership
-    )
     do {
-      async let storedCredentials = taskBoardSettingsWorker.loadStoredCredentials(
-        instanceID: instanceID,
-        ownership: daemonOwnership
-      )
-      async let runtimeConfig = client.taskBoardGitRuntimeConfig()
-      let hydratedRuntime = await taskBoardSettingsWorker.hydrateKeyMaterial(
-        into: try await runtimeConfig,
-        instanceID: instanceID,
-        ownership: daemonOwnership
-      )
-      _ = try await client.syncTaskBoardGitRuntimeKeyMaterial(
-        request: TaskBoardGitRuntimeKeyMaterialSyncRequest(runtime: hydratedRuntime)
-      )
-      let credentials = try await storedCredentials
+      let credentials = try await taskBoardSettingsWorker.loadStoredCredentials()
       let now = Date()
-      if shouldSkipStoredTaskBoardCredentialSync(
-        credentials,
-        instanceID: instanceID,
-        now: now
-      ) {
+      if shouldSkipStoredTaskBoardCredentialSync(credentials, now: now) {
         return
       }
       _ = try await client.syncTaskBoardGitHubTokens(
@@ -313,7 +244,6 @@ extension HarnessMonitorStore {
         request: credentials.openRouterCredentials.syncRequest
       )
       lastTaskBoardCredentialSync = TaskBoardCredentialSyncState(
-        instanceID: instanceID,
         credentials: credentials,
         syncedAt: now
       )
@@ -325,35 +255,14 @@ extension HarnessMonitorStore {
     }
   }
 
-  func syncStoredTaskBoardCredentialsForNewDaemon(
-    using client: any HarnessMonitorClientProtocol
-  ) async -> Bool {
-    do {
-      _ = try await requireDatabaseBackedTaskBoard(using: client)
-    } catch {
-      let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
-      HarnessMonitorLogger.store.error(
-        "task-board database capability check failed: \(description, privacy: .public)"
-      )
-      taskBoardDatabaseInstanceID = nil
-      return false
-    }
-    lastTaskBoardCredentialSync = nil
-    await syncStoredTaskBoardCredentials(using: client)
-    return true
-  }
-
   private func shouldSkipStoredTaskBoardCredentialSync(
     _ credentials: TaskBoardStoredCredentialSnapshot,
-    instanceID: String,
     now: Date
   ) -> Bool {
     if credentials.isEmpty,
-      lastTaskBoardCredentialSync?.instanceID == instanceID,
       lastTaskBoardCredentialSync?.credentials.isEmpty != false
     {
       lastTaskBoardCredentialSync = TaskBoardCredentialSyncState(
-        instanceID: instanceID,
         credentials: credentials,
         syncedAt: now
       )
@@ -362,8 +271,7 @@ extension HarnessMonitorStore {
     guard let lastTaskBoardCredentialSync else {
       return false
     }
-    return lastTaskBoardCredentialSync.instanceID == instanceID
-      && lastTaskBoardCredentialSync.credentials == credentials
+    return lastTaskBoardCredentialSync.credentials == credentials
       && now.timeIntervalSince(lastTaskBoardCredentialSync.syncedAt)
         < taskBoardCredentialSyncRepeatInterval
   }

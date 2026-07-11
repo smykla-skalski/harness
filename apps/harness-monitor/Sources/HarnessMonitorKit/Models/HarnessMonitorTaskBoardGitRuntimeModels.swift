@@ -1,82 +1,30 @@
 import Foundation
 
-public struct TaskBoardGitRuntimeSecretHandoffPrepareRequest: Codable, Equatable, Sendable {
+public struct TaskBoardGitRuntimeDrainSecretsRequest: Codable, Equatable, Sendable {
   public init() {}
 }
 
-public struct TaskBoardGitRuntimeSecretHandoffPrepareResponse: Codable, Equatable, Sendable {
-  public let prepared: Bool
-  public let migrationID: String?
-  public let digest: String?
+public struct TaskBoardGitRuntimeDrainSecretsResponse: Codable, Equatable, Sendable {
+  public let drained: Bool
   public let runtime: TaskBoardGitRuntimeConfig
 
-  public init(
-    prepared: Bool,
-    migrationID: String? = nil,
-    digest: String? = nil,
-    runtime: TaskBoardGitRuntimeConfig
-  ) {
-    self.prepared = prepared
-    self.migrationID = migrationID
-    self.digest = digest
+  public init(drained: Bool, runtime: TaskBoardGitRuntimeConfig) {
+    self.drained = drained
     self.runtime = runtime
   }
 
   enum CodingKeys: String, CodingKey {
-    case prepared
-    case migrationID = "migration_id"
-    case digest
+    case drained
     case runtime
   }
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.init(
-      prepared: try container.decodeIfPresent(Bool.self, forKey: .prepared) ?? false,
-      migrationID: try container.decodeIfPresent(String.self, forKey: .migrationID),
-      digest: try container.decodeIfPresent(String.self, forKey: .digest),
+      drained: try container.decodeIfPresent(Bool.self, forKey: .drained) ?? false,
       runtime: try container.decodeIfPresent(TaskBoardGitRuntimeConfig.self, forKey: .runtime)
         ?? TaskBoardGitRuntimeConfig()
     )
-  }
-}
-
-public struct TaskBoardGitRuntimeSecretHandoffAckRequest: Codable, Equatable, Sendable {
-  public let migrationID: String
-  public let digest: String
-
-  public init(migrationID: String, digest: String) {
-    self.migrationID = migrationID
-    self.digest = digest
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case migrationID = "migration_id"
-    case digest
-  }
-}
-
-public struct TaskBoardGitRuntimeSecretHandoffAckResponse: Codable, Equatable, Sendable {
-  public let acknowledged: Bool
-
-  public init(acknowledged: Bool) {
-    self.acknowledged = acknowledged
-  }
-}
-
-public struct TaskBoardGitRuntimeKeyMaterialSyncRequest: Codable, Equatable, Sendable {
-  public let runtime: TaskBoardGitRuntimeConfig
-
-  public init(runtime: TaskBoardGitRuntimeConfig) {
-    self.runtime = runtime
-  }
-}
-
-public struct TaskBoardGitRuntimeKeyMaterialSyncResponse: Codable, Equatable, Sendable {
-  public let synchronized: Bool
-
-  public init(synchronized: Bool) {
-    self.synchronized = synchronized
   }
 }
 

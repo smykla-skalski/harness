@@ -50,7 +50,6 @@ mod snapshot_broadcast;
 mod startup_telemetry;
 mod stream_initial_events;
 mod task_active_delivery;
-mod task_board_dispatch_db;
 mod task_lifecycle;
 mod task_mutations;
 mod timeline;

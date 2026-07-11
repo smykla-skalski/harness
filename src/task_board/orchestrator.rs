@@ -1,59 +1,41 @@
-#[cfg(test)]
 use std::path::PathBuf;
 
-#[cfg(test)]
 use crate::errors::CliError;
-#[cfg(test)]
 use crate::infra::io::write_json_pretty;
-#[cfg(test)]
 use crate::workspace::utc_now;
 
-#[cfg(test)]
 use super::dispatch::DispatchExecutionSummary;
-#[cfg(test)]
 use super::evaluation::TaskBoardEvaluationSummary;
-#[cfg(test)]
 use super::external::ExternalSyncConfig;
-#[cfg(test)]
 use super::machines::{Machine, MachineRegistry};
-#[cfg(test)]
 use super::store::TaskBoardStore;
-#[cfg(test)]
 use super::summary::{build_audit_summary, build_sync_summary};
-#[cfg(test)]
 use super::types::TaskBoardItem;
 
-#[cfg(test)]
 mod run_record;
 mod settings;
 mod types;
 
-#[cfg(test)]
 use self::run_record::{
     RunRecordInput, new_run_id, read_or_default, run_items_for_machine, run_record,
     workflow_statuses,
 };
 pub(crate) use self::settings::parse_persisted_settings_read_only;
-#[cfg(test)]
 use self::settings::{
     apply_settings_update, dispatch_input, migrate_persisted_settings, normalize_github_inbox,
     normalize_todoist_inbox,
 };
 pub use self::types::*;
 
-#[cfg(test)]
 const SETTINGS_FILE: &str = "orchestrator-settings.json";
-#[cfg(test)]
 const STATE_FILE: &str = "orchestrator-state.json";
 
 #[derive(Debug, Clone)]
-#[cfg(test)]
 pub struct TaskBoardOrchestrator {
     board: TaskBoardStore,
     root: PathBuf,
 }
 
-#[cfg(test)]
 impl TaskBoardOrchestrator {
     #[must_use]
     pub fn new(root: PathBuf) -> Self {
@@ -212,7 +194,6 @@ impl TaskBoardOrchestrator {
     ///
     /// # Errors
     /// Returns `CliError` when selected board items cannot be read.
-    #[cfg(test)]
     pub(crate) fn items_for_input(
         &self,
         input: &TaskBoardOrchestratorDispatchInput,

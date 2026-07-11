@@ -112,40 +112,14 @@ extension RecordingHarnessClient {
     return lock.withLock { taskBoardGitSigningVerifyValue }
   }
 
-  func syncTaskBoardGitRuntimeKeyMaterial(
-    request: TaskBoardGitRuntimeKeyMaterialSyncRequest
-  ) async throws -> TaskBoardGitRuntimeKeyMaterialSyncResponse {
-    calls.append(
-      .syncTaskBoardGitRuntimeKeyMaterial(
-        overrideCount: request.runtime.repositoryOverrides.count
-      )
-    )
-    return TaskBoardGitRuntimeKeyMaterialSyncResponse(synchronized: true)
-  }
-
-  func prepareTaskBoardGitRuntimeSecretHandoff() async throws
-    -> TaskBoardGitRuntimeSecretHandoffPrepareResponse
+  func drainTaskBoardGitRuntimeSecrets() async throws
+    -> TaskBoardGitRuntimeDrainSecretsResponse
   {
-    calls.append(.prepareTaskBoardSecretHandoff)
-    if let error = taskBoardSecretHandoffPrepareError {
+    calls.append(.drainTaskBoardGitRuntimeSecrets)
+    if let error = lock.withLock({ taskBoardGitRuntimeDrainSecretsError }) {
       throw error
     }
-    return taskBoardSecretHandoffPrepareValue
-  }
-
-  func acknowledgeTaskBoardGitRuntimeSecretHandoff(
-    request: TaskBoardGitRuntimeSecretHandoffAckRequest
-  ) async throws -> TaskBoardGitRuntimeSecretHandoffAckResponse {
-    calls.append(
-      .ackTaskBoardSecretHandoff(
-        migrationID: request.migrationID,
-        digest: request.digest
-      )
-    )
-    if let error = taskBoardSecretHandoffAckError {
-      throw error
-    }
-    return taskBoardSecretHandoffAckValue
+    return lock.withLock { taskBoardGitRuntimeDrainSecretsValue }
   }
 
   func sampleTaskBoardOrchestratorStatus(

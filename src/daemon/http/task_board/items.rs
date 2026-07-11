@@ -57,24 +57,7 @@ pub(super) async fn post_task_board_item(
         http_paths::TASK_BOARD_ITEMS,
         &request_id,
         start,
-        task_board_route_executor::create_item(&state, &request).await,
-    )
-}
-
-pub(super) async fn get_task_board_capabilities(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "GET",
-        http_paths::TASK_BOARD_CAPABILITIES,
-        &request_id,
-        start,
-        task_board_route_executor::capabilities(&state).await,
+        task_board_route_executor::create_item(&request).await,
     )
 }
 
@@ -95,7 +78,7 @@ pub(super) async fn get_task_board_items(
         http_paths::TASK_BOARD_ITEMS,
         &request_id,
         start,
-        task_board_route_executor::list_items(&state, &request).await,
+        task_board_route_executor::list_items(&request).await,
     )
 }
 
@@ -113,7 +96,7 @@ pub(super) async fn get_task_board_item(
         http_paths::TASK_BOARD_ITEM,
         &request_id,
         start,
-        task_board_route_executor::get_item(&state, &TaskBoardGetItemRequest { id: item_id }).await,
+        task_board_route_executor::get_item(&TaskBoardGetItemRequest { id: item_id }).await,
     )
 }
 
@@ -132,7 +115,7 @@ pub(super) async fn put_task_board_item(
         http_paths::TASK_BOARD_ITEM,
         &request_id,
         start,
-        task_board_route_executor::update_item(&state, &item_id, &request).await,
+        task_board_route_executor::update_item(&item_id, &request).await,
     )
 }
 
@@ -151,7 +134,7 @@ pub(super) async fn delete_task_board_item(
         http_paths::TASK_BOARD_ITEM,
         &request_id,
         start,
-        task_board_route_executor::delete_item(&state, &request).await,
+        task_board_route_executor::delete_item(&request).await,
     )
 }
 
@@ -170,7 +153,7 @@ pub(super) async fn post_task_board_plan_begin(
         http_paths::TASK_BOARD_PLAN_BEGIN,
         &request_id,
         start,
-        task_board_route_executor::begin_planning(&state, &request).await,
+        task_board_route_executor::begin_planning(&request).await,
     )
 }
 
@@ -193,7 +176,7 @@ pub(super) async fn post_task_board_plan_submit(
         http_paths::TASK_BOARD_PLAN_SUBMIT,
         &request_id,
         start,
-        task_board_route_executor::submit_plan(&state, &request).await,
+        task_board_route_executor::submit_plan(&request).await,
     )
 }
 
@@ -218,7 +201,7 @@ pub(super) async fn post_task_board_plan_approve(
         http_paths::TASK_BOARD_PLAN_APPROVE,
         &request_id,
         start,
-        task_board_route_executor::approve_plan(&state, &request).await,
+        task_board_route_executor::approve_plan(&request).await,
     )
 }
 
@@ -242,7 +225,7 @@ pub(super) async fn post_task_board_plan_revoke(
         http_paths::TASK_BOARD_PLAN_REVOKE,
         &request_id,
         start,
-        task_board_route_executor::revoke_plan(&state, &request).await,
+        task_board_route_executor::revoke_plan(&request).await,
     )
 }
 
@@ -260,7 +243,7 @@ pub(super) async fn post_task_board_sync(
         http_paths::TASK_BOARD_SYNC,
         &request_id,
         start,
-        task_board_route_executor::sync(&state, &request).await,
+        task_board_route_executor::sync(&request).await,
     )
 }
 
@@ -321,7 +304,7 @@ pub(super) async fn get_task_board_audit(
         http_paths::TASK_BOARD_AUDIT,
         &request_id,
         start,
-        task_board_route_executor::audit(&state, &request).await,
+        task_board_route_executor::audit(&request).await,
     )
 }
 
@@ -342,7 +325,7 @@ pub(super) async fn get_task_board_projects(
         http_paths::TASK_BOARD_PROJECTS,
         &request_id,
         start,
-        task_board_route_executor::projects(&state, &request).await,
+        task_board_route_executor::projects(&request).await,
     )
 }
 
@@ -363,7 +346,7 @@ pub(super) async fn get_task_board_machines(
         http_paths::TASK_BOARD_MACHINES,
         &request_id,
         start,
-        task_board_route_executor::machines(&state, &request).await,
+        task_board_route_executor::machines(&request).await,
     )
 }
 
@@ -380,7 +363,7 @@ pub(super) async fn get_task_board_host_local(
         http_paths::TASK_BOARD_HOST_LOCAL,
         &request_id,
         start,
-        task_board_route_executor::host_local(&state).await,
+        task_board_route_executor::host_local().await,
     )
 }
 
@@ -397,7 +380,7 @@ pub(super) async fn get_task_board_host_list(
         http_paths::TASK_BOARD_HOST_LIST,
         &request_id,
         start,
-        task_board_route_executor::host_list(&state).await,
+        task_board_route_executor::host_list().await,
     )
 }
 
@@ -415,7 +398,7 @@ pub(super) async fn put_task_board_host_set_project_types(
         http_paths::TASK_BOARD_HOST_SET_PROJECT_TYPES,
         &request_id,
         start,
-        task_board_route_executor::host_set_project_types(&state, &request).await,
+        task_board_route_executor::host_set_project_types(&request).await,
     )
 }
 

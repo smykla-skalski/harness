@@ -1,24 +1,18 @@
-#[cfg(test)]
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use crate::session::types::{TaskSeverity, TaskSource};
 
-#[cfg(test)]
 use super::default_board_root;
-#[cfg(not(test))]
-use super::machines::Machine;
-#[cfg(test)]
 use super::machines::{Machine, MachineRegistry};
 use super::planning::{PlanApprovalBlockReason, PlanApprovalGate, approval_gate};
 use super::policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyGate, PolicyInput, PolicySubject,
 };
-#[cfg(test)]
-use super::policy_graph::resolve_gate_policy;
-use super::policy_graph::{PolicyPipelineMode, RecordedPolicyDecision, record_policy_decision};
-#[cfg(test)]
+use super::policy_graph::{
+    PolicyPipelineMode, RecordedPolicyDecision, record_policy_decision, resolve_gate_policy,
+};
 use super::store::TaskBoardStore;
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
@@ -179,22 +173,16 @@ impl DispatchExecutionSummary {
 }
 
 #[must_use]
-#[cfg(test)]
 pub fn build_dispatch_plan(item: &TaskBoardItem) -> DispatchPlan {
     build_dispatch_plan_with_policy_root(item, &default_board_root())
 }
 
 #[must_use]
-#[cfg(test)]
 pub fn build_dispatch_plan_with_policy_root(
     item: &TaskBoardItem,
     policy_root: &Path,
 ) -> DispatchPlan {
     let policy = dispatch_policy(item, policy_root);
-    build_dispatch_plan_with_decision(item, policy)
-}
-
-fn build_dispatch_plan_with_decision(item: &TaskBoardItem, policy: PolicyDecision) -> DispatchPlan {
     let worker = WorkerIntent {
         mode: item.agent_mode,
     };
@@ -214,27 +202,11 @@ fn build_dispatch_plan_with_decision(item: &TaskBoardItem, policy: PolicyDecisio
 }
 
 #[must_use]
-pub(crate) fn build_dispatch_plans_with_policy(
-    items: &[TaskBoardItem],
-    policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
-) -> Vec<DispatchPlan> {
-    items
-        .iter()
-        .map(|item| {
-            let decision = dispatch_policy_from_graph(item, policy);
-            build_dispatch_plan_with_decision(item, decision)
-        })
-        .collect()
-}
-
-#[must_use]
-#[cfg(test)]
 pub fn build_dispatch_plans(items: &[TaskBoardItem]) -> Vec<DispatchPlan> {
     items.iter().map(build_dispatch_plan).collect()
 }
 
 #[must_use]
-#[cfg(test)]
 pub fn build_dispatch_plans_with_policy_root(
     items: &[TaskBoardItem],
     policy_root: &Path,
@@ -250,7 +222,6 @@ pub fn build_dispatch_plans_with_policy_root(
 /// cannot be loaded, every item is kept (fail-open) so dispatch on an
 /// unregistered host behaves like a single-machine setup.
 #[must_use]
-#[cfg(test)]
 pub fn filter_for_local_machine(
     items: Vec<TaskBoardItem>,
     board: &TaskBoardStore,
@@ -277,7 +248,6 @@ pub fn filter_for_local_machine(
 /// pipeline at `policy_root` for the plan's policy field so the response
 /// still reflects what policy evaluation would have produced.
 #[must_use]
-#[cfg(test)]
 pub fn machine_mismatch_plan_with_policy_root(
     item: &TaskBoardItem,
     machine: &Machine,
@@ -302,21 +272,6 @@ pub fn machine_mismatch_plan_with_policy_root(
         evaluator,
         policy: dispatch_policy(item, policy_root),
     }
-}
-
-#[must_use]
-pub(crate) fn machine_mismatch_plan_with_policy(
-    item: &TaskBoardItem,
-    machine: &Machine,
-    policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
-) -> DispatchPlan {
-    let mut plan =
-        build_dispatch_plan_with_decision(item, dispatch_policy_from_graph(item, policy));
-    plan.readiness = blocked(DispatchBlockReason::MachineMismatch {
-        required: item.target_project_types.clone(),
-        declared: machine.project_types.clone(),
-    });
-    plan
 }
 
 fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> DispatchReadiness {
@@ -344,7 +299,6 @@ fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> DispatchReadiness
     DispatchReadiness::Ready
 }
 
-#[cfg(test)]
 fn dispatch_policy(item: &TaskBoardItem, policy_root: &Path) -> PolicyDecision {
     let mut input = PolicyInput::new(PolicyAction::SpawnAgent);
     input.subject = PolicySubject {
@@ -367,37 +321,6 @@ fn dispatch_policy(item: &TaskBoardItem, policy_root: &Path) -> PolicyDecision {
                 "task_board_dispatch",
             )
             .with_canvas_id(document.canvas_id.clone()),
-        );
-        return decision;
-    }
-    BuiltInPolicyGate::default().evaluate(&input)
-}
-
-fn dispatch_policy_from_graph(
-    item: &TaskBoardItem,
-    policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
-) -> PolicyDecision {
-    let mut input = PolicyInput::new(PolicyAction::SpawnAgent);
-    input.subject = PolicySubject {
-        task_board_item_id: Some(item.id.clone()),
-        session_id: item.session_id.clone(),
-        repository: item.project_id.clone(),
-        ..PolicySubject::default()
-    };
-    if let Some((canvas_id, document)) = policy
-        && document.mode != PolicyPipelineMode::Draft
-    {
-        let simulation = document.simulate(&input);
-        let decision = simulation.decision;
-        record_policy_decision(
-            RecordedPolicyDecision::new(
-                document.revision,
-                input,
-                decision.clone(),
-                simulation.visited_node_ids,
-                "task_board_dispatch",
-            )
-            .with_canvas_id(Some(canvas_id.to_string())),
         );
         return decision;
     }

@@ -420,7 +420,7 @@ async fn sync_external_tasks_marks_imported_from_provider_on_new_github_items() 
     .expect("sync external tasks");
 
     let imported = board
-        .get("github-owner-repo-21-c8d898f018309d954acd32bcfc9a755e")
+        .get("github-owner-repo-21")
         .expect("load imported github task");
     assert_eq!(
         imported.imported_from_provider,

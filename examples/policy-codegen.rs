@@ -1271,14 +1271,14 @@ const WIRE_SUFFIXED_TYPES: &[&str] = &[
     "TaskBoardOrchestratorRunSummary",
     "TaskBoardWorkflowExecutionCount",
     "TaskBoardOrchestratorStatus",
-    // task_board git runtime config tree (runtime_config.rs) + secret-handoff response
+    // task_board git runtime config tree (runtime_config.rs) + drain-secrets response
     // (daemon/protocol/task_board.rs). The signing mode is the decoder-agnostic hand open enum
     // TaskBoardGitSigningMode, referenced bare; everything else is a thin wire/model mirror.
     "TaskBoardGitRuntimeConfig",
     "TaskBoardGitRuntimeProfile",
     "TaskBoardGitSigningConfig",
     "TaskBoardGitRepositoryOverride",
-    "TaskBoardGitRuntimeSecretHandoffPrepareResponse",
+    "TaskBoardGitRuntimeDrainSecretsResponse",
     // task_board git signing verify outcome (daemon/protocol/task_board.rs): an internally-tagged
     // (tag = "outcome") enum with unit + struct variants, emitted as a Swift associated-value enum.
     "TaskBoardGitSigningVerifyResponse",
@@ -2676,8 +2676,8 @@ const ORCHESTRATOR_EMIT_ONLY: &[&str] = &[
     "TaskBoardOrchestratorStatus",
 ];
 const GIT_RUNTIME_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitRuntimeWireTypes.generated.swift";
-// The git runtime config tree (runtime-config get/update + secret handoff). The config/profile/
-// signing-config/override structs come from runtime_config.rs; the prepare response wrapper comes
+// The git runtime config tree (runtime-config get/update + drain-secrets). The config/profile/
+// signing-config/override structs come from runtime_config.rs; the drain response wrapper comes
 // from daemon/protocol/task_board.rs and nests the config wire. The signing mode rides bare through
 // the decoder-agnostic TaskBoardGitSigningMode open enum.
 const GIT_RUNTIME_EMIT_ONLY: &[&str] = &[
@@ -2685,7 +2685,7 @@ const GIT_RUNTIME_EMIT_ONLY: &[&str] = &[
     "TaskBoardGitRuntimeProfile",
     "TaskBoardGitSigningConfig",
     "TaskBoardGitRepositoryOverride",
-    "TaskBoardGitRuntimeSecretHandoffPrepareResponse",
+    "TaskBoardGitRuntimeDrainSecretsResponse",
 ];
 const GIT_SIGNING_VERIFY_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitSigningVerifyWireTypes.generated.swift";
 // The git signing verify outcome (git/signing/verify). An internally-tagged enum on "outcome" with
@@ -3034,7 +3034,7 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: GIT_RUNTIME_OUTPUT,
-            description: "the Rust task-board git runtime config and secret-handoff response",
+            description: "the Rust task-board git runtime config and drain-secrets response",
             defaults: &[TASK_BOARD_CREDENTIAL_SOURCE],
             sources: &[TASK_BOARD_CREDENTIAL_SOURCE, TASK_BOARD_PROTOCOL_SOURCE],
         },

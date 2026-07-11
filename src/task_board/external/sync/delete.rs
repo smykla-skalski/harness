@@ -2,15 +2,16 @@ use crate::errors::CliError;
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncClient, ExternalSyncField, ExternalTaskRef,
 };
+use crate::task_board::store::TaskBoardStore;
 use crate::task_board::types::TaskBoardItem;
 
 use super::{
-    ExternalSyncAction, ExternalSyncOperation, ExternalSyncOptions, OperationDraft,
-    TaskBoardSyncStore, operation, provider_ref,
+    ExternalSyncAction, ExternalSyncOperation, ExternalSyncOptions, OperationDraft, operation,
+    provider_ref, run_board_blocking,
 };
 
 pub(super) async fn delete_remote_tombstones(
-    board: &dyn TaskBoardSyncStore,
+    board: &TaskBoardStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
     operations: &mut Vec<ExternalSyncOperation>,
@@ -19,12 +20,15 @@ pub(super) async fn delete_remote_tombstones(
         return Ok(());
     }
     let provider = client.provider();
-    let tombstones = board
-        .list_items_including_deleted()
-        .await?
-        .into_iter()
-        .filter(|item| item.is_deleted() && !item.external_refs.is_empty())
-        .collect::<Vec<_>>();
+    let tombstones = run_board_blocking(board, "list tombstones", |board| {
+        board.list_including_deleted().map(|items| {
+            items
+                .into_iter()
+                .filter(|item| item.is_deleted() && !item.external_refs.is_empty())
+                .collect::<Vec<_>>()
+        })
+    })
+    .await?;
     for item in tombstones {
         let Some(reference) = provider_ref(&item, provider) else {
             continue;

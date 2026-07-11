@@ -12,7 +12,6 @@ use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer, run_broadcast_fa
 use super::acp_inspect_publisher::spawn_acp_inspect_publisher;
 use super::github_data_change_publisher::spawn_github_data_change_publisher;
 use super::machine_heartbeat_loop::spawn_machine_heartbeat_loop;
-use super::task_board_dispatch_loop::spawn_task_board_dispatch_loop;
 use super::task_board_orchestrator_loop::spawn_task_board_orchestrator_loop;
 
 /// Spawn the single broadcast fan-out task and return the prepared-event
@@ -35,8 +34,7 @@ pub(super) fn spawn_broadcast_fanout(
 pub(super) struct BackgroundTaskHandles {
     pub _acp_inspect_push: JoinHandle<()>,
     pub _github_data_change_push: JoinHandle<()>,
-    pub _machine_heartbeat: Option<JoinHandle<()>>,
-    pub _task_board_dispatch_loop: Option<JoinHandle<()>>,
+    pub _machine_heartbeat: JoinHandle<()>,
     pub _task_board_orchestrator_loop: Option<JoinHandle<()>>,
 }
 
@@ -45,7 +43,6 @@ pub(super) fn spawn_background_tasks(
     poll_interval: Duration,
     shutdown_rx: tokio_watch::Receiver<bool>,
 ) -> BackgroundTaskHandles {
-    let async_db = app_state.async_db.get().cloned();
     BackgroundTaskHandles {
         _acp_inspect_push: spawn_acp_inspect_publisher(
             app_state.sender.clone(),
@@ -56,14 +53,9 @@ pub(super) fn spawn_background_tasks(
             app_state.sender.clone(),
             shutdown_rx.clone(),
         ),
-        _machine_heartbeat: async_db
-            .as_ref()
-            .map(|db| spawn_machine_heartbeat_loop(Arc::clone(db), shutdown_rx.clone())),
-        _task_board_dispatch_loop: async_db
-            .as_ref()
-            .map(|_| spawn_task_board_dispatch_loop(app_state.clone(), shutdown_rx.clone())),
-        _task_board_orchestrator_loop: async_db.map(|db| {
-            spawn_task_board_orchestrator_loop(app_state.clone(), db, poll_interval, shutdown_rx)
+        _machine_heartbeat: spawn_machine_heartbeat_loop(shutdown_rx.clone()),
+        _task_board_orchestrator_loop: app_state.async_db.get().map(|_| {
+            spawn_task_board_orchestrator_loop(app_state.clone(), poll_interval, shutdown_rx)
         }),
     }
 }

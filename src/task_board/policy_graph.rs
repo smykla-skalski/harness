@@ -14,7 +14,6 @@ mod compiler;
 mod decisions;
 mod defaults;
 mod evaluation;
-#[cfg(test)]
 mod gate_cache;
 mod graph_impls;
 mod ids;
@@ -37,9 +36,10 @@ pub const POLICY_GRAPH_INITIAL_REVISION: u64 = 1;
 pub use compiler::{CompiledWorkflowPlan, CompiledWorkflowStep};
 pub(crate) use decisions::{RecordedPolicyDecision, install_decision_sink, record_policy_decision};
 #[cfg(test)]
+pub(crate) use gate_cache::store_gate_policy;
 pub(crate) use gate_cache::{
-    CachedGatePolicy, cached_gate_policy, resolve_gate_policy, store_database_gate_policy_entry,
-    store_gate_policy,
+    CachedGatePolicy, cached_gate_policy, install_gate_coldfill, resolve_gate_policy,
+    store_gate_policy_entry,
 };
 pub use ids::{PolicyGraphEdgeId, PolicyGraphGroupId, PolicyGraphNodeId, PolicyGraphPortId};
 pub use models::{

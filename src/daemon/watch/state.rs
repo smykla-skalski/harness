@@ -23,8 +23,6 @@ pub(super) struct WatchSnapshot {
 pub(super) struct WatchChanges {
     pub(super) sessions_updated: bool,
     pub(super) session_ids: BTreeSet<String>,
-    pub(super) task_board_revision: Option<i64>,
-    pub(super) task_board_scopes: BTreeSet<String>,
 }
 
 impl WatchChanges {
