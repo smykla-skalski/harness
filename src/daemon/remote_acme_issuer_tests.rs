@@ -1,3 +1,5 @@
+use std::env;
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -19,8 +21,28 @@ use crate::daemon::remote::{RemoteAcmeChallenge, RemoteDaemonServeConfig, Remote
 use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_tls::build_remote_tls_server_config;
 
+const PRODUCTION_PROVIDER_CHILD_ENV: &str = "HARNESS_TEST_REMOTE_ACME_PROVIDER_CHILD";
+const PRODUCTION_PROVIDER_TEST: &str =
+    "daemon::remote_acme_issuer::tests::production_acme_issuer_installs_rustls_provider_before_client_creation";
+
 #[test]
 fn production_acme_issuer_installs_rustls_provider_before_client_creation() {
+    if env::var_os(PRODUCTION_PROVIDER_CHILD_ENV).is_none() {
+        let output = Command::new(env::current_exe().expect("current unit test executable"))
+            .args(["--exact", PRODUCTION_PROVIDER_TEST, "--nocapture"])
+            .env(PRODUCTION_PROVIDER_CHILD_ENV, "1")
+            .output()
+            .expect("run isolated ACME provider test");
+        assert!(
+            output.status.success(),
+            "isolated ACME provider test failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        return;
+    }
+
+    assert!(rustls::crypto::CryptoProvider::get_default().is_none());
     let _issuer = InstantAcmeIssuer::production(RecordingProvisioner::default());
 
     assert!(rustls::crypto::CryptoProvider::get_default().is_some());
