@@ -1,5 +1,6 @@
 //! CLI subcommand entry points for `harness mcp ...`.
 
+#[cfg(target_os = "macos")]
 use std::io;
 use std::path::PathBuf;
 
@@ -97,6 +98,7 @@ where
         .map_err(|error| map_io_error(&error))
 }
 
+#[cfg(target_os = "macos")]
 fn map_io_error(error: &io::Error) -> CliError {
     CliError::from(CliErrorKind::workflow_io(format!(
         "mcp stdio serve: {error}"
