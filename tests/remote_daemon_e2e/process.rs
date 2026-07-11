@@ -251,11 +251,9 @@ impl RemoteDaemonProcess {
     }
 
     pub fn diagnostics(&self) -> String {
-        format!(
-            "stdout={:?} stderr={:?}",
-            fs::read_to_string(&self.stdout_path).unwrap_or_default(),
-            fs::read_to_string(&self.stderr_path).unwrap_or_default()
-        )
+        let stdout = fs::read_to_string(&self.stdout_path).unwrap_or_default();
+        let stderr = fs::read_to_string(&self.stderr_path).unwrap_or_default();
+        format!("stdout:\n{stdout}\nstderr:\n{stderr}")
     }
 }
 
@@ -276,7 +274,7 @@ fn unused_port() -> Result<u16, String> {
     TcpListener::bind(("127.0.0.1", 0))
         .and_then(|listener| listener.local_addr())
         .map(|address| address.port())
-        .map_err(|error| format!("reserve unused local port: {error}"))
+        .map_err(|error| format!("select unused local port: {error}"))
 }
 
 fn write_dns_hook(path: &Path) -> Result<(), String> {
