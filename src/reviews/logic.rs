@@ -4,7 +4,7 @@
 //! that derive request/response state from the structs declared in
 //! [`crate::reviews::types`].
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::enums::{
     ReviewCheckStatus, ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus,
@@ -191,14 +191,12 @@ impl ReviewsPullRequestReference {
 impl ReviewsPullRequestResolveRequest {
     #[must_use]
     pub fn normalized_references(&self) -> Vec<ReviewsPullRequestReference> {
-        let mut seen = std::collections::BTreeSet::new();
+        let mut seen = BTreeSet::new();
         self.references
             .iter()
             .filter_map(|reference| {
                 let repository = reference.normalized_repository();
-                let Some((owner, name)) = repository.split_once('/') else {
-                    return None;
-                };
+                let (owner, name) = repository.split_once('/')?;
                 if owner.is_empty()
                     || name.is_empty()
                     || name.contains('/')
