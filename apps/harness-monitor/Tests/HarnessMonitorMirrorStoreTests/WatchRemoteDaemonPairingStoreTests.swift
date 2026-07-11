@@ -1,5 +1,5 @@
 import Foundation
-import HarnessMonitorCrypto
+@testable import HarnessMonitorCrypto
 import HarnessMonitorMirrorStore
 import XCTest
 
@@ -25,7 +25,7 @@ final class WatchRemoteDaemonPairingStoreTests: XCTestCase {
     let removal = Task { @MainActor in
       await fixture.store.removeDirectWatchPairing(stationID: fixture.credential.stationID)
     }
-    try await Task.sleep(for: .milliseconds(50))
+    await mutationGate.waitUntilQueuedOperations(atLeast: 1)
 
     let credentialWhileBlocked = try await fixture.credentialStore.load(
       stationID: fixture.credential.stationID
