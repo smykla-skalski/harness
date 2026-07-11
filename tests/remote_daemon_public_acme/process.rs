@@ -167,7 +167,8 @@ impl PublicAcmeProcess<'_> {
 
 impl Drop for PublicAcmeProcess<'_> {
     fn drop(&mut self) {
-        if !matches!(self.child.try_wait(), Ok(None)) {
+        let poll = self.child.try_wait();
+        if !child_may_still_be_running(&poll) {
             return;
         }
         let _ = Command::new("/bin/kill")
@@ -175,7 +176,8 @@ impl Drop for PublicAcmeProcess<'_> {
             .status();
         let deadline = Instant::now() + Duration::from_secs(45);
         while Instant::now() < deadline {
-            if !matches!(self.child.try_wait(), Ok(None)) {
+            let poll = self.child.try_wait();
+            if !child_may_still_be_running(&poll) {
                 return;
             }
             thread::sleep(Duration::from_millis(100));
@@ -183,6 +185,10 @@ impl Drop for PublicAcmeProcess<'_> {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
+}
+
+fn child_may_still_be_running(poll: &std::io::Result<Option<std::process::ExitStatus>>) -> bool {
+    !matches!(poll, Ok(Some(_)))
 }
 
 pub fn remote_daemon_args(
@@ -275,12 +281,28 @@ fn prepare_capable_binary(root: &Path) -> Result<PathBuf, String> {
         .map_err(|error| format!("verify public ACME bind capability: {error}"))?;
     let capabilities = String::from_utf8_lossy(&output.stdout);
     if !output.status.success() || !capabilities.contains("cap_net_bind_service=ep") {
-        return Err(format!(
-            "public ACME binary lacks CAP_NET_BIND_SERVICE: {}",
-            capabilities.trim()
+        return Err(capability_verification_error(
+            &binary,
+            &output.status.to_string(),
+            &output.stdout,
+            &output.stderr,
         ));
     }
     Ok(binary)
+}
+
+fn capability_verification_error(
+    binary: &Path,
+    status: &str,
+    stdout: &[u8],
+    stderr: &[u8],
+) -> String {
+    format!(
+        "public ACME binary {} lacks CAP_NET_BIND_SERVICE or getcap failed with {status}; stdout={}; stderr={}",
+        binary.display(),
+        String::from_utf8_lossy(stdout).trim(),
+        String::from_utf8_lossy(stderr).trim(),
+    )
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -300,8 +322,29 @@ fn system_command<'a>(absolute: &'a str, fallback: &'a str) -> &'a str {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::io;
 
     use super::*;
+
+    #[test]
+    fn public_acme_drop_attempts_cleanup_after_poll_error() {
+        let poll = Err(io::Error::other("poll failed"));
+
+        assert!(child_may_still_be_running(&poll));
+    }
+
+    #[test]
+    fn getcap_failure_reports_status_and_stderr() {
+        let error = capability_verification_error(
+            Path::new("/tmp/harness-public-acme"),
+            "exit status: 1",
+            b"",
+            b"permission denied",
+        );
+
+        assert!(error.contains("exit status: 1"));
+        assert!(error.contains("stderr=permission denied"));
+    }
 
     #[test]
     fn public_acme_daemon_args_bind_standard_public_ports() {
