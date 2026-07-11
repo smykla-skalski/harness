@@ -338,6 +338,8 @@ private struct TaskBoardCardChrome: ViewModifier {
   private var reduceTransparency
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
+  @Environment(\.colorScheme)
+  private var colorScheme
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
 
@@ -354,11 +356,7 @@ private struct TaskBoardCardChrome: ViewModifier {
       )
       .background(
         RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
-          .fill(
-            AnyShapeStyle(
-              .background.opacity(reduceTransparency ? 0.68 : 0.56)
-            )
-          )
+          .fill(cardSurfaceFill)
       )
       .overlay {
         RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
@@ -369,6 +367,21 @@ private struct TaskBoardCardChrome: ViewModifier {
             lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
           )
       }
+  }
+
+  private var cardSurfaceFill: Color {
+    switch colorScheme {
+    case .dark:
+      if reduceTransparency {
+        return Color(red: 0.225, green: 0.26, blue: 0.27)
+      }
+      return Color(red: 0.205, green: 0.24, blue: 0.25)
+    default:
+      if reduceTransparency {
+        return Color(red: 0.98, green: 0.99, blue: 0.995)
+      }
+      return Color(red: 0.99, green: 0.995, blue: 1)
+    }
   }
 }
 

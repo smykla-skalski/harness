@@ -54,6 +54,17 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(!laneChrome.contains("AnyShapeStyle(.background.opacity"))
   }
 
+  @Test("Task cards use a raised neutral surface fill")
+  func taskCardsUseRaisedNeutralSurfaceFill() throws {
+    let support = try taskBoardSourceFile(named: "TaskBoardLaneSupport.swift")
+
+    #expect(support.contains("private var cardSurfaceFill: Color"))
+    #expect(support.contains("Color(red: 0.205, green: 0.24, blue: 0.25)"))
+    #expect(support.contains("Color(red: 0.99, green: 0.995, blue: 1)"))
+    #expect(support.contains(".fill(cardSurfaceFill)"))
+    #expect(!support.contains(".background.opacity(reduceTransparency ? 0.68 : 0.56)"))
+  }
+
   @Test("Expanded and collapsed lane titles use matching type size")
   func expandedAndCollapsedLaneTitlesUseMatchingTypeSize() throws {
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
