@@ -1,16 +1,15 @@
 use std::path::{Path, PathBuf};
 
-use fs_err as fs;
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{CliError, CliErrorKind, io_for};
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
 use crate::workspace::{harness_data_root, utc_now};
 
+mod loading;
 mod parse_cache;
-use parse_cache::{BOARD_PARSE_CACHE, Resolve};
+use parse_cache::BOARD_PARSE_CACHE;
 
 use super::types::{
     AgentMode, CURRENT_TASK_BOARD_ITEM_VERSION, ExternalRef, ExternalRefProvider, PlanningState,
@@ -182,19 +181,6 @@ impl TaskBoardStore {
         })
     }
 
-    /// Load one board item by ID.
-    ///
-    /// # Errors
-    /// Returns `CliError` if the ID is unsafe, the file is missing, or the
-    /// markdown/frontmatter payload cannot be parsed or repaired on disk.
-    pub fn get(&self, id: &str) -> Result<TaskBoardItem, CliError> {
-        let path = self.path_for(id)?;
-        let mut item = read_path(&path)?;
-        validate_loaded_id(id, &item)?;
-        Self::repair_legacy_status_at(&path, &mut item)?;
-        Ok(item)
-    }
-
     /// List active board items, optionally filtered by status.
     ///
     /// # Errors
@@ -220,64 +206,6 @@ impl TaskBoardStore {
         Ok(items)
     }
 
-    /// Read and parse every markdown item in the tasks directory.
-    ///
-    /// The directory scan is cheap, but parsing the YAML frontmatter is not, so
-    /// the per-file parse fans out across the rayon pool and each result is
-    /// memoized by `(mtime, len)` in [`BOARD_PARSE_CACHE`]. A steady-state
-    /// listing (the daemon orchestrator lists every couple of seconds) then
-    /// costs one `stat` per file instead of a full reparse.
-    ///
-    /// # Errors
-    /// Returns `CliError` if the tasks directory cannot be read or an item
-    /// cannot be parsed.
-    fn read_all_items(&self) -> Result<Vec<TaskBoardItem>, CliError> {
-        let dir = self.tasks_dir();
-        if !dir.exists() {
-            return Ok(Vec::new());
-        }
-        let mut paths = Vec::new();
-        for entry in fs::read_dir(&dir).map_err(|error| io_for("read dir", &dir, &error))? {
-            let path = entry
-                .map_err(|error| io_for("read dir entry", &dir, &error))?
-                .path();
-            if path.extension().and_then(|ext| ext.to_str()) == Some("md") {
-                paths.push(path);
-            }
-        }
-        // Resolve cache hits serially - it is just a `stat` plus a map lookup,
-        // and the steady-state listing is all hits, so paying rayon's fork/join
-        // overhead there would cost more than the work itself. Only the cold
-        // parses (`yaml_rust2` scanning) fan out across the pool.
-        let mut items = Vec::with_capacity(paths.len());
-        let mut misses = Vec::new();
-        for path in paths {
-            match BOARD_PARSE_CACHE.resolve(&path)? {
-                // The cache always holds its own Arc reference, so the
-                // returned Arc has refcount >= 2. Clone outside the Mutex so
-                // the lock is held only for an atomic refcount increment rather
-                // than a full TaskBoardItem deep-clone.
-                Resolve::Hit(arc) => items.push((path, (*arc).clone())),
-                Resolve::Miss { mtime, len } => misses.push((path, mtime, len)),
-            }
-        }
-        if !misses.is_empty() {
-            let parsed = misses
-                .par_iter()
-                .map(|(path, mtime, len)| {
-                    BOARD_PARSE_CACHE
-                        .parse_miss(path, *mtime, *len)
-                        .map(|arc| (path.clone(), (*arc).clone()))
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            items.extend(parsed);
-        }
-        for (path, item) in &mut items {
-            Self::repair_legacy_status_at(path, item)?;
-        }
-        Ok(items.into_iter().map(|(_, item)| item).collect())
-    }
-
     /// Patch one board item in place.
     ///
     /// # Errors
@@ -298,7 +226,7 @@ impl TaskBoardStore {
         patch_for: impl FnOnce(&TaskBoardItem) -> Option<TaskBoardItemPatch>,
     ) -> Result<Option<TaskBoardItem>, CliError> {
         self.with_mutation_lock(|| {
-            let item = self.get(id)?;
+            let item = self.get_locked(id)?;
             let Some(patch) = patch_for(&item) else {
                 return Ok(None);
             };
@@ -311,7 +239,7 @@ impl TaskBoardStore {
     /// Returns `CliError` if the item cannot be loaded or saved.
     pub fn delete(&self, id: &str) -> Result<TaskBoardItem, CliError> {
         self.with_mutation_lock(|| {
-            let mut item = self.get(id)?;
+            let mut item = self.get_locked(id)?;
             apply_canonical_persisted_status(&mut item);
             let now = utc_now();
             item.deleted_at = Some(now.clone());
@@ -326,7 +254,7 @@ impl TaskBoardStore {
         id: &str,
         patch: TaskBoardItemPatch,
     ) -> Result<TaskBoardItem, CliError> {
-        let item = self.get(id)?;
+        let item = self.get_locked(id)?;
         self.update_item(item, patch)
     }
 
@@ -396,7 +324,10 @@ impl TaskBoardStore {
         Ok(())
     }
 
-    fn repair_legacy_status_at(path: &Path, item: &mut TaskBoardItem) -> Result<(), CliError> {
+    fn repair_legacy_status_at_locked(
+        path: &Path,
+        item: &mut TaskBoardItem,
+    ) -> Result<(), CliError> {
         if apply_canonical_persisted_status(item) {
             Self::save_to_path(path, item)?;
         }

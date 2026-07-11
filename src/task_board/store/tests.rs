@@ -86,6 +86,26 @@ fn get_repairs_legacy_status_on_disk() {
 }
 
 #[test]
+fn get_repair_reloads_a_newer_item_before_persisting() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    let path = seed_raw_item(&store, "repair-race", "new");
+    let stale = super::read_path(&path).expect("read stale item");
+    write_raw_item(&path, "repair-race", "Concurrent edit", "in_progress");
+
+    let loaded = store
+        .finish_get("repair-race", stale)
+        .expect("finish legacy repair");
+
+    assert_eq!(loaded.title, "Concurrent edit");
+    assert_eq!(loaded.status, TaskBoardStatus::InProgress);
+    let contents = fs::read_to_string(path).expect("read latest file");
+    assert!(contents.contains("title: Concurrent edit"));
+    assert!(contents.contains("status: in_progress"));
+    assert!(!contents.contains("status: todo"));
+}
+
+#[test]
 fn get_rejects_mismatched_frontmatter_id_before_repair() {
     let temp = tempdir().expect("tempdir");
     let store = TaskBoardStore::new(temp.path().join("board"));
@@ -120,6 +140,32 @@ fn list_repairs_legacy_statuses_before_filtering() {
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].id, "legacy-needs-you");
     assert_eq!(listed[0].status, TaskBoardStatus::HumanRequired);
+}
+
+#[test]
+fn list_repair_reloads_newer_items_before_persisting() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    let path = seed_raw_item(&store, "list-repair-race", "needs_you");
+    let stale = super::read_path(&path).expect("read stale item");
+    write_raw_item(
+        &path,
+        "list-repair-race",
+        "Concurrent list edit",
+        "in_progress",
+    );
+
+    let loaded = store
+        .finish_read_all_items(vec![(path.clone(), stale)])
+        .expect("finish list repair");
+
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(loaded[0].title, "Concurrent list edit");
+    assert_eq!(loaded[0].status, TaskBoardStatus::InProgress);
+    let contents = fs::read_to_string(path).expect("read latest file");
+    assert!(contents.contains("title: Concurrent list edit"));
+    assert!(contents.contains("status: in_progress"));
+    assert!(!contents.contains("status: human_required"));
 }
 
 #[test]
@@ -237,13 +283,18 @@ fn seed_raw_item_with_frontmatter_id(
 ) -> std::path::PathBuf {
     let path = store.tasks_dir().join(format!("{filename_id}.md"));
     fs::create_dir_all(store.tasks_dir()).expect("create tasks dir");
+    write_raw_item(&path, frontmatter_id, "Legacy status", status);
+    path
+}
+
+fn write_raw_item(path: &std::path::Path, frontmatter_id: &str, title: &str, status: &str) {
     fs::write(
-        &path,
+        path,
         format!(
             "---\n\
              schema_version: 1\n\
              id: {frontmatter_id}\n\
-             title: Legacy status\n\
+             title: {title}\n\
              status: {status}\n\
              priority: medium\n\
              agent_mode: headless\n\
@@ -254,7 +305,6 @@ fn seed_raw_item_with_frontmatter_id(
         ),
     )
     .expect("write raw item");
-    path
 }
 
 #[test]
