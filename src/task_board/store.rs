@@ -196,7 +196,7 @@ impl TaskBoardStore {
     ///
     /// # Errors
     /// Returns `CliError` if the tasks directory cannot be read or an item
-    /// cannot be parsed.
+    /// cannot be parsed or repaired on disk.
     pub fn list(&self, status: Option<TaskBoardStatus>) -> Result<Vec<TaskBoardItem>, CliError> {
         let status = status.map(TaskBoardStatus::canonical_persisted_status);
         let mut items = self.read_all_items()?;

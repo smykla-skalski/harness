@@ -14,10 +14,11 @@ use super::types::{
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardTodoistInboxConfig,
 };
 
-/// Rewrite legacy `enabled_workflows` entries on disk so the strict enum
-/// deserializer can load settings written before the Dependencies → Reviews
-/// rename. Idempotent: once the file holds only current variants, no write
-/// happens.
+/// Rewrite legacy persisted settings entries on disk so strict enum
+/// deserializers can load older settings files. This repairs workflow names
+/// written before the Dependencies → Reviews rename and legacy dispatch status
+/// filters from earlier task-board lanes. Idempotent: once the file holds only
+/// current variants, no write happens.
 ///
 /// Returns the parsed settings when the file exists, or `None` when it is
 /// absent. Callers can use the returned value directly to avoid a second
