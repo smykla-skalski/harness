@@ -1,19 +1,25 @@
 use std::env;
+use std::fmt;
 use std::net::IpAddr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use hickory_resolver::config::{NameServerConfig, ResolverConfig, ResolverOpts};
 use hickory_resolver::lookup::Lookup;
 use hickory_resolver::net::runtime::TokioRuntimeProvider;
-use hickory_resolver::proto::rr::{RData, RecordType};
+use hickory_resolver::proto::rr::RData;
 use hickory_resolver::{Resolver, TokioResolver};
 use tokio::time::{Instant, sleep};
 
+use crate::daemon::remote_redaction::redact_secret_detail;
+
 const TIMEOUT_ENV: &str = "HARNESS_REMOTE_ACME_DNS_VISIBILITY_TIMEOUT_SECONDS";
 const POLL_INTERVAL_ENV: &str = "HARNESS_REMOTE_ACME_DNS_VISIBILITY_POLL_SECONDS";
+const STABLE_POLLS_ENV: &str = "HARNESS_REMOTE_ACME_DNS_VISIBILITY_STABLE_POLLS";
 const DEFAULT_TIMEOUT: Duration = Duration::from_mins(5);
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(5);
+const DEFAULT_STABLE_POLLS: usize = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DnsTxtRecordState {
@@ -22,10 +28,10 @@ pub(crate) enum DnsTxtRecordState {
 }
 
 impl DnsTxtRecordState {
-    const fn matches(self, present: bool) -> bool {
+    const fn matches(self, observed: DnsTxtValueState) -> bool {
         match self {
-            Self::Present => present,
-            Self::Absent => !present,
+            Self::Present => matches!(observed, DnsTxtValueState::Matching),
+            Self::Absent => !matches!(observed, DnsTxtValueState::Matching),
         }
     }
 
@@ -33,6 +39,24 @@ impl DnsTxtRecordState {
         match self {
             Self::Present => "appear",
             Self::Absent => "disappear",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DnsTxtValueState {
+    Matching,
+    Different,
+    Absent,
+}
+
+impl DnsTxtValueState {
+    #[cfg(test)]
+    const fn from_present(present: bool) -> Self {
+        if present {
+            Self::Matching
+        } else {
+            Self::Absent
         }
     }
 }
@@ -47,20 +71,70 @@ pub(crate) trait DnsTxtVisibilityWaiter: Send + Sync {
     ) -> Result<(), String>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct AuthoritativeDnsTxtVisibilityWaiter {
     zone_name: String,
     timeout: Duration,
     poll_interval: Duration,
+    stable_polls: usize,
+    observer: Arc<dyn AuthoritativeDnsTxtObserver>,
+}
+
+impl fmt::Debug for AuthoritativeDnsTxtVisibilityWaiter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AuthoritativeDnsTxtVisibilityWaiter")
+            .field("zone_name", &self.zone_name)
+            .field("timeout", &self.timeout)
+            .field("poll_interval", &self.poll_interval)
+            .field("stable_polls", &self.stable_polls)
+            .finish_non_exhaustive()
+    }
 }
 
 impl AuthoritativeDnsTxtVisibilityWaiter {
     pub(crate) fn from_environment(zone_name: &str) -> Result<Self, String> {
-        Ok(Self {
+        Ok(Self::new_with_observer(
+            zone_name,
+            duration_from_env(TIMEOUT_ENV, DEFAULT_TIMEOUT)?,
+            duration_from_env(POLL_INTERVAL_ENV, DEFAULT_POLL_INTERVAL)?,
+            positive_usize_from_env(STABLE_POLLS_ENV, DEFAULT_STABLE_POLLS)?,
+            Arc::new(SystemAuthoritativeDnsTxtObserver),
+        ))
+    }
+
+    fn new_with_observer(
+        zone_name: &str,
+        timeout: Duration,
+        poll_interval: Duration,
+        stable_polls: usize,
+        observer: Arc<dyn AuthoritativeDnsTxtObserver>,
+    ) -> Self {
+        Self {
             zone_name: zone_name.to_string(),
-            timeout: duration_from_env(TIMEOUT_ENV, DEFAULT_TIMEOUT)?,
-            poll_interval: duration_from_env(POLL_INTERVAL_ENV, DEFAULT_POLL_INTERVAL)?,
-        })
+            timeout,
+            poll_interval,
+            stable_polls,
+            observer,
+        }
+    }
+
+    async fn observe(
+        &self,
+        endpoints: &[AuthoritativeDnsEndpoint],
+        record_name: &str,
+        record_value: &str,
+    ) -> Vec<AuthoritativeDnsObservation> {
+        let mut observations = Vec::with_capacity(endpoints.len());
+        for endpoint in endpoints {
+            observations.push(AuthoritativeDnsObservation {
+                endpoint: endpoint.clone(),
+                result: self
+                    .observer
+                    .txt_value_state(endpoint, record_name, record_value)
+                    .await,
+            });
+        }
+        observations
     }
 }
 
@@ -72,25 +146,35 @@ impl DnsTxtVisibilityWaiter for AuthoritativeDnsTxtVisibilityWaiter {
         record_value: &str,
         state: DnsTxtRecordState,
     ) -> Result<(), String> {
-        let resolvers = authoritative_resolvers(&self.zone_name).await?;
+        let endpoints = self.observer.discover_endpoints(&self.zone_name).await?;
+        if endpoints.is_empty() {
+            return Err(format!(
+                "authoritative DNS lookup for {} returned no endpoints",
+                self.zone_name
+            ));
+        }
         let fqdn = format!("{}.", record_name.trim_end_matches('.'));
         let deadline = Instant::now() + self.timeout;
+        let mut stable_polls = 0;
         loop {
-            let query_error =
-                match all_authoritative_resolvers_match(&resolvers, &fqdn, record_value, state)
-                    .await
-                {
-                    Ok(true) => return Ok(()),
-                    Ok(_) => None,
-                    Err(error) => Some(error),
-                };
+            let observations = self.observe(&endpoints, &fqdn, record_value).await;
+            if all_authoritative_observations_match(state, &observations) {
+                stable_polls += 1;
+                if stable_polls == self.stable_polls {
+                    return Ok(());
+                }
+            } else {
+                stable_polls = 0;
+            }
             let now = Instant::now();
             if now >= deadline {
                 return Err(visibility_timeout_error(
                     record_name,
                     state,
                     self.timeout,
-                    query_error.as_deref(),
+                    stable_polls,
+                    self.stable_polls,
+                    &observations,
                 ));
             }
             sleep(self.poll_interval.min(deadline - now)).await;
@@ -98,12 +182,68 @@ impl DnsTxtVisibilityWaiter for AuthoritativeDnsTxtVisibilityWaiter {
     }
 }
 
-struct AuthoritativeDnsResolver {
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct AuthoritativeDnsEndpoint {
     name: String,
-    resolver: TokioResolver,
+    address: IpAddr,
 }
 
-async fn authoritative_resolvers(zone_name: &str) -> Result<Vec<AuthoritativeDnsResolver>, String> {
+impl AuthoritativeDnsEndpoint {
+    fn new(name: &str, address: IpAddr) -> Self {
+        Self {
+            name: name.trim_end_matches('.').to_string(),
+            address,
+        }
+    }
+
+    fn label(&self) -> String {
+        format!("{}@{}", self.name, self.address)
+    }
+}
+
+struct AuthoritativeDnsObservation {
+    endpoint: AuthoritativeDnsEndpoint,
+    result: Result<DnsTxtValueState, String>,
+}
+
+#[async_trait]
+trait AuthoritativeDnsTxtObserver: Send + Sync {
+    async fn discover_endpoints(
+        &self,
+        zone_name: &str,
+    ) -> Result<Vec<AuthoritativeDnsEndpoint>, String>;
+
+    async fn txt_value_state(
+        &self,
+        endpoint: &AuthoritativeDnsEndpoint,
+        record_name: &str,
+        record_value: &str,
+    ) -> Result<DnsTxtValueState, String>;
+}
+
+struct SystemAuthoritativeDnsTxtObserver;
+
+#[async_trait]
+impl AuthoritativeDnsTxtObserver for SystemAuthoritativeDnsTxtObserver {
+    async fn discover_endpoints(
+        &self,
+        zone_name: &str,
+    ) -> Result<Vec<AuthoritativeDnsEndpoint>, String> {
+        authoritative_endpoints(zone_name).await
+    }
+
+    async fn txt_value_state(
+        &self,
+        endpoint: &AuthoritativeDnsEndpoint,
+        record_name: &str,
+        record_value: &str,
+    ) -> Result<DnsTxtValueState, String> {
+        let resolver = build_authoritative_resolver(endpoint)?;
+        txt_value_state(&resolver, record_name, record_value).await
+    }
+}
+
+async fn authoritative_endpoints(zone_name: &str) -> Result<Vec<AuthoritativeDnsEndpoint>, String> {
     let system = TokioResolver::builder_tokio()
         .map_err(|error| format!("load system DNS resolver: {error}"))?
         .build()
@@ -128,7 +268,7 @@ async fn authoritative_resolvers(zone_name: &str) -> Result<Vec<AuthoritativeDns
             "authoritative DNS lookup for {zone_name} returned no nameservers"
         ));
     }
-    let mut resolvers = Vec::with_capacity(names.len());
+    let mut endpoints = Vec::with_capacity(names.len());
     for nameserver in names {
         let resolved = system
             .lookup_ip(nameserver.as_str())
@@ -137,88 +277,85 @@ async fn authoritative_resolvers(zone_name: &str) -> Result<Vec<AuthoritativeDns
         let mut addresses = resolved.iter().collect::<Vec<_>>();
         addresses.sort_unstable();
         addresses.dedup();
-        resolvers.push(AuthoritativeDnsResolver {
-            resolver: build_authoritative_resolver(&addresses, &nameserver)?,
-            name: nameserver,
-        });
+        if addresses.is_empty() {
+            return Err(format!(
+                "authoritative DNS server {nameserver} resolved without addresses"
+            ));
+        }
+        endpoints.extend(
+            addresses
+                .into_iter()
+                .map(|address| AuthoritativeDnsEndpoint::new(&nameserver, address)),
+        );
     }
-    Ok(resolvers)
+    endpoints.sort_unstable();
+    endpoints.dedup();
+    Ok(endpoints)
 }
 
 fn build_authoritative_resolver(
-    addresses: &[IpAddr],
-    zone_name: &str,
+    endpoint: &AuthoritativeDnsEndpoint,
 ) -> Result<TokioResolver, String> {
-    if addresses.is_empty() {
-        return Err(format!(
-            "authoritative DNS servers for {zone_name} resolved without addresses"
-        ));
-    }
-    let name_servers = addresses
-        .iter()
-        .copied()
-        .map(|address| {
-            let mut config = NameServerConfig::udp_and_tcp(address);
-            config.trust_negative_responses = false;
-            config
-        })
-        .collect();
+    let mut name_server = NameServerConfig::udp_and_tcp(endpoint.address);
+    name_server.trust_negative_responses = false;
     let mut options = ResolverOpts::default();
     options.attempts = 2;
     options.cache_size = 0;
-    options.num_concurrent_reqs = addresses.len().min(2);
+    options.num_concurrent_reqs = 1;
     options.recursion_desired = false;
     options.timeout = Duration::from_secs(5);
     options.try_tcp_on_error = true;
     Resolver::builder_with_config(
-        ResolverConfig::from_parts(None, Vec::new(), name_servers),
+        ResolverConfig::from_parts(None, Vec::new(), vec![name_server]),
         TokioRuntimeProvider::default(),
     )
     .with_options(options)
     .build()
-    .map_err(|error| format!("build authoritative DNS resolver for {zone_name}: {error}"))
+    .map_err(|error| {
+        format!(
+            "build authoritative DNS resolver for {}: {error}",
+            endpoint.label()
+        )
+    })
 }
 
-async fn txt_value_present(
+async fn txt_value_state(
     resolver: &TokioResolver,
     record_name: &str,
     record_value: &str,
-) -> Result<bool, String> {
+) -> Result<DnsTxtValueState, String> {
     match resolver.txt_lookup(record_name).await {
-        Ok(lookup) => Ok(lookup_contains_txt(&lookup, record_value)),
-        Err(error) if error.is_no_records_found() => Ok(false),
+        Ok(lookup) => Ok(lookup_txt_value_state(&lookup, record_value)),
+        Err(error) if error.is_no_records_found() => Ok(DnsTxtValueState::Absent),
         Err(error) => Err(format!(
             "query authoritative TXT record {record_name}: {error}"
         )),
     }
 }
 
-async fn all_authoritative_resolvers_match(
-    resolvers: &[AuthoritativeDnsResolver],
-    record_name: &str,
-    record_value: &str,
+fn all_authoritative_observations_match(
     state: DnsTxtRecordState,
-) -> Result<bool, String> {
-    let mut states = Vec::with_capacity(resolvers.len());
-    for server in resolvers {
-        server
-            .resolver
-            .clear_lookup_cache(record_name, RecordType::TXT);
-        states.push(
-            txt_value_present(&server.resolver, record_name, record_value)
-                .await
-                .map_err(|error| format!("{error} via {}", server.name))?,
-        );
-    }
-    Ok(all_authoritative_states_match(state, states))
+    observations: &[AuthoritativeDnsObservation],
+) -> bool {
+    !observations.is_empty()
+        && observations.iter().all(|observation| {
+            observation
+                .result
+                .as_ref()
+                .is_ok_and(|present| state.matches(*present))
+        })
 }
 
+#[cfg(test)]
 fn all_authoritative_states_match(
     state: DnsTxtRecordState,
     states: impl IntoIterator<Item = bool>,
 ) -> bool {
-    let mut states = states.into_iter().peekable();
-    states.peek().is_some() && states.all(|present| state.matches(present))
+    let mut states = states
+        .into_iter()
+        .map(DnsTxtValueState::from_present)
+        .peekable();
+    states.peek().is_some() && states.all(|observed| state.matches(observed))
 }
 
 fn lookup_contains_txt(lookup: &Lookup, record_value: &str) -> bool {
@@ -231,6 +368,14 @@ fn lookup_contains_txt(lookup: &Lookup, record_value: &str) -> bool {
             .flat_map(|part| part.iter().copied())
             .eq(record_value.bytes())
     })
+}
+
+fn lookup_txt_value_state(lookup: &Lookup, record_value: &str) -> DnsTxtValueState {
+    if lookup_contains_txt(lookup, record_value) {
+        DnsTxtValueState::Matching
+    } else {
+        DnsTxtValueState::Different
+    }
 }
 
 fn duration_from_env(name: &str, default: Duration) -> Result<Duration, String> {
@@ -250,86 +395,53 @@ fn duration_from_env(name: &str, default: Duration) -> Result<Duration, String> 
     Ok(Duration::from_secs(seconds))
 }
 
+fn positive_usize_from_env(name: &str, default: usize) -> Result<usize, String> {
+    let Ok(value) = env::var(name) else {
+        return Ok(default);
+    };
+    let value = value.trim();
+    if value.is_empty() {
+        return Ok(default);
+    }
+    let parsed = value
+        .parse::<usize>()
+        .map_err(|error| format!("parse {name}: {error}"))?;
+    if parsed == 0 {
+        return Err(format!("{name} must be greater than zero"));
+    }
+    Ok(parsed)
+}
+
 fn visibility_timeout_error(
     record_name: &str,
     state: DnsTxtRecordState,
     timeout: Duration,
-    last_error: Option<&str>,
+    stable_polls: usize,
+    required_stable_polls: usize,
+    observations: &[AuthoritativeDnsObservation],
 ) -> String {
-    let detail = last_error.map_or_else(String::new, |error| format!("; last query: {error}"));
+    let endpoint_states = observations
+        .iter()
+        .map(format_observation)
+        .collect::<Vec<_>>()
+        .join(", ");
     format!(
-        "authoritative DNS TXT record {record_name} did not {} within {} seconds{detail}",
+        "authoritative DNS TXT record {record_name} did not {} within {} seconds; stable polls {stable_polls}/{required_stable_polls}; last authoritative observations: {endpoint_states}",
         state.description(),
         timeout.as_secs(),
     )
 }
 
-#[cfg(test)]
-mod tests {
-    use hickory_resolver::lookup::Lookup;
-    use hickory_resolver::proto::op::Query;
-    use hickory_resolver::proto::rr::rdata::TXT;
-    use hickory_resolver::proto::rr::{Name, RData, RecordType};
-
-    use super::*;
-
-    #[test]
-    fn visibility_config_uses_provider_neutral_environment() {
-        temp_env::with_vars(
-            [(TIMEOUT_ENV, Some("17")), (POLL_INTERVAL_ENV, Some("3"))],
-            || {
-                let waiter = AuthoritativeDnsTxtVisibilityWaiter::from_environment("example.com")
-                    .expect("visibility config");
-                assert_eq!(waiter.timeout, Duration::from_secs(17));
-                assert_eq!(waiter.poll_interval, Duration::from_secs(3));
-            },
-        );
-    }
-
-    #[test]
-    fn visibility_config_rejects_zero_duration() {
-        temp_env::with_var(TIMEOUT_ENV, Some("0"), || {
-            let error = AuthoritativeDnsTxtVisibilityWaiter::from_environment("example.com")
-                .expect_err("reject zero timeout");
-            assert_eq!(
-                error,
-                "HARNESS_REMOTE_ACME_DNS_VISIBILITY_TIMEOUT_SECONDS must be greater than zero"
-            );
-        });
-    }
-
-    #[test]
-    fn txt_matching_joins_segments_and_requires_the_exact_value() {
-        let query = Query::query(
-            Name::from_ascii("_acme-challenge.example.com.").expect("record name"),
-            RecordType::TXT,
-        );
-        let lookup = Lookup::from_rdata(
-            query,
-            RData::TXT(TXT::from_bytes(vec![b"dns-proof-", b"value"])),
-        );
-
-        assert!(lookup_contains_txt(&lookup, "dns-proof-value"));
-        assert!(!lookup_contains_txt(&lookup, "dns-proof"));
-    }
-
-    #[test]
-    fn visibility_requires_every_authoritative_server_to_match() {
-        assert!(all_authoritative_states_match(
-            DnsTxtRecordState::Present,
-            [true, true]
-        ));
-        assert!(!all_authoritative_states_match(
-            DnsTxtRecordState::Present,
-            [true, false]
-        ));
-        assert!(all_authoritative_states_match(
-            DnsTxtRecordState::Absent,
-            [false, false]
-        ));
-        assert!(!all_authoritative_states_match(
-            DnsTxtRecordState::Absent,
-            [false, true]
-        ));
-    }
+fn format_observation(observation: &AuthoritativeDnsObservation) -> String {
+    let state = match &observation.result {
+        Ok(DnsTxtValueState::Matching) => "present".to_string(),
+        Ok(DnsTxtValueState::Different) => "different-value".to_string(),
+        Ok(DnsTxtValueState::Absent) => "absent".to_string(),
+        Err(error) => format!("error({})", redact_secret_detail(error)),
+    };
+    format!("{}={state}", observation.endpoint.label())
 }
+
+#[cfg(test)]
+#[path = "remote_acme_dns_visibility_tests.rs"]
+mod tests;

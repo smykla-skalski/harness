@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use instant_acme::{Account, RetryPolicy};
 use rcgen::KeyPair;
+use tokio::sync::Notify;
 use tokio::time::{sleep, timeout};
 
 #[path = "remote_acme_issuer_test_support.rs"]
@@ -271,6 +272,45 @@ async fn instant_acme_issuer_cleans_challenge_after_rejected_order() {
 }
 
 #[tokio::test]
+async fn instant_acme_issuer_awaits_cleanup_after_readiness_failure() {
+    let http = ScriptedAcmeHttp::new(acme_happy_path());
+    let cleanup_release = Arc::new(Notify::new());
+    let provisioner = RecordingProvisioner::with_wait_ready_error_and_cleanup_gate(
+        "authoritative DNS visibility timed out",
+        Arc::clone(&cleanup_release),
+    );
+    let issuer = test_issuer(http, provisioner.clone());
+    let config = http_serve_config();
+    let account = issuer
+        .create_account(config.acme_email.as_str())
+        .await
+        .expect("create ACME account");
+    let task = tokio::spawn(async move { issuer.issue_certificate(&account, &config, None).await });
+
+    timeout(Duration::from_secs(2), async {
+        while !provisioner.cleanup_started() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("readiness failure did not start cleanup");
+    assert!(
+        !task.is_finished(),
+        "issuance returned before cleanup finished"
+    );
+
+    cleanup_release.notify_one();
+    let error = timeout(Duration::from_secs(2), task)
+        .await
+        .expect("readiness cleanup timeout")
+        .expect("join ACME issuance")
+        .expect_err("readiness failure must fail issuance");
+
+    assert_eq!(error, "authoritative DNS visibility timed out");
+    assert_eq!(provisioner.cleanup_count(), 1);
+}
+
+#[tokio::test]
 async fn instant_acme_issuer_redacts_challenge_cleanup_failure() {
     let http = ScriptedAcmeHttp::new(acme_rejected_order_path());
     let provisioner = RecordingProvisioner::with_cleanup_error(
@@ -349,8 +389,10 @@ struct RecordingProvisionerState {
     materials: Vec<RemoteAcmeChallengeMaterial>,
     cleanup_count: usize,
     cleanup_delay: Duration,
+    cleanup_release: Option<Arc<Notify>>,
     cleanup_started: bool,
     cleanup_error: Option<String>,
+    wait_ready_error: Option<String>,
 }
 
 impl RecordingProvisioner {
@@ -367,6 +409,16 @@ impl RecordingProvisioner {
         Self {
             inner: Arc::new(Mutex::new(RecordingProvisionerState {
                 cleanup_delay: delay,
+                ..RecordingProvisionerState::default()
+            })),
+        }
+    }
+
+    fn with_wait_ready_error_and_cleanup_gate(error: &str, release: Arc<Notify>) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(RecordingProvisionerState {
+                cleanup_release: Some(release),
+                wait_ready_error: Some(error.to_string()),
                 ..RecordingProvisionerState::default()
             })),
         }
@@ -402,12 +454,24 @@ impl RemoteAcmeChallengeProvisioner for RecordingProvisioner {
         Ok(())
     }
 
+    async fn wait_ready(&self, _lease: &Self::Lease) -> Result<(), String> {
+        self.inner
+            .lock()
+            .map_err(|error| error.to_string())?
+            .wait_ready_error
+            .clone()
+            .map_or(Ok(()), Err)
+    }
+
     async fn cleanup(&self, _lease: Self::Lease) -> Result<(), String> {
-        let delay = {
+        let (delay, release) = {
             let mut state = self.inner.lock().map_err(|error| error.to_string())?;
             state.cleanup_started = true;
-            state.cleanup_delay
+            (state.cleanup_delay, state.cleanup_release.clone())
         };
+        if let Some(release) = release {
+            release.notified().await;
+        }
         sleep(delay).await;
         let mut state = self.inner.lock().map_err(|error| error.to_string())?;
         state.cleanup_count += 1;
