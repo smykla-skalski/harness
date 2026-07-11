@@ -7,8 +7,14 @@ struct TaskBoardLaneHeader: View {
   let onToggleCollapse: () -> Void
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.taskBoardLaneAppearance)
+  private var laneAppearance
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var laneColor: Color { taskBoardLaneColor(for: lane, appearance: laneAppearance) }
+  private var laneSymbol: String? {
+    taskBoardLaneSystemImage(for: lane, appearance: laneAppearance)
+  }
   private var iconFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
@@ -40,15 +46,17 @@ struct TaskBoardLaneHeader: View {
 
   private var headerContent: some View {
     HStack(spacing: metrics.laneSpacing) {
-      Image(systemName: lane.systemImage)
-        .font(iconFont)
-        .foregroundStyle(taskBoardLaneColor(for: lane))
-        .frame(
-          width: metrics.headerIconWidth + HarnessMonitorTheme.spacingMD,
-          height: metrics.headerIconWidth + HarnessMonitorTheme.spacingMD
-        )
-        .background(taskBoardLaneColor(for: lane).opacity(0.14), in: Circle())
-        .accessibilityHidden(true)
+      if let laneSymbol {
+        Image(systemName: laneSymbol)
+          .font(iconFont)
+          .foregroundStyle(laneColor)
+          .frame(
+            width: metrics.headerIconWidth + HarnessMonitorTheme.spacingMD,
+            height: metrics.headerIconWidth + HarnessMonitorTheme.spacingMD
+          )
+          .background(laneColor.opacity(0.14), in: Circle())
+          .accessibilityHidden(true)
+      }
       Text(lane.title)
         .font(titleFont)
         .foregroundStyle(HarnessMonitorTheme.ink)
@@ -57,14 +65,14 @@ struct TaskBoardLaneHeader: View {
       Spacer(minLength: metrics.laneSpacing)
       Text("\(count)")
         .font(countFont)
-        .foregroundStyle(taskBoardLaneColor(for: lane))
+        .foregroundStyle(laneColor)
         .monospacedDigit()
         .padding(.horizontal, metrics.countHorizontalPadding)
         .padding(.vertical, metrics.countVerticalPadding)
-        .background(taskBoardLaneColor(for: lane).opacity(0.14), in: .capsule)
+        .background(laneColor.opacity(0.14), in: .capsule)
         .overlay {
           Capsule()
-            .stroke(taskBoardLaneColor(for: lane).opacity(0.26), lineWidth: 1)
+            .stroke(laneColor.opacity(0.26), lineWidth: 1)
         }
     }
   }
@@ -75,16 +83,20 @@ private struct TaskBoardLaneToggleFeedback: ViewModifier {
   let cornerRadius: CGFloat
   @State private var isHovered = false
   @GestureState private var isPressed = false
+  @Environment(\.taskBoardLaneAppearance)
+  private var laneAppearance
+
+  private var laneColor: Color { taskBoardLaneColor(for: lane, appearance: laneAppearance) }
 
   func body(content: Content) -> some View {
     content
       .background {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-          .fill(taskBoardLaneColor(for: lane).opacity(backgroundOpacity))
+          .fill(laneColor.opacity(backgroundOpacity))
       }
       .overlay {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-          .strokeBorder(taskBoardLaneColor(for: lane).opacity(strokeOpacity), lineWidth: 1)
+          .strokeBorder(laneColor.opacity(strokeOpacity), lineWidth: 1)
       }
       .onHover { hovering in
         isHovered = hovering
@@ -126,8 +138,11 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
   private var reduceTransparency
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
+  @Environment(\.taskBoardLaneAppearance)
+  private var laneAppearance
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var laneColor: Color { taskBoardLaneColor(for: lane, appearance: laneAppearance) }
 
   func body(content: Content) -> some View {
     content
@@ -168,7 +183,7 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
 
   private var laneFill: AnyShapeStyle {
     if isDropTargeted {
-      return AnyShapeStyle(taskBoardLaneColor(for: lane).opacity(reduceTransparency ? 0.18 : 0.12))
+      return AnyShapeStyle(laneColor.opacity(reduceTransparency ? 0.18 : 0.12))
     }
     return AnyShapeStyle(.background.opacity(reduceTransparency ? 0.72 : 0.6))
   }
@@ -179,7 +194,7 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
 
   private var laneStrokeColor: Color {
     if isDropTargeted {
-      return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.84 : 0.62)
+      return laneColor.opacity(colorSchemeContrast == .increased ? 0.84 : 0.62)
     }
     return HarnessMonitorTheme.controlBorder.opacity(
       colorSchemeContrast == .increased ? 0.78 : 0.54
@@ -188,9 +203,9 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
 
   private var laneAccentColor: Color {
     if isDropTargeted {
-      return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 1 : 0.96)
+      return laneColor.opacity(colorSchemeContrast == .increased ? 1 : 0.96)
     }
-    return taskBoardLaneColor(for: lane).opacity(colorSchemeContrast == .increased ? 0.96 : 0.9)
+    return laneColor.opacity(colorSchemeContrast == .increased ? 0.96 : 0.9)
   }
 
   private var laneStrokeWidth: CGFloat {
@@ -275,8 +290,11 @@ private struct TaskBoardLaneBodyChrome: ViewModifier {
   private var fontScale
   @Environment(\.accessibilityReduceTransparency)
   private var reduceTransparency
+  @Environment(\.taskBoardLaneAppearance)
+  private var laneAppearance
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
+  private var laneColor: Color { taskBoardLaneColor(for: lane, appearance: laneAppearance) }
 
   func body(content: Content) -> some View {
     content
@@ -286,8 +304,7 @@ private struct TaskBoardLaneBodyChrome: ViewModifier {
         if isDropTargeted {
           RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
             .fill(
-              taskBoardLaneColor(for: lane)
-                .opacity(reduceTransparency ? 0.14 : 0.08)
+              laneColor.opacity(reduceTransparency ? 0.14 : 0.08)
             )
         }
       }
@@ -321,30 +338,5 @@ extension View {
     isDropTargeted: Bool = false
   ) -> some View {
     modifier(TaskBoardLaneBodyChrome(lane: lane, isDropTargeted: isDropTargeted))
-  }
-}
-
-func taskBoardLaneColor(for lane: TaskBoardInboxLane) -> Color {
-  switch lane {
-  case .umbrella:
-    HarnessMonitorTheme.warmAccent
-  case .todo:
-    HarnessMonitorTheme.secondaryInk
-  case .planning:
-    HarnessMonitorTheme.warmAccent
-  case .inProgress:
-    HarnessMonitorTheme.caution
-  case .agenticReview:
-    HarnessMonitorTheme.success
-  case .testing:
-    HarnessMonitorTheme.accent
-  case .inReview:
-    HarnessMonitorTheme.accent
-  case .toReview:
-    HarnessMonitorTheme.success
-  case .humanRequired:
-    HarnessMonitorTheme.danger
-  case .failed:
-    HarnessMonitorTheme.danger
   }
 }

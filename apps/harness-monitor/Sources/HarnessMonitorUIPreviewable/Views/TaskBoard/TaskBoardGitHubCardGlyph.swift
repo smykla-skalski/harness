@@ -3,7 +3,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct TaskBoardCardGlyph {
-  let systemImage: String
+  let systemImage: String?
   let tint: Color
 }
 

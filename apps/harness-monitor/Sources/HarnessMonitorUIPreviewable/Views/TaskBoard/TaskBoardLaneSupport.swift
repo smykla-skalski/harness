@@ -73,6 +73,8 @@ struct TaskBoardEmptyLane: View {
   let lane: TaskBoardInboxLane
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.taskBoardLaneAppearance)
+  private var laneAppearance
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
   private var captionSemibold: Font {
@@ -81,10 +83,12 @@ struct TaskBoardEmptyLane: View {
 
   var body: some View {
     VStack(spacing: metrics.laneSpacing) {
-      TaskBoardCardLeadingIcon(
-        systemImage: lane.systemImage,
-        tint: taskBoardLaneColor(for: lane)
-      )
+      if let symbolName = taskBoardLaneSystemImage(for: lane, appearance: laneAppearance) {
+        TaskBoardCardLeadingIcon(
+          systemImage: symbolName,
+          tint: taskBoardLaneColor(for: lane, appearance: laneAppearance)
+        )
+      }
       Text("Nothing here")
         .font(captionSemibold)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)

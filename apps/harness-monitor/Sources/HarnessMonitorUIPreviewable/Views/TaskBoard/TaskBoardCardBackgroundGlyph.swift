@@ -1,7 +1,7 @@
 import SwiftUI
 
 private struct TaskBoardCardBackgroundGlyphModifier: ViewModifier {
-  let systemImage: String
+  let systemImage: String?
   let tint: Color
   let cornerRadius: CGFloat
   let providerSymbol: ProviderBrandSymbol?
@@ -51,7 +51,7 @@ private struct TaskBoardCardBackgroundGlyphModifier: ViewModifier {
   }
 
   private var systemGlyphOpacity: Double {
-    providerSymbol == nil ? 0.22 : 0
+    providerSymbol == nil && systemImage != nil ? 0.22 : 0
   }
 
   private var providerGlyphTint: Color {
@@ -80,10 +80,12 @@ private struct TaskBoardCardBackgroundGlyphModifier: ViewModifier {
     content
       .background(alignment: .bottomTrailing) {
         ZStack {
-          Image(systemName: systemImage)
-            .font(.system(size: glyphSize, weight: .black, design: .rounded))
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(tint.opacity(systemGlyphOpacity))
+          if let systemImage {
+            Image(systemName: systemImage)
+              .font(.system(size: glyphSize, weight: .black, design: .rounded))
+              .symbolRenderingMode(.hierarchical)
+              .foregroundStyle(tint.opacity(systemGlyphOpacity))
+          }
           ProviderBrandSymbolView(
             symbol: resolvedProviderSymbol,
             colorMode: providerGlyphColorMode,
@@ -104,7 +106,7 @@ private struct TaskBoardCardBackgroundGlyphModifier: ViewModifier {
 
 extension View {
   func taskBoardCardBackgroundGlyph(
-    systemImage: String,
+    systemImage: String?,
     tint: Color,
     cornerRadius: CGFloat,
     providerSymbol: ProviderBrandSymbol? = nil

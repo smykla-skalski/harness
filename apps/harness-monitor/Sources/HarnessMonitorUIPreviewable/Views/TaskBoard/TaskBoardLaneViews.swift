@@ -163,6 +163,8 @@ struct TaskBoardItemRow: View {
   let onOpenItem: (TaskBoardItem) -> Void
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.taskBoardLaneAppearance)
+  private var laneAppearance
 
   private var dragPayload: TaskBoardItemDragPayload {
     TaskBoardItemDragPayload(itemID: item.id, status: item.status)
@@ -217,17 +219,17 @@ struct TaskBoardItemRow: View {
     .accessibilityIdentifier("harness.task-board.api-item.\(item.id)")
   }
 
-  private var statusTint: Color {
-    taskBoardStatusColor(for: item.status)
-  }
+  private var statusTint: Color { taskBoardStatusColor(for: item.status) }
 
   private var cardGlyph: TaskBoardCardGlyph {
     TaskBoardGitHubCardGlyph.resolve(for: item)
       ?? TaskBoardCardGlyph(systemImage: statusSymbol, tint: statusTint)
   }
 
-  private var statusSymbol: String {
-    TaskBoardInboxLane(status: item.status)?.systemImage ?? "tray"
+  private var statusSymbol: String? {
+    TaskBoardInboxLane(status: item.status).flatMap { lane in
+      taskBoardLaneSystemImage(for: lane, appearance: laneAppearance)
+    }
   }
 
   @ViewBuilder private var badgeContent: some View {
@@ -278,6 +280,8 @@ struct TaskBoardInboxItemRow: View {
   let onOpenItem: (TaskBoardInboxItem) -> Void
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.taskBoardLaneAppearance)
+  private var laneAppearance
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
   private var titleFont: Font {
@@ -336,12 +340,10 @@ struct TaskBoardInboxItemRow: View {
     .accessibilityIdentifier("harness.task-board.item.\(item.task.taskId)")
   }
 
-  private var statusTint: Color {
-    taskStatusColor(for: item.task.status)
-  }
+  private var statusTint: Color { taskStatusColor(for: item.task.status) }
 
-  private var statusSymbol: String {
-    item.lane.systemImage
+  private var statusSymbol: String? {
+    taskBoardLaneSystemImage(for: item.lane, appearance: laneAppearance)
   }
 
   @ViewBuilder private var badgeContent: some View {

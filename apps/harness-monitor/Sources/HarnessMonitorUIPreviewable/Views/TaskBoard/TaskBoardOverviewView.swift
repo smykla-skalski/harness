@@ -41,7 +41,8 @@ public struct TaskBoardOverviewView: View {
   @State private var presentationGeneration: UInt64 = 0
   @AppStorage(TaskBoardLaneCollapsePreferences.storageKey)
   var laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.emptyRawValue
-
+  @AppStorage(TaskBoardLaneAppearancePreferences.storageKey)
+  var laneAppearancePreferencesRawValue = TaskBoardLaneAppearancePreferences.emptyRawValue
   var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
@@ -160,6 +161,10 @@ public struct TaskBoardOverviewView: View {
     )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.overview")
+    .environment(
+      \.taskBoardLaneAppearance,
+      TaskBoardLaneAppearance(rawValue: laneAppearancePreferencesRawValue)
+    )
     .sheet(item: taskBoardManagementSheet) { taskBoardManagementSheet in
       taskBoardManagementSheetContent(taskBoardManagementSheet)
     }
