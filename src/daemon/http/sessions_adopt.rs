@@ -11,6 +11,7 @@ use crate::daemon::db::{DaemonDb, ensure_shared_db};
 use crate::daemon::protocol::{AdoptSessionRequest, SessionMutationResponse};
 use crate::daemon::service;
 use crate::errors::{CliError, CliErrorKind};
+#[cfg(target_os = "macos")]
 use crate::sandbox;
 use crate::workspace::adopter::{AdoptionError, AdoptionOutcome, SessionAdopter};
 use crate::workspace::harness_data_root;

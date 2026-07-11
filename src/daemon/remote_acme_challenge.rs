@@ -301,8 +301,14 @@ impl RemoteAcmeChallengeProvisioner for SystemRemoteAcmeChallengeProvisioner {
     }
 
     async fn wait_ready(&self, lease: &Self::Lease) -> Result<(), String> {
-        if matches!(lease, SystemRemoteAcmeChallengeLease::Dns(_)) {
-            sleep(self.dns_propagation_delay).await;
+        if let SystemRemoteAcmeChallengeLease::Dns(lease) = lease {
+            let dns = self
+                .dns
+                .as_ref()
+                .ok_or_else(|| "remote ACME DNS provider is not configured".to_string())?;
+            if !dns.wait_ready(lease).await? {
+                sleep(self.dns_propagation_delay).await;
+            }
         }
         Ok(())
     }

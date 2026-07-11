@@ -426,6 +426,7 @@ fn parse_acme_challenge_at_column(
 
 fn parse_dns_provider_at_column(label: &str, column: usize) -> rusqlite::Result<RemoteDnsProvider> {
     match label {
+        "aftermarket" => Ok(RemoteDnsProvider::Aftermarket),
         "cloudflare" => Ok(RemoteDnsProvider::Cloudflare),
         "route53" => Ok(RemoteDnsProvider::Route53),
         "exec" => Ok(RemoteDnsProvider::Exec),

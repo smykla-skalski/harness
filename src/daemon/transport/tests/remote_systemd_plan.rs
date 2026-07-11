@@ -10,7 +10,7 @@ use super::super::remote_systemd_lifecycle::{
 };
 
 #[test]
-fn remote_systemd_install_enables_without_starting_reserved_serve() {
+fn remote_systemd_install_enables_and_starts_remote_serve() {
     let temp = tempdir().expect("temp dir");
     let unit_path = temp
         .path()
@@ -44,16 +44,45 @@ fn remote_systemd_install_enables_without_starting_reserved_serve() {
     let report = install_remote_systemd_with(&plan, &runner).expect("install systemd");
 
     assert!(report.enabled);
-    assert!(!report.started);
+    assert!(report.started);
     assert_eq!(
         calls.borrow().as_slice(),
         [
             vec!["daemon-reload".to_string()],
             vec![
                 "enable".to_string(),
+                "--now".to_string(),
                 "harness-remote-daemon.service".to_string(),
             ],
         ]
+    );
+}
+
+#[test]
+fn remote_systemd_plan_runs_aftermarket_dns01() {
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+        "--acme-challenge",
+        "dns",
+        "--acme-dns-provider",
+        "aftermarket",
+    ]);
+    let plan = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+    )
+    .expect("systemd install plan");
+
+    assert!(plan.unit_contents.contains("--acme-challenge dns"));
+    assert!(
+        plan.unit_contents
+            .contains("--acme-dns-provider aftermarket")
     );
 }
 

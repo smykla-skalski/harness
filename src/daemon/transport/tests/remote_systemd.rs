@@ -6,6 +6,7 @@ use tempfile::tempdir;
 use super::super::remote::DaemonRemoteCommand;
 use super::super::remote_systemd::{
     DaemonRemoteSystemdInstallArgs, RemoteSystemdInstallPlan, default_env_path_for_tests,
+    systemd_daemon_root_for_tests,
 };
 use super::super::remote_systemd_lifecycle::{
     RemoteSystemdCommandOutput, install_remote_systemd_with, uninstall_remote_systemd_with,
@@ -15,6 +16,15 @@ use super::super::remote_systemd_lifecycle::{
 struct DaemonRemoteCommandTestHarness {
     #[command(subcommand)]
     command: DaemonRemoteCommand,
+}
+
+#[test]
+fn remote_systemd_management_root_uses_private_state_directory() {
+    assert_eq!(
+        systemd_daemon_root_for_tests("harness-remote-proof").expect("systemd daemon root"),
+        PathBuf::from("/var/lib/private/harness-remote-proof/harness/daemon/external")
+    );
+    assert!(systemd_daemon_root_for_tests("../unsafe").is_err());
 }
 
 #[test]
@@ -135,6 +145,10 @@ fn remote_systemd_unit_is_hardened_and_runs_remote_serve() {
     assert!(
         plan.unit_contents
             .contains("Environment=HARNESS_DAEMON_DATA_HOME=%S/harness-remote-daemon")
+    );
+    assert!(
+        plan.unit_contents
+            .contains("Environment=XDG_DATA_HOME=%S/harness-remote-daemon")
     );
     assert!(
         plan.unit_contents
@@ -374,7 +388,7 @@ fn remote_systemd_uninstall_reports_disable_failure() {
 }
 
 #[test]
-fn remote_systemd_install_writes_files_with_secret_permissions_idempotently() {
+fn remote_systemd_install_preserves_preprovisioned_environment_idempotently() {
     let temp = tempdir().expect("temp dir");
     let unit_path = temp
         .path()
@@ -384,7 +398,12 @@ fn remote_systemd_install_writes_files_with_secret_permissions_idempotently() {
     std::fs::create_dir_all(unit_path.parent().expect("unit parent")).expect("unit dir");
     std::fs::create_dir_all(env_path.parent().expect("env parent")).expect("env dir");
     std::fs::write(&unit_path, "stale unit").expect("write stale unit");
-    std::fs::write(&env_path, "stale env").expect("write stale env");
+    let provisioned_env = concat!(
+        "HARNESS_REMOTE_ACME_DIRECTORY_URL=",
+        "https://acme-staging-v02.api.letsencrypt.org/directory\n",
+        "HARNESS_REMOTE_ACME_DNS_EXEC=/usr/local/bin/harness-acme-dns\n",
+    );
+    std::fs::write(&env_path, provisioned_env).expect("write provisioned env");
     let args = install_args([
         "test",
         "--domain",
@@ -411,7 +430,7 @@ fn remote_systemd_install_writes_files_with_secret_permissions_idempotently() {
     let second = install_remote_systemd_with(&plan, &runner).expect("second install");
 
     assert!(first.unit_written);
-    assert!(first.env_written);
+    assert!(!first.env_written);
     assert!(!second.unit_written);
     assert!(!second.env_written);
     assert_eq!(
@@ -420,7 +439,7 @@ fn remote_systemd_install_writes_files_with_secret_permissions_idempotently() {
     );
     assert_eq!(
         std::fs::read_to_string(&env_path).expect("env file"),
-        plan.env_contents
+        provisioned_env
     );
     assert_secret_file_mode(&env_path);
 }

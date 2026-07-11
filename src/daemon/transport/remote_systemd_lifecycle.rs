@@ -57,11 +57,15 @@ where
     RunSystemctl: Fn(&[String]) -> Result<RemoteSystemdCommandOutput, CliError>,
 {
     let unit_written = write_if_changed(&plan.unit_path, &plan.unit_contents, 0o644)?;
-    let env_written = write_if_changed(&plan.env_path, &plan.env_contents, 0o600)?;
+    let env_written = write_if_missing(&plan.env_path, &plan.env_contents, 0o600)?;
     run_checked(run_systemctl, &["daemon-reload".to_string()])?;
     run_checked(
         run_systemctl,
-        &["enable".to_string(), unit_service_name(&plan.unit)],
+        &[
+            "enable".to_string(),
+            "--now".to_string(),
+            unit_service_name(&plan.unit),
+        ],
     )?;
     Ok(RemoteSystemdInstallReport {
         unit_path: plan.unit_path.clone(),
@@ -70,7 +74,7 @@ where
         env_written,
         daemon_reloaded: true,
         enabled: true,
-        started: false,
+        started: true,
     })
 }
 
@@ -163,6 +167,90 @@ fn write_if_changed(path: &Path, contents: &str, mode: u32) -> Result<bool, CliE
     Ok(true)
 }
 
+fn write_if_missing(path: &Path, contents: &str, mode: u32) -> Result<bool, CliError> {
+    if secure_existing_regular_file(path, mode)? {
+        return Ok(false);
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "create directory {}: {error}",
+                parent.display()
+            )))
+        })?;
+    }
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "create temp file for {}: {error}",
+            path.display()
+        )))
+    })?;
+    set_file_mode(temp.path(), mode)?;
+    temp.write_all(contents.as_bytes()).map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "write temp file for {}: {error}",
+            path.display()
+        )))
+    })?;
+    temp.flush().map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "flush temp file for {}: {error}",
+            path.display()
+        )))
+    })?;
+    match temp.persist_noclobber(path) {
+        Ok(_) => Ok(true),
+        Err(error) if error.error.kind() == ErrorKind::AlreadyExists => {
+            if secure_existing_regular_file(path, mode)? {
+                Ok(false)
+            } else {
+                Err(CliErrorKind::workflow_io(format!(
+                    "environment file {} disappeared during installation",
+                    path.display()
+                ))
+                .into())
+            }
+        }
+        Err(error) => {
+            Err(
+                CliErrorKind::workflow_io(format!("persist {}: {}", path.display(), error.error))
+                    .into(),
+            )
+        }
+    }
+}
+
+fn secure_existing_regular_file(path: &Path, mode: u32) -> Result<bool, CliError> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(false),
+        Err(error) => {
+            return Err(CliErrorKind::workflow_io(format!(
+                "inspect environment file {}: {error}",
+                path.display()
+            ))
+            .into());
+        }
+    };
+    if metadata.file_type().is_symlink() {
+        return Err(CliErrorKind::workflow_io(format!(
+            "refusing symbolic link environment file {}",
+            path.display()
+        ))
+        .into());
+    }
+    if !metadata.is_file() {
+        return Err(CliErrorKind::workflow_io(format!(
+            "environment file {} is not a regular file",
+            path.display()
+        ))
+        .into());
+    }
+    set_existing_file_mode(path, mode)?;
+    Ok(true)
+}
+
 fn write_atomic(path: &Path, contents: &str, mode: u32) -> Result<(), CliError> {
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
     let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
@@ -237,6 +325,51 @@ fn set_file_mode(path: &Path, mode: u32) -> Result<(), CliError> {
 #[cfg(not(unix))]
 fn set_file_mode(_path: &Path, _mode: u32) -> Result<(), CliError> {
     Ok(())
+}
+
+#[cfg(unix)]
+fn set_existing_file_mode(path: &Path, mode: u32) -> Result<(), CliError> {
+    use std::fs::{OpenOptions, Permissions};
+    use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
+
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "open regular environment file {}: {error}",
+                path.display()
+            )))
+        })?;
+    if !file
+        .metadata()
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "inspect open environment file {}: {error}",
+                path.display()
+            )))
+        })?
+        .is_file()
+    {
+        return Err(CliErrorKind::workflow_io(format!(
+            "environment file {} is not a regular file",
+            path.display()
+        ))
+        .into());
+    }
+    file.set_permissions(Permissions::from_mode(mode))
+        .map_err(|error| {
+            CliError::from(CliErrorKind::workflow_io(format!(
+                "set permissions {}: {error}",
+                path.display()
+            )))
+        })
+}
+
+#[cfg(not(unix))]
+fn set_existing_file_mode(path: &Path, mode: u32) -> Result<(), CliError> {
+    set_file_mode(path, mode)
 }
 
 fn run_checked<RunSystemctl>(runner: &RunSystemctl, args: &[String]) -> Result<(), CliError>

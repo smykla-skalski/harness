@@ -7,6 +7,7 @@ mod remote_doctor;
 mod remote_pairing_contract;
 mod remote_serve;
 mod remote_systemd;
+mod remote_systemd_lifecycle;
 mod remote_systemd_plan;
 
 use std::path::{Path, PathBuf};
