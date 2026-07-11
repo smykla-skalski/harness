@@ -94,6 +94,7 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
   @Binding var rawValue: String
   @Environment(\.fontScale)
   private var fontScale
+  @State private var showsColorSliders = false
 
   private static let symbolColumns = Array(
     repeating: GridItem(.flexible(minimum: 44), spacing: HarnessMonitorTheme.spacingXS),
@@ -161,10 +162,22 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
         .disabled(!appearance.hasColorOverride(for: lane))
       }
 
-      ColorPicker(selection: colorBinding, supportsOpacity: false) {
-        EmptyView()
+      Button {
+        showsColorSliders.toggle()
+      } label: {
+        colorPill
       }
-      .labelsHidden()
+      .harnessPlainButtonStyle()
+      .help("Customize top bar color")
+      .accessibilityLabel("Customize top bar color")
+
+      if showsColorSliders {
+        SettingsTaskBoardLaneColorSliders(
+          red: colorComponentBinding(\.red),
+          green: colorComponentBinding(\.green),
+          blue: colorComponentBinding(\.blue)
+        )
+      }
     }
   }
 
@@ -254,12 +267,31 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
     symbolName == appearance.symbolName(for: lane) ? .white : appearance.color(for: lane)
   }
 
-  private var colorBinding: Binding<Color> {
+  private var colorPill: some View {
+    RoundedRectangle(cornerRadius: 10, style: .continuous)
+      .fill(appearance.color(for: lane))
+      .frame(width: 58, height: 30)
+      .overlay {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+          .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+      }
+  }
+
+  private var colorComponents: TaskBoardLaneCustomColor {
+    TaskBoardLaneCustomColor(color: appearance.color(for: lane))
+      ?? TaskBoardLaneCustomColor(red: 0, green: 0, blue: 0)
+  }
+
+  private func colorComponentBinding(
+    _ keyPath: WritableKeyPath<TaskBoardLaneCustomColor, Double>
+  ) -> Binding<Double> {
     Binding(
-      get: { appearance.color(for: lane) },
-      set: { color in
+      get: { colorComponents[keyPath: keyPath] },
+      set: { value in
+        var updated = colorComponents
+        updated[keyPath: keyPath] = value
         rawValue = TaskBoardLaneAppearancePreferences.settingCustomColor(
-          color,
+          updated.color,
           for: lane,
           rawValue: rawValue
         )
@@ -321,4 +353,40 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
     "server.rack",
     "list.bullet.rectangle",
   ]
+}
+
+private struct SettingsTaskBoardLaneColorSliders: View {
+  @Binding var red: Double
+  @Binding var green: Double
+  @Binding var blue: Double
+  @Environment(\.fontScale)
+  private var fontScale
+
+  private var componentFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption2.weight(.semibold), by: fontScale)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      componentSlider("R", value: $red, tint: .red)
+      componentSlider("G", value: $green, tint: .green)
+      componentSlider("B", value: $blue, tint: .blue)
+    }
+    .padding(.top, HarnessMonitorTheme.spacingXS)
+  }
+
+  private func componentSlider(
+    _ title: String,
+    value: Binding<Double>,
+    tint: Color
+  ) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      Text(title)
+        .font(componentFont)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .frame(width: 14, alignment: .leading)
+      Slider(value: value, in: 0...1)
+        .tint(tint)
+    }
+  }
 }

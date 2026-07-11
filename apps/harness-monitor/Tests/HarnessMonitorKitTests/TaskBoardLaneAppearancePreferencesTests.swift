@@ -200,7 +200,9 @@ struct TaskBoardLaneAppearancePreferencesTests {
     )
 
     #expect(source.contains(".popover("))
-    #expect(source.contains("ColorPicker("))
+    #expect(source.contains("showsColorSliders.toggle()"))
+    #expect(source.contains("SettingsTaskBoardLaneColorSliders("))
+    #expect(source.contains("Slider(value: value, in: 0...1)"))
     #expect(source.contains("Button(\"Customize\")"))
     #expect(source.contains("laneIndicator(for: lane)"))
     #expect(source.contains("if let symbolName = appearance.symbolName(for: lane)"))
@@ -219,7 +221,12 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(!source.contains("Reset Symbol"))
     #expect(!source.contains("Reset Lane"))
     #expect(!source.contains("Top Bar Color"))
+    #expect(!source.contains("ColorPicker("))
     #expect(!source.contains("ColorPicker(\"Color\""))
+    #expect(!source.contains("NSColorWell"))
+    #expect(!source.contains("NSViewRepresentable"))
+    #expect(!source.contains("@objc"))
+    #expect(!source.contains("import AppKit"))
     #expect(!source.contains("customizeButtonLabel"))
     #expect(!source.contains("?? \"slash.circle\""))
 
