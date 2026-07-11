@@ -42,7 +42,7 @@ extension HarnessMonitorStore {
     case .reviewsLocalCloneProgress(let progress):
       applyLocalCloneProgress(progress)
     case .githubDataChanged(let payload):
-      if contentUI.dashboard.latestGitHubDataChange?.revision != payload.revision {
+      if contentUI.dashboard.latestGitHubDataChange != payload {
         contentUI.dashboard.latestGitHubDataChange = payload
       }
       if contentUI.dashboard.githubDataRevision != payload.revision {

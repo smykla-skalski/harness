@@ -185,8 +185,8 @@ struct DashboardReviewsGitHubMutationRefreshCoordinator {
   }
 }
 
-private extension Optional where Wrapped: Comparable {
-  func isSomeAndLess(than value: Wrapped) -> Bool {
+extension Optional where Wrapped: Comparable {
+  fileprivate func isSomeAndLess(than value: Wrapped) -> Bool {
     guard let self else { return false }
     return self < value
   }
