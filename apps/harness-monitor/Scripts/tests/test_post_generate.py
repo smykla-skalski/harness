@@ -74,7 +74,6 @@ class PostGenerateScriptTests(unittest.TestCase):
                 "monitor": True,
             }
             external_daemon_entitlements = {
-                "com.apple.security.application-groups": ["Q498EB36N4.io.harnessmonitor"],
                 "external-daemon": True,
             }
             ui_test_host_entitlements = {
@@ -222,7 +221,6 @@ class PostGenerateScriptTests(unittest.TestCase):
                 "monitor": True,
             }
             external_daemon_entitlements = {
-                "com.apple.security.application-groups": ["Q498EB36N4.io.harnessmonitor"],
                 "external-daemon": True,
             }
             ui_test_host_entitlements = {

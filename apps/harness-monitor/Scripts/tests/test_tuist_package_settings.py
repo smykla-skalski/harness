@@ -13,6 +13,9 @@ BUILD_SETTINGS_HELPER = (
 )
 XCODE_VISIBLE_ENTITLEMENTS = APP_ROOT / "HarnessMonitorBase.entitlements"
 MONITOR_ENTITLEMENTS = APP_ROOT / "HarnessMonitor.entitlements"
+EXTERNAL_DAEMON_ENTITLEMENTS = (
+    APP_ROOT / "HarnessMonitorExternalDaemon.entitlements"
+)
 UI_TEST_HOST_ENTITLEMENTS = APP_ROOT / "HarnessMonitorUITestHost.entitlements"
 
 RECOMMENDED_PACKAGE_SETTINGS = (
@@ -100,13 +103,16 @@ class TuistPackageSettingsTests(unittest.TestCase):
                 self.assertIn(setting, manifest)
         self.assertEqual(
             manifest.count('"REGISTER_APP_GROUPS": "YES"'),
-            3,
-            "REGISTER_APP_GROUPS=YES must be set on monitorAppSettings, externalDaemonAppSettings, and uiTestHostSettings",
+            2,
+            "REGISTER_APP_GROUPS=YES must be set only on the sandboxed app targets",
         )
         self.assertEqual(
             manifest.count('"REGISTER_APP_GROUPS": "NO"'),
-            1,
-            "only isolatedAppSettings keeps REGISTER_APP_GROUPS=NO; the three app targets register app groups with Xcode",
+            2,
+            "isolatedAppSettings and externalDaemonAppSettings must not register app groups with Xcode",
+        )
+        self.assertIn(
+            "private let externalDaemonAppSettings: Settings = .settings", manifest
         )
         self.assertEqual(
             manifest.count(
@@ -135,9 +141,11 @@ class TuistPackageSettingsTests(unittest.TestCase):
     ) -> None:
         xcode_visible = plistlib.loads(XCODE_VISIBLE_ENTITLEMENTS.read_bytes())
         monitor = plistlib.loads(MONITOR_ENTITLEMENTS.read_bytes())
+        external_daemon = plistlib.loads(EXTERNAL_DAEMON_ENTITLEMENTS.read_bytes())
         ui_test_host = plistlib.loads(UI_TEST_HOST_ENTITLEMENTS.read_bytes())
 
         self.assertNotIn("com.apple.security.application-groups", xcode_visible)
+        self.assertNotIn("com.apple.security.application-groups", external_daemon)
         self.assertEqual(
             monitor["com.apple.security.application-groups"],
             ["Q498EB36N4.io.harnessmonitor"],

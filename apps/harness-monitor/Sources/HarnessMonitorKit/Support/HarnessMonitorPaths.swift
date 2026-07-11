@@ -36,7 +36,8 @@ public enum HarnessMonitorPaths {
   ///    Per-ownership: managed mode walks managed/ subtrees; external mode
   ///    walks external/ subtrees. Cross-checkout attach is preserved for
   ///    external mode.
-  /// 4. Native group-container resolution for the configured or default app group id.
+  /// 4. Native group-container resolution for the configured or default app group id
+  ///    in managed mode.
   /// 5. Home-relative app-group fallback via `HARNESS_APP_GROUP_ID`.
   /// 6. External-daemon legacy bypass (`HARNESS_MONITOR_EXTERNAL_DAEMON=1` or a
   ///    persisted external-mode preference injected into the environment):

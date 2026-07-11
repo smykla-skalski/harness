@@ -757,10 +757,13 @@ private let monitorAppTarget: Target = .target(
 // the bundled managed plist stays inert; we still ship the helper binary in the
 // .app to keep the layout identical to the sandboxed product.
 // Reuse the regular app's bundle ID so the existing automatic-signing
-// provisioning profile covers both variants and so user defaults / app-group
-// containers stay shared. The two products live side-by-side in DerivedData
-// thanks to their distinct PRODUCT_NAME values, and `HARNESS_MONITOR_EXTERNAL_DAEMON=1`
-// is what actually selects external-daemon runtime behavior at launch.
+// provisioning profile covers both variants and user defaults stay shared. The
+// external-daemon app is intentionally unsandboxed, so it resolves app-group
+// files through the home-relative fallback instead of carrying the app-group
+// entitlement that only the sandboxed app targets need. The two products live
+// side-by-side in DerivedData thanks to their distinct PRODUCT_NAME values, and
+// `HARNESS_MONITOR_EXTERNAL_DAEMON=1` is what actually selects external-daemon
+// runtime behavior at launch.
 private let externalDaemonAppSettings: Settings = .settings(
     base: [
         "CODE_SIGN_ENTITLEMENTS": generatedAppEntitlements,
@@ -774,7 +777,7 @@ private let externalDaemonAppSettings: Settings = .settings(
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.app",
         "PRODUCT_MODULE_NAME": "HarnessMonitor",
         "PRODUCT_NAME": "Harness Monitor (External Daemon)",
-        "REGISTER_APP_GROUPS": "YES",
+        "REGISTER_APP_GROUPS": "NO",
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
     ]
 )

@@ -22,6 +22,12 @@ extension HarnessMonitorPaths {
     guard !environment.isXCTestProcess else {
       return nil
     }
+    // External-daemon launches are unsandboxed and deliberately omit the
+    // app-group entitlement; using the deterministic home-relative path avoids
+    // container/preference probes that are only valid for sandboxed app targets.
+    guard DaemonOwnership(environment: environment) == .managed else {
+      return nil
+    }
     return FileManager.default.containerURL(
       forSecurityApplicationGroupIdentifier: identifier
     )

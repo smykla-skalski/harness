@@ -61,19 +61,27 @@ public enum HarnessMonitorMCPSettingsDefaults {
 /// same location.
 public enum HarnessMonitorMCPSocketPath {
   /// Returns the absolute socket path, or `nil` if the app-group container
-  /// cannot be resolved.
+  /// cannot be resolved. External-daemon launches are unsandboxed and resolve
+  /// the same path through the home-relative app-group container fallback.
   public static func resolved(
     fileManager: FileManager = .default,
     appGroup: String = HarnessMonitorMCPSettingsDefaults.appGroupIdentifier,
-    filename: String = HarnessMonitorMCPSettingsDefaults.socketFilename
+    filename: String = HarnessMonitorMCPSettingsDefaults.socketFilename,
+    environment: HarnessMonitorEnvironment = .current
   ) -> URL? {
-    guard
-      let container = fileManager.containerURL(
-        forSecurityApplicationGroupIdentifier: appGroup
+    if DaemonOwnership(environment: environment) == .external {
+      return HarnessMonitorPaths.appGroupContainerURL(
+        identifier: appGroup,
+        using: environment
       )
-    else {
-      return nil
+      .appendingPathComponent(filename, isDirectory: false)
     }
-    return container.appendingPathComponent(filename, isDirectory: false)
+
+    if let container = fileManager.containerURL(
+      forSecurityApplicationGroupIdentifier: appGroup
+    ) {
+      return container.appendingPathComponent(filename, isDirectory: false)
+    }
+    return nil
   }
 }
