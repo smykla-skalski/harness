@@ -113,9 +113,14 @@ struct TaskBoardLaneAppearanceOverride: Codable, Equatable, Sendable {
   var customColor: TaskBoardLaneCustomColor?
   var symbolName: String?
   var hidesSymbol: Bool?
+  var hidesPriorityBadge: Bool?
 
   var isEmpty: Bool {
-    colorToken == nil && customColor == nil && symbolName == nil && hidesSymbol != true
+    colorToken == nil
+      && customColor == nil
+      && symbolName == nil
+      && hidesSymbol != true
+      && hidesPriorityBadge != true
   }
 }
 
@@ -150,6 +155,10 @@ struct TaskBoardLaneAppearance: Equatable {
     overrides[lane]?.hidesSymbol == true
   }
 
+  func showsPriorityBadge(for lane: TaskBoardInboxLane) -> Bool {
+    overrides[lane]?.hidesPriorityBadge != true
+  }
+
   func hasOverride(for lane: TaskBoardInboxLane) -> Bool {
     overrides[lane]?.isEmpty == false
   }
@@ -162,6 +171,10 @@ struct TaskBoardLaneAppearance: Equatable {
   func hasSymbolOverride(for lane: TaskBoardInboxLane) -> Bool {
     let override = overrides[lane]
     return override?.symbolName != nil || override?.hidesSymbol == true
+  }
+
+  func hasPriorityBadgeOverride(for lane: TaskBoardInboxLane) -> Bool {
+    overrides[lane]?.hidesPriorityBadge == true
   }
 }
 
@@ -276,6 +289,18 @@ enum TaskBoardLaneAppearancePreferences {
     if !isVisible {
       override.symbolName = nil
     }
+    overrides[lane] = override
+    return Self.rawValue(for: overrides)
+  }
+
+  static func settingPriorityBadgeVisibility(
+    _ isVisible: Bool,
+    for lane: TaskBoardInboxLane,
+    rawValue: String
+  ) -> String {
+    var overrides = overrides(from: rawValue)
+    var override = overrides[lane] ?? TaskBoardLaneAppearanceOverride()
+    override.hidesPriorityBadge = isVisible ? nil : true
     overrides[lane] = override
     return Self.rawValue(for: overrides)
   }
