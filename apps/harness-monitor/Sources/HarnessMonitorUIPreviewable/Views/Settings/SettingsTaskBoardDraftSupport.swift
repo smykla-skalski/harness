@@ -13,11 +13,6 @@ enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
   case toReview
   case humanRequired
   case failed
-  case done
-  case new
-  case planReview
-  case needsYou
-  case blocked
 
   private static let statusChoices: [TaskBoardStatus: Self] = [
     .umbrella: .umbrella,
@@ -30,11 +25,6 @@ enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
     .toReview: .toReview,
     .humanRequired: .humanRequired,
     .failed: .failed,
-    .done: .done,
-    .new: .new,
-    .planReview: .planReview,
-    .needsYou: .needsYou,
-    .blocked: .blocked,
   ]
 
   init(status: TaskBoardStatus?) {
@@ -56,11 +46,6 @@ extension DispatchStatusFilterChoice {
     case .toReview: "To Review"
     case .humanRequired: "Human Required"
     case .failed: "Failed"
-    case .done: "Done"
-    case .new: "New"
-    case .planReview: "Plan Review"
-    case .needsYou: "Needs You"
-    case .blocked: "Blocked"
     }
   }
 
@@ -77,11 +62,6 @@ extension DispatchStatusFilterChoice {
     case .toReview: .toReview
     case .humanRequired: .humanRequired
     case .failed: .failed
-    case .done: .done
-    case .new: .new
-    case .planReview: .planReview
-    case .needsYou: .needsYou
-    case .blocked: .blocked
     }
   }
 }

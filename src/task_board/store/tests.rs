@@ -6,6 +6,7 @@ use crate::task_board::types::{
     AgentMode, PlanningState, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
     TaskBoardWorkflowStatus,
 };
+use fs_err as fs;
 
 fn seed_item(store: &TaskBoardStore, id: &str, title: &str) {
     let item = TaskBoardItem::new(
@@ -71,6 +72,58 @@ fn parse_cache_reparses_after_file_changes() {
 }
 
 #[test]
+fn get_repairs_legacy_status_on_disk() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    let path = seed_raw_item(&store, "legacy-new", "new");
+
+    let loaded = store.get("legacy-new").expect("load legacy item");
+
+    assert_eq!(loaded.status, TaskBoardStatus::Todo);
+    let contents = fs::read_to_string(path).expect("read repaired file");
+    assert!(contents.contains("status: todo"));
+    assert!(!contents.contains("status: new"));
+}
+
+#[test]
+fn list_repairs_legacy_statuses_before_filtering() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    seed_raw_item(&store, "legacy-needs-you", "needs_you");
+
+    let listed = store
+        .list(Some(TaskBoardStatus::HumanRequired))
+        .expect("list repaired status");
+
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].id, "legacy-needs-you");
+    assert_eq!(listed[0].status, TaskBoardStatus::HumanRequired);
+}
+
+#[test]
+fn update_writes_current_status_for_legacy_status_patch() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    seed_item(&store, "task-0", "Task 0");
+
+    let updated = store
+        .update(
+            "task-0",
+            TaskBoardItemPatch {
+                status: Some(TaskBoardStatus::PlanReview),
+                ..TaskBoardItemPatch::default()
+            },
+        )
+        .expect("update item");
+
+    assert_eq!(updated.status, TaskBoardStatus::AgenticReview);
+    let contents =
+        fs::read_to_string(store.tasks_dir().join("task-0.md")).expect("read current status file");
+    assert!(contents.contains("status: agentic_review"));
+    assert!(!contents.contains("status: plan_review"));
+}
+
+#[test]
 fn list_keeps_filter_and_sort_across_parallel_parse() {
     let temp = tempdir().expect("tempdir");
     let store = TaskBoardStore::new(temp.path().join("board"));
@@ -110,6 +163,29 @@ fn list_keeps_filter_and_sort_across_parallel_parse() {
         all, sorted,
         "list output is already sorted regardless of parse order"
     );
+}
+
+fn seed_raw_item(store: &TaskBoardStore, id: &str, status: &str) -> std::path::PathBuf {
+    let path = store.tasks_dir().join(format!("{id}.md"));
+    fs::create_dir_all(store.tasks_dir()).expect("create tasks dir");
+    fs::write(
+        &path,
+        format!(
+            "---\n\
+             schema_version: 1\n\
+             id: {id}\n\
+             title: Legacy status\n\
+             status: {status}\n\
+             priority: medium\n\
+             agent_mode: headless\n\
+             created_at: 2026-05-14T00:00:00Z\n\
+             updated_at: 2026-05-14T00:00:00Z\n\
+             ---\n\n\
+             body\n"
+        ),
+    )
+    .expect("write raw item");
+    path
 }
 
 #[test]

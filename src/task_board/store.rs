@@ -173,6 +173,7 @@ impl TaskBoardStore {
     ) -> Result<TaskBoardItem, CliError> {
         item.title = title.to_string();
         item.body = body.to_string();
+        apply_canonical_persisted_status(&mut item);
         self.validate_new_id(&item.id)?;
         self.save(&item)?;
         Ok(item)
@@ -185,7 +186,9 @@ impl TaskBoardStore {
     /// markdown/frontmatter payload cannot be parsed.
     pub fn get(&self, id: &str) -> Result<TaskBoardItem, CliError> {
         let path = self.path_for(id)?;
-        read_path(&path)
+        let mut item = read_path(&path)?;
+        self.repair_legacy_status(&mut item)?;
+        Ok(item)
     }
 
     /// List active board items, optionally filtered by status.
@@ -264,6 +267,9 @@ impl TaskBoardStore {
                 .collect::<Result<Vec<_>, _>>()?;
             items.extend(parsed);
         }
+        for item in &mut items {
+            self.repair_legacy_status(item)?;
+        }
         Ok(items)
     }
 
@@ -274,6 +280,7 @@ impl TaskBoardStore {
     pub fn update(&self, id: &str, patch: TaskBoardItemPatch) -> Result<TaskBoardItem, CliError> {
         let mut item = self.get(id)?;
         apply_patch(&mut item, patch);
+        apply_canonical_persisted_status(&mut item);
         item.updated_at = utc_now();
         self.save(&item)?;
         Ok(item)
@@ -285,6 +292,7 @@ impl TaskBoardStore {
     /// Returns `CliError` if the item cannot be loaded or saved.
     pub fn delete(&self, id: &str) -> Result<TaskBoardItem, CliError> {
         let mut item = self.get(id)?;
+        apply_canonical_persisted_status(&mut item);
         let now = utc_now();
         item.deleted_at = Some(now.clone());
         item.updated_at = now;
@@ -330,6 +338,22 @@ impl TaskBoardStore {
         }
         Ok(())
     }
+
+    fn repair_legacy_status(&self, item: &mut TaskBoardItem) -> Result<(), CliError> {
+        if apply_canonical_persisted_status(item) {
+            self.save(item)?;
+        }
+        Ok(())
+    }
+}
+
+fn apply_canonical_persisted_status(item: &mut TaskBoardItem) -> bool {
+    let status = item.status.canonical_persisted_status();
+    if item.status == status {
+        return false;
+    }
+    item.status = status;
+    true
 }
 
 fn apply_patch(item: &mut TaskBoardItem, patch: TaskBoardItemPatch) {

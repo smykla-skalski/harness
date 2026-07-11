@@ -60,6 +60,30 @@ struct TaskBoardItemEditorDraftTests {
     #expect(TaskBoardExternalRefProvider.taskBoardCases == [.gitHub])
   }
 
+  @Test("Status menus expose only current task board lanes")
+  func statusMenusExposeOnlyCurrentTaskBoardLanes() {
+    let expectedFilterTitles = [
+      "All Items",
+      "Umbrella",
+      "Todo",
+      "Planning",
+      "In Progress",
+      "Agentic Review",
+      "Testing",
+      "In Review",
+      "To Review",
+      "Human Required",
+      "Failed",
+    ]
+
+    #expect(
+      TaskBoardStatus.currentLaneCases.map(\.title)
+        == Array(expectedFilterTitles.dropFirst())
+    )
+    #expect(TaskBoardStatusFilterChoice.stableAllCases.map(\.title) == expectedFilterTitles)
+    #expect(DispatchStatusFilterChoice.allCases.map(\.title) == expectedFilterTitles)
+  }
+
   @Test("Monitor public UI hides Todoist sync summaries")
   func monitorPublicUIHidesTodoistSyncSummaries() {
     let summary = TaskBoardSyncSummary(

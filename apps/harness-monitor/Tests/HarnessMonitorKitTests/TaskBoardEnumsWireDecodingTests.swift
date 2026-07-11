@@ -46,6 +46,28 @@ struct TaskBoardEnumsWireDecodingTests {
     #expect(TaskBoardStatus.unknown("custom").title == "custom")
   }
 
+  @Test("current lane status choices exclude legacy and hidden statuses")
+  func currentLaneStatusChoicesExcludeLegacyAndHiddenStatuses() {
+    #expect(
+      TaskBoardStatus.currentLaneCases == [
+        .umbrella,
+        .todo,
+        .planning,
+        .inProgress,
+        .agenticReview,
+        .testing,
+        .inReview,
+        .toReview,
+        .humanRequired,
+        .failed,
+      ])
+    #expect(!TaskBoardStatus.currentLaneCases.contains(.done))
+    #expect(!TaskBoardStatus.currentLaneCases.contains(.new))
+    #expect(!TaskBoardStatus.currentLaneCases.contains(.planReview))
+    #expect(!TaskBoardStatus.currentLaneCases.contains(.needsYou))
+    #expect(!TaskBoardStatus.currentLaneCases.contains(.blocked))
+  }
+
   @Test("decodes agent mode including the unknown fallback")
   func decodesAgentMode() throws {
     #expect(try decode(TaskBoardAgentMode.self, "headless") == .headless)

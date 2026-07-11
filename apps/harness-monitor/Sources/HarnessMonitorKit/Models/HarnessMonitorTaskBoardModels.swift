@@ -1,6 +1,19 @@
 import Foundation
 
 extension TaskBoardStatus {
+  public static let currentLaneCases: [Self] = [
+    .umbrella,
+    .todo,
+    .planning,
+    .inProgress,
+    .agenticReview,
+    .testing,
+    .inReview,
+    .toReview,
+    .humanRequired,
+    .failed,
+  ]
+
   public var title: String {
     switch self {
     case .umbrella:
