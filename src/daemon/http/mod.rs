@@ -304,7 +304,7 @@ fn recover_poisoned_mutation_lock_map(
 /// Serve the daemon's HTTP API.
 ///
 /// # Errors
-/// Returns `CliError` on listener failures.
+/// Returns `CliError` when serving the HTTP API fails.
 pub async fn serve_tcp(
     listener: TcpListener,
     state: DaemonHttpState,
