@@ -233,10 +233,17 @@ struct TaskBoardItemRow: View {
   }
 
   @ViewBuilder private var badgeContent: some View {
-    TaskBoardCardPill(label: item.priority.title, tint: priorityColor(for: item.priority))
+    if showsPriorityBadge {
+      TaskBoardCardPill(label: item.priority.title, tint: priorityColor(for: item.priority))
+    }
     if let policyTraceCount = item.workflow?.policyTraceIds.count, policyTraceCount > 0 {
       TaskBoardCardPill(label: "\(policyTraceCount) policy", tint: HarnessMonitorTheme.secondaryInk)
     }
+  }
+
+  private var showsPriorityBadge: Bool {
+    TaskBoardInboxLane(status: item.status)
+      .map { laneAppearance.showsPriorityBadge(for: $0) } ?? true
   }
 }
 
@@ -383,37 +390,5 @@ private struct TaskBoardInboxItemDragPreviewCard: View {
     .frame(width: metrics.dragPreviewWidth, alignment: .leading)
     .padding(metrics.cardPadding)
     .background(.background.opacity(0.92), in: .rect(cornerRadius: metrics.cardCornerRadius))
-  }
-}
-
-func priorityColor(for priority: TaskBoardPriority) -> Color {
-  switch priority {
-  case .critical:
-    HarnessMonitorTheme.danger
-  case .high:
-    HarnessMonitorTheme.caution
-  case .medium:
-    HarnessMonitorTheme.accent
-  case .low:
-    HarnessMonitorTheme.secondaryInk
-  }
-}
-
-func taskBoardStatusColor(for status: TaskBoardStatus) -> Color {
-  switch status {
-  case .failed, .blocked:
-    HarnessMonitorTheme.danger
-  case .agenticReview, .planReview, .testing, .inReview, .toReview:
-    HarnessMonitorTheme.caution
-  case .humanRequired, .needsYou:
-    HarnessMonitorTheme.danger
-  case .planning, .inProgress:
-    HarnessMonitorTheme.warmAccent
-  case .umbrella, .new, .todo:
-    HarnessMonitorTheme.accent
-  case .done:
-    HarnessMonitorTheme.secondaryInk
-  case .unknown:
-    HarnessMonitorTheme.secondaryInk
   }
 }

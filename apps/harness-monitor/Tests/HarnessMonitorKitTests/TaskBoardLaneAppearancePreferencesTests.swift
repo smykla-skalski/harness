@@ -17,6 +17,7 @@ struct TaskBoardLaneAppearancePreferencesTests {
         == TaskBoardLaneAppearancePreferences.defaultSymbolName(for: .agenticReview)
     )
     #expect(!appearance.hidesSymbol(for: .agenticReview))
+    #expect(appearance.showsPriorityBadge(for: .agenticReview))
     #expect(!appearance.hasOverride(for: .agenticReview))
   }
 
@@ -85,6 +86,36 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(restoredAppearance.symbolName(for: .planning) == nil)
     #expect(restoredAppearance.hidesSymbol(for: .planning))
     #expect(restoredAppearance.hasOverride(for: .planning))
+  }
+
+  @Test("Hidden priority badges persist through UserDefaults")
+  func hiddenPriorityBadgesPersistThroughUserDefaults() throws {
+    let suiteName = "TaskBoardLaneAppearancePreferencesTests.\(UUID().uuidString)"
+    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+    defer {
+      userDefaults.removePersistentDomain(forName: suiteName)
+    }
+
+    let rawValue = TaskBoardLaneAppearancePreferences.settingPriorityBadgeVisibility(
+      false,
+      for: .todo,
+      rawValue: TaskBoardLaneAppearancePreferences.emptyRawValue
+    )
+    TaskBoardLaneAppearancePreferences.save(
+      TaskBoardLaneAppearancePreferences.overrides(from: rawValue),
+      to: userDefaults
+    )
+    userDefaults.synchronize()
+
+    let restartedDefaults = try #require(UserDefaults(suiteName: suiteName))
+    let storedRawValue = try #require(
+      restartedDefaults.string(forKey: TaskBoardLaneAppearancePreferences.storageKey)
+    )
+    let restoredAppearance = TaskBoardLaneAppearance(rawValue: storedRawValue)
+
+    #expect(!restoredAppearance.showsPriorityBadge(for: .todo))
+    #expect(restoredAppearance.hasPriorityBadgeOverride(for: .todo))
+    #expect(restoredAppearance.hasOverride(for: .todo))
   }
 
   @Test("Custom colors persist through UserDefaults")
@@ -157,6 +188,20 @@ struct TaskBoardLaneAppearancePreferencesTests {
     )
     #expect(rawValue == TaskBoardLaneAppearancePreferences.emptyRawValue)
 
+    rawValue = TaskBoardLaneAppearancePreferences.settingPriorityBadgeVisibility(
+      false,
+      for: .testing,
+      rawValue: rawValue
+    )
+    #expect(!TaskBoardLaneAppearance(rawValue: rawValue).showsPriorityBadge(for: .testing))
+
+    rawValue = TaskBoardLaneAppearancePreferences.settingPriorityBadgeVisibility(
+      true,
+      for: .testing,
+      rawValue: rawValue
+    )
+    #expect(rawValue == TaskBoardLaneAppearancePreferences.emptyRawValue)
+
     rawValue = TaskBoardLaneAppearancePreferences.settingColorToken(
       .pink,
       for: .testing,
@@ -209,6 +254,10 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(source.contains(".frame(width: 58, height: 30)"))
     #expect(source.contains("Label(\"Clear\", systemImage: \"slash.circle\")"))
     #expect(source.contains("Label(\"Reset\", systemImage: \"arrow.counterclockwise\")"))
+    #expect(source.contains("Toggle(\"Priority Badge\", isOn: priorityBadgeBinding)"))
+    #expect(
+      source.contains("TaskBoardLaneAppearancePreferences.settingPriorityBadgeVisibility(")
+    )
     #expect(source.contains("HarnessMonitorTextSize.scaledFont(.body.weight(.medium)"))
     #expect(source.contains("\"terminal\""))
     #expect(source.contains("\"gearshape\""))
@@ -231,7 +280,17 @@ struct TaskBoardLaneAppearancePreferencesTests {
 
     let colorRange = try #require(source.range(of: "colorSection"))
     let symbolRange = try #require(source.range(of: "symbolSection"))
+    let cardsRange = try #require(source.range(of: "cardsSection"))
     #expect(colorRange.lowerBound < symbolRange.lowerBound)
+    #expect(symbolRange.lowerBound < cardsRange.lowerBound)
+  }
+
+  @Test("Task cards read priority badge visibility from lane appearance")
+  func taskCardsReadPriorityBadgeVisibilityFromLaneAppearance() throws {
+    let source = try sourceFile(named: "Views/TaskBoard/TaskBoardLaneViews.swift")
+
+    #expect(source.contains("if showsPriorityBadge"))
+    #expect(source.contains(".map { laneAppearance.showsPriorityBadge(for: $0) } ?? true"))
   }
 
   private func sourceFile(named relativePath: String) throws -> String {
