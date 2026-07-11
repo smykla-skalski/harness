@@ -318,4 +318,39 @@ final class MobilePairingTests: XCTestCase {
     XCTAssertEqual(plan.credentialStationIDsToDelete, [])
     XCTAssertEqual(plan.identityIDsToDelete, [])
   }
+
+  func testWatchPairingTransferUsesLastDuplicateStationCredential() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let current = [
+      makePairedStationCredential(
+        stationID: "station-studio",
+        deviceIdentityID: "device-first",
+        now: now
+      )
+    ]
+    let transfer = MobileWatchPairingTransfer(
+      identities: [
+        makePairingIdentity(id: "device-first", now: now),
+        makePairingIdentity(id: "device-second", now: now),
+      ],
+      credentials: [
+        makePairedStationCredential(
+          stationID: "station-studio",
+          deviceIdentityID: "device-first",
+          now: now
+        ),
+        makePairedStationCredential(
+          stationID: "station-studio",
+          deviceIdentityID: "device-second",
+          now: now
+        ),
+      ],
+      exportedAt: now.addingTimeInterval(20)
+    )
+
+    let plan = transfer.replacementPlan(replacing: current)
+
+    XCTAssertEqual(plan.credentialStationIDsToDelete, [])
+    XCTAssertEqual(plan.identityIDsToDelete, ["device-first"])
+  }
 }

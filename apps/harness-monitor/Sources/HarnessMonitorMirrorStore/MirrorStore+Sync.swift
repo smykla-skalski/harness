@@ -200,16 +200,20 @@ extension MirrorStore {
     guard MobilePairingLink.supports(url) else {
       return
     }
-    await pair(invitationURL: url, deviceName: deviceName)
+    _ = await pair(invitationURL: url, deviceName: deviceName)
   }
 
-  func pair(invitationURL: URL, deviceName: String) async {
+  @discardableResult
+  func pair(
+    invitationURL: URL,
+    deviceName: String,
+    now: Date = .now
+  ) async -> MobilePairedStationCredential? {
     guard let pairer else {
       syncStatus = .stale("Pairing service is unavailable.")
-      return
+      return nil
     }
     do {
-      let now = Date()
       let pairingLink = try MobilePairingLink.decode(invitationURL, now: now)
       let wasDemoModeEnabled = demoModeEnabled
       demoModeEnabled = false
@@ -226,8 +230,10 @@ extension MirrorStore {
       try await rebuildSyncClients(preferredStationID: credential.stationID)
       syncStatus = .paired(credential.stationName)
       await refreshAfterPairingBootstrap()
+      return credential
     } catch {
       syncStatus = mobileMonitorSyncStatus(for: error)
+      return nil
     }
   }
 

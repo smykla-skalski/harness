@@ -46,6 +46,24 @@ public enum MobileRemoteDaemonPairingError: Error, Equatable, Sendable {
   case claimMismatch
 }
 
+public struct MobileRemoteDaemonPairingDevice: Equatable, Sendable {
+  public static let iOS = Self(identityID: "default-mobile-device", platform: "ios")
+  public static let watchOS = Self(identityID: "default-watch-device", platform: "watchos")
+
+  public let identityID: String
+  public let platform: String
+
+  public init(identityID: String, platform: String) {
+    self.identityID = identityID
+    self.platform = platform
+  }
+
+  public func owns(_ credential: MobilePairedStationCredential) -> Bool {
+    credential.deviceIdentityID == identityID
+      && credential.remoteDaemonAccess?.platform.caseInsensitiveCompare(platform) == .orderedSame
+  }
+}
+
 public struct URLSessionMobileRemoteDaemonPairingTransport:
   MobileRemoteDaemonPairingTransport, Sendable
 {
@@ -112,23 +130,21 @@ public struct URLSessionMobileRemoteDaemonPairingTransport:
 }
 
 public actor MobileRemoteDaemonPairingCoordinator<Transport: MobileRemoteDaemonPairingTransport> {
-  public static var identityID: String { "default-mobile-device" }
-
   private let identityStore: any MobileDeviceIdentityStore
   private let credentialStore: any MobilePairedStationCredentialStore
   private let transport: Transport
-  private let platform: String
+  private let device: MobileRemoteDaemonPairingDevice
 
   public init(
     identityStore: any MobileDeviceIdentityStore,
     credentialStore: any MobilePairedStationCredentialStore,
     transport: Transport,
-    platform: String
+    device: MobileRemoteDaemonPairingDevice
   ) {
     self.identityStore = identityStore
     self.credentialStore = credentialStore
     self.transport = transport
-    self.platform = platform
+    self.device = device
   }
 
   public func pair(
@@ -143,7 +159,7 @@ public actor MobileRemoteDaemonPairingCoordinator<Transport: MobileRemoteDaemonP
       invitation: invitation,
       clientID: clientID,
       displayName: deviceName,
-      platform: platform
+      platform: device.platform
     )
     let access = MobileRemoteDaemonAccess(
       endpoint: invitation.endpoint,
@@ -175,18 +191,40 @@ public actor MobileRemoteDaemonPairingCoordinator<Transport: MobileRemoteDaemonP
       remoteDaemonAccess: access
     )
     try await credentialStore.save(credential)
+    try await removeReplacedIdentityIfUnused(
+      existingCredential: existingCredential,
+      existingCredentials: existing,
+      replacement: credential
+    )
     return credential
+  }
+
+  private func removeReplacedIdentityIfUnused(
+    existingCredential: MobilePairedStationCredential?,
+    existingCredentials: [MobilePairedStationCredential],
+    replacement: MobilePairedStationCredential
+  ) async throws {
+    guard let existingCredential,
+      existingCredential.deviceIdentityID != replacement.deviceIdentityID,
+      !existingCredentials.contains(where: {
+        $0.stationID != replacement.stationID
+          && $0.deviceIdentityID == existingCredential.deviceIdentityID
+      })
+    else {
+      return
+    }
+    try await identityStore.delete(id: existingCredential.deviceIdentityID)
   }
 
   private func loadOrCreateIdentity(
     deviceName: String,
     now: Date
   ) async throws -> MobileDeviceIdentity {
-    if let identity = try await identityStore.load(id: Self.identityID) {
+    if let identity = try await identityStore.load(id: device.identityID) {
       return identity
     }
     let identity = MobileDeviceIdentity(
-      id: Self.identityID,
+      id: device.identityID,
       displayName: deviceName,
       createdAt: now
     )
@@ -197,7 +235,7 @@ public actor MobileRemoteDaemonPairingCoordinator<Transport: MobileRemoteDaemonP
   private func makeClientID(identity: MobileDeviceIdentity) throws -> String {
     let fingerprint = try identity.signingKeyFingerprint()
     let suffix = fingerprint.filter(\.isHexDigit).lowercased().prefix(24)
-    let normalizedPlatform = platform.lowercased().filter { $0.isLetter || $0.isNumber }
+    let normalizedPlatform = device.platform.lowercased().filter { $0.isLetter || $0.isNumber }
     return "\(normalizedPlatform)-\(suffix)"
   }
 }

@@ -32,6 +32,7 @@ public final class MirrorStore {
   let credentialStore: (any MobilePairedStationCredentialStore)?
   let syncClientFactory: any MobileMonitorSyncClientFactory
   let pairer: (any MobileMonitorCredentialPairer)?
+  let pairingMutationGate: MobilePairingMutationGate?
   let privacyServiceProvider: @Sendable () -> any MobileCloudMirrorPrivacyManaging
   let sharedSnapshotStore: MobileSharedSnapshotStore?
   let watchPairingSyncer: (any MobileWatchPairingSyncing)?
@@ -60,6 +61,7 @@ public final class MirrorStore {
     credentialStore: (any MobilePairedStationCredentialStore)? = nil,
     syncClientFactory: any MobileMonitorSyncClientFactory = LiveMobileMonitorSyncClientFactory(),
     pairer: (any MobileMonitorCredentialPairer)? = nil,
+    pairingMutationGate: MobilePairingMutationGate? = nil,
     privacyServiceProvider: @escaping @Sendable () -> any MobileCloudMirrorPrivacyManaging = {
       MobileCloudMirrorPrivacyService(database: LiveMobileCloudMirrorDatabase())
     },
@@ -83,6 +85,7 @@ public final class MirrorStore {
     self.credentialStore = credentialStore
     self.syncClientFactory = syncClientFactory
     self.pairer = pairer
+    self.pairingMutationGate = pairingMutationGate
     self.privacyServiceProvider = privacyServiceProvider
     self.sharedSnapshotStore = sharedSnapshotStore
     self.watchPairingSyncer = watchPairingSyncer

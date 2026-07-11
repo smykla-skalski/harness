@@ -60,11 +60,12 @@ public struct MobileWatchPairingTransfer: Codable, Equatable, Sendable {
         identityIDsToDelete: []
       )
     }
-    let incomingStationIDs = Set(credentials.map(\.stationID))
-    let incomingIdentityIDs = Set(credentials.map(\.deviceIdentityID))
-    let incomingIdentityIDByStation = Dictionary(
-      uniqueKeysWithValues: credentials.map { ($0.stationID, $0.deviceIdentityID) }
-    )
+    var incomingIdentityIDByStation: [String: String] = [:]
+    for credential in credentials {
+      incomingIdentityIDByStation[credential.stationID] = credential.deviceIdentityID
+    }
+    let incomingStationIDs = Set(incomingIdentityIDByStation.keys)
+    let incomingIdentityIDs = Set(incomingIdentityIDByStation.values)
     let staleCredentials = currentCredentials.filter {
       !incomingStationIDs.contains($0.stationID)
     }

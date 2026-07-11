@@ -64,7 +64,7 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
       identityStore: identityStore,
       credentialStore: credentialStore,
       transport: transport,
-      platform: "ios"
+      device: .iOS
     )
 
     let credential = try await coordinator.pair(
@@ -85,7 +85,7 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     let storedCredential = try await credentialStore.load(stationID: credential.stationID)
     XCTAssertEqual(storedCredential, credential)
     let storedIdentity = try await identityStore.load(
-      id: MobileRemoteDaemonPairingCoordinator<RecordingRemotePairingTransport>.identityID
+      id: MobileRemoteDaemonPairingDevice.iOS.identityID
     )
     XCTAssertNotNil(storedIdentity)
   }
@@ -129,7 +129,7 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
       identityStore: InMemoryMobileDeviceIdentityStore(),
       credentialStore: credentialStore,
       transport: transport,
-      platform: "ios"
+      device: .iOS
     )
 
     let credential = try await coordinator.pair(
