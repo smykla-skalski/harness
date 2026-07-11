@@ -16,8 +16,10 @@ mod process;
 
 use acme::{AcmeChallenge, AcmeChallengeConfig, FakeAcmeServer};
 use client::RemoteDaemonClient;
-use process::{RemoteDaemonEnvironment, RemoteDaemonProcess};
+use process::{AftermarketDnsEnvironment, RemoteDaemonEnvironment, RemoteDaemonProcess};
 use serde_json::Value;
+use std::env;
+use std::time::Duration;
 
 const DOMAIN: &str = "daemon.example.com";
 
@@ -29,6 +31,70 @@ async fn remote_daemon_e2e_proves_acme_https_wss_pairing_and_revocation() {
             .await
             .unwrap_or_else(|error| panic!("{} e2e failed: {error}", challenge.cli_name()));
     }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "requires live Aftermarket credentials and authoritative DNS"]
+async fn remote_daemon_e2e_cleans_aftermarket_dns_after_failed_issuance() {
+    if env::var_os("HARNESS_TEST_AFTERMARKET_DOMAIN").is_none() {
+        return;
+    }
+    run_aftermarket_failed_issuance_case()
+        .await
+        .unwrap_or_else(|error| panic!("live Aftermarket cleanup e2e failed: {error}"));
+}
+
+async fn run_aftermarket_failed_issuance_case() -> Result<(), String> {
+    let domain = required_env("HARNESS_TEST_AFTERMARKET_DOMAIN")?;
+    let zone_name = required_env("AFTERMARKET_ZONE_NAME")?;
+    let api_key = required_env("AFTERMARKET_API_KEY")?;
+    let api_secret = required_env("AFTERMARKET_API_SECRET")?;
+    let environment = RemoteDaemonEnvironment::new(AcmeChallenge::Dns)?;
+    let acme = FakeAcmeServer::start(AcmeChallengeConfig {
+        challenge: AcmeChallenge::Dns,
+        domain: domain.clone(),
+        http_port: environment.http_port(),
+        https_port: environment.https_port(),
+        dns_log: environment.dns_log().to_path_buf(),
+        ca_root: environment.acme_ca_root().to_path_buf(),
+    })
+    .await?;
+    let aftermarket = AftermarketDnsEnvironment {
+        zone_name: &zone_name,
+        api_key: &api_key,
+        api_secret: &api_secret,
+        visibility_timeout_seconds: 300,
+        visibility_poll_seconds: 2,
+        visibility_stable_polls: 3,
+    };
+    let mut daemon = RemoteDaemonProcess::spawn_aftermarket(
+        &environment,
+        &domain,
+        acme.directory_url(),
+        &aftermarket,
+    )?;
+
+    let diagnostics = daemon.wait_for_failure(Duration::from_secs(660)).await?;
+    let validation_error = acme.validation_error()?.ok_or_else(|| {
+        format!("fake ACME server never received the ready DNS challenge; {diagnostics}")
+    })?;
+
+    if !validation_error.contains("DNS-01 hook") {
+        return Err(format!(
+            "fake ACME server failed before DNS validation: {validation_error}"
+        ));
+    }
+    if diagnostics.contains("cleanup also failed") {
+        return Err(format!(
+            "Aftermarket cleanup failed after issuance error: {diagnostics}"
+        ));
+    }
+    for secret in [&api_key, &api_secret] {
+        if diagnostics.contains(secret) {
+            return Err("remote daemon diagnostics exposed an Aftermarket secret".to_string());
+        }
+    }
+    acme.shutdown().await
 }
 
 async fn run_remote_daemon_case(challenge: AcmeChallenge) -> Result<(), String> {
@@ -98,4 +164,11 @@ fn required_string<'a>(value: &'a Value, field: &str) -> Result<&'a str, String>
         .as_str()
         .filter(|value| !value.is_empty())
         .ok_or_else(|| format!("pairing response omitted {field}: {value}"))
+}
+
+fn required_env(name: &str) -> Result<String, String> {
+    env::var(name)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| format!("live Aftermarket e2e requires {name}"))
 }

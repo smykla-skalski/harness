@@ -365,6 +365,18 @@ mise run monitor:quality-gate  # slower build-based sandbox + daemon validation 
 XCODE_ONLY_TESTING=HarnessMonitorKitTests/PolicyGapRuleTests mise run monitor:test  # focused macOS XCTest via the shared wrapper
 ```
 
+Authoritative DNS-01 visibility uses provider-neutral runtime controls: `HARNESS_REMOTE_ACME_DNS_VISIBILITY_TIMEOUT_SECONDS` (default `300`), `HARNESS_REMOTE_ACME_DNS_VISIBILITY_POLL_SECONDS` (default `5`), and `HARNESS_REMOTE_ACME_DNS_VISIBILITY_STABLE_POLLS` (default `3`). The Aftermarket provider currently uses this check for both challenge presentation and cleanup. A state is accepted only after every authoritative nameserver IP reports the expected result for the configured number of consecutive polls.
+
+`mise run remote-daemon:e2e` runs the self-contained fake-ACME HTTPS/WSS, pairing, authorization, and revocation proof. Its live Aftermarket failure-cleanup case is opt-in. Set `HARNESS_TEST_AFTERMARKET_DOMAIN`, `AFTERMARKET_ZONE_NAME`, `AFTERMARKET_API_KEY`, and `AFTERMARKET_API_SECRET`, then run:
+
+```bash
+mise run cargo:local -- test --test remote_daemon_e2e \
+  remote_daemon_e2e_cleans_aftermarket_dns_after_failed_issuance -- \
+  --ignored --nocapture
+```
+
+The test presents a real TXT record, waits for authoritative visibility, forces the fake ACME server to reject issuance, and succeeds only after provider cleanup completes. Without `HARNESS_TEST_AFTERMARKET_DOMAIN`, the normal self-contained e2e task skips the external mutation.
+
 The macOS Harness Monitor app lives under `apps/harness-monitor/`. The Xcode project is generated from the Tuist manifests (`Project.swift`, `Tuist/Package.swift`); the generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are not tracked. Run `mise run monitor:generate` to materialize them before opening the project in Xcode.
 Its fast lint lane runs `swift format` directly and runs `swiftlint lint` outside the Xcode build graph with a shared cache. Build-based sandbox and daemon validation now live in `mise run monitor:quality-gate`, so routine linting stays off the daemon/Xcode path.
 

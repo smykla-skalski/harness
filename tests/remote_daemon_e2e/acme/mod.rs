@@ -118,6 +118,14 @@ impl FakeAcmeServer {
         &self.ca_pem
     }
 
+    pub fn validation_error(&self) -> Result<Option<String>, String> {
+        self.state
+            .progress
+            .lock()
+            .map_err(|_| "fake ACME progress lock poisoned".to_string())
+            .map(|progress| progress.validation_error.clone())
+    }
+
     pub async fn assert_complete(&self) -> Result<(), String> {
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {

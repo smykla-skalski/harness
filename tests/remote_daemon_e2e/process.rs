@@ -24,6 +24,15 @@ pub struct RemoteDaemonEnvironment {
     http_port: u16,
 }
 
+pub struct AftermarketDnsEnvironment<'a> {
+    pub zone_name: &'a str,
+    pub api_key: &'a str,
+    pub api_secret: &'a str,
+    pub visibility_timeout_seconds: u64,
+    pub visibility_poll_seconds: u64,
+    pub visibility_stable_polls: usize,
+}
+
 impl RemoteDaemonEnvironment {
     pub fn new(challenge: AcmeChallenge) -> Result<Self, String> {
         let temp = tempfile::Builder::new()
@@ -114,32 +123,50 @@ impl RemoteDaemonProcess {
         challenge: AcmeChallenge,
         directory_url: &str,
     ) -> Result<Self, String> {
+        let dns_provider = (challenge == AcmeChallenge::Dns).then_some("exec");
+        let mut command =
+            remote_daemon_command(environment, super::DOMAIN, challenge, dns_provider);
+        environment.apply(&mut command, directory_url);
+        Self::spawn_command(environment, directory_url, command)
+    }
+
+    pub fn spawn_aftermarket(
+        environment: &RemoteDaemonEnvironment,
+        domain: &str,
+        directory_url: &str,
+        aftermarket: &AftermarketDnsEnvironment<'_>,
+    ) -> Result<Self, String> {
+        let mut command =
+            remote_daemon_command(environment, domain, AcmeChallenge::Dns, Some("aftermarket"));
+        environment.apply(&mut command, directory_url);
+        command
+            .env("AFTERMARKET_ZONE_NAME", aftermarket.zone_name)
+            .env("AFTERMARKET_API_KEY", aftermarket.api_key)
+            .env("AFTERMARKET_API_SECRET", aftermarket.api_secret)
+            .env(
+                "HARNESS_REMOTE_ACME_DNS_VISIBILITY_TIMEOUT_SECONDS",
+                aftermarket.visibility_timeout_seconds.to_string(),
+            )
+            .env(
+                "HARNESS_REMOTE_ACME_DNS_VISIBILITY_POLL_SECONDS",
+                aftermarket.visibility_poll_seconds.to_string(),
+            )
+            .env(
+                "HARNESS_REMOTE_ACME_DNS_VISIBILITY_STABLE_POLLS",
+                aftermarket.visibility_stable_polls.to_string(),
+            );
+        Self::spawn_command(environment, directory_url, command)
+    }
+
+    fn spawn_command(
+        environment: &RemoteDaemonEnvironment,
+        directory_url: &str,
+        mut command: Command,
+    ) -> Result<Self, String> {
         let stdout = File::create(&environment.daemon_stdout)
             .map_err(|error| format!("create daemon stdout log: {error}"))?;
         let stderr = File::create(&environment.daemon_stderr)
             .map_err(|error| format!("create daemon stderr log: {error}"))?;
-        let mut command = Command::new(harness_binary());
-        command.args([
-            "daemon",
-            "remote",
-            "serve",
-            "--domain",
-            super::DOMAIN,
-            "--host",
-            "127.0.0.1",
-            "--https-port",
-            &environment.https_port.to_string(),
-            "--http-port",
-            &environment.http_port.to_string(),
-            "--acme-email",
-            "remote-e2e@example.com",
-            "--acme-challenge",
-            challenge.cli_name(),
-        ]);
-        if challenge == AcmeChallenge::Dns {
-            command.args(["--acme-dns-provider", "exec"]);
-        }
-        environment.apply(&mut command, directory_url);
         let child = command
             .stdin(Stdio::null())
             .stdout(Stdio::from(stdout))
@@ -250,6 +277,31 @@ impl RemoteDaemonProcess {
         }
     }
 
+    pub async fn wait_for_failure(&mut self, wait_timeout: Duration) -> Result<String, String> {
+        let deadline = Instant::now() + wait_timeout;
+        loop {
+            match self.child.try_wait() {
+                Ok(Some(status)) if status.success() => {
+                    return Err(format!(
+                        "remote daemon unexpectedly succeeded; {}",
+                        self.diagnostics()
+                    ));
+                }
+                Ok(Some(_)) => return Ok(self.diagnostics()),
+                Ok(None) if Instant::now() < deadline => {
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+                Ok(None) => {
+                    return Err(format!(
+                        "remote daemon did not fail within {wait_timeout:?}; {}",
+                        self.diagnostics()
+                    ));
+                }
+                Err(error) => return Err(format!("wait for remote daemon failure: {error}")),
+            }
+        }
+    }
+
     pub fn diagnostics(&self) -> String {
         let stdout = fs::read_to_string(&self.stdout_path).unwrap_or_default();
         let stderr = fs::read_to_string(&self.stderr_path).unwrap_or_default();
@@ -268,6 +320,36 @@ impl Drop for RemoteDaemonProcess {
 
 fn harness_binary() -> PathBuf {
     assert_cmd::cargo::cargo_bin("harness")
+}
+
+fn remote_daemon_command(
+    environment: &RemoteDaemonEnvironment,
+    domain: &str,
+    challenge: AcmeChallenge,
+    dns_provider: Option<&str>,
+) -> Command {
+    let mut command = Command::new(harness_binary());
+    command.args([
+        "daemon",
+        "remote",
+        "serve",
+        "--domain",
+        domain,
+        "--host",
+        "127.0.0.1",
+        "--https-port",
+        &environment.https_port.to_string(),
+        "--http-port",
+        &environment.http_port.to_string(),
+        "--acme-email",
+        "remote-e2e@example.com",
+        "--acme-challenge",
+        challenge.cli_name(),
+    ]);
+    if let Some(provider) = dns_provider {
+        command.args(["--acme-dns-provider", provider]);
+    }
+    command
 }
 
 fn unused_port() -> Result<u16, String> {
