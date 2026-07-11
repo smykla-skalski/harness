@@ -1,7 +1,13 @@
+use async_trait::async_trait;
 use clap::Parser;
 use harness_testkit::with_isolated_harness_env;
+use std::future::pending;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::thread;
+use std::time::Duration;
+use tokio::sync::{Notify, watch as tokio_watch};
+use tokio::time::{sleep, timeout};
 
 use crate::daemon::db::DaemonDb;
 use crate::daemon::http::DaemonHttpAuthMode;
@@ -10,11 +16,17 @@ use crate::daemon::remote_acme::{
     RemoteAcmeAccountCredentials, RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest,
     RemoteCertificateBundle,
 };
+use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
+use crate::errors::CliError;
 
 use super::super::remote::DaemonRemoteServeArgs;
 use super::super::remote_serve::{
     RemoteServeRuntimeMode, build_remote_serve_execution_plan, execute_remote_serve_with,
-    execute_remote_serve_with_issuer, remote_serve_runtime_mode,
+    execute_remote_serve_with_issuer, remote_serve_runtime_mode, run_remote_daemon_thread,
+};
+use super::super::remote_serve_startup::{
+    RemoteInitialAcmeControl, RemoteInitialAcmeIssuer, ensure_initial_remote_acme,
+    record_initial_acme_shutdown, run_initial_acme_until_shutdown,
 };
 
 #[derive(Debug, Parser)]
@@ -181,6 +193,202 @@ fn daemon_remote_serve_runtime_mode_detects_existing_tokio_runtime() {
             RemoteServeRuntimeMode::ExistingTokioRuntime
         );
     });
+}
+
+#[tokio::test]
+async fn daemon_remote_initial_acme_shutdown_waits_for_challenge_cleanup() {
+    let cleanup_tracker = RemoteAcmeCleanupTracker::default();
+    let challenge_presented = Arc::new(Notify::new());
+    let cleanup_started = Arc::new(AtomicBool::new(false));
+    let cleanup_completed = Arc::new(AtomicBool::new(false));
+    let cleanup_on_drop = CleanupOnDrop {
+        tracker: cleanup_tracker.clone(),
+        started: Arc::clone(&cleanup_started),
+        completed: Arc::clone(&cleanup_completed),
+    };
+    let issuance = {
+        let challenge_presented = Arc::clone(&challenge_presented);
+        async move {
+            let _cleanup_on_drop = cleanup_on_drop;
+            challenge_presented.notify_one();
+            pending::<Result<(), CliError>>().await
+        }
+    };
+    let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
+    let shutdown = tokio::spawn(async move {
+        challenge_presented.notified().await;
+        shutdown_tx.send(true).expect("request startup shutdown");
+    });
+
+    let control = timeout(
+        Duration::from_secs(2),
+        run_initial_acme_until_shutdown(shutdown_rx, &cleanup_tracker, issuance),
+    )
+    .await
+    .expect("initial ACME shutdown should not time out")
+    .expect("initial ACME shutdown should succeed");
+    shutdown.await.expect("join shutdown request");
+
+    assert_eq!(control, RemoteInitialAcmeControl::ShutdownDuringIssuance);
+    assert!(cleanup_started.load(Ordering::SeqCst));
+    assert!(cleanup_completed.load(Ordering::SeqCst));
+}
+
+#[tokio::test]
+async fn daemon_remote_initial_acme_completion_observes_pending_shutdown() {
+    let cleanup_tracker = RemoteAcmeCleanupTracker::default();
+    let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
+    let issuance = async move {
+        shutdown_tx
+            .send(true)
+            .expect("request shutdown before issuance completes");
+        Ok(())
+    };
+
+    let control = run_initial_acme_until_shutdown(shutdown_rx, &cleanup_tracker, issuance)
+        .await
+        .expect("observe shutdown after issuance");
+
+    assert_eq!(control, RemoteInitialAcmeControl::ShutdownAfterIssuance);
+}
+
+#[test]
+fn daemon_remote_existing_runtime_thread_has_stable_name() {
+    let name =
+        run_remote_daemon_thread(|| Ok(thread::current().name().unwrap_or_default().to_string()))
+            .expect("run named remote daemon thread");
+
+    assert_eq!(name, "harness-remote-daemon");
+}
+
+#[tokio::test]
+async fn daemon_remote_initial_acme_shutdown_persists_account_cleanup_and_failure() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let config = remote_serve_args().contract_config().expect("serve config");
+    db.record_remote_acme_serve_config(&config, "2026-07-11T10:00:00Z")
+        .expect("record serve config");
+    let cleanup_tracker = RemoteAcmeCleanupTracker::default();
+    let issuer = BlockingInitialIssuer::new(cleanup_tracker.clone());
+    let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
+    let challenge_presented = Arc::clone(&issuer.challenge_presented);
+    let shutdown = tokio::spawn(async move {
+        challenge_presented.notified().await;
+        shutdown_tx.send(true).expect("request startup shutdown");
+    });
+    let initial_acme = ensure_initial_remote_acme(
+        &db,
+        &issuer,
+        "2026-07-11T10:00:00Z",
+        false,
+        &cleanup_tracker,
+    );
+
+    let control = run_initial_acme_until_shutdown(shutdown_rx, &cleanup_tracker, initial_acme)
+        .await
+        .expect("cancel initial ACME issuance");
+    shutdown.await.expect("join shutdown request");
+    record_initial_acme_shutdown(&db, "2026-07-11T10:00:01Z")
+        .expect("record initial ACME shutdown");
+
+    assert_eq!(control, RemoteInitialAcmeControl::ShutdownDuringIssuance);
+    assert!(issuer.cleanup_started.load(Ordering::SeqCst));
+    assert!(issuer.cleanup_completed.load(Ordering::SeqCst));
+    let issuance = db
+        .load_remote_acme_issuance_state()
+        .expect("load ACME issuance state");
+    assert_eq!(
+        issuance
+            .account
+            .as_ref()
+            .map(|account| account.account_id()),
+        Some("https://acme.test/acct/startup")
+    );
+    let state = db.load_remote_acme_state().expect("load ACME state");
+    assert!(!state.certificate_configured);
+    assert_eq!(state.renewal_status.as_str(), "failed");
+    assert!(
+        state
+            .renewal_error
+            .as_deref()
+            .is_some_and(|detail| detail.contains("cancelled during daemon shutdown"))
+    );
+    let events = db.load_remote_audit_events(10).expect("load audit events");
+    assert!(events.iter().any(|event| {
+        event.route_or_method == "remote.acme.renew"
+            && event.outcome.as_str() == "failure"
+            && event
+                .error_detail
+                .as_deref()
+                .is_some_and(|detail| detail.contains("cancelled during daemon shutdown"))
+    }));
+}
+
+struct CleanupOnDrop {
+    tracker: RemoteAcmeCleanupTracker,
+    started: Arc<AtomicBool>,
+    completed: Arc<AtomicBool>,
+}
+
+impl Drop for CleanupOnDrop {
+    fn drop(&mut self) {
+        let started = Arc::clone(&self.started);
+        let completed = Arc::clone(&self.completed);
+        drop(self.tracker.spawn_cleanup(async move {
+            started.store(true, Ordering::SeqCst);
+            sleep(Duration::from_millis(50)).await;
+            completed.store(true, Ordering::SeqCst);
+            Ok(())
+        }));
+    }
+}
+
+struct BlockingInitialIssuer {
+    tracker: RemoteAcmeCleanupTracker,
+    challenge_presented: Arc<Notify>,
+    cleanup_started: Arc<AtomicBool>,
+    cleanup_completed: Arc<AtomicBool>,
+}
+
+impl BlockingInitialIssuer {
+    fn new(tracker: RemoteAcmeCleanupTracker) -> Self {
+        Self {
+            tracker,
+            challenge_presented: Arc::new(Notify::new()),
+            cleanup_started: Arc::new(AtomicBool::new(false)),
+            cleanup_completed: Arc::new(AtomicBool::new(false)),
+        }
+    }
+}
+
+#[async_trait]
+impl RemoteInitialAcmeIssuer for BlockingInitialIssuer {
+    async fn create_account(
+        &self,
+        config: &RemoteDaemonServeConfig,
+    ) -> Result<RemoteAcmeAccountCredentials, String> {
+        assert_eq!(config.domain, "daemon.example.com");
+        RemoteAcmeAccountCredentials::new(
+            "https://acme.test/acct/startup",
+            r#"{"id":"https://acme.test/acct/startup","key_pkcs8":"startup-account-key"}"#,
+        )
+        .map_err(|error| error.to_string())
+    }
+
+    async fn renew_certificate(
+        &self,
+        request: &RemoteAcmeRenewalRequest,
+        cleanup_tracker: &RemoteAcmeCleanupTracker,
+    ) -> Result<RemoteCertificateBundle, String> {
+        assert_eq!(request.account_id(), "https://acme.test/acct/startup");
+        assert!(cleanup_tracker.same_operation(&self.tracker));
+        let _cleanup_on_drop = CleanupOnDrop {
+            tracker: cleanup_tracker.clone(),
+            started: Arc::clone(&self.cleanup_started),
+            completed: Arc::clone(&self.cleanup_completed),
+        };
+        self.challenge_presented.notify_one();
+        pending().await
+    }
 }
 
 fn remote_serve_args() -> DaemonRemoteServeArgs {

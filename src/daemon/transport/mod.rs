@@ -6,6 +6,7 @@ mod remote_clients;
 mod remote_doctor;
 mod remote_pairing_invitation;
 mod remote_serve;
+mod remote_serve_startup;
 mod remote_systemd;
 mod remote_systemd_lifecycle;
 #[cfg(test)]

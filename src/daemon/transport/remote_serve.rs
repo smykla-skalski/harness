@@ -2,17 +2,25 @@ use std::thread;
 
 use crate::daemon::db::DaemonDb;
 use crate::daemon::remote::RemoteDaemonServeConfig;
-use crate::daemon::remote_acme::{
-    RemoteAcmeRenewalIssuer, RemoteAcmeRuntimePlan, build_remote_acme_runtime_plan,
-};
+#[cfg(test)]
+use crate::daemon::remote_acme::RemoteAcmeRenewalIssuer;
+use crate::daemon::remote_acme::{RemoteAcmeRuntimePlan, build_remote_acme_runtime_plan};
+use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_acme_issuer::SystemRemoteAcmeIssuer;
-use crate::daemon::service::{self, DaemonServeConfig};
+use crate::daemon::service::{self, DaemonServeConfig, ShutdownSignalGuard};
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 use tokio::runtime::{Handle, Runtime};
+use tokio::sync::watch as tokio_watch;
 
 use super::control::adopt_daemon_root_for_transport_command;
-use super::remote::{DaemonRemoteAcmeCommand, DaemonRemoteServeArgs, open_remote_daemon_db};
+#[cfg(test)]
+use super::remote::DaemonRemoteAcmeCommand;
+use super::remote::{DaemonRemoteServeArgs, open_remote_daemon_db};
+use super::remote_serve_startup::{
+    RemoteInitialAcmeControl, ensure_initial_remote_acme, record_initial_acme_shutdown,
+    run_initial_acme_until_shutdown,
+};
 
 #[derive(Clone)]
 pub(crate) struct RemoteDaemonServeExecutionPlan {
@@ -21,9 +29,22 @@ pub(crate) struct RemoteDaemonServeExecutionPlan {
 }
 
 pub(super) fn execute_remote_serve(args: &DaemonRemoteServeArgs) -> Result<i32, CliError> {
-    execute_remote_serve_with(args, open_remote_daemon_db, run_remote_serve_plan)
+    adopt_daemon_root_for_transport_command("daemon-remote-serve");
+    let db = open_remote_daemon_db()?;
+    let remote_config = args.contract_config()?;
+    let certificate_domain_matches = certificate_domain_matches(&db, &remote_config)?;
+    let now = utc_now();
+    db.record_remote_acme_serve_config(&remote_config, now.as_str())?;
+    run_remote_serve_lifecycle(
+        args.clone(),
+        db,
+        remote_config,
+        certificate_domain_matches,
+        now,
+    )
 }
 
+#[cfg(test)]
 pub(crate) fn execute_remote_serve_with<OpenDb, Run>(
     args: &DaemonRemoteServeArgs,
     open_db: OpenDb,
@@ -43,6 +64,7 @@ where
     )
 }
 
+#[cfg(test)]
 pub(crate) fn execute_remote_serve_with_issuer<OpenDb, Run, Issuer>(
     args: &DaemonRemoteServeArgs,
     open_db: OpenDb,
@@ -58,7 +80,18 @@ where
     adopt_daemon_root_for_transport_command("daemon-remote-serve");
     let db = open_db()?;
     let remote_config = args.contract_config()?;
-    let certificate_domain_matches = db
+    let certificate_domain_matches = certificate_domain_matches(&db, &remote_config)?;
+    db.record_remote_acme_serve_config(&remote_config, now)?;
+    ensure_remote_acme_for_serve(&db, issuer, now, certificate_domain_matches)?;
+    let plan = build_remote_serve_execution_plan_from_config(args, &db, &remote_config)?;
+    run_plan(plan)
+}
+
+fn certificate_domain_matches(
+    db: &DaemonDb,
+    remote_config: &RemoteDaemonServeConfig,
+) -> Result<bool, CliError> {
+    Ok(db
         .load_remote_acme_state()?
         .serve_config
         .as_ref()
@@ -67,11 +100,7 @@ where
                 .domain
                 .trim()
                 .eq_ignore_ascii_case(remote_config.domain.trim())
-        });
-    db.record_remote_acme_serve_config(&remote_config, now)?;
-    ensure_remote_acme_for_serve(&db, issuer, now, certificate_domain_matches)?;
-    let plan = build_remote_serve_execution_plan_from_config(args, &db, &remote_config)?;
-    run_plan(plan)
+        }))
 }
 
 /// Build the remote daemon serve execution plan from static CLI config and
@@ -105,6 +134,7 @@ fn build_remote_serve_execution_plan_from_config(
     })
 }
 
+#[cfg(test)]
 fn ensure_remote_acme_for_serve<I>(
     db: &DaemonDb,
     issuer: &I,
@@ -125,13 +155,6 @@ where
         .ensure_success()
 }
 
-fn run_remote_serve_plan(plan: RemoteDaemonServeExecutionPlan) -> Result<i32, CliError> {
-    match remote_serve_runtime_mode() {
-        RemoteServeRuntimeMode::ExistingTokioRuntime => run_remote_serve_plan_on_thread(plan),
-        RemoteServeRuntimeMode::NewTokioRuntime => run_remote_serve_plan_on_runtime(plan),
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RemoteServeRuntimeMode {
     ExistingTokioRuntime,
@@ -146,32 +169,112 @@ pub(crate) fn remote_serve_runtime_mode() -> RemoteServeRuntimeMode {
     }
 }
 
-fn run_remote_serve_plan_on_thread(plan: RemoteDaemonServeExecutionPlan) -> Result<i32, CliError> {
-    thread::Builder::new()
-        .name("harness-remote-daemon".to_string())
-        .spawn(move || run_remote_serve_plan_on_runtime(plan))
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "spawn remote daemon runtime thread: {error}"
-            )))
-        })?
-        .join()
-        .map_err(|_| {
-            CliError::from(CliErrorKind::workflow_io(
-                "remote daemon runtime thread panicked",
-            ))
-        })?
+fn run_remote_serve_lifecycle(
+    args: DaemonRemoteServeArgs,
+    db: DaemonDb,
+    remote_config: RemoteDaemonServeConfig,
+    certificate_domain_matches: bool,
+    now: String,
+) -> Result<i32, CliError> {
+    match remote_serve_runtime_mode() {
+        RemoteServeRuntimeMode::ExistingTokioRuntime => run_remote_daemon_thread(move || {
+            run_remote_serve_lifecycle_on_runtime(
+                &args,
+                &db,
+                &remote_config,
+                certificate_domain_matches,
+                &now,
+            )
+        }),
+        RemoteServeRuntimeMode::NewTokioRuntime => run_remote_serve_lifecycle_on_runtime(
+            &args,
+            &db,
+            &remote_config,
+            certificate_domain_matches,
+            &now,
+        ),
+    }
 }
 
-fn run_remote_serve_plan_on_runtime(plan: RemoteDaemonServeExecutionPlan) -> Result<i32, CliError> {
+pub(crate) fn run_remote_daemon_thread<T, Run>(run: Run) -> Result<T, CliError>
+where
+    T: Send,
+    Run: FnOnce() -> Result<T, CliError> + Send,
+{
+    thread::scope(|scope| {
+        thread::Builder::new()
+            .name("harness-remote-daemon".to_string())
+            .spawn_scoped(scope, run)
+            .map_err(|error| {
+                CliError::from(CliErrorKind::workflow_io(format!(
+                    "spawn remote daemon lifecycle thread: {error}"
+                )))
+            })?
+            .join()
+            .map_err(|_| {
+                CliError::from(CliErrorKind::workflow_io(
+                    "remote daemon lifecycle thread panicked",
+                ))
+            })?
+    })
+}
+
+fn run_remote_serve_lifecycle_on_runtime(
+    args: &DaemonRemoteServeArgs,
+    db: &DaemonDb,
+    remote_config: &RemoteDaemonServeConfig,
+    certificate_domain_matches: bool,
+    now: &str,
+) -> Result<i32, CliError> {
     let runtime = Runtime::new().map_err(|error| {
         CliError::from(CliErrorKind::workflow_io(format!(
             "create remote daemon tokio runtime: {error}"
         )))
     })?;
-    runtime.block_on(service::serve_remote_https(
+    runtime.block_on(run_remote_serve_lifecycle_async(
+        args,
+        db,
+        remote_config,
+        certificate_domain_matches,
+        now,
+    ))
+}
+
+async fn run_remote_serve_lifecycle_async(
+    args: &DaemonRemoteServeArgs,
+    db: &DaemonDb,
+    remote_config: &RemoteDaemonServeConfig,
+    certificate_domain_matches: bool,
+    now: &str,
+) -> Result<i32, CliError> {
+    let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
+    let _shutdown_signal_guard = ShutdownSignalGuard::install(shutdown_tx.clone())?;
+    let cleanup_tracker = RemoteAcmeCleanupTracker::default();
+    let initial_acme = ensure_initial_remote_acme(
+        db,
+        &SystemRemoteAcmeIssuer,
+        now,
+        certificate_domain_matches,
+        &cleanup_tracker,
+    );
+    let control =
+        run_initial_acme_until_shutdown(shutdown_rx.clone(), &cleanup_tracker, initial_acme)
+            .await?;
+    match control {
+        RemoteInitialAcmeControl::Continue => {}
+        RemoteInitialAcmeControl::ShutdownDuringIssuance => {
+            record_initial_acme_shutdown(db, utc_now().as_str())?;
+            return Ok(0);
+        }
+        RemoteInitialAcmeControl::ShutdownAfterIssuance => return Ok(0),
+    }
+    let plan = build_remote_serve_execution_plan_from_config(args, db, remote_config)?;
+    service::serve_remote_https(
         plan.service_config,
         plan.acme_plan,
-    ))?;
+        shutdown_tx,
+        shutdown_rx,
+    )
+    .await?;
     Ok(0)
 }

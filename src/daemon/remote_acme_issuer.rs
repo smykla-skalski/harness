@@ -189,6 +189,7 @@ where
         project_account_credentials(&credentials)
     }
 
+    #[cfg(test)]
     pub(crate) async fn issue_certificate(
         &self,
         credentials: &RemoteAcmeAccountCredentials,
@@ -405,28 +406,48 @@ fn redacted_acme_error(error: &instant_acme::Error) -> String {
 
 pub(crate) struct SystemRemoteAcmeIssuer;
 
+impl SystemRemoteAcmeIssuer {
+    pub(crate) async fn create_account_async(
+        &self,
+        config: &RemoteDaemonServeConfig,
+    ) -> Result<RemoteAcmeAccountCredentials, String> {
+        let provisioner = SystemRemoteAcmeChallengeProvisioner::from_environment(config)?;
+        InstantAcmeIssuer::production(provisioner)
+            .create_account(config.acme_email.as_str())
+            .await
+    }
+
+    pub(crate) async fn renew_certificate_async(
+        &self,
+        request: &RemoteAcmeRenewalRequest,
+        cleanup_tracker: RemoteAcmeCleanupTracker,
+    ) -> Result<RemoteCertificateBundle, String> {
+        let provisioner =
+            SystemRemoteAcmeChallengeProvisioner::from_environment(request.serve_config())?;
+        InstantAcmeIssuer::production(provisioner)
+            .issue_certificate_with_cleanup(
+                request.account(),
+                request.serve_config(),
+                request.previous_private_key_pem(),
+                cleanup_tracker,
+            )
+            .await
+    }
+}
+
 impl RemoteAcmeRenewalIssuer for SystemRemoteAcmeIssuer {
     fn create_account(
         &self,
         config: &RemoteDaemonServeConfig,
     ) -> Result<RemoteAcmeAccountCredentials, String> {
-        let provisioner = SystemRemoteAcmeChallengeProvisioner::from_environment(config)?;
-        let issuer = InstantAcmeIssuer::production(provisioner);
-        run_acme_future(issuer.create_account(config.acme_email.as_str()))
+        run_acme_future(self.create_account_async(config))
     }
 
     fn renew_certificate(
         &self,
         request: &RemoteAcmeRenewalRequest,
     ) -> Result<RemoteCertificateBundle, String> {
-        let provisioner =
-            SystemRemoteAcmeChallengeProvisioner::from_environment(request.serve_config())?;
-        let issuer = InstantAcmeIssuer::production(provisioner);
-        run_acme_future(issuer.issue_certificate(
-            request.account(),
-            request.serve_config(),
-            request.previous_private_key_pem(),
-        ))
+        run_acme_future(self.renew_certificate_async(request, RemoteAcmeCleanupTracker::default()))
     }
 }
 

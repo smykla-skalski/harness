@@ -20,6 +20,11 @@ struct RemoteAcmeCleanupState {
 }
 
 impl RemoteAcmeCleanupTracker {
+    #[cfg(test)]
+    pub(crate) fn same_operation(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.state, &other.state)
+    }
+
     pub(crate) fn spawn_cleanup<F>(&self, cleanup: F) -> oneshot::Receiver<Result<(), String>>
     where
         F: Future<Output = Result<(), String>> + Send + 'static,

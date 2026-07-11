@@ -3685,6 +3685,7 @@ dependencies = [
  "serde",
  "serde-sarif",
  "serde_json",
+ "serde_urlencoded",
  "serde_yml",
  "sha1 0.11.0",
  "sha2 0.11.0",

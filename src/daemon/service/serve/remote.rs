@@ -25,7 +25,6 @@ use super::background_tasks::{self, spawn_background_tasks};
 use super::binary_stamp::current_binary_stamp;
 use super::initialize_startup_state;
 use super::legacy_migration::log_legacy_daemon_root_migration;
-use super::shutdown_signals::ShutdownSignalGuard;
 
 /// Start the remote daemon HTTPS API.
 ///
@@ -39,6 +38,8 @@ use super::shutdown_signals::ShutdownSignalGuard;
 pub async fn serve_remote_https(
     config: DaemonServeConfig,
     acme_plan: RemoteAcmeRuntimePlan,
+    shutdown_tx: tokio_watch::Sender<bool>,
+    shutdown_rx: tokio_watch::Receiver<bool>,
 ) -> Result<(), CliError> {
     validate_remote_https_config(&config)?;
     super::super::log_sandbox_startup(config.sandboxed);
@@ -68,7 +69,6 @@ pub async fn serve_remote_https(
     state::append_event("info", &remote_bound_event_message(&endpoint))?;
 
     let (sender, _) = broadcast::channel(256);
-    let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
     let db: Arc<OnceLock<Arc<Mutex<DaemonDb>>>> = Arc::new(OnceLock::new());
     let async_db: Arc<OnceLock<Arc<AsyncDaemonDb>>> = Arc::new(OnceLock::new());
     let _ = OBSERVE_RUNTIME.set(DaemonObserveRuntime {
@@ -79,7 +79,6 @@ pub async fn serve_remote_https(
         async_db: async_db.clone(),
     });
     let _ = SHUTDOWN_SIGNAL.set(shutdown_tx.clone());
-    let _shutdown_signal_guard = ShutdownSignalGuard::install(shutdown_tx.clone())?;
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let prepared_sender = background_tasks::spawn_broadcast_fanout(&sender, &replay_buffer);
     let daemon_epoch = manifest.started_at.clone();
