@@ -84,8 +84,7 @@ pub const POLICY_CANVAS_DUPLICATE: &str = "policy_canvas.duplicate";
 pub const POLICY_CANVAS_RENAME: &str = "policy_canvas.rename";
 pub const POLICY_CANVAS_SET_ACTIVE: &str = "policy_canvas.set_active";
 pub const POLICY_CANVAS_DELETE: &str = "policy_canvas.delete";
-pub const POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT: &str =
-    "policy_canvas.set_global_enforcement";
+pub const POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT: &str = "policy_canvas.set_global_enforcement";
 pub const POLICY_PIPELINE_GET: &str = "policy_pipeline.get";
 pub const POLICY_PIPELINE_SAVE_DRAFT: &str = "policy_pipeline.save_draft";
 pub const POLICY_PIPELINE_SIMULATE: &str = "policy_pipeline.simulate";

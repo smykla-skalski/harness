@@ -166,9 +166,7 @@ fn claim_pairing_client(
     Ok(claimed)
 }
 
-fn remote_pair_claim_response(
-    claimed: RemotePairingClaimedClient,
-) -> RemotePairClaimHttpResponse {
+fn remote_pair_claim_response(claimed: RemotePairingClaimedClient) -> RemotePairClaimHttpResponse {
     RemotePairClaimHttpResponse {
         client_id: claimed.client.client_id,
         display_name: claimed.client.display_name,

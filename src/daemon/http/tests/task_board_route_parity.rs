@@ -328,10 +328,7 @@ async fn run_policy_pipeline_parity() {
     let http_audit = get_json(
         &client,
         &base_url,
-        &format!(
-            "{}?canvas_id={active_canvas_id}",
-            http_paths::POLICY_AUDIT
-        ),
+        &format!("{}?canvas_id={active_canvas_id}", http_paths::POLICY_AUDIT),
     )
     .await;
     let ws_audit = ws_result(

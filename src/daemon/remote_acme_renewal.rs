@@ -242,9 +242,7 @@ where
 {
     let snapshot = load_renewal_snapshot(db)?;
     let due = remote_certificate_needs_renewal(&snapshot.bundle, now).unwrap_or(true);
-    if !due
-        && let Some(outcome) = reload_not_due_certificate(db, tls, &snapshot.bundle, now)?
-    {
+    if !due && let Some(outcome) = reload_not_due_certificate(db, tls, &snapshot.bundle, now)? {
         return Ok(outcome);
     }
     renew_due_certificate(db, tls, issuer, &snapshot, now, cleanup_tracker).await

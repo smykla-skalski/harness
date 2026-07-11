@@ -6,15 +6,13 @@ use axum::response::Response;
 use axum::routing::{get, post};
 
 use crate::daemon::protocol::{
-    PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest,
-    PolicyCanvasDuplicateRequest, PolicyCanvasRenameRequest,
-    PolicyCanvasSetActiveRequest, PolicyCanvasSetGlobalEnforcementRequest,
-    PolicyPipelineAuditRequest, PolicyPipelineGetRequest,
-    PolicyPipelineGoLiveDiffRequest, PolicyPipelineMakeLiveRequest,
-    PolicyPipelinePromoteRequest, PolicyPipelineReplayRequest,
-    PolicyPipelineSaveDraftRequest, PolicyPipelineSimulateRequest,
-    PolicyScenarioCreateRequest, PolicyScenarioDeleteRequest,
-    PolicyScenarioUpdateRequest, http_paths,
+    PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest, PolicyCanvasDuplicateRequest,
+    PolicyCanvasRenameRequest, PolicyCanvasSetActiveRequest,
+    PolicyCanvasSetGlobalEnforcementRequest, PolicyPipelineAuditRequest, PolicyPipelineGetRequest,
+    PolicyPipelineGoLiveDiffRequest, PolicyPipelineMakeLiveRequest, PolicyPipelinePromoteRequest,
+    PolicyPipelineReplayRequest, PolicyPipelineSaveDraftRequest, PolicyPipelineSimulateRequest,
+    PolicyScenarioCreateRequest, PolicyScenarioDeleteRequest, PolicyScenarioUpdateRequest,
+    http_paths,
 };
 
 use super::super::response::timed_json;
@@ -55,30 +53,15 @@ pub(super) fn merge_policy_routes(router: Router<DaemonHttpState>) -> Router<Dae
             http_paths::POLICY_PIPELINE,
             get(get_policy_pipeline).put(put_policy_pipeline_draft),
         )
-        .route(
-            http_paths::POLICY_SIMULATE,
-            post(post_policy_simulate),
-        )
-        .route(
-            http_paths::POLICY_PROMOTE,
-            post(post_policy_promote),
-        )
-        .route(
-            http_paths::POLICY_MAKE_LIVE,
-            post(post_policy_make_live),
-        )
+        .route(http_paths::POLICY_SIMULATE, post(post_policy_simulate))
+        .route(http_paths::POLICY_PROMOTE, post(post_policy_promote))
+        .route(http_paths::POLICY_MAKE_LIVE, post(post_policy_make_live))
         .route(
             http_paths::POLICY_GO_LIVE_DIFF,
             post(post_policy_go_live_diff),
         )
-        .route(
-            http_paths::POLICY_REPLAY,
-            post(post_policy_replay),
-        )
-        .route(
-            http_paths::POLICY_AUDIT,
-            get(get_policy_audit),
-        )
+        .route(http_paths::POLICY_REPLAY, post(post_policy_replay))
+        .route(http_paths::POLICY_AUDIT, get(get_policy_audit))
         .route(
             http_paths::POLICY_SCENARIOS_CREATE,
             post(post_policy_scenario_create),
@@ -419,13 +402,7 @@ pub(super) async fn get_policy_audit(
         Ok(db) => task_board_route_executor::audit_policy_pipeline(db, &request).await,
         Err(error) => Err(error),
     };
-    timed_json(
-        "GET",
-        http_paths::POLICY_AUDIT,
-        &request_id,
-        start,
-        audit,
-    )
+    timed_json("GET", http_paths::POLICY_AUDIT, &request_id, start, audit)
 }
 
 pub(super) async fn post_policy_scenario_create(

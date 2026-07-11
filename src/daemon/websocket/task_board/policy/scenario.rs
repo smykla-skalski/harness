@@ -1,8 +1,7 @@
 use crate::daemon::http::{DaemonHttpState, require_async_db, task_board_route_executor};
 use crate::daemon::protocol::{
-    PolicyScenarioCreateRequest, PolicyScenarioDeleteRequest,
-    PolicyScenarioResetRequest, PolicyScenarioUpdateRequest, WsRequest,
-    WsResponse,
+    PolicyScenarioCreateRequest, PolicyScenarioDeleteRequest, PolicyScenarioResetRequest,
+    PolicyScenarioUpdateRequest, WsRequest, WsResponse,
 };
 use crate::daemon::websocket::mutations::dispatch_query_result;
 

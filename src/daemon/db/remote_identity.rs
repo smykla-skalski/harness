@@ -8,12 +8,12 @@
 
 use rusqlite::{params, types::Type};
 
-use super::{db_error, CliError, DaemonDb, OptionalExtension};
+use super::{CliError, DaemonDb, OptionalExtension, db_error};
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
-    parse_remote_role, parse_remote_scope, remote_token_hint, RemoteAuditEvent, RemoteAuditOutcome,
-    RemoteAuditScopeDecision, RemoteClientRegistration, RemoteStoredAuditEvent, RemoteStoredClient,
-    RemoteTokenHash,
+    RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration,
+    RemoteStoredAuditEvent, RemoteStoredClient, RemoteTokenHash, parse_remote_role,
+    parse_remote_scope, remote_token_hint,
 };
 
 const INSERT_REMOTE_CLIENT_SQL: &str = "

@@ -44,7 +44,10 @@ async fn remote_pair_claim_is_public_and_returns_one_time_client_token() {
         .expect("send claim request");
 
     assert_eq!(response.status(), StatusCode::OK);
-    let body = response.json::<serde_json::Value>().await.expect("json body");
+    let body = response
+        .json::<serde_json::Value>()
+        .await
+        .expect("json body");
     assert_eq!(body["client_id"], "iphone-1");
     assert_eq!(body["role"], "operator");
     assert_eq!(body["scopes"], serde_json::json!(["read", "write"]));
@@ -200,7 +203,10 @@ async fn remote_pair_claim_fails_closed_without_remote_domain_config() {
         .expect("send unconfigured claim");
 
     assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-    let body = response.json::<serde_json::Value>().await.expect("json body");
+    let body = response
+        .json::<serde_json::Value>()
+        .await
+        .expect("json body");
     assert_eq!(body["error"]["code"], "REMOTE_PAIRING_CONFIG");
 
     server.abort();
@@ -235,7 +241,10 @@ async fn remote_pair_claim_wrong_domain_is_redacted() {
         .expect("send wrong-domain claim");
 
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    let body = response.json::<serde_json::Value>().await.expect("json body");
+    let body = response
+        .json::<serde_json::Value>()
+        .await
+        .expect("json body");
     assert_eq!(body["error"]["code"], "REMOTE_PAIRING");
     assert_eq!(
         body["error"]["message"],
@@ -298,7 +307,10 @@ async fn remote_pair_claim_redacts_store_failures() {
         .expect("send duplicate-client claim");
 
     assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-    let body = response.json::<serde_json::Value>().await.expect("json body");
+    let body = response
+        .json::<serde_json::Value>()
+        .await
+        .expect("json body");
     assert_eq!(body["error"]["code"], "REMOTE_PAIRING_STORE");
     assert_eq!(
         body["error"]["message"],
@@ -329,7 +341,12 @@ fn seed_pairing_code(
 ) -> RemotePairingCode {
     let code = RemotePairingCode::from_value_for_tests(code);
     let record = RemotePairingRecord::new_for_tests(
-        pairing_id, role, scopes, code.expose(), created_at, expires_at,
+        pairing_id,
+        role,
+        scopes,
+        code.expose(),
+        created_at,
+        expires_at,
     )
     .expect("pairing record");
     state

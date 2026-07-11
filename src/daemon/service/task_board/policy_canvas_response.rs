@@ -1,6 +1,4 @@
-use crate::daemon::protocol::{
-    PolicyCanvasSummary, PolicyCanvasWorkspaceResponse,
-};
+use crate::daemon::protocol::{PolicyCanvasSummary, PolicyCanvasWorkspaceResponse};
 use crate::task_board::policy_graph::{PolicyCanvasRecord, PolicyCanvasWorkspace};
 
 pub(super) fn policy_canvas_workspace_response(

@@ -8,8 +8,7 @@ use super::super::remote_systemd::{
     DaemonRemoteSystemdInstallArgs, RemoteSystemdInstallPlan, default_env_path_for_tests,
 };
 use super::super::remote_systemd_lifecycle::{
-    RemoteSystemdCommandOutput,
-    install_remote_systemd_with, uninstall_remote_systemd_with,
+    RemoteSystemdCommandOutput, install_remote_systemd_with, uninstall_remote_systemd_with,
 };
 
 #[derive(Debug, Parser)]
@@ -70,7 +69,10 @@ fn daemon_remote_systemd_lifecycle_parses_custom_env_file() {
     match parsed {
         DaemonRemoteCommand::UninstallSystemd(args) => {
             assert_eq!(args.unit, "harness-remote");
-            assert_eq!(args.env_file, Some(PathBuf::from("/srv/harness/remote.env")));
+            assert_eq!(
+                args.env_file,
+                Some(PathBuf::from("/srv/harness/remote.env"))
+            );
             assert!(args.json);
         }
         other => panic!("expected uninstall-systemd, got {other:?}"),
@@ -91,7 +93,10 @@ fn daemon_remote_systemd_lifecycle_parses_custom_env_file() {
     match parsed {
         DaemonRemoteCommand::Status(args) => {
             assert_eq!(args.unit, "harness-remote");
-            assert_eq!(args.env_file, Some(PathBuf::from("/srv/harness/remote.env")));
+            assert_eq!(
+                args.env_file,
+                Some(PathBuf::from("/srv/harness/remote.env"))
+            );
             assert!(args.json);
         }
         other => panic!("expected status, got {other:?}"),
@@ -300,7 +305,11 @@ fn remote_systemd_default_env_path_strips_service_suffix() {
         plan.unit_contents
             .contains("StateDirectory=harness-remote-daemon")
     );
-    assert!(!plan.unit_contents.contains("StateDirectory=harness-remote-daemon.service"));
+    assert!(
+        !plan
+            .unit_contents
+            .contains("StateDirectory=harness-remote-daemon.service")
+    );
     assert_eq!(
         default_env_path_for_tests("harness-remote-daemon"),
         PathBuf::from("/etc/harness/harness-remote-daemon.env")

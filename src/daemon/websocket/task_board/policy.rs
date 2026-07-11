@@ -7,19 +7,16 @@ mod pipeline;
 mod scenario;
 
 use self::canvas::{
-    dispatch_policy_canvas_create, dispatch_policy_canvas_delete,
-    dispatch_policy_canvas_duplicate, dispatch_policy_canvas_rename,
-    dispatch_policy_canvas_set_active,
-    dispatch_policy_canvas_set_global_enforcement,
-    dispatch_policy_canvas_workspace_get,
+    dispatch_policy_canvas_create, dispatch_policy_canvas_delete, dispatch_policy_canvas_duplicate,
+    dispatch_policy_canvas_rename, dispatch_policy_canvas_set_active,
+    dispatch_policy_canvas_set_global_enforcement, dispatch_policy_canvas_workspace_get,
 };
 use self::io::{dispatch_policy_export, dispatch_policy_import};
 use self::pipeline::{
     dispatch_policy_pipeline_audit, dispatch_policy_pipeline_get,
-    dispatch_policy_pipeline_go_live_diff,
-    dispatch_policy_pipeline_make_live, dispatch_policy_pipeline_promote,
-    dispatch_policy_pipeline_replay, dispatch_policy_pipeline_save_draft,
-    dispatch_policy_pipeline_simulate,
+    dispatch_policy_pipeline_go_live_diff, dispatch_policy_pipeline_make_live,
+    dispatch_policy_pipeline_promote, dispatch_policy_pipeline_replay,
+    dispatch_policy_pipeline_save_draft, dispatch_policy_pipeline_simulate,
 };
 use self::scenario::{
     dispatch_policy_scenario_create, dispatch_policy_scenario_delete,
@@ -127,9 +124,7 @@ async fn dispatch_policy_pipeline_read_method(
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
-        ws_methods::POLICY_PIPELINE_GET => {
-            Some(dispatch_policy_pipeline_get(request, state).await)
-        }
+        ws_methods::POLICY_PIPELINE_GET => Some(dispatch_policy_pipeline_get(request, state).await),
         ws_methods::POLICY_PIPELINE_GO_LIVE_DIFF => {
             Some(dispatch_policy_pipeline_go_live_diff(request, state).await)
         }
@@ -169,12 +164,8 @@ async fn dispatch_policy_io_method(
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
-        ws_methods::POLICY_CANVAS_EXPORT => {
-            Some(dispatch_policy_export(request, state).await)
-        }
-        ws_methods::POLICY_CANVAS_IMPORT => {
-            Some(dispatch_policy_import(request, state).await)
-        }
+        ws_methods::POLICY_CANVAS_EXPORT => Some(dispatch_policy_export(request, state).await),
+        ws_methods::POLICY_CANVAS_IMPORT => Some(dispatch_policy_import(request, state).await),
         _ => None,
     }
 }

@@ -5,9 +5,7 @@ use axum::http::HeaderMap;
 use axum::response::Response;
 use axum::routing::post;
 
-use crate::daemon::protocol::{
-    PolicyCanvasExportRequest, PolicyCanvasImportRequest, http_paths,
-};
+use crate::daemon::protocol::{PolicyCanvasExportRequest, PolicyCanvasImportRequest, http_paths};
 
 use super::super::response::timed_json;
 use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
@@ -15,14 +13,8 @@ use super::authenticated_request;
 
 pub(super) fn merge_policy_io_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
     router
-        .route(
-            http_paths::POLICY_CANVAS_EXPORT,
-            post(post_policy_export),
-        )
-        .route(
-            http_paths::POLICY_CANVAS_IMPORT,
-            post(post_policy_import),
-        )
+        .route(http_paths::POLICY_CANVAS_EXPORT, post(post_policy_export))
+        .route(http_paths::POLICY_CANVAS_IMPORT, post(post_policy_import))
 }
 
 pub(super) async fn post_policy_export(

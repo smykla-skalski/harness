@@ -244,8 +244,5 @@ fn assert_control_character_rejected(args: DaemonRemoteSystemdInstallArgs, expec
     )
     .expect_err("reject control characters");
 
-    assert!(
-        error.to_string().contains(expected),
-        "{expected}: {error}"
-    );
+    assert!(error.to_string().contains(expected), "{expected}: {error}");
 }

@@ -79,8 +79,7 @@ pub const POLICY_CANVASES_DUPLICATE: &str = "/v1/policy-canvases/duplicate";
 pub const POLICY_CANVASES_RENAME: &str = "/v1/policy-canvases/rename";
 pub const POLICY_CANVASES_ACTIVE: &str = "/v1/policy-canvases/active";
 pub const POLICY_CANVASES_DELETE: &str = "/v1/policy-canvases/delete";
-pub const POLICY_CANVASES_GLOBAL_ENFORCEMENT: &str =
-    "/v1/policy-canvases/global-enforcement";
+pub const POLICY_CANVASES_GLOBAL_ENFORCEMENT: &str = "/v1/policy-canvases/global-enforcement";
 pub const POLICY_PIPELINE: &str = "/v1/policy-pipeline";
 pub const POLICY_SIMULATE: &str = "/v1/policy-pipeline/simulate";
 pub const POLICY_PROMOTE: &str = "/v1/policy-pipeline/promote";

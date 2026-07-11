@@ -1,10 +1,8 @@
 use crate::daemon::http::{DaemonHttpState, require_async_db, task_board_route_executor};
 use crate::daemon::protocol::{
-    PolicyPipelineAuditRequest, PolicyPipelineGetRequest,
-    PolicyPipelineGoLiveDiffRequest, PolicyPipelineMakeLiveRequest,
-    PolicyPipelinePromoteRequest, PolicyPipelineReplayRequest,
-    PolicyPipelineSaveDraftRequest, PolicyPipelineSimulateRequest, WsRequest,
-    WsResponse,
+    PolicyPipelineAuditRequest, PolicyPipelineGetRequest, PolicyPipelineGoLiveDiffRequest,
+    PolicyPipelineMakeLiveRequest, PolicyPipelinePromoteRequest, PolicyPipelineReplayRequest,
+    PolicyPipelineSaveDraftRequest, PolicyPipelineSimulateRequest, WsRequest, WsResponse,
 };
 use crate::daemon::websocket::mutations::dispatch_query_result;
 
@@ -133,8 +131,7 @@ pub(super) async fn dispatch_policy_pipeline_go_live_diff(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(body) = parse_params_or_default::<PolicyPipelineGoLiveDiffRequest>(request)
-    else {
+    let Ok(body) = parse_params_or_default::<PolicyPipelineGoLiveDiffRequest>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy pipeline go live diff") {

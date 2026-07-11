@@ -22,8 +22,7 @@ use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_tls::build_remote_tls_server_config;
 
 const PRODUCTION_PROVIDER_CHILD_ENV: &str = "HARNESS_TEST_REMOTE_ACME_PROVIDER_CHILD";
-const PRODUCTION_PROVIDER_TEST: &str =
-    "daemon::remote_acme_issuer::tests::production_acme_issuer_installs_rustls_provider_before_client_creation";
+const PRODUCTION_PROVIDER_TEST: &str = "daemon::remote_acme_issuer::tests::production_acme_issuer_installs_rustls_provider_before_client_creation";
 
 #[test]
 fn production_acme_issuer_installs_rustls_provider_before_client_creation() {

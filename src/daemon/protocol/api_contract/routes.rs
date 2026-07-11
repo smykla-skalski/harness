@@ -1,8 +1,8 @@
 use std::sync::LazyLock;
 
 use super::{
-    HttpApiRouteContract, routes_remote, routes_reviews, routes_sessions_infra,
-    routes_task_board, routes_tasks_agents_voice,
+    HttpApiRouteContract, routes_remote, routes_reviews, routes_sessions_infra, routes_task_board,
+    routes_tasks_agents_voice,
 };
 
 pub static HTTP_API_CONTRACT: LazyLock<Vec<HttpApiRouteContract>> = LazyLock::new(|| {

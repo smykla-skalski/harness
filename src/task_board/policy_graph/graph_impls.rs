@@ -1,6 +1,5 @@
 use crate::task_board::policy::{
-    BuiltInPolicyGate, DEFAULT_AUTO_MERGE_RISK_THRESHOLD, PolicyGate, PolicyInput,
-    POLICY_VERSION,
+    BuiltInPolicyGate, DEFAULT_AUTO_MERGE_RISK_THRESHOLD, POLICY_VERSION, PolicyGate, PolicyInput,
 };
 
 use super::{

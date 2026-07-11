@@ -134,9 +134,11 @@ async fn persisted_tls_reload_failure_logs_early_renewal_fallback() {
 
     assert_eq!(outcome, RemoteAcmeRenewalCheckOutcome::Renewed);
     assert_eq!(issuer.renewal_count(), 1);
-    assert!(output.contents().contains(
-        "persisted remote TLS certificate reload failed; attempting early ACME renewal"
-    ));
+    assert!(
+        output.contents().contains(
+            "persisted remote TLS certificate reload failed; attempting early ACME renewal"
+        )
+    );
 }
 
 struct ConcurrentRenewalIssuer {

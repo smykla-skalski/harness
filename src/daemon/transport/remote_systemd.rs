@@ -12,7 +12,7 @@ use super::control::print_json;
 use super::remote::DaemonRemoteServeArgs;
 use super::remote_systemd_lifecycle::{
     RemoteSystemdInstallReport, install_remote_systemd_with, normalize_unit_name, run_systemctl,
-    unit_service_name, uninstall_remote_systemd_with, validate_unit_name,
+    uninstall_remote_systemd_with, unit_service_name, validate_unit_name,
 };
 
 const DEFAULT_UNIT: &str = "harness-remote-daemon";
