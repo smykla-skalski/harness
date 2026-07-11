@@ -50,6 +50,7 @@ struct DashboardReviewsGitHubMutationRefreshCoordinator {
     expectedRevisionCount: UInt64,
     now: Date = Date()
   ) -> Token? {
+    discardExpiredUnmatched(at: now)
     guard !operations.isEmpty, expectedRevisionCount > 0 else { return nil }
     nextToken &+= 1
     let token = Token(value: nextToken)
@@ -66,7 +67,7 @@ struct DashboardReviewsGitHubMutationRefreshCoordinator {
     for change: GitHubDataChangedPayload,
     now: Date = Date()
   ) -> DashboardReviewsGitHubChangeDecision {
-    discardExpired(at: now)
+    guard !discardExpired(at: now) else { return .refreshAll }
     let candidateTokens = pendingMutations.compactMap { token, mutation in
       mutation.baselineRevision < change.revision
         && mutation.operations.contains(change.operation)
@@ -109,8 +110,13 @@ struct DashboardReviewsGitHubMutationRefreshCoordinator {
   mutating func confirm(
     _ token: Token,
     endingRevision: UInt64,
-    appliedRevisionCount: UInt64
+    appliedRevisionCount: UInt64,
+    now: Date = Date()
   ) -> DashboardReviewsGitHubMutationConfirmation {
+    guard !discardExpired(at: now) else {
+      pendingMutations.removeValue(forKey: token)
+      return .refreshAll
+    }
     guard var mutation = pendingMutations[token] else { return .discarded }
     let expectedRevision = mutation.baselineRevision.addingReportingOverflow(
       mutation.expectedRevisionCount
@@ -134,8 +140,13 @@ struct DashboardReviewsGitHubMutationRefreshCoordinator {
   }
 
   mutating func targetedRefreshSucceeded(
-    for token: Token
+    for token: Token,
+    now: Date = Date()
   ) -> DashboardReviewsGitHubMutationCompletion {
+    guard !discardExpired(at: now) else {
+      pendingMutations.removeValue(forKey: token)
+      return .refreshAll
+    }
     guard var mutation = pendingMutations[token] else { return .none }
     mutation.refreshState = .succeeded
     pendingMutations[token] = mutation
@@ -144,17 +155,26 @@ struct DashboardReviewsGitHubMutationRefreshCoordinator {
   }
 
   mutating func targetedRefreshFailed(
-    for token: Token
+    for token: Token,
+    now: Date = Date()
   ) -> DashboardReviewsGitHubMutationCompletion {
+    guard !discardExpired(at: now) else {
+      pendingMutations.removeValue(forKey: token)
+      return .refreshAll
+    }
     guard let mutation = pendingMutations.removeValue(forKey: token) else { return .none }
     return mutation.matchedRevision == nil ? .none : .refreshAll
   }
 
-  mutating func discardAcknowledgedChanges(upTo revision: UInt64) {
+  mutating func discardAcknowledgedChanges(
+    upTo revision: UInt64,
+    now: Date = Date()
+  ) {
     pendingMutations = pendingMutations.filter { _, mutation in
       guard let matchedRevision = mutation.matchedRevision else { return true }
       return matchedRevision > revision
     }
+    discardExpiredUnmatched(at: now)
   }
 
   private mutating func resolveSucceededMutations(
@@ -178,9 +198,19 @@ struct DashboardReviewsGitHubMutationRefreshCoordinator {
     return .acknowledge(revision: revision)
   }
 
-  private mutating func discardExpired(at now: Date) {
+  private mutating func discardExpired(at now: Date) -> Bool {
+    let discardedMatchedMutation = pendingMutations.values.contains { mutation in
+      mutation.expiresAt <= now && mutation.matchedRevision != nil
+    }
     pendingMutations = pendingMutations.filter { _, mutation in
       mutation.expiresAt > now
+    }
+    return discardedMatchedMutation
+  }
+
+  private mutating func discardExpiredUnmatched(at now: Date) {
+    pendingMutations = pendingMutations.filter { _, mutation in
+      mutation.expiresAt > now || mutation.matchedRevision != nil
     }
   }
 }
