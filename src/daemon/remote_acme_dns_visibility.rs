@@ -18,7 +18,7 @@ use crate::daemon::remote_redaction::redact_secret_detail;
 const TIMEOUT_ENV: &str = "HARNESS_REMOTE_ACME_DNS_VISIBILITY_TIMEOUT_SECONDS";
 const POLL_INTERVAL_ENV: &str = "HARNESS_REMOTE_ACME_DNS_VISIBILITY_POLL_SECONDS";
 const STABLE_POLLS_ENV: &str = "HARNESS_REMOTE_ACME_DNS_VISIBILITY_STABLE_POLLS";
-const DEFAULT_TIMEOUT: Duration = Duration::from_mins(5);
+const DEFAULT_TIMEOUT: Duration = Duration::from_mins(15);
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(5);
 const DEFAULT_STABLE_POLLS: usize = 3;
 

@@ -21,6 +21,8 @@ mod config;
 mod dns;
 #[path = "remote_daemon_public_acme/process.rs"]
 mod process;
+#[path = "remote_daemon_public_acme/staging_roots.rs"]
+mod staging_roots;
 #[path = "remote_daemon_public_acme/visibility.rs"]
 mod visibility;
 #[path = "remote_daemon_public_acme/visibility_system.rs"]
@@ -30,12 +32,13 @@ use std::process::id as process_id;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use aftermarket::LiveAftermarketPublicDnsApi;
-use certificate::validate_issued_certificate;
+use certificate::validate_verified_leaf_metadata;
 use client::{RemoteCredentials, RemoteDaemonClient};
 use config::{PublicAcmeChallenge, PublicAcmeConfig};
-use dns::with_temporary_a_record;
+use dns::with_temporary_a_records;
 use process::{PublicAcmeEnvironment, PublicAcmeProcess};
 use serde_json::Value;
+use staging_roots::LETS_ENCRYPT_STAGING_ROOTS_PEM;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "requires Linux, sudo setcap, live Aftermarket credentials, public DNS, and Let's Encrypt staging"]
@@ -45,24 +48,32 @@ async fn remote_daemon_public_acme_staging_proves_all_challenges() {
         LiveAftermarketPublicDnsApi::new_live(&config).expect("public ACME Aftermarket DNS client");
     let environment = PublicAcmeEnvironment::new().expect("public ACME process environment");
     let nonce = proof_nonce().expect("public ACME proof nonce");
+    let cases = PublicAcmeChallenge::ALL
+        .map(|challenge| (challenge, config.case_domain(challenge, &nonce)));
+    let records = cases
+        .iter()
+        .map(|(_, domain)| (domain.clone(), config.ipv4))
+        .collect::<Vec<_>>();
 
-    for challenge in PublicAcmeChallenge::ALL {
-        let domain = config.case_domain(challenge, &nonce);
-        with_temporary_a_record(&dns, &domain, config.ipv4, || {
-            run_public_acme_case(&environment, &config, &domain, challenge)
-        })
-        .await
-        .unwrap_or_else(|error| {
-            panic!(
-                "{} public ACME staging proof failed for {domain}: {error}",
+    with_temporary_a_records(&dns, &records, || async {
+        for (challenge, domain) in &cases {
+            run_public_acme_case(&environment, &config, domain, *challenge)
+                .await
+                .map_err(|error| {
+                    format!(
+                        "{} public ACME staging proof failed for {domain}: {error}",
+                        challenge.cli_name()
+                    )
+                })?;
+            println!(
+                "{} public ACME staging proof passed for {domain}",
                 challenge.cli_name()
-            )
-        });
-        println!(
-            "{} public ACME staging proof passed for {domain}",
-            challenge.cli_name()
-        );
-    }
+            );
+        }
+        Ok(())
+    })
+    .await
+    .unwrap_or_else(|error| panic!("public ACME staging proof failed: {error}"));
 }
 
 async fn run_public_acme_case(
@@ -72,7 +83,7 @@ async fn run_public_acme_case(
     challenge: PublicAcmeChallenge,
 ) -> Result<(), String> {
     let mut daemon = environment.spawn(config, domain, challenge)?;
-    let client = RemoteDaemonClient::new_untrusted_staging(domain, 443)?;
+    let client = RemoteDaemonClient::new(domain, 443, LETS_ENCRYPT_STAGING_ROOTS_PEM)?;
     wait_for_public_listener(&client, &mut daemon).await?;
     daemon.ensure_running()?;
     verify_public_transport(&daemon, &client, domain, challenge).await?;
@@ -86,8 +97,8 @@ async fn verify_public_transport(
     domain: &str,
     challenge: PublicAcmeChallenge,
 ) -> Result<(), String> {
-    let leaf = client.leaf_certificate_der().await?;
-    validate_issued_certificate(domain, &leaf)?;
+    let leaf = client.verified_leaf_certificate_der().await?;
+    validate_verified_leaf_metadata(domain, &leaf)?;
     let operator_id = format!("public-{}-operator", challenge.cli_name());
     let operator = pair_client(daemon, client, "operator", &operator_id).await?;
     client.expect_health(&operator, 200).await?;

@@ -5,12 +5,9 @@ use std::time::{Duration, Instant};
 use futures_util::{SinkExt as _, StreamExt as _};
 use http::header::{AUTHORIZATION, HeaderValue};
 use reqwest::StatusCode;
-use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::pki_types::pem::PemObject as _;
 use rustls::pki_types::{CertificateDer, ServerName};
-use rustls::{
-    ClientConfig, DigitallySignedStruct, Error as TlsError, RootCertStore, SignatureScheme,
-};
+use rustls::{ClientConfig, RootCertStore};
 use serde_json::{Value, json};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
@@ -31,58 +28,31 @@ pub struct RemoteDaemonClient {
     domain: String,
     port: u16,
     origin: String,
-    trust: RemoteDaemonClientTrust,
+    ca_pem: String,
     http: reqwest::Client,
-}
-
-enum RemoteDaemonClientTrust {
-    Pem(String),
-    #[allow(
-        dead_code,
-        reason = "used by the public ACME sibling integration target"
-    )]
-    UntrustedStaging,
 }
 
 impl RemoteDaemonClient {
     pub fn new(domain: &str, port: u16, ca_pem: &str) -> Result<Self, String> {
         ensure_rustls_provider();
-        let certificate = reqwest::Certificate::from_pem(ca_pem.as_bytes())
-            .map_err(|error| format!("parse fake ACME CA: {error}"))?;
+        let certificates = parse_root_certificates(ca_pem)?;
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
-        let http = reqwest::Client::builder()
-            .add_root_certificate(certificate)
+        let mut http = reqwest::Client::builder();
+        for certificate in certificates {
+            let certificate = reqwest::Certificate::from_der(certificate.as_ref())
+                .map_err(|error| format!("parse remote ACME CA: {error}"))?;
+            http = http.add_root_certificate(certificate);
+        }
+        let http = http
             .resolve(domain, address)
-            .timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(10))
             .build()
             .map_err(|error| format!("build remote HTTPS client: {error}"))?;
         Ok(Self {
             domain: domain.to_string(),
             port,
             origin: format!("https://{domain}:{port}"),
-            trust: RemoteDaemonClientTrust::Pem(ca_pem.to_string()),
-            http,
-        })
-    }
-
-    #[allow(
-        dead_code,
-        reason = "used by the public ACME sibling integration target"
-    )]
-    pub fn new_untrusted_staging(domain: &str, port: u16) -> Result<Self, String> {
-        ensure_rustls_provider();
-        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
-        let http = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .resolve(domain, address)
-            .timeout(Duration::from_secs(10))
-            .build()
-            .map_err(|error| format!("build staging HTTPS client: {error}"))?;
-        Ok(Self {
-            domain: domain.to_string(),
-            port,
-            origin: format!("https://{domain}:{port}"),
-            trust: RemoteDaemonClientTrust::UntrustedStaging,
+            ca_pem: ca_pem.to_string(),
             http,
         })
     }
@@ -229,7 +199,7 @@ impl RemoteDaemonClient {
         dead_code,
         reason = "used by the public ACME sibling integration target"
     )]
-    pub async fn leaf_certificate_der(&self) -> Result<Vec<u8>, String> {
+    pub async fn verified_leaf_certificate_der(&self) -> Result<Vec<u8>, String> {
         let tls = self.connect_tls().await?;
         tls.get_ref()
             .1
@@ -263,23 +233,15 @@ impl RemoteDaemonClient {
 
     async fn connect_tls(&self) -> Result<tokio_rustls::client::TlsStream<TcpStream>, String> {
         ensure_rustls_provider();
-        let mut tls_config = match &self.trust {
-            RemoteDaemonClientTrust::Pem(ca_pem) => {
-                let mut roots = RootCertStore::empty();
-                for certificate in CertificateDer::pem_slice_iter(ca_pem.as_bytes()) {
-                    roots
-                        .add(certificate.map_err(|error| format!("parse WSS root CA: {error}"))?)
-                        .map_err(|error| format!("add WSS root CA: {error}"))?;
-                }
-                ClientConfig::builder()
-                    .with_root_certificates(roots)
-                    .with_no_client_auth()
-            }
-            RemoteDaemonClientTrust::UntrustedStaging => ClientConfig::builder()
-                .dangerous()
-                .with_custom_certificate_verifier(Arc::new(UntrustedStagingVerifier))
-                .with_no_client_auth(),
-        };
+        let mut roots = RootCertStore::empty();
+        for certificate in parse_root_certificates(&self.ca_pem)? {
+            roots
+                .add(certificate)
+                .map_err(|error| format!("add WSS root CA: {error}"))?;
+        }
+        let mut tls_config = ClientConfig::builder()
+            .with_root_certificates(roots)
+            .with_no_client_auth();
         tls_config.alpn_protocols = vec![b"http/1.1".to_vec()];
         let stream = TcpStream::connect(("127.0.0.1", self.port))
             .await
@@ -297,52 +259,18 @@ fn ensure_rustls_provider() {
     let _ = rustls::crypto::ring::default_provider().install_default();
 }
 
-#[derive(Debug)]
-struct UntrustedStagingVerifier;
-
-impl ServerCertVerifier for UntrustedStagingVerifier {
-    fn verify_server_cert(
-        &self,
-        _end_entity: &CertificateDer<'_>,
-        _intermediates: &[CertificateDer<'_>],
-        _server_name: &ServerName<'_>,
-        _ocsp_response: &[u8],
-        _now: rustls::pki_types::UnixTime,
-    ) -> Result<ServerCertVerified, TlsError> {
-        Ok(ServerCertVerified::assertion())
+fn parse_root_certificates(ca_pem: &str) -> Result<Vec<CertificateDer<'static>>, String> {
+    let certificates = CertificateDer::pem_slice_iter(ca_pem.as_bytes())
+        .map(|certificate| {
+            certificate
+                .map(CertificateDer::into_owned)
+                .map_err(|error| format!("parse remote ACME CA: {error}"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if certificates.is_empty() {
+        return Err("remote ACME CA bundle contained no certificates".to_string());
     }
-
-    fn verify_tls12_signature(
-        &self,
-        _message: &[u8],
-        _certificate: &CertificateDer<'_>,
-        _signature: &DigitallySignedStruct,
-    ) -> Result<HandshakeSignatureValid, TlsError> {
-        Ok(HandshakeSignatureValid::assertion())
-    }
-
-    fn verify_tls13_signature(
-        &self,
-        _message: &[u8],
-        _certificate: &CertificateDer<'_>,
-        _signature: &DigitallySignedStruct,
-    ) -> Result<HandshakeSignatureValid, TlsError> {
-        Ok(HandshakeSignatureValid::assertion())
-    }
-
-    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-        vec![
-            SignatureScheme::ECDSA_NISTP256_SHA256,
-            SignatureScheme::ECDSA_NISTP384_SHA384,
-            SignatureScheme::ED25519,
-            SignatureScheme::RSA_PSS_SHA256,
-            SignatureScheme::RSA_PSS_SHA384,
-            SignatureScheme::RSA_PSS_SHA512,
-            SignatureScheme::RSA_PKCS1_SHA256,
-            SignatureScheme::RSA_PKCS1_SHA384,
-            SignatureScheme::RSA_PKCS1_SHA512,
-        ]
-    }
+    Ok(certificates)
 }
 
 async fn websocket_rpc<S>(socket: &mut S, id: &str, method: &str) -> Result<Value, String>
@@ -397,4 +325,18 @@ fn required_string<'a>(value: &'a Value, field: &str) -> Result<&'a str, String>
         .as_str()
         .filter(|value| !value.is_empty())
         .ok_or_else(|| format!("response omitted {field}: {value}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn remote_client_rejects_empty_root_bundle() {
+        let Err(error) = RemoteDaemonClient::new("daemon.example.com", 443, "") else {
+            panic!("empty root bundle must be rejected");
+        };
+
+        assert!(error.contains("no certificates"));
+    }
 }

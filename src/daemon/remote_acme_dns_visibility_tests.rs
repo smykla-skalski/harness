@@ -13,6 +13,22 @@ use hickory_resolver::proto::rr::{Name, RData, RecordType};
 use super::*;
 
 #[test]
+fn visibility_config_defaults_to_fifteen_minute_propagation_window() {
+    temp_env::with_vars(
+        [
+            (TIMEOUT_ENV, None::<&str>),
+            (POLL_INTERVAL_ENV, None::<&str>),
+            (STABLE_POLLS_ENV, None::<&str>),
+        ],
+        || {
+            let waiter = AuthoritativeDnsTxtVisibilityWaiter::from_environment("example.com")
+                .expect("default visibility config");
+            assert_eq!(waiter.timeout, Duration::from_mins(15));
+        },
+    );
+}
+
+#[test]
 fn visibility_config_uses_provider_neutral_environment() {
     temp_env::with_vars(
         [

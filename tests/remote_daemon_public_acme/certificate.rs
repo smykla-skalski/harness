@@ -1,7 +1,7 @@
 use x509_parser::extensions::GeneralName;
 use x509_parser::parse_x509_certificate;
 
-pub fn validate_issued_certificate(domain: &str, der: &[u8]) -> Result<(), String> {
+pub fn validate_verified_leaf_metadata(domain: &str, der: &[u8]) -> Result<(), String> {
     let (_, certificate) = parse_x509_certificate(der)
         .map_err(|error| format!("parse public ACME leaf certificate: {error}"))?;
     if certificate.subject() == certificate.issuer() {
@@ -42,7 +42,7 @@ mod tests {
     fn issued_certificate_accepts_exact_ca_signed_hostname() {
         let certificate = signed_certificate("tls.remote.example.com");
 
-        validate_issued_certificate("tls.remote.example.com", &certificate)
+        validate_verified_leaf_metadata("tls.remote.example.com", &certificate)
             .expect("valid issued certificate");
     }
 
@@ -50,7 +50,7 @@ mod tests {
     fn issued_certificate_rejects_wrong_hostname() {
         let certificate = signed_certificate("other.remote.example.com");
 
-        let error = validate_issued_certificate("tls.remote.example.com", &certificate)
+        let error = validate_verified_leaf_metadata("tls.remote.example.com", &certificate)
             .expect_err("wrong hostname must be rejected");
 
         assert!(error.contains("subject alternative name"));
@@ -65,7 +65,7 @@ mod tests {
             .expect("self-sign certificate");
 
         let error =
-            validate_issued_certificate("tls.remote.example.com", certificate.der().as_ref())
+            validate_verified_leaf_metadata("tls.remote.example.com", certificate.der().as_ref())
                 .expect_err("self-signed certificate must be rejected");
 
         assert!(error.contains("self-signed"));

@@ -13,7 +13,7 @@ use super::visibility_system::SystemAuthoritativeARecordObserver;
 const TIMEOUT_ENV: &str = "HARNESS_REMOTE_ACME_DNS_VISIBILITY_TIMEOUT_SECONDS";
 const POLL_INTERVAL_ENV: &str = "HARNESS_REMOTE_ACME_DNS_VISIBILITY_POLL_SECONDS";
 const STABLE_POLLS_ENV: &str = "HARNESS_REMOTE_ACME_DNS_VISIBILITY_STABLE_POLLS";
-const DEFAULT_TIMEOUT: Duration = Duration::from_mins(5);
+const DEFAULT_TIMEOUT: Duration = Duration::from_mins(15);
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(5);
 const DEFAULT_STABLE_POLLS: usize = 3;
 
@@ -269,6 +269,22 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
+
+    #[test]
+    fn authoritative_visibility_defaults_to_runtime_propagation_window() {
+        temp_env::with_vars(
+            [
+                (TIMEOUT_ENV, None::<&str>),
+                (POLL_INTERVAL_ENV, None::<&str>),
+                (STABLE_POLLS_ENV, None::<&str>),
+            ],
+            || {
+                let visibility = AuthoritativeARecordVisibility::from_environment("example.com")
+                    .expect("default authoritative visibility");
+                assert_eq!(visibility.timeout, Duration::from_mins(15));
+            },
+        );
+    }
 
     #[tokio::test(start_paused = true)]
     async fn authoritative_visibility_requires_stable_presence() {
