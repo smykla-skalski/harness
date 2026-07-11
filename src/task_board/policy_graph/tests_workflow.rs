@@ -18,6 +18,37 @@ fn workflow_entry_matches_reviews_auto_only() {
 }
 
 #[test]
+fn direct_input_does_not_fallback_to_workflow_internal_action_gate() {
+    let graph = workflow_only_action_gate_graph();
+
+    let direct = graph.simulate(&PolicyInput {
+        workflow: None,
+        action: PolicyAction::SubmitReview,
+        subject: PolicySubject::default(),
+        evidence: PolicyEvidence::default(),
+    });
+    assert!(
+        direct.visited_node_ids.is_empty(),
+        "direct review approval unexpectedly entered workflow nodes: {:?}",
+        direct.visited_node_ids
+    );
+
+    let workflow = graph.simulate(&PolicyInput {
+        workflow: Some("reviews_auto".to_owned()),
+        action: PolicyAction::SubmitReview,
+        subject: PolicySubject::default(),
+        evidence: PolicyEvidence::default(),
+    });
+    assert_eq!(
+        workflow.visited_node_ids,
+        vec![
+            "reviews-auto-entry".to_owned(),
+            "reviews-auto-action-router".to_owned(),
+        ],
+    );
+}
+
+#[test]
 fn compile_workflow_requires_a_matching_entry() {
     let graph = reviews_auto_test_graph();
     let input = PolicyInput {
@@ -108,6 +139,46 @@ fn handoff_graph() -> PolicyGraph {
     graph
 }
 
+fn workflow_only_action_gate_graph() -> PolicyGraph {
+    let mut graph = PolicyGraph::seeded_v2();
+    graph.nodes.clear();
+    graph.edges.clear();
+    graph.groups.clear();
+    graph.layout.nodes.clear();
+    graph.nodes.push(PolicyGraphNode {
+        id: "reviews-auto-entry".into(),
+        label: "Reviews Auto".to_owned(),
+        kind: PolicyGraphNodeKind::WorkflowEntry(PolicyWorkflowEntry {
+            workflow_id: "reviews_auto".to_owned(),
+        }),
+        automation: None,
+        input_ports: Vec::new(),
+        output_ports: vec!["out".into()],
+        group_id: None,
+    });
+    graph.nodes.push(PolicyGraphNode {
+        id: "reviews-auto-action-router".into(),
+        label: "Action gate".to_owned(),
+        kind: PolicyGraphNodeKind::ActionGate {
+            actions: vec![PolicyAction::SubmitReview],
+        },
+        automation: None,
+        input_ports: vec![PORT_IN.into()],
+        output_ports: Vec::new(),
+        group_id: None,
+    });
+    graph.edges.push(PolicyGraphEdge {
+        id: "edge:reviews-auto-entry-action-router".into(),
+        from_node: "reviews-auto-entry".into(),
+        from_port: "out".into(),
+        to_node: "reviews-auto-action-router".into(),
+        to_port: PORT_IN.into(),
+        label: None,
+        condition: PolicyGraphEdgeCondition::Always,
+    });
+    graph
+}
+
 #[test]
 fn workflow_entry_matches_case_insensitively() {
     let graph = reviews_auto_test_graph();
@@ -168,6 +239,19 @@ fn promote_rejects_revision_without_matching_boundary_aware_simulation() {
     let save_response = apply_save_draft(&mut ws, wait_for_checks_graph(), 0, None)
         .expect("save draft should succeed");
     assert!(save_response.persisted, "wait graph should persist");
+    ws.scenarios.clear();
+    ws.scenarios
+        .push(crate::task_board::policy_graph::PolicyScenario {
+            id: "scenario-reviews-auto".to_owned(),
+            name: "reviews auto".to_owned(),
+            input: PolicyInput {
+                workflow: Some("reviews_auto".to_owned()),
+                action: PolicyAction::MergePr,
+                subject: PolicySubject::default(),
+                evidence: PolicyEvidence::default(),
+            },
+            seeded: false,
+        });
 
     let simulation = apply_simulate(&mut ws, Some(save_response.document.clone()), None)
         .expect("simulate wait graph");

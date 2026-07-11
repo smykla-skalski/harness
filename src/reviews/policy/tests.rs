@@ -25,6 +25,7 @@ use crate::task_board::policy_runtime::models::{
 };
 use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
+use crate::task_board::{PolicyAction, PolicyEvidence, PolicyInput, PolicySubject};
 
 #[test]
 fn review_target_maps_into_policy_evidence() {
@@ -185,6 +186,33 @@ fn authored_plan_does_not_synthesize_missing_reviews_auto_workflow() {
     assert!(
         plan.steps.is_empty(),
         "missing workflow must not produce actions"
+    );
+}
+
+#[test]
+fn reviews_auto_workflow_does_not_handle_plain_review_approval() {
+    let mut graph = PolicyGraph::seeded_v2().with_mode(PolicyGraphMode::Enforced);
+    ensure_reviews_auto_workflow(&mut graph);
+
+    let simulation = graph.simulate(&PolicyInput {
+        workflow: None,
+        action: PolicyAction::SubmitReview,
+        subject: PolicySubject::default(),
+        evidence: PolicyEvidence::default(),
+    });
+
+    assert_eq!(
+        simulation.trace.entry_node_id.as_deref(),
+        Some("action:router"),
+        "direct review approvals must use the generic gate, not the reviews_auto workflow entry",
+    );
+    assert!(
+        simulation
+            .visited_node_ids
+            .iter()
+            .all(|node_id| !node_id.starts_with("reviews-auto-")),
+        "plain review approval unexpectedly visited Reviews Auto nodes: {:?}",
+        simulation.visited_node_ids
     );
 }
 

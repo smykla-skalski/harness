@@ -183,8 +183,10 @@ impl PolicyGraph {
     }
 
     fn entry_node(&self, input: &PolicyInput) -> Option<&PolicyGraphNode> {
-        Self::matching_entry_node(&self.nodes, input)
-            .or_else(|| Self::fallback_entry_node(&self.nodes))
+        if input.workflow.is_some() {
+            return Self::matching_entry_node(&self.nodes, input);
+        }
+        self.fallback_entry_node()
     }
 
     fn next_node_for_action(&self, node_id: &str, action: PolicyAction) -> Option<String> {
@@ -246,21 +248,41 @@ impl PolicyGraph {
         })
     }
 
-    fn fallback_entry_node(nodes: &[PolicyGraphNode]) -> Option<&PolicyGraphNode> {
-        nodes
+    fn fallback_entry_node(&self) -> Option<&PolicyGraphNode> {
+        let workflow_node_ids = self.workflow_node_ids();
+        self.nodes
             .iter()
             .find(|node| {
-                matches!(
-                    node.kind,
-                    PolicyGraphNodeKind::Trigger { .. } | PolicyGraphNodeKind::WorkflowEntry(_)
-                )
+                node.input_ports.is_empty() && !workflow_node_ids.contains(node.id.as_str())
             })
-            .or_else(|| nodes.iter().find(|node| node.input_ports.is_empty()))
             .or_else(|| {
-                nodes
-                    .iter()
-                    .find(|node| matches!(node.kind, PolicyGraphNodeKind::ActionGate { .. }))
+                self.nodes.iter().find(|node| {
+                    matches!(node.kind, PolicyGraphNodeKind::ActionGate { .. })
+                        && !workflow_node_ids.contains(node.id.as_str())
+                })
             })
+    }
+
+    fn workflow_node_ids(&self) -> HashSet<String> {
+        let mut workflow_node_ids = HashSet::new();
+        let mut pending: VecDeque<&str> = self
+            .nodes
+            .iter()
+            .filter(|node| is_workflow_entry_node(node))
+            .map(|node| node.id.as_str())
+            .collect();
+        while let Some(node_id) = pending.pop_front() {
+            if !workflow_node_ids.insert(node_id.to_owned()) {
+                continue;
+            }
+            pending.extend(
+                self.edges
+                    .iter()
+                    .filter(|edge| edge.from_node == node_id)
+                    .map(|edge| edge.to_node.as_str()),
+            );
+        }
+        workflow_node_ids
     }
 
     fn next_node(&self, node_id: &str, condition: &PolicyGraphEdgeCondition) -> Option<String> {
@@ -277,6 +299,13 @@ impl PolicyGraph {
             })
             .map(|edge| edge.to_node.as_str().to_owned())
     }
+}
+
+fn is_workflow_entry_node(node: &PolicyGraphNode) -> bool {
+    matches!(
+        node.kind,
+        PolicyGraphNodeKind::Trigger { .. } | PolicyGraphNodeKind::WorkflowEntry(_)
+    )
 }
 
 fn evidence_condition(
