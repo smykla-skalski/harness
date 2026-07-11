@@ -331,6 +331,8 @@ impl From<DaemonRemoteAcmeChallenge> for RemoteAcmeChallenge {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum DaemonRemoteDnsProvider {
+    #[value(name = "aftermarket")]
+    Aftermarket,
     #[value(name = "cloudflare")]
     Cloudflare,
     #[value(name = "route53")]
@@ -343,6 +345,7 @@ impl DaemonRemoteDnsProvider {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::Aftermarket => "aftermarket",
             Self::Cloudflare => "cloudflare",
             Self::Route53 => "route53",
             Self::Exec => "exec",
@@ -353,6 +356,7 @@ impl DaemonRemoteDnsProvider {
 impl From<DaemonRemoteDnsProvider> for RemoteDnsProvider {
     fn from(value: DaemonRemoteDnsProvider) -> Self {
         match value {
+            DaemonRemoteDnsProvider::Aftermarket => Self::Aftermarket,
             DaemonRemoteDnsProvider::Cloudflare => Self::Cloudflare,
             DaemonRemoteDnsProvider::Route53 => Self::Route53,
             DaemonRemoteDnsProvider::Exec => Self::Exec,

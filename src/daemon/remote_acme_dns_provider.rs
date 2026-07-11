@@ -4,13 +4,18 @@ use std::fmt;
 use async_trait::async_trait;
 use http::Method;
 
+#[path = "remote_acme_dns_aftermarket.rs"]
+mod aftermarket;
 #[path = "remote_acme_dns_cloudflare.rs"]
 mod cloudflare;
 #[path = "remote_acme_dns_exec.rs"]
 mod exec;
 #[path = "remote_acme_dns_route53.rs"]
 mod route53;
+#[path = "remote_acme_dns_visibility.rs"]
+mod visibility;
 
+pub(crate) use aftermarket::{AftermarketDns01Lease, AftermarketDns01Provider};
 pub(crate) use cloudflare::CloudflareDns01Lease;
 pub(crate) use cloudflare::CloudflareDns01Provider;
 #[cfg(test)]
@@ -18,6 +23,8 @@ pub(crate) use exec::RemoteDnsCommandRunner;
 pub(crate) use exec::{ExecDns01Lease, ExecDns01Provider, TokioRemoteDnsCommandRunner};
 pub(crate) use route53::Route53Dns01Lease;
 pub(crate) use route53::{AwsRoute53Credentials, Route53Dns01Provider};
+#[cfg(test)]
+pub(crate) use visibility::{DnsTxtRecordState, DnsTxtVisibilityWaiter};
 
 use super::remote::RemoteDnsProvider;
 
@@ -158,12 +165,14 @@ impl RemoteDnsHttpClient for ReqwestRemoteDnsHttpClient {
 
 #[derive(Debug)]
 pub(crate) enum SystemDns01Provider {
+    Aftermarket(AftermarketDns01Provider<ReqwestRemoteDnsHttpClient>),
     Cloudflare(CloudflareDns01Provider<ReqwestRemoteDnsHttpClient>),
     Route53(Route53Dns01Provider<ReqwestRemoteDnsHttpClient>),
     Exec(ExecDns01Provider<TokioRemoteDnsCommandRunner>),
 }
 
 pub(crate) enum SystemDns01Lease {
+    Aftermarket(AftermarketDns01Lease),
     Cloudflare(CloudflareDns01Lease),
     Route53(Route53Dns01Lease),
     Exec(ExecDns01Lease),
@@ -172,6 +181,16 @@ pub(crate) enum SystemDns01Lease {
 impl SystemDns01Provider {
     pub(crate) fn from_environment(provider: RemoteDnsProvider) -> Result<Self, String> {
         match provider {
+            RemoteDnsProvider::Aftermarket => Ok(Self::Aftermarket(AftermarketDns01Provider::new(
+                ReqwestRemoteDnsHttpClient::default(),
+                &optional_env(
+                    "HARNESS_REMOTE_ACME_AFTERMARKET_API_BASE",
+                    "https://json.aftermarket.pl",
+                ),
+                &required_env("AFTERMARKET_ZONE_NAME")?,
+                &required_env("AFTERMARKET_API_KEY")?,
+                &required_env("AFTERMARKET_API_SECRET")?,
+            )?)),
             RemoteDnsProvider::Cloudflare => Ok(Self::Cloudflare(CloudflareDns01Provider::new(
                 ReqwestRemoteDnsHttpClient::default(),
                 &optional_env(
@@ -211,6 +230,10 @@ impl SystemDns01Provider {
         record_value: &str,
     ) -> Result<SystemDns01Lease, String> {
         match (self, provider) {
+            (Self::Aftermarket(client), RemoteDnsProvider::Aftermarket) => client
+                .present(record_name, record_value)
+                .await
+                .map(SystemDns01Lease::Aftermarket),
             (Self::Cloudflare(client), RemoteDnsProvider::Cloudflare) => client
                 .present(record_name, record_value)
                 .await
@@ -227,8 +250,24 @@ impl SystemDns01Provider {
         }
     }
 
+    pub(crate) async fn wait_ready(&self, lease: &SystemDns01Lease) -> Result<bool, String> {
+        match (self, lease) {
+            (Self::Aftermarket(client), SystemDns01Lease::Aftermarket(lease)) => {
+                client.wait_ready(lease).await?;
+                Ok(true)
+            }
+            (Self::Cloudflare(_), SystemDns01Lease::Cloudflare(_))
+            | (Self::Route53(_), SystemDns01Lease::Route53(_))
+            | (Self::Exec(_), SystemDns01Lease::Exec(_)) => Ok(false),
+            _ => Err("remote DNS provider lease does not match configured provider".to_string()),
+        }
+    }
+
     pub(crate) async fn cleanup(&self, lease: SystemDns01Lease) -> Result<(), String> {
         match (self, lease) {
+            (Self::Aftermarket(client), SystemDns01Lease::Aftermarket(lease)) => {
+                client.cleanup(lease).await
+            }
             (Self::Cloudflare(client), SystemDns01Lease::Cloudflare(lease)) => {
                 client.cleanup(lease).await
             }

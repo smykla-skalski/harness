@@ -146,6 +146,28 @@ fn daemon_remote_serve_args_support_dns01_providers() {
 }
 
 #[test]
+fn daemon_remote_serve_args_support_aftermarket_dns01() {
+    let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+        "--acme-challenge",
+        "dns",
+        "--acme-dns-provider",
+        "aftermarket",
+    ])
+    .unwrap();
+
+    let config = parsed.args.contract_config().expect("Aftermarket DNS-01");
+    assert_eq!(
+        config.acme_dns_provider.expect("dns provider").as_str(),
+        "aftermarket"
+    );
+}
+
+#[test]
 fn daemon_remote_serve_args_reject_dns01_without_provider() {
     let parsed = DaemonRemoteServeArgsTestHarness::try_parse_from([
         "test",

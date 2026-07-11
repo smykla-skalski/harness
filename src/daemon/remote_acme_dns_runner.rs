@@ -11,12 +11,20 @@ use super::remote_redaction::redact_secret_detail;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Dns01ProviderExecutionConfig {
+    Aftermarket { zone_name: String },
     Cloudflare { zone_id: String },
     Route53 { hosted_zone_id: String },
     Exec { hook_program: String },
 }
 
 impl Dns01ProviderExecutionConfig {
+    #[must_use]
+    pub fn aftermarket(zone_name: impl Into<String>) -> Self {
+        Self::Aftermarket {
+            zone_name: zone_name.into(),
+        }
+    }
+
     #[must_use]
     pub fn cloudflare(zone_id: impl Into<String>) -> Self {
         Self::Cloudflare {
@@ -40,6 +48,18 @@ impl Dns01ProviderExecutionConfig {
 }
 
 pub trait Dns01ProviderChangeRunner {
+    /// Apply an Aftermarket DNS-01 TXT record change.
+    ///
+    /// # Errors
+    /// Returns a redaction-ready provider detail when the change fails.
+    fn apply_aftermarket_change(
+        &mut self,
+        zone_name: &str,
+        fqdn: &str,
+        digest: &str,
+        operation: Dns01ChangeOperation,
+    ) -> Result<(), String>;
+
     /// Apply a Cloudflare DNS-01 TXT record change.
     ///
     /// # Errors
@@ -172,6 +192,7 @@ impl Dns01ProviderAction {
     #[must_use]
     pub const fn required_secret_names(&self) -> &'static [&'static str] {
         match self.provider {
+            RemoteDnsProvider::Aftermarket => &["AFTERMARKET_API_KEY", "AFTERMARKET_API_SECRET"],
             RemoteDnsProvider::Cloudflare => &["CLOUDFLARE_API_TOKEN"],
             RemoteDnsProvider::Route53 => &["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
             RemoteDnsProvider::Exec => &["HARNESS_REMOTE_ACME_DNS_EXEC"],
@@ -181,6 +202,9 @@ impl Dns01ProviderAction {
     #[must_use]
     pub fn command_preview(&self) -> String {
         match self.provider {
+            RemoteDnsProvider::Aftermarket => {
+                format!("aftermarket TXT {} {}", self.fqdn, self.digest)
+            }
             RemoteDnsProvider::Cloudflare => {
                 format!("cloudflare TXT {} {}", self.fqdn, self.digest)
             }
@@ -252,6 +276,16 @@ impl Dns01ProviderAction {
         Runner: Dns01ProviderChangeRunner,
     {
         match self.provider {
+            RemoteDnsProvider::Aftermarket => {
+                let Dns01ProviderExecutionConfig::Aftermarket { zone_name } = config else {
+                    return Err(Dns01ProviderExecutionError::WrongProviderConfig(
+                        "aftermarket",
+                    ));
+                };
+                runner
+                    .apply_aftermarket_change(zone_name, &self.fqdn, &self.digest, operation)
+                    .map_err(|detail| Dns01ProviderExecutionError::runner_failed(&detail))
+            }
             RemoteDnsProvider::Cloudflare => {
                 let Dns01ProviderExecutionConfig::Cloudflare { zone_id } = config else {
                     return Err(Dns01ProviderExecutionError::WrongProviderConfig(

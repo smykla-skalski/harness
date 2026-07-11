@@ -59,6 +59,34 @@ fn remote_systemd_install_enables_and_starts_remote_serve() {
 }
 
 #[test]
+fn remote_systemd_plan_runs_aftermarket_dns01() {
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+        "--acme-challenge",
+        "dns",
+        "--acme-dns-provider",
+        "aftermarket",
+    ]);
+    let plan = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+    )
+    .expect("systemd install plan");
+
+    assert!(plan.unit_contents.contains("--acme-challenge dns"));
+    assert!(
+        plan.unit_contents
+            .contains("--acme-dns-provider aftermarket")
+    );
+}
+
+#[test]
 fn remote_systemd_plan_rejects_relative_binary_path() {
     let args = install_args([
         "test",

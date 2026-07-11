@@ -128,6 +128,11 @@ fn remote_http01_challenge_routes_only_well_known_tokens() {
 
 #[test]
 fn remote_dns01_providers_report_required_operations() {
+    let aftermarket = Dns01ProviderAction::for_provider(
+        RemoteDnsProvider::Aftermarket,
+        "_acme-challenge.daemon.example.com",
+        "digest",
+    );
     let cloudflare = Dns01ProviderAction::for_provider(
         RemoteDnsProvider::Cloudflare,
         "_acme-challenge.daemon.example.com",
@@ -144,6 +149,10 @@ fn remote_dns01_providers_report_required_operations() {
         "digest",
     );
 
+    assert_eq!(
+        aftermarket.required_secret_names(),
+        &["AFTERMARKET_API_KEY", "AFTERMARKET_API_SECRET"]
+    );
     assert_eq!(
         cloudflare.required_secret_names(),
         &["CLOUDFLARE_API_TOKEN"]
