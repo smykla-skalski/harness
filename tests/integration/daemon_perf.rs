@@ -9,9 +9,8 @@ use tokio::sync::{broadcast, watch};
 use harness::daemon::agent_acp::AcpAgentManagerHandle;
 use harness::daemon::codex_controller::CodexControllerHandle;
 use harness::daemon::db::DaemonDb;
-use harness::daemon::http::{DaemonHttpState, serve};
+use harness::daemon::http::{DaemonHttpState, default_remote_pairing_limiter, serve_tcp};
 use harness::daemon::protocol::StreamEvent;
-use harness::daemon::remote_pairing::RemotePairingRateLimiter;
 use harness::daemon::service;
 use harness::daemon::state::{self, DaemonManifest, HostBridgeManifest};
 use harness::daemon::websocket::ReplayBuffer;
@@ -98,7 +97,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         token: token.clone(),
         auth_mode: harness::daemon::http::DaemonHttpAuthMode::Local,
         remote_domain: None,
-        remote_pairing_limiter: Arc::new(Mutex::new(RemotePairingRateLimiter::new(5))),
+        remote_pairing_limiter: default_remote_pairing_limiter(),
         sender: sender.clone(),
         manifest,
         daemon_epoch: harness::workspace::utc_now(),
@@ -115,7 +114,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
     };
 
     tokio::spawn(async move {
-        let _ = serve(listener, state, shutdown_rx).await;
+        let _ = serve_tcp(listener, state, shutdown_rx).await;
     });
 
     let client = Client::new();
