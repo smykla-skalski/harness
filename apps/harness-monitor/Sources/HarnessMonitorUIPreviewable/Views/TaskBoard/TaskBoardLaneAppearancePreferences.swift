@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import HarnessMonitorKit
 import SwiftUI
@@ -72,13 +73,49 @@ enum TaskBoardLaneColorToken: String, CaseIterable, Codable, Identifiable, Senda
   }
 }
 
+struct TaskBoardLaneCustomColor: Codable, Equatable, Sendable {
+  var red: Double
+  var green: Double
+  var blue: Double
+  var opacity: Double
+
+  init(red: Double, green: Double, blue: Double, opacity: Double = 1) {
+    self.red = Self.normalized(red)
+    self.green = Self.normalized(green)
+    self.blue = Self.normalized(blue)
+    self.opacity = Self.normalized(opacity)
+  }
+
+  init?(color: Color) {
+    let nsColor = NSColor(color)
+    guard let rgbColor = nsColor.usingColorSpace(.sRGB) else {
+      return nil
+    }
+    self.init(
+      red: Double(rgbColor.redComponent),
+      green: Double(rgbColor.greenComponent),
+      blue: Double(rgbColor.blueComponent),
+      opacity: Double(rgbColor.alphaComponent)
+    )
+  }
+
+  var color: Color {
+    Color(.sRGB, red: red, green: green, blue: blue, opacity: opacity)
+  }
+
+  private static func normalized(_ value: Double) -> Double {
+    min(max((value * 1_000).rounded() / 1_000, 0), 1)
+  }
+}
+
 struct TaskBoardLaneAppearanceOverride: Codable, Equatable, Sendable {
   var colorToken: TaskBoardLaneColorToken?
+  var customColor: TaskBoardLaneCustomColor?
   var symbolName: String?
   var hidesSymbol: Bool?
 
   var isEmpty: Bool {
-    colorToken == nil && symbolName == nil && hidesSymbol != true
+    colorToken == nil && customColor == nil && symbolName == nil && hidesSymbol != true
   }
 }
 
@@ -94,7 +131,11 @@ struct TaskBoardLaneAppearance: Equatable {
   }
 
   func color(for lane: TaskBoardInboxLane) -> Color {
-    colorToken(for: lane).color
+    customColor(for: lane)?.color ?? colorToken(for: lane).color
+  }
+
+  func customColor(for lane: TaskBoardInboxLane) -> TaskBoardLaneCustomColor? {
+    overrides[lane]?.customColor
   }
 
   func symbolName(for lane: TaskBoardInboxLane) -> String? {
@@ -111,6 +152,16 @@ struct TaskBoardLaneAppearance: Equatable {
 
   func hasOverride(for lane: TaskBoardInboxLane) -> Bool {
     overrides[lane]?.isEmpty == false
+  }
+
+  func hasColorOverride(for lane: TaskBoardInboxLane) -> Bool {
+    let override = overrides[lane]
+    return override?.customColor != nil || override?.colorToken != nil
+  }
+
+  func hasSymbolOverride(for lane: TaskBoardInboxLane) -> Bool {
+    let override = overrides[lane]
+    return override?.symbolName != nil || override?.hidesSymbol == true
   }
 }
 
@@ -178,6 +229,23 @@ enum TaskBoardLaneAppearancePreferences {
     var overrides = overrides(from: rawValue)
     var override = overrides[lane] ?? TaskBoardLaneAppearanceOverride()
     override.colorToken = colorToken == defaultColorToken(for: lane) ? nil : colorToken
+    override.customColor = nil
+    overrides[lane] = override
+    return Self.rawValue(for: overrides)
+  }
+
+  static func settingCustomColor(
+    _ color: Color,
+    for lane: TaskBoardInboxLane,
+    rawValue: String
+  ) -> String {
+    guard let customColor = TaskBoardLaneCustomColor(color: color) else {
+      return rawValue
+    }
+    var overrides = overrides(from: rawValue)
+    var override = overrides[lane] ?? TaskBoardLaneAppearanceOverride()
+    override.colorToken = nil
+    override.customColor = customColor
     overrides[lane] = override
     return Self.rawValue(for: overrides)
   }
@@ -192,6 +260,7 @@ enum TaskBoardLaneAppearancePreferences {
     let normalized = symbolName.trimmingCharacters(in: .whitespacesAndNewlines)
     override.symbolName =
       normalized.isEmpty || normalized == defaultSymbolName(for: lane) ? nil : normalized
+    override.hidesSymbol = nil
     overrides[lane] = override
     return Self.rawValue(for: overrides)
   }
@@ -204,6 +273,33 @@ enum TaskBoardLaneAppearancePreferences {
     var overrides = overrides(from: rawValue)
     var override = overrides[lane] ?? TaskBoardLaneAppearanceOverride()
     override.hidesSymbol = isVisible ? nil : true
+    if !isVisible {
+      override.symbolName = nil
+    }
+    overrides[lane] = override
+    return Self.rawValue(for: overrides)
+  }
+
+  static func resetColorRawValue(
+    for lane: TaskBoardInboxLane,
+    rawValue: String
+  ) -> String {
+    var overrides = overrides(from: rawValue)
+    var override = overrides[lane] ?? TaskBoardLaneAppearanceOverride()
+    override.colorToken = nil
+    override.customColor = nil
+    overrides[lane] = override
+    return Self.rawValue(for: overrides)
+  }
+
+  static func resetSymbolRawValue(
+    for lane: TaskBoardInboxLane,
+    rawValue: String
+  ) -> String {
+    var overrides = overrides(from: rawValue)
+    var override = overrides[lane] ?? TaskBoardLaneAppearanceOverride()
+    override.symbolName = nil
+    override.hidesSymbol = nil
     overrides[lane] = override
     return Self.rawValue(for: overrides)
   }

@@ -71,6 +71,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
   @State private var pendingRestore: PendingRestore?
   @State private var restoreGeneration: UInt64 = 0
   @State private var restoreRetryDeferrer = SettingsScrollRestoreRetryDeferrer()
+  @State private var restoreStateDeferrer = SettingsScrollRestoreStateDeferrer()
   @State private var restoredSection: SettingsSection?
   @State private var restoreApplicatorRequest: SettingsScrollRestoreRequest?
   @State private var restoreApplicatorRequestID: UInt64 = 0
@@ -95,7 +96,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
             },
             action: { _, newState in
               guard let newState else { return }
-              _ = waitForPendingRestore(newState, for: section)
+              schedulePendingRestoreCheck(newState, for: section)
             }
           )
           .onScrollPhaseChange { _, newPhase, context in
@@ -116,6 +117,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
             cancelRestore(for: section, observedOffset: nil)
           }
           .onDisappear {
+            restoreStateDeferrer.cancel()
             flushBufferedOffset(for: section)
           }
       } else {
@@ -141,6 +143,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     restoreGeneration &+= 1
     let generation = restoreGeneration
     restoreRetryDeferrer.cancel()
+    restoreStateDeferrer.cancel()
     let offset = SettingsRestorationDefaults.scrollOffset(for: section)
     activeUserScroll = false
     userScrollObserved = false
@@ -208,11 +211,21 @@ struct SettingsScrollRestorationModifier: ViewModifier {
   ) {
     restoreGeneration &+= 1
     restoreRetryDeferrer.cancel()
+    restoreStateDeferrer.cancel()
     pendingRestore = nil
     restoredSection = section
     scrollPersistenceDeferrer.cancel(for: section)
     scrollPersistenceBuffer.clear(for: section)
     lastPersistedOffset = SettingsRestorationDefaults.scrollOffset(for: section)
+  }
+
+  private func schedulePendingRestoreCheck(
+    _ state: SettingsScrollState,
+    for section: SettingsSection
+  ) {
+    restoreStateDeferrer.schedule {
+      _ = waitForPendingRestore(state, for: section)
+    }
   }
 
   private func waitForPendingRestore(
@@ -265,6 +278,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     observedOffset _: CGFloat
   ) {
     restoreRetryDeferrer.cancel()
+    restoreStateDeferrer.cancel()
     pendingRestore = nil
     restoredSection = section
   }

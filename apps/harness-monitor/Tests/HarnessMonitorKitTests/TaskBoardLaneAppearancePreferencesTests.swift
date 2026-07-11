@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import HarnessMonitorKit
@@ -86,6 +87,33 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(restoredAppearance.hasOverride(for: .planning))
   }
 
+  @Test("Custom colors persist through UserDefaults")
+  func customColorsPersistThroughUserDefaults() throws {
+    let suiteName = "TaskBoardLaneAppearancePreferencesTests.\(UUID().uuidString)"
+    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+    defer {
+      userDefaults.removePersistentDomain(forName: suiteName)
+    }
+
+    let rawValue = TaskBoardLaneAppearancePreferences.settingCustomColor(
+      Color(.sRGB, red: 0.24, green: 0.48, blue: 0.72, opacity: 1),
+      for: .testing,
+      rawValue: TaskBoardLaneAppearancePreferences.emptyRawValue
+    )
+    TaskBoardLaneAppearancePreferences.save(
+      TaskBoardLaneAppearancePreferences.overrides(from: rawValue),
+      to: userDefaults
+    )
+    userDefaults.synchronize()
+
+    let restartedDefaults = try #require(UserDefaults(suiteName: suiteName))
+    let restored = TaskBoardLaneAppearancePreferences.load(from: restartedDefaults)
+    let customColor = try #require(restored[.testing]?.customColor)
+
+    #expect(customColor == TaskBoardLaneCustomColor(red: 0.24, green: 0.48, blue: 0.72))
+    #expect(TaskBoardLaneAppearance(rawValue: rawValue).hasColorOverride(for: .testing))
+  }
+
   @Test("Reset and default values remove overrides")
   func resetAndDefaultValuesRemoveOverrides() {
     var rawValue = TaskBoardLaneAppearancePreferences.settingColorToken(
@@ -139,5 +167,60 @@ struct TaskBoardLaneAppearancePreferencesTests {
       rawValue: rawValue
     )
     #expect(rawValue == TaskBoardLaneAppearancePreferences.emptyRawValue)
+  }
+
+  @Test("Color reset keeps symbol overrides")
+  func colorResetKeepsSymbolOverrides() {
+    var rawValue = TaskBoardLaneAppearancePreferences.settingCustomColor(
+      Color(.sRGB, red: 0.2, green: 0.4, blue: 0.6, opacity: 1),
+      for: .inReview,
+      rawValue: TaskBoardLaneAppearancePreferences.emptyRawValue
+    )
+    rawValue = TaskBoardLaneAppearancePreferences.settingSymbolName(
+      "eye",
+      for: .inReview,
+      rawValue: rawValue
+    )
+
+    rawValue = TaskBoardLaneAppearancePreferences.resetColorRawValue(
+      for: .inReview,
+      rawValue: rawValue
+    )
+    let appearance = TaskBoardLaneAppearance(rawValue: rawValue)
+
+    #expect(!appearance.hasColorOverride(for: .inReview))
+    #expect(appearance.symbolName(for: .inReview) == "eye")
+    #expect(appearance.hasSymbolOverride(for: .inReview))
+  }
+
+  @Test("Settings lane appearance uses visual popover controls")
+  func settingsLaneAppearanceUsesVisualPopoverControls() throws {
+    let source = try sourceFile(
+      named: "Views/Settings/SettingsTaskBoardLaneAppearanceSection.swift"
+    )
+
+    #expect(source.contains(".popover("))
+    #expect(source.contains("ColorPicker("))
+    #expect(source.contains("Remove Symbol"))
+    #expect(source.contains("Reset Color"))
+    #expect(source.contains("Reset Symbol"))
+    #expect(!source.contains("TextField("))
+    #expect(!source.contains("Show Symbol"))
+  }
+
+  private func sourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor")
+      .appendingPathComponent("Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }

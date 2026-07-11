@@ -70,6 +70,31 @@ struct SettingsRestorationTests {
     #expect(waitBody.contains("scheduleRestoreRetry("))
   }
 
+  @Test("Scroll geometry callback defers restore state updates")
+  func scrollGeometryCallbackDefersRestoreStateUpdates() throws {
+    let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")
+    let geometryRange = try #require(source.range(of: ".onScrollGeometryChange("))
+    let phaseRange = try #require(source.range(of: ".onScrollPhaseChange"))
+    let geometryBody = String(source[geometryRange.lowerBound..<phaseRange.lowerBound])
+
+    #expect(geometryBody.contains("schedulePendingRestoreCheck("))
+    #expect(!geometryBody.contains("waitForPendingRestore("))
+    #expect(!geometryBody.contains("pendingRestore ="))
+    #expect(!geometryBody.contains("restoredSection ="))
+  }
+
+  @Test("Pending restore checks run through a main actor deferrer")
+  func pendingRestoreChecksRunThroughMainActorDeferrer() throws {
+    let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")
+    let scheduleRange =
+      try #require(source.range(of: "private func schedulePendingRestoreCheck("))
+    let waitRange = try #require(source.range(of: "private func waitForPendingRestore("))
+    let scheduleBody = String(source[scheduleRange.lowerBound..<waitRange.lowerBound])
+
+    #expect(scheduleBody.contains("restoreStateDeferrer.schedule"))
+    #expect(scheduleBody.contains("waitForPendingRestore("))
+  }
+
   @Test("Restore requests use the AppKit applicator as the single scroll write path")
   func restoreRequestsUseSingleWritePath() throws {
     let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")

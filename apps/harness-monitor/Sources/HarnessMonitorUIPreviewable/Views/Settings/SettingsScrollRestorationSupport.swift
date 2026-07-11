@@ -30,6 +30,32 @@ final class SettingsScrollRestoreRetryDeferrer {
 }
 
 @MainActor
+final class SettingsScrollRestoreStateDeferrer {
+  private var generation: UInt64 = 0
+  private var task: Task<Void, Never>?
+
+  func schedule(apply: @escaping @MainActor () -> Void) {
+    generation &+= 1
+    let scheduledGeneration = generation
+    task?.cancel()
+    task = Task { @MainActor in
+      await Task.yield()
+      guard !Task.isCancelled, self.generation == scheduledGeneration else {
+        return
+      }
+      self.task = nil
+      apply()
+    }
+  }
+
+  func cancel() {
+    generation &+= 1
+    task?.cancel()
+    task = nil
+  }
+}
+
+@MainActor
 final class SettingsScrollPersistenceBuffer {
   private var pendingOffsets: [SettingsSection: CGFloat] = [:]
 
