@@ -68,6 +68,16 @@ struct TaskBoardEnumsWireDecodingTests {
     #expect(!TaskBoardStatus.currentLaneCases.contains(.blocked))
   }
 
+  @Test("legacy statuses map to current persisted lanes")
+  func legacyStatusesMapToCurrentPersistedLanes() {
+    #expect(TaskBoardStatus.new.canonicalPersistedStatus == .todo)
+    #expect(TaskBoardStatus.planReview.canonicalPersistedStatus == .agenticReview)
+    #expect(TaskBoardStatus.needsYou.canonicalPersistedStatus == .humanRequired)
+    #expect(TaskBoardStatus.blocked.canonicalPersistedStatus == .failed)
+    #expect(TaskBoardStatus.done.canonicalPersistedStatus == .done)
+    #expect(TaskBoardStatus.unknown("custom").canonicalPersistedStatus == .unknown("custom"))
+  }
+
   @Test("decodes agent mode including the unknown fallback")
   func decodesAgentMode() throws {
     #expect(try decode(TaskBoardAgentMode.self, "headless") == .headless)

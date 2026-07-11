@@ -14,6 +14,21 @@ extension TaskBoardStatus {
     .failed,
   ]
 
+  public var canonicalPersistedStatus: Self {
+    switch self {
+    case .new:
+      .todo
+    case .planReview:
+      .agenticReview
+    case .needsYou:
+      .humanRequired
+    case .blocked:
+      .failed
+    default:
+      self
+    }
+  }
+
   public var title: String {
     switch self {
     case .umbrella:

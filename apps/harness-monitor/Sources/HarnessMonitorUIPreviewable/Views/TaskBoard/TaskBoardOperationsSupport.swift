@@ -33,7 +33,7 @@ enum TaskBoardStatusFilterChoice: String, CaseIterable, Identifiable, Hashable {
   ]
 
   init(status: TaskBoardStatus?) {
-    self = status.flatMap { Self.statusChoices[$0] } ?? .all
+    self = status.flatMap { Self.statusChoices[$0.canonicalPersistedStatus] } ?? .all
   }
 
   var id: String { rawValue }

@@ -84,6 +84,27 @@ struct TaskBoardItemEditorDraftTests {
     #expect(DispatchStatusFilterChoice.allCases.map(\.title) == expectedFilterTitles)
   }
 
+  @Test("Legacy statuses seed current picker-compatible draft values")
+  func legacyStatusesSeedCurrentPickerCompatibleDraftValues() {
+    #expect(TaskBoardItemEditorDraft(item: sampleTaskBoardItem(status: .new)).status == .todo)
+    #expect(
+      TaskBoardItemEditorDraft(item: sampleTaskBoardItem(status: .planReview)).status
+        == .agenticReview)
+    #expect(
+      TaskBoardItemEditorDraft(item: sampleTaskBoardItem(status: .needsYou)).status
+        == .humanRequired)
+    #expect(TaskBoardItemEditorDraft(item: sampleTaskBoardItem(status: .blocked)).status == .failed)
+
+    #expect(TaskBoardStatusFilterChoice(status: .new) == .todo)
+    #expect(TaskBoardStatusFilterChoice(status: .planReview) == .agenticReview)
+    #expect(TaskBoardStatusFilterChoice(status: .needsYou) == .humanRequired)
+    #expect(TaskBoardStatusFilterChoice(status: .blocked) == .failed)
+    #expect(DispatchStatusFilterChoice(status: .new) == .todo)
+    #expect(DispatchStatusFilterChoice(status: .planReview) == .agenticReview)
+    #expect(DispatchStatusFilterChoice(status: .needsYou) == .humanRequired)
+    #expect(DispatchStatusFilterChoice(status: .blocked) == .failed)
+  }
+
   @Test("Monitor public UI hides Todoist sync summaries")
   func monitorPublicUIHidesTodoistSyncSummaries() {
     let summary = TaskBoardSyncSummary(
@@ -180,6 +201,7 @@ struct TaskBoardItemEditorDraftTests {
   }
 
   private func sampleTaskBoardItem(
+    status: TaskBoardStatus = .todo,
     targetProjectTypes: [String] = [],
     externalRefs: [TaskBoardExternalRef] = []
   ) -> TaskBoardItem {
@@ -188,7 +210,7 @@ struct TaskBoardItemEditorDraftTests {
       id: "board-1",
       title: "Board item",
       body: "Body",
-      status: .todo,
+      status: status,
       priority: .high,
       tags: ["automation"],
       projectId: "project-1",

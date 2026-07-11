@@ -28,7 +28,7 @@ enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
   ]
 
   init(status: TaskBoardStatus?) {
-    self = status.flatMap { Self.statusChoices[$0] } ?? .all
+    self = status.flatMap { Self.statusChoices[$0.canonicalPersistedStatus] } ?? .all
   }
 }
 
