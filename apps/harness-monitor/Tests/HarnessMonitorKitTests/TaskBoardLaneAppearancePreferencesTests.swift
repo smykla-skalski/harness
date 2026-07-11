@@ -201,11 +201,21 @@ struct TaskBoardLaneAppearancePreferencesTests {
 
     #expect(source.contains(".popover("))
     #expect(source.contains("ColorPicker("))
-    #expect(source.contains("Remove Symbol"))
+    #expect(source.contains("Customize"))
+    #expect(source.contains("Clear Symbol"))
     #expect(source.contains("Reset Color"))
     #expect(source.contains("Reset Symbol"))
+    #expect(source.contains("Label(\"Reset\", systemImage: \"arrow.counterclockwise\")"))
+    #expect(source.contains("HarnessMonitorTextSize.scaledFont(.body.weight(.medium)"))
     #expect(!source.contains("TextField("))
     #expect(!source.contains("Show Symbol"))
+    #expect(!source.contains("Remove Symbol"))
+    #expect(!source.contains("Reset Lane"))
+    #expect(!source.contains("Top Bar Color"))
+
+    let colorRange = try #require(source.range(of: "colorSection"))
+    let symbolRange = try #require(source.range(of: "symbolSection"))
+    #expect(colorRange.lowerBound < symbolRange.lowerBound)
   }
 
   private func sourceFile(named relativePath: String) throws -> String {

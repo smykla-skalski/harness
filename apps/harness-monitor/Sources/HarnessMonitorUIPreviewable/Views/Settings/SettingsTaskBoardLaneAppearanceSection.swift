@@ -4,10 +4,20 @@ import SwiftUI
 struct SettingsTaskBoardLaneAppearanceSection: View {
   @AppStorage(TaskBoardLaneAppearancePreferences.storageKey)
   private var rawValue = TaskBoardLaneAppearancePreferences.emptyRawValue
+  @Environment(\.fontScale)
+  private var fontScale
   @State private var presentedLane: TaskBoardInboxLane?
 
   private var appearance: TaskBoardLaneAppearance {
     TaskBoardLaneAppearance(rawValue: rawValue)
+  }
+
+  private var laneTitleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.body.weight(.medium), by: fontScale)
+  }
+
+  private var customizeFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
 
   var body: some View {
@@ -32,28 +42,19 @@ struct SettingsTaskBoardLaneAppearanceSection: View {
 
   private func laneRow(_ lane: TaskBoardInboxLane) -> some View {
     HStack(spacing: HarnessMonitorTheme.spacingMD) {
-      Button {
-        presentedLane = lane
-      } label: {
-        symbolPreview(for: lane)
-      }
-      .harnessPlainButtonStyle()
-      .help("Configure \(lane.title) appearance")
-      .accessibilityLabel("Configure \(lane.title) appearance")
-
       Text(lane.title)
-        .font(.body.weight(.medium))
+        .font(laneTitleFont)
 
       Spacer(minLength: HarnessMonitorTheme.spacingMD)
 
       Button {
         presentedLane = lane
       } label: {
-        colorPreview(for: lane)
+        customizeButtonLabel(for: lane)
       }
       .harnessPlainButtonStyle()
-      .help("Configure \(lane.title) top bar color")
-      .accessibilityLabel("Configure \(lane.title) top bar color")
+      .help("Configure \(lane.title) appearance")
+      .accessibilityLabel("Configure \(lane.title) appearance")
     }
     .padding(.vertical, HarnessMonitorTheme.spacingXS)
     .popover(isPresented: presentedBinding(for: lane), arrowEdge: .trailing) {
@@ -61,35 +62,23 @@ struct SettingsTaskBoardLaneAppearanceSection: View {
     }
   }
 
-  private func symbolPreview(for lane: TaskBoardInboxLane) -> some View {
-    ZStack {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-        .fill(appearance.color(for: lane).opacity(0.14))
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-        .strokeBorder(appearance.color(for: lane).opacity(0.32), lineWidth: 1)
-      if let symbolName = appearance.symbolName(for: lane) {
-        Image(systemName: symbolName)
-          .font(.body.weight(.semibold))
-          .foregroundStyle(appearance.color(for: lane))
-      } else {
-        Image(systemName: "slash.circle")
-          .font(.body.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
+  private func customizeButtonLabel(for lane: TaskBoardInboxLane) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      Image(systemName: appearance.symbolName(for: lane) ?? "slash.circle")
+        .font(customizeFont)
+        .foregroundStyle(.white)
+        .frame(width: 16)
+      Text("Customize")
+        .font(customizeFont)
+        .foregroundStyle(.white)
     }
-    .frame(width: 34, height: 34)
-    .accessibilityHidden(true)
-  }
-
-  private func colorPreview(for lane: TaskBoardInboxLane) -> some View {
-    Capsule(style: .continuous)
-      .fill(appearance.color(for: lane))
-      .frame(width: 54, height: 18)
-      .overlay {
-        Capsule(style: .continuous)
-          .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.54), lineWidth: 1)
-      }
-      .accessibilityHidden(true)
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .frame(minHeight: 30)
+    .background(appearance.color(for: lane), in: .capsule)
+    .overlay {
+      Capsule(style: .continuous)
+        .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+    }
   }
 
   private func presentedBinding(for lane: TaskBoardInboxLane) -> Binding<Bool> {
@@ -107,9 +96,11 @@ struct SettingsTaskBoardLaneAppearanceSection: View {
 private struct SettingsTaskBoardLaneAppearancePopover: View {
   let lane: TaskBoardInboxLane
   @Binding var rawValue: String
+  @Environment(\.fontScale)
+  private var fontScale
 
   private static let symbolColumns = Array(
-    repeating: GridItem(.fixed(36), spacing: HarnessMonitorTheme.spacingXS),
+    repeating: GridItem(.flexible(minimum: 44), spacing: HarnessMonitorTheme.spacingXS),
     count: 6
   )
 
@@ -117,21 +108,34 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
     TaskBoardLaneAppearance(rawValue: rawValue)
   }
 
+  private var headerFont: Font {
+    HarnessMonitorTextSize.scaledFont(.headline.weight(.semibold), by: fontScale)
+  }
+
+  private var sectionTitleFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+
+  private var symbolFont: Font {
+    HarnessMonitorTextSize.scaledFont(.title3.weight(.semibold), by: fontScale)
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
       header
-      symbolPicker
       Divider()
-      colorPicker
+      colorSection
+      Divider()
+      symbolSection
     }
     .padding(HarnessMonitorTheme.spacingMD)
-    .frame(width: 320, alignment: .topLeading)
+    .frame(width: 360, alignment: .topLeading)
   }
 
   private var header: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       Text(lane.title)
-        .font(.headline.weight(.semibold))
+        .font(headerFont)
       Spacer(minLength: HarnessMonitorTheme.spacingMD)
       Button {
         rawValue = TaskBoardLaneAppearancePreferences.resetRawValue(
@@ -139,59 +143,16 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
           rawValue: rawValue
         )
       } label: {
-        Label("Reset Lane", systemImage: "arrow.counterclockwise")
+        Label("Reset", systemImage: "arrow.counterclockwise")
       }
       .buttonStyle(.borderless)
       .disabled(!appearance.hasOverride(for: lane))
     }
   }
 
-  private var symbolPicker: some View {
+  private var colorSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Symbol")
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      LazyVGrid(
-        columns: Self.symbolColumns,
-        alignment: .leading,
-        spacing: HarnessMonitorTheme.spacingXS
-      ) {
-        ForEach(Self.symbolOptions(for: lane), id: \.self) { symbolName in
-          symbolButton(symbolName)
-        }
-      }
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        Button {
-          rawValue = TaskBoardLaneAppearancePreferences.settingSymbolVisibility(
-            false,
-            for: lane,
-            rawValue: rawValue
-          )
-        } label: {
-          Label("Remove Symbol", systemImage: "slash.circle")
-        }
-        Button {
-          rawValue = TaskBoardLaneAppearancePreferences.resetSymbolRawValue(
-            for: lane,
-            rawValue: rawValue
-          )
-        } label: {
-          Label("Reset Symbol", systemImage: "arrow.counterclockwise")
-        }
-        .disabled(!appearance.hasSymbolOverride(for: lane))
-      }
-      .buttonStyle(.borderless)
-    }
-  }
-
-  private var colorPicker: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("Top Bar Color")
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      ColorPicker("Color", selection: colorBinding, supportsOpacity: false)
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        colorSwatch
+      sectionHeader(title: "Color") {
         Button {
           rawValue = TaskBoardLaneAppearancePreferences.resetColorRawValue(
             for: lane,
@@ -203,6 +164,61 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
         .buttonStyle(.borderless)
         .disabled(!appearance.hasColorOverride(for: lane))
       }
+
+      ColorPicker("Color", selection: colorBinding, supportsOpacity: false)
+    }
+  }
+
+  private var symbolSection: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      sectionHeader(title: "Symbol") {
+        HStack(spacing: HarnessMonitorTheme.spacingSM) {
+          Button {
+            rawValue = TaskBoardLaneAppearancePreferences.settingSymbolVisibility(
+              false,
+              for: lane,
+              rawValue: rawValue
+            )
+          } label: {
+            Label("Clear Symbol", systemImage: "slash.circle")
+          }
+          .disabled(appearance.hidesSymbol(for: lane))
+
+          Button {
+            rawValue = TaskBoardLaneAppearancePreferences.resetSymbolRawValue(
+              for: lane,
+              rawValue: rawValue
+            )
+          } label: {
+            Label("Reset Symbol", systemImage: "arrow.counterclockwise")
+          }
+          .disabled(!appearance.hasSymbolOverride(for: lane))
+        }
+        .buttonStyle(.borderless)
+      }
+
+      LazyVGrid(
+        columns: Self.symbolColumns,
+        alignment: .leading,
+        spacing: HarnessMonitorTheme.spacingXS
+      ) {
+        ForEach(Self.symbolOptions(for: lane), id: \.self) { symbolName in
+          symbolButton(symbolName)
+        }
+      }
+    }
+  }
+
+  private func sectionHeader<Actions: View>(
+    title: String,
+    @ViewBuilder actions: () -> Actions
+  ) -> some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      Text(title)
+        .font(sectionTitleFont)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Spacer(minLength: HarnessMonitorTheme.spacingMD)
+      actions()
     }
   }
 
@@ -215,9 +231,9 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
       )
     } label: {
       Image(systemName: symbolName)
-        .font(.body.weight(.semibold))
+        .font(symbolFont)
         .foregroundStyle(symbolForegroundStyle(for: symbolName))
-        .frame(width: 32, height: 32)
+        .frame(maxWidth: .infinity, minHeight: 46)
         .background(symbolButtonBackground(for: symbolName), in: .rect(cornerRadius: 8))
         .overlay {
           RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -237,17 +253,6 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
 
   private func symbolForegroundStyle(for symbolName: String) -> Color {
     symbolName == appearance.symbolName(for: lane) ? .white : appearance.color(for: lane)
-  }
-
-  private var colorSwatch: some View {
-    RoundedRectangle(cornerRadius: 8, style: .continuous)
-      .fill(appearance.color(for: lane))
-      .frame(width: 42, height: 24)
-      .overlay {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.54), lineWidth: 1)
-      }
-      .accessibilityHidden(true)
   }
 
   private var colorBinding: Binding<Color> {
