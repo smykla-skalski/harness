@@ -62,14 +62,15 @@ struct SettingsTaskBoardLaneAppearanceSection: View {
   }
 
   private func laneIndicator(for lane: TaskBoardInboxLane) -> some View {
-    ZStack {
-      if let symbolName = appearance.symbolName(for: lane) {
+    let symbolName = appearance.symbolName(for: lane)
+    return ZStack {
+      if let symbolName {
         Image(systemName: symbolName)
           .font(laneIndicatorFont)
           .foregroundStyle(.white)
       }
     }
-    .frame(width: 58, height: 30)
+    .frame(width: 58, height: symbolName == nil ? 18 : 30)
     .background(appearance.color(for: lane), in: .capsule)
     .overlay {
       Capsule(style: .continuous)
@@ -123,8 +124,6 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
       colorSection
       Divider()
       symbolSection
-      Divider()
-      cardsSection
     }
     .padding(HarnessMonitorTheme.spacingMD)
     .frame(width: 360, alignment: .topLeading)
@@ -210,26 +209,6 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
     }
   }
 
-  private var cardsSection: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      sectionHeader(title: "Cards") {
-        Button {
-          rawValue = TaskBoardLaneAppearancePreferences.settingPriorityBadgeVisibility(
-            true,
-            for: lane,
-            rawValue: rawValue
-          )
-        } label: {
-          Label("Reset", systemImage: "arrow.counterclockwise")
-        }
-        .buttonStyle(.borderless)
-        .disabled(!appearance.hasPriorityBadgeOverride(for: lane))
-      }
-
-      Toggle("Priority Badge", isOn: priorityBadgeBinding)
-    }
-  }
-
   private func sectionHeader<Actions: View>(
     title: String,
     @ViewBuilder actions: () -> Actions
@@ -282,19 +261,6 @@ private struct SettingsTaskBoardLaneAppearancePopover: View {
       set: { color in
         rawValue = TaskBoardLaneAppearancePreferences.settingCustomColor(
           color,
-          for: lane,
-          rawValue: rawValue
-        )
-      }
-    )
-  }
-
-  private var priorityBadgeBinding: Binding<Bool> {
-    Binding(
-      get: { appearance.showsPriorityBadge(for: lane) },
-      set: { isVisible in
-        rawValue = TaskBoardLaneAppearancePreferences.settingPriorityBadgeVisibility(
-          isVisible,
           for: lane,
           rawValue: rawValue
         )

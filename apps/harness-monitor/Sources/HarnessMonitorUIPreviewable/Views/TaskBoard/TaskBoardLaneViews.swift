@@ -165,6 +165,8 @@ struct TaskBoardItemRow: View {
   private var fontScale
   @Environment(\.taskBoardLaneAppearance)
   private var laneAppearance
+  @Environment(\.taskBoardShowsPriorityBadge)
+  private var showsPriorityBadge
 
   private var dragPayload: TaskBoardItemDragPayload {
     TaskBoardItemDragPayload(itemID: item.id, status: item.status)
@@ -239,11 +241,6 @@ struct TaskBoardItemRow: View {
     if let policyTraceCount = item.workflow?.policyTraceIds.count, policyTraceCount > 0 {
       TaskBoardCardPill(label: "\(policyTraceCount) policy", tint: HarnessMonitorTheme.secondaryInk)
     }
-  }
-
-  private var showsPriorityBadge: Bool {
-    TaskBoardInboxLane(status: item.status)
-      .map { laneAppearance.showsPriorityBadge(for: $0) } ?? true
   }
 }
 
