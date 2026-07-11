@@ -110,7 +110,7 @@ pub(crate) fn require_async_db<'a>(
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct DaemonConnectInfo {
+pub struct DaemonConnectInfo {
     remote_addr: SocketAddr,
 }
 
@@ -330,7 +330,7 @@ fn recover_poisoned_mutation_lock_map(
 ///
 /// # Errors
 /// Returns `CliError` on listener failures.
-pub(crate) async fn serve<L>(
+pub async fn serve<L>(
     listener: L,
     state: DaemonHttpState,
     mut shutdown_rx: watch::Receiver<bool>,
