@@ -318,6 +318,8 @@ extension HarnessMonitorStore {
     public var notificationHistory: [NotificationHistoryEntry] = []
     public var auditEvents: [HarnessMonitorAuditEvent] = []
     public var auditHasOlder = false
+    public var githubDataRevision: UInt64 = 0
+    public var latestGitHubDataChange: GitHubDataChangedPayload?
     public var taskBoardItems: [TaskBoardItem] = []
     public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
     public var taskBoardSyncSummary: TaskBoardSyncSummary?

@@ -7,8 +7,10 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::budget::parse_retry_after;
 use super::client::GitHubProtectedClient;
+use super::mutation::run_detached_mutation;
 use super::response::{budget_error, context_error, http_status_error, request_error};
-use super::{GitHubRateResource, GitHubRequestDescriptor};
+use super::state::GitHubMutationGuard;
+use super::{GitHubRateResource, GitHubRequestDescriptor, retry_stable_read};
 
 pub(crate) struct GitHubRestRawResponse<T> {
     pub(crate) status: StatusCode,
@@ -26,6 +28,63 @@ impl GitHubProtectedClient {
         extra_headers: HeaderMap,
     ) -> Result<GitHubRestRawResponse<T>, CliError>
     where
+        T: DeserializeOwned + Send + 'static,
+    {
+        let priority = descriptor.priority;
+        let route = route.as_ref().to_string();
+        if priority.is_write() {
+            let operation = descriptor.operation.clone();
+            let client = self.clone();
+            return run_detached_mutation(operation, move |guard| async move {
+                let mut mutation_guard = Some(guard);
+                client
+                    .rest_json_with_headers_at_revision(
+                        method,
+                        &route,
+                        body,
+                        descriptor,
+                        extra_headers,
+                        &mut mutation_guard,
+                    )
+                    .await
+            })
+            .await;
+        }
+
+        let operation = descriptor.operation.clone();
+        retry_stable_read(&operation, |_| {
+            let method = method.clone();
+            let route = route.clone();
+            let body = body.clone();
+            let descriptor = descriptor.clone();
+            let extra_headers = extra_headers.clone();
+            async move {
+                let mut mutation_guard = None;
+                self.rest_json_with_headers_at_revision(
+                    method,
+                    &route,
+                    body,
+                    descriptor,
+                    extra_headers,
+                    &mut mutation_guard,
+                )
+                .await
+            }
+        })
+        .await
+        .map(|(response, _)| response)
+    }
+
+    async fn rest_json_with_headers_at_revision<T>(
+        &self,
+        method: Method,
+        route: &str,
+        body: Option<Value>,
+        descriptor: GitHubRequestDescriptor,
+        extra_headers: HeaderMap,
+        mutation_guard: &mut Option<GitHubMutationGuard>,
+    ) -> Result<GitHubRestRawResponse<T>, CliError>
+    where
         T: DeserializeOwned,
     {
         let _permit = self
@@ -35,11 +94,16 @@ impl GitHubProtectedClient {
             .await
             .map_err(|error| budget_error(&descriptor.operation, error))?;
         let response = self
-            .send_json_with_headers(method, route.as_ref(), body, extra_headers)
+            .send_json_with_headers(method, route, body, extra_headers)
             .await
             .map_err(|error| request_error(&descriptor.operation, &error))?;
         let status = response.status();
         let headers = response.headers().clone();
+        if status.is_success()
+            && let Some(guard) = mutation_guard.as_mut()
+        {
+            guard.mark_remote_success();
+        }
         self.observe_rest_status(&descriptor, status, &headers)
             .await;
         if status == StatusCode::NOT_MODIFIED {
@@ -79,6 +143,45 @@ impl GitHubProtectedClient {
         body: Option<Value>,
         descriptor: GitHubRequestDescriptor,
     ) -> Result<(), CliError> {
+        let priority = descriptor.priority;
+        let route = route.as_ref().to_string();
+        if priority.is_write() {
+            let operation = descriptor.operation.clone();
+            let client = self.clone();
+            return run_detached_mutation(operation, move |guard| async move {
+                let mut mutation_guard = Some(guard);
+                client
+                    .rest_empty_with_mutation_boundary(
+                        method,
+                        &route,
+                        body,
+                        descriptor,
+                        &mut mutation_guard,
+                    )
+                    .await
+            })
+            .await;
+        }
+
+        let mut mutation_guard = None;
+        self.rest_empty_with_mutation_boundary(
+            method,
+            &route,
+            body,
+            descriptor,
+            &mut mutation_guard,
+        )
+        .await
+    }
+
+    async fn rest_empty_with_mutation_boundary(
+        &self,
+        method: Method,
+        route: &str,
+        body: Option<Value>,
+        descriptor: GitHubRequestDescriptor,
+        mutation_guard: &mut Option<GitHubMutationGuard>,
+    ) -> Result<(), CliError> {
         let _permit = self
             .state
             .budget
@@ -86,11 +189,16 @@ impl GitHubProtectedClient {
             .await
             .map_err(|error| budget_error(&descriptor.operation, error))?;
         let response = self
-            .send_json(method, route.as_ref(), body, None)
+            .send_json(method, route, body, None)
             .await
             .map_err(|error| request_error(&descriptor.operation, &error))?;
         let status = response.status();
         let headers = response.headers().clone();
+        if status.is_success()
+            && let Some(guard) = mutation_guard.as_mut()
+        {
+            guard.mark_remote_success();
+        }
         self.observe_rest_status(&descriptor, status, &headers)
             .await;
         let text = response

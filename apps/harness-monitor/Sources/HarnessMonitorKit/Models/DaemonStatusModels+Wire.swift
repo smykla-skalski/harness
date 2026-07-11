@@ -139,7 +139,8 @@ extension GitHubApiDiagnostics {
       cacheStaleHits: wire.cacheStaleHits,
       cacheDeferredHits: wire.cacheDeferredHits,
       deferredBudget: wire.deferredBudget,
-      topOperations: wire.topOperations.map(GitHubOperationSpendDiagnostics.init(wire:))
+      topOperations: wire.topOperations.map(GitHubOperationSpendDiagnostics.init(wire:)),
+      dataRevision: wire.dataRevision
     )
   }
 }

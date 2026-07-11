@@ -161,6 +161,7 @@ public struct DaemonDiagnosticsReport: Codable, Equatable, Sendable {
 }
 
 public struct GitHubApiDiagnostics: Codable, Equatable, Sendable {
+  public let dataRevision: UInt64?
   public let buckets: [GitHubRateBucketDiagnostics]
   public let cooling: [GitHubCooldownDiagnostics]
   public let lastHourNetworkRequests: UInt64
@@ -180,8 +181,10 @@ public struct GitHubApiDiagnostics: Codable, Equatable, Sendable {
     cacheStaleHits: UInt64,
     cacheDeferredHits: UInt64,
     deferredBudget: UInt64,
-    topOperations: [GitHubOperationSpendDiagnostics]
+    topOperations: [GitHubOperationSpendDiagnostics],
+    dataRevision: UInt64? = nil
   ) {
+    self.dataRevision = dataRevision
     self.buckets = buckets
     self.cooling = cooling
     self.lastHourNetworkRequests = lastHourNetworkRequests

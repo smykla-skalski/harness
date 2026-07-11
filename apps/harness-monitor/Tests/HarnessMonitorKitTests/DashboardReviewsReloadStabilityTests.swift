@@ -100,4 +100,58 @@ struct DashboardReviewsReloadStabilityTests {
     )
     #expect(oldKey != newKey)
   }
+
+  @Test("GitHub data revision drives a reload")
+  func githubDataRevisionDrivesAReload() {
+    let oldKey = DashboardReviewsReloadTaskKey(
+      preferencesSignature: "preferences=stable",
+      isConnected: true,
+      githubDataRevision: 4
+    )
+    let newKey = DashboardReviewsReloadTaskKey(
+      preferencesSignature: "preferences=stable",
+      isConnected: true,
+      githubDataRevision: 5
+    )
+
+    #expect(oldKey != newKey)
+  }
+
+  @Test("GitHub data revision forces a fresh query only when it changes")
+  func githubDataRevisionForcesFreshQueryOnChange() {
+    #expect(
+      dashboardReviewsGitHubRevisionNeedsForceRefresh(
+        loadedRevision: 8,
+        currentRevision: 9
+      )
+    )
+    #expect(
+      !dashboardReviewsGitHubRevisionNeedsForceRefresh(
+        loadedRevision: 9,
+        currentRevision: 9
+      )
+    )
+  }
+
+  @Test("GitHub revision is acknowledged only after refresh starts")
+  func githubRevisionAcknowledgementRequiresStartedRefresh() {
+    #expect(
+      dashboardReviewsShouldAcknowledgeGitHubRevision(
+        refreshIsDurablyScheduled: true,
+        taskIsCancelled: false
+      )
+    )
+    #expect(
+      !dashboardReviewsShouldAcknowledgeGitHubRevision(
+        refreshIsDurablyScheduled: false,
+        taskIsCancelled: false
+      )
+    )
+    #expect(
+      !dashboardReviewsShouldAcknowledgeGitHubRevision(
+        refreshIsDurablyScheduled: true,
+        taskIsCancelled: true
+      )
+    )
+  }
 }

@@ -128,7 +128,7 @@ struct DashboardReviewsRouteView: View {
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsRoot)
         .environment(\.reviewsPreferences, reviewsPreferencesStore)
         .task(id: reloadTaskKey) {
-          await reload(forceRefresh: false)
+          await reloadForCurrentGitHubRevision()
         }
         .task(id: presentationTaskID) {
           await rebuildPresentation(input: listPresentationInput)

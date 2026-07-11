@@ -9,6 +9,7 @@ use serde_json::json;
 use crate::errors::{CliError, CliErrorKind};
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+    retry_stable_read,
 };
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
@@ -21,14 +22,17 @@ use super::{
 mod errors;
 mod graphql;
 mod inbox;
+mod review_projection;
 
 use errors::{github_sync_error_with_context, warn_github_message};
 pub use inbox::GitHubInboxSyncClient;
+pub(crate) use review_projection::{
+    imported_review_pull_request_references, reconcile_pull_request_snapshots,
+};
 
 #[derive(Clone)]
 pub struct GitHubSyncClient {
     client: GitHubProtectedClient,
-    graphql_cache_key: graphql::GitHubGraphqlCacheKey,
     repository: Option<GitHubRepository>,
     pull_enabled: bool,
     import_labels: Vec<String>,
@@ -64,12 +68,10 @@ impl GitHubSyncClient {
         pull_enabled: bool,
     ) -> Result<Self, CliError> {
         let token = normalize_token(ExternalProvider::GitHub, token)?;
-        let graphql_cache_key = graphql::token_cache_key(token.as_str());
         let repository = repository.map(parse_github_repository).transpose()?;
         let client = GitHubProtectedClient::new(&token)?;
         Ok(Self {
             client,
-            graphql_cache_key,
             repository,
             pull_enabled,
             import_labels: Vec::new(),
@@ -117,6 +119,44 @@ impl GitHubSyncClient {
             .or_else(|| self.repository.clone())
             .ok_or_else(missing_github_repository_error)
     }
+
+    async fn pull_tasks_at_revision(&self) -> Result<Vec<ExternalTask>, CliError> {
+        let repository = self.repository_for(None)?;
+        let project_id = repository.slug();
+        let login = self.protected().viewer_login().await?;
+        let mut tasks = BTreeMap::new();
+        for query in graphql::personal_issue_queries(&repository, login.as_str()) {
+            let context = format!("searching task-board issues in {}", repository.slug());
+            let issues =
+                graphql::search_issue_pull_requests(self.protected(), &query, &context).await?;
+            tasks.extend(
+                issues
+                    .into_iter()
+                    .filter(|issue| {
+                        search_label_matches_filter(&issue.label_names(), &self.import_labels)
+                    })
+                    .map(|issue| {
+                        let number = issue.number;
+                        (
+                            number,
+                            ExternalTask {
+                                reference: ExternalTaskRef::new(
+                                    ExternalProvider::GitHub,
+                                    github_external_id(&repository, number),
+                                )
+                                .with_url(issue.url),
+                                title: issue.title,
+                                body: issue.body.unwrap_or_default(),
+                                status: github_issue_search_status(issue.state.as_str()),
+                                project_id: Some(project_id.clone()),
+                                updated_at: Some(issue.updated_at),
+                            },
+                        )
+                    }),
+            );
+        }
+        Ok(tasks.into_values().collect())
+    }
 }
 
 impl fmt::Debug for GitHubSyncClient {
@@ -151,46 +191,11 @@ impl ExternalSyncClient for GitHubSyncClient {
         if !self.pull_enabled {
             return Ok(Vec::new());
         }
-        let repository = self.repository_for(None)?;
-        let project_id = repository.slug();
-        let login = graphql::current_user_login(self.protected(), self.graphql_cache_key).await?;
-        let mut tasks = BTreeMap::new();
-        for query in graphql::personal_issue_queries(&repository, login.as_str()) {
-            let context = format!("searching task-board issues in {}", repository.slug());
-            let issues = graphql::search_issue_pull_requests(
-                self.protected(),
-                self.graphql_cache_key,
-                &query,
-                &context,
-            )
-            .await?;
-            tasks.extend(
-                issues
-                    .into_iter()
-                    .filter(|issue| {
-                        search_label_matches_filter(&issue.label_names(), &self.import_labels)
-                    })
-                    .map(|issue| {
-                        let number = issue.number;
-                        (
-                            number,
-                            ExternalTask {
-                                reference: ExternalTaskRef::new(
-                                    ExternalProvider::GitHub,
-                                    github_external_id(&repository, number),
-                                )
-                                .with_url(issue.url),
-                                title: issue.title,
-                                body: issue.body.unwrap_or_default(),
-                                status: github_issue_search_status(issue.state.as_str()),
-                                project_id: Some(project_id.clone()),
-                                updated_at: Some(issue.updated_at),
-                            },
-                        )
-                    }),
-            );
-        }
-        Ok(tasks.into_values().collect())
+        retry_stable_read("task_board.github.pull_tasks", |_| {
+            self.pull_tasks_at_revision()
+        })
+        .await
+        .map(|(tasks, _)| tasks)
     }
 
     async fn push_task(&self, item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {

@@ -40,6 +40,17 @@ enum DashboardReviewsRemoteLoader {
 struct DashboardReviewsReloadTaskKey: Hashable {
   let preferencesSignature: String
   let isConnected: Bool
+  let githubDataRevision: UInt64
+
+  init(
+    preferencesSignature: String,
+    isConnected: Bool,
+    githubDataRevision: UInt64 = 0
+  ) {
+    self.preferencesSignature = preferencesSignature
+    self.isConnected = isConnected
+    self.githubDataRevision = githubDataRevision
+  }
 }
 
 /// Classify a `HarnessMonitorStore.ConnectionState` into a stable boolean for the
@@ -54,6 +65,20 @@ func isReviewsReloadConnected(_ state: HarnessMonitorStore.ConnectionState) -> B
   case .idle, .connecting, .offline:
     return false
   }
+}
+
+func dashboardReviewsGitHubRevisionNeedsForceRefresh(
+  loadedRevision: UInt64,
+  currentRevision: UInt64
+) -> Bool {
+  loadedRevision != currentRevision
+}
+
+func dashboardReviewsShouldAcknowledgeGitHubRevision(
+  refreshIsDurablyScheduled: Bool,
+  taskIsCancelled: Bool
+) -> Bool {
+  refreshIsDurablyScheduled && !taskIsCancelled
 }
 
 /// Decision produced by `dashboardReviewsRouteChangeDecision`. The route view

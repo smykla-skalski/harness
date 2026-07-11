@@ -9,6 +9,7 @@ use gix::{ObjectId, objs};
 use tokio::task::spawn_blocking;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::github_api::begin_external_mutation;
 use crate::sandbox;
 use crate::task_board::github::GitHubProjectConfig;
 
@@ -22,6 +23,8 @@ use super::types::{
     RestCommitSignatureBoundary,
 };
 
+const PUBLICATION_OPERATION: &str = "task_board.github.publish_branch";
+
 pub(super) async fn publish_native_branch(
     config: &GitHubProjectConfig,
     worktree: &Path,
@@ -31,14 +34,27 @@ pub(super) async fn publish_native_branch(
     mode: &BranchPublicationMode,
 ) -> Result<(), CliError> {
     let plan = GitPublishPlan::new(config, worktree, branch, github_token, snapshot, mode)?;
-    spawn_blocking(move || plan.publish())
-        .await
-        .unwrap_or_else(|error| {
-            Err(CliErrorKind::workflow_io(format!(
-                "task-board github SSH git publisher worker failed: {error}"
-            ))
-            .into())
-        })
+    run_native_publication_worker(move || plan.publish()).await
+}
+
+pub(super) async fn run_native_publication_worker(
+    publish: impl FnOnce() -> Result<(), CliError> + Send + 'static,
+) -> Result<(), CliError> {
+    let mut mutation = begin_external_mutation(PUBLICATION_OPERATION).await;
+    spawn_blocking(move || {
+        let result = publish();
+        if result.is_ok() {
+            mutation.mark_remote_success();
+        }
+        result
+    })
+    .await
+    .unwrap_or_else(|error| {
+        Err(CliErrorKind::workflow_io(format!(
+            "task-board github SSH git publisher worker failed: {error}"
+        ))
+        .into())
+    })
 }
 
 struct GitPublishPlan {

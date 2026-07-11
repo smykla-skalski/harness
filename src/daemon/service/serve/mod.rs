@@ -4,6 +4,7 @@ mod audit;
 mod background_tasks;
 mod binary_stamp;
 mod config;
+mod github_data_change_publisher;
 mod legacy_migration;
 mod machine_heartbeat_loop;
 mod manifest;
@@ -16,6 +17,7 @@ mod task_board_orchestrator_loop;
 pub(crate) use shutdown_signals::ShutdownSignalGuard;
 
 pub(crate) use config::{http_auth_mode, validate_serve_config};
+pub(crate) use github_data_change_publisher::broadcast_github_data_change;
 pub(crate) use open_db::{open_daemon_async_db, open_daemon_db};
 pub(crate) use remote::serve_remote_https;
 

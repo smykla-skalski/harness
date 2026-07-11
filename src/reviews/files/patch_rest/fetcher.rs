@@ -9,7 +9,8 @@ use std::fmt;
 
 use super::parsing::{RestPullFile, parse_next_link, select_patches_by_path, split_repo_full_name};
 use crate::github_api::{
-    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubReadStabilityError,
+    GitHubRequestDescriptor, retry_stable_read,
 };
 use crate::reviews::files::{FILES_PAGE_CAP, ReviewFilePatch};
 
@@ -39,9 +40,31 @@ pub enum ConditionalFetchOutcome {
 /// with no body fetched. Without an etag the first call is unconditional.
 ///
 /// # Errors
-/// Returns `RestFetchError` on network / auth failures and on malformed
-/// `repo_full_name`.
+/// Returns `RestFetchError` on network / auth failures, malformed
+/// `repo_full_name`, or repeated concurrent GitHub data changes.
 pub async fn fetch_patches_conditional(
+    client: &GitHubProtectedClient,
+    repo_full_name: &str,
+    pr_number: u64,
+    head_ref_oid: &str,
+    requested_paths: &[String],
+    if_none_match: Option<&str>,
+) -> Result<ConditionalFetchOutcome, RestFetchError> {
+    retry_stable_read("reviews.files_patch", |_| {
+        fetch_patches_conditional_at_revision(
+            client,
+            repo_full_name,
+            pr_number,
+            head_ref_oid,
+            requested_paths,
+            if_none_match,
+        )
+    })
+    .await
+    .map(|(outcome, _)| outcome)
+}
+
+async fn fetch_patches_conditional_at_revision(
     client: &GitHubProtectedClient,
     repo_full_name: &str,
     pr_number: u64,
@@ -118,13 +141,29 @@ pub async fn fetch_patches_conditional(
 /// need a yes/no answer do not materialize every patch for large pull requests.
 ///
 /// # Errors
-/// Returns `RestFetchError` on network / auth failures and on malformed
-/// `repo_full_name`.
+/// Returns `RestFetchError` on network / auth failures, malformed
+/// `repo_full_name`, or repeated concurrent GitHub data changes.
 pub async fn any_patch_matches<F>(
     client: &GitHubProtectedClient,
     repo_full_name: &str,
     pr_number: u64,
     predicate: F,
+) -> Result<bool, RestFetchError>
+where
+    F: Fn(&str) -> bool + Send + Sync,
+{
+    retry_stable_read("reviews.files_patch_scan", |_| {
+        any_patch_matches_at_revision(client, repo_full_name, pr_number, &predicate)
+    })
+    .await
+    .map(|(matched, _)| matched)
+}
+
+async fn any_patch_matches_at_revision<F>(
+    client: &GitHubProtectedClient,
+    repo_full_name: &str,
+    pr_number: u64,
+    predicate: &F,
 ) -> Result<bool, RestFetchError>
 where
     F: Fn(&str) -> bool + Send + Sync,
@@ -157,7 +196,7 @@ where
     let first_page = response
         .body
         .ok_or_else(|| RestFetchError::Http("rest patches missing body".into()))?;
-    if page_has_matching_patch(&first_page, &predicate) {
+    if page_has_matching_patch(&first_page, predicate) {
         return Ok(true);
     }
 
@@ -189,7 +228,7 @@ where
         let page = response
             .body
             .ok_or_else(|| RestFetchError::Http("paginated body missing".into()))?;
-        if page_has_matching_patch(&page, &predicate) {
+        if page_has_matching_patch(&page, predicate) {
             return Ok(true);
         }
         visited_pages += 1;
@@ -300,6 +339,7 @@ pub async fn fetch_patches(
 pub enum RestFetchError {
     InvalidRequest(String),
     Http(String),
+    UnstableRead(String),
 }
 
 impl fmt::Display for RestFetchError {
@@ -307,11 +347,18 @@ impl fmt::Display for RestFetchError {
         match self {
             Self::InvalidRequest(msg) => write!(f, "rest patch fetch: {msg}"),
             Self::Http(msg) => write!(f, "rest patch fetch http: {msg}"),
+            Self::UnstableRead(msg) => write!(f, "rest patch fetch unstable: {msg}"),
         }
     }
 }
 
 impl Error for RestFetchError {}
+
+impl From<GitHubReadStabilityError> for RestFetchError {
+    fn from(error: GitHubReadStabilityError) -> Self {
+        Self::UnstableRead(error.to_string())
+    }
+}
 
 fn patch_descriptor(operation: &str) -> GitHubRequestDescriptor {
     GitHubRequestDescriptor::rest_core(

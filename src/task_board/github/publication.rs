@@ -19,6 +19,8 @@ use signing::{commit_author, local_commit_signature};
 use types::{BranchPublicationMode, LocalBranchSnapshot};
 
 mod git_ssh_publish;
+#[cfg(test)]
+mod mutation_tests;
 mod signing;
 mod ssh_signing;
 mod types;

@@ -302,14 +302,6 @@ query PullRequestBody($id: ID!) {
 }
 ";
 
-pub(super) const VIEWER_LOGIN_QUERY: &str = r"
-query ReviewsViewerLogin {
-  viewer {
-    login
-  }
-}
-";
-
 pub(super) const APPROVE_MUTATION: &str = r"
 mutation ApproveReview($id: ID!) {
   addPullRequestReview(input: { pullRequestId: $id, event: APPROVE }) {

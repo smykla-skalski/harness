@@ -4,6 +4,21 @@ use serde::{Deserialize, Serialize};
 
 use super::budget::GitHubRateResource;
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct GitHubDataChange {
+    pub revision: u64,
+    pub operation: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct GitHubPullRequestSnapshot {
+    pub repository: String,
+    pub number: u64,
+    pub is_open: Option<bool>,
+    pub viewer_review_requested: Option<bool>,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum GitHubPriority {
@@ -135,6 +150,7 @@ impl GitHubResponseProvenance {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct GitHubApiStatus {
+    pub data_revision: u64,
     pub buckets: Vec<GitHubRateBucketStatus>,
     pub cooling: Vec<GitHubCooldownStatus>,
     pub last_hour_network_requests: u64,

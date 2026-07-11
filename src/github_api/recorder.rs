@@ -101,9 +101,14 @@ impl GitHubUsageRecorder {
         });
     }
 
-    pub(crate) async fn status(&self, budget: &GitHubRateBudget) -> GitHubApiStatus {
+    pub(crate) async fn status(
+        &self,
+        budget: &GitHubRateBudget,
+        data_revision: u64,
+    ) -> GitHubApiStatus {
         let events = self.window_events();
         GitHubApiStatus {
+            data_revision,
             buckets: budget.bucket_statuses().await,
             cooling: budget.cooldown_statuses().await,
             last_hour_network_requests: count_network(&events),

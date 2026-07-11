@@ -5,7 +5,8 @@ extension DashboardReviewsRouteView {
   var reloadTaskKey: DashboardReviewsReloadTaskKey {
     DashboardReviewsReloadTaskKey(
       preferencesSignature: routeResolvedPreferences.cacheHash,
-      isConnected: isReviewsReloadConnected(store.connectionState)
+      isConnected: isReviewsReloadConnected(store.connectionState),
+      githubDataRevision: store.contentUI.dashboard.githubDataRevision
     )
   }
 

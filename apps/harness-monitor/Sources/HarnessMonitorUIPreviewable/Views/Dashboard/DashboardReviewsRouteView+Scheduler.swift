@@ -6,10 +6,11 @@ extension DashboardReviewsRouteView {
   /// per-repository scheduler. Idempotent and safe to call on every
   /// preferences-change tick; the scheduler internally cancels its prior
   /// tick task and any in-flight fetches before resuming.
-  func startScheduler(forceRefreshAll: Bool = false) async {
+  @discardableResult
+  func startScheduler(forceRefreshAll: Bool = false) async -> Bool {
     guard let client = store.apiClient else {
       routeScheduler.stop()
-      return
+      return false
     }
     let preferences = routeResolvedPreferences
     let resolver = ensureRepoResolver(client: client)
@@ -20,7 +21,7 @@ extension DashboardReviewsRouteView {
         excludeRepositories: preferences.excludeRepositories,
         expandOrganizations: preferences.preferences.expandOrganizations
       )
-      guard !Task.isCancelled else { return }
+      guard !Task.isCancelled else { return false }
       let trackedRepositories = dashboardReviewsTrackedRepositories(
         resolvedRepositories: resolvedRepositories,
         visibleRepositories: routeResponse.items.map(\.repository),
@@ -47,6 +48,7 @@ extension DashboardReviewsRouteView {
           self.applyPerRepoResponse(repository: repository, response: response)
         }
       )
+      return true
     } catch {
       HarnessMonitorLogger.api.warning(
         """
@@ -60,6 +62,7 @@ extension DashboardReviewsRouteView {
       } else {
         store.presentFailureFeedback(displayMessage)
       }
+      return false
     }
   }
 

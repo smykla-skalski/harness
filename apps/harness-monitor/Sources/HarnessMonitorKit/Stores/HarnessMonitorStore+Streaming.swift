@@ -149,6 +149,7 @@ extension HarnessMonitorStore {
         "websocket reconnect log-level refresh failed: \(err, privacy: .public)"
       )
     }
+    await recoverGitHubDataPushState(using: client)
   }
 
   func applyGlobalPushEvent(_ event: DaemonPushEvent) {
@@ -241,7 +242,7 @@ extension HarnessMonitorStore {
       shouldTickSupervisor = true
     case .codexRunUpdated, .codexApprovalRequested, .agentTuiUpdated, .acpAgentUpdated,
       .acpInspect, .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
-      .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved, .auditEvent:
+      .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved, .githubDataChanged, .auditEvent:
       break
     case .reviewsLocalCloneProgress(let progress):
       applyLocalCloneProgress(progress)
@@ -299,10 +300,7 @@ extension HarnessMonitorStore {
       scheduleSupervisorTick(reason: "global-managed-agent")
       return
     }
-    if case .auditEvent(let auditEvent) = event.kind {
-      await applyApplicationAuditEventFromStream(auditEvent)
-      return
-    }
+    if await applyGlobalDataPushEventFromStream(event) { return }
     applyGlobalPushEvent(event)
   }
 

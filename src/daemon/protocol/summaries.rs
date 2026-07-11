@@ -128,6 +128,8 @@ pub struct DaemonDiagnosticsReport {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitHubApiDiagnostics {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data_revision: Option<u64>,
     pub buckets: Vec<GitHubRateBucketDiagnostics>,
     pub cooling: Vec<GitHubCooldownDiagnostics>,
     pub last_hour_network_requests: u64,
@@ -165,6 +167,7 @@ pub struct GitHubOperationSpendDiagnostics {
 impl From<GitHubApiStatus> for GitHubApiDiagnostics {
     fn from(status: GitHubApiStatus) -> Self {
         Self {
+            data_revision: Some(status.data_revision),
             buckets: status
                 .buckets
                 .into_iter()

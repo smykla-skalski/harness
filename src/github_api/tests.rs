@@ -25,6 +25,45 @@ fn cache_key_hashes_secret_material() {
 }
 
 #[test]
+fn disk_cache_control_reuses_healthy_scope_and_rotates_during_recovery() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let first = GitHubCache::test_with_root(temp.path().to_path_buf());
+    first.persist_data_revision(7).expect("persist revision");
+    let second = GitHubCache::test_with_root(temp.path().to_path_buf());
+
+    assert_eq!(first.scope(), second.scope());
+    assert_eq!(second.data_revision(), 7);
+    let healthy_scope = second.scope();
+    second
+        .disable_disk_after_revision_failure(8)
+        .expect("rotate failed cache");
+    let recovered = GitHubCache::test_with_root(temp.path().to_path_buf());
+    assert_ne!(healthy_scope, recovered.scope());
+    assert_eq!(second.scope(), recovered.scope());
+    assert_eq!(recovered.data_revision(), 8);
+}
+
+#[test]
+fn disk_cache_recovery_propagates_control_rotation_failure() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let cache = GitHubCache::test_with_root(temp.path().to_path_buf());
+    cache.persist_data_revision(7).expect("persist revision");
+    let blocked_tmp = temp
+        .path()
+        .join("github-cache-control.json")
+        .with_extension(format!("{}.tmp", std::process::id()));
+    fs_err::create_dir(&blocked_tmp).expect("block temporary control file");
+
+    let error = cache
+        .disable_disk_after_revision_failure(8)
+        .expect_err("control rotation must remain observable");
+    let restarted = GitHubCache::test_with_root(temp.path().to_path_buf());
+
+    assert!(error.to_string().contains("rotate github cache control"));
+    assert_eq!(restarted.data_revision(), 7);
+}
+
+#[test]
 fn retry_after_header_parses_seconds() {
     let mut headers = HeaderMap::new();
     headers.insert(reqwest::header::RETRY_AFTER, HeaderValue::from_static("42"));

@@ -30,6 +30,16 @@ public struct AcpPermissionBatchRemovedPayload: Equatable, Sendable {
   }
 }
 
+public struct GitHubDataChangedPayload: Codable, Equatable, Sendable {
+  public let revision: UInt64
+  public let operation: String
+
+  public init(revision: UInt64, operation: String) {
+    self.revision = revision
+    self.operation = operation
+  }
+}
+
 public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
   public enum Kind: Equatable, Sendable {
     case ready
@@ -49,6 +59,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case acpBridgeResyncIncident(AcpBridgeResyncIncidentPayload)
     case acpPermissionBatch(AcpPermissionBatch)
     case acpPermissionBatchRemoved(AcpPermissionBatchRemovedPayload)
+    case githubDataChanged(GitHubDataChangedPayload)
     case reviewsLocalCloneProgress(ReviewLocalCloneProgress)
     case auditEvent(HarnessMonitorAuditEvent)
     case unknown(eventName: String, payload: JSONValue)
@@ -125,6 +136,14 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
           ReviewLocalCloneProgress(
             wire: try streamEvent.decodePayloadWire(as: LocalCloneProgressEventPayloadWire.self)
           )
+        )
+      )
+    case "github_data_changed":
+      return Self(
+        recordedAt: at,
+        sessionId: nil,
+        kind: .githubDataChanged(
+          try streamEvent.decodePayloadWire(as: GitHubDataChangedPayload.self)
         )
       )
     case "audit_event":

@@ -1,6 +1,8 @@
 import Foundation
 
 struct CacheWriteSyncState {
+  var githubDataTaskBoardRefreshTask: Task<Void, Never>?
+  var githubDataRefreshGeneration: UInt64 = 0
   var pendingCacheWriteTask: Task<Void, Never>?
   var pendingCacheWriteTaskToken: UInt64 = 0
   var pendingTaskBoardSnapshotCacheWriteTask: Task<Void, Never>?
