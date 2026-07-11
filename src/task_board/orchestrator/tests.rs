@@ -1,3 +1,4 @@
+use fs_err as fs;
 use tempfile::tempdir;
 
 use super::*;
@@ -211,6 +212,69 @@ fn partial_settings_json_populates_defaults() {
     assert_eq!(settings.enabled_workflows, defaults.enabled_workflows);
     assert_eq!(settings.dry_run_default, defaults.dry_run_default);
     assert_eq!(settings.policy_version, defaults.policy_version);
+}
+
+#[test]
+fn settings_read_repairs_legacy_dispatch_status_filter_on_disk() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("board");
+    fs::create_dir_all(&root).expect("create board root");
+    let settings_path = root.join(SETTINGS_FILE);
+    fs::write(
+        &settings_path,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "dispatch_status_filter": "needs_you"
+        }))
+        .expect("serialize settings"),
+    )
+    .expect("write settings");
+    let orchestrator = TaskBoardOrchestrator::new(root);
+
+    let settings = orchestrator.settings().expect("load settings");
+
+    assert_eq!(
+        settings.dispatch_status_filter,
+        Some(TaskBoardStatus::HumanRequired)
+    );
+    let contents = fs::read_to_string(settings_path).expect("read repaired settings");
+    assert!(contents.contains("\"dispatch_status_filter\": \"human_required\""));
+    assert!(!contents.contains("\"dispatch_status_filter\": \"needs_you\""));
+}
+
+#[test]
+fn settings_update_writes_current_dispatch_status_filter() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("board");
+    let settings_path = root.join(SETTINGS_FILE);
+    let orchestrator = TaskBoardOrchestrator::new(root);
+
+    let settings = orchestrator
+        .update_settings(&TaskBoardOrchestratorSettingsUpdateRequest {
+            dispatch_status_filter: Some(TaskBoardStatus::PlanReview),
+            ..TaskBoardOrchestratorSettingsUpdateRequest::default()
+        })
+        .expect("update settings");
+
+    assert_eq!(
+        settings.dispatch_status_filter,
+        Some(TaskBoardStatus::AgenticReview)
+    );
+    let contents = fs::read_to_string(settings_path).expect("read current settings");
+    assert!(contents.contains("\"dispatch_status_filter\": \"agentic_review\""));
+    assert!(!contents.contains("\"dispatch_status_filter\": \"plan_review\""));
+}
+
+#[test]
+fn dispatch_input_maps_legacy_filter_to_current_lane() {
+    let settings = TaskBoardOrchestratorSettings::default();
+    let request = TaskBoardOrchestratorRunOnceRequest {
+        status: Some(TaskBoardStatus::Blocked),
+        ..TaskBoardOrchestratorRunOnceRequest::default()
+    };
+
+    let input = settings::dispatch_input(&request, &settings);
+
+    assert_eq!(input.status, Some(TaskBoardStatus::Failed));
 }
 
 #[test]

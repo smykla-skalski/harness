@@ -101,6 +101,21 @@ fn list_repairs_legacy_statuses_before_filtering() {
 }
 
 #[test]
+fn list_maps_legacy_status_filter_to_current_status() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    seed_raw_item(&store, "legacy-blocked", "blocked");
+
+    let listed = store
+        .list(Some(TaskBoardStatus::Blocked))
+        .expect("list legacy filter");
+
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].id, "legacy-blocked");
+    assert_eq!(listed[0].status, TaskBoardStatus::Failed);
+}
+
+#[test]
 fn update_writes_current_status_for_legacy_status_patch() {
     let temp = tempdir().expect("tempdir");
     let store = TaskBoardStore::new(temp.path().join("board"));
