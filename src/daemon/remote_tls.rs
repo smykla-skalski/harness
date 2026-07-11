@@ -446,7 +446,7 @@ fn handle_tls_handshake_error(addr: SocketAddr, error: &io::Error) {
     );
 }
 
-fn ensure_rustls_provider() {
+pub(crate) fn ensure_rustls_provider() {
     RUSTLS_PROVIDER.get_or_init(install_remote_tls_rustls_provider);
 }
 
