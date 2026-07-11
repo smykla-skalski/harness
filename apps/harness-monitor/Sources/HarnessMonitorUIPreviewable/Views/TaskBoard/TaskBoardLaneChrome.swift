@@ -138,6 +138,8 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
   private var reduceTransparency
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
+  @Environment(\.colorScheme)
+  private var colorScheme
   @Environment(\.taskBoardLaneAppearance)
   private var laneAppearance
 
@@ -189,7 +191,18 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
   }
 
   private var laneSurfaceFill: Color {
-    HarnessMonitorTheme.ink.opacity(reduceTransparency ? 0.08 : 0.055)
+    switch colorScheme {
+    case .dark:
+      if reduceTransparency {
+        return Color(red: 0.1, green: 0.135, blue: 0.14)
+      }
+      return Color(red: 0.075, green: 0.105, blue: 0.11)
+    default:
+      if reduceTransparency {
+        return Color(red: 0.9, green: 0.925, blue: 0.94)
+      }
+      return Color(red: 0.925, green: 0.945, blue: 0.955)
+    }
   }
 
   private var laneAccentInteriorStyle: AnyShapeStyle {

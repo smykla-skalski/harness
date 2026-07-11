@@ -45,9 +45,10 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(laneChrome.contains("private var laneSurfaceFill: Color"))
     #expect(
       laneChrome.contains(
-        "HarnessMonitorTheme.ink.opacity(reduceTransparency ? 0.08 : 0.055)"
+        "Color(red: 0.075, green: 0.105, blue: 0.11)"
       )
     )
+    #expect(laneChrome.contains("Color(red: 0.925, green: 0.945, blue: 0.955)"))
     #expect(laneChrome.contains("shape.fill(laneSurfaceFill)"))
     #expect(laneChrome.contains("AnyShapeStyle(laneSurfaceFill)"))
     #expect(!laneChrome.contains("AnyShapeStyle(.background.opacity"))
