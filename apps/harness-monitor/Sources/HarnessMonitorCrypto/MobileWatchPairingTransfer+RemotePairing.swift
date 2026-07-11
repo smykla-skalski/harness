@@ -13,14 +13,23 @@ extension MobileWatchPairingTransfer {
 
     let localStationIDs = Set(localCredentials.map(\.stationID))
     let localIdentityIDs = Set(localCredentials.map(\.deviceIdentityID))
-    var mergedCredentials = credentials.filter { !localStationIDs.contains($0.stationID) }
+    var mergedCredentialsByStationID: [String: MobilePairedStationCredential] = [:]
+    for credential in credentials where !localStationIDs.contains(credential.stationID) {
+      mergedCredentialsByStationID[credential.stationID] = credential
+    }
     if localCredentials.contains(where: \.defaultStation) {
-      for index in mergedCredentials.indices {
-        mergedCredentials[index].defaultStation = false
+      mergedCredentialsByStationID = mergedCredentialsByStationID.mapValues { credential in
+        var credential = credential
+        credential.defaultStation = false
+        return credential
       }
     }
-    mergedCredentials.append(contentsOf: localCredentials)
-    mergedCredentials.sort { $0.stationID < $1.stationID }
+    for credential in localCredentials {
+      mergedCredentialsByStationID[credential.stationID] = credential
+    }
+    let mergedCredentials = mergedCredentialsByStationID.values.sorted {
+      $0.stationID < $1.stationID
+    }
 
     let referencedIdentityIDs = Set(mergedCredentials.map(\.deviceIdentityID))
     var identitiesByID: [String: MobileDeviceIdentity] = [:]

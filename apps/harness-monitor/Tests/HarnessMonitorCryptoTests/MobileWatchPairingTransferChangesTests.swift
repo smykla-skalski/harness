@@ -306,6 +306,51 @@ final class MobileWatchPairingTransferChangesTests: XCTestCase {
       latestPhoneIdentity
     )
   }
+
+  func testDuplicateIncomingStationsUseTheLastCredential() throws {
+    let firstPhoneIdentity = makePairingIdentity(id: "phone-first", now: now)
+    let latestPhoneIdentity = makePairingIdentity(id: "phone-latest", now: now)
+    let watchIdentity = makePairingIdentity(
+      id: MobileRemoteDaemonPairingDevice.watchOS.identityID,
+      now: now
+    )
+    let firstPhoneCredential = makePairedStationCredential(
+      stationID: "relay-phone",
+      deviceIdentityID: firstPhoneIdentity.id,
+      now: now
+    )
+    let latestPhoneCredential = makePairedStationCredential(
+      stationID: "relay-phone",
+      deviceIdentityID: latestPhoneIdentity.id,
+      now: now
+    )
+    let watchCredential = try makeRemoteCredential(
+      stationID: "remote-watch",
+      identityID: watchIdentity.id,
+      platform: "watchos",
+      token: "watch-token"
+    )
+    let transfer = MobileWatchPairingTransfer(
+      identities: [firstPhoneIdentity, latestPhoneIdentity],
+      credentials: [firstPhoneCredential, latestPhoneCredential],
+      exportedAt: now
+    )
+
+    let reconciled = transfer.preservingLocallyPairedRemoteCredentials(
+      for: .watchOS,
+      currentIdentities: [watchIdentity],
+      currentCredentials: [watchCredential]
+    )
+
+    XCTAssertEqual(
+      reconciled.credentials.filter { $0.stationID == latestPhoneCredential.stationID },
+      [latestPhoneCredential]
+    )
+    XCTAssertEqual(
+      Set(reconciled.identities.map(\.id)),
+      Set([latestPhoneIdentity.id, watchIdentity.id])
+    )
+  }
 }
 
 private func makeRemoteCredential(
