@@ -176,11 +176,10 @@ struct RootView: View {
   }
 
   private var directWatchCredential: MobilePairedStationCredential? {
-    let directCredentials = store.pairedCredentials.filter(
-      MobileRemoteDaemonPairingDevice.watchOS.owns
-    )
-    return directCredentials.first { $0.stationID == store.selectedStationID }
-      ?? directCredentials.first
+    store.pairedCredentials.first { credential in
+      credential.stationID == store.selectedStationID
+        && MobileRemoteDaemonPairingDevice.watchOS.owns(credential)
+    }
   }
 
   @ViewBuilder private var needsYouSection: some View {

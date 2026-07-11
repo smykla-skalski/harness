@@ -103,6 +103,8 @@ struct HarnessMonitorAppBundleMetadataTests {
     )
     #expect(rootViewSource.contains("Remove Watch Pairing"))
     #expect(rootViewSource.contains("removeDirectWatchPairing"))
+    #expect(rootViewSource.contains("credential.stationID == store.selectedStationID"))
+    #expect(!rootViewSource.contains("?? directCredentials.first"))
 
     let pairingViewSource = try String(
       contentsOf: root.appendingPathComponent(
