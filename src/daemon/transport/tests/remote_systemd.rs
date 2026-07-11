@@ -6,6 +6,7 @@ use tempfile::tempdir;
 use super::super::remote::DaemonRemoteCommand;
 use super::super::remote_systemd::{
     DaemonRemoteSystemdInstallArgs, RemoteSystemdInstallPlan, default_env_path_for_tests,
+    systemd_daemon_root_for_tests,
 };
 use super::super::remote_systemd_lifecycle::{
     RemoteSystemdCommandOutput, install_remote_systemd_with, uninstall_remote_systemd_with,
@@ -15,6 +16,15 @@ use super::super::remote_systemd_lifecycle::{
 struct DaemonRemoteCommandTestHarness {
     #[command(subcommand)]
     command: DaemonRemoteCommand,
+}
+
+#[test]
+fn remote_systemd_management_root_uses_private_state_directory() {
+    assert_eq!(
+        systemd_daemon_root_for_tests("harness-remote-proof").expect("systemd daemon root"),
+        PathBuf::from("/var/lib/private/harness-remote-proof/harness/daemon/external")
+    );
+    assert!(systemd_daemon_root_for_tests("../unsafe").is_err());
 }
 
 #[test]

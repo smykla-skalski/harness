@@ -48,15 +48,41 @@ fn parse_daemon_remote_serve() {
 
     match cli.command {
         Command::Daemon {
-            command: DaemonCommand::Remote { command },
+            command:
+                DaemonCommand::Remote {
+                    command,
+                    systemd_unit,
+                },
         } => match command {
             crate::daemon::transport::DaemonRemoteCommand::Serve(args) => {
+                assert_eq!(systemd_unit, None);
                 assert_eq!(args.domain, "daemon.example.com");
                 assert_eq!(args.host, "0.0.0.0");
                 assert_eq!(args.https_port, 443);
             }
             other => panic!("expected daemon remote serve, got {other:?}"),
         },
+        _ => panic!("expected daemon remote command"),
+    }
+}
+
+#[test]
+fn parse_daemon_remote_systemd_unit_after_nested_command() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "daemon",
+        "remote",
+        "pair",
+        "create",
+        "--systemd-unit",
+        "harness-remote-proof",
+    ])
+    .expect("parse remote systemd unit");
+
+    match cli.command {
+        Command::Daemon {
+            command: DaemonCommand::Remote { systemd_unit, .. },
+        } => assert_eq!(systemd_unit.as_deref(), Some("harness-remote-proof")),
         _ => panic!("expected daemon remote command"),
     }
 }

@@ -19,6 +19,7 @@ use super::control::{
     restart_daemon, stop_daemon,
 };
 use super::remote::DaemonRemoteCommand;
+use super::remote_systemd::{ensure_linux_systemd, systemd_daemon_root};
 
 /// Local daemon operations and remote-daemon scaffolding.
 #[derive(Debug, Clone, Subcommand)]
@@ -31,6 +32,9 @@ pub enum DaemonCommand {
     Dev(DaemonDevArgs),
     /// Serve and manage an internet-reachable remote daemon.
     Remote {
+        /// Use the private state directory of an installed systemd unit.
+        #[arg(long, global = true)]
+        systemd_unit: Option<String>,
         #[command(subcommand)]
         command: DaemonRemoteCommand,
     },
@@ -55,7 +59,10 @@ impl Execute for DaemonCommand {
         match self {
             Self::Serve(args) => args.execute(context),
             Self::Dev(args) => args.execute(context),
-            Self::Remote { command } => command.execute(context),
+            Self::Remote {
+                command,
+                systemd_unit,
+            } => execute_remote_command(command, systemd_unit.as_deref(), context),
             Self::Status => {
                 adopt_daemon_root_for_transport_command("daemon-status");
                 let report = service::status_report()?;
@@ -77,6 +84,21 @@ impl Execute for DaemonCommand {
             Self::Snapshot(args) => args.execute(context),
         }
     }
+}
+
+fn execute_remote_command(
+    command: &DaemonRemoteCommand,
+    systemd_unit: Option<&str>,
+    context: &AppContext,
+) -> Result<i32, CliError> {
+    let _root_override = systemd_unit
+        .map(|unit| {
+            ensure_linux_systemd()?;
+            systemd_daemon_root(unit)
+        })
+        .transpose()?
+        .map(|root| state::ScopedDaemonRootOverride::set(Some(root)));
+    command.execute(context)
 }
 
 #[derive(Debug, Clone, Args)]
