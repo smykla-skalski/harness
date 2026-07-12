@@ -113,4 +113,26 @@ struct PolicyDocumentDecodingTests {
     #expect(document.layout.nodes.first?.nodeId == "risk:merge")
     #expect(document.nodes.first { $0.id == "supervisor:allow" }?.groupId == "terminal")
   }
+
+  @Test("defaults policy trace IDs when the daemon omits an empty list")
+  func defaultsMissingPolicyTraceIDs() throws {
+    let payload = """
+      {
+        "schema_version": 2,
+        "revision": 1,
+        "mode": "draft",
+        "nodes": [],
+        "edges": [],
+        "groups": [],
+        "layout": {}
+      }
+      """
+
+    let document = try PolicyWireCoding.decoder.decode(
+      PolicyPipelineDocument.self,
+      from: Data(payload.utf8)
+    )
+
+    #expect(document.policyTraceIds.isEmpty)
+  }
 }

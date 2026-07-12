@@ -48,6 +48,22 @@ public struct PolicyPipelineDocument: Codable, Equatable, Sendable {
     case policyTraceIds = "policy_trace_ids"
   }
 
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    schemaVersion = try container.decode(UInt16.self, forKey: .schemaVersion)
+    revision = try container.decode(UInt64.self, forKey: .revision)
+    mode = try container.decode(PolicyPipelineMode.self, forKey: .mode)
+    nodes = try container.decode([PolicyPipelineNode].self, forKey: .nodes)
+    edges = try container.decode([PolicyPipelineEdge].self, forKey: .edges)
+    groups = try container.decode([PolicyPipelineGroup].self, forKey: .groups)
+    layout = try container.decode(PolicyPipelineLayout.self, forKey: .layout)
+    policyTraceIds =
+      try container.decodeIfPresent(
+        [String].self,
+        forKey: .policyTraceIds
+      ) ?? []
+  }
+
   public func supervisorPolicyOverrides() -> [PolicyConfigOverride] {
     nodes.compactMap { node in
       // The wire model identifies a supervisor rule by the node id (the seed

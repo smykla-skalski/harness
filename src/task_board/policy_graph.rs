@@ -105,7 +105,7 @@ pub struct PolicyGraph {
     pub edges: Vec<PolicyGraphEdge>,
     pub groups: Vec<PolicyGraphGroup>,
     pub layout: PolicyGraphLayout,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub policy_trace_ids: Vec<String>,
 }
 

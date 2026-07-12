@@ -53,6 +53,16 @@ fn seeded_graph_serializes_as_v2_draft() {
 }
 
 #[test]
+fn graph_serialization_keeps_empty_policy_trace_ids() {
+    let mut graph = PolicyGraph::seeded_v2();
+    graph.policy_trace_ids.clear();
+
+    let encoded = serde_json::to_value(graph).expect("serialize policy graph");
+
+    assert_eq!(encoded["policy_trace_ids"], json!([]));
+}
+
+#[test]
 fn seeded_graph_layout_starts_clear_and_non_overlapping() {
     let graph = PolicyGraph::seeded_v2();
     let node_layouts: HashMap<_, _> = graph
