@@ -251,6 +251,41 @@ impl RemoteDaemonClient {
             .map_err(|error| format!("close WSS connection: {error}"))
     }
 
+    pub async fn expect_live_websocket_invalidation<Mutate, Output>(
+        &self,
+        credentials: &RemoteCredentials,
+        mutate: Mutate,
+    ) -> Result<Output, String>
+    where
+        Mutate: FnOnce() -> Result<Output, String>,
+    {
+        let mut socket = self.connect_websocket(credentials).await?;
+        let health = websocket_rpc(&mut socket, "e2e-before-revoke", "health").await?;
+        if !health["error"].is_null() || health["result"].is_null() {
+            return Err(format!("WSS health before revoke failed: {health}"));
+        }
+
+        let output = mutate()?;
+        let denied = websocket_rpc(&mut socket, "e2e-after-revoke", "health").await?;
+        if denied["error"]["status_code"].as_u64() != Some(401) {
+            return Err(format!(
+                "live WSS revoke did not deny the request: {denied}"
+            ));
+        }
+
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while let Some(frame) = socket.next().await {
+                match frame {
+                    Ok(Message::Close(_)) | Err(_) => return,
+                    Ok(_) => {}
+                }
+            }
+        })
+        .await
+        .map_err(|_| "invalidated WSS connection remained open".to_string())?;
+        Ok(output)
+    }
+
     #[allow(
         dead_code,
         reason = "used by the public ACME sibling integration target"

@@ -164,6 +164,56 @@ fn remote_clients_persist_hashed_tokens_and_support_revoke_rotate() {
 }
 
 #[test]
+fn remote_client_session_rejects_revoke_and_token_rotation() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let registration = RemoteClientRegistration::new_for_tests(
+        "session-client",
+        "Session Client",
+        "macos",
+        RemoteRole::Viewer,
+        &[RemoteAccessScope::Read],
+        "session-token",
+        "2026-07-12T15:00:00Z",
+    )
+    .expect("registration");
+    let authenticated = db
+        .register_remote_client(&registration)
+        .expect("register client");
+
+    assert!(
+        db.validate_remote_client_session(&authenticated)
+            .expect("validate active session")
+            .is_some()
+    );
+
+    db.rotate_remote_client_token(
+        &authenticated.client_id,
+        "rotated-session-token",
+        "2026-07-12T15:01:00Z",
+    )
+    .expect("rotate token");
+    assert!(
+        db.validate_remote_client_session(&authenticated)
+            .expect("validate rotated session")
+            .is_none(),
+        "a token rotation must invalidate the handshake identity"
+    );
+
+    let rotated = db
+        .verify_remote_client_token(&authenticated.client_id, "rotated-session-token")
+        .expect("verify rotated token")
+        .expect("rotated client");
+    db.revoke_remote_client(&rotated.client_id, "2026-07-12T15:02:00Z")
+        .expect("revoke client");
+    assert!(
+        db.validate_remote_client_session(&rotated)
+            .expect("validate revoked session")
+            .is_none(),
+        "revocation must invalidate the handshake identity"
+    );
+}
+
+#[test]
 fn remote_audit_events_persist_with_redacted_error_detail() {
     let db = DaemonDb::open_in_memory().expect("open db");
     let event = RemoteAuditEvent::new(

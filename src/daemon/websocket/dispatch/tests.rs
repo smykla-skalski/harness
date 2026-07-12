@@ -3,7 +3,10 @@ use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::protocol::ws_methods;
 use crate::daemon::protocol::{WsRequest, current_control_plane_actor_id};
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
-use crate::daemon::remote_identity::{RemoteStoredClient, RemoteTokenHash};
+use crate::daemon::remote_identity::{
+    RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration, RemoteStoredClient,
+    RemoteTokenHash,
+};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -71,6 +74,58 @@ async fn remote_ws_dispatch_denies_known_method_without_remote_client() {
     assert_eq!(error.message, "remote client id is required");
     assert_eq!(error.status_code, Some(401));
     assert!(response.result.is_none());
+}
+
+#[tokio::test]
+async fn remote_ws_dispatch_denies_client_revoked_after_handshake() {
+    let mut state = super::super::test_support::test_http_state_with_db();
+    state.auth_mode = DaemonHttpAuthMode::Remote;
+    let registration = RemoteClientRegistration::new_for_tests(
+        "revoked-viewer",
+        "Revoked Viewer",
+        "macos",
+        RemoteRole::Viewer,
+        &[RemoteAccessScope::Read],
+        "revoked-viewer-token-abcdefghijklmnopqrstuvwxyz",
+        "2026-07-12T15:00:00Z",
+    )
+    .expect("remote registration");
+    let authenticated = {
+        let db = state.db.get().expect("db slot").lock().expect("db lock");
+        let client = db
+            .register_remote_client(&registration)
+            .expect("register remote client");
+        db.revoke_remote_client(&client.client_id, "2026-07-12T15:01:00Z")
+            .expect("revoke remote client");
+        client
+    };
+    let connection = Arc::new(Mutex::new(ConnectionState::new_remote(authenticated)));
+    let request = ws_request("req-revoked", ws_methods::PING);
+
+    let response = dispatch(&request, &state, &connection).await;
+    let error = response.error.expect("remote auth error");
+
+    assert_eq!(error.code, "REMOTE_AUTH");
+    assert_eq!(error.message, "remote bearer token is invalid");
+    assert_eq!(error.status_code, Some(401));
+    let audit = state
+        .db
+        .get()
+        .expect("db slot")
+        .lock()
+        .expect("db lock")
+        .load_remote_audit_events(10)
+        .expect("load remote audits")
+        .into_iter()
+        .find(|event| event.request_id.as_deref() == Some("req-revoked"))
+        .expect("revoked request audit");
+    assert_eq!(audit.client_id.as_deref(), Some("revoked-viewer"));
+    assert_eq!(audit.scope_decision, RemoteAuditScopeDecision::Denied);
+    assert_eq!(audit.outcome, RemoteAuditOutcome::Failure);
+    assert_eq!(
+        audit.error_detail.as_deref(),
+        Some("remote bearer token is invalid")
+    );
 }
 
 #[tokio::test]
