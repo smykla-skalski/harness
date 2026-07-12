@@ -91,7 +91,8 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     let snapshot = try XCTUnwrap(fetchedSnapshot)
 
     let requests = RemoteDaemonSessionsURLProtocol.requests
-    XCTAssertEqual(Set(requests.compactMap(\.url?.path)), [
+    XCTAssertEqual(requests.count, 2)
+    XCTAssertEqual(requests.compactMap(\.url?.path).sorted(), [
       "/v1/sessions", "/v1/task-board/items",
     ])
     for request in requests {

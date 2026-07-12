@@ -12,27 +12,13 @@ public struct MobileMirrorSecretRedactor: Sendable {
     var template: String
   }
 
-  private let rules: [Rule]
-
-  public init() {
-    rules = Self.rawRules.map { rule in
-      guard
-        let expression = try? NSRegularExpression(
-          pattern: rule.pattern,
-          options: rule.options
-        )
-      else {
-        fatalError("Invalid redaction rule pattern: \(rule.pattern)")
-      }
-      return Rule(expression: expression, template: rule.template)
-    }
-  }
+  public init() {}
 
   public func redact(_ value: String) -> String {
     guard !value.isEmpty else {
       return value
     }
-    return rules.reduce(value) { partial, rule in
+    return Self.rules.reduce(value) { partial, rule in
       let range = NSRange(partial.startIndex..<partial.endIndex, in: partial)
       return rule.expression.stringByReplacingMatches(
         in: partial,
@@ -41,6 +27,18 @@ public struct MobileMirrorSecretRedactor: Sendable {
         withTemplate: rule.template
       )
     }
+  }
+
+  private static let rules: [Rule] = rawRules.map { rule in
+    guard
+      let expression = try? NSRegularExpression(
+        pattern: rule.pattern,
+        options: rule.options
+      )
+    else {
+      fatalError("Invalid redaction rule pattern: \(rule.pattern)")
+    }
+    return Rule(expression: expression, template: rule.template)
   }
 
   private static let rawRules: [RawRule] = [
