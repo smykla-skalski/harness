@@ -105,14 +105,14 @@ monitor_python_tests_dir="$ROOT/apps/harness-monitor/Scripts/tests"
 monitor_python_tests=("$ROOT"/apps/harness-monitor/Scripts/tests/*.py)
 monitor_python_fast_tests=()
 
+if ! command -v python3 >/dev/null 2>&1; then
+  printf 'error: python3 is required to compile-check or test scripts/*.py.\n' >&2
+  exit 1
+fi
+
 if [[ "$mode" != "--tests" ]]; then
   if ! command -v shellcheck >/dev/null 2>&1; then
     printf "error: shellcheck is required. Install tools with \`mise install\`.\n" >&2
-    exit 1
-  fi
-
-  if ! command -v python3 >/dev/null 2>&1; then
-    printf 'error: python3 is required to compile-check scripts/*.py.\n' >&2
     exit 1
   fi
 
