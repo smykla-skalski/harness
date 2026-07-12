@@ -43,8 +43,6 @@ public struct TaskBoardOverviewView: View {
   var laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.emptyRawValue
   @AppStorage(TaskBoardLaneAppearancePreferences.storageKey)
   var laneAppearancePreferencesRawValue = TaskBoardLaneAppearancePreferences.emptyRawValue
-  @AppStorage(TaskBoardCardPreferences.priorityBadgeVisibilityStorageKey)
-  var showsPriorityBadge = TaskBoardCardPreferences.defaultShowsPriorityBadge
   var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
@@ -161,7 +159,7 @@ public struct TaskBoardOverviewView: View {
       \.taskBoardLaneAppearance,
       TaskBoardLaneAppearance(rawValue: laneAppearancePreferencesRawValue)
     )
-    .environment(\.taskBoardShowsPriorityBadge, showsPriorityBadge)
+    .taskBoardCardPreferences(projectLabelResolver: cachedPresentation.projectLabelResolver)
     .sheet(item: taskBoardManagementSheet) { taskBoardManagementSheet in
       taskBoardManagementSheetContent(taskBoardManagementSheet)
     }

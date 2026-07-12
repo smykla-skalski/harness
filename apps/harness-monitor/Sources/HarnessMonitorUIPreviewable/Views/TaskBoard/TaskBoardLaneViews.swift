@@ -168,6 +168,10 @@ struct TaskBoardItemRow: View {
   private var laneAppearance
   @Environment(\.taskBoardShowsPriorityBadge)
   private var showsPriorityBadge
+  @Environment(\.taskBoardAlwaysShowsFullRepositoryNames)
+  private var alwaysShowsFullRepositoryNames
+  @Environment(\.taskBoardProjectLabelResolver)
+  private var projectLabelResolver
 
   private var dragPayload: TaskBoardItemDragPayload {
     TaskBoardItemDragPayload(itemID: item.id, status: item.status)
@@ -188,7 +192,7 @@ struct TaskBoardItemRow: View {
             lineLimit: 2
           )
         }
-        TaskBoardCardFooter(repository: item.projectId ?? item.agentMode.title) {
+        TaskBoardCardFooter(repository: repositoryLabel) {
           badgeContent
         }
       }
@@ -210,6 +214,16 @@ struct TaskBoardItemRow: View {
   }
 
   private var statusTint: Color { taskBoardStatusColor(for: item.status) }
+
+  private var repositoryLabel: String {
+    guard let projectID = item.projectId else {
+      return item.agentMode.title
+    }
+    return projectLabelResolver.label(
+      for: projectID,
+      alwaysShowFullName: alwaysShowsFullRepositoryNames
+    )
+  }
 
   private var cardGlyph: TaskBoardCardGlyph {
     TaskBoardGitHubCardGlyph.resolve(for: item)

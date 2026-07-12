@@ -13,6 +13,7 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
   static let empty = Self(
     taskBoardItems: [],
     taskBoardItemsByID: [:],
+    projectLabelResolver: TaskBoardProjectLabelResolver(projectIDs: []),
     apiItemsByLane: [:],
     inboxItemsByLane: [:],
     decisionIDsByLane: [:],
@@ -25,6 +26,7 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
 
   let taskBoardItems: [TaskBoardItem]
   let taskBoardItemsByID: [String: TaskBoardItem]
+  let projectLabelResolver: TaskBoardProjectLabelResolver
   let apiItemsByLane: [TaskBoardInboxLane: [TaskBoardItem]]
   let inboxItemsByLane: [TaskBoardInboxLane: [TaskBoardInboxItem]]
   let decisionIDsByLane: [TaskBoardInboxLane: [String]]
@@ -135,6 +137,9 @@ actor TaskBoardOverviewPresentationWorker {
     return TaskBoardOverviewPresentation(
       taskBoardItems: taskBoardItems,
       taskBoardItemsByID: Dictionary(uniqueKeysWithValues: taskBoardItems.map { ($0.id, $0) }),
+      projectLabelResolver: TaskBoardProjectLabelResolver(
+        projectIDs: taskBoardItems.compactMap(\.projectId)
+      ),
       apiItemsByLane: apiItemsByLane,
       inboxItemsByLane: inboxItemsByLane,
       decisionIDsByLane: decisionIDsByLane,
