@@ -100,6 +100,45 @@ fn empty_cutover_keeps_a_recoverable_stage_until_database_commit() {
 }
 
 #[test]
+fn completed_global_cutover_starts_fresh_lane_from_empty_board() {
+    let parent = tempdir().expect("legacy parent");
+    let root = parent.path().join("task-board");
+    // A prior daemon already ran the global file->SQLite cutover: the sentinel
+    // is in place, the migrated data lives in a `legacy-v45-*` archive, and no
+    // in-progress stage remains. A fresh per-lane daemon database reaching this
+    // point has nothing to import and must not abort.
+    fs::write(&root, SENTINEL).expect("write cutover sentinel");
+    let archive = parent
+        .path()
+        .join(format!("{ARCHIVE_PREFIX}20260712T101519Z-389a4ededa84"));
+    fs::create_dir(&archive).expect("completed archive");
+
+    let prepared = prepare_managed_source(&root).expect("fresh lane recovers to empty board");
+    assert!(prepared.staged);
+    assert!(prepared.source.is_dir());
+    assert!(
+        LegacyTaskBoardSnapshot::load(&prepared.source)
+            .expect("load empty stage")
+            .items
+            .is_empty()
+    );
+    assert!(archive.is_dir(), "completed archive must be left untouched");
+    assert_eq!(fs::read_to_string(&root).expect("read sentinel"), SENTINEL);
+}
+
+#[test]
+fn sentinel_without_stage_or_archive_fails_closed() {
+    let parent = tempdir().expect("legacy parent");
+    let root = parent.path().join("task-board");
+    fs::write(&root, SENTINEL).expect("write cutover sentinel");
+
+    let error = prepare_managed_source(&root)
+        .err()
+        .expect("orphan sentinel must fail closed");
+    assert!(error.to_string().contains("recoverable migration stage"));
+}
+
+#[test]
 fn recreated_root_with_orphan_stage_fails_closed() {
     let parent = tempdir().expect("legacy parent");
     let root = parent.path().join("task-board");

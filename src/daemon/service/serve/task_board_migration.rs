@@ -3,7 +3,6 @@
 use std::fs::{File, Metadata, OpenOptions};
 use std::io::{ErrorKind, Write as _};
 use std::path::{Path, PathBuf};
-use std::process::id as process_id;
 
 use crate::daemon::db::{AsyncDaemonDb, TaskBoardImportMarker};
 use crate::daemon::state::{self, DaemonManifest, DaemonOwnership, FlockGuard};
@@ -13,6 +12,9 @@ use crate::task_board::legacy_import::LegacyTaskBoardSnapshot;
 use crate::task_board::{TaskBoardGitRuntimeConfig, default_board_root};
 use crate::workspace::utc_now;
 use fs_err as fs;
+
+mod stages;
+use stages::{archive_path, find_single_stage, has_completed_archive, stage_path};
 
 const LEGACY_SOURCE: &str = "legacy_global_board";
 const STAGE_PREFIX: &str = "task-board.migrating-v46-";
@@ -158,16 +160,24 @@ fn prepare_managed_source(root: &Path) -> Result<PreparedSource, CliError> {
 
     if root_metadata.is_some() {
         validate_sentinel(root)?;
-        let stage = existing_stage.ok_or_else(|| {
-            migration_error(
-                "legacy Task Board sentinel exists without a recoverable migration stage",
-            )
-        })?;
-        return Ok(PreparedSource {
-            source: stage,
-            staged: true,
-            locks: Vec::new(),
-        });
+        if let Some(stage) = existing_stage {
+            return Ok(PreparedSource {
+                source: stage,
+                staged: true,
+                locks: Vec::new(),
+            });
+        }
+        if has_completed_archive(root)? {
+            // The global file->SQLite cutover already ran to completion: the
+            // sentinel is in place and the migrated data lives in a
+            // `legacy-v45-*` archive. A fresh per-lane daemon database reaching
+            // this point has nothing to import, so start from an empty board
+            // rather than aborting. The archive is left untouched.
+            return stage_empty_source(root);
+        }
+        return Err(migration_error(
+            "legacy Task Board sentinel exists without a recoverable migration stage",
+        ));
     }
 
     if let Some(stage) = existing_stage {
@@ -179,6 +189,10 @@ fn prepare_managed_source(root: &Path) -> Result<PreparedSource, CliError> {
         });
     }
 
+    stage_empty_source(root)
+}
+
+fn stage_empty_source(root: &Path) -> Result<PreparedSource, CliError> {
     let empty = LegacyTaskBoardSnapshot::empty()?;
     let stage = stage_path(root, &empty.source_digest)?;
     fs::create_dir(&stage)
@@ -388,75 +402,6 @@ fn path_metadata(path: &Path) -> Result<Option<Metadata>, CliError> {
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
         Err(error) => Err(io_for("inspect legacy task board path", path, &error).into()),
     }
-}
-
-fn find_single_stage(root: &Path) -> Result<Option<PathBuf>, CliError> {
-    let Some(parent) = root.parent() else {
-        return Ok(None);
-    };
-    if !parent.is_dir() {
-        return Ok(None);
-    }
-    let mut stages = Vec::new();
-    for entry in fs::read_dir(parent)
-        .map_err(|error| io_for("read task board migration stages", parent, &error))?
-    {
-        let path = entry
-            .map_err(|error| io_for("read task board migration stage", parent, &error))?
-            .path();
-        if path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| name.starts_with(STAGE_PREFIX))
-        {
-            let metadata = fs::symlink_metadata(&path)
-                .map_err(|error| io_for("inspect task board migration stage", &path, &error))?;
-            if metadata.file_type().is_symlink() || !metadata.is_dir() {
-                return Err(migration_error(
-                    "legacy Task Board migration stage is not a plain directory",
-                ));
-            }
-            stages.push(path);
-        }
-    }
-    stages.sort();
-    match stages.len() {
-        0 => Ok(None),
-        1 => Ok(stages.pop()),
-        _ => Err(migration_error(
-            "multiple legacy Task Board migration stages require manual recovery",
-        )),
-    }
-}
-
-fn stage_path(root: &Path, digest: &str) -> Result<PathBuf, CliError> {
-    let parent = root
-        .parent()
-        .ok_or_else(|| migration_error("legacy Task Board root has no parent"))?;
-    let path = parent.join(format!(
-        "{STAGE_PREFIX}{}-{}",
-        process_id(),
-        digest_prefix(digest)
-    ));
-    if path.exists() {
-        return Err(migration_error(
-            "legacy Task Board migration stage already exists",
-        ));
-    }
-    Ok(path)
-}
-
-fn archive_path(stage: &Path, marker: &TaskBoardImportMarker) -> PathBuf {
-    let parent = stage.parent().unwrap_or_else(|| Path::new("."));
-    let timestamp = marker
-        .imported_at
-        .chars()
-        .filter(char::is_ascii_alphanumeric)
-        .collect::<String>();
-    parent.join(format!(
-        "{ARCHIVE_PREFIX}{timestamp}-{}",
-        digest_prefix(&marker.source_digest)
-    ))
 }
 
 fn sync_parent(path: &Path) -> Result<(), CliError> {
