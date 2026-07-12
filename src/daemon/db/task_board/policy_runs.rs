@@ -146,8 +146,8 @@ impl AsyncDaemonDb {
     ) -> Result<(R, i64), CliError> {
         let mut transaction = self.begin_immediate_transaction(context).await?;
         let mut document = PolicyWorkflowRunsDocument {
-            schema_version: 1,
             runs: load_runs(transaction.as_mut()).await?,
+            ..PolicyWorkflowRunsDocument::default()
         };
         let result = mutate(&mut document)?;
         write_runs(&mut transaction, &document.runs).await?;
