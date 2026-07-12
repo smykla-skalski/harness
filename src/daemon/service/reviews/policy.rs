@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use std::slice::from_ref;
 use std::sync::Arc;
 
 use crate::daemon::db::AsyncDaemonDb;
@@ -12,10 +11,11 @@ use crate::daemon::service::reviews::policy_executor::{
     build_policy_provider_registry, daemon_policy_executor_with_audit,
 };
 use crate::daemon::service::reviews::policy_mapping::{
-    map_run_response, preview_step, runtime_trigger_from_reviews,
+    map_run_response, runtime_trigger_from_reviews,
 };
-use crate::daemon::service::reviews::preview::{preview_action_target, preview_action_warnings};
-use crate::daemon::service::reviews::token::github_token;
+use crate::daemon::service::reviews::policy_plan::{
+    preview_legacy_reviews_policy, preview_legacy_reviews_policy_with_token,
+};
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
 use crate::reviews::policy::{
@@ -23,10 +23,9 @@ use crate::reviews::policy::{
     planned_reviews_policy_run_matches_target,
 };
 use crate::reviews::{
-    ReviewActionPreviewKind, ReviewItem, ReviewTarget, ReviewsPolicyPreviewRequest,
-    ReviewsPolicyPreviewResponse, ReviewsPolicyRunResponse, ReviewsPolicyRunStartRequest,
-    ReviewsPolicyStatusRequest, ReviewsPolicyStatusResponse, ReviewsPolicyStepType,
-    ReviewsPolicyTrigger,
+    ReviewItem, ReviewTarget, ReviewsPolicyPreviewRequest, ReviewsPolicyPreviewResponse,
+    ReviewsPolicyRunResponse, ReviewsPolicyRunStartRequest, ReviewsPolicyStatusRequest,
+    ReviewsPolicyStatusResponse, ReviewsPolicyTrigger,
 };
 use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy_runtime::executor::PolicyRuntimeExecutor;
@@ -49,20 +48,7 @@ pub(crate) use super::policy_resume::{
 pub fn preview_reviews_policy(
     request: &ReviewsPolicyPreviewRequest,
 ) -> Result<ReviewsPolicyPreviewResponse, CliError> {
-    let mut response = preview_reviews_policy_with_root(&default_board_root(), request)?;
-    if response.eligible
-        && preview_response_requires_token(&response)
-        && github_token(Some(request.target.repository.as_str()))
-            .or_else(|| github_token(None))
-            .is_none()
-    {
-        response.eligible = false;
-        response.reason = Some(format!(
-            "No GitHub token is configured for '{}'",
-            request.target.repository
-        ));
-    }
-    Ok(response)
+    preview_legacy_reviews_policy_with_token(&default_board_root(), request)
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -70,24 +56,7 @@ pub(crate) fn preview_reviews_policy_with_root(
     root: &Path,
     request: &ReviewsPolicyPreviewRequest,
 ) -> Result<ReviewsPolicyPreviewResponse, CliError> {
-    request.validate()?;
-    let preview_target = preview_action_target(ReviewActionPreviewKind::Auto, &request.target);
-    let subject = request.subject();
-    let workflow_id = request.normalized_workflow_id();
-    let plan = authored_reviews_policy_plan(root, &workflow_id, &request.target, request.method)?;
-    let mut warnings =
-        preview_action_warnings(ReviewActionPreviewKind::Auto, from_ref(&request.target));
-    extend_unique(&mut warnings, preview_target.warnings);
-    let (eligible, reason) = plan_preview_eligibility(&plan);
-
-    Ok(ReviewsPolicyPreviewResponse {
-        workflow_id,
-        subject,
-        eligible,
-        reason,
-        warnings,
-        steps: plan.steps.iter().map(preview_step).collect(),
-    })
+    preview_legacy_reviews_policy(root, request)
 }
 
 /// Start a reviews policy run for one target through the daemon executor.
@@ -342,27 +311,6 @@ pub fn reviews_policy_status(
     })
 }
 
-fn plan_preview_eligibility(plan: &ReviewsPolicyPlan) -> (bool, Option<String>) {
-    if !plan.actionable {
-        return (
-            false,
-            Some(
-                plan.reason.clone().unwrap_or_else(|| {
-                    "reviews policy run produced no actionable steps".to_owned()
-                }),
-            ),
-        );
-    }
-    (true, plan.reason.clone())
-}
-
-fn preview_response_requires_token(response: &ReviewsPolicyPreviewResponse) -> bool {
-    response
-        .steps
-        .iter()
-        .any(|step| step.step_type == ReviewsPolicyStepType::Action)
-}
-
 pub(super) fn background_reviews_policy_runs_enabled() -> bool {
     feature_flags::reviews_background_auto_enabled_from_env()
 }
@@ -396,14 +344,6 @@ fn terminal_run_matches_target_head(
                 PolicyRunStatus::Running | PolicyRunStatus::Waiting
             ) && planned_reviews_policy_run_matches_target(&run.planned_steps, target)
         }))
-}
-
-fn extend_unique(target: &mut Vec<String>, additions: Vec<String>) {
-    for addition in additions {
-        if !target.contains(&addition) {
-            target.push(addition);
-        }
-    }
 }
 
 fn non_actionable_plan_message(workflow_id: &str, plan: &ReviewsPolicyPlan) -> String {
