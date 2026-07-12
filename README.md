@@ -355,6 +355,7 @@ If `harness run repair` still leaves blocking findings, start a fresh tracked ru
 mise run version:check
 mise run check                       # default harness quality gates
 mise run harness:check               # harness-only quality gates (same gates as default check)
+mise run test:scripts                # helper-script regression tests (slower; separate from feedback checks)
 mise run aff:check                   # aff-only quality gates (manual; not run by default)
 mise run test                        # default aggregate: harness + aff fast tests
 mise run test:unit                   # harness unit tests (opt-in; not run by default)
