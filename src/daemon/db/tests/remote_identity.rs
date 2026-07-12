@@ -192,3 +192,38 @@ fn remote_audit_events_persist_with_redacted_error_detail() {
         Some("backend failed token=<redacted>&retry=1")
     );
 }
+
+#[test]
+fn remote_audit_allowed_event_is_marked_failed_in_place() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let event = RemoteAuditEvent::new(
+        "remote-audit-timeout",
+        "2026-07-12T10:45:00Z",
+        Some("request-timeout"),
+        Some("client-1"),
+        "GET /v1/health",
+        RemoteAccessScope::Read,
+        RemoteAuditScopeDecision::Allowed,
+        RemoteAuditOutcome::Success,
+        Some("203.0.113.10"),
+        None,
+    );
+    db.record_remote_audit_event(&event)
+        .expect("record allowed audit");
+
+    db.mark_remote_audit_event_failed(
+        "remote-audit-timeout",
+        "request timeout authorization=Bearer-secret",
+    )
+    .expect("mark audit failed");
+    let rows = db
+        .load_remote_audit_events(10)
+        .expect("load remote audit events");
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].outcome, RemoteAuditOutcome::Failure);
+    assert_eq!(
+        rows[0].error_detail.as_deref(),
+        Some("request timeout authorization=<redacted>")
+    );
+}

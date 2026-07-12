@@ -13,7 +13,7 @@ use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration,
     RemoteStoredAuditEvent, RemoteStoredClient, RemoteTokenHash, parse_remote_role,
-    parse_remote_scope, remote_token_hint,
+    parse_remote_scope, redact_remote_error_detail, remote_token_hint,
 };
 
 const INSERT_REMOTE_CLIENT_SQL: &str = "
@@ -39,6 +39,11 @@ INSERT INTO remote_audit_events (
     event_id, recorded_at, request_id, client_id, route_or_method, scope,
     scope_decision, outcome, remote_addr, error_detail, metadata_json
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '{}')";
+
+const MARK_REMOTE_AUDIT_EVENT_FAILED_SQL: &str = "
+UPDATE remote_audit_events
+SET outcome = 'failure', error_detail = ?2
+WHERE event_id = ?1 AND scope_decision = 'allowed'";
 
 impl DaemonDb {
     /// Persist a paired remote client with a hashed bearer token.
@@ -191,6 +196,31 @@ impl DaemonDb {
                 ))
             })?;
         Ok(())
+    }
+
+    /// Mark a persisted allowed request as failed without creating a duplicate audit row.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the row is missing, denied, or cannot be updated.
+    pub(crate) fn mark_remote_audit_event_failed(
+        &self,
+        event_id: &str,
+        error_detail: &str,
+    ) -> Result<(), CliError> {
+        let error_detail = redact_remote_error_detail(error_detail);
+        let changed = self
+            .conn
+            .execute(
+                MARK_REMOTE_AUDIT_EVENT_FAILED_SQL,
+                params![event_id, error_detail],
+            )
+            .map_err(|error| db_error(format!("mark remote audit {event_id} failed: {error}")))?;
+        if changed == 1 {
+            return Ok(());
+        }
+        Err(db_error(format!(
+            "mark remote audit {event_id} failed: allowed event not found"
+        )))
     }
 
     /// Load newest remote audit events.

@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, OnceLock};
 
 use axum::Json;
 use axum::body::Body;
@@ -12,7 +11,9 @@ use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_auth::{
     REMOTE_CLIENT_ID_HEADER, RemoteAuthError, remote_http_required_scope,
 };
-use crate::daemon::remote_request_audit::RemoteAuthorizationAudit;
+use crate::daemon::remote_request_audit::{
+    RemoteAuthorizationAudit, RemoteAuthorizationAuditReceipt,
+};
 use crate::errors::CliError;
 
 use super::{DaemonConnectInfo, DaemonHttpState};
@@ -21,15 +22,15 @@ const AUDIT_CLIENT_ID_MAX_CHARS: usize = 256;
 const REMOTE_AUDIT_UNAVAILABLE_MESSAGE: &str = "remote authorization audit is unavailable";
 
 #[derive(Clone, Default)]
-pub(super) struct RemoteHttpAuditMarker(Arc<AtomicBool>);
+pub(super) struct RemoteHttpAuditMarker(Arc<OnceLock<RemoteAuthorizationAuditReceipt>>);
 
 impl RemoteHttpAuditMarker {
-    fn mark_recorded(&self) {
-        self.0.store(true, Ordering::Release);
+    fn mark_recorded(&self, receipt: RemoteAuthorizationAuditReceipt) {
+        drop(self.0.set(receipt));
     }
 
-    fn was_recorded(&self) -> bool {
-        self.0.load(Ordering::Acquire)
+    fn receipt(&self) -> Option<RemoteAuthorizationAuditReceipt> {
+        self.0.get().cloned()
     }
 }
 
@@ -73,8 +74,7 @@ impl RemoteHttpAuditContext {
             self.remote_addr.as_deref(),
         )
         .record(state.db.get());
-        self.mark_recorded(&result);
-        result
+        self.finish_record(result)
     }
 
     pub(super) fn record_allowed_failure(
@@ -92,8 +92,7 @@ impl RemoteHttpAuditContext {
             error_detail,
         )
         .record(state.db.get());
-        self.mark_recorded(&result);
-        result
+        self.finish_record(result)
     }
 
     pub(super) fn record_denied(
@@ -111,22 +110,34 @@ impl RemoteHttpAuditContext {
             error_detail,
         )
         .record(state.db.get());
-        self.mark_recorded(&result);
-        result
+        self.finish_record(result)
     }
 
-    pub(super) fn was_recorded(&self) -> bool {
-        self.marker
+    pub(super) fn amend_recorded_failure(
+        &self,
+        state: &DaemonHttpState,
+        error_detail: &str,
+    ) -> Result<bool, CliError> {
+        let Some(receipt) = self
+            .marker
             .as_ref()
-            .is_some_and(RemoteHttpAuditMarker::was_recorded)
+            .and_then(RemoteHttpAuditMarker::receipt)
+        else {
+            return Ok(false);
+        };
+        receipt.mark_failed(state.db.get(), error_detail)?;
+        Ok(true)
     }
 
-    fn mark_recorded(&self, result: &Result<(), CliError>) {
-        if result.is_ok()
-            && let Some(marker) = &self.marker
-        {
-            marker.mark_recorded();
+    fn finish_record(
+        &self,
+        result: Result<RemoteAuthorizationAuditReceipt, CliError>,
+    ) -> Result<(), CliError> {
+        let receipt = result?;
+        if let Some(marker) = &self.marker {
+            marker.mark_recorded(receipt);
         }
+        Ok(())
     }
 }
 

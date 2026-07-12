@@ -267,8 +267,10 @@ fn record_remote_http_limit_rejection(
     route: &HttpApiRouteContract,
     error_detail: &str,
 ) -> Result<(), Box<Response>> {
-    if audit.was_recorded() {
-        return Ok(());
+    match audit.amend_recorded_failure(state, error_detail) {
+        Ok(true) => return Ok(()),
+        Ok(false) => {}
+        Err(error) => return Err(Box::new(auth_audit::unavailable_response(&error))),
     }
     let result = match verify_remote_client(headers, state) {
         Ok(client) if authorize_remote_http_route(&client, route).is_ok() => {

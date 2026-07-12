@@ -243,6 +243,7 @@ fn authorize_remote_ws_request(
             remote_addr.as_deref(),
         )
         .record(state.db.get())
+        .map(|_| ())
         .map_err(|error| remote_ws_audit_error_response(request, &error)),
         Err(error) => {
             record_remote_ws_denial(
@@ -295,6 +296,7 @@ fn record_remote_ws_denial(
         &error.to_string(),
     )
     .record(state.db.get())
+    .map(|_| ())
     .map_err(|audit_error| remote_ws_audit_error_response(request, &audit_error))
 }
 

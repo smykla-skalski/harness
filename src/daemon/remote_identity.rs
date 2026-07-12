@@ -415,7 +415,7 @@ pub(crate) fn remote_token_hint(token: &str) -> String {
         .collect()
 }
 
-fn redact_remote_error_detail(detail: &str) -> String {
+pub(crate) fn redact_remote_error_detail(detail: &str) -> String {
     let mut redacted = String::with_capacity(detail.len());
     let mut offset = 0;
 

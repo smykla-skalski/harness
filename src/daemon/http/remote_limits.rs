@@ -167,7 +167,11 @@ pub(super) async fn admit_remote_http_request(
         );
     };
     let config = limits.config();
-    if request.uri().to_string().len() > config.max_http_uri_bytes {
+    let uri_bytes = request
+        .uri()
+        .path_and_query()
+        .map_or(0, |value| value.as_str().len());
+    if uri_bytes > config.max_http_uri_bytes {
         return audited_http_limit_response(
             &state,
             &request,

@@ -247,6 +247,54 @@ async fn remote_http_audits_timeout_before_authentication() {
 }
 
 #[tokio::test]
+async fn remote_http_audits_timeout_after_authentication() {
+    let config = RemoteRequestLimitConfig {
+        request_timeout: Duration::from_millis(250),
+        ..RemoteRequestLimitConfig::default()
+    };
+    let state = remote_state_with_viewer_config(config);
+    let audit_state = state.clone();
+    let started = Arc::new(Notify::new());
+    let app = remote_limit_test_router(
+        state,
+        BlockingRequest {
+            started: Arc::clone(&started),
+            release: Arc::new(Notify::new()),
+        },
+    );
+    let (base_url, server) = serve_remote_app(app).await;
+    let request = tokio::spawn(send_remote_health(
+        reqwest::Client::new(),
+        base_url,
+        "limit-timeout-after-auth",
+    ));
+    timeout(Duration::from_secs(2), started.notified())
+        .await
+        .expect("timed request reached handler");
+
+    let response = request
+        .await
+        .expect("join timed request")
+        .expect("send timed request");
+    let audits = audit_state
+        .db
+        .get()
+        .expect("db slot")
+        .lock()
+        .expect("db lock")
+        .load_remote_audit_events(20)
+        .expect("load remote audits")
+        .into_iter()
+        .filter(|event| event.request_id.as_deref() == Some("limit-timeout-after-auth"))
+        .collect::<Vec<_>>();
+
+    stop_server(server).await;
+    assert_eq!(response.status(), StatusCode::GATEWAY_TIMEOUT);
+    assert_eq!(audits.len(), 1, "timeout audit should update in place");
+    assert_allowed_limit_failure(&audits[0], "remote request exceeded the configured timeout");
+}
+
+#[tokio::test]
 async fn remote_websocket_rejects_messages_over_the_configured_limit() {
     let (base_url, server) = serve_remote(remote_state_with_viewer()).await;
     let request = remote_ws_request(&base_url, "viewer", "ws-size-handshake");
