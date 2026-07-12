@@ -63,6 +63,63 @@ final class MobileRemoteDaemonPairingTransportTests: XCTestCase {
     XCTAssertEqual(claim.token, "server-issued-token")
     XCTAssertEqual(claim.role, .operator)
     XCTAssertEqual(claim.scopes, ["read", "write"])
+    XCTAssertNil(claim.reviewsQuery)
+  }
+
+  func testClaimDecodesServerOwnedReviewsQuery() async throws {
+    let now = Date(timeIntervalSince1970: 1_752_124_400)
+    RemotePairingURLProtocol.respond(
+      statusCode: 201,
+      body: """
+        {
+          "client_id": "ios-device-fingerprint",
+          "display_name": "Bart's iPhone",
+          "platform": "ios",
+          "role": "viewer",
+          "scopes": ["read"],
+          "token": "server-issued-token",
+          "token_hint": "abcd1234",
+          "paired_at": "2025-07-10T14:33:25Z",
+          "reviews_query": {
+            "authors": ["renovate[bot]"],
+            "organizations": ["smykla-skalski"],
+            "repositories": ["smykla-skalski/harness"],
+            "exclude_repositories": ["smykla-skalski/archive"],
+            "force_refresh": false,
+            "cache_max_age_seconds": 45,
+            "backport_detection_enabled": true,
+            "backport_patterns": ["backport"]
+          }
+        }
+        """
+    )
+    let session = makeSession()
+    let transport = URLSessionMobileRemoteDaemonPairingTransport { _ in session }
+    let invitation = try MobileRemoteDaemonPairingInvitation.decode(
+      remoteInvitationURL(now: now),
+      now: now
+    )
+
+    let claim = try await transport.claim(
+      invitation: invitation,
+      clientID: "ios-device-fingerprint",
+      displayName: "Bart's iPhone",
+      platform: "ios"
+    )
+
+    XCTAssertEqual(
+      claim.reviewsQuery,
+      MobileRemoteDaemonReviewsQuery(
+        authors: ["renovate[bot]"],
+        organizations: ["smykla-skalski"],
+        repositories: ["smykla-skalski/harness"],
+        excludeRepositories: ["smykla-skalski/archive"],
+        forceRefresh: false,
+        cacheMaxAgeSeconds: 45,
+        backportDetectionEnabled: true,
+        backportPatterns: ["backport"]
+      )
+    )
   }
 
   func testClaimRejectsServerIdentityMismatch() async throws {
@@ -99,6 +156,44 @@ final class MobileRemoteDaemonPairingTransportTests: XCTestCase {
       XCTFail("expected claim mismatch")
     } catch let error as MobileRemoteDaemonPairingError {
       XCTAssertEqual(error, .claimMismatch)
+    }
+  }
+
+  func testClaimRejectsUnscopedReviewsQuery() async throws {
+    let now = Date(timeIntervalSince1970: 1_752_124_400)
+    RemotePairingURLProtocol.respond(
+      statusCode: 200,
+      body: """
+        {
+          "client_id": "ios-device-fingerprint",
+          "display_name": "Bart's iPhone",
+          "platform": "ios",
+          "role": "viewer",
+          "scopes": ["read"],
+          "token": "server-issued-token",
+          "token_hint": "abcd1234",
+          "paired_at": "2025-07-10T14:33:25Z",
+          "reviews_query": {"authors": ["renovate[bot]"]}
+        }
+        """
+    )
+    let session = makeSession()
+    let transport = URLSessionMobileRemoteDaemonPairingTransport { _ in session }
+    let invitation = try MobileRemoteDaemonPairingInvitation.decode(
+      remoteInvitationURL(now: now),
+      now: now
+    )
+
+    do {
+      _ = try await transport.claim(
+        invitation: invitation,
+        clientID: "ios-device-fingerprint",
+        displayName: "Bart's iPhone",
+        platform: "ios"
+      )
+      XCTFail("expected invalid Reviews profile")
+    } catch let error as MobileRemoteDaemonPairingError {
+      XCTAssertEqual(error, .invalidResponse)
     }
   }
 

@@ -40,6 +40,10 @@ final class MobileRemoteDaemonWatchPairingTests: XCTestCase {
     XCTAssertEqual(credential.deviceIdentityID, MobileRemoteDaemonPairingDevice.watchOS.identityID)
     XCTAssertEqual(credential.remoteDaemonAccess?.platform, "watchos")
     XCTAssertEqual(credential.remoteDaemonAccess?.clientID, request.clientID)
+    XCTAssertEqual(
+      credential.remoteDaemonAccess?.reviewsQuery?.repositories,
+      ["smykla-skalski/harness"]
+    )
     let storedWatchIdentity = try await identityStore.load(
       id: MobileRemoteDaemonPairingDevice.watchOS.identityID
     )
@@ -112,7 +116,11 @@ private actor RecordingWatchRemotePairingTransport: MobileRemoteDaemonPairingTra
       scopes: ["read", "write"],
       token: "watch-server-token",
       tokenHint: "watch123",
-      pairedAt: pairedAt
+      pairedAt: pairedAt,
+      reviewsQuery: MobileRemoteDaemonReviewsQuery(
+        repositories: ["smykla-skalski/harness"],
+        cacheMaxAgeSeconds: 45
+      )
     )
   }
 

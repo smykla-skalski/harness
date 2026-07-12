@@ -9,6 +9,7 @@ public struct MobileRemoteDaemonPairingClaim: Equatable, Sendable {
   public var token: String
   public var tokenHint: String
   public var pairedAt: Date
+  public var reviewsQuery: MobileRemoteDaemonReviewsQuery?
 
   public init(
     clientID: String,
@@ -18,7 +19,8 @@ public struct MobileRemoteDaemonPairingClaim: Equatable, Sendable {
     scopes: [String],
     token: String,
     tokenHint: String,
-    pairedAt: Date
+    pairedAt: Date,
+    reviewsQuery: MobileRemoteDaemonReviewsQuery? = nil
   ) {
     self.clientID = clientID
     self.displayName = displayName
@@ -28,6 +30,7 @@ public struct MobileRemoteDaemonPairingClaim: Equatable, Sendable {
     self.token = token
     self.tokenHint = tokenHint
     self.pairedAt = pairedAt
+    self.reviewsQuery = reviewsQuery
   }
 }
 
@@ -117,6 +120,9 @@ public struct URLSessionMobileRemoteDaemonPairingTransport:
     else {
       throw MobileRemoteDaemonPairingError.claimMismatch
     }
+    guard wire.reviewsQuery?.isValidProfile != false else {
+      throw MobileRemoteDaemonPairingError.invalidResponse
+    }
     return wire.claim
   }
 
@@ -171,7 +177,8 @@ public actor MobileRemoteDaemonPairingCoordinator<Transport: MobileRemoteDaemonP
       bearerToken: claim.token,
       tokenHint: claim.tokenHint,
       serverSPKISHA256: invitation.serverSPKISHA256,
-      pairedAt: claim.pairedAt
+      pairedAt: claim.pairedAt,
+      reviewsQuery: claim.reviewsQuery
     )
     let stationID = MobileRemoteDaemonStationID.make(endpoint: invitation.endpoint)
     let existing = try await credentialStore.loadAll()
@@ -265,6 +272,7 @@ private struct MobileRemoteDaemonPairingClaimResponse: Decodable {
   var token: String
   var tokenHint: String
   var pairedAt: Date
+  var reviewsQuery: MobileRemoteDaemonReviewsQuery?
 
   var claim: MobileRemoteDaemonPairingClaim {
     MobileRemoteDaemonPairingClaim(
@@ -275,7 +283,8 @@ private struct MobileRemoteDaemonPairingClaimResponse: Decodable {
       scopes: scopes,
       token: token,
       tokenHint: tokenHint,
-      pairedAt: pairedAt
+      pairedAt: pairedAt,
+      reviewsQuery: reviewsQuery
     )
   }
 
@@ -288,5 +297,6 @@ private struct MobileRemoteDaemonPairingClaimResponse: Decodable {
     case token
     case tokenHint = "token_hint"
     case pairedAt = "paired_at"
+    case reviewsQuery = "reviews_query"
   }
 }

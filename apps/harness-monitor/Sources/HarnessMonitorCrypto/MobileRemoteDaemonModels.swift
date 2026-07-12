@@ -60,6 +60,7 @@ public struct MobileRemoteDaemonAccess: Codable, Equatable, Sendable, CustomStri
   public var tokenHint: String
   public var serverSPKISHA256: MobileRemoteDaemonSPKIPin
   public var pairedAt: Date
+  public var reviewsQuery: MobileRemoteDaemonReviewsQuery?
 
   public init(
     endpoint: URL,
@@ -71,7 +72,8 @@ public struct MobileRemoteDaemonAccess: Codable, Equatable, Sendable, CustomStri
     bearerToken: String,
     tokenHint: String,
     serverSPKISHA256: MobileRemoteDaemonSPKIPin,
-    pairedAt: Date
+    pairedAt: Date,
+    reviewsQuery: MobileRemoteDaemonReviewsQuery? = nil
   ) {
     self.endpoint = endpoint
     self.clientID = clientID
@@ -83,12 +85,14 @@ public struct MobileRemoteDaemonAccess: Codable, Equatable, Sendable, CustomStri
     self.tokenHint = tokenHint
     self.serverSPKISHA256 = serverSPKISHA256
     self.pairedAt = pairedAt
+    self.reviewsQuery = reviewsQuery
   }
 
   public var description: String {
     "MobileRemoteDaemonAccess(endpoint: \(endpoint.absoluteString), clientID: \(clientID), "
       + "platform: \(platform), role: \(role.rawValue), scopes: \(scopes), "
-      + "tokenHint: \(tokenHint), bearerToken: <redacted>)"
+      + "tokenHint: \(tokenHint), reviewsQuery: \(reviewsQuery == nil ? "none" : "configured"), "
+      + "bearerToken: <redacted>)"
   }
 
   public var canRead: Bool {
