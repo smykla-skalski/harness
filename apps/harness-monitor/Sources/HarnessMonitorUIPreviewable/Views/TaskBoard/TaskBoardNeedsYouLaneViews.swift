@@ -94,11 +94,6 @@ struct TaskBoardDecisionRow: View {
       alignment: .topLeading
     )
     .padding(metrics.cardPadding)
-    .taskBoardCardBackgroundGlyph(
-      systemImage: severitySystemImage,
-      tint: severityColor,
-      cornerRadius: metrics.cardCornerRadius
-    )
   }
 
   private var headerRow: some View {
@@ -152,15 +147,6 @@ struct TaskBoardDecisionRow: View {
   }
 
   private var severityColor: Color { severity.chipColor }
-
-  private var severitySystemImage: String {
-    switch severity {
-    case .critical: "exclamationmark.octagon.fill"
-    case .needsUser: "person.fill.questionmark"
-    case .warn: "exclamationmark.triangle.fill"
-    case .info: "info.circle.fill"
-    }
-  }
 
   private var ruleDisplayName: String {
     humanizedWorkspaceLabel(decision.ruleID)

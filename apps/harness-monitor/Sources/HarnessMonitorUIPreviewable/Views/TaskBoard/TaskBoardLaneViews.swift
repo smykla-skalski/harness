@@ -159,6 +159,7 @@ extension UTType {
 
 struct TaskBoardItemRow: View {
   let item: TaskBoardItem
+  let titleTypography: TaskBoardCardTitleTypography
   let isHovered: Bool
   let onOpenItem: (TaskBoardItem) -> Void
   @Environment(\.fontScale)
@@ -173,13 +174,6 @@ struct TaskBoardItemRow: View {
   }
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
-  private var titleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
-  }
-  private var titleCodeFont: Font {
-    HarnessMonitorTextSize.scaledFont(.subheadline.monospaced().weight(.semibold), by: fontScale)
-  }
-
   var body: some View {
     Button {
       onOpenItem(item)
@@ -188,8 +182,8 @@ struct TaskBoardItemRow: View {
         VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
           TaskBoardInlineCodeText(
             item.title,
-            font: titleFont,
-            codeFont: titleCodeFont,
+            font: titleTypography.font,
+            codeFont: titleTypography.codeFont,
             foregroundStyle: HarnessMonitorTheme.ink,
             lineLimit: 2
           )
@@ -203,12 +197,6 @@ struct TaskBoardItemRow: View {
         alignment: .topLeading
       )
       .padding(metrics.cardPadding)
-      .taskBoardCardBackgroundGlyph(
-        systemImage: cardGlyph.systemImage,
-        tint: cardGlyph.tint,
-        cornerRadius: metrics.cardCornerRadius,
-        providerSymbol: item.taskBoardBackgroundProviderSymbol
-      )
     }
     .taskBoardCardChrome(tint: cardGlyph.tint, isHovered: isHovered)
     .contentShape(.rect)
@@ -216,7 +204,7 @@ struct TaskBoardItemRow: View {
       dragPayload.itemProvider()
     }
     .draggable(dragPayload) {
-      TaskBoardItemDragPreviewCard(item: item)
+      TaskBoardItemDragPreviewCard(item: item, titleTypography: titleTypography)
     }
     .accessibilityIdentifier("harness.task-board.api-item.\(item.id)")
   }
@@ -246,16 +234,11 @@ struct TaskBoardItemRow: View {
 
 private struct TaskBoardItemDragPreviewCard: View {
   let item: TaskBoardItem
+  let titleTypography: TaskBoardCardTitleTypography
   @Environment(\.fontScale)
   private var fontScale
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
-  private var titleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
-  }
-  private var titleCodeFont: Font {
-    HarnessMonitorTextSize.scaledFont(.subheadline.monospaced().weight(.semibold), by: fontScale)
-  }
   private var statusFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
@@ -264,8 +247,8 @@ private struct TaskBoardItemDragPreviewCard: View {
     VStack(alignment: .leading, spacing: metrics.laneBodyTopPadding) {
       TaskBoardInlineCodeText(
         item.title,
-        font: titleFont,
-        codeFont: titleCodeFont,
+        font: titleTypography.font,
+        codeFont: titleTypography.codeFont,
         lineLimit: 2
       )
       Text(item.status.title)
@@ -280,21 +263,13 @@ private struct TaskBoardItemDragPreviewCard: View {
 
 struct TaskBoardInboxItemRow: View {
   let item: TaskBoardInboxItem
+  let titleTypography: TaskBoardCardTitleTypography
   let isHovered: Bool
   let onOpenItem: (TaskBoardInboxItem) -> Void
   @Environment(\.fontScale)
   private var fontScale
-  @Environment(\.taskBoardLaneAppearance)
-  private var laneAppearance
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
-  private var titleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
-  }
-  private var titleCodeFont: Font {
-    HarnessMonitorTextSize.scaledFont(.subheadline.monospaced().weight(.semibold), by: fontScale)
-  }
-
   private var dragPayload: TaskBoardInboxItemDragPayload {
     TaskBoardInboxItemDragPayload(
       sessionID: item.session.sessionId,
@@ -312,8 +287,8 @@ struct TaskBoardInboxItemRow: View {
         VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
           TaskBoardInlineCodeText(
             item.task.title,
-            font: titleFont,
-            codeFont: titleCodeFont,
+            font: titleTypography.font,
+            codeFont: titleTypography.codeFont,
             foregroundStyle: HarnessMonitorTheme.ink,
             lineLimit: 2
           )
@@ -327,11 +302,6 @@ struct TaskBoardInboxItemRow: View {
         alignment: .topLeading
       )
       .padding(metrics.cardPadding)
-      .taskBoardCardBackgroundGlyph(
-        systemImage: statusSymbol,
-        tint: statusTint,
-        cornerRadius: metrics.cardCornerRadius
-      )
     }
     .taskBoardCardChrome(tint: statusTint, isHovered: isHovered)
     .contentShape(.rect)
@@ -339,16 +309,12 @@ struct TaskBoardInboxItemRow: View {
       dragPayload.itemProvider()
     }
     .draggable(dragPayload) {
-      TaskBoardInboxItemDragPreviewCard(item: item)
+      TaskBoardInboxItemDragPreviewCard(item: item, titleTypography: titleTypography)
     }
     .accessibilityIdentifier("harness.task-board.item.\(item.task.taskId)")
   }
 
   private var statusTint: Color { taskStatusColor(for: item.task.status) }
-
-  private var statusSymbol: String? {
-    taskBoardLaneSystemImage(for: item.lane, appearance: laneAppearance)
-  }
 
   @ViewBuilder private var badgeContent: some View {
     TaskBoardCardPill(label: item.task.status.title, tint: statusTint)
@@ -358,16 +324,11 @@ struct TaskBoardInboxItemRow: View {
 
 private struct TaskBoardInboxItemDragPreviewCard: View {
   let item: TaskBoardInboxItem
+  let titleTypography: TaskBoardCardTitleTypography
   @Environment(\.fontScale)
   private var fontScale
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
-  private var titleFont: Font {
-    HarnessMonitorTextSize.scaledFont(.subheadline.weight(.semibold), by: fontScale)
-  }
-  private var titleCodeFont: Font {
-    HarnessMonitorTextSize.scaledFont(.subheadline.monospaced().weight(.semibold), by: fontScale)
-  }
   private var statusFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
@@ -376,8 +337,8 @@ private struct TaskBoardInboxItemDragPreviewCard: View {
     VStack(alignment: .leading, spacing: metrics.laneBodyTopPadding) {
       TaskBoardInlineCodeText(
         item.task.title,
-        font: titleFont,
-        codeFont: titleCodeFont,
+        font: titleTypography.font,
+        codeFont: titleTypography.codeFont,
         lineLimit: 2
       )
       Text(item.task.status.title)

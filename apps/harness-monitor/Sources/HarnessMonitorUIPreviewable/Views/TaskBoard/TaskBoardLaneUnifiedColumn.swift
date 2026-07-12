@@ -8,6 +8,7 @@ struct TaskBoardLaneUnifiedColumn: View {
   let apiItems: [TaskBoardItem]
   let inboxItems: [TaskBoardInboxItem]
   let decisions: [Decision]
+  let titleTypography: TaskBoardCardTitleTypography
   let isCollapsed: Bool
   let onOpenAPIItem: (TaskBoardItem) -> Void
   let onOpenInboxItem: (TaskBoardInboxItem) -> Void
@@ -156,6 +157,7 @@ struct TaskBoardLaneUnifiedColumn: View {
         let cardID = TaskBoardLaneCardHoverID.api(item.id)
         TaskBoardItemRow(
           item: item,
+          titleTypography: titleTypography,
           isHovered: hoveredCardID == cardID,
           onOpenItem: onOpenAPIItem
         )
@@ -168,6 +170,7 @@ struct TaskBoardLaneUnifiedColumn: View {
         )
         TaskBoardInboxItemRow(
           item: item,
+          titleTypography: titleTypography,
           isHovered: hoveredCardID == cardID,
           onOpenItem: onOpenInboxItem
         )
