@@ -91,9 +91,11 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     let snapshot = try XCTUnwrap(fetchedSnapshot)
 
     let requests = RemoteDaemonSessionsURLProtocol.requests
-    XCTAssertEqual(requests.count, 2)
+    XCTAssertEqual(requests.count, 3)
     XCTAssertEqual(requests.compactMap(\.url?.path).sorted(), [
-      "/v1/sessions", "/v1/task-board/items",
+      "/v1/sessions",
+      "/v1/sessions/session-1/managed-agents",
+      "/v1/task-board/items",
     ])
     for request in requests {
       XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer server-token")
