@@ -7,8 +7,13 @@ use crate::daemon::http::{DaemonHttpAuthMode, DaemonHttpState};
 use crate::daemon::protocol::{
     WsErrorPayload, WsRequest, WsResponse, with_control_plane_actor, ws_methods,
 };
-use crate::daemon::remote_auth::{RemoteAuthError, authorize_remote_ws_method};
+use crate::daemon::remote::RemoteAccessScope;
+use crate::daemon::remote_auth::{
+    RemoteAuthError, authorize_remote_ws_method, remote_ws_required_scope,
+};
 use crate::daemon::remote_identity::RemoteStoredClient;
+use crate::daemon::remote_request_audit::RemoteAuthorizationAudit;
+use crate::errors::CliError;
 use crate::telemetry::{
     TelemetryBaggage, apply_parent_context_from_text_map, current_trace_id, with_active_baggage,
 };
@@ -126,8 +131,8 @@ async fn dispatch_inner(
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> WsResponse {
-    if let Some(response) = authorize_remote_ws_request(request, state, connection) {
-        return response;
+    if let Err(response) = authorize_remote_ws_request(request, state, connection) {
+        return *response;
     }
     if let Some(response) = with_connection_actor(
         state,
@@ -165,19 +170,47 @@ fn authorize_remote_ws_request(
     request: &WsRequest,
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
-) -> Option<WsResponse> {
+) -> Result<(), Box<WsResponse>> {
     if state.auth_mode == DaemonHttpAuthMode::Local || !is_declared_ws_method(&request.method) {
-        return None;
+        return Ok(());
     }
-    let Some(client) = remote_client_for_connection(connection) else {
-        return Some(remote_ws_auth_error_response(
-            &request.id,
-            RemoteAuthError::MissingClientId,
-        ));
+    let required_scope = remote_ws_required_scope(&request.method)
+        .map_err(|error| Box::new(remote_ws_auth_error_response(&request.id, error)))?;
+    let (client, remote_addr) = remote_connection_identity(connection);
+    let Some(client) = client else {
+        let error = RemoteAuthError::MissingClientId;
+        record_remote_ws_denial(
+            request,
+            state,
+            None,
+            required_scope,
+            remote_addr.as_deref(),
+            error,
+        )?;
+        return Err(Box::new(remote_ws_auth_error_response(&request.id, error)));
     };
-    authorize_remote_ws_method(&client, &request.method)
-        .err()
-        .map(|error| remote_ws_auth_error_response(&request.id, error))
+    match authorize_remote_ws_method(&client, &request.method) {
+        Ok(decision) => RemoteAuthorizationAudit::allowed(
+            &request.id,
+            &client.client_id,
+            &request.method,
+            decision.required_scope,
+            remote_addr.as_deref(),
+        )
+        .record(state.db.get())
+        .map_err(|error| remote_ws_audit_error_response(request, &error)),
+        Err(error) => {
+            record_remote_ws_denial(
+                request,
+                state,
+                Some(&client.client_id),
+                required_scope,
+                remote_addr.as_deref(),
+                error,
+            )?;
+            Err(Box::new(remote_ws_auth_error_response(&request.id, error)))
+        }
+    }
 }
 
 fn is_declared_ws_method(method: &str) -> bool {
@@ -187,11 +220,64 @@ fn is_declared_ws_method(method: &str) -> bool {
 fn remote_client_for_connection(
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> Option<RemoteStoredClient> {
-    connection
-        .lock()
-        .expect("connection lock")
-        .remote_client()
-        .cloned()
+    remote_connection_identity(connection).0
+}
+
+fn remote_connection_identity(
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> (Option<RemoteStoredClient>, Option<String>) {
+    let connection = connection.lock().expect("connection lock");
+    (
+        connection.remote_client().cloned(),
+        connection.remote_addr().map(ToOwned::to_owned),
+    )
+}
+
+fn record_remote_ws_denial(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    client_id: Option<&str>,
+    required_scope: RemoteAccessScope,
+    remote_addr: Option<&str>,
+    error: RemoteAuthError,
+) -> Result<(), Box<WsResponse>> {
+    RemoteAuthorizationAudit::denied(
+        &request.id,
+        client_id,
+        &request.method,
+        required_scope,
+        remote_addr,
+        &error.to_string(),
+    )
+    .record(state.db.get())
+    .map_err(|audit_error| remote_ws_audit_error_response(request, &audit_error))
+}
+
+fn remote_ws_audit_error_response(request: &WsRequest, error: &CliError) -> Box<WsResponse> {
+    log_remote_ws_audit_error(request, error);
+    Box::new(error_response_with_payload(
+        &request.id,
+        WsErrorPayload {
+            code: "REMOTE_AUDIT".to_string(),
+            message: "remote authorization audit is unavailable".to_string(),
+            details: Vec::new(),
+            status_code: Some(503),
+            data: None,
+        },
+    ))
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_remote_ws_audit_error(request: &WsRequest, error: &CliError) {
+    tracing::error!(
+        error = %error,
+        method = %request.method,
+        request_id = %request.id,
+        "remote websocket authorization audit failed"
+    );
 }
 
 fn remote_ws_auth_error_response(request_id: &str, error: RemoteAuthError) -> WsResponse {

@@ -1,6 +1,7 @@
 mod broadcast;
 mod config;
 mod connection;
+mod connection_metadata;
 mod dispatch;
 mod frames;
 mod mutations;
@@ -33,4 +34,4 @@ const WS_CHUNK_DATA_BYTES: usize = 128 * 1024;
 pub(crate) use broadcast::run_broadcast_fanout;
 pub use broadcast::{PreparedBroadcast, ReplayBuffer};
 pub(crate) use config::build_config_payload;
-pub use connection::ws_upgrade_handler;
+pub(crate) use connection::ws_upgrade_handler;
