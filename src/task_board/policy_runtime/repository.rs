@@ -1,16 +1,22 @@
 use std::collections::HashMap;
+#[cfg(test)]
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 
+#[cfg(test)]
 use crate::errors::{CliError, CliErrorKind};
+#[cfg(test)]
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 
+#[cfg(test)]
 use super::events::run_matches_event;
+#[cfg(test)]
 use super::models::{POLICY_WORKFLOW_RUNS_SCHEMA_VERSION, PolicyWorkflowEvent};
 use super::models::{
     PolicyRunStatus, PolicyRunTrigger, PolicyWorkflowRun, PolicyWorkflowRunsDocument,
 };
+#[cfg(test)]
 use super::scheduler::timer_wait_is_due;
 
 /// A `Running` run whose `updated_at` is older than this is treated as
@@ -32,10 +38,12 @@ pub enum BeginRunOutcome {
     Existing(PolicyWorkflowRun),
 }
 
+#[cfg(test)]
 pub struct PolicyRuntimeRepository {
     repository: VersionedJsonRepository<PolicyWorkflowRunsDocument>,
 }
 
+#[cfg(test)]
 impl PolicyRuntimeRepository {
     #[must_use]
     pub fn new(mut root: PathBuf) -> Self {

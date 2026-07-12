@@ -1,3 +1,4 @@
+#[cfg(test)]
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -7,20 +8,26 @@ use crate::daemon::service::reviews::policy_audit::record_policy_run_start_resul
 use crate::daemon::service::reviews::policy_enrichment::{
     enrich_policy_target_for_execution, enrich_policy_targets_for_execution,
 };
+#[cfg(test)]
+use crate::daemon::service::reviews::policy_executor::build_policy_provider_registry;
 use crate::daemon::service::reviews::policy_executor::{
-    build_policy_provider_registry, daemon_policy_executor_with_audit,
+    build_database_policy_provider_registry, daemon_policy_executor_with_audit,
 };
 use crate::daemon::service::reviews::policy_mapping::{
     map_run_response, runtime_trigger_from_reviews,
 };
+#[cfg(test)]
+use crate::daemon::service::reviews::policy_plan::preview_legacy_reviews_policy;
 use crate::daemon::service::reviews::policy_plan::{
-    preview_legacy_reviews_policy, preview_legacy_reviews_policy_with_token,
+    authored_database_reviews_policy_plan, preview_database_reviews_policy,
+    preview_database_reviews_policy_plan,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags;
+#[cfg(test)]
+use crate::reviews::policy::authored_reviews_policy_plan;
 use crate::reviews::policy::{
-    ReviewsPolicyActionExecutor, ReviewsPolicyPlan, authored_reviews_policy_plan,
-    planned_reviews_policy_run_matches_target,
+    ReviewsPolicyActionExecutor, ReviewsPolicyPlan, planned_reviews_policy_run_matches_target,
 };
 use crate::reviews::{
     ReviewItem, ReviewTarget, ReviewsPolicyPreviewRequest, ReviewsPolicyPreviewResponse,
@@ -29,15 +36,18 @@ use crate::reviews::{
 };
 use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy_runtime::executor::PolicyRuntimeExecutor;
-use crate::task_board::policy_runtime::models::PolicyRunStatus;
+use crate::task_board::policy_runtime::models::{
+    PolicyRunRequest, PolicyRunStatus, PolicyWorkflowRun,
+};
+#[cfg(test)]
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
-use crate::task_board::store::default_board_root;
 
 #[cfg(test)]
-pub(crate) use super::policy_resume::resume_due_reviews_policy_timers_with_executor_at;
 pub(crate) use super::policy_resume::{
-    resume_reviews_policy_event, resume_reviews_policy_event_with_executor,
-    spawn_reviews_policy_timer_loop,
+    resume_due_reviews_policy_timers_with_executor_at, resume_reviews_policy_event_with_executor,
+};
+pub(crate) use super::policy_resume::{
+    resume_reviews_policy_event, spawn_reviews_policy_timer_loop,
 };
 
 /// Preview the reviews policy plan for one target and report token readiness.
@@ -45,13 +55,21 @@ pub(crate) use super::policy_resume::{
 /// # Errors
 /// Returns `CliError` when the request is invalid or the policy plan cannot be
 /// authored for the target.
-pub fn preview_reviews_policy(
+pub async fn preview_reviews_policy(
     request: &ReviewsPolicyPreviewRequest,
 ) -> Result<ReviewsPolicyPreviewResponse, CliError> {
-    preview_legacy_reviews_policy_with_token(&default_board_root(), request)
+    preview_reviews_policy_with_audit_db(request, observe_async_db()).await
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) async fn preview_reviews_policy_with_audit_db(
+    request: &ReviewsPolicyPreviewRequest,
+    database: Option<Arc<AsyncDaemonDb>>,
+) -> Result<ReviewsPolicyPreviewResponse, CliError> {
+    let database = require_policy_runtime_db(database)?;
+    preview_database_reviews_policy(&database, request).await
+}
+
+#[cfg(test)]
 pub(crate) fn preview_reviews_policy_with_root(
     root: &Path,
     request: &ReviewsPolicyPreviewRequest,
@@ -74,19 +92,15 @@ pub(crate) async fn start_reviews_policy_run_with_audit_db(
     request: &ReviewsPolicyRunStartRequest,
     audit_db: Option<Arc<AsyncDaemonDb>>,
 ) -> Result<ReviewsPolicyRunResponse, CliError> {
+    let audit_db = require_policy_runtime_db(audit_db)?;
     let target = enrich_policy_target_for_execution(&request.target).await;
     let request = ReviewsPolicyRunStartRequest {
         target,
         ..request.clone()
     };
-    let executor = daemon_policy_executor_with_audit(&request.target.repository, audit_db.clone())?;
-    start_reviews_policy_run_with_executor_and_audit_db(
-        default_board_root(),
-        executor,
-        &request,
-        audit_db,
-    )
-    .await
+    let executor =
+        daemon_policy_executor_with_audit(&request.target.repository, Some(Arc::clone(&audit_db)))?;
+    start_reviews_policy_run_with_database(executor, &request, audit_db).await
 }
 
 pub(crate) async fn start_background_reviews_policy_runs(items: &[ReviewItem]) {
@@ -121,12 +135,16 @@ fn log_started_background_runs(started_runs: usize) {
 /// Returns `true` only when a run was actually started; resolve and start
 /// failures are logged and reported as `false`.
 async fn start_background_reviews_policy_run_for_target(target: &ReviewTarget) -> bool {
-    let audit_db = observe_async_db();
-    let Some(executor) = resolve_background_run_executor(target, audit_db.clone()) else {
+    let Ok(audit_db) = require_policy_runtime_db(observe_async_db()).inspect_err(|error| {
+        log_background_runtime_database_error(target, error);
+    }) else {
         return false;
     };
-    maybe_start_background_reviews_policy_run_with_executor_and_audit_db(
-        default_board_root(),
+    let Some(executor) = resolve_background_run_executor(target, Some(Arc::clone(&audit_db)))
+    else {
+        return false;
+    };
+    maybe_start_background_reviews_policy_run_with_database(
         executor,
         target,
         GitHubMergeMethod::default(),
@@ -135,6 +153,19 @@ async fn start_background_reviews_policy_run_for_target(target: &ReviewTarget) -
     .await
     .inspect_err(|error| log_background_run_start_error(target, error))
     .is_ok_and(|started| started.is_some())
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_background_runtime_database_error(target: &ReviewTarget, error: &CliError) {
+    tracing::warn!(
+        repository = %target.repository,
+        pull_request = target.number,
+        error = %error,
+        "reviews policy runtime database is unavailable"
+    );
 }
 
 fn resolve_background_run_executor(
@@ -172,7 +203,52 @@ fn log_background_run_start_error(target: &ReviewTarget, error: &CliError) {
     );
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+async fn start_reviews_policy_run_with_database<E>(
+    executor: E,
+    request: &ReviewsPolicyRunStartRequest,
+    database: Arc<AsyncDaemonDb>,
+) -> Result<ReviewsPolicyRunResponse, CliError>
+where
+    E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
+{
+    let result: Result<ReviewsPolicyRunResponse, CliError> = async {
+        request.validate()?;
+        reject_disabled_background_request(request)?;
+        let workflow_id = request.normalized_workflow_id();
+        let plan = authored_database_reviews_policy_plan(
+            &database,
+            &workflow_id,
+            &request.target,
+            request.method,
+        )
+        .await?;
+        start_actionable_database_run(executor, request, workflow_id, plan, &database).await
+    }
+    .await;
+    record_policy_run_start_result(Some(&database), request, &result).await;
+    result
+}
+
+async fn start_actionable_database_run<E>(
+    executor: E,
+    request: &ReviewsPolicyRunStartRequest,
+    workflow_id: String,
+    plan: ReviewsPolicyPlan,
+    database: &Arc<AsyncDaemonDb>,
+) -> Result<ReviewsPolicyRunResponse, CliError>
+where
+    E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
+{
+    let run_request = actionable_run_request(&workflow_id, plan)?;
+    let providers = build_database_policy_provider_registry(executor, Arc::clone(database));
+    let runtime = PolicyRuntimeExecutor::new_database(Arc::clone(database), providers);
+    let run = runtime
+        .start(runtime_trigger_from_reviews(request.trigger), run_request)
+        .await?;
+    map_run_response(&run)
+}
+
+#[cfg(test)]
 pub(crate) async fn start_reviews_policy_run_with_executor<E>(
     root: PathBuf,
     executor: E,
@@ -181,9 +257,20 @@ pub(crate) async fn start_reviews_policy_run_with_executor<E>(
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
 {
-    start_reviews_policy_run_with_executor_and_audit_db(root, executor, request, None).await
+    request.validate()?;
+    reject_disabled_background_request(request)?;
+    let workflow_id = request.normalized_workflow_id();
+    let plan = authored_reviews_policy_plan(&root, &workflow_id, &request.target, request.method)?;
+    let run_request = actionable_run_request(&workflow_id, plan)?;
+    let providers = build_policy_provider_registry(executor, root.clone());
+    let runtime = PolicyRuntimeExecutor::new(PolicyRuntimeRepository::new(root), providers);
+    let run = runtime
+        .start(runtime_trigger_from_reviews(request.trigger), run_request)
+        .await?;
+    map_run_response(&run)
 }
 
+#[cfg(test)]
 pub(crate) async fn start_reviews_policy_run_with_executor_and_audit_db<E>(
     root: PathBuf,
     executor: E,
@@ -193,36 +280,12 @@ pub(crate) async fn start_reviews_policy_run_with_executor_and_audit_db<E>(
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
 {
-    let result: Result<ReviewsPolicyRunResponse, CliError> = async {
-        request.validate()?;
-        reject_disabled_background_request(request)?;
-        let workflow_id = request.normalized_workflow_id();
-        let plan =
-            authored_reviews_policy_plan(&root, &workflow_id, &request.target, request.method)?;
-        if !plan.actionable {
-            return Err(CliErrorKind::workflow_parse(non_actionable_plan_message(
-                &workflow_id,
-                &plan,
-            ))
-            .into());
-        }
-        let run_request = plan
-            .into_run_request()
-            .expect("actionable reviews policy plan should produce a run request");
-
-        let providers = build_policy_provider_registry(executor, root.clone());
-        let runtime = PolicyRuntimeExecutor::new(PolicyRuntimeRepository::new(root), providers);
-        let run = runtime
-            .start(runtime_trigger_from_reviews(request.trigger), run_request)
-            .await?;
-        map_run_response(&run)
-    }
-    .await;
+    let result = start_reviews_policy_run_with_executor(root, executor, request).await;
     record_policy_run_start_result(audit_db.as_ref(), request, &result).await;
     result
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub(crate) async fn maybe_start_background_reviews_policy_run_with_executor<E>(
     root: PathBuf,
     executor: E,
@@ -232,23 +295,7 @@ pub(crate) async fn maybe_start_background_reviews_policy_run_with_executor<E>(
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
 {
-    maybe_start_background_reviews_policy_run_with_executor_and_audit_db(
-        root, executor, target, method, None,
-    )
-    .await
-}
-
-pub(crate) async fn maybe_start_background_reviews_policy_run_with_executor_and_audit_db<E>(
-    root: PathBuf,
-    executor: E,
-    target: &ReviewTarget,
-    method: GitHubMergeMethod,
-    audit_db: Option<Arc<AsyncDaemonDb>>,
-) -> Result<Option<ReviewsPolicyRunResponse>, CliError>
-where
-    E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
-{
-    let preview = preview_reviews_policy_with_root(
+    let preview = preview_legacy_reviews_policy(
         &root,
         &ReviewsPolicyPreviewRequest {
             workflow_id: String::new(),
@@ -259,14 +306,10 @@ where
     if !preview.eligible {
         return Ok(None);
     }
-    if terminal_run_matches_target_head(
-        &PolicyRuntimeRepository::new(root.clone()),
-        &preview.workflow_id,
-        target,
-    )? {
+    if terminal_legacy_run_matches_target_head(&root, &preview.workflow_id, target)? {
         return Ok(None);
     }
-    start_reviews_policy_run_with_executor_and_audit_db(
+    start_reviews_policy_run_with_executor(
         root,
         executor,
         &ReviewsPolicyRunStartRequest {
@@ -275,7 +318,44 @@ where
             method,
             trigger: ReviewsPolicyTrigger::Background,
         },
-        audit_db,
+    )
+    .await
+    .map(Some)
+}
+
+async fn maybe_start_background_reviews_policy_run_with_database<E>(
+    executor: E,
+    target: &ReviewTarget,
+    method: GitHubMergeMethod,
+    database: Arc<AsyncDaemonDb>,
+) -> Result<Option<ReviewsPolicyRunResponse>, CliError>
+where
+    E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
+{
+    let preview = preview_database_reviews_policy_plan(
+        &database,
+        &ReviewsPolicyPreviewRequest {
+            workflow_id: String::new(),
+            target: target.clone(),
+            method,
+        },
+    )
+    .await?;
+    if !preview.eligible
+        || terminal_database_run_matches_target_head(&database, &preview.workflow_id, target)
+            .await?
+    {
+        return Ok(None);
+    }
+    start_reviews_policy_run_with_database(
+        executor,
+        &ReviewsPolicyRunStartRequest {
+            workflow_id: preview.workflow_id,
+            target: target.clone(),
+            method,
+            trigger: ReviewsPolicyTrigger::Background,
+        },
+        database,
     )
     .await
     .map(Some)
@@ -286,19 +366,30 @@ where
 /// # Errors
 /// Returns `CliError` when the request is invalid or the runtime repository
 /// cannot read the subject's runs.
-pub fn reviews_policy_status(
+pub async fn reviews_policy_status(
     request: &ReviewsPolicyStatusRequest,
 ) -> Result<ReviewsPolicyStatusResponse, CliError> {
+    reviews_policy_status_with_audit_db(request, observe_async_db()).await
+}
+
+pub(crate) async fn reviews_policy_status_with_audit_db(
+    request: &ReviewsPolicyStatusRequest,
+    database: Option<Arc<AsyncDaemonDb>>,
+) -> Result<ReviewsPolicyStatusResponse, CliError> {
     request.validate()?;
+    let database = require_policy_runtime_db(database)?;
     let workflow_id = request.normalized_workflow_id();
-    let repository = PolicyRuntimeRepository::new(default_board_root());
     let subject_key = request.subject.subject_key();
-    let active_run = repository
-        .active_run(&workflow_id, &subject_key)?
+    let active_run = database
+        .active_policy_runs_for_subject(&workflow_id, &subject_key)
+        .await?
+        .into_iter()
+        .next()
         .map(|run| map_run_response(&run))
         .transpose()?;
-    let recent_runs = repository
-        .runs_for_subject(&workflow_id, &subject_key)?
+    let recent_runs = database
+        .policy_runs_for_subject(&workflow_id, &subject_key)
+        .await?
         .into_iter()
         .map(|run| map_run_response(&run))
         .collect::<Result<Vec<_>, _>>()?;
@@ -330,20 +421,57 @@ fn reject_disabled_background_request(
     .into())
 }
 
-fn terminal_run_matches_target_head(
-    repository: &PolicyRuntimeRepository,
+async fn terminal_database_run_matches_target_head(
+    database: &AsyncDaemonDb,
     workflow_id: &str,
     target: &ReviewTarget,
 ) -> Result<bool, CliError> {
-    Ok(repository
-        .runs_for_subject(workflow_id, &target.subject_key())?
-        .into_iter()
-        .any(|run| {
-            !matches!(
-                run.status,
-                PolicyRunStatus::Running | PolicyRunStatus::Waiting
-            ) && planned_reviews_policy_run_matches_target(&run.planned_steps, target)
-        }))
+    let runs = database
+        .policy_runs_for_subject(workflow_id, &target.subject_key())
+        .await?;
+    Ok(terminal_run_matches_target(&runs, target))
+}
+
+#[cfg(test)]
+fn terminal_legacy_run_matches_target_head(
+    root: &Path,
+    workflow_id: &str,
+    target: &ReviewTarget,
+) -> Result<bool, CliError> {
+    let runs = PolicyRuntimeRepository::new(root.to_path_buf())
+        .runs_for_subject(workflow_id, &target.subject_key())?;
+    Ok(terminal_run_matches_target(&runs, target))
+}
+
+fn terminal_run_matches_target(runs: &[PolicyWorkflowRun], target: &ReviewTarget) -> bool {
+    runs.iter().any(|run| {
+        !matches!(
+            run.status,
+            PolicyRunStatus::Running | PolicyRunStatus::Waiting
+        ) && planned_reviews_policy_run_matches_target(&run.planned_steps, target)
+    })
+}
+
+pub(super) fn require_policy_runtime_db(
+    database: Option<Arc<AsyncDaemonDb>>,
+) -> Result<Arc<AsyncDaemonDb>, CliError> {
+    database.ok_or_else(|| {
+        CliErrorKind::workflow_io("reviews policy runtime database is unavailable").into()
+    })
+}
+
+fn actionable_run_request(
+    workflow_id: &str,
+    plan: ReviewsPolicyPlan,
+) -> Result<PolicyRunRequest, CliError> {
+    if !plan.actionable {
+        return Err(
+            CliErrorKind::workflow_parse(non_actionable_plan_message(workflow_id, &plan)).into(),
+        );
+    }
+    Ok(plan
+        .into_run_request()
+        .expect("actionable reviews policy plan should produce a run request"))
 }
 
 fn non_actionable_plan_message(workflow_id: &str, plan: &ReviewsPolicyPlan) -> String {

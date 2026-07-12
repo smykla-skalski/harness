@@ -1,28 +1,20 @@
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::protocol::TaskBoardSyncRequest;
 use crate::errors::CliError;
-use crate::task_board::external::{
-    ExternalSyncConfig, ExternalSyncOptions, configured_sync_clients, sync_external_tasks,
-};
-use crate::task_board::summary::{TaskBoardSyncSummary, build_sync_summary};
+use crate::task_board::summary::TaskBoardSyncSummary;
 
-use super::{TaskBoardSyncArgs, print_json, run_blocking, store};
+use super::{TaskBoardSyncArgs, daemon_client, print_json};
 
 impl Execute for TaskBoardSyncArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let board = store(self.board_root.clone());
-        let config = ExternalSyncConfig::from_env();
-        let clients = configured_sync_clients(&config, self.provider)?;
-        let options = ExternalSyncOptions {
+        let request = TaskBoardSyncRequest {
+            status: None,
             provider: self.provider,
             direction: self.direction,
             conflict_policy: self.conflict_policy,
             dry_run: !self.apply,
-            ..ExternalSyncOptions::default()
         };
-        let operations = run_blocking(sync_external_tasks(&board, options, &clients))?;
-        let items = board.list(None)?;
-        let mut payload = build_sync_summary(&items, &config);
-        payload.operations = operations;
+        let payload = daemon_client()?.sync_task_board(&request)?;
         if self.json {
             print_json(&payload)?;
         } else {

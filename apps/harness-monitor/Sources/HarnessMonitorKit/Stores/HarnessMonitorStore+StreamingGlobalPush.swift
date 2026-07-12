@@ -42,18 +42,30 @@ extension HarnessMonitorStore {
     case .reviewsLocalCloneProgress(let progress):
       applyLocalCloneProgress(progress)
     case .githubDataChanged(let payload):
-      if contentUI.dashboard.latestGitHubDataChange != payload {
-        contentUI.dashboard.latestGitHubDataChange = payload
-      }
-      if contentUI.dashboard.githubDataRevision != payload.revision {
-        contentUI.dashboard.githubDataRevision = payload.revision
-      }
+      applyGitHubDataChange(payload)
+    case .taskBoardUpdated(let payload):
+      applyTaskBoardChange(payload)
     case .auditEvent(let event):
       applyApplicationAuditEvent(event)
     case .unknown:
       break
     case .sessionsUpdated, .sessionsUpdatedDelta, .sessionUpdated, .sessionExtensions:
       break
+    }
+  }
+
+  private func applyGitHubDataChange(_ payload: GitHubDataChangedPayload) {
+    if contentUI.dashboard.latestGitHubDataChange != payload {
+      contentUI.dashboard.latestGitHubDataChange = payload
+    }
+    if contentUI.dashboard.githubDataRevision != payload.revision {
+      contentUI.dashboard.githubDataRevision = payload.revision
+    }
+  }
+
+  private func applyTaskBoardChange(_ payload: TaskBoardUpdatedPayload) {
+    if contentUI.dashboard.taskBoardRevision != payload.revision {
+      contentUI.dashboard.taskBoardRevision = payload.revision
     }
   }
 

@@ -38,13 +38,13 @@ pub(crate) async fn dispatch_reviews_method(
         ws_methods::REVIEWS_PULL_REQUEST_RESOLVE => {
             Some(super::reviews_resolve::dispatch_reviews_pull_request_resolve(request).await)
         }
-        ws_methods::REVIEWS_ACTION_PREVIEW => Some(dispatch_reviews_action_preview(request)),
-        ws_methods::REVIEWS_POLICY_PREVIEW => Some(dispatch_reviews_policy_preview(request)),
+        ws_methods::REVIEWS_ACTION_PREVIEW => Some(dispatch_action_preview(request, state).await),
+        ws_methods::REVIEWS_POLICY_PREVIEW => Some(dispatch_policy_preview(request, state).await),
         ws_methods::REVIEWS_POLICY_START => {
             Some(dispatch_reviews_policy_start(request, state).await)
         }
-        ws_methods::REVIEWS_POLICY_STATUS => Some(dispatch_reviews_policy_status(request)),
-        ws_methods::REVIEWS_POLICY_HISTORY => Some(dispatch_reviews_policy_history(request)),
+        ws_methods::REVIEWS_POLICY_STATUS => Some(dispatch_policy_status(request, state).await),
+        ws_methods::REVIEWS_POLICY_HISTORY => Some(dispatch_policy_history(request, state).await),
         ws_methods::REVIEWS_APPROVE => Some(dispatch_reviews_approve(request, state).await),
         ws_methods::REVIEWS_MERGE => Some(dispatch_reviews_merge(request, state).await),
         ws_methods::REVIEWS_RERUN_CHECKS => {
@@ -89,18 +89,24 @@ pub(crate) async fn dispatch_reviews_method(
     }
 }
 
-fn dispatch_reviews_action_preview(request: &WsRequest) -> WsResponse {
+async fn dispatch_action_preview(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsActionPreviewRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::preview_review_action(&body))
+    dispatch_query_result(
+        &request.id,
+        service::preview_review_action_with_audit_db(&body, state.async_db.get().cloned()).await,
+    )
 }
 
-fn dispatch_reviews_policy_preview(request: &WsRequest) -> WsResponse {
+async fn dispatch_policy_preview(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsPolicyPreviewRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::preview_reviews_policy(&body))
+    dispatch_query_result(
+        &request.id,
+        service::preview_reviews_policy_with_audit_db(&body, state.async_db.get().cloned()).await,
+    )
 }
 
 async fn dispatch_reviews_policy_start(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
@@ -113,18 +119,24 @@ async fn dispatch_reviews_policy_start(request: &WsRequest, state: &DaemonHttpSt
     )
 }
 
-fn dispatch_reviews_policy_status(request: &WsRequest) -> WsResponse {
+async fn dispatch_policy_status(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsPolicyStatusRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::reviews_policy_status(&body))
+    dispatch_query_result(
+        &request.id,
+        service::reviews_policy_status_with_audit_db(&body, state.async_db.get().cloned()).await,
+    )
 }
 
-fn dispatch_reviews_policy_history(request: &WsRequest) -> WsResponse {
+async fn dispatch_policy_history(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsPolicyHistoryRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::reviews_policy_history(&body))
+    dispatch_query_result(
+        &request.id,
+        service::reviews_policy_history_with_audit_db(&body, state.async_db.get().cloned()).await,
+    )
 }
 
 async fn dispatch_reviews_repository_catalog(request: &WsRequest) -> WsResponse {

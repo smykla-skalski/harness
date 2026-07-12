@@ -4,12 +4,13 @@ use harness_testkit::with_isolated_harness_env;
 use tempfile::tempdir;
 
 use super::super::{
-    DaemonRuntimeConfig, config_path, drain_task_board_git_runtime_secrets,
-    load_persisted_log_level, load_runtime_config, load_task_board_git_runtime_config,
-    persist_log_level, persist_task_board_git_runtime_config, read_recent_events,
-    replace_task_board_git_runtime_secrets, replace_task_board_github_tokens,
-    replace_task_board_openrouter_token, replace_task_board_todoist_token, task_board_github_token,
-    task_board_openrouter_token, task_board_todoist_token,
+    DaemonRuntimeConfig, config_path, load_persisted_log_level, load_runtime_config,
+    load_runtime_config_raw, load_task_board_git_runtime_config, persist_log_level,
+    persist_task_board_git_runtime_config, read_recent_events,
+    remove_migrated_task_board_config_after_ack, replace_task_board_git_runtime_secrets,
+    replace_task_board_github_tokens, replace_task_board_openrouter_token,
+    replace_task_board_todoist_token, task_board_git_runtime_secret_handoff_digest,
+    task_board_github_token, task_board_openrouter_token, task_board_todoist_token,
 };
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
@@ -211,12 +212,12 @@ fn github_token_snapshot_prefers_repository_override() {
 }
 
 #[test]
-fn drain_returns_none_when_disk_config_is_already_stripped() {
+fn handoff_digest_is_absent_when_disk_config_is_already_stripped() {
     let tmp = tempdir().expect("tempdir");
     with_isolated_harness_env(tmp.path(), || {
         assert!(
-            drain_task_board_git_runtime_secrets()
-                .expect("drain on missing config")
+            task_board_git_runtime_secret_handoff_digest(&TaskBoardGitRuntimeConfig::default())
+                .expect("digest empty config")
                 .is_none()
         );
 
@@ -231,15 +232,20 @@ fn drain_returns_none_when_disk_config_is_already_stripped() {
         .expect("persist stripped config");
 
         assert!(
-            drain_task_board_git_runtime_secrets()
-                .expect("drain on stripped config")
-                .is_none()
+            task_board_git_runtime_secret_handoff_digest(
+                &load_runtime_config_raw()
+                    .expect("load raw config")
+                    .and_then(|config| config.task_board_git_runtime_config)
+                    .unwrap_or_default()
+            )
+            .expect("digest stripped config")
+            .is_none()
         );
     });
 }
 
 #[test]
-fn drain_returns_secrets_and_persists_stripped_when_disk_has_plaintext() {
+fn handoff_digest_is_stable_and_does_not_strip_plaintext() {
     let tmp = tempdir().expect("tempdir");
     with_isolated_harness_env(tmp.path(), || {
         let raw_disk = serde_json::json!({
@@ -271,42 +277,116 @@ fn drain_returns_secrets_and_persists_stripped_when_disk_has_plaintext() {
         )
         .expect("write raw config");
 
-        let drained = drain_task_board_git_runtime_secrets()
-            .expect("drain on plaintext config")
-            .expect("drain returns secrets");
+        let raw = load_runtime_config_raw()
+            .expect("load plaintext config")
+            .and_then(|config| config.task_board_git_runtime_config)
+            .expect("task board config");
+        let digest = task_board_git_runtime_secret_handoff_digest(&raw)
+            .expect("digest plaintext config")
+            .expect("plaintext produces digest");
+        let second_digest = task_board_git_runtime_secret_handoff_digest(&raw)
+            .expect("digest again")
+            .expect("plaintext still produces digest");
+        assert_eq!(digest, second_digest);
+        assert_eq!(digest.len(), 64);
         assert_eq!(
-            drained.global.ssh_private_key.as_deref(),
+            raw.global.ssh_private_key.as_deref(),
             Some("global-ssh-secret")
         );
         assert_eq!(
-            drained.global.signing.gpg_private_key.as_deref(),
+            raw.global.signing.gpg_private_key.as_deref(),
             Some("global-gpg-secret")
         );
-        assert_eq!(drained.repository_overrides.len(), 1);
+        assert_eq!(raw.repository_overrides.len(), 1);
         assert_eq!(
-            drained.repository_overrides[0]
+            raw.repository_overrides[0]
                 .profile
                 .ssh_private_key
                 .as_deref(),
             Some("repo-ssh-secret")
         );
+        let still_on_disk = fs::read_to_string(config_path()).expect("read legacy payload");
+        assert!(still_on_disk.contains("global-ssh-secret"));
+    });
+}
 
-        let after = load_task_board_git_runtime_config().expect("load post-drain config");
-        assert!(after.global.ssh_private_key.is_none());
-        assert!(after.global.signing.gpg_private_key.is_none());
+#[test]
+fn acknowledged_handoff_cleanup_rejects_changed_plaintext() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let original = TaskBoardGitRuntimeConfig {
+            global: TaskBoardGitRuntimeProfile {
+                ssh_private_key: Some("original-secret".into()),
+                ..Default::default()
+            },
+            repository_overrides: vec![],
+        };
+        let changed = TaskBoardGitRuntimeConfig {
+            global: TaskBoardGitRuntimeProfile {
+                ssh_private_key: Some("replacement-secret".into()),
+                ..Default::default()
+            },
+            repository_overrides: vec![],
+        };
+        let digest = task_board_git_runtime_secret_handoff_digest(&original)
+            .expect("digest original")
+            .expect("plaintext digest");
+        fs::create_dir_all(config_path().parent().expect("parent")).expect("mkdir");
+        fs::write(
+            config_path(),
+            serde_json::to_vec_pretty(&DaemonRuntimeConfig {
+                log_level: None,
+                task_board_git_runtime_config: Some(changed),
+            })
+            .expect("encode changed config"),
+        )
+        .expect("write changed config");
+
+        let error = remove_migrated_task_board_config_after_ack(&digest)
+            .expect_err("changed payload must survive cleanup");
+
+        assert!(error.to_string().contains("payload changed"));
         assert!(
-            after
-                .repository_overrides
-                .iter()
-                .all(|over| over.profile.ssh_private_key.is_none())
+            fs::read_to_string(config_path())
+                .expect("read retained config")
+                .contains("replacement-secret")
         );
+    });
+}
+
+#[test]
+fn acknowledged_handoff_cleanup_removes_matching_envelope() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let runtime = TaskBoardGitRuntimeConfig {
+            global: TaskBoardGitRuntimeProfile {
+                ssh_private_key: Some("migrated-secret".into()),
+                ..Default::default()
+            },
+            repository_overrides: vec![],
+        };
+        let digest = task_board_git_runtime_secret_handoff_digest(&runtime)
+            .expect("digest runtime")
+            .expect("plaintext digest");
+        fs::create_dir_all(config_path().parent().expect("parent")).expect("mkdir");
+        fs::write(
+            config_path(),
+            serde_json::to_vec_pretty(&DaemonRuntimeConfig {
+                log_level: Some("debug".into()),
+                task_board_git_runtime_config: Some(runtime),
+            })
+            .expect("encode config"),
+        )
+        .expect("write config");
 
         assert!(
-            drain_task_board_git_runtime_secrets()
-                .expect("drain again")
-                .is_none(),
-            "drain should be idempotent once disk is stripped"
+            remove_migrated_task_board_config_after_ack(&digest).expect("remove matching envelope")
         );
+        let stored = load_runtime_config_raw()
+            .expect("load cleaned config")
+            .expect("log-level config remains");
+        assert_eq!(stored.log_level.as_deref(), Some("debug"));
+        assert!(stored.task_board_git_runtime_config.is_none());
     });
 }
 

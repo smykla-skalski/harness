@@ -5,13 +5,16 @@ use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
+#[cfg(test)]
 use crate::task_board::normalize_repository_slug;
 use crate::task_board::types::TaskBoardStatus;
 
+use super::types::TaskBoardOrchestratorSettings;
+#[cfg(test)]
 use super::types::{
     TaskBoardGitHubInboxConfig, TaskBoardOrchestratorDispatchInput,
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettings,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardTodoistInboxConfig,
+    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
+    TaskBoardTodoistInboxConfig,
 };
 
 /// Rewrite legacy persisted settings entries on disk so strict enum
@@ -26,6 +29,7 @@ use super::types::{
 ///
 /// # Errors
 /// Returns `CliError` when the file is malformed JSON or cannot be rewritten.
+#[cfg(test)]
 pub(super) fn migrate_persisted_settings(
     path: &Path,
 ) -> Result<Option<TaskBoardOrchestratorSettings>, CliError> {
@@ -114,6 +118,7 @@ fn repair_dispatch_status_filter(document: &mut Value) -> bool {
     true
 }
 
+#[cfg(test)]
 pub(super) fn apply_settings_update(
     settings: &mut TaskBoardOrchestratorSettings,
     update: &TaskBoardOrchestratorSettingsUpdateRequest,
@@ -140,6 +145,7 @@ pub(super) fn apply_settings_update(
     }
 }
 
+#[cfg(test)]
 pub(super) fn normalize_github_inbox(
     inbox: &TaskBoardGitHubInboxConfig,
 ) -> Result<TaskBoardGitHubInboxConfig, CliError> {
@@ -161,6 +167,7 @@ pub(super) fn normalize_github_inbox(
     })
 }
 
+#[cfg(test)]
 pub(super) fn normalize_todoist_inbox(
     inbox: &TaskBoardTodoistInboxConfig,
 ) -> TaskBoardTodoistInboxConfig {
@@ -169,6 +176,7 @@ pub(super) fn normalize_todoist_inbox(
     }
 }
 
+#[cfg(test)]
 fn normalize_trimmed_unique(values: &[String]) -> Vec<String> {
     let mut seen = BTreeSet::new();
     let mut out = Vec::with_capacity(values.len());
@@ -184,6 +192,7 @@ fn normalize_trimmed_unique(values: &[String]) -> Vec<String> {
     out
 }
 
+#[cfg(test)]
 fn apply_status_filter_update(
     settings: &mut TaskBoardOrchestratorSettings,
     update: &TaskBoardOrchestratorSettingsUpdateRequest,
@@ -195,6 +204,7 @@ fn apply_status_filter_update(
     }
 }
 
+#[cfg(test)]
 fn apply_project_update(
     settings: &mut TaskBoardOrchestratorSettings,
     update: &TaskBoardOrchestratorSettingsUpdateRequest,
@@ -206,6 +216,7 @@ fn apply_project_update(
     }
 }
 
+#[cfg(test)]
 pub(super) fn dispatch_input(
     request: &TaskBoardOrchestratorRunOnceRequest,
     settings: &TaskBoardOrchestratorSettings,
@@ -231,6 +242,7 @@ pub(super) fn dispatch_input(
     }
 }
 
+#[cfg(test)]
 fn canonical_status_filter(status: Option<TaskBoardStatus>) -> Option<TaskBoardStatus> {
     status.map(TaskBoardStatus::canonical_persisted_status)
 }

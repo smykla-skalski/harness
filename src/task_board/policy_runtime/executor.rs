@@ -1,26 +1,86 @@
 use std::ops::ControlFlow;
+use std::sync::Arc;
 
 use chrono::Utc;
 use tracing::{info, warn};
 
+use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::CliError;
 
 use super::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunTrigger, PolicyWorkflowRun,
 };
 use super::providers::{PolicyExecutionContext, PolicyProviderRegistry};
-use super::repository::{BeginRunOutcome, PolicyRuntimeRepository};
+use super::repository::BeginRunOutcome;
+#[cfg(test)]
+use super::repository::PolicyRuntimeRepository;
 
 pub struct PolicyRuntimeExecutor {
-    repository: PolicyRuntimeRepository,
+    storage: PolicyRunStorage,
     providers: PolicyProviderRegistry,
+}
+
+enum PolicyRunStorage {
+    #[cfg(test)]
+    LegacyFile(PolicyRuntimeRepository),
+    Database(Arc<AsyncDaemonDb>),
+}
+
+impl PolicyRunStorage {
+    async fn begin_run(
+        &self,
+        run: PolicyWorkflowRun,
+        trigger: PolicyRunTrigger,
+    ) -> Result<BeginRunOutcome, CliError> {
+        match self {
+            #[cfg(test)]
+            Self::LegacyFile(repository) => repository.begin_run(run, trigger, Utc::now()),
+            Self::Database(database) => {
+                database
+                    .begin_policy_workflow_run(run, trigger, Utc::now())
+                    .await
+            }
+        }
+    }
+
+    async fn claim_waiting_run(
+        &self,
+        run_id: &str,
+        trigger: PolicyRunTrigger,
+    ) -> Result<Option<PolicyWorkflowRun>, CliError> {
+        match self {
+            #[cfg(test)]
+            Self::LegacyFile(repository) => repository.claim_waiting_run(run_id, trigger),
+            Self::Database(database) => database.claim_waiting_policy_run(run_id, trigger).await,
+        }
+    }
+
+    async fn save(&self, run: &PolicyWorkflowRun) -> Result<(), CliError> {
+        match self {
+            #[cfg(test)]
+            Self::LegacyFile(repository) => repository.save(run),
+            Self::Database(database) => database.save_policy_workflow_run(run).await.map(|_| ()),
+        }
+    }
 }
 
 impl PolicyRuntimeExecutor {
     #[must_use]
+    #[cfg(test)]
     pub fn new(repository: PolicyRuntimeRepository, providers: PolicyProviderRegistry) -> Self {
         Self {
-            repository,
+            storage: PolicyRunStorage::LegacyFile(repository),
+            providers,
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn new_database(
+        database: Arc<AsyncDaemonDb>,
+        providers: PolicyProviderRegistry,
+    ) -> Self {
+        Self {
+            storage: PolicyRunStorage::Database(database),
             providers,
         }
     }
@@ -61,7 +121,7 @@ impl PolicyRuntimeExecutor {
         // action runs. A reused run is returned untouched; a freshly created
         // run is already durable (status Running), so a crash mid-run leaves a
         // recoverable record instead of silently losing executed side effects.
-        match self.repository.begin_run(run, trigger, Utc::now())? {
+        match self.storage.begin_run(run, trigger).await? {
             BeginRunOutcome::Existing(existing) => Ok(existing),
             BeginRunOutcome::Created(run) => self.drive_created_run(run, &ctx, trigger).await,
         }
@@ -75,7 +135,7 @@ impl PolicyRuntimeExecutor {
     ) -> Result<PolicyWorkflowRun, CliError> {
         log_run_started(&run, trigger);
         let execution = self.execute_remaining_steps(&mut run, ctx).await;
-        self.finish_execution(run, execution)
+        self.finish_execution(run, execution).await
     }
 
     /// Resume a waiting run identified by `run_id`, executing its remaining
@@ -93,7 +153,7 @@ impl PolicyRuntimeExecutor {
         // Atomically claim the waiting run (Waiting -> Running, persisted)
         // so a concurrent timer and event poll cannot both resume the same
         // run and execute its remaining actions (e.g. merge) twice.
-        let Some(run) = self.repository.claim_waiting_run(run_id, trigger)? else {
+        let Some(run) = self.storage.claim_waiting_run(run_id, trigger).await? else {
             return Ok(None);
         };
         self.drive_resumed_run(run, trigger).await.map(Some)
@@ -111,7 +171,7 @@ impl PolicyRuntimeExecutor {
             trigger,
         };
         let execution = self.execute_remaining_steps(&mut run, &ctx).await;
-        self.finish_execution(run, execution)
+        self.finish_execution(run, execution).await
     }
 
     async fn execute_remaining_steps(
@@ -172,32 +232,32 @@ impl PolicyRuntimeExecutor {
         run.record_action(execution.action_key, index + 1);
         // Persist after every action so the cursor advances durably and a
         // resume never replays an action that already ran.
-        self.repository.save(run)?;
+        self.storage.save(run).await?;
         log_action_executed(run, &action_key);
         Ok(())
     }
 
-    fn finish_execution(
+    async fn finish_execution(
         &self,
         run: PolicyWorkflowRun,
         execution: Result<(), CliError>,
     ) -> Result<PolicyWorkflowRun, CliError> {
         match execution {
             Ok(()) => {
-                self.repository.save(&run)?;
+                self.storage.save(&run).await?;
                 Ok(run)
             }
-            Err(error) => self.record_failure(run, error),
+            Err(error) => self.record_failure(run, error).await,
         }
     }
 
-    fn record_failure(
+    async fn record_failure(
         &self,
         mut run: PolicyWorkflowRun,
         error: CliError,
     ) -> Result<PolicyWorkflowRun, CliError> {
         run.mark_failed(error.to_string());
-        self.repository.save(&run)?;
+        self.storage.save(&run).await?;
         log_run_failed(&run, &error);
         Err(error)
     }

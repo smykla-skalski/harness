@@ -62,7 +62,7 @@ async fn ensure_pull_request(
         return AutomationFlow::Continue(prepared.workflow.pr_number);
     }
     let decision = action_policy(
-        context.board_root,
+        context.policy,
         context.item,
         PolicyAction::OpenPr,
         Some(prepared.branch.as_str()),
@@ -143,7 +143,7 @@ async fn ready_pull_request(
         return AutomationFlow::Continue(());
     }
     let decision = action_policy(
-        context.board_root,
+        context.policy,
         context.item,
         PolicyAction::SubmitReview,
         Some(prepared.branch.as_str()),

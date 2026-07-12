@@ -16,6 +16,7 @@ use super::mutations::dispatch_query_result;
 
 mod orchestrator;
 mod policy;
+mod secret_handoff;
 
 #[expect(
     clippy::cognitive_complexity,
@@ -27,8 +28,11 @@ pub(crate) async fn dispatch_task_board_method(
 ) -> Option<WsResponse> {
     match request.method.as_str() {
         ws_methods::TASK_BOARD_CREATE => Some(dispatch_task_board_create(request, state).await),
-        ws_methods::TASK_BOARD_LIST => Some(dispatch_task_board_list(request).await),
-        ws_methods::TASK_BOARD_GET => Some(dispatch_task_board_get(request).await),
+        ws_methods::TASK_BOARD_CAPABILITIES => {
+            Some(dispatch_task_board_capabilities(request, state).await)
+        }
+        ws_methods::TASK_BOARD_LIST => Some(dispatch_task_board_list(request, state).await),
+        ws_methods::TASK_BOARD_GET => Some(dispatch_task_board_get(request, state).await),
         ws_methods::TASK_BOARD_UPDATE => Some(dispatch_task_board_update(request, state).await),
         ws_methods::TASK_BOARD_DELETE => Some(dispatch_task_board_delete(request, state).await),
         ws_methods::TASK_BOARD_PLAN_BEGIN => {
@@ -46,16 +50,20 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_SYNC => Some(dispatch_task_board_sync(request, state).await),
         ws_methods::TASK_BOARD_DISPATCH => Some(dispatch_task_board_dispatch(request, state).await),
         ws_methods::TASK_BOARD_EVALUATE => Some(dispatch_task_board_evaluate(request, state).await),
-        ws_methods::TASK_BOARD_AUDIT => Some(dispatch_task_board_audit(request).await),
-        ws_methods::TASK_BOARD_PROJECTS => Some(dispatch_task_board_projects(request).await),
-        ws_methods::TASK_BOARD_MACHINES => Some(dispatch_task_board_machines(request).await),
-        ws_methods::TASK_BOARD_HOST_LOCAL => Some(dispatch_task_board_host_local(request).await),
-        ws_methods::TASK_BOARD_HOST_LIST => Some(dispatch_task_board_host_list(request).await),
+        ws_methods::TASK_BOARD_AUDIT => Some(dispatch_task_board_audit(request, state).await),
+        ws_methods::TASK_BOARD_PROJECTS => Some(dispatch_task_board_projects(request, state).await),
+        ws_methods::TASK_BOARD_MACHINES => Some(dispatch_task_board_machines(request, state).await),
+        ws_methods::TASK_BOARD_HOST_LOCAL => {
+            Some(dispatch_task_board_host_local(request, state).await)
+        }
+        ws_methods::TASK_BOARD_HOST_LIST => {
+            Some(dispatch_task_board_host_list(request, state).await)
+        }
         ws_methods::TASK_BOARD_HOST_SET_PROJECT_TYPES => {
             Some(dispatch_task_board_host_set_project_types(request, state).await)
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS => {
-            Some(orchestrator::dispatch_task_board_orchestrator_status(request).await)
+            Some(orchestrator::dispatch_task_board_orchestrator_status(request, state).await)
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_START => {
             Some(orchestrator::dispatch_task_board_orchestrator_start(request, state).await)
@@ -67,14 +75,14 @@ pub(crate) async fn dispatch_task_board_method(
             Some(orchestrator::dispatch_task_board_orchestrator_run_once(request, state).await)
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_GET => {
-            Some(orchestrator::dispatch_task_board_orchestrator_settings_get(request).await)
+            Some(orchestrator::dispatch_task_board_orchestrator_settings_get(request, state).await)
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE => Some(
             orchestrator::dispatch_task_board_orchestrator_settings_update(request, state).await,
         ),
-        ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_GET => {
-            Some(orchestrator::dispatch_task_board_orchestrator_runtime_config_get(request).await)
-        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_GET => Some(
+            orchestrator::dispatch_task_board_orchestrator_runtime_config_get(request, state).await,
+        ),
         ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE => Some(
             orchestrator::dispatch_task_board_orchestrator_runtime_config_update(request, state)
                 .await,
@@ -93,20 +101,36 @@ pub(crate) async fn dispatch_task_board_method(
             Some(dispatch_task_board_git_identity_defaults(request).await)
         }
         ws_methods::TASK_BOARD_GIT_SIGNING_VERIFY => {
-            Some(dispatch_task_board_git_signing_verify(request).await)
+            Some(dispatch_task_board_git_signing_verify(request, state).await)
         }
-        ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS => {
-            Some(dispatch_task_board_git_runtime_drain_secrets(request, state).await)
+        ws_methods::TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL_SYNC => {
+            Some(secret_handoff::dispatch_key_material_sync(request, state).await)
+        }
+        ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE => {
+            Some(secret_handoff::dispatch_prepare(request, state).await)
+        }
+        ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK => {
+            Some(secret_handoff::dispatch_ack(request, state).await)
         }
         _ => policy::dispatch_policy_method(request, state).await,
     }
+}
+
+async fn dispatch_task_board_capabilities(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::capabilities(state).await,
+    )
 }
 
 async fn dispatch_task_board_create(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<TaskBoardCreateItemRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::create_item(&body).await;
+    let result = task_board_route_executor::create_item(state, &body).await;
     record_task_board_audit_result(
         state,
         "task_board.create",
@@ -123,23 +147,23 @@ async fn dispatch_task_board_create(request: &WsRequest, state: &DaemonHttpState
     dispatch_query_result(&request.id, result)
 }
 
-async fn dispatch_task_board_list(request: &WsRequest) -> WsResponse {
+async fn dispatch_task_board_list(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params_or_default::<TaskBoardListItemsRequest>(request) else {
         return invalid_params(request);
     };
     dispatch_query_result(
         &request.id,
-        task_board_route_executor::list_items(&body).await,
+        task_board_route_executor::list_items(state, &body).await,
     )
 }
 
-async fn dispatch_task_board_get(request: &WsRequest) -> WsResponse {
+async fn dispatch_task_board_get(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<TaskBoardGetItemRequest>(request) else {
         return invalid_params(request);
     };
     dispatch_query_result(
         &request.id,
-        task_board_route_executor::get_item(&body).await,
+        task_board_route_executor::get_item(state, &body).await,
     )
 }
 
@@ -150,7 +174,7 @@ async fn dispatch_task_board_update(request: &WsRequest, state: &DaemonHttpState
     let Ok(body) = parse_params::<TaskBoardUpdateItemRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::update_item(id, &body).await;
+    let result = task_board_route_executor::update_item(state, id, &body).await;
     record_task_board_audit_result(
         state,
         "task_board.update",
@@ -177,7 +201,7 @@ async fn dispatch_task_board_delete(request: &WsRequest, state: &DaemonHttpState
     let Ok(body) = parse_params::<TaskBoardDeleteItemRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::delete_item(&body).await;
+    let result = task_board_route_executor::delete_item(state, &body).await;
     record_task_board_audit_result(
         state,
         "task_board.delete",
@@ -197,7 +221,7 @@ async fn dispatch_task_board_plan_begin(
     let Ok(body) = parse_params::<TaskBoardPlanBeginRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::begin_planning(&body).await;
+    let result = task_board_route_executor::begin_planning(state, &body).await;
     record_task_board_audit_result(
         state,
         "task_board.plan_begin",
@@ -217,7 +241,7 @@ async fn dispatch_task_board_plan_submit(
     let Ok(body) = parse_params::<TaskBoardPlanSubmitRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::submit_plan(&body).await;
+    let result = task_board_route_executor::submit_plan(state, &body).await;
     record_task_board_audit_result(
         state,
         "task_board.plan_submit",
@@ -240,7 +264,7 @@ async fn dispatch_task_board_plan_approve(
     let Ok(body) = parse_control_plane_params::<TaskBoardPlanApproveRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::approve_plan(&body).await;
+    let result = task_board_route_executor::approve_plan(state, &body).await;
     record_task_board_audit_result(
         state,
         "task_board.plan_approve",
@@ -263,7 +287,7 @@ async fn dispatch_task_board_plan_revoke(
     let Ok(body) = parse_control_plane_params::<TaskBoardPlanRevokeRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::revoke_plan(&body).await;
+    let result = task_board_route_executor::revoke_plan(state, &body).await;
     record_task_board_audit_result(
         state,
         "task_board.plan_revoke",
@@ -283,7 +307,7 @@ async fn dispatch_task_board_sync(request: &WsRequest, state: &DaemonHttpState) 
     let Ok(body) = parse_params_or_default::<TaskBoardSyncRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::sync(&body).await;
+    let result = task_board_route_executor::sync(state, &body).await;
     record_task_board_audit_result(
         state,
         "task_board.sync",
@@ -342,39 +366,51 @@ async fn dispatch_task_board_evaluate(request: &WsRequest, state: &DaemonHttpSta
     dispatch_query_result(&request.id, result)
 }
 
-async fn dispatch_task_board_audit(request: &WsRequest) -> WsResponse {
+async fn dispatch_task_board_audit(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params_or_default::<TaskBoardAuditRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, task_board_route_executor::audit(&body).await)
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::audit(state, &body).await,
+    )
 }
 
-async fn dispatch_task_board_projects(request: &WsRequest) -> WsResponse {
+async fn dispatch_task_board_projects(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params_or_default::<TaskBoardCatalogRequest>(request) else {
         return invalid_params(request);
     };
     dispatch_query_result(
         &request.id,
-        task_board_route_executor::projects(&body).await,
+        task_board_route_executor::projects(state, &body).await,
     )
 }
 
-async fn dispatch_task_board_machines(request: &WsRequest) -> WsResponse {
+async fn dispatch_task_board_machines(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params_or_default::<TaskBoardCatalogRequest>(request) else {
         return invalid_params(request);
     };
     dispatch_query_result(
         &request.id,
-        task_board_route_executor::machines(&body).await,
+        task_board_route_executor::machines(state, &body).await,
     )
 }
 
-async fn dispatch_task_board_host_local(request: &WsRequest) -> WsResponse {
-    dispatch_query_result(&request.id, task_board_route_executor::host_local().await)
+async fn dispatch_task_board_host_local(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::host_local(state).await,
+    )
 }
 
-async fn dispatch_task_board_host_list(request: &WsRequest) -> WsResponse {
-    dispatch_query_result(&request.id, task_board_route_executor::host_list().await)
+async fn dispatch_task_board_host_list(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::host_list(state).await,
+    )
 }
 
 async fn dispatch_task_board_host_set_project_types(
@@ -384,7 +420,7 @@ async fn dispatch_task_board_host_set_project_types(
     let Ok(body) = parse_params_or_default::<TaskBoardHostSetProjectTypesRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::host_set_project_types(&body).await;
+    let result = task_board_route_executor::host_set_project_types(state, &body).await;
     record_task_board_audit_result(
         state,
         "task_board.host_set_project_types",
@@ -404,31 +440,17 @@ async fn dispatch_task_board_git_identity_defaults(request: &WsRequest) -> WsRes
     )
 }
 
-async fn dispatch_task_board_git_signing_verify(request: &WsRequest) -> WsResponse {
+async fn dispatch_task_board_git_signing_verify(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
     let Ok(body) = parse_params::<TaskBoardGitSigningVerifyRequest>(request) else {
         return invalid_params(request);
     };
     dispatch_query_result(
         &request.id,
-        task_board_route_executor::verify_git_signing(&body).await,
+        task_board_route_executor::verify_git_signing(state, &body).await,
     )
-}
-
-async fn dispatch_task_board_git_runtime_drain_secrets(
-    request: &WsRequest,
-    state: &DaemonHttpState,
-) -> WsResponse {
-    let result = task_board_route_executor::drain_git_runtime_secrets().await;
-    record_task_board_audit_result(
-        state,
-        "task_board.git_runtime_drain_secrets",
-        "Drain task-board Git runtime secrets",
-        None,
-        serde_json::json!({}),
-        &result,
-    )
-    .await;
-    dispatch_query_result(&request.id, result)
 }
 
 pub(super) fn parse_params<T: DeserializeOwned>(request: &WsRequest) -> serde_json::Result<T> {
@@ -458,7 +480,7 @@ pub(super) fn invalid_params(request: &WsRequest) -> WsResponse {
     error_response(&request.id, "INVALID_PARAMS", "invalid task-board params")
 }
 
-async fn record_task_board_audit_result<T>(
+pub(super) async fn record_task_board_audit_result<T>(
     state: &DaemonHttpState,
     action_key: &'static str,
     title: &'static str,

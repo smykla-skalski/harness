@@ -1,18 +1,22 @@
 use crate::errors::CliError;
-use crate::task_board::external::{ExternalProvider, ExternalSyncConflictPolicy, ExternalTask};
-use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch, TaskBoardStore};
-use crate::task_board::types::{ExternalRef, TaskBoardItem};
+use crate::task_board::external::{
+    ExternalProvider, ExternalSyncConflictPolicy, ExternalTask, ExternalTaskRef,
+};
+use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
+use crate::task_board::types::{
+    ExternalRef, ExternalRefProvider, ExternalRefSyncState, TaskBoardItem, TaskBoardStatus,
+};
 
 use super::merge::{
     changed_fields, external_ref_matches, pull_conflict_fields, sync_state_from_task,
 };
 use super::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
-    OperationDraft, operation, run_board_blocking,
+    OperationDraft, TaskBoardSyncStore, operation,
 };
 
 pub(super) async fn reconcile_existing_item(
-    board: &TaskBoardStore,
+    board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     provider: ExternalProvider,
     item: &TaskBoardItem,
@@ -51,7 +55,7 @@ pub(super) async fn reconcile_existing_item(
         provider,
         action: ExternalSyncAction::Pull,
         board_item_id: Some(item.id.clone()),
-        reference: task.reference,
+        reference: task.reference.clone(),
         dry_run: options.dry_run,
         applied: !options.dry_run,
         changed_fields: changed_fields(&patch),
@@ -60,12 +64,28 @@ pub(super) async fn reconcile_existing_item(
     if options.dry_run {
         return Ok(());
     }
-    let item_id = item.id.clone();
-    run_board_blocking(board, "reconcile pulled item", move |board| {
-        board.update(&item_id, patch)
-    })
-    .await?;
+    if let Err(error) = board.update_item(item, patch).await
+        && (error.code() != "WORKFLOW_CONCURRENT"
+            || latest_item_still_needs_reconciliation(board, item, &task).await?)
+    {
+        return Err(error);
+    }
     Ok(())
+}
+
+async fn latest_item_still_needs_reconciliation(
+    board: &dyn TaskBoardSyncStore,
+    expected_item: &TaskBoardItem,
+    task: &ExternalTask,
+) -> Result<bool, CliError> {
+    let latest = board
+        .list_items(None)
+        .await?
+        .into_iter()
+        .find(|item| item.id == expected_item.id);
+    Ok(latest
+        .as_ref()
+        .is_none_or(|item| has_reconciliation_change(&reconciliation_patch(item, task))))
 }
 
 fn reconciliation_patch(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardItemPatch {
@@ -73,11 +93,18 @@ fn reconciliation_patch(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardI
     if item.title != task.title {
         patch.title = Some(task.title.clone());
     }
-    if item.body != task.body {
+    let shared_review_without_body = task.body.is_empty()
+        && task
+            .reference
+            .url
+            .as_deref()
+            .is_some_and(|url| url.contains("/pull/"));
+    if item.body != task.body && !shared_review_without_body {
         patch.body = Some(task.body.clone());
     }
-    if item.status != task.status {
-        patch.status = Some(task.status);
+    let status = reconciled_status(item, task);
+    if item.status != status {
+        patch.status = Some(status);
     }
     if item.project_id != task.project_id {
         patch.project_id = task
@@ -91,6 +118,24 @@ fn reconciliation_patch(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardI
     patch
 }
 
+fn reconciled_status(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardStatus {
+    if is_active_github_review_request(item, task) && item.status != TaskBoardStatus::Done {
+        return item.status;
+    }
+    task.status
+}
+
+fn is_active_github_review_request(item: &TaskBoardItem, task: &ExternalTask) -> bool {
+    item.imported_from_provider == Some(ExternalRefProvider::GitHub)
+        && task.reference.provider == ExternalProvider::GitHub
+        && task.status == TaskBoardStatus::HumanRequired
+        && task
+            .reference
+            .url
+            .as_deref()
+            .is_some_and(|url| url.contains("/pull/"))
+}
+
 fn has_reconciliation_change(patch: &TaskBoardItemPatch) -> bool {
     patch.title.is_some()
         || patch.body.is_some()
@@ -102,21 +147,38 @@ fn has_reconciliation_change(patch: &TaskBoardItemPatch) -> bool {
 fn reconciled_external_refs(item: &TaskBoardItem, task: &ExternalTask) -> Option<Vec<ExternalRef>> {
     let reference = &task.reference;
     let mut changed = false;
-    let next_sync_state = Some(sync_state_from_task(task));
+    let next_sync_state = sync_state_from_task(task);
     let refs = item
         .external_refs
         .iter()
         .map(|candidate| {
             if external_ref_matches(item, candidate, reference, task.project_id.as_deref())
-                && (candidate.url != reference.url || candidate.sync_state != next_sync_state)
+                && reference_changed(candidate, reference, &next_sync_state)
             {
                 changed = true;
                 let mut next = reference.clone().into_core_ref();
-                next.sync_state.clone_from(&next_sync_state);
+                next.sync_state = Some(next_sync_state.clone());
                 return next;
             }
             candidate.clone()
         })
         .collect();
     changed.then_some(refs)
+}
+
+fn reference_changed(
+    current: &ExternalRef,
+    next: &ExternalTaskRef,
+    next_state: &ExternalRefSyncState,
+) -> bool {
+    current.provider != next.provider.into()
+        || current.external_id != next.external_id
+        || current.url != next.url
+        || current.sync_state.as_ref().is_none_or(|current_state| {
+            current_state.title != next_state.title
+                || current_state.body != next_state.body
+                || current_state.status != next_state.status
+                || current_state.project_id != next_state.project_id
+                || current_state.updated_at != next_state.updated_at
+        })
 }

@@ -1,17 +1,12 @@
-use std::future::Future;
-use std::path::PathBuf;
-
 use clap::{Args, Subcommand};
 use serde::Serialize;
-use tokio::runtime::Builder as TokioRuntimeBuilder;
-use uuid::Uuid;
 
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::client::DaemonClient;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
 };
-use crate::task_board::store::{TaskBoardStore, default_board_root};
 use crate::task_board::types::{AgentMode, TaskBoardPriority, TaskBoardStatus};
 
 mod catalog;
@@ -99,8 +94,6 @@ pub struct TaskBoardCreateArgs {
     pub fields: TaskBoardItemFieldArgs,
     #[arg(long)]
     pub id: Option<String>,
-    #[arg(long)]
-    pub board_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -109,8 +102,6 @@ pub struct TaskBoardListArgs {
     pub status: Option<TaskBoardStatus>,
     #[arg(long)]
     pub json: bool,
-    #[arg(long)]
-    pub board_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -118,8 +109,6 @@ pub struct TaskBoardGetArgs {
     pub id: String,
     #[arg(long)]
     pub json: bool,
-    #[arg(long)]
-    pub board_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -147,8 +136,6 @@ pub struct TaskBoardUpdateArgs {
     pub clear_links: TaskBoardUpdateClearLinkArgs,
     #[command(flatten)]
     pub clear_state: TaskBoardUpdateClearStateArgs,
-    #[arg(long)]
-    pub board_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -174,8 +161,6 @@ pub struct TaskBoardUpdateClearStateArgs {
 #[derive(Debug, Clone, Args)]
 pub struct TaskBoardDeleteArgs {
     pub id: String,
-    #[arg(long)]
-    pub board_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -190,8 +175,6 @@ pub struct TaskBoardSyncArgs {
     pub conflict_policy: ExternalSyncConflictPolicy,
     #[arg(long)]
     pub apply: bool,
-    #[arg(long)]
-    pub board_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -200,8 +183,6 @@ pub struct TaskBoardCatalogArgs {
     pub json: bool,
     #[arg(long, value_enum)]
     pub status: Option<TaskBoardStatus>,
-    #[arg(long)]
-    pub board_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -218,16 +199,12 @@ pub struct TaskBoardDispatchArgs {
     pub project_dir: Option<String>,
     #[arg(long)]
     pub actor: Option<String>,
-    #[arg(long)]
-    pub board_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct TaskBoardAuditArgs {
     #[arg(long)]
     pub json: bool,
-    #[arg(long)]
-    pub board_root: Option<PathBuf>,
 }
 
 impl Execute for TaskBoardCommand {
@@ -254,20 +231,14 @@ impl Execute for TaskBoardCommand {
     }
 }
 
-pub(super) fn store(root: Option<PathBuf>) -> TaskBoardStore {
-    TaskBoardStore::new(root.unwrap_or_else(default_board_root))
-}
-
-fn new_task_id() -> String {
-    format!("task-{}", Uuid::new_v4().simple())
-}
-
-pub(super) fn new_workflow_execution_id() -> String {
-    format!("workflow-{}", Uuid::new_v4().simple())
-}
-
-pub(super) fn new_policy_trace_id() -> String {
-    format!("policy-trace-{}", Uuid::new_v4().simple())
+pub(super) fn daemon_client() -> Result<DaemonClient, CliError> {
+    let client = DaemonClient::try_connect().ok_or_else(|| {
+        CliError::from(CliErrorKind::workflow_io(
+            "task-board commands require a running daemon; start Harness Monitor or run `harness daemon dev`",
+        ))
+    })?;
+    client.require_database_task_board()?;
+    Ok(client)
 }
 
 pub(super) fn print_json<T: Serialize>(value: &T) -> Result<(), CliError> {
@@ -275,14 +246,4 @@ pub(super) fn print_json<T: Serialize>(value: &T) -> Result<(), CliError> {
         .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
     println!("{json}");
     Ok(())
-}
-
-pub(super) fn run_blocking<T>(
-    future: impl Future<Output = Result<T, CliError>>,
-) -> Result<T, CliError> {
-    TokioRuntimeBuilder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|error| CliErrorKind::workflow_io(format!("create task-board runtime: {error}")))?
-        .block_on(future)
 }

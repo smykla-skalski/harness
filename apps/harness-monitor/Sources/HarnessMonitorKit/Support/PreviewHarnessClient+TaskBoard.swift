@@ -1,6 +1,10 @@
 import Foundation
 
 extension PreviewHarnessClient {
+  public func taskBoardCapabilities() async throws -> TaskBoardCapabilities {
+    TaskBoardCapabilities(storage: "database", revision: 0, instanceID: "preview-task-board")
+  }
+
   public func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {
     try await performActionDelay()
     return await state.currentTaskBoardItems(status: status)

@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
 use crate::errors::CliErrorKind;
 use crate::task_board::github::{
@@ -11,7 +10,9 @@ use crate::task_board::{
     TaskBoardWorkflowState,
 };
 
+#[cfg(test)]
 use super::AutomationRequest;
+use super::DatabaseAutomationRequest;
 use super::support::{
     STEP_BRANCH_PUSHED, STEP_EVIDENCE_FAILED, STEP_MERGED, STEP_MISSING_WORKTREE, STEP_PR_FAILED,
     STEP_PUSH_FAILED, STEP_READY, STEP_WAITING_FOR_CHECKS, STEP_WAITING_FOR_COMMITS,
@@ -25,9 +26,32 @@ mod pull_request;
 
 use pull_request::prepare_pull_request_state;
 
+#[cfg(test)]
 pub(super) async fn automate_item(request: AutomationRequest<'_>) -> TaskBoardWorkflowState {
     let context = AutomationContext {
-        board_root: request.board_root,
+        policy: super::support::AutomationPolicy::LegacyRoot(request.board_root),
+        config: request.config,
+        item: request.item,
+        client: request.client,
+        host_id: request.host_id,
+    };
+    let mut prepared = match prepare_item(
+        &context,
+        request.project_dir,
+        request.dry_run,
+        request.session_worktrees,
+    ) {
+        AutomationFlow::Continue(prepared) => prepared,
+        AutomationFlow::Done(workflow) => return workflow,
+    };
+    continue_automation(&context, &mut prepared).await
+}
+
+pub(super) async fn automate_item_with_database_policy(
+    request: DatabaseAutomationRequest<'_>,
+) -> TaskBoardWorkflowState {
+    let context = AutomationContext {
+        policy: super::support::AutomationPolicy::Database(request.policy),
         config: request.config,
         item: request.item,
         client: request.client,
@@ -83,7 +107,7 @@ async fn sync_labels_for_context(
     desired_labels: BTreeSet<String>,
 ) -> TaskBoardWorkflowState {
     let decision = action_policy(
-        context.board_root,
+        context.policy,
         context.item,
         PolicyAction::Triage,
         Some(prepared.branch.as_str()),
@@ -104,7 +128,7 @@ async fn sync_labels_for_context(
 }
 
 struct AutomationContext<'a> {
-    board_root: &'a Path,
+    policy: super::support::AutomationPolicy<'a>,
     config: &'a GitHubProjectConfig,
     item: &'a TaskBoardItem,
     client: &'a dyn GitHubAutomationClient,
@@ -201,7 +225,7 @@ async fn publish_branch(
         return AutomationFlow::Continue(());
     }
     let decision = action_policy(
-        context.board_root,
+        context.policy,
         context.item,
         PolicyAction::PushBranch,
         Some(prepared.branch.as_str()),
@@ -285,7 +309,7 @@ async fn auto_merge_item(
 ) -> TaskBoardWorkflowState {
     desired_labels.insert(context.config.labels.auto_merge.clone());
     let decision = action_policy(
-        context.board_root,
+        context.policy,
         context.item,
         PolicyAction::MergePr,
         Some(prepared.branch.as_str()),

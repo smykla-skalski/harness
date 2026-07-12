@@ -3,9 +3,74 @@ use tempfile::tempdir;
 
 use super::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
-    TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig, TaskBoardTodoistTokenSyncRequest,
-    update_task_board_git_runtime_config, validate_repository_tokens,
+    TaskBoardGitRepositoryOverride, TaskBoardGitRuntimeConfig,
+    TaskBoardGitRuntimeKeyMaterialSyncRequest, TaskBoardGitRuntimeSecretHandoffAckRequest,
+    TaskBoardTodoistTokenSyncRequest, update_task_board_git_runtime_config,
+    validate_repository_tokens,
 };
+
+#[test]
+fn runtime_key_material_sync_never_persists_durable_config() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let response = super::sync_task_board_git_runtime_key_material(
+            &TaskBoardGitRuntimeKeyMaterialSyncRequest {
+                runtime: TaskBoardGitRuntimeConfig {
+                    global: TaskBoardGitRuntimeProfile {
+                        ssh_private_key: Some("process-secret".into()),
+                        ..Default::default()
+                    },
+                    repository_overrides: vec![],
+                },
+            },
+        )
+        .expect("sync key material");
+        assert!(response.synchronized);
+        assert_eq!(
+            super::git_runtime_profile_for_repository(None)
+                .expect("runtime profile")
+                .ssh_private_key
+                .as_deref(),
+            Some("process-secret")
+        );
+        assert!(!state::config_path().exists());
+    });
+}
+
+#[test]
+fn runtime_key_material_sync_retains_redacted_configured_secrets() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let sync = |runtime| {
+            super::sync_task_board_git_runtime_key_material(
+                &TaskBoardGitRuntimeKeyMaterialSyncRequest { runtime },
+            )
+            .expect("sync key material");
+        };
+        sync(TaskBoardGitRuntimeConfig {
+            global: TaskBoardGitRuntimeProfile {
+                ssh_private_key: Some("process-secret".into()),
+                ..Default::default()
+            },
+            repository_overrides: vec![],
+        });
+
+        sync(TaskBoardGitRuntimeConfig {
+            global: TaskBoardGitRuntimeProfile {
+                ssh_private_key_configured: true,
+                ..Default::default()
+            },
+            repository_overrides: vec![],
+        });
+        let retained = super::git_runtime_profile_for_repository(None).expect("runtime profile");
+        assert_eq!(retained.ssh_private_key.as_deref(), Some("process-secret"));
+
+        sync(TaskBoardGitRuntimeConfig::default());
+        let cleared = super::git_runtime_profile_for_repository(None).expect("cleared profile");
+        assert!(cleared.ssh_private_key.is_none());
+    });
+}
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::state;
 use crate::task_board::{
     TaskBoardGitRuntimeProfile, TaskBoardGitSigningConfig, TaskBoardGitSigningMode,
@@ -208,6 +273,164 @@ fn external_sync_config_uses_app_configured_todoist_token_when_env_missing() {
             Some("todoist-token")
         );
         let _ = super::sync_task_board_todoist_token(&TaskBoardTodoistTokenSyncRequest::default());
+    });
+}
+
+#[test]
+fn secret_handoff_keeps_legacy_payload_until_ack_and_is_idempotent() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let runtime_config = TaskBoardGitRuntimeConfig {
+            global: TaskBoardGitRuntimeProfile {
+                ssh_private_key: Some("legacy-secret".into()),
+                ..Default::default()
+            },
+            repository_overrides: vec![],
+        };
+        fs_err::create_dir_all(state::config_path().parent().expect("config parent"))
+            .expect("create config dir");
+        fs_err::write(
+            state::config_path(),
+            serde_json::to_vec_pretty(&state::DaemonRuntimeConfig {
+                log_level: Some("debug".into()),
+                task_board_git_runtime_config: Some(runtime_config.clone()),
+            })
+            .expect("encode legacy config"),
+        )
+        .expect("write legacy config");
+        let digest = state::task_board_git_runtime_secret_handoff_digest(&runtime_config)
+            .expect("digest legacy secrets")
+            .expect("plaintext digest");
+
+        tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(async {
+                let db = AsyncDaemonDb::connect(&tmp.path().join("harness.db"))
+                    .await
+                    .expect("open db");
+                db.initialize_empty_task_board(
+                    &runtime_config.without_secret_metadata(),
+                    Some(&digest),
+                )
+                .await
+                .expect("initialize task board");
+
+                let prepared = super::prepare_task_board_git_runtime_secret_handoff(&db)
+                    .await
+                    .expect("prepare handoff");
+                assert!(prepared.prepared);
+                assert_eq!(prepared.digest.as_deref(), Some(digest.as_str()));
+                assert_eq!(
+                    prepared.runtime.global.ssh_private_key.as_deref(),
+                    Some("legacy-secret")
+                );
+                assert!(
+                    fs_err::read_to_string(state::config_path())
+                        .expect("read prepared config")
+                        .contains("legacy-secret"),
+                    "prepare must not strip the legacy payload"
+                );
+
+                let request = TaskBoardGitRuntimeSecretHandoffAckRequest {
+                    migration_id: prepared.migration_id.expect("migration id"),
+                    digest,
+                };
+                let acknowledged =
+                    super::acknowledge_task_board_git_runtime_secret_handoff(&db, &request)
+                        .await
+                        .expect("acknowledge handoff");
+                assert!(acknowledged.acknowledged);
+                assert!(
+                    state::load_runtime_config_raw()
+                        .expect("load post-ack config")
+                        .expect("config remains for log level")
+                        .task_board_git_runtime_config
+                        .is_none()
+                );
+                let marker = db
+                    .task_board_import_marker("empty_database")
+                    .await
+                    .expect("load import marker")
+                    .expect("import marker");
+                assert_eq!(marker.secret_handoff_phase, "complete");
+
+                assert!(
+                    super::acknowledge_task_board_git_runtime_secret_handoff(&db, &request)
+                        .await
+                        .expect("repeat acknowledgement")
+                        .acknowledged
+                );
+            });
+    });
+}
+
+#[test]
+fn secret_handoff_ack_recovers_after_legacy_envelope_was_removed() {
+    let tmp = tempdir().expect("tempdir");
+    with_isolated_harness_env(tmp.path(), || {
+        let runtime_config = TaskBoardGitRuntimeConfig {
+            global: TaskBoardGitRuntimeProfile {
+                ssh_private_key: Some("legacy-secret".into()),
+                ..Default::default()
+            },
+            repository_overrides: vec![],
+        };
+        fs_err::create_dir_all(state::config_path().parent().expect("config parent"))
+            .expect("create config dir");
+        fs_err::write(
+            state::config_path(),
+            serde_json::to_vec_pretty(&state::DaemonRuntimeConfig {
+                log_level: Some("debug".into()),
+                task_board_git_runtime_config: Some(runtime_config.clone()),
+            })
+            .expect("encode legacy config"),
+        )
+        .expect("write legacy config");
+        let digest = state::task_board_git_runtime_secret_handoff_digest(&runtime_config)
+            .expect("digest legacy secrets")
+            .expect("plaintext digest");
+
+        tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(async {
+                let db = AsyncDaemonDb::connect(&tmp.path().join("harness.db"))
+                    .await
+                    .expect("open db");
+                db.initialize_empty_task_board(
+                    &runtime_config.without_secret_metadata(),
+                    Some(&digest),
+                )
+                .await
+                .expect("initialize task board");
+                let marker = db
+                    .pending_task_board_secret_handoff()
+                    .await
+                    .expect("pending marker")
+                    .expect("handoff marker");
+                let migration_id = marker.secret_handoff_id.expect("migration id");
+                db.acknowledge_task_board_secret_handoff(&migration_id, &digest)
+                    .await
+                    .expect("persist acknowledging phase");
+                state::remove_migrated_task_board_config_after_ack(&digest)
+                    .expect("remove legacy envelope");
+
+                let response = super::acknowledge_task_board_git_runtime_secret_handoff(
+                    &db,
+                    &TaskBoardGitRuntimeSecretHandoffAckRequest {
+                        migration_id,
+                        digest,
+                    },
+                )
+                .await
+                .expect("recover acknowledgement");
+                assert!(response.acknowledged);
+                assert!(
+                    db.pending_task_board_secret_handoff()
+                        .await
+                        .expect("pending marker after recovery")
+                        .is_none()
+                );
+            });
     });
 }
 

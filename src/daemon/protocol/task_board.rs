@@ -425,16 +425,6 @@ pub enum TaskBoardGitSigningVerifyResponse {
     Failed { message: String },
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TaskBoardGitRuntimeDrainSecretsRequest {}
-
-/// Legacy one-shot secret drain retained until the database cutover activates.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct TaskBoardGitRuntimeDrainSecretsResponse {
-    pub drained: bool,
-    pub runtime: TaskBoardGitRuntimeConfig,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskBoardGitRuntimeSecretHandoffPrepareRequest {}
 
 /// Non-destructive first half of the legacy-secret handoff. The daemon keeps

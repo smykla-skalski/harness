@@ -4,19 +4,28 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;
+#[cfg(test)]
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
-use crate::workspace::{harness_data_root, utc_now};
+use crate::workspace::harness_data_root;
+#[cfg(test)]
+use crate::workspace::utc_now;
 
+#[cfg(test)]
 mod loading;
+#[cfg(test)]
 mod parse_cache;
+#[cfg(test)]
 use parse_cache::BOARD_PARSE_CACHE;
 
+#[cfg(test)]
+use super::types::CURRENT_TASK_BOARD_ITEM_VERSION;
 use super::types::{
-    AgentMode, CURRENT_TASK_BOARD_ITEM_VERSION, ExternalRef, ExternalRefProvider, PlanningState,
-    TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowState,
+    AgentMode, ExternalRef, ExternalRefProvider, PlanningState, TaskBoardItem, TaskBoardPriority,
+    TaskBoardStatus, TaskBoardWorkflowState,
 };
 
 #[derive(Debug, Clone)]
+#[cfg(test)]
 pub struct TaskBoardStore {
     root: PathBuf,
 }
@@ -140,10 +149,11 @@ impl TaskBoardFrontmatter {
 }
 
 #[must_use]
-pub fn default_board_root() -> PathBuf {
+pub(crate) fn default_board_root() -> PathBuf {
     harness_data_root().join("task-board")
 }
 
+#[cfg(test)]
 impl TaskBoardStore {
     #[must_use]
     pub fn new(root: PathBuf) -> Self {
@@ -220,6 +230,7 @@ impl TaskBoardStore {
     ///
     /// # Errors
     /// Returns `CliError` if the item cannot be loaded, locked, or saved.
+    #[cfg(test)]
     pub(crate) fn update_if(
         &self,
         id: &str,
@@ -355,7 +366,7 @@ pub(crate) fn apply_canonical_persisted_status(item: &mut TaskBoardItem) -> bool
     true
 }
 
-fn apply_patch(item: &mut TaskBoardItem, patch: TaskBoardItemPatch) {
+pub(crate) fn apply_patch(item: &mut TaskBoardItem, patch: TaskBoardItemPatch) {
     apply_core_patch(item, &patch);
     apply_link_patch(item, patch);
 }
@@ -430,12 +441,13 @@ fn apply_optional_patch<T>(target: &mut Option<T>, patch: OptionalFieldPatch<T>)
     }
 }
 
-pub(super) fn read_path(path: &Path) -> Result<TaskBoardItem, CliError> {
+pub(crate) fn read_path(path: &Path) -> Result<TaskBoardItem, CliError> {
     let text = io::read_text(path)?;
     let parsed = io::parse_frontmatter::<TaskBoardFrontmatter>(&text, &path.display().to_string())?;
     Ok(parsed.frontmatter.into_item(parsed.body))
 }
 
+#[cfg(test)]
 fn sort_items(items: &mut [TaskBoardItem]) {
     items.sort_by(|left, right| {
         left.status
