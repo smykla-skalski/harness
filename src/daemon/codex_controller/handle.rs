@@ -98,8 +98,12 @@ impl CodexControllerHandle {
         validate_safe_segment(&run_id)?;
         let reservation = match self.state.active_runs.reserve(run_id.clone())? {
             ActiveRunRegistration::Acquired(reservation) => reservation,
-            ActiveRunRegistration::Waiting(waiter) => return waiter.wait(),
-            ActiveRunRegistration::Active => return self.load_run(&run_id),
+            ActiveRunRegistration::Waiting(waiter) => {
+                return ensure_run_belongs_to_session(waiter.wait()?, session_id);
+            }
+            ActiveRunRegistration::Active => {
+                return ensure_run_belongs_to_session(self.load_run(&run_id)?, session_id);
+            }
         };
         let snapshot = match self.prepare_durable_run(session_id, request, run_id) {
             Ok(snapshot) => snapshot,
@@ -270,6 +274,20 @@ fn validate_run_request(request: &CodexRunRequest) -> Result<&str, CliError> {
         validate_codex_effort(requested_model, effort)?;
     }
     Ok(prompt)
+}
+
+fn ensure_run_belongs_to_session(
+    snapshot: CodexRunSnapshot,
+    requested_session_id: &str,
+) -> Result<CodexRunSnapshot, CliError> {
+    if snapshot.session_id == requested_session_id {
+        return Ok(snapshot);
+    }
+    Err(CliErrorKind::session_agent_conflict(format!(
+        "codex run '{}' belongs to session '{}', not requested session '{requested_session_id}'",
+        snapshot.run_id, snapshot.session_id
+    ))
+    .into())
 }
 
 fn queued_run_snapshot(

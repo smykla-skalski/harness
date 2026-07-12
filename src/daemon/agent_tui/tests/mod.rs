@@ -1,4 +1,5 @@
 mod backend;
+mod identity;
 mod input_worker;
 mod live_refresh;
 mod manager;

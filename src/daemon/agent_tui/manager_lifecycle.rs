@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::agents::runtime::{AgentRuntime, InitialPromptDelivery, runtime_for_name};
 use crate::daemon::bridge::{AgentTuiStartSpec, BridgeCapability, BridgeClient};
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::validate_safe_segment;
 
 use super::manager::{ActiveAgentTui, AgentTuiManagerHandle};
@@ -46,8 +46,8 @@ impl AgentTuiManagerHandle {
         tui_id: String,
     ) -> Result<AgentTuiSnapshot, CliError> {
         validate_safe_segment(&tui_id)?;
-        if self.active_tui(&tui_id).is_ok() {
-            return self.load_snapshot(&tui_id);
+        if self.is_tui_active(&tui_id)? {
+            return ensure_tui_session(self.load_snapshot(&tui_id)?, session_id);
         }
         if self.state.sandboxed {
             return self.start_via_bridge(session_id, request, tui_id);
@@ -247,4 +247,18 @@ impl AgentTuiManagerHandle {
         self.spawn_live_refresh(tui_id, stop_flag);
         Ok(())
     }
+}
+
+fn ensure_tui_session(
+    snapshot: AgentTuiSnapshot,
+    requested_session_id: &str,
+) -> Result<AgentTuiSnapshot, CliError> {
+    if snapshot.session_id != requested_session_id {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "terminal agent '{}' belongs to session '{}', not requested session '{}'",
+            snapshot.tui_id, snapshot.session_id, requested_session_id
+        ))
+        .into());
+    }
+    Ok(snapshot)
 }
