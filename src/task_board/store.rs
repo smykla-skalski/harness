@@ -335,7 +335,7 @@ impl TaskBoardStore {
     }
 }
 
-fn validate_loaded_id(expected: &str, item: &TaskBoardItem) -> Result<(), CliError> {
+pub(crate) fn validate_loaded_id(expected: &str, item: &TaskBoardItem) -> Result<(), CliError> {
     if item.id == expected {
         return Ok(());
     }
@@ -346,7 +346,7 @@ fn validate_loaded_id(expected: &str, item: &TaskBoardItem) -> Result<(), CliErr
     .into())
 }
 
-fn apply_canonical_persisted_status(item: &mut TaskBoardItem) -> bool {
+pub(crate) fn apply_canonical_persisted_status(item: &mut TaskBoardItem) -> bool {
     let status = item.status.canonical_persisted_status();
     if item.status == status {
         return false;

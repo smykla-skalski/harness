@@ -1,5 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskBoardUpdatedPayload {
+    pub revision: i64,
+    pub scopes: Vec<String>,
+}
+
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::types::TaskBoardWorkflowState;
 use crate::task_board::{
@@ -151,6 +157,15 @@ pub struct TaskBoardPlanRevokeRequest {
 pub struct TaskBoardListItemsResponse {
     pub items: Vec<TaskBoardItem>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardCapabilitiesResponse {
+    pub storage: String,
+    pub revision: i64,
+    pub instance_id: String,
+}
+
+pub const TASK_BOARD_STORAGE_DATABASE: &str = "database";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskBoardPlanningResponse {
@@ -412,19 +427,49 @@ pub enum TaskBoardGitSigningVerifyResponse {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskBoardGitRuntimeDrainSecretsRequest {}
 
-/// One-shot migration response that returns plaintext task-board git secrets
-/// the daemon found on-disk. Callers must persist the payload into their own
-/// secure store (e.g. macOS Keychain) immediately; the daemon writes the
-/// stripped config back before responding.
+/// Legacy one-shot secret drain retained until the database cutover activates.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TaskBoardGitRuntimeDrainSecretsResponse {
-    /// `true` when the on-disk config still contained plaintext secrets and
-    /// they were drained into `runtime`. `false` means the on-disk config was
-    /// already stripped and `runtime` carries no secret bytes.
     pub drained: bool,
-    /// Plaintext runtime config covering all scopes that had secrets. Empty
-    /// profiles are omitted via the wire defaults.
     pub runtime: TaskBoardGitRuntimeConfig,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardGitRuntimeSecretHandoffPrepareRequest {}
+
+/// Non-destructive first half of the legacy-secret handoff. The daemon keeps
+/// the legacy envelope intact until the caller persists and verifies the
+/// payload, then acknowledges this exact migration id and digest.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskBoardGitRuntimeSecretHandoffPrepareResponse {
+    pub prepared: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub migration_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+    pub runtime: TaskBoardGitRuntimeConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskBoardGitRuntimeSecretHandoffAckRequest {
+    pub migration_id: String,
+    pub digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskBoardGitRuntimeSecretHandoffAckResponse {
+    pub acknowledged: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskBoardGitRuntimeKeyMaterialSyncRequest {
+    #[serde(default)]
+    pub runtime: TaskBoardGitRuntimeConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskBoardGitRuntimeKeyMaterialSyncResponse {
+    pub synchronized: bool,
 }
 
 pub type TaskBoardGitHubTokensSyncResponse = TaskBoardGitHubTokensSyncOutcome;

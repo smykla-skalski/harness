@@ -20,6 +20,7 @@ use self::run_record::{
     RunRecordInput, new_run_id, read_or_default, run_items_for_machine, run_record,
     workflow_statuses,
 };
+pub(crate) use self::settings::parse_persisted_settings_read_only;
 use self::settings::{
     apply_settings_update, dispatch_input, migrate_persisted_settings, normalize_github_inbox,
     normalize_todoist_inbox,

@@ -144,6 +144,20 @@ impl PolicyCanvasWorkspace {
     }
 
     #[must_use]
+    pub(crate) fn from_legacy(
+        document: PolicyGraph,
+        latest_simulation: Option<PolicyPipelineSimulationResult>,
+    ) -> Self {
+        let mut workspace = Self::seeded();
+        if let Some(canvas) = workspace.active_canvas_mut() {
+            canvas.document = document;
+            canvas.latest_simulation = latest_simulation;
+            canvas.touch();
+        }
+        workspace
+    }
+
+    #[must_use]
     pub fn active_canvas(&self) -> Option<&PolicyCanvasRecord> {
         self.canvases
             .iter()

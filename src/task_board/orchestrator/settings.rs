@@ -29,13 +29,28 @@ use super::types::{
 pub(super) fn migrate_persisted_settings(
     path: &Path,
 ) -> Result<Option<TaskBoardOrchestratorSettings>, CliError> {
+    load_normalized_settings(path, true)
+}
+
+/// Parse legacy settings with the same canonicalization as the live loader,
+/// without rewriting the source. Used by the one-time database importer.
+pub(crate) fn parse_persisted_settings_read_only(
+    path: &Path,
+) -> Result<Option<TaskBoardOrchestratorSettings>, CliError> {
+    load_normalized_settings(path, false)
+}
+
+fn load_normalized_settings(
+    path: &Path,
+    persist_repairs: bool,
+) -> Result<Option<TaskBoardOrchestratorSettings>, CliError> {
     if !path.exists() {
         return Ok(None);
     }
     let mut document: Value = read_json_typed(path)?;
     let workflows_changed = normalize_enabled_workflows(&mut document);
     let status_changed = repair_dispatch_status_filter(&mut document);
-    if workflows_changed || status_changed {
+    if persist_repairs && (workflows_changed || status_changed) {
         write_json_pretty(path, &document)?;
     }
     let settings: TaskBoardOrchestratorSettings =

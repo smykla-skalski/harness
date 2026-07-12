@@ -16,7 +16,7 @@ use crate::daemon::protocol::{
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
 
-use super::active_runs::{ActiveRun, CodexControlAck, CodexControlMessage};
+use super::active_runs::{ActiveRun, ActiveRunRegistration, CodexControlAck, CodexControlMessage};
 use super::handle::{CodexControllerHandle, record_snapshot_event};
 use super::worker::CodexRunWorker;
 
@@ -155,7 +155,7 @@ impl CodexControllerHandle {
         run_id: &str,
         prompt: &str,
     ) -> Result<CodexRunSnapshot, CliError> {
-        let mut snapshot = self.run(run_id)?;
+        let snapshot = self.run(run_id)?;
         if snapshot.thread_id.is_none() {
             return Err(CliErrorKind::session_not_active(format!(
                 "codex agent '{run_id}' has no thread to resume"
@@ -168,7 +168,40 @@ impl CodexControllerHandle {
             ))
             .into());
         }
+        let reservation = match self.state.active_runs.reserve(run_id.to_string())? {
+            ActiveRunRegistration::Acquired(reservation) => reservation,
+            ActiveRunRegistration::Waiting(waiter) => return waiter.wait(),
+            ActiveRunRegistration::Active => {
+                return Err(CliErrorKind::session_agent_conflict(format!(
+                    "codex agent '{run_id}' already has an active turn"
+                ))
+                .into());
+            }
+        };
+        let snapshot = match self.prepare_follow_up_turn(snapshot, prompt) {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                reservation.abort(&error);
+                return Err(error);
+            }
+        };
+        let (control_tx, control_rx) = mpsc::unbounded_channel();
+        if let Err(error) = reservation.commit(control_tx, snapshot.clone()) {
+            self.record_follow_up_attach_failure(&snapshot, &error);
+            return Err(error);
+        }
+        let worker = CodexRunWorker::new(self.clone(), snapshot.clone(), control_rx);
+        tokio::spawn(async move {
+            worker.run().await;
+        });
+        Ok(snapshot)
+    }
 
+    fn prepare_follow_up_turn(
+        &self,
+        mut snapshot: CodexRunSnapshot,
+        prompt: &str,
+    ) -> Result<CodexRunSnapshot, CliError> {
         self.preflight_websocket_probe(&snapshot.session_id)?;
         snapshot.prompt = prompt.to_string();
         snapshot.turn_id = None;
@@ -180,40 +213,30 @@ impl CodexControllerHandle {
         snapshot.updated_at = utc_now();
         self.save_and_broadcast(&snapshot)?;
         self.sync_orchestration_status_for_run(&snapshot)?;
-
-        let (control_tx, control_rx) = mpsc::unbounded_channel();
-        if let Err(error) = self
-            .state
-            .active_runs
-            .insert(snapshot.run_id.clone(), control_tx)
-        {
-            let mut failed = snapshot.clone();
-            failed.status = CodexRunStatus::Failed;
-            failed.latest_summary =
-                Some("Codex worker could not attach follow-up turn to daemon".to_string());
-            failed.error = Some(error.to_string());
-            failed.updated_at = utc_now();
-            let payload = json!({
-                "runId": failed.run_id.clone(),
-                "status": "failed",
-                "reason": "active run registry failed",
-                "error": failed.error.clone(),
-            });
-            record_snapshot_event(
-                &mut failed,
-                "agent/reconciled",
-                "Codex follow-up worker could not attach to daemon".to_string(),
-                &payload,
-            );
-            let _ = self.save_and_broadcast(&failed);
-            let _ = self.sync_orchestration_status_for_run(&failed);
-            return Err(error);
-        }
-        let worker = CodexRunWorker::new(self.clone(), snapshot.clone(), control_rx);
-        tokio::spawn(async move {
-            worker.run().await;
-        });
         Ok(snapshot)
+    }
+
+    fn record_follow_up_attach_failure(&self, snapshot: &CodexRunSnapshot, error: &CliError) {
+        let mut failed = snapshot.clone();
+        failed.status = CodexRunStatus::Failed;
+        failed.latest_summary =
+            Some("Codex worker could not attach follow-up turn to daemon".to_string());
+        failed.error = Some(error.to_string());
+        failed.updated_at = utc_now();
+        let payload = json!({
+            "runId": failed.run_id.clone(),
+            "status": "failed",
+            "reason": "active run registry failed",
+            "error": failed.error.clone(),
+        });
+        record_snapshot_event(
+            &mut failed,
+            "agent/reconciled",
+            "Codex follow-up worker could not attach to daemon".to_string(),
+            &payload,
+        );
+        let _ = self.save_and_broadcast(&failed);
+        let _ = self.sync_orchestration_status_for_run(&failed);
     }
 
     pub(super) fn broadcast_approval(

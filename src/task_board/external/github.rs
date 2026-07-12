@@ -26,8 +26,10 @@ mod review_projection;
 
 use errors::{github_sync_error_with_context, warn_github_message};
 pub use inbox::GitHubInboxSyncClient;
+#[allow(unused_imports)]
 pub(crate) use review_projection::{
-    imported_review_pull_request_references, reconcile_pull_request_snapshots,
+    imported_review_pull_request_references, imported_review_references_from_items,
+    reconcile_pull_request_snapshots, reconcile_review_item_from_snapshots,
 };
 
 #[derive(Clone)]

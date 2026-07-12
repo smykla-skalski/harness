@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::errors::CliError;
 use crate::github_api::GitHubPullRequestSnapshot;
-use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
+use crate::task_board::store::TaskBoardItemPatch;
+use crate::task_board::store::TaskBoardStore;
 use crate::task_board::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
 
@@ -49,6 +50,48 @@ pub(crate) fn imported_review_pull_request_references(
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect())
+}
+
+#[allow(dead_code)]
+pub(crate) fn imported_review_references_from_items(items: &[TaskBoardItem]) -> Vec<(String, u64)> {
+    items
+        .iter()
+        .filter(|item| is_imported_review(item) && is_review_inbox_status(item.status))
+        .flat_map(|item| {
+            item.external_refs
+                .iter()
+                .filter(|reference| is_github_pull_request(reference))
+                .filter_map(|reference| normalized_reference(item, reference))
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+#[allow(dead_code)]
+pub(crate) fn reconcile_review_item_from_snapshots(
+    item: &mut TaskBoardItem,
+    snapshots: &[GitHubPullRequestSnapshot],
+) -> bool {
+    let snapshots = snapshots
+        .iter()
+        .map(|snapshot| {
+            (
+                snapshot_key(&snapshot.repository, snapshot.number),
+                snapshot,
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let Some(patch) = projection_patch(item, &snapshots) else {
+        return false;
+    };
+    if let Some(status) = patch.status {
+        item.status = status;
+    }
+    if let Some(external_refs) = patch.external_refs {
+        item.external_refs = external_refs;
+    }
+    true
 }
 
 fn reconcile_candidate(

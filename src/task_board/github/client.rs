@@ -9,6 +9,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
+use crate::task_board::TaskBoardGitRuntimeConfig;
 
 use super::GitHubAutomationClient;
 use super::config::{GitHubMergeMethod, GitHubProjectConfig};
@@ -42,6 +43,7 @@ pub struct GitHubCreatePullRequest {
 pub struct GitHubApiAutomationClient {
     client: GitHubProtectedClient,
     token: String,
+    runtime_config: TaskBoardGitRuntimeConfig,
 }
 
 impl GitHubApiAutomationClient {
@@ -50,6 +52,17 @@ impl GitHubApiAutomationClient {
     /// # Errors
     /// Returns an error when the token is empty or the API client cannot be built.
     pub fn new(token: impl Into<String>) -> Result<Self, CliError> {
+        Self::new_with_runtime_config(token, TaskBoardGitRuntimeConfig::default())
+    }
+
+    /// Build a GitHub automation client with the database-loaded Task Board Git profile.
+    ///
+    /// # Errors
+    /// Returns an error when the token is empty or the API client cannot be built.
+    pub fn new_with_runtime_config(
+        token: impl Into<String>,
+        runtime_config: TaskBoardGitRuntimeConfig,
+    ) -> Result<Self, CliError> {
         let token = token.into();
         let token = token.trim();
         if token.is_empty() {
@@ -59,6 +72,7 @@ impl GitHubApiAutomationClient {
         Ok(Self {
             client,
             token: token.to_string(),
+            runtime_config,
         })
     }
 }
@@ -79,8 +93,15 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         worktree: &Path,
         branch: &str,
     ) -> Result<(), CliError> {
-        publish_branch_from_worktree_async(&self.client, config, worktree, branch, &self.token)
-            .await
+        publish_branch_from_worktree_async(
+            &self.client,
+            config,
+            worktree,
+            branch,
+            &self.token,
+            &self.runtime_config,
+        )
+        .await
     }
 
     async fn pull_request_merge_evidence(

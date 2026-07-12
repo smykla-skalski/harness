@@ -1,12 +1,14 @@
 use serde_json::json;
 use std::path::Path;
+use std::time::Duration;
 
 use super::{
+    active_runs::ActiveRunRegistration,
     approvals::{approval_from_request, upsert_pending_approval},
     handle::{preferred_codex_project_dir, record_snapshot_event},
 };
-use crate::daemon::protocol::CodexRunStatus;
-use crate::session::types::AgentStatus;
+use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunStatus};
+use crate::session::types::{AgentStatus, SessionRole};
 
 mod request_validation;
 mod test_support;
@@ -15,6 +17,8 @@ use self::test_support::{
     codex_approval_request, codex_run_snapshot, controller_with_db, controller_with_session_state,
     sample_session_state_with_codex_agent,
 };
+
+const OTHER_SESSION_ID: &str = "78e20780-1723-4a72-bdd6-a66f976723b3";
 
 #[test]
 fn preferred_codex_project_dir_uses_session_worktree_when_present() {
@@ -186,7 +190,79 @@ fn run_reconciles_stale_active_codex_run() {
 }
 
 #[test]
-fn follow_up_attach_failure_marks_run_failed() {
+fn active_durable_run_id_cannot_be_reused_across_sessions() {
+    let (controller, db, _tempdir) = controller_with_db();
+    let snapshot = codex_run_snapshot(CodexRunStatus::Queued);
+    {
+        let db = db.lock().expect("db lock");
+        db.save_codex_run(&snapshot).expect("save codex run");
+    }
+    let ActiveRunRegistration::Acquired(reservation) = controller
+        .state
+        .active_runs
+        .reserve(snapshot.run_id.clone())
+        .expect("reserve run identity")
+    else {
+        panic!("expected startup reservation");
+    };
+    let (control_tx, _control_rx) = tokio::sync::mpsc::unbounded_channel();
+    reservation
+        .commit(control_tx, snapshot.clone())
+        .expect("commit active run");
+
+    let error = controller
+        .start_run_with_id(
+            OTHER_SESSION_ID,
+            &durable_run_request(),
+            snapshot.run_id.clone(),
+        )
+        .expect_err("cross-session run identity must be rejected");
+
+    assert_cross_session_conflict(&error, &snapshot);
+    let persisted = db
+        .lock()
+        .expect("db lock")
+        .codex_run(&snapshot.run_id)
+        .expect("load persisted run")
+        .expect("persisted run");
+    assert_eq!(persisted.session_id, snapshot.session_id);
+}
+
+#[test]
+fn waiting_durable_run_id_cannot_be_reused_across_sessions() {
+    let (controller, _db, _tempdir) = controller_with_db();
+    let snapshot = codex_run_snapshot(CodexRunStatus::Queued);
+    let ActiveRunRegistration::Acquired(reservation) = controller
+        .state
+        .active_runs
+        .reserve(snapshot.run_id.clone())
+        .expect("reserve run identity")
+    else {
+        panic!("expected startup reservation");
+    };
+    let committed = snapshot.clone();
+    let commit_thread = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(50));
+        let (control_tx, _control_rx) = tokio::sync::mpsc::unbounded_channel();
+        reservation
+            .commit(control_tx, committed)
+            .expect("commit waiting run");
+    });
+
+    let error = controller
+        .start_run_with_id(
+            OTHER_SESSION_ID,
+            &durable_run_request(),
+            snapshot.run_id.clone(),
+        )
+        .expect_err("waiting cross-session run identity must be rejected");
+    commit_thread.join().expect("commit thread");
+
+    assert_cross_session_conflict(&error, &snapshot);
+}
+
+#[test]
+fn follow_up_reservation_failure_preserves_completed_run() {
     let (controller, db, _tempdir) = controller_with_db();
     let mut run = codex_run_snapshot(CodexRunStatus::Completed);
     run.thread_id = Some("thread-1".into());
@@ -215,11 +291,8 @@ fn follow_up_attach_failure_marks_run_failed() {
         .codex_run("codex-run-1")
         .expect("load persisted run")
         .expect("persisted run");
-    assert_eq!(persisted.status, CodexRunStatus::Failed);
-    assert_eq!(
-        persisted.latest_summary.as_deref(),
-        Some("Codex worker could not attach follow-up turn to daemon")
-    );
+    assert_eq!(persisted.status, CodexRunStatus::Completed);
+    assert_eq!(persisted.latest_summary.as_deref(), Some("Running"));
 }
 
 #[test]
@@ -339,4 +412,44 @@ fn transcript_deduplicates_final_message_from_completed_item_event() {
         .filter(|entry| entry.kind == "assistant_text" && entry.summary == "Done from Codex")
         .count();
     assert_eq!(assistant_entries, 1);
+}
+
+fn durable_run_request() -> CodexRunRequest {
+    CodexRunRequest {
+        actor: Some("task-board".into()),
+        prompt: "Investigate".into(),
+        mode: CodexRunMode::WorkspaceWrite,
+        role: SessionRole::Worker,
+        fallback_role: None,
+        capabilities: Vec::new(),
+        name: Some("Codex Worker".into()),
+        persona: None,
+        resume_thread_id: None,
+        task_id: None,
+        board_item_id: None,
+        workflow_execution_id: None,
+        model: None,
+        effort: None,
+        allow_custom_model: false,
+    }
+}
+
+fn assert_cross_session_conflict(
+    error: &crate::errors::CliError,
+    snapshot: &crate::daemon::protocol::CodexRunSnapshot,
+) {
+    assert_eq!(error.code(), "KSRCLI092");
+    let message = error.to_string();
+    assert!(
+        message.contains(&snapshot.run_id),
+        "unexpected error: {message}"
+    );
+    assert!(
+        message.contains(&snapshot.session_id),
+        "unexpected error: {message}"
+    );
+    assert!(
+        message.contains(OTHER_SESSION_ID),
+        "unexpected error: {message}"
+    );
 }

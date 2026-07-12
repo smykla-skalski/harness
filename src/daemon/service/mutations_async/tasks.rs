@@ -3,10 +3,11 @@ use super::super::{CliError, session_detail_from_async_daemon_db};
 use super::super::{
     CliErrorKind, SessionDetail, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
     TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskSource, TaskUpdateRequest,
-    db::AsyncDaemonDb, session_service, sync_file_state_from_async_db, utc_now,
+    db::AsyncDaemonDb, session_not_found, session_service, sync_file_state_from_async_db, utc_now,
 };
 use super::{append_log, bump_session, persist_task_signal_effects, resolved_session_for_mutation};
-use crate::session::types::{SessionState, TaskStatus};
+use crate::infra::io::validate_safe_segment;
+use crate::session::types::{SessionState, TaskStatus, WorkItem};
 
 struct DeleteRollback<'a> {
     project_id: &'a str,
@@ -54,6 +55,86 @@ pub(crate) async fn create_task_async(
     .await?;
     bump_session(async_db, session_id).await?;
     session_detail_from_async_daemon_db(session_id, async_db).await
+}
+
+/// Idempotently create a task with an identity reserved by durable dispatch.
+#[allow(dead_code)]
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "idempotent task creation validates reserved state before synchronizing mirrors and audit data"
+)]
+pub(crate) async fn create_task_with_id_async(
+    session_id: &str,
+    task_id: &str,
+    request: &TaskCreateRequest,
+    async_db: &AsyncDaemonDb,
+) -> Result<SessionDetail, CliError> {
+    validate_safe_segment(task_id)?;
+    let spec = session_service::TaskSpec {
+        title: &request.title,
+        context: request.context.as_deref(),
+        severity: request.severity,
+        suggested_fix: request.suggested_fix.as_deref(),
+        source: TaskSource::Manual,
+        observe_issue_id: None,
+    };
+    let now = utc_now();
+    let created = async_db
+        .update_session_state_immediate(session_id, |state| {
+            if let Some(existing) = state.tasks.get(task_id) {
+                ensure_reserved_task_matches(existing, &spec)?;
+                return Ok(false);
+            }
+            session_service::apply_create_task_with_id(
+                state,
+                task_id,
+                &spec,
+                &request.actor,
+                &now,
+            )?;
+            Ok(true)
+        })
+        .await?;
+    // The task row may have been committed by an earlier preparation attempt
+    // that crashed before its file mirror was refreshed. Re-sync on both the
+    // create and idempotent-retry paths.
+    sync_file_state_from_async_db(async_db, session_id).await?;
+    if created {
+        let item = async_db
+            .resolve_session(session_id)
+            .await?
+            .and_then(|resolved| resolved.state.tasks.get(task_id).cloned())
+            .ok_or_else(|| session_not_found(session_id))?;
+        append_log(
+            async_db,
+            session_id,
+            session_service::log_task_created(&spec, &item),
+            &request.actor,
+        )
+        .await?;
+    }
+    bump_session(async_db, session_id).await?;
+    session_detail_from_async_daemon_db(session_id, async_db).await
+}
+
+#[allow(dead_code)]
+fn ensure_reserved_task_matches(
+    item: &WorkItem,
+    spec: &session_service::TaskSpec<'_>,
+) -> Result<(), CliError> {
+    let matches = item.title == spec.title
+        && item.context.as_deref() == spec.context
+        && item.severity == spec.severity
+        && item.suggested_fix.as_deref() == spec.suggested_fix
+        && item.source == spec.source;
+    if matches {
+        return Ok(());
+    }
+    Err(CliErrorKind::session_agent_conflict(format!(
+        "reserved task '{}' already exists with different content",
+        item.task_id
+    ))
+    .into())
 }
 
 /// Delete a task from active task views while preserving timeline history.

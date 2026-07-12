@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+pub(crate) mod action_persistence;
 pub mod events;
 pub mod executor;
 pub mod handoff;

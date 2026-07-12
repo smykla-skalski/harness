@@ -86,6 +86,11 @@ mod schema_v26;
 mod schema_v27;
 mod schema_v28;
 mod schema_v29;
+mod schema_v30;
+#[allow(dead_code)]
+mod task_board;
+#[cfg(test)]
+pub(crate) use task_board::ReservedTaskBoardDispatch;
 mod session_data;
 mod signals;
 mod summaries;
@@ -123,7 +128,7 @@ use timeline_store::{
 };
 
 pub(crate) fn normalize_change_scope(scope: &str) -> Cow<'_, str> {
-    if scope == "global" || scope.starts_with("session:") {
+    if scope == "global" || scope.starts_with("session:") || scope.starts_with("task_board:") {
         Cow::Borrowed(scope)
     } else {
         Cow::Owned(format!("session:{scope}"))
@@ -131,7 +136,7 @@ pub(crate) fn normalize_change_scope(scope: &str) -> Cow<'_, str> {
 }
 
 pub(crate) fn session_id_from_change_scope(scope: &str) -> Option<&str> {
-    if scope == "global" {
+    if scope == "global" || scope.starts_with("task_board:") {
         None
     } else {
         Some(scope.strip_prefix("session:").unwrap_or(scope))
@@ -279,7 +284,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "29";
+pub(crate) const SCHEMA_VERSION: &str = "30";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

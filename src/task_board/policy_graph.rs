@@ -66,6 +66,7 @@ pub use store_canvas::{
     apply_create, apply_delete, apply_duplicate, apply_import, apply_rename, apply_set_active,
     apply_set_global_enforcement,
 };
+pub(crate) use workspace::POLICY_CANVAS_WORKSPACE_VERSION;
 pub use workspace::{
     DEFAULT_POLICY_CANVAS_TITLE, MANUAL_OCR_PASTE_CANVAS_TITLE, PolicyCanvasRecord,
     PolicyCanvasWorkspace, REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE,

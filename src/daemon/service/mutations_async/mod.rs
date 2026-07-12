@@ -25,9 +25,10 @@ mod tasks;
 
 pub(crate) use agents::{change_role_async, remove_agent_async};
 pub(crate) use sessions::{archive_session_async, end_session_async, transfer_leader_async};
+#[allow(unused_imports)]
 pub(crate) use tasks::{
-    assign_task_async, checkpoint_task_async, create_task_async, delete_task_async,
-    drop_task_async, update_task_async, update_task_queue_policy_async,
+    assign_task_async, checkpoint_task_async, create_task_async, create_task_with_id_async,
+    delete_task_async, drop_task_async, update_task_async, update_task_queue_policy_async,
 };
 
 async fn resolved_session_for_mutation(

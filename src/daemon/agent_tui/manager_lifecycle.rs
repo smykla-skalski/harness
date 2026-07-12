@@ -5,7 +5,8 @@ use uuid::Uuid;
 
 use crate::agents::runtime::{AgentRuntime, InitialPromptDelivery, runtime_for_name};
 use crate::daemon::bridge::{AgentTuiStartSpec, BridgeCapability, BridgeClient};
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
+use crate::infra::io::validate_safe_segment;
 
 use super::manager::{ActiveAgentTui, AgentTuiManagerHandle};
 use super::model::{AgentTuiSnapshot, AgentTuiStartRequest, AgentTuiStatus};
@@ -34,13 +35,26 @@ impl AgentTuiManagerHandle {
         session_id: &str,
         request: &AgentTuiStartRequest,
     ) -> Result<AgentTuiSnapshot, CliError> {
+        self.start_with_id(session_id, request, format!("agent-tui-{}", Uuid::new_v4()))
+    }
+
+    /// Start a terminal worker with a durable caller-reserved identity.
+    pub(crate) fn start_with_id(
+        &self,
+        session_id: &str,
+        request: &AgentTuiStartRequest,
+        tui_id: String,
+    ) -> Result<AgentTuiSnapshot, CliError> {
+        validate_safe_segment(&tui_id)?;
+        if self.is_tui_active(&tui_id)? {
+            return ensure_tui_session(self.load_snapshot(&tui_id)?, session_id);
+        }
         if self.state.sandboxed {
-            return self.start_via_bridge(session_id, request);
+            return self.start_via_bridge(session_id, request, tui_id);
         }
 
         let profile = request.launch_profile()?;
         let size = request.size()?;
-        let tui_id = format!("agent-tui-{}", Uuid::new_v4());
         let project = self.resolve_project(session_id, request.project_dir.as_deref())?;
         let transcript_path = transcript_path(&project.context_root, &profile.runtime, &tui_id);
         let snapshot_context = AgentTuiSnapshotContext {
@@ -161,10 +175,10 @@ impl AgentTuiManagerHandle {
         &self,
         session_id: &str,
         request: &AgentTuiStartRequest,
+        tui_id: String,
     ) -> Result<AgentTuiSnapshot, CliError> {
         let profile = request.launch_profile()?;
         let size = request.size()?;
-        let tui_id = format!("agent-tui-{}", Uuid::new_v4());
         let bridge = BridgeClient::for_capability(BridgeCapability::AgentTui)?;
         let project = self.resolve_project(session_id, request.project_dir.as_deref())?;
         let auto_join = build_auto_join_prompt(
@@ -233,4 +247,18 @@ impl AgentTuiManagerHandle {
         self.spawn_live_refresh(tui_id, stop_flag);
         Ok(())
     }
+}
+
+fn ensure_tui_session(
+    snapshot: AgentTuiSnapshot,
+    requested_session_id: &str,
+) -> Result<AgentTuiSnapshot, CliError> {
+    if snapshot.session_id != requested_session_id {
+        return Err(CliErrorKind::session_agent_conflict(format!(
+            "terminal agent '{}' belongs to session '{}', not requested session '{}'",
+            snapshot.tui_id, snapshot.session_id, requested_session_id
+        ))
+        .into());
+    }
+    Ok(snapshot)
 }

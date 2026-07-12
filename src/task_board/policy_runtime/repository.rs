@@ -7,9 +7,9 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 
 use super::events::run_matches_event;
+use super::models::{POLICY_WORKFLOW_RUNS_SCHEMA_VERSION, PolicyWorkflowEvent};
 use super::models::{
-    POLICY_WORKFLOW_RUNS_SCHEMA_VERSION, PolicyRunStatus, PolicyRunTrigger, PolicyWorkflowEvent,
-    PolicyWorkflowRun, PolicyWorkflowRunsDocument,
+    PolicyRunStatus, PolicyRunTrigger, PolicyWorkflowRun, PolicyWorkflowRunsDocument,
 };
 use super::scheduler::timer_wait_is_due;
 
@@ -23,7 +23,7 @@ const STALE_RUNNING_SECONDS: i64 = 600;
 /// limit as Auto is pressed repeatedly; active runs are never pruned.
 const TERMINAL_RUN_RETENTION_PER_SUBJECT: usize = 10;
 
-/// Outcome of an atomic [`PolicyRuntimeRepository::begin_run`].
+/// Outcome of atomically beginning a policy workflow run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BeginRunOutcome {
     /// A fresh run was inserted and should be executed by the caller.
@@ -57,15 +57,7 @@ impl PolicyRuntimeRepository {
         let run = run.clone();
         let _ = self.repository.update(|current| {
             let mut document = current.unwrap_or_default();
-            if let Some(existing) = document
-                .runs
-                .iter_mut()
-                .find(|existing| existing.run_id == run.run_id)
-            {
-                *existing = run.clone();
-            } else {
-                document.runs.push(run.clone());
-            }
+            save_run_in_document(&mut document, &run);
             Ok(Some(document))
         })?;
         Ok(())
@@ -85,38 +77,10 @@ impl PolicyRuntimeRepository {
         trigger: PolicyRunTrigger,
         now: DateTime<Utc>,
     ) -> Result<BeginRunOutcome, CliError> {
-        let workflow_id = run.workflow_id.clone();
-        let subject_key = run.subject.key.clone();
-        let fingerprint = run.subject_fingerprint.clone();
         let mut outcome: Option<BeginRunOutcome> = None;
         self.repository.update(|current| {
             let mut document = current.unwrap_or_default();
-            reclaim_abandoned_runs(&mut document, &workflow_id, &subject_key, now);
-            if let Some(existing) = document.runs.iter_mut().find(|candidate| {
-                same_subject(candidate, &workflow_id, &subject_key)
-                    && run_is_active(candidate, now)
-                    && fingerprint_reusable(candidate, fingerprint.as_deref())
-            }) {
-                if matches!(trigger, PolicyRunTrigger::Manual) {
-                    existing.nudge_manually();
-                }
-                outcome = Some(BeginRunOutcome::Existing(existing.clone()));
-                return Ok(Some(document));
-            }
-            if fingerprint.is_some() {
-                for stale in document.runs.iter_mut().filter(|candidate| {
-                    same_subject(candidate, &workflow_id, &subject_key)
-                        && run_is_active(candidate, now)
-                        && candidate.subject_fingerprint != fingerprint
-                }) {
-                    stale.mark_cancelled("superseded by newer workflow subject state");
-                }
-            }
-            outcome = Some(BeginRunOutcome::Created(run.clone()));
-            // Move `run` into the document on the create path so the owned
-            // parameter is genuinely consumed rather than only borrowed.
-            document.runs.push(run);
-            prune_terminal_runs(&mut document);
+            outcome = Some(begin_run_in_document(&mut document, run, trigger, now));
             Ok(Some(document))
         })?;
         outcome.ok_or_else(|| {
@@ -139,12 +103,7 @@ impl PolicyRuntimeRepository {
         let mut claimed: Option<PolicyWorkflowRun> = None;
         self.repository.update(|current| {
             let mut document = current.unwrap_or_default();
-            if let Some(run) = document.runs.iter_mut().find(|run| run.run_id == run_id)
-                && run.status == PolicyRunStatus::Waiting
-            {
-                run.mark_running(trigger);
-                claimed = Some(run.clone());
-            }
+            claimed = claim_waiting_run_in_document(&mut document, run_id, trigger);
             Ok(Some(document))
         })?;
         Ok(claimed)
@@ -304,6 +263,69 @@ impl PolicyRuntimeRepository {
 
 fn same_subject(run: &PolicyWorkflowRun, workflow_id: &str, subject_key: &str) -> bool {
     run.workflow_id == workflow_id && run.subject.key == subject_key
+}
+
+pub(crate) fn save_run_in_document(
+    document: &mut PolicyWorkflowRunsDocument,
+    run: &PolicyWorkflowRun,
+) {
+    if let Some(existing) = document
+        .runs
+        .iter_mut()
+        .find(|existing| existing.run_id == run.run_id)
+    {
+        existing.clone_from(run);
+    } else {
+        document.runs.push(run.clone());
+    }
+}
+
+pub(crate) fn begin_run_in_document(
+    document: &mut PolicyWorkflowRunsDocument,
+    run: PolicyWorkflowRun,
+    trigger: PolicyRunTrigger,
+    now: DateTime<Utc>,
+) -> BeginRunOutcome {
+    let workflow_id = run.workflow_id.clone();
+    let subject_key = run.subject.key.clone();
+    let fingerprint = run.subject_fingerprint.clone();
+    reclaim_abandoned_runs(document, &workflow_id, &subject_key, now);
+    if let Some(existing) = document.runs.iter_mut().find(|candidate| {
+        same_subject(candidate, &workflow_id, &subject_key)
+            && run_is_active(candidate, now)
+            && fingerprint_reusable(candidate, fingerprint.as_deref())
+    }) {
+        if matches!(trigger, PolicyRunTrigger::Manual) {
+            existing.nudge_manually();
+        }
+        return BeginRunOutcome::Existing(existing.clone());
+    }
+    if fingerprint.is_some() {
+        for stale in document.runs.iter_mut().filter(|candidate| {
+            same_subject(candidate, &workflow_id, &subject_key)
+                && run_is_active(candidate, now)
+                && candidate.subject_fingerprint != fingerprint
+        }) {
+            stale.mark_cancelled("superseded by newer workflow subject state");
+        }
+    }
+    let outcome = BeginRunOutcome::Created(run.clone());
+    document.runs.push(run);
+    prune_terminal_runs(document);
+    outcome
+}
+
+pub(crate) fn claim_waiting_run_in_document(
+    document: &mut PolicyWorkflowRunsDocument,
+    run_id: &str,
+    trigger: PolicyRunTrigger,
+) -> Option<PolicyWorkflowRun> {
+    let run = document
+        .runs
+        .iter_mut()
+        .find(|run| run.run_id == run_id && run.status == PolicyRunStatus::Waiting)?;
+    run.mark_running(trigger);
+    Some(run.clone())
 }
 
 fn fingerprint_reusable(run: &PolicyWorkflowRun, fingerprint: Option<&str>) -> bool {

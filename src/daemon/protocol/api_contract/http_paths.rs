@@ -45,6 +45,7 @@ pub const SESSION_TASK_RESPOND_REVIEW: &str =
 pub const SESSION_TASK_ARBITRATE: &str = "/v1/sessions/{session_id}/tasks/{task_id}/arbitrate";
 pub const SESSION_IMPROVER_APPLY: &str = "/v1/sessions/{session_id}/improver/apply";
 pub const TASK_BOARD_ITEMS: &str = "/v1/task-board/items";
+pub const TASK_BOARD_CAPABILITIES: &str = "/v1/task-board/capabilities";
 pub const TASK_BOARD_ITEM: &str = "/v1/task-board/items/{item_id}";
 pub const TASK_BOARD_PLAN_BEGIN: &str = "/v1/task-board/items/{item_id}/planning/begin";
 pub const TASK_BOARD_PLAN_SUBMIT: &str = "/v1/task-board/items/{item_id}/planning/submit";
@@ -72,6 +73,11 @@ pub const TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN: &str =
     "/v1/task-board/orchestrator/openrouter-token";
 pub const TASK_BOARD_GIT_IDENTITY_DEFAULTS: &str = "/v1/task-board/git/identity-defaults";
 pub const TASK_BOARD_GIT_SIGNING_VERIFY: &str = "/v1/task-board/git/signing/verify";
+pub const TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL: &str = "/v1/task-board/git/runtime/key-material";
+pub const TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE: &str =
+    "/v1/task-board/git/runtime/secret-handoff/prepare";
+pub const TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK: &str =
+    "/v1/task-board/git/runtime/secret-handoff/ack";
 pub const TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS: &str = "/v1/task-board/git/runtime/drain-secrets";
 pub const POLICY_CANVASES: &str = "/v1/policy-canvases";
 pub const POLICY_CANVASES_CREATE: &str = "/v1/policy-canvases/create";

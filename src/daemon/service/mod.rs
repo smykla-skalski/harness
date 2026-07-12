@@ -367,6 +367,7 @@ pub use task_board_orchestrator::{
     task_board_orchestrator_settings, task_board_orchestrator_status,
     update_task_board_orchestrator_settings,
 };
+#[allow(unused_imports)]
 pub(crate) use task_board_runtime::git_runtime_profile_for_repository;
 pub use task_board_runtime::{
     drain_task_board_git_runtime_secrets, sync_task_board_github_tokens,

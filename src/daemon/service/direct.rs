@@ -1,4 +1,8 @@
-use super::session_setup::{PreparedSession, prepare_session, rollback_session_artifacts};
+use tokio::task::spawn_blocking;
+
+use super::session_setup::{
+    PreparedSession, prepare_session, rollback_session_artifacts, rollback_session_artifacts_async,
+};
 use super::session_teardown::destroy_session_artifacts;
 use super::{
     CliError, Path, SessionState, agents_service, build_log_entry, index, record_signal_ack,
@@ -69,11 +73,20 @@ pub fn start_session_direct(
 ///
 /// # Errors
 /// Returns `CliError` when the worktree cannot be created or async DB operations fail.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "session creation must pair each database failure with asynchronous artifact rollback"
+)]
 pub(crate) async fn start_session_direct_async(
     request: &super::protocol::SessionStartRequest,
     async_db: &super::db::AsyncDaemonDb,
 ) -> Result<SessionState, CliError> {
-    let prepared = prepare_session(request)?;
+    let request_for_worker = request.clone();
+    let prepared = spawn_blocking(move || prepare_session(&request_for_worker))
+        .await
+        .map_err(|error| {
+            CliErrorKind::workflow_io(format!("join session preparation worker: {error}"))
+        })??;
     let PreparedSession {
         layout,
         canonical_origin,
@@ -83,12 +96,12 @@ pub(crate) async fn start_session_direct_async(
     let project_id = match ensure_project_registered_async(async_db, &canonical_origin).await {
         Ok(id) => id,
         Err(error) => {
-            rollback_session_artifacts(&canonical_origin, &layout);
+            rollback_session_artifacts_async(canonical_origin, layout).await;
             return Err(error);
         }
     };
     if let Err(error) = async_db.create_session_record(&project_id, &state).await {
-        rollback_session_artifacts(&canonical_origin, &layout);
+        rollback_session_artifacts_async(canonical_origin, layout).await;
         return Err(error);
     }
     async_db

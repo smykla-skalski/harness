@@ -172,6 +172,7 @@ pub(crate) fn external_sync_config_for_repository(
     config
 }
 
+#[allow(dead_code)]
 pub(crate) fn git_runtime_profile_for_repository(
     repository: Option<&str>,
 ) -> Result<TaskBoardGitRuntimeProfile, CliError> {

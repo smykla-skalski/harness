@@ -58,6 +58,21 @@ pub(super) fn current_schema_shape_needs_repair(
         "remote_clients",
         "remote_pairing_codes",
         "policy_decisions",
+        "task_board_items",
+        "task_board_identity",
+        "task_board_external_refs",
+        "task_board_machines",
+        "task_board_local_machine",
+        "task_board_orchestrator_settings",
+        "task_board_orchestrator_state",
+        "task_board_runtime_config",
+        "policy_workflow_runs",
+        "policy_event_inbox",
+        "policy_handoff_outbox",
+        "policy_notification_outbox",
+        "policy_task_creation_outbox",
+        "task_board_dispatch_intents",
+        "task_board_imports",
     ] {
         if !table_exists(conn, table)? {
             return Ok(true);
@@ -102,6 +117,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v27::run(&db.conn)?;
     super::schema_v28::run(&db.conn)?;
     super::schema_v29::run(&db.conn)?;
+    super::schema_v30::run(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

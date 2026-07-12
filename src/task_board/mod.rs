@@ -3,6 +3,8 @@ pub mod evaluation;
 pub mod external;
 pub mod git_identity_defaults;
 pub mod github;
+#[allow(dead_code)]
+pub(crate) mod legacy_import;
 pub mod machines;
 pub mod orchestrator;
 pub mod planning;

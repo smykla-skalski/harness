@@ -92,7 +92,25 @@ fn automation_client_with_base_uri(base_uri: String) -> GitHubApiAutomationClien
     GitHubApiAutomationClient {
         client,
         token: "token".to_string(),
+        runtime_config: TaskBoardGitRuntimeConfig::default(),
     }
+}
+
+#[test]
+fn automation_client_keeps_database_runtime_profile() {
+    let runtime_config = TaskBoardGitRuntimeConfig {
+        global: crate::task_board::TaskBoardGitRuntimeProfile {
+            author_name: Some("Database Author".to_string()),
+            ..Default::default()
+        },
+        repository_overrides: Vec::new(),
+    };
+    let client = GitHubApiAutomationClient::new_with_runtime_config("token", runtime_config)
+        .expect("automation client");
+    assert_eq!(
+        client.runtime_config.global.author_name.as_deref(),
+        Some("Database Author")
+    );
 }
 
 fn spawn_json_mock(
