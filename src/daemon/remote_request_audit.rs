@@ -18,6 +18,7 @@ pub(crate) struct RemoteAuthorizationAudit<'a> {
     target: &'a str,
     scope: RemoteAccessScope,
     decision: RemoteAuditScopeDecision,
+    outcome: RemoteAuditOutcome,
     remote_addr: Option<&'a str>,
     error_detail: Option<&'a str>,
 }
@@ -36,8 +37,29 @@ impl<'a> RemoteAuthorizationAudit<'a> {
             target,
             scope,
             decision: RemoteAuditScopeDecision::Allowed,
+            outcome: RemoteAuditOutcome::Success,
             remote_addr,
             error_detail: None,
+        }
+    }
+
+    pub(crate) fn allowed_failure(
+        request_id: &'a str,
+        client_id: &'a str,
+        target: &'a str,
+        scope: RemoteAccessScope,
+        remote_addr: Option<&'a str>,
+        error_detail: &'a str,
+    ) -> Self {
+        Self {
+            request_id,
+            client_id: Some(client_id),
+            target,
+            scope,
+            decision: RemoteAuditScopeDecision::Allowed,
+            outcome: RemoteAuditOutcome::Failure,
+            remote_addr,
+            error_detail: Some(error_detail),
         }
     }
 
@@ -55,6 +77,7 @@ impl<'a> RemoteAuthorizationAudit<'a> {
             target,
             scope,
             decision: RemoteAuditScopeDecision::Denied,
+            outcome: RemoteAuditOutcome::Failure,
             remote_addr,
             error_detail: Some(error_detail),
         }
@@ -75,10 +98,6 @@ impl<'a> RemoteAuthorizationAudit<'a> {
                 "remote authorization audit store lock: {error}"
             )))
         })?;
-        let outcome = match self.decision {
-            RemoteAuditScopeDecision::Allowed => RemoteAuditOutcome::Success,
-            RemoteAuditScopeDecision::Denied => RemoteAuditOutcome::Failure,
-        };
         let request_id = bounded_request_id(self.request_id);
         db.record_remote_audit_event(&RemoteAuditEvent::new(
             format!("remote-auth-{}", Uuid::new_v4()),
@@ -88,7 +107,7 @@ impl<'a> RemoteAuthorizationAudit<'a> {
             self.target,
             self.scope,
             self.decision,
-            outcome,
+            self.outcome,
             self.remote_addr,
             self.error_detail,
         ))

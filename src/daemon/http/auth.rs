@@ -10,7 +10,7 @@ use crate::daemon::protocol::{
     with_control_plane_actor,
 };
 use crate::daemon::remote_auth::{
-    RemoteAuthError, RemoteBearerCredentials, authorize_remote_http_route,
+    REMOTE_CLIENT_ID_HEADER, RemoteAuthError, RemoteBearerCredentials, authorize_remote_http_route,
 };
 use crate::daemon::remote_identity::RemoteStoredClient;
 
@@ -28,6 +28,53 @@ pub enum DaemonHttpAuthMode {
     #[default]
     Local,
     Remote,
+}
+
+pub(super) struct RemoteHttpLimitAudit {
+    context: RemoteHttpAuditContext,
+    route: &'static HttpApiRouteContract,
+    headers: HeaderMap,
+}
+
+impl RemoteHttpLimitAudit {
+    pub(super) fn from_request(
+        request: &Request<Body>,
+        state: &DaemonHttpState,
+    ) -> Result<Option<Self>, Box<Response>> {
+        let Some((context, route)) = remote_http_limit_audit_target(request, state)? else {
+            return Ok(None);
+        };
+        Ok(Some(Self {
+            context,
+            route,
+            headers: remote_limit_auth_headers(request.headers()),
+        }))
+    }
+
+    pub(super) fn record_rejection(
+        &self,
+        state: &DaemonHttpState,
+        error_detail: &str,
+    ) -> Result<(), Box<Response>> {
+        record_remote_http_limit_rejection(
+            &self.context,
+            &self.headers,
+            state,
+            self.route,
+            error_detail,
+        )
+    }
+}
+
+pub(super) fn audit_remote_http_limit_rejection(
+    request: &Request<Body>,
+    state: &DaemonHttpState,
+    error_detail: &str,
+) -> Result<(), Box<Response>> {
+    let Some((context, route)) = remote_http_limit_audit_target(request, state)? else {
+        return Ok(());
+    };
+    record_remote_http_limit_rejection(&context, request.headers(), state, route, error_detail)
 }
 
 pub(super) fn authorize_control_request<T: ControlPlaneActorRequest>(
@@ -184,6 +231,64 @@ fn http_route_contract(method: &Method, route_path: &str) -> Option<&'static Htt
 
 fn is_public_remote_http_route(method: &Method, route_path: &str) -> bool {
     *method == Method::POST && route_path == http_paths::REMOTE_PAIR_CLAIM
+}
+
+fn remote_http_limit_audit_target(
+    request: &Request<Body>,
+    state: &DaemonHttpState,
+) -> Result<Option<(RemoteHttpAuditContext, &'static HttpApiRouteContract)>, Box<Response>> {
+    if state.auth_mode == DaemonHttpAuthMode::Local {
+        return Ok(None);
+    }
+    let Some(route_path) = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str)
+    else {
+        return Ok(None);
+    };
+    if is_public_remote_http_route(request.method(), route_path) {
+        return Ok(None);
+    }
+    let route = http_route_contract(request.method(), route_path).ok_or_else(|| {
+        Box::new(remote_auth_error_response(
+            RemoteAuthError::MissingScopeContract,
+        ))
+    })?;
+    let context = RemoteHttpAuditContext::from_request(request, route)
+        .map_err(|error| Box::new(remote_auth_error_response(error)))?;
+    Ok(Some((context, route)))
+}
+
+fn record_remote_http_limit_rejection(
+    audit: &RemoteHttpAuditContext,
+    headers: &HeaderMap,
+    state: &DaemonHttpState,
+    route: &HttpApiRouteContract,
+    error_detail: &str,
+) -> Result<(), Box<Response>> {
+    if audit.was_recorded() {
+        return Ok(());
+    }
+    let result = match verify_remote_client(headers, state) {
+        Ok(client) if authorize_remote_http_route(&client, route).is_ok() => {
+            audit.record_allowed_failure(state, &client.client_id, error_detail)
+        }
+        Ok(client) => audit.record_denied(state, Some(&client.client_id), error_detail),
+        Err(_) => audit.record_denied(state, None, error_detail),
+    };
+    result.map_err(|error| Box::new(auth_audit::unavailable_response(&error)))
+}
+
+fn remote_limit_auth_headers(headers: &HeaderMap) -> HeaderMap {
+    let mut owned = HeaderMap::new();
+    if let Some(value) = headers.get(AUTHORIZATION) {
+        owned.insert(AUTHORIZATION, value.clone());
+    }
+    if let Some(value) = headers.get(REMOTE_CLIENT_ID_HEADER) {
+        owned.insert(REMOTE_CLIENT_ID_HEADER, value.clone());
+    }
+    owned
 }
 
 fn verify_remote_client(

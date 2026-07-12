@@ -11,6 +11,7 @@ use tokio::net::TcpListener;
 use tokio::sync::Notify;
 
 use super::*;
+use crate::daemon::protocol::http_paths;
 
 #[test]
 fn remote_request_limit_defaults_are_valid_and_non_zero() {
@@ -45,10 +46,13 @@ async fn remote_http_admission_fails_closed_without_runtime_limits() {
     let mut state = crate::daemon::http::tests::test_http_state_with_db();
     state.auth_mode = DaemonHttpAuthMode::Remote;
     state.remote_request_limits = None;
-    let (base_url, server) =
-        serve_admission(state, Router::new().route("/", get(StatusCode::OK))).await;
+    let (base_url, server) = serve_admission(
+        state,
+        Router::new().route(http_paths::HEALTH, get(StatusCode::OK)),
+    )
+    .await;
 
-    let response = reqwest::get(base_url)
+    let response = reqwest::get(format!("{base_url}{}", http_paths::HEALTH))
         .await
         .expect("request missing limits");
     let status = response.status();
@@ -70,22 +74,23 @@ async fn remote_http_admission_rejects_excess_concurrency() {
     let started = Arc::new(Notify::new());
     let release = Arc::new(Notify::new());
     let app = Router::new()
-        .route("/", get(blocking_handler))
+        .route(http_paths::HEALTH, get(blocking_handler))
         .layer(Extension(BlockingRequest {
             started: Arc::clone(&started),
             release: Arc::clone(&release),
         }));
     let (base_url, server) = serve_admission(state, app).await;
+    let request_url = format!("{base_url}{}", http_paths::HEALTH);
     let client = reqwest::Client::new();
     let first = tokio::spawn({
         let client = client.clone();
-        let base_url = base_url.clone();
-        async move { client.get(base_url).send().await }
+        let request_url = request_url.clone();
+        async move { client.get(request_url).send().await }
     });
     started.notified().await;
 
     let overflow = client
-        .get(&base_url)
+        .get(&request_url)
         .send()
         .await
         .expect("overflow request");
@@ -116,11 +121,11 @@ async fn remote_http_admission_enforces_header_and_timeout_limits() {
     };
     let (base_url, server) = serve_admission(
         remote_state(header_config),
-        Router::new().route("/", get(StatusCode::OK)),
+        Router::new().route(http_paths::HEALTH, get(StatusCode::OK)),
     )
     .await;
     let header_status = reqwest::Client::new()
-        .get(&base_url)
+        .get(format!("{base_url}{}", http_paths::HEALTH))
         .header("x-padding", "x".repeat(512))
         .send()
         .await
@@ -134,10 +139,10 @@ async fn remote_http_admission_enforces_header_and_timeout_limits() {
     };
     let (base_url, server) = serve_admission(
         remote_state(timeout_config),
-        Router::new().route("/", get(slow_handler)),
+        Router::new().route(http_paths::HEALTH, get(slow_handler)),
     )
     .await;
-    let timeout_status = reqwest::get(base_url)
+    let timeout_status = reqwest::get(format!("{base_url}{}", http_paths::HEALTH))
         .await
         .expect("timed request")
         .status();
@@ -221,7 +226,7 @@ async fn serve_router(app: Router) -> (String, tokio::task::JoinHandle<()>) {
             .await
             .expect("serve request limit test router");
     });
-    (format!("http://{address}/"), server)
+    (format!("http://{address}"), server)
 }
 
 async fn stop_server(server: tokio::task::JoinHandle<()>) {
