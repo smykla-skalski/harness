@@ -107,6 +107,65 @@ final class MobileRemoteDaemonReviewsSyncTests: XCTestCase {
     XCTAssertEqual(fallbackFetchCount, 0)
   }
 
+  func testReadOnlyReviewAttentionDoesNotExposeCommand() async throws {
+    var response = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(reviewsResponse.utf8)) as? [String: Any]
+    )
+    var items = try XCTUnwrap(response["items"] as? [[String: Any]])
+    items[0]["viewer_can_update"] = false
+    response["items"] = items
+    let responseData = try JSONSerialization.data(withJSONObject: response)
+    ReviewsRemoteDaemonURLProtocol.respond(path: "/v1/sessions", body: "[]")
+    ReviewsRemoteDaemonURLProtocol.respond(path: "/v1/task-board/items", body: #"{"items":[]}"#)
+    ReviewsRemoteDaemonURLProtocol.respond(
+      path: "/v1/reviews/query",
+      body: String(decoding: responseData, as: UTF8.self)
+    )
+    let client = MobileRemoteDaemonSyncClient(
+      access: try reviewsRemoteAccess(),
+      stationID: "remote-daemon-example-com",
+      stationName: "daemon.example.com",
+      defaultStation: true,
+      session: makeReviewsSession()
+    )
+
+    let fetchedSnapshot = try await client.fetchLatestSnapshot(
+      stationID: "remote-daemon-example-com",
+      now: .now
+    )
+    let attention = try XCTUnwrap(fetchedSnapshot?.attention.first)
+
+    XCTAssertNil(attention.commandKind)
+    XCTAssertNil(attention.target)
+    XCTAssertTrue(attention.commandPayload.isEmpty)
+  }
+
+  func testReadOnlyRemoteProfileDoesNotExposeReviewCommand() async throws {
+    ReviewsRemoteDaemonURLProtocol.respond(path: "/v1/sessions", body: "[]")
+    ReviewsRemoteDaemonURLProtocol.respond(path: "/v1/task-board/items", body: #"{"items":[]}"#)
+    ReviewsRemoteDaemonURLProtocol.respond(path: "/v1/reviews/query", body: reviewsResponse)
+    var access = try reviewsRemoteAccess()
+    access.role = .viewer
+    access.scopes = ["read"]
+    let client = MobileRemoteDaemonSyncClient(
+      access: access,
+      stationID: "remote-daemon-example-com",
+      stationName: "daemon.example.com",
+      defaultStation: true,
+      session: makeReviewsSession()
+    )
+
+    let fetchedSnapshot = try await client.fetchLatestSnapshot(
+      stationID: "remote-daemon-example-com",
+      now: .now
+    )
+    let attention = try XCTUnwrap(fetchedSnapshot?.attention.first)
+
+    XCTAssertNil(attention.commandKind)
+    XCTAssertNil(attention.target)
+    XCTAssertTrue(attention.commandPayload.isEmpty)
+  }
+
   func testReviewsServerFailureUsesCloudFallback() async throws {
     ReviewsRemoteDaemonURLProtocol.respond(path: "/v1/sessions", body: "[]")
     ReviewsRemoteDaemonURLProtocol.respond(path: "/v1/task-board/items", body: #"{"items":[]}"#)
@@ -240,8 +299,8 @@ private func reviewsRemoteAccess() throws -> MobileRemoteDaemonAccess {
     clientID: "ios-device",
     displayName: "Phone",
     platform: "ios",
-    role: .viewer,
-    scopes: ["read"],
+    role: .operator,
+    scopes: ["read", "write"],
     bearerToken: "server-token",
     tokenHint: "abcd1234",
     serverSPKISHA256: try MobileRemoteDaemonSPKIPin(

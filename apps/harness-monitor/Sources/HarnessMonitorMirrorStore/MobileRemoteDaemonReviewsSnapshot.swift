@@ -29,7 +29,11 @@ extension MobileRemoteDaemonSyncClient {
       $0.mobileSummary(stationID: stationID, now: now, redactor: redactor)
     }
     let attention = reviews.filter(\.needsYou).map {
-      $0.mobileAttention(stationID: stationID, redactor: redactor)
+      $0.mobileAttention(
+        stationID: stationID,
+        canExecuteCommands: access.canWrite,
+        redactor: redactor
+      )
     }
     return MobileRemoteReviewsSnapshot(reviews: reviews, attention: attention)
   }
@@ -165,9 +169,31 @@ private struct MobileRemoteReviewCheckWire: Decodable, Sendable {
 extension MobileReviewSummary {
   fileprivate func mobileAttention(
     stationID: String,
+    canExecuteCommands: Bool,
     redactor: MobileMirrorSecretRedactor
   ) -> MobileAttentionItem {
-    MobileAttentionItem(
+    let exposesCommand = canExecuteCommands && viewerCanUpdate
+    let commandKind: MobileCommandKind? =
+      exposesCommand
+      ? (checkStatus == "failure" ? .pullRequestRerunChecks : .pullRequestApprove)
+      : nil
+    let target =
+      exposesCommand
+      ? MobileCommandTarget(
+        stationID: stationID,
+        reviewID: id,
+        targetRevision: 0
+      )
+      : nil
+    let commandPayload =
+      exposesCommand
+      ? [
+        "repository": repository,
+        "number": String(number),
+        "headSha": headSha ?? "",
+      ]
+      : [:]
+    return MobileAttentionItem(
       id: "review-\(id)",
       stationID: stationID,
       kind: .pullRequest,
@@ -175,17 +201,9 @@ extension MobileReviewSummary {
       title: redactor.redact("\(repository) #\(number) needs you"),
       subtitle: title,
       updatedAt: updatedAt,
-      commandKind: checkStatus == "failure" ? .pullRequestRerunChecks : .pullRequestApprove,
-      target: MobileCommandTarget(
-        stationID: stationID,
-        reviewID: id,
-        targetRevision: 0
-      ),
-      commandPayload: [
-        "repository": repository,
-        "number": String(number),
-        "headSha": headSha ?? "",
-      ]
+      commandKind: commandKind,
+      target: target,
+      commandPayload: commandPayload
     )
   }
 }
