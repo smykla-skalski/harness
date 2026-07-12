@@ -16,6 +16,12 @@ struct RecordedReviewBodyUpdateRequest: Equatable {
   let newBody: String
 }
 
+struct RecordingTaskBoardSyncStub {
+  var importedItems: [TaskBoardItem]?
+  var summary = TaskBoardSyncSummary(total: 0, providers: [])
+  var error: (any Error)?
+}
+
 final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sendable {
   enum Call: Equatable {
     case assignTask(sessionID: String, taskID: String, agentID: String, actor: String)
@@ -281,8 +287,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     instanceID: "recording-task-board"
   )
   var queuedTaskBoardItemSnapshots: [[TaskBoardItem]] = []
-  var taskBoardItemsAfterSyncStorage: [TaskBoardItem]?
-  var taskBoardSyncSummaryStorage = TaskBoardSyncSummary(total: 0, providers: [])
+  var taskBoardSyncStub = RecordingTaskBoardSyncStub()
   var taskBoardAuditSummaryStorage: TaskBoardAuditSummary?
   var taskBoardProjectSummariesStorage: [TaskBoardProjectSummary]?
   var taskBoardMachineSummariesStorage: [TaskBoardMachineSummary]?

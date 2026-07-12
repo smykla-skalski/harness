@@ -129,11 +129,14 @@ extension RecordingHarnessClient {
         provider: request.provider
       )
     )
+    if let error = lock.withLock({ taskBoardSyncStub.error }) {
+      throw error
+    }
     return lock.withLock {
-      if let importedItems = taskBoardItemsAfterSyncStorage {
+      if let importedItems = taskBoardSyncStub.importedItems {
         taskBoardItemsStorage = importedItems
       }
-      return taskBoardSyncSummaryStorage
+      return taskBoardSyncStub.summary
     }
   }
 

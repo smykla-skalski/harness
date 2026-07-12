@@ -163,8 +163,14 @@ extension RecordingHarnessClient {
     importedItems: [TaskBoardItem]? = nil
   ) {
     lock.withLock {
-      taskBoardSyncSummaryStorage = summary
-      taskBoardItemsAfterSyncStorage = importedItems
+      taskBoardSyncStub.summary = summary
+      taskBoardSyncStub.importedItems = importedItems
+    }
+  }
+
+  func configureTaskBoardSyncError(_ error: any Error) {
+    lock.withLock {
+      taskBoardSyncStub.error = error
     }
   }
 

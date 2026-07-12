@@ -109,6 +109,7 @@ extension HarnessMonitorStore {
       message: "Syncing task sources",
       position: feedbackPosition
     )
+    defer { dismissTaskBoardRefreshActivity(key: activityKey) }
     do {
       let measuredSummary = try await Self.measureOperation {
         try await client.syncTaskBoard(request: request)
@@ -122,11 +123,12 @@ extension HarnessMonitorStore {
         position: feedbackPosition
       )
       await refreshTaskBoardDashboardSnapshot(using: client)
-      dismissTaskBoardRefreshActivity(key: activityKey)
       if let successMessage {
         presentSuccessFeedback(successMessage, position: feedbackPosition)
       }
       return true
+    } catch is CancellationError {
+      return false
     } catch {
       updateTaskBoardRefreshActivity(
         key: activityKey,
@@ -135,7 +137,6 @@ extension HarnessMonitorStore {
         position: feedbackPosition
       )
       await refreshTaskBoardDashboardSnapshot(using: client)
-      dismissTaskBoardRefreshActivity(key: activityKey)
       let failureDescription =
         if let failureMessagePrefix {
           "\(failureMessagePrefix): \(error.localizedDescription)"

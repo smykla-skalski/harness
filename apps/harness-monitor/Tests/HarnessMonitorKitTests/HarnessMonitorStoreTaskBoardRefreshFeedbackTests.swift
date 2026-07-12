@@ -29,4 +29,18 @@ struct HarnessMonitorStoreTaskBoardRefreshFeedbackTests {
     #expect(store.toast.activeFeedback.first?.severity == .success)
     #expect(store.toast.activeFeedback.first?.position == .bottomTrailing)
   }
+
+  @Test("Cancellation dismisses progress without reload or failure feedback")
+  func cancellationDismissesProgressWithoutReloadOrFailureFeedback() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    let baselineItemReads = client.readCallCount(.taskBoardItems(nil))
+    client.configureTaskBoardSyncError(CancellationError())
+
+    await store.refreshTaskBoardDashboard()
+
+    #expect(client.readCallCount(.taskBoardItems(nil)) == baselineItemReads)
+    #expect(store.toast.activeFeedback.isEmpty)
+    #expect(store.currentFailureFeedbackMessage == nil)
+  }
 }
