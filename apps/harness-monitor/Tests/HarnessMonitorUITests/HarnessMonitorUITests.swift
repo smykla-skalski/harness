@@ -107,7 +107,7 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertFalse(feedback.exists)
   }
 
-  func testTaskBoardBoardOnlyItemOpensManagementSheet() throws {
+  func testTaskBoardBoardOnlyItemSelectsThenDoubleClickOpensManagementSheet() throws {
     let itemID = "preview-board-only"
     let app = launch(
       mode: "preview",
@@ -121,12 +121,16 @@ final class HarnessMonitorUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(boardRoot.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(boardItem.waitForExistence(timeout: Self.actionTimeout))
 
-    tapButton(in: app, identifier: "harness.task-board.api-item.\(itemID)")
-
     let managementPanel = element(
       in: app,
       identifier: "harness.task-board.manage-item.\(itemID)"
     )
+
+    boardItem.click()
+    XCTAssertEqual(boardItem.value as? String, "Selected")
+    XCTAssertFalse(managementPanel.exists)
+
+    boardItem.doubleClick()
     XCTAssertTrue(managementPanel.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(app.staticTexts["Manage Board Item"].exists)
     XCTAssertTrue(app.textFields["Title"].exists)

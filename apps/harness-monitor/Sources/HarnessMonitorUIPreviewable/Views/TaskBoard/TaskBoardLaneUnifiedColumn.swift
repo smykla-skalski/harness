@@ -1,7 +1,6 @@
 import Foundation
 import HarnessMonitorKit
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct TaskBoardLaneUnifiedColumn: View {
   let lane: TaskBoardInboxLane
@@ -10,18 +9,17 @@ struct TaskBoardLaneUnifiedColumn: View {
   let decisions: [Decision]
   let titleTypography: TaskBoardCardTitleTypography
   let isCollapsed: Bool
+  let selectedCardIDs: Set<TaskBoardCardID>
   let onOpenAPIItem: (TaskBoardItem) -> Void
   let onOpenInboxItem: (TaskBoardInboxItem) -> Void
   let onOpenDecision: (Decision) -> Void
   let onToggleCollapse: () -> Void
-  let onMoveAPIItem: (String, TaskBoardInboxLane) -> Bool
-  let onMoveInboxItem: (TaskBoardInboxItemDragPayload, TaskBoardInboxLane) -> Bool
+  let onSelectCard: (TaskBoardCardID, [TaskBoardCardID], EventModifiers) -> Void
+  let onMoveCards: ([TaskBoardCardDragItem], TaskBoardInboxLane) -> Bool
   @Environment(\.fontScale)
   private var fontScale
-  @State private var isAPIDropTargeted = false
-  @State private var isInboxDropTargeted = false
-  @State private var apiDropDeduper = TaskBoardDropDeduper<TaskBoardItemDropSignature>()
-  @State private var inboxDropDeduper = TaskBoardDropDeduper<TaskBoardInboxItemDropSignature>()
+  @State private var isDropTargeted = false
+  @State private var dropDeduper = TaskBoardDropDeduper<TaskBoardCardDropSignature>()
   @State private var perfScrollPosition = ScrollPosition()
   @State private var cardHoverLocation: CGPoint?
   @State private var cardHoverFrames: [TaskBoardLaneCardFrame] = []
@@ -37,12 +35,15 @@ struct TaskBoardLaneUnifiedColumn: View {
     apiItems.count + inboxItems.count + decisions.count
   }
 
-  private var isDropTargeted: Bool {
-    isAPIDropTargeted || isInboxDropTargeted
-  }
-
   private var isEmpty: Bool {
     apiItems.isEmpty && inboxItems.isEmpty && decisions.isEmpty
+  }
+
+  private var orderedCardIDs: [TaskBoardCardID] {
+    apiItems.map { .api($0.id) }
+      + inboxItems.map {
+        .inbox(sessionID: $0.session.sessionId, taskID: $0.task.taskId)
+      }
   }
 
   var body: some View {
@@ -52,25 +53,9 @@ struct TaskBoardLaneUnifiedColumn: View {
         isCollapsed: isCollapsed,
         isDropTargeted: isDropTargeted
       )
-      .dropDestination(for: TaskBoardItemDragPayload.self, action: handleAPIDrop) { targeted in
-        updateAPIDropTargeted(targeted)
+      .dropDestination(for: TaskBoardCardDragPayload.self, action: handleDrop) { targeted in
+        updateDropTargeted(targeted)
       }
-      .onDrop(
-        of: [.harnessMonitorTaskBoardItem],
-        isTargeted: nil,
-        perform: handleLegacyAPIDrop
-      )
-      .dropDestination(
-        for: TaskBoardInboxItemDragPayload.self,
-        action: handleInboxDrop
-      ) { targeted in
-        updateInboxDropTargeted(targeted)
-      }
-      .onDrop(
-        of: [.harnessMonitorTaskBoardInboxItem],
-        isTargeted: nil,
-        perform: handleLegacyInboxDrop
-      )
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier("harness.task-board.column.\(lane.rawValue)")
   }
@@ -154,27 +139,40 @@ struct TaskBoardLaneUnifiedColumn: View {
         decisionRows
       }
       ForEach(apiItems) { item in
-        let cardID = TaskBoardLaneCardHoverID.api(item.id)
+        let cardID = TaskBoardCardID.api(item.id)
+        let hoverID = TaskBoardLaneCardHoverID.api(item.id)
         TaskBoardItemRow(
           item: item,
           titleTypography: titleTypography,
-          isHovered: hoveredCardID == cardID,
+          isHovered: hoveredCardID == hoverID,
+          isSelected: selectedCardIDs.contains(cardID),
+          onSelect: { modifiers in
+            onSelectCard(cardID, orderedCardIDs, modifiers)
+          },
           onOpenItem: onOpenAPIItem
         )
-        .taskBoardCardFrame(id: cardID, in: cardHoverCoordinateSpace)
+        .taskBoardCardFrame(id: hoverID, in: cardHoverCoordinateSpace)
       }
       ForEach(inboxItems) { item in
-        let cardID = TaskBoardLaneCardHoverID.inbox(
+        let cardID = TaskBoardCardID.inbox(
+          sessionID: item.session.sessionId,
+          taskID: item.task.taskId
+        )
+        let hoverID = TaskBoardLaneCardHoverID.inbox(
           sessionID: item.session.sessionId,
           taskID: item.task.taskId
         )
         TaskBoardInboxItemRow(
           item: item,
           titleTypography: titleTypography,
-          isHovered: hoveredCardID == cardID,
+          isHovered: hoveredCardID == hoverID,
+          isSelected: selectedCardIDs.contains(cardID),
+          onSelect: { modifiers in
+            onSelectCard(cardID, orderedCardIDs, modifiers)
+          },
           onOpenItem: onOpenInboxItem
         )
-        .taskBoardCardFrame(id: cardID, in: cardHoverCoordinateSpace)
+        .taskBoardCardFrame(id: hoverID, in: cardHoverCoordinateSpace)
       }
     }
     .frame(maxWidth: .infinity)
@@ -237,83 +235,34 @@ struct TaskBoardLaneUnifiedColumn: View {
     hoveredCardID = id
   }
 
-  private func handleAPIDrop(_ payloads: [TaskBoardItemDragPayload], _: CGPoint) -> Bool {
-    guard let payload = payloads.first else {
+  private func handleDrop(_ payloads: [TaskBoardCardDragPayload], _: CGPoint) -> Bool {
+    guard let plan = TaskBoardCardDropPlan.resolve(payloads, to: lane) else {
       return false
     }
-    return performAPIDrop(
-      signature: TaskBoardItemDropSignature(itemID: payload.itemID, destination: lane)
-    ) {
-      TaskBoardLaneDropPolicy.moveFirstPayload(
-        payloads,
-        to: lane,
-        move: onMoveAPIItem
-      )
-    }
-  }
-
-  private func handleInboxDrop(_ payloads: [TaskBoardInboxItemDragPayload], _: CGPoint) -> Bool {
-    guard let payload = payloads.first else {
-      return false
-    }
-    return performInboxDrop(
-      signature: TaskBoardInboxItemDropSignature(
-        sessionID: payload.sessionID,
-        taskID: payload.taskID,
+    return performDrop(
+      signature: TaskBoardCardDropSignature(
+        cardIDs: plan.items.map(\.id),
         destination: lane
       )
     ) {
-      TaskBoardInboxDropPolicy.moveFirstPayload(
-        payloads,
-        to: lane,
-        move: onMoveInboxItem
-      )
+      onMoveCards(plan.items, lane)
     }
   }
 
-  private func handleLegacyAPIDrop(_ providers: [NSItemProvider]) -> Bool {
-    TaskBoardItemDragPayload.loadFirst(from: providers) { payload in
-      _ = handleAPIDrop([payload], .zero)
-    }
-  }
-
-  private func handleLegacyInboxDrop(_ providers: [NSItemProvider]) -> Bool {
-    TaskBoardInboxItemDragPayload.loadFirst(from: providers) { payload in
-      _ = handleInboxDrop([payload], .zero)
-    }
-  }
-
-  private func updateAPIDropTargeted(_ targeted: Bool) {
-    isAPIDropTargeted = targeted
+  private func updateDropTargeted(_ targeted: Bool) {
+    isDropTargeted = targeted
     if !targeted {
-      apiDropDeduper = TaskBoardDropDeduper()
+      dropDeduper = TaskBoardDropDeduper()
     }
   }
 
-  private func updateInboxDropTargeted(_ targeted: Bool) {
-    isInboxDropTargeted = targeted
-    if !targeted {
-      inboxDropDeduper = TaskBoardDropDeduper()
-    }
-  }
-
-  private func performAPIDrop(
-    signature: TaskBoardItemDropSignature,
+  private func performDrop(
+    signature: TaskBoardCardDropSignature,
     action: () -> Bool
   ) -> Bool {
-    var deduper = apiDropDeduper
+    var deduper = dropDeduper
     let handled = deduper.perform(signature, move: action)
-    apiDropDeduper = deduper
-    return handled
-  }
-
-  private func performInboxDrop(
-    signature: TaskBoardInboxItemDropSignature,
-    action: () -> Bool
-  ) -> Bool {
-    var deduper = inboxDropDeduper
-    let handled = deduper.perform(signature, move: action)
-    inboxDropDeduper = deduper
+    dropDeduper = deduper
     return handled
   }
 }

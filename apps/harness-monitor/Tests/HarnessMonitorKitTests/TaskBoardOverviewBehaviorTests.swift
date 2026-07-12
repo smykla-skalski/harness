@@ -7,52 +7,50 @@ import Testing
 
 @Suite("Task board overview behavior")
 struct TaskBoardOverviewBehaviorTests {
-  @Test("Lane drop policy ignores empty and same-lane payloads")
-  func laneDropPolicyIgnoresEmptyAndSameLanePayloads() {
-    var moves: [(String, TaskBoardInboxLane)] = []
-    let payload = TaskBoardItemDragPayload(itemID: "board-1", status: .todo)
+  @Test("Card drop plan rejects empty and same-lane payloads")
+  func cardDropPlanRejectsEmptyAndSameLanePayloads() {
+    let item = TaskBoardCardDragItem.api(itemID: "board-1", status: .todo)
+    let payload = TaskBoardCardDragPayload(item: item)
 
-    #expect(
-      !TaskBoardLaneDropPolicy.moveFirstPayload([], to: .inProgress) { itemID, lane in
-        moves.append((itemID, lane))
-        return true
-      }
-    )
-    #expect(
-      !TaskBoardLaneDropPolicy.moveFirstPayload([payload], to: .todo) { itemID, lane in
-        moves.append((itemID, lane))
-        return true
-      }
-    )
-    #expect(moves.isEmpty)
+    #expect(TaskBoardCardDropPlan.resolve([], to: .inProgress) == nil)
+    #expect(TaskBoardCardDropPlan.resolve([payload], to: .todo) == nil)
   }
 
-  @Test("Lane drop policy forwards first cross-lane payload only")
-  func laneDropPolicyForwardsFirstCrossLanePayloadOnly() {
-    var moves: [(String, TaskBoardInboxLane)] = []
-    let first = TaskBoardItemDragPayload(itemID: "board-1", status: .todo)
-    let second = TaskBoardItemDragPayload(itemID: "board-2", status: .failed)
+  @Test("Card drop plan keeps every selected card in visible order")
+  func cardDropPlanKeepsEverySelectedCardInVisibleOrder() throws {
+    let first = TaskBoardCardDragItem.api(itemID: "board-1", status: .todo)
+    let second = TaskBoardCardDragItem.api(itemID: "board-2", status: .failed)
+    let payload = TaskBoardCardDragPayload(primaryCardID: first.id, items: [first, second])
 
-    #expect(
-      TaskBoardLaneDropPolicy.moveFirstPayload([first, second], to: .inProgress) { itemID, lane in
-        moves.append((itemID, lane))
-        return true
-      }
-    )
-    #expect(moves.count == 1)
-    #expect(moves.first?.0 == "board-1")
-    #expect(moves.first?.1 == .inProgress)
+    let plan = try #require(TaskBoardCardDropPlan.resolve([payload], to: .inProgress))
+
+    #expect(plan.items.map(\.id) == [first.id, second.id])
   }
 
-  @Test("Lane drop policy returns move result")
-  func laneDropPolicyReturnsMoveResult() {
-    let payload = TaskBoardItemDragPayload(itemID: "board-1", status: .todo)
-
-    #expect(
-      !TaskBoardLaneDropPolicy.moveFirstPayload([payload], to: .inProgress) { _, _ in
-        false
-      }
+  @Test("Card drop plan skips cards already in the destination")
+  func cardDropPlanSkipsCardsAlreadyInDestination() throws {
+    let stationary = TaskBoardCardDragItem.api(itemID: "board-1", status: .inProgress)
+    let moving = TaskBoardCardDragItem.api(itemID: "board-2", status: .todo)
+    let payload = TaskBoardCardDragPayload(
+      primaryCardID: stationary.id,
+      items: [stationary, moving]
     )
+
+    let plan = try #require(TaskBoardCardDropPlan.resolve([payload], to: .inProgress))
+
+    #expect(plan.items == [moving])
+  }
+
+  @Test("Card drop plan deduplicates repeated payloads")
+  func cardDropPlanDeduplicatesRepeatedPayloads() throws {
+    let item = TaskBoardCardDragItem.api(itemID: "board-1", status: .todo)
+    let payload = TaskBoardCardDragPayload(item: item)
+
+    let plan = try #require(
+      TaskBoardCardDropPlan.resolve([payload, payload], to: .inProgress)
+    )
+
+    #expect(plan.items == [item])
   }
 
   @Test("Board-only items select management surface instead of opening linked task")
@@ -97,54 +95,37 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(confirmation.message.contains("current filter"))
   }
 
-  @Test("Inbox drop policy ignores unknown source lane payloads")
-  func inboxDropPolicyIgnoresUnknownSourceLanePayloads() throws {
-    let payload = try JSONDecoder().decode(
-      TaskBoardInboxItemDragPayload.self,
-      from: Data(
-        """
-        {
-          "sessionID": "sess-1",
-          "taskID": "task-1",
-          "status": "open",
-          "laneRawValue": "unknown"
-        }
-        """.utf8
-      )
+  @Test("Card drop plan rejects unknown inbox source lanes")
+  func cardDropPlanRejectsUnknownInboxSourceLanes() {
+    let item = TaskBoardCardDragItem.inbox(
+      sessionID: "session-1",
+      taskID: "task-1",
+      status: .open,
+      sourceLaneRawValue: "unknown"
     )
 
     #expect(
-      !TaskBoardInboxDropPolicy.moveFirstPayload([payload], to: .inProgress) { _, _ in
-        true
-      }
+      TaskBoardCardDropPlan.resolve([TaskBoardCardDragPayload(item: item)], to: .inProgress)
+        == nil
     )
   }
 
-  @Test("Inbox drop policy forwards first cross-lane payload only")
-  func inboxDropPolicyForwardsFirstCrossLanePayloadOnly() {
-    var moves: [(String, TaskBoardInboxLane)] = []
-    let first = TaskBoardInboxItemDragPayload(
-      sessionID: "sess-1",
+  @Test("Card drop plan rejects a destination unsupported by one selected card")
+  func cardDropPlanRejectsDestinationUnsupportedByOneSelectedCard() {
+    let boardItem = TaskBoardCardDragItem.api(itemID: "board-1", status: .todo)
+    let inboxItem = TaskBoardCardDragItem.inbox(
+      sessionID: "session-1",
       taskID: "task-1",
       status: .open,
-      lane: .todo
+      sourceLaneRawValue: TaskBoardInboxLane.todo.rawValue
     )
-    let second = TaskBoardInboxItemDragPayload(
-      sessionID: "sess-2",
-      taskID: "task-2",
-      status: .blocked,
-      lane: .failed
+    let payload = TaskBoardCardDragPayload(
+      primaryCardID: boardItem.id,
+      items: [boardItem, inboxItem]
     )
 
-    #expect(
-      TaskBoardInboxDropPolicy.moveFirstPayload([first, second], to: .inProgress) { payload, lane in
-        moves.append((payload.taskID, lane))
-        return true
-      }
-    )
-    #expect(moves.count == 1)
-    #expect(moves.first?.0 == "task-1")
-    #expect(moves.first?.1 == .inProgress)
+    #expect(TaskBoardCardDropPlan.resolve([payload], to: .planning) == nil)
+    #expect(TaskBoardCardDropPlan.resolve([payload], to: .inProgress) != nil)
   }
 
   @Test("Board-only Run Once and Evaluate requests carry board item identity")

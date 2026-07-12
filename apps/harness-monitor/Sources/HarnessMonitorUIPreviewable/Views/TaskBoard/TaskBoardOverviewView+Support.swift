@@ -99,7 +99,7 @@ extension TaskBoardOverviewView {
   }
 
   func moveTaskBoardItem(_ itemID: String, to lane: TaskBoardInboxLane) -> Bool {
-    guard let onMoveTaskBoardItem else {
+    guard let onMoveTaskBoardItems else {
       return false
     }
     guard
@@ -110,25 +110,34 @@ extension TaskBoardOverviewView {
     else {
       return false
     }
-    onMoveTaskBoardItem(itemID, lane.taskBoardDropStatus(for: item))
+    onMoveTaskBoardItems([
+      TaskBoardItemStatusUpdate(id: itemID, status: lane.taskBoardDropStatus(for: item))
+    ])
     return true
   }
 
   func moveInboxItem(
-    _ payload: TaskBoardInboxItemDragPayload,
+    sessionID: String,
+    taskID: String,
     to lane: TaskBoardInboxLane
   ) -> Bool {
     guard
-      let onMoveInboxItem,
+      let onMoveInboxItems,
       let status = lane.taskDropStatus,
       let item = snapshot.items.first(where: {
-        $0.session.sessionId == payload.sessionID && $0.task.taskId == payload.taskID
+        $0.session.sessionId == sessionID && $0.task.taskId == taskID
       }),
       item.lane != lane
     else {
       return false
     }
-    onMoveInboxItem(item, status)
+    onMoveInboxItems([
+      TaskBoardInboxStatusUpdate(
+        sessionID: item.session.sessionId,
+        taskID: item.task.taskId,
+        status: status
+      )
+    ])
     return true
   }
 

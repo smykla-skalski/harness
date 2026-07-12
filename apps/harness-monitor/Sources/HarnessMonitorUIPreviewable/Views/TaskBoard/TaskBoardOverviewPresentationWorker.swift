@@ -16,6 +16,8 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
     projectLabelResolver: TaskBoardProjectLabelResolver(projectIDs: []),
     apiItemsByLane: [:],
     inboxItemsByLane: [:],
+    inboxItemsByID: [:],
+    orderedCardIDs: [],
     decisionIDsByLane: [:],
     aggregateNeedsYouCount: 0,
     aggregateOpenCount: 0,
@@ -29,6 +31,8 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
   let projectLabelResolver: TaskBoardProjectLabelResolver
   let apiItemsByLane: [TaskBoardInboxLane: [TaskBoardItem]]
   let inboxItemsByLane: [TaskBoardInboxLane: [TaskBoardInboxItem]]
+  let inboxItemsByID: [TaskBoardCardID: TaskBoardInboxItem]
+  let orderedCardIDs: [TaskBoardCardID]
   let decisionIDsByLane: [TaskBoardInboxLane: [String]]
   let aggregateNeedsYouCount: Int
   let aggregateOpenCount: Int
@@ -64,6 +68,10 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
 
   func taskBoardItem(id: String) -> TaskBoardItem? {
     taskBoardItemsByID[id]
+  }
+
+  func inboxItem(id: TaskBoardCardID) -> TaskBoardInboxItem? {
+    inboxItemsByID[id]
   }
 }
 
@@ -120,6 +128,17 @@ actor TaskBoardOverviewPresentationWorker {
       TaskBoardInboxLane(status: item.status) ?? .todo
     }
     let inboxItemsByLane = Dictionary(grouping: input.snapshot.items, by: \.lane)
+    let inboxItemsByID = Dictionary(
+      uniqueKeysWithValues: input.snapshot.items.map { item in
+        (
+          TaskBoardCardID.inbox(
+            sessionID: item.session.sessionId,
+            taskID: item.task.taskId
+          ),
+          item
+        )
+      }
+    )
     let decisionIDs = sortedOpenDecisionIDs(input.decisionItems)
     let decisionIDsByLane: [TaskBoardInboxLane: [String]] =
       decisionIDs.isEmpty ? [:] : [.humanRequired: decisionIDs]
@@ -142,6 +161,11 @@ actor TaskBoardOverviewPresentationWorker {
       ),
       apiItemsByLane: apiItemsByLane,
       inboxItemsByLane: inboxItemsByLane,
+      inboxItemsByID: inboxItemsByID,
+      orderedCardIDs: orderedCardIDs(
+        apiItemsByLane: apiItemsByLane,
+        inboxItemsByLane: inboxItemsByLane
+      ),
       decisionIDsByLane: decisionIDsByLane,
       aggregateNeedsYouCount: taskBoardNeedsYouCount
         + (inboxItemsByLane[.humanRequired]?.count ?? 0)
@@ -164,6 +188,18 @@ actor TaskBoardOverviewPresentationWorker {
     .inReview,
     .toReview,
   ]
+
+  private static func orderedCardIDs(
+    apiItemsByLane: [TaskBoardInboxLane: [TaskBoardItem]],
+    inboxItemsByLane: [TaskBoardInboxLane: [TaskBoardInboxItem]]
+  ) -> [TaskBoardCardID] {
+    TaskBoardInboxLane.allCases.flatMap { lane in
+      (apiItemsByLane[lane] ?? []).map { .api($0.id) }
+        + (inboxItemsByLane[lane] ?? []).map {
+          .inbox(sessionID: $0.session.sessionId, taskID: $0.task.taskId)
+        }
+    }
+  }
 
   private static func sortedTaskBoardItems(_ items: [TaskBoardItem]) -> [TaskBoardItem] {
     items

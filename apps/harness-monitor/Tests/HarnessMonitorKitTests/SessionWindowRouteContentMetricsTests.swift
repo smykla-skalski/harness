@@ -89,32 +89,14 @@ struct SessionWindowRouteContentMetricsTests {
     )
   }
 
-  @Test("Task board lane drop policy moves only cross-lane payloads")
-  func taskBoardLaneDropPolicyMovesOnlyCrossLanePayloads() {
-    var moves: [String] = []
-    let readyPayload = TaskBoardItemDragPayload(itemID: "item-1", status: .todo)
+  @Test("Task board card drop plans move only cross-lane payloads")
+  func taskBoardCardDropPlansMoveOnlyCrossLanePayloads() {
+    let item = TaskBoardCardDragItem.api(itemID: "item-1", status: .todo)
+    let payload = TaskBoardCardDragPayload(item: item)
 
-    #expect(
-      !TaskBoardLaneDropPolicy.moveFirstPayload([], to: .todo) { itemID, lane in
-        moves.append("\(itemID):\(lane.rawValue)")
-        return true
-      }
-    )
-    #expect(
-      !TaskBoardLaneDropPolicy.moveFirstPayload([readyPayload], to: .todo) { itemID, lane in
-        moves.append("\(itemID):\(lane.rawValue)")
-        return true
-      }
-    )
-    #expect(moves.isEmpty)
-
-    #expect(
-      TaskBoardLaneDropPolicy.moveFirstPayload([readyPayload], to: .inProgress) { itemID, lane in
-        moves.append("\(itemID):\(lane.rawValue)")
-        return true
-      }
-    )
-    #expect(moves == ["item-1:in_progress"])
+    #expect(TaskBoardCardDropPlan.resolve([], to: .todo) == nil)
+    #expect(TaskBoardCardDropPlan.resolve([payload], to: .todo) == nil)
+    #expect(TaskBoardCardDropPlan.resolve([payload], to: .inProgress)?.items == [item])
   }
 
   @Test("Task selection renders a real detail pane")
@@ -202,7 +184,11 @@ struct SessionWindowRouteContentMetricsTests {
       #expect(source.contains("onStartTaskBoardOrchestrator: startTaskBoardOrchestrator"))
       #expect(source.contains("onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator"))
       #expect(source.contains("onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce"))
-      #expect(source.contains("onMoveTaskBoardItem: moveTaskBoardItem"))
+      #expect(source.contains("onMoveTaskBoardItems: moveTaskBoardItems"))
+      #expect(source.contains("onMoveInboxItems: moveInboxItems"))
+      #expect(source.contains("HarnessMonitorAsyncWorkQueue.shared.submit("))
+      #expect(source.contains("await store.updateTaskBoardItemStatuses(updates)"))
+      #expect(source.contains("await store.updateTaskBoardInboxStatuses(updates)"))
       #expect(source.contains("onEvaluateTaskBoardItem: evaluateTaskBoardItem"))
       #expect(source.contains("onBeginTaskBoardPlan: beginTaskBoardPlan"))
       #expect(source.contains("onSubmitTaskBoardPlan: submitTaskBoardPlan"))

@@ -34,6 +34,7 @@ struct HarnessMonitorAppBundleMetadataTests {
     for identifier in [
       "io.harnessmonitor.task",
       "io.harnessmonitor.session-agent",
+      "io.harnessmonitor.task-board-card",
       "io.harnessmonitor.task-board-item",
       "io.harnessmonitor.task-board-inbox-item",
     ] {

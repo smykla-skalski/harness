@@ -95,10 +95,8 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func updateTaskBoardItemStatus(id: String, status: TaskBoardStatus) async -> Bool {
-    await updateTaskBoardItem(
-      id: id,
-      request: TaskBoardUpdateItemRequest(status: status),
-      successMessage: "Moved task board item"
+    await updateTaskBoardItemStatuses(
+      [TaskBoardItemStatusUpdate(id: id, status: status)]
     )
   }
 

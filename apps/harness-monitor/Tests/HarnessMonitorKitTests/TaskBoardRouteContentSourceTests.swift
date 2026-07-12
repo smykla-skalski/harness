@@ -28,7 +28,7 @@ struct TaskBoardRouteContentSourceTests {
     #expect(overviewSource.contains("onEvaluateTaskBoardItem(item)"))
     #expect(!overviewSource.contains("if !item.hasLinkedSessionTask"))
     #expect(overviewSource.contains("TaskBoardOverviewItemBehavior.selectionAction("))
-    #expect(overviewSource.contains("inboxItems: cachedPresentation.inboxItems(in: lane)"))
+    #expect(overviewSource.contains("let inboxItems = currentPresentation.inboxItems(in: lane)"))
     #expect(managementPanelSource.contains("Session Task"))
     #expect(managementPanelSource.contains("Board Only"))
     #expect(managementPanelSource.contains("TaskBoardManagementFacts("))
@@ -72,23 +72,36 @@ struct TaskBoardRouteContentSourceTests {
     let overviewSource = try taskBoardOverviewSource()
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let laneDropSource = try taskBoardSourceFile(named: "TaskBoardLaneDropSupport.swift")
+    let dragSource = try taskBoardSourceFile(named: "TaskBoardCardDragSupport.swift")
     let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
 
     #expect(overviewSource.contains("lane.taskBoardDropStatus"))
-    #expect(laneSource.contains("TaskBoardItemDragPayload"))
-    #expect(laneSource.contains("TaskBoardInboxItemDragPayload"))
-    #expect(laneSource.contains("let status: TaskBoardStatus"))
-    #expect(unifiedSource.contains("TaskBoardLaneDropPolicy.moveFirstPayload("))
-    #expect(unifiedSource.contains("TaskBoardInboxDropPolicy.moveFirstPayload("))
-    #expect(laneDropSource.contains("TaskBoardInboxDropPolicy"))
-    #expect(laneDropSource.contains("sourceLane != destination"))
-    #expect(laneSource.contains(".draggable(dragPayload)"))
-    #expect(laneSource.contains(".onDrag {"))
+    #expect(dragSource.contains("TaskBoardCardDragPayload"))
+    #expect(laneDropSource.contains("TaskBoardCardDropPlan"))
+    #expect(laneDropSource.contains("items.allSatisfy"))
+    #expect(laneSource.contains(".draggable(containerItemID: cardID)"))
+    #expect(!laneSource.contains(".onDrag {"))
     #expect(!laneSource.contains("TaskBoardCardPill(label: item.status.title"))
-    #expect(laneSource.contains("Text(item.status.title)"))
-    #expect(unifiedSource.contains(".dropDestination(for: TaskBoardItemDragPayload.self"))
-    #expect(unifiedSource.contains(".dropDestination(for: TaskBoardInboxItemDragPayload.self"))
-    #expect(unifiedSource.contains(".onDrop("))
+    #expect(!laneSource.contains("DragPreviewCard"))
+    #expect(unifiedSource.contains(".dropDestination(for: TaskBoardCardDragPayload.self"))
+    #expect(!unifiedSource.contains(".onDrop("))
+    #expect(!unifiedSource.contains("let dragPayload:"))
+    #expect(dragSource.contains(".dragContainerSelection("))
+    #expect(dragSource.contains(".dragContainer("))
+    #expect(!laneSource.contains("TaskBoardItemDragPayload"))
+    #expect(!laneSource.contains("TaskBoardInboxItemDragPayload"))
+  }
+
+  @Test("Task board task cards select on click and open on double click")
+  func taskBoardTaskCardsSelectOnClickAndOpenOnDoubleClick() throws {
+    let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
+    let supportSource = try taskBoardSourceFile(named: "TaskBoardCardSelection.swift")
+
+    #expect(laneSource.contains("onSelect(Self.currentEventModifiers)"))
+    #expect(laneSource.contains("Self.currentClickCount == 2"))
+    #expect(!laneSource.contains("TapGesture(count: 2)"))
+    #expect(laneSource.contains(".accessibilityAddTraits(isSelected ? .isSelected : [])"))
+    #expect(supportSource.contains("SessionSidebarMultiSelect.resolve("))
   }
 
   @Test("Task board lanes keep board column chrome")
@@ -99,7 +112,7 @@ struct TaskBoardRouteContentSourceTests {
 
     #expect(unifiedSource.contains(".taskBoardLaneColumnChrome("))
     #expect(laneChromeSource.contains("private struct TaskBoardLaneColumnChrome"))
-    #expect(laneChromeSource.contains("private var laneFill: AnyShapeStyle"))
+    #expect(laneChromeSource.contains("private var laneSurfaceFill: Color"))
     #expect(laneChromeSource.contains("RoundedRectangle(cornerRadius: metrics.cardCornerRadius"))
     #expect(laneChromeSource.contains(".strokeBorder(laneStrokeColor, lineWidth: laneStrokeWidth)"))
     #expect(laneChromeSource.contains("private var laneStrokeColor: Color"))
@@ -186,6 +199,8 @@ struct TaskBoardRouteContentSourceTests {
     try [
       taskBoardSourceFile(named: "TaskBoardOverviewView.swift"),
       taskBoardSourceFile(named: "TaskBoardOverviewView+Support.swift"),
+      taskBoardSourceFile(named: "TaskBoardOverviewView+Board.swift"),
+      taskBoardSourceFile(named: "TaskBoardOverviewView+CardInteraction.swift"),
     ].joined(separator: "\n")
   }
 
