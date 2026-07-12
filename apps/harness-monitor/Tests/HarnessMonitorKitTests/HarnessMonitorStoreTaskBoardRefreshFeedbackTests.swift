@@ -24,6 +24,10 @@ struct HarnessMonitorStoreTaskBoardRefreshFeedbackTests {
       }
     }
     #expect(progressMessages == ["Syncing task sources", "Loading refreshed tasks"])
+    #expect(
+      toastEvents.first?.feedback.accessibilityIdentifier
+        == "harness.toast.activity.task-board-dashboard-refresh"
+    )
     #expect(store.toast.activeFeedback.count == 1)
     #expect(store.toast.activeFeedback.first?.message == "Task board refreshed")
     #expect(store.toast.activeFeedback.first?.severity == .success)

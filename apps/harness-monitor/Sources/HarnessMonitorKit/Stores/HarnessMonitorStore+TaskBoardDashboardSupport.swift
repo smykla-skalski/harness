@@ -159,7 +159,6 @@ extension HarnessMonitorStore {
       key: key,
       message: message,
       title: title,
-      accessibilityIdentifier: "harness.toast.task-board-refresh",
       position: position
     )
   }
