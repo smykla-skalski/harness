@@ -94,7 +94,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         let _ = state::clear_manifest_for_pid(process_id());
         return Err(error);
     }
-    persist_manifest(&manifest)?;
+    let manifest = persist_manifest(&manifest)?;
     audit::record_daemon_started(async_db.get(), &endpoint, config.sandboxed).await;
     schedule_probe_cache_refresh();
     let codex_controller = CodexControllerHandle::new_with_async_db(

@@ -51,8 +51,10 @@ pub(super) async fn load_or_seed_workspace(
     Ok(workspace)
 }
 
-/// Refresh the synchronous gating cache with the active enforced canvas
-/// document so the allow/deny hot path never re-reads the database.
+/// Mirror the active live canvas into the legacy synchronous gate cache in tests.
+///
+/// Production enforcement reads the database-backed workspace directly, so
+/// non-test builds intentionally keep this compatibility hook as a no-op.
 pub(super) fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
     #[cfg(test)]
     policy_graph::store_database_gate_policy_entry(workspace.active_live_canvas().map(

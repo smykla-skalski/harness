@@ -151,6 +151,10 @@ async fn emit_watch_changes_async(
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
+)]
 fn emit_task_board_updated(sender: &Sender<StreamEvent>, changes: &WatchChanges) {
     let Some(revision) = changes.task_board_revision else {
         return;
@@ -159,8 +163,16 @@ fn emit_task_board_updated(sender: &Sender<StreamEvent>, changes: &WatchChanges)
         revision,
         scopes: changes.task_board_scopes.iter().cloned().collect(),
     };
-    let Ok(payload) = serde_json::to_value(payload) else {
-        return;
+    let payload = match serde_json::to_value(payload) {
+        Ok(payload) => payload,
+        Err(error) => {
+            tracing::warn!(
+                %error,
+                revision,
+                "failed to serialize task board update payload"
+            );
+            return;
+        }
     };
     let _ = sender.send(StreamEvent {
         event: "task_board_updated".to_string(),

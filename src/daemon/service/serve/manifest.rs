@@ -27,10 +27,50 @@ pub(super) fn build_manifest(endpoint: &str, sandboxed: bool) -> Result<DaemonMa
 }
 
 /// Publish a fully initialized daemon and record its listening event.
-pub(super) fn persist_manifest(manifest: &DaemonManifest) -> Result<(), CliError> {
-    state::write_manifest(manifest)?;
+pub(super) fn persist_manifest(manifest: &DaemonManifest) -> Result<DaemonManifest, CliError> {
+    let persisted = state::write_manifest(manifest)?;
     state::append_event(
         "info",
         &format!("daemon listening on {}", manifest.endpoint),
-    )
+    )?;
+    Ok(persisted)
+}
+
+#[cfg(test)]
+mod tests {
+    use harness_testkit::with_isolated_harness_env;
+    use tempfile::tempdir;
+
+    use super::*;
+    use crate::daemon::state::{DaemonOwnership, HostBridgeManifest};
+
+    #[test]
+    fn persist_manifest_returns_the_snapshot_written_to_disk() {
+        let tmp = tempdir().expect("tempdir");
+        with_isolated_harness_env(tmp.path(), || {
+            let manifest = DaemonManifest {
+                version: "46.0.0".into(),
+                pid: 42,
+                endpoint: "http://127.0.0.1:4242".into(),
+                started_at: "2026-07-12T00:00:00Z".into(),
+                token_path: "/tmp/harness-token".into(),
+                sandboxed: true,
+                host_bridge: HostBridgeManifest::default(),
+                revision: 0,
+                updated_at: String::new(),
+                binary_stamp: None,
+                ownership: DaemonOwnership::Managed,
+            };
+
+            let persisted = persist_manifest(&manifest).expect("persist manifest");
+            let loaded = state::load_manifest()
+                .expect("load manifest")
+                .expect("persisted manifest");
+
+            assert_eq!(persisted.revision, 1);
+            assert!(!persisted.updated_at.is_empty());
+            assert_eq!(persisted.revision, loaded.revision);
+            assert_eq!(persisted.updated_at, loaded.updated_at);
+        });
+    }
 }
