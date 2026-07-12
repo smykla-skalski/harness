@@ -231,6 +231,16 @@ extension HarnessMonitorStore {
         ]
       )
       _ = await deleteTasks(sessionID: sessionID, taskIDs: taskIDs, actorID: actorID)
+    case .deleteTaskBoardTargets(let targets):
+      HarnessMonitorUITestTrace.record(
+        component: "store.confirmation",
+        event: "dispatch-delete-task-board-targets",
+        details: [
+          "target_count": String(targets.count),
+          "target_ids": targets.map(\.id).joined(separator: ","),
+        ]
+      )
+      _ = await deleteTaskBoardTargets(targets)
     default:
       return false
     }

@@ -22,6 +22,7 @@ public struct TaskBoardOverviewView: View {
   let onCreateTaskBoardItem: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)?
   let onUpdateTaskBoardItem: ((String, TaskBoardUpdateItemRequest) -> Void)?
   let onDeleteTaskBoardItem: ((TaskBoardItem) -> Void)?
+  let onDeleteTaskBoardTargets: (([TaskBoardDeletionTarget]) -> Void)?
   let onEvaluateTaskBoard: (() -> Void)?
   let onEvaluateTaskBoardItem: ((TaskBoardItem) -> Void)?
   let onBeginTaskBoardPlan: ((TaskBoardItem) -> Void)?
@@ -40,6 +41,8 @@ public struct TaskBoardOverviewView: View {
   @State private var cachedPresentation = TaskBoardOverviewPresentation.empty
   @State private var presentationGeneration: UInt64 = 0
   @State private var cardSelection = TaskBoardCardSelectionState()
+  @State private var draggedCardIDs: [TaskBoardCardID] = []
+  @State private var taskBoardSelectionDispatcher = TaskBoardSelectionDispatcher()
   @AppStorage(TaskBoardLaneCollapsePreferences.storageKey)
   var laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.emptyRawValue
   @AppStorage(TaskBoardLaneAppearancePreferences.storageKey)
@@ -99,6 +102,7 @@ public struct TaskBoardOverviewView: View {
     onCreateTaskBoardItem: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)? = nil,
     onUpdateTaskBoardItem: ((String, TaskBoardUpdateItemRequest) -> Void)? = nil,
     onDeleteTaskBoardItem: ((TaskBoardItem) -> Void)? = nil,
+    onDeleteTaskBoardTargets: (([TaskBoardDeletionTarget]) -> Void)? = nil,
     onEvaluateTaskBoard: (() -> Void)? = nil,
     onEvaluateTaskBoardItem: ((TaskBoardItem) -> Void)? = nil,
     onBeginTaskBoardPlan: ((TaskBoardItem) -> Void)? = nil,
@@ -132,6 +136,7 @@ public struct TaskBoardOverviewView: View {
     self.onCreateTaskBoardItem = onCreateTaskBoardItem
     self.onUpdateTaskBoardItem = onUpdateTaskBoardItem
     self.onDeleteTaskBoardItem = onDeleteTaskBoardItem
+    self.onDeleteTaskBoardTargets = onDeleteTaskBoardTargets
     self.onEvaluateTaskBoard = onEvaluateTaskBoard
     self.onEvaluateTaskBoardItem = onEvaluateTaskBoardItem
     self.onBeginTaskBoardPlan = onBeginTaskBoardPlan
@@ -160,12 +165,20 @@ public struct TaskBoardOverviewView: View {
       \.taskBoardLaneAppearance,
       TaskBoardLaneAppearance(rawValue: laneAppearancePreferencesRawValue)
     )
+    .harnessFocusedSceneValue(\.harnessTaskBoardSelection, taskBoardSelectionFocus)
+    .taskBoardSelectionForwardDeleteShortcut(taskBoardSelectionFocus)
     .taskBoardCardPreferences(projectLabelResolver: cachedPresentation.projectLabelResolver)
     .sheet(item: taskBoardManagementSheet) { taskBoardManagementSheet in
       taskBoardManagementSheetContent(taskBoardManagementSheet)
     }
     .task(id: presentationInput) {
       await rebuildPresentation(input: presentationInput)
+    }
+    .task {
+      bindTaskBoardSelectionDispatcher()
+    }
+    .onDisappear {
+      taskBoardSelectionDispatcher.deleteSelection = nil
     }
   }
 
@@ -182,6 +195,15 @@ public struct TaskBoardOverviewView: View {
   var cardSelectionValue: TaskBoardCardSelectionState {
     get { cardSelection }
     nonmutating set { cardSelection = newValue }
+  }
+
+  var draggedCardIDsValue: [TaskBoardCardID] {
+    get { draggedCardIDs }
+    nonmutating set { draggedCardIDs = newValue }
+  }
+
+  var taskBoardSelectionDispatcherValue: TaskBoardSelectionDispatcher {
+    taskBoardSelectionDispatcher
   }
 }
 

@@ -57,6 +57,7 @@ struct TaskBoardOverviewHost: View {
       onCreateTaskBoardItem: createTaskBoardItem,
       onUpdateTaskBoardItem: updateTaskBoardItem,
       onDeleteTaskBoardItem: deleteTaskBoardItem,
+      onDeleteTaskBoardTargets: deleteTaskBoardTargets,
       onEvaluateTaskBoard: evaluateTaskBoard,
       onEvaluateTaskBoardItem: evaluateTaskBoardItem,
       onBeginTaskBoardPlan: beginTaskBoardPlan,
@@ -157,9 +158,11 @@ struct TaskBoardOverviewHost: View {
   }
 
   private func deleteTaskBoardItem(_ item: TaskBoardItem) {
-    Task { @MainActor in
-      await store.deleteTaskBoardItem(id: item.id)
-    }
+    deleteTaskBoardTargets([TaskBoardDeletionTarget(taskBoardItem: item)])
+  }
+
+  private func deleteTaskBoardTargets(_ targets: [TaskBoardDeletionTarget]) {
+    store.requestTaskBoardDeletionConfirmation(targets: targets)
   }
 
   private func moveInboxItems(_ updates: [TaskBoardInboxStatusUpdate]) {

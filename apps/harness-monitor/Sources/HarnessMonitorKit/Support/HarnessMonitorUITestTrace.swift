@@ -169,6 +169,8 @@ extension HarnessMonitorStore.PendingConfirmation {
       "delete-task"
     case .deleteTasks:
       "delete-tasks"
+    case .deleteTaskBoardTargets:
+      "delete-task-board-targets"
     case .removeAgent:
       "remove-agent"
     case .removeAgents:

@@ -131,6 +131,7 @@ private struct TaskBoardLaneToggleFeedback: ViewModifier {
 private struct TaskBoardLaneColumnChrome: ViewModifier {
   let lane: TaskBoardInboxLane
   let isCollapsed: Bool
+  let isDropCandidate: Bool
   let isDropTargeted: Bool
   @Environment(\.fontScale)
   private var fontScale
@@ -172,6 +173,8 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
           metrics: metrics
         )
       }
+      .animation(.easeOut(duration: 0.14), value: isDropCandidate)
+      .animation(.easeOut(duration: 0.1), value: isDropTargeted)
   }
 
   private var laneWidth: CGFloat {
@@ -185,9 +188,16 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
   @ViewBuilder private var laneBackground: some View {
     let shape = RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
     shape.fill(laneSurfaceFill)
-    if isDropTargeted {
-      shape.fill(laneColor.opacity(reduceTransparency ? 0.18 : 0.12))
+    if isDropCandidate {
+      shape.fill(laneColor.opacity(dropBackgroundOpacity))
     }
+  }
+
+  private var dropBackgroundOpacity: Double {
+    if isDropTargeted {
+      return reduceTransparency ? 0.18 : 0.12
+    }
+    return reduceTransparency ? 0.1 : 0.055
   }
 
   private var laneSurfaceFill: Color {
@@ -212,6 +222,9 @@ private struct TaskBoardLaneColumnChrome: ViewModifier {
   private var laneStrokeColor: Color {
     if isDropTargeted {
       return laneColor.opacity(colorSchemeContrast == .increased ? 0.84 : 0.62)
+    }
+    if isDropCandidate {
+      return laneColor.opacity(colorSchemeContrast == .increased ? 0.64 : 0.42)
     }
     return HarnessMonitorTheme.controlBorder.opacity(
       colorSchemeContrast == .increased ? 0.78 : 0.54
@@ -339,12 +352,14 @@ extension View {
   func taskBoardLaneColumnChrome(
     lane: TaskBoardInboxLane,
     isCollapsed: Bool = false,
+    isDropCandidate: Bool = false,
     isDropTargeted: Bool = false
   ) -> some View {
     modifier(
       TaskBoardLaneColumnChrome(
         lane: lane,
         isCollapsed: isCollapsed,
+        isDropCandidate: isDropCandidate,
         isDropTargeted: isDropTargeted
       )
     )

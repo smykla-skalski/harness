@@ -83,7 +83,14 @@ struct TaskBoardRouteContentSourceTests {
     #expect(!laneSource.contains(".onDrag {"))
     #expect(!laneSource.contains("TaskBoardCardPill(label: item.status.title"))
     #expect(!laneSource.contains("DragPreviewCard"))
-    #expect(unifiedSource.contains(".dropDestination(for: TaskBoardCardDragPayload.self"))
+    #expect(unifiedSource.contains("for: TaskBoardCardDragPayload.self"))
+    #expect(unifiedSource.contains("isEnabled: isDropEnabled"))
+    #expect(unifiedSource.contains("session: DropSession"))
+    #expect(unifiedSource.contains(".dropConfiguration(dropConfiguration)"))
+    #expect(unifiedSource.contains(".onDropSessionUpdated(updateDropSession)"))
+    #expect(unifiedSource.contains("? .move : .forbidden"))
+    #expect(unifiedSource.contains("dropPlan(for: session) != nil"))
+    #expect(unifiedSource.contains("TaskBoardCardDropPlan.resolve(payloads, to: lane)"))
     #expect(!unifiedSource.contains(".onDrop("))
     #expect(!unifiedSource.contains("let dragPayload:"))
     #expect(dragSource.contains(".dragContainerSelection("))
@@ -102,6 +109,32 @@ struct TaskBoardRouteContentSourceTests {
     #expect(!laneSource.contains("TapGesture(count: 2)"))
     #expect(laneSource.contains(".accessibilityAddTraits(isSelected ? .isSelected : [])"))
     #expect(supportSource.contains("SessionSidebarMultiSelect.resolve("))
+  }
+
+  @Test("Task board cards expose one selection-aware context menu per card")
+  func taskBoardCardsExposeSelectionAwareContextMenus() throws {
+    let boardSource = try taskBoardSourceFile(named: "TaskBoardOverviewView+Board.swift")
+    let contextMenuSource = try taskBoardSourceFile(
+      named: "TaskBoardCardContextMenu.swift"
+    )
+    let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
+    let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+
+    #expect(
+      !boardSource.contains(".contextMenu(forSelectionType: TaskBoardCardID.self)")
+    )
+    #expect(unifiedSource.contains(".contextMenu {"))
+    #expect(unifiedSource.contains("TaskBoardCardContextMenu(cardID: cardID"))
+    #expect(contextMenuSource.contains("TaskBoardCardContextMenuScope.resolve("))
+    #expect(contextMenuSource.contains(".onAppear {"))
+    #expect(contextMenuSource.contains("actions.primeSelection(scope.cardIDs)"))
+    #expect(!contextMenuSource.contains("let _: Task"))
+    #expect(contextMenuSource.contains("Menu(\"Move to...\")"))
+    #expect(contextMenuSource.contains("ForEach(TaskBoardInboxLane.allCases)"))
+    #expect(contextMenuSource.contains("Button(scope.deleteLabel, role: .destructive)"))
+    #expect(contextMenuSource.contains("!actions.canDelete(scope.cardIDs)"))
+    #expect(contextMenuSource.contains("actions.deleteTargets?(targets)"))
+    #expect(!laneSource.contains(".contextMenu"))
   }
 
   @Test("Task board lanes keep board column chrome")

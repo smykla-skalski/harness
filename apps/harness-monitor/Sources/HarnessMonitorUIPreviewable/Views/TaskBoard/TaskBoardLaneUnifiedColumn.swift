@@ -9,12 +9,16 @@ struct TaskBoardLaneUnifiedColumn: View {
   let decisions: [Decision]
   let titleTypography: TaskBoardCardTitleTypography
   let isCollapsed: Bool
+  let isDropEnabled: Bool
+  let isDropCandidate: Bool
   let selectedCardIDs: Set<TaskBoardCardID>
   let onOpenAPIItem: (TaskBoardItem) -> Void
   let onOpenInboxItem: (TaskBoardInboxItem) -> Void
   let onOpenDecision: (Decision) -> Void
   let onToggleCollapse: () -> Void
   let onSelectCard: (TaskBoardCardID, [TaskBoardCardID], EventModifiers) -> Void
+  let contextMenuActions: TaskBoardCardContextMenuActions
+  let dropPlanForCardIDs: ([TaskBoardCardID]) -> TaskBoardCardDropPlan?
   let onMoveCards: ([TaskBoardCardDragItem], TaskBoardInboxLane) -> Bool
   @Environment(\.fontScale)
   private var fontScale
@@ -51,11 +55,16 @@ struct TaskBoardLaneUnifiedColumn: View {
       .taskBoardLaneColumnChrome(
         lane: lane,
         isCollapsed: isCollapsed,
+        isDropCandidate: isDropCandidate,
         isDropTargeted: isDropTargeted
       )
-      .dropDestination(for: TaskBoardCardDragPayload.self, action: handleDrop) { targeted in
-        updateDropTargeted(targeted)
-      }
+      .dropDestination(
+        for: TaskBoardCardDragPayload.self,
+        isEnabled: isDropEnabled,
+        action: handleDrop
+      )
+      .dropConfiguration(dropConfiguration)
+      .onDropSessionUpdated(updateDropSession)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier("harness.task-board.column.\(lane.rawValue)")
   }
@@ -152,6 +161,9 @@ struct TaskBoardLaneUnifiedColumn: View {
           onOpenItem: onOpenAPIItem
         )
         .taskBoardCardFrame(id: hoverID, in: cardHoverCoordinateSpace)
+        .contextMenu {
+          TaskBoardCardContextMenu(cardID: cardID, actions: contextMenuActions)
+        }
       }
       ForEach(inboxItems) { item in
         let cardID = TaskBoardCardID.inbox(
@@ -173,6 +185,9 @@ struct TaskBoardLaneUnifiedColumn: View {
           onOpenItem: onOpenInboxItem
         )
         .taskBoardCardFrame(id: hoverID, in: cardHoverCoordinateSpace)
+        .contextMenu {
+          TaskBoardCardContextMenu(cardID: cardID, actions: contextMenuActions)
+        }
       }
     }
     .frame(maxWidth: .infinity)
@@ -235,11 +250,15 @@ struct TaskBoardLaneUnifiedColumn: View {
     hoveredCardID = id
   }
 
-  private func handleDrop(_ payloads: [TaskBoardCardDragPayload], _: CGPoint) -> Bool {
-    guard let plan = TaskBoardCardDropPlan.resolve(payloads, to: lane) else {
-      return false
+  private func handleDrop(_ payloads: [TaskBoardCardDragPayload], session: DropSession) {
+    guard
+      dropPlan(for: session) != nil,
+      let plan = TaskBoardCardDropPlan.resolve(payloads, to: lane)
+    else {
+      updateDropTargeted(false)
+      return
     }
-    return performDrop(
+    _ = performDrop(
       signature: TaskBoardCardDropSignature(
         cardIDs: plan.items.map(\.id),
         destination: lane
@@ -247,13 +266,39 @@ struct TaskBoardLaneUnifiedColumn: View {
     ) {
       onMoveCards(plan.items, lane)
     }
+    updateDropTargeted(false)
+  }
+
+  private func dropConfiguration(for session: DropSession) -> DropConfiguration {
+    let operation: DropOperation =
+      isDropEnabled && dropPlan(for: session) != nil ? .move : .forbidden
+    return DropConfiguration(operation: operation)
+  }
+
+  private func updateDropSession(_ session: DropSession) {
+    switch session.phase {
+    case .entering:
+      dropDeduper.reset()
+      updateDropTargeted(dropPlan(for: session) != nil)
+    case .active:
+      updateDropTargeted(dropPlan(for: session) != nil)
+    case .exiting, .ended, .dataTransferCompleted:
+      updateDropTargeted(false)
+    @unknown default:
+      updateDropTargeted(false)
+    }
+  }
+
+  private func dropPlan(for session: DropSession) -> TaskBoardCardDropPlan? {
+    guard isDropEnabled, let localSession = session.localSession else {
+      return nil
+    }
+    let cardIDs = localSession.draggedItemIDs(for: TaskBoardCardID.self)
+    return dropPlanForCardIDs(cardIDs)
   }
 
   private func updateDropTargeted(_ targeted: Bool) {
     isDropTargeted = targeted
-    if !targeted {
-      dropDeduper = TaskBoardDropDeduper()
-    }
   }
 
   private func performDrop(

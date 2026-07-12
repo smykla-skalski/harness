@@ -56,6 +56,9 @@ extension TaskBoardOverviewView {
         decisions: decisions,
         titleTypography: titleTypography,
         isCollapsed: isCollapsed,
+        isDropEnabled: !isActionInFlight,
+        isDropCandidate:
+          !isActionInFlight && cardDropPlan(draggedCardIDsValue, to: lane) != nil,
         selectedCardIDs: cardSelectionValue.selectedIDs,
         onOpenAPIItem: openTaskBoardItem,
         onOpenInboxItem: onOpenItem,
@@ -64,6 +67,10 @@ extension TaskBoardOverviewView {
           toggleLaneCollapse(lane, contentCount: contentCount)
         },
         onSelectCard: selectCard,
+        contextMenuActions: taskBoardCardContextMenuActions,
+        dropPlanForCardIDs: { cardIDs in
+          cardDropPlan(cardIDs, to: lane)
+        },
         onMoveCards: moveCards
       )
       .layoutValue(

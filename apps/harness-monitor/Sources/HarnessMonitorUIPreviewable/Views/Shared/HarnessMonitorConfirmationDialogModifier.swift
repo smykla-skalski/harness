@@ -45,7 +45,7 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
               event: "confirm-tapped",
               details: ["pending_confirmation": pendingConfirmation.uiTestTraceLabel]
             )
-            Task { await store.confirmPendingAction(pendingConfirmation) }
+            dispatchConfirmation(pendingConfirmation)
           }
         } else {
           EmptyView()
@@ -67,6 +67,20 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
       }
   }
 
+  private func dispatchConfirmation(
+    _ pendingConfirmation: HarnessMonitorStore.PendingConfirmation
+  ) {
+    if case .deleteTaskBoardTargets(let targets) = pendingConfirmation {
+      HarnessMonitorAsyncWorkQueue.shared.submit(
+        .init(title: targets.count == 1 ? "Deleting task" : "Deleting tasks") {
+          await store.confirmPendingAction(pendingConfirmation)
+        }
+      )
+      return
+    }
+    Task { await store.confirmPendingAction(pendingConfirmation) }
+  }
+
   private var title: String {
     switch shellUI.pendingConfirmation {
     case .endSession: "End Session?"
@@ -76,6 +90,8 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
       "Delete Task and \(noteCount) \(noteCount == 1 ? "Note" : "Notes")?"
     case .deleteTask: "Delete Task?"
     case .deleteTasks(_, let taskIDs, _): "Delete \(taskIDs.count) Tasks?"
+    case .deleteTaskBoardTargets(let targets):
+      targets.count == 1 ? "Delete Task?" : "Delete \(targets.count) Tasks?"
     case .removeAgent: "Remove Agent?"
     case .removeAgents(_, let agentIDs, _): "Remove \(agentIDs.count) Agents?"
     case .interruptCodexRun: "Interrupt Whole Run?"
@@ -95,6 +111,8 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
       "Delete Task Now"
     case .deleteTasks(_, let taskIDs, _):
       "Delete \(taskIDs.count) Tasks Now"
+    case .deleteTaskBoardTargets(let targets):
+      targets.count == 1 ? "Delete Task Now" : "Delete \(targets.count) Tasks Now"
     case .removeAgent:
       "Remove Agent Now"
     case .removeAgents(_, let agentIDs, _):
@@ -155,6 +173,18 @@ public struct HarnessMonitorConfirmationDialogModifier: ViewModifier {
       This deletes \(taskIDs.count) selected tasks from active task views. \
       Existing task history stays on the timeline as deletion events. Local workspace notes \
       attached to these tasks will be deleted with them.
+      """
+    case .deleteTaskBoardTargets(let targets) where targets.count == 1:
+      """
+      This deletes \(store.confirmationTaskSubject(taskTitle: targets[0].title)) from active \
+      Task Board views. Session task history stays on the timeline when applicable, and local \
+      workspace notes attached to a session task will be deleted with it.
+      """
+    case .deleteTaskBoardTargets(let targets):
+      """
+      This deletes \(targets.count) selected tasks from active Task Board views. Session task \
+      history stays on timelines when applicable, and local workspace notes attached to session \
+      tasks will be deleted with them.
       """
     case .interruptCodexRun(_, _, let runTitle):
       "This interrupts the active Codex run for \"\(runTitle)\". The current turn stops immediately"

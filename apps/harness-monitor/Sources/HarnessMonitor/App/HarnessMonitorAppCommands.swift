@@ -17,6 +17,8 @@ struct HarnessMonitorAppCommands: Commands {
   private var searchFocusAction
   @FocusedValue(\.harnessSessionSidebarSelection)
   private var sidebarSelectionFocus
+  @FocusedValue(\.harnessTaskBoardSelection)
+  private var taskBoardSelectionFocus
   @FocusedValue(\.dashboardAuditCopyCommand)
   private var dashboardAuditCopyFocus
   @FocusedValue(\.harnessPolicyCanvasCommandFocus)
@@ -73,6 +75,19 @@ struct HarnessMonitorAppCommands: Commands {
 
   private var searchCommandTitle: LocalizedStringKey {
     searchFocusAction?.menuLabel.localizedTitle ?? "Find"
+  }
+
+  private var deleteSelectionCommandTitle: String {
+    taskBoardSelectionFocus == nil
+      ? "Delete Sidebar Selection"
+      : "Delete Task Board Selection"
+  }
+
+  private var canDeleteFocusedSelection: Bool {
+    if let taskBoardSelectionFocus {
+      return taskBoardSelectionFocus.canDelete
+    }
+    return sidebarSelectionFocus?.canDelete == true
   }
 
   var body: some Commands {
@@ -137,12 +152,20 @@ struct HarnessMonitorAppCommands: Commands {
       }
       .keyboardShortcut(.escape, modifiers: [])
       .disabled(sidebarSelectionFocus?.hasMultiSelection != true)
-      Button("Delete Sidebar Selection") {
-        sidebarSelectionFocus?.dispatcher.performDeleteSelection()
+      Button(deleteSelectionCommandTitle) {
+        performDeleteFocusedSelection()
       }
       .keyboardShortcut(.delete, modifiers: [])
-      .disabled(sidebarSelectionFocus?.canDelete != true)
+      .disabled(!canDeleteFocusedSelection)
     }
+  }
+
+  private func performDeleteFocusedSelection() {
+    if let taskBoardSelectionFocus {
+      taskBoardSelectionFocus.performDeleteSelection()
+      return
+    }
+    sidebarSelectionFocus?.dispatcher.performDeleteSelection()
   }
 
   @CommandsBuilder private var dashboardAuditCopyCommands: some Commands {

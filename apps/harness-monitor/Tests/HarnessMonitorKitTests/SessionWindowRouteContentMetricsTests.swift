@@ -186,6 +186,7 @@ struct SessionWindowRouteContentMetricsTests {
       #expect(source.contains("onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce"))
       #expect(source.contains("onMoveTaskBoardItems: moveTaskBoardItems"))
       #expect(source.contains("onMoveInboxItems: moveInboxItems"))
+      #expect(source.contains("onDeleteTaskBoardTargets: deleteTaskBoardTargets"))
       #expect(source.contains("HarnessMonitorAsyncWorkQueue.shared.submit("))
       #expect(source.contains("await store.updateTaskBoardItemStatuses(updates)"))
       #expect(source.contains("await store.updateTaskBoardInboxStatuses(updates)"))

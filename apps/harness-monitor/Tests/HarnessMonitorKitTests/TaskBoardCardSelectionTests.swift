@@ -106,4 +106,14 @@ struct TaskBoardCardSelectionTests {
     #expect(next.anchorID == second)
     #expect(next.orderedSelectedIDs(in: [second, first, third]) == [second, first])
   }
+
+  @Test("Context menu priming replaces selection with its action scope")
+  func contextMenuPrimingUsesActionScope() {
+    let state = TaskBoardCardSelectionState(selectedIDs: [first, second], anchorID: first)
+
+    let next = state.selectingForContextMenu([third])
+
+    #expect(next.selectedIDs == [third])
+    #expect(next.anchorID == third)
+  }
 }

@@ -29,17 +29,42 @@ extension TaskBoardOverviewView {
     cardIDs.compactMap(cardDragItem).map(TaskBoardCardDragPayload.init(item:))
   }
 
+  func cardDropPlan(
+    _ cardIDs: [TaskBoardCardID],
+    to lane: TaskBoardInboxLane
+  ) -> TaskBoardCardDropPlan? {
+    TaskBoardCardDropPlan.resolve(cardDragPayloads(cardIDs), to: lane)
+  }
+
   func updateCardDragSession(_ session: DragSession) {
-    guard case .initial = session.phase else {
-      return
+    switch session.phase {
+    case .initial, .active:
+      updateActiveCardDrag(session)
+    case .ended, .dataTransferCompleted:
+      updateDraggedCardIDs([])
+    @unknown default:
+      updateDraggedCardIDs([])
     }
+  }
+
+  private func updateActiveCardDrag(_ session: DragSession) {
     let draggedIDs = session.draggedItemIDs(for: TaskBoardCardID.self)
     guard !draggedIDs.isEmpty else {
+      return
+    }
+    updateDraggedCardIDs(draggedIDs)
+    guard case .initial = session.phase else {
       return
     }
     let next = cardSelectionValue.selectingForDrag(draggedIDs)
     if cardSelectionValue != next {
       cardSelectionValue = next
+    }
+  }
+
+  private func updateDraggedCardIDs(_ cardIDs: [TaskBoardCardID]) {
+    if draggedCardIDsValue != cardIDs {
+      draggedCardIDsValue = cardIDs
     }
   }
 

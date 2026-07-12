@@ -46,6 +46,17 @@ struct TaskBoardCardSelectionState: Equatable {
     return Self(selectedIDs: draggedIDSet, anchorID: first)
   }
 
+  func selectingForContextMenu(_ menuIDs: [TaskBoardCardID]) -> Self {
+    guard let first = menuIDs.first else {
+      return self
+    }
+    let menuIDSet = Set(menuIDs)
+    guard menuIDSet != selectedIDs else {
+      return self
+    }
+    return Self(selectedIDs: menuIDSet, anchorID: first)
+  }
+
   func pruning(orderedVisibleIDs: [TaskBoardCardID]) -> Self {
     let visibleIDs = Set(orderedVisibleIDs)
     let prunedSelection = selectedIDs.intersection(visibleIDs)
