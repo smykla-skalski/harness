@@ -3,6 +3,7 @@ use super::{
     RemotePairingRateLimiter, RemotePairingRecord, validate_pairing_domain,
 };
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
+use crate::reviews::ReviewsQueryRequest;
 
 #[test]
 fn remote_pairing_code_hashes_secret_and_redacts_debug() {
@@ -43,6 +44,62 @@ fn remote_pairing_code_hash_normalizes_surrounding_whitespace() {
         trimmed_hash.as_storage_value()
     );
     assert!(trimmed_hash.verify(" \tpairing-secret-value\n"));
+}
+
+#[test]
+fn remote_pairing_record_normalizes_reviews_query_profile() {
+    let query = ReviewsQueryRequest {
+        authors: vec![" renovate[bot] ".into(), "renovate[bot]".into()],
+        organizations: vec![" smykla-skalski ".into()],
+        repositories: vec![
+            "smykla-skalski/harness".into(),
+            "smykla-skalski/harness".into(),
+        ],
+        exclude_repositories: vec![" smykla-skalski/archive ".into()],
+        force_refresh: true,
+        cache_max_age_seconds: 0,
+        ..ReviewsQueryRequest::default()
+    };
+
+    let record = RemotePairingRecord::new_with_reviews_query_for_tests(
+        "pairing-reviews",
+        RemoteRole::Viewer,
+        &[RemoteAccessScope::Read],
+        "pairing-secret",
+        "2026-07-12T18:00:00Z",
+        "2026-07-12T18:10:00Z",
+        Some(query),
+    )
+    .expect("pairing record with reviews query");
+    let query = record.reviews_query.expect("reviews query");
+
+    assert_eq!(query.authors, vec!["renovate[bot]"]);
+    assert_eq!(query.organizations, vec!["smykla-skalski"]);
+    assert_eq!(query.repositories, vec!["smykla-skalski/harness"]);
+    assert_eq!(query.exclude_repositories, vec!["smykla-skalski/archive"]);
+    assert!(!query.force_refresh);
+    assert_eq!(query.cache_max_age_seconds, 1);
+}
+
+#[test]
+fn remote_pairing_record_rejects_author_only_reviews_query() {
+    let query = ReviewsQueryRequest {
+        authors: vec!["renovate[bot]".into()],
+        ..ReviewsQueryRequest::default()
+    };
+
+    let error = RemotePairingRecord::new_with_reviews_query_for_tests(
+        "pairing-reviews-invalid",
+        RemoteRole::Viewer,
+        &[RemoteAccessScope::Read],
+        "pairing-secret",
+        "2026-07-12T18:00:00Z",
+        "2026-07-12T18:10:00Z",
+        Some(query),
+    )
+    .expect_err("author-only reviews query must fail");
+
+    assert!(error.to_string().contains("organization or repository"));
 }
 
 #[test]

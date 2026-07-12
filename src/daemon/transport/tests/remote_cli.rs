@@ -478,7 +478,7 @@ fn daemon_remote_pair_create_execute_persists_pairing_in_daemon_db() {
     });
 }
 
-fn seed_remote_tls_identity(db: &DaemonDb) -> String {
+pub(super) fn seed_remote_tls_identity(db: &DaemonDb) -> String {
     let config = RemoteDaemonServeConfig {
         domain: "daemon.example.com".to_string(),
         host: "0.0.0.0".to_string(),

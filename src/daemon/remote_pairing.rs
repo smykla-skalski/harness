@@ -10,9 +10,11 @@ use super::remote::{RemoteAccessScope, RemoteRole};
 use super::remote_crypto::{
     parse_sha256_storage_digest, sha256_storage_value, verify_sha256_storage_value,
 };
-use super::remote_identity::{
-    RemoteBearerToken, RemoteIdentityError, RemoteStoredClient, expand_client_scopes,
-};
+use super::remote_identity::{RemoteBearerToken, RemoteIdentityError, RemoteStoredClient};
+use crate::reviews::ReviewsQueryRequest;
+
+mod reviews;
+pub(crate) use reviews::normalize_remote_reviews_query;
 
 #[cfg(test)]
 #[path = "remote_pairing_tests.rs"]
@@ -36,6 +38,7 @@ pub enum RemotePairingError {
     Expired,
     AlreadyClaimed,
     UnknownCode,
+    InvalidReviewsQuery(String),
     Identity(RemoteIdentityError),
 }
 
@@ -58,6 +61,9 @@ impl fmt::Display for RemotePairingError {
             Self::Expired => write!(f, "remote pairing code expired"),
             Self::AlreadyClaimed => write!(f, "remote pairing code already claimed"),
             Self::UnknownCode => write!(f, "remote pairing code is unknown"),
+            Self::InvalidReviewsQuery(detail) => {
+                write!(f, "remote pairing reviews query is invalid: {detail}")
+            }
             Self::Identity(error) => write!(f, "{error}"),
         }
     }
@@ -79,7 +85,8 @@ impl Error for RemotePairingError {
             | Self::RateLimited
             | Self::Expired
             | Self::AlreadyClaimed
-            | Self::UnknownCode => None,
+            | Self::UnknownCode
+            | Self::InvalidReviewsQuery(_) => None,
         }
     }
 }
@@ -181,6 +188,7 @@ pub struct RemotePairingRecord {
     pub scopes: Vec<RemoteAccessScope>,
     pub created_at: String,
     pub expires_at: String,
+    pub reviews_query: Option<ReviewsQueryRequest>,
 }
 
 impl RemotePairingRecord {
@@ -197,18 +205,15 @@ impl RemotePairingRecord {
         created_at: impl Into<String>,
         expires_at: impl Into<String>,
     ) -> Result<Self, RemotePairingError> {
-        let pairing_id = pairing_id.into();
-        if pairing_id.trim().is_empty() {
-            return Err(RemotePairingError::EmptyPairingId);
-        }
-        Ok(Self {
+        Self::new_with_reviews_query(
             pairing_id,
-            code_hash: RemotePairingCodeHash::from_code(code)?,
             role,
-            scopes: expand_client_scopes(role, requested_scopes)?,
-            created_at: created_at.into(),
-            expires_at: expires_at.into(),
-        })
+            requested_scopes,
+            code,
+            created_at,
+            expires_at,
+            None,
+        )
     }
 
     #[cfg(test)]
@@ -242,6 +247,7 @@ pub struct RemoteStoredPairing {
     pub claimed_at: Option<String>,
     pub claimed_client_id: Option<String>,
     pub claim_remote_addr: Option<String>,
+    pub reviews_query: Option<ReviewsQueryRequest>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -329,6 +335,7 @@ impl RemotePairingClaimRequest {
 pub struct RemotePairingClaimedClient {
     pub client: RemoteStoredClient,
     pub bearer_token: RemoteBearerToken,
+    pub reviews_query: Option<ReviewsQueryRequest>,
 }
 
 #[derive(Debug, Clone)]

@@ -20,6 +20,7 @@ use crate::daemon::remote_pairing::{
     RemotePairingError,
 };
 use crate::errors::{CliError, CliErrorKind};
+use crate::reviews::ReviewsQueryRequest;
 use crate::workspace::utc_now;
 
 use super::response::{extract_request_id, timed_json, timed_response};
@@ -48,6 +49,8 @@ pub(crate) struct RemotePairClaimHttpResponse {
     token: String,
     token_hint: String,
     paired_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reviews_query: Option<ReviewsQueryRequest>,
 }
 
 async fn post_remote_pair_claim(
@@ -181,6 +184,7 @@ fn remote_pair_claim_response(claimed: RemotePairingClaimedClient) -> RemotePair
         token: claimed.bearer_token.expose().to_string(),
         token_hint: claimed.client.token_hint,
         paired_at: claimed.client.created_at,
+        reviews_query: claimed.reviews_query,
     }
 }
 
@@ -311,6 +315,7 @@ fn pairing_error_status(error: &RemotePairingError) -> StatusCode {
         | RemotePairingError::EmptyPlatform
         | RemotePairingError::EmptyAuditEventId
         | RemotePairingError::InvalidStoredCodeHash
+        | RemotePairingError::InvalidReviewsQuery(_)
         | RemotePairingError::UnknownCode
         | RemotePairingError::Identity(_) => StatusCode::BAD_REQUEST,
     }
@@ -330,6 +335,7 @@ fn pairing_error_message(error: &RemotePairingError) -> &'static str {
         RemotePairingError::EmptyPlatform => "remote pairing platform is required",
         RemotePairingError::EmptyAuditEventId => "remote pairing audit event id is required",
         RemotePairingError::InvalidStoredCodeHash => "remote pairing code is invalid",
+        RemotePairingError::InvalidReviewsQuery(_) => "remote pairing reviews query is invalid",
         RemotePairingError::UnknownCode => "remote pairing code is unknown",
         RemotePairingError::Identity(_) => "remote pairing client identity is invalid",
     }
