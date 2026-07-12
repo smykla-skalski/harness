@@ -340,15 +340,16 @@ extension TaskBoardOverviewView {
   }
 
   var taskBoardColumns: some View {
-    ViewThatFits(in: .horizontal) {
+    let titleTypography = TaskBoardCardTitleTypography(fontScale: fontScale)
+    return ViewThatFits(in: .horizontal) {
       TaskBoardLaneStripLayout(sizing: laneStripSizing) {
-        taskBoardLaneColumns
+        taskBoardLaneColumns(titleTypography: titleTypography)
       }
       .padding(.vertical, metrics.boardVerticalPadding)
 
       ScrollView(.horizontal, showsIndicators: true) {
         TaskBoardLaneStripLayout(sizing: laneStripSizing) {
-          taskBoardLaneColumns
+          taskBoardLaneColumns(titleTypography: titleTypography)
         }
         .padding(.vertical, metrics.boardVerticalPadding)
       }
@@ -356,7 +357,8 @@ extension TaskBoardOverviewView {
     }
   }
 
-  @ViewBuilder var taskBoardLaneColumns: some View {
+  @ViewBuilder
+  func taskBoardLaneColumns(titleTypography: TaskBoardCardTitleTypography) -> some View {
     ForEach(TaskBoardInboxLane.allCases) { lane in
       let apiItems = cachedPresentation.apiItems(in: lane)
       let inboxItems = cachedPresentation.inboxItems(in: lane)
@@ -372,6 +374,7 @@ extension TaskBoardOverviewView {
         apiItems: apiItems,
         inboxItems: inboxItems,
         decisions: decisions,
+        titleTypography: titleTypography,
         isCollapsed: isCollapsed,
         onOpenAPIItem: openTaskBoardItem,
         onOpenInboxItem: onOpenItem,

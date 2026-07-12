@@ -98,20 +98,44 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol,
     request: TaskBoardSyncRequest,
     successMessage: String? = nil,
-    failureMessagePrefix: String? = nil
+    failureMessagePrefix: String? = nil,
+    activityKey: String? = nil,
+    activityTitle: String? = nil,
+    feedbackPosition: ActionFeedback.Position = .topTrailing
   ) async -> Bool {
+    updateTaskBoardRefreshActivity(
+      key: activityKey,
+      title: activityTitle,
+      message: "Syncing task sources",
+      position: feedbackPosition
+    )
+    defer { dismissTaskBoardRefreshActivity(key: activityKey) }
     do {
       let measuredSummary = try await Self.measureOperation {
         try await client.syncTaskBoard(request: request)
       }
       recordRequestSuccess()
       globalTaskBoardSyncSummary = measuredSummary.value
+      updateTaskBoardRefreshActivity(
+        key: activityKey,
+        title: activityTitle,
+        message: "Loading refreshed tasks",
+        position: feedbackPosition
+      )
       await refreshTaskBoardDashboardSnapshot(using: client)
       if let successMessage {
-        presentSuccessFeedback(successMessage)
+        presentSuccessFeedback(successMessage, position: feedbackPosition)
       }
       return true
+    } catch is CancellationError {
+      return false
     } catch {
+      updateTaskBoardRefreshActivity(
+        key: activityKey,
+        title: activityTitle,
+        message: "Reloading current tasks",
+        position: feedbackPosition
+      )
       await refreshTaskBoardDashboardSnapshot(using: client)
       let failureDescription =
         if let failureMessagePrefix {
@@ -119,9 +143,29 @@ extension HarnessMonitorStore {
         } else {
           error.localizedDescription
         }
-      presentFailureFeedback(failureDescription)
+      presentFailureFeedback(failureDescription, position: feedbackPosition)
       return false
     }
+  }
+
+  private func updateTaskBoardRefreshActivity(
+    key: String?,
+    title: String?,
+    message: String,
+    position: ActionFeedback.Position
+  ) {
+    guard let key else { return }
+    toast.updateActivity(
+      key: key,
+      message: message,
+      title: title,
+      position: position
+    )
+  }
+
+  private func dismissTaskBoardRefreshActivity(key: String?) {
+    guard let key else { return }
+    toast.dismissActivity(key: key)
   }
 
   func mergeTaskBoardItem(_ item: TaskBoardItem) {

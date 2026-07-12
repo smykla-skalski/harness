@@ -16,6 +16,7 @@ extension HarnessMonitorStore {
     direction: .pull,
     dryRun: false
   )
+  private static let taskBoardDashboardRefreshActivityKey = "task-board-dashboard-refresh"
 
   nonisolated static func loadTaskBoardItemsSnapshot(
     using client: any HarnessMonitorClientProtocol
@@ -77,14 +78,18 @@ extension HarnessMonitorStore {
   }
 
   public func refreshTaskBoardDashboard() async {
-    guard let client else {
+    guard let client, !isDaemonActionInFlight else {
       return
     }
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
     _ = await syncAndRefreshTaskBoardDashboard(
       using: client,
-      request: Self.taskBoardDashboardSyncRequest
+      request: Self.taskBoardDashboardSyncRequest,
+      successMessage: "Task board refreshed",
+      activityKey: Self.taskBoardDashboardRefreshActivityKey,
+      activityTitle: "Refreshing Task Board",
+      feedbackPosition: .bottomTrailing
     )
   }
 
