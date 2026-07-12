@@ -54,9 +54,11 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
     }
     async let sessions = fetchSessions()
     async let taskBoardItems = fetchTaskBoardItems()
+    async let reviewsSnapshot = fetchReviewsSnapshot(now: now)
     return try await makeSnapshot(
       sessions: sessions,
       taskBoardItems: taskBoardItems,
+      reviewsSnapshot: reviewsSnapshot,
       now: now
     )
   }
@@ -99,6 +101,7 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
   private func makeSnapshot(
     sessions: [MobileRemoteSessionWire],
     taskBoardItems: [MobileRemoteTaskBoardWire],
+    reviewsSnapshot: MobileRemoteReviewsSnapshot,
     now: Date
   ) -> MobileMirrorSnapshot {
     let redactor = MobileMirrorSecretRedactor()
@@ -110,7 +113,10 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
     }
     let activeSessions = sessions.filter { $0.status != "ended" }
     let sessionNeedsYouCount = sessions.count(where: { $0.metrics.awaitingReviewAgentCount > 0 })
-    let needsYouCount = sessionNeedsYouCount + mobileTaskBoardItems.count(where: \.needsYou)
+    let needsYouCount =
+      sessionNeedsYouCount
+      + mobileTaskBoardItems.count(where: \.needsYou)
+      + reviewsSnapshot.reviews.count(where: \.needsYou)
     let station = MobileStationSummary(
       id: stationID,
       displayName: stationName,
@@ -126,9 +132,9 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
       generatedAt: now,
       expiresAt: now.addingTimeInterval(60),
       stations: [station],
-      attention: [],
+      attention: reviewsSnapshot.attention,
       sessions: mobileSessions,
-      reviews: [],
+      reviews: reviewsSnapshot.reviews,
       taskBoardItems: mobileTaskBoardItems,
       commands: [],
       trustedDevices: []

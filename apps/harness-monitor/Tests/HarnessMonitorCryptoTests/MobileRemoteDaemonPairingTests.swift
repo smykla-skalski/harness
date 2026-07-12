@@ -57,7 +57,8 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
         scopes: ["read", "write"],
         token: "server-issued-token",
         tokenHint: "abcd1234",
-        pairedAt: now.addingTimeInterval(5)
+        pairedAt: now.addingTimeInterval(5),
+        reviewsQuery: remoteReviewsQuery()
       )
     )
     let coordinator = MobileRemoteDaemonPairingCoordinator(
@@ -80,6 +81,7 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     XCTAssertTrue(request.clientID.hasPrefix("ios-"))
     XCTAssertEqual(credential.remoteDaemonAccess?.bearerToken, "server-issued-token")
     XCTAssertEqual(credential.remoteDaemonAccess?.serverSPKISHA256.value, testSPKIPin)
+    XCTAssertEqual(credential.remoteDaemonAccess?.reviewsQuery, remoteReviewsQuery())
     XCTAssertTrue(credential.symmetricKeyRawRepresentation.isEmpty)
     XCTAssertTrue(credential.snapshotKeyID.isEmpty)
     let storedCredential = try await credentialStore.load(stationID: credential.stationID)
@@ -151,6 +153,21 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     XCTAssertTrue(description.contains("abcd1234"))
   }
 
+  func testRemoteAccessDecodesLegacyCredentialWithoutReviewsQuery() throws {
+    var access = try remoteAccess()
+    access.reviewsQuery = nil
+    let encoded = try JSONEncoder().encode(access)
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+    )
+    object.removeValue(forKey: "reviewsQuery")
+    let legacyPayload = try JSONSerialization.data(withJSONObject: object)
+
+    let decoded = try JSONDecoder().decode(MobileRemoteDaemonAccess.self, from: legacyPayload)
+
+    XCTAssertNil(decoded.reviewsQuery)
+  }
+
   func testAdminRoleCanReadBeforeScopeExpansion() throws {
     var access = try remoteAccess()
     access.role = .admin
@@ -200,6 +217,7 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     try await store.save(credential)
     let stored = try await store.load(stationID: stationID)
     XCTAssertEqual(stored?.remoteDaemonAccess?.bearerToken, "server-issued-token")
+    XCTAssertEqual(stored?.remoteDaemonAccess?.reviewsQuery, remoteReviewsQuery())
 
     credential.remoteDaemonAccess?.bearerToken = "rotated-server-token"
     try await store.save(credential)
@@ -328,7 +346,16 @@ private func remoteAccess() throws -> MobileRemoteDaemonAccess {
     bearerToken: "server-issued-token",
     tokenHint: "abcd1234",
     serverSPKISHA256: try MobileRemoteDaemonSPKIPin(validating: testSPKIPin),
-    pairedAt: Date(timeIntervalSince1970: 1_752_124_405)
+    pairedAt: Date(timeIntervalSince1970: 1_752_124_405),
+    reviewsQuery: remoteReviewsQuery()
+  )
+}
+
+private func remoteReviewsQuery() -> MobileRemoteDaemonReviewsQuery {
+  MobileRemoteDaemonReviewsQuery(
+    organizations: ["smykla-skalski"],
+    repositories: ["smykla-skalski/harness"],
+    cacheMaxAgeSeconds: 45
   )
 }
 

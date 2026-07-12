@@ -133,6 +133,32 @@ final class MobileWatchPairingTransferChangesTests: XCTestCase {
     XCTAssertTrue(changed, "a rotated symmetric key must trigger a reload")
   }
 
+  func testChangedRemoteReviewsQueryIsAChange() throws {
+    let identity = makePairingIdentity(id: "default-mobile-device", now: now)
+    let current = try makeRemoteCredential(
+      identityID: identity.id,
+      platform: "ios",
+      token: "phone-token"
+    )
+    var incoming = current
+    incoming.remoteDaemonAccess?.reviewsQuery = MobileRemoteDaemonReviewsQuery(
+      repositories: ["smykla-skalski/harness"],
+      cacheMaxAgeSeconds: 45
+    )
+    let transfer = MobileWatchPairingTransfer(
+      identities: [identity],
+      credentials: [incoming],
+      exportedAt: now
+    )
+
+    let changed = transfer.changesPairingMaterial(
+      currentIdentities: [identity],
+      currentCredentials: [current]
+    )
+
+    XCTAssertTrue(changed, "a changed remote Reviews profile must trigger a reload")
+  }
+
   func testRotatedIdentityKeyIsAChange() {
     var current = makePairingIdentity(id: "device-watch", now: now)
     current.signingPrivateKeyRawRepresentation = Data(repeating: 7, count: 32)
