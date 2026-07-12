@@ -306,6 +306,63 @@ async fn policy_inbox_and_outboxes_round_trip_in_order() {
 }
 
 #[tokio::test]
+async fn malformed_policy_queue_timestamps_are_pruned_on_next_mutation() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("open db");
+    let now = chrono::DateTime::parse_from_rfc3339("2026-07-11T10:00:00Z")
+        .expect("timestamp")
+        .with_timezone(&chrono::Utc);
+    let malformed_event = PolicyWorkflowEvent {
+        event_key: "malformed".to_owned(),
+        subject_key: "owner/repo#42".to_owned(),
+        occurred_at: "not-a-timestamp".to_owned(),
+    };
+    db.publish_policy_event_at(malformed_event, now)
+        .await
+        .expect("publish malformed event");
+    let valid_event = PolicyWorkflowEvent {
+        event_key: "valid".to_owned(),
+        subject_key: "owner/repo#42".to_owned(),
+        occurred_at: now.to_rfc3339(),
+    };
+    db.publish_policy_event_at(valid_event.clone(), now)
+        .await
+        .expect("publish valid event");
+    assert_eq!(
+        db.pending_policy_events().await.expect("events"),
+        vec![valid_event]
+    );
+
+    db.record_policy_handoff_at(
+        HandoffRecord {
+            handoff_key: "malformed".to_owned(),
+            workflow_id: "reviews_auto".to_owned(),
+            subject_key: "owner/repo#42".to_owned(),
+            recorded_at: "not-a-timestamp".to_owned(),
+        },
+        now,
+    )
+    .await
+    .expect("record malformed handoff");
+    db.record_policy_handoff_at(
+        HandoffRecord {
+            handoff_key: "valid".to_owned(),
+            workflow_id: "reviews_auto".to_owned(),
+            subject_key: "owner/repo#42".to_owned(),
+            recorded_at: now.to_rfc3339(),
+        },
+        now,
+    )
+    .await
+    .expect("record valid handoff");
+    let handoffs = db.policy_handoff_records().await.expect("handoffs");
+    assert_eq!(handoffs.len(), 1);
+    assert_eq!(handoffs[0].handoff_key, "valid");
+}
+
+#[tokio::test]
 async fn legacy_snapshot_import_is_atomic_and_idempotent() {
     let legacy = tempdir().expect("legacy root");
     let store = TaskBoardStore::new(legacy.path().to_path_buf());

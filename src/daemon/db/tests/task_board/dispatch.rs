@@ -202,3 +202,55 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
             .is_some()
     );
 }
+
+#[tokio::test]
+async fn active_dispatch_intent_requires_matching_linkage() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("open db");
+    let item_id = "task-dispatch-linkage";
+    db.create_task_board_item(TaskBoardItem::new(
+        item_id.to_owned(),
+        "Dispatch linkage".to_owned(),
+        "Body".to_owned(),
+        "2026-07-11T10:00:00Z".to_owned(),
+    ))
+    .await
+    .expect("create item");
+    let item = db.task_board_item(item_id).await.expect("load item");
+    let lifecycle = build_dispatch_plan_with_policy_root(&item, dir.path()).applied_lifecycle();
+    let original = db
+        .link_and_enqueue_task_board_dispatch(item_id, "session-1", "work-1", &lifecycle)
+        .await
+        .expect("enqueue original dispatch");
+
+    let session_error = db
+        .link_and_enqueue_task_board_dispatch(item_id, "session-2", "work-1", &lifecycle)
+        .await
+        .expect_err("mismatched session must conflict");
+    assert_eq!(session_error.code(), "KSRCLI092");
+    let work_item_error = db
+        .link_and_enqueue_task_board_dispatch(item_id, "session-1", "work-2", &lifecycle)
+        .await
+        .expect_err("mismatched work item must conflict");
+    assert_eq!(work_item_error.code(), "KSRCLI092");
+    let repeated = db
+        .link_and_enqueue_task_board_dispatch(item_id, "session-1", "work-1", &lifecycle)
+        .await
+        .expect("matching retry");
+    assert_eq!(repeated, original);
+
+    let active_intents: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM task_board_dispatch_intents
+         WHERE item_id = ?1 AND status IN ('pending', 'starting')",
+    )
+    .bind(item_id)
+    .fetch_one(db.pool())
+    .await
+    .expect("count active intents");
+    assert_eq!(active_intents, 1);
+    let linked = db.task_board_item(item_id).await.expect("load linked item");
+    assert_eq!(linked.session_id.as_deref(), Some("session-1"));
+    assert_eq!(linked.work_item_id.as_deref(), Some("work-1"));
+}

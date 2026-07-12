@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
-use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
+use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::infra::io;
 use crate::task_board::dispatch::DispatchLifecycle;
 use crate::task_board::{DispatchAppliedTask, TaskBoardStatus, TaskBoardWorkflowStatus};
@@ -35,12 +35,18 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("task board dispatch enqueue")
             .await?;
         if let Some(existing) = active_intent_payload(&mut transaction, board_item_id).await? {
+            let applied = ensure_dispatch_linkage(
+                decode_applied(&existing)?,
+                board_item_id,
+                session_id,
+                work_item_id,
+            )?;
             transaction.commit().await.map_err(|error| {
                 db_error(format!(
                     "commit existing task board dispatch intent: {error}"
                 ))
             })?;
-            return decode_applied(&existing);
+            return Ok(applied);
         }
         let (mut item, revision) = load_item_in_tx(&mut transaction, board_item_id)
             .await?
@@ -206,6 +212,25 @@ impl AsyncDaemonDb {
             .await
             .map_err(|error| db_error(format!("commit task board dispatch failure: {error}")))
     }
+}
+
+fn ensure_dispatch_linkage(
+    applied: DispatchAppliedTask,
+    board_item_id: &str,
+    session_id: &str,
+    work_item_id: &str,
+) -> Result<DispatchAppliedTask, CliError> {
+    let matches = applied.board_item_id == board_item_id
+        && applied.session_id == session_id
+        && applied.work_item_id == work_item_id;
+    if matches {
+        return Ok(applied);
+    }
+    Err(CliErrorKind::session_agent_conflict(format!(
+        "task-board dispatch intent for item '{}' links session '{}' work item '{}', not requested item '{board_item_id}' session '{session_id}' work item '{work_item_id}'",
+        applied.board_item_id, applied.session_id, applied.work_item_id
+    ))
+    .into())
 }
 
 async fn active_intent_payload(

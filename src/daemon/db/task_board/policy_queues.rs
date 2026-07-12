@@ -273,9 +273,54 @@ fn parse_rows<T: DeserializeOwned>(
 }
 
 fn expired(recorded_at: &str, now: DateTime<Utc>) -> bool {
-    DateTime::parse_from_rfc3339(recorded_at).is_ok_and(|recorded| {
-        now.signed_duration_since(recorded.with_timezone(&Utc))
-            .num_seconds()
-            > RETENTION_SECONDS
-    })
+    let Some(recorded) = policy_queue_timestamp(recorded_at) else {
+        return true;
+    };
+    now.signed_duration_since(recorded).num_seconds() > RETENTION_SECONDS
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn policy_queue_timestamp(recorded_at: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(recorded_at)
+        .inspect_err(|error| {
+            tracing::warn!(recorded_at, %error, "dropping policy queue record with invalid timestamp");
+        })
+        .ok()
+        .map(|recorded| recorded.with_timezone(&Utc))
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Duration;
+
+    use super::*;
+
+    #[test]
+    fn malformed_policy_queue_timestamp_is_expired() {
+        let now = "2026-07-11T10:00:00Z"
+            .parse::<DateTime<Utc>>()
+            .expect("timestamp");
+
+        assert!(expired("not-a-timestamp", now));
+    }
+
+    #[test]
+    fn policy_queue_retention_boundary_is_preserved() {
+        let now = "2026-07-11T10:00:00Z"
+            .parse::<DateTime<Utc>>()
+            .expect("timestamp");
+
+        assert!(!expired(
+            &(now - Duration::seconds(RETENTION_SECONDS)).to_rfc3339(),
+            now
+        ));
+        assert!(expired(
+            &(now - Duration::seconds(RETENTION_SECONDS + 1)).to_rfc3339(),
+            now
+        ));
+        assert!(!expired(&(now + Duration::seconds(1)).to_rfc3339(), now));
+    }
 }
