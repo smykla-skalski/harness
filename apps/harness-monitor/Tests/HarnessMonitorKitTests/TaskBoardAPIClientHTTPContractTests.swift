@@ -16,6 +16,7 @@ extension TaskBoardAPIClientTests {
     let todoistTokenSync = try await performHTTPTodoistTokenCalls(client)
     try await performHTTPDiscoveryCalls(client)
     let planning = try await performHTTPPlanningCalls(client)
+    try await performHTTPSecretHandoffCalls(client)
 
     return TaskBoardHTTPContractResult(
       planning: planning,
@@ -169,6 +170,24 @@ extension TaskBoardAPIClientTests {
     )
   }
 
+  private func performHTTPSecretHandoffCalls(_ client: HarnessMonitorAPIClient) async throws {
+    let prepared = try await client.prepareTaskBoardGitRuntimeSecretHandoff()
+    #expect(prepared.migrationID == "migration-1")
+    _ = try await client.acknowledgeTaskBoardGitRuntimeSecretHandoff(
+      request: TaskBoardGitRuntimeSecretHandoffAckRequest(
+        migrationID: "migration-1",
+        digest: "digest-1"
+      )
+    )
+    let capabilities = try await client.taskBoardCapabilities()
+    #expect(capabilities.instanceID == "task-board-instance-1")
+    _ = try await client.syncTaskBoardGitRuntimeKeyMaterial(
+      request: TaskBoardGitRuntimeKeyMaterialSyncRequest(
+        runtime: taskBoardRuntimeConfigUpdateRequest()
+      )
+    )
+  }
+
   private func httpUpdateItemRequest() -> TaskBoardUpdateItemRequest {
     TaskBoardUpdateItemRequest(
       status: .inProgress,
@@ -185,7 +204,7 @@ extension TaskBoardAPIClientTests {
         == [
           "GET", "GET", "POST", "PUT", "DELETE", "POST", "POST", "POST", "GET", "GET", "POST",
           "POST", "POST", "GET", "PUT", "GET", "PUT", "PUT", "PUT", "GET", "GET", "POST",
-          "POST", "POST",
+          "POST", "POST", "POST", "POST", "GET", "PUT",
         ]
     )
     #expect(
@@ -215,6 +234,10 @@ extension TaskBoardAPIClientTests {
           "/v1/task-board/items/board-1/planning/begin",
           "/v1/task-board/items/board-1/planning/submit",
           "/v1/task-board/items/board-1/planning/approve",
+          "/v1/task-board/git/runtime/secret-handoff/prepare",
+          "/v1/task-board/git/runtime/secret-handoff/ack",
+          "/v1/task-board/capabilities",
+          "/v1/task-board/git/runtime/key-material",
         ]
     )
   }
@@ -280,6 +303,11 @@ extension TaskBoardAPIClientTests {
     #expect(records[22].body?["summary"] as? String == "Use the semantic plan.")
     #expect(records[23].body?["approved_by"] as? String == "lead")
     #expect(records[23].body?["approved_at"] as? String == "2026-05-14T02:00:00Z")
+    #expect(records[24].body?.isEmpty == true)
+    #expect(records[25].body?["migration_id"] as? String == "migration-1")
+    #expect(records[25].body?["digest"] as? String == "digest-1")
+    #expect(records[26].body == nil)
+    #expect((records[27].body?["runtime"] as? [String: Any]) != nil)
   }
 
 }

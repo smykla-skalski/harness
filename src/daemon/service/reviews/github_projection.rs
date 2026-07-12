@@ -1,99 +1,90 @@
 use std::collections::HashSet;
-use std::sync::{Mutex, OnceLock, PoisonError};
 
 use chrono::SecondsFormat;
-use tokio::task::spawn_blocking;
 
-use crate::daemon::service::{broadcast_github_data_change, observe_sender};
-use crate::errors::{CliError, CliErrorKind};
+use crate::daemon::db::AsyncDaemonDb;
+use crate::errors::CliError;
 use crate::github_api::stable_data_revision_guard;
-use crate::github_api::{GitHubDataChange, GitHubProtectedClient, GitHubPullRequestSnapshot};
+use crate::github_api::{GitHubProtectedClient, GitHubPullRequestSnapshot};
 use crate::reviews::{
     ReviewItem, ReviewPullRequestState, ReviewsPullRequestReference,
-    ReviewsPullRequestResolveRequest,
+    ReviewsPullRequestResolveRequest, ReviewsQueryRequest,
 };
 use crate::task_board::{
-    TaskBoardStore, default_board_root, imported_review_pull_request_references,
-    reconcile_pull_request_snapshots,
+    imported_review_references_from_items, reconcile_review_item_from_snapshots,
 };
 
-static PROJECTION_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-
 pub(super) enum MissingReviewResolution {
-    ExactActiveImports,
+    ExactActiveImports(ReviewsQueryRequest),
     ProvidedSnapshotsOnly,
 }
 
 impl MissingReviewResolution {
-    const fn resolves_active_imports(&self) -> bool {
-        matches!(self, Self::ExactActiveImports)
+    const fn query_scope(&self) -> Option<&ReviewsQueryRequest> {
+        match self {
+            Self::ExactActiveImports(scope) => Some(scope),
+            Self::ProvidedSnapshotsOnly => None,
+        }
     }
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "the projection boundary handles the changed, unchanged, and failed persistence outcomes"
-)]
 pub(super) async fn reconcile_task_board(
+    database: Option<&AsyncDaemonDb>,
     items: &[ReviewItem],
     authoritative_viewer_keys: &HashSet<String>,
     missing_review_resolution: MissingReviewResolution,
     backport_detection_enabled: bool,
     backport_patterns: &[String],
     expected_revision: u64,
-) -> bool {
-    let Some(sender) = observe_sender() else {
-        return true;
+) -> Result<bool, CliError> {
+    let Some(database) = database else {
+        return Ok(true);
     };
-    let mut snapshots = items
+    let mut observed_items = items.to_vec();
+    let mut observed_authoritative_viewer_keys = authoritative_viewer_keys.clone();
+    let initial_snapshots = items
         .iter()
         .map(|item| snapshot_from_review(item, authoritative_viewer_keys))
         .collect::<Vec<_>>();
-    if missing_review_resolution.resolves_active_imports() {
-        match resolve_missing_review_snapshots(
-            &snapshots,
+    if let Some(query_scope) = missing_review_resolution.query_scope() {
+        let resolved = resolve_missing_review_items(
+            database,
+            &initial_snapshots,
+            query_scope,
             backport_detection_enabled,
             backport_patterns,
         )
-        .await
-        {
-            Ok(resolved) => snapshots.extend(resolved),
-            Err(error) => {
-                tracing::warn!(%error, "resolve missing task-board review pull requests");
-            }
-        }
+        .await?;
+        let (resolved_items, resolved_authoritative_viewer_keys) = resolved;
+        observed_authoritative_viewer_keys.extend(resolved_authoritative_viewer_keys);
+        observed_items.extend(resolved_items);
     }
-    let result = reconcile_snapshots(snapshots, expected_revision).await;
-    let changed = match result {
-        Ok(Some(changed)) => changed,
-        Ok(None) => return false,
-        Err(error) => {
-            tracing::warn!(%error, "reconcile reviews into task board");
-            return true;
-        }
+    let Some(_revision_guard) = stable_data_revision_guard(expected_revision).await else {
+        return Ok(false);
     };
-    let revision_stable = GitHubProtectedClient::data_revision() == expected_revision;
-    if changed && revision_stable {
-        broadcast_github_data_change(
-            &sender,
-            &GitHubDataChange {
-                revision: GitHubProtectedClient::data_revision(),
-                operation: "reviews.shared_pull_request_projection".to_string(),
-            },
-        );
-    }
-    revision_stable
+    let configured_keys =
+        super::super::task_board_db::reconcile_shared_review_items_db(database, &observed_items)
+            .await?;
+    let mut snapshots = observed_items
+        .iter()
+        .map(|item| snapshot_from_review(item, &observed_authoritative_viewer_keys))
+        .collect::<Vec<_>>();
+    mark_ineligible_snapshots(&mut snapshots, &configured_keys);
+    reconcile_snapshots(database, snapshots).await?;
+    Ok(GitHubProtectedClient::data_revision() == expected_revision)
 }
 
-async fn resolve_missing_review_snapshots(
+async fn resolve_missing_review_items(
+    database: &AsyncDaemonDb,
     snapshots: &[GitHubPullRequestSnapshot],
+    query_scope: &ReviewsQueryRequest,
     backport_detection_enabled: bool,
     backport_patterns: &[String],
-) -> Result<Vec<GitHubPullRequestSnapshot>, CliError> {
-    let imported = load_imported_review_references().await?;
-    let references = references_missing_from_snapshots(imported, snapshots);
+) -> Result<(Vec<ReviewItem>, HashSet<String>), CliError> {
+    let imported = load_imported_review_references(database).await?;
+    let references = references_missing_from_snapshots(imported, snapshots, query_scope);
     if references.is_empty() {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), HashSet::new()));
     }
     let request = ReviewsPullRequestResolveRequest {
         references,
@@ -101,28 +92,22 @@ async fn resolve_missing_review_snapshots(
         backport_patterns: backport_patterns.to_vec(),
     };
     let resolved = super::resolve::fetch_pull_requests_by_reference(&request).await?;
-    Ok(resolved
-        .items
-        .iter()
-        .map(|item| snapshot_from_review(item, &resolved.authoritative_viewer_keys))
-        .collect())
+    Ok((resolved.items, resolved.authoritative_viewer_keys))
 }
 
-async fn load_imported_review_references() -> Result<Vec<(String, u64)>, CliError> {
-    spawn_blocking(|| {
-        imported_review_pull_request_references(&TaskBoardStore::new(default_board_root()))
-    })
-    .await
-    .map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "join task-board review reference discovery: {error}"
-        )))
-    })?
+async fn load_imported_review_references(
+    database: &AsyncDaemonDb,
+) -> Result<Vec<(String, u64)>, CliError> {
+    database
+        .list_task_board_items(None)
+        .await
+        .map(|items| imported_review_references_from_items(&items))
 }
 
 fn references_missing_from_snapshots(
     imported: Vec<(String, u64)>,
     snapshots: &[GitHubPullRequestSnapshot],
+    query_scope: &ReviewsQueryRequest,
 ) -> Vec<ReviewsPullRequestReference> {
     let covered = snapshots
         .iter()
@@ -130,9 +115,46 @@ fn references_missing_from_snapshots(
         .collect::<HashSet<_>>();
     imported
         .into_iter()
+        .filter(|(repository, _)| repository_is_in_query_scope(repository, query_scope))
         .filter(|(repository, number)| !covered.contains(&snapshot_key(repository, *number)))
         .map(|(repository, number)| ReviewsPullRequestReference { repository, number })
         .collect()
+}
+
+fn repository_is_in_query_scope(repository: &str, query_scope: &ReviewsQueryRequest) -> bool {
+    let repository = repository.trim();
+    if query_scope
+        .normalized_exclude_repositories()
+        .iter()
+        .any(|excluded| excluded.eq_ignore_ascii_case(repository))
+    {
+        return false;
+    }
+    if query_scope
+        .normalized_repositories()
+        .iter()
+        .any(|candidate| candidate.eq_ignore_ascii_case(repository))
+    {
+        return true;
+    }
+    let Some((owner, _)) = repository.split_once('/') else {
+        return false;
+    };
+    query_scope
+        .normalized_organizations()
+        .iter()
+        .any(|organization| organization.eq_ignore_ascii_case(owner))
+}
+
+fn mark_ineligible_snapshots(
+    snapshots: &mut [GitHubPullRequestSnapshot],
+    configured_keys: &HashSet<String>,
+) {
+    for snapshot in snapshots {
+        if !configured_keys.contains(&snapshot_key(&snapshot.repository, snapshot.number)) {
+            snapshot.viewer_review_requested = Some(false);
+        }
+    }
 }
 
 fn snapshot_key(repository: &str, number: u64) -> String {
@@ -140,26 +162,20 @@ fn snapshot_key(repository: &str, number: u64) -> String {
 }
 
 async fn reconcile_snapshots(
+    database: &AsyncDaemonDb,
     snapshots: Vec<GitHubPullRequestSnapshot>,
-    expected_revision: u64,
-) -> Result<Option<bool>, CliError> {
-    let Some(_revision_guard) = stable_data_revision_guard(expected_revision).await else {
-        return Ok(None);
-    };
-    spawn_blocking(move || {
-        let _guard = PROJECTION_LOCK
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        let board = TaskBoardStore::new(default_board_root());
-        reconcile_pull_request_snapshots(&board, &snapshots).map(Some)
-    })
-    .await
-    .map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "join reviews task-board reconciliation: {error}"
-        )))
-    })?
+) -> Result<bool, CliError> {
+    let items = database.list_task_board_items(None).await?;
+    let mut changed = false;
+    for item in items {
+        let mutation = database
+            .update_task_board_item(&item.id, |current| {
+                Ok(reconcile_review_item_from_snapshots(current, &snapshots))
+            })
+            .await?;
+        changed |= mutation.is_some();
+    }
+    Ok(changed)
 }
 
 fn snapshot_from_review(
@@ -188,6 +204,10 @@ mod tests {
 
     #[test]
     fn only_imported_references_absent_from_the_aggregate_are_resolved() {
+        let query_scope = ReviewsQueryRequest {
+            repositories: vec!["example/repo".into(), "example/other".into()],
+            ..ReviewsQueryRequest::default()
+        };
         let snapshots = vec![GitHubPullRequestSnapshot {
             repository: "example/repo".into(),
             number: 42,
@@ -199,6 +219,7 @@ mod tests {
         let missing = references_missing_from_snapshots(
             vec![("Example/Repo".into(), 42), ("example/other".into(), 7)],
             &snapshots,
+            &query_scope,
         );
 
         assert_eq!(
@@ -211,8 +232,62 @@ mod tests {
     }
 
     #[test]
+    fn per_repository_query_resolves_only_imports_in_its_scope() {
+        let query_scope = ReviewsQueryRequest {
+            repositories: vec!["acme/api".into()],
+            ..ReviewsQueryRequest::default()
+        };
+
+        let missing = references_missing_from_snapshots(
+            vec![("acme/api".into(), 1), ("acme/web".into(), 2)],
+            &[],
+            &query_scope,
+        );
+
+        assert_eq!(
+            missing,
+            vec![ReviewsPullRequestReference {
+                repository: "acme/api".into(),
+                number: 1,
+            }]
+        );
+    }
+
+    #[test]
+    fn organization_query_respects_owner_scope_and_exclusions() {
+        let query_scope = ReviewsQueryRequest {
+            organizations: vec!["Acme".into()],
+            exclude_repositories: vec!["acme/legacy".into()],
+            ..ReviewsQueryRequest::default()
+        };
+
+        let missing = references_missing_from_snapshots(
+            vec![
+                ("acme/api".into(), 1),
+                ("acme/legacy".into(), 2),
+                ("other/api".into(), 3),
+            ],
+            &[],
+            &query_scope,
+        );
+
+        assert_eq!(
+            missing,
+            vec![ReviewsPullRequestReference {
+                repository: "acme/api".into(),
+                number: 1,
+            }]
+        );
+    }
+
+    #[test]
     fn targeted_refresh_uses_only_its_provided_snapshots() {
-        assert!(MissingReviewResolution::ExactActiveImports.resolves_active_imports());
-        assert!(!MissingReviewResolution::ProvidedSnapshotsOnly.resolves_active_imports());
+        let scoped = MissingReviewResolution::ExactActiveImports(ReviewsQueryRequest::default());
+        assert!(scoped.query_scope().is_some());
+        assert!(
+            MissingReviewResolution::ProvidedSnapshotsOnly
+                .query_scope()
+                .is_none()
+        );
     }
 }

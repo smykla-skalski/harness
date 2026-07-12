@@ -84,7 +84,6 @@ pub const TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE: &str =
     "task_board.git_runtime_secret_handoff_prepare";
 pub const TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK: &str =
     "task_board.git_runtime_secret_handoff_ack";
-pub const TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS: &str = "task_board.git_runtime_drain_secrets";
 pub const POLICY_CANVAS_WORKSPACE_GET: &str = "policy_canvas.workspace_get";
 pub const POLICY_CANVAS_CREATE: &str = "policy_canvas.create";
 pub const POLICY_CANVAS_DUPLICATE: &str = "policy_canvas.duplicate";
@@ -249,7 +248,6 @@ pub const ALL: &[&str] = &[
     TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL_SYNC,
     TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
     TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK,
-    TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
     POLICY_CANVAS_WORKSPACE_GET,
     POLICY_CANVAS_CREATE,
     POLICY_CANVAS_DUPLICATE,

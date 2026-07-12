@@ -3,6 +3,26 @@ import Testing
 @testable import HarnessMonitorKit
 
 extension HarnessMonitorStoreUpdateStreamTests {
+  @Test("Task Board push scopes select only affected dashboard data")
+  func taskBoardPushScopesSelectAffectedData() {
+    #expect(
+      HarnessMonitorStore.taskBoardPushRefreshSelection(scopes: ["task_board:items"])
+        == .init(items: true, orchestratorStatus: false)
+    )
+    #expect(
+      HarnessMonitorStore.taskBoardPushRefreshSelection(scopes: ["task_board:orchestrator"])
+        == .init(items: false, orchestratorStatus: true)
+    )
+    #expect(
+      HarnessMonitorStore.taskBoardPushRefreshSelection(scopes: ["task_board:runtime_config"])
+        == .init(items: false, orchestratorStatus: false)
+    )
+    #expect(
+      HarnessMonitorStore.taskBoardPushRefreshSelection(scopes: ["task_board:future"])
+        == .init(items: true, orchestratorStatus: true)
+    )
+  }
+
   @Test("Same-revision GitHub pushes replace the latest operation")
   func sameRevisionGitHubPushReplacesLatestOperation() {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())

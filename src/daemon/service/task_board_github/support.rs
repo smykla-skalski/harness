@@ -1,25 +1,41 @@
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(test)]
 use std::future::Future;
+#[cfg(test)]
 use std::path::Path;
 
+#[cfg(test)]
 use tokio::runtime::Builder as TokioRuntimeBuilder;
 use uuid::Uuid;
 
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
-use crate::daemon::service::{session_detail_core, session_detail_core_async};
-use crate::errors::{CliError, CliErrorKind};
+use crate::daemon::db::AsyncDaemonDb;
+#[cfg(test)]
+use crate::daemon::db::DaemonDb;
+#[cfg(test)]
+use crate::daemon::service::session_detail_core;
+use crate::daemon::service::session_detail_core_async;
+use crate::errors::CliError;
+#[cfg(test)]
+use crate::errors::CliErrorKind;
 use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
     GitHubPullRequestHandle,
 };
-use crate::task_board::policy_graph::{
-    RecordedPolicyDecision, record_policy_decision, resolve_gate_policy,
-};
+#[cfg(test)]
+use crate::task_board::policy_graph::resolve_gate_policy;
+use crate::task_board::policy_graph::{RecordedPolicyDecision, record_policy_decision};
 use crate::task_board::{
     BuiltInPolicyGate, ExternalProvider, ExternalRefProvider, PolicyAction, PolicyDecision,
-    PolicyGate, PolicyInput, PolicyPipelineMode, PolicySubject, TaskBoardItem,
+    PolicyGate, PolicyGraph, PolicyInput, PolicyPipelineMode, PolicySubject, TaskBoardItem,
     TaskBoardOrchestratorSettings, TaskBoardWorkflowState,
 };
+
+#[derive(Clone, Copy)]
+pub(super) enum AutomationPolicy<'a> {
+    #[cfg(test)]
+    LegacyRoot(&'a Path),
+    Database(Option<(&'a str, &'a PolicyGraph)>),
+}
 
 use super::super::task_board_runtime::external_sync_config_for_repository;
 
@@ -137,6 +153,7 @@ pub(super) fn update_pull_request_metadata(
     workflow.pr_url.clone_from(&pull_request.html_url);
 }
 
+#[cfg(test)]
 pub(super) fn load_session_worktrees(
     items: &[TaskBoardItem],
     db: Option<&DaemonDb>,
@@ -210,7 +227,7 @@ pub(super) fn automation_config(
 }
 
 pub(super) fn action_policy(
-    board_root: &Path,
+    policy: AutomationPolicy<'_>,
     item: &TaskBoardItem,
     action: PolicyAction,
     branch: Option<&str>,
@@ -227,7 +244,15 @@ pub(super) fn action_policy(
         pull_request: pull_request.map(|number| number.to_string()),
         ..PolicySubject::default()
     };
-    if let Some(document) = resolve_gate_policy(board_root)
+    let graph = match policy {
+        #[cfg(test)]
+        AutomationPolicy::LegacyRoot(root) => resolve_gate_policy(root)
+            .map(|document| (document.canvas_id.clone(), document.document.clone())),
+        AutomationPolicy::Database(policy) => {
+            policy.map(|(canvas_id, document)| (Some(canvas_id.to_string()), document.clone()))
+        }
+    };
+    if let Some((canvas_id, document)) = graph
         && document.mode != PolicyPipelineMode::Draft
     {
         let simulation = document.simulate(&policy_input);
@@ -240,7 +265,7 @@ pub(super) fn action_policy(
                 simulation.visited_node_ids,
                 "task_board_github",
             )
-            .with_canvas_id(document.canvas_id.clone()),
+            .with_canvas_id(canvas_id),
         );
         return decision;
     }
@@ -289,6 +314,7 @@ pub(super) fn new_policy_trace_id() -> String {
     format!("policy-trace-{}", Uuid::new_v4().simple())
 }
 
+#[cfg(test)]
 pub(super) fn run_blocking<T>(
     future: impl Future<Output = Result<T, CliError>>,
 ) -> Result<T, CliError> {

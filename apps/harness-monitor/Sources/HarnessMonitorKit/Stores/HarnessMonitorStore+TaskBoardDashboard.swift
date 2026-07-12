@@ -54,10 +54,22 @@ extension HarnessMonitorStore {
   }
 
   nonisolated static func loadTaskBoardRefreshSnapshot(
-    using client: any HarnessMonitorClientProtocol
+    using client: any HarnessMonitorClientProtocol,
+    includeItems: Bool = true,
+    includeOrchestratorStatus: Bool = true
   ) async -> TaskBoardRefreshSnapshot {
-    async let items = loadTaskBoardItemsSnapshot(using: client)
-    async let orchestratorStatus = loadTaskBoardOrchestratorStatusSnapshot(using: client)
+    async let items =
+      if includeItems {
+        loadTaskBoardItemsSnapshot(using: client)
+      } else {
+        TaskBoardSnapshotLoad<[TaskBoardItem]>(measured: nil)
+      }
+    async let orchestratorStatus =
+      if includeOrchestratorStatus {
+        loadTaskBoardOrchestratorStatusSnapshot(using: client)
+      } else {
+        TaskBoardSnapshotLoad<TaskBoardOrchestratorStatus?>(measured: nil)
+      }
     return TaskBoardRefreshSnapshot(
       items: await items,
       orchestratorStatus: await orchestratorStatus

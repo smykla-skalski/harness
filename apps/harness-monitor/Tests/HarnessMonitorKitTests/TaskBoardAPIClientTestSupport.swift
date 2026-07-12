@@ -34,6 +34,11 @@ private func fixtureJSONValue(_ text: String) -> JSONValue {
 }
 
 private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
+  .taskBoardCapabilities: .object([
+    "storage": .string("database"),
+    "revision": .number(7),
+    "instance_id": .string("task-board-instance-1"),
+  ]),
   .taskBoardList: .object(["items": .array([.object(sampleTaskBoardItemJSON)])]),
   .taskBoardCreate: .object(sampleTaskBoardItemJSON),
   .taskBoardGet: .object(sampleTaskBoardItemJSON),
@@ -76,6 +81,14 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .taskBoardOrchestratorRuntimeConfigUpdate: .object(sampleTaskBoardGitRuntimeConfigJSON),
   .taskBoardOrchestratorGitHubTokensSync: .object(sampleGitHubTokensSyncJSON),
   .taskBoardOrchestratorTodoistTokenSync: .object(sampleTodoistTokenSyncJSON),
+  .taskBoardGitRuntimeSecretHandoffPrepare: .object([
+    "prepared": .bool(true),
+    "migration_id": .string("migration-1"),
+    "digest": .string("digest-1"),
+    "runtime": .object(sampleTaskBoardGitRuntimeConfigJSON),
+  ]),
+  .taskBoardGitRuntimeSecretHandoffAck: .object(["acknowledged": .bool(true)]),
+  .taskBoardGitRuntimeKeyMaterialSync: .object(["synchronized": .bool(true)]),
   .policyCanvasWorkspaceGet: .object(samplePolicyCanvasWorkspaceJSON),
   .policyCanvasCreate: .object(samplePolicyCanvasWorkspaceCreatedJSON),
   .policyCanvasDuplicate: .object(samplePolicyCanvasWorkspaceDuplicateJSON),
@@ -131,6 +144,11 @@ private let taskBoardRPCResponses: [WebSocketRPCMethod: JSONValue] = [
   .reviewsTimeline: fixtureJSONValue(sampleReviewsTimelineResponseText),
 ]
 
+private let sampleSecretHandoffPrepareText =
+  #"{"prepared":true,"migration_id":"migration-1","digest":"digest-1","runtime":"#
+  + sampleTaskBoardGitRuntimeConfigText
+  + "}"
+
 final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
   struct RecordedRequest {
     let path: String
@@ -152,6 +170,8 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
   private static let lock = NSLock()
   nonisolated(unsafe) private static var recordedRequests: [RecordedRequest] = []
   private static let responseBodies: [Route: String] = [
+    Route("/v1/task-board/capabilities", method: "GET"):
+      #"{"storage":"database","revision":7,"instance_id":"task-board-instance-1"}"#,
     Route("/v1/task-board/items", method: "GET"): #"{"items":[\#(sampleTaskBoardItemJSONString)]}"#,
     Route("/v1/task-board/items/board-1/planning/begin"): sampleTaskBoardPlanningResponseText,
     Route("/v1/task-board/items/board-1/planning/submit"): sampleTaskBoardPlanningResponseText,
@@ -171,6 +191,12 @@ final class TaskBoardURLProtocol: URLProtocol, @unchecked Sendable {
     Route("/v1/task-board/orchestrator/runtime-config"): sampleTaskBoardGitRuntimeConfigText,
     Route("/v1/task-board/orchestrator/github-tokens"): sampleGitHubTokensSyncText,
     Route("/v1/task-board/orchestrator/todoist-token"): sampleTodoistTokenSyncText,
+    Route("/v1/task-board/git/runtime/secret-handoff/prepare"):
+      sampleSecretHandoffPrepareText,
+    Route("/v1/task-board/git/runtime/secret-handoff/ack"):
+      #"{"acknowledged":true}"#,
+    Route("/v1/task-board/git/runtime/key-material", method: "PUT"):
+      #"{"synchronized":true}"#,
     Route("/v1/policy-canvases", method: "GET"): samplePolicyCanvasWorkspaceText,
     Route("/v1/policy-canvases/create"): samplePolicyCanvasWorkspaceCreatedText,
     Route("/v1/policy-canvases/duplicate"): samplePolicyCanvasWorkspaceDuplicateText,

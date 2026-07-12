@@ -17,17 +17,22 @@ extension HarnessMonitorStore {
       }
 
       var attempt = 0
+      var hasSeenReady = false
       while !Task.isCancelled {
         do {
           for try await event in await client.globalStream() {
             recordReconnectRecovery(detail: "Global stream restored")
             attempt = 0
             recordStreamEvent(countedInTraffic: true)
-            if case .ready = event.kind {
-              await recoverGlobalPushOnlyState(using: client)
-              continue
+            guard
+              await processGlobalStreamEvent(
+                event,
+                using: client,
+                hasSeenReady: &hasSeenReady
+              )
+            else {
+              return
             }
-            await applyGlobalPushEventFromStream(event)
           }
         } catch {
           if Task.isCancelled {
@@ -134,24 +139,6 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func recoverGlobalPushOnlyState(
-    using client: any HarnessMonitorClientProtocol
-  ) async {
-    do {
-      let measuredLogLevel = try await Self.measureOperation {
-        try await client.logLevel()
-      }
-      recordRequestSuccess()
-      daemonLogLevel = measuredLogLevel.value.level
-    } catch {
-      let err = error.localizedDescription
-      HarnessMonitorLogger.store.warning(
-        "websocket reconnect log-level refresh failed: \(err, privacy: .public)"
-      )
-    }
-    await recoverGitHubDataPushState(using: client)
-  }
-
   func applyGlobalPushEvent(_ event: DaemonPushEvent) {
     if applyManagedAgentPushEvent(event) {
       scheduleSupervisorTick(reason: "global-managed-agent")
@@ -242,7 +229,8 @@ extension HarnessMonitorStore {
       shouldTickSupervisor = true
     case .codexRunUpdated, .codexApprovalRequested, .agentTuiUpdated, .acpAgentUpdated,
       .acpInspect, .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
-      .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved, .githubDataChanged, .auditEvent:
+      .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved, .githubDataChanged,
+      .taskBoardUpdated, .auditEvent:
       break
     case .reviewsLocalCloneProgress(let progress):
       applyLocalCloneProgress(progress)
@@ -295,7 +283,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func applyGlobalPushEventFromStream(_ event: DaemonPushEvent) async {
+  func applyGlobalPushEventFromStream(_ event: DaemonPushEvent) async {
     if await applyManagedAgentPushEventFromStream(event) {
       scheduleSupervisorTick(reason: "global-managed-agent")
       return

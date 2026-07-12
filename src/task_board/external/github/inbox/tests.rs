@@ -127,6 +127,7 @@ fn inbox_client_with_base_uri(base_uri: String, repositories: &[&str]) -> GitHub
         client,
         repositories,
         import_labels: Vec::new(),
+        include_review_requests: true,
     }
 }
 

@@ -1,40 +1,34 @@
 use crate::app::command_context::{AppContext, Execute};
+use crate::daemon::protocol::{
+    TaskBoardAuditRequest, TaskBoardCreateItemRequest, TaskBoardListItemsRequest,
+    TaskBoardUpdateIdentityClears, TaskBoardUpdateItemRequest, TaskBoardUpdateStateClears,
+};
 use crate::errors::CliError;
-use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
-use crate::task_board::summary::build_audit_summary;
 use crate::task_board::types::{ExternalRef, TaskBoardItem};
-use crate::workspace::utc_now;
 
 use super::{
     TaskBoardAuditArgs, TaskBoardCreateArgs, TaskBoardDeleteArgs, TaskBoardGetArgs,
-    TaskBoardListArgs, TaskBoardUpdateArgs, new_task_id, print_json, store,
+    TaskBoardListArgs, TaskBoardUpdateArgs, daemon_client, print_json,
 };
 
 impl Execute for TaskBoardCreateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let now = utc_now();
-        let mut item = TaskBoardItem::new(
-            self.id.clone().unwrap_or_else(new_task_id),
-            self.title.clone(),
-            self.body.clone(),
-            now,
-        );
-        item.priority = self.priority;
-        item.agent_mode = self.agent_mode;
-        item.tags.clone_from(&self.tag);
-        item.project_id.clone_from(&self.project_id);
-        item.target_project_types
-            .clone_from(&self.target_project_type);
-        item.external_refs = self.fields.external_refs();
-        if let Some(planning) = self.fields.planning() {
-            item.planning = planning;
-        }
-        if let Some(workflow) = self.fields.workflow(None) {
-            item.workflow = workflow;
-        }
-        item.session_id.clone_from(&self.fields.session_id);
-        item.work_item_id.clone_from(&self.fields.work_item_id);
-        let item = store(self.board_root.clone()).create(&self.title, &self.body, item)?;
+        let request = TaskBoardCreateItemRequest {
+            title: self.title.clone(),
+            body: self.body.clone(),
+            priority: self.priority,
+            agent_mode: self.agent_mode,
+            tags: self.tag.clone(),
+            project_id: self.project_id.clone(),
+            target_project_types: self.target_project_type.clone(),
+            external_refs: self.fields.external_refs(),
+            planning: self.fields.planning().unwrap_or_default(),
+            workflow: self.fields.workflow(None),
+            session_id: self.fields.session_id.clone(),
+            work_item_id: self.fields.work_item_id.clone(),
+            id: self.id.clone(),
+        };
+        let item = daemon_client()?.create_task_board_item(&request)?;
         print_json(&item)?;
         Ok(0)
     }
@@ -42,7 +36,9 @@ impl Execute for TaskBoardCreateArgs {
 
 impl Execute for TaskBoardListArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let items = store(self.board_root.clone()).list(self.status)?;
+        let items = daemon_client()?.list_task_board_items(&TaskBoardListItemsRequest {
+            status: self.status,
+        })?;
         if self.json {
             print_json(&items)?;
         } else {
@@ -59,7 +55,7 @@ impl Execute for TaskBoardListArgs {
 
 impl Execute for TaskBoardGetArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let item = store(self.board_root.clone()).get(&self.id)?;
+        let item = daemon_client()?.get_task_board_item(&self.id)?;
         if self.json {
             print_json(&item)?;
         } else {
@@ -71,49 +67,46 @@ impl Execute for TaskBoardGetArgs {
 
 impl Execute for TaskBoardUpdateArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let board = store(self.board_root.clone());
+        let client = daemon_client()?;
         let current = self
             .fields
             .has_workflow_update()
-            .then(|| board.get(&self.id))
+            .then(|| client.get_task_board_item(&self.id))
             .transpose()?;
-        let patch = self.patch(current.as_ref());
-        let item = board.update(&self.id, patch)?;
+        let request = self.request(current.as_ref());
+        let item = client.update_task_board_item(&self.id, &request)?;
         print_json(&item)?;
         Ok(0)
     }
 }
 
 impl TaskBoardUpdateArgs {
-    fn patch(&self, current: Option<&TaskBoardItem>) -> TaskBoardItemPatch {
-        TaskBoardItemPatch {
+    fn request(&self, current: Option<&TaskBoardItem>) -> TaskBoardUpdateItemRequest {
+        TaskBoardUpdateItemRequest {
             title: self.title.clone(),
             body: self.body.clone(),
             status: self.status,
             priority: self.priority,
+            agent_mode: self.agent_mode,
             tags: (!self.tag.is_empty()).then(|| self.tag.clone()),
-            project_id: self.project_patch(),
+            project_id: self.project_id.clone(),
             target_project_types: (!self.target_project_type.is_empty())
                 .then(|| self.target_project_type.clone()),
-            agent_mode: self.agent_mode,
+            clear_identity: TaskBoardUpdateIdentityClears {
+                clear_project_id: self.clear_links.clear_project,
+                clear_session_id: self.clear_links.clear_session,
+                clear_work_item_id: self.clear_links.clear_work_item,
+            },
             external_refs: self.external_refs_patch(),
             planning: self.fields.planning(),
-            clear_planning: self.clear_state.clear_planning,
-            clear_approval: false,
+            clear_state: TaskBoardUpdateStateClears {
+                clear_planning: self.clear_state.clear_planning,
+                clear_workflow: self.clear_state.clear_workflow,
+            },
             workflow: self.fields.workflow(current.map(|item| &item.workflow)),
-            clear_workflow: self.clear_state.clear_workflow,
-            session_id: self.session_patch(),
-            work_item_id: self.work_item_patch(),
+            session_id: self.fields.session_id.clone(),
+            work_item_id: self.fields.work_item_id.clone(),
         }
-    }
-
-    fn project_patch(&self) -> OptionalFieldPatch<String> {
-        if self.clear_links.clear_project {
-            return OptionalFieldPatch::Clear;
-        }
-        self.project_id
-            .clone()
-            .map_or(OptionalFieldPatch::Unchanged, OptionalFieldPatch::Set)
     }
 
     fn external_refs_patch(&self) -> Option<Vec<ExternalRef>> {
@@ -125,31 +118,11 @@ impl TaskBoardUpdateArgs {
                 .then(|| self.fields.external_refs())
         }
     }
-
-    fn session_patch(&self) -> OptionalFieldPatch<String> {
-        if self.clear_links.clear_session {
-            return OptionalFieldPatch::Clear;
-        }
-        self.fields
-            .session_id
-            .clone()
-            .map_or(OptionalFieldPatch::Unchanged, OptionalFieldPatch::Set)
-    }
-
-    fn work_item_patch(&self) -> OptionalFieldPatch<String> {
-        if self.clear_links.clear_work_item {
-            return OptionalFieldPatch::Clear;
-        }
-        self.fields
-            .work_item_id
-            .clone()
-            .map_or(OptionalFieldPatch::Unchanged, OptionalFieldPatch::Set)
-    }
 }
 
 impl Execute for TaskBoardDeleteArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let item = store(self.board_root.clone()).delete(&self.id)?;
+        let item = daemon_client()?.delete_task_board_item(&self.id)?;
         print_json(&item)?;
         Ok(0)
     }
@@ -157,8 +130,7 @@ impl Execute for TaskBoardDeleteArgs {
 
 impl Execute for TaskBoardAuditArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let items = store(self.board_root.clone()).list(None)?;
-        let summary = build_audit_summary(&items);
+        let summary = daemon_client()?.audit_task_board(&TaskBoardAuditRequest { status: None })?;
         if self.json {
             print_json(&summary)?;
         } else {

@@ -1,18 +1,27 @@
 use std::collections::BTreeSet;
+#[cfg(test)]
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
+use chrono::Utc;
 use tokio::task::JoinHandle;
 use tokio::time::interval as tokio_interval;
 
+use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::service::observe_async_db;
 use crate::errors::CliError;
-use crate::reviews::policy::{REVIEWS_CHECKS_PASSED_EVENT, ReviewsPolicyActionExecutor};
+use crate::reviews::policy::REVIEWS_CHECKS_PASSED_EVENT;
+#[cfg(test)]
+use crate::reviews::policy::ReviewsPolicyActionExecutor;
 use crate::reviews::{ReviewCheckStatus, ReviewItem, ReviewsPolicyRunResponse};
+#[cfg(test)]
 use crate::task_board::policy_runtime::inbox::PolicyEventInbox;
 use crate::task_board::policy_runtime::models::PolicyWorkflowEvent;
-use crate::task_board::store::default_board_root;
 
-use super::policy::{resume_reviews_policy_event, resume_reviews_policy_event_with_executor};
+#[cfg(test)]
+use super::policy::resume_reviews_policy_event_with_executor;
+use super::policy::{require_policy_runtime_db, resume_reviews_policy_event};
 
 /// Derive `reviews.checks_passed` wake-ups from a fresh reviews snapshot,
 /// durably enqueue them, and immediately attempt an inline resume so an open
@@ -20,11 +29,11 @@ use super::policy::{resume_reviews_policy_event, resume_reviews_policy_event_wit
 /// loop still resumes the run when the inline attempt races a concurrent claim
 /// or its token is momentarily unavailable.
 pub(crate) async fn resume_waiting_reviews_policy_runs(items: &[ReviewItem]) {
-    resume_waiting_reviews_policy_runs_in(default_board_root(), items).await;
-}
-
-async fn resume_waiting_reviews_policy_runs_in(root: PathBuf, items: &[ReviewItem]) {
-    let inbox = PolicyEventInbox::new(root);
+    let Ok(database) =
+        require_policy_runtime_db(observe_async_db()).inspect_err(log_policy_event_database_error)
+    else {
+        return;
+    };
     let subject_keys = items
         .iter()
         .filter(|item| item.check_status == ReviewCheckStatus::Success)
@@ -33,7 +42,7 @@ async fn resume_waiting_reviews_policy_runs_in(root: PathBuf, items: &[ReviewIte
         .collect::<BTreeSet<_>>();
     for subject_key in subject_keys {
         let event = PolicyWorkflowEvent::named(REVIEWS_CHECKS_PASSED_EVENT, &subject_key);
-        enqueue_and_resume_checks_passed_event(&inbox, &event).await;
+        enqueue_and_resume_checks_passed_event(&database, &event).await;
     }
 }
 
@@ -42,15 +51,24 @@ async fn resume_waiting_reviews_policy_runs_in(root: PathBuf, items: &[ReviewIte
 /// transient resume error still leaves the event durably queued for the drain
 /// loop.
 async fn enqueue_and_resume_checks_passed_event(
-    inbox: &PolicyEventInbox,
+    database: &Arc<AsyncDaemonDb>,
     event: &PolicyWorkflowEvent,
 ) {
-    let _ = inbox
-        .publish(event.clone())
+    let _ = database
+        .publish_policy_event_at(event.clone(), Utc::now())
+        .await
         .inspect_err(|error| log_enqueue_event_error(event, error));
     let _ = resume_reviews_policy_event(event)
         .await
         .inspect_err(|error| log_resume_waiting_runs_error(event, error));
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_policy_event_database_error(error: &CliError) {
+    tracing::warn!(%error, "reviews policy event database is unavailable");
 }
 
 #[expect(
@@ -83,9 +101,8 @@ fn log_resume_waiting_runs_error(event: &PolicyWorkflowEvent, error: &CliError) 
 /// event, then remove the delivered events. Domain-agnostic in storage; reviews
 /// is the first event producer and consumer.
 pub async fn resume_due_reviews_policy_events() -> Result<Vec<ReviewsPolicyRunResponse>, CliError> {
-    let root = default_board_root();
-    let inbox = PolicyEventInbox::new(root);
-    let pending = inbox.pending()?;
+    let database = require_policy_runtime_db(observe_async_db())?;
+    let pending = database.pending_policy_events().await?;
     if pending.is_empty() {
         return Ok(Vec::new());
     }
@@ -97,7 +114,9 @@ pub async fn resume_due_reviews_policy_events() -> Result<Vec<ReviewsPolicyRunRe
             delivered.push(event);
         }
     }
-    inbox.remove_delivered(&delivered)?;
+    database
+        .remove_delivered_policy_events_at(&delivered, Utc::now())
+        .await?;
     Ok(resumed_runs)
 }
 
@@ -126,7 +145,7 @@ fn log_drain_event_error(event: &PolicyWorkflowEvent, error: &CliError) {
     );
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub(crate) async fn resume_due_reviews_policy_events_with_executor_at<E>(
     root: PathBuf,
     executor: E,

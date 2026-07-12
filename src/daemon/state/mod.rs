@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 mod audit;
 mod config;
+mod config_migration;
 mod locks;
 mod manifest;
 mod migration;
@@ -24,13 +25,25 @@ pub use audit::{
     read_recent_events,
 };
 pub use config::{
-    DaemonRuntimeConfig, VALID_LOG_LEVELS, drain_task_board_git_runtime_secrets,
-    load_persisted_log_level, load_runtime_config, load_task_board_git_runtime_config,
-    parse_log_level, persist_log_level, persist_task_board_git_runtime_config,
-    replace_task_board_git_runtime_secrets, replace_task_board_github_tokens,
-    replace_task_board_openrouter_token, replace_task_board_todoist_token,
-    task_board_git_runtime_profile, task_board_github_repository_token, task_board_github_token,
+    DaemonRuntimeConfig, VALID_LOG_LEVELS, load_persisted_log_level, load_runtime_config,
+    parse_log_level, persist_log_level, replace_task_board_git_runtime_secrets,
+    replace_task_board_github_tokens, replace_task_board_openrouter_token,
+    replace_task_board_todoist_token, task_board_github_repository_token, task_board_github_token,
     task_board_openrouter_token, task_board_todoist_token,
+};
+pub(crate) use config::{
+    load_runtime_config_raw, overlay_task_board_git_runtime_profile_secrets,
+    overlay_task_board_git_runtime_secret_flags, overlay_task_board_git_runtime_secrets,
+    retaining_task_board_git_runtime_secrets,
+};
+#[cfg(test)]
+pub use config::{
+    load_task_board_git_runtime_config, persist_task_board_git_runtime_config,
+    task_board_git_runtime_profile,
+};
+pub(crate) use config_migration::{
+    remove_migrated_task_board_config_after_ack, remove_migrated_task_board_config_if_safe,
+    task_board_git_runtime_secret_handoff_digest,
 };
 pub use locks::{acquire_singleton_lock, daemon_lock_is_held, daemon_lock_is_held_at};
 pub use manifest::{clear_manifest_for_pid, load_manifest, load_running_manifest, write_manifest};

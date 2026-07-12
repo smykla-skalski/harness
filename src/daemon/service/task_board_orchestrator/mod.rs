@@ -1,4 +1,4 @@
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db::DaemonDb;
 use crate::daemon::protocol::{
     TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorRunOnceResponse, TaskBoardOrchestratorSettingsResponse,
@@ -14,14 +14,9 @@ use crate::task_board::{
     TaskBoardOrchestratorTickPhase, TaskBoardStatus, build_audit_summary, default_board_root,
 };
 
-use super::task_board::{
-    dispatch_task_board, dispatch_task_board_async, run_task_board_sync_blocking_with_config,
-    sync_task_board_async_with_config,
-};
-use super::task_board_evaluation::{evaluate_task_board, evaluate_task_board_async};
-use super::task_board_github::{
-    run_task_board_github_automation, run_task_board_github_automation_async,
-};
+use super::task_board::{dispatch_task_board, run_task_board_sync_blocking_with_config};
+use super::task_board_evaluation::evaluate_task_board;
+use super::task_board_github::run_task_board_github_automation;
 use super::task_board_runtime::external_sync_config_for_repository;
 
 /// Load task-board orchestrator status from durable JSON state.
@@ -118,62 +113,6 @@ pub fn run_task_board_orchestrator_once(
     orchestrator.complete_run_with_evaluation(prepared, dispatch, Some(evaluation))
 }
 
-/// Run one task-board orchestrator tick through the async daemon DB path.
-///
-/// # Errors
-/// Returns `CliError` when summaries, dispatch, or state persistence fails.
-pub(crate) async fn run_task_board_orchestrator_once_async(
-    request: &TaskBoardOrchestratorRunOnceRequest,
-    async_db: &AsyncDaemonDb,
-) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
-    let orchestrator = orchestrator();
-    let mut prepared = orchestrator.prepare_run(request)?;
-    if let Err(error) = sync_github_tasks_async(&orchestrator, &mut prepared).await {
-        orchestrator.fail_run(&prepared, &error)?;
-        return Err(error);
-    }
-    let dispatch_request = dispatch_request_from_input(&prepared.input);
-    let dispatch = match dispatch_task_board_async(&dispatch_request, async_db).await {
-        Ok(dispatch) => dispatch,
-        Err(error) => {
-            orchestrator.fail_run(&prepared, &error)?;
-            return Err(error);
-        }
-    };
-    orchestrator.record_run_phase(&prepared, TaskBoardOrchestratorTickPhase::Evaluation)?;
-    let evaluation = match evaluate_task_board_async(
-        &TaskBoardEvaluateRequest {
-            item_id: prepared.input.item_id.clone(),
-            status: None,
-            dry_run: prepared.input.dry_run,
-        },
-        async_db,
-    )
-    .await
-    {
-        Ok(evaluation) => evaluation,
-        Err(error) => {
-            orchestrator.fail_run(&prepared, &error)?;
-            return Err(error);
-        }
-    };
-    let items = orchestrator.items_for_input(&prepared.input)?;
-    let board_root = default_board_root();
-    if let Err(error) = run_task_board_github_automation_async(
-        &board_root,
-        &orchestrator.settings()?,
-        &prepared.input,
-        &items,
-        async_db,
-    )
-    .await
-    {
-        orchestrator.fail_run(&prepared, &error)?;
-        return Err(error);
-    }
-    orchestrator.complete_run_with_evaluation(prepared, dispatch, Some(evaluation))
-}
-
 fn orchestrator() -> TaskBoardOrchestrator {
     TaskBoardOrchestrator::new(default_board_root())
 }
@@ -211,17 +150,6 @@ where
         return Ok(());
     };
     let sync = run_sync(&sync_request(&prepared.input), config)?;
-    refresh_prepared_run(orchestrator, prepared, sync)
-}
-
-async fn sync_github_tasks_async(
-    orchestrator: &TaskBoardOrchestrator,
-    prepared: &mut TaskBoardOrchestratorPreparedRun,
-) -> Result<(), CliError> {
-    let Some(config) = github_sync_config(orchestrator, &prepared.input)? else {
-        return Ok(());
-    };
-    let sync = sync_task_board_async_with_config(&sync_request(&prepared.input), config).await?;
     refresh_prepared_run(orchestrator, prepared, sync)
 }
 
