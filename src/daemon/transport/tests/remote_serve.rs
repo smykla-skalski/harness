@@ -98,6 +98,14 @@ fn daemon_remote_serve_execution_plan_uses_remote_auth_and_tls() {
     assert_eq!(plan.service_config.host, "0.0.0.0");
     assert_eq!(plan.service_config.port, 443);
     assert_eq!(plan.service_config.auth_mode, DaemonHttpAuthMode::Remote);
+    let limits = plan
+        .service_config
+        .remote_request_limits
+        .expect("remote request limits");
+    assert!(limits.max_http_body_bytes > 0);
+    assert!(limits.max_http_concurrency > 0);
+    assert!(limits.max_concurrent_tls_handshakes > 0);
+    assert!(limits.max_websocket_connections > 0);
     assert_eq!(
         plan.service_config.remote_domain.as_deref(),
         Some("daemon.example.com")

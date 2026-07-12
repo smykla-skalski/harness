@@ -55,6 +55,7 @@ pub(super) async fn test_http_state_with_empty_async_db(
         token: "token".into(),
         auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
         remote_domain: None,
+        remote_request_limits: None,
         remote_pairing_limiter: super::super::default_remote_pairing_limiter(),
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,

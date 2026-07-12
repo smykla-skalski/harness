@@ -53,6 +53,56 @@ pub(crate) async fn handle_message(
     })
 }
 
+pub(crate) fn handle_overloaded_message(
+    text: &str,
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+    status: u16,
+    message: &str,
+) -> Vec<Message> {
+    let request: WsRequest = match serde_json::from_str(text) {
+        Ok(request) => request,
+        Err(error) => {
+            return serialize_error_response_frames(
+                None,
+                "MALFORMED_MESSAGE",
+                &format!("failed to parse message: {error}"),
+            );
+        }
+    };
+    if let Err(response) = authorize_remote_ws_request(
+        &request,
+        state,
+        connection,
+        RemoteWsAllowedAudit::Failure(message),
+    ) {
+        return serialize_response_frames(&response).unwrap_or_else(|_| {
+            serialize_error_response_frames(
+                Some(&request.id),
+                "SERIALIZE_ERROR",
+                "failed to serialize remote authorization response",
+            )
+        });
+    }
+    let response = error_response_with_payload(
+        &request.id,
+        WsErrorPayload {
+            code: "REMOTE_LIMITS".to_string(),
+            message: message.to_string(),
+            details: Vec::new(),
+            status_code: Some(status),
+            data: None,
+        },
+    );
+    serialize_response_frames(&response).unwrap_or_else(|_| {
+        serialize_error_response_frames(
+            Some(&request.id),
+            "SERIALIZE_ERROR",
+            "failed to serialize remote limit response",
+        )
+    })
+}
+
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
@@ -131,7 +181,9 @@ async fn dispatch_inner(
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> WsResponse {
-    if let Err(response) = authorize_remote_ws_request(request, state, connection) {
+    if let Err(response) =
+        authorize_remote_ws_request(request, state, connection, RemoteWsAllowedAudit::Success)
+    {
         return *response;
     }
     if let Some(response) = with_connection_actor(
@@ -166,10 +218,17 @@ async fn with_connection_actor<T>(
     }
 }
 
+#[derive(Clone, Copy)]
+enum RemoteWsAllowedAudit<'a> {
+    Success,
+    Failure(&'a str),
+}
+
 fn authorize_remote_ws_request(
     request: &WsRequest,
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
+    allowed_audit: RemoteWsAllowedAudit<'_>,
 ) -> Result<(), Box<WsResponse>> {
     if state.auth_mode == DaemonHttpAuthMode::Local || !is_declared_ws_method(&request.method) {
         return Ok(());
@@ -190,15 +249,31 @@ fn authorize_remote_ws_request(
         return Err(Box::new(remote_ws_auth_error_response(&request.id, error)));
     };
     match authorize_remote_ws_method(&client, &request.method) {
-        Ok(decision) => RemoteAuthorizationAudit::allowed(
-            &request.id,
-            &client.client_id,
-            &request.method,
-            decision.required_scope,
-            remote_addr.as_deref(),
-        )
-        .record(state.db.get())
-        .map_err(|error| remote_ws_audit_error_response(request, &error)),
+        Ok(decision) => {
+            let audit = match allowed_audit {
+                RemoteWsAllowedAudit::Success => RemoteAuthorizationAudit::allowed(
+                    &request.id,
+                    &client.client_id,
+                    &request.method,
+                    decision.required_scope,
+                    remote_addr.as_deref(),
+                ),
+                RemoteWsAllowedAudit::Failure(error_detail) => {
+                    RemoteAuthorizationAudit::allowed_failure(
+                        &request.id,
+                        &client.client_id,
+                        &request.method,
+                        decision.required_scope,
+                        remote_addr.as_deref(),
+                        error_detail,
+                    )
+                }
+            };
+            audit
+                .record(state.db.get())
+                .map(|_| ())
+                .map_err(|error| remote_ws_audit_error_response(request, &error))
+        }
         Err(error) => {
             record_remote_ws_denial(
                 request,
@@ -250,6 +325,7 @@ fn record_remote_ws_denial(
         &error.to_string(),
     )
     .record(state.db.get())
+    .map(|_| ())
     .map_err(|audit_error| remote_ws_audit_error_response(request, &audit_error))
 }
 

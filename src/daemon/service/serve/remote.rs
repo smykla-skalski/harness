@@ -41,7 +41,7 @@ pub async fn serve_remote_https(
     shutdown_tx: tokio_watch::Sender<bool>,
     shutdown_rx: tokio_watch::Receiver<bool>,
 ) -> Result<(), CliError> {
-    validate_remote_https_config(&config)?;
+    let remote_request_limits = build_remote_request_limits(&config)?;
     super::super::log_sandbox_startup(config.sandboxed);
     run_startup_sweep();
 
@@ -53,17 +53,13 @@ pub async fn serve_remote_https(
 
     let tls_config = RemoteTlsConfigHandle::new(acme_plan.certificate().clone())
         .map_err(|error| remote_tls_config_cli_error(&error))?;
+    let request_limit_config = remote_request_limits.config();
     tracing::info!(
         tls_generation = tls_config.generation(),
         certificate_fingerprint = %tls_config.certificate_fingerprint(),
         "remote TLS certificate loaded",
     );
-    let listener =
-        RemoteTlsListener::bind_reloadable((config.host.as_str(), config.port), &tls_config)
-            .await
-            .map_err(|error| {
-                CliErrorKind::workflow_io(format!("bind remote HTTPS listener: {error}"))
-            })?;
+    let listener = bind_remote_tls_listener(&config, &tls_config, request_limit_config).await?;
     let endpoint = acme_plan.public_https_origin();
     let manifest = remote_daemon_manifest(&endpoint, config.sandboxed);
     state::append_event("info", &remote_bound_event_message(&endpoint))?;
@@ -107,6 +103,7 @@ pub async fn serve_remote_https(
         token: String::new(),
         auth_mode: config.auth_mode,
         remote_domain: config.remote_domain.clone(),
+        remote_request_limits: Some(remote_request_limits),
         remote_pairing_limiter: http::default_remote_pairing_limiter(),
         sender,
         prepared_sender,
@@ -145,6 +142,37 @@ pub async fn serve_remote_https(
     }
 }
 
+fn build_remote_request_limits(
+    config: &DaemonServeConfig,
+) -> Result<http::RemoteRequestLimits, CliError> {
+    validate_remote_https_config(config)?;
+    let request_limits = config.remote_request_limits.ok_or_else(|| {
+        CliError::from(CliErrorKind::workflow_parse(
+            "remote HTTPS serve requires request limits",
+        ))
+    })?;
+    http::RemoteRequestLimits::new(request_limits)
+}
+
+async fn bind_remote_tls_listener(
+    config: &DaemonServeConfig,
+    tls_config: &RemoteTlsConfigHandle,
+    limits: http::RemoteRequestLimitConfig,
+) -> Result<RemoteTlsListener, CliError> {
+    RemoteTlsListener::bind_reloadable_with_limits(
+        (config.host.as_str(), config.port),
+        tls_config,
+        limits.max_concurrent_tls_handshakes,
+        limits.tls_handshake_timeout,
+    )
+    .await
+    .map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "bind remote HTTPS listener: {error}"
+        )))
+    })
+}
+
 fn start_remote_acme_renewal(
     db: &Arc<OnceLock<Arc<Mutex<DaemonDb>>>>,
     tls: RemoteTlsConfigHandle,
@@ -176,6 +204,12 @@ fn validate_remote_https_config(config: &DaemonServeConfig) -> Result<(), CliErr
             CliErrorKind::workflow_parse("remote HTTPS serve requires a remote domain").into(),
         );
     }
+    let request_limits = config.remote_request_limits.ok_or_else(|| {
+        CliError::from(CliErrorKind::workflow_parse(
+            "remote HTTPS serve requires request limits",
+        ))
+    })?;
+    request_limits.validate()?;
     Ok(())
 }
 
@@ -211,7 +245,7 @@ fn remote_audit_bound_summary(endpoint: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::daemon::http::DaemonHttpAuthMode;
+    use crate::daemon::http::{DaemonHttpAuthMode, RemoteRequestLimitConfig};
     use crate::daemon::service::DaemonServeConfig;
 
     use super::{
@@ -265,10 +299,41 @@ mod tests {
     }
 
     #[test]
+    fn validate_remote_https_config_requires_request_limits() {
+        let config = DaemonServeConfig {
+            auth_mode: DaemonHttpAuthMode::Remote,
+            remote_domain: Some("daemon.example.com".to_string()),
+            ..DaemonServeConfig::default()
+        };
+        let error = validate_remote_https_config(&config)
+            .expect_err("remote HTTPS should reject missing request limits");
+
+        assert!(error.to_string().contains("request limits"));
+    }
+
+    #[test]
+    fn validate_remote_https_config_rejects_disabled_request_limits() {
+        let config = DaemonServeConfig {
+            auth_mode: DaemonHttpAuthMode::Remote,
+            remote_domain: Some("daemon.example.com".to_string()),
+            remote_request_limits: Some(RemoteRequestLimitConfig {
+                max_http_concurrency: 0,
+                ..RemoteRequestLimitConfig::default()
+            }),
+            ..DaemonServeConfig::default()
+        };
+        let error = validate_remote_https_config(&config)
+            .expect_err("remote HTTPS should reject disabled request limits");
+
+        assert!(error.to_string().contains("non-zero HTTP concurrency"));
+    }
+
+    #[test]
     fn validate_remote_https_config_accepts_remote_auth_and_domain() {
         let config = DaemonServeConfig {
             auth_mode: DaemonHttpAuthMode::Remote,
             remote_domain: Some("daemon.example.com".to_string()),
+            remote_request_limits: Some(RemoteRequestLimitConfig::default()),
             ..DaemonServeConfig::default()
         };
 

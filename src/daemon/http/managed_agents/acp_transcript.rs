@@ -84,6 +84,7 @@ mod tests {
             token: "token".into(),
             auth_mode: crate::daemon::http::DaemonHttpAuthMode::Local,
             remote_domain: None,
+            remote_request_limits: None,
             remote_pairing_limiter: crate::daemon::http::default_remote_pairing_limiter(),
             sender: sender.clone(),
             prepared_sender: broadcast::channel(8).0,

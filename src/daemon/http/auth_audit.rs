@@ -1,3 +1,5 @@
+use std::sync::{Arc, OnceLock};
+
 use axum::Json;
 use axum::body::Body;
 use axum::extract::connect_info::ConnectInfo;
@@ -9,7 +11,9 @@ use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_auth::{
     REMOTE_CLIENT_ID_HEADER, RemoteAuthError, remote_http_required_scope,
 };
-use crate::daemon::remote_request_audit::RemoteAuthorizationAudit;
+use crate::daemon::remote_request_audit::{
+    RemoteAuthorizationAudit, RemoteAuthorizationAuditReceipt,
+};
 use crate::errors::CliError;
 
 use super::{DaemonConnectInfo, DaemonHttpState};
@@ -17,12 +21,26 @@ use super::{DaemonConnectInfo, DaemonHttpState};
 const AUDIT_CLIENT_ID_MAX_CHARS: usize = 256;
 const REMOTE_AUDIT_UNAVAILABLE_MESSAGE: &str = "remote authorization audit is unavailable";
 
+#[derive(Clone, Default)]
+pub(super) struct RemoteHttpAuditMarker(Arc<OnceLock<RemoteAuthorizationAuditReceipt>>);
+
+impl RemoteHttpAuditMarker {
+    fn mark_recorded(&self, receipt: RemoteAuthorizationAuditReceipt) {
+        drop(self.0.set(receipt));
+    }
+
+    fn receipt(&self) -> Option<RemoteAuthorizationAuditReceipt> {
+        self.0.get().cloned()
+    }
+}
+
 pub(super) struct RemoteHttpAuditContext {
     request_id: String,
     attempted_client_id: Option<String>,
     target: String,
     scope: RemoteAccessScope,
     remote_addr: Option<String>,
+    marker: Option<RemoteHttpAuditMarker>,
 }
 
 impl RemoteHttpAuditContext {
@@ -39,6 +57,7 @@ impl RemoteHttpAuditContext {
                 .extensions()
                 .get::<ConnectInfo<DaemonConnectInfo>>()
                 .map(|ConnectInfo(info)| info.remote_addr().ip().to_string()),
+            marker: request.extensions().get::<RemoteHttpAuditMarker>().cloned(),
         })
     }
 
@@ -47,14 +66,33 @@ impl RemoteHttpAuditContext {
         state: &DaemonHttpState,
         client_id: &str,
     ) -> Result<(), CliError> {
-        RemoteAuthorizationAudit::allowed(
+        let result = RemoteAuthorizationAudit::allowed(
             &self.request_id,
             client_id,
             &self.target,
             self.scope,
             self.remote_addr.as_deref(),
         )
-        .record(state.db.get())
+        .record(state.db.get());
+        self.finish_record(result)
+    }
+
+    pub(super) fn record_allowed_failure(
+        &self,
+        state: &DaemonHttpState,
+        client_id: &str,
+        error_detail: &str,
+    ) -> Result<(), CliError> {
+        let result = RemoteAuthorizationAudit::allowed_failure(
+            &self.request_id,
+            client_id,
+            &self.target,
+            self.scope,
+            self.remote_addr.as_deref(),
+            error_detail,
+        )
+        .record(state.db.get());
+        self.finish_record(result)
     }
 
     pub(super) fn record_denied(
@@ -63,7 +101,7 @@ impl RemoteHttpAuditContext {
         client_id: Option<&str>,
         error_detail: &str,
     ) -> Result<(), CliError> {
-        RemoteAuthorizationAudit::denied(
+        let result = RemoteAuthorizationAudit::denied(
             &self.request_id,
             client_id.or(self.attempted_client_id.as_deref()),
             &self.target,
@@ -71,7 +109,35 @@ impl RemoteHttpAuditContext {
             self.remote_addr.as_deref(),
             error_detail,
         )
-        .record(state.db.get())
+        .record(state.db.get());
+        self.finish_record(result)
+    }
+
+    pub(super) fn amend_recorded_failure(
+        &self,
+        state: &DaemonHttpState,
+        error_detail: &str,
+    ) -> Result<bool, CliError> {
+        let Some(receipt) = self
+            .marker
+            .as_ref()
+            .and_then(RemoteHttpAuditMarker::receipt)
+        else {
+            return Ok(false);
+        };
+        receipt.mark_failed(state.db.get(), error_detail)?;
+        Ok(true)
+    }
+
+    fn finish_record(
+        &self,
+        result: Result<RemoteAuthorizationAuditReceipt, CliError>,
+    ) -> Result<(), CliError> {
+        let receipt = result?;
+        if let Some(marker) = &self.marker {
+            marker.mark_recorded(receipt);
+        }
+        Ok(())
     }
 }
 

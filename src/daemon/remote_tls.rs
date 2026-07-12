@@ -1,14 +1,9 @@
 use std::error::Error;
 use std::fmt;
-use std::io;
-use std::net::SocketAddr;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
-use std::time::Duration;
 
+use super::remote_acme::RemoteCertificateBundle;
 use arc_swap::ArcSwap;
-use axum::extract::connect_info::Connected;
-use axum::serve::IncomingStream;
-use axum::serve::Listener;
 use rcgen::{CertificateParams, CustomExtension, DistinguishedName, KeyPair};
 use rustls::ServerConfig;
 use rustls::crypto::ring::default_provider;
@@ -17,14 +12,12 @@ use rustls::pki_types::pem::PemObject as _;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::server::{ClientHello, ResolvesServerCert};
 use rustls::sign::CertifiedKey;
-use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
-use tokio::task::yield_now;
-use tokio::time::sleep;
-use tokio_rustls::TlsAcceptor;
-use tokio_rustls::server::TlsStream;
 
-use super::http::DaemonConnectInfo;
-use super::remote_acme::RemoteCertificateBundle;
+mod listener;
+pub use listener::RemoteTlsListener;
+pub(crate) use listener::{DEFAULT_MAX_CONCURRENT_TLS_HANDSHAKES, DEFAULT_TLS_HANDSHAKE_TIMEOUT};
+#[cfg(test)]
+use listener::{handle_tcp_accept_error, handle_tls_handshake_error, is_transient_accept_error};
 
 #[cfg(test)]
 #[path = "remote_tls_live_tests.rs"]
@@ -319,72 +312,6 @@ impl RemoteTlsConfigHandle {
     }
 }
 
-pub struct RemoteTlsListener {
-    listener: TcpListener,
-    config: Arc<ArcSwap<ServerConfig>>,
-}
-
-impl RemoteTlsListener {
-    /// Bind a TCP socket and wrap each accepted stream in rustls.
-    ///
-    /// # Errors
-    /// Returns [`io::Error`] when the TCP listener cannot bind.
-    pub async fn bind<A>(addr: A, config: Arc<ServerConfig>) -> io::Result<Self>
-    where
-        A: ToSocketAddrs,
-    {
-        Ok(Self {
-            listener: TcpListener::bind(addr).await?,
-            config: Arc::new(ArcSwap::from(config)),
-        })
-    }
-
-    pub(crate) async fn bind_reloadable<A>(
-        addr: A,
-        config: &RemoteTlsConfigHandle,
-    ) -> io::Result<Self>
-    where
-        A: ToSocketAddrs,
-    {
-        Ok(Self {
-            listener: TcpListener::bind(addr).await?,
-            config: config.config_source(),
-        })
-    }
-}
-
-impl Listener for RemoteTlsListener {
-    type Io = TlsStream<TcpStream>;
-    type Addr = SocketAddr;
-
-    async fn accept(&mut self) -> (Self::Io, Self::Addr) {
-        loop {
-            let (stream, addr) = match self.listener.accept().await {
-                Ok(connection) => connection,
-                Err(error) => {
-                    handle_tcp_accept_error(error).await;
-                    continue;
-                }
-            };
-            let acceptor = TlsAcceptor::from(self.config.load_full());
-            match acceptor.accept(stream).await {
-                Ok(tls_stream) => return (tls_stream, addr),
-                Err(error) => handle_tls_handshake_error(addr, &error),
-            }
-        }
-    }
-
-    fn local_addr(&self) -> io::Result<Self::Addr> {
-        self.listener.local_addr()
-    }
-}
-
-impl Connected<IncomingStream<'_, RemoteTlsListener>> for DaemonConnectInfo {
-    fn connect_info(stream: IncomingStream<'_, RemoteTlsListener>) -> Self {
-        Self::new(*stream.remote_addr())
-    }
-}
-
 fn parse_certificate_chain(
     pem: &str,
 ) -> Result<Vec<CertificateDer<'static>>, RemoteTlsConfigError> {
@@ -408,42 +335,6 @@ fn parse_private_key(pem: &str) -> Result<PrivateKeyDer<'static>, RemoteTlsConfi
     }
     PrivateKeyDer::from_pem_slice(pem.as_bytes())
         .map_err(|error| RemoteTlsConfigError::InvalidPrivateKeyPem(error.to_string()))
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion; tokio-rs/tracing#553"
-)]
-async fn handle_tcp_accept_error(error: io::Error) {
-    if is_transient_accept_error(&error) {
-        yield_now().await;
-        return;
-    }
-    tracing::error!(%error, "remote TLS TCP accept failed");
-    sleep(Duration::from_secs(1)).await;
-}
-
-fn is_transient_accept_error(error: &io::Error) -> bool {
-    matches!(
-        error.kind(),
-        io::ErrorKind::ConnectionRefused
-            | io::ErrorKind::ConnectionAborted
-            | io::ErrorKind::ConnectionReset
-            | io::ErrorKind::Interrupted
-            | io::ErrorKind::WouldBlock
-    )
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion; tokio-rs/tracing#553"
-)]
-fn handle_tls_handshake_error(addr: SocketAddr, error: &io::Error) {
-    tracing::debug!(
-        remote_addr = %addr,
-        %error,
-        "remote TLS handshake failed"
-    );
 }
 
 pub(crate) fn ensure_rustls_provider() {

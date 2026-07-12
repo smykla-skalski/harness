@@ -7,7 +7,7 @@ use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, Server
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, DigitallySignedStruct, Error as TlsError, SignatureScheme};
 use tokio::net::TcpStream;
-use tokio::time::{Duration, timeout};
+use tokio::time::{Duration, sleep, timeout};
 use tokio_rustls::TlsConnector;
 use x509_parser::parse_x509_certificate;
 
@@ -116,6 +116,93 @@ async fn remote_tls_listener_falls_back_when_acme_challenge_sni_does_not_match()
     handle
         .clear_tls_alpn_challenge(lease)
         .expect("clear TLS-ALPN-01 challenge");
+}
+
+#[tokio::test]
+async fn remote_tls_listener_accepts_valid_client_while_another_handshake_stalls() {
+    let (normal, _) = generated_bundle("daemon.example.com");
+    let handle = RemoteTlsConfigHandle::new(normal).expect("initial TLS config");
+    let mut listener = RemoteTlsListener::bind_reloadable(("127.0.0.1", 0), &handle)
+        .await
+        .expect("bind reloadable TLS listener");
+    let address = listener.local_addr().expect("TLS listener address");
+    let _stalled = TcpStream::connect(address)
+        .await
+        .expect("open stalled TLS connection");
+    let alpn_protocols = [b"h2".as_slice()];
+
+    let ((server_stream, _), client_stream) = timeout(Duration::from_secs(1), async {
+        tokio::join!(
+            listener.accept(),
+            connect_client(address, &alpn_protocols, "daemon.example.com")
+        )
+    })
+    .await
+    .expect("valid TLS client was blocked by stalled handshake");
+
+    client_stream.expect("complete valid TLS handshake");
+    drop(server_stream);
+}
+
+#[tokio::test]
+async fn remote_tls_listener_times_out_stalled_handshakes_at_capacity() {
+    let (normal, _) = generated_bundle("daemon.example.com");
+    let handle = RemoteTlsConfigHandle::new(normal).expect("initial TLS config");
+    let mut listener = RemoteTlsListener::bind_reloadable_with_limits(
+        ("127.0.0.1", 0),
+        &handle,
+        1,
+        Duration::from_millis(50),
+    )
+    .await
+    .expect("bind limited TLS listener");
+    let address = listener.local_addr().expect("TLS listener address");
+    let _stalled = TcpStream::connect(address)
+        .await
+        .expect("open stalled TLS connection");
+    let alpn_protocols = [b"h2".as_slice()];
+
+    let ((server_stream, _), client_stream) = timeout(Duration::from_secs(1), async {
+        tokio::join!(
+            listener.accept(),
+            connect_client(address, &alpn_protocols, "daemon.example.com")
+        )
+    })
+    .await
+    .expect("stalled TLS handshake did not release capacity");
+
+    client_stream.expect("complete valid TLS handshake after timeout");
+    drop(server_stream);
+}
+
+#[tokio::test]
+async fn remote_tls_listener_bounds_pending_handshake_tasks() {
+    let (normal, _) = generated_bundle("daemon.example.com");
+    let handle = RemoteTlsConfigHandle::new(normal).expect("initial TLS config");
+    let mut listener = RemoteTlsListener::bind_reloadable_with_limits(
+        ("127.0.0.1", 0),
+        &handle,
+        1,
+        Duration::from_secs(5),
+    )
+    .await
+    .expect("bind limited TLS listener");
+    let address = listener.local_addr().expect("TLS listener address");
+    let _first = TcpStream::connect(address)
+        .await
+        .expect("open first stalled TLS connection");
+    let _second = TcpStream::connect(address)
+        .await
+        .expect("open second stalled TLS connection");
+    let mut accept = Box::pin(listener.accept());
+
+    tokio::select! {
+        _ = &mut accept => panic!("stalled TLS handshake unexpectedly completed"),
+        () = sleep(Duration::from_millis(50)) => {}
+    }
+    drop(accept);
+
+    assert_eq!(listener.pending_handshake_count(), 1);
 }
 
 struct ClientHandshake {

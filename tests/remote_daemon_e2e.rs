@@ -125,6 +125,10 @@ async fn run_remote_daemon_case(challenge: AcmeChallenge) -> Result<(), String> 
 
     let viewer = pair_client(&daemon, &client, "viewer", "viewer-e2e").await?;
     client.expect_health(&viewer, 200).await?;
+    client.expect_oversized_http_body_rejected(&viewer).await?;
+    client
+        .expect_oversized_websocket_message_rejected(&viewer)
+        .await?;
     client.expect_telemetry(&viewer, 403).await?;
 
     let operator = pair_client(&daemon, &client, "operator", "operator-e2e").await?;

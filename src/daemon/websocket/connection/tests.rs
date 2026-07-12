@@ -10,6 +10,10 @@ use super::super::relay::next_relay_frames;
 use super::super::test_support::{seed_sample_session, test_http_state, test_http_state_with_db};
 use super::*;
 use crate::daemon::protocol::WsPushEvent;
+use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
+use crate::daemon::remote_identity::{
+    RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration,
+};
 
 #[test]
 fn connection_state_relay_filtering() {
@@ -226,7 +230,7 @@ async fn incoming_ping_frames_reply_with_matching_pong() {
     let mut dispatch_tasks = JoinSet::new();
     let action = handle_incoming_message(
         Message::Ping(vec![4, 5, 6].into()),
-        state,
+        state.clone(),
         connection,
         priority_tx,
         &mut dispatch_tasks,
@@ -244,4 +248,82 @@ async fn incoming_ping_frames_reply_with_matching_pong() {
         }
         _ => panic!("expected pong response batch"),
     }
+}
+
+#[tokio::test]
+async fn remote_websocket_caps_in_flight_dispatch_tasks() {
+    let mut state = test_http_state_with_db();
+    state.auth_mode = crate::daemon::http::DaemonHttpAuthMode::Remote;
+    let mut config = crate::daemon::http::RemoteRequestLimitConfig::default();
+    config.max_websocket_in_flight_requests = 1;
+    state.remote_request_limits =
+        Some(crate::daemon::http::RemoteRequestLimits::new(config).expect("remote request limits"));
+    let registration = RemoteClientRegistration::new_for_tests(
+        "viewer",
+        "Viewer",
+        "macos",
+        RemoteRole::Viewer,
+        &[RemoteAccessScope::Read],
+        "token-viewer-abcdefghijklmnopqrstuvwxyz0123456789",
+        "2026-07-12T09:00:00Z",
+    )
+    .expect("remote registration");
+    let remote_client = {
+        let db = state.db.get().expect("db slot").lock().expect("db lock");
+        db.register_remote_client(&registration)
+            .expect("register remote client");
+        db.list_remote_clients()
+            .expect("list remote clients")
+            .into_iter()
+            .next()
+            .expect("stored remote client")
+    };
+    let connection = Arc::new(Mutex::new(ConnectionState::new_remote(remote_client)));
+    let (priority_tx, _) = mpsc::channel::<Message>(1);
+    let mut dispatch_tasks = JoinSet::new();
+    dispatch_tasks.spawn(std::future::pending::<()>());
+
+    let action = handle_incoming_message(
+        Message::Text(
+            serde_json::json!({
+                "id": "overloaded-request",
+                "method": crate::daemon::protocol::ws_methods::PING,
+            })
+            .to_string()
+            .into(),
+        ),
+        state.clone(),
+        connection,
+        priority_tx,
+        &mut dispatch_tasks,
+    );
+
+    assert_eq!(dispatch_tasks.len(), 1, "overload must not spawn work");
+    let IncomingMessageAction::RespondBatch(frames) = action else {
+        panic!("overload should return a bounded error response");
+    };
+    let Message::Text(text) = &frames[0] else {
+        panic!("overload response should be JSON text");
+    };
+    let response: serde_json::Value = serde_json::from_str(text).expect("overload response JSON");
+    assert_eq!(response["id"], "overloaded-request");
+    assert_eq!(response["error"]["code"], "REMOTE_LIMITS");
+    assert_eq!(response["error"]["status_code"], 429);
+    let audit = state
+        .db
+        .get()
+        .expect("db slot")
+        .lock()
+        .expect("db lock")
+        .load_remote_audit_events(10)
+        .expect("load remote audits")
+        .into_iter()
+        .find(|event| event.request_id.as_deref() == Some("overloaded-request"))
+        .expect("overload authorization audit");
+    assert_eq!(audit.scope_decision, RemoteAuditScopeDecision::Allowed);
+    assert_eq!(audit.outcome, RemoteAuditOutcome::Failure);
+    assert_eq!(
+        audit.error_detail.as_deref(),
+        Some("remote WebSocket in-flight request limit reached")
+    );
 }

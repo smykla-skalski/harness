@@ -97,6 +97,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         token: token.clone(),
         auth_mode: harness::daemon::http::DaemonHttpAuthMode::Local,
         remote_domain: None,
+        remote_request_limits: None,
         remote_pairing_limiter: default_remote_pairing_limiter(),
         sender: sender.clone(),
         manifest,
