@@ -33,7 +33,9 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     )
     let snapshot = try XCTUnwrap(fetchedSnapshot)
 
-    let request = try XCTUnwrap(RemoteDaemonSessionsURLProtocol.lastRequest)
+    let request = try XCTUnwrap(
+      RemoteDaemonSessionsURLProtocol.requests.first { $0.url?.path == "/v1/sessions" }
+    )
     XCTAssertEqual(request.url?.absoluteString, "https://daemon.example.com/v1/sessions")
     XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer server-token")
     XCTAssertEqual(
@@ -47,9 +49,12 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     XCTAssertEqual(snapshot.stations.first?.activeSessionCount, 1)
     XCTAssertEqual(snapshot.stations.first?.defaultStation, false)
     XCTAssertEqual(snapshot.sessions.first?.id, "session-1")
+    XCTAssertEqual(snapshot.sessions.first?.title, "Remote work api_key=[redacted]")
     XCTAssertEqual(snapshot.sessions.first?.status, "Active")
     XCTAssertEqual(snapshot.sessions.first?.activeAgentCount, 2)
-    XCTAssertEqual(snapshot.sessions.first?.blockedAgentCount, 1)
+    XCTAssertEqual(snapshot.sessions.first?.blockedAgentCount, 2)
+    XCTAssertEqual(snapshot.stations.first?.needsYouCount, 1)
+    XCTAssertEqual(snapshot.needsYouCount, 1)
     let expectedActivity = try Date.ISO8601FormatStyle().year().month().day()
       .timeZone(separator: .omitted)
       .time(includingFractionalSeconds: true)
@@ -57,6 +62,100 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     XCTAssertEqual(snapshot.sessions.first?.lastActivityAt, expectedActivity)
     XCTAssertFalse(snapshot.sessions.first?.summary.contains("super-secret") ?? true)
     XCTAssertFalse(client.supportsCommands)
+  }
+
+  func testFetchIncludesAuthenticatedRemoteTaskBoardSnapshot() async throws {
+    RemoteDaemonSessionsURLProtocol.respond(
+      path: "/v1/sessions",
+      statusCode: 200,
+      body: sessionsResponse
+    )
+    RemoteDaemonSessionsURLProtocol.respond(
+      path: "/v1/task-board/items",
+      statusCode: 200,
+      body: taskBoardResponse
+    )
+    let client = MobileRemoteDaemonSyncClient(
+      access: try remoteAccess(),
+      stationID: "remote-daemon-example-com",
+      stationName: "daemon.example.com",
+      defaultStation: false,
+      session: makeSession()
+    )
+    let now = Date(timeIntervalSince1970: 1_752_124_400)
+
+    let fetchedSnapshot = try await client.fetchLatestSnapshot(
+      stationID: "remote-daemon-example-com",
+      now: now
+    )
+    let snapshot = try XCTUnwrap(fetchedSnapshot)
+
+    let requests = RemoteDaemonSessionsURLProtocol.requests
+    XCTAssertEqual(requests.count, 2)
+    XCTAssertEqual(requests.compactMap(\.url?.path).sorted(), [
+      "/v1/sessions", "/v1/task-board/items",
+    ])
+    for request in requests {
+      XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer server-token")
+      XCTAssertEqual(
+        request.value(forHTTPHeaderField: "x-harness-remote-client-id"),
+        "ios-device"
+      )
+    }
+    let item = try XCTUnwrap(snapshot.taskBoardItems.first)
+    XCTAssertEqual(item.id, "board-1")
+    XCTAssertEqual(item.stationID, "remote-daemon-example-com")
+    XCTAssertEqual(item.title, "Approve deployment")
+    XCTAssertEqual(
+      item.bodyPreview,
+      "Review the production rollout plan api_key=[redacted]"
+    )
+    XCTAssertEqual(item.status, "human_required")
+    XCTAssertEqual(item.statusTitle, "Human Required")
+    XCTAssertEqual(item.priority, "high")
+    XCTAssertEqual(item.priorityTitle, "High")
+    XCTAssertEqual(item.tags, [])
+    XCTAssertEqual(item.projectID, "harness")
+    XCTAssertEqual(item.sessionID, "session-1")
+    XCTAssertEqual(item.workItemID, "work-1")
+    XCTAssertEqual(item.agentMode, "headless")
+    XCTAssertTrue(item.needsYou)
+    let futureItem = try XCTUnwrap(
+      snapshot.taskBoardItems.first { $0.id == "board-future" }
+    )
+    XCTAssertEqual(futureItem.statusTitle, "future_status")
+    XCTAssertEqual(futureItem.priorityTitle, "hyper_priority")
+    XCTAssertEqual(snapshot.stations.first?.needsYouCount, 2)
+    XCTAssertEqual(snapshot.needsYouCount, 2)
+  }
+
+  func testMissingTaskBoardRouteKeepsRemoteSessionsAvailable() async throws {
+    RemoteDaemonSessionsURLProtocol.respond(
+      path: "/v1/sessions",
+      statusCode: 200,
+      body: sessionsResponse
+    )
+    RemoteDaemonSessionsURLProtocol.respond(
+      path: "/v1/task-board/items",
+      statusCode: 404,
+      body: #"{"error":"not found"}"#
+    )
+    let client = MobileRemoteDaemonSyncClient(
+      access: try remoteAccess(),
+      stationID: "remote-daemon-example-com",
+      stationName: "daemon.example.com",
+      defaultStation: false,
+      session: makeSession()
+    )
+
+    let fetchedSnapshot = try await client.fetchLatestSnapshot(
+      stationID: "remote-daemon-example-com",
+      now: Date(timeIntervalSince1970: 1_752_124_400)
+    )
+    let snapshot = try XCTUnwrap(fetchedSnapshot)
+
+    XCTAssertEqual(snapshot.sessions.count, 2)
+    XCTAssertTrue(snapshot.taskBoardItems.isEmpty)
   }
 
   func testUnauthorizedDirectResponseDoesNotUseCloudFallback() async throws {
@@ -248,26 +347,28 @@ private actor RecordingSyncClient: MobileMonitorSyncClient {
 
 private final class RemoteDaemonSessionsURLProtocol: URLProtocol, @unchecked Sendable {
   private static let lock = NSLock()
-  nonisolated(unsafe) private static var responseStatusCode = 200
-  nonisolated(unsafe) private static var responseBody = Data()
-  nonisolated(unsafe) private static var recordedRequest: URLRequest?
+  nonisolated(unsafe) private static var responsesByPath: [String: (Int, Data)] = [:]
+  nonisolated(unsafe) private static var recordedRequests: [URLRequest] = []
 
-  static var lastRequest: URLRequest? {
-    lock.withLock { recordedRequest }
+  static var requests: [URLRequest] {
+    lock.withLock { recordedRequests }
   }
 
   static func reset() {
     lock.withLock {
-      responseStatusCode = 200
-      responseBody = Data()
-      recordedRequest = nil
+      responsesByPath = [:]
+      recordedRequests = []
     }
   }
 
   static func respond(statusCode: Int, body: String) {
+    respond(path: "/v1/sessions", statusCode: statusCode, body: body)
+    respond(path: "/v1/task-board/items", statusCode: 200, body: #"{"items":[]}"#)
+  }
+
+  static func respond(path: String, statusCode: Int, body: String) {
     lock.withLock {
-      responseStatusCode = statusCode
-      responseBody = Data(body.utf8)
+      responsesByPath[path] = (statusCode, Data(body.utf8))
     }
   }
 
@@ -276,8 +377,8 @@ private final class RemoteDaemonSessionsURLProtocol: URLProtocol, @unchecked Sen
 
   override func startLoading() {
     let response: (Int, Data) = Self.lock.withLock {
-      Self.recordedRequest = request
-      return (Self.responseStatusCode, Self.responseBody)
+      Self.recordedRequests.append(request)
+      return Self.responsesByPath[request.url?.path ?? ""] ?? (404, Data())
     }
     guard let url = request.url,
       let httpResponse = HTTPURLResponse(
@@ -305,7 +406,7 @@ private let sessionsResponse = """
     {
       "project_name": "Harness",
       "session_id": "session-1",
-      "title": "Remote work",
+      "title": "Remote work api_key=super-secret",
       "branch_ref": "main",
       "status": "active",
       "context": "api_key=super-secret",
@@ -313,7 +414,7 @@ private let sessionsResponse = """
       "last_activity_at": "2026-07-10T13:01:00.250Z",
       "metrics": {
         "active_agent_count": 2,
-        "awaiting_review_agent_count": 1
+        "awaiting_review_agent_count": 2
       }
     },
     {
@@ -327,6 +428,38 @@ private let sessionsResponse = """
       "metrics": {}
     }
   ]
+  """
+
+private let taskBoardResponse = """
+  {
+    "items": [
+      {
+        "schema_version": 1,
+        "id": "board-1",
+        "title": "Approve deployment",
+        "body": "Review the production rollout plan api_key=super-secret",
+        "status": "human_required",
+        "priority": "high",
+        "project_id": "harness",
+        "agent_mode": "headless",
+        "session_id": "session-1",
+        "work_item_id": "work-1",
+        "created_at": "2026-07-10T12:00:00Z",
+        "updated_at": "2026-07-10T13:02:00Z"
+      },
+      {
+        "schema_version": 1,
+        "id": "board-future",
+        "title": "Future workflow",
+        "body": "",
+        "status": "future_status",
+        "priority": "hyper_priority",
+        "agent_mode": "headless",
+        "created_at": "2026-07-10T12:00:00Z",
+        "updated_at": "2026-07-10T13:03:00Z"
+      }
+    ]
+  }
   """
 
 private func remoteAccess() throws -> MobileRemoteDaemonAccess {

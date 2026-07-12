@@ -52,7 +52,17 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
     guard stationID == self.stationID else {
       throw MobileRemoteDaemonSyncError.stationMismatch
     }
-    var request = URLRequest(url: access.endpoint.appending(path: "/v1/sessions"))
+    async let sessions = fetchSessions()
+    async let taskBoardItems = fetchTaskBoardItems()
+    return try await makeSnapshot(
+      sessions: sessions,
+      taskBoardItems: taskBoardItems,
+      now: now
+    )
+  }
+
+  func authenticatedRequest(path: String) -> URLRequest {
+    var request = URLRequest(url: access.endpoint.appending(path: path))
     request.httpMethod = "GET"
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     request.setValue("Bearer \(access.bearerToken)", forHTTPHeaderField: "Authorization")
@@ -60,13 +70,17 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
       access.clientID,
       forHTTPHeaderField: RemoteDaemonAuthentication.clientIDHeader
     )
+    return request
+  }
+
+  private func fetchSessions() async throws -> [MobileRemoteSessionWire] {
+    let request = authenticatedRequest(path: "/v1/sessions")
     let (data, response) = try await session.data(for: request)
     guard let response = response as? HTTPURLResponse else {
       throw MobileRemoteDaemonSyncError.invalidResponse
     }
     try validate(response)
-    let sessions = try JSONDecoder().decode([MobileRemoteSessionWire].self, from: data)
-    return makeSnapshot(sessions: sessions, now: now)
+    return try JSONDecoder().decode([MobileRemoteSessionWire].self, from: data)
   }
 
   func validate(_ response: HTTPURLResponse) throws {
@@ -84,13 +98,19 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
 
   private func makeSnapshot(
     sessions: [MobileRemoteSessionWire],
+    taskBoardItems: [MobileRemoteTaskBoardWire],
     now: Date
   ) -> MobileMirrorSnapshot {
-    let mobileSessions = sessions.map { $0.mobileSummary(stationID: stationID, now: now) }
-    let activeSessions = sessions.filter { $0.status != "ended" }
-    let needsYouCount = sessions.reduce(0) { count, session in
-      count + session.metrics.awaitingReviewAgentCount
+    let redactor = MobileMirrorSecretRedactor()
+    let mobileSessions = sessions.map {
+      $0.mobileSummary(stationID: stationID, now: now, redactor: redactor)
     }
+    let mobileTaskBoardItems = taskBoardItems.map {
+      $0.mobileSummary(stationID: stationID, now: now, redactor: redactor)
+    }
+    let activeSessions = sessions.filter { $0.status != "ended" }
+    let sessionNeedsYouCount = sessions.count(where: { $0.metrics.awaitingReviewAgentCount > 0 })
+    let needsYouCount = sessionNeedsYouCount + mobileTaskBoardItems.count(where: \.needsYou)
     let station = MobileStationSummary(
       id: stationID,
       displayName: stationName,
@@ -109,7 +129,7 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
       attention: [],
       sessions: mobileSessions,
       reviews: [],
-      taskBoardItems: [],
+      taskBoardItems: mobileTaskBoardItems,
       commands: [],
       trustedDevices: []
     )
@@ -126,13 +146,17 @@ private struct MobileRemoteSessionWire: Decodable, Sendable {
   var lastActivityAt: String?
   var metrics: MobileRemoteSessionMetricsWire
 
-  func mobileSummary(stationID: String, now: Date) -> MobileSessionSummary {
+  func mobileSummary(
+    stationID: String,
+    now: Date,
+    redactor: MobileMirrorSecretRedactor
+  ) -> MobileSessionSummary {
     MobileSessionSummary(
       id: sessionID,
       stationID: stationID,
-      projectName: projectName,
-      title: title.isEmpty ? "(untitled)" : title,
-      branch: branchRef,
+      projectName: redactor.redact(projectName),
+      title: title.isEmpty ? "(untitled)" : redactor.redact(title),
+      branch: redactor.redact(branchRef),
       status: MobileRemoteSessionStatus.title(for: status),
       activeAgentCount: metrics.activeAgentCount,
       blockedAgentCount: metrics.awaitingReviewAgentCount,
@@ -183,7 +207,7 @@ private enum MobileRemoteSessionStatus {
   }
 }
 
-private enum MobileRemoteSessionDate {
+enum MobileRemoteSessionDate {
   private static let fractional =
     Date.ISO8601FormatStyle().year().month().day()
     .timeZone(separator: .omitted)
