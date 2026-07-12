@@ -174,7 +174,7 @@ fn is_github_pull_request(reference: &ExternalRef) -> bool {
 
 fn is_imported_review(item: &TaskBoardItem) -> bool {
     item.imported_from_provider == Some(ExternalRefProvider::GitHub)
-        && item.planning.summary.is_none()
+        && item.external_refs.iter().any(is_github_pull_request)
 }
 
 fn projected_status(
@@ -189,7 +189,7 @@ fn projected_status(
         };
     }
     if snapshot.viewer_review_requested == Some(true) && current == TaskBoardStatus::Done {
-        return TaskBoardStatus::HumanRequired;
+        return TaskBoardStatus::Todo;
     }
     current
 }
@@ -197,7 +197,8 @@ fn projected_status(
 fn is_review_inbox_status(status: TaskBoardStatus) -> bool {
     matches!(
         status,
-        TaskBoardStatus::HumanRequired
+        TaskBoardStatus::Todo
+            | TaskBoardStatus::HumanRequired
             | TaskBoardStatus::AgenticReview
             | TaskBoardStatus::NeedsYou
             | TaskBoardStatus::PlanReview

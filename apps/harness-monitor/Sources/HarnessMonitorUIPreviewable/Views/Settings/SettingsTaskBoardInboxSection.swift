@@ -32,7 +32,7 @@ struct SettingsTaskBoardInboxSection: View {
     } footer: {
       Text(
         """
-        Import assigned issues and requested reviews into Needs You. Shared monitored repositories \
+        Import assigned issues and requested reviews into Todo. Shared monitored repositories \
         live in Settings > Repositories. Empty label filters mean all labels are included.
         """
       )

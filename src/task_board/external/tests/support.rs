@@ -13,6 +13,7 @@ pub(super) struct FakeSyncClient {
     tasks: Vec<ExternalTask>,
     pushed: Mutex<Vec<String>>,
     allows_delete: bool,
+    authoritative_review_inbox: bool,
     deleted: Arc<Mutex<Vec<String>>>,
 }
 
@@ -23,12 +24,18 @@ impl FakeSyncClient {
             tasks,
             pushed: Mutex::new(Vec::new()),
             allows_delete: false,
+            authoritative_review_inbox: false,
             deleted: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
     pub(super) fn with_delete(mut self) -> Self {
         self.allows_delete = true;
+        self
+    }
+
+    pub(super) fn with_authoritative_review_inbox(mut self) -> Self {
+        self.authoritative_review_inbox = true;
         self
     }
 
@@ -52,6 +59,10 @@ impl ExternalSyncClient for FakeSyncClient {
 
     fn allows_delete(&self) -> bool {
         self.allows_delete
+    }
+
+    fn authoritative_review_inbox(&self) -> bool {
+        self.authoritative_review_inbox
     }
 
     async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {

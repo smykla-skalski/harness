@@ -119,7 +119,12 @@ fn reconciliation_patch(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardI
 }
 
 fn reconciled_status(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardStatus {
-    if is_active_github_review_request(item, task) && item.status != TaskBoardStatus::Done {
+    if is_active_github_review_request(item, task)
+        && !matches!(
+            item.status,
+            TaskBoardStatus::Done | TaskBoardStatus::HumanRequired | TaskBoardStatus::NeedsYou
+        )
+    {
         return item.status;
     }
     task.status
@@ -128,7 +133,7 @@ fn reconciled_status(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardStat
 fn is_active_github_review_request(item: &TaskBoardItem, task: &ExternalTask) -> bool {
     item.imported_from_provider == Some(ExternalRefProvider::GitHub)
         && task.reference.provider == ExternalProvider::GitHub
-        && task.status == TaskBoardStatus::HumanRequired
+        && task.status == TaskBoardStatus::Todo
         && task
             .reference
             .url

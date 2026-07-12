@@ -73,6 +73,29 @@ async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
     assert!(requests[2].contains("repo:good/repo"));
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].reference.external_id, "good/repo#7");
+    assert_eq!(tasks[0].status, TaskBoardStatus::Todo);
+}
+
+#[tokio::test]
+async fn github_inbox_pull_imports_review_requests_as_todo() {
+    let (endpoint, requests, handle) = spawn_sequence_mock(vec![
+        MockResponse::json(200, viewer_response("octo-user")),
+        MockResponse::json(200, empty_search_response()),
+        MockResponse::json(
+            200,
+            search_response_with_issue("https://example.test/good/pull/7"),
+        ),
+    ]);
+    let client = inbox_client_with_base_uri(endpoint, &["good/repo"]);
+
+    let tasks = client.pull_tasks().await.expect("inbox pull");
+
+    handle.join().expect("mock server");
+    let requests = requests.lock().expect("requests");
+    assert_eq!(requests.len(), 3);
+    assert!(requests[2].contains("review-requested:octo-user"));
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(tasks[0].status, TaskBoardStatus::Todo);
 }
 
 #[tokio::test]

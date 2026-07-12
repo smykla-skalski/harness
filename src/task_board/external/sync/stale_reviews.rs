@@ -52,7 +52,8 @@ fn allows_stale_review_reconcile(options: ExternalSyncOptions) -> bool {
     options.status.is_none_or(|status| {
         matches!(
             status,
-            TaskBoardStatus::HumanRequired
+            TaskBoardStatus::Todo
+                | TaskBoardStatus::HumanRequired
                 | TaskBoardStatus::AgenticReview
                 | TaskBoardStatus::NeedsYou
                 | TaskBoardStatus::PlanReview
@@ -121,10 +122,10 @@ fn is_stale_github_review_request(
     tasks: &[ExternalTask],
 ) -> bool {
     item.imported_from_provider == Some(ExternalRefProvider::GitHub)
-        && item.planning.summary.is_none()
         && matches!(
             item.status,
-            TaskBoardStatus::HumanRequired
+            TaskBoardStatus::Todo
+                | TaskBoardStatus::HumanRequired
                 | TaskBoardStatus::AgenticReview
                 | TaskBoardStatus::NeedsYou
                 | TaskBoardStatus::PlanReview
