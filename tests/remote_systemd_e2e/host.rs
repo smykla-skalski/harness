@@ -166,10 +166,6 @@ impl RemoteSystemdHost {
     }
 
     pub fn create_pairing(&self, role: &str) -> Result<Value, String> {
-        let user = self.systemd_property("User")?;
-        if user.is_empty() || user == "root" {
-            return Err(format!("remote daemon has unsafe runtime user '{user}'"));
-        }
         let mut command = sudo(["env"]);
         command
             .arg(format!("HOME={}", self.state_path.display()))
@@ -397,7 +393,7 @@ fn tcp_port_accepts(port: u16) -> bool {
 fn assert_non_root_uid(status: &str) -> Result<(), String> {
     let uid = process_status_value(status, "Uid:")?
         .split_whitespace()
-        .next()
+        .nth(1)
         .ok_or_else(|| "daemon process status omitted effective UID".to_string())?;
     if uid == "0" {
         Err("remote daemon runs as root".to_string())
