@@ -170,7 +170,7 @@ private struct MobileRemoteSessionWire: Decodable, Sendable {
       id: sessionID,
       stationID: stationID,
       projectName: redactor.redact(projectName),
-      title: title.isEmpty ? "(untitled)" : redactor.redact(title),
+      title: redactor.redact(displayTitle),
       branch: redactor.redact(branchRef),
       status: MobileRemoteSessionStatus.title(for: status),
       activeAgentCount: metrics.activeAgentCount,
@@ -185,8 +185,10 @@ private struct MobileRemoteSessionWire: Decodable, Sendable {
     guard status != "ended" else {
       return nil
     }
-    return MobileRemoteManagedAgentsSession(id: sessionID, title: title)
+    return MobileRemoteManagedAgentsSession(id: sessionID, title: displayTitle)
   }
+
+  private var displayTitle: String { title.isEmpty ? "(untitled)" : title }
 
   enum CodingKeys: String, CodingKey {
     case projectName = "project_name"

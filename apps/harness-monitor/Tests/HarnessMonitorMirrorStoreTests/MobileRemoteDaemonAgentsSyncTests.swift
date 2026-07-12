@@ -122,6 +122,44 @@ final class MobileRemoteDaemonAgentsSyncTests: XCTestCase {
     XCTAssertEqual(snapshot.sortedAttention.count, 2)
   }
 
+  func testEmptySessionTitleUsesUntitledAttentionLabel() async throws {
+    var sessions = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(agentsSessionsResponse.utf8))
+        as? [[String: Any]]
+    )
+    sessions[0]["title"] = ""
+    let sessionsData = try JSONSerialization.data(withJSONObject: sessions)
+    AgentsRemoteDaemonURLProtocol.respond(
+      path: "/v1/sessions",
+      body: String(decoding: sessionsData, as: UTF8.self)
+    )
+    AgentsRemoteDaemonURLProtocol.respond(
+      path: "/v1/task-board/items",
+      body: #"{"items":[]}"#
+    )
+    AgentsRemoteDaemonURLProtocol.respond(
+      path: "/v1/sessions/session-1/managed-agents",
+      body: managedAgentsResponse
+    )
+    let client = try makeAgentsRemoteClient(canWrite: true)
+
+    let fetchedSnapshot = try await client.fetchLatestSnapshot(
+      stationID: agentsStationID,
+      now: Date(timeIntervalSince1970: 1_752_124_400)
+    )
+    let snapshot = try XCTUnwrap(fetchedSnapshot)
+
+    XCTAssertEqual(snapshot.sessions.first?.title, "(untitled)")
+    XCTAssertEqual(
+      snapshot.attention.first { $0.kind == .acpDecision }?.subtitle,
+      "2 requests waiting in (untitled)."
+    )
+    XCTAssertEqual(
+      snapshot.attention.first { $0.kind == .blockedAgent }?.subtitle,
+      "(untitled)"
+    )
+  }
+
   func testMissingManagedAgentsRouteKeepsRemoteSessionsAvailable() async throws {
     configureAgentsBaseResponses()
     AgentsRemoteDaemonURLProtocol.respond(
