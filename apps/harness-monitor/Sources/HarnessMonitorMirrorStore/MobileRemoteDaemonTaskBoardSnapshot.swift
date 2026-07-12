@@ -9,8 +9,12 @@ extension MobileRemoteDaemonSyncClient {
       throw MobileRemoteDaemonSyncError.invalidResponse
     }
     try validate(response)
-    return try JSONDecoder().decode([MobileRemoteTaskBoardWire].self, from: data)
+    return try JSONDecoder().decode(MobileRemoteTaskBoardListWire.self, from: data).items
   }
+}
+
+private struct MobileRemoteTaskBoardListWire: Decodable, Sendable {
+  var items: [MobileRemoteTaskBoardWire]
 }
 
 struct MobileRemoteTaskBoardWire: Decodable, Sendable {
@@ -19,7 +23,7 @@ struct MobileRemoteTaskBoardWire: Decodable, Sendable {
   var body: String
   var status: String
   var priority: String
-  var tags: [String]
+  var tags: [String]?
   var projectID: String?
   var agentMode: String
   var sessionID: String?
@@ -40,7 +44,7 @@ struct MobileRemoteTaskBoardWire: Decodable, Sendable {
       statusTitle: Self.title(for: status),
       priority: priority,
       priorityTitle: Self.title(for: priority),
-      tags: tags.map(redactor.redact),
+      tags: (tags ?? []).map(redactor.redact),
       projectID: projectID.map(redactor.redact),
       sessionID: sessionID,
       workItemID: workItemID,

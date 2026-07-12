@@ -111,6 +111,7 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     XCTAssertEqual(item.statusTitle, "Human Required")
     XCTAssertEqual(item.priority, "high")
     XCTAssertEqual(item.priorityTitle, "High")
+    XCTAssertEqual(item.tags, [])
     XCTAssertEqual(item.projectID, "harness")
     XCTAssertEqual(item.sessionID, "session-1")
     XCTAssertEqual(item.workItemID, "work-1")
@@ -323,7 +324,7 @@ private final class RemoteDaemonSessionsURLProtocol: URLProtocol, @unchecked Sen
 
   static func respond(statusCode: Int, body: String) {
     respond(path: "/v1/sessions", statusCode: statusCode, body: body)
-    respond(path: "/v1/task-board/items", statusCode: 200, body: "[]")
+    respond(path: "/v1/task-board/items", statusCode: 200, body: #"{"items":[]}"#)
   }
 
   static func respond(path: String, statusCode: Int, body: String) {
@@ -391,23 +392,24 @@ private let sessionsResponse = """
   """
 
 private let taskBoardResponse = """
-  [
-    {
-      "schema_version": 1,
-      "id": "board-1",
-      "title": "Approve deployment",
-      "body": "Review the production rollout plan api_key=super-secret",
-      "status": "human_required",
-      "priority": "high",
-      "tags": ["production"],
-      "project_id": "harness",
-      "agent_mode": "headless",
-      "session_id": "session-1",
-      "work_item_id": "work-1",
-      "created_at": "2026-07-10T12:00:00Z",
-      "updated_at": "2026-07-10T13:02:00Z"
-    }
-  ]
+  {
+    "items": [
+      {
+        "schema_version": 1,
+        "id": "board-1",
+        "title": "Approve deployment",
+        "body": "Review the production rollout plan api_key=super-secret",
+        "status": "human_required",
+        "priority": "high",
+        "project_id": "harness",
+        "agent_mode": "headless",
+        "session_id": "session-1",
+        "work_item_id": "work-1",
+        "created_at": "2026-07-10T12:00:00Z",
+        "updated_at": "2026-07-10T13:02:00Z"
+      }
+    ]
+  }
   """
 
 private func remoteAccess() throws -> MobileRemoteDaemonAccess {
