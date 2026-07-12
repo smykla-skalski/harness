@@ -33,8 +33,8 @@ struct RepositoriesMonitoredSection: View {
     } footer: {
       Text(
         """
-        Manage the shared repository scope for Reviews and Task Board here. Turning both \
-        feature toggles off removes the row.
+        Manage the shared repository scope for Reviews and Task Board here. Use the switches \
+        to control each feature independently, or the delete button to remove a repository.
         """
       )
     }
@@ -123,6 +123,7 @@ struct RepositoriesMonitoredSection: View {
       )
       .labelsHidden()
       .toggleStyle(.switch)
+      .harnessNativeFormControl()
       .frame(width: 116, alignment: .center)
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.settingsRepositoriesReviewsToggle(index)
@@ -136,6 +137,7 @@ struct RepositoriesMonitoredSection: View {
       )
       .labelsHidden()
       .toggleStyle(.switch)
+      .harnessNativeFormControl()
       .frame(width: 110, alignment: .center)
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.settingsRepositoriesTaskBoardToggle(index)

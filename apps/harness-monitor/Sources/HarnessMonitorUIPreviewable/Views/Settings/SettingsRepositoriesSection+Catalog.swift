@@ -86,7 +86,7 @@ extension SettingsRepositoriesSection {
             Spacer()
 
             Button("Add Selected") {
-              addCatalogRepositories(Array(catalogSelection))
+              addCatalogRepositories(catalogRepositories.filter(catalogSelection.contains))
             }
             .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
             .disabled(catalogSelection.isEmpty)
