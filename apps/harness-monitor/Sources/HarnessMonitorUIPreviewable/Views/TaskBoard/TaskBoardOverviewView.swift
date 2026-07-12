@@ -16,12 +16,13 @@ public struct TaskBoardOverviewView: View {
   let isActionInFlight: Bool
   let onOpenItem: (TaskBoardInboxItem) -> Void
   let onOpenTaskBoardItem: (TaskBoardItem) -> Void
-  let onMoveInboxItem: ((TaskBoardInboxItem, TaskStatus) -> Void)?
-  let onMoveTaskBoardItem: ((String, TaskBoardStatus) -> Void)?
+  let onMoveInboxItems: (([TaskBoardInboxStatusUpdate]) -> Void)?
+  let onMoveTaskBoardItems: (([TaskBoardItemStatusUpdate]) -> Void)?
   let onOpenDecision: (Decision) -> Void
   let onCreateTaskBoardItem: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)?
   let onUpdateTaskBoardItem: ((String, TaskBoardUpdateItemRequest) -> Void)?
   let onDeleteTaskBoardItem: ((TaskBoardItem) -> Void)?
+  let onDeleteTaskBoardTargets: (([TaskBoardDeletionTarget]) -> Void)?
   let onEvaluateTaskBoard: (() -> Void)?
   let onEvaluateTaskBoardItem: ((TaskBoardItem) -> Void)?
   let onBeginTaskBoardPlan: ((TaskBoardItem) -> Void)?
@@ -39,12 +40,13 @@ public struct TaskBoardOverviewView: View {
   @State private var presentationWorker = TaskBoardOverviewPresentationWorker()
   @State private var cachedPresentation = TaskBoardOverviewPresentation.empty
   @State private var presentationGeneration: UInt64 = 0
+  @State private var cardSelection = TaskBoardCardSelectionState()
+  @State private var draggedCardIDs: [TaskBoardCardID] = []
+  @State private var taskBoardSelectionDispatcher = TaskBoardSelectionDispatcher()
   @AppStorage(TaskBoardLaneCollapsePreferences.storageKey)
   var laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.emptyRawValue
   @AppStorage(TaskBoardLaneAppearancePreferences.storageKey)
   var laneAppearancePreferencesRawValue = TaskBoardLaneAppearancePreferences.emptyRawValue
-  @AppStorage(TaskBoardCardPreferences.priorityBadgeVisibilityStorageKey)
-  var showsPriorityBadge = TaskBoardCardPreferences.defaultShowsPriorityBadge
   var captionSemibold: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
   }
@@ -94,12 +96,13 @@ public struct TaskBoardOverviewView: View {
     isActionInFlight: Bool = false,
     onOpenItem: @escaping (TaskBoardInboxItem) -> Void = { _ in },
     onOpenTaskBoardItem: @escaping (TaskBoardItem) -> Void = { _ in },
-    onMoveInboxItem: ((TaskBoardInboxItem, TaskStatus) -> Void)? = nil,
-    onMoveTaskBoardItem: ((String, TaskBoardStatus) -> Void)? = nil,
+    onMoveInboxItems: (([TaskBoardInboxStatusUpdate]) -> Void)? = nil,
+    onMoveTaskBoardItems: (([TaskBoardItemStatusUpdate]) -> Void)? = nil,
     onOpenDecision: @escaping (Decision) -> Void = { _ in },
     onCreateTaskBoardItem: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)? = nil,
     onUpdateTaskBoardItem: ((String, TaskBoardUpdateItemRequest) -> Void)? = nil,
     onDeleteTaskBoardItem: ((TaskBoardItem) -> Void)? = nil,
+    onDeleteTaskBoardTargets: (([TaskBoardDeletionTarget]) -> Void)? = nil,
     onEvaluateTaskBoard: (() -> Void)? = nil,
     onEvaluateTaskBoardItem: ((TaskBoardItem) -> Void)? = nil,
     onBeginTaskBoardPlan: ((TaskBoardItem) -> Void)? = nil,
@@ -127,12 +130,13 @@ public struct TaskBoardOverviewView: View {
     self.isActionInFlight = isActionInFlight
     self.onOpenItem = onOpenItem
     self.onOpenTaskBoardItem = onOpenTaskBoardItem
-    self.onMoveInboxItem = onMoveInboxItem
-    self.onMoveTaskBoardItem = onMoveTaskBoardItem
+    self.onMoveInboxItems = onMoveInboxItems
+    self.onMoveTaskBoardItems = onMoveTaskBoardItems
     self.onOpenDecision = onOpenDecision
     self.onCreateTaskBoardItem = onCreateTaskBoardItem
     self.onUpdateTaskBoardItem = onUpdateTaskBoardItem
     self.onDeleteTaskBoardItem = onDeleteTaskBoardItem
+    self.onDeleteTaskBoardTargets = onDeleteTaskBoardTargets
     self.onEvaluateTaskBoard = onEvaluateTaskBoard
     self.onEvaluateTaskBoardItem = onEvaluateTaskBoardItem
     self.onBeginTaskBoardPlan = onBeginTaskBoardPlan
@@ -161,12 +165,17 @@ public struct TaskBoardOverviewView: View {
       \.taskBoardLaneAppearance,
       TaskBoardLaneAppearance(rawValue: laneAppearancePreferencesRawValue)
     )
-    .environment(\.taskBoardShowsPriorityBadge, showsPriorityBadge)
+    .harnessFocusedSceneValue(\.harnessTaskBoardSelection, taskBoardSelectionFocus)
+    .taskBoardSelectionForwardDeleteShortcut(taskBoardSelectionFocus)
+    .taskBoardCardPreferences(projectLabelResolver: cachedPresentation.projectLabelResolver)
     .sheet(item: taskBoardManagementSheet) { taskBoardManagementSheet in
       taskBoardManagementSheetContent(taskBoardManagementSheet)
     }
     .task(id: presentationInput) {
       await rebuildPresentation(input: presentationInput)
+    }
+    .onChange(of: taskBoardSelectionDispatcher.deleteRequestGeneration) {
+      requestDeleteSelectedTaskBoardCards()
     }
   }
 
@@ -178,6 +187,20 @@ public struct TaskBoardOverviewView: View {
   var isCreatingTaskBoardItemValue: Bool {
     get { isCreatingTaskBoardItem }
     nonmutating set { isCreatingTaskBoardItem = newValue }
+  }
+
+  var cardSelectionValue: TaskBoardCardSelectionState {
+    get { cardSelection }
+    nonmutating set { cardSelection = newValue }
+  }
+
+  var draggedCardIDsValue: [TaskBoardCardID] {
+    get { draggedCardIDs }
+    nonmutating set { draggedCardIDs = newValue }
+  }
+
+  var taskBoardSelectionDispatcherValue: TaskBoardSelectionDispatcher {
+    taskBoardSelectionDispatcher
   }
 }
 
@@ -331,80 +354,6 @@ extension TaskBoardOverviewView {
     .frame(maxHeight: fillsAvailableHeight ? .infinity : nil)
   }
 
-  @ViewBuilder var boardContent: some View {
-    if hasBoardContent {
-      taskBoardColumns
-    } else {
-      emptyState
-    }
-  }
-
-  var taskBoardColumns: some View {
-    let titleTypography = TaskBoardCardTitleTypography(fontScale: fontScale)
-    return ViewThatFits(in: .horizontal) {
-      TaskBoardLaneStripLayout(sizing: laneStripSizing) {
-        taskBoardLaneColumns(titleTypography: titleTypography)
-      }
-      .padding(.vertical, metrics.boardVerticalPadding)
-
-      ScrollView(.horizontal, showsIndicators: true) {
-        TaskBoardLaneStripLayout(sizing: laneStripSizing) {
-          taskBoardLaneColumns(titleTypography: titleTypography)
-        }
-        .padding(.vertical, metrics.boardVerticalPadding)
-      }
-      .scrollClipDisabled()
-    }
-  }
-
-  @ViewBuilder
-  func taskBoardLaneColumns(titleTypography: TaskBoardCardTitleTypography) -> some View {
-    ForEach(TaskBoardInboxLane.allCases) { lane in
-      let apiItems = cachedPresentation.apiItems(in: lane)
-      let inboxItems = cachedPresentation.inboxItems(in: lane)
-      let decisions = decisions(in: lane)
-      let contentCount = laneContentCount(
-        apiItems: apiItems,
-        inboxItems: inboxItems,
-        decisions: decisions
-      )
-      let isCollapsed = isLaneCollapsed(lane, contentCount: contentCount)
-      TaskBoardLaneUnifiedColumn(
-        lane: lane,
-        apiItems: apiItems,
-        inboxItems: inboxItems,
-        decisions: decisions,
-        titleTypography: titleTypography,
-        isCollapsed: isCollapsed,
-        onOpenAPIItem: openTaskBoardItem,
-        onOpenInboxItem: onOpenItem,
-        onOpenDecision: onOpenDecision,
-        onToggleCollapse: {
-          toggleLaneCollapse(lane, contentCount: contentCount)
-        },
-        onMoveAPIItem: moveTaskBoardItem,
-        onMoveInboxItem: moveInboxItem
-      )
-      .layoutValue(
-        key: TaskBoardLanePreferredWidthKey.self,
-        value: isCollapsed ? laneMetrics.laneCollapsedWidth : laneMetrics.laneWidth
-      )
-      .layoutValue(key: TaskBoardLaneCanExpandKey.self, value: !isCollapsed)
-    }
-  }
-
-  var emptyState: some View {
-    ContentUnavailableView("No Open Tasks", systemImage: "tray")
-      .font(bodyFont)
-      .frame(maxWidth: .infinity, minHeight: 180)
-      .background(
-        .background.opacity(0.45), in: .rect(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
-  }
-
-  func decisions(in lane: TaskBoardInboxLane) -> [Decision] {
-    cachedPresentation.decisionIDs(in: lane).compactMap { decisionsByID[$0] }
-  }
-
   @MainActor
   func rebuildPresentation(input: TaskBoardOverviewPresentationInput) async {
     presentationGeneration &+= 1
@@ -415,6 +364,9 @@ extension TaskBoardOverviewView {
     }
     if cachedPresentation != presentation {
       cachedPresentation = presentation
+      cardSelection = cardSelection.pruning(
+        orderedVisibleIDs: presentation.orderedCardIDs
+      )
     }
   }
 }

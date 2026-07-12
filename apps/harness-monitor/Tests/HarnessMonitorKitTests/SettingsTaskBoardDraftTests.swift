@@ -285,6 +285,23 @@ struct SettingsRepositoriesPerformanceSourceTests {
     #expect(source.contains("func index(for rowID: String) -> Int?"))
   }
 
+  @Test("Repository switches use native sizing and explicit deletion")
+  func repositorySwitchesUseNativeSizingAndExplicitDeletion() throws {
+    let tableSource = try settingsSourceFile("SettingsRepositoriesSection+Table.swift")
+    let source = try settingsSourceFiles([
+      "SettingsRepositoriesSection.swift",
+      "SettingsRepositoriesSection+Persistence.swift",
+      "SettingsSharedRepositoriesDraft.swift",
+    ])
+
+    let nativeSwitchChain = ".toggleStyle(.switch)\n      .harnessNativeFormControl()"
+    #expect(tableSource.components(separatedBy: nativeSwitchChain).count - 1 == 2)
+    #expect(source.contains("@AppStorage(SettingsRepositoriesCatalog.storageKey)"))
+    #expect(source.contains("SettingsRepositoriesCatalog.decode(storedRepositoryCatalog)"))
+    #expect(source.contains("SettingsRepositoriesCatalog.encode(repositoryCatalog)"))
+    #expect(!source.contains("removeIfDisabled"))
+  }
+
   @Test("Supervisor panes are retained without hidden scroll or MCP work")
   func supervisorPanesAreRetainedWithoutHiddenScrollOrMCPWork() throws {
     let source = try settingsSourceFile("Supervisor/SettingsSupervisorSection.swift")

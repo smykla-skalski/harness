@@ -1,5 +1,27 @@
 import Foundation
 
+public struct TaskBoardInboxStatusUpdate: Equatable, Sendable {
+  public let sessionID: String
+  public let taskID: String
+  public let status: TaskStatus
+
+  public init(sessionID: String, taskID: String, status: TaskStatus) {
+    self.sessionID = sessionID
+    self.taskID = taskID
+    self.status = status
+  }
+}
+
+public struct TaskBoardItemStatusUpdate: Equatable, Sendable {
+  public let id: String
+  public let status: TaskBoardStatus
+
+  public init(id: String, status: TaskBoardStatus) {
+    self.id = id
+    self.status = status
+  }
+}
+
 public struct TaskBoardUpdateItemRequest: Codable, Equatable, Sendable {
   public let title: String?
   public let body: String?

@@ -77,6 +77,108 @@ extension HarnessMonitorStore {
     }
   }
 
+  public func requestTaskBoardDeletionConfirmation(
+    targets: [TaskBoardDeletionTarget]
+  ) {
+    let targets = orderedUniqueTaskBoardDeletionTargets(targets)
+    guard !targets.isEmpty else { return }
+    let actionName = targets.count == 1 ? "Delete task" : "Delete tasks"
+    guard taskBoardDeletionActionIsAvailable(actionName: actionName) else { return }
+    pendingConfirmation = .deleteTaskBoardTargets(targets: targets)
+  }
+
+  @discardableResult
+  func deleteTaskBoardTargets(_ targets: [TaskBoardDeletionTarget]) async -> Bool {
+    let targets = orderedUniqueTaskBoardDeletionTargets(targets)
+    guard !targets.isEmpty else { return false }
+    let actionName = targets.count == 1 ? "Delete task" : "Delete tasks"
+    guard taskBoardDeletionActionIsAvailable(actionName: actionName) else { return false }
+
+    let taskBoardItemIDs = targets.compactMap { target -> String? in
+      guard case .taskBoardItem(let id, _) = target else { return nil }
+      return id
+    }
+    if !taskBoardItemIDs.isEmpty {
+      guard
+        await deleteTaskBoardItems(
+          ids: taskBoardItemIDs,
+          presentsSuccessFeedback: false
+        )
+      else {
+        return false
+      }
+    }
+
+    for group in taskBoardInboxDeletionGroups(targets) {
+      guard
+        await deleteTasks(
+          sessionID: group.sessionID,
+          taskIDs: group.taskIDs,
+          actorID: "harness-app"
+        )
+      else {
+        return false
+      }
+    }
+
+    presentSuccessFeedback(
+      targets.count == 1 ? "Deleted task" : "Deleted \(targets.count) tasks"
+    )
+    return true
+  }
+
+  @discardableResult
+  public func deleteTaskBoardItems(ids: [String]) async -> Bool {
+    await deleteTaskBoardItems(ids: ids, presentsSuccessFeedback: true)
+  }
+
+  private func deleteTaskBoardItems(
+    ids: [String],
+    presentsSuccessFeedback: Bool
+  ) async -> Bool {
+    let ids = orderedUniqueDeletionTaskIDs(ids)
+    guard let client, !ids.isEmpty, !isDaemonActionInFlight else {
+      return false
+    }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    var deletedIDs: Set<String> = []
+    var firstFailure: (index: Int, error: any Error)?
+    for (index, id) in ids.enumerated() {
+      do {
+        _ = try await Self.measureOperation {
+          try await client.deleteTaskBoardItem(id: id)
+        }
+        recordRequestSuccess()
+        deletedIDs.insert(id)
+      } catch {
+        firstFailure = (index, error)
+        break
+      }
+    }
+
+    globalTaskBoardItems.removeAll { deletedIDs.contains($0.id) }
+    await refreshTaskBoardDashboardSnapshot(using: client)
+    if let firstFailure {
+      presentFailureFeedback(
+        taskBoardDeletionFailureMessage(
+          total: ids.count,
+          succeeded: deletedIDs.count,
+          failedIndex: firstFailure.index,
+          error: firstFailure.error
+        )
+      )
+      return false
+    }
+    if presentsSuccessFeedback {
+      presentSuccessFeedback(
+        ids.count == 1 ? "Deleted task board item" : "Deleted \(ids.count) task board items"
+      )
+    }
+    return true
+  }
+
   /// Stop-on-first-failure policy mirrors `removeAgents`: surface where the
   /// boundary fell rather than hammer through. Transient failure on item N
   /// strands items N+1…M; the toast names the unattempted suffix so the user
@@ -116,6 +218,74 @@ extension HarnessMonitorStore {
   private func orderedUniqueDeletionTaskIDs(_ ids: [String]) -> [String] {
     var seen: Set<String> = []
     return ids.filter { seen.insert($0).inserted }
+  }
+
+  private func orderedUniqueTaskBoardDeletionTargets(
+    _ targets: [TaskBoardDeletionTarget]
+  ) -> [TaskBoardDeletionTarget] {
+    var seenIDs: Set<String> = []
+    return targets.filter { seenIDs.insert($0.id).inserted }
+  }
+
+  private func taskBoardInboxDeletionGroups(
+    _ targets: [TaskBoardDeletionTarget]
+  ) -> [(sessionID: String, taskIDs: [String])] {
+    var groups: [(sessionID: String, taskIDs: [String])] = []
+    var groupIndexBySessionID: [String: Int] = [:]
+    for target in targets {
+      guard case .inboxTask(let sessionID, let taskID, _) = target else { continue }
+      if let index = groupIndexBySessionID[sessionID] {
+        groups[index].taskIDs.append(taskID)
+      } else {
+        groupIndexBySessionID[sessionID] = groups.count
+        groups.append((sessionID: sessionID, taskIDs: [taskID]))
+      }
+    }
+    return groups
+  }
+
+  private func taskBoardDeletionActionIsAvailable(actionName: String) -> Bool {
+    if isBusy {
+      presentFailureFeedback(
+        "\(actionName) is unavailable because another action is already in progress. "
+          + "Try again when it finishes"
+      )
+      return false
+    }
+    if isSessionReadOnly {
+      presentFailureFeedback(readOnlySessionAccessMessage)
+      return false
+    }
+    guard client != nil else {
+      presentFailureFeedback(
+        "The daemon action channel is unavailable. Refresh the session and try again"
+      )
+      return false
+    }
+    return true
+  }
+
+  private func taskBoardDeletionFailureMessage(
+    total: Int,
+    succeeded: Int,
+    failedIndex: Int,
+    error: any Error
+  ) -> String {
+    guard total > 1 else {
+      return "Task board item could not be deleted: \(error.localizedDescription)"
+    }
+    let remaining = total - failedIndex - 1
+    let unattemptedSuffix: String
+    if remaining == 0 {
+      unattemptedSuffix = ""
+    } else {
+      let noun = remaining == 1 ? "item was" : "items were"
+      unattemptedSuffix = " \(remaining) \(noun) not attempted."
+    }
+    return """
+      Deleted \(succeeded) of \(total) task board items. Stopped after a failure.\
+      \(unattemptedSuffix) \(error.localizedDescription)
+      """
   }
 
   @discardableResult

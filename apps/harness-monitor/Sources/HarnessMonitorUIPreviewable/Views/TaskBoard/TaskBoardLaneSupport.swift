@@ -30,7 +30,6 @@ struct TaskBoardLaneMetrics: Equatable {
   let rowTextSpacing: CGFloat
   let pillHorizontalPadding: CGFloat
   let pillVerticalPadding: CGFloat
-  let dragPreviewWidth: CGFloat
 
   init(fontScale: CGFloat) {
     let scale = SessionWindowFontScale.metricsScale(for: fontScale)
@@ -65,7 +64,6 @@ struct TaskBoardLaneMetrics: Equatable {
     rowTextSpacing = HarnessMonitorTheme.spacingXS * denseScale
     pillHorizontalPadding = HarnessMonitorTheme.pillPaddingH * denseScale
     pillVerticalPadding = HarnessMonitorTheme.pillPaddingV * min(scale, 1.2)
-    dragPreviewWidth = 220 * broadScale
   }
 }
 
@@ -229,6 +227,7 @@ struct TaskBoardLaneCardFramePreferenceKey: PreferenceKey {
 private struct TaskBoardCardChrome: ViewModifier {
   let tint: Color
   let isHovered: Bool
+  let isSelected: Bool
   @Environment(\.fontScale)
   private var fontScale
   @Environment(\.accessibilityReduceTransparency)
@@ -251,19 +250,40 @@ private struct TaskBoardCardChrome: ViewModifier {
         extraHoverHint: isHovered,
         respondsToHover: false
       )
-      .background(
-        RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
-          .fill(cardSurfaceFill)
-      )
+      .background {
+        let shape = RoundedRectangle(
+          cornerRadius: metrics.cardCornerRadius,
+          style: .continuous
+        )
+        shape.fill(cardSurfaceFill)
+        if isSelected {
+          shape.fill(tint.opacity(selectedFillOpacity))
+        }
+      }
       .overlay {
         RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
           .strokeBorder(
-            HarnessMonitorTheme.controlBorder.opacity(
-              colorSchemeContrast == .increased ? 0.74 : 0.52
-            ),
-            lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
+            cardStrokeColor,
+            lineWidth: cardStrokeWidth
           )
       }
+  }
+
+  private var selectedFillOpacity: Double {
+    reduceTransparency ? 0.2 : 0.12
+  }
+
+  private var cardStrokeColor: Color {
+    if isSelected {
+      return tint.opacity(colorSchemeContrast == .increased ? 1 : 0.86)
+    }
+    return HarnessMonitorTheme.controlBorder.opacity(
+      colorSchemeContrast == .increased ? 0.74 : 0.52
+    )
+  }
+
+  private var cardStrokeWidth: CGFloat {
+    isSelected ? 2 : (colorSchemeContrast == .increased ? 1.5 : 1)
   }
 
   private var cardSurfaceFill: Color {
@@ -285,9 +305,12 @@ private struct TaskBoardCardChrome: ViewModifier {
 extension View {
   func taskBoardCardChrome(
     tint: Color = HarnessMonitorTheme.accent,
-    isHovered: Bool = false
+    isHovered: Bool = false,
+    isSelected: Bool = false
   ) -> some View {
-    modifier(TaskBoardCardChrome(tint: tint, isHovered: isHovered))
+    modifier(
+      TaskBoardCardChrome(tint: tint, isHovered: isHovered, isSelected: isSelected)
+    )
   }
 
   func taskBoardCardFrame(

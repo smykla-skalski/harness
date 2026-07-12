@@ -1,18 +1,22 @@
 import HarnessMonitorKit
 
-enum TaskBoardLaneDropPolicy {
-  static func moveFirstPayload(
-    _ payloads: [TaskBoardItemDragPayload],
-    to destination: TaskBoardInboxLane,
-    move: (String, TaskBoardInboxLane) -> Bool
-  ) -> Bool {
-    guard let payload = payloads.first else {
-      return false
+struct TaskBoardCardDropPlan: Equatable {
+  let items: [TaskBoardCardDragItem]
+  let destination: TaskBoardInboxLane
+
+  static func resolve(
+    _ payloads: [TaskBoardCardDragPayload],
+    to destination: TaskBoardInboxLane
+  ) -> Self? {
+    var seenIDs: Set<TaskBoardCardID> = []
+    let uniqueItems = payloads.flatMap(\.items).filter { item in
+      seenIDs.insert(item.id).inserted
     }
-    guard let sourceLane = payload.sourceLane, sourceLane != destination else {
-      return false
+    let items = uniqueItems.filter { $0.sourceLane != destination }
+    guard !items.isEmpty, items.allSatisfy({ $0.accepts(destination: destination) }) else {
+      return nil
     }
-    return move(payload.itemID, destination)
+    return Self(items: items, destination: destination)
   }
 }
 
@@ -35,29 +39,7 @@ struct TaskBoardDropDeduper<Key: Equatable> {
   }
 }
 
-struct TaskBoardItemDropSignature: Equatable {
-  let itemID: String
+struct TaskBoardCardDropSignature: Equatable {
+  let cardIDs: [TaskBoardCardID]
   let destination: TaskBoardInboxLane
-}
-
-struct TaskBoardInboxItemDropSignature: Equatable {
-  let sessionID: String
-  let taskID: String
-  let destination: TaskBoardInboxLane
-}
-
-enum TaskBoardInboxDropPolicy {
-  static func moveFirstPayload(
-    _ payloads: [TaskBoardInboxItemDragPayload],
-    to destination: TaskBoardInboxLane,
-    move: (TaskBoardInboxItemDragPayload, TaskBoardInboxLane) -> Bool
-  ) -> Bool {
-    guard let payload = payloads.first else {
-      return false
-    }
-    guard let sourceLane = payload.sourceLane, sourceLane != destination else {
-      return false
-    }
-    return move(payload, destination)
-  }
 }

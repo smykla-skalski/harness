@@ -13,8 +13,11 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
   static let empty = Self(
     taskBoardItems: [],
     taskBoardItemsByID: [:],
+    projectLabelResolver: TaskBoardProjectLabelResolver(projectIDs: []),
     apiItemsByLane: [:],
     inboxItemsByLane: [:],
+    inboxItemsByID: [:],
+    orderedCardIDs: [],
     decisionIDsByLane: [:],
     aggregateNeedsYouCount: 0,
     aggregateOpenCount: 0,
@@ -25,8 +28,11 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
 
   let taskBoardItems: [TaskBoardItem]
   let taskBoardItemsByID: [String: TaskBoardItem]
+  let projectLabelResolver: TaskBoardProjectLabelResolver
   let apiItemsByLane: [TaskBoardInboxLane: [TaskBoardItem]]
   let inboxItemsByLane: [TaskBoardInboxLane: [TaskBoardInboxItem]]
+  let inboxItemsByID: [TaskBoardCardID: TaskBoardInboxItem]
+  let orderedCardIDs: [TaskBoardCardID]
   let decisionIDsByLane: [TaskBoardInboxLane: [String]]
   let aggregateNeedsYouCount: Int
   let aggregateOpenCount: Int
@@ -62,6 +68,10 @@ struct TaskBoardOverviewPresentation: Equatable, Sendable {
 
   func taskBoardItem(id: String) -> TaskBoardItem? {
     taskBoardItemsByID[id]
+  }
+
+  func inboxItem(id: TaskBoardCardID) -> TaskBoardInboxItem? {
+    inboxItemsByID[id]
   }
 }
 
@@ -117,7 +127,14 @@ actor TaskBoardOverviewPresentationWorker {
     let apiItemsByLane = Dictionary(grouping: taskBoardItems) { item in
       TaskBoardInboxLane(status: item.status) ?? .todo
     }
-    let inboxItemsByLane = Dictionary(grouping: input.snapshot.items, by: \.lane)
+    let inboxItems = uniqueInboxItems(input.snapshot.items)
+    let inboxItemsByLane = Dictionary(grouping: inboxItems, by: \.lane)
+    let inboxItemsByID = Dictionary(
+      inboxItems.map { item in
+        (inboxCardID(for: item), item)
+      },
+      uniquingKeysWith: { first, _ in first }
+    )
     let decisionIDs = sortedOpenDecisionIDs(input.decisionItems)
     let decisionIDsByLane: [TaskBoardInboxLane: [String]] =
       decisionIDs.isEmpty ? [:] : [.humanRequired: decisionIDs]
@@ -135,14 +152,22 @@ actor TaskBoardOverviewPresentationWorker {
     return TaskBoardOverviewPresentation(
       taskBoardItems: taskBoardItems,
       taskBoardItemsByID: Dictionary(uniqueKeysWithValues: taskBoardItems.map { ($0.id, $0) }),
+      projectLabelResolver: TaskBoardProjectLabelResolver(
+        projectIDs: taskBoardItems.compactMap(\.projectId)
+      ),
       apiItemsByLane: apiItemsByLane,
       inboxItemsByLane: inboxItemsByLane,
+      inboxItemsByID: inboxItemsByID,
+      orderedCardIDs: orderedCardIDs(
+        apiItemsByLane: apiItemsByLane,
+        inboxItemsByLane: inboxItemsByLane
+      ),
       decisionIDsByLane: decisionIDsByLane,
       aggregateNeedsYouCount: taskBoardNeedsYouCount
         + (inboxItemsByLane[.humanRequired]?.count ?? 0)
         + decisionIDs.count,
       aggregateOpenCount: taskBoardOpenCount
-        + input.snapshot.openItemCount
+        + inboxItems.count
         + decisionIDs.count,
       aggregateReviewCount: taskBoardReviewCount
         + reviewLanes.reduce(0) { count, lane in
@@ -159,6 +184,32 @@ actor TaskBoardOverviewPresentationWorker {
     .inReview,
     .toReview,
   ]
+
+  private static func uniqueInboxItems(
+    _ items: [TaskBoardInboxItem]
+  ) -> [TaskBoardInboxItem] {
+    var seenIDs: Set<TaskBoardCardID> = []
+    return items.filter { seenIDs.insert(inboxCardID(for: $0)).inserted }
+  }
+
+  private static func inboxCardID(for item: TaskBoardInboxItem) -> TaskBoardCardID {
+    .inbox(
+      sessionID: item.session.sessionId,
+      taskID: item.task.taskId
+    )
+  }
+
+  private static func orderedCardIDs(
+    apiItemsByLane: [TaskBoardInboxLane: [TaskBoardItem]],
+    inboxItemsByLane: [TaskBoardInboxLane: [TaskBoardInboxItem]]
+  ) -> [TaskBoardCardID] {
+    TaskBoardInboxLane.allCases.flatMap { lane in
+      (apiItemsByLane[lane] ?? []).map { .api($0.id) }
+        + (inboxItemsByLane[lane] ?? []).map {
+          inboxCardID(for: $0)
+        }
+    }
+  }
 
   private static func sortedTaskBoardItems(_ items: [TaskBoardItem]) -> [TaskBoardItem] {
     items

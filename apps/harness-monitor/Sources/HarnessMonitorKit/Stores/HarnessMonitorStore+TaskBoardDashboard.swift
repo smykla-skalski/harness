@@ -95,10 +95,8 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func updateTaskBoardItemStatus(id: String, status: TaskBoardStatus) async -> Bool {
-    await updateTaskBoardItem(
-      id: id,
-      request: TaskBoardUpdateItemRequest(status: status),
-      successMessage: "Moved task board item"
+    await updateTaskBoardItemStatuses(
+      [TaskBoardItemStatusUpdate(id: id, status: status)]
     )
   }
 
@@ -182,25 +180,7 @@ extension HarnessMonitorStore {
 
   @discardableResult
   public func deleteTaskBoardItem(id: String) async -> Bool {
-    guard let client else {
-      return false
-    }
-    isDaemonActionInFlight = true
-    defer { isDaemonActionInFlight = false }
-
-    do {
-      _ = try await Self.measureOperation {
-        try await client.deleteTaskBoardItem(id: id)
-      }
-      recordRequestSuccess()
-      globalTaskBoardItems.removeAll { $0.id == id }
-      await refreshTaskBoardDashboardSnapshot(using: client)
-      presentSuccessFeedback("Deleted task board item")
-      return true
-    } catch {
-      presentFailureFeedback(error.localizedDescription)
-      return false
-    }
+    await deleteTaskBoardItems(ids: [id])
   }
 
   @discardableResult

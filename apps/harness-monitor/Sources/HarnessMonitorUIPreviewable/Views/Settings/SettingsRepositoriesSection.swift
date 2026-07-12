@@ -7,6 +7,8 @@ struct SettingsRepositoriesSection: View {
   let isActive: Bool
   @AppStorage(DashboardReviewsPreferences.storageKey)
   var storedReviewsPreferences = ""
+  @AppStorage(SettingsRepositoriesCatalog.storageKey)
+  var storedRepositoryCatalog = ""
   @State private var draftStorage = SettingsSharedRepositoriesDraft()
   @State private var isLoadingStorage = false
   @State private var isSavingStorage = false

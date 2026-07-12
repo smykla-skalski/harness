@@ -1,166 +1,13 @@
-import Foundation
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
-import UniformTypeIdentifiers
-
-struct TaskBoardItemDragPayload: Codable, Transferable, Sendable {
-  let itemID: String
-  let status: TaskBoardStatus
-
-  static var transferRepresentation: some TransferRepresentation {
-    CodableRepresentation(contentType: .harnessMonitorTaskBoardItem)
-  }
-
-  var sourceLane: TaskBoardInboxLane? {
-    TaskBoardInboxLane(status: status)
-  }
-
-  func itemProvider() -> NSItemProvider {
-    let provider = NSItemProvider()
-    guard let encodedPayload = try? JSONEncoder().encode(self) else {
-      return provider
-    }
-    provider.registerDataRepresentation(
-      forTypeIdentifier: UTType.harnessMonitorTaskBoardItem.identifier,
-      visibility: .all
-    ) { completion in
-      completion(encodedPayload, nil)
-      return nil
-    }
-    return provider
-  }
-
-  static func loadFirst(
-    from providers: [NSItemProvider],
-    completion: @escaping @MainActor (Self) -> Void
-  ) -> Bool {
-    guard
-      let provider = providers.first(where: {
-        $0.hasItemConformingToTypeIdentifier(UTType.harnessMonitorTaskBoardItem.identifier)
-      })
-    else {
-      return false
-    }
-    provider.loadDataRepresentation(
-      forTypeIdentifier: UTType.harnessMonitorTaskBoardItem.identifier
-    ) { data, _ in
-      guard
-        let data,
-        let payload = try? JSONDecoder().decode(Self.self, from: data)
-      else {
-        return
-      }
-      Task { @MainActor in
-        completion(payload)
-      }
-    }
-    return true
-  }
-}
-
-struct TaskBoardInboxItemDragPayload: Codable, Transferable, Sendable {
-  let sessionID: String
-  let taskID: String
-  let status: TaskStatus
-  private let laneRawValue: String
-
-  enum CodingKeys: String, CodingKey {
-    case sessionID
-    case taskID
-    case status
-    case laneRawValue
-  }
-
-  init(sessionID: String, taskID: String, status: TaskStatus, lane: TaskBoardInboxLane) {
-    self.sessionID = sessionID
-    self.taskID = taskID
-    self.status = status
-    laneRawValue = lane.rawValue
-  }
-
-  init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    sessionID = try container.decode(String.self, forKey: .sessionID)
-    taskID = try container.decode(String.self, forKey: .taskID)
-    status = try container.decode(TaskStatus.self, forKey: .status)
-    laneRawValue = try container.decode(String.self, forKey: .laneRawValue)
-  }
-
-  func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(sessionID, forKey: .sessionID)
-    try container.encode(taskID, forKey: .taskID)
-    try container.encode(status, forKey: .status)
-    try container.encode(laneRawValue, forKey: .laneRawValue)
-  }
-
-  static var transferRepresentation: some TransferRepresentation {
-    CodableRepresentation(contentType: .harnessMonitorTaskBoardInboxItem)
-  }
-
-  var sourceLane: TaskBoardInboxLane? {
-    TaskBoardInboxLane(rawValue: laneRawValue)
-  }
-
-  func itemProvider() -> NSItemProvider {
-    let provider = NSItemProvider()
-    guard let encodedPayload = try? JSONEncoder().encode(self) else {
-      return provider
-    }
-    provider.registerDataRepresentation(
-      forTypeIdentifier: UTType.harnessMonitorTaskBoardInboxItem.identifier,
-      visibility: .all
-    ) { completion in
-      completion(encodedPayload, nil)
-      return nil
-    }
-    return provider
-  }
-
-  static func loadFirst(
-    from providers: [NSItemProvider],
-    completion: @escaping @MainActor (Self) -> Void
-  ) -> Bool {
-    guard
-      let provider = providers.first(where: {
-        $0.hasItemConformingToTypeIdentifier(UTType.harnessMonitorTaskBoardInboxItem.identifier)
-      })
-    else {
-      return false
-    }
-    provider.loadDataRepresentation(
-      forTypeIdentifier: UTType.harnessMonitorTaskBoardInboxItem.identifier
-    ) { data, _ in
-      guard
-        let data,
-        let payload = try? JSONDecoder().decode(Self.self, from: data)
-      else {
-        return
-      }
-      Task { @MainActor in
-        completion(payload)
-      }
-    }
-    return true
-  }
-}
-
-extension UTType {
-  static let harnessMonitorTaskBoardItem = UTType(
-    exportedAs: "io.harnessmonitor.task-board-item",
-    conformingTo: .json
-  )
-
-  static let harnessMonitorTaskBoardInboxItem = UTType(
-    exportedAs: "io.harnessmonitor.task-board-inbox-item",
-    conformingTo: .json
-  )
-}
 
 struct TaskBoardItemRow: View {
   let item: TaskBoardItem
   let titleTypography: TaskBoardCardTitleTypography
   let isHovered: Bool
+  let isSelected: Bool
+  let onSelect: (EventModifiers) -> Void
   let onOpenItem: (TaskBoardItem) -> Void
   @Environment(\.fontScale)
   private var fontScale
@@ -168,15 +15,19 @@ struct TaskBoardItemRow: View {
   private var laneAppearance
   @Environment(\.taskBoardShowsPriorityBadge)
   private var showsPriorityBadge
+  @Environment(\.taskBoardAlwaysShowsFullRepositoryNames)
+  private var alwaysShowsFullRepositoryNames
+  @Environment(\.taskBoardProjectLabelResolver)
+  private var projectLabelResolver
 
-  private var dragPayload: TaskBoardItemDragPayload {
-    TaskBoardItemDragPayload(itemID: item.id, status: item.status)
-  }
-
+  private var cardID: TaskBoardCardID { .api(item.id) }
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
   var body: some View {
     Button {
-      onOpenItem(item)
+      onSelect(Self.currentEventModifiers)
+      if Self.currentClickCount == 2 {
+        onOpenItem(item)
+      }
     } label: {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
         VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
@@ -188,7 +39,7 @@ struct TaskBoardItemRow: View {
             lineLimit: 2
           )
         }
-        TaskBoardCardFooter(repository: item.projectId ?? item.agentMode.title) {
+        TaskBoardCardFooter(repository: repositoryLabel) {
           badgeContent
         }
       }
@@ -198,18 +49,29 @@ struct TaskBoardItemRow: View {
       )
       .padding(metrics.cardPadding)
     }
-    .taskBoardCardChrome(tint: cardGlyph.tint, isHovered: isHovered)
+    .taskBoardCardChrome(tint: cardGlyph.tint, isHovered: isHovered, isSelected: isSelected)
     .contentShape(.rect)
-    .onDrag {
-      dragPayload.itemProvider()
-    }
-    .draggable(dragPayload) {
-      TaskBoardItemDragPreviewCard(item: item, titleTypography: titleTypography)
+    .draggable(containerItemID: cardID)
+    .accessibilityValue(isSelected ? "Selected" : "Not selected")
+    .accessibilityHint("Click to select. Double-click to open.")
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
+    .accessibilityAction(named: Text("Open")) {
+      onOpenItem(item)
     }
     .accessibilityIdentifier("harness.task-board.api-item.\(item.id)")
   }
 
   private var statusTint: Color { taskBoardStatusColor(for: item.status) }
+
+  private var repositoryLabel: String {
+    guard let projectID = item.projectId else {
+      return item.agentMode.title
+    }
+    return projectLabelResolver.label(
+      for: projectID,
+      alwaysShowFullName: alwaysShowsFullRepositoryNames
+    )
+  }
 
   private var cardGlyph: TaskBoardCardGlyph {
     TaskBoardGitHubCardGlyph.resolve(for: item)
@@ -230,34 +92,13 @@ struct TaskBoardItemRow: View {
       TaskBoardCardPill(label: "\(policyTraceCount) policy", tint: HarnessMonitorTheme.secondaryInk)
     }
   }
-}
 
-private struct TaskBoardItemDragPreviewCard: View {
-  let item: TaskBoardItem
-  let titleTypography: TaskBoardCardTitleTypography
-  @Environment(\.fontScale)
-  private var fontScale
-
-  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
-  private var statusFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  private static var currentEventModifiers: EventModifiers {
+    EventModifiers(nsModifiers: NSEvent.modifierFlags)
   }
 
-  var body: some View {
-    VStack(alignment: .leading, spacing: metrics.laneBodyTopPadding) {
-      TaskBoardInlineCodeText(
-        item.title,
-        font: titleTypography.font,
-        codeFont: titleTypography.codeFont,
-        lineLimit: 2
-      )
-      Text(item.status.title)
-        .font(statusFont)
-        .foregroundStyle(taskBoardStatusColor(for: item.status))
-    }
-    .frame(width: metrics.dragPreviewWidth, alignment: .leading)
-    .padding(metrics.cardPadding)
-    .background(.background.opacity(0.92), in: .rect(cornerRadius: metrics.cardCornerRadius))
+  private static var currentClickCount: Int {
+    NSApp.currentEvent?.clickCount ?? 1
   }
 }
 
@@ -265,23 +106,23 @@ struct TaskBoardInboxItemRow: View {
   let item: TaskBoardInboxItem
   let titleTypography: TaskBoardCardTitleTypography
   let isHovered: Bool
+  let isSelected: Bool
+  let onSelect: (EventModifiers) -> Void
   let onOpenItem: (TaskBoardInboxItem) -> Void
   @Environment(\.fontScale)
   private var fontScale
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
-  private var dragPayload: TaskBoardInboxItemDragPayload {
-    TaskBoardInboxItemDragPayload(
-      sessionID: item.session.sessionId,
-      taskID: item.task.taskId,
-      status: item.task.status,
-      lane: item.lane
-    )
+  private var cardID: TaskBoardCardID {
+    .inbox(sessionID: item.session.sessionId, taskID: item.task.taskId)
   }
 
   var body: some View {
     Button {
-      onOpenItem(item)
+      onSelect(Self.currentEventModifiers)
+      if Self.currentClickCount == 2 {
+        onOpenItem(item)
+      }
     } label: {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
         VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
@@ -303,13 +144,14 @@ struct TaskBoardInboxItemRow: View {
       )
       .padding(metrics.cardPadding)
     }
-    .taskBoardCardChrome(tint: statusTint, isHovered: isHovered)
+    .taskBoardCardChrome(tint: statusTint, isHovered: isHovered, isSelected: isSelected)
     .contentShape(.rect)
-    .onDrag {
-      dragPayload.itemProvider()
-    }
-    .draggable(dragPayload) {
-      TaskBoardInboxItemDragPreviewCard(item: item, titleTypography: titleTypography)
+    .draggable(containerItemID: cardID)
+    .accessibilityValue(isSelected ? "Selected" : "Not selected")
+    .accessibilityHint("Click to select. Double-click to open.")
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
+    .accessibilityAction(named: Text("Open")) {
+      onOpenItem(item)
     }
     .accessibilityIdentifier("harness.task-board.item.\(item.task.taskId)")
   }
@@ -320,33 +162,12 @@ struct TaskBoardInboxItemRow: View {
     TaskBoardCardPill(label: item.task.status.title, tint: statusTint)
     TaskBoardCardPill(label: item.task.severity.title, tint: severityColor(for: item.task.severity))
   }
-}
 
-private struct TaskBoardInboxItemDragPreviewCard: View {
-  let item: TaskBoardInboxItem
-  let titleTypography: TaskBoardCardTitleTypography
-  @Environment(\.fontScale)
-  private var fontScale
-
-  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
-  private var statusFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  private static var currentEventModifiers: EventModifiers {
+    EventModifiers(nsModifiers: NSEvent.modifierFlags)
   }
 
-  var body: some View {
-    VStack(alignment: .leading, spacing: metrics.laneBodyTopPadding) {
-      TaskBoardInlineCodeText(
-        item.task.title,
-        font: titleTypography.font,
-        codeFont: titleTypography.codeFont,
-        lineLimit: 2
-      )
-      Text(item.task.status.title)
-        .font(statusFont)
-        .foregroundStyle(taskStatusColor(for: item.task.status))
-    }
-    .frame(width: metrics.dragPreviewWidth, alignment: .leading)
-    .padding(metrics.cardPadding)
-    .background(.background.opacity(0.92), in: .rect(cornerRadius: metrics.cardCornerRadius))
+  private static var currentClickCount: Int {
+    NSApp.currentEvent?.clickCount ?? 1
   }
 }

@@ -75,7 +75,8 @@ extension SettingsRepositoriesSection {
       ).normalized()
       draft = SettingsSharedRepositoriesDraft(
         reviewsPreferences: reviewsPreferences,
-        taskBoardDraft: taskBoardFormState.draft
+        taskBoardDraft: taskBoardFormState.draft,
+        repositoryCatalog: SettingsRepositoriesCatalog.decode(storedRepositoryCatalog)
       )
       hasLoadedDraft = true
       resetCatalogState()
@@ -145,6 +146,7 @@ extension SettingsRepositoriesSection {
 
     let reviewsRepositories = draft.reviewsRepositories
     let legacyOrganizations = draft.legacyOrganizations
+    let repositoryCatalog = draft.repositoryCatalog
 
     let succeeded = await store.updateTaskBoardGitSettings(
       snapshot: taskBoardDraft.snapshot,
@@ -159,6 +161,7 @@ extension SettingsRepositoriesSection {
     reviewsPreferences.organizationsText = legacyOrganizations.joined(separator: ", ")
     let normalizedPreferences = reviewsPreferences.normalized()
     storedReviewsPreferences = normalizedPreferences.encodedString
+    storedRepositoryCatalog = SettingsRepositoriesCatalog.encode(repositoryCatalog)
 
     do {
       let snapshot = try await store.taskBoardGitSettingsSnapshot()
@@ -167,7 +170,8 @@ extension SettingsRepositoriesSection {
       taskBoardFormState.hasLoadedSettings = true
       draft = SettingsSharedRepositoriesDraft(
         reviewsPreferences: normalizedPreferences,
-        taskBoardDraft: taskBoardFormState.draft
+        taskBoardDraft: taskBoardFormState.draft,
+        repositoryCatalog: repositoryCatalog
       )
       hasLoadedDraft = true
       loadError = nil
@@ -177,7 +181,8 @@ extension SettingsRepositoriesSection {
       taskBoardFormState.hasLoadedSettings = true
       draft = SettingsSharedRepositoriesDraft(
         reviewsPreferences: normalizedPreferences,
-        taskBoardDraft: taskBoardDraft
+        taskBoardDraft: taskBoardDraft,
+        repositoryCatalog: repositoryCatalog
       )
       hasLoadedDraft = true
       loadError = nil

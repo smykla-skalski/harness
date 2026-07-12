@@ -1,6 +1,18 @@
 import HarnessMonitorKit
 import SwiftUI
 
+enum SettingsRepositoriesCatalog {
+  static let storageKey = "settings.repositories.catalog"
+
+  static func decode(_ value: String) -> [String] {
+    SettingsGitHubRepositoryNormalization.repositories(from: value)
+  }
+
+  static func encode(_ repositories: [String]) -> String {
+    repositories.joined(separator: "\n")
+  }
+}
+
 struct SettingsSharedRepositoryRow: Identifiable, Equatable {
   let owner: String
   let repository: String
@@ -22,8 +34,14 @@ struct SettingsSharedRepositoriesDraft: Equatable {
 
   init(
     reviewsPreferences: DashboardReviewsPreferences,
-    taskBoardDraft: TaskBoardGitSettingsDraft
+    taskBoardDraft: TaskBoardGitSettingsDraft,
+    repositoryCatalog: [String] = []
   ) {
+    insert(
+      repositories: repositoryCatalog,
+      reviewsEnabled: false,
+      taskBoardEnabled: false
+    )
     insert(
       repositories: reviewsPreferences.normalizedRepositories,
       reviewsEnabled: true,
@@ -51,6 +69,10 @@ struct SettingsSharedRepositoriesDraft: Equatable {
 
   var taskBoardRepositories: [String] {
     rows.filter(\.taskBoardEnabled).map(\.repositoryPath)
+  }
+
+  var repositoryCatalog: [String] {
+    rows.map(\.repositoryPath)
   }
 
   func index(for rowID: String) -> Int? {
@@ -86,13 +108,11 @@ struct SettingsSharedRepositoriesDraft: Equatable {
   mutating func setReviewsEnabled(_ isEnabled: Bool, for rowID: String) {
     guard let index = rowIndexes[rowID] else { return }
     rows[index].reviewsEnabled = isEnabled
-    removeIfDisabled(index: index)
   }
 
   mutating func setTaskBoardEnabled(_ isEnabled: Bool, for rowID: String) {
     guard let index = rowIndexes[rowID] else { return }
     rows[index].taskBoardEnabled = isEnabled
-    removeIfDisabled(index: index)
   }
 
   mutating func remove(rowID: String) {
@@ -143,13 +163,6 @@ struct SettingsSharedRepositoriesDraft: Equatable {
     }
     rowIndexes[candidate.id] = rows.count
     rows.append(candidate)
-  }
-
-  private mutating func removeIfDisabled(index: Int) {
-    guard rows.indices.contains(index) else { return }
-    guard !rows[index].reviewsEnabled, !rows[index].taskBoardEnabled else { return }
-    rows.remove(at: index)
-    rebuildRowIndexes()
   }
 
   private mutating func rebuildRowIndexes() {

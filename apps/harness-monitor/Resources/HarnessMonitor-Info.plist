@@ -73,6 +73,18 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
+			<string>io.harnessmonitor.task-board-card</string>
+			<key>UTTypeDescription</key>
+			<string>Harness Monitor Task Board Card</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict/>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
 			<string>io.harnessmonitor.task-board-item</string>
 			<key>UTTypeDescription</key>
 			<string>Harness Monitor Task Board Item</string>

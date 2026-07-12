@@ -51,12 +51,13 @@ struct TaskBoardOverviewHost: View {
       isActionInFlight: isActionInFlight,
       onOpenItem: openInboxItem,
       onOpenTaskBoardItem: openTaskBoardItem,
-      onMoveInboxItem: moveInboxItem,
-      onMoveTaskBoardItem: moveTaskBoardItem,
+      onMoveInboxItems: moveInboxItems,
+      onMoveTaskBoardItems: moveTaskBoardItems,
       onOpenDecision: openDecision,
       onCreateTaskBoardItem: createTaskBoardItem,
       onUpdateTaskBoardItem: updateTaskBoardItem,
       onDeleteTaskBoardItem: deleteTaskBoardItem,
+      onDeleteTaskBoardTargets: deleteTaskBoardTargets,
       onEvaluateTaskBoard: evaluateTaskBoard,
       onEvaluateTaskBoardItem: evaluateTaskBoardItem,
       onBeginTaskBoardPlan: beginTaskBoardPlan,
@@ -133,10 +134,12 @@ struct TaskBoardOverviewHost: View {
     }
   }
 
-  private func moveTaskBoardItem(_ itemID: String, status: TaskBoardStatus) {
-    Task { @MainActor in
-      await store.updateTaskBoardItemStatus(id: itemID, status: status)
-    }
+  private func moveTaskBoardItems(_ updates: [TaskBoardItemStatusUpdate]) {
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Moving task board items") {
+        await store.updateTaskBoardItemStatuses(updates)
+      }
+    )
   }
 
   private func createTaskBoardItem(
@@ -155,19 +158,19 @@ struct TaskBoardOverviewHost: View {
   }
 
   private func deleteTaskBoardItem(_ item: TaskBoardItem) {
-    Task { @MainActor in
-      await store.deleteTaskBoardItem(id: item.id)
-    }
+    deleteTaskBoardTargets([TaskBoardDeletionTarget(taskBoardItem: item)])
   }
 
-  private func moveInboxItem(_ item: TaskBoardInboxItem, status: TaskStatus) {
-    Task { @MainActor in
-      await store.updateTaskStatus(
-        taskID: item.task.taskId,
-        status: status,
-        sessionID: item.session.sessionId
-      )
-    }
+  private func deleteTaskBoardTargets(_ targets: [TaskBoardDeletionTarget]) {
+    store.requestTaskBoardDeletionConfirmation(targets: targets)
+  }
+
+  private func moveInboxItems(_ updates: [TaskBoardInboxStatusUpdate]) {
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Moving session tasks") {
+        await store.updateTaskBoardInboxStatuses(updates)
+      }
+    )
   }
 
   private func evaluateTaskBoard() {
