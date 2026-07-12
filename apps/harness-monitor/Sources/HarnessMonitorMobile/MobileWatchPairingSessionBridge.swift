@@ -39,9 +39,6 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
     snapshot: MobileMirrorSnapshot? = nil,
     exportedAt: Date = .now
   ) async {
-    guard !credentials.isEmpty else {
-      return
-    }
     let transfer = MobileWatchPairingTransfer(
       identities: identities,
       credentials: credentials,
@@ -49,13 +46,12 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
       exportedAt: exportedAt
     )
     guard
-      let data = try? transfer.encodedData(
+      let payload = try? transfer.watchConnectivityPayload(
         maximumBytes: Self.maximumTransferPayloadBytes
       )
     else {
       return
     }
-    let payload = [MobileWatchPairingTransferEnvelope.transferKey: data]
     cachePayloadForTransfer(payload)
 
     guard let session else {

@@ -224,6 +224,78 @@ final class MobileWatchPairingTransferChangesTests: XCTestCase {
     XCTAssertEqual(reconciled.snapshot, transfer.snapshot)
   }
 
+  func testEmptyPhoneTransferRemovesAllTransferredCredentials() {
+    let phoneIdentity = makePairingIdentity(id: "default-mobile-device", now: now)
+    let phoneCredential = makePairedStationCredential(
+      stationID: "relay-stale",
+      deviceIdentityID: phoneIdentity.id,
+      now: now
+    )
+    let transfer = MobileWatchPairingTransfer(
+      identities: [],
+      credentials: [],
+      exportedAt: now
+    )
+
+    let plan = transfer.replacementPlan(replacing: [phoneCredential])
+
+    XCTAssertEqual(plan.credentialStationIDsToDelete, [phoneCredential.stationID])
+    XCTAssertEqual(plan.identityIDsToDelete, [phoneIdentity.id])
+  }
+
+  func testEmptyPhoneTransferBuildsWatchConnectivityPayload() throws {
+    let transfer = MobileWatchPairingTransfer(
+      identities: [],
+      credentials: [],
+      exportedAt: now
+    )
+
+    let payload = try transfer.watchConnectivityPayload(maximumBytes: 60 * 1024)
+    let data = try XCTUnwrap(
+      payload[MobileWatchPairingTransferEnvelope.transferKey] as? Data
+    )
+
+    XCTAssertEqual(try MobileWatchPairingTransfer.decode(data), transfer)
+  }
+
+  func testEmptyPhoneTransferPreservesWatchOwnedCredentialWhileRemovingPhoneCredential() throws {
+    let phoneIdentity = makePairingIdentity(id: "default-mobile-device", now: now)
+    let watchIdentity = makePairingIdentity(
+      id: MobileRemoteDaemonPairingDevice.watchOS.identityID,
+      now: now
+    )
+    let phoneCredential = makePairedStationCredential(
+      stationID: "relay-stale",
+      deviceIdentityID: phoneIdentity.id,
+      now: now
+    )
+    let watchCredential = try makeRemoteCredential(
+      stationID: "remote-watch",
+      identityID: watchIdentity.id,
+      platform: "watchos",
+      token: "watch-token"
+    )
+    let transfer = MobileWatchPairingTransfer(
+      identities: [],
+      credentials: [],
+      exportedAt: now
+    )
+
+    let reconciled = transfer.preservingLocallyPairedRemoteCredentials(
+      for: .watchOS,
+      currentIdentities: [phoneIdentity, watchIdentity],
+      currentCredentials: [phoneCredential, watchCredential]
+    )
+    let plan = reconciled.replacementPlan(
+      replacing: [phoneCredential, watchCredential]
+    )
+
+    XCTAssertEqual(reconciled.credentials, [watchCredential])
+    XCTAssertEqual(reconciled.identities, [watchIdentity])
+    XCTAssertEqual(plan.credentialStationIDsToDelete, [phoneCredential.stationID])
+    XCTAssertEqual(plan.identityIDsToDelete, [phoneIdentity.id])
+  }
+
   func testPhoneTransferStillReplacesStaleTransferredCredentials() throws {
     let phoneIdentity = makePairingIdentity(id: "default-mobile-device", now: now)
     let watchIdentity = makePairingIdentity(
