@@ -22,7 +22,7 @@ fn ws_request_deserialization() {
 
 #[tokio::test]
 async fn remote_ws_dispatch_allows_viewer_read_method() {
-    let mut state = super::super::test_support::test_ws_state();
+    let mut state = super::super::test_support::test_http_state_with_db();
     state.auth_mode = DaemonHttpAuthMode::Remote;
     let connection = Arc::new(Mutex::new(ConnectionState::new_remote(remote_client(
         "viewer",
@@ -39,7 +39,7 @@ async fn remote_ws_dispatch_allows_viewer_read_method() {
 
 #[tokio::test]
 async fn remote_ws_dispatch_denies_viewer_write_method() {
-    let mut state = super::super::test_support::test_ws_state();
+    let mut state = super::super::test_support::test_http_state_with_db();
     state.auth_mode = DaemonHttpAuthMode::Remote;
     let connection = Arc::new(Mutex::new(ConnectionState::new_remote(remote_client(
         "viewer",
@@ -59,7 +59,7 @@ async fn remote_ws_dispatch_denies_viewer_write_method() {
 
 #[tokio::test]
 async fn remote_ws_dispatch_denies_known_method_without_remote_client() {
-    let mut state = super::super::test_support::test_ws_state();
+    let mut state = super::super::test_support::test_http_state_with_db();
     state.auth_mode = DaemonHttpAuthMode::Remote;
     let connection = Arc::new(Mutex::new(ConnectionState::new()));
     let request = ws_request("req-missing-client", ws_methods::PING);
@@ -75,7 +75,7 @@ async fn remote_ws_dispatch_denies_known_method_without_remote_client() {
 
 #[tokio::test]
 async fn remote_ws_dispatch_preserves_unknown_method_errors() {
-    let mut state = super::super::test_support::test_ws_state();
+    let mut state = super::super::test_support::test_http_state_with_db();
     state.auth_mode = DaemonHttpAuthMode::Remote;
     let connection = Arc::new(Mutex::new(ConnectionState::new_remote(remote_client(
         "admin",

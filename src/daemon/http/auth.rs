@@ -14,7 +14,8 @@ use crate::daemon::remote_auth::{
 };
 use crate::daemon::remote_identity::RemoteStoredClient;
 
-use super::DaemonHttpState;
+use super::auth_audit::RemoteHttpAuditContext;
+use super::{DaemonHttpState, auth_audit};
 
 const REMOTE_AUTH_STORE_UNAVAILABLE_MESSAGE: &str = "remote authentication store is unavailable";
 
@@ -106,15 +107,56 @@ pub(crate) async fn authorize_remote_http_request(
     let Some(route) = http_route_contract(request.method(), route_path) else {
         return remote_auth_error_response(RemoteAuthError::MissingScopeContract);
     };
-    match verify_and_authorize_http_route(request.headers(), &state, route) {
-        Ok(client) => {
-            let actor = client.control_plane_actor_id();
-            REMOTE_HTTP_CLIENT
-                .scope(client, with_control_plane_actor(actor, next.run(request)))
-                .await
-        }
-        Err(response) => *response,
+    let client = match authenticate_and_audit_remote_http_request(&request, &state, route) {
+        Ok(client) => client,
+        Err(response) => return *response,
+    };
+    let actor = client.control_plane_actor_id();
+    REMOTE_HTTP_CLIENT
+        .scope(client, with_control_plane_actor(actor, next.run(request)))
+        .await
+}
+
+fn authenticate_and_audit_remote_http_request(
+    request: &Request<Body>,
+    state: &DaemonHttpState,
+    route: &HttpApiRouteContract,
+) -> Result<RemoteStoredClient, Box<Response>> {
+    let audit = RemoteHttpAuditContext::from_request(request, route)
+        .map_err(|error| Box::new(remote_auth_error_response(error)))?;
+    let client = verify_remote_client(request.headers(), state)
+        .map_err(|response| Box::new(audit_verification_failure(&audit, state, *response)))?;
+    authorize_and_audit_remote_http_client(&audit, state, route, client)
+}
+
+fn audit_verification_failure(
+    audit: &RemoteHttpAuditContext,
+    state: &DaemonHttpState,
+    response: Response,
+) -> Response {
+    let error_detail = auth_audit::authentication_error_detail(response.status());
+    match audit.record_denied(state, None, error_detail) {
+        Ok(()) => response,
+        Err(error) => auth_audit::unavailable_response(&error),
     }
+}
+
+fn authorize_and_audit_remote_http_client(
+    audit: &RemoteHttpAuditContext,
+    state: &DaemonHttpState,
+    route: &HttpApiRouteContract,
+    client: RemoteStoredClient,
+) -> Result<RemoteStoredClient, Box<Response>> {
+    if let Err(error) = authorize_remote_http_route(&client, route) {
+        return match audit.record_denied(state, Some(&client.client_id), &error.to_string()) {
+            Ok(()) => Err(Box::new(remote_auth_error_response(error))),
+            Err(audit_error) => Err(Box::new(auth_audit::unavailable_response(&audit_error))),
+        };
+    }
+    audit
+        .record_allowed(state, &client.client_id)
+        .map_err(|error| Box::new(auth_audit::unavailable_response(&error)))?;
+    Ok(client)
 }
 
 fn require_local_auth(headers: &HeaderMap, state: &DaemonHttpState) -> Result<(), Box<Response>> {
@@ -166,6 +208,7 @@ fn verify_remote_client(
         })
 }
 
+#[cfg(test)]
 fn verify_and_authorize_http_route(
     headers: &HeaderMap,
     state: &DaemonHttpState,

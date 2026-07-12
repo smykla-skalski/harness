@@ -137,7 +137,7 @@ pub fn authorize_remote_http_route(
     client: &RemoteStoredClient,
     route: &HttpApiRouteContract,
 ) -> Result<RemoteAuthDecision, RemoteAuthError> {
-    let required_scope = first_required_scope(remote_http_scopes(route))?;
+    let required_scope = remote_http_required_scope(route)?;
     authorize_client_scope(client, required_scope)?;
     Ok(RemoteAuthDecision {
         client_id: client.client_id.clone(),
@@ -189,7 +189,7 @@ pub fn authorize_remote_ws_method(
     client: &RemoteStoredClient,
     method: &str,
 ) -> Result<RemoteAuthDecision, RemoteAuthError> {
-    let required_scope = first_required_scope(remote_ws_scopes(method))?;
+    let required_scope = remote_ws_required_scope(method)?;
     authorize_client_scope(client, required_scope)?;
     Ok(RemoteAuthDecision {
         client_id: client.client_id.clone(),
@@ -198,6 +198,16 @@ pub fn authorize_remote_ws_method(
         },
         required_scope,
     })
+}
+
+pub(crate) fn remote_http_required_scope(
+    route: &HttpApiRouteContract,
+) -> Result<RemoteAccessScope, RemoteAuthError> {
+    first_required_scope(remote_http_scopes(route))
+}
+
+pub(crate) fn remote_ws_required_scope(method: &str) -> Result<RemoteAccessScope, RemoteAuthError> {
+    first_required_scope(remote_ws_scopes(method))
 }
 
 fn first_required_scope(

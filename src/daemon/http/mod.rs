@@ -39,6 +39,7 @@ use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with
 mod agents;
 mod audit;
 mod auth;
+mod auth_audit;
 mod core;
 mod improver;
 mod managed_agents;
