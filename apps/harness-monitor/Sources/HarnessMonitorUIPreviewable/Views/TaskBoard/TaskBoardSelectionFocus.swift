@@ -1,13 +1,14 @@
 import SwiftUI
 
 @MainActor
+@Observable
 public final class TaskBoardSelectionDispatcher {
-  public var deleteSelection: (() -> Void)?
+  public private(set) var deleteRequestGeneration: UInt64 = 0
 
   public init() {}
 
   public func performDeleteSelection() {
-    deleteSelection?()
+    deleteRequestGeneration &+= 1
   }
 }
 

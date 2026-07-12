@@ -174,11 +174,8 @@ public struct TaskBoardOverviewView: View {
     .task(id: presentationInput) {
       await rebuildPresentation(input: presentationInput)
     }
-    .task {
-      bindTaskBoardSelectionDispatcher()
-    }
-    .onDisappear {
-      taskBoardSelectionDispatcher.deleteSelection = nil
+    .onChange(of: taskBoardSelectionDispatcher.deleteRequestGeneration) {
+      requestDeleteSelectedTaskBoardCards()
     }
   }
 

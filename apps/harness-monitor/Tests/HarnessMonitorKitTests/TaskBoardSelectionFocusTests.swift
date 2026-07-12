@@ -42,8 +42,6 @@ struct TaskBoardSelectionFocusTests {
   @Test("Delete forwards only while enabled")
   func deleteForwardsOnlyWhileEnabled() {
     let dispatcher = TaskBoardSelectionDispatcher()
-    var callCount = 0
-    dispatcher.deleteSelection = { callCount += 1 }
 
     TaskBoardSelectionFocus(
       selectionCount: 0,
@@ -56,7 +54,7 @@ struct TaskBoardSelectionFocusTests {
       dispatcher: dispatcher
     ).performDeleteSelection()
 
-    #expect(callCount == 1)
+    #expect(dispatcher.deleteRequestGeneration == 1)
   }
 
   @Test("Task board command owns Delete whenever its focus is mounted")
@@ -78,6 +76,9 @@ struct TaskBoardSelectionFocusTests {
     #expect(commandsSource.contains(".keyboardShortcut(.delete, modifiers: [])"))
     #expect(!commandsSource.contains(".keyboardShortcut(.deleteForward"))
     #expect(focusSource.contains(".keyboardShortcut(.deleteForward, modifiers: [])"))
+    #expect(focusSource.contains("@Observable"))
+    #expect(focusSource.contains("deleteRequestGeneration &+= 1"))
+    #expect(!focusSource.contains("deleteSelection: (() -> Void)?"))
     #expect(focusSource.contains(".opacity(0)"))
     #expect(focusSource.contains(".accessibilityHidden(true)"))
     #expect(
@@ -90,6 +91,12 @@ struct TaskBoardSelectionFocusTests {
         ".taskBoardSelectionForwardDeleteShortcut(taskBoardSelectionFocus)"
       )
     )
+    #expect(
+      overviewSource.contains(
+        ".onChange(of: taskBoardSelectionDispatcher.deleteRequestGeneration)"
+      )
+    )
+    #expect(!overviewSource.contains("bindTaskBoardSelectionDispatcher"))
   }
 
   private func sourceFile(at relativePath: String) throws -> String {

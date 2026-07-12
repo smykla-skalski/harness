@@ -9,12 +9,6 @@ extension TaskBoardOverviewView {
     )
   }
 
-  func bindTaskBoardSelectionDispatcher() {
-    taskBoardSelectionDispatcherValue.deleteSelection = { [self] in
-      requestDeleteSelectedTaskBoardCards()
-    }
-  }
-
   private var canDeleteSelectedTaskBoardCards: Bool {
     canDeleteTaskBoardCards(orderedSelectedCardIDs)
   }
@@ -36,7 +30,7 @@ extension TaskBoardOverviewView {
     return !store.isBusy && !store.isSessionReadOnly && store.apiClient != nil
   }
 
-  private func requestDeleteSelectedTaskBoardCards() {
+  func requestDeleteSelectedTaskBoardCards() {
     guard canDeleteSelectedTaskBoardCards else {
       return
     }
