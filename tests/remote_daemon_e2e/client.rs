@@ -260,13 +260,13 @@ impl RemoteDaemonClient {
         Mutate: FnOnce() -> Result<Output, String>,
     {
         let mut socket = self.connect_websocket(credentials).await?;
-        let health = websocket_rpc(&mut socket, "e2e-before-revoke", "health").await?;
+        let health = websocket_rpc(&mut socket, "e2e-before-invalidation", "health").await?;
         if !health["error"].is_null() || health["result"].is_null() {
             return Err(format!("WSS health before invalidation failed: {health}"));
         }
 
         let output = mutate()?;
-        let denied = websocket_rpc(&mut socket, "e2e-after-revoke", "health").await?;
+        let denied = websocket_rpc(&mut socket, "e2e-after-invalidation", "health").await?;
         if denied["error"]["status_code"].as_u64() != Some(401) {
             return Err(format!(
                 "live WSS invalidation did not deny the request: {denied}"

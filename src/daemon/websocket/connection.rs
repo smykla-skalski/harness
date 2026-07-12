@@ -253,6 +253,7 @@ fn spawn_inbound_task(
         let mut last_client_message = Instant::now();
         let mut idle_check = tokio_interval(Duration::from_secs(15));
         let mut credential_check = tokio_interval(Duration::from_secs(5));
+        credential_check.tick().await;
 
         loop {
             tokio::select! {
