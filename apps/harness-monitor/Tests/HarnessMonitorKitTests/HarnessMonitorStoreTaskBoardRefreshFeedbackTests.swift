@@ -43,4 +43,21 @@ struct HarnessMonitorStoreTaskBoardRefreshFeedbackTests {
     #expect(store.toast.activeFeedback.isEmpty)
     #expect(store.currentFailureFeedbackMessage == nil)
   }
+
+  @Test("Refresh is ignored while another daemon action is in flight")
+  func refreshIsIgnoredWhileAnotherDaemonActionIsInFlight() async {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.isDaemonActionInFlight = true
+    defer { store.isDaemonActionInFlight = false }
+
+    await store.refreshTaskBoardDashboard()
+
+    #expect(
+      !client.recordedCalls().contains(
+        .syncTaskBoard(direction: .pull, dryRun: false, status: nil, provider: nil)
+      )
+    )
+    #expect(store.toast.activeFeedback.isEmpty)
+  }
 }

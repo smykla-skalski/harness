@@ -78,7 +78,7 @@ extension HarnessMonitorStore {
   }
 
   public func refreshTaskBoardDashboard() async {
-    guard let client else {
+    guard let client, !isDaemonActionInFlight else {
       return
     }
     isDaemonActionInFlight = true
