@@ -129,6 +129,35 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     XCTAssertEqual(snapshot.needsYouCount, 2)
   }
 
+  func testMissingTaskBoardRouteKeepsRemoteSessionsAvailable() async throws {
+    RemoteDaemonSessionsURLProtocol.respond(
+      path: "/v1/sessions",
+      statusCode: 200,
+      body: sessionsResponse
+    )
+    RemoteDaemonSessionsURLProtocol.respond(
+      path: "/v1/task-board/items",
+      statusCode: 404,
+      body: #"{"error":"not found"}"#
+    )
+    let client = MobileRemoteDaemonSyncClient(
+      access: try remoteAccess(),
+      stationID: "remote-daemon-example-com",
+      stationName: "daemon.example.com",
+      defaultStation: false,
+      session: makeSession()
+    )
+
+    let fetchedSnapshot = try await client.fetchLatestSnapshot(
+      stationID: "remote-daemon-example-com",
+      now: Date(timeIntervalSince1970: 1_752_124_400)
+    )
+    let snapshot = try XCTUnwrap(fetchedSnapshot)
+
+    XCTAssertEqual(snapshot.sessions.count, 2)
+    XCTAssertTrue(snapshot.taskBoardItems.isEmpty)
+  }
+
   func testUnauthorizedDirectResponseDoesNotUseCloudFallback() async throws {
     let fallback = RecordingSyncClient(snapshot: snapshotFixture())
     let client = DirectFirstMobileMonitorSyncClient(

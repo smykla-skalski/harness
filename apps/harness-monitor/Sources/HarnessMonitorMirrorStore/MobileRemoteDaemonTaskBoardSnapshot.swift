@@ -8,6 +8,9 @@ extension MobileRemoteDaemonSyncClient {
     guard let response = response as? HTTPURLResponse else {
       throw MobileRemoteDaemonSyncError.invalidResponse
     }
+    guard response.statusCode != 404 else {
+      return []
+    }
     try validate(response)
     return try JSONDecoder().decode(MobileRemoteTaskBoardListWire.self, from: data).items
   }
