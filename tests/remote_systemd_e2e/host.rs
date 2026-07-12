@@ -34,7 +34,7 @@ impl RemoteSystemdHost {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|error| format!("read system clock: {error}"))?
-            .subsec_nanos();
+            .as_nanos();
         let unit = format!("harness-remote-e2e-{}-{nonce}", std::process::id());
         let (https_port, http_port) = available_low_port_pair()?;
         Ok(Self {
@@ -250,8 +250,12 @@ impl RemoteSystemdHost {
             }
         }
         let pid = self.main_pid()?;
-        let status = fs::read_to_string(format!("/proc/{pid}/status"))
-            .map_err(|error| format!("read daemon process status: {error}"))?;
+        let status_path = format!("/proc/{pid}/status");
+        let output = checked(
+            sudo(["cat", status_path.as_str()]),
+            "read daemon process status",
+        )?;
+        let status = stdout(&output, "daemon process status")?;
         assert_non_root_uid(&status)?;
         assert_bind_capability(&status)
     }
