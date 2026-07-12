@@ -123,13 +123,18 @@ async fn run_remote_daemon_case(challenge: AcmeChallenge) -> Result<(), String> 
     daemon.ensure_running()?;
     expect_untrusted_ca_rejected(environment.https_port()).await?;
 
-    let viewer = pair_client(&daemon, &client, "viewer", "viewer-e2e").await?;
+    let mut viewer = pair_client(&daemon, &client, "viewer", "viewer-e2e").await?;
     client.expect_health(&viewer, 200).await?;
     client.expect_oversized_http_body_rejected(&viewer).await?;
     client
         .expect_oversized_websocket_message_rejected(&viewer)
         .await?;
     client.expect_telemetry(&viewer, 403).await?;
+    let rotated = client
+        .expect_live_websocket_invalidation(&viewer, || daemon.rotate_client(&viewer.client_id))
+        .await?;
+    viewer.token = required_string(&rotated, "token")?.to_string();
+    client.expect_health(&viewer, 200).await?;
 
     let operator = pair_client(&daemon, &client, "operator", "operator-e2e").await?;
     client.expect_telemetry(&operator, 200).await?;
@@ -141,7 +146,11 @@ async fn run_remote_daemon_case(challenge: AcmeChallenge) -> Result<(), String> 
     let admin = pair_client(&daemon, &client, "admin", "admin-e2e").await?;
     client.expect_log_level_update(&admin, 200).await?;
 
-    daemon.revoke_client(&operator.client_id)?;
+    client
+        .expect_live_websocket_invalidation(&operator, || {
+            daemon.revoke_client(&operator.client_id).map(|_| ())
+        })
+        .await?;
     client.expect_health(&operator, 401).await?;
     acme.assert_complete().await?;
 

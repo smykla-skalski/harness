@@ -215,6 +215,17 @@ impl RemoteDaemonProcess {
         ])
     }
 
+    pub fn rotate_client(&self, client_id: &str) -> Result<Value, String> {
+        self.run_json(&[
+            "daemon",
+            "remote",
+            "clients",
+            "rotate",
+            "--client-id",
+            client_id,
+        ])
+    }
+
     fn run_json(&self, args: &[&str]) -> Result<Value, String> {
         let mut command = Command::new(harness_binary());
         command.args(args);

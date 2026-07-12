@@ -113,6 +113,26 @@ impl DaemonDb {
         Ok(Some(client))
     }
 
+    /// Refresh an authenticated WebSocket identity from persisted state.
+    ///
+    /// A missing/revoked client or changed token hash invalidates the session
+    /// established with `authenticated`.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or row parsing failures.
+    pub(crate) fn validate_remote_client_session(
+        &self,
+        authenticated: &RemoteStoredClient,
+    ) -> Result<Option<RemoteStoredClient>, CliError> {
+        let Some(current) = self.remote_client(&authenticated.client_id)? else {
+            return Ok(None);
+        };
+        if current.revoked_at.is_some() || current.token_hash != authenticated.token_hash {
+            return Ok(None);
+        }
+        Ok(Some(current))
+    }
+
     /// Revoke a remote client.
     ///
     /// # Errors

@@ -7,6 +7,7 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
+use futures_util::stream::SplitStream;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 use tokio::task::{JoinHandle, JoinSet};
@@ -15,10 +16,12 @@ use tracing::Instrument as _;
 use tracing::field::{Empty, display};
 use tracing::{debug, info, warn};
 
+use crate::daemon::db::db_error;
 use crate::daemon::http::{self, DaemonConnectInfo, DaemonHttpState};
 #[cfg(test)]
 use crate::daemon::protocol::StreamEvent;
 use crate::daemon::remote_identity::RemoteStoredClient;
+use crate::errors::CliError;
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
 
 use super::config::build_config_push_frame;
@@ -67,6 +70,10 @@ impl ConnectionState {
 
     pub(crate) fn remote_addr(&self) -> Option<&str> {
         self.remote_addr.as_deref()
+    }
+
+    fn replace_remote_client(&mut self, client: RemoteStoredClient) {
+        self.remote_client = Some(client);
     }
 
     #[cfg(test)]
@@ -174,7 +181,7 @@ async fn handle_connection(
     remote_addr: Option<String>,
 ) {
     tracing::info!(client = %client_label, "websocket connection opened");
-    let (mut sender, mut receiver) = socket.split();
+    let (mut sender, receiver) = socket.split();
     let connection = Arc::new(Mutex::new(ConnectionState::new_with_remote_client(
         remote_client,
         remote_addr,
@@ -205,59 +212,13 @@ async fn handle_connection(
         relay_state,
     ));
 
-    let priority_tx_dispatch = priority_tx.clone();
-    let connection_dispatch = Arc::clone(&connection);
-    let inbound_client_label = client_label.clone();
-    let inbound_task = tokio::spawn(async move {
-        let mut dispatch_tasks = JoinSet::new();
-        let mut last_client_message = Instant::now();
-        let mut idle_check = tokio_interval(Duration::from_secs(15));
-
-        loop {
-            tokio::select! {
-                message = receiver.next() => {
-                    match message {
-                        Some(Ok(message)) => {
-                            if incoming_message_counts_as_activity(&message) {
-                                last_client_message = Instant::now();
-                            }
-                            match handle_incoming_message(
-                                message,
-                                state.clone(),
-                                Arc::clone(&connection_dispatch),
-                                priority_tx_dispatch.clone(),
-                                &mut dispatch_tasks,
-                            ) {
-                                IncomingMessageAction::ContinueLoop => {}
-                                IncomingMessageAction::CloseConnection => break,
-                                IncomingMessageAction::RespondBatch(frames) => {
-                                    for frame in frames {
-                                        if priority_tx_dispatch.send(frame).await.is_err() {
-                                            return;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        None => break,
-                        Some(Err(error)) => {
-                            debug!(%error, "websocket receive error");
-                            break;
-                        }
-                    }
-                }
-                Some(_) = dispatch_tasks.join_next(), if !dispatch_tasks.is_empty() => {}
-                _ = idle_check.tick() => {
-                    if last_client_message.elapsed() > Duration::from_secs(45) {
-                        info!(client = %inbound_client_label, "websocket idle timeout, closing connection");
-                        break;
-                    }
-                }
-            }
-        }
-        dispatch_tasks.abort_all();
-        while dispatch_tasks.join_next().await.is_some() {}
-    });
+    let inbound_task = spawn_inbound_task(
+        receiver,
+        state,
+        connection,
+        priority_tx,
+        client_label.clone(),
+    );
 
     let writer_task = tokio::spawn(async move {
         loop {
@@ -278,6 +239,109 @@ async fn handle_connection(
 
     await_connection_tasks(relay_task, inbound_task, writer_task).await;
     tracing::info!(client = %client_label, "websocket connection closed");
+}
+
+fn spawn_inbound_task(
+    mut receiver: SplitStream<WebSocket>,
+    state: DaemonHttpState,
+    connection: Arc<Mutex<ConnectionState>>,
+    priority_tx: mpsc::Sender<Message>,
+    client_label: String,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut dispatch_tasks = JoinSet::new();
+        let mut last_client_message = Instant::now();
+        let mut idle_check = tokio_interval(Duration::from_secs(15));
+        let mut credential_check = tokio_interval(Duration::from_secs(5));
+        credential_check.tick().await;
+
+        loop {
+            tokio::select! {
+                message = receiver.next() => {
+                    match message {
+                        Some(Ok(message)) => {
+                            if incoming_message_counts_as_activity(&message) {
+                                last_client_message = Instant::now();
+                            }
+                            match handle_incoming_message(
+                                message,
+                                state.clone(),
+                                Arc::clone(&connection),
+                                priority_tx.clone(),
+                                &mut dispatch_tasks,
+                            ) {
+                                IncomingMessageAction::ContinueLoop => {}
+                                IncomingMessageAction::CloseConnection => break,
+                                IncomingMessageAction::RespondBatch(frames) => {
+                                    for frame in frames {
+                                        if priority_tx.send(frame).await.is_err() {
+                                            return;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        None => break,
+                        Some(Err(error)) => {
+                            debug!(%error, "websocket receive error");
+                            break;
+                        }
+                    }
+                }
+                Some(_) = dispatch_tasks.join_next(), if !dispatch_tasks.is_empty() => {}
+                _ = credential_check.tick(), if state.auth_mode == http::DaemonHttpAuthMode::Remote => {
+                    match refresh_remote_connection_client(&state, &connection) {
+                        Ok(Some(_)) => {}
+                        Ok(None) => {
+                            info!(client = %client_label, "remote websocket credentials invalidated, closing connection");
+                            break;
+                        }
+                        Err(error) => {
+                            warn!(client = %client_label, %error, "remote websocket credential validation failed, closing connection");
+                            break;
+                        }
+                    }
+                }
+                _ = idle_check.tick() => {
+                    if last_client_message.elapsed() > Duration::from_secs(45) {
+                        info!(client = %client_label, "websocket idle timeout, closing connection");
+                        break;
+                    }
+                }
+            }
+        }
+        dispatch_tasks.abort_all();
+        while dispatch_tasks.join_next().await.is_some() {}
+    })
+}
+
+pub(crate) fn refresh_remote_connection_client(
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> Result<Option<RemoteStoredClient>, CliError> {
+    let authenticated = connection
+        .lock()
+        .map_err(|_| db_error("remote websocket connection state is unavailable"))?
+        .remote_client()
+        .cloned();
+    let Some(authenticated) = authenticated else {
+        return Ok(None);
+    };
+    let db = state
+        .db
+        .get()
+        .ok_or_else(|| db_error("remote authentication store is unavailable"))?;
+    let current = db
+        .lock()
+        .map_err(|_| db_error("remote authentication store is unavailable"))?
+        .validate_remote_client_session(&authenticated)?;
+    if let Some(client) = current.as_ref() {
+        connection
+            .lock()
+            .map_err(|_| db_error("remote websocket connection state is unavailable"))?
+            .replace_remote_client(client.clone());
+    }
+    Ok(current)
 }
 
 pub(crate) async fn await_connection_tasks(

@@ -1,4 +1,4 @@
-use super::connection::ConnectionState;
+use super::connection::{ConnectionState, refresh_remote_connection_client};
 use super::frames::{
     error_response, error_response_with_payload, serialize_error_response_frames,
     serialize_response_frames,
@@ -235,8 +235,8 @@ fn authorize_remote_ws_request(
     }
     let required_scope = remote_ws_required_scope(&request.method)
         .map_err(|error| Box::new(remote_ws_auth_error_response(&request.id, error)))?;
-    let (client, remote_addr) = remote_connection_identity(connection);
-    let Some(client) = client else {
+    let (authenticated, remote_addr) = remote_connection_identity(connection);
+    let Some(authenticated) = authenticated else {
         let error = RemoteAuthError::MissingClientId;
         record_remote_ws_denial(
             request,
@@ -247,6 +247,22 @@ fn authorize_remote_ws_request(
             error,
         )?;
         return Err(Box::new(remote_ws_auth_error_response(&request.id, error)));
+    };
+    let client = match refresh_remote_connection_client(state, connection) {
+        Ok(Some(client)) => client,
+        Ok(None) => {
+            let error = RemoteAuthError::InvalidBearerToken;
+            record_remote_ws_denial(
+                request,
+                state,
+                Some(&authenticated.client_id),
+                required_scope,
+                remote_addr.as_deref(),
+                error,
+            )?;
+            return Err(Box::new(remote_ws_auth_error_response(&request.id, error)));
+        }
+        Err(error) => return Err(remote_ws_auth_store_error_response(request, &error)),
     };
     match authorize_remote_ws_method(&client, &request.method) {
         Ok(decision) => {
@@ -341,6 +357,33 @@ fn remote_ws_audit_error_response(request: &WsRequest, error: &CliError) -> Box<
             data: None,
         },
     ))
+}
+
+fn remote_ws_auth_store_error_response(request: &WsRequest, error: &CliError) -> Box<WsResponse> {
+    log_remote_ws_auth_store_error(request, error);
+    Box::new(error_response_with_payload(
+        &request.id,
+        WsErrorPayload {
+            code: "REMOTE_AUTH_STORE".to_string(),
+            message: "remote authentication store is unavailable".to_string(),
+            details: Vec::new(),
+            status_code: Some(503),
+            data: None,
+        },
+    ))
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn log_remote_ws_auth_store_error(request: &WsRequest, error: &CliError) {
+    tracing::error!(
+        error = %error,
+        method = %request.method,
+        request_id = %request.id,
+        "remote websocket authentication store refresh failed"
+    );
 }
 
 #[expect(
