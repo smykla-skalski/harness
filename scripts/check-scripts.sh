@@ -3,6 +3,11 @@ set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 
+if (( $# > 1 )); then
+  printf 'usage: %s [--all|--lint|--tests]\n' "${0##*/}" >&2
+  exit 2
+fi
+
 mode="${1:---all}"
 case "$mode" in
   --all|--lint|--tests)
