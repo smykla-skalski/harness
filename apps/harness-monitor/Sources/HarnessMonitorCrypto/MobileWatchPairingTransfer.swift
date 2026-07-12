@@ -38,6 +38,13 @@ public struct MobileWatchPairingTransfer: Codable, Equatable, Sendable {
     return try Self.encode(fallback)
   }
 
+  public func watchConnectivityPayload(maximumBytes: Int) throws -> [String: Any] {
+    [
+      MobileWatchPairingTransferEnvelope.transferKey:
+        try encodedData(maximumBytes: maximumBytes)
+    ]
+  }
+
   private static func encode(_ transfer: Self) throws -> Data {
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
@@ -54,12 +61,6 @@ public struct MobileWatchPairingTransfer: Codable, Equatable, Sendable {
   public func replacementPlan(
     replacing currentCredentials: [MobilePairedStationCredential]
   ) -> MobileWatchPairingReplacementPlan {
-    guard !credentials.isEmpty else {
-      return MobileWatchPairingReplacementPlan(
-        credentialStationIDsToDelete: [],
-        identityIDsToDelete: []
-      )
-    }
     var incomingIdentityIDByStation: [String: String] = [:]
     for credential in credentials {
       incomingIdentityIDByStation[credential.stationID] = credential.deviceIdentityID
