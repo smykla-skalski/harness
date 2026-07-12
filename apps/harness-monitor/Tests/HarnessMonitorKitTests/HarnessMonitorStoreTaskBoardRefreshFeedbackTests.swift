@@ -60,4 +60,19 @@ struct HarnessMonitorStoreTaskBoardRefreshFeedbackTests {
     )
     #expect(store.toast.activeFeedback.isEmpty)
   }
+
+  @Test("Successful sync configuration clears a prior fixture error")
+  func successfulSyncConfigurationClearsPriorFixtureError() async throws {
+    let client = RecordingHarnessClient()
+    client.configureTaskBoardSyncError(CancellationError())
+    client.configureTaskBoardSync(
+      summary: TaskBoardSyncSummary(total: 2, providers: [])
+    )
+
+    let summary = try await client.syncTaskBoard(
+      request: TaskBoardSyncRequest(direction: .pull, dryRun: false)
+    )
+
+    #expect(summary.total == 2)
+  }
 }

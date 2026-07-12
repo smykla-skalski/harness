@@ -165,6 +165,7 @@ extension RecordingHarnessClient {
     lock.withLock {
       taskBoardSyncStub.summary = summary
       taskBoardSyncStub.importedItems = importedItems
+      taskBoardSyncStub.error = nil
     }
   }
 

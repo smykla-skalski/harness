@@ -129,15 +129,17 @@ extension RecordingHarnessClient {
         provider: request.provider
       )
     )
-    if let error = lock.withLock({ taskBoardSyncStub.error }) {
-      throw error
-    }
-    return lock.withLock {
-      if let importedItems = taskBoardSyncStub.importedItems {
+    let result: (summary: TaskBoardSyncSummary, error: (any Error)?) = lock.withLock {
+      let error = taskBoardSyncStub.error
+      if error == nil, let importedItems = taskBoardSyncStub.importedItems {
         taskBoardItemsStorage = importedItems
       }
-      return taskBoardSyncStub.summary
+      return (taskBoardSyncStub.summary, error)
     }
+    if let error = result.error {
+      throw error
+    }
+    return result.summary
   }
 
   func dispatchTaskBoard(
