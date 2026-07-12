@@ -6,10 +6,14 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 
 use super::super::{AsyncDaemonDb, CliError, db_error};
 use super::mapper::{self, CanvasRowSet};
-use super::rows::{CanvasRow, EdgeRow, GroupNodeRow, GroupRow, NodeRow, WorkspaceRow};
+#[cfg(test)]
+use super::rows::WorkspaceRow;
+use super::rows::{CanvasRow, EdgeRow, GroupNodeRow, GroupRow, NodeRow};
+#[cfg(test)]
+use super::sql::SELECT_WORKSPACE;
 use super::sql::{
     SELECT_CANVAS_BY_ID, SELECT_EDGES_BY_CANVAS, SELECT_GROUP_NODES_BY_CANVAS,
-    SELECT_GROUPS_BY_CANVAS, SELECT_NODES_BY_CANVAS, SELECT_WORKSPACE,
+    SELECT_GROUPS_BY_CANVAS, SELECT_NODES_BY_CANVAS,
 };
 use super::store_async::insert_canvas_rowset;
 use crate::task_board::policy_graph::{
@@ -18,11 +22,15 @@ use crate::task_board::policy_graph::{
 
 pub(crate) struct PolicyCanvasDraftSaveResult {
     pub(crate) response: PolicyPipelineSaveResponse,
+    #[cfg(test)]
     pub(crate) saved_canvas: PolicyCanvasRecord,
+    #[cfg(test)]
     pub(crate) active_canvas_id: String,
+    #[cfg(test)]
     pub(crate) global_policy_enforcement_enabled: bool,
 }
 
+#[cfg(test)]
 impl PolicyCanvasDraftSaveResult {
     #[must_use]
     pub(crate) fn saved_active_canvas(&self) -> bool {
@@ -58,6 +66,7 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("policy canvas draft save")
             .await?;
         let load_started = Instant::now();
+        #[cfg(test)]
         let workspace_row = load_workspace_row(&mut transaction).await?;
         let (mut canvas, position) = load_canvas_rowset(&mut transaction, canvas_id).await?;
         let load_elapsed = load_started.elapsed();
@@ -81,13 +90,17 @@ impl AsyncDaemonDb {
         );
         Ok(PolicyCanvasDraftSaveResult {
             response,
+            #[cfg(test)]
             saved_canvas: canvas,
+            #[cfg(test)]
             active_canvas_id: workspace_row.active_canvas_id,
+            #[cfg(test)]
             global_policy_enforcement_enabled: workspace_row.global_policy_enforcement_enabled,
         })
     }
 }
 
+#[cfg(test)]
 async fn load_workspace_row(
     transaction: &mut Transaction<'_, Sqlite>,
 ) -> Result<WorkspaceRow, CliError> {

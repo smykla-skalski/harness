@@ -1,3 +1,4 @@
+#[cfg(test)]
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -98,11 +99,9 @@ async fn record_reviews_policy_action_audit_result<T>(
     .await;
 }
 
-/// Build the production policy provider registry: the reviews action provider
-/// plus the domain-agnostic handoff, notification, and task-board providers. A
-/// workflow that mixes reviews actions and orchestration steps dispatches each
-/// step to the right domain through the same runtime, and every non-reviews
-/// provider writes a durable side effect under `root`.
+/// Build the legacy file-backed provider registry used by explicit compatibility
+/// tests. Production callers use [`build_database_policy_provider_registry`].
+#[cfg(test)]
 pub(crate) fn build_policy_provider_registry<E>(
     executor: E,
     root: PathBuf,
@@ -115,6 +114,25 @@ where
     providers.register(HandoffPolicyProvider::new(root.clone()));
     providers.register(NotificationPolicyProvider::new(root.clone()));
     providers.register(TaskCreationPolicyProvider::new(root));
+    providers
+}
+
+/// Build the production registry with every durable non-reviews side effect
+/// written to the canonical daemon database.
+pub(crate) fn build_database_policy_provider_registry<E>(
+    executor: E,
+    database: Arc<AsyncDaemonDb>,
+) -> PolicyProviderRegistry
+where
+    E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
+{
+    let mut providers = PolicyProviderRegistry::default();
+    providers.register(ReviewsPolicyProvider::new(executor));
+    providers.register(HandoffPolicyProvider::new_database(Arc::clone(&database)));
+    providers.register(NotificationPolicyProvider::new_database(Arc::clone(
+        &database,
+    )));
+    providers.register(TaskCreationPolicyProvider::new_database(database));
     providers
 }
 
@@ -169,7 +187,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn production_registry_dispatches_handoff_to_the_handoff_provider() {
+    async fn legacy_registry_dispatches_handoff_to_the_handoff_provider() {
         let dir = tempdir().expect("tempdir");
         let registry = build_policy_provider_registry(NoopExecutor, dir.path().to_path_buf());
         let action = PolicyActionDescriptor {
@@ -180,12 +198,12 @@ mod tests {
         let execution = registry
             .execute(&action, &execution_context())
             .await
-            .expect("dispatch handoff in production registry");
+            .expect("dispatch handoff in legacy registry");
         assert_eq!(execution.action_key, HANDOFF_ACTION_KEY);
     }
 
     #[tokio::test]
-    async fn production_registry_still_routes_reviews_actions_to_the_reviews_provider() {
+    async fn legacy_registry_still_routes_reviews_actions_to_the_reviews_provider() {
         let dir = tempdir().expect("tempdir");
         let registry = build_policy_provider_registry(NoopExecutor, dir.path().to_path_buf());
         let action = PolicyActionDescriptor {
@@ -205,7 +223,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn production_registry_dispatches_all_four_domains() {
+    async fn legacy_registry_dispatches_all_four_domains() {
         let dir = tempdir().expect("tempdir");
         let registry = build_policy_provider_registry(NoopExecutor, dir.path().to_path_buf());
 
@@ -242,6 +260,74 @@ mod tests {
                 action.provider
             );
         }
+    }
+
+    #[tokio::test]
+    async fn database_registry_persists_all_orchestration_side_effects() {
+        let dir = tempdir().expect("tempdir");
+        let database = Arc::new(
+            AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+                .await
+                .expect("open async daemon db"),
+        );
+        let registry = build_database_policy_provider_registry(NoopExecutor, Arc::clone(&database));
+        let actions = [
+            PolicyActionDescriptor {
+                provider: HANDOFF_PROVIDER.to_owned(),
+                action_key: HANDOFF_ACTION_KEY.to_owned(),
+                payload: Some(serde_json::json!({ "handoff_key": "next-handler" })),
+            },
+            PolicyActionDescriptor {
+                provider: NOTIFICATION_PROVIDER.to_owned(),
+                action_key: NOTIFICATION_ACTION_KEY.to_owned(),
+                payload: Some(serde_json::json!({ "channel": "ops", "message": "merged" })),
+            },
+            PolicyActionDescriptor {
+                provider: TASK_CREATION_PROVIDER.to_owned(),
+                action_key: TASK_CREATION_ACTION_KEY.to_owned(),
+                payload: Some(serde_json::json!({ "title": "Follow up" })),
+            },
+        ];
+
+        for action in &actions {
+            registry
+                .execute(action, &execution_context())
+                .await
+                .expect("persist database side effect");
+        }
+
+        assert_eq!(
+            database
+                .policy_handoff_records()
+                .await
+                .expect("load handoffs")
+                .len(),
+            1
+        );
+        assert_eq!(
+            database
+                .pending_policy_events()
+                .await
+                .expect("load events")
+                .len(),
+            1
+        );
+        assert_eq!(
+            database
+                .policy_notification_records()
+                .await
+                .expect("load notifications")
+                .len(),
+            1
+        );
+        assert_eq!(
+            database
+                .policy_task_creation_records()
+                .await
+                .expect("load task creations")
+                .len(),
+            1
+        );
     }
 
     #[tokio::test]

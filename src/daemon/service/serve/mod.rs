@@ -12,12 +12,13 @@ mod open_db;
 mod policy_bootstrap;
 mod remote;
 mod shutdown_signals;
+mod task_board_dispatch_loop;
+mod task_board_migration;
 mod task_board_orchestrator_loop;
 
 pub(crate) use shutdown_signals::ShutdownSignalGuard;
 
 pub(crate) use config::{http_auth_mode, validate_serve_config};
-pub(crate) use github_data_change_publisher::broadcast_github_data_change;
 pub(crate) use open_db::{open_daemon_async_db, open_daemon_db};
 pub(crate) use remote::serve_remote_https;
 
@@ -34,7 +35,7 @@ use crate::telemetry::current_trace_id;
 use crate::workspace::orphan_cleanup::run_startup_sweep;
 use background_tasks::spawn_background_tasks;
 use legacy_migration::log_legacy_daemon_root_migration;
-use manifest::build_and_persist_manifest;
+use manifest::{build_manifest, persist_manifest};
 use std::time::Instant;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
@@ -66,7 +67,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         CliErrorKind::workflow_io(format!("read daemon listener addr: {error}"))
     })?;
     let endpoint = format!("http://{local_addr}");
-    let manifest = build_and_persist_manifest(&endpoint, config.sandboxed)?;
+    let manifest = build_manifest(&endpoint, config.sandboxed)?;
 
     let (sender, _) = broadcast::channel(256);
     let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
@@ -93,6 +94,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         let _ = state::clear_manifest_for_pid(process_id());
         return Err(error);
     }
+    let manifest = persist_manifest(&manifest)?;
     audit::record_daemon_started(async_db.get(), &endpoint, config.sandboxed).await;
     schedule_probe_cache_refresh();
     let codex_controller = CodexControllerHandle::new_with_async_db(
@@ -162,27 +164,6 @@ pub(crate) fn open_and_publish_db(
     Ok(db)
 }
 
-pub(crate) fn initialize_db_and_spawn_background_tasks(
-    db_slot: &Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
-    async_db_slot: &Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
-    sender: broadcast::Sender<super::protocol::StreamEvent>,
-    poll_interval: Duration,
-) -> Result<(), CliError> {
-    let db = open_and_publish_db(db_slot)?;
-    let _watch = watch::spawn_watch_loop(
-        sender,
-        poll_interval,
-        Some(Arc::clone(&db)),
-        Arc::clone(async_db_slot),
-    );
-    let _reviews_policy_timers =
-        super::reviews::policy::spawn_reviews_policy_timer_loop(poll_interval);
-    let _reviews_policy_events =
-        super::reviews::policy_event_inbox::spawn_reviews_policy_event_loop(poll_interval);
-    run_background_reconciliation(&db);
-    Ok(())
-}
-
 pub(crate) async fn initialize_startup_state(
     db_slot: &Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>>,
     async_db_slot: &Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
@@ -195,11 +176,19 @@ pub(crate) async fn initialize_startup_state(
     }
     let started_at = Instant::now();
     let result = async {
-        initialize_db_and_spawn_background_tasks(db_slot, async_db_slot, sender, poll_interval)?;
+        let db = open_and_publish_db(db_slot)?;
         initialize_async_db(async_db_slot).await?;
         if let Some(async_db) = async_db_slot.get() {
+            task_board_migration::migrate_task_board(async_db).await?;
             policy_bootstrap::bootstrap_policy_storage(async_db).await?;
         }
+        run_background_reconciliation(&db);
+        spawn_startup_background_tasks(
+            Arc::clone(&db),
+            Arc::clone(async_db_slot),
+            sender,
+            poll_interval,
+        );
         Ok(())
     }
     .instrument(span.clone())
@@ -213,6 +202,19 @@ pub(crate) async fn initialize_startup_state(
     }
 
     result
+}
+
+fn spawn_startup_background_tasks(
+    db: Arc<Mutex<super::db::DaemonDb>>,
+    async_db_slot: Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>>,
+    sender: broadcast::Sender<super::protocol::StreamEvent>,
+    poll_interval: Duration,
+) {
+    let _watch = watch::spawn_watch_loop(sender, poll_interval, Some(db), async_db_slot);
+    let _reviews_policy_timers =
+        super::reviews::policy::spawn_reviews_policy_timer_loop(poll_interval);
+    let _reviews_policy_events =
+        super::reviews::policy_event_inbox::spawn_reviews_policy_event_loop(poll_interval);
 }
 
 pub(crate) async fn initialize_async_db(

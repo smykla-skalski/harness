@@ -16,6 +16,7 @@ pub(crate) struct CachedReviews {
     stored_at: Instant,
     github_data_revision: u64,
     response: ReviewsQueryResponse,
+    authoritative_viewer_keys: HashSet<String>,
 }
 
 #[derive(Clone)]
@@ -33,22 +34,24 @@ pub(crate) fn body_cache() -> &'static Mutex<BTreeMap<String, CachedReviewBody>>
     REVIEWS_BODY_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()))
 }
 
+#[cfg(test)]
 pub(crate) fn cached_query_response(
     cache_key: &str,
     max_age_seconds: u64,
 ) -> Option<ReviewsQueryResponse> {
-    cached_query_response_at_revision(
+    cached_query_source_at_revision(
         cache_key,
         max_age_seconds,
         GitHubProtectedClient::data_revision(),
     )
+    .map(|(response, _)| response)
 }
 
-fn cached_query_response_at_revision(
+pub(super) fn cached_query_source_at_revision(
     cache_key: &str,
     max_age_seconds: u64,
     github_data_revision: u64,
-) -> Option<ReviewsQueryResponse> {
+) -> Option<(ReviewsQueryResponse, HashSet<String>)> {
     let cache = cache().lock().expect("reviews cache lock");
     let entry = cache.get(cache_key)?;
     if entry.github_data_revision != github_data_revision {
@@ -59,14 +62,21 @@ fn cached_query_response_at_revision(
     }
     let mut response = entry.response.clone();
     response.from_cache = true;
-    Some(response)
+    Some((response, entry.authoritative_viewer_keys.clone()))
 }
 
 #[cfg(test)]
 pub(crate) fn store_cached_query_response(cache_key: String, response: &ReviewsQueryResponse) {
+    let authoritative_viewer_keys = response
+        .items
+        .iter()
+        .filter(|item| item.flags.viewer_is_requested_reviewer)
+        .map(|item| format!("{}#{}", item.repository.to_ascii_lowercase(), item.number))
+        .collect();
     store_cached_query_response_at_revision(
         cache_key,
         response,
+        &authoritative_viewer_keys,
         GitHubProtectedClient::data_revision(),
     );
 }
@@ -74,6 +84,7 @@ pub(crate) fn store_cached_query_response(cache_key: String, response: &ReviewsQ
 pub(super) fn store_cached_query_response_at_revision(
     cache_key: String,
     response: &ReviewsQueryResponse,
+    authoritative_viewer_keys: &HashSet<String>,
     github_data_revision: u64,
 ) {
     let mut cache = cache().lock().expect("reviews cache lock");
@@ -83,6 +94,7 @@ pub(super) fn store_cached_query_response_at_revision(
             stored_at: Instant::now(),
             github_data_revision,
             response: response.clone(),
+            authoritative_viewer_keys: authoritative_viewer_keys.clone(),
         },
     );
 }
@@ -140,17 +152,57 @@ pub(super) fn store_cached_body_response_at_revision(
     );
 }
 
-pub(crate) fn patch_cached_items(refreshed: &[ReviewItem], missing: &[String]) {
+pub(crate) fn patch_cached_items(
+    refreshed: &[ReviewItem],
+    missing: &[String],
+    authoritative_viewer_keys: &HashSet<String>,
+) {
     if refreshed.is_empty() && missing.is_empty() {
         return;
     }
     let mut cache = cache().lock().expect("reviews cache lock");
     for entry in cache.values_mut() {
+        patch_cached_authoritative_keys(entry, refreshed, missing, authoritative_viewer_keys);
         if let Some(updated) = apply_refresh_to_items(&entry.response.items, refreshed, missing) {
             entry.response.summary = ReviewsSummary::from_items(&updated);
             entry.response.items = updated;
         }
     }
+}
+
+fn patch_cached_authoritative_keys(
+    entry: &mut CachedReviews,
+    refreshed: &[ReviewItem],
+    missing: &[String],
+    authoritative_viewer_keys: &HashSet<String>,
+) {
+    for cached in &entry.response.items {
+        if missing.contains(&cached.pull_request_id) {
+            entry
+                .authoritative_viewer_keys
+                .remove(&review_item_key(cached));
+        }
+    }
+    for item in refreshed {
+        if !entry
+            .response
+            .items
+            .iter()
+            .any(|cached| cached.pull_request_id == item.pull_request_id)
+        {
+            continue;
+        }
+        let key = review_item_key(item);
+        if authoritative_viewer_keys.contains(&key) {
+            entry.authoritative_viewer_keys.insert(key);
+        } else {
+            entry.authoritative_viewer_keys.remove(&key);
+        }
+    }
+}
+
+fn review_item_key(item: &ReviewItem) -> String {
+    format!("{}#{}", item.repository.to_ascii_lowercase(), item.number)
 }
 
 pub(crate) fn patch_cached_repository_labels(
@@ -216,10 +268,10 @@ mod revision_tests {
     fn query_cache_rejects_entries_from_an_older_github_revision() {
         let key = "reviews-cache-revision-query".to_string();
         let response = ReviewsQueryResponse::new(Vec::new(), "2026-07-11T12:00:00Z".into());
-        store_cached_query_response_at_revision(key.clone(), &response, 41);
+        store_cached_query_response_at_revision(key.clone(), &response, &HashSet::new(), 41);
 
-        assert!(cached_query_response_at_revision(&key, 600, 42).is_none());
-        assert!(cached_query_response_at_revision(&key, 600, 41).is_some());
+        assert!(cached_query_source_at_revision(&key, 600, 42).is_none());
+        assert!(cached_query_source_at_revision(&key, 600, 41).is_some());
     }
 
     #[test]

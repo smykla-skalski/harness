@@ -254,6 +254,9 @@ pub(super) fn poll_change_tracking(db: &DaemonDb, last_change_seq: &mut i64) -> 
         *last_change_seq = change_seq;
         if scope == "global" {
             changes.sessions_updated = true;
+        } else if scope.starts_with("task_board:") {
+            changes.task_board_revision = Some(change_seq);
+            changes.task_board_scopes.insert(scope);
         } else if let Some(session_id) = session_id_from_change_scope(&scope) {
             changes.session_ids.insert(session_id.to_string());
         }
@@ -288,6 +291,9 @@ pub(super) async fn poll_change_tracking_async(
         *last_change_seq = change_seq;
         if scope == "global" {
             changes.sessions_updated = true;
+        } else if scope.starts_with("task_board:") {
+            changes.task_board_revision = Some(change_seq);
+            changes.task_board_scopes.insert(scope);
         } else if let Some(session_id) = session_id_from_change_scope(&scope) {
             changes.session_ids.insert(session_id.to_string());
         }

@@ -17,12 +17,13 @@ public enum TaskBoardTodoistCredentialStoreError: LocalizedError, Equatable {
 
 public struct TaskBoardTodoistCredentialStore: TaskBoardTodoistCredentialPersisting, Sendable {
   private let service = "io.harnessmonitor.task-board.todoist-credentials"
-  private let account = "default"
 
   public init() {}
 
-  public func load() throws -> TaskBoardTodoistCredentialSnapshot {
-    var query = baseQuery
+  public func load(
+    scope: TaskBoardCredentialScope = .legacy
+  ) throws -> TaskBoardTodoistCredentialSnapshot {
+    var query = baseQuery(scope: scope)
     query[kSecReturnData as String] = true
     query[kSecMatchLimit as String] = kSecMatchLimitOne
 
@@ -48,21 +49,28 @@ public struct TaskBoardTodoistCredentialStore: TaskBoardTodoistCredentialPersist
   }
 
   public func save(_ snapshot: TaskBoardTodoistCredentialSnapshot) throws {
+    try save(snapshot, scope: .legacy)
+  }
+
+  public func save(
+    _ snapshot: TaskBoardTodoistCredentialSnapshot,
+    scope: TaskBoardCredentialScope
+  ) throws {
     if snapshot.isEmpty {
-      try delete()
+      try delete(scope: scope)
       return
     }
 
     let data = try JSONEncoder().encode(snapshot)
     let updateStatus = SecItemUpdate(
-      baseQuery as CFDictionary,
+      baseQuery(scope: scope) as CFDictionary,
       [kSecValueData as String: data] as CFDictionary
     )
     switch updateStatus {
     case errSecSuccess:
       return
     case errSecItemNotFound:
-      var addQuery = baseQuery
+      var addQuery = baseQuery(scope: scope)
       addQuery[kSecValueData as String] = data
       addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
       let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
@@ -75,17 +83,21 @@ public struct TaskBoardTodoistCredentialStore: TaskBoardTodoistCredentialPersist
   }
 
   public func delete() throws {
-    let status = SecItemDelete(baseQuery as CFDictionary)
+    try delete(scope: .legacy)
+  }
+
+  public func delete(scope: TaskBoardCredentialScope) throws {
+    let status = SecItemDelete(baseQuery(scope: scope) as CFDictionary)
     guard status == errSecSuccess || status == errSecItemNotFound else {
       throw TaskBoardTodoistCredentialStoreError.unexpectedStatus(status)
     }
   }
 
-  private var baseQuery: [String: Any] {
+  private func baseQuery(scope: TaskBoardCredentialScope) -> [String: Any] {
     [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: service,
-      kSecAttrAccount as String: account,
+      kSecAttrAccount as String: scope.account,
     ]
   }
 }

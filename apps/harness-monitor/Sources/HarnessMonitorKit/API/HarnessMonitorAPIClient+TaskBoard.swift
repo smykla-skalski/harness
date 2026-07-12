@@ -1,6 +1,10 @@
 import Foundation
 
 extension HarnessMonitorAPIClient {
+  public func taskBoardCapabilities() async throws -> TaskBoardCapabilities {
+    try await get("/v1/task-board/capabilities", decoder: PolicyWireCoding.decoder)
+  }
+
   public func taskBoardItems(status: TaskBoardStatus? = nil) async throws -> [TaskBoardItem] {
     let response: TaskBoardListItemsResponseWire = try await get(
       "/v1/task-board/items",
@@ -279,15 +283,35 @@ extension HarnessMonitorAPIClient {
     return TaskBoardGitSigningVerifyResponse(wire: wire)
   }
 
-  public func drainTaskBoardGitRuntimeSecrets() async throws
-    -> TaskBoardGitRuntimeDrainSecretsResponse
-  {
-    let wire: TaskBoardGitRuntimeDrainSecretsResponseWire = try await post(
-      "/v1/task-board/git/runtime/drain-secrets",
-      body: TaskBoardGitRuntimeDrainSecretsRequest(),
+  public func syncTaskBoardGitRuntimeKeyMaterial(
+    request: TaskBoardGitRuntimeKeyMaterialSyncRequest
+  ) async throws -> TaskBoardGitRuntimeKeyMaterialSyncResponse {
+    try await put(
+      "/v1/task-board/git/runtime/key-material",
+      body: request,
       decoder: PolicyWireCoding.decoder
     )
-    return TaskBoardGitRuntimeDrainSecretsResponse(wire: wire)
+  }
+
+  public func prepareTaskBoardGitRuntimeSecretHandoff() async throws
+    -> TaskBoardGitRuntimeSecretHandoffPrepareResponse
+  {
+    let wire: TaskBoardGitRuntimeSecretHandoffPrepareResponseWire = try await post(
+      "/v1/task-board/git/runtime/secret-handoff/prepare",
+      body: TaskBoardGitRuntimeSecretHandoffPrepareRequest(),
+      decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardGitRuntimeSecretHandoffPrepareResponse(wire: wire)
+  }
+
+  public func acknowledgeTaskBoardGitRuntimeSecretHandoff(
+    request: TaskBoardGitRuntimeSecretHandoffAckRequest
+  ) async throws -> TaskBoardGitRuntimeSecretHandoffAckResponse {
+    try await post(
+      "/v1/task-board/git/runtime/secret-handoff/ack",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
   }
 
   private func taskBoardQueryItems(status: TaskBoardStatus?) -> [URLQueryItem] {

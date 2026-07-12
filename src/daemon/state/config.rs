@@ -5,7 +5,7 @@ use std::sync::{LazyLock, RwLock};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::io::{read_json_typed, write_json_pretty};
+use crate::infra::io::read_json_typed;
 use crate::task_board::{
     TaskBoardGitHubRepositoryToken, TaskBoardGitHubTokensSyncRequest,
     TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig, TaskBoardGitRuntimeProfile,
@@ -66,6 +66,18 @@ pub fn load_runtime_config() -> Result<Option<DaemonRuntimeConfig>, CliError> {
         .map(Some)
 }
 
+/// Load the persisted daemon runtime config without stripping a pending
+/// Task Board secret-migration envelope.
+///
+/// This is restricted to the one-time migration and config-preserving write
+/// paths. Runtime consumers must continue to use [`load_runtime_config`].
+pub(crate) fn load_runtime_config_raw() -> Result<Option<DaemonRuntimeConfig>, CliError> {
+    if !config_path().is_file() {
+        return Ok(None);
+    }
+    read_json_typed::<DaemonRuntimeConfig>(&config_path()).map(Some)
+}
+
 /// Return the persisted daemon log level, normalized for runtime use.
 ///
 /// # Errors
@@ -85,25 +97,28 @@ pub fn load_persisted_log_level() -> Result<Option<String>, CliError> {
 pub fn persist_log_level(level: Option<&str>) -> Result<(), CliError> {
     let normalized = normalize_optional_log_level(level)?;
     ensure_daemon_dirs()?;
-    let mut config = load_runtime_config_for_persist();
-    config.log_level = normalized;
-    write_json_pretty(&config_path(), &config)
+    super::config_migration::with_runtime_config_lock(|| {
+        let mut config = load_runtime_config_for_persist();
+        config.log_level = normalized;
+        super::config_migration::write_runtime_config_durable(&config)
+    })
 }
 
 /// Load the persisted task-board git runtime config, defaulting when absent.
 ///
 /// # Errors
 /// Returns `CliError` when the daemon runtime config exists but cannot be parsed.
+#[cfg(test)]
 pub fn load_task_board_git_runtime_config() -> Result<TaskBoardGitRuntimeConfig, CliError> {
     let mut config = load_runtime_config()?
         .and_then(|config| config.task_board_git_runtime_config)
         .map(|config| config.without_secret_metadata())
         .unwrap_or_default();
-    overlay_runtime_secret_flags(&mut config);
+    overlay_task_board_git_runtime_secret_flags(&mut config);
     Ok(config)
 }
 
-fn overlay_runtime_secret_flags(config: &mut TaskBoardGitRuntimeConfig) {
+pub(crate) fn overlay_task_board_git_runtime_secret_flags(config: &mut TaskBoardGitRuntimeConfig) {
     let secrets = TASK_BOARD_GIT_RUNTIME_SECRETS
         .read()
         .expect("task-board git runtime secret state lock poisoned")
@@ -114,6 +129,37 @@ fn overlay_runtime_secret_flags(config: &mut TaskBoardGitRuntimeConfig) {
     for override_config in &mut config.repository_overrides {
         let secret_profile = secrets.resolved_profile(Some(&override_config.repository));
         overlay_profile_flags(&mut override_config.profile, &secret_profile);
+    }
+}
+
+pub(crate) fn overlay_task_board_git_runtime_profile_secrets(
+    profile: &mut TaskBoardGitRuntimeProfile,
+    repository: Option<&str>,
+) {
+    let secrets = TASK_BOARD_GIT_RUNTIME_SECRETS
+        .read()
+        .expect("task-board git runtime secret state lock poisoned")
+        .get(&task_board_memory_key())
+        .cloned()
+        .unwrap_or_default()
+        .resolved_profile(repository);
+    profile.ssh_private_key = secrets.ssh_private_key;
+    profile.ssh_private_key_passphrase = secrets.ssh_private_key_passphrase;
+    profile.signing.ssh_private_key = secrets.signing.ssh_private_key;
+    profile.signing.ssh_private_key_passphrase = secrets.signing.ssh_private_key_passphrase;
+    profile.signing.gpg_private_key = secrets.signing.gpg_private_key;
+    profile.signing.gpg_private_key_passphrase = secrets.signing.gpg_private_key_passphrase;
+}
+
+/// Materialize process-only key material into a database-loaded runtime config.
+/// The returned value must remain in memory and must never be persisted.
+pub(crate) fn overlay_task_board_git_runtime_secrets(config: &mut TaskBoardGitRuntimeConfig) {
+    overlay_task_board_git_runtime_profile_secrets(&mut config.global, None);
+    for override_config in &mut config.repository_overrides {
+        overlay_task_board_git_runtime_profile_secrets(
+            &mut override_config.profile,
+            Some(&override_config.repository),
+        );
     }
 }
 
@@ -138,45 +184,18 @@ fn overlay_profile_flags(
 ///
 /// # Errors
 /// Returns `CliError` when the runtime config cannot be written.
+#[cfg(test)]
 pub fn persist_task_board_git_runtime_config(
     task_board_config: &TaskBoardGitRuntimeConfig,
 ) -> Result<(), CliError> {
     ensure_daemon_dirs()?;
-    let mut config = load_runtime_config_for_persist();
-    let task_board_config = task_board_config.without_secret_metadata();
-    config.task_board_git_runtime_config =
-        (!task_board_config.is_empty()).then_some(task_board_config);
-    write_json_pretty(&config_path(), &config)
-}
-
-/// One-shot migration drain: if the on-disk daemon runtime config still
-/// contains plaintext task-board git secrets (from an older daemon) or stale
-/// `*_configured` indicators (from a daemon that pre-dated the metadata
-/// strip), return the full unstripped runtime config and persist a stripped
-/// version back to disk. Returns `Ok(None)` when the on-disk config is
-/// already free of secret material and wire-only metadata.
-///
-/// # Errors
-/// Returns `CliError` when the runtime config exists but cannot be parsed or
-/// the stripped version cannot be written back.
-pub fn drain_task_board_git_runtime_secrets() -> Result<Option<TaskBoardGitRuntimeConfig>, CliError>
-{
-    if !config_path().is_file() {
-        return Ok(None);
-    }
-    let raw = read_json_typed::<DaemonRuntimeConfig>(&config_path())?;
-    let Some(raw_task_board) = raw.task_board_git_runtime_config.clone() else {
-        return Ok(None);
-    };
-    let stripped = raw_task_board.without_secret_metadata();
-    if stripped == raw_task_board {
-        return Ok(None);
-    }
-    ensure_daemon_dirs()?;
-    let mut on_disk = raw;
-    on_disk.task_board_git_runtime_config = (!stripped.is_empty()).then_some(stripped);
-    write_json_pretty(&config_path(), &on_disk)?;
-    Ok(Some(raw_task_board))
+    super::config_migration::with_runtime_config_lock(|| {
+        let mut config = load_runtime_config_for_persist();
+        let task_board_config = task_board_config.without_secret_metadata();
+        config.task_board_git_runtime_config =
+            (!task_board_config.is_empty()).then_some(task_board_config);
+        super::config_migration::write_runtime_config_durable(&config)
+    })
 }
 
 /// Replace the daemon's in-memory task-board Git runtime secrets snapshot.
@@ -190,6 +209,76 @@ pub fn replace_task_board_git_runtime_secrets(task_board_config: &TaskBoardGitRu
     state.insert(task_board_memory_key(), task_board_config.clone());
 }
 
+/// Preserve process-only secret bytes when a redacted GET response is sent
+/// back as a full runtime-config update. A false configured flag remains an
+/// explicit removal.
+#[must_use]
+pub(crate) fn retaining_task_board_git_runtime_secrets(
+    request: &TaskBoardGitRuntimeConfig,
+) -> TaskBoardGitRuntimeConfig {
+    let current = TASK_BOARD_GIT_RUNTIME_SECRETS
+        .read()
+        .expect("task-board git runtime secret state lock poisoned")
+        .get(&task_board_memory_key())
+        .cloned()
+        .unwrap_or_default();
+    let mut merged = request.clone();
+    retain_profile_secrets(&mut merged.global, &current.global);
+    for override_config in &mut merged.repository_overrides {
+        let existing = current
+            .repository_overrides
+            .iter()
+            .find(|candidate| candidate.repository == override_config.repository)
+            .map(|candidate| &candidate.profile)
+            .cloned()
+            .unwrap_or_default();
+        retain_profile_secrets(&mut override_config.profile, &existing);
+    }
+    merged
+}
+
+fn retain_profile_secrets(
+    target: &mut TaskBoardGitRuntimeProfile,
+    existing: &TaskBoardGitRuntimeProfile,
+) {
+    retain_secret(
+        &mut target.ssh_private_key,
+        target.ssh_private_key_configured,
+        existing.ssh_private_key.as_ref(),
+    );
+    retain_secret(
+        &mut target.ssh_private_key_passphrase,
+        target.ssh_private_key_passphrase_configured,
+        existing.ssh_private_key_passphrase.as_ref(),
+    );
+    retain_secret(
+        &mut target.signing.ssh_private_key,
+        target.signing.ssh_private_key_configured,
+        existing.signing.ssh_private_key.as_ref(),
+    );
+    retain_secret(
+        &mut target.signing.ssh_private_key_passphrase,
+        target.signing.ssh_private_key_passphrase_configured,
+        existing.signing.ssh_private_key_passphrase.as_ref(),
+    );
+    retain_secret(
+        &mut target.signing.gpg_private_key,
+        target.signing.gpg_private_key_configured,
+        existing.signing.gpg_private_key.as_ref(),
+    );
+    retain_secret(
+        &mut target.signing.gpg_private_key_passphrase,
+        target.signing.gpg_private_key_passphrase_configured,
+        existing.signing.gpg_private_key_passphrase.as_ref(),
+    );
+}
+
+fn retain_secret(target: &mut Option<String>, configured: bool, existing: Option<&String>) {
+    if target.is_none() && configured {
+        *target = existing.cloned();
+    }
+}
+
 /// Resolve a task-board Git runtime profile with current process-only secrets.
 ///
 /// # Errors
@@ -197,23 +286,12 @@ pub fn replace_task_board_git_runtime_secrets(task_board_config: &TaskBoardGitRu
 ///
 /// # Panics
 /// Panics when the in-memory secret state lock is poisoned.
+#[cfg(test)]
 pub fn task_board_git_runtime_profile(
     repository: Option<&str>,
 ) -> Result<TaskBoardGitRuntimeProfile, CliError> {
     let mut profile = load_task_board_git_runtime_config()?.resolved_profile(repository);
-    let secrets = TASK_BOARD_GIT_RUNTIME_SECRETS
-        .read()
-        .expect("task-board git runtime secret state lock poisoned")
-        .get(&task_board_memory_key())
-        .cloned()
-        .unwrap_or_default();
-    let secret_profile = secrets.resolved_profile(repository);
-    profile.ssh_private_key = secret_profile.ssh_private_key;
-    profile.ssh_private_key_passphrase = secret_profile.ssh_private_key_passphrase;
-    profile.signing.ssh_private_key = secret_profile.signing.ssh_private_key;
-    profile.signing.ssh_private_key_passphrase = secret_profile.signing.ssh_private_key_passphrase;
-    profile.signing.gpg_private_key = secret_profile.signing.gpg_private_key;
-    profile.signing.gpg_private_key_passphrase = secret_profile.signing.gpg_private_key_passphrase;
+    overlay_task_board_git_runtime_profile_secrets(&mut profile, repository);
     Ok(profile)
 }
 
@@ -362,7 +440,7 @@ fn normalize_optional_log_level(level: Option<&str>) -> Result<Option<String>, C
 }
 
 fn load_runtime_config_for_persist() -> DaemonRuntimeConfig {
-    match load_runtime_config() {
+    match load_runtime_config_raw() {
         Ok(Some(config)) => config,
         Ok(None) => DaemonRuntimeConfig::default(),
         Err(error) => {

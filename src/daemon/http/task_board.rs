@@ -13,12 +13,12 @@ mod policy_io;
 pub(super) use self::items::{authenticated_request, authorized_control_request_parts};
 
 use self::items::{
-    delete_task_board_item, get_task_board_audit, get_task_board_host_list,
-    get_task_board_host_local, get_task_board_item, get_task_board_items, get_task_board_machines,
-    get_task_board_projects, post_task_board_dispatch, post_task_board_evaluate,
-    post_task_board_item, post_task_board_plan_approve, post_task_board_plan_begin,
-    post_task_board_plan_revoke, post_task_board_plan_submit, post_task_board_sync,
-    put_task_board_host_set_project_types, put_task_board_item,
+    delete_task_board_item, get_task_board_audit, get_task_board_capabilities,
+    get_task_board_host_list, get_task_board_host_local, get_task_board_item, get_task_board_items,
+    get_task_board_machines, get_task_board_projects, post_task_board_dispatch,
+    post_task_board_evaluate, post_task_board_item, post_task_board_plan_approve,
+    post_task_board_plan_begin, post_task_board_plan_revoke, post_task_board_plan_submit,
+    post_task_board_sync, put_task_board_host_set_project_types, put_task_board_item,
 };
 use self::policy::merge_policy_routes;
 use self::policy_io::merge_policy_io_routes;
@@ -41,6 +41,10 @@ fn task_board_host_routes() -> Router<DaemonHttpState> {
 
 pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
     let router = Router::new()
+        .route(
+            http_paths::TASK_BOARD_CAPABILITIES,
+            get(get_task_board_capabilities),
+        )
         .route(
             http_paths::TASK_BOARD_ITEMS,
             post(post_task_board_item).get(get_task_board_items),

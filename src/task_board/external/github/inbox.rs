@@ -21,6 +21,7 @@ pub struct GitHubInboxSyncClient {
     client: GitHubProtectedClient,
     repositories: Vec<GitHubRepository>,
     import_labels: Vec<String>,
+    include_review_requests: bool,
 }
 
 impl GitHubInboxSyncClient {
@@ -55,6 +56,7 @@ impl GitHubInboxSyncClient {
             client,
             repositories,
             import_labels: import_labels.to_vec(),
+            include_review_requests: true,
         })
     }
 
@@ -68,6 +70,12 @@ impl GitHubInboxSyncClient {
             config.github_inbox_repositories(),
             config.github_import_labels(),
         )
+    }
+
+    pub(crate) fn from_config_assigned_only(config: &ExternalSyncConfig) -> Result<Self, CliError> {
+        let mut client = Self::from_config(config)?;
+        client.include_review_requests = false;
+        Ok(client)
     }
 
     async fn current_user_login(&self) -> Result<String, CliError> {
@@ -105,6 +113,10 @@ impl ExternalSyncClient for GitHubInboxSyncClient {
         false
     }
 
+    fn authoritative_review_inbox(&self) -> bool {
+        self.include_review_requests
+    }
+
     async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
         if self.repositories.is_empty() {
             return Ok(Vec::new());
@@ -129,6 +141,9 @@ impl ExternalSyncClient for GitHubInboxSyncClient {
             pulled_repository_count += 1;
             tasks.extend(assigned_tasks);
 
+            if !self.include_review_requests {
+                continue;
+            }
             match self.review_request_tasks(repository, login.as_str()).await {
                 Ok(review_tasks) => tasks.extend(review_tasks),
                 Err(error) => record_repository_failure(

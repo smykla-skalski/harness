@@ -1,11 +1,13 @@
 use crate::daemon::protocol::{TaskBoardSyncRequest, TaskBoardSyncResponse};
 use crate::errors::{CliError, CliErrorKind};
+#[cfg(test)]
+use crate::task_board::TaskBoardStore;
 use crate::task_board::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalSyncDirection,
-    ExternalSyncOperation, ExternalSyncOptions, TaskBoardStore, build_sync_summary,
+    ExternalSyncOperation, ExternalSyncOptions, TaskBoardItem, build_sync_summary,
 };
 
-pub(super) fn sync_options(request: &TaskBoardSyncRequest) -> ExternalSyncOptions {
+pub(crate) fn sync_options(request: &TaskBoardSyncRequest) -> ExternalSyncOptions {
     ExternalSyncOptions {
         status: request.status,
         provider: request.provider,
@@ -15,7 +17,7 @@ pub(super) fn sync_options(request: &TaskBoardSyncRequest) -> ExternalSyncOption
     }
 }
 
-pub(super) fn ensure_sync_request_can_run(
+pub(crate) fn ensure_sync_request_can_run(
     request: &TaskBoardSyncRequest,
     config: &ExternalSyncConfig,
     clients: &[Box<dyn ExternalSyncClient>],
@@ -29,6 +31,7 @@ pub(super) fn ensure_sync_request_can_run(
     reject_sync_request(request, config)
 }
 
+#[cfg(test)]
 pub(super) fn build_sync_response(
     board: &TaskBoardStore,
     request: &TaskBoardSyncRequest,
@@ -36,16 +39,24 @@ pub(super) fn build_sync_response(
     operations: Vec<ExternalSyncOperation>,
 ) -> Result<TaskBoardSyncResponse, CliError> {
     let items = board.list(request.status)?;
-    let mut summary = build_sync_summary(&items, config);
+    Ok(build_sync_response_from_items(&items, config, operations))
+}
+
+pub(crate) fn build_sync_response_from_items(
+    items: &[TaskBoardItem],
+    config: &ExternalSyncConfig,
+    operations: Vec<ExternalSyncOperation>,
+) -> TaskBoardSyncResponse {
+    let mut summary = build_sync_summary(items, config);
     summary.operations = operations;
-    Ok(summary)
+    summary
 }
 
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
-pub(super) fn log_sync_request(
+pub(crate) fn log_sync_request(
     request: &TaskBoardSyncRequest,
     config: &ExternalSyncConfig,
     client_count: usize,
@@ -60,7 +71,7 @@ pub(super) fn log_sync_request(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
-pub(super) fn log_sync_completion(summary: &TaskBoardSyncResponse) {
+pub(crate) fn log_sync_completion(summary: &TaskBoardSyncResponse) {
     tracing::info!("{}", format_sync_completion_message(summary));
 }
 

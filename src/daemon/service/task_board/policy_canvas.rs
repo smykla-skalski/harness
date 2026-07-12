@@ -12,7 +12,6 @@ use crate::daemon::protocol::{
     PolicyScenarioDeleteRequest, PolicyScenarioUpdateRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
-use crate::task_board::default_board_root;
 use crate::task_board::policy_graph::{self, PolicyCanvasWorkspace};
 
 use super::policy_canvas_response::policy_canvas_workspace_response;
@@ -52,15 +51,19 @@ pub(super) async fn load_or_seed_workspace(
     Ok(workspace)
 }
 
-/// Refresh the synchronous gating cache with the active enforced canvas
-/// document so the allow/deny hot path never re-reads the database.
+/// Mirror the active live canvas into the legacy synchronous gate cache in tests.
+///
+/// Production enforcement reads the database-backed workspace directly, so
+/// non-test builds intentionally keep this compatibility hook as a no-op.
 pub(super) fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
-    policy_graph::store_gate_policy_entry(
-        &default_board_root(),
-        workspace.active_live_canvas().map(|(canvas, document)| {
+    #[cfg(test)]
+    policy_graph::store_database_gate_policy_entry(workspace.active_live_canvas().map(
+        |(canvas, document)| {
             policy_graph::CachedGatePolicy::for_canvas(canvas.id.clone(), document.clone())
-        }),
-    );
+        },
+    ));
+    #[cfg(not(test))]
+    let _ = workspace;
 }
 
 /// Emit the `policy_pipeline` change event so websocket subscribers re-query.
@@ -326,11 +329,12 @@ pub(crate) async fn save_policy_pipeline_draft(
         .save_policy_canvas_draft(canvas_id, request.document.clone(), request.if_revision)
         .await?;
     if saved.response.persisted {
+        #[cfg(test)]
         if saved.saved_active_canvas() {
             let entry = saved
                 .gate_document()
                 .map(|document| policy_graph::CachedGatePolicy::for_canvas(canvas_id, document));
-            policy_graph::store_gate_policy_entry(&default_board_root(), entry);
+            policy_graph::store_database_gate_policy_entry(entry);
         }
         bump_change_policy(db).await;
     }

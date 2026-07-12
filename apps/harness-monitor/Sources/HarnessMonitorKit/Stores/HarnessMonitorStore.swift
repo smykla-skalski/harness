@@ -27,7 +27,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored let timelineWindowWorker = TimelineWindowWorker()
   @ObservationIgnored let sessionWindowPresentationWorker = SessionWindowPresentationWorker()
   @ObservationIgnored let taskBoardSettingsWorker: TaskBoardSettingsWorker
-  @ObservationIgnored var lastTaskBoardCredentialSync: TaskBoardCredentialSyncState?
+  @ObservationIgnored var taskBoardConnectionState = TaskBoardConnectionState()
   @ObservationIgnored var sessionIndexSnapshotApplyTask: Task<Void, Never>?
   @ObservationIgnored var sessionIndexSnapshotApplyGeneration: UInt64 = 0
   @ObservationIgnored var acpTimelineSync = AcpTimelineSyncState()

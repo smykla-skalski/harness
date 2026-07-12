@@ -1,39 +1,42 @@
+#[cfg(test)]
 use std::path::Path;
 use std::slice::from_ref;
 
+use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::CliError;
-use crate::reviews::policy::{ReviewsPolicyPlan, authored_reviews_policy_plan};
+#[cfg(test)]
+use crate::reviews::policy::authored_reviews_policy_plan;
+use crate::reviews::policy::{ReviewsPolicyPlan, authored_reviews_policy_plan_from_document};
 use crate::reviews::{
-    ReviewActionPreviewKind, ReviewsPolicyPreviewRequest, ReviewsPolicyPreviewResponse,
-    ReviewsPolicyStepType,
+    ReviewActionPreviewKind, ReviewTarget, ReviewsPolicyPreviewRequest,
+    ReviewsPolicyPreviewResponse, ReviewsPolicyStepType,
 };
+use crate::task_board::github::GitHubMergeMethod;
+use crate::task_board::policy_graph::PolicyGraphMode;
 
 use super::policy_mapping::preview_step;
 use super::preview::{preview_action_target, preview_action_warnings};
 use super::token::github_token;
 
-pub(super) fn preview_legacy_reviews_policy_with_token(
-    root: &Path,
-    request: &ReviewsPolicyPreviewRequest,
-) -> Result<ReviewsPolicyPreviewResponse, CliError> {
-    let response = preview_legacy_reviews_policy(root, request)?;
-    Ok(apply_preview_token_readiness(response, request))
+pub(super) async fn authored_database_reviews_policy_plan(
+    database: &AsyncDaemonDb,
+    workflow_id: &str,
+    target: &ReviewTarget,
+    method: GitHubMergeMethod,
+) -> Result<ReviewsPolicyPlan, CliError> {
+    let workspace = database.load_policy_workspace().await?;
+    let document = workspace
+        .as_ref()
+        .and_then(|workspace| workspace.active_live_document())
+        .filter(|document| document.mode == PolicyGraphMode::Enforced);
+    authored_reviews_policy_plan_from_document(document, workflow_id, target, method)
 }
 
-pub(super) fn preview_legacy_reviews_policy(
-    root: &Path,
+pub(super) async fn preview_database_reviews_policy(
+    database: &AsyncDaemonDb,
     request: &ReviewsPolicyPreviewRequest,
 ) -> Result<ReviewsPolicyPreviewResponse, CliError> {
-    request.validate()?;
-    let workflow_id = request.normalized_workflow_id();
-    let plan = authored_reviews_policy_plan(root, &workflow_id, &request.target, request.method)?;
-    Ok(preview_response(request, workflow_id, &plan))
-}
-
-fn apply_preview_token_readiness(
-    mut response: ReviewsPolicyPreviewResponse,
-    request: &ReviewsPolicyPreviewRequest,
-) -> ReviewsPolicyPreviewResponse {
+    let mut response = preview_database_reviews_policy_plan(database, request).await?;
     if response.eligible
         && preview_response_requires_token(&response)
         && github_token(Some(request.target.repository.as_str()))
@@ -46,7 +49,45 @@ fn apply_preview_token_readiness(
             request.target.repository
         ));
     }
-    response
+    Ok(response)
+}
+
+pub(super) async fn preview_database_reviews_policy_plan(
+    database: &AsyncDaemonDb,
+    request: &ReviewsPolicyPreviewRequest,
+) -> Result<ReviewsPolicyPreviewResponse, CliError> {
+    request.validate()?;
+    let workflow_id = request.normalized_workflow_id();
+    let plan = authored_database_reviews_policy_plan(
+        database,
+        &workflow_id,
+        &request.target,
+        request.method,
+    )
+    .await?;
+    Ok(preview_response(request, workflow_id, &plan))
+}
+
+#[cfg(test)]
+pub(super) fn preview_legacy_reviews_policy(
+    root: &Path,
+    request: &ReviewsPolicyPreviewRequest,
+) -> Result<ReviewsPolicyPreviewResponse, CliError> {
+    request.validate()?;
+    let workflow_id = request.normalized_workflow_id();
+    let plan = authored_reviews_policy_plan(root, &workflow_id, &request.target, request.method)?;
+    Ok(preview_response(request, workflow_id, &plan))
+}
+
+pub(super) async fn enforced_database_reviews_policy_active(
+    database: &AsyncDaemonDb,
+) -> Result<bool, CliError> {
+    Ok(database
+        .load_policy_workspace()
+        .await?
+        .as_ref()
+        .and_then(|workspace| workspace.active_live_document())
+        .is_some_and(|document| document.mode == PolicyGraphMode::Enforced))
 }
 
 fn preview_response(

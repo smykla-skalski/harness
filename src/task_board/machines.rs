@@ -1,19 +1,29 @@
+#[cfg(test)]
 use std::collections::BTreeSet;
+#[cfg(test)]
 use std::env;
+#[cfg(test)]
 use std::io;
+#[cfg(test)]
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
+#[cfg(test)]
 use uuid::Uuid;
 
+#[cfg(test)]
 use crate::errors::{CliError, CliErrorKind};
+#[cfg(test)]
 use crate::infra::io::{read_json_typed, write_json_pretty};
 use crate::workspace::utc_now;
 
 use super::types::AgentMode;
 
+#[cfg(test)]
 const REGISTRY_DIR: &str = "machines";
+#[cfg(test)]
 const LOCAL_ID_FILE: &str = "local.json";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,15 +74,18 @@ impl Machine {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg(test)]
 struct LocalIdFile {
     id: String,
 }
 
 #[derive(Debug, Clone)]
+#[cfg(test)]
 pub struct MachineRegistry {
     root: PathBuf,
 }
 
+#[cfg(test)]
 impl MachineRegistry {
     #[must_use]
     pub fn new(board_root: impl Into<PathBuf>) -> Self {
@@ -199,6 +212,7 @@ impl MachineRegistry {
     }
 }
 
+#[cfg(test)]
 fn normalize_strings(values: &[String]) -> Vec<String> {
     let mut seen = BTreeSet::new();
     let mut out = Vec::with_capacity(values.len());
@@ -215,6 +229,7 @@ fn normalize_strings(values: &[String]) -> Vec<String> {
     out
 }
 
+#[cfg(test)]
 fn default_label() -> String {
     env::var("HARNESS_MACHINE_LABEL")
         .ok()
@@ -231,10 +246,12 @@ fn default_label() -> String {
         .unwrap_or_else(|| "local".to_string())
 }
 
+#[cfg(test)]
 fn generate_local_id() -> String {
     Uuid::new_v4().simple().to_string()
 }
 
+#[cfg(test)]
 fn io_error(action: &str, path: &Path, error: io::Error) -> CliError {
     CliError::new(CliErrorKind::workflow_io(format!(
         "task-board machine registry {action} '{}': {error}",

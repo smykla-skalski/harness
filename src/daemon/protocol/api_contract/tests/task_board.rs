@@ -22,6 +22,12 @@ fn task_board_routes_have_complete_ws_parity() {
         actual,
         vec![
             (
+                HttpRouteMethod::Get,
+                http_paths::TASK_BOARD_CAPABILITIES,
+                ws_methods::TASK_BOARD_CAPABILITIES,
+                true,
+            ),
+            (
                 HttpRouteMethod::Post,
                 http_paths::TASK_BOARD_ITEMS,
                 ws_methods::TASK_BOARD_CREATE,
@@ -208,9 +214,21 @@ fn task_board_routes_have_complete_ws_parity() {
                 true,
             ),
             (
+                HttpRouteMethod::Put,
+                http_paths::TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL,
+                ws_methods::TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL_SYNC,
+                true,
+            ),
+            (
                 HttpRouteMethod::Post,
-                http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
-                ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
+                http_paths::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
+                ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_PREPARE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK,
+                ws_methods::TASK_BOARD_GIT_RUNTIME_SECRET_HANDOFF_ACK,
                 true,
             ),
             (

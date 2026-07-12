@@ -1,6 +1,6 @@
 import Foundation
 
-// Wire maps for the git runtime config tree + drain-secrets response. Thin mirrors; the signing
+// Wire maps for the git runtime config tree + secret-handoff response. Thin mirrors; the signing
 // mode (TaskBoardGitSigningMode) is the decoder-agnostic hand open enum that rides through bare, so
 // it carries across without a per-value map.
 
@@ -56,10 +56,12 @@ extension TaskBoardGitRuntimeConfig {
   }
 }
 
-extension TaskBoardGitRuntimeDrainSecretsResponse {
-  init(wire: TaskBoardGitRuntimeDrainSecretsResponseWire) {
+extension TaskBoardGitRuntimeSecretHandoffPrepareResponse {
+  init(wire: TaskBoardGitRuntimeSecretHandoffPrepareResponseWire) {
     self.init(
-      drained: wire.drained,
+      prepared: wire.prepared,
+      migrationID: wire.migrationId,
+      digest: wire.digest,
       runtime: TaskBoardGitRuntimeConfig(wire: wire.runtime)
     )
   }
