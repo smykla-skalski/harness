@@ -41,7 +41,7 @@ The macOS app, the iOS app, and the watch app all share the same iCloud containe
 
 On a relay-paired device, `MobileCloudMirrorSyncClient.fetchLatestSnapshot(stationID:now:)` fetches the record(s), checks the `expiresAt` TTL (a stale record raises `MobileCloudMirrorSyncError.staleSnapshot`), decrypts and verifies the envelope with the per-station symmetric key, reassembles chunks, and returns a `MobileMirrorSnapshot`.
 
-On a remote-paired device, `MobileRemoteDaemonSyncClient.fetchLatestSnapshot(stationID:now:)` sends an authenticated `GET /v1/sessions` to the pinned endpoint and maps the daemon's secret-free session fields into the shared snapshot model. `DirectFirstMobileMonitorSyncClient` applies the fail-closed fallback policy described above. The shared `MirrorStore.refresh()` aggregates every paired station through the same `MobileMonitorSyncClient` protocol.
+On a remote-paired device, `MobileRemoteDaemonSyncClient.fetchLatestSnapshot(stationID:now:)` sends authenticated requests through the pinned endpoint for sessions, active-session managed agents, task-board items, and the paired Reviews query. It maps terminal, Codex, and ACP agents into redacted mobile session details, including role-gated ACP permission and blocked-agent attention. A missing managed-agent or task-board route remains compatible with older servers; authentication failures fail closed, while reachability and server failures follow the CloudMirror fallback policy described above. The shared `MirrorStore.refresh()` aggregates every paired station through the same `MobileMonitorSyncClient` protocol.
 
 ### Device command paths
 

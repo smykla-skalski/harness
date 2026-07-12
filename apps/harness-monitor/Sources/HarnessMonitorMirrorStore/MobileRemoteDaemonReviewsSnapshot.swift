@@ -177,14 +177,11 @@ extension MobileReviewSummary {
       exposesCommand
       ? (checkStatus == "failure" ? .pullRequestRerunChecks : .pullRequestApprove)
       : nil
-    let target =
-      exposesCommand
-      ? MobileCommandTarget(
-        stationID: stationID,
-        reviewID: id,
-        targetRevision: 0
-      )
-      : nil
+    let target = MobileCommandTarget(
+      stationID: stationID,
+      reviewID: id,
+      targetRevision: 0
+    )
     let commandPayload =
       exposesCommand
       ? [

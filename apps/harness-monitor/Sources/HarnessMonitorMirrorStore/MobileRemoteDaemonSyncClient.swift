@@ -52,13 +52,18 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
     guard stationID == self.stationID else {
       throw MobileRemoteDaemonSyncError.stationMismatch
     }
-    async let sessions = fetchSessions()
     async let taskBoardItems = fetchTaskBoardItems()
     async let reviewsSnapshot = fetchReviewsSnapshot(now: now)
+    let sessions = try await fetchSessions()
+    async let managedAgentsSnapshot = fetchManagedAgentsSnapshot(
+      for: sessions.compactMap(\.managedAgentsSession),
+      now: now
+    )
     return try await makeSnapshot(
       sessions: sessions,
       taskBoardItems: taskBoardItems,
       reviewsSnapshot: reviewsSnapshot,
+      managedAgentsSnapshot: managedAgentsSnapshot,
       now: now
     )
   }
@@ -102,43 +107,46 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
     sessions: [MobileRemoteSessionWire],
     taskBoardItems: [MobileRemoteTaskBoardWire],
     reviewsSnapshot: MobileRemoteReviewsSnapshot,
+    managedAgentsSnapshot: MobileRemoteManagedAgentsSnapshot,
     now: Date
   ) -> MobileMirrorSnapshot {
     let redactor = MobileMirrorSecretRedactor()
     let mobileSessions = sessions.map {
-      $0.mobileSummary(stationID: stationID, now: now, redactor: redactor)
+      $0.mobileSummary(
+        stationID: stationID,
+        agents: managedAgentsSnapshot.agentsBySessionID[$0.sessionID] ?? [],
+        now: now,
+        redactor: redactor
+      )
     }
     let mobileTaskBoardItems = taskBoardItems.map {
       $0.mobileSummary(stationID: stationID, now: now, redactor: redactor)
     }
     let activeSessions = sessions.filter { $0.status != "ended" }
-    let sessionNeedsYouCount = sessions.count(where: { $0.metrics.awaitingReviewAgentCount > 0 })
-    let needsYouCount =
-      sessionNeedsYouCount
-      + mobileTaskBoardItems.count(where: \.needsYou)
-      + reviewsSnapshot.reviews.count(where: \.needsYou)
     let station = MobileStationSummary(
       id: stationID,
       displayName: stationName,
       state: .online,
       lastSeenAt: now,
       activeSessionCount: activeSessions.count,
-      needsYouCount: needsYouCount,
+      needsYouCount: 0,
       commandQueueCount: 0,
       defaultStation: defaultStation
     )
-    return MobileMirrorSnapshot(
+    var snapshot = MobileMirrorSnapshot(
       revision: 0,
       generatedAt: now,
       expiresAt: now.addingTimeInterval(60),
       stations: [station],
-      attention: reviewsSnapshot.attention,
+      attention: managedAgentsSnapshot.attention + reviewsSnapshot.attention,
       sessions: mobileSessions,
       reviews: reviewsSnapshot.reviews,
       taskBoardItems: mobileTaskBoardItems,
       commands: [],
       trustedDevices: []
     )
+    snapshot.stations[0].needsYouCount = snapshot.needsYouCount
+    return snapshot
   }
 }
 
@@ -154,6 +162,7 @@ private struct MobileRemoteSessionWire: Decodable, Sendable {
 
   func mobileSummary(
     stationID: String,
+    agents: [MobileAgentSummary],
     now: Date,
     redactor: MobileMirrorSecretRedactor
   ) -> MobileSessionSummary {
@@ -161,15 +170,25 @@ private struct MobileRemoteSessionWire: Decodable, Sendable {
       id: sessionID,
       stationID: stationID,
       projectName: redactor.redact(projectName),
-      title: title.isEmpty ? "(untitled)" : redactor.redact(title),
+      title: redactor.redact(displayTitle),
       branch: redactor.redact(branchRef),
       status: MobileRemoteSessionStatus.title(for: status),
       activeAgentCount: metrics.activeAgentCount,
       blockedAgentCount: metrics.awaitingReviewAgentCount,
       lastActivityAt: MobileRemoteSessionDate.parse(lastActivityAt ?? updatedAt) ?? now,
-      summary: MobileRemoteSessionSummaryText.make(metrics: metrics)
+      summary: MobileRemoteSessionSummaryText.make(metrics: metrics),
+      agents: agents
     )
   }
+
+  var managedAgentsSession: MobileRemoteManagedAgentsSession? {
+    guard status != "ended" else {
+      return nil
+    }
+    return MobileRemoteManagedAgentsSession(id: sessionID, title: displayTitle)
+  }
+
+  private var displayTitle: String { title.isEmpty ? "(untitled)" : title }
 
   enum CodingKeys: String, CodingKey {
     case projectName = "project_name"
