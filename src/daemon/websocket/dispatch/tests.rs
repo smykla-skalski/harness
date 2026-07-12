@@ -129,6 +129,25 @@ async fn remote_ws_dispatch_denies_client_revoked_after_handshake() {
 }
 
 #[tokio::test]
+async fn remote_ws_dispatch_reports_auth_store_refresh_failure() {
+    let mut state = super::super::test_support::test_http_state();
+    state.auth_mode = DaemonHttpAuthMode::Remote;
+    let connection = Arc::new(Mutex::new(ConnectionState::new_remote(remote_client(
+        "viewer",
+        RemoteRole::Viewer,
+        &[RemoteAccessScope::Read],
+    ))));
+    let request = ws_request("req-auth-store", ws_methods::PING);
+
+    let response = dispatch(&request, &state, &connection).await;
+    let error = response.error.expect("remote auth store error");
+
+    assert_eq!(error.code, "REMOTE_AUTH_STORE");
+    assert_eq!(error.message, "remote authentication store is unavailable");
+    assert_eq!(error.status_code, Some(503));
+}
+
+#[tokio::test]
 async fn remote_ws_dispatch_preserves_unknown_method_errors() {
     let mut state = super::super::test_support::test_http_state_with_db();
     state.auth_mode = DaemonHttpAuthMode::Remote;
