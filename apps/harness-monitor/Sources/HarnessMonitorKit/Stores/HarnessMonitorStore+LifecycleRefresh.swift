@@ -177,6 +177,7 @@ extension HarnessMonitorStore {
     recordConnectionTelemetry: Bool = true,
     isInitialConnect: Bool = false
   ) async throws {
+    let adoptsLocalManifest = !usesRemoteDaemon
     let refreshSnapshot = try await Self.loadRefreshSnapshot(using: client)
     await applyRefreshSnapshot(
       refreshSnapshot,
@@ -185,7 +186,8 @@ extension HarnessMonitorStore {
         preserveSelection: preserveSelection,
         allowPreviewReadySelection: allowPreviewReadySelection,
         recordConnectionTelemetry: recordConnectionTelemetry,
-        isInitialConnect: isInitialConnect
+        isInitialConnect: isInitialConnect,
+        adoptsLocalManifest: adoptsLocalManifest
       )
     )
   }
@@ -194,6 +196,7 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol,
     preserveSelection: Bool
   ) async throws {
+    let adoptsLocalManifest = !usesRemoteDaemon
     let refreshSnapshot = try await Self.loadRefreshSnapshot(using: client)
     await applyRefreshSnapshot(
       refreshSnapshot,
@@ -202,7 +205,8 @@ extension HarnessMonitorStore {
         preserveSelection: preserveSelection,
         allowPreviewReadySelection: true,
         recordConnectionTelemetry: false,
-        isInitialConnect: false
+        isInitialConnect: false,
+        adoptsLocalManifest: adoptsLocalManifest
       )
     )
   }
@@ -326,6 +330,7 @@ struct RefreshApplyOptions {
   let allowPreviewReadySelection: Bool
   let recordConnectionTelemetry: Bool
   let isInitialConnect: Bool
+  let adoptsLocalManifest: Bool
 }
 
 struct TaskBoardConfirmationTick {

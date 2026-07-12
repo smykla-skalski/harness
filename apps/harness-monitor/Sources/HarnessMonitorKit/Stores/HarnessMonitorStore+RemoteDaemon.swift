@@ -131,7 +131,7 @@ extension HarnessMonitorStore {
   private func completeRemoteDaemonForget() async {
     remoteDaemonProfile = nil
     remoteDaemonActionState = .idle
-    ensureLocalManifestURL()
+    resetLocalManifestURL()
     await reconnect()
   }
 

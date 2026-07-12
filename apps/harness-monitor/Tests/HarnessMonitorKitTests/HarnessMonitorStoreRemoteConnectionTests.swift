@@ -159,6 +159,35 @@ struct HarnessMonitorStoreRemoteConnectionTests {
     #expect(await daemon.recordedWarmUpCallCount() == 1)
   }
 
+  @Test("Forgetting a remote daemon reconnects with the local manifest")
+  func forgettingRemoteDaemonRestoresLocalManifest() async throws {
+    let fixture = try RemoteStoreFixture()
+    let daemon = RecordingDaemonController(
+      warmUpError: DaemonControlError.daemonDidNotStart,
+      usesWarmUpErrorForBootstrap: false
+    )
+    let store = HarnessMonitorStore(
+      daemonController: daemon,
+      daemonOwnership: .external,
+      remoteDaemonServices: fixture.services
+    )
+    let localManifestURL = URL(fileURLWithPath: "/tmp/harness-local/manifest.json")
+    store.manifestURL = localManifestURL
+
+    await store.bootstrap()
+    #expect(store.manifestURL == localManifestURL)
+
+    store.manifestURL = URL(fileURLWithPath: "/var/lib/harness-remote/manifest.json")
+    store.forgetRemoteDaemon()
+    try await waitUntil {
+      guard case .offline = store.connectionState else { return false }
+      return !store.usesRemoteDaemon && store.remoteDaemonActionState == .idle
+    }
+
+    #expect(store.manifestURL == HarnessMonitorPaths.manifestURLWithoutLiveDiscovery())
+    #expect(await daemon.recordedWarmUpCallCount() == 1)
+  }
+
   private func waitUntil(
     _ condition: @MainActor () -> Bool
   ) async throws {
