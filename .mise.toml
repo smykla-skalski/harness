@@ -202,7 +202,7 @@ run = "./scripts/version.sh check"
 
 [tasks."harness:check:scripts"]
 hide = true
-run = "mise run check:scripts"
+depends = ["check:scripts"]
 
 [tasks."harness:check:rust"]
 hide = true
