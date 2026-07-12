@@ -208,7 +208,7 @@ impl GitHubInboxSyncClient {
                 reference: github_task_ref(repository, item.number, item.url),
                 title: item.title,
                 body: item.body.unwrap_or_default(),
-                status: TaskBoardStatus::HumanRequired,
+                status: TaskBoardStatus::Todo,
                 project_id: Some(project_id.clone()),
                 updated_at: Some(item.updated_at),
             })

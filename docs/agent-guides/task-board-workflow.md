@@ -67,11 +67,6 @@ new -> planning -> plan_review -> todo -> in_progress -> in_review -> done
            |                         |          |
            v                         v          v
         blocked                   blocked    blocked
-
-github inbox -> needs_you -> todo
-                   |
-                   v
-                blocked
 ```
 
 `blocked` means the task cannot proceed without new input, an external
@@ -90,10 +85,9 @@ The CLI sets `approved_at` when `--approved-by` is provided.
 Standard GitHub issue sync still imports repo-scoped `todo` items with a
 synthesized planning summary. The separate GitHub inbox flow for selected repos
 imports issues assigned to you and pull requests requesting your review as
-repo-scoped `needs_you` items instead. Inbox items are not dispatch-ready until
-a human moves them into the normal planning/ready flow. Review-request inbox
-items that GitHub no longer reports for you are automatically resolved out of
-the inbox state on the next pull sync.
+repo-scoped `todo` items. Imported items still require planning approval before
+dispatch. Review-request inbox items that GitHub no longer reports for you are
+automatically resolved on the next pull sync.
 
 ## Intake And Planning
 

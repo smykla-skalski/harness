@@ -50,7 +50,7 @@ async fn sync_external_tasks_imports_github_tasks_with_plan_pending_approval() {
 }
 
 #[tokio::test]
-async fn sync_external_tasks_imports_github_human_required_without_planning() {
+async fn sync_external_tasks_imports_github_inbox_items_as_todo_with_plan_pending_approval() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
@@ -59,7 +59,7 @@ async fn sync_external_tasks_imports_github_human_required_without_planning() {
             "owner/repo#19",
             "Review requested",
             "owner/repo",
-            TaskBoardStatus::HumanRequired,
+            TaskBoardStatus::Todo,
         )],
     ))];
 
@@ -80,9 +80,11 @@ async fn sync_external_tasks_imports_github_human_required_without_planning() {
     let item = board
         .get("github-owner-repo-19-983c1507241b6007ac5729cfcea78b64")
         .expect("load imported github inbox task");
-    assert_eq!(item.status, TaskBoardStatus::HumanRequired);
+    assert_eq!(item.status, TaskBoardStatus::Todo);
     assert_eq!(item.project_id.as_deref(), Some("owner/repo"));
-    assert!(item.planning.summary.is_none());
+    assert!(item.planning.summary.is_some());
+    assert!(item.planning.approved_by.is_none());
+    assert!(item.planning.approved_at.is_none());
     assert!(item.external_refs.iter().any(|reference| {
         reference.provider == ExternalRefProvider::GitHub
             && reference.external_id == "owner/repo#19"

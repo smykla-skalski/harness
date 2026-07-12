@@ -13,10 +13,14 @@ fn shared_review_snapshot_completes_imported_review_request() {
         "Body".into(),
         "2026-07-11T10:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::HumanRequired;
+    item.status = TaskBoardStatus::Todo;
     item.project_id = Some("Example/Repo".into());
     item.imported_from_provider = Some(ExternalRefProvider::GitHub);
-    item.planning = PlanningState::default();
+    item.planning = PlanningState {
+        summary: Some("Review the linked pull request.".into()),
+        approved_by: None,
+        approved_at: None,
+    };
     item.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
         external_id: "example/repo#42".into(),
@@ -147,7 +151,7 @@ fn unknown_viewer_does_not_complete_review_request() {
         "Body".into(),
         "2026-07-11T10:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::HumanRequired;
+    item.status = TaskBoardStatus::Todo;
     item.project_id = Some("example/repo".into());
     item.imported_from_provider = Some(ExternalRefProvider::GitHub);
     item.external_refs = vec![ExternalRef {
@@ -176,7 +180,7 @@ fn unknown_viewer_does_not_complete_review_request() {
             .get("github-example-repo-42")
             .expect("review item")
             .status,
-        TaskBoardStatus::HumanRequired
+        TaskBoardStatus::Todo
     );
 }
 
@@ -233,7 +237,7 @@ fn candidate_projection_reloads_refs_edited_after_listing() {
         "Body".into(),
         "2026-07-11T10:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::HumanRequired;
+    item.status = TaskBoardStatus::Todo;
     item.project_id = Some("example/repo".into());
     item.imported_from_provider = Some(ExternalRefProvider::GitHub);
     item.external_refs = vec![ExternalRef {
@@ -286,7 +290,7 @@ fn aggregate_omission_does_not_complete_imported_review_request() {
         "Body".into(),
         "2026-07-11T10:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::HumanRequired;
+    item.status = TaskBoardStatus::Todo;
     item.imported_from_provider = Some(ExternalRefProvider::GitHub);
     item.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
@@ -302,7 +306,7 @@ fn aggregate_omission_does_not_complete_imported_review_request() {
             .get("github-example-repo-42")
             .expect("review item")
             .status,
-        TaskBoardStatus::HumanRequired
+        TaskBoardStatus::Todo
     );
 }
 
@@ -316,7 +320,7 @@ fn active_imported_reviews_are_discovered_for_exact_resolution() {
         "Body".into(),
         "2026-07-11T10:00:00Z".into(),
     );
-    active.status = TaskBoardStatus::HumanRequired;
+    active.status = TaskBoardStatus::Todo;
     active.imported_from_provider = Some(ExternalRefProvider::GitHub);
     active.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
