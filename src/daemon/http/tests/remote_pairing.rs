@@ -11,6 +11,7 @@ use crate::daemon::remote_identity::{RemoteBearerToken, RemoteClientRegistration
 use crate::daemon::remote_pairing::{
     RemotePairingCode, RemotePairingRateLimiter, RemotePairingRecord,
 };
+use crate::reviews::ReviewsQueryRequest;
 
 use super::test_http_state_with_db;
 
@@ -51,6 +52,7 @@ async fn remote_pair_claim_is_public_and_returns_one_time_client_token() {
     assert_eq!(body["client_id"], "iphone-1");
     assert_eq!(body["role"], "operator");
     assert_eq!(body["scopes"], serde_json::json!(["read", "write"]));
+    assert!(body.get("reviews_query").is_none());
     let token = body["token"].as_str().expect("paired token");
     assert!(!token.is_empty());
     assert!(!body.to_string().contains(code.expose()));
@@ -70,6 +72,56 @@ async fn remote_pair_claim_is_public_and_returns_one_time_client_token() {
         .find(|event| event.route_or_method == "remote.pair.claim")
         .expect("claim audit event");
     assert_eq!(claim_event.remote_addr.as_deref(), Some("127.0.0.1"));
+
+    server.abort();
+    let _ = server.await;
+}
+
+#[tokio::test]
+async fn remote_pair_claim_returns_server_owned_reviews_query() {
+    let state = remote_pairing_state();
+    let query = ReviewsQueryRequest {
+        organizations: vec!["smykla-skalski".into()],
+        repositories: vec!["smykla-skalski/harness".into()],
+        cache_max_age_seconds: 45,
+        ..ReviewsQueryRequest::default()
+    };
+    let code = seed_pairing_code_with_reviews_query(
+        &state,
+        "pairing-http-reviews",
+        RemoteRole::Viewer,
+        &[RemoteAccessScope::Read],
+        "http-reviews-secret",
+        "2026-07-12T18:00:00Z",
+        "2099-07-12T18:10:00Z",
+        Some(query),
+    );
+    let (base_url, server) = serve_http(state).await;
+
+    let response = reqwest::Client::new()
+        .post(format!("{base_url}{}", http_paths::REMOTE_PAIR_CLAIM))
+        .json(&serde_json::json!({
+            "code": code.expose(),
+            "domain": "daemon.example.com",
+            "client_id": "reviews-iphone",
+            "display_name": "Bart iPhone",
+            "platform": "ios",
+        }))
+        .send()
+        .await
+        .expect("send claim request");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response
+        .json::<serde_json::Value>()
+        .await
+        .expect("json body");
+    assert_eq!(
+        body["reviews_query"]["repositories"],
+        serde_json::json!(["smykla-skalski/harness"])
+    );
+    assert_eq!(body["reviews_query"]["cache_max_age_seconds"], 45);
+    assert!(!body.to_string().contains(code.expose()));
 
     server.abort();
     let _ = server.await;
@@ -339,14 +391,34 @@ fn seed_pairing_code(
     created_at: &str,
     expires_at: &str,
 ) -> RemotePairingCode {
+    seed_pairing_code_with_reviews_query(
+        state, pairing_id, role, scopes, code, created_at, expires_at, None,
+    )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "pairing fixture mirrors the persisted record"
+)]
+fn seed_pairing_code_with_reviews_query(
+    state: &crate::daemon::http::DaemonHttpState,
+    pairing_id: &str,
+    role: RemoteRole,
+    scopes: &[RemoteAccessScope],
+    code: &str,
+    created_at: &str,
+    expires_at: &str,
+    reviews_query: Option<ReviewsQueryRequest>,
+) -> RemotePairingCode {
     let code = RemotePairingCode::from_value_for_tests(code);
-    let record = RemotePairingRecord::new_for_tests(
+    let record = RemotePairingRecord::new_with_reviews_query_for_tests(
         pairing_id,
         role,
         scopes,
         code.expose(),
         created_at,
         expires_at,
+        reviews_query,
     )
     .expect("pairing record");
     state

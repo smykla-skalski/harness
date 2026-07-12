@@ -17,10 +17,12 @@ use crate::daemon::remote_pairing::{RemotePairingCode, RemotePairingRecord};
 use crate::daemon::service::DaemonServeConfig;
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
+use crate::reviews::ReviewsQueryRequest;
 use crate::workspace::utc_now;
 
 use super::control::{adopt_daemon_root_for_transport_command, print_json};
 use super::remote_doctor::execute_remote_doctor;
+use super::remote_pair_reviews::DaemonRemotePairReviewsArgs;
 use super::remote_pairing_invitation::build_remote_pairing_invitation;
 use super::remote_serve::execute_remote_serve;
 use super::remote_systemd::{DaemonRemoteSystemdArgs, DaemonRemoteSystemdInstallArgs};
@@ -161,6 +163,8 @@ pub struct DaemonRemotePairCreateArgs {
     /// Pairing code time-to-live.
     #[arg(long, default_value = "10m")]
     pub ttl: DaemonRemotePairTtl,
+    #[command(flatten)]
+    pub(super) reviews: DaemonRemotePairReviewsArgs,
 }
 
 impl Execute for DaemonRemotePairCreateArgs {
@@ -206,13 +210,15 @@ impl DaemonRemotePairCreateArgs {
             .map(RemoteAccessScope::from)
             .collect::<Vec<_>>();
         let expires_at = expires_at_from_ttl(created_at, self.ttl.as_secs())?;
-        let record = RemotePairingRecord::new(
+        let reviews_query = self.reviews_query()?;
+        let record = RemotePairingRecord::new_with_reviews_query(
             pairing_id,
             role,
             &requested_scopes,
             code.expose(),
             created_at,
             expires_at.as_str(),
+            reviews_query.as_ref(),
         )
         .map_err(|error| CliErrorKind::workflow_parse(error.to_string()))?;
         let role = record.role.as_str().to_string();
@@ -240,6 +246,7 @@ impl DaemonRemotePairCreateArgs {
             endpoint: invitation.endpoint,
             server_spki_sha256: invitation.server_spki_sha256,
             pairing_url: invitation.pairing_url,
+            reviews_query: stored.reviews_query,
         })
     }
 }
@@ -256,6 +263,8 @@ pub(crate) struct DaemonRemotePairCreateResponse {
     pub endpoint: String,
     pub server_spki_sha256: String,
     pub pairing_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reviews_query: Option<ReviewsQueryRequest>,
 }
 
 pub(super) fn open_remote_daemon_db() -> Result<DaemonDb, CliError> {

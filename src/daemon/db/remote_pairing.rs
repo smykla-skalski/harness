@@ -24,15 +24,18 @@ use crate::daemon::remote_pairing::{
     validate_pairing_domain,
 };
 
+mod metadata;
+use metadata::{decode_remote_pairing_metadata, encode_remote_pairing_metadata};
+
 const INSERT_REMOTE_PAIRING_SQL: &str = "
 INSERT INTO remote_pairing_codes (
     pairing_id, code_hash, role, scopes_json, created_at, expires_at,
     claimed_at, claimed_client_id, claim_remote_addr, metadata_json
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, NULL, NULL, '{}')";
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, NULL, NULL, ?7)";
 
 const SELECT_REMOTE_PAIRING_BY_HASH_SQL: &str = "
 SELECT pairing_id, code_hash, role, scopes_json, created_at, expires_at,
-       claimed_at, claimed_client_id, claim_remote_addr
+       claimed_at, claimed_client_id, claim_remote_addr, metadata_json
 FROM remote_pairing_codes
 WHERE code_hash = ?1";
 
@@ -103,6 +106,7 @@ impl DaemonDb {
         validate_pairing_audit_event_id(audit_event_id)
             .map_err(|error| db_error(error.to_string()))?;
         let scopes_json = scopes_to_json(&record.scopes)?;
+        let metadata_json = encode_remote_pairing_metadata(record.reviews_query.as_ref())?;
         let transaction = self
             .conn
             .unchecked_transaction()
@@ -117,6 +121,7 @@ impl DaemonDb {
                     scopes_json,
                     record.created_at.as_str(),
                     record.expires_at.as_str(),
+                    metadata_json,
                 ],
             )
             .map_err(|error| {
@@ -323,6 +328,7 @@ impl DaemonDb {
         Ok(RemotePairingClaimedClient {
             client,
             bearer_token,
+            reviews_query: pairing.reviews_query.clone(),
         })
     }
 
@@ -449,6 +455,9 @@ fn remote_pairing_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteSt
         .map_err(|error| rusqlite::Error::FromSqlConversionFailure(3, Type::Text, error.into()))?;
     let code_hash = RemotePairingCodeHash::try_from_storage_value(row.get::<_, String>(1)?)
         .map_err(|error| rusqlite::Error::FromSqlConversionFailure(1, Type::Text, error.into()))?;
+    let metadata_json = row.get::<_, String>(9)?;
+    let reviews_query = decode_remote_pairing_metadata(&metadata_json)
+        .map_err(|error| rusqlite::Error::FromSqlConversionFailure(9, Type::Text, error.into()))?;
     Ok(RemoteStoredPairing {
         pairing_id: row.get(0)?,
         code_hash,
@@ -459,6 +468,7 @@ fn remote_pairing_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteSt
         claimed_at: row.get(6)?,
         claimed_client_id: row.get(7)?,
         claim_remote_addr: row.get(8)?,
+        reviews_query,
     })
 }
 

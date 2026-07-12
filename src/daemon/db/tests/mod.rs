@@ -21,6 +21,7 @@ mod remote_acme;
 mod remote_acme_providers;
 mod remote_identity;
 mod remote_pairing;
+mod remote_pairing_reviews;
 mod runtime;
 mod schema;
 mod schema_backfill;
