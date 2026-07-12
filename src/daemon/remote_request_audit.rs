@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
@@ -7,6 +8,9 @@ use super::remote::RemoteAccessScope;
 use super::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision};
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
+
+const REMOTE_AUDIT_REQUEST_ID_MAX_BYTES: usize = 256;
+const REMOTE_AUDIT_TRUNCATION_MARKER: &str = "...";
 
 pub(crate) struct RemoteAuthorizationAudit<'a> {
     request_id: &'a str,
@@ -75,10 +79,11 @@ impl<'a> RemoteAuthorizationAudit<'a> {
             RemoteAuditScopeDecision::Allowed => RemoteAuditOutcome::Success,
             RemoteAuditScopeDecision::Denied => RemoteAuditOutcome::Failure,
         };
+        let request_id = bounded_request_id(self.request_id);
         db.record_remote_audit_event(&RemoteAuditEvent::new(
             format!("remote-auth-{}", Uuid::new_v4()),
             utc_now(),
-            Some(self.request_id),
+            Some(request_id.as_ref()),
             self.client_id,
             self.target,
             self.scope,
@@ -87,5 +92,35 @@ impl<'a> RemoteAuthorizationAudit<'a> {
             self.remote_addr,
             self.error_detail,
         ))
+    }
+}
+
+fn bounded_request_id(request_id: &str) -> Cow<'_, str> {
+    if request_id.len() <= REMOTE_AUDIT_REQUEST_ID_MAX_BYTES {
+        return Cow::Borrowed(request_id);
+    }
+    let mut boundary = REMOTE_AUDIT_REQUEST_ID_MAX_BYTES - REMOTE_AUDIT_TRUNCATION_MARKER.len();
+    while !request_id.is_char_boundary(boundary) {
+        boundary -= 1;
+    }
+    let mut bounded = String::with_capacity(REMOTE_AUDIT_REQUEST_ID_MAX_BYTES);
+    bounded.push_str(&request_id[..boundary]);
+    bounded.push_str(REMOTE_AUDIT_TRUNCATION_MARKER);
+    Cow::Owned(bounded)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn remote_authorization_audit_bounds_unicode_request_ids_on_a_character_boundary() {
+        let request_id = "\u{17c}".repeat(256);
+
+        let bounded = bounded_request_id(&request_id);
+
+        assert!(bounded.len() <= REMOTE_AUDIT_REQUEST_ID_MAX_BYTES);
+        assert!(bounded.ends_with(REMOTE_AUDIT_TRUNCATION_MARKER));
+        assert!(bounded.is_char_boundary(bounded.len()));
     }
 }

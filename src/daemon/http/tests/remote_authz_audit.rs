@@ -112,6 +112,46 @@ async fn remote_authorization_audit_redacts_unauthenticated_attempts() {
 }
 
 #[tokio::test]
+async fn remote_authorization_audit_bounds_client_controlled_request_ids() {
+    const MAX_PERSISTED_REQUEST_ID_BYTES: usize = 256;
+
+    let state = remote_state_with_viewer();
+    let audit_state = state.clone();
+    let (base_url, server) = serve_remote(state).await;
+    let oversized_request_id = "request-id-".repeat(256);
+
+    let response = reqwest::Client::new()
+        .get(format!("{base_url}{}", http_paths::HEALTH))
+        .header("x-request-id", &oversized_request_id)
+        .header(REMOTE_CLIENT_ID_HEADER, "viewer")
+        .bearer_auth(remote_token("viewer"))
+        .send()
+        .await
+        .expect("send oversized HTTP request id");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let request = remote_ws_request(&base_url, "viewer", "audit-ws-bounded-handshake");
+    let (mut socket, _) = connect_async(request).await.expect("connect websocket");
+    let response = ws_rpc(&mut socket, &oversized_request_id, ws_methods::PING).await;
+    assert_eq!(response["error"], serde_json::Value::Null);
+
+    let events = remote_audits(&audit_state);
+    let http = events
+        .iter()
+        .find(|event| event.route_or_method == format!("GET {}", http_paths::HEALTH))
+        .expect("HTTP audit event");
+    assert_bounded_request_id(http, MAX_PERSISTED_REQUEST_ID_BYTES);
+    let websocket = events
+        .iter()
+        .find(|event| event.route_or_method == ws_methods::PING)
+        .expect("WebSocket audit event");
+    assert_bounded_request_id(websocket, MAX_PERSISTED_REQUEST_ID_BYTES);
+
+    let _ = socket.close(None).await;
+    stop_server(server).await;
+}
+
+#[tokio::test]
 async fn remote_authorization_audit_fails_closed_without_a_store() {
     let state = remote_state_with_viewer();
     drop_remote_audit_table(&state);
@@ -235,6 +275,12 @@ fn audit_for_request<'a>(
         .iter()
         .find(|event| event.request_id.as_deref() == Some(request_id))
         .unwrap_or_else(|| panic!("missing audit for {request_id}: {events:?}"))
+}
+
+fn assert_bounded_request_id(event: &RemoteStoredAuditEvent, max_bytes: usize) {
+    let request_id = event.request_id.as_deref().expect("audit request id");
+    assert!(request_id.len() <= max_bytes, "oversized audit request id");
+    assert!(request_id.ends_with("..."), "missing truncation marker");
 }
 
 fn drop_remote_audit_table(state: &DaemonHttpState) {
