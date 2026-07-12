@@ -70,7 +70,12 @@ pub(crate) fn handle_overloaded_message(
             );
         }
     };
-    if let Err(response) = authorize_remote_ws_request(&request, state, connection) {
+    if let Err(response) = authorize_remote_ws_request(
+        &request,
+        state,
+        connection,
+        RemoteWsAllowedAudit::Failure(message),
+    ) {
         return serialize_response_frames(&response).unwrap_or_else(|_| {
             serialize_error_response_frames(
                 Some(&request.id),
@@ -176,7 +181,9 @@ async fn dispatch_inner(
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> WsResponse {
-    if let Err(response) = authorize_remote_ws_request(request, state, connection) {
+    if let Err(response) =
+        authorize_remote_ws_request(request, state, connection, RemoteWsAllowedAudit::Success)
+    {
         return *response;
     }
     if let Some(response) = with_connection_actor(
@@ -211,10 +218,17 @@ async fn with_connection_actor<T>(
     }
 }
 
+#[derive(Clone, Copy)]
+enum RemoteWsAllowedAudit<'a> {
+    Success,
+    Failure(&'a str),
+}
+
 fn authorize_remote_ws_request(
     request: &WsRequest,
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
+    allowed_audit: RemoteWsAllowedAudit<'_>,
 ) -> Result<(), Box<WsResponse>> {
     if state.auth_mode == DaemonHttpAuthMode::Local || !is_declared_ws_method(&request.method) {
         return Ok(());
@@ -235,16 +249,31 @@ fn authorize_remote_ws_request(
         return Err(Box::new(remote_ws_auth_error_response(&request.id, error)));
     };
     match authorize_remote_ws_method(&client, &request.method) {
-        Ok(decision) => RemoteAuthorizationAudit::allowed(
-            &request.id,
-            &client.client_id,
-            &request.method,
-            decision.required_scope,
-            remote_addr.as_deref(),
-        )
-        .record(state.db.get())
-        .map(|_| ())
-        .map_err(|error| remote_ws_audit_error_response(request, &error)),
+        Ok(decision) => {
+            let audit = match allowed_audit {
+                RemoteWsAllowedAudit::Success => RemoteAuthorizationAudit::allowed(
+                    &request.id,
+                    &client.client_id,
+                    &request.method,
+                    decision.required_scope,
+                    remote_addr.as_deref(),
+                ),
+                RemoteWsAllowedAudit::Failure(error_detail) => {
+                    RemoteAuthorizationAudit::allowed_failure(
+                        &request.id,
+                        &client.client_id,
+                        &request.method,
+                        decision.required_scope,
+                        remote_addr.as_deref(),
+                        error_detail,
+                    )
+                }
+            };
+            audit
+                .record(state.db.get())
+                .map(|_| ())
+                .map_err(|error| remote_ws_audit_error_response(request, &error))
+        }
         Err(error) => {
             record_remote_ws_denial(
                 request,

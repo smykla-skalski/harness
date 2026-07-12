@@ -321,5 +321,9 @@ async fn remote_websocket_caps_in_flight_dispatch_tasks() {
         .find(|event| event.request_id.as_deref() == Some("overloaded-request"))
         .expect("overload authorization audit");
     assert_eq!(audit.scope_decision, RemoteAuditScopeDecision::Allowed);
-    assert_eq!(audit.outcome, RemoteAuditOutcome::Success);
+    assert_eq!(audit.outcome, RemoteAuditOutcome::Failure);
+    assert_eq!(
+        audit.error_detail.as_deref(),
+        Some("remote WebSocket in-flight request limit reached")
+    );
 }
