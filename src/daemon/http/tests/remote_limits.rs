@@ -36,6 +36,26 @@ async fn remote_http_rejects_bodies_over_the_configured_limit() {
 }
 
 #[tokio::test]
+async fn remote_http_bounds_unauthenticated_bodies_before_authentication() {
+    let (base_url, server) = serve_remote(remote_state_with_viewer()).await;
+    let response = reqwest::Client::new()
+        .get(format!("{base_url}{}", http_paths::HEALTH))
+        .body(vec![b'x'; MAX_REMOTE_REQUEST_BYTES + 1])
+        .send()
+        .await
+        .expect("send unauthenticated oversized remote request");
+    let status = response.status();
+    let body = response
+        .json::<serde_json::Value>()
+        .await
+        .expect("decode remote limit error");
+
+    stop_server(server).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(body["error"]["code"], "REMOTE_LIMITS");
+}
+
+#[tokio::test]
 async fn remote_websocket_rejects_messages_over_the_configured_limit() {
     let (base_url, server) = serve_remote(remote_state_with_viewer()).await;
     let request = remote_ws_request(&base_url, "viewer", "ws-size-handshake");

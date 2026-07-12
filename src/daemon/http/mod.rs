@@ -400,11 +400,11 @@ fn daemon_http_router(state: DaemonHttpState) -> Router<()> {
         .merge(voice::voice_routes())
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            remote_limits::limit_remote_http_body,
+            auth::authorize_remote_http_request,
         ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            auth::authorize_remote_http_request,
+            remote_limits::limit_remote_http_body,
         ))
         .layer(middleware::from_fn_with_state(
             state.clone(),

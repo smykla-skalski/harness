@@ -165,12 +165,15 @@ impl RemoteDaemonClient {
             "method": "ping",
             "params": { "padding": "x".repeat(REMOTE_REQUEST_BODY_LIMIT) },
         });
-        if socket
-            .send(Message::Text(payload.to_string().into()))
-            .await
-            .is_err()
+        let send_deadline = Instant::now() + Duration::from_secs(5);
+        match await_before_deadline(
+            send_deadline,
+            socket.send(Message::Text(payload.to_string().into())),
+        )
+        .await
         {
-            return Ok(());
+            Ok(Ok(())) => {}
+            Ok(Err(_)) | Err(_) => return Ok(()),
         }
         tokio::time::timeout(Duration::from_secs(5), async {
             while let Some(frame) = socket.next().await {
