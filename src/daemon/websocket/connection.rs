@@ -23,7 +23,7 @@ use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with
 
 use super::config::build_config_push_frame;
 use super::connection_metadata::WebSocketHandshakeMetadata;
-use super::dispatch::handle_message;
+use super::dispatch::{handle_message, handle_overloaded_message};
 use super::relay::relay_broadcast;
 
 pub(crate) struct ConnectionState {
@@ -107,9 +107,14 @@ pub(crate) async fn ws_upgrade_handler(
             return *response;
         }
     };
+    let (ws, remote_connection_permit) = match http::prepare_remote_websocket_upgrade(ws, &state) {
+        Ok(prepared) => prepared,
+        Err(response) => return *response,
+    };
     let remote_addr =
         connect_info.map(|Extension(ConnectInfo(info))| info.remote_addr().ip().to_string());
     ws.on_upgrade(move |socket| async move {
+        let _remote_connection_permit = remote_connection_permit;
         with_active_baggage(
             baggage,
             handle_connection(socket, state, client_label, remote_client, remote_addr)
@@ -364,6 +369,16 @@ pub(crate) fn handle_incoming_message(
 ) -> IncomingMessageAction {
     match message {
         Message::Text(text) => {
+            while dispatch_tasks.try_join_next().is_some() {}
+            if let Some(rejection) = remote_dispatch_rejection(&state, dispatch_tasks.len()) {
+                return IncomingMessageAction::RespondBatch(handle_overloaded_message(
+                    &text,
+                    &state,
+                    &connection,
+                    rejection.status,
+                    rejection.message,
+                ));
+            }
             spawn_text_dispatch(
                 text.to_string(),
                 state,
@@ -377,6 +392,32 @@ pub(crate) fn handle_incoming_message(
         Message::Close(_) => IncomingMessageAction::CloseConnection,
         Message::Binary(_) | Message::Pong(_) => IncomingMessageAction::ContinueLoop,
     }
+}
+
+struct RemoteDispatchRejection {
+    status: u16,
+    message: &'static str,
+}
+
+fn remote_dispatch_rejection(
+    state: &DaemonHttpState,
+    in_flight: usize,
+) -> Option<RemoteDispatchRejection> {
+    if state.auth_mode == http::DaemonHttpAuthMode::Local {
+        return None;
+    }
+    let Some(limits) = state.remote_request_limits.as_ref() else {
+        return Some(RemoteDispatchRejection {
+            status: 503,
+            message: "remote request limits are unavailable",
+        });
+    };
+    (in_flight >= limits.config().max_websocket_in_flight_requests).then_some(
+        RemoteDispatchRejection {
+            status: 429,
+            message: "remote WebSocket in-flight request limit reached",
+        },
+    )
 }
 
 fn spawn_text_dispatch(

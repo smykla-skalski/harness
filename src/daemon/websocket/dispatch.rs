@@ -53,6 +53,51 @@ pub(crate) async fn handle_message(
     })
 }
 
+pub(crate) fn handle_overloaded_message(
+    text: &str,
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+    status: u16,
+    message: &str,
+) -> Vec<Message> {
+    let request: WsRequest = match serde_json::from_str(text) {
+        Ok(request) => request,
+        Err(error) => {
+            return serialize_error_response_frames(
+                None,
+                "MALFORMED_MESSAGE",
+                &format!("failed to parse message: {error}"),
+            );
+        }
+    };
+    if let Err(response) = authorize_remote_ws_request(&request, state, connection) {
+        return serialize_response_frames(&response).unwrap_or_else(|_| {
+            serialize_error_response_frames(
+                Some(&request.id),
+                "SERIALIZE_ERROR",
+                "failed to serialize remote authorization response",
+            )
+        });
+    }
+    let response = error_response_with_payload(
+        &request.id,
+        WsErrorPayload {
+            code: "REMOTE_LIMITS".to_string(),
+            message: message.to_string(),
+            details: Vec::new(),
+            status_code: Some(status),
+            data: None,
+        },
+    );
+    serialize_response_frames(&response).unwrap_or_else(|_| {
+        serialize_error_response_frames(
+            Some(&request.id),
+            "SERIALIZE_ERROR",
+            "failed to serialize remote limit response",
+        )
+    })
+}
+
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"

@@ -8,6 +8,7 @@ use uuid::Uuid;
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::db::DaemonDb;
 use crate::daemon::http::DaemonHttpAuthMode;
+use crate::daemon::http::RemoteRequestLimitConfig;
 use crate::daemon::remote::{
     RemoteAccessScope, RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, RemoteRole,
     validate_remote_serve_config,
@@ -129,6 +130,7 @@ impl DaemonRemoteServeArgs {
             port: remote_config.https_port,
             auth_mode: DaemonHttpAuthMode::Remote,
             remote_domain: Some(remote_config.domain),
+            remote_request_limits: Some(RemoteRequestLimitConfig::default()),
             ..DaemonServeConfig::default()
         })
     }

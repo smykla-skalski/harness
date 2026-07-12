@@ -45,6 +45,7 @@ mod improver;
 mod managed_agents;
 mod openrouter_models;
 mod recovery_snapshot_cache;
+mod remote_limits;
 mod remote_pairing;
 mod response;
 mod reviews;
@@ -74,6 +75,8 @@ pub(crate) use managed_agents::{
     run_terminal_agent_blocking,
 };
 pub use recovery_snapshot_cache::RecoverySnapshotCache;
+pub(crate) use remote_limits::prepare_remote_websocket_upgrade;
+pub use remote_limits::{RemoteRequestLimitConfig, RemoteRequestLimits};
 pub(crate) use response::{error_status_and_body, extract_request_id};
 pub(crate) use sessions_adopt::{
     adopt_session, adoption_error_status_and_body, record_adopt_in_db,
@@ -196,6 +199,7 @@ pub struct DaemonHttpState {
     pub token: String,
     pub auth_mode: DaemonHttpAuthMode,
     pub remote_domain: Option<String>,
+    pub remote_request_limits: Option<RemoteRequestLimits>,
     pub remote_pairing_limiter: Arc<Mutex<RemotePairingRateLimiter>>,
     pub sender: broadcast::Sender<StreamEvent>,
     /// Fan-out channel carrying events serialized once into a shared
@@ -396,7 +400,15 @@ fn daemon_http_router(state: DaemonHttpState) -> Router<()> {
         .merge(voice::voice_routes())
         .layer(middleware::from_fn_with_state(
             state.clone(),
+            remote_limits::limit_remote_http_body,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
             auth::authorize_remote_http_request,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            remote_limits::admit_remote_http_request,
         ))
         .layer(middleware::from_fn(trace_http_request))
         .with_state(state)

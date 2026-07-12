@@ -11,11 +11,12 @@ use rustls::{ClientConfig, RootCertStore};
 use serde_json::{Value, json};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
-use tokio_tungstenite::client_async;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
+use tokio_tungstenite::{WebSocketStream, client_async};
 
 const REMOTE_CLIENT_ID_HEADER: &str = "x-harness-remote-client-id";
+const REMOTE_REQUEST_BODY_LIMIT: usize = 4 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
 pub struct RemoteCredentials {
@@ -129,6 +130,68 @@ impl RemoteDaemonClient {
         expect_status("GET /v1/health", response, expected).await
     }
 
+    pub async fn expect_oversized_http_body_rejected(
+        &self,
+        credentials: &RemoteCredentials,
+    ) -> Result<(), String> {
+        let request = self
+            .http
+            .get(self.url("/v1/health"))
+            .body(vec![b'x'; REMOTE_REQUEST_BODY_LIMIT + 1]);
+        let response = Self::authenticated(request, credentials)
+            .send()
+            .await
+            .map_err(|error| format!("send oversized remote HTTPS request: {error}"))?;
+        let status = response.status();
+        let body = response
+            .json::<Value>()
+            .await
+            .map_err(|error| format!("decode oversized HTTPS response: {error}"))?;
+        if status != StatusCode::PAYLOAD_TOO_LARGE || body["error"]["code"] != "REMOTE_LIMITS" {
+            return Err(format!(
+                "oversized HTTPS request was not rejected safely: {status} {body}"
+            ));
+        }
+        Ok(())
+    }
+
+    pub async fn expect_oversized_websocket_message_rejected(
+        &self,
+        credentials: &RemoteCredentials,
+    ) -> Result<(), String> {
+        let mut socket = self.connect_websocket(credentials).await?;
+        let payload = json!({
+            "id": "e2e-oversized-wss",
+            "method": "ping",
+            "params": { "padding": "x".repeat(REMOTE_REQUEST_BODY_LIMIT) },
+        });
+        if socket
+            .send(Message::Text(payload.to_string().into()))
+            .await
+            .is_err()
+        {
+            return Ok(());
+        }
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while let Some(frame) = socket.next().await {
+                match frame {
+                    Err(_) | Ok(Message::Close(_)) => return Ok(()),
+                    Ok(Message::Text(text)) => {
+                        let value = serde_json::from_str::<Value>(&text)
+                            .map_err(|error| format!("decode oversized WSS response: {error}"))?;
+                        if value["id"].as_str() == Some("e2e-oversized-wss") {
+                            return Err(format!("oversized WSS request reached dispatch: {value}"));
+                        }
+                    }
+                    Ok(_) => {}
+                }
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|_| "timed out waiting for oversized WSS rejection".to_string())?
+    }
+
     pub async fn expect_telemetry(
         &self,
         credentials: &RemoteCredentials,
@@ -169,23 +232,7 @@ impl RemoteDaemonClient {
         &self,
         credentials: &RemoteCredentials,
     ) -> Result<(), String> {
-        let tls = self.connect_tls().await?;
-        let mut request = format!("wss://{}:{}/v1/ws", self.domain, self.port)
-            .into_client_request()
-            .map_err(|error| format!("build WSS request: {error}"))?;
-        request.headers_mut().insert(
-            REMOTE_CLIENT_ID_HEADER,
-            HeaderValue::from_str(&credentials.client_id)
-                .map_err(|error| format!("build WSS client id header: {error}"))?,
-        );
-        request.headers_mut().insert(
-            AUTHORIZATION,
-            HeaderValue::from_str(&format!("Bearer {}", credentials.token))
-                .map_err(|error| format!("build WSS auth header: {error}"))?,
-        );
-        let (mut socket, _) = client_async(request, tls)
-            .await
-            .map_err(|error| format!("upgrade WSS connection: {error}"))?;
+        let mut socket = self.connect_websocket(credentials).await?;
 
         let health = websocket_rpc(&mut socket, "e2e-health", "health").await?;
         if !health["error"].is_null() || health["result"].is_null() {
@@ -258,6 +305,30 @@ impl RemoteDaemonClient {
             .connect(server_name, stream)
             .await
             .map_err(|error| format!("connect WSS TLS stream: {error}"))
+    }
+
+    async fn connect_websocket(
+        &self,
+        credentials: &RemoteCredentials,
+    ) -> Result<WebSocketStream<tokio_rustls::client::TlsStream<TcpStream>>, String> {
+        let tls = self.connect_tls().await?;
+        let mut request = format!("wss://{}:{}/v1/ws", self.domain, self.port)
+            .into_client_request()
+            .map_err(|error| format!("build WSS request: {error}"))?;
+        request.headers_mut().insert(
+            REMOTE_CLIENT_ID_HEADER,
+            HeaderValue::from_str(&credentials.client_id)
+                .map_err(|error| format!("build WSS client id header: {error}"))?,
+        );
+        request.headers_mut().insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", credentials.token))
+                .map_err(|error| format!("build WSS auth header: {error}"))?,
+        );
+        client_async(request, tls)
+            .await
+            .map(|(socket, _)| socket)
+            .map_err(|error| format!("upgrade WSS connection: {error}"))
     }
 }
 

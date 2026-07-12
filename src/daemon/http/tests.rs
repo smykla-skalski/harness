@@ -44,6 +44,7 @@ mod policy_io_route_parity;
 mod remote_actor;
 mod remote_authz;
 mod remote_authz_audit;
+mod remote_limits;
 mod remote_pairing;
 mod reviews_policy_writes;
 mod session_archive_tests;
