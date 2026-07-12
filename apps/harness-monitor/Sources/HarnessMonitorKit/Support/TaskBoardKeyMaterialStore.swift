@@ -110,7 +110,7 @@ public struct TaskBoardKeyMaterialStore: TaskBoardKeyMaterialPersisting, Sendabl
       case .databaseGlobal(let instanceID):
         "db" + Self.hashValue(instanceID) + "-global"
       case .databaseRepository(let instanceID, let slug):
-        "db" + Self.hashValue(instanceID) + "-repo" + Self.hashValue(slug)
+        "db" + Self.hashValue(instanceID) + "-repo" + Self.hashRepository(slug)
       }
     }
 

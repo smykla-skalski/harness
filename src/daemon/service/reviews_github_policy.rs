@@ -6,8 +6,8 @@ use crate::reviews::{
 };
 use crate::task_board::policy_graph::{RecordedPolicyDecision, record_policy_decision};
 use crate::task_board::{
-    PolicyAction, PolicyDecision, PolicyEvidence, PolicyGraph, PolicyGraphNodeKind, PolicyInput,
-    PolicyReasonCode, PolicySubject,
+    PolicyAction, PolicyDecision, PolicyEvidence, PolicyGraph, PolicyGraphMode,
+    PolicyGraphNodeKind, PolicyInput, PolicyReasonCode, PolicySubject,
 };
 
 const REVIEW_APPROVE_ACTION_ID: &str = "reviews.approve";
@@ -203,7 +203,10 @@ fn enforced_reviews_github_policy_entry(
             "no enforced policy canvas is active",
         ));
     };
-    let Some((canvas, document)) = workspace.active_live_canvas() else {
+    let Some((canvas, document)) = workspace
+        .active_live_canvas()
+        .filter(|(_canvas, document)| document.mode == PolicyGraphMode::Enforced)
+    else {
         return Err(disabled_reviews_policy_error(
             mutation,
             "no enforced policy canvas is active",
@@ -337,9 +340,7 @@ mod tests {
         ReviewCheckStatus, ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus,
         ReviewTargetFlags,
     };
-    use crate::task_board::policy_graph::{
-        PolicyActionStep, PolicyCanvasWorkspace, PolicyGraphMode,
-    };
+    use crate::task_board::policy_graph::{PolicyActionStep, PolicyCanvasWorkspace};
 
     static DAEMON_ROOT_TEST_LOCK: Mutex<()> = Mutex::new(());
 
@@ -378,6 +379,32 @@ mod tests {
                 .to_string()
                 .contains("does not approve pasted pull requests")
         );
+    }
+
+    #[tokio::test]
+    async fn non_enforced_live_canvas_cannot_authorize_github_mutations() {
+        for mode in [PolicyGraphMode::Draft, PolicyGraphMode::DryRun] {
+            let mut workspace = PolicyCanvasWorkspace::seeded();
+            workspace
+                .active_canvas_mut()
+                .expect("active policy canvas")
+                .mark_live(PolicyGraph::seeded_v2().with_mode(mode));
+            let temp = write_workspace_to_temp_daemon_root(&workspace).await;
+            let _guard = DAEMON_ROOT_TEST_LOCK.lock().expect("daemon root test lock");
+            let _root = state::ScopedDaemonRootOverride::set(Some(temp.path().to_path_buf()));
+
+            let error = enforce_review_targets_policy(
+                ReviewsGitHubMutation::Comment,
+                &[review_target_fixture()],
+            )
+            .expect_err("non-enforced live policy must fail closed");
+
+            assert!(
+                error
+                    .to_string()
+                    .contains("no enforced policy canvas is active")
+            );
+        }
     }
 
     async fn write_workspace_to_temp_daemon_root(workspace: &PolicyCanvasWorkspace) -> TempDir {
