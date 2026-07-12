@@ -44,3 +44,9 @@ require_text "scripts/check-scripts.sh" 'clean-stale-lanes shell tests'
 require_text "scripts/check-scripts.sh" 'e2e triage-run shell tests'
 require_text "scripts/check-scripts.sh" 'HARNESS_CHECK_SCRIPTS_FULL_TIMEOUT_SECONDS'
 require_no_text "scripts/check-scripts.sh" 'HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS=180'
+
+set +e
+"$ROOT/scripts/check-scripts.sh" --lint extra >/dev/null 2>&1
+status=$?
+set -e
+[[ "$status" -eq 2 ]] || fail "extra arguments should return usage status 2 (got $status)"

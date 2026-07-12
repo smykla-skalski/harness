@@ -138,7 +138,11 @@ run = "./scripts/version.sh check"
 
 [tasks."check:scripts"]
 description = "Run shell and Python script lint plus syntax checks for repo-local helpers"
-run = "./scripts/check-scripts.sh"
+run = "./scripts/check-scripts.sh --lint"
+
+[tasks."test:scripts"]
+description = "Run repo-local helper script regression tests"
+run = "HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS=180 ./scripts/check-scripts.sh --tests"
 
 [tasks."test:unit"]
 description = "Run unit tests"
@@ -181,13 +185,28 @@ run = "./scripts/cargo-local.sh run --quiet -- setup bootstrap"
 
 [tasks."harness:check"]
 description = "Run harness-only quality gates (without aff package checks)"
-run = [
-  "./scripts/check-no-stale-state.sh",
-  "./scripts/version.sh check",
-  "./scripts/check-scripts.sh",
-  "./scripts/cargo-local.sh check -p harness",
-  "./scripts/cargo-local.sh clippy -p harness --lib",
+depends = [
+  "harness:check:stale-state",
+  "harness:check:version",
+  "harness:check:scripts",
+  "harness:check:rust",
 ]
+
+[tasks."harness:check:stale-state"]
+hide = true
+run = "./scripts/check-no-stale-state.sh"
+
+[tasks."harness:check:version"]
+hide = true
+run = "./scripts/version.sh check"
+
+[tasks."harness:check:scripts"]
+hide = true
+depends = ["check:scripts"]
+
+[tasks."harness:check:rust"]
+hide = true
+run = "./scripts/cargo-local.sh clippy -p harness --lib --bins"
 
 [tasks."aff:check"]
 description = "Run aff-only quality gates"
