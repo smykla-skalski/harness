@@ -25,13 +25,14 @@ actor RecordingDaemonController: DaemonControlling {
     statusReport: DaemonStatusReport? = nil,
     bootstrapError: (any Error)? = nil,
     warmUpError: (any Error)? = nil,
+    usesWarmUpErrorForBootstrap: Bool = true,
     deferredManagedLaunchAgentRefreshResult: Bool = false
   ) {
     self.client = client
     self.launchAgentInstalled = launchAgentInstalled
     self.registrationStateOverride = registrationState
     self.statusReportOverride = statusReport
-    self.bootstrapError = bootstrapError ?? warmUpError
+    self.bootstrapError = bootstrapError ?? (usesWarmUpErrorForBootstrap ? warmUpError : nil)
     self.warmUpError = warmUpError
     self.deferredManagedLaunchAgentRefreshResult = deferredManagedLaunchAgentRefreshResult
   }

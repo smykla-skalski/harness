@@ -12,6 +12,10 @@ extension HarnessMonitorStore {
     guard manifestURL == nil else {
       return
     }
+    resetLocalManifestURL()
+  }
+
+  func resetLocalManifestURL() {
     manifestURL = HarnessMonitorPaths.manifestURLWithoutLiveDiscovery()
   }
 

@@ -47,7 +47,9 @@ extension HarnessMonitorStore {
         measuredDiagnostics.value.health?.logLevel
         ?? HarnessMonitorLogger.defaultDaemonLogLevel
       lastRefreshTimings = refreshTimings
-      adoptManifestURL(from: measuredDiagnostics.value.workspace.manifestPath)
+      if options.adoptsLocalManifest {
+        adoptManifestURL(from: measuredDiagnostics.value.workspace.manifestPath)
+      }
       globalTaskBoardItems = resolvedTaskBoardSnapshot.items
       globalTaskBoardOrchestratorStatus = resolvedTaskBoardSnapshot.orchestratorStatus
     }
