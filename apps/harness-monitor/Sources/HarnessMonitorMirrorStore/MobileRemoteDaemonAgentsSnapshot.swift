@@ -51,9 +51,10 @@ extension MobileRemoteDaemonSyncClient {
   private func fetchManagedAgentWires(
     for sessions: [MobileRemoteManagedAgentsSession]
   ) async throws -> [String: [MobileRemoteManagedAgentWire]] {
+    let batchSize = 6
     var agentsBySessionID: [String: [MobileRemoteManagedAgentWire]] = [:]
-    for startIndex in stride(from: 0, to: sessions.count, by: 6) {
-      let endIndex = min(startIndex + 6, sessions.count)
+    for startIndex in stride(from: 0, to: sessions.count, by: batchSize) {
+      let endIndex = min(startIndex + batchSize, sessions.count)
       let batch = sessions[startIndex..<endIndex]
       try await withThrowingTaskGroup(of: MobileRemoteManagedAgentsFetchResult.self) { group in
         for session in batch {

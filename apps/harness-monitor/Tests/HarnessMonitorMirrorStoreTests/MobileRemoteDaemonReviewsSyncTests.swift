@@ -133,11 +133,14 @@ final class MobileRemoteDaemonReviewsSyncTests: XCTestCase {
       stationID: "remote-daemon-example-com",
       now: .now
     )
-    let attention = try XCTUnwrap(fetchedSnapshot?.attention.first)
+    let snapshot = try XCTUnwrap(fetchedSnapshot)
+    let attention = try XCTUnwrap(snapshot.attention.first)
 
     XCTAssertNil(attention.commandKind)
-    XCTAssertNil(attention.target)
+    XCTAssertEqual(attention.target?.reviewID, "pr-232")
     XCTAssertTrue(attention.commandPayload.isEmpty)
+    XCTAssertEqual(snapshot.sortedAttention.count, 1)
+    XCTAssertEqual(snapshot.stations.first?.needsYouCount, 1)
   }
 
   func testReadOnlyRemoteProfileDoesNotExposeReviewCommand() async throws {
@@ -159,11 +162,14 @@ final class MobileRemoteDaemonReviewsSyncTests: XCTestCase {
       stationID: "remote-daemon-example-com",
       now: .now
     )
-    let attention = try XCTUnwrap(fetchedSnapshot?.attention.first)
+    let snapshot = try XCTUnwrap(fetchedSnapshot)
+    let attention = try XCTUnwrap(snapshot.attention.first)
 
     XCTAssertNil(attention.commandKind)
-    XCTAssertNil(attention.target)
+    XCTAssertEqual(attention.target?.reviewID, "pr-232")
     XCTAssertTrue(attention.commandPayload.isEmpty)
+    XCTAssertEqual(snapshot.sortedAttention.count, 1)
+    XCTAssertEqual(snapshot.stations.first?.needsYouCount, 1)
   }
 
   func testReviewsServerFailureUsesCloudFallback() async throws {
