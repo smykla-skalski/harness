@@ -273,7 +273,7 @@ impl RemoteDaemonClient {
             ));
         }
 
-        tokio::time::timeout(Duration::from_secs(10), async {
+        tokio::time::timeout(Duration::from_secs(7), async {
             while let Some(frame) = socket.next().await {
                 match frame {
                     Ok(Message::Close(_)) | Err(_) => return,

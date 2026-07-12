@@ -289,9 +289,16 @@ fn spawn_inbound_task(
                 }
                 Some(_) = dispatch_tasks.join_next(), if !dispatch_tasks.is_empty() => {}
                 _ = credential_check.tick(), if state.auth_mode == http::DaemonHttpAuthMode::Remote => {
-                    if !matches!(refresh_remote_connection_client(&state, &connection), Ok(Some(_))) {
-                        info!(client = %client_label, "remote websocket credentials invalidated, closing connection");
-                        break;
+                    match refresh_remote_connection_client(&state, &connection) {
+                        Ok(Some(_)) => {}
+                        Ok(None) => {
+                            info!(client = %client_label, "remote websocket credentials invalidated, closing connection");
+                            break;
+                        }
+                        Err(error) => {
+                            warn!(client = %client_label, %error, "remote websocket credential validation failed, closing connection");
+                            break;
+                        }
                     }
                 }
                 _ = idle_check.tick() => {
