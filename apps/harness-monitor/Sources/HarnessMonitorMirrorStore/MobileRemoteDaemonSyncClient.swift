@@ -109,9 +109,7 @@ public struct MobileRemoteDaemonSyncClient: MobileMonitorSyncClient, Sendable {
       $0.mobileSummary(stationID: stationID, now: now, redactor: redactor)
     }
     let activeSessions = sessions.filter { $0.status != "ended" }
-    let sessionNeedsYouCount = sessions.reduce(0) { count, session in
-      count + session.metrics.awaitingReviewAgentCount
-    }
+    let sessionNeedsYouCount = sessions.count { $0.metrics.awaitingReviewAgentCount > 0 }
     let needsYouCount = sessionNeedsYouCount + mobileTaskBoardItems.count(where: \.needsYou)
     let station = MobileStationSummary(
       id: stationID,

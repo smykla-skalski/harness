@@ -52,7 +52,9 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     XCTAssertEqual(snapshot.sessions.first?.title, "Remote work api_key=[redacted]")
     XCTAssertEqual(snapshot.sessions.first?.status, "Active")
     XCTAssertEqual(snapshot.sessions.first?.activeAgentCount, 2)
-    XCTAssertEqual(snapshot.sessions.first?.blockedAgentCount, 1)
+    XCTAssertEqual(snapshot.sessions.first?.blockedAgentCount, 2)
+    XCTAssertEqual(snapshot.stations.first?.needsYouCount, 1)
+    XCTAssertEqual(snapshot.needsYouCount, 1)
     let expectedActivity = try Date.ISO8601FormatStyle().year().month().day()
       .timeZone(separator: .omitted)
       .time(includingFractionalSeconds: true)
@@ -117,6 +119,13 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     XCTAssertEqual(item.workItemID, "work-1")
     XCTAssertEqual(item.agentMode, "headless")
     XCTAssertTrue(item.needsYou)
+    let futureItem = try XCTUnwrap(
+      snapshot.taskBoardItems.first { $0.id == "board-future" }
+    )
+    XCTAssertEqual(futureItem.statusTitle, "future_status")
+    XCTAssertEqual(futureItem.priorityTitle, "hyper_priority")
+    XCTAssertEqual(snapshot.stations.first?.needsYouCount, 2)
+    XCTAssertEqual(snapshot.needsYouCount, 2)
   }
 
   func testUnauthorizedDirectResponseDoesNotUseCloudFallback() async throws {
@@ -375,7 +384,7 @@ private let sessionsResponse = """
       "last_activity_at": "2026-07-10T13:01:00.250Z",
       "metrics": {
         "active_agent_count": 2,
-        "awaiting_review_agent_count": 1
+        "awaiting_review_agent_count": 2
       }
     },
     {
@@ -407,6 +416,17 @@ private let taskBoardResponse = """
         "work_item_id": "work-1",
         "created_at": "2026-07-10T12:00:00Z",
         "updated_at": "2026-07-10T13:02:00Z"
+      },
+      {
+        "schema_version": 1,
+        "id": "board-future",
+        "title": "Future workflow",
+        "body": "",
+        "status": "future_status",
+        "priority": "hyper_priority",
+        "agent_mode": "headless",
+        "created_at": "2026-07-10T12:00:00Z",
+        "updated_at": "2026-07-10T13:03:00Z"
       }
     ]
   }

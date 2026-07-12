@@ -41,9 +41,9 @@ struct MobileRemoteTaskBoardWire: Decodable, Sendable {
       title: redactor.redact(title),
       bodyPreview: bodyPreview(redactor: redactor),
       status: status,
-      statusTitle: Self.title(for: status),
+      statusTitle: Self.statusTitle(for: status),
       priority: priority,
-      priorityTitle: Self.title(for: priority),
+      priorityTitle: Self.priorityTitle(for: priority),
       tags: (tags ?? []).map(redactor.redact),
       projectID: projectID.map(redactor.redact),
       sessionID: sessionID,
@@ -62,9 +62,38 @@ struct MobileRemoteTaskBoardWire: Decodable, Sendable {
     return "\(redacted.prefix(177))..."
   }
 
-  private static func title(for value: String) -> String {
-    value.replacingOccurrences(of: "_", with: " ").capitalized
+  private static func statusTitle(for value: String) -> String {
+    statusTitles[value] ?? value
   }
+
+  private static func priorityTitle(for value: String) -> String {
+    priorityTitles[value] ?? value
+  }
+
+  private static let statusTitles = [
+    "umbrella": "Umbrella",
+    "todo": "Todo",
+    "new": "New",
+    "planning": "Planning",
+    "agentic_review": "Agentic Review",
+    "plan_review": "Plan Review",
+    "needs_you": "Needs You",
+    "in_progress": "In Progress",
+    "testing": "Testing",
+    "in_review": "In Review",
+    "to_review": "To Review",
+    "human_required": "Human Required",
+    "failed": "Failed",
+    "done": "Done",
+    "blocked": "Blocked",
+  ]
+
+  private static let priorityTitles = [
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "critical": "Critical",
+  ]
 
   private static let needsYouStatuses: Set<String> = [
     "agentic_review",
