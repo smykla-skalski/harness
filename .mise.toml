@@ -160,6 +160,10 @@ run = "./scripts/cargo-local.sh test --quiet --test remote_daemon_e2e -- --ignor
 description = "Run the Linux Let's Encrypt staging proof for TLS-ALPN-01, HTTP-01, and DNS-01"
 run = "./scripts/cargo-local.sh test --quiet --test remote_daemon_public_acme_e2e remote_daemon_public_acme_staging_proves_all_challenges -- --ignored --nocapture --test-threads=1"
 
+[tasks."remote-daemon:systemd-e2e"]
+description = "Run the real Linux systemd lifecycle and effective security proof"
+run = "./scripts/cargo-local.sh test --quiet --test remote_systemd_e2e -- --ignored --nocapture --test-threads=1"
+
 [tasks.codegen]
 description = "Regenerate every Rust -> Swift wire-type module from the Rust sources"
 run = "./scripts/cargo-local.sh run --quiet --example policy-codegen"
