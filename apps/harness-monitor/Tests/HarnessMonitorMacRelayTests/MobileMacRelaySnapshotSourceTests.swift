@@ -32,7 +32,7 @@ final class MobileMacRelaySnapshotSourceTests: XCTestCase {
     XCTAssertEqual(taskBoardAttention.target?.taskID, "task-1")
     XCTAssertEqual(snapshot.taskBoardItems.first?.id, "task-1")
     XCTAssertEqual(snapshot.taskBoardItems.first?.title, "Approve the mobile plan")
-    XCTAssertEqual(snapshot.taskBoardItems.first?.statusTitle, "Plan Review")
+    XCTAssertEqual(snapshot.taskBoardItems.first?.statusTitle, "Agentic Review")
     XCTAssertEqual(snapshot.taskBoardItems.first?.priorityTitle, "High")
     XCTAssertEqual(snapshot.taskBoardItems.first?.needsYou, true)
     XCTAssertEqual(snapshot.reviews.first?.labels, ["mobile", "needs-review"])
