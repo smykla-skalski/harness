@@ -144,6 +144,36 @@ struct TaskBoardOverviewBehaviorTests {
     #expect(evaluation.dryRun == false)
   }
 
+  @Test("Overview presentation collapses duplicate inbox identities")
+  func overviewPresentationCollapsesDuplicateInboxIdentities() async {
+    let worker = TaskBoardOverviewPresentationWorker()
+    let first = inboxItem(taskID: "duplicate-task", title: "First duplicate")
+    let second = inboxItem(taskID: "duplicate-task", title: "Second duplicate")
+    let snapshot = TaskBoardInboxSnapshot(items: [first, second])
+    let expectedItem = snapshot.items[0]
+
+    let presentation = await worker.compute(
+      input: TaskBoardOverviewPresentationInput(
+        snapshot: snapshot,
+        taskBoardItems: [],
+        decisionItems: [],
+        scopeSessionID: nil
+      )
+    )
+    let cardID = TaskBoardCardID.inbox(
+      sessionID: expectedItem.session.sessionId,
+      taskID: expectedItem.task.taskId
+    )
+    let laneItemCount = TaskBoardInboxLane.allCases.reduce(0) { count, lane in
+      count + presentation.inboxItems(in: lane).count
+    }
+
+    #expect(presentation.inboxItem(id: cardID)?.task.title == expectedItem.task.title)
+    #expect(laneItemCount == 1)
+    #expect(presentation.orderedCardIDs == [cardID])
+    #expect(presentation.aggregateOpenCount == 1)
+  }
+
   @Test("Collapsed lane titles keep a consistent font size")
   func collapsedLaneTitlesKeepConsistentFontSize() throws {
     let source = try taskBoardSource("TaskBoardLaneUnifiedColumn.swift")

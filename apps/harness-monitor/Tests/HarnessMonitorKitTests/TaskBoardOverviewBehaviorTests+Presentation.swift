@@ -321,13 +321,14 @@ extension TaskBoardOverviewBehaviorTests {
 extension TaskBoardOverviewBehaviorTests {
   func inboxItem(
     taskID: String,
-    status: TaskStatus = .inProgress
+    status: TaskStatus = .inProgress,
+    title: String = "Linked task"
   ) -> TaskBoardInboxItem {
     let item = TaskBoardInboxItem(
       session: PreviewFixtures.summary,
       task: WorkItem(
         taskId: taskID,
-        title: "Linked task",
+        title: title,
         context: nil,
         severity: .medium,
         status: status,

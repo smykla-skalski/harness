@@ -127,17 +127,13 @@ actor TaskBoardOverviewPresentationWorker {
     let apiItemsByLane = Dictionary(grouping: taskBoardItems) { item in
       TaskBoardInboxLane(status: item.status) ?? .todo
     }
-    let inboxItemsByLane = Dictionary(grouping: input.snapshot.items, by: \.lane)
+    let inboxItems = uniqueInboxItems(input.snapshot.items)
+    let inboxItemsByLane = Dictionary(grouping: inboxItems, by: \.lane)
     let inboxItemsByID = Dictionary(
-      uniqueKeysWithValues: input.snapshot.items.map { item in
-        (
-          TaskBoardCardID.inbox(
-            sessionID: item.session.sessionId,
-            taskID: item.task.taskId
-          ),
-          item
-        )
-      }
+      inboxItems.map { item in
+        (inboxCardID(for: item), item)
+      },
+      uniquingKeysWith: { first, _ in first }
     )
     let decisionIDs = sortedOpenDecisionIDs(input.decisionItems)
     let decisionIDsByLane: [TaskBoardInboxLane: [String]] =
@@ -171,7 +167,7 @@ actor TaskBoardOverviewPresentationWorker {
         + (inboxItemsByLane[.humanRequired]?.count ?? 0)
         + decisionIDs.count,
       aggregateOpenCount: taskBoardOpenCount
-        + input.snapshot.openItemCount
+        + inboxItems.count
         + decisionIDs.count,
       aggregateReviewCount: taskBoardReviewCount
         + reviewLanes.reduce(0) { count, lane in
@@ -189,6 +185,20 @@ actor TaskBoardOverviewPresentationWorker {
     .toReview,
   ]
 
+  private static func uniqueInboxItems(
+    _ items: [TaskBoardInboxItem]
+  ) -> [TaskBoardInboxItem] {
+    var seenIDs: Set<TaskBoardCardID> = []
+    return items.filter { seenIDs.insert(inboxCardID(for: $0)).inserted }
+  }
+
+  private static func inboxCardID(for item: TaskBoardInboxItem) -> TaskBoardCardID {
+    .inbox(
+      sessionID: item.session.sessionId,
+      taskID: item.task.taskId
+    )
+  }
+
   private static func orderedCardIDs(
     apiItemsByLane: [TaskBoardInboxLane: [TaskBoardItem]],
     inboxItemsByLane: [TaskBoardInboxLane: [TaskBoardInboxItem]]
@@ -196,7 +206,7 @@ actor TaskBoardOverviewPresentationWorker {
     TaskBoardInboxLane.allCases.flatMap { lane in
       (apiItemsByLane[lane] ?? []).map { .api($0.id) }
         + (inboxItemsByLane[lane] ?? []).map {
-          .inbox(sessionID: $0.session.sessionId, taskID: $0.task.taskId)
+          inboxCardID(for: $0)
         }
     }
   }
