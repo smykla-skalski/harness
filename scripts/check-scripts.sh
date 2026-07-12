@@ -133,6 +133,9 @@ if [[ "$mode" != "--tests" ]]; then
   if (( ${#python_scripts[@]} > 0 )); then
     python3 -m py_compile "${python_scripts[@]}"
   fi
+  if (( ${#monitor_python_tests[@]} > 0 )); then
+    python3 -m py_compile "${monitor_python_tests[@]}"
+  fi
 fi
 
 if [[ "$mode" != "--lint" ]] && (( ${#root_python_tests[@]} > 0 )); then
@@ -142,7 +145,6 @@ if [[ "$mode" != "--lint" ]] && (( ${#root_python_tests[@]} > 0 )); then
     python3 -m unittest discover -s "$ROOT/scripts/tests" -p 'test_*.py'
 fi
 if [[ "$mode" != "--lint" ]] && (( ${#monitor_python_tests[@]} > 0 )); then
-  python3 -m py_compile "${monitor_python_tests[@]}"
   for test_path in "${monitor_python_tests[@]}"; do
     case "$(basename -- "$test_path")" in
       test_xcodebuild_with_lock.py|test_test_swift.py)
