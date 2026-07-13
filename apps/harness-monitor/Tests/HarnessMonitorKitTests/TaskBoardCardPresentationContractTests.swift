@@ -41,6 +41,14 @@ struct TaskBoardCardPresentationContractTests {
     #expect(rows.contains("updatedAt: item.task.updatedAt"))
     #expect(support.contains("@Environment(TaskBoardRelativeTimeClock.self)"))
     #expect(support.contains("Task.sleep(for: .seconds(60))"))
+    #expect(support.contains("let referenceDate = relativeTimeClock.referenceDate"))
+    #expect(support.contains("let accessibleAge ="))
+    #expect(
+      support.contains("formatRelativeUpdatedAt(updatedAt, reference: referenceDate)")
+    )
+    #expect(support.contains("label == \"just now\""))
+    #expect(support.contains(".accessibilityLabel(\"Updated \\(accessibleAge)\")"))
+    #expect(!support.contains(".accessibilityLabel(\"Updated \\(label)\")"))
     #expect(!rows.contains("TimelineView"))
     #expect(!rows.contains("Timer.publish"))
   }

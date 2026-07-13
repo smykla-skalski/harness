@@ -249,17 +249,22 @@ private struct TaskBoardCardUpdatedAtLabel: View {
   private var relativeTimeClock
 
   var body: some View {
+    let referenceDate = relativeTimeClock.referenceDate
     let label = formatCompactRelativeUpdatedAt(
       updatedAt,
-      reference: relativeTimeClock.referenceDate
+      reference: referenceDate
     )
     if !label.isEmpty {
+      let accessibleAge =
+        label == "just now"
+        ? label
+        : formatRelativeUpdatedAt(updatedAt, reference: referenceDate)
       Text(label)
         .font(font)
         .foregroundStyle(HarnessMonitorTheme.tertiaryInk.opacity(0.8))
         .lineLimit(1)
         .fixedSize(horizontal: true, vertical: false)
-        .accessibilityLabel("Updated \(label)")
+        .accessibilityLabel("Updated \(accessibleAge)")
     }
   }
 }
