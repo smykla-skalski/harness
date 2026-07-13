@@ -1,7 +1,9 @@
 use tempfile::tempdir;
 
 use crate::daemon::db::{AsyncDaemonDb, ReservedTaskBoardDispatch};
-use crate::task_board::{TaskBoardItem, TaskBoardStatus, build_dispatch_plans_with_policy};
+use crate::task_board::{
+    SessionIntent, TaskBoardItem, TaskBoardStatus, build_dispatch_plans_with_policy,
+};
 
 #[tokio::test]
 async fn task_board_dispatch_intents_survive_until_worker_outcome() {
@@ -236,6 +238,72 @@ async fn existing_session_without_work_item_is_reservable() {
     assert!(
         reserved.is_ok(),
         "existing session without work item should reserve: {reserved:?}"
+    );
+}
+
+#[tokio::test]
+async fn existing_session_with_mismatched_session_id_is_rejected() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("open db");
+    let mut item = TaskBoardItem::new(
+        "task-existing-mismatch".to_owned(),
+        "Existing session dispatch".to_owned(),
+        "Body".to_owned(),
+        "2026-07-11T10:00:00Z".to_owned(),
+    );
+    item.session_id = Some("session-existing".into());
+    db.create_task_board_item(item).await.expect("create item");
+    let item = db
+        .task_board_item("task-existing-mismatch")
+        .await
+        .expect("load item");
+    let mut plan = build_dispatch_plans_with_policy(&[item], None).remove(0);
+    plan.session = SessionIntent::Existing {
+        session_id: "session-other".into(),
+    };
+
+    let reserved = db
+        .reserve_task_board_dispatch(&plan, "control-plane", None)
+        .await
+        .expect_err("mismatched session id must be rejected");
+
+    assert!(
+        reserved.message().contains("changed before dispatch reservation"),
+        "unexpected error: {reserved:?}"
+    );
+}
+
+#[tokio::test]
+async fn existing_session_with_work_item_is_rejected() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("open db");
+    let mut item = TaskBoardItem::new(
+        "task-existing-linked".to_owned(),
+        "Existing session dispatch".to_owned(),
+        "Body".to_owned(),
+        "2026-07-11T10:00:00Z".to_owned(),
+    );
+    item.session_id = Some("session-existing".into());
+    item.work_item_id = Some("work-existing".into());
+    db.create_task_board_item(item).await.expect("create item");
+    let item = db
+        .task_board_item("task-existing-linked")
+        .await
+        .expect("load item");
+    let plan = build_dispatch_plans_with_policy(&[item], None).remove(0);
+
+    let reserved = db
+        .reserve_task_board_dispatch(&plan, "control-plane", None)
+        .await
+        .expect_err("existing work item must be rejected");
+
+    assert!(
+        reserved.message().contains("changed before dispatch reservation"),
+        "unexpected error: {reserved:?}"
     );
 }
 
