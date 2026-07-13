@@ -9,7 +9,7 @@ static KNOWN_SECRET_RULES: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(
     vec![
         (
             Regex::new(
-                r#"(?i)(\b(?:aws_secret_access_key|aws_access_key_id|github_token|gh_token|gitlab_token|openai_api_key|anthropic_api_key|api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|id[_-]?token|client[_-]?secret|private[_-]?key|token|secret|password|passwd|pwd)\b\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;]+)"#,
+                r#"(?i)(["']?\b(?:aws_secret_access_key|aws_access_key_id|github_token|gh_token|gitlab_token|openai_api_key|anthropic_api_key|api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|id[_-]?token|client[_-]?secret|private[_-]?key|token|secret|password|passwd|pwd)\b["']?\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;]+)"#,
             )
             .expect("known secret key regex"),
             "$1[redacted]",
@@ -138,6 +138,18 @@ mod tests {
             assert!(!redacted.contains(secret), "secret remained: {secret}");
         }
         assert_eq!(redacted.matches("[redacted]").count(), 6);
+    }
+
+    #[test]
+    fn known_secret_redaction_matches_quoted_json_keys() {
+        let value = r#"{"api_key":"json-alpha","token":"json-delta","name":"safe"} {'password': 'json-charlie'}"#;
+
+        let redacted = redact_known_secrets(value);
+
+        for secret in ["json-alpha", "json-delta", "json-charlie"] {
+            assert!(!redacted.contains(secret), "secret remained: {secret}");
+        }
+        assert!(redacted.contains(r#""name":"safe""#));
     }
 
     #[test]
