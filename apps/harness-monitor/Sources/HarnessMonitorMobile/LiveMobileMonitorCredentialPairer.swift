@@ -28,6 +28,7 @@ actor LiveMobileMonitorCredentialPairer: MobileMonitorCredentialPairer {
   func pair(
     invitationURL: URL,
     deviceName: String,
+    cloudFallbackStationID: String?,
     now: Date
   ) async throws -> MobilePairedStationCredential {
     switch try MobilePairingLink.decode(invitationURL, now: now) {
@@ -41,6 +42,7 @@ actor LiveMobileMonitorCredentialPairer: MobileMonitorCredentialPairer {
       return try await remoteCoordinator.pair(
         invitationURL: invitationURL,
         deviceName: deviceName,
+        cloudFallbackStationID: cloudFallbackStationID,
         now: now
       )
     }

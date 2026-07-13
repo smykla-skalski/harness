@@ -206,6 +206,14 @@ public struct MobilePairedStationCredential: Codable, Equatable, Identifiable, S
     !snapshotKeyID.isEmpty
       && !symmetricKeyRawRepresentation.isEmpty
   }
+
+  public var referencedDeviceIdentityIDs: Set<String> {
+    var identityIDs = Set([deviceIdentityID])
+    if let remoteIdentityID = remoteDaemonAccess?.deviceIdentityID {
+      identityIDs.insert(remoteIdentityID)
+    }
+    return identityIDs
+  }
 }
 
 public protocol MobilePairingTransport: Sendable {

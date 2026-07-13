@@ -61,6 +61,7 @@ public struct MobileRemoteDaemonAccess: Codable, Equatable, Sendable, CustomStri
   public var serverSPKISHA256: MobileRemoteDaemonSPKIPin
   public var pairedAt: Date
   public var reviewsQuery: MobileRemoteDaemonReviewsQuery?
+  public var deviceIdentityID: String?
 
   public init(
     endpoint: URL,
@@ -73,7 +74,8 @@ public struct MobileRemoteDaemonAccess: Codable, Equatable, Sendable, CustomStri
     tokenHint: String,
     serverSPKISHA256: MobileRemoteDaemonSPKIPin,
     pairedAt: Date,
-    reviewsQuery: MobileRemoteDaemonReviewsQuery? = nil
+    reviewsQuery: MobileRemoteDaemonReviewsQuery? = nil,
+    deviceIdentityID: String? = nil
   ) {
     self.endpoint = endpoint
     self.clientID = clientID
@@ -86,12 +88,14 @@ public struct MobileRemoteDaemonAccess: Codable, Equatable, Sendable, CustomStri
     self.serverSPKISHA256 = serverSPKISHA256
     self.pairedAt = pairedAt
     self.reviewsQuery = reviewsQuery
+    self.deviceIdentityID = deviceIdentityID
   }
 
   public var description: String {
     "MobileRemoteDaemonAccess(endpoint: \(endpoint.absoluteString), clientID: \(clientID), "
       + "platform: \(platform), role: \(role.rawValue), scopes: \(scopes), "
       + "tokenHint: \(tokenHint), reviewsQuery: \(reviewsQuery == nil ? "none" : "configured"), "
+      + "deviceIdentityID: \(deviceIdentityID ?? "legacy"), "
       + "bearerToken: <redacted>)"
   }
 

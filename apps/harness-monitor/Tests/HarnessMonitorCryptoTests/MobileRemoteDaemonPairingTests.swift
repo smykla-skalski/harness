@@ -166,6 +166,7 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     let decoded = try JSONDecoder().decode(MobileRemoteDaemonAccess.self, from: legacyPayload)
 
     XCTAssertNil(decoded.reviewsQuery)
+    XCTAssertNil(decoded.deviceIdentityID)
   }
 
   func testAdminRoleCanReadBeforeScopeExpansion() throws {
@@ -266,7 +267,7 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
       symmetricKeyRawRepresentation: Data(),
       pairedAt: now,
       defaultStation: true,
-      remoteDaemonAccess: try remoteAccess()
+      remoteDaemonAccess: try remoteAccess(deviceIdentityID: identity.id)
     )
     let transfer = MobileWatchPairingTransfer(
       identities: [identity],
@@ -277,11 +278,12 @@ final class MobileRemoteDaemonPairingTests: XCTestCase {
     let decoded = try MobileWatchPairingTransfer.decode(try transfer.encodedData())
 
     XCTAssertEqual(decoded.credentials.first?.remoteDaemonAccess, credential.remoteDaemonAccess)
+    XCTAssertEqual(decoded.credentials.first?.remoteDaemonAccess?.deviceIdentityID, identity.id)
     XCTAssertEqual(decoded, transfer)
   }
 }
 
-private actor RecordingRemotePairingTransport: MobileRemoteDaemonPairingTransport {
+actor RecordingRemotePairingTransport: MobileRemoteDaemonPairingTransport {
   struct Request: Sendable {
     var clientID: String
     var displayName: String
@@ -310,9 +312,9 @@ private actor RecordingRemotePairingTransport: MobileRemoteDaemonPairingTranspor
   }
 }
 
-private let testSPKIPin = "sha256/CQ8Rnn313xPUG+5zny4xTooD6AxAsZr/anC/ea4bTIY="
+let testSPKIPin = "sha256/CQ8Rnn313xPUG+5zny4xTooD6AxAsZr/anC/ea4bTIY="
 
-private func remoteInvitationURL(
+func remoteInvitationURL(
   now: Date,
   endpoint: String = "https://daemon.example.com",
   ttl: TimeInterval = 600
@@ -335,7 +337,7 @@ private func remoteInvitationURL(
   return try XCTUnwrap(URL(string: "harness://remote-pair?payload=\(encoded)"))
 }
 
-private func remoteAccess() throws -> MobileRemoteDaemonAccess {
+func remoteAccess(deviceIdentityID: String? = nil) throws -> MobileRemoteDaemonAccess {
   MobileRemoteDaemonAccess(
     endpoint: URL(string: "https://daemon.example.com")!,
     clientID: "ios-identity-fingerprint",
@@ -347,7 +349,8 @@ private func remoteAccess() throws -> MobileRemoteDaemonAccess {
     tokenHint: "abcd1234",
     serverSPKISHA256: try MobileRemoteDaemonSPKIPin(validating: testSPKIPin),
     pairedAt: Date(timeIntervalSince1970: 1_752_124_405),
-    reviewsQuery: remoteReviewsQuery()
+    reviewsQuery: remoteReviewsQuery(),
+    deviceIdentityID: deviceIdentityID
   )
 }
 
