@@ -5,6 +5,7 @@ mod events;
 mod handle;
 mod handle_control;
 mod handle_orchestration;
+mod handle_orchestration_lifecycle;
 mod handle_preflight;
 mod handle_storage;
 mod orchestration;
