@@ -1,4 +1,6 @@
+import Foundation
 import HarnessMonitorKit
+import Observation
 import SwiftUI
 
 struct TaskBoardLaneMetrics: Equatable {
@@ -167,18 +169,23 @@ struct TaskBoardCardTitleTypography {
 
 struct TaskBoardCardFooter<Badges: View>: View {
   let repository: String
+  let updatedAt: String
   let badges: Badges
   @Environment(\.fontScale)
   private var fontScale
 
-  init(repository: String, @ViewBuilder badges: () -> Badges) {
+  init(repository: String, updatedAt: String, @ViewBuilder badges: () -> Badges) {
     self.repository = repository
+    self.updatedAt = updatedAt
     self.badges = badges()
   }
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
   private var repositoryFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+  }
+  private var updatedAtFont: Font {
+    HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
   }
 
   var body: some View {
@@ -198,6 +205,61 @@ struct TaskBoardCardFooter<Badges: View>: View {
         badges
       }
       .layoutPriority(1)
+      TaskBoardCardUpdatedAtLabel(updatedAt: updatedAt, font: updatedAtFont)
+        .layoutPriority(3)
+    }
+  }
+}
+
+@MainActor
+@Observable
+final class TaskBoardRelativeTimeClock {
+  private(set) var referenceDate: Date
+
+  init(referenceDate: Date = .now) {
+    self.referenceDate = referenceDate
+  }
+
+  func refresh(at referenceDate: Date = .now) {
+    guard self.referenceDate != referenceDate else { return }
+    self.referenceDate = referenceDate
+  }
+
+  func run() async {
+    refresh()
+    while await Self.sleepUntilNextUpdate() {
+      refresh()
+    }
+  }
+
+  private static func sleepUntilNextUpdate() async -> Bool {
+    do {
+      try await Task.sleep(for: .seconds(60))
+      return !Task.isCancelled
+    } catch {
+      return false
+    }
+  }
+}
+
+private struct TaskBoardCardUpdatedAtLabel: View {
+  let updatedAt: String
+  let font: Font
+  @Environment(TaskBoardRelativeTimeClock.self)
+  private var relativeTimeClock
+
+  var body: some View {
+    let label = formatCompactRelativeUpdatedAt(
+      updatedAt,
+      reference: relativeTimeClock.referenceDate
+    )
+    if !label.isEmpty {
+      Text(label)
+        .font(font)
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityLabel("Updated \(label)")
     }
   }
 }

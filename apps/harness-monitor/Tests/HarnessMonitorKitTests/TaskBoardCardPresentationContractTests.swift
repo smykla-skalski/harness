@@ -13,9 +13,26 @@ struct TaskBoardCardPresentationContractTests {
     #expect(source.contains(".multilineTextAlignment(.leading)"))
   }
 
+  @Test("Card update labels share one board-owned minute clock")
+  func cardUpdateLabelsShareBoardClock() throws {
+    let overview = try taskBoardSource("TaskBoardOverviewView.swift")
+    let rows = try taskBoardSource("TaskBoardLaneViews.swift")
+    let support = try taskBoardSource("TaskBoardLaneSupport.swift")
+
+    #expect(overview.contains("@State private var relativeTimeClock"))
+    #expect(overview.contains(".environment(relativeTimeClock)"))
+    #expect(overview.contains("await relativeTimeClock.run()"))
+    #expect(rows.contains("updatedAt: item.updatedAt"))
+    #expect(rows.contains("updatedAt: item.task.updatedAt"))
+    #expect(support.contains("@Environment(TaskBoardRelativeTimeClock.self)"))
+    #expect(support.contains("Task.sleep(for: .seconds(60))"))
+    #expect(!rows.contains("TimelineView"))
+    #expect(!rows.contains("Timer.publish"))
+  }
+
   @Test("Board resolves scaled task-title fonts once and passes them through lanes")
   func boardPassesScaledTaskTitleFontsThroughLanes() throws {
-    let overviewSource = try taskBoardSource("TaskBoardOverviewView.swift")
+    let overviewSource = try taskBoardSource("TaskBoardOverviewView+Board.swift")
     let laneSource = try taskBoardSource("TaskBoardLaneUnifiedColumn.swift")
     let rowSource = try taskBoardSource("TaskBoardLaneViews.swift")
     let textSource = try taskBoardSource("TaskBoardInlineCodeText.swift")

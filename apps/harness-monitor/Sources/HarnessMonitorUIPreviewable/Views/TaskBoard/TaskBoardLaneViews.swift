@@ -39,7 +39,7 @@ struct TaskBoardItemRow: View {
             lineLimit: 2
           )
         }
-        TaskBoardCardFooter(repository: repositoryLabel) {
+        TaskBoardCardFooter(repository: repositoryLabel, updatedAt: item.updatedAt) {
           badgeContent
         }
       }
@@ -134,7 +134,7 @@ struct TaskBoardInboxItemRow: View {
             lineLimit: 2
           )
         }
-        TaskBoardCardFooter(repository: item.subtitle) {
+        TaskBoardCardFooter(repository: item.subtitle, updatedAt: item.task.updatedAt) {
           badgeContent
         }
       }

@@ -43,6 +43,7 @@ public struct TaskBoardOverviewView: View {
   @State private var cardSelection = TaskBoardCardSelectionState()
   @State private var draggedCardIDs: [TaskBoardCardID] = []
   @State private var taskBoardSelectionDispatcher = TaskBoardSelectionDispatcher()
+  @State private var relativeTimeClock = TaskBoardRelativeTimeClock()
   @AppStorage(TaskBoardLaneCollapsePreferences.storageKey)
   var laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.emptyRawValue
   @AppStorage(TaskBoardLaneAppearancePreferences.storageKey)
@@ -168,8 +169,12 @@ public struct TaskBoardOverviewView: View {
     .harnessFocusedSceneValue(\.harnessTaskBoardSelection, taskBoardSelectionFocus)
     .taskBoardSelectionForwardDeleteShortcut(taskBoardSelectionFocus)
     .taskBoardCardPreferences(projectLabelResolver: cachedPresentation.projectLabelResolver)
+    .environment(relativeTimeClock)
     .sheet(item: taskBoardManagementSheet) { taskBoardManagementSheet in
       taskBoardManagementSheetContent(taskBoardManagementSheet)
+    }
+    .task {
+      await relativeTimeClock.run()
     }
     .task(id: presentationInput) {
       await rebuildPresentation(input: presentationInput)
