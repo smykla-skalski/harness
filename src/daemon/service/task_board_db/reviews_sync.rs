@@ -209,7 +209,7 @@ fn review_external_task(item: &ReviewItem) -> ExternalTask {
         .with_url(item.url.clone()),
         title: item.title.clone(),
         body: String::new(),
-        status: TaskBoardStatus::HumanRequired,
+        status: TaskBoardStatus::Todo,
         project_id: Some(item.repository.clone()),
         updated_at: Some(item.updated_at.to_rfc3339_opts(SecondsFormat::Secs, true)),
     }

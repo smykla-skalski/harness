@@ -28,6 +28,7 @@ use errors::{github_sync_error_with_context, warn_github_message};
 pub use inbox::GitHubInboxSyncClient;
 pub(crate) use review_projection::{
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
+    reconciled_review_status,
 };
 #[derive(Clone)]
 pub struct GitHubSyncClient {
