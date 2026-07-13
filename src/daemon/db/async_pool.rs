@@ -161,6 +161,11 @@ impl AsyncDaemonDb {
         &self.pool
     }
 
+    #[must_use]
+    pub(crate) fn storage_path(&self) -> &Path {
+        &self.path
+    }
+
     /// Read the canonical schema version through `SQLx`.
     ///
     /// # Errors

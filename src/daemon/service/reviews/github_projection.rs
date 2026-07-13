@@ -14,6 +14,10 @@ use crate::task_board::{
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
 };
 
+use super::super::task_board_db::{
+    ReviewsProjectionAuditSummary, record_reviews_projection_result,
+};
+
 pub(super) enum MissingReviewResolution {
     ExactActiveImports(ReviewsQueryRequest),
     ProvidedSnapshotsOnly,
@@ -37,8 +41,33 @@ pub(super) async fn reconcile_task_board(
     backport_patterns: &[String],
     expected_revision: u64,
 ) -> Result<bool, CliError> {
+    let result = reconcile_task_board_inner(
+        database,
+        items,
+        authoritative_viewer_keys,
+        missing_review_resolution,
+        backport_detection_enabled,
+        backport_patterns,
+        expected_revision,
+    )
+    .await;
+    if let Some(database) = database {
+        record_reviews_projection_result(database, &result).await;
+    }
+    result.map(|summary| summary.is_stable())
+}
+
+async fn reconcile_task_board_inner(
+    database: Option<&AsyncDaemonDb>,
+    items: &[ReviewItem],
+    authoritative_viewer_keys: &HashSet<String>,
+    missing_review_resolution: MissingReviewResolution,
+    backport_detection_enabled: bool,
+    backport_patterns: &[String],
+    expected_revision: u64,
+) -> Result<ReviewsProjectionAuditSummary, CliError> {
     let Some(database) = database else {
-        return Ok(true);
+        return Ok(ReviewsProjectionAuditSummary::new(true, &[], 0));
     };
     let mut observed_items = items.to_vec();
     let mut observed_authoritative_viewer_keys = authoritative_viewer_keys.clone();
@@ -60,9 +89,9 @@ pub(super) async fn reconcile_task_board(
         observed_items.extend(resolved_items);
     }
     let Some(_revision_guard) = stable_data_revision_guard(expected_revision).await else {
-        return Ok(false);
+        return Ok(ReviewsProjectionAuditSummary::new(false, &[], 0));
     };
-    let configured_keys =
+    let (configured_keys, operations) =
         super::super::task_board_db::reconcile_shared_review_items_db(database, &observed_items)
             .await?;
     let mut snapshots = observed_items
@@ -70,8 +99,12 @@ pub(super) async fn reconcile_task_board(
         .map(|item| snapshot_from_review(item, &observed_authoritative_viewer_keys))
         .collect::<Vec<_>>();
     mark_ineligible_snapshots(&mut snapshots, &configured_keys);
-    reconcile_snapshots(database, snapshots).await?;
-    Ok(GitHubProtectedClient::data_revision() == expected_revision)
+    let snapshot_update_count = reconcile_snapshots(database, snapshots).await?;
+    Ok(ReviewsProjectionAuditSummary::new(
+        GitHubProtectedClient::data_revision() == expected_revision,
+        &operations,
+        snapshot_update_count,
+    ))
 }
 
 async fn resolve_missing_review_items(
@@ -164,18 +197,18 @@ fn snapshot_key(repository: &str, number: u64) -> String {
 async fn reconcile_snapshots(
     database: &AsyncDaemonDb,
     snapshots: Vec<GitHubPullRequestSnapshot>,
-) -> Result<bool, CliError> {
+) -> Result<usize, CliError> {
     let items = database.list_task_board_items(None).await?;
-    let mut changed = false;
+    let mut update_count = 0;
     for item in items {
         let mutation = database
             .update_task_board_item(&item.id, |current| {
                 Ok(reconcile_review_item_from_snapshots(current, &snapshots))
             })
             .await?;
-        changed |= mutation.is_some();
+        update_count += usize::from(mutation.is_some());
     }
-    Ok(changed)
+    Ok(update_count)
 }
 
 fn snapshot_from_review(

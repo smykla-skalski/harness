@@ -412,6 +412,40 @@ async fn targeted_missing_refresh_completes_only_matching_imported_review() {
             .and_then(|state| state.status),
         Some(TaskBoardStatus::HumanRequired)
     );
+
+    let revision_after_first = db.task_board_revision().await.expect("first revision");
+    assert!(
+        reconcile_targeted_missing_task_board_reviews(
+            Some(&db),
+            &request,
+            &["pr_missing".into()],
+            crate::github_api::GitHubProtectedClient::data_revision(),
+        )
+        .await
+        .expect("repeat missing review reconciliation")
+    );
+    assert_eq!(
+        db.task_board_revision().await.expect("second revision"),
+        revision_after_first,
+        "an unchanged missing review must not be rewritten"
+    );
+    let events = db
+        .load_audit_events(&crate::daemon::protocol::HarnessMonitorAuditEventsRequest {
+            action_keys: vec!["task_board.sync".into()],
+            ..Default::default()
+        })
+        .await
+        .expect("load sync audit events")
+        .events;
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].outcome, "success");
+    assert_eq!(
+        events[0]
+            .payload_json
+            .as_ref()
+            .and_then(|payload| payload["snapshot_update_count"].as_u64()),
+        Some(1)
+    );
 }
 
 async fn create_imported_review(db: &AsyncDaemonDb, item_id: &str, repository: &str, number: u64) {

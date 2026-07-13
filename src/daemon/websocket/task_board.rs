@@ -286,23 +286,10 @@ async fn dispatch_task_board_sync(request: &WsRequest, state: &DaemonHttpState) 
     let Ok(body) = parse_params_or_default::<TaskBoardSyncRequest>(request) else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::sync(state, &body).await;
-    record_task_board_audit_result(
-        state,
-        "task_board.sync",
-        "Sync task-board providers",
-        None,
-        serde_json::json!({
-            "status": body.status,
-            "provider": body.provider,
-            "direction": body.direction,
-            "conflict_policy": body.conflict_policy,
-            "dry_run": body.dry_run,
-        }),
-        &result,
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::sync(state, &body).await,
     )
-    .await;
-    dispatch_query_result(&request.id, result)
 }
 
 async fn dispatch_task_board_dispatch(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {

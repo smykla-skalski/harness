@@ -25,7 +25,7 @@ use crate::workspace::utc_now;
 
 use super::task_board::dispatch_task_board_async;
 use super::task_board_db::{
-    active_external_sync_config_db, sync_task_board_db, task_board_host_local_db,
+    active_external_sync_config_db, sync_task_board_for_orchestrator_db, task_board_host_local_db,
 };
 use super::task_board_evaluation::evaluate_task_board_async;
 use super::task_board_github::run_task_board_github_automation_async;
@@ -163,7 +163,7 @@ async fn sync_github_tasks(
     {
         return Ok(());
     }
-    prepared.sync = sync_task_board_db(
+    prepared.sync = sync_task_board_for_orchestrator_db(
         db,
         &TaskBoardSyncRequest {
             status: prepared.input.status,

@@ -10,8 +10,9 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::github_api::stable_data_revision_guard;
 use crate::reviews::{ReviewItem, ReviewPullRequestState, ReviewsQueryRequest};
 use crate::task_board::{
-    ExternalProvider, ExternalSyncClient, ExternalSyncDirection, ExternalSyncOptions, ExternalTask,
-    ExternalTaskRef, TaskBoardItem, TaskBoardStatus, sync_external_tasks,
+    ExternalProvider, ExternalSyncClient, ExternalSyncDirection, ExternalSyncOperation,
+    ExternalSyncOptions, ExternalTask, ExternalTaskRef, TaskBoardItem, TaskBoardStatus,
+    sync_external_tasks,
 };
 
 pub(super) struct SharedReviewRequestClient {
@@ -104,7 +105,7 @@ pub(super) async fn shared_review_request_client(
 pub(crate) async fn reconcile_shared_review_items_db(
     db: &AsyncDaemonDb,
     items: &[ReviewItem],
-) -> Result<HashSet<String>, CliError> {
+) -> Result<(HashSet<String>, Vec<ExternalSyncOperation>), CliError> {
     let settings = db.task_board_orchestrator_settings().await?;
     let configured_keys = items
         .iter()
@@ -123,10 +124,10 @@ pub(crate) async fn reconcile_shared_review_items_db(
         items,
         false,
     ) else {
-        return Ok(configured_keys);
+        return Ok((configured_keys, Vec::new()));
     };
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
-    sync_external_tasks(
+    let operations = sync_external_tasks(
         db,
         ExternalSyncOptions {
             provider: Some(ExternalProvider::GitHub),
@@ -137,7 +138,7 @@ pub(crate) async fn reconcile_shared_review_items_db(
         &clients,
     )
     .await?;
-    Ok(configured_keys)
+    Ok((configured_keys, operations))
 }
 
 fn shared_review_request_client_from_settings(
