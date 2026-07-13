@@ -2526,6 +2526,7 @@ const TASK_BOARD_EVALUATION_EMIT_ONLY: &[&str] = &[
     "EvaluationSignalFailure",
 ];
 const TASK_BOARD_DISPATCH_SOURCE: &str = include_str!("../src/task_board/dispatch.rs");
+const TASK_BOARD_STEPS_SOURCE: &str = include_str!("../src/daemon/protocol/task_board_steps.rs");
 const TASK_BOARD_DISPATCH_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardDispatchWireTypes.generated.swift";
 // The dispatch-endpoint execution summary and its plan/intent graph (dispatch.rs).
 // The internally-tagged enums emit as Swift enums with associated values; references
@@ -2547,6 +2548,11 @@ const TASK_BOARD_DISPATCH_EMIT_ONLY: &[&str] = &[
     "EvaluatorIntent",
     "FollowUpPhase",
     "PlanApprovalBlockReason",
+    "TaskBoardDispatchDeliverRequest",
+    "TaskBoardDispatchDeliverResponse",
+    "TaskBoardDispatchPickRequest",
+    "TaskBoardDispatchPickResponse",
+    "TaskBoardDispatchPickSelection",
 ];
 const POLICY_CANVAS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/PolicyCanvasWireTypes.generated.swift";
 // The policy-canvas read types in the task_board.rs facade. The rest of that file
@@ -2749,6 +2755,8 @@ const ORCHESTRATOR_EMIT_ONLY: &[&str] = &[
     "TaskBoardOrchestratorRunSummary",
     "TaskBoardWorkflowExecutionCount",
     "TaskBoardOrchestratorStatus",
+    "TaskBoardHeldDispatchSummary",
+    "TaskBoardHeldDispatchItem",
 ];
 const GIT_RUNTIME_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitRuntimeWireTypes.generated.swift";
 // The git runtime config tree (runtime-config get/update + secret handoff). The config/profile/
@@ -3001,9 +3009,13 @@ fn modules() -> Vec<GeneratedModule> {
         },
         GeneratedModule {
             output: TASK_BOARD_DISPATCH_OUTPUT,
-            description: "the Rust task-board dispatch execution summary and its plan graph",
+            description: "the Rust task-board dispatch execution summary, step routes and plan graph",
             defaults: &[],
-            sources: &[TASK_BOARD_DISPATCH_SOURCE, TASK_BOARD_PLANNING_SOURCE],
+            sources: &[
+                TASK_BOARD_DISPATCH_SOURCE,
+                TASK_BOARD_PLANNING_SOURCE,
+                TASK_BOARD_STEPS_SOURCE,
+            ],
         },
         GeneratedModule {
             output: ACP_PROBE_OUTPUT,
