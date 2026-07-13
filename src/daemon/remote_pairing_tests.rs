@@ -195,13 +195,13 @@ fn remote_pairing_rate_limiter_enforces_independent_code_budget() {
 }
 
 #[test]
-fn remote_pairing_rate_limiter_keys_do_not_have_delimiter_collisions() {
+fn remote_pairing_rate_limiter_treats_delimiters_as_key_content() {
     let mut limiter = RemotePairingRateLimiter::new_for_tests(1);
 
     assert!(limiter.record_attempt("addr\0part", "code").is_ok());
     assert!(
         limiter.record_attempt("addr", "part\0code").is_ok(),
-        "distinct address/code tuples must not collide"
+        "distinct addresses and code fingerprints must remain independent"
     );
     assert!(limiter.record_attempt("addr\0part", "code").is_err());
 }

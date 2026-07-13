@@ -106,12 +106,15 @@ fn record_bounded_attempt(
     key: &str,
     max_entries: usize,
 ) {
-    if !attempts.contains_key(key) {
-        evict_until_room(attempts, order, max_entries);
-        order.push_back(key.to_string());
+    if let Some(count) = attempts.get_mut(key) {
+        *count = count.saturating_add(1);
+        return;
     }
-    let count = attempts.entry(key.to_string()).or_insert(0);
-    *count = count.saturating_add(1);
+
+    evict_until_room(attempts, order, max_entries);
+    let key = key.to_string();
+    order.push_back(key.clone());
+    attempts.insert(key, 1);
 }
 
 fn evict_until_room(
