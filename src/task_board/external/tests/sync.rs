@@ -257,8 +257,7 @@ async fn sync_external_tasks_dry_run_reports_reconciliation_without_writing() {
 }
 
 #[tokio::test]
-async fn todo_filtered_stale_review_sync_records_remote_completion_without_overriding_local_status()
-{
+async fn todo_filtered_stale_review_sync_preserves_local_status() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let item = super::support::github_review_request_item(

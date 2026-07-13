@@ -203,13 +203,14 @@ pub(crate) fn reconciled_review_status(
 ) -> TaskBoardStatus {
     let current = current.canonical_persisted_status();
     let observed = observed.canonical_persisted_status();
-    last_synced.map_or(current, |last_synced| {
-        if current == last_synced.canonical_persisted_status() {
-            observed
-        } else {
-            current
-        }
-    })
+    let last_synced = last_synced
+        .unwrap_or(TaskBoardStatus::Todo)
+        .canonical_persisted_status();
+    if current == last_synced {
+        observed
+    } else {
+        current
+    }
 }
 
 fn is_active_github_review_reference(reference: &ExternalRef) -> bool {

@@ -45,6 +45,14 @@ fn review_status_reconciliation_uses_the_last_sync_as_shared_truth() {
         ),
         TaskBoardStatus::Todo
     );
+    assert_eq!(
+        reconciled_review_status(TaskBoardStatus::Todo, None, TaskBoardStatus::Done),
+        TaskBoardStatus::Done
+    );
+    assert_eq!(
+        reconciled_review_status(TaskBoardStatus::InProgress, None, TaskBoardStatus::Done),
+        TaskBoardStatus::InProgress
+    );
 }
 
 #[test]
@@ -63,7 +71,7 @@ fn review_status_reconciliation_canonicalizes_legacy_shared_truth() {
 }
 
 #[test]
-fn shared_review_snapshot_completes_imported_review_request() {
+fn shared_review_snapshot_completes_legacy_import_without_sync_status() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let mut item = TaskBoardItem::new(
@@ -84,10 +92,7 @@ fn shared_review_snapshot_completes_imported_review_request() {
         provider: ExternalRefProvider::GitHub,
         external_id: "example/repo#42".into(),
         url: Some("https://github.com/example/repo/pull/42".into()),
-        sync_state: Some(review_sync_state(
-            TaskBoardStatus::Todo,
-            "2026-07-11T10:00:00Z",
-        )),
+        sync_state: None,
     }];
     board.create("Old title", "Body", item).expect("create");
 
