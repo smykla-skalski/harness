@@ -261,12 +261,8 @@ async fn fetch_reviews_across_segments(
             .await?;
         for item in fetch.items {
             let key = review_item_key(&item);
-            if segment_viewer_login.is_some() {
-                authoritative_viewer_keys.insert(key.clone());
-                items_by_key.insert(key, item);
-            } else {
-                items_by_key.entry(key).or_insert(item);
-            }
+            authoritative_viewer_keys.insert(key.clone());
+            items_by_key.insert(key, item);
         }
         merge_segment_repository_labels(&mut repository_labels, fetch.repository_labels);
     }

@@ -101,7 +101,6 @@ pub(super) fn scopes(request: &ReviewsQueryRequest) -> Result<Vec<ScopeQuery>, C
 pub(super) fn convert_node(
     mut node: SearchNode,
     backport_detector: Option<&BackportDetector>,
-    viewer_login: Option<&str>,
 ) -> Result<(ReviewItem, Option<RepositoryLabelBundle>, NodeContinuation), CliError> {
     let created_at = parse_timestamp(node.created_at.as_str())?;
     let updated_at = parse_timestamp(node.updated_at.as_str())?;
@@ -149,7 +148,6 @@ pub(super) fn convert_node(
         },
         node,
         backport_detector,
-        viewer_login,
     );
     let continuation = NodeContinuation {
         pull_request_id,
@@ -200,7 +198,6 @@ fn build_review_item(
     ctx: NodeItemContext,
     node: SearchNode,
     backport_detector: Option<&BackportDetector>,
-    viewer_login: Option<&str>,
 ) -> ReviewItem {
     let (author_login, author_avatar_url) = node.author.map_or_else(
         || (String::new(), None),
@@ -211,19 +208,7 @@ fn build_review_item(
         .default_branch_ref
         .as_ref()
         .map(|branch| branch.name.clone());
-    let viewer_is_requested_reviewer = viewer_login.is_some_and(|viewer_login| {
-        node.review_requests
-            .as_ref()
-            .is_some_and(|review_requests| {
-                review_requests.nodes.iter().any(|review_request| {
-                    review_request
-                        .requested_reviewer
-                        .as_ref()
-                        .and_then(|reviewer| reviewer.login())
-                        .is_some_and(|login| login.eq_ignore_ascii_case(viewer_login))
-                })
-            })
-    });
+    let viewer_is_requested_reviewer = node.viewer_latest_review_request.is_some();
     let backport_detection =
         backport_detector.and_then(|detector| detector.detect(&ctx.repository_name, &node.title));
     let (title, backport_source) = backport_detection.map_or_else(

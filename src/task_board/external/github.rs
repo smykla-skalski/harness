@@ -410,17 +410,11 @@ fn github_external_id(repository: &GitHubRepository, issue_number: u64) -> Strin
 }
 
 fn assigned_issue_query(repository: &GitHubRepository, login: &str) -> String {
-    format!(
-        "repo:{} is:issue assignee:{login} state:all",
-        repository.slug()
-    )
+    format!("repo:{} is:issue assignee:{login}", repository.slug())
 }
 
 fn author_issue_query(repository: &GitHubRepository, login: &str) -> String {
-    format!(
-        "repo:{} is:issue author:{login} state:all",
-        repository.slug()
-    )
+    format!("repo:{} is:issue author:{login}", repository.slug())
 }
 
 fn review_request_query(repository: &GitHubRepository, login: &str) -> String {

@@ -21,16 +21,7 @@ query SearchReviews($query: String!, $after: String) {
         baseRefName
         author { login avatarUrl }
         authorAssociation
-        reviewRequests(first: 100) {
-          nodes {
-            requestedReviewer {
-              ... on User { login }
-              ... on Bot { login }
-              ... on Mannequin { login }
-              ... on Team { slug name }
-            }
-          }
-        }
+        viewerLatestReviewRequest { id }
         repository {
           id
           nameWithOwner
@@ -133,16 +124,7 @@ query ReviewNodes($ids: [ID!]!) {
       baseRefName
       author { login avatarUrl }
       authorAssociation
-      reviewRequests(first: 100) {
-        nodes {
-          requestedReviewer {
-            ... on User { login }
-            ... on Bot { login }
-            ... on Mannequin { login }
-            ... on Team { slug name }
-          }
-        }
-      }
+      viewerLatestReviewRequest { id }
       repository {
         id
         nameWithOwner

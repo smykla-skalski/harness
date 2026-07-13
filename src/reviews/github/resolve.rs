@@ -16,7 +16,7 @@ use super::pagination::resolve_continuation;
 use super::types::SearchNode;
 use super::{ReviewItem, ReviewRepositoryLabel, ReviewsPullRequestResolveRequest};
 
-const PULL_REQUEST_BY_REFERENCE_QUERY: &str = r"
+pub(super) const PULL_REQUEST_BY_REFERENCE_QUERY: &str = r"
 query ReviewPullRequestByReference($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
@@ -34,16 +34,7 @@ query ReviewPullRequestByReference($owner: String!, $name: String!, $number: Int
       baseRefName
       author { login avatarUrl }
       authorAssociation
-      reviewRequests(first: 100) {
-        nodes {
-          requestedReviewer {
-            ... on User { login }
-            ... on Bot { login }
-            ... on Mannequin { login }
-            ... on Team { slug name }
-          }
-        }
-      }
+      viewerLatestReviewRequest { id }
       repository {
         id
         nameWithOwner
@@ -151,7 +142,6 @@ impl ReviewsGitHubClient {
                 ],
                 &[key],
                 backport_detector.as_ref(),
-                viewer_login,
                 &mut items,
                 &mut continuations,
                 &mut missing,

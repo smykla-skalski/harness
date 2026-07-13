@@ -13,7 +13,7 @@ fn github_inbox_search_queries_scope_assigned_issues_and_review_requests() {
 
     assert_eq!(
         assigned_issue_query(&repository, "octo-user"),
-        "repo:owner/repo is:issue assignee:octo-user state:all"
+        "repo:owner/repo is:issue assignee:octo-user"
     );
     assert_eq!(
         review_request_query(&repository, "octo-user"),

@@ -86,6 +86,7 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
                     "isDraft": false,
                     "viewerCanMergeAsAdmin": true,
                     "reviewDecision": "REVIEW_REQUIRED",
+                    "viewerLatestReviewRequest": { "id": "RR_1" },
                     "headRefOid": "abc123",
                     "author": {
                         "login": "renovate[bot]",
@@ -183,7 +184,7 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
         .into_iter()
         .next()
         .expect("fixture node");
-    let (item, _, _) = super::super::mapping::convert_node(node, None, None).expect("convert node");
+    let (item, _, _) = super::super::mapping::convert_node(node, None).expect("convert node");
 
     assert_eq!(item.checks.len(), 3);
     assert_eq!(item.checks[0].details_url.as_deref(), Some(check_run_url));
@@ -193,6 +194,7 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
     );
     assert_eq!(item.checks[2].details_url, None);
     assert!(item.viewer_can_merge_as_admin);
+    assert!(item.flags.viewer_is_requested_reviewer);
     assert_eq!(
         item.author_avatar_url.as_deref(),
         Some("https://avatars.githubusercontent.com/in/2740?v=4")
