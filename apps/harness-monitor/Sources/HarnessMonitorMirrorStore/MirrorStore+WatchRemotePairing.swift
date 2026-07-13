@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorCore
 import HarnessMonitorCrypto
 
 extension MirrorStore {
@@ -8,6 +9,7 @@ extension MirrorStore {
     deviceName: String,
     now: Date = .now
   ) async -> Bool {
+    pairingFailureDescription = nil
     do {
       let invitationURL = try MobilePairingLink.normalizedURL(from: payload, now: now)
       guard case .remote = try MobilePairingLink.decode(invitationURL, now: now) else {
@@ -24,7 +26,7 @@ extension MirrorStore {
       }
       return MobileRemoteDaemonPairingDevice.watchOS.owns(credential)
     } catch {
-      syncStatus = mobileMonitorSyncStatus(for: error)
+      recordPairingFailure(mobileMirrorReadableErrorDescription(error))
       return false
     }
   }

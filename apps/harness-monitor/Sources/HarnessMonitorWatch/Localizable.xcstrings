@@ -802,6 +802,17 @@
         }
       }
     },
+    "Pairing failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parowanie nie powiodło się"
+          }
+        }
+      }
+    },
     "PR" : {
       "extractionState" : "manual",
       "localizations" : {

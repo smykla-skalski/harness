@@ -158,7 +158,7 @@ struct RootView: View {
 
   @ViewBuilder private var statusSection: some View {
     Section {
-      WatchStatusRow(status: store.syncStatus)
+      WatchStatusRow(status: store.presentedSyncStatus)
       if let directWatchCredential {
         Button(role: .destructive) {
           pendingDirectPairingRemoval = directWatchCredential

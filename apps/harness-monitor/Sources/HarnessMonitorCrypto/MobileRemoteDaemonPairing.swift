@@ -43,11 +43,51 @@ public protocol MobileRemoteDaemonPairingTransport: Sendable {
   ) async throws -> MobileRemoteDaemonPairingClaim
 }
 
-public enum MobileRemoteDaemonPairingError: Error, Equatable, Sendable {
+public enum MobileRemoteDaemonPairingError: Error, LocalizedError, Equatable, Sendable {
   case invalidResponse
   case serverStatus(Int)
   case claimMismatch
   case invalidCloudFallbackStation
+
+  public var errorDescription: String? {
+    switch self {
+    case .invalidResponse:
+      "The remote daemon returned an invalid pairing response. "
+        + "Update or restart the daemon, then create a new pairing link."
+    case .serverStatus(let statusCode):
+      Self.serverStatusDescription(statusCode)
+    case .claimMismatch:
+      "The remote daemon returned credentials for a different client. "
+        + "Do not use them; create a new pairing link and try again."
+    case .invalidCloudFallbackStation:
+      "The selected CloudKit fallback does not match this remote daemon. "
+        + "Remove the stale pairing and try again."
+    }
+  }
+
+  private static func serverStatusDescription(_ statusCode: Int) -> String {
+    switch statusCode {
+    case 403:
+      "The remote daemon rejected this pairing domain (HTTP 403). "
+        + "Create the link on the server you are connecting to."
+    case 409:
+      "This pairing link has already been used (HTTP 409). "
+        + "Create a new pairing link on the remote daemon."
+    case 410:
+      "This pairing link has expired (HTTP 410). "
+        + "Create a new pairing link on the remote daemon."
+    case 429:
+      "Too many pairing attempts were made (HTTP 429). "
+        + "Wait briefly, then create a new pairing link."
+    case 503:
+      "The remote daemon could not access its pairing store (HTTP 503). "
+        + "This device may already be registered; revoke the existing client on the server, "
+        + "then create a new pairing link."
+    default:
+      "The remote daemon rejected pairing (HTTP \(statusCode)). "
+        + "Check the server status, then create a new pairing link."
+    }
+  }
 }
 
 public struct MobileRemoteDaemonPairingDevice: Equatable, Sendable {

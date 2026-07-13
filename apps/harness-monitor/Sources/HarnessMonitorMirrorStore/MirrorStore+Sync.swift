@@ -209,8 +209,9 @@ extension MirrorStore {
     deviceName: String,
     now: Date = .now
   ) async -> MobilePairedStationCredential? {
+    pairingFailureDescription = nil
     guard let pairer else {
-      syncStatus = .stale("Pairing service is unavailable.")
+      recordPairingFailure("Pairing service is unavailable.")
       return nil
     }
     do {
@@ -234,9 +235,15 @@ extension MirrorStore {
       await refreshAfterPairingBootstrap()
       return credential
     } catch {
-      syncStatus = mobileMonitorSyncStatus(for: error)
+      recordPairingFailure(mobileMirrorReadableErrorDescription(error))
       return nil
     }
+  }
+
+  func recordPairingFailure(_ description: String) {
+    let status = MirrorSyncStatus.pairingFailed(description)
+    pairingFailureDescription = description
+    syncStatus = status
   }
 
   private func cloudFallbackStationID(for pairingLink: MobilePairingLink) -> String? {
@@ -260,6 +267,7 @@ extension MirrorStore {
   }
 
   public func unpair(stationID: String) async {
+    pairingFailureDescription = nil
     guard let identityStore, let credentialStore else {
       syncStatus = .stale("Pairing storage is unavailable.")
       return

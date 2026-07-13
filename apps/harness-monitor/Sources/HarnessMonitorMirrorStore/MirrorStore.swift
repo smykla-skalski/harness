@@ -18,6 +18,7 @@ public final class MirrorStore {
   public var selectedStationID: String
   public var demoModeEnabled: Bool
   public var syncStatus: MirrorSyncStatus
+  var pairingFailureDescription: String?
   public var lastAuthenticationFailed = false
   public var pairedCredentials: [MobilePairedStationCredential] = []
   public var notificationSettings: MobileNotificationSettings
@@ -120,6 +121,14 @@ public final class MirrorStore {
     snapshot.station(id: selectedStationID)
   }
 
+  public var presentedSyncStatus: MirrorSyncStatus {
+    if let pairingFailureDescription {
+      .pairingFailed(pairingFailureDescription)
+    } else {
+      syncStatus
+    }
+  }
+
   public var sessionsForSelectedStation: [MobileSessionSummary] {
     snapshot.sessions
       .filter { selectedStationID.isEmpty || $0.stationID == selectedStationID }
@@ -164,7 +173,14 @@ public final class MirrorStore {
     guard demoModeEnabled != enabled else {
       return
     }
+    pairingFailureDescription = nil
     demoModeEnabled = enabled
+    if !enabled {
+      snapshot = .empty()
+      selectedStationID = ""
+      persistSharedSnapshot(snapshot)
+      reconcileLiveActivity(snapshot)
+    }
     Task {
       await refresh()
     }
