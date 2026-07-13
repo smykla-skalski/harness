@@ -43,7 +43,8 @@ struct DashboardRouteContent: View, Equatable {
       DashboardTaskBoardRouteView(
         store: store,
         dashboardUI: dashboardUI,
-        sessionCatalog: sessionCatalog
+        sessionCatalog: sessionCatalog,
+        isRouteVisible: isTaskBoardVisible
       )
       .layoutValue(key: DashboardRetainedRouteKey.self, value: .taskBoard)
       .opacity(isTaskBoardVisible ? 1 : 0)
@@ -164,11 +165,16 @@ struct DashboardTaskBoardRouteView: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
+  let isRouteVisible: Bool
+  @AppStorage(TaskBoardOperationsInspectorVisibility.storageKey)
+  private var operationsInspectorVisible = TaskBoardOperationsInspectorVisibility.defaultValue
   @State private var taskBoardInboxSnapshot = TaskBoardInboxSnapshot(
     generatedAt: nil,
     isFromCache: true
   )
   @State private var perfScrollPosition = ScrollPosition()
+  @State private var operationsInspectorDispatcher =
+    TaskBoardOperationsInspectorFocusDispatcher()
   private let perfScrollHookEnabled = HarnessMonitorPerfDashboardScrollBus.isActive()
 
   private var visibleTaskBoardSessions: [SessionSummary] {
@@ -180,14 +186,24 @@ struct DashboardTaskBoardRouteView: View {
     visibleTaskBoardSessions.map(\.sessionId)
   }
 
+  private var operationsInspectorFocus: TaskBoardOperationsInspectorFocus? {
+    guard isRouteVisible else { return nil }
+    return TaskBoardOperationsInspectorFocus(
+      isVisible: operationsInspectorVisible,
+      canToggle: true,
+      dispatcher: operationsInspectorDispatcher
+    )
+  }
+
   var body: some View {
     let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardTaskBoardRouteView")
-    Group {
-      if perfScrollHookEnabled {
-        dashboardScrollingContent(scrollPosition: $perfScrollPosition)
-      } else {
-        dashboardExpandedContent
-      }
+    HStack(spacing: 0) {
+      taskBoardMainContent
+      TaskBoardOperationsInspector(
+        store: store,
+        taskBoardItems: dashboardUI.taskBoardItems,
+        isVisible: operationsInspectorVisible && isRouteVisible
+      )
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .onAppear {
@@ -196,6 +212,9 @@ struct DashboardTaskBoardRouteView: View {
     }
     .task(id: taskBoardInboxSessionIDs) {
       await refreshVisibleTaskBoardInboxSnapshot()
+    }
+    .onAppear {
+      operationsInspectorDispatcher.toggleInspector = toggleOperationsInspector
     }
     .onReceive(
       NotificationCenter.default.publisher(
@@ -221,6 +240,14 @@ struct DashboardTaskBoardRouteView: View {
     }
   }
 
+  @ViewBuilder private var taskBoardMainContent: some View {
+    if perfScrollHookEnabled {
+      dashboardScrollingContent(scrollPosition: $perfScrollPosition)
+    } else {
+      dashboardExpandedContent
+    }
+  }
+
   private var taskBoardOverviewContent: some View {
     TaskBoardOverviewHost(
       scope: .dashboard,
@@ -230,7 +257,10 @@ struct DashboardTaskBoardRouteView: View {
       decisions: store.supervisorOpenDecisions,
       orchestratorStatus: dashboardUI.taskBoardOrchestratorStatus,
       evaluationSummary: dashboardUI.taskBoardEvaluationSummary,
-      isActionInFlight: dashboardUI.isBusy
+      isActionInFlight: dashboardUI.isBusy,
+      showsOperationsPanel: false,
+      isCommandFocusActive: isRouteVisible,
+      operationsInspectorFocus: operationsInspectorFocus
     )
   }
 
@@ -277,5 +307,10 @@ struct DashboardTaskBoardRouteView: View {
     )
     guard !Task.isCancelled else { return }
     taskBoardInboxSnapshot = snapshot
+  }
+
+  @MainActor
+  private func toggleOperationsInspector() {
+    operationsInspectorVisible.toggle()
   }
 }

@@ -2,8 +2,8 @@ import HarnessMonitorKit
 import SwiftUI
 
 /// Thin orchestrator: composes the Sync / Dispatch / Inventory cards in a
-/// 3-column layout and resolves the local host's `project_types` once for
-/// Dispatch's host-aware filter. Each card is its own `View` struct with
+/// responsive 3-column/stacked layout and resolves the local host's
+/// `project_types` once for Dispatch's host-aware filter. Each card is its own `View` struct with
 /// isolated `@State` so a change inside one card no longer invalidates
 /// the other two during scroll - the structural lever that the live Time
 /// Profiler trace 2026-05-16 surfaced as the cold-launch + scroll hot
@@ -11,6 +11,17 @@ import SwiftUI
 struct TaskBoardOperationsPanel: View {
   let store: HarnessMonitorStore
   let taskBoardItems: [TaskBoardItem]
+  let isActive: Bool
+
+  init(
+    store: HarnessMonitorStore,
+    taskBoardItems: [TaskBoardItem],
+    isActive: Bool = true
+  ) {
+    self.store = store
+    self.taskBoardItems = taskBoardItems
+    self.isActive = isActive
+  }
 
   @Environment(\.fontScale)
   var fontScale
@@ -48,7 +59,8 @@ struct TaskBoardOperationsPanel: View {
           metrics: metrics,
           dashboard: dashboard,
           taskBoardItems: taskBoardItems,
-          localHostProjectTypes: localHostProjectTypes
+          localHostProjectTypes: localHostProjectTypes,
+          isActive: isActive
         ),
         inventoryCard: TaskBoardOperationsPanelInventoryCard(
           store: store,
@@ -61,7 +73,10 @@ struct TaskBoardOperationsPanel: View {
       .environment(\.taskBoardOperationsRowLabelFont, rowLabelFont)
       .environment(\.taskBoardOperationsRowLabelWidth, rowLabelWidth)
     }
-    .task { await loadLocalHostProjectTypes() }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await loadLocalHostProjectTypes()
+    }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("harness.task-board.operations")
   }
@@ -71,6 +86,8 @@ struct TaskBoardOperationsPanel: View {
     do {
       let snapshot = try await store.taskBoardHostSnapshot()
       localHostProjectTypes = snapshot.local.projectTypes
+    } catch is CancellationError {
+      return
     } catch {
       // Fail open: leave project types empty so dispatch shows every item.
       localHostProjectTypes = []

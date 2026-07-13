@@ -57,6 +57,38 @@ struct TaskBoardSelectionFocusTests {
     #expect(dispatcher.deleteRequestGeneration == 1)
   }
 
+  @Test("Inspector toggle forwards through a stable dispatcher")
+  func inspectorToggleForwardsThroughStableDispatcher() {
+    let dispatcher = TaskBoardOperationsInspectorFocusDispatcher()
+    var toggleCount = 0
+    dispatcher.toggleInspector = {
+      toggleCount += 1
+    }
+    let first = TaskBoardOperationsInspectorFocus(
+      isVisible: false,
+      canToggle: true,
+      dispatcher: dispatcher
+    )
+    let second = TaskBoardOperationsInspectorFocus(
+      isVisible: false,
+      canToggle: true,
+      dispatcher: dispatcher
+    )
+
+    first.dispatcher.performToggleInspector()
+
+    #expect(toggleCount == 1)
+    #expect(first == second)
+    #expect(
+      first
+        != TaskBoardOperationsInspectorFocus(
+          isVisible: true,
+          canToggle: true,
+          dispatcher: dispatcher
+        )
+    )
+  }
+
   @Test("Task board command owns Delete whenever its focus is mounted")
   func taskBoardCommandOwnsDeleteWheneverMounted() throws {
     let commandsSource = try sourceFile(
@@ -68,8 +100,13 @@ struct TaskBoardSelectionFocusTests {
     let overviewSource = try sourceFile(
       at: "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardOverviewView.swift"
     )
+    let overviewFocusSource = try sourceFile(
+      at:
+        "Sources/HarnessMonitorUIPreviewable/Views/TaskBoard/TaskBoardOverviewView+SelectionFocus.swift"
+    )
 
-    #expect(commandsSource.contains("@FocusedValue(\\.harnessTaskBoardSelection)"))
+    #expect(commandsSource.contains("@FocusedValue(\\.harnessTaskBoardCommandFocus)"))
+    #expect(commandsSource.contains("taskBoardCommandFocus?.selection"))
     #expect(commandsSource.contains("if let taskBoardSelectionFocus"))
     #expect(commandsSource.contains("return taskBoardSelectionFocus.canDelete"))
     #expect(commandsSource.contains("taskBoardSelectionFocus.performDeleteSelection()"))
@@ -81,16 +118,29 @@ struct TaskBoardSelectionFocusTests {
     #expect(!focusSource.contains("deleteSelection: (() -> Void)?"))
     #expect(focusSource.contains(".opacity(0)"))
     #expect(focusSource.contains(".accessibilityHidden(true)"))
+    #expect(focusSource.contains("public struct TaskBoardCommandFocus: Equatable"))
     #expect(
-      overviewSource.contains(
-        ".harnessFocusedSceneValue(\\.harnessTaskBoardSelection, taskBoardSelectionFocus)"
+      focusSource.contains(
+        "public let operationsInspector: TaskBoardOperationsInspectorFocus?"
+      )
+    )
+    #expect(
+      focusSource.contains(
+        "@Entry public var harnessTaskBoardCommandFocus: TaskBoardCommandFocus?"
       )
     )
     #expect(
       overviewSource.contains(
-        ".taskBoardSelectionForwardDeleteShortcut(taskBoardSelectionFocus)"
+        ".harnessFocusedSceneValue(\\.harnessTaskBoardCommandFocus, taskBoardCommandFocus)"
       )
     )
+    #expect(
+      overviewSource.contains(
+        ".taskBoardSelectionForwardDeleteShortcut(taskBoardCommandFocus?.selection)"
+      )
+    )
+    #expect(overviewFocusSource.contains("guard isCommandFocusActive else { return nil }"))
+    #expect(overviewFocusSource.contains("operationsInspector: operationsInspectorFocus"))
     #expect(
       overviewSource.contains(
         ".onChange(of: taskBoardSelectionDispatcher.deleteRequestGeneration)"

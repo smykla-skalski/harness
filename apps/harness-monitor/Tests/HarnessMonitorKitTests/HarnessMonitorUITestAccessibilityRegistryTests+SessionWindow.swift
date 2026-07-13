@@ -6,6 +6,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
   @Test("Dashboard and session window identifiers match UI-test mirror")
   func dashboardAndSessionWindowIdentifiersMirror() {
     expectDashboardIdentifiersMirrorRegistry()
+    expectTaskBoardIdentifiersMirrorRegistry()
     expectReviewsIdentifiersMirrorRegistry()
     expectSessionWindowIdentifiersMirrorRegistry()
   }
@@ -97,6 +98,17 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(
       HarnessMonitorAccessibility.dashboardAuditRow("toast-success")
         == "harness.dashboard.audit.row.toast-success"
+    )
+  }
+
+  private func expectTaskBoardIdentifiersMirrorRegistry() {
+    #expect(
+      HarnessMonitorAccessibility.taskBoardOperationsInspector
+        == "harness.task-board.operations.inspector"
+    )
+    #expect(
+      HarnessMonitorAccessibility.taskBoardOperationsInspectorButton
+        == "harness.task-board.operations.inspector.toolbar"
     )
   }
 

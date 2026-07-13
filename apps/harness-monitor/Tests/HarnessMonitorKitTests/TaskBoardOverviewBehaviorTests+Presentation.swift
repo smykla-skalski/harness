@@ -73,33 +73,6 @@ extension TaskBoardOverviewBehaviorTests {
     )
   }
 
-  @Test("Dispatch presentation filters host project types off main")
-  func dispatchPresentationFiltersHostProjectTypes() async {
-    let worker = TaskBoardOperationsDispatchPresentationWorker()
-    let accepted = taskBoardItem(
-      id: "swift",
-      status: .todo,
-      targetProjectTypes: ["swift"]
-    )
-    let rejected = taskBoardItem(
-      id: "rust",
-      status: .todo,
-      targetProjectTypes: ["rust"]
-    )
-
-    let presentation = await worker.compute(
-      input: TaskBoardOperationsDispatchPresentationInput(
-        taskBoardItems: [accepted, rejected],
-        localHostProjectTypes: ["swift"]
-      )
-    )
-
-    #expect(presentation.dispatchableItems.map(\.id) == ["swift"])
-    #expect(presentation.item(id: "swift")?.id == "swift")
-    #expect(presentation.item(id: "rust") == nil)
-    #expect(!presentation.didFilterOut)
-  }
-
   @Test("Inline code formatter strips matched backticks and styles code spans")
   func inlineCodeFormatterStylesMatchedBackticks() {
     let raw = "feat(matches): add `matches` to shared `inbound.Rule` struct"

@@ -40,8 +40,23 @@ public struct TaskBoardSelectionFocus: Equatable {
   }
 }
 
+public struct TaskBoardCommandFocus: Equatable {
+  public let selection: TaskBoardSelectionFocus
+  public let operationsInspector: TaskBoardOperationsInspectorFocus?
+
+  public init(
+    selection: TaskBoardSelectionFocus,
+    operationsInspector: TaskBoardOperationsInspectorFocus?
+  ) {
+    self.selection = selection
+    self.operationsInspector = operationsInspector
+  }
+}
+
 extension FocusedValues {
-  @Entry public var harnessTaskBoardSelection: TaskBoardSelectionFocus?
+  /// Publish one Task Board-focused value so selection and inspector changes
+  /// cannot produce multiple same-frame FocusedValue updates from the route.
+  @Entry public var harnessTaskBoardCommandFocus: TaskBoardCommandFocus?
 }
 
 extension View {

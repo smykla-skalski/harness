@@ -97,6 +97,38 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(!dashboardToolbar.contains("ToolbarItemGroup(placement: .secondaryAction)"))
     #expect(dashboardToolbar.contains(".sharedBackgroundVisibility(.hidden)"))
     #expect(!dashboardToolbar.contains("Divider()"))
+    #expect(
+      dashboardWindow.contains(
+        "showsTaskBoardOperationsInspectorToggle: route == .taskBoard"
+      )
+    )
+    #expect(
+      dashboardToolbar.contains(
+        "GlobalPolicyEnforcementToolbarGroup(store: store)\n\n    if showsTaskBoardOperationsInspectorToggle"
+      )
+    )
+    #expect(
+      dashboardToolbar.contains(
+        """
+        ToolbarItem(placement: .primaryAction) {
+                TaskBoardOperationsInspectorToolbarButton()
+              }
+        """
+      )
+    )
+    #expect(dashboardToolbar.contains("@FocusedValue(\\.harnessTaskBoardCommandFocus)"))
+    #expect(dashboardToolbar.contains("Image(systemName: \"sidebar.trailing\")"))
+    #expect(dashboardToolbar.contains("\"Hide Task Board Operations\""))
+    #expect(dashboardToolbar.contains("\"Show Task Board Operations\""))
+    #expect(dashboardToolbar.contains(".disabled(!isToggleEnabled)"))
+    #expect(dashboardToolbar.contains("enabled: isToggleEnabled"))
+    #expect(dashboardToolbar.contains("guard isToggleEnabled else { return }"))
+    #expect(
+      dashboardToolbar.contains(
+        "HarnessMonitorAccessibility.taskBoardOperationsInspectorButton"
+      )
+    )
+    #expect(dashboardToolbar.contains(".harnessMCPButton("))
   }
 
   @Test("Global enforcement button stays out of auxiliary windows")

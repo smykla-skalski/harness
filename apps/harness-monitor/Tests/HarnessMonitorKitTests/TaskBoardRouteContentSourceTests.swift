@@ -224,6 +224,72 @@ struct TaskBoardRouteContentSourceTests {
     #expect(dashboardSource.contains(".accessibilityHidden(!isPolicyCanvasVisible)"))
   }
 
+  @Test("Dashboard task board moves operations into a collapsed retained inspector")
+  func dashboardTaskBoardMovesOperationsIntoCollapsedRetainedInspector() throws {
+    let dashboardSource = try previewableSourceFile(
+      domain: "Dashboard",
+      named: "DashboardRouteContent.swift"
+    )
+    let overviewHostSource = try taskBoardSourceFile(named: "TaskBoardOverviewHost.swift")
+    let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
+    let inspectorSource = try taskBoardSourceFile(named: "TaskBoardOperationsInspector.swift")
+    let operationsPanelSource = try taskBoardSourceFile(named: "TaskBoardOperationsPanel.swift")
+    let dispatchCardSource = try taskBoardSourceFile(
+      named: "TaskBoardOperationsDispatchCard.swift"
+    )
+
+    #expect(dashboardSource.contains("isRouteVisible: isTaskBoardVisible"))
+    #expect(
+      dashboardSource.contains(
+        "@AppStorage(TaskBoardOperationsInspectorVisibility.storageKey)"
+      )
+    )
+    #expect(
+      dashboardSource.contains(
+        "private var operationsInspectorVisible = TaskBoardOperationsInspectorVisibility.defaultValue"
+      )
+    )
+    #expect(dashboardSource.contains("TaskBoardOperationsInspector("))
+    #expect(!dashboardSource.contains("if operationsInspectorVisible {"))
+    #expect(
+      dashboardSource.contains(
+        "isVisible: operationsInspectorVisible && isRouteVisible"
+      )
+    )
+    #expect(dashboardSource.contains("taskBoardItems: dashboardUI.taskBoardItems"))
+    #expect(dashboardSource.contains("showsOperationsPanel: false"))
+    #expect(dashboardSource.contains("isCommandFocusActive: isRouteVisible"))
+    #expect(dashboardSource.contains("operationsInspectorFocus: operationsInspectorFocus"))
+    #expect(
+      dashboardSource.contains(
+        "operationsInspectorDispatcher.toggleInspector = toggleOperationsInspector"
+      )
+    )
+    #expect(dashboardSource.contains(".onAppear {"))
+    #expect(dashboardSource.contains("operationsInspectorVisible.toggle()"))
+    #expect(overviewHostSource.contains("showsOperationsPanel: Bool = true"))
+    #expect(overviewSource.contains("if showsOperationsPanel, let store"))
+    #expect(inspectorSource.contains("static let defaultValue = false"))
+    #expect(inspectorSource.contains("private static let width: CGFloat = 380"))
+    #expect(inspectorSource.contains("ScrollView(.vertical)"))
+    #expect(inspectorSource.contains("TaskBoardOperationsPanel("))
+    #expect(inspectorSource.contains("taskBoardItems: isVisible ? taskBoardItems : []"))
+    #expect(inspectorSource.contains("isActive: isVisible"))
+    #expect(inspectorSource.contains(".frame(width: isVisible ? Self.width : 0"))
+    #expect(inspectorSource.contains(".allowsHitTesting(isVisible)"))
+    #expect(inspectorSource.contains(".accessibilityHidden(!isVisible)"))
+    #expect(operationsPanelSource.contains("isActive: Bool = true"))
+    #expect(operationsPanelSource.contains(".task(id: isActive)"))
+    #expect(operationsPanelSource.contains("catch is CancellationError"))
+    #expect(dispatchCardSource.contains("isActive ? presentationInput : nil"))
+    #expect(dispatchCardSource.contains(".task(id: activePresentationInput)"))
+    #expect(dispatchCardSource.contains("guard let activePresentationInput else { return }"))
+    #expect(dispatchCardSource.contains("guard isActive else { return false }"))
+    #expect(dispatchCardSource.contains("return presentedInput == presentationInput"))
+    #expect(dispatchCardSource.contains("isDisabled: !isPresentationCurrent"))
+    #expect(dispatchCardSource.contains("presentedInput = input"))
+  }
+
   @Test("Task board lanes render every card instead of hiding overflow")
   func taskBoardLanesRenderEveryCardInsteadOfHidingOverflow() throws {
     let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")

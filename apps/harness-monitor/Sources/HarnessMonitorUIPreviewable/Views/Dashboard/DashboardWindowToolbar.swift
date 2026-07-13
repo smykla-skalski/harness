@@ -6,6 +6,7 @@ struct DashboardWindowToolbar: ToolbarContent {
   let store: HarnessMonitorStore
   let navigation: WindowNavigationState
   let showsQuickActions: Bool
+  let showsTaskBoardOperationsInspectorToggle: Bool
   let showsPolicyInspectorToggle: Bool
   let sleepPreventionPresentation: SleepPreventionToolbarPresentation
 
@@ -39,7 +40,13 @@ struct DashboardWindowToolbar: ToolbarContent {
 
     GlobalPolicyEnforcementToolbarGroup(store: store)
 
-    if showsPolicyInspectorToggle {
+    if showsTaskBoardOperationsInspectorToggle {
+      ToolbarSpacer(.fixed, placement: .primaryAction)
+        .sharedBackgroundVisibility(.hidden)
+      ToolbarItem(placement: .primaryAction) {
+        TaskBoardOperationsInspectorToolbarButton()
+      }
+    } else if showsPolicyInspectorToggle {
       // Sits to the right of the kill switch as its own platter: the hidden
       // spacer breaks the shared glass background so the inspector toggle reads
       // as a separate group, not part of the enforcement control.
@@ -49,6 +56,53 @@ struct DashboardWindowToolbar: ToolbarContent {
         PolicyCanvasInspectorToolbarButton()
       }
     }
+  }
+}
+
+private struct TaskBoardOperationsInspectorToolbarButton: View {
+  @FocusedValue(\.harnessTaskBoardCommandFocus)
+  private var taskBoardCommandFocus
+
+  private var operationsInspectorFocus: TaskBoardOperationsInspectorFocus? {
+    taskBoardCommandFocus?.operationsInspector
+  }
+
+  private var buttonTitle: String {
+    operationsInspectorFocus?.isVisible == true
+      ? "Hide Task Board Operations"
+      : "Show Task Board Operations"
+  }
+
+  private var isToggleEnabled: Bool {
+    operationsInspectorFocus?.canToggle == true
+  }
+
+  var body: some View {
+    Button {
+      guard isToggleEnabled else { return }
+      operationsInspectorFocus?.dispatcher.performToggleInspector()
+    } label: {
+      Image(systemName: "sidebar.trailing")
+        .frame(width: 14, height: 14)
+    }
+    .disabled(!isToggleEnabled)
+    .help(buttonTitle)
+    .accessibilityLabel("Task Board Operations")
+    .accessibilityValue(operationsInspectorFocus?.isVisible == true ? "Shown" : "Hidden")
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.taskBoardOperationsInspectorButton
+    )
+    .harnessMCPButton(
+      HarnessMonitorAccessibility.taskBoardOperationsInspectorButton,
+      label: "Task Board Operations",
+      value: operationsInspectorFocus?.isVisible == true ? "Shown" : "Hidden",
+      hint: buttonTitle,
+      enabled: isToggleEnabled,
+      pressAction: {
+        guard isToggleEnabled else { return }
+        operationsInspectorFocus?.dispatcher.performToggleInspector()
+      }
+    )
   }
 }
 

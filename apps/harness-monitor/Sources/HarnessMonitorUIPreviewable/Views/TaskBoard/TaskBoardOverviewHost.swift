@@ -16,6 +16,9 @@ struct TaskBoardOverviewHost: View {
   let orchestratorStatus: TaskBoardOrchestratorStatus?
   let evaluationSummary: TaskBoardEvaluationSummary?
   let isActionInFlight: Bool
+  let showsOperationsPanel: Bool
+  let isCommandFocusActive: Bool
+  let operationsInspectorFocus: TaskBoardOperationsInspectorFocus?
 
   init(
     scope: Scope,
@@ -25,7 +28,10 @@ struct TaskBoardOverviewHost: View {
     decisions: [Decision],
     orchestratorStatus: TaskBoardOrchestratorStatus?,
     evaluationSummary: TaskBoardEvaluationSummary?,
-    isActionInFlight: Bool
+    isActionInFlight: Bool,
+    showsOperationsPanel: Bool = true,
+    isCommandFocusActive: Bool = true,
+    operationsInspectorFocus: TaskBoardOperationsInspectorFocus? = nil
   ) {
     self.scope = scope
     self.store = store
@@ -35,6 +41,9 @@ struct TaskBoardOverviewHost: View {
     self.orchestratorStatus = orchestratorStatus
     self.evaluationSummary = evaluationSummary
     self.isActionInFlight = isActionInFlight
+    self.showsOperationsPanel = showsOperationsPanel
+    self.isCommandFocusActive = isCommandFocusActive
+    self.operationsInspectorFocus = operationsInspectorFocus
   }
 
   var body: some View {
@@ -47,6 +56,9 @@ struct TaskBoardOverviewHost: View {
       taskBoardSessionID: scope.sessionID,
       contentHorizontalPadding: scope.taskBoardContentHorizontalPadding,
       fillsAvailableHeight: scope.fillsAvailableHeight,
+      showsOperationsPanel: showsOperationsPanel,
+      isCommandFocusActive: isCommandFocusActive,
+      operationsInspectorFocus: operationsInspectorFocus,
       decisions: decisions,
       isActionInFlight: isActionInFlight,
       onOpenItem: openInboxItem,
