@@ -150,6 +150,8 @@ async fn fetch_reviews_refresh_once(
             .await?;
         for item in fetch.items {
             let key = review_item_key(&item);
+            // `viewerLatestReviewRequest` remains authoritative without the optional login;
+            // a missing login leaves separate policy metadata unknown instead.
             authoritative_viewer_keys.insert(key.clone());
             items_by_key.insert(key, item);
         }

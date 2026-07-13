@@ -216,6 +216,8 @@ struct ReviewsFetchAccumulator {
     items_by_key: BTreeMap<String, ReviewItem>,
     repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>>,
     viewer_login: Option<String>,
+    /// Keys with authoritative `viewerLatestReviewRequest` values. This does not imply that
+    /// separate login-derived policy metadata was available for the item.
     authoritative_viewer_keys: HashSet<String>,
 }
 
@@ -261,6 +263,8 @@ async fn fetch_reviews_across_segments(
             .await?;
         for item in fetch.items {
             let key = review_item_key(&item);
+            // GitHub evaluates `viewerLatestReviewRequest` for the authenticated token even
+            // when the separate best-effort viewer-login lookup fails.
             authoritative_viewer_keys.insert(key.clone());
             items_by_key.insert(key, item);
         }
