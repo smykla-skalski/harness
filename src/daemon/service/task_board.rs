@@ -15,7 +15,9 @@ use crate::daemon::protocol::{
     TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse, TaskBoardProjectsResponse,
     TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
 };
-use crate::daemon::protocol::{TaskBoardDispatchRequest, TaskBoardDispatchResponse};
+use crate::daemon::protocol::{
+    TaskBoardDispatchPickResponse, TaskBoardDispatchRequest, TaskBoardDispatchResponse,
+};
 use crate::errors::CliError;
 #[cfg(test)]
 use crate::errors::CliErrorKind;
@@ -294,7 +296,7 @@ pub(crate) async fn dispatch_task_board_async(
 
 pub(crate) async fn pick_task_board_dispatch_async(
     async_db: &AsyncDaemonDb,
-) -> Result<crate::daemon::protocol::TaskBoardDispatchPickResponse, CliError> {
+) -> Result<TaskBoardDispatchPickResponse, CliError> {
     dispatch::pick_task_board_dispatch_async(async_db).await
 }
 

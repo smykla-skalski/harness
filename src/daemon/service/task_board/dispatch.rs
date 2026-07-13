@@ -16,14 +16,13 @@ use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
     DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, DispatchFailureKind,
-    DispatchPlan, Machine, TaskBoardItem, build_dispatch_plans_with_policy,
+    DispatchPlan, Machine, TaskBoardItem, TaskBoardStatus, build_dispatch_plans_with_policy,
     machine_mismatch_plan_with_policy,
 };
 #[cfg(test)]
 use crate::task_board::{
-    SessionIntent, TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus,
-    build_dispatch_summary_with_policy_root, filter_for_local_machine,
-    machine_mismatch_plan_with_policy_root,
+    SessionIntent, TaskBoardStore, TaskBoardWorkflowStatus, build_dispatch_summary_with_policy_root,
+    filter_for_local_machine, machine_mismatch_plan_with_policy_root,
 };
 
 use super::super::task_board_db::task_board_host_local_db;
@@ -115,13 +114,13 @@ pub async fn pick_task_board_dispatch_async(
 ) -> Result<TaskBoardDispatchPickResponse, CliError> {
     let request = TaskBoardDispatchRequest {
         item_id: None,
-        status: Some(crate::task_board::TaskBoardStatus::Todo),
+        status: Some(TaskBoardStatus::Todo),
         dry_run: true,
         project_dir: None,
         actor: None,
     };
     let plans = build_dispatch_plans_for_request_async(db, &request).await?;
-    let selection = if let Some(plan) = plans.into_iter().find(|plan| plan.is_ready()) {
+    let selection = if let Some(plan) = plans.into_iter().find(DispatchPlan::is_ready) {
         Some(TaskBoardDispatchPickSelection {
             item: db.task_board_item(&plan.board_item_id).await?,
             plan,

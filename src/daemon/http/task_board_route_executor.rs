@@ -15,7 +15,9 @@ use crate::daemon::task_board_managed_agents::{
     rendered_worker_prompt, start_worker_for_applied_task,
 };
 use crate::errors::{CliError, CliErrorKind};
-use crate::task_board::{DispatchAppliedTask, DispatchFailure, DispatchFailureKind};
+use crate::task_board::{
+    DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, DispatchFailureKind,
+};
 
 use super::{DaemonHttpState, require_async_db};
 
@@ -159,7 +161,7 @@ async fn handle_run_once_result(
 }
 
 fn amend_dispatch_for_worker_outcomes(
-    dispatch: &mut crate::task_board::DispatchExecutionSummary,
+    dispatch: &mut DispatchExecutionSummary,
     kept: Vec<DispatchAppliedTask>,
     failures: Vec<DispatchFailure>,
 ) {
