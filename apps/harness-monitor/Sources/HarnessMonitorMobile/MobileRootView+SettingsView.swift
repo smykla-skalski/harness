@@ -38,10 +38,11 @@ struct SettingsView: View {
             )
           )
           .harnessBalancedListSeparator()
-          if store.presentedSyncStatus.opensAppSettingsForRecovery
-            || store.presentedSyncStatus.isPairingFailure
-          {
-            SyncStatusRow(status: store.presentedSyncStatus)
+          if let pairingFailureStatus = store.pairingFailureStatus {
+            SyncStatusRow(status: pairingFailureStatus)
+              .harnessBalancedListSeparator()
+          } else if store.syncStatus.opensAppSettingsForRecovery {
+            SyncStatusRow(status: store.syncStatus)
               .harnessBalancedListSeparator()
           }
           ForEach(store.pairedCredentials) { credential in

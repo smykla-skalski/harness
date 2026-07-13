@@ -12,20 +12,61 @@ final class MirrorStorePairingFeedbackTests: XCTestCase {
       pairer: PairingStoreUnavailablePairer(),
       sharedSnapshotStore: nil
     )
-    let expectedStatus = MirrorSyncStatus.pairingFailed(
-      "The remote daemon could not access its pairing store (HTTP 503). "
-        + "This device may already be registered; revoke the existing client on the server, "
-        + "then create a new pairing link."
-    )
 
     await store.handleOpenURL(try remoteInvitationURL(now: now), deviceName: "Bart's iPhone")
 
-    XCTAssertEqual(store.syncStatus, expectedStatus)
+    XCTAssertEqual(store.syncStatus, pairingStoreUnavailableStatus)
 
     await store.refresh()
 
     XCTAssertEqual(store.syncStatus, .unpaired)
-    XCTAssertEqual(store.presentedSyncStatus, expectedStatus)
+    XCTAssertEqual(store.presentedSyncStatus, pairingStoreUnavailableStatus)
+  }
+
+  func testLiveRefreshWinsOverPriorPairingFailure() async throws {
+    let now = Date()
+    let store = MirrorStore(
+      syncClient: SuccessfulPairingFeedbackRefreshClient(),
+      pairer: PairingStoreUnavailablePairer(),
+      sharedSnapshotStore: nil
+    )
+
+    await store.handleOpenURL(try remoteInvitationURL(now: now), deviceName: "Test iPhone")
+    await store.refresh()
+
+    guard case .live = store.syncStatus else {
+      return XCTFail("expected a successful refresh, got \(store.syncStatus)")
+    }
+    XCTAssertEqual(store.presentedSyncStatus, store.syncStatus)
+    XCTAssertEqual(store.pairingFailureStatus, pairingStoreUnavailableStatus)
+  }
+}
+
+private let pairingStoreUnavailableStatus = MirrorSyncStatus.pairingFailed(
+  "The remote daemon could not access its pairing store (HTTP 503). "
+    + "This device may already be registered; revoke the existing client on the server, "
+    + "then create a new pairing link."
+)
+
+private struct SuccessfulPairingFeedbackRefreshClient: MobileMonitorSyncClient {
+  func fetchLatestSnapshot(stationID: String, now: Date) async throws -> MobileMirrorSnapshot? {
+    .empty()
+  }
+
+  func queueCommand(
+    _ command: MobileCommandRecord,
+    currentRevision: Int64,
+    now: Date
+  ) async throws -> MobileCommandSubmission {
+    throw MobileRemoteDaemonPairingError.invalidResponse
+  }
+
+  func cancelCommand(
+    _ command: MobileCommandRecord,
+    currentRevision: Int64,
+    now: Date
+  ) async throws -> MobileCommandReceipt {
+    throw MobileRemoteDaemonPairingError.invalidResponse
   }
 }
 

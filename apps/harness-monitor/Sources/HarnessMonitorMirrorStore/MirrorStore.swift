@@ -122,11 +122,21 @@ public final class MirrorStore {
   }
 
   public var presentedSyncStatus: MirrorSyncStatus {
-    if let pairingFailureDescription {
-      .pairingFailed(pairingFailureDescription)
-    } else {
-      syncStatus
+    guard let pairingFailureStatus else {
+      return syncStatus
     }
+    switch syncStatus {
+    case .unpaired, .pairing, .pairingFailed, .syncing, .stale, .localNetworkDenied,
+      .iCloudAccountUnavailable:
+      return pairingFailureStatus
+    case .demo, .live, .paired, .privacy, .commandQueued, .commandCompleted,
+      .commandCancelled, .commandFailed:
+      return syncStatus
+    }
+  }
+
+  public var pairingFailureStatus: MirrorSyncStatus? {
+    pairingFailureDescription.map(MirrorSyncStatus.pairingFailed)
   }
 
   public var sessionsForSelectedStation: [MobileSessionSummary] {
