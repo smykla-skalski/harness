@@ -123,7 +123,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(dashboardToolbar.contains(".disabled(!isToggleEnabled)"))
     #expect(
       dashboardToolbar.contains(
-        "HarnessMonitorAccessibility.taskBoardOperationsInspectorToolbarButton"
+        "HarnessMonitorAccessibility.taskBoardOperationsInspectorButton"
       )
     )
     #expect(dashboardToolbar.contains(".harnessMCPButton("))

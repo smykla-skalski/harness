@@ -142,7 +142,7 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardNewSessionButton = "harness.dashboard.new-session"
   public static let dashboardOpenFolderButton = "harness.dashboard.open-folder"
   public static let taskBoardOperationsInspector = "harness.task-board.operations.inspector"
-  public static let taskBoardOperationsInspectorToolbarButton =
+  public static let taskBoardOperationsInspectorButton =
     "harness.task-board.operations.inspector.toolbar"
   public static let sessionsBoardRoot = "harness.board.root"
   public static let sessionsBoardScrollView = "harness.board.scroll"

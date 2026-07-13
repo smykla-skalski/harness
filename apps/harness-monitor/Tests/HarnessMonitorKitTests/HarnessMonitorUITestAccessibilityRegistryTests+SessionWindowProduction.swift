@@ -65,7 +65,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(
       dashboardToolbar.contains(
-        "HarnessMonitorAccessibility.taskBoardOperationsInspectorToolbarButton"
+        "HarnessMonitorAccessibility.taskBoardOperationsInspectorButton"
       )
     )
     #expect(dashboardRouteContent.contains("DashboardAuditRouteView("))

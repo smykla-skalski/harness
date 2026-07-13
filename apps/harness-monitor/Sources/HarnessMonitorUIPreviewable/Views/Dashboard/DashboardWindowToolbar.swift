@@ -89,10 +89,10 @@ private struct TaskBoardOperationsInspectorToolbarButton: View {
     .accessibilityLabel("Task Board Operations")
     .accessibilityValue(operationsInspectorFocus?.isVisible == true ? "Shown" : "Hidden")
     .accessibilityIdentifier(
-      HarnessMonitorAccessibility.taskBoardOperationsInspectorToolbarButton
+      HarnessMonitorAccessibility.taskBoardOperationsInspectorButton
     )
     .harnessMCPButton(
-      HarnessMonitorAccessibility.taskBoardOperationsInspectorToolbarButton,
+      HarnessMonitorAccessibility.taskBoardOperationsInspectorButton,
       label: "Task Board Operations",
       value: operationsInspectorFocus?.isVisible == true ? "Shown" : "Hidden",
       hint: buttonTitle,
