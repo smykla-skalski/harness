@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use axum::http::StatusCode;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
@@ -6,7 +8,9 @@ use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::protocol::http_paths;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::{RemoteAuditOutcome, RemoteAuditScopeDecision};
-use crate::daemon::remote_pairing::{RemotePairingCode, RemotePairingRecord};
+use crate::daemon::remote_pairing::{
+    RemotePairingCode, RemotePairingRecord, RemotePairingStatusRateLimiter,
+};
 
 use super::test_http_state_with_db;
 
@@ -111,6 +115,62 @@ async fn remote_pair_status_fails_closed_without_remote_config() {
         .await
         .expect("local pairing status body");
     assert_eq!(body["error"]["code"], "REMOTE_PAIRING_CONFIG");
+
+    server.abort();
+}
+
+#[tokio::test]
+async fn remote_pair_status_rate_limits_one_ip_across_rotating_ids() {
+    let mut state = remote_pairing_status_state();
+    state.remote_pairing_status_limiter =
+        Arc::new(Mutex::new(RemotePairingStatusRateLimiter::new_for_tests(2)));
+    let db = state.db.get().expect("db slot").clone();
+    let (base_url, server) = serve_http(state).await;
+    let client = reqwest::Client::new();
+
+    for pairing_id in ["unknown-status-1", "unknown-status-2"] {
+        let response = client
+            .post(format!("{base_url}{}", http_paths::REMOTE_PAIR_STATUS))
+            .json(&serde_json::json!({ "pairing_id": pairing_id }))
+            .send()
+            .await
+            .expect("send allowed pairing status request");
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+    for pairing_id in ["unknown-status-3", "unknown-status-4"] {
+        let response = client
+            .post(format!("{base_url}{}", http_paths::REMOTE_PAIR_STATUS))
+            .json(&serde_json::json!({ "pairing_id": pairing_id }))
+            .send()
+            .await
+            .expect("send rate-limited pairing status request");
+
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        let body = response
+            .json::<serde_json::Value>()
+            .await
+            .expect("rate-limited pairing status body");
+        assert_eq!(body["error"]["code"], "REMOTE_PAIRING_STATUS_RATE_LIMIT");
+    }
+    let events = db
+        .lock()
+        .expect("db lock")
+        .load_remote_audit_events(20)
+        .expect("audit events");
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event.route_or_method == "remote.pair.status")
+            .count(),
+        2
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event.route_or_method == "remote.pair.status.rate_limit")
+            .count(),
+        1
+    );
 
     server.abort();
 }

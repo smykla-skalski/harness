@@ -57,6 +57,7 @@ pub(super) async fn test_http_state_with_empty_async_db(
         remote_domain: None,
         remote_request_limits: None,
         remote_pairing_limiter: super::super::default_remote_pairing_limiter(),
+        remote_pairing_status_limiter: super::super::default_remote_pairing_status_limiter(),
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
         manifest,

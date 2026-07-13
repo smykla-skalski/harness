@@ -9,7 +9,10 @@ use tokio::sync::{broadcast, watch};
 use harness::daemon::agent_acp::AcpAgentManagerHandle;
 use harness::daemon::codex_controller::CodexControllerHandle;
 use harness::daemon::db::DaemonDb;
-use harness::daemon::http::{DaemonHttpState, default_remote_pairing_limiter, serve_tcp};
+use harness::daemon::http::{
+    DaemonHttpState, default_remote_pairing_limiter, default_remote_pairing_status_limiter,
+    serve_tcp,
+};
 use harness::daemon::protocol::StreamEvent;
 use harness::daemon::service;
 use harness::daemon::state::{self, DaemonManifest, HostBridgeManifest};
@@ -99,6 +102,7 @@ async fn start_test_daemon(db: Option<DaemonDb>) -> TestDaemon {
         remote_domain: None,
         remote_request_limits: None,
         remote_pairing_limiter: default_remote_pairing_limiter(),
+        remote_pairing_status_limiter: default_remote_pairing_status_limiter(),
         sender: sender.clone(),
         manifest,
         daemon_epoch: harness::workspace::utc_now(),

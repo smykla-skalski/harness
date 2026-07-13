@@ -16,6 +16,8 @@ mod reviews;
 pub(crate) use reviews::normalize_remote_reviews_query;
 mod rate_limit;
 pub use rate_limit::RemotePairingRateLimiter;
+mod status_rate_limit;
+pub use status_rate_limit::{RemotePairingStatusRateLimitDecision, RemotePairingStatusRateLimiter};
 
 #[cfg(test)]
 #[path = "remote_pairing_tests.rs"]
