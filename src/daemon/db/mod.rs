@@ -110,6 +110,7 @@ mod timeline_store;
 mod writes;
 
 pub(crate) use async_pool::AsyncDaemonDb;
+pub(crate) use policy::NewApprovalGrant;
 #[allow(unused_imports)]
 use conversation::{
     clear_session_conversation_events, prepare_agent_conversation_imports_and_activity,
