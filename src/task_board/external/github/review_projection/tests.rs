@@ -48,6 +48,21 @@ fn review_status_reconciliation_uses_the_last_sync_as_shared_truth() {
 }
 
 #[test]
+fn review_status_reconciliation_canonicalizes_legacy_shared_truth() {
+    for (current, last_synced) in [
+        (TaskBoardStatus::Todo, TaskBoardStatus::New),
+        (TaskBoardStatus::AgenticReview, TaskBoardStatus::PlanReview),
+        (TaskBoardStatus::HumanRequired, TaskBoardStatus::NeedsYou),
+        (TaskBoardStatus::Failed, TaskBoardStatus::Blocked),
+    ] {
+        assert_eq!(
+            reconciled_review_status(current, Some(last_synced), TaskBoardStatus::Done),
+            TaskBoardStatus::Done
+        );
+    }
+}
+
+#[test]
 fn shared_review_snapshot_completes_imported_review_request() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));

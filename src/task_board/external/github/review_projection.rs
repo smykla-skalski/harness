@@ -201,8 +201,10 @@ pub(crate) fn reconciled_review_status(
     last_synced: Option<TaskBoardStatus>,
     observed: TaskBoardStatus,
 ) -> TaskBoardStatus {
+    let current = current.canonical_persisted_status();
+    let observed = observed.canonical_persisted_status();
     last_synced.map_or(current, |last_synced| {
-        if current == last_synced {
+        if current == last_synced.canonical_persisted_status() {
             observed
         } else {
             current
@@ -212,10 +214,7 @@ pub(crate) fn reconciled_review_status(
 
 fn is_active_github_review_reference(reference: &ExternalRef) -> bool {
     is_github_pull_request(reference)
-        && reference
-            .sync_state
-            .as_ref()
-            .and_then(|state| state.status)
+        && reference.sync_state.as_ref().and_then(|state| state.status)
             != Some(TaskBoardStatus::Done)
 }
 

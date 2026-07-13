@@ -257,7 +257,8 @@ async fn sync_external_tasks_dry_run_reports_reconciliation_without_writing() {
 }
 
 #[tokio::test]
-async fn stale_review_sync_records_remote_completion_without_overriding_local_status() {
+async fn todo_filtered_stale_review_sync_records_remote_completion_without_overriding_local_status()
+{
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let item = super::support::github_review_request_item(
@@ -269,11 +270,9 @@ async fn stale_review_sync_records_remote_completion_without_overriding_local_st
         .create("Review requested", "Please review the pull request.", item)
         .expect("create review request task");
 
-    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
-        ExternalProvider::GitHub,
-        Vec::new(),
-    )
-    .with_authoritative_review_inbox())];
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(
+        FakeSyncClient::new(ExternalProvider::GitHub, Vec::new()).with_authoritative_review_inbox(),
+    )];
 
     let operations = sync_external_tasks(
         &board,
@@ -282,7 +281,7 @@ async fn stale_review_sync_records_remote_completion_without_overriding_local_st
             direction: ExternalSyncDirection::Pull,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
-            status: None,
+            status: Some(TaskBoardStatus::Todo),
         },
         &clients,
     )
@@ -315,7 +314,7 @@ async fn stale_review_sync_records_remote_completion_without_overriding_local_st
             direction: ExternalSyncDirection::Pull,
             conflict_policy: ExternalSyncConflictPolicy::Report,
             dry_run: false,
-            status: None,
+            status: Some(TaskBoardStatus::Todo),
         },
         &clients,
     )
@@ -337,11 +336,9 @@ async fn sync_external_tasks_dry_run_reports_stale_todo_github_review_requests_w
         .create("Review requested", "Please review the pull request.", item)
         .expect("create review request task");
 
-    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
-        ExternalProvider::GitHub,
-        Vec::new(),
-    )
-    .with_authoritative_review_inbox())];
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(
+        FakeSyncClient::new(ExternalProvider::GitHub, Vec::new()).with_authoritative_review_inbox(),
+    )];
 
     let operations = sync_external_tasks(
         &board,
@@ -383,11 +380,9 @@ async fn sync_external_tasks_resolves_stale_todo_github_review_requests() {
         .create("Review requested", "Please review the pull request.", item)
         .expect("create todo review request task");
 
-    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
-        ExternalProvider::GitHub,
-        Vec::new(),
-    )
-    .with_authoritative_review_inbox())];
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(
+        FakeSyncClient::new(ExternalProvider::GitHub, Vec::new()).with_authoritative_review_inbox(),
+    )];
 
     let operations = sync_external_tasks(
         &board,
