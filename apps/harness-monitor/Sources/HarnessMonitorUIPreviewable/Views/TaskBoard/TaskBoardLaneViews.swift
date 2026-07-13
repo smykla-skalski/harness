@@ -15,6 +15,8 @@ struct TaskBoardItemRow: View {
   private var laneAppearance
   @Environment(\.taskBoardShowsPriorityBadge)
   private var showsPriorityBadge
+  @Environment(\.taskBoardShowsApprovalBadge)
+  private var showsApprovalBadge
   @Environment(\.taskBoardAlwaysShowsFullRepositoryNames)
   private var alwaysShowsFullRepositoryNames
   @Environment(\.taskBoardProjectLabelResolver)
@@ -89,6 +91,14 @@ struct TaskBoardItemRow: View {
   @ViewBuilder private var badgeContent: some View {
     if showsPriorityBadge {
       TaskBoardCardPill(label: item.priority.title, tint: priorityColor(for: item.priority))
+    }
+    if showsApprovalBadge {
+      let approvalState = item.planApprovalState
+      TaskBoardCardPill(
+        label: approvalState.badgeLabel,
+        tint: taskBoardApprovalColor(for: approvalState)
+      )
+      .accessibilityLabel(approvalState.accessibilityLabel)
     }
     if let policyTraceCount = item.workflow?.policyTraceIds.count, policyTraceCount > 0 {
       TaskBoardCardPill(label: "\(policyTraceCount) policy", tint: HarnessMonitorTheme.secondaryInk)
