@@ -121,6 +121,8 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(dashboardToolbar.contains("\"Hide Task Board Operations\""))
     #expect(dashboardToolbar.contains("\"Show Task Board Operations\""))
     #expect(dashboardToolbar.contains(".disabled(!isToggleEnabled)"))
+    #expect(dashboardToolbar.contains("enabled: isToggleEnabled"))
+    #expect(dashboardToolbar.contains("guard isToggleEnabled else { return }"))
     #expect(
       dashboardToolbar.contains(
         "HarnessMonitorAccessibility.taskBoardOperationsInspectorButton"

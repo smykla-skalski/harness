@@ -79,6 +79,7 @@ private struct TaskBoardOperationsInspectorToolbarButton: View {
 
   var body: some View {
     Button {
+      guard isToggleEnabled else { return }
       operationsInspectorFocus?.dispatcher.performToggleInspector()
     } label: {
       Image(systemName: "sidebar.trailing")
@@ -96,7 +97,9 @@ private struct TaskBoardOperationsInspectorToolbarButton: View {
       label: "Task Board Operations",
       value: operationsInspectorFocus?.isVisible == true ? "Shown" : "Hidden",
       hint: buttonTitle,
+      enabled: isToggleEnabled,
       pressAction: {
+        guard isToggleEnabled else { return }
         operationsInspectorFocus?.dispatcher.performToggleInspector()
       }
     )

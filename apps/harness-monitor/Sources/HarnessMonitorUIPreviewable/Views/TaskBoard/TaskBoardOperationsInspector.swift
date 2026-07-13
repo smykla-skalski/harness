@@ -66,6 +66,8 @@ struct TaskBoardOperationsInspector: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .background(.background)
     }
+    // Preserve the inspector subtree's 380-point layout while the outer frame
+    // collapses only its clipped container, keeping form state and geometry stable.
     .frame(width: Self.width)
     .frame(width: isVisible ? Self.width : 0, alignment: .leading)
     .clipped()
