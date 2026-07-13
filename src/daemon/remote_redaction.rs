@@ -8,7 +8,7 @@ static KNOWN_SECRET_RULES: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(
     vec![
         (
             Regex::new(
-                r#"(?i)(\b(?:aws_secret_access_key|aws_access_key_id|github_token|gh_token|gitlab_token|openai_api_key|anthropic_api_key|api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|id[_-]?token|client[_-]?secret|private[_-]?key|secret|password|passwd|pwd)\b\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;]+)"#,
+                r#"(?i)(\b(?:aws_secret_access_key|aws_access_key_id|github_token|gh_token|gitlab_token|openai_api_key|anthropic_api_key|api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|id[_-]?token|client[_-]?secret|private[_-]?key|token|secret|password|passwd|pwd)\b\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;]+)"#,
             )
             .expect("known secret key regex"),
             "$1[redacted]",
@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn known_secret_redaction_matches_remote_client_policy() {
         let value = concat!(
-            "api_key=alpha Bearer abcdefghijklmnop ",
+            "api_key=alpha token=delta Bearer abcdefghijklmnop ",
             "https://user:password@example.com ",
             "github_pat_abcdefghijklmnopqrstuvwxyz123456 ",
             "AKIAABCDEFGHIJKLMNOP"
@@ -115,6 +115,7 @@ mod tests {
 
         for secret in [
             "alpha",
+            "delta",
             "abcdefghijklmnop",
             "user:password",
             "github_pat_",
@@ -122,6 +123,6 @@ mod tests {
         ] {
             assert!(!redacted.contains(secret), "secret remained: {secret}");
         }
-        assert_eq!(redacted.matches("[redacted]").count(), 5);
+        assert_eq!(redacted.matches("[redacted]").count(), 6);
     }
 }

@@ -129,7 +129,7 @@ async fn seed_sensitive_item(state: &crate::daemon::http::DaemonHttpState) {
     let item: TaskBoardItem = serde_json::from_value(json!({
         "schema_version": 1,
         "id": ITEM_ID,
-        "title": "Deploy api_key=title-secret",
+        "title": "Deploy api_key=title-secret token=viewer-title-secret",
         "body": format!(
             "Authorization: Bearer abcdefghijklmnop {}",
             "private details ".repeat(20)
@@ -201,6 +201,7 @@ fn assert_viewer_projection(item: &Value) {
     let serialized = serde_json::to_string(item).expect("serialize viewer item");
     for secret in [
         "title-secret",
+        "viewer-title-secret",
         "abcdefghijklmnop",
         "github_pat_abcdefghijklmnopqrstuvwxyz123456",
         "user:password",
