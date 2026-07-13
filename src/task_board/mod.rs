@@ -74,8 +74,9 @@ pub use planning::{
     begin_planning, revoke_plan, submit_plan,
 };
 pub use policy::{
-    BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput,
-    PolicyReasonCode, PolicySubject,
+    BuiltInPolicyGate, PolicyAction, PolicyApprovalGrant, PolicyApprovalGrantState,
+    PolicyApprovalState, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput, PolicyReasonCode,
+    PolicySubject,
 };
 pub use policy_graph::{
     GraphPolicyGate, POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PolicyCanvasPoint,

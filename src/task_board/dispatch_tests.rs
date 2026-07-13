@@ -1,6 +1,6 @@
 use super::*;
 use crate::task_board::planning::{approve_plan, submit_plan};
-use crate::task_board::policy::PolicyAction;
+use crate::task_board::policy::{PolicyAction, PolicyReasonCode};
 use crate::task_board::policy_graph::{
     PolicyCanvasWorkspace, PolicyGraph, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphMode,
     PolicyGraphNodeKind, PolicyPipelinePromoteRequest, apply_promote, apply_save_draft,
