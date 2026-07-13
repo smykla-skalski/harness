@@ -79,23 +79,44 @@ pub(crate) async fn prepare_claimed_task_board_dispatch(
             return Err((DispatchFailureKind::LinkItem, heartbeat_error(result)));
         }
     };
-    prepared?;
-    db.complete_task_board_dispatch_preparation(claim)
+    let checkout = prepared?;
+    db.complete_task_board_dispatch_preparation(claim, &checkout.branch, &checkout.worktree)
         .await
         .map_err(|error| (DispatchFailureKind::LinkItem, error))
+}
+
+struct DispatchCheckout {
+    branch: String,
+    worktree: String,
 }
 
 async fn prepare_dispatch_side_effects(
     db: &AsyncDaemonDb,
     claim: &ClaimedTaskBoardDispatchPreparation,
-) -> Result<(), (DispatchFailureKind, CliError)> {
+) -> Result<DispatchCheckout, (DispatchFailureKind, CliError)> {
     ensure_dispatch_session(db, claim)
         .await
         .map_err(|error| (DispatchFailureKind::CreateSession, error))?;
     ensure_dispatch_task(db, claim)
         .await
         .map_err(|error| (DispatchFailureKind::CreateTask, error))?;
-    Ok(())
+    let resolved = db
+        .resolve_session(&claim.preparation.session_id)
+        .await
+        .map_err(|error| (DispatchFailureKind::CreateSession, error))?
+        .ok_or_else(|| {
+            (
+                DispatchFailureKind::CreateSession,
+                CliError::from(CliErrorKind::session_not_active(format!(
+                    "dispatch session '{}' no longer exists",
+                    claim.preparation.session_id
+                ))),
+            )
+        })?;
+    Ok(DispatchCheckout {
+        branch: resolved.state.branch_ref,
+        worktree: resolved.state.worktree_path.to_string_lossy().into_owned(),
+    })
 }
 
 async fn maintain_preparation_claim(

@@ -126,6 +126,14 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
                 linked.work_item_id.as_deref(),
                 Some(preparation.work_item_id.as_str())
             );
+            assert_eq!(
+                linked.workflow.branch.as_deref(),
+                Some(resolved.state.branch_ref.as_str())
+            );
+            assert_eq!(
+                linked.workflow.worktree.as_deref(),
+                resolved.state.worktree_path.to_str()
+            );
         });
     });
 }

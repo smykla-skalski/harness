@@ -189,7 +189,11 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
         .expect("expired preparation");
     assert_ne!(reclaimed.claim_token, claim.claim_token);
     let applied = db
-        .complete_task_board_dispatch_preparation(&reclaimed)
+        .complete_task_board_dispatch_preparation(
+            &reclaimed,
+            "harness/session-reserved",
+            "/tmp/session-reserved",
+        )
         .await
         .expect("complete preparation");
     assert_eq!(applied.item.status, TaskBoardStatus::InProgress);
@@ -202,6 +206,36 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
             .await
             .expect("claim worker")
             .is_some()
+    );
+}
+
+#[tokio::test]
+async fn existing_session_without_work_item_is_reservable() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("open db");
+    let mut item = TaskBoardItem::new(
+        "task-existing-session".to_owned(),
+        "Existing session dispatch".to_owned(),
+        "Body".to_owned(),
+        "2026-07-11T10:00:00Z".to_owned(),
+    );
+    item.session_id = Some("session-existing".into());
+    db.create_task_board_item(item).await.expect("create item");
+    let item = db
+        .task_board_item("task-existing-session")
+        .await
+        .expect("load item");
+    let plan = build_dispatch_plans_with_policy(&[item], None).remove(0);
+
+    let reserved = db
+        .reserve_task_board_dispatch(&plan, "control-plane", None)
+        .await;
+
+    assert!(
+        reserved.is_ok(),
+        "existing session without work item should reserve: {reserved:?}"
     );
 }
 

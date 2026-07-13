@@ -202,6 +202,8 @@ impl AsyncDaemonDb {
     pub(crate) async fn complete_task_board_dispatch_preparation(
         &self,
         claim: &ClaimedTaskBoardDispatchPreparation,
+        branch: &str,
+        worktree: &str,
     ) -> Result<DispatchAppliedTask, CliError> {
         let mut transaction = self
             .begin_immediate_transaction("task board dispatch preparation completion")
@@ -218,6 +220,8 @@ impl AsyncDaemonDb {
             })?;
         validate_reservable_item(&item, &preparation.plan)?;
         item.workflow.execution_id = Some(preparation.workflow_execution_id.clone());
+        item.workflow.branch = Some(branch.to_string());
+        item.workflow.worktree = Some(worktree.to_string());
         item.workflow.status = TaskBoardWorkflowStatus::Running;
         item.workflow.current_step_id = Some("dispatch".to_string());
         item.workflow.attempts = item.workflow.attempts.saturating_add(1);
@@ -388,6 +392,10 @@ async fn ensure_preparation_claim(
 fn validate_reservable_item(item: &TaskBoardItem, plan: &DispatchPlan) -> Result<(), CliError> {
     let body = item.body.trim();
     let body = (!body.is_empty()).then_some(body);
+    let session_matches = match &plan.session {
+        SessionIntent::Existing { session_id } => item.session_id.as_deref() == Some(session_id),
+        SessionIntent::Create { .. } => item.session_id.is_none(),
+    };
     let matches_plan = item.id == plan.board_item_id
         && item.title == plan.task.title
         && body == plan.task.context.as_deref()
@@ -396,7 +404,7 @@ fn validate_reservable_item(item: &TaskBoardItem, plan: &DispatchPlan) -> Result
         && item.tags == plan.task.tags
         && item.external_refs == plan.task.external_refs
         && item.status == TaskBoardStatus::Todo
-        && item.session_id.is_none()
+        && session_matches
         && item.work_item_id.is_none()
         && !item.is_deleted();
     if matches_plan {
