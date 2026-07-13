@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use super::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
 pub(crate) const DISPATCH_PLACEHOLDER: &str = "<assigned-at-dispatch>";
@@ -45,9 +47,11 @@ fn push_lifecycle(prompt: &mut String, session_id: Option<&str>, work_item_id: &
         prompt.push_str(" Submit the task for review when ready.");
         return;
     };
-    prompt.push_str(&format!(
+    write!(
+        prompt,
         "\n1. Run `harness session task list {session_id} --json` and read `assigned_to` from task `{work_item_id}`; use that value as `<assigned-agent-id>`.\n2. Report progress with `harness session task checkpoint {session_id} {work_item_id} --actor <assigned-agent-id> --summary \"<summary>\" --progress <0-100>`.\n3. Submit with `harness session task submit-for-review {session_id} {work_item_id} --actor <assigned-agent-id> --summary \"<summary>\"`.\nThe controller also advances this task when the managed run completes and is the authoritative safety net."
-    ));
+    )
+    .expect("writing to a string cannot fail");
 }
 
 pub(crate) fn plan_worker_prompt(item: &TaskBoardItem) -> String {

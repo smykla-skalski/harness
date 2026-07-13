@@ -1,6 +1,6 @@
-use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot};
+use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, CodexRunStatus};
 use crate::daemon::service as daemon_service;
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
 use crate::session::types::{
     AgentStatus, CONTROL_PLANE_ACTOR_ID, ManagedAgentRef, SessionState, TaskStatus,
@@ -359,6 +359,10 @@ impl CodexControllerHandle {
 
 const TASK_SUBMISSION_SUMMARY_LIMIT: usize = 2_000;
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "terminal task bridging keeps all manual-move guards together"
+)]
 fn apply_bound_task_terminal_transition(
     state: &mut SessionState,
     run: &CodexRunSnapshot,
@@ -392,7 +396,7 @@ fn apply_bound_task_terminal_transition(
         return Ok(false);
     }
     match run.status {
-        crate::daemon::protocol::CodexRunStatus::Completed => {
+        CodexRunStatus::Completed => {
             let summary = completion_summary(run.final_message.as_deref());
             session_service::apply_submit_for_review_for_managed_run(
                 state,
@@ -402,8 +406,7 @@ fn apply_bound_task_terminal_transition(
                 now,
             )?;
         }
-        crate::daemon::protocol::CodexRunStatus::Failed
-        | crate::daemon::protocol::CodexRunStatus::Cancelled => {
+        CodexRunStatus::Failed | CodexRunStatus::Cancelled => {
             let reason = terminal_failure_reason(run);
             session_service::apply_update_task_for_managed_run(
                 state,
@@ -414,9 +417,9 @@ fn apply_bound_task_terminal_transition(
                 now,
             )?;
         }
-        crate::daemon::protocol::CodexRunStatus::Queued
-        | crate::daemon::protocol::CodexRunStatus::Running
-        | crate::daemon::protocol::CodexRunStatus::WaitingApproval => return Ok(false),
+        CodexRunStatus::Queued | CodexRunStatus::Running | CodexRunStatus::WaitingApproval => {
+            return Ok(false);
+        }
     }
     Ok(true)
 }
@@ -440,7 +443,7 @@ fn terminal_failure_reason(run: &CodexRunSnapshot) -> String {
         .filter(|detail| !detail.is_empty())
         .unwrap_or("no failure detail was reported");
     let prefix = match run.status {
-        crate::daemon::protocol::CodexRunStatus::Cancelled => "Codex run was cancelled",
+        CodexRunStatus::Cancelled => "Codex run was cancelled",
         _ => "Codex run failed",
     };
     truncate_chars(
@@ -469,12 +472,10 @@ fn bind_requested_task(
         return Ok(());
     };
     let task = state.tasks.get(task_id).ok_or_else(|| {
-        CliError::from(crate::errors::CliErrorKind::session_agent_conflict(
-            format!(
-                "task '{task_id}' not found in session '{}'",
-                state.session_id
-            ),
-        ))
+        CliError::from(CliErrorKind::session_agent_conflict(format!(
+            "task '{task_id}' not found in session '{}'",
+            state.session_id
+        )))
     })?;
     if task.status == TaskStatus::InProgress && task.assigned_to.as_deref() == Some(agent_id) {
         return Ok(());
@@ -482,7 +483,7 @@ fn bind_requested_task(
     if task.status != TaskStatus::Open
         || task.assigned_to.as_deref().is_some_and(|id| id != agent_id)
     {
-        return Err(crate::errors::CliErrorKind::session_agent_conflict(format!(
+        return Err(CliErrorKind::session_agent_conflict(format!(
             "task '{task_id}' cannot be bound to agent '{agent_id}' from status {:?} and assignee {:?}",
             task.status, task.assigned_to
         ))
@@ -505,7 +506,7 @@ fn bind_requested_task(
         session_service::apply_task_start_delivery(state, agent_id, signal, now)
     });
     if started.as_deref() != Some(task_id) {
-        return Err(crate::errors::CliErrorKind::session_agent_conflict(format!(
+        return Err(CliErrorKind::session_agent_conflict(format!(
             "task '{task_id}' could not be started for agent '{agent_id}'"
         ))
         .into());
