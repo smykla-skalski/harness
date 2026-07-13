@@ -1,3 +1,4 @@
+#[cfg(not(target_os = "macos"))]
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
