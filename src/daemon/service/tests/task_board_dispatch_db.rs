@@ -2,6 +2,8 @@ use super::*;
 
 use crate::daemon::db::ReservedTaskBoardDispatch;
 use crate::daemon::protocol::SessionStartRequest;
+use std::collections::HashMap;
+
 use crate::task_board::{TaskBoardItem, build_dispatch_plans_with_policy};
 
 #[test]
@@ -33,6 +35,7 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
                 None,
                 None,
                 crate::task_board::SpawnGateSwitches::default(),
+                &HashMap::new(),
             )
             .remove(0);
             let reserved = db

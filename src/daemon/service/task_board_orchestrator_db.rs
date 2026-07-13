@@ -14,13 +14,13 @@ use crate::task_board::github::GitHubAutomation;
 use crate::task_board::orchestrator::TaskBoardOrchestratorPreparedRun;
 use crate::task_board::{
     DispatchExecutionSummary, ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
-    SpawnGateSwitches, TaskBoardAuditSummary, TaskBoardEvaluationSummary, TaskBoardGitHubInboxConfig,
-    TaskBoardItem,
-    TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorRunStatus,
-    TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
-    TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase, TaskBoardStatus,
-    TaskBoardTodoistInboxConfig, TaskBoardWorkflowExecutionCount, TaskBoardWorkflowStatus,
-    build_audit_summary_with_policy, build_sync_summary, normalize_repository_slug,
+    SpawnGateSwitches, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
+    TaskBoardGitHubInboxConfig, TaskBoardItem, TaskBoardOrchestratorDispatchInput,
+    TaskBoardOrchestratorRunStatus, TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
+    TaskBoardOrchestratorState, TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase,
+    TaskBoardStatus, TaskBoardTodoistInboxConfig, TaskBoardWorkflowExecutionCount,
+    TaskBoardWorkflowStatus, build_audit_summary_with_policy, build_sync_summary,
+    normalize_repository_slug,
 };
 use crate::workspace::utc_now;
 

@@ -110,7 +110,6 @@ mod timeline_store;
 mod writes;
 
 pub(crate) use async_pool::AsyncDaemonDb;
-pub(crate) use policy::NewApprovalGrant;
 #[allow(unused_imports)]
 use conversation::{
     clear_session_conversation_events, prepare_agent_conversation_imports_and_activity,
@@ -118,6 +117,7 @@ use conversation::{
 };
 #[allow(unused_imports)]
 use diagnostics::import_daemon_events;
+pub(crate) use policy::NewApprovalGrant;
 pub(crate) use remote_acme::RemoteAcmeStoredState;
 pub(crate) use remote_pairing::RemotePairingClaimCodeError;
 pub(crate) use runtime::ensure_shared_db;

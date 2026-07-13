@@ -210,7 +210,11 @@ where
         .bind(revision_to_i64(grant.canvas_revision))
         .bind(&grant.node_id)
         .bind(enum_to_snake(&grant.reason_code)?)
-        .bind(grant.expiry_seconds.and_then(|value| i64::try_from(value).ok()))
+        .bind(
+            grant
+                .expiry_seconds
+                .and_then(|value| i64::try_from(value).ok()),
+        )
         .bind(utc_now())
         .execute(executor)
         .await
@@ -266,7 +270,9 @@ impl ApprovalGrantRow {
 fn enum_to_snake<T: Serialize>(value: &T) -> Result<String, CliError> {
     match serde_json::to_value(value) {
         Ok(Value::String(text)) => Ok(text),
-        Ok(other) => Err(db_error(format!("enum did not serialize to a string: {other}"))),
+        Ok(other) => Err(db_error(format!(
+            "enum did not serialize to a string: {other}"
+        ))),
         Err(error) => Err(db_error(format!("serialize enum: {error}"))),
     }
 }

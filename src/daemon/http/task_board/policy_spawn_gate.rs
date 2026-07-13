@@ -75,7 +75,9 @@ pub(super) async fn post_policy_canvas_set_spawn_kill_switch(
         Err(response) => return *response,
     };
     let workspace = match require_async_db(&state, "policy canvas spawn kill switch") {
-        Ok(db) => task_board_route_executor::set_policy_canvas_spawn_kill_switch(db, &request).await,
+        Ok(db) => {
+            task_board_route_executor::set_policy_canvas_spawn_kill_switch(db, &request).await
+        }
         Err(error) => Err(error),
     };
     timed_json(

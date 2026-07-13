@@ -1,8 +1,11 @@
+use std::collections::HashMap;
+
 use tempfile::tempdir;
 
-use crate::daemon::db::{AsyncDaemonDb, ReservedTaskBoardDispatch};
+use crate::daemon::db::{AsyncDaemonDb, NewApprovalGrant, ReservedTaskBoardDispatch};
 use crate::task_board::{
-    SessionIntent, TaskBoardItem, TaskBoardStatus, build_dispatch_plans_with_policy,
+    PolicyAction, PolicyReasonCode, SessionIntent, TaskBoardItem, TaskBoardStatus,
+    build_dispatch_plans_with_policy,
 };
 
 #[tokio::test]
@@ -30,6 +33,7 @@ async fn task_board_dispatch_intents_survive_until_worker_outcome() {
         None,
         None,
         crate::task_board::SpawnGateSwitches::default(),
+        &HashMap::new(),
     )
     .remove(0)
     .applied_lifecycle();
@@ -76,6 +80,7 @@ async fn task_board_dispatch_intents_survive_until_worker_outcome() {
         None,
         None,
         crate::task_board::SpawnGateSwitches::default(),
+        &HashMap::new(),
     )
     .remove(0)
     .applied_lifecycle();
@@ -135,6 +140,7 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
         None,
         None,
         crate::task_board::SpawnGateSwitches::default(),
+        &HashMap::new(),
     )
     .remove(0);
     let first = db
@@ -250,6 +256,7 @@ async fn existing_session_without_work_item_is_reservable() {
         None,
         None,
         crate::task_board::SpawnGateSwitches::default(),
+        &HashMap::new(),
     )
     .remove(0);
 
@@ -281,7 +288,14 @@ async fn existing_session_with_mismatched_session_id_is_rejected() {
         .task_board_item("task-existing-mismatch")
         .await
         .expect("load item");
-    let mut plan = build_dispatch_plans_with_policy(&[item], None).remove(0);
+    let mut plan = build_dispatch_plans_with_policy(
+        &[item],
+        None,
+        None,
+        crate::task_board::SpawnGateSwitches::default(),
+        &HashMap::new(),
+    )
+    .remove(0);
     plan.session = SessionIntent::Existing {
         session_id: "session-other".into(),
     };
@@ -292,7 +306,9 @@ async fn existing_session_with_mismatched_session_id_is_rejected() {
         .expect_err("mismatched session id must be rejected");
 
     assert!(
-        reserved.message().contains("changed before dispatch reservation"),
+        reserved
+            .message()
+            .contains("changed before dispatch reservation"),
         "unexpected error: {reserved:?}"
     );
 }
@@ -316,7 +332,14 @@ async fn existing_session_with_work_item_is_rejected() {
         .task_board_item("task-existing-linked")
         .await
         .expect("load item");
-    let plan = build_dispatch_plans_with_policy(&[item], None).remove(0);
+    let plan = build_dispatch_plans_with_policy(
+        &[item],
+        None,
+        None,
+        crate::task_board::SpawnGateSwitches::default(),
+        &HashMap::new(),
+    )
+    .remove(0);
 
     let reserved = db
         .reserve_task_board_dispatch(&plan, "control-plane", None, false)
@@ -324,7 +347,9 @@ async fn existing_session_with_work_item_is_rejected() {
         .expect_err("existing work item must be rejected");
 
     assert!(
-        reserved.message().contains("changed before dispatch reservation"),
+        reserved
+            .message()
+            .contains("changed before dispatch reservation"),
         "unexpected error: {reserved:?}"
     );
 }
@@ -350,6 +375,7 @@ async fn active_dispatch_intent_requires_matching_linkage() {
         None,
         None,
         crate::task_board::SpawnGateSwitches::default(),
+        &HashMap::new(),
     )
     .remove(0)
     .applied_lifecycle();
@@ -386,4 +412,79 @@ async fn active_dispatch_intent_requires_matching_linkage() {
     let linked = db.task_board_item(item_id).await.expect("load linked item");
     assert_eq!(linked.session_id.as_deref(), Some("session-1"));
     assert_eq!(linked.work_item_id.as_deref(), Some("work-1"));
+}
+
+#[tokio::test]
+async fn approved_grant_is_consumed_at_reservation() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("open db");
+    db.create_task_board_item(TaskBoardItem::new(
+        "task-grant-consume".to_owned(),
+        "Grant consume".to_owned(),
+        "Body".to_owned(),
+        "2026-07-14T10:00:00Z".to_owned(),
+    ))
+    .await
+    .expect("create item");
+
+    let pending = db
+        .ensure_pending_approval_grant(&NewApprovalGrant {
+            board_item_id: "task-grant-consume".to_owned(),
+            action: PolicyAction::SpawnAgent,
+            canvas_id: Some("canvas-1".to_owned()),
+            canvas_revision: 1,
+            node_id: "approve-spawn".to_owned(),
+            reason_code: PolicyReasonCode::ApprovalRequired,
+            expiry_seconds: None,
+        })
+        .await
+        .expect("create pending grant");
+    db.resolve_approval_grant(&pending.id, true, "operator")
+        .await
+        .expect("approve grant");
+
+    let item = db
+        .task_board_item("task-grant-consume")
+        .await
+        .expect("load item");
+    let mut plan = build_dispatch_plans_with_policy(
+        &[item],
+        None,
+        None,
+        crate::task_board::SpawnGateSwitches::default(),
+        &HashMap::new(),
+    )
+    .remove(0);
+    plan.consumed_approval_grant_id = Some(pending.id.clone());
+
+    let reserved = db
+        .reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
+        .await
+        .expect("reserve dispatch");
+    let intent_id = match reserved {
+        ReservedTaskBoardDispatch::Preparing { intent_id, .. } => intent_id,
+        ReservedTaskBoardDispatch::Applied(_) => panic!("new reservation was already applied"),
+    };
+    let claim = db
+        .claim_task_board_dispatch_preparation(&intent_id)
+        .await
+        .expect("claim preparation")
+        .expect("pending preparation");
+    db.complete_task_board_dispatch_preparation(
+        &claim,
+        "harness/session-grant",
+        "/tmp/session-grant",
+    )
+    .await
+    .expect("complete preparation");
+
+    assert!(
+        db.live_approval_grant("task-grant-consume", PolicyAction::SpawnAgent, 1)
+            .await
+            .expect("live lookup")
+            .is_none(),
+        "reservation must consume the approved grant one-shot"
+    );
 }

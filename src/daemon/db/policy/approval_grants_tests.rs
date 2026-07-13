@@ -94,10 +94,7 @@ async fn approve_then_consume_is_one_shot() {
     assert_eq!(resolved.resolved_by.as_deref(), Some("operator"));
 
     assert!(consume(&db, &grant.id).await, "first consume transitions");
-    assert!(
-        !consume(&db, &grant.id).await,
-        "second consume is a no-op"
-    );
+    assert!(!consume(&db, &grant.id).await, "second consume is a no-op");
     assert!(
         db.live_approval_grant("board-item-1", PolicyAction::SpawnAgent, 7)
             .await

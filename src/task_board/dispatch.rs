@@ -346,8 +346,13 @@ pub(crate) fn machine_mismatch_plan_with_policy(
     switches: SpawnGateSwitches,
     grant: Option<&PolicyApprovalGrant>,
 ) -> DispatchPlan {
-    let (decision, decision_id) =
-        dispatch_policy_from_graph(item, policy, evaluated_at.map(str::to_owned), switches, grant);
+    let (decision, decision_id) = dispatch_policy_from_graph(
+        item,
+        policy,
+        evaluated_at.map(str::to_owned),
+        switches,
+        grant,
+    );
     let consumed = consumed_grant_id(grant, &decision);
     let mut plan = build_dispatch_plan_with_decision(item, decision, decision_id, consumed);
     plan.readiness = blocked(DispatchBlockReason::MachineMismatch {
@@ -387,9 +392,9 @@ mod spawn_policy;
 pub use spawn_policy::SpawnGateSwitches;
 #[cfg(test)]
 use spawn_policy::dispatch_policy;
-use spawn_policy::{consumed_grant_id, dispatch_policy_from_graph};
 #[cfg(test)]
 pub(crate) use spawn_policy::spawn_policy_input;
+use spawn_policy::{consumed_grant_id, dispatch_policy_from_graph};
 
 fn session_intent(item: &TaskBoardItem) -> SessionIntent {
     if let Some(session_id) = item.session_id.as_deref() {

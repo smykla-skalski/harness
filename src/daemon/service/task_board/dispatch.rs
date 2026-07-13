@@ -14,6 +14,7 @@ use crate::errors::CliError;
 use crate::errors::CliErrorKind;
 #[cfg(test)]
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
+use crate::task_board::policy_graph::PolicyGraph;
 #[cfg(test)]
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
@@ -21,11 +22,11 @@ use crate::task_board::{
     DispatchPlan, Machine, PolicyAction, PolicyApprovalGrant, SpawnGateSwitches, TaskBoardItem,
     TaskBoardStatus, build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy,
 };
-use crate::task_board::policy_graph::PolicyGraph;
 #[cfg(test)]
 use crate::task_board::{
-    SessionIntent, TaskBoardStore, TaskBoardWorkflowStatus, build_dispatch_summary_with_policy_root,
-    filter_for_local_machine, machine_mismatch_plan_with_policy_root,
+    SessionIntent, TaskBoardStore, TaskBoardWorkflowStatus,
+    build_dispatch_summary_with_policy_root, filter_for_local_machine,
+    machine_mismatch_plan_with_policy_root,
 };
 use crate::workspace::utc_now;
 
@@ -337,9 +338,10 @@ async fn build_dispatch_plans_for_request_async(
         .as_ref()
         .and_then(|workspace| workspace.active_live_canvas())
         .map(|(canvas, document)| (canvas.id.as_str(), document));
-    let switches = workspace
-        .as_ref()
-        .map_or_else(SpawnGateSwitches::default, SpawnGateSwitches::from_workspace);
+    let switches = workspace.as_ref().map_or_else(
+        SpawnGateSwitches::default,
+        SpawnGateSwitches::from_workspace,
+    );
     let grants = load_live_spawn_grants(db, policy, &kept, &rejected).await?;
     let evaluated_at = utc_now();
     let mut plans = build_dispatch_plans_with_policy(

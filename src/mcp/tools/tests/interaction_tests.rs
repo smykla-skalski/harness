@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use crate::daemon::protocol::task_board_mcp_methods;
+use crate::daemon::protocol::{task_board_mcp_methods, ws_methods};
 use crate::mcp::automation::INPUT_OVERRIDE_ENV;
 use crate::mcp::registry::RegistryClient;
 use crate::mcp::tool::{Tool, ToolRegistry};
@@ -177,10 +177,19 @@ fn register_all_registers_monitor_and_task_board_tools() {
     let mut registry = ToolRegistry::new();
     register_all(&mut registry, &client);
     let metadata = registry.metadata();
-    let expected_task_board = task_board_mcp_methods();
+    // Not every task-board WS route is exposed as an MCP tool: `capabilities` is
+    // the client/daemon handshake and `git_runtime_key_material_sync` moves secret
+    // key material, so neither is agent-facing. The MCP registry excludes them.
+    let expected_task_board: Vec<&str> = task_board_mcp_methods()
+        .into_iter()
+        .filter(|method| {
+            *method != ws_methods::TASK_BOARD_CAPABILITIES
+                && *method != ws_methods::TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL_SYNC
+        })
+        .collect();
     assert_eq!(metadata.len(), 11 + expected_task_board.len());
     let names: Vec<&str> = metadata.iter().map(|t| t.name).collect();
-    let mut expected = vec![
+    let expected_monitor = [
         "list_windows",
         "list_elements",
         "get_element",
@@ -193,8 +202,16 @@ fn register_all_registers_monitor_and_task_board_tools() {
         "type_text",
         "screenshot_window",
     ];
-    expected.extend(expected_task_board);
-    assert_eq!(names, expected,);
+    assert_eq!(&names[..expected_monitor.len()], &expected_monitor[..]);
+    // The task-board tools are compared as a set: MCP registration groups them by
+    // descriptor family (canvas, spawn-gate, pipeline, scenario) while the HTTP
+    // route contract orders the same tools differently, so ordering is incidental.
+    // Membership - every expected tool present, none extra - is the guarantee.
+    let mut actual_task_board: Vec<&str> = names[expected_monitor.len()..].to_vec();
+    let mut expected_task_board = expected_task_board;
+    actual_task_board.sort_unstable();
+    expected_task_board.sort_unstable();
+    assert_eq!(actual_task_board, expected_task_board);
 }
 
 #[test]

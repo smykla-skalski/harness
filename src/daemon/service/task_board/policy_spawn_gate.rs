@@ -53,7 +53,9 @@ pub(crate) async fn set_policy_canvas_spawn_kill_switch(
         .update_policy_workspace(|workspace| {
             workspace.ensure_seeded_automation_canvases();
             workspace.ensure_seeded_scenarios();
-            Ok(policy_graph::apply_set_spawn_kill_switch(workspace, enabled))
+            Ok(policy_graph::apply_set_spawn_kill_switch(
+                workspace, enabled,
+            ))
         })
         .await?;
     feed_gate_cache(&workspace);
