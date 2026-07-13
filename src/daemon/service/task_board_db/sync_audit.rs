@@ -122,6 +122,9 @@ impl BackgroundAuditState {
         now: Instant,
     ) -> AuditDecision {
         let trigger_failures = self.failures.entry(scope).or_default();
+        trigger_failures.retain(|_, last_recorded_at| {
+            now.saturating_duration_since(*last_recorded_at) < BACKGROUND_FAILURE_REPEAT_INTERVAL
+        });
         let should_record = trigger_failures
             .get(&fingerprint)
             .is_none_or(|last_recorded_at| {
@@ -386,6 +389,7 @@ mod tests {
             ),
             AuditDecision::Record { recovered: false }
         );
+        assert_eq!(state.failures[&(0, trigger)].len(), 1);
     }
 
     #[test]
