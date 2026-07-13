@@ -14,9 +14,8 @@ use crate::daemon::protocol::{
     TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardSyncRequest,
     TaskBoardUpdateItemRequest, http_paths,
 };
-use crate::daemon::remote_task_board::{
-    is_remote_viewer, project_task_board_item, project_task_board_list,
-};
+use crate::daemon::remote_task_board::{project_task_board_item, project_task_board_list};
+use crate::daemon::remote_viewer::is_remote_viewer;
 use crate::task_board::TaskBoardStatus;
 
 use super::super::DaemonHttpState;

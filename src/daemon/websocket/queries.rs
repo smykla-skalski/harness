@@ -12,6 +12,7 @@ use crate::daemon::protocol::{
     HarnessMonitorAuditEventsRequest, StreamEvent, TimelineWindowRequest, WsRequest, WsResponse,
     ws_methods,
 };
+use crate::daemon::remote_diagnostics::{project_audit_events, project_diagnostics_report};
 use crate::daemon::service;
 use crate::errors::CliError;
 
@@ -24,11 +25,20 @@ use super::params::{
     extract_string_param, extract_u64_param,
 };
 
+#[cfg(test)]
 pub(crate) async fn dispatch_read_query(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    if let Some(response) = dispatch_daemon_read_query(request, state).await {
+    dispatch_read_query_with_projection(request, state, false).await
+}
+
+pub(crate) async fn dispatch_read_query_with_projection(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    viewer: bool,
+) -> WsResponse {
+    if let Some(response) = dispatch_daemon_read_query(request, state, viewer).await {
         return response;
     }
 
@@ -42,8 +52,9 @@ pub(crate) async fn dispatch_read_query(
 async fn dispatch_daemon_read_query(
     request: &WsRequest,
     state: &DaemonHttpState,
+    viewer: bool,
 ) -> Option<WsResponse> {
-    if let Some(response) = dispatch_daemon_status_query(request, state).await {
+    if let Some(response) = dispatch_daemon_status_query(request, state, viewer).await {
         return Some(response);
     }
     dispatch_daemon_inventory_query(request, state).await
@@ -52,12 +63,15 @@ async fn dispatch_daemon_read_query(
 async fn dispatch_daemon_status_query(
     request: &WsRequest,
     state: &DaemonHttpState,
+    viewer: bool,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
         ws_methods::HEALTH => Some(dispatch_health_query(&request.id, state).await),
-        ws_methods::DIAGNOSTICS => Some(dispatch_diagnostics_query(&request.id, state).await),
+        ws_methods::DIAGNOSTICS => {
+            Some(dispatch_diagnostics_query(&request.id, state, viewer).await)
+        }
         ws_methods::GITHUB_STATUS => Some(dispatch_github_status_query(&request.id).await),
-        ws_methods::AUDIT_EVENTS => Some(dispatch_audit_events_query(request, state).await),
+        ws_methods::AUDIT_EVENTS => Some(dispatch_audit_events_query(request, state, viewer).await),
         ws_methods::CONFIG => Some(dispatch_config_query(&request.id)),
         ws_methods::DAEMON_STOP => Some(dispatch_daemon_stop_query(&request.id, state)),
         ws_methods::DAEMON_LOG_LEVEL => Some(dispatch_query(&request.id, service::get_log_level)),
@@ -80,12 +94,19 @@ async fn dispatch_daemon_inventory_query(
     }
 }
 
-async fn dispatch_audit_events_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+async fn dispatch_audit_events_query(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    viewer: bool,
+) -> WsResponse {
     let Ok(body) = audit_params(request) else {
         return error_response(&request.id, "INVALID_PARAMS", "invalid audit params");
     };
     let result = match require_async_db(state, "audit events") {
-        Ok(db) => db.load_audit_events(&body).await,
+        Ok(db) => db
+            .load_audit_events(&body)
+            .await
+            .map(|response| project_audit_events(response, viewer)),
         Err(error) => Err(error),
     };
     dispatch_query_result(&request.id, result)
@@ -351,11 +372,17 @@ async fn dispatch_health_query(request_id: &str, state: &DaemonHttpState) -> WsR
     )
 }
 
-async fn dispatch_diagnostics_query(request_id: &str, state: &DaemonHttpState) -> WsResponse {
+async fn dispatch_diagnostics_query(
+    request_id: &str,
+    state: &DaemonHttpState,
+    viewer: bool,
+) -> WsResponse {
     dispatch_query_result(
         request_id,
         match require_async_db(state, "diagnostics") {
-            Ok(async_db) => service::diagnostics_report_async(Some(async_db)).await,
+            Ok(async_db) => service::diagnostics_report_async(Some(async_db))
+                .await
+                .map(|report| project_diagnostics_report(report, viewer)),
             Err(error) => Err(error),
         },
     )

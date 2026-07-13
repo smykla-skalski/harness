@@ -47,6 +47,8 @@ mod remote_authz_audit;
 mod remote_limits;
 mod remote_limits_support;
 mod remote_pairing;
+mod remote_viewer_diagnostics;
+mod remote_viewer_support;
 mod remote_viewer_task_board;
 mod reviews_policy_writes;
 mod session_archive_tests;
