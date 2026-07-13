@@ -265,7 +265,7 @@ async fn existing_session_with_mismatched_session_id_is_rejected() {
     };
 
     let reserved = db
-        .reserve_task_board_dispatch(&plan, "control-plane", None)
+        .reserve_task_board_dispatch(&plan, "control-plane", None, false)
         .await
         .expect_err("mismatched session id must be rejected");
 
@@ -297,7 +297,7 @@ async fn existing_session_with_work_item_is_rejected() {
     let plan = build_dispatch_plans_with_policy(&[item], None).remove(0);
 
     let reserved = db
-        .reserve_task_board_dispatch(&plan, "control-plane", None)
+        .reserve_task_board_dispatch(&plan, "control-plane", None, false)
         .await
         .expect_err("existing work item must be rejected");
 
