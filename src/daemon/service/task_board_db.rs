@@ -28,9 +28,14 @@ use crate::workspace::utc_now;
 #[cfg(test)]
 mod external_ref_tests;
 mod reviews_sync;
+mod sync_audit;
 
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
 use reviews_sync::shared_review_request_client;
+pub(crate) use sync_audit::{
+    ReviewsProjectionAuditSummary, record_reviews_projection_result,
+    record_targeted_reviews_projection_result,
+};
 
 #[async_trait]
 impl TaskBoardSyncStore for AsyncDaemonDb {
@@ -237,6 +242,40 @@ pub(crate) async fn task_board_host_set_project_types_db(
 }
 
 pub(crate) async fn sync_task_board_db(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardSyncRequest,
+) -> Result<TaskBoardSyncResponse, CliError> {
+    sync_task_board_db_with_trigger(
+        db,
+        request,
+        sync_audit::TaskBoardSyncAuditTrigger::Requested,
+    )
+    .await
+}
+
+pub(crate) async fn sync_task_board_for_orchestrator_db(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardSyncRequest,
+) -> Result<TaskBoardSyncResponse, CliError> {
+    sync_task_board_db_with_trigger(
+        db,
+        request,
+        sync_audit::TaskBoardSyncAuditTrigger::Orchestrator,
+    )
+    .await
+}
+
+async fn sync_task_board_db_with_trigger(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardSyncRequest,
+    trigger: sync_audit::TaskBoardSyncAuditTrigger,
+) -> Result<TaskBoardSyncResponse, CliError> {
+    let result = sync_task_board_db_inner(db, request).await;
+    sync_audit::record_request_result(db, request, trigger, &result).await;
+    result
+}
+
+async fn sync_task_board_db_inner(
     db: &AsyncDaemonDb,
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {

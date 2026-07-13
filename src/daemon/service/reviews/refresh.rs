@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashSet};
+use std::slice;
 
 use crate::errors::CliError;
 use crate::github_api::{
@@ -8,10 +9,15 @@ use crate::reviews::{
     ReviewItem, ReviewRepositoryLabel, ReviewTarget, ReviewsGitHubClient, ReviewsRefreshRequest,
     ReviewsRefreshResponse,
 };
-use crate::task_board::reconcile_review_item_from_snapshots;
+use crate::task_board::{
+    TaskBoardItem, imported_review_references_from_items, reconcile_review_item_from_snapshots,
+};
 use crate::workspace::utc_now;
 
 use super::super::db::AsyncDaemonDb;
+use super::super::task_board_db::{
+    ReviewsProjectionAuditSummary, record_targeted_reviews_projection_result,
+};
 use super::cache_internal::{patch_cached_items, patch_cached_repository_labels};
 use super::token::token_bound_targets;
 use super::{
@@ -81,24 +87,73 @@ pub(super) async fn reconcile_targeted_missing_task_board_reviews(
     missing_pull_request_ids: &[String],
     expected_revision: u64,
 ) -> Result<bool, CliError> {
+    let result = reconcile_targeted_missing_task_board_reviews_inner(
+        database,
+        request,
+        missing_pull_request_ids,
+        expected_revision,
+    )
+    .await;
+    if let Some(database) = database {
+        record_targeted_reviews_projection_result(database, &result).await;
+    }
+    result.map(|summary| summary.is_stable())
+}
+
+async fn reconcile_targeted_missing_task_board_reviews_inner(
+    database: Option<&AsyncDaemonDb>,
+    request: &ReviewsRefreshRequest,
+    missing_pull_request_ids: &[String],
+    expected_revision: u64,
+) -> Result<ReviewsProjectionAuditSummary, CliError> {
     let Some(database) = database else {
-        return Ok(true);
+        return Ok(ReviewsProjectionAuditSummary::new(true, &[], 0));
     };
     let snapshots = missing_review_snapshots(&request.targets, missing_pull_request_ids);
     if snapshots.is_empty() {
-        return Ok(true);
+        return Ok(ReviewsProjectionAuditSummary::new(true, &[], 0));
     }
     let Some(_revision_guard) = stable_data_revision_guard(expected_revision).await else {
-        return Ok(false);
+        return Ok(ReviewsProjectionAuditSummary::new(false, &[], 0));
     };
+    let missing_references = snapshots
+        .iter()
+        .map(|snapshot| {
+            (
+                snapshot.repository.trim().to_ascii_lowercase(),
+                snapshot.number,
+            )
+        })
+        .collect::<HashSet<_>>();
+    let mut update_count = 0;
     for item in database.list_task_board_items(None).await? {
-        database
+        if !has_targeted_active_review(&item, &missing_references) {
+            continue;
+        }
+        let mutation = database
             .update_task_board_item(&item.id, |current| {
+                if !has_targeted_active_review(current, &missing_references) {
+                    return Ok(false);
+                }
                 Ok(reconcile_review_item_from_snapshots(current, &snapshots))
             })
             .await?;
+        update_count += usize::from(mutation.is_some());
     }
-    Ok(GitHubProtectedClient::data_revision() == expected_revision)
+    Ok(ReviewsProjectionAuditSummary::new(
+        GitHubProtectedClient::data_revision() == expected_revision,
+        &[],
+        update_count,
+    ))
+}
+
+fn has_targeted_active_review(
+    item: &TaskBoardItem,
+    missing_references: &HashSet<(String, u64)>,
+) -> bool {
+    imported_review_references_from_items(slice::from_ref(item))
+        .into_iter()
+        .any(|reference| missing_references.contains(&reference))
 }
 
 fn missing_review_snapshots(

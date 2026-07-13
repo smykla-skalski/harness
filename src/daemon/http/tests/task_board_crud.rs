@@ -77,6 +77,7 @@ async fn run_flow() {
             .as_str()
             .is_some_and(|message| message.contains("external sync token missing"))
     );
+    assert_task_board_sync_audit(&client, &base_url).await;
     let audit = get_json(
         &client,
         &base_url,
@@ -203,6 +204,30 @@ async fn run_flow() {
 
     server.abort();
     let _ = server.await;
+}
+
+async fn assert_task_board_sync_audit(client: &reqwest::Client, base_url: &str) {
+    let sync_audit = get_json(
+        client,
+        base_url,
+        &format!("{}?action_keys=task_board.sync", http_paths::AUDIT_EVENTS),
+    )
+    .await;
+    let sync_events = sync_audit["events"].as_array().expect("sync audit events");
+    assert_eq!(sync_events.len(), 2);
+    assert!(sync_events.iter().any(|event| {
+        event["outcome"].as_str() == Some("success")
+            && event["payload_json"]["direction"].as_str() == Some("push")
+    }));
+    assert!(sync_events.iter().any(|event| {
+        event["outcome"].as_str() == Some("failure")
+            && event["payload_json"]["provider"].as_str() == Some("todoist")
+    }));
+    assert!(sync_events.iter().all(|event| {
+        event["source"].as_str() == Some("taskBoard")
+            && event["category"].as_str() == Some("taskBoardMutation")
+            && event["action_key"].as_str() == Some("task_board.sync")
+    }));
 }
 
 async fn serve_http(state: crate::daemon::http::DaemonHttpState) -> (String, JoinHandle<()>) {

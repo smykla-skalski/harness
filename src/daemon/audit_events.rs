@@ -48,6 +48,14 @@ pub(crate) async fn record_audit_result<T>(
         return;
     };
 
+    record_audit_result_in_db(async_db, draft, result).await;
+}
+
+pub(crate) async fn record_audit_result_in_db<T>(
+    async_db: &AsyncDaemonDb,
+    draft: AuditEventDraft,
+    result: &Result<T, CliError>,
+) {
     let event = audit_event_from_result(draft, result);
     persist_audit_event(async_db, &event).await;
 }
@@ -85,7 +93,7 @@ pub(crate) async fn record_audit_event(
     clippy::cognitive_complexity,
     reason = "audit persistence branches separately for db and legacy-event fallback"
 )]
-async fn persist_audit_event(async_db: &Arc<AsyncDaemonDb>, event: &HarnessMonitorAuditEvent) {
+async fn persist_audit_event(async_db: &AsyncDaemonDb, event: &HarnessMonitorAuditEvent) {
     match async_db.upsert_audit_event(event).await {
         Ok(()) => broadcast_audit_event(event),
         Err(error) => {
