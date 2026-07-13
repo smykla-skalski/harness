@@ -88,6 +88,44 @@ fn completed_bound_run_submits_task_for_review() {
 }
 
 #[test]
+fn completed_bound_run_skips_when_agent_removed() {
+    let (controller, db, _tempdir) =
+        controller_with_session_state(sample_session_state_with_open_task());
+    let agent_id = register_bound_worker(&controller);
+    {
+        let db_guard = db.lock().expect("db lock");
+        let mut state = db_guard
+            .load_session_state_for_mutation(SESSION_ID)
+            .expect("load session")
+            .expect("session");
+        state.agents.remove(&agent_id);
+        db_guard
+            .save_session_state("project-1", &state)
+            .expect("save session without agent");
+    }
+    let mut run = codex_run_snapshot(CodexRunStatus::Completed);
+    run.task_id = Some("task-1".into());
+    run.session_agent_id = Some(agent_id);
+    run.final_message = Some("Implemented the requested flow.".into());
+
+    controller
+        .sync_orchestration_status_for_run(&run)
+        .expect("bridge skips removed agent");
+
+    let state = db
+        .lock()
+        .expect("db lock")
+        .load_session_state_for_mutation(SESSION_ID)
+        .expect("load session")
+        .expect("session");
+    assert_eq!(
+        state.tasks["task-1"].status,
+        TaskStatus::InProgress,
+        "task must stay in progress when the bound agent is gone"
+    );
+}
+
+#[test]
 fn failed_bound_run_blocks_task() {
     let (controller, db, _tempdir) =
         controller_with_session_state(sample_session_state_with_open_task());

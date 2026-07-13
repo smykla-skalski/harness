@@ -395,6 +395,20 @@ fn apply_bound_task_terminal_transition(
         );
         return Ok(false);
     }
+    if !state
+        .agents
+        .get(agent_id)
+        .is_some_and(|agent| agent.status.is_alive())
+    {
+        tracing::info!(
+            run_id = %run.run_id,
+            session_id = %run.session_id,
+            task_id,
+            agent_id,
+            "skipping codex task bridge because the bound agent is gone"
+        );
+        return Ok(false);
+    }
     match run.status {
         CodexRunStatus::Completed => {
             let summary = completion_summary(run.final_message.as_deref());
