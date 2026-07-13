@@ -22,8 +22,8 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(!needsYouRows.contains(".onHover {"))
   }
 
-  @Test("Expanded lanes do not add extra header body spacing")
-  func expandedLanesDoNotAddExtraHeaderBodySpacing() throws {
+  @Test("Expanded lane scroll owns its card content margins")
+  func expandedLaneScrollOwnsItsCardContentMargins() throws {
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
     let laneChrome = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
 
@@ -35,7 +35,32 @@ extension TaskBoardOverviewBehaviorTests {
         """
       )
     )
-    #expect(laneChrome.contains(".padding(.top, metrics.laneHeaderBodyTopPadding)"))
+    #expect(
+      laneColumn.contains(
+        ".contentMargins(.horizontal, metrics.laneInnerPadding, for: .scrollContent)"
+      )
+    )
+    #expect(
+      laneColumn.contains(
+        ".contentMargins(.top, metrics.laneHeaderBodyTopPadding, for: .scrollContent)"
+      )
+    )
+    #expect(
+      laneColumn.contains(
+        ".contentMargins(.bottom, metrics.laneInnerPadding, for: .scrollContent)"
+      )
+    )
+    #expect(
+      laneColumn.contains(
+        """
+        TaskBoardEmptyLane(lane: lane)
+                    .padding(.horizontal, metrics.laneInnerPadding)
+                    .padding(.top, metrics.laneHeaderBodyTopPadding)
+                    .padding(.bottom, metrics.laneInnerPadding)
+        """
+      )
+    )
+    #expect(!laneChrome.contains(".padding(.top, metrics.laneHeaderBodyTopPadding)"))
   }
 
   @Test("Lane chrome uses a distinct neutral surface fill")

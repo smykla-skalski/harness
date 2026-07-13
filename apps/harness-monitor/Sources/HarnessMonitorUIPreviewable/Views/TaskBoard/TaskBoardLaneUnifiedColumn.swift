@@ -92,13 +92,17 @@ struct TaskBoardLaneUnifiedColumn: View {
       Group {
         if isEmpty {
           TaskBoardEmptyLane(lane: lane)
+            .padding(.horizontal, metrics.laneInnerPadding)
+            .padding(.top, metrics.laneHeaderBodyTopPadding)
+            .padding(.bottom, metrics.laneInnerPadding)
         } else {
           laneScrollSurface
+            .contentMargins(.horizontal, metrics.laneInnerPadding, for: .scrollContent)
+            .contentMargins(.top, metrics.laneHeaderBodyTopPadding, for: .scrollContent)
+            .contentMargins(.bottom, metrics.laneInnerPadding, for: .scrollContent)
         }
       }
       .taskBoardLaneBodyChrome(lane: lane, isDropTargeted: isDropTargeted)
-      .padding(.horizontal, metrics.laneInnerPadding)
-      .padding(.bottom, metrics.laneInnerPadding)
     }
   }
 

@@ -316,20 +316,16 @@ private struct TaskBoardLaneTopRoundedShape: Shape {
 private struct TaskBoardLaneBodyChrome: ViewModifier {
   let lane: TaskBoardInboxLane
   let isDropTargeted: Bool
-  @Environment(\.fontScale)
-  private var fontScale
   @Environment(\.accessibilityReduceTransparency)
   private var reduceTransparency
   @Environment(\.taskBoardLaneAppearance)
   private var laneAppearance
 
-  private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
   private var laneColor: Color { taskBoardLaneColor(for: lane, appearance: laneAppearance) }
 
   func body(content: Content) -> some View {
     content
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-      .padding(.top, metrics.laneHeaderBodyTopPadding)
       .background {
         if isDropTargeted {
           RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
