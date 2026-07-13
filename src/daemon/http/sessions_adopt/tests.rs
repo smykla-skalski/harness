@@ -1,4 +1,5 @@
 use std::fs;
+#[cfg(target_os = "macos")]
 use std::path::Path;
 
 use axum::Json;
@@ -8,6 +9,7 @@ use axum::response::IntoResponse as _;
 use tempfile::TempDir;
 
 use crate::daemon::protocol::AdoptSessionRequest;
+#[cfg(target_os = "macos")]
 use crate::sandbox::bookmarks::{self, Kind, PersistedStore, Record};
 use crate::session::types::CURRENT_VERSION;
 use crate::workspace::adopter::AdoptionError;
@@ -29,6 +31,7 @@ fn write_valid_session(root: &std::path::Path, sid: &str, origin: &str) {
     fs::write(root.join(".origin"), origin).unwrap();
 }
 
+#[cfg(target_os = "macos")]
 fn write_bookmarks_store(path: &Path, bookmarks: Vec<Record>) {
     bookmarks::save(
         path,

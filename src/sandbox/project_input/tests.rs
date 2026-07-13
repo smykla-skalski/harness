@@ -1,6 +1,9 @@
+#[cfg(target_os = "macos")]
 use std::path::Path;
 
-use super::{helper_bookmark_store_path, resolve_project_input};
+#[cfg(target_os = "macos")]
+use super::helper_bookmark_store_path;
+use super::resolve_project_input;
 use tempfile::TempDir;
 
 #[test]
