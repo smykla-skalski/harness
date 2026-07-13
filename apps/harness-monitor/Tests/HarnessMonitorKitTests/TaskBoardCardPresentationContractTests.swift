@@ -30,6 +30,20 @@ struct TaskBoardCardPresentationContractTests {
     #expect(!rows.contains("Timer.publish"))
   }
 
+  @Test("Card update labels stay smaller and dimmer than repository metadata")
+  func cardUpdateLabelsStaySmallerAndDimmerThanRepositoryMetadata() throws {
+    let support = try taskBoardSource("TaskBoardLaneSupport.swift")
+
+    #expect(
+      support.contains(
+        "HarnessMonitorTextSize.scaledFont(.system(size: 8), by: fontScale)"
+      )
+    )
+    #expect(
+      support.contains("HarnessMonitorTheme.tertiaryInk.opacity(0.8)")
+    )
+  }
+
   @Test("Board resolves scaled task-title fonts once and passes them through lanes")
   func boardPassesScaledTaskTitleFontsThroughLanes() throws {
     let overviewSource = try taskBoardSource("TaskBoardOverviewView+Board.swift")

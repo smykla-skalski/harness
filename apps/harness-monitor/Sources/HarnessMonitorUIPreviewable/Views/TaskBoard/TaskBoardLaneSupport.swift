@@ -185,7 +185,7 @@ struct TaskBoardCardFooter<Badges: View>: View {
     HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
   }
   private var updatedAtFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
+    HarnessMonitorTextSize.scaledFont(.system(size: 8), by: fontScale)
   }
 
   var body: some View {
@@ -256,7 +256,7 @@ private struct TaskBoardCardUpdatedAtLabel: View {
     if !label.isEmpty {
       Text(label)
         .font(font)
-        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk.opacity(0.8))
         .lineLimit(1)
         .fixedSize(horizontal: true, vertical: false)
         .accessibilityLabel("Updated \(label)")
