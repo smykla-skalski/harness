@@ -1,5 +1,6 @@
 use crate::daemon::db::DaemonDb;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
+use crate::daemon::remote_acme::{RemoteAcmeAccountCredentials, RemoteCertificateBundle};
 use crate::daemon::remote_identity::RemoteClientRegistration;
 
 use super::super::remote_doctor::run_remote_doctor_with;
@@ -47,20 +48,17 @@ fn daemon_remote_doctor_reports_missing_remote_readiness_and_audits() {
 #[test]
 fn daemon_remote_doctor_reports_ready_state_without_secret_material() {
     let db = DaemonDb::open_in_memory().expect("open db");
-    db.connection()
-        .execute(
-            "UPDATE remote_acme_state
-             SET account_id = 'acct-1',
-                 certificate_pem = 'cert-pem',
-                 private_key_pem = 'key-secret',
-                 certificate_fingerprint = 'fp-1',
-                 renewal_status = 'succeeded',
-                 renewal_error = NULL,
-                 updated_at = '2026-06-21T15:10:00Z'
-             WHERE singleton = 1",
-            [],
-        )
-        .expect("seed acme state");
+    let account = RemoteAcmeAccountCredentials::new(
+        "acct-1",
+        r#"{"id":"acct-1","key_pkcs8":"account-key-secret"}"#,
+    )
+    .expect("valid ACME account");
+    db.record_remote_acme_account(&account, "2026-06-21T15:00:00Z")
+        .expect("seed ACME account");
+    let certificate = RemoteCertificateBundle::new_for_tests("cert-pem", "key-secret");
+    let expected_fingerprint = certificate.fingerprint().to_string();
+    db.record_remote_acme_renewal_success(&certificate, "2026-06-21T15:10:00Z")
+        .expect("seed ACME certificate");
     register_client(&db, "client-active", None);
     register_client(&db, "client-revoked", Some("2026-06-21T15:15:00Z"));
 
@@ -76,13 +74,14 @@ fn daemon_remote_doctor_reports_ready_state_without_secret_material() {
     assert!(response.summary.certificate_configured);
     assert_eq!(
         response.summary.certificate_fingerprint.as_deref(),
-        Some("fp-1")
+        Some(expected_fingerprint.as_str())
     );
     assert_eq!(response.summary.active_client_count, 1);
     assert_eq!(response.summary.revoked_client_count, 1);
 
     let json = serde_json::to_string(&response).expect("serialize response");
-    assert!(json.contains("\"certificate_fingerprint\":\"fp-1\""));
+    assert!(json.contains(&expected_fingerprint));
+    assert!(!json.contains("account-key-secret"));
     assert!(!json.contains("key-secret"));
     assert!(!json.contains("cert-pem"));
 }

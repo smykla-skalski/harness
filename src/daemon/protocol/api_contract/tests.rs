@@ -170,6 +170,23 @@ fn remote_viewer_scope_is_read_only() {
 }
 
 #[test]
+fn reviews_pull_request_resolve_remote_scope_is_read_only() {
+    let route = HTTP_API_CONTRACT
+        .iter()
+        .find(|route| route.path == http_paths::REVIEWS_PULL_REQUEST_RESOLVE)
+        .expect("reviews pull request resolve route should be registered");
+
+    assert_eq!(
+        remote_http_scopes(route),
+        Some(&[RemoteAccessScope::Read][..])
+    );
+    assert_eq!(
+        remote_ws_scopes(ws_methods::REVIEWS_PULL_REQUEST_RESOLVE),
+        Some(&[RemoteAccessScope::Read][..])
+    );
+}
+
+#[test]
 fn reviews_files_patch_remote_scope_is_read_only() {
     let scopes = remote_ws_scopes(ws_methods::REVIEWS_FILES_PATCH)
         .expect("reviews files patch should declare remote scopes");
