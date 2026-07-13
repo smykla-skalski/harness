@@ -303,14 +303,14 @@ extension TaskBoardOverviewView {
       Button {
         onRefreshTaskBoard()
       } label: {
-        Label("Refresh", systemImage: "arrow.clockwise")
+        Label("Sync", systemImage: "arrow.clockwise")
           .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       .disabled(isActionInFlight)
-      .help("Refresh task board")
+      .help("Sync task board")
       .accessibilityIdentifier("harness.task-board.refresh")
     }
   }

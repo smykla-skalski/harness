@@ -210,7 +210,7 @@ struct SessionWindowRouteContentMetricsTests {
     )
     let managementPanelSource = try taskBoardSourceFile(named: "TaskBoardItemManagementPanel.swift")
 
-    #expect(overviewSource.contains("Label(\"Refresh\", systemImage: \"arrow.clockwise\")"))
+    #expect(overviewSource.contains("Label(\"Sync\", systemImage: \"arrow.clockwise\")"))
     #expect(
       overviewSource.contains(
         ".harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)"
