@@ -54,7 +54,7 @@ pub(crate) async fn handle_message(
     })
 }
 
-pub(crate) fn handle_overloaded_message(
+pub(crate) async fn handle_overloaded_message(
     text: &str,
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
@@ -76,7 +76,9 @@ pub(crate) fn handle_overloaded_message(
         state,
         connection,
         RemoteWsAllowedAudit::Failure(message),
-    ) {
+    )
+    .await
+    {
         return serialize_response_frames(&response).unwrap_or_else(|_| {
             serialize_error_response_frames(
                 Some(&request.id),
@@ -183,7 +185,7 @@ async fn dispatch_inner(
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> WsResponse {
     if let Err(response) =
-        authorize_remote_ws_request(request, state, connection, RemoteWsAllowedAudit::Success)
+        authorize_remote_ws_request(request, state, connection, RemoteWsAllowedAudit::Success).await
     {
         return *response;
     }
@@ -225,7 +227,7 @@ enum RemoteWsAllowedAudit<'a> {
     Failure(&'a str),
 }
 
-fn authorize_remote_ws_request(
+async fn authorize_remote_ws_request(
     request: &WsRequest,
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
@@ -246,7 +248,8 @@ fn authorize_remote_ws_request(
             required_scope,
             remote_addr.as_deref(),
             error,
-        )?;
+        )
+        .await?;
         return Err(Box::new(remote_ws_auth_error_response(&request.id, error)));
     };
     let client = match refresh_remote_connection_client(state, connection) {
@@ -260,7 +263,8 @@ fn authorize_remote_ws_request(
                 required_scope,
                 remote_addr.as_deref(),
                 error,
-            )?;
+            )
+            .await?;
             return Err(Box::new(remote_ws_auth_error_response(&request.id, error)));
         }
         Err(error) => return Err(remote_ws_auth_store_error_response(request, &error)),
@@ -287,7 +291,8 @@ fn authorize_remote_ws_request(
                 }
             };
             audit
-                .record(state.db.get())
+                .record(state.async_db.get())
+                .await
                 .map(|_| ())
                 .map_err(|error| remote_ws_audit_error_response(request, &error))
         }
@@ -299,7 +304,8 @@ fn authorize_remote_ws_request(
                 required_scope,
                 remote_addr.as_deref(),
                 error,
-            )?;
+            )
+            .await?;
             Err(Box::new(remote_ws_auth_error_response(&request.id, error)))
         }
     }
@@ -334,7 +340,7 @@ pub(crate) fn remote_viewer_projection_required(connection: &Arc<Mutex<Connectio
     is_remote_viewer(connection.remote_client())
 }
 
-fn record_remote_ws_denial(
+async fn record_remote_ws_denial(
     request: &WsRequest,
     state: &DaemonHttpState,
     client_id: Option<&str>,
@@ -350,7 +356,8 @@ fn record_remote_ws_denial(
         remote_addr,
         &error.to_string(),
     )
-    .record(state.db.get())
+    .record(state.async_db.get())
+    .await
     .map(|_| ())
     .map_err(|audit_error| remote_ws_audit_error_response(request, &audit_error))
 }

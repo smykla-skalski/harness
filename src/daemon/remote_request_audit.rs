@@ -1,9 +1,9 @@
 use std::borrow::Cow;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use uuid::Uuid;
 
-use super::db::DaemonDb;
+use super::db::AsyncDaemonDb;
 use super::remote::RemoteAccessScope;
 use super::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision};
 use crate::errors::{CliError, CliErrorKind};
@@ -30,25 +30,17 @@ pub(crate) struct RemoteAuthorizationAuditReceipt {
 }
 
 impl RemoteAuthorizationAuditReceipt {
-    pub(crate) fn mark_failed(
+    pub(crate) async fn mark_failed(
         &self,
-        db: Option<&Arc<Mutex<DaemonDb>>>,
+        db: Option<&Arc<AsyncDaemonDb>>,
         error_detail: &str,
     ) -> Result<(), CliError> {
         if self.decision == RemoteAuditScopeDecision::Denied {
             return Ok(());
         }
-        let db = db.ok_or_else(|| {
-            CliError::from(CliErrorKind::workflow_io(
-                "remote authorization audit store is unavailable",
-            ))
-        })?;
-        let db = db.lock().map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "remote authorization audit store lock: {error}"
-            )))
-        })?;
+        let db = db.ok_or_else(remote_audit_store_unavailable)?;
         db.mark_remote_audit_event_failed(&self.event_id, error_detail)
+            .await
     }
 }
 
@@ -116,23 +108,14 @@ impl<'a> RemoteAuthorizationAudit<'a> {
     ///
     /// # Errors
     /// Returns [`CliError`] when the audit store is unavailable or rejects the event.
-    pub(crate) fn record(
+    pub(crate) async fn record(
         self,
-        db: Option<&Arc<Mutex<DaemonDb>>>,
+        db: Option<&Arc<AsyncDaemonDb>>,
     ) -> Result<RemoteAuthorizationAuditReceipt, CliError> {
-        let db = db.ok_or_else(|| {
-            CliError::from(CliErrorKind::workflow_io(
-                "remote authorization audit store is unavailable",
-            ))
-        })?;
-        let db = db.lock().map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "remote authorization audit store lock: {error}"
-            )))
-        })?;
+        let db = db.ok_or_else(remote_audit_store_unavailable)?;
         let request_id = bounded_request_id(self.request_id);
         let event_id = format!("remote-auth-{}", Uuid::new_v4());
-        db.record_remote_audit_event(&RemoteAuditEvent::new(
+        let event = RemoteAuditEvent::new(
             event_id.clone(),
             utc_now(),
             Some(request_id.as_ref()),
@@ -143,12 +126,19 @@ impl<'a> RemoteAuthorizationAudit<'a> {
             self.outcome,
             self.remote_addr,
             self.error_detail,
-        ))?;
+        );
+        db.record_remote_audit_event(&event).await?;
         Ok(RemoteAuthorizationAuditReceipt {
             event_id,
             decision: self.decision,
         })
     }
+}
+
+fn remote_audit_store_unavailable() -> CliError {
+    CliError::from(CliErrorKind::workflow_io(
+        "remote authorization audit store is unavailable",
+    ))
 }
 
 fn bounded_request_id(request_id: &str) -> Cow<'_, str> {
@@ -168,6 +158,14 @@ fn bounded_request_id(request_id: &str) -> Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::mpsc;
+    use std::thread;
+    use std::time::Duration;
+
+    use rusqlite::TransactionBehavior;
+    use tempfile::tempdir;
+
+    use super::super::db::DaemonDb;
 
     #[test]
     fn remote_authorization_audit_bounds_unicode_request_ids_on_a_character_boundary() {
@@ -178,5 +176,58 @@ mod tests {
         assert!(bounded.len() <= REMOTE_AUDIT_REQUEST_ID_MAX_BYTES);
         assert!(bounded.ends_with(REMOTE_AUDIT_TRUNCATION_MARKER));
         assert!(bounded.is_char_boundary(bounded.len()));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn remote_authorization_audit_yields_while_sqlite_writer_finishes() {
+        let temp = tempdir().expect("create audit contention tempdir");
+        let db_path = temp.path().join("harness.db");
+        drop(DaemonDb::open(&db_path).expect("initialize daemon database"));
+        let db = Arc::new(
+            AsyncDaemonDb::connect(&db_path)
+                .await
+                .expect("open async daemon database"),
+        );
+        let (writer_ready_tx, writer_ready_rx) = mpsc::channel();
+        let (release_writer_tx, release_writer_rx) = mpsc::channel();
+        let writer_path = db_path.clone();
+        let writer = thread::spawn(move || {
+            let mut connection =
+                rusqlite::Connection::open(writer_path).expect("open contending SQLite writer");
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .expect("hold SQLite write transaction");
+            writer_ready_tx.send(()).expect("signal writer ready");
+            release_writer_rx.recv().expect("receive writer release");
+            transaction.commit().expect("commit contending writer");
+        });
+        writer_ready_rx.recv().expect("wait for SQLite writer");
+
+        let release = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(25)).await;
+            release_writer_tx.send(()).expect("release SQLite writer");
+        });
+        let receipt = RemoteAuthorizationAudit::allowed(
+            "audit-contention-request",
+            "remote-client",
+            "reviews.files_list",
+            RemoteAccessScope::Read,
+            Some("203.0.113.10"),
+        )
+        .record(Some(&db))
+        .await
+        .expect("persist remote audit after contending writer releases");
+
+        release.await.expect("join writer release task");
+        writer.join().expect("join contending SQLite writer");
+        let events = DaemonDb::open(&db_path)
+            .expect("open daemon database for audit verification")
+            .load_remote_audit_events(10)
+            .expect("load remote audits");
+        assert!(
+            events
+                .iter()
+                .any(|event| event.event_id == receipt.event_id)
+        );
     }
 }

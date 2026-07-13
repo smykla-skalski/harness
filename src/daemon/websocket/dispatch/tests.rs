@@ -27,11 +27,14 @@ fn ws_request_deserialization() {
 async fn remote_ws_dispatch_allows_viewer_read_method() {
     let mut state = super::super::test_support::test_http_state_with_db();
     state.auth_mode = DaemonHttpAuthMode::Remote;
-    let connection = Arc::new(Mutex::new(ConnectionState::new_remote(remote_client(
-        "viewer",
-        RemoteRole::Viewer,
-        &[RemoteAccessScope::Read],
-    ))));
+    let connection = Arc::new(Mutex::new(ConnectionState::new_remote(
+        registered_remote_client(
+            &state,
+            "viewer",
+            RemoteRole::Viewer,
+            &[RemoteAccessScope::Read],
+        ),
+    )));
     let request = ws_request("req-read", ws_methods::PING);
 
     let response = dispatch(&request, &state, &connection).await;
@@ -44,11 +47,14 @@ async fn remote_ws_dispatch_allows_viewer_read_method() {
 async fn remote_ws_dispatch_denies_viewer_write_method() {
     let mut state = super::super::test_support::test_http_state_with_db();
     state.auth_mode = DaemonHttpAuthMode::Remote;
-    let connection = Arc::new(Mutex::new(ConnectionState::new_remote(remote_client(
-        "viewer",
-        RemoteRole::Viewer,
-        &[RemoteAccessScope::Read],
-    ))));
+    let connection = Arc::new(Mutex::new(ConnectionState::new_remote(
+        registered_remote_client(
+            &state,
+            "viewer",
+            RemoteRole::Viewer,
+            &[RemoteAccessScope::Read],
+        ),
+    )));
     let request = ws_request("req-write", ws_methods::SESSION_START);
 
     let response = dispatch(&request, &state, &connection).await;
@@ -234,4 +240,30 @@ fn remote_client(
         revoked_at: None,
         rotated_at: None,
     }
+}
+
+fn registered_remote_client(
+    state: &DaemonHttpState,
+    client_id: &str,
+    role: RemoteRole,
+    scopes: &[RemoteAccessScope],
+) -> RemoteStoredClient {
+    let registration = RemoteClientRegistration::new_for_tests(
+        client_id,
+        "MacBook Pro",
+        "macos",
+        role,
+        scopes,
+        "remote-token-secret",
+        "2026-06-21T18:30:00Z",
+    )
+    .expect("remote client registration");
+    state
+        .db
+        .get()
+        .expect("db slot")
+        .lock()
+        .expect("db lock")
+        .register_remote_client(&registration)
+        .expect("register remote client")
 }

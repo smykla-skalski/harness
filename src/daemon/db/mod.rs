@@ -59,6 +59,7 @@ mod rebuild;
 mod remote_acme;
 mod remote_acme_cas;
 mod remote_identity;
+mod remote_identity_async;
 mod remote_pairing;
 mod review_writes;
 mod runtime;

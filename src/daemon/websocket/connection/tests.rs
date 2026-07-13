@@ -234,7 +234,8 @@ async fn incoming_ping_frames_reply_with_matching_pong() {
         connection,
         priority_tx,
         &mut dispatch_tasks,
-    );
+    )
+    .await;
 
     match action {
         IncomingMessageAction::RespondBatch(frames) => {
@@ -296,7 +297,8 @@ async fn remote_websocket_caps_in_flight_dispatch_tasks() {
         connection,
         priority_tx,
         &mut dispatch_tasks,
-    );
+    )
+    .await;
 
     assert_eq!(dispatch_tasks.len(), 1, "overload must not spawn work");
     let IncomingMessageAction::RespondBatch(frames) = action else {

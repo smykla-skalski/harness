@@ -61,7 +61,7 @@ impl RemoteHttpAuditContext {
         })
     }
 
-    pub(super) fn record_allowed(
+    pub(super) async fn record_allowed(
         &self,
         state: &DaemonHttpState,
         client_id: &str,
@@ -73,11 +73,12 @@ impl RemoteHttpAuditContext {
             self.scope,
             self.remote_addr.as_deref(),
         )
-        .record(state.db.get());
+        .record(state.async_db.get())
+        .await;
         self.finish_record(result)
     }
 
-    pub(super) fn record_allowed_failure(
+    pub(super) async fn record_allowed_failure(
         &self,
         state: &DaemonHttpState,
         client_id: &str,
@@ -91,11 +92,12 @@ impl RemoteHttpAuditContext {
             self.remote_addr.as_deref(),
             error_detail,
         )
-        .record(state.db.get());
+        .record(state.async_db.get())
+        .await;
         self.finish_record(result)
     }
 
-    pub(super) fn record_denied(
+    pub(super) async fn record_denied(
         &self,
         state: &DaemonHttpState,
         client_id: Option<&str>,
@@ -109,11 +111,12 @@ impl RemoteHttpAuditContext {
             self.remote_addr.as_deref(),
             error_detail,
         )
-        .record(state.db.get());
+        .record(state.async_db.get())
+        .await;
         self.finish_record(result)
     }
 
-    pub(super) fn amend_recorded_failure(
+    pub(super) async fn amend_recorded_failure(
         &self,
         state: &DaemonHttpState,
         error_detail: &str,
@@ -125,7 +128,9 @@ impl RemoteHttpAuditContext {
         else {
             return Ok(false);
         };
-        receipt.mark_failed(state.db.get(), error_detail)?;
+        receipt
+            .mark_failed(state.async_db.get(), error_detail)
+            .await?;
         Ok(true)
     }
 
