@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 #[cfg(test)]
 use std::path::Path;
 
@@ -12,7 +13,7 @@ use super::machines::Machine;
 #[cfg(test)]
 use super::machines::{Machine, MachineRegistry};
 use super::planning::{PlanApprovalBlockReason, PlanApprovalGate, approval_gate};
-use super::policy::PolicyDecision;
+use super::policy::{PolicyApprovalGrant, PolicyDecision};
 #[cfg(test)]
 use super::store::TaskBoardStore;
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
@@ -46,6 +47,12 @@ pub struct DispatchPlan {
     /// (no decision is recorded on that path).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub policy_decision_id: Option<String>,
+    /// Id of the durable approval grant this dispatch will consume at reservation.
+    /// Set only when an approved live grant matched the spawn evaluation and the
+    /// decision allowed; the reservation transaction consumes it one-shot so a
+    /// re-dispatch needs a fresh approval. `None` on every non-approval path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub consumed_approval_grant_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -194,13 +201,14 @@ pub fn build_dispatch_plan_with_policy_root(
     policy_root: &Path,
 ) -> DispatchPlan {
     let (policy, policy_decision_id) = dispatch_policy(item, policy_root);
-    build_dispatch_plan_with_decision(item, policy, policy_decision_id)
+    build_dispatch_plan_with_decision(item, policy, policy_decision_id, None)
 }
 
 fn build_dispatch_plan_with_decision(
     item: &TaskBoardItem,
     policy: PolicyDecision,
     policy_decision_id: Option<String>,
+    consumed_approval_grant_id: Option<String>,
 ) -> DispatchPlan {
     let worker = WorkerIntent {
         mode: item.agent_mode,
@@ -219,6 +227,7 @@ fn build_dispatch_plan_with_decision(
         evaluator,
         policy,
         policy_decision_id,
+        consumed_approval_grant_id,
     }
 }
 
@@ -228,13 +237,21 @@ pub(crate) fn build_dispatch_plans_with_policy(
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
     evaluated_at: Option<&str>,
     switches: SpawnGateSwitches,
+    grants: &HashMap<String, PolicyApprovalGrant>,
 ) -> Vec<DispatchPlan> {
     items
         .iter()
         .map(|item| {
-            let (decision, decision_id) =
-                dispatch_policy_from_graph(item, policy, evaluated_at.map(str::to_owned), switches);
-            build_dispatch_plan_with_decision(item, decision, decision_id)
+            let grant = grants.get(&item.id);
+            let (decision, decision_id) = dispatch_policy_from_graph(
+                item,
+                policy,
+                evaluated_at.map(str::to_owned),
+                switches,
+                grant,
+            );
+            let consumed = consumed_grant_id(grant, &decision);
+            build_dispatch_plan_with_decision(item, decision, decision_id, consumed)
         })
         .collect()
 }
@@ -316,6 +333,7 @@ pub fn machine_mismatch_plan_with_policy_root(
         evaluator,
         policy,
         policy_decision_id,
+        consumed_approval_grant_id: None,
     }
 }
 
@@ -326,10 +344,12 @@ pub(crate) fn machine_mismatch_plan_with_policy(
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
     evaluated_at: Option<&str>,
     switches: SpawnGateSwitches,
+    grant: Option<&PolicyApprovalGrant>,
 ) -> DispatchPlan {
     let (decision, decision_id) =
-        dispatch_policy_from_graph(item, policy, evaluated_at.map(str::to_owned), switches);
-    let mut plan = build_dispatch_plan_with_decision(item, decision, decision_id);
+        dispatch_policy_from_graph(item, policy, evaluated_at.map(str::to_owned), switches, grant);
+    let consumed = consumed_grant_id(grant, &decision);
+    let mut plan = build_dispatch_plan_with_decision(item, decision, decision_id, consumed);
     plan.readiness = blocked(DispatchBlockReason::MachineMismatch {
         required: item.target_project_types.clone(),
         declared: machine.project_types.clone(),
@@ -367,7 +387,7 @@ mod spawn_policy;
 pub use spawn_policy::SpawnGateSwitches;
 #[cfg(test)]
 use spawn_policy::dispatch_policy;
-use spawn_policy::dispatch_policy_from_graph;
+use spawn_policy::{consumed_grant_id, dispatch_policy_from_graph};
 #[cfg(test)]
 pub(crate) use spawn_policy::spawn_policy_input;
 

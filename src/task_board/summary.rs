@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 #[cfg(test)]
 use std::path::Path;
 
@@ -67,13 +68,10 @@ pub fn build_audit_summary(items: &[TaskBoardItem]) -> TaskBoardAuditSummary {
 pub(crate) fn build_audit_summary_with_policy(
     items: &[TaskBoardItem],
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
+    switches: super::dispatch::SpawnGateSwitches,
 ) -> TaskBoardAuditSummary {
-    let plans = build_dispatch_plans_with_policy(
-        items,
-        policy,
-        None,
-        super::dispatch::SpawnGateSwitches::default(),
-    );
+    let grants = HashMap::new();
+    let plans = build_dispatch_plans_with_policy(items, policy, None, switches, &grants);
     audit_summary(items, &plans)
 }
 

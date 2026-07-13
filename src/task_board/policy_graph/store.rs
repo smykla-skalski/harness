@@ -127,6 +127,12 @@ pub struct PolicyPipelineAuditSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_simulation: Option<PolicyPipelineSimulationResult>,
     pub validation: PolicyGraphValidationReport,
+    #[serde(default)]
+    pub spawn_requires_live_policy: bool,
+    #[serde(default)]
+    pub spawn_kill_switch: bool,
+    #[serde(default)]
+    pub pending_approval_grant_count: usize,
 }
 
 /// Read the active canvas document, guarding against a stale canvas selection.
@@ -427,6 +433,9 @@ pub fn audit_summary(
             .map(|simulation| simulation.trace_id.clone()),
         latest_simulation,
         validation: canvas.document.validate(),
+        spawn_requires_live_policy: ws.spawn_requires_live_policy,
+        spawn_kill_switch: ws.spawn_kill_switch,
+        pending_approval_grant_count: 0,
     })
 }
 

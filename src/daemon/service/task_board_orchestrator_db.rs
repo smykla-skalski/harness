@@ -14,7 +14,8 @@ use crate::task_board::github::GitHubAutomation;
 use crate::task_board::orchestrator::TaskBoardOrchestratorPreparedRun;
 use crate::task_board::{
     DispatchExecutionSummary, ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
-    TaskBoardAuditSummary, TaskBoardEvaluationSummary, TaskBoardGitHubInboxConfig, TaskBoardItem,
+    SpawnGateSwitches, TaskBoardAuditSummary, TaskBoardEvaluationSummary, TaskBoardGitHubInboxConfig,
+    TaskBoardItem,
     TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorRunStatus,
     TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
     TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase, TaskBoardStatus,
@@ -194,7 +195,11 @@ async fn audit_summary(
         .as_ref()
         .and_then(|workspace| workspace.active_live_canvas())
         .map(|(canvas, document)| (canvas.id.as_str(), document));
-    Ok(build_audit_summary_with_policy(items, policy))
+    let switches = workspace
+        .as_ref()
+        .map(SpawnGateSwitches::from_workspace)
+        .unwrap_or_default();
+    Ok(build_audit_summary_with_policy(items, policy, switches))
 }
 
 fn dispatch_input(

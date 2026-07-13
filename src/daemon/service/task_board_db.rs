@@ -18,8 +18,8 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::store::{TaskBoardItemPatch, apply_patch};
 use crate::task_board::{
-    ExternalRef, ExternalSyncConfig, Machine, PlanningState, TaskBoardItem, TaskBoardStatus,
-    TaskBoardSyncStore, TaskBoardWorkflowState, approve_plan, begin_planning,
+    ExternalRef, ExternalSyncConfig, Machine, PlanningState, SpawnGateSwitches, TaskBoardItem,
+    TaskBoardStatus, TaskBoardSyncStore, TaskBoardWorkflowState, approve_plan, begin_planning,
     build_audit_summary_with_policy, build_machine_summaries, build_project_summaries,
     configured_sync_clients_without_review_requests, revoke_plan, submit_plan, sync_external_tasks,
 };
@@ -190,7 +190,11 @@ pub(crate) async fn audit_task_board_db(
         .as_ref()
         .and_then(|workspace| workspace.active_live_canvas())
         .map(|(canvas, document)| (canvas.id.as_str(), document));
-    Ok(build_audit_summary_with_policy(&items, policy))
+    let switches = workspace
+        .as_ref()
+        .map(SpawnGateSwitches::from_workspace)
+        .unwrap_or_default();
+    Ok(build_audit_summary_with_policy(&items, policy, switches))
 }
 
 pub(crate) async fn list_task_board_projects_db(

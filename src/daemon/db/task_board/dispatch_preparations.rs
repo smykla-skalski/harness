@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
+use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::infra::io;
 use crate::session::types::TaskSeverity;
@@ -251,6 +252,12 @@ impl AsyncDaemonDb {
         item.work_item_id = Some(preparation.work_item_id.clone());
         item.updated_at = utc_now();
         replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
+        // Consume the approved approval grant one-shot inside the reservation
+        // transaction so a re-dispatch of the same item must obtain a fresh
+        // approval. Nothing to consume on every non-approval dispatch path.
+        if let Some(grant_id) = preparation.plan.consumed_approval_grant_id.as_deref() {
+            consume_approval_grant_in_tx(transaction.as_mut(), grant_id).await?;
+        }
         let applied = DispatchAppliedTask {
             board_item_id: preparation.board_item_id.clone(),
             session_id: preparation.session_id.clone(),

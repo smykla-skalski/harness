@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::daemon::db::AsyncDaemonDb;
 #[cfg(test)]
 use crate::daemon::db::DaemonDb;
@@ -16,9 +18,10 @@ use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
     DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, DispatchFailureKind,
-    DispatchPlan, Machine, SpawnGateSwitches, TaskBoardItem, TaskBoardStatus,
-    build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy,
+    DispatchPlan, Machine, PolicyAction, PolicyApprovalGrant, SpawnGateSwitches, TaskBoardItem,
+    TaskBoardStatus, build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy,
 };
+use crate::task_board::policy_graph::PolicyGraph;
 #[cfg(test)]
 use crate::task_board::{
     SessionIntent, TaskBoardStore, TaskBoardWorkflowStatus, build_dispatch_summary_with_policy_root,
@@ -336,13 +339,16 @@ async fn build_dispatch_plans_for_request_async(
         .map(|(canvas, document)| (canvas.id.as_str(), document));
     let switches = workspace
         .as_ref()
-        .map_or_else(SpawnGateSwitches::default, |workspace| SpawnGateSwitches {
-            requires_live_policy: workspace.spawn_requires_live_policy,
-            kill_switch: workspace.spawn_kill_switch,
-        });
+        .map_or_else(SpawnGateSwitches::default, SpawnGateSwitches::from_workspace);
+    let grants = load_live_spawn_grants(db, policy, &kept, &rejected).await?;
     let evaluated_at = utc_now();
-    let mut plans =
-        build_dispatch_plans_with_policy(&kept, policy, Some(evaluated_at.as_str()), switches);
+    let mut plans = build_dispatch_plans_with_policy(
+        &kept,
+        policy,
+        Some(evaluated_at.as_str()),
+        switches,
+        &grants,
+    );
     plans.extend(rejected.iter().map(|(item, machine)| {
         machine_mismatch_plan_with_policy(
             item,
@@ -350,9 +356,37 @@ async fn build_dispatch_plans_for_request_async(
             policy,
             Some(evaluated_at.as_str()),
             switches,
+            grants.get(&item.id),
         )
     }));
     Ok(plans)
+}
+
+/// Load the live (unconsumed) spawn approval grant for every item under
+/// evaluation, keyed by board item id. Only meaningful when a live enforced
+/// graph exists (a grant is keyed to that graph's revision); returns an empty
+/// map otherwise so no injection happens on the built-in fallback path.
+async fn load_live_spawn_grants(
+    db: &AsyncDaemonDb,
+    policy: Option<(&str, &PolicyGraph)>,
+    kept: &[TaskBoardItem],
+    rejected: &[(TaskBoardItem, Machine)],
+) -> Result<HashMap<String, PolicyApprovalGrant>, CliError> {
+    let mut grants = HashMap::new();
+    let Some((_canvas_id, document)) = policy else {
+        return Ok(grants);
+    };
+    let revision = document.revision;
+    let items = kept.iter().chain(rejected.iter().map(|(item, _)| item));
+    for item in items {
+        if let Some(grant) = db
+            .live_approval_grant(&item.id, PolicyAction::SpawnAgent, revision)
+            .await?
+        {
+            grants.insert(item.id.clone(), grant);
+        }
+    }
+    Ok(grants)
 }
 
 fn filter_for_machine(

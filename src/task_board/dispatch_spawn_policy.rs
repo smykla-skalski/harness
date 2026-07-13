@@ -6,13 +6,14 @@
 use std::path::Path;
 
 use crate::task_board::policy::{
-    BuiltInPolicyGate, POLICY_VERSION, PolicyAction, PolicyDecision, PolicyGate, PolicyInput,
-    PolicyReasonCode, PolicySubject,
+    BuiltInPolicyGate, POLICY_VERSION, PolicyAction, PolicyApprovalGrant, PolicyApprovalGrantState,
+    PolicyApprovalState, PolicyDecision, PolicyGate, PolicyInput, PolicyReasonCode, PolicySubject,
 };
 #[cfg(test)]
 use crate::task_board::policy_graph::resolve_gate_policy;
 use crate::task_board::policy_graph::{
-    PolicyGraph, PolicyPipelineMode, RecordedPolicyDecision, record_policy_decision,
+    PolicyCanvasWorkspace, PolicyGraph, PolicyPendingGrantRequest, PolicyPipelineMode,
+    RecordedPolicyDecision, record_pending_grant, record_policy_decision,
 };
 use crate::task_board::types::TaskBoardItem;
 
@@ -26,6 +27,17 @@ pub struct SpawnGateSwitches {
     pub requires_live_policy: bool,
     /// Emergency kill switch: deny all spawning before graph evaluation.
     pub kill_switch: bool,
+}
+
+impl SpawnGateSwitches {
+    /// Read the persisted spawn switches off a policy workspace.
+    #[must_use]
+    pub fn from_workspace(workspace: &PolicyCanvasWorkspace) -> Self {
+        Self {
+            requires_live_policy: workspace.spawn_requires_live_policy,
+            kill_switch: workspace.spawn_kill_switch,
+        }
+    }
 }
 
 /// Build the `spawn_agent` policy input for a board item. Fills the WP3
@@ -84,15 +96,22 @@ pub(super) fn dispatch_policy_from_graph(
     policy: Option<(&str, &PolicyGraph)>,
     evaluated_at: Option<String>,
     switches: SpawnGateSwitches,
+    grant: Option<&PolicyApprovalGrant>,
 ) -> (PolicyDecision, Option<String>) {
-    let input = spawn_policy_input(item, evaluated_at);
+    let mut input = spawn_policy_input(item, evaluated_at);
+    if let Some(grant) = grant {
+        input.approvals.push(PolicyApprovalGrantState {
+            node_id: grant.node_id.clone(),
+            state: grant.state,
+        });
+    }
     if switches.kill_switch {
         return deny_kill_switch(&item.id, input);
     }
     if let Some((canvas_id, document)) = policy
         && document.mode != PolicyPipelineMode::Draft
     {
-        return graph_decision(canvas_id, document, input);
+        return graph_decision(&item.id, canvas_id, document, input);
     }
     if switches.requires_live_policy {
         return deny_requires_live_policy(&item.id, input);
@@ -100,13 +119,37 @@ pub(super) fn dispatch_policy_from_graph(
     (BuiltInPolicyGate::default().evaluate(&input), None)
 }
 
-/// Evaluate the live graph, record the decision, and return it with its id.
+/// The durable grant this dispatch consumes: only an approved live grant whose
+/// gate the decision cleared. Everything else leaves nothing to consume.
+pub(super) fn consumed_grant_id(
+    grant: Option<&PolicyApprovalGrant>,
+    decision: &PolicyDecision,
+) -> Option<String> {
+    grant
+        .filter(|grant| grant.state == PolicyApprovalState::Approved && decision.is_allow())
+        .map(|grant| grant.id.clone())
+}
+
+/// Evaluate the live graph, record the decision, emit pending-grant requests for
+/// any reached approval gate, and return the decision with its recorded id.
 fn graph_decision(
+    board_item_id: &str,
     canvas_id: &str,
     document: &PolicyGraph,
     input: PolicyInput,
 ) -> (PolicyDecision, Option<String>) {
     let simulation = document.simulate(&input);
+    for request in &simulation.approval_requests {
+        record_pending_grant(PolicyPendingGrantRequest {
+            board_item_id: board_item_id.to_owned(),
+            action: input.action,
+            canvas_id: Some(canvas_id.to_owned()),
+            canvas_revision: document.revision,
+            node_id: request.node_id.clone(),
+            reason_code: request.reason_code,
+            expiry_seconds: request.expiry_seconds,
+        });
+    }
     let decision = simulation.decision;
     let record = RecordedPolicyDecision::new(
         document.revision,
