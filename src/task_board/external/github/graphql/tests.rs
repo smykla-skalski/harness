@@ -1,20 +1,22 @@
 use super::*;
 
 #[test]
-fn personal_issue_queries_scope_to_user_and_renovate() {
+fn personal_issue_queries_use_github_all_state_form() {
     let repository = GitHubRepository {
         owner: "owner".into(),
         repo: "repo".into(),
     };
+    let queries = personal_issue_queries(&repository, "octo-user");
 
     assert_eq!(
-        personal_issue_queries(&repository, "octo-user"),
+        queries,
         vec![
             "repo:owner/repo is:issue assignee:octo-user",
             "repo:owner/repo is:issue author:octo-user",
             "repo:owner/repo is:issue author:renovate[bot]",
         ]
     );
+    assert!(queries.iter().all(|query| !query.contains("state:")));
 }
 
 #[test]
