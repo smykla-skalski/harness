@@ -292,6 +292,12 @@ pub(crate) async fn dispatch_task_board_async(
     dispatch::dispatch_task_board_async(request, async_db).await
 }
 
+pub(crate) async fn pick_task_board_dispatch_async(
+    async_db: &AsyncDaemonDb,
+) -> Result<crate::daemon::protocol::TaskBoardDispatchPickResponse, CliError> {
+    dispatch::pick_task_board_dispatch_async(async_db).await
+}
+
 /// Build task-board audit counts.
 ///
 /// # Errors

@@ -23,6 +23,8 @@ pub(crate) struct TaskBoardDispatchPreparation {
     pub(crate) actor: String,
     pub(crate) project_dir: Option<String>,
     pub(crate) plan: DispatchPlan,
+    #[serde(default)]
+    pub(crate) hold_worker: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +54,7 @@ impl AsyncDaemonDb {
         plan: &DispatchPlan,
         actor: &str,
         project_dir: Option<&str>,
+        hold_worker: bool,
     ) -> Result<ReservedTaskBoardDispatch, CliError> {
         io::validate_safe_segment(&plan.board_item_id)?;
         let mut transaction = self
@@ -86,6 +89,7 @@ impl AsyncDaemonDb {
             actor: actor.to_string(),
             project_dir: project_dir.map(ToString::to_string),
             plan: plan.clone(),
+            hold_worker,
         };
         insert_preparation(&mut transaction, &intent_id, &preparation).await?;
         transaction.commit().await.map_err(|error| {
@@ -223,7 +227,14 @@ impl AsyncDaemonDb {
         item.workflow.branch = Some(branch.to_string());
         item.workflow.worktree = Some(worktree.to_string());
         item.workflow.status = TaskBoardWorkflowStatus::Running;
-        item.workflow.current_step_id = Some("dispatch".to_string());
+        item.workflow.current_step_id = Some(
+            if preparation.hold_worker {
+                "awaiting_delivery"
+            } else {
+                "dispatch"
+            }
+            .to_string(),
+        );
         item.workflow.attempts = item.workflow.attempts.saturating_add(1);
         item.workflow
             .push_policy_trace_id(format!("policy-trace-{}", Uuid::new_v4().simple()));
@@ -242,15 +253,21 @@ impl AsyncDaemonDb {
         let payload = serde_json::to_string(&applied).map_err(|error| {
             db_error(format!("serialize prepared task board dispatch: {error}"))
         })?;
+        let published_status = if preparation.hold_worker {
+            "held"
+        } else {
+            "pending"
+        };
         query(
             "UPDATE task_board_dispatch_intents
-             SET payload_json = ?3, status = 'pending', claim_token = NULL,
-                 claimed_at = NULL, last_error = NULL, updated_at = ?4
+             SET payload_json = ?3, status = ?4, claim_token = NULL,
+                 claimed_at = NULL, last_error = NULL, updated_at = ?5
              WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'preparing_claimed'",
         )
         .bind(&claim.intent_id)
         .bind(&claim.claim_token)
         .bind(payload)
+        .bind(published_status)
         .bind(utc_now())
         .execute(transaction.as_mut())
         .await
@@ -299,7 +316,7 @@ async fn active_reservation(
     let row = query_as::<_, (String, String, String)>(
         "SELECT intent_id, status, payload_json FROM task_board_dispatch_intents
          WHERE item_id = ?1
-           AND status IN ('preparing', 'preparing_claimed', 'pending', 'starting')
+           AND status IN ('preparing', 'preparing_claimed', 'held', 'pending', 'starting')
          ORDER BY created_at DESC LIMIT 1",
     )
     .bind(item_id)

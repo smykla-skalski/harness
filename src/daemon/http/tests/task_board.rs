@@ -20,6 +20,24 @@ fn task_board_http_dispatch_evaluate_and_run_once_use_real_state() {
 }
 
 #[test]
+fn task_board_http_step_mode_holds_worker_until_delivery() {
+    let sandbox = tempdir().expect("tempdir");
+    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(run_task_board_step_mode_hold(sandbox.path()));
+    });
+}
+
+#[test]
+fn task_board_http_pick_previews_highest_priority_item() {
+    let sandbox = tempdir().expect("tempdir");
+    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(run_task_board_pick_preview());
+    });
+}
+
+#[test]
 fn task_board_http_policy_pipeline_routes_round_trip() {
     let sandbox = tempdir().expect("tempdir");
     harness_testkit::with_isolated_harness_env(sandbox.path(), || {
@@ -55,6 +73,119 @@ async fn run_task_board_http_flow(sandbox: &Path) {
 
     run_task_board_http_item_scope_flow(&client, &base_url, &state, &project_dir).await;
     run_task_board_http_run_once_flow(&client, &base_url, &state, &project_dir).await;
+
+    server.abort();
+    let _ = server.await;
+}
+
+async fn run_task_board_step_mode_hold(sandbox: &Path) {
+    let project_dir = sandbox.join("step-project");
+    harness_testkit::init_git_repo_with_seed(&project_dir);
+    let state = test_http_state_with_db();
+    let (base_url, server) = serve_http(state.clone()).await;
+    let client = reqwest::Client::new();
+    put_json(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
+        json!({ "step_mode": true }),
+    )
+    .await;
+    seed_ready_board_item(&state, "board-step-held", "Held step item").await;
+
+    let response = dispatch_http_item(&client, &base_url, "board-step-held", &project_dir).await;
+    let applied = first_applied(&response);
+    let session_id = required_string(applied, "session_id");
+
+    assert_eq!(
+        applied["item"]["workflow"]["current_step_id"].as_str(),
+        Some("awaiting_delivery")
+    );
+    assert!(
+        state
+            .codex_controller
+            .list_runs(&session_id)
+            .expect("list held runs")
+            .runs
+            .is_empty()
+    );
+    let status = get_json(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
+    )
+    .await;
+    assert_eq!(status["held_dispatches"]["count"].as_u64(), Some(1));
+    assert_eq!(
+        status["held_dispatches"]["items"][0]["board_item_id"].as_str(),
+        Some("board-step-held")
+    );
+    let preview = post_json(
+        &client,
+        &base_url,
+        "/v1/task-board/dispatch/deliver",
+        json!({ "item_id": "board-step-held", "dry_run": true }),
+    )
+    .await;
+    assert_eq!(preview["started_agent"], serde_json::Value::Null);
+    assert!(
+        preview["rendered_prompt"]
+            .as_str()
+            .is_some_and(|prompt| { prompt.contains("Board item: board-step-held") })
+    );
+    let delivered = post_json(
+        &client,
+        &base_url,
+        "/v1/task-board/dispatch/deliver",
+        json!({ "item_id": "board-step-held" }),
+    )
+    .await;
+    assert!(delivered["started_agent"].is_object());
+    assert_codex_worker_started(
+        &state,
+        &session_id,
+        "board-step-held",
+        &required_string(applied, "work_item_id"),
+    );
+
+    server.abort();
+    let _ = server.await;
+}
+
+async fn run_task_board_pick_preview() {
+    let state = test_http_state_with_db();
+    let (base_url, server) = serve_http(state.clone()).await;
+    let client = reqwest::Client::new();
+    seed_ready_board_item(&state, "board-pick-low", "Low item").await;
+    seed_ready_board_item(&state, "board-pick-high", "High item").await;
+    put_json(
+        &client,
+        &base_url,
+        "/v1/task-board/items/board-pick-high",
+        json!({ "priority": "critical" }),
+    )
+    .await;
+
+    let picked = post_json(
+        &client,
+        &base_url,
+        "/v1/task-board/dispatch/pick",
+        json!({}),
+    )
+    .await;
+    assert_eq!(
+        picked["selection"]["item"]["id"].as_str(),
+        Some("board-pick-high")
+    );
+    assert_eq!(
+        picked["selection"]["plan"]["board_item_id"].as_str(),
+        Some("board-pick-high")
+    );
+    assert!(
+        picked["selection"]["plan"]["rendered_prompt"]
+            .as_str()
+            .is_some_and(|prompt| prompt.contains("Board item: board-pick-high"))
+    );
 
     server.abort();
     let _ = server.await;

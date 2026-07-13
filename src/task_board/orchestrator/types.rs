@@ -122,12 +122,29 @@ pub struct TaskBoardOrchestratorStatus {
     pub running: bool,
     #[serde(default)]
     pub step_mode: bool,
+    #[serde(default)]
+    pub held_dispatches: TaskBoardHeldDispatchSummary,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_tick: Option<TaskBoardOrchestratorTickInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_run: Option<TaskBoardOrchestratorRunSummary>,
     pub workflow_execution_counts: Vec<TaskBoardWorkflowExecutionCount>,
     pub settings: TaskBoardOrchestratorSettings,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardHeldDispatchSummary {
+    pub count: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub items: Vec<TaskBoardHeldDispatchItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardHeldDispatchItem {
+    pub intent_id: String,
+    pub board_item_id: String,
+    pub session_id: String,
+    pub work_item_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

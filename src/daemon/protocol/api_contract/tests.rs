@@ -148,6 +148,18 @@ fn database_task_board_methods_have_remote_scope_contract() {
 }
 
 #[test]
+fn manual_dispatch_steps_have_remote_surface_scopes() {
+    assert_eq!(
+        remote_ws_scopes(ws_methods::TASK_BOARD_DISPATCH_PICK),
+        Some(&[RemoteAccessScope::Read][..])
+    );
+    assert_eq!(
+        remote_ws_scopes(ws_methods::TASK_BOARD_DISPATCH_DELIVER),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+}
+
+#[test]
 fn every_mapped_ws_method_is_listed_in_ws_methods_all() {
     let declared_methods: BTreeSet<_> = ws_methods::ALL.iter().copied().collect();
 

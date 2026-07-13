@@ -16,9 +16,10 @@ use self::items::{
     delete_task_board_item, get_task_board_audit, get_task_board_capabilities,
     get_task_board_host_list, get_task_board_host_local, get_task_board_item, get_task_board_items,
     get_task_board_machines, get_task_board_projects, post_task_board_dispatch,
-    post_task_board_evaluate, post_task_board_item, post_task_board_plan_approve,
-    post_task_board_plan_begin, post_task_board_plan_revoke, post_task_board_plan_submit,
-    post_task_board_sync, put_task_board_host_set_project_types, put_task_board_item,
+    post_task_board_dispatch_deliver, post_task_board_dispatch_pick, post_task_board_evaluate,
+    post_task_board_item, post_task_board_plan_approve, post_task_board_plan_begin,
+    post_task_board_plan_revoke, post_task_board_plan_submit, post_task_board_sync,
+    put_task_board_host_set_project_types, put_task_board_item,
 };
 use self::policy::merge_policy_routes;
 use self::policy_io::merge_policy_io_routes;
@@ -75,6 +76,14 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::TASK_BOARD_DISPATCH,
             post(post_task_board_dispatch),
+        )
+        .route(
+            http_paths::TASK_BOARD_DISPATCH_DELIVER,
+            post(post_task_board_dispatch_deliver),
+        )
+        .route(
+            http_paths::TASK_BOARD_DISPATCH_PICK,
+            post(post_task_board_dispatch_pick),
         )
         .route(
             http_paths::TASK_BOARD_EVALUATE,

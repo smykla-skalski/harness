@@ -122,7 +122,7 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
         .expect("load item");
     let plan = build_dispatch_plans_with_policy(&[item], None).remove(0);
     let first = db
-        .reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"))
+        .reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
         .await
         .expect("reserve dispatch");
     let (intent_id, preparation) = match first {
@@ -142,7 +142,7 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
     assert!(still_todo.work_item_id.is_none());
 
     let repeated = db
-        .reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"))
+        .reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
         .await
         .expect("repeat reservation");
     assert!(matches!(
@@ -232,7 +232,7 @@ async fn existing_session_without_work_item_is_reservable() {
     let plan = build_dispatch_plans_with_policy(&[item], None).remove(0);
 
     let reserved = db
-        .reserve_task_board_dispatch(&plan, "control-plane", None)
+        .reserve_task_board_dispatch(&plan, "control-plane", None, false)
         .await;
 
     assert!(

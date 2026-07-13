@@ -5,12 +5,15 @@ use crate::daemon::db::{AsyncDaemonDb, ClaimedTaskBoardDispatch};
 #[cfg(test)]
 use crate::daemon::protocol::ManagedAgentSnapshot;
 use crate::daemon::protocol::{
-    TaskBoardDispatchRequest, TaskBoardDispatchResponse, TaskBoardEvaluateRequest,
-    TaskBoardEvaluationResponse, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
+    TaskBoardDispatchPickResponse, TaskBoardDispatchRequest, TaskBoardDispatchResponse,
+    TaskBoardEvaluateRequest, TaskBoardEvaluationResponse, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorRunOnceResponse,
 };
 use crate::daemon::service;
-use crate::daemon::task_board_managed_agents::start_worker_for_applied_task;
+use crate::daemon::task_board_managed_agents::{
+    rendered_worker_prompt, start_worker_for_applied_task,
+};
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{DispatchAppliedTask, DispatchFailure, DispatchFailureKind};
 
@@ -44,6 +47,48 @@ pub(crate) async fn dispatch(
     let async_db = require_async_db(state, "task board dispatch")?;
     let result = service::dispatch_task_board_async(&request, async_db).await;
     handle_dispatch_result(state, result, async_db).await
+}
+
+pub(crate) async fn deliver(
+    state: &DaemonHttpState,
+    request: &TaskBoardDispatchDeliverRequest,
+) -> Result<TaskBoardDispatchDeliverResponse, CliError> {
+    let db = require_async_db(state, "task board dispatch deliver")?;
+    if request.dry_run {
+        let held = db.held_task_board_dispatch(&request.item_id).await?;
+        return Ok(TaskBoardDispatchDeliverResponse {
+            rendered_prompt: rendered_worker_prompt(&held.applied, &held.intent_id),
+            intent_id: held.intent_id,
+            applied: held.applied,
+            started_agent: None,
+        });
+    }
+    let claim = db.claim_held_task_board_dispatch(&request.item_id).await?;
+    let prompt = rendered_worker_prompt(&claim.applied, &claim.intent_id);
+    match start_worker_for_applied_task(state, &claim.applied, &claim.intent_id).await {
+        Ok(agent) => {
+            db.complete_task_board_dispatch(&claim.intent_id, &claim.claim_token)
+                .await?;
+            Ok(TaskBoardDispatchDeliverResponse {
+                intent_id: claim.intent_id,
+                applied: claim.applied,
+                rendered_prompt: prompt,
+                started_agent: Some(agent),
+            })
+        }
+        Err(error) => {
+            db.fail_task_board_dispatch(&claim.intent_id, &claim.claim_token, &error.to_string())
+                .await?;
+            Err(error)
+        }
+    }
+}
+
+pub(crate) async fn pick(
+    state: &DaemonHttpState,
+) -> Result<TaskBoardDispatchPickResponse, CliError> {
+    let db = require_async_db(state, "task board dispatch pick")?;
+    service::pick_task_board_dispatch_async(db).await
 }
 
 pub(crate) async fn evaluate(
@@ -87,7 +132,7 @@ async fn handle_run_once_result(
     result: Result<TaskBoardOrchestratorRunOnceResponse, CliError>,
     async_db: &AsyncDaemonDb,
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
-    let status = result?;
+    let mut status = result?;
     if status.last_run_applied_count() > 0 {
         let applied: Vec<DispatchAppliedTask> = status
             .last_run
@@ -95,10 +140,31 @@ async fn handle_run_once_result(
             .and_then(|run| run.dispatch.as_ref())
             .map(|dispatch| dispatch.applied.clone())
             .unwrap_or_default();
-        let _ = start_claimed_workers(state, &applied, async_db).await;
+        let (kept, failures) = start_claimed_workers(state, &applied, async_db).await;
+        if let Some(dispatch) = status
+            .last_run
+            .as_mut()
+            .and_then(|run| run.dispatch.as_mut())
+        {
+            amend_dispatch_for_worker_outcomes(dispatch, kept, failures);
+            let mut orchestrator_state = async_db.task_board_orchestrator_state().await?;
+            orchestrator_state.last_run.clone_from(&status.last_run);
+            async_db
+                .replace_task_board_orchestrator_state(&orchestrator_state)
+                .await?;
+        }
         broadcast_sessions_updated(state, Some(async_db)).await;
     }
     Ok(status)
+}
+
+fn amend_dispatch_for_worker_outcomes(
+    dispatch: &mut crate::task_board::DispatchExecutionSummary,
+    kept: Vec<DispatchAppliedTask>,
+    failures: Vec<DispatchFailure>,
+) {
+    dispatch.applied = kept;
+    dispatch.failures.extend(failures);
 }
 
 #[expect(
@@ -310,5 +376,26 @@ mod tests {
         assert_eq!(rollback_calls.len(), 1);
         assert_eq!(rollback_calls[0].0, "fail-2");
         assert!(rollback_calls[0].1.contains("worker spawn failed"));
+    }
+
+    #[test]
+    fn startup_failures_amend_orchestrator_dispatch() {
+        let original = applied_task("failed");
+        let kept = applied_task("kept");
+        let failure = DispatchFailure {
+            board_item_id: original.board_item_id.clone(),
+            kind: DispatchFailureKind::WorkerSpawnFailed,
+            message: "spawn failed".into(),
+        };
+        let mut dispatch = crate::task_board::DispatchExecutionSummary {
+            plans: Vec::new(),
+            applied: vec![original],
+            failures: Vec::new(),
+        };
+
+        amend_dispatch_for_worker_outcomes(&mut dispatch, vec![kept], vec![failure]);
+
+        assert_eq!(dispatch.applied[0].board_item_id, "kept");
+        assert_eq!(dispatch.failures.len(), 1);
     }
 }

@@ -3,7 +3,10 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::db::DaemonDb;
 #[cfg(test)]
 use crate::daemon::protocol::{SessionDetail, SessionStartRequest, TaskCreateRequest};
-use crate::daemon::protocol::{TaskBoardDispatchRequest, TaskBoardDispatchResponse};
+use crate::daemon::protocol::{
+    TaskBoardDispatchPickResponse, TaskBoardDispatchPickSelection, TaskBoardDispatchRequest,
+    TaskBoardDispatchResponse,
+};
 use crate::errors::CliError;
 #[cfg(test)]
 use crate::errors::CliErrorKind;
@@ -83,8 +86,9 @@ pub async fn dispatch_task_board_async(
     }
     let mut applied = Vec::new();
     let mut failures = Vec::new();
+    let hold_worker = async_db.task_board_orchestrator_settings().await?.step_mode;
     for plan in plans.iter().filter(|plan| plan.is_ready()) {
-        match apply_dispatch_plan_async(request, async_db, plan).await {
+        match apply_dispatch_plan_async(request, async_db, plan, hold_worker).await {
             Ok(task) => applied.push(task),
             Err((kind, error)) => {
                 failures.push(DispatchFailure {
@@ -100,6 +104,32 @@ pub async fn dispatch_task_board_async(
         applied,
         failures,
     })
+}
+
+/// Preview the highest-priority ready todo item without reserving it.
+///
+/// # Errors
+/// Returns `CliError` when board items or policy state cannot be loaded.
+pub async fn pick_task_board_dispatch_async(
+    db: &AsyncDaemonDb,
+) -> Result<TaskBoardDispatchPickResponse, CliError> {
+    let request = TaskBoardDispatchRequest {
+        item_id: None,
+        status: Some(crate::task_board::TaskBoardStatus::Todo),
+        dry_run: true,
+        project_dir: None,
+        actor: None,
+    };
+    let plans = build_dispatch_plans_for_request_async(db, &request).await?;
+    let selection = if let Some(plan) = plans.into_iter().find(|plan| plan.is_ready()) {
+        Some(TaskBoardDispatchPickSelection {
+            item: db.task_board_item(&plan.board_item_id).await?,
+            plan,
+        })
+    } else {
+        None
+    };
+    Ok(TaskBoardDispatchPickResponse { selection })
 }
 
 #[cfg(test)]
@@ -166,8 +196,9 @@ async fn apply_dispatch_plan_async(
     request: &TaskBoardDispatchRequest,
     async_db: &AsyncDaemonDb,
     plan: &DispatchPlan,
+    hold_worker: bool,
 ) -> Result<DispatchAppliedTask, (DispatchFailureKind, CliError)> {
-    reserve_and_prepare_task_board_dispatch(async_db, request, plan).await
+    reserve_and_prepare_task_board_dispatch(async_db, request, plan, hold_worker).await
 }
 
 #[cfg(test)]

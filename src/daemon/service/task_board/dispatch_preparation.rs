@@ -26,12 +26,13 @@ pub(super) async fn reserve_and_prepare_task_board_dispatch(
     db: &AsyncDaemonDb,
     request: &TaskBoardDispatchRequest,
     plan: &DispatchPlan,
+    hold_worker: bool,
 ) -> Result<DispatchAppliedTask, (DispatchFailureKind, CliError)> {
     let project_dir = dispatch_project_dir(request, plan)
         .map_err(|error| (DispatchFailureKind::CreateSession, error))?;
     let actor = request.actor.as_deref().unwrap_or(CONTROL_PLANE_ACTOR_ID);
     let reserved = db
-        .reserve_task_board_dispatch(plan, actor, project_dir.as_deref())
+        .reserve_task_board_dispatch(plan, actor, project_dir.as_deref(), hold_worker)
         .await
         .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
     let (intent_id, _) = match reserved {

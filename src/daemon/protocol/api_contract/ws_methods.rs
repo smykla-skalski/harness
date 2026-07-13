@@ -53,6 +53,8 @@ pub const TASK_BOARD_PLAN_APPROVE: &str = "task_board.plan_approve";
 pub const TASK_BOARD_PLAN_REVOKE: &str = "task_board.plan_revoke";
 pub const TASK_BOARD_SYNC: &str = "task_board.sync";
 pub const TASK_BOARD_DISPATCH: &str = "task_board.dispatch";
+pub const TASK_BOARD_DISPATCH_DELIVER: &str = "task_board.dispatch_deliver";
+pub const TASK_BOARD_DISPATCH_PICK: &str = "task_board.dispatch_pick";
 pub const TASK_BOARD_EVALUATE: &str = "task_board.evaluate";
 pub const TASK_BOARD_AUDIT: &str = "task_board.audit";
 pub const TASK_BOARD_PROJECTS: &str = "task_board.projects";
@@ -225,6 +227,8 @@ pub const ALL: &[&str] = &[
     TASK_BOARD_PLAN_REVOKE,
     TASK_BOARD_SYNC,
     TASK_BOARD_DISPATCH,
+    TASK_BOARD_DISPATCH_DELIVER,
+    TASK_BOARD_DISPATCH_PICK,
     TASK_BOARD_EVALUATE,
     TASK_BOARD_AUDIT,
     TASK_BOARD_PROJECTS,

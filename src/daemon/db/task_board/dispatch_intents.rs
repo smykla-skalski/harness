@@ -6,7 +6,10 @@ use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::infra::io;
 use crate::task_board::dispatch::DispatchLifecycle;
-use crate::task_board::{DispatchAppliedTask, TaskBoardStatus, TaskBoardWorkflowStatus};
+use crate::task_board::{
+    DispatchAppliedTask, TaskBoardHeldDispatchItem, TaskBoardHeldDispatchSummary, TaskBoardStatus,
+    TaskBoardWorkflowStatus,
+};
 
 const CLAIM_LEASE_SECONDS: i64 = 30;
 
@@ -17,7 +20,109 @@ pub(crate) struct ClaimedTaskBoardDispatch {
     pub(crate) applied: DispatchAppliedTask,
 }
 
+#[derive(Debug)]
+pub(crate) struct HeldTaskBoardDispatch {
+    pub(crate) intent_id: String,
+    pub(crate) applied: DispatchAppliedTask,
+}
+
 impl AsyncDaemonDb {
+    pub(crate) async fn held_task_board_dispatch_summary(
+        &self,
+    ) -> Result<TaskBoardHeldDispatchSummary, CliError> {
+        let rows = query_as::<_, (String, String, String, String)>(
+            "SELECT intent_id, item_id, session_id, work_item_id
+             FROM task_board_dispatch_intents WHERE status = 'held'
+             ORDER BY created_at, intent_id",
+        )
+        .fetch_all(self.pool())
+        .await
+        .map_err(|error| db_error(format!("list held task board dispatches: {error}")))?;
+        let items = rows
+            .into_iter()
+            .map(
+                |(intent_id, board_item_id, session_id, work_item_id)| TaskBoardHeldDispatchItem {
+                    intent_id,
+                    board_item_id,
+                    session_id,
+                    work_item_id,
+                },
+            )
+            .collect::<Vec<_>>();
+        Ok(TaskBoardHeldDispatchSummary {
+            count: items.len(),
+            items,
+        })
+    }
+
+    pub(crate) async fn held_task_board_dispatch(
+        &self,
+        board_item_id: &str,
+    ) -> Result<HeldTaskBoardDispatch, CliError> {
+        io::validate_safe_segment(board_item_id)?;
+        let row = query_as::<_, (String, String)>(
+            "SELECT intent_id, payload_json FROM task_board_dispatch_intents
+             WHERE item_id = ?1 AND status = 'held'",
+        )
+        .bind(board_item_id)
+        .fetch_optional(self.pool())
+        .await
+        .map_err(|error| db_error(format!("load held task board dispatch: {error}")))?
+        .ok_or_else(|| {
+            CliError::from(CliErrorKind::session_agent_conflict(format!(
+                "task-board dispatch for item '{board_item_id}' is not held"
+            )))
+        })?;
+        Ok(HeldTaskBoardDispatch {
+            intent_id: row.0,
+            applied: decode_applied(&row.1)?,
+        })
+    }
+
+    pub(crate) async fn claim_held_task_board_dispatch(
+        &self,
+        board_item_id: &str,
+    ) -> Result<ClaimedTaskBoardDispatch, CliError> {
+        io::validate_safe_segment(board_item_id)?;
+        let mut transaction = self
+            .begin_immediate_transaction("task board held dispatch delivery")
+            .await?;
+        let (intent_id, payload_json) = query_as::<_, (String, String)>(
+            "SELECT intent_id, payload_json FROM task_board_dispatch_intents
+             WHERE item_id = ?1 AND status = 'held'",
+        )
+        .bind(board_item_id)
+        .fetch_optional(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("load held task board delivery: {error}")))?
+        .ok_or_else(|| {
+            CliError::from(CliErrorKind::session_agent_conflict(format!(
+                "task-board dispatch for item '{board_item_id}' is not held"
+            )))
+        })?;
+        let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
+        query(
+            "UPDATE task_board_dispatch_intents SET status = 'starting', attempts = attempts + 1,
+             claim_token = ?2, claimed_at = ?3, updated_at = ?3
+             WHERE intent_id = ?1 AND status = 'held'",
+        )
+        .bind(&intent_id)
+        .bind(&claim_token)
+        .bind(utc_now())
+        .execute(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("claim held task board dispatch: {error}")))?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit held task board delivery: {error}")))?;
+        Ok(ClaimedTaskBoardDispatch {
+            intent_id,
+            claim_token,
+            applied: decode_applied(&payload_json)?,
+        })
+    }
+
     /// Atomically link a Task Board item to its created task and enqueue worker startup.
     #[expect(
         clippy::cognitive_complexity,

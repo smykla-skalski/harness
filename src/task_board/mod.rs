@@ -59,7 +59,8 @@ pub use machines::MachineRegistry;
 #[cfg(test)]
 pub use orchestrator::TaskBoardOrchestrator;
 pub use orchestrator::{
-    TaskBoardGitHubInboxConfig, TaskBoardGitHubProjectConfig, TaskBoardOrchestratorDispatchInput,
+    TaskBoardGitHubInboxConfig, TaskBoardGitHubProjectConfig, TaskBoardHeldDispatchItem,
+    TaskBoardHeldDispatchSummary, TaskBoardOrchestratorDispatchInput,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunStatus,
     TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorState,

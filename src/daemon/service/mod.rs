@@ -347,7 +347,6 @@ pub use status::{
     diagnostics_report, get_log_level, health_response, record_telemetry, request_shutdown,
     set_log_level, status_report,
 };
-pub(crate) use task_board::dispatch_task_board_async;
 #[cfg(test)]
 pub use task_board::{
     approve_task_board_plan, audit_task_board, begin_task_board_planning, create_task_board_item,
@@ -363,6 +362,7 @@ pub(crate) use task_board::{
     save_policy_pipeline_draft, set_active_policy_canvas, set_policy_canvas_global_enforcement,
     simulate_policy_pipeline, update_policy_scenario,
 };
+pub(crate) use task_board::{dispatch_task_board_async, pick_task_board_dispatch_async};
 pub(crate) use task_board_db::{
     approve_task_board_plan_db, audit_task_board_db, begin_task_board_planning_db,
     create_task_board_item_db, delete_task_board_item_db, get_task_board_item_db,

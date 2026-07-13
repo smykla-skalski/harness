@@ -91,6 +91,7 @@ mod schema_v29;
 mod schema_v30;
 mod schema_v31;
 mod schema_v32;
+mod schema_v33;
 #[allow(dead_code)]
 mod task_board;
 pub(crate) use task_board::{
@@ -290,7 +291,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "32";
+pub(crate) const SCHEMA_VERSION: &str = "33";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

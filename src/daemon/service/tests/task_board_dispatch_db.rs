@@ -34,6 +34,7 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
                     &plan,
                     crate::session::types::CONTROL_PLANE_ACTOR_ID,
                     Some(project.to_string_lossy().as_ref()),
+                    false,
                 )
                 .await
                 .expect("reserve dispatch");

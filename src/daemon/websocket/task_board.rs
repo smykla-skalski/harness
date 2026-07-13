@@ -4,11 +4,12 @@ use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::daemon::protocol::{
     ControlPlaneActorRequest, TaskBoardAuditRequest, TaskBoardCatalogRequest,
-    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchRequest,
-    TaskBoardEvaluateRequest, TaskBoardGitSigningVerifyRequest,
-    TaskBoardHostSetProjectTypesRequest, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
-    TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardSyncRequest,
-    TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
+    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchDeliverRequest,
+    TaskBoardDispatchPickRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
+    TaskBoardGitSigningVerifyRequest, TaskBoardHostSetProjectTypesRequest,
+    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
+    TaskBoardPlanSubmitRequest, TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest,
+    WsResponse, ws_methods,
 };
 use crate::errors::CliError;
 use serde::de::DeserializeOwned;
@@ -58,6 +59,12 @@ pub(crate) async fn dispatch_task_board_method(
         }
         ws_methods::TASK_BOARD_SYNC => Some(dispatch_task_board_sync(request, state).await),
         ws_methods::TASK_BOARD_DISPATCH => Some(dispatch_task_board_dispatch(request, state).await),
+        ws_methods::TASK_BOARD_DISPATCH_DELIVER => {
+            Some(dispatch_task_board_dispatch_deliver(request, state).await)
+        }
+        ws_methods::TASK_BOARD_DISPATCH_PICK => {
+            Some(dispatch_task_board_dispatch_pick(request, state).await)
+        }
         ws_methods::TASK_BOARD_EVALUATE => Some(dispatch_task_board_evaluate(request, state).await),
         ws_methods::TASK_BOARD_AUDIT => Some(dispatch_task_board_audit(request, state).await),
         ws_methods::TASK_BOARD_PROJECTS => Some(dispatch_task_board_projects(request, state).await),
@@ -310,6 +317,29 @@ async fn dispatch_task_board_dispatch(request: &WsRequest, state: &DaemonHttpSta
     )
     .await;
     dispatch_query_result(&request.id, result)
+}
+
+async fn dispatch_task_board_dispatch_deliver(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardDispatchDeliverRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::deliver(state, &body).await,
+    )
+}
+
+async fn dispatch_task_board_dispatch_pick(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    if parse_params::<TaskBoardDispatchPickRequest>(request).is_err() {
+        return invalid_params(request);
+    }
+    dispatch_query_result(&request.id, task_board_route_executor::pick(state).await)
 }
 
 async fn dispatch_task_board_evaluate(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {

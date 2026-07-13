@@ -150,6 +150,18 @@ fn worker_prompt(applied: &DispatchAppliedTask, managed_run_id: &str) -> String 
     )
 }
 
+pub(crate) fn rendered_worker_prompt(
+    applied: &DispatchAppliedTask,
+    dispatch_intent_id: &str,
+) -> String {
+    let managed_run_id = if applied.item.agent_mode == AgentMode::Interactive {
+        terminal_worker_id(dispatch_intent_id)
+    } else {
+        codex_worker_id(dispatch_intent_id)
+    };
+    worker_prompt(applied, &managed_run_id)
+}
+
 #[cfg(test)]
 mod tests {
     use std::env::temp_dir;

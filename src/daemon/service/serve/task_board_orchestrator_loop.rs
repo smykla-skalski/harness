@@ -198,6 +198,7 @@ mod tests {
             enabled,
             running,
             step_mode: false,
+            held_dispatches: crate::task_board::TaskBoardHeldDispatchSummary::default(),
             current_tick: None,
             last_run: None,
             workflow_execution_counts: Vec::new(),

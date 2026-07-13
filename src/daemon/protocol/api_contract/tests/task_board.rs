@@ -95,6 +95,18 @@ fn task_board_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_DISPATCH_DELIVER,
+                ws_methods::TASK_BOARD_DISPATCH_DELIVER,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_DISPATCH_PICK,
+                ws_methods::TASK_BOARD_DISPATCH_PICK,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
                 http_paths::TASK_BOARD_EVALUATE,
                 ws_methods::TASK_BOARD_EVALUATE,
                 true,

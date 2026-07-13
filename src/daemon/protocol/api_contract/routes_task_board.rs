@@ -99,6 +99,22 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_DISPATCH_DELIVER,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_DISPATCH_DELIVER,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_DISPATCH_PICK,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_DISPATCH_PICK,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
         path: http_paths::TASK_BOARD_EVALUATE,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::TASK_BOARD_EVALUATE,
