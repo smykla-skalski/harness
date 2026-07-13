@@ -88,6 +88,48 @@ extension TaskBoardOverviewView {
     }
   }
 
+  /// Routes the board-level Evaluate action: a live evaluate goes through the
+  /// host closure (applies changes, updates the persisted summary), while a
+  /// dry run reads counts into a local preview strip without mutating state.
+  func triggerBoardEvaluate(_ liveEvaluate: @escaping () -> Void) {
+    guard evaluateDryRun, let store else {
+      evaluatePreviewSummaryValue = nil
+      liveEvaluate()
+      return
+    }
+    Task { @MainActor in
+      evaluatePreviewSummaryValue = await store.previewEvaluateTaskBoard()
+    }
+  }
+
+  func evaluatePreviewRow(_ summary: TaskBoardEvaluationSummary) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      TaskBoardSummaryPill(
+        value: "Preview",
+        label: "Dry Run",
+        systemImage: "eye",
+        tint: HarnessMonitorTheme.caution
+      )
+      evaluationSummaryContent(summary)
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      Button {
+        evaluatePreviewSummaryValue = nil
+      } label: {
+        Image(systemName: "xmark.circle.fill")
+          .foregroundStyle(.secondary)
+          .contentShape(.circle)
+          .accessibilityHidden(true)
+      }
+      .harnessDismissButtonStyle()
+      .help("Dismiss the evaluate preview")
+      .accessibilityLabel("Dismiss preview")
+      .accessibilityIdentifier("harness.task-board.evaluate.preview.dismiss")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("harness.task-board.evaluate.preview")
+  }
+
   @ViewBuilder
   func evaluationSummaryContent(_ summary: TaskBoardEvaluationSummary) -> some View {
     TaskBoardSummaryPill(

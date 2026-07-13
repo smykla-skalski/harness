@@ -71,6 +71,7 @@ extension TaskBoardOverviewView {
         onBeginPlan: onBeginTaskBoardPlan,
         onSubmitPlan: onSubmitTaskBoardPlan,
         onApprovePlan: onApproveTaskBoardPlan,
+        onRevokePlan: onRevokeTaskBoardPlan,
         onRefresh: onRefreshTaskBoard,
         onClose: clearSelectedTaskBoardItem
       )

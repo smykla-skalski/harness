@@ -75,6 +75,7 @@ struct TaskBoardOverviewHost: View {
       onBeginTaskBoardPlan: beginTaskBoardPlan,
       onSubmitTaskBoardPlan: submitTaskBoardPlan,
       onApproveTaskBoardPlan: approveTaskBoardPlan,
+      onRevokeTaskBoardPlan: revokeTaskBoardPlan,
       onRefreshTaskBoard: refreshTaskBoard,
       onStartTaskBoardOrchestrator: startTaskBoardOrchestrator,
       onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator,
@@ -223,6 +224,14 @@ struct TaskBoardOverviewHost: View {
         approvedAt: approvedAt
       )
     }
+  }
+
+  private func revokeTaskBoardPlan(_ item: TaskBoardItem) {
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Revoking task board plan") {
+        await store.revokeTaskBoardPlan(id: item.id)
+      }
+    )
   }
 
   private func refreshTaskBoard() {

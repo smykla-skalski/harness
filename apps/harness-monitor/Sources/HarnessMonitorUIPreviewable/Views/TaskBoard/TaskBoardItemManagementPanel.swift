@@ -15,6 +15,7 @@ struct TaskBoardItemManagementPanel: View {
   let onBeginPlan: ((TaskBoardItem) -> Void)?
   let onSubmitPlan: ((TaskBoardItem, String) -> Void)?
   let onApprovePlan: ((TaskBoardItem, String, String?) -> Void)?
+  let onRevokePlan: ((TaskBoardItem) -> Void)?
   let onRefresh: (() -> Void)?
   let onClose: () -> Void
 
@@ -49,6 +50,7 @@ struct TaskBoardItemManagementPanel: View {
     onBeginPlan: ((TaskBoardItem) -> Void)?,
     onSubmitPlan: ((TaskBoardItem, String) -> Void)?,
     onApprovePlan: ((TaskBoardItem, String, String?) -> Void)?,
+    onRevokePlan: ((TaskBoardItem) -> Void)?,
     onRefresh: (() -> Void)?,
     onClose: @escaping () -> Void
   ) {
@@ -64,6 +66,7 @@ struct TaskBoardItemManagementPanel: View {
     self.onBeginPlan = onBeginPlan
     self.onSubmitPlan = onSubmitPlan
     self.onApprovePlan = onApprovePlan
+    self.onRevokePlan = onRevokePlan
     self.onRefresh = onRefresh
     self.onClose = onClose
     _draft = State(
@@ -274,7 +277,8 @@ struct TaskBoardItemManagementPanel: View {
         isActionInFlight: isActionInFlight,
         onBeginPlan: onBeginPlan,
         onSubmitPlan: onSubmitPlan,
-        onApprovePlan: onApprovePlan
+        onApprovePlan: onApprovePlan,
+        onRevokePlan: onRevokePlan
       )
 
       Button {

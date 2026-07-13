@@ -31,6 +31,7 @@ public struct TaskBoardOverviewView: View {
   let onBeginTaskBoardPlan: ((TaskBoardItem) -> Void)?
   let onSubmitTaskBoardPlan: ((TaskBoardItem, String) -> Void)?
   let onApproveTaskBoardPlan: ((TaskBoardItem, String, String?) -> Void)?
+  let onRevokeTaskBoardPlan: ((TaskBoardItem) -> Void)?
   let onRefreshTaskBoard: (() -> Void)?
   let onStartTaskBoardOrchestrator: (() -> Void)?
   let onStopTaskBoardOrchestrator: (() -> Void)?
@@ -39,6 +40,8 @@ public struct TaskBoardOverviewView: View {
   var fontScale
   @Environment(\.openURL)
   var openURL
+  @Environment(\.openWindow)
+  var openWindow
   @State private var selectedTaskBoardItemID: String?
   @State private var isCreatingTaskBoardItem = false
   @State private var evaluationSummaryFitsHorizontally = true
@@ -49,6 +52,9 @@ public struct TaskBoardOverviewView: View {
   @State private var draggedCardIDs: [TaskBoardCardID] = []
   @State private var taskBoardSelectionDispatcher = TaskBoardSelectionDispatcher()
   @State private var relativeTimeClock = TaskBoardRelativeTimeClock()
+  @AppStorage(TaskBoardEvaluatePreferences.dryRunStorageKey)
+  var evaluateDryRun = TaskBoardEvaluatePreferences.defaultDryRun
+  @State private var evaluatePreviewSummary: TaskBoardEvaluationSummary?
   @AppStorage(TaskBoardLaneCollapsePreferences.storageKey)
   var laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.emptyRawValue
   @AppStorage(TaskBoardLaneAppearancePreferences.storageKey)
@@ -117,6 +123,7 @@ public struct TaskBoardOverviewView: View {
     onBeginTaskBoardPlan: ((TaskBoardItem) -> Void)? = nil,
     onSubmitTaskBoardPlan: ((TaskBoardItem, String) -> Void)? = nil,
     onApproveTaskBoardPlan: ((TaskBoardItem, String, String?) -> Void)? = nil,
+    onRevokeTaskBoardPlan: ((TaskBoardItem) -> Void)? = nil,
     onRefreshTaskBoard: (() -> Void)? = nil,
     onStartTaskBoardOrchestrator: (() -> Void)? = nil,
     onStopTaskBoardOrchestrator: (() -> Void)? = nil,
@@ -154,6 +161,7 @@ public struct TaskBoardOverviewView: View {
     self.onBeginTaskBoardPlan = onBeginTaskBoardPlan
     self.onSubmitTaskBoardPlan = onSubmitTaskBoardPlan
     self.onApproveTaskBoardPlan = onApproveTaskBoardPlan
+    self.onRevokeTaskBoardPlan = onRevokeTaskBoardPlan
     self.onRefreshTaskBoard = onRefreshTaskBoard
     self.onStartTaskBoardOrchestrator = onStartTaskBoardOrchestrator
     self.onStopTaskBoardOrchestrator = onStopTaskBoardOrchestrator
@@ -218,6 +226,11 @@ public struct TaskBoardOverviewView: View {
   var taskBoardSelectionDispatcherValue: TaskBoardSelectionDispatcher {
     taskBoardSelectionDispatcher
   }
+
+  var evaluatePreviewSummaryValue: TaskBoardEvaluationSummary? {
+    get { evaluatePreviewSummary }
+    nonmutating set { evaluatePreviewSummary = newValue }
+  }
 }
 
 extension TaskBoardOverviewView {
@@ -237,6 +250,9 @@ extension TaskBoardOverviewView {
       } else if let evaluationSummary {
         taskBoardDetailRow { evaluationSummaryRow(evaluationSummary) }
       }
+    }
+    if let evaluatePreviewSummaryValue {
+      taskBoardDetailRow { evaluatePreviewRow(evaluatePreviewSummaryValue) }
     }
     taskBoardDetailRow { headerTitle }
     if showsOperationsPanel, let store {
@@ -294,17 +310,25 @@ extension TaskBoardOverviewView {
     }
 
     if let onEvaluateTaskBoard {
+      if store != nil {
+        Toggle("Dry run", isOn: $evaluateDryRun)
+          .toggleStyle(.checkbox)
+          .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+          .disabled(isActionInFlight)
+          .help("Preview the evaluate without applying any board changes")
+          .accessibilityIdentifier("harness.task-board.evaluate.dry-run")
+      }
       Button {
-        onEvaluateTaskBoard()
+        triggerBoardEvaluate(onEvaluateTaskBoard)
       } label: {
-        Label("Evaluate", systemImage: "checkmark.seal")
+        Label(evaluateDryRun ? "Preview" : "Evaluate", systemImage: "checkmark.seal")
           .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       .disabled(isActionInFlight)
-      .help("Evaluate board state")
+      .help(evaluateDryRun ? "Preview evaluate results without applying" : "Evaluate board state")
       .accessibilityIdentifier("harness.task-board.evaluate")
     }
 
