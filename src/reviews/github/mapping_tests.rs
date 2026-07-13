@@ -15,7 +15,11 @@ fn review(author: &str, state: ReviewReviewEventState) -> PullRequestReview {
     }
 }
 
-fn item(required_approvals: u32, reviews: Vec<PullRequestReview>) -> ReviewItem {
+fn item(
+    required_approvals: u32,
+    viewer_has_active_approval: bool,
+    reviews: Vec<PullRequestReview>,
+) -> ReviewItem {
     ReviewItem {
         pull_request_id: "pr_1".to_owned(),
         repository_id: "repo_1".to_owned(),
@@ -51,7 +55,7 @@ fn item(required_approvals: u32, reviews: Vec<PullRequestReview>) -> ReviewItem 
         required_failed_check_names: Vec::new(),
         required_approving_review_count: Some(required_approvals),
         has_conflict_markers: None,
-        viewer_has_active_approval: None,
+        viewer_has_active_approval: Some(viewer_has_active_approval),
         auto_merge_enabled: None,
         approval_requirement_satisfied_after_viewer_approval: None,
     }
@@ -61,14 +65,15 @@ fn item(required_approvals: u32, reviews: Vec<PullRequestReview>) -> ReviewItem 
 fn policy_metadata_uses_latest_review_per_author() {
     let mut items = vec![item(
         2,
+        false,
         vec![
-            review("alice", ReviewReviewEventState::Approved),
-            review("Viewer", ReviewReviewEventState::Approved),
-            review("viewer", ReviewReviewEventState::ChangesRequested),
+            review("reviewer-a", ReviewReviewEventState::Approved),
+            review("reviewer-a", ReviewReviewEventState::ChangesRequested),
+            review("reviewer-b", ReviewReviewEventState::Approved),
         ],
     )];
 
-    apply_policy_review_metadata(&mut items, Some("VIEWER"));
+    apply_policy_review_metadata(&mut items);
 
     assert_eq!(items[0].viewer_has_active_approval, Some(false));
     assert_eq!(
@@ -80,37 +85,37 @@ fn policy_metadata_uses_latest_review_per_author() {
 #[test]
 fn policy_metadata_counts_existing_viewer_approval_once() {
     let mut items = vec![item(
-        2,
+        3,
+        true,
         vec![
-            review("alice", ReviewReviewEventState::Approved),
-            review("viewer", ReviewReviewEventState::Approved),
+            review("reviewer-a", ReviewReviewEventState::Approved),
+            review("reviewer-b", ReviewReviewEventState::Approved),
         ],
     )];
 
-    apply_policy_review_metadata(&mut items, Some("viewer"));
+    apply_policy_review_metadata(&mut items);
 
     assert_eq!(items[0].viewer_has_active_approval, Some(true));
     assert_eq!(
         items[0].approval_requirement_satisfied_after_viewer_approval,
-        Some(true)
+        Some(false)
     );
 }
 
 #[test]
-fn policy_metadata_handles_missing_viewer_and_zero_required_approvals() {
-    let mut items = vec![item(0, Vec::new()), item(2, Vec::new())];
+fn policy_metadata_handles_zero_and_unsatisfied_required_approvals() {
+    let mut items = vec![item(0, false, Vec::new()), item(2, false, Vec::new())];
 
-    apply_policy_review_metadata(&mut items, None);
+    apply_policy_review_metadata(&mut items);
 
-    assert!(items[0].viewer_has_active_approval.is_none());
+    assert_eq!(items[0].viewer_has_active_approval, Some(false));
     assert_eq!(
         items[0].approval_requirement_satisfied_after_viewer_approval,
         Some(true)
     );
-    assert!(items[1].viewer_has_active_approval.is_none());
-    assert!(
-        items[1]
-            .approval_requirement_satisfied_after_viewer_approval
-            .is_none()
+    assert_eq!(items[1].viewer_has_active_approval, Some(false));
+    assert_eq!(
+        items[1].approval_requirement_satisfied_after_viewer_approval,
+        Some(false)
     );
 }

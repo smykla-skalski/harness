@@ -144,14 +144,10 @@ async fn fetch_reviews_refresh_once(
             .map(|target| target.pull_request_id.clone())
             .collect::<Vec<_>>();
         let client = ReviewsGitHubClient::new(&segment.token)?;
-        let viewer_login = client.fetch_viewer_login().await;
-        let fetch = client
-            .fetch_by_ids(&ids, request, viewer_login.as_deref())
-            .await?;
+        let fetch = client.fetch_by_ids(&ids, request).await?;
         for item in fetch.items {
             let key = review_item_key(&item);
-            // `viewerLatestReviewRequest` remains authoritative without the optional login;
-            // a missing login leaves separate policy metadata unknown instead.
+            // Both viewer-scoped values come directly from the authenticated node query.
             authoritative_viewer_keys.insert(key.clone());
             items_by_key.insert(key, item);
         }

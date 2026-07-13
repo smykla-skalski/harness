@@ -73,6 +73,8 @@ pub(super) struct SearchNode {
     pub(super) author_association: Option<String>,
     #[serde(rename = "viewerLatestReviewRequest", default)]
     pub(super) viewer_latest_review_request: Option<ViewerLatestReviewRequestNode>,
+    #[serde(rename = "viewerLatestReview", default)]
+    pub(super) viewer_latest_review: Option<ViewerLatestReviewNode>,
     pub(super) repository: RepositoryNode,
     pub(super) commits: CommitConnection,
     #[serde(rename = "baseRef", default)]
@@ -220,6 +222,11 @@ pub(super) struct ReviewConnection {
 pub(super) struct ViewerLatestReviewRequestNode {
     #[serde(rename = "id")]
     pub(super) _id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ViewerLatestReviewNode {
+    pub(super) state: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

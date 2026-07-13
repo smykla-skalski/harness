@@ -105,7 +105,7 @@ extension TaskBoardItem {
     externalRefs.filter { $0.provider == .gitHub }
   }
 
-  private var taskBoardRepositoryOwner: String? {
+  var taskBoardRepositoryOwner: String? {
     if let owner = TaskBoardGitHubRepositoryIdentity.owner(fromPathLike: projectId) {
       return owner
     }
@@ -142,7 +142,10 @@ private enum TaskBoardGitHubURL {
 
 extension TaskBoardExternalRef {
   fileprivate var isActiveViewerReviewReference: Bool {
-    isPullRequestURL && syncState?.status != .done
+    guard let url = TaskBoardGitHubURL.resolve(url) else {
+      return false
+    }
+    return url.path.lowercased().contains("/pull/") && syncState?.status != .done
   }
 
   fileprivate var repositoryOwner: String? {
@@ -173,9 +176,12 @@ extension TaskBoardExternalRef {
 
 private enum TaskBoardGitHubRepositoryIdentity {
   static func owner(fromURLString urlString: String?) -> String? {
+    guard let urlString else {
+      return nil
+    }
+    let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
     guard
-      let urlString,
-      let url = URL(string: urlString),
+      let url = URL(string: trimmed),
       TaskBoardGitHubURL.isGitHubHost(url.host)
     else {
       return nil

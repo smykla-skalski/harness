@@ -62,12 +62,8 @@ pub(super) async fn fetch_pull_requests_by_reference(
             backport_patterns: request.normalized_backport_patterns(),
         };
         let client = ReviewsGitHubClient::new(&segment.token)?;
-        let viewer_login = client.fetch_viewer_login().await;
-        let fetch = client
-            .fetch_by_references(&segment_request, viewer_login.as_deref())
-            .await?;
-        // GitHub returns `viewerLatestReviewRequest` for the authenticated token independently
-        // of the optional login lookup used for policy metadata.
+        let fetch = client.fetch_by_references(&segment_request).await?;
+        // GitHub returns both viewer-scoped values for the authenticated token.
         authoritative_viewer_keys.extend(fetch.items.iter().map(super::review_item_key));
         items.extend(fetch.items);
         missing_references.extend(

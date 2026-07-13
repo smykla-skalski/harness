@@ -21,6 +21,7 @@ query SearchReviews($query: String!, $after: String) {
         baseRefName
         author { login avatarUrl }
         authorAssociation
+        viewerLatestReview { state }
         viewerLatestReviewRequest { id }
         repository {
           id
@@ -124,6 +125,7 @@ query ReviewNodes($ids: [ID!]!) {
       baseRefName
       author { login avatarUrl }
       authorAssociation
+      viewerLatestReview { state }
       viewerLatestReviewRequest { id }
       repository {
         id

@@ -33,6 +33,26 @@ struct TaskBoardReviewTitlePresentationTests {
     #expect(item.requiresViewerGitHubReview)
   }
 
+  @Test("Review references require secure GitHub pull request URLs")
+  func reviewReferencesRequireSecureGitHubURLs() {
+    let insecure = taskBoardItem(
+      importedFromProvider: .gitHub,
+      referenceURL: "http://github.com/example/project/pull/42"
+    )
+    let otherHost = taskBoardItem(
+      importedFromProvider: .gitHub,
+      referenceURL: "https://code.example.com/example/project/pull/42"
+    )
+    let padded = taskBoardItem(
+      importedFromProvider: .gitHub,
+      referenceURL: "  https://github.com/example/project/pull/42\n"
+    )
+
+    #expect(!insecure.requiresViewerGitHubReview)
+    #expect(!otherHost.requiresViewerGitHubReview)
+    #expect(padded.requiresViewerGitHubReview)
+  }
+
   @Test("Completed, manual, and issue references do not get the review prefix")
   func nonReviewTasksDoNotGetReviewPrefix() {
     let completed = taskBoardItem(

@@ -68,9 +68,23 @@ struct TaskBoardGitHubURLTests {
     #expect(item.taskBoardGitHubURL == nil)
   }
 
+  @Test("Repository owner accepts a padded workflow pull request URL")
+  func repositoryOwnerAcceptsPaddedWorkflowURL() {
+    let item = taskBoardItem(
+      externalRefs: [],
+      workflow: TaskBoardWorkflowState(
+        prUrl: "  https://github.com/example/project/pull/7\n"
+      ),
+      projectId: nil
+    )
+
+    #expect(item.taskBoardRepositoryOwner == "example")
+  }
+
   private func taskBoardItem(
     externalRefs: [TaskBoardExternalRef],
-    workflow: TaskBoardWorkflowState?
+    workflow: TaskBoardWorkflowState?,
+    projectId: String? = "example/project"
   ) -> TaskBoardItem {
     TaskBoardItem(
       schemaVersion: 1,
@@ -80,7 +94,7 @@ struct TaskBoardGitHubURLTests {
       status: .todo,
       priority: .medium,
       tags: [],
-      projectId: "example/project",
+      projectId: projectId,
       agentMode: .interactive,
       externalRefs: externalRefs,
       planning: TaskBoardPlanningState(),

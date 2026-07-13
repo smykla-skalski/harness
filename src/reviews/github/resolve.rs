@@ -34,6 +34,7 @@ query ReviewPullRequestByReference($owner: String!, $name: String!, $number: Int
       baseRefName
       author { login avatarUrl }
       authorAssociation
+      viewerLatestReview { state }
       viewerLatestReviewRequest { id }
       repository {
         id
@@ -117,7 +118,6 @@ impl ReviewsGitHubClient {
     pub(crate) async fn fetch_by_references(
         &self,
         request: &ReviewsPullRequestResolveRequest,
-        viewer_login: Option<&str>,
     ) -> Result<ReviewsFetchByIds, CliError> {
         let mut items: Vec<ReviewItem> = Vec::with_capacity(request.references.len());
         let mut continuations: Vec<NodeContinuation> = Vec::new();
@@ -158,7 +158,7 @@ impl ReviewsGitHubClient {
                     .await?;
             }
         }
-        apply_policy_review_metadata(&mut items, viewer_login);
+        apply_policy_review_metadata(&mut items);
         log_check_details_url_coverage(&items);
         Ok(ReviewsFetchByIds {
             items,

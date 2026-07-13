@@ -208,6 +208,9 @@ fn build_review_item(
         .default_branch_ref
         .as_ref()
         .map(|branch| branch.name.clone());
+    let viewer_has_active_approval = node.viewer_latest_review.as_ref().is_some_and(|review| {
+        map_review_event_state(review.state.as_deref()) == ReviewReviewEventState::Approved
+    });
     let viewer_is_requested_reviewer = node.viewer_latest_review_request.is_some();
     let backport_detection =
         backport_detector.and_then(|detector| detector.detect(&ctx.repository_name, &node.title));
@@ -257,32 +260,27 @@ fn build_review_item(
             node.base_ref.as_ref(),
         )),
         has_conflict_markers: None,
-        viewer_has_active_approval: None,
+        viewer_has_active_approval: Some(viewer_has_active_approval),
         auto_merge_enabled: Some(node.auto_merge_request.is_some()),
         approval_requirement_satisfied_after_viewer_approval: None,
     }
 }
 
-pub(super) fn apply_policy_review_metadata(items: &mut [ReviewItem], viewer_login: Option<&str>) {
+pub(super) fn apply_policy_review_metadata(items: &mut [ReviewItem]) {
     for item in items {
         let latest_review_by_author = latest_review_by_author(&item.reviews);
         let active_approval_count = latest_review_by_author
             .values()
             .filter(|state| **state == ReviewReviewEventState::Approved)
             .count();
-        let viewer_has_active_approval = viewer_login.is_some_and(|login| {
-            latest_review_by_author
-                .get(&login.to_ascii_lowercase())
-                .is_some_and(|state| *state == ReviewReviewEventState::Approved)
-        });
-        item.viewer_has_active_approval = viewer_login.map(|_| viewer_has_active_approval);
+        let viewer_has_active_approval = item.viewer_has_active_approval.unwrap_or(false);
+        item.viewer_has_active_approval = Some(viewer_has_active_approval);
         item.approval_requirement_satisfied_after_viewer_approval =
-            approval_requirement_satisfied_after_viewer_approval(
+            Some(approval_requirement_satisfied_after_viewer_approval(
                 item.required_approving_review_count.unwrap_or(0),
                 active_approval_count,
-                viewer_login,
                 viewer_has_active_approval,
-            );
+            ));
     }
 }
 
@@ -303,16 +301,13 @@ fn latest_review_by_author(
 fn approval_requirement_satisfied_after_viewer_approval(
     required: u32,
     active_approval_count: usize,
-    viewer_login: Option<&str>,
     viewer_has_active_approval: bool,
-) -> Option<bool> {
+) -> bool {
     if required == 0 {
-        return Some(true);
+        return true;
     }
-    let viewer_login = viewer_login?;
-    let viewer_addition =
-        usize::from(!viewer_login.trim().is_empty() && !viewer_has_active_approval);
-    Some(active_approval_count.saturating_add(viewer_addition) >= required as usize)
+    let viewer_addition = usize::from(!viewer_has_active_approval);
+    active_approval_count.saturating_add(viewer_addition) >= required as usize
 }
 
 fn required_approving_review_count(base_ref: Option<&super::types::RefNode>) -> u32 {

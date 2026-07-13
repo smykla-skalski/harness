@@ -176,10 +176,14 @@ fn append_repository_labels_preserves_color_into_response_struct() {
 }
 
 #[test]
-fn review_queries_request_author_association_and_viewer_review_request() {
+fn review_queries_request_author_association_and_viewer_scoped_review_fields() {
     assert!(
         SEARCH_QUERY.contains("authorAssociation"),
         "search query must request authorAssociation for row halo semantics"
+    );
+    assert!(
+        SEARCH_QUERY.contains("viewerLatestReview { state }"),
+        "search query must request the viewer-specific latest review"
     );
     assert!(
         SEARCH_QUERY.contains("viewerLatestReviewRequest"),
@@ -194,12 +198,20 @@ fn review_queries_request_author_association_and_viewer_review_request() {
         "nodes query must request authorAssociation for refresh parity"
     );
     assert!(
+        NODES_BY_IDS_QUERY.contains("viewerLatestReview { state }"),
+        "nodes query must request the viewer-specific latest review for refresh parity"
+    );
+    assert!(
         NODES_BY_IDS_QUERY.contains("viewerLatestReviewRequest"),
         "nodes query must request the viewer-specific review request for refresh parity"
     );
     assert!(
         !NODES_BY_IDS_QUERY.contains("reviewRequests(first: 100)"),
         "nodes query must avoid fetching every requested reviewer"
+    );
+    assert!(
+        PULL_REQUEST_BY_REFERENCE_QUERY.contains("viewerLatestReview { state }"),
+        "reference query must request the viewer-specific latest review"
     );
     assert!(
         PULL_REQUEST_BY_REFERENCE_QUERY.contains("viewerLatestReviewRequest"),
