@@ -27,7 +27,7 @@ async fn connect_reads_current_schema_version() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=26).collect::<Vec<i64>>()
+        (1..=28).collect::<Vec<i64>>()
     );
 }
 
@@ -52,7 +52,7 @@ async fn connect_bootstraps_empty_database_with_sqlx_migrations() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=26).collect::<Vec<i64>>()
+        (1..=28).collect::<Vec<i64>>()
     );
     let policy_workspace_columns =
         query_scalar::<_, String>("SELECT name FROM pragma_table_info('policy_workspace')")
@@ -144,7 +144,7 @@ async fn connect_migrates_legacy_schema_before_opening_pool() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=26).collect::<Vec<i64>>()
+        (1..=28).collect::<Vec<i64>>()
     );
 }
 
@@ -188,7 +188,7 @@ async fn connect_preserves_existing_db_when_baseline_checksum_drifted() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=26).collect::<Vec<i64>>()
+        (1..=28).collect::<Vec<i64>>()
     );
 }
 
@@ -247,7 +247,7 @@ async fn connect_accepts_v22_db_with_recorded_policy_snapshot_migration() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=26).collect::<Vec<i64>>()
+        (1..=28).collect::<Vec<i64>>()
     );
     let policy_workspace_columns =
         query_scalar::<_, String>("SELECT name FROM pragma_table_info('policy_workspace')")
@@ -280,7 +280,7 @@ async fn connect_seeds_v18_sqlx_ledger_when_sync_schema_already_applied() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=26).collect::<Vec<i64>>()
+        (1..=28).collect::<Vec<i64>>()
     );
 }
 
@@ -370,7 +370,7 @@ async fn connect_repairs_v8_active_sessions_without_leader_before_opening_pool()
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=26).collect::<Vec<i64>>()
+        (1..=28).collect::<Vec<i64>>()
     );
     drop(async_db);
 
