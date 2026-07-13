@@ -135,6 +135,7 @@ mod tests {
             subject: Default::default(),
             evidence: Default::default(),
             evaluated_at: None,
+            approvals: Vec::new(),
         }
     }
 

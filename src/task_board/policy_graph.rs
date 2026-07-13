@@ -43,9 +43,10 @@ pub(crate) use gate_cache::{
 };
 pub use ids::{PolicyGraphEdgeId, PolicyGraphGroupId, PolicyGraphNodeId, PolicyGraphPortId};
 pub use models::{
-    PolicyActionStep, PolicyEventWait, PolicyFinishNode, PolicyGraphAutomationBinding,
-    PolicyGraphOCRConfiguration, PolicyGraphReviewPullRequestExtraction, PolicyHandoffStep,
-    PolicyRuntimeBoundary, PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
+    PolicyActionStep, PolicyApprovalGate, PolicyApprovalRequest, PolicyEventWait, PolicyFinishNode,
+    PolicyGraphAutomationBinding, PolicyGraphOCRConfiguration,
+    PolicyGraphReviewPullRequestExtraction, PolicyHandoffStep, PolicyRuntimeBoundary,
+    PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
 };
 pub use node_kinds::{
     POLICY_NODE_KIND_DESCRIPTORS, PolicyNodeCategory, PolicyNodeKindDescriptor, descriptor_for,
@@ -89,6 +90,7 @@ pub(crate) const PORT_THEN: &str = "then";
 pub(crate) const PORT_ELSE: &str = "else";
 pub(crate) const PORT_HIGH: &str = "high";
 pub(crate) const PORT_LOW_OR_EQUAL: &str = "low_or_equal";
+pub(crate) const PORT_APPROVED: &str = "approved";
 
 pub(crate) const UNSAFE_HIGH_RISK_ACTIONS: [PolicyAction; 3] = [
     PolicyAction::DeleteWorktree,
@@ -165,6 +167,7 @@ pub enum PolicyGraphNodeKind {
     ConsensusGate {
         reason_code: PolicyReasonCode,
     },
+    ApprovalGate(PolicyApprovalGate),
     DryRunGate {
         reason_code: PolicyReasonCode,
     },
@@ -373,6 +376,12 @@ pub enum PolicyGraphValidationIssue {
         provided: String,
         required: String,
     },
+    /// A route reachable by a `spawn_agent` input reaches `node_id`, a
+    /// non-terminal node with no continuation, so the evaluator would fall
+    /// through to an implicit default-allow instead of an explicit terminal.
+    SpawnRouteMissingTerminal {
+        node_id: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -394,6 +403,8 @@ pub struct PolicyGraphSimulation {
     pub policy_trace_ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub boundaries: Vec<PolicyRuntimeBoundary>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approval_requests: Vec<PolicyApprovalRequest>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

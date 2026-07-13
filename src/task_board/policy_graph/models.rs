@@ -105,3 +105,25 @@ pub struct PolicyFinishNode {
     pub decision: PolicyGraphDecision,
     pub reason_code: PolicyReasonCode,
 }
+
+/// Configuration for an approval-gate node. A durable one-shot grant governs
+/// the gate: an approved grant traverses the `approved` output, a denied grant
+/// terminates the route as `Deny`, and no or pending grant blocks the route as
+/// `RequireHuman`. `reason_code` is the human/pending block reason.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyApprovalGate {
+    pub reason_code: PolicyReasonCode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expiry_seconds: Option<u64>,
+}
+
+/// A pending-grant request emitted by evaluation when an approval gate is
+/// reached with no existing grant. The caller creates the durable grant
+/// fire-and-forget so evaluation itself stays non-blocking.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyApprovalRequest {
+    pub node_id: String,
+    pub reason_code: PolicyReasonCode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expiry_seconds: Option<u64>,
+}

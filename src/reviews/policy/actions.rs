@@ -166,6 +166,7 @@ pub(crate) fn authored_reviews_policy_plan_from_document(
         subject: policy_subject(target),
         evidence: review_target_policy_evidence(target),
         evaluated_at: None,
+        approvals: Vec::new(),
     };
     let Some(compiled) = document.compile_workflow(&workflow_id, &input) else {
         return Ok(ReviewsPolicyPlan {
@@ -338,6 +339,16 @@ fn policy_reason_message(reason_code: PolicyReasonCode) -> &'static str {
         }
         PolicyReasonCode::DryRunRequired => {
             "reviews policy workflow is configured for dry-run only"
+        }
+        PolicyReasonCode::ApprovalRequired => {
+            "workflow requires a spawn approval before continuing"
+        }
+        PolicyReasonCode::ApprovalDenied => "workflow spawn approval was denied",
+        PolicyReasonCode::SpawnPolicyRequired => {
+            "spawn is blocked because no live enforced policy is active"
+        }
+        PolicyReasonCode::SpawnKillSwitchEngaged => {
+            "spawn is blocked because the kill switch is engaged"
         }
     }
 }

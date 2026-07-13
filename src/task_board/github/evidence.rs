@@ -94,6 +94,7 @@ impl GitHubMergeEvidence {
             },
             evidence: self.policy_evidence(config),
             evaluated_at: None,
+            approvals: Vec::new(),
         }
     }
 

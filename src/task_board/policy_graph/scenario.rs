@@ -138,6 +138,7 @@ mod tests {
             subject: PolicySubject::default(),
             evidence: PolicyEvidence::default(),
             evaluated_at: None,
+            approvals: Vec::new(),
         }
     }
 

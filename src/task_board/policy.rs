@@ -64,6 +64,32 @@ pub enum PolicyReasonCode {
     RiskAboveThreshold,
     HumanRequired,
     DryRunRequired,
+    // WP3 spawn-policy reason codes (additive).
+    ApprovalRequired,
+    ApprovalDenied,
+    SpawnPolicyRequired,
+    SpawnKillSwitchEngaged,
+}
+
+/// Resolution state of a durable [`ApprovalGate`](crate::task_board::policy_graph)
+/// grant, injected into evaluation by the caller. `None` on the input means no
+/// grant exists yet for the gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PolicyApprovalState {
+    Pending,
+    Approved,
+    Denied,
+}
+
+/// Caller-supplied approval-grant state for one approval-gate node. Dispatch
+/// resolves durable grants for the (board item, action, revision) key and injects
+/// their state here; simulation and replay supply fixture state so those paths
+/// stay deterministic.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyApprovalGrantState {
+    pub node_id: String,
+    pub state: PolicyApprovalState,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -147,6 +173,10 @@ pub struct PolicyInput {
     // paths stay deterministic. Additive so pre-WP3 records decode as `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evaluated_at: Option<String>,
+    // WP3: caller-supplied approval-grant states, keyed by approval-gate node id.
+    // Additive so pre-WP3 records decode with an empty set.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approvals: Vec<PolicyApprovalGrantState>,
 }
 
 pub trait PolicyGate {
@@ -175,7 +205,18 @@ impl PolicyInput {
             subject: PolicySubject::default(),
             evidence: PolicyEvidence::default(),
             evaluated_at: None,
+            approvals: Vec::new(),
         }
+    }
+
+    /// Resolved approval state for one approval-gate node, if the caller injected
+    /// one. `None` means no grant exists yet for that gate.
+    #[must_use]
+    pub fn approval_state(&self, node_id: &str) -> Option<PolicyApprovalState> {
+        self.approvals
+            .iter()
+            .find(|grant| grant.node_id == node_id)
+            .map(|grant| grant.state)
     }
 
     #[must_use]

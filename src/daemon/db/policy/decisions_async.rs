@@ -200,6 +200,7 @@ impl PolicyDecisionRow {
                 subject,
                 evidence,
                 evaluated_at: self.evaluated_at,
+                approvals: Vec::new(),
             },
             decision,
             visited_node_ids,
@@ -275,6 +276,7 @@ mod tests {
                 ..PolicyEvidence::default()
             },
             evaluated_at: None,
+            approvals: Vec::new(),
         };
         let decision = PolicyDecision::Deny {
             reason_code: PolicyReasonCode::ChecksNotGreen,

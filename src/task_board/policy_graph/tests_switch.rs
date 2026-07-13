@@ -25,6 +25,7 @@ fn switch_routes_to_the_first_matching_case() {
             ..PolicyEvidence::default()
         },
         evaluated_at: None,
+        approvals: Vec::new(),
     });
 
     assert_eq!(
@@ -63,6 +64,7 @@ fn switch_routes_to_default_when_no_case_matches() {
             ..PolicyEvidence::default()
         },
         evaluated_at: None,
+        approvals: Vec::new(),
     });
 
     assert_eq!(
@@ -98,6 +100,7 @@ fn switch_routes_missing_evidence_through_is_missing_cases() {
         subject: PolicySubject::default(),
         evidence: PolicyEvidence::default(),
         evaluated_at: None,
+        approvals: Vec::new(),
     });
 
     assert_eq!(

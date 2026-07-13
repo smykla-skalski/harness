@@ -5,16 +5,26 @@ use tracing::warn;
 mod decisions;
 
 use super::{
-    PORT_DEFAULT, PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField,
-    PolicyEvidencePredicate, PolicyGraph, PolicyGraphDecision, PolicyGraphEdgeCondition,
-    PolicyGraphNode, PolicyGraphNodeId, PolicyGraphNodeKind, PolicyIfThenElseCondition,
-    PolicyReasonCode, PolicyRuntimeBoundary, PolicySwitchArm, PolicySwitchNode,
+    PORT_APPROVED, PORT_DEFAULT, PolicyApprovalRequest, PolicyDecision, PolicyEvidenceCheck,
+    PolicyEvidenceField, PolicyEvidencePredicate, PolicyGraph, PolicyGraphDecision,
+    PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeId, PolicyGraphNodeKind,
+    PolicyIfThenElseCondition, PolicyReasonCode, PolicyRuntimeBoundary, PolicySwitchArm,
+    PolicySwitchNode,
 };
-use crate::task_board::policy::{PolicyAction, PolicyInput};
+use crate::task_board::policy::{PolicyAction, PolicyApprovalState, PolicyInput};
 
 use decisions::{
     dry_run_only, require_consensus, require_human, supervisor_decision, supervisor_reason_code,
 };
+
+/// Side-effect signals collected while the pure evaluator walks the graph: the
+/// runtime wait boundaries and the pending-grant requests emitted by approval
+/// gates that had no existing grant.
+#[derive(Default)]
+struct EvaluationEffects {
+    boundaries: Vec<PolicyRuntimeBoundary>,
+    approval_requests: Vec<PolicyApprovalRequest>,
+}
 
 enum EvaluationStep {
     Continue(Vec<String>),
@@ -25,10 +35,16 @@ impl PolicyGraph {
     pub(super) fn evaluate_graph(
         &self,
         input: &PolicyInput,
-    ) -> Option<(PolicyDecision, Vec<String>, Vec<PolicyRuntimeBoundary>)> {
+    ) -> Option<(
+        PolicyDecision,
+        Vec<String>,
+        Vec<PolicyRuntimeBoundary>,
+        Vec<PolicyApprovalRequest>,
+    )> {
         if !self.validate().is_valid() {
             return Some((
                 require_human(PolicyReasonCode::HumanRequired),
+                Vec::new(),
                 Vec::new(),
                 Vec::new(),
             ));
@@ -36,7 +52,7 @@ impl PolicyGraph {
         let mut pending = VecDeque::from([self.entry_node(input)?.id.clone()]);
         let mut visited = Vec::new();
         let mut visited_ids: HashSet<String> = HashSet::new();
-        let mut boundaries = Vec::new();
+        let mut effects = EvaluationEffects::default();
         let safety_cap = self.nodes.len().saturating_mul(4).max(4);
         while let Some(node_id) = pending.pop_front() {
             if visited_ids.contains(node_id.as_str()) {
@@ -45,24 +61,37 @@ impl PolicyGraph {
             if let Some(bailout) =
                 Self::traversal_bailout(node_id.as_str(), &visited, &mut visited_ids, safety_cap)
             {
-                return Some((bailout.0, bailout.1, boundaries));
+                return Some((
+                    bailout.0,
+                    bailout.1,
+                    effects.boundaries,
+                    effects.approval_requests,
+                ));
             }
             let node = self
                 .nodes
                 .iter()
                 .find(|candidate| candidate.id == node_id)?;
             visited.push(node.id.as_str().to_owned());
-            match self.evaluation_step(node, input, &mut boundaries) {
+            match self.evaluation_step(node, input, &mut effects) {
                 EvaluationStep::Continue(next_node_ids) => {
                     pending.extend(next_node_ids.into_iter().map(PolicyGraphNodeId::from));
                 }
-                EvaluationStep::Terminal(decision) => return Some((decision, visited, boundaries)),
+                EvaluationStep::Terminal(decision) => {
+                    return Some((
+                        decision,
+                        visited,
+                        effects.boundaries,
+                        effects.approval_requests,
+                    ));
+                }
             }
         }
         Some((
             supervisor_decision(PolicyGraphDecision::Allow, PolicyReasonCode::DefaultAllow),
             visited,
-            boundaries,
+            effects.boundaries,
+            effects.approval_requests,
         ))
     }
 
@@ -93,7 +122,7 @@ impl PolicyGraph {
         &self,
         node: &PolicyGraphNode,
         input: &PolicyInput,
-        boundaries: &mut Vec<PolicyRuntimeBoundary>,
+        effects: &mut EvaluationEffects,
     ) -> EvaluationStep {
         match &node.kind {
             PolicyGraphNodeKind::Trigger { .. }
@@ -112,7 +141,7 @@ impl PolicyGraph {
                 EvaluationStep::Terminal(require_human(PolicyReasonCode::HumanRequired))
             }
             PolicyGraphNodeKind::WaitStep(step) => {
-                boundaries.push(PolicyRuntimeBoundary {
+                effects.boundaries.push(PolicyRuntimeBoundary {
                     node_id: node.id.as_str().to_owned(),
                     resume_key: step.resume_key.clone(),
                     wait: step.wait.clone(),
@@ -165,6 +194,31 @@ impl PolicyGraph {
             }
             PolicyGraphNodeKind::ConsensusGate { reason_code } => {
                 EvaluationStep::Terminal(require_consensus(*reason_code))
+            }
+            PolicyGraphNodeKind::ApprovalGate(gate) => {
+                match input.approval_state(node.id.as_str()) {
+                    Some(PolicyApprovalState::Approved) => EvaluationStep::Continue(
+                        self.next_node_for_port(node.id.as_str(), PORT_APPROVED)
+                            .into_iter()
+                            .collect(),
+                    ),
+                    Some(PolicyApprovalState::Denied) => EvaluationStep::Terminal(
+                        supervisor_decision(PolicyGraphDecision::Deny, gate.reason_code),
+                    ),
+                    Some(PolicyApprovalState::Pending) => {
+                        EvaluationStep::Terminal(require_human(gate.reason_code))
+                    }
+                    None => {
+                        // No grant yet: ask the caller to create a pending grant
+                        // (fire-and-forget) and block the route for a human.
+                        effects.approval_requests.push(PolicyApprovalRequest {
+                            node_id: node.id.as_str().to_owned(),
+                            reason_code: gate.reason_code,
+                            expiry_seconds: gate.expiry_seconds,
+                        });
+                        EvaluationStep::Terminal(require_human(gate.reason_code))
+                    }
+                }
             }
             PolicyGraphNodeKind::DryRunGate { reason_code } => {
                 EvaluationStep::Terminal(dry_run_only(*reason_code))

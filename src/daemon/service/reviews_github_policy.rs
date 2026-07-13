@@ -85,6 +85,7 @@ pub(crate) fn enforce_review_targets_policy(
             },
             evidence: review_target_policy_evidence(target),
             evaluated_at: None,
+            approvals: Vec::new(),
         };
         enforce_reviews_policy_input(
             mutation,
@@ -124,6 +125,7 @@ fn enforce_review_text_paste_approval_policy(targets: &[ReviewTarget]) -> Result
             },
             evidence: review_target_policy_evidence(target),
             evaluated_at: None,
+            approvals: Vec::new(),
         };
         enforce_reviews_policy_input(
             ReviewsGitHubMutation::Approve,
@@ -168,6 +170,7 @@ pub(crate) fn enforce_review_pull_request_policy(
         },
         evidence: PolicyEvidence::default(),
         evaluated_at: None,
+        approvals: Vec::new(),
     };
     enforce_reviews_policy_input(
         mutation,
