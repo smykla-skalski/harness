@@ -18,6 +18,8 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
 
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.openWindow)
+  private var openWindow
 
   @State private var statusChoice = TaskBoardStatusFilterChoice.all
   @State private var itemID: String?
@@ -211,7 +213,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
               .foregroundStyle(HarnessMonitorTheme.secondaryInk)
               .accessibilityAddTraits(.isHeader)
             ForEach(summary.applied.prefix(4)) { applied in
-              appliedSummaryRow(applied)
+              appliedTaskRow(applied)
             }
           }
           .padding(.top, HarnessMonitorTheme.spacingSM)
@@ -273,6 +275,40 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
       cachedPresentation = presentation
     }
     presentedInput = input
+  }
+
+  /// Actionable variant of the shared applied-summary row: the spawned
+  /// session/work-item ids gain an Open Session control that jumps into the
+  /// live session window instead of leaving the ids as inert text.
+  private func appliedTaskRow(_ applied: TaskBoardDispatchAppliedTask) -> some View {
+    TaskBoardOperationsFormRow(applied.item.title) {
+      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+        Text("\(applied.sessionId) · \(applied.workItemId)")
+          .font(captionFont)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .lineLimit(1)
+          .truncationMode(.middle)
+        Button {
+          TaskBoardSpawnedSessionNavigator.open(
+            store: store,
+            openWindow: openWindow,
+            sessionID: applied.sessionId,
+            workItemID: applied.workItemId
+          )
+        } label: {
+          Label("Open Session", systemImage: "arrow.up.forward.app")
+            .font(captionFont)
+        }
+        .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+        .help("Open the spawned session and focus its work item")
+        .accessibilityIdentifier(
+          "harness.task-board.dispatch.applied.open-session.\(applied.boardItemId)"
+        )
+      }
+      .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+    .accessibilityElement(children: .contain)
   }
 
   private var formattedLocalHostProjectTypes: String {
