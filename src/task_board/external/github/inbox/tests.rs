@@ -14,9 +14,8 @@ fn github_inbox_search_queries_use_github_all_state_issue_form() {
 
     assert_eq!(
         assigned_query,
-        "repo:owner/repo is:issue assignee:octo-user"
+        "repo:owner/repo is:issue assignee:octo-user state:open state:closed"
     );
-    assert!(!assigned_query.contains("state:"));
     assert_eq!(
         review_request_query(&repository, "octo-user"),
         "repo:owner/repo is:pr review-requested:octo-user state:open"

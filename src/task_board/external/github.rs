@@ -409,14 +409,20 @@ fn github_external_id(repository: &GitHubRepository, issue_number: u64) -> Strin
     format!("{}#{issue_number}", repository.slug())
 }
 
-// GitHub has no all-state qualifier: `state:all` matches nothing. Omitting `state` is the
-// query form that returns open and closed issues so remote closures can reconcile to Done.
+// GitHub has no `state:all` qualifier. Repeating the state qualifier matches either state,
+// so one query explicitly returns open and closed issues for remote closure reconciliation.
 fn assigned_issue_query(repository: &GitHubRepository, login: &str) -> String {
-    format!("repo:{} is:issue assignee:{login}", repository.slug())
+    format!(
+        "repo:{} is:issue assignee:{login} state:open state:closed",
+        repository.slug()
+    )
 }
 
 fn author_issue_query(repository: &GitHubRepository, login: &str) -> String {
-    format!("repo:{} is:issue author:{login}", repository.slug())
+    format!(
+        "repo:{} is:issue author:{login} state:open state:closed",
+        repository.slug()
+    )
 }
 
 fn review_request_query(repository: &GitHubRepository, login: &str) -> String {
