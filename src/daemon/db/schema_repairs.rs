@@ -30,6 +30,7 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
 
 const DEPRECATED_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] =
     &[("policy_workspace", "enforcement_snapshot_json")];
+const CURRENT_SCHEMA_TRIGGERS: &[&str] = &["remote_audit_events_touch_client_activity"];
 
 const CURRENT_SCHEMA_REMOTE_ACME_COLUMNS: &[(&str, &str)] = &[
     ("remote_acme_state", "domain"),
@@ -93,6 +94,11 @@ pub(super) fn current_schema_shape_needs_repair(
             return Ok(true);
         }
     }
+    for trigger in CURRENT_SCHEMA_TRIGGERS {
+        if !trigger_exists(conn, trigger)? {
+            return Ok(true);
+        }
+    }
     Ok(false)
 }
 
@@ -118,6 +124,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v28::run(&db.conn)?;
     super::schema_v29::run(&db.conn)?;
     super::schema_v30::run(&db.conn)?;
+    super::schema_v31::run(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
@@ -252,6 +259,16 @@ fn table_exists(conn: &super::Connection, table_name: &str) -> Result<bool, CliE
     )
     .map(|count| count > 0)
     .map_err(|error| db_error(format!("check {table_name} table existence: {error}")))
+}
+
+fn trigger_exists(conn: &super::Connection, trigger_name: &str) -> Result<bool, CliError> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name = ?1",
+        [trigger_name],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|count| count > 0)
+    .map_err(|error| db_error(format!("check {trigger_name} trigger existence: {error}")))
 }
 
 fn column_exists(

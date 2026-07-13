@@ -19,6 +19,7 @@ mod projects;
 mod reconcile;
 mod remote_acme;
 mod remote_acme_providers;
+mod remote_client_activity;
 mod remote_identity;
 mod remote_pairing;
 mod remote_pairing_reviews;
