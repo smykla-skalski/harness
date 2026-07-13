@@ -17,11 +17,11 @@ struct TaskBoardSyncSummaryWireDecodingTests {
       {
         "total": 5,
         "providers": [
-          {"provider": "git_hub", "configured": true, "linked": 3, "pushable": 1,
+          {"provider": "github", "configured": true, "linked": 3, "pushable": 1,
            "blocked": 0, "token_env": ["GH_TOKEN"]}
         ],
         "operations": [
-          {"provider": "git_hub", "action": "conflict", "board_item_id": "b1",
+          {"provider": "github", "action": "conflict", "board_item_id": "b1",
            "external_id": "e1", "url": "https://example.com/1", "dry_run": true, "applied": false,
            "changed_fields": ["title"], "unsupported_fields": ["labels"]}
         ]

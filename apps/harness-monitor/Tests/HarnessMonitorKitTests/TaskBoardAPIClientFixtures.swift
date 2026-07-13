@@ -113,7 +113,7 @@ let sampleTaskBoardSyncSummaryJSON: [String: JSONValue] = [
   "total": .number(1),
   "providers": .array([
     .object([
-      "provider": .string("git_hub"),
+      "provider": .string("github"),
       "configured": .bool(true),
       "linked": .number(1),
       "pushable": .number(0),
@@ -123,7 +123,7 @@ let sampleTaskBoardSyncSummaryJSON: [String: JSONValue] = [
   ]),
   "operations": .array([
     .object([
-      "provider": .string("git_hub"),
+      "provider": .string("github"),
       "action": .string("push"),
       "board_item_id": .string("board-1"),
       "external_id": .string("123"),

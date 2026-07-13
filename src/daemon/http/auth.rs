@@ -103,7 +103,7 @@ pub(crate) fn require_auth(
     }
 }
 
-pub(crate) fn websocket_remote_client(
+pub(crate) fn authenticated_remote_client(
     headers: &HeaderMap,
     state: &DaemonHttpState,
 ) -> Result<Option<RemoteStoredClient>, Box<Response>> {

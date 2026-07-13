@@ -118,8 +118,27 @@ extension TaskBoardAgentMode {
 }
 
 public enum TaskBoardExternalRefProvider: String, Codable, Sendable {
-  case gitHub = "git_hub"
+  case gitHub = "github"
   case todoist
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let rawValue = try container.decode(String.self)
+    switch rawValue {
+    case "github", "git_hub": self = .gitHub
+    case "todoist": self = .todoist
+    default:
+      throw DecodingError.dataCorruptedError(
+        in: container,
+        debugDescription: "Unknown task-board external reference provider: \(rawValue)"
+      )
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
 }
 
 public struct TaskBoardExternalRef: Codable, Equatable, Sendable {

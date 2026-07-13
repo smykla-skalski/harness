@@ -107,7 +107,7 @@ pub(crate) async fn ws_upgrade_handler(
     metadata.record_on_span(&connection_span);
     let baggage = apply_parent_context_from_headers(&connection_span, &headers);
     record_trace_id_on_span(&connection_span);
-    let remote_client = match http::websocket_remote_client(&headers, &state) {
+    let remote_client = match http::authenticated_remote_client(&headers, &state) {
         Ok(client) => client,
         Err(response) => {
             record_rejected_connection(&connection_span, &client_label);

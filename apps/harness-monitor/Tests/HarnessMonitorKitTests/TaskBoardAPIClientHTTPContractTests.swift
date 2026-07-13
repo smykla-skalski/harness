@@ -257,7 +257,7 @@ extension TaskBoardAPIClientTests {
     #expect(records[3].body?["clear_session_id"] as? Bool == true)
     #expect(records[3].body?["clear_work_item_id"] as? Bool == true)
     #expect(records[5].body?["status"] as? String == "todo")
-    #expect(records[5].body?["provider"] as? String == "git_hub")
+    #expect(records[5].body?["provider"] as? String == "github")
     #expect(records[5].body?["direction"] as? String == "push")
     #expect(records[5].body?["dry_run"] as? Bool == false)
     #expect(records[6].body?["status"] as? String == "todo")

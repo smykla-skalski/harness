@@ -95,7 +95,26 @@ public enum ReviewFileViewedOutcome: String, Codable, Equatable, Sendable, CaseI
 /// Settings choice for substantial-PR strategy. Mirrors the daemon enum.
 public enum FilesLargeDiffStrategy: String, Codable, Equatable, Sendable, CaseIterable {
   case autoLocalClone = "auto_local_clone"
-  case forceGitHubRest = "force_git_hub_rest"
+  case forceGitHubRest = "force_github_rest"
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let rawValue = try container.decode(String.self)
+    switch rawValue {
+    case "auto_local_clone": self = .autoLocalClone
+    case "force_github_rest", "force_git_hub_rest": self = .forceGitHubRest
+    default:
+      throw DecodingError.dataCorruptedError(
+        in: container,
+        debugDescription: "Unknown large-diff strategy: \(rawValue)"
+      )
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
 }
 
 /// Per-file metadata returned by the daemon's `files_list` endpoint.

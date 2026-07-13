@@ -5,6 +5,29 @@ import Testing
 
 @Suite("Task-board daemon API client", .serialized)
 struct TaskBoardAPIClientTests {
+  @Test("GitHub providers encode canonically and accept legacy values")
+  func gitHubProviderWireNames() throws {
+    let encoder = JSONEncoder()
+    let decoder = JSONDecoder()
+
+    #expect(
+      String(bytes: try encoder.encode(TaskBoardExternalProvider.gitHub), encoding: .utf8)
+        == #""github""#
+    )
+    #expect(
+      String(bytes: try encoder.encode(TaskBoardExternalRefProvider.gitHub), encoding: .utf8)
+        == #""github""#
+    )
+    #expect(
+      try decoder.decode(TaskBoardExternalProvider.self, from: Data(#""git_hub""#.utf8))
+        == .gitHub
+    )
+    #expect(
+      try decoder.decode(TaskBoardExternalRefProvider.self, from: Data(#""git_hub""#.utf8))
+        == .gitHub
+    )
+  }
+
   @Test("Git runtime config decodes daemon default payload")
   func gitRuntimeConfigDecodesDaemonDefaultPayload() throws {
     let data = Data(#"{"global":{"signing":{"mode":"none"}}}"#.utf8)
@@ -112,7 +135,7 @@ struct TaskBoardAPIClientTests {
         "agent_mode": "interactive",
         "external_refs": [
           {
-            "provider": "git_hub",
+            "provider": "github",
             "external_id": "123",
             "url": "https://example.invalid/issues/123"
           }

@@ -45,6 +45,7 @@ use super::*;
 #[tokio::test]
 async fn ws_task_board_method_parity_against_constants() {
     let state = test_http_state_with_db();
+    let connection = Arc::new(Mutex::new(ConnectionState::new()));
     for method in TASK_BOARD_WS_METHOD_CATALOG {
         let request = WsRequest {
             id: format!("ws-parity-{method}"),
@@ -52,7 +53,7 @@ async fn ws_task_board_method_parity_against_constants() {
             params: json!({}),
             trace_context: None,
         };
-        let response = dispatch_task_board_method(&request, &state).await;
+        let response = dispatch_task_board_method(&request, &state, &connection).await;
         assert!(
             response.is_some(),
             "ws method {method} has no handler arm in dispatch_task_board_method",
@@ -63,12 +64,13 @@ async fn ws_task_board_method_parity_against_constants() {
 #[tokio::test]
 async fn ws_unknown_task_board_method_returns_none() {
     let state = test_http_state_with_db();
+    let connection = Arc::new(Mutex::new(ConnectionState::new()));
     let request = WsRequest {
         id: "ws-parity-unknown".into(),
         method: "task_board.unknown_method".into(),
         params: json!({}),
         trace_context: None,
     };
-    let response = dispatch_task_board_method(&request, &state).await;
+    let response = dispatch_task_board_method(&request, &state, &connection).await;
     assert!(response.is_none());
 }
