@@ -12,7 +12,7 @@ use http_body_util::{BodyExt as _, Limited};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, TryAcquireError};
 use tokio::time::timeout;
 
-use super::auth::{self, RemoteHttpLimitAudit};
+use super::auth::RemoteHttpLimitAudit;
 use super::auth_audit::RemoteHttpAuditMarker;
 use super::{DaemonHttpAuthMode, DaemonHttpState};
 use crate::daemon::remote_tls::{
@@ -158,13 +158,57 @@ pub(super) async fn admit_remote_http_request(
     request
         .extensions_mut()
         .insert(RemoteHttpAuditMarker::default());
+    let (config, permit) = match remote_http_admission(&state, &request) {
+        Ok(admission) => admission,
+        Err(rejection) => {
+            let response = audited_http_limit_response(
+                &state,
+                RemoteHttpLimitAudit::from_request(&request, &state),
+                rejection.status,
+                rejection.message,
+            )
+            .await;
+            return rejection.with_response_headers(response);
+        }
+    };
+    let response = run_remote_http_request_with_timeout(&state, request, next, config).await;
+    drop(permit);
+    response
+}
+
+async fn run_remote_http_request_with_timeout(
+    state: &DaemonHttpState,
+    request: Request<Body>,
+    next: Next,
+    config: RemoteRequestLimitConfig,
+) -> Response {
+    let timeout_audit = match RemoteHttpLimitAudit::from_request(&request, state) {
+        Ok(audit) => audit,
+        Err(response) => return *response,
+    };
+    match timeout(config.request_timeout, next.run(request)).await {
+        Ok(response) => response,
+        Err(_) => {
+            audited_http_limit_response_from_snapshot(
+                state,
+                timeout_audit.as_ref(),
+                StatusCode::GATEWAY_TIMEOUT,
+                "remote request exceeded the configured timeout",
+            )
+            .await
+        }
+    }
+}
+
+fn remote_http_admission(
+    state: &DaemonHttpState,
+    request: &Request<Body>,
+) -> Result<(RemoteRequestLimitConfig, OwnedSemaphorePermit), RemoteHttpLimitRejection> {
     let Some(limits) = state.remote_request_limits.as_ref() else {
-        return audited_http_limit_response(
-            &state,
-            &request,
+        return Err(RemoteHttpLimitRejection::new(
             StatusCode::SERVICE_UNAVAILABLE,
             "remote request limits are unavailable",
-        );
+        ));
     };
     let config = limits.config();
     let uri_bytes = request
@@ -172,12 +216,10 @@ pub(super) async fn admit_remote_http_request(
         .path_and_query()
         .map_or(0, |value| value.as_str().len());
     if uri_bytes > config.max_http_uri_bytes {
-        return audited_http_limit_response(
-            &state,
-            &request,
+        return Err(RemoteHttpLimitRejection::new(
             StatusCode::URI_TOO_LONG,
             "remote request URI exceeds the configured limit",
-        );
+        ));
     }
     let header_bytes = request
         .headers()
@@ -188,34 +230,49 @@ pub(super) async fn admit_remote_http_request(
                 .saturating_add(value.as_bytes().len())
         });
     if header_bytes > config.max_http_header_bytes {
-        return audited_http_limit_response(
-            &state,
-            &request,
+        return Err(RemoteHttpLimitRejection::new(
             StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
             "remote request headers exceed the configured limit",
-        );
+        ));
     }
-    let Ok(_permit) = limits.try_http_permit() else {
-        let response = audited_http_limit_response(
-            &state,
-            &request,
+    let permit = limits.try_http_permit().map_err(|_| {
+        RemoteHttpLimitRejection::with_retry_after(
             StatusCode::TOO_MANY_REQUESTS,
             "remote request concurrency limit reached",
-        );
-        return with_retry_after(response);
-    };
-    let timeout_audit = match RemoteHttpLimitAudit::from_request(&request, &state) {
-        Ok(audit) => audit,
-        Err(response) => return *response,
-    };
-    match timeout(config.request_timeout, next.run(request)).await {
-        Ok(response) => response,
-        Err(_) => audited_http_limit_response_from_snapshot(
-            &state,
-            timeout_audit.as_ref(),
-            StatusCode::GATEWAY_TIMEOUT,
-            "remote request exceeded the configured timeout",
-        ),
+        )
+    })?;
+    Ok((config, permit))
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RemoteHttpLimitRejection {
+    status: StatusCode,
+    message: &'static str,
+    retry_after: bool,
+}
+
+impl RemoteHttpLimitRejection {
+    const fn new(status: StatusCode, message: &'static str) -> Self {
+        Self {
+            status,
+            message,
+            retry_after: false,
+        }
+    }
+
+    const fn with_retry_after(status: StatusCode, message: &'static str) -> Self {
+        Self {
+            status,
+            message,
+            retry_after: true,
+        }
+    }
+
+    fn with_response_headers(self, response: Response) -> Response {
+        if self.retry_after {
+            return with_retry_after(response);
+        }
+        response
     }
 }
 
@@ -234,21 +291,24 @@ pub(super) async fn limit_remote_http_body(
     if content_length_exceeds(&request, max_bytes) {
         return audited_http_limit_response(
             &state,
-            &request,
+            RemoteHttpLimitAudit::from_request(&request, &state),
             StatusCode::PAYLOAD_TOO_LARGE,
             "remote request body exceeds the configured limit",
-        );
+        )
+        .await;
     }
     let (parts, body) = request.into_parts();
     let collected = Limited::new(body, max_bytes).collect().await;
     let Ok(collected) = collected else {
         let rejected = Request::from_parts(parts, Body::empty());
+        let audit = RemoteHttpLimitAudit::from_request(&rejected, &state);
         return audited_http_limit_response(
             &state,
-            &rejected,
+            audit,
             StatusCode::PAYLOAD_TOO_LARGE,
             "remote request body exceeds the configured limit",
-        );
+        )
+        .await;
     };
     next.run(Request::from_parts(parts, Body::from(collected.to_bytes())))
         .await
@@ -308,25 +368,30 @@ fn with_retry_after(mut response: Response) -> Response {
     response
 }
 
-fn audited_http_limit_response(
+async fn audited_http_limit_response(
     state: &DaemonHttpState,
-    request: &Request<Body>,
+    audit: Result<Option<RemoteHttpLimitAudit>, Box<Response>>,
     status: StatusCode,
     message: &str,
 ) -> Response {
-    match auth::audit_remote_http_limit_rejection(request, state, message) {
-        Ok(()) => limit_response(status, message),
-        Err(response) => *response,
-    }
+    let audit = match audit {
+        Ok(audit) => audit,
+        Err(response) => return *response,
+    };
+    audited_http_limit_response_from_snapshot(state, audit.as_ref(), status, message).await
 }
 
-fn audited_http_limit_response_from_snapshot(
+async fn audited_http_limit_response_from_snapshot(
     state: &DaemonHttpState,
     audit: Option<&RemoteHttpLimitAudit>,
     status: StatusCode,
     message: &str,
 ) -> Response {
-    match audit.map_or(Ok(()), |audit| audit.record_rejection(state, message)) {
+    let result = match audit {
+        Some(audit) => audit.record_rejection(state, message).await,
+        None => Ok(()),
+    };
+    match result {
         Ok(()) => limit_response(status, message),
         Err(response) => *response,
     }

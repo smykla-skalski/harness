@@ -34,13 +34,13 @@ SELECT client_id, display_name, platform, role, scopes_json, token_hash, token_h
 FROM remote_clients
 ORDER BY created_at ASC, client_id ASC";
 
-const INSERT_REMOTE_AUDIT_EVENT_SQL: &str = "
+pub(super) const INSERT_REMOTE_AUDIT_EVENT_SQL: &str = "
 INSERT INTO remote_audit_events (
     event_id, recorded_at, request_id, client_id, route_or_method, scope,
     scope_decision, outcome, remote_addr, error_detail, metadata_json
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '{}')";
 
-const MARK_REMOTE_AUDIT_EVENT_FAILED_SQL: &str = "
+pub(super) const MARK_REMOTE_AUDIT_EVENT_FAILED_SQL: &str = "
 UPDATE remote_audit_events
 SET outcome = 'failure', error_detail = ?2
 WHERE event_id = ?1 AND scope_decision = 'allowed'";

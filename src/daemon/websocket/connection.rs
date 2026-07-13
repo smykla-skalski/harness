@@ -269,7 +269,9 @@ fn spawn_inbound_task(
                                 Arc::clone(&connection),
                                 priority_tx.clone(),
                                 &mut dispatch_tasks,
-                            ) {
+                            )
+                            .await
+                            {
                                 IncomingMessageAction::ContinueLoop => {}
                                 IncomingMessageAction::CloseConnection => break,
                                 IncomingMessageAction::RespondBatch(frames) => {
@@ -424,7 +426,7 @@ pub(crate) fn incoming_message_counts_as_activity(message: &Message) -> bool {
     )
 }
 
-pub(crate) fn handle_incoming_message(
+pub(crate) async fn handle_incoming_message(
     message: Message,
     state: DaemonHttpState,
     connection: Arc<Mutex<ConnectionState>>,
@@ -435,13 +437,16 @@ pub(crate) fn handle_incoming_message(
         Message::Text(text) => {
             while dispatch_tasks.try_join_next().is_some() {}
             if let Some(rejection) = remote_dispatch_rejection(&state, dispatch_tasks.len()) {
-                return IncomingMessageAction::RespondBatch(handle_overloaded_message(
-                    &text,
-                    &state,
-                    &connection,
-                    rejection.status,
-                    rejection.message,
-                ));
+                return IncomingMessageAction::RespondBatch(
+                    handle_overloaded_message(
+                        &text,
+                        &state,
+                        &connection,
+                        rejection.status,
+                        rejection.message,
+                    )
+                    .await,
+                );
             }
             spawn_text_dispatch(
                 text.to_string(),
