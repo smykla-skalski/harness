@@ -34,6 +34,8 @@ public struct TaskBoardOverviewView: View {
   let onRunTaskBoardOrchestratorOnce: ((TaskBoardOrchestratorRunOnceRequest) -> Void)?
   @Environment(\.fontScale)
   var fontScale
+  @Environment(\.openURL)
+  var openURL
   @State private var selectedTaskBoardItemID: String?
   @State private var isCreatingTaskBoardItem = false
   @State private var evaluationSummaryFitsHorizontally = true

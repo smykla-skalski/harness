@@ -117,6 +117,10 @@ struct TaskBoardRouteContentSourceTests {
     let contextMenuSource = try taskBoardSourceFile(
       named: "TaskBoardCardContextMenu.swift"
     )
+    let contextMenuActionsSource = try taskBoardSourceFile(
+      named: "TaskBoardOverviewView+ContextMenu.swift"
+    )
+    let overviewViewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
     let laneSource = try taskBoardSourceFile(named: "TaskBoardLaneViews.swift")
     let unifiedSource = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
 
@@ -129,6 +133,16 @@ struct TaskBoardRouteContentSourceTests {
     #expect(contextMenuSource.contains(".onAppear {"))
     #expect(contextMenuSource.contains("actions.primeSelection(scope.cardIDs)"))
     #expect(!contextMenuSource.contains("let _: Task"))
+    #expect(contextMenuSource.contains("if let githubURL = actions.githubURL(scope.primaryID)"))
+    #expect(
+      contextMenuSource.contains(
+        "Label(\"Open on GitHub\", systemImage: \"arrow.up.right.square\")"
+      )
+    )
+    #expect(contextMenuSource.contains("actions.openGitHubURL(githubURL)"))
+    #expect(contextMenuActionsSource.contains("githubURL: githubURL"))
+    #expect(contextMenuActionsSource.contains("openURL(url)"))
+    #expect(overviewViewSource.contains("@Environment(\\.openURL)"))
     #expect(contextMenuSource.contains("Menu(\"Move to...\")"))
     #expect(contextMenuSource.contains("ForEach(TaskBoardInboxLane.allCases)"))
     #expect(contextMenuSource.contains("Button(scope.deleteLabel, role: .destructive)"))

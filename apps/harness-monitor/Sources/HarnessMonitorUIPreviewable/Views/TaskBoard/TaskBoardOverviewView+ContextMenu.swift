@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 
 extension TaskBoardOverviewView {
@@ -8,6 +9,10 @@ extension TaskBoardOverviewView {
       isActionInFlight: isActionInFlight,
       canOpen: canOpenCard,
       open: openCard,
+      githubURL: githubURL,
+      openGitHubURL: { url in
+        openURL(url)
+      },
       canMove: canMoveCardContextMenuSelection,
       move: moveCardContextMenuSelection,
       deletionTargets: deletionTargets,
@@ -78,6 +83,13 @@ extension TaskBoardOverviewView {
         onOpenItem(item)
       }
     }
+  }
+
+  private func githubURL(for cardID: TaskBoardCardID) -> URL? {
+    guard case .api(let itemID) = cardID else {
+      return nil
+    }
+    return currentPresentation.taskBoardItem(id: itemID)?.taskBoardGitHubURL
   }
 
   func deletionTargets(

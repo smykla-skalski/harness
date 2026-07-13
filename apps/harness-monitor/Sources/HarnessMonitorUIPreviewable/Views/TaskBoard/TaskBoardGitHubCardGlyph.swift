@@ -38,6 +38,15 @@ enum TaskBoardGitHubCardGlyph {
 }
 
 extension TaskBoardItem {
+  var taskBoardGitHubURL: URL? {
+    for ref in externalRefs where ref.provider == .gitHub {
+      if let url = TaskBoardGitHubURL.resolve(ref.url) {
+        return url
+      }
+    }
+    return TaskBoardGitHubURL.resolve(workflow?.prUrl)
+  }
+
   var taskBoardBackgroundProviderSymbol: ProviderBrandSymbol? {
     taskBoardRepositoryOwner.flatMap(ProviderBrandSymbol.init(taskBoardOwner:))
   }
@@ -68,6 +77,30 @@ extension TaskBoardItem {
       return owner
     }
     return githubExternalRefs.lazy.compactMap(\.repositoryOwner).first
+  }
+}
+
+private enum TaskBoardGitHubURL {
+  static func resolve(_ rawValue: String?) -> URL? {
+    guard let rawValue else {
+      return nil
+    }
+    let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard
+      let url = URL(string: trimmed),
+      url.scheme?.lowercased() == "https",
+      isGitHubHost(url.host)
+    else {
+      return nil
+    }
+    return url
+  }
+
+  static func isGitHubHost(_ rawHost: String?) -> Bool {
+    guard let host = rawHost?.lowercased() else {
+      return false
+    }
+    return host == "github.com" || host == "www.github.com"
   }
 }
 
@@ -103,8 +136,7 @@ private enum TaskBoardGitHubRepositoryIdentity {
     guard
       let urlString,
       let url = URL(string: urlString),
-      let host = url.host?.lowercased(),
-      host == "github.com" || host == "www.github.com"
+      TaskBoardGitHubURL.isGitHubHost(url.host)
     else {
       return nil
     }
