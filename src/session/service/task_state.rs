@@ -268,6 +268,30 @@ pub(crate) fn apply_update_task(
     require_active(state)?;
     require_permission(state, actor_id, SessionAction::UpdateTaskStatus)?;
 
+    apply_update_task_fields(state, task_id, status, note, actor_id, now)
+}
+
+/// Apply a daemon-managed run status without requiring a session leader.
+pub(crate) fn apply_update_task_for_managed_run(
+    state: &mut SessionState,
+    task_id: &str,
+    status: TaskStatus,
+    note: Option<&str>,
+    actor_id: &str,
+    now: &str,
+) -> Result<TaskStatus, CliError> {
+    require_permission(state, actor_id, SessionAction::UpdateTaskStatus)?;
+    apply_update_task_fields(state, task_id, status, note, actor_id, now)
+}
+
+fn apply_update_task_fields(
+    state: &mut SessionState,
+    task_id: &str,
+    status: TaskStatus,
+    note: Option<&str>,
+    actor_id: &str,
+    now: &str,
+) -> Result<TaskStatus, CliError> {
     reject_review_only_status(task_id, status)?;
 
     let current_task = state

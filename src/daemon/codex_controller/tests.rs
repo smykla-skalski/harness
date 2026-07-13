@@ -11,6 +11,7 @@ use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunStatus};
 use crate::session::types::{AgentStatus, SessionRole};
 
 mod request_validation;
+mod task_lifecycle;
 mod test_support;
 
 use self::test_support::{

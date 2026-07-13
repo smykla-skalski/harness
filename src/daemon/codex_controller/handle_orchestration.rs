@@ -2,13 +2,15 @@ use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot};
 use crate::daemon::service as daemon_service;
 use crate::errors::CliError;
 use crate::session::service as session_service;
-use crate::session::types::{AgentStatus, ManagedAgentRef};
+use crate::session::types::{
+    AgentStatus, CONTROL_PLANE_ACTOR_ID, ManagedAgentRef, SessionState, TaskStatus,
+};
 use crate::workspace::utc_now;
 
 use super::handle::{CodexControllerHandle, lock_db};
 use super::orchestration::{
-    codex_orchestration_status_needs_update, orchestration_status_for_codex_run,
-    remove_registered_codex_agent, update_codex_orchestration_status,
+    orchestration_status_for_codex_run, remove_registered_codex_agent,
+    update_codex_orchestration_status,
 };
 
 impl CodexControllerHandle {
@@ -51,33 +53,25 @@ impl CodexControllerHandle {
         status: AgentStatus,
     ) -> Option<Result<bool, CliError>> {
         let session_id_async = run.session_id.clone();
+        let run_async = run.clone();
         self.run_with_async_db(|async_db| async move {
-            let Some(resolved) = async_db.resolve_session(&session_id_async).await? else {
-                return Ok(false);
-            };
-            if !codex_orchestration_status_needs_update(
-                &resolved.state,
-                &session_agent_id,
-                &managed_agent,
-                &status,
-            ) {
-                return Ok(false);
-            }
             let now = utc_now();
             let status_for_update = status.clone();
             let changed = async_db
                 .update_session_state_immediate(&session_id_async, |state| {
-                    let changed = update_codex_orchestration_status(
+                    let task_changed =
+                        apply_bound_task_terminal_transition(state, &run_async, &now)?;
+                    let status_changed = update_codex_orchestration_status(
                         state,
                         &session_agent_id,
                         &managed_agent,
                         status_for_update,
                         &now,
                     );
-                    if changed {
+                    if task_changed || status_changed {
                         session_service::refresh_session(state, &now);
                     }
-                    Ok(changed)
+                    Ok(task_changed || status_changed)
                 })
                 .await?;
             if changed {
@@ -101,13 +95,15 @@ impl CodexControllerHandle {
             return Ok(false);
         };
         let now = utc_now();
-        if !update_codex_orchestration_status(
+        let task_changed = apply_bound_task_terminal_transition(&mut state, run, &now)?;
+        let status_changed = update_codex_orchestration_status(
             &mut state,
             session_agent_id,
             managed_agent,
             status,
             &now,
-        ) {
+        );
+        if !task_changed && !status_changed {
             return Ok(false);
         }
         session_service::refresh_session(&mut state, &now);
@@ -186,7 +182,7 @@ impl CodexControllerHandle {
                         request_async.role,
                         request_async.fallback_role,
                     )?;
-                    session_service::apply_join_session(
+                    let agent_id = session_service::apply_join_session(
                         &mut *state,
                         &display_name_owned,
                         runtime_name,
@@ -196,8 +192,14 @@ impl CodexControllerHandle {
                         &now,
                         request_async.persona.as_deref(),
                         Some(managed_agent_async),
-                    )
-                    .map(|agent_id| (agent_id, joined_role))
+                    )?;
+                    bind_requested_task(
+                        &mut *state,
+                        request_async.task_id.as_deref(),
+                        &agent_id,
+                        &now,
+                    )?;
+                    Ok((agent_id, joined_role))
                 })
                 .await?;
             async_db
@@ -238,6 +240,7 @@ impl CodexControllerHandle {
             request.persona.as_deref(),
             Some(managed_agent),
         )?;
+        bind_requested_task(&mut state, request.task_id.as_deref(), &agent_id, &now)?;
         let project_id = db
             .project_id_for_session(session_id)?
             .ok_or_else(|| daemon_service::session_not_found(session_id))?;
@@ -352,4 +355,161 @@ impl CodexControllerHandle {
         db.bump_change("global")?;
         Ok(true)
     }
+}
+
+const TASK_SUBMISSION_SUMMARY_LIMIT: usize = 2_000;
+
+fn apply_bound_task_terminal_transition(
+    state: &mut SessionState,
+    run: &CodexRunSnapshot,
+    now: &str,
+) -> Result<bool, CliError> {
+    let (Some(task_id), Some(agent_id)) = (run.task_id.as_deref(), run.session_agent_id.as_deref())
+    else {
+        return Ok(false);
+    };
+    if run.status.is_active() {
+        return Ok(false);
+    }
+    let Some(task) = state.tasks.get(task_id) else {
+        tracing::info!(
+            run_id = %run.run_id,
+            session_id = %run.session_id,
+            task_id,
+            "skipping codex task bridge because the bound task no longer exists"
+        );
+        return Ok(false);
+    };
+    if task.status != TaskStatus::InProgress || task.assigned_to.as_deref() != Some(agent_id) {
+        tracing::info!(
+            run_id = %run.run_id,
+            session_id = %run.session_id,
+            task_id,
+            status = ?task.status,
+            assignee = ?task.assigned_to,
+            "skipping codex task bridge because the task was moved manually"
+        );
+        return Ok(false);
+    }
+    match run.status {
+        crate::daemon::protocol::CodexRunStatus::Completed => {
+            let summary = completion_summary(run.final_message.as_deref());
+            session_service::apply_submit_for_review_for_managed_run(
+                state,
+                task_id,
+                agent_id,
+                Some(&summary),
+                now,
+            )?;
+        }
+        crate::daemon::protocol::CodexRunStatus::Failed
+        | crate::daemon::protocol::CodexRunStatus::Cancelled => {
+            let reason = terminal_failure_reason(run);
+            session_service::apply_update_task_for_managed_run(
+                state,
+                task_id,
+                TaskStatus::Blocked,
+                Some(&reason),
+                CONTROL_PLANE_ACTOR_ID,
+                now,
+            )?;
+        }
+        crate::daemon::protocol::CodexRunStatus::Queued
+        | crate::daemon::protocol::CodexRunStatus::Running
+        | crate::daemon::protocol::CodexRunStatus::WaitingApproval => return Ok(false),
+    }
+    Ok(true)
+}
+
+fn completion_summary(final_message: Option<&str>) -> String {
+    let message = final_message
+        .map(str::trim)
+        .filter(|message| !message.is_empty());
+    truncate_chars(
+        message.unwrap_or("Codex worker completed the assigned task."),
+        TASK_SUBMISSION_SUMMARY_LIMIT,
+    )
+}
+
+fn terminal_failure_reason(run: &CodexRunSnapshot) -> String {
+    let detail = run
+        .error
+        .as_deref()
+        .or(run.latest_summary.as_deref())
+        .map(str::trim)
+        .filter(|detail| !detail.is_empty())
+        .unwrap_or("no failure detail was reported");
+    let prefix = match run.status {
+        crate::daemon::protocol::CodexRunStatus::Cancelled => "Codex run was cancelled",
+        _ => "Codex run failed",
+    };
+    truncate_chars(
+        &format!("{prefix}: {detail}"),
+        TASK_SUBMISSION_SUMMARY_LIMIT,
+    )
+}
+
+fn truncate_chars(value: &str, limit: usize) -> String {
+    let mut chars = value.chars();
+    let truncated: String = chars.by_ref().take(limit).collect();
+    if chars.next().is_some() {
+        format!("{truncated}…")
+    } else {
+        truncated
+    }
+}
+
+fn bind_requested_task(
+    state: &mut SessionState,
+    task_id: Option<&str>,
+    agent_id: &str,
+    now: &str,
+) -> Result<(), CliError> {
+    let Some(task_id) = task_id else {
+        return Ok(());
+    };
+    let task = state.tasks.get(task_id).ok_or_else(|| {
+        CliError::from(crate::errors::CliErrorKind::session_agent_conflict(
+            format!(
+                "task '{task_id}' not found in session '{}'",
+                state.session_id
+            ),
+        ))
+    })?;
+    if task.status == TaskStatus::InProgress && task.assigned_to.as_deref() == Some(agent_id) {
+        return Ok(());
+    }
+    if task.status != TaskStatus::Open
+        || task.assigned_to.as_deref().is_some_and(|id| id != agent_id)
+    {
+        return Err(crate::errors::CliErrorKind::session_agent_conflict(format!(
+            "task '{task_id}' cannot be bound to agent '{agent_id}' from status {:?} and assignee {:?}",
+            task.status, task.assigned_to
+        ))
+        .into());
+    }
+    let mut effects = Vec::new();
+    session_service::start_task_for_agent(
+        state,
+        task_id,
+        agent_id,
+        CONTROL_PLANE_ACTOR_ID,
+        now,
+        &mut effects,
+    )?;
+    let start_signal = effects.into_iter().find_map(|effect| match effect {
+        session_service::TaskDropEffect::Started(record) => Some(record.signal),
+        session_service::TaskDropEffect::Queued { .. } => None,
+    });
+    let started = start_signal.as_ref().and_then(|signal| {
+        session_service::apply_task_start_delivery(state, agent_id, signal, now)
+    });
+    if started.as_deref() != Some(task_id) {
+        return Err(crate::errors::CliErrorKind::session_agent_conflict(format!(
+            "task '{task_id}' could not be started for agent '{agent_id}'"
+        ))
+        .into());
+    }
+    session_service::refresh_session(state, now);
+    Ok(())
 }

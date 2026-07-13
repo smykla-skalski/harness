@@ -11,9 +11,10 @@ use crate::daemon::index::DiscoveredProject;
 use crate::daemon::protocol::{
     CodexApprovalRequest, CodexRunMode, CodexRunSnapshot, CodexRunStatus, StreamEvent,
 };
+use crate::session::service::{self as session_service, TaskSpec};
 use crate::session::types::{
     AgentRegistration, AgentStatus, ManagedAgentRef, SessionMetrics, SessionRole, SessionState,
-    SessionStatus,
+    SessionStatus, TaskSeverity, TaskSource,
 };
 
 pub(super) fn codex_approval_request(
@@ -130,6 +131,26 @@ pub(super) fn sample_session_state_with_codex_agent(status: AgentStatus) -> Sess
         },
     );
     state.metrics = SessionMetrics::recalculate(&state);
+    state
+}
+
+pub(super) fn sample_session_state_with_open_task() -> SessionState {
+    let mut state = sample_session_state();
+    session_service::apply_create_task_with_id(
+        &mut state,
+        "task-1",
+        &TaskSpec {
+            title: "Implement task binding",
+            context: None,
+            severity: TaskSeverity::Medium,
+            suggested_fix: None,
+            source: TaskSource::Manual,
+            observe_issue_id: None,
+        },
+        crate::session::types::CONTROL_PLANE_ACTOR_ID,
+        "2026-04-09T10:00:02Z",
+    )
+    .expect("create task");
     state
 }
 
