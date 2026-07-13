@@ -158,7 +158,7 @@ pub(super) async fn admit_remote_http_request(
     request
         .extensions_mut()
         .insert(RemoteHttpAuditMarker::default());
-    let (config, _permit) = match remote_http_admission(&state, &request) {
+    let (config, permit) = match remote_http_admission(&state, &request) {
         Ok(admission) => admission,
         Err(rejection) => {
             let response = audited_http_limit_response(
@@ -171,7 +171,9 @@ pub(super) async fn admit_remote_http_request(
             return rejection.with_response_headers(response);
         }
     };
-    run_remote_http_request_with_timeout(&state, request, next, config).await
+    let response = run_remote_http_request_with_timeout(&state, request, next, config).await;
+    drop(permit);
+    response
 }
 
 async fn run_remote_http_request_with_timeout(

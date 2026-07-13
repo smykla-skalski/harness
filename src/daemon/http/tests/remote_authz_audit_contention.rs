@@ -182,8 +182,12 @@ impl ContendingWriter {
     fn release_after(self, delay: Duration) -> ScheduledWriterRelease {
         let task = tokio::spawn(async move {
             sleep(delay).await;
-            self.release.send(()).expect("release contending writer");
-            self.thread.join().expect("join contending SQLite writer");
+            tokio::task::spawn_blocking(move || {
+                self.release.send(()).expect("release contending writer");
+                self.thread.join().expect("join contending SQLite writer");
+            })
+            .await
+            .expect("join contending writer release task");
         });
         ScheduledWriterRelease(task)
     }
