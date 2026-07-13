@@ -21,6 +21,27 @@ fn ready_item() -> TaskBoardItem {
 }
 
 #[test]
+fn spawn_policy_input_fills_subject_enrichment_and_evaluated_at() {
+    let mut item = ready_item();
+    item.priority = TaskBoardPriority::Critical;
+    item.agent_mode = AgentMode::Interactive;
+    item.project_id = Some("project-1".into());
+    item.tags = vec!["cli".into(), "board".into()];
+    item.target_project_types = vec!["kuma".into(), "kuma-mesh".into()];
+
+    let input = super::spawn_policy_input(&item, Some("2026-07-13T12:00:00Z".into()));
+
+    assert_eq!(input.action, PolicyAction::SpawnAgent);
+    assert_eq!(input.subject.task_board_item_id.as_deref(), Some("task-1"));
+    assert_eq!(input.subject.repository.as_deref(), Some("project-1"));
+    assert_eq!(input.subject.tags, ["cli", "board"]);
+    assert_eq!(input.subject.priority, Some(TaskBoardPriority::Critical));
+    assert_eq!(input.subject.agent_mode, Some(AgentMode::Interactive));
+    assert_eq!(input.subject.target_project_types, ["kuma", "kuma-mesh"]);
+    assert_eq!(input.evaluated_at.as_deref(), Some("2026-07-13T12:00:00Z"));
+}
+
+#[test]
 fn ready_dispatch_plan_maps_board_fields_to_session_task_intent() {
     let mut item = ready_item();
     item.priority = TaskBoardPriority::Critical;

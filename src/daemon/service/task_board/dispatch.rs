@@ -333,12 +333,11 @@ async fn build_dispatch_plans_for_request_async(
         .as_ref()
         .and_then(|workspace| workspace.active_live_canvas())
         .map(|(canvas, document)| (canvas.id.as_str(), document));
-    let mut plans = build_dispatch_plans_with_policy(&kept, policy);
-    plans.extend(
-        rejected
-            .iter()
-            .map(|(item, machine)| machine_mismatch_plan_with_policy(item, machine, policy)),
-    );
+    let evaluated_at = crate::workspace::utc_now();
+    let mut plans = build_dispatch_plans_with_policy(&kept, policy, Some(evaluated_at.as_str()));
+    plans.extend(rejected.iter().map(|(item, machine)| {
+        machine_mismatch_plan_with_policy(item, machine, policy, Some(evaluated_at.as_str()))
+    }));
     Ok(plans)
 }
 

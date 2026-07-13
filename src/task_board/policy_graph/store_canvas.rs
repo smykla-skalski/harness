@@ -196,6 +196,7 @@ pub(crate) fn simulation_inputs() -> Vec<PolicyInput> {
             } else {
                 PolicyEvidence::default()
             },
+            evaluated_at: None,
         })
         .collect()
 }

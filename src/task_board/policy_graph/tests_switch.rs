@@ -24,6 +24,7 @@ fn switch_routes_to_the_first_matching_case() {
             branch_protection_allows_merge: Some(true),
             ..PolicyEvidence::default()
         },
+        evaluated_at: None,
     });
 
     assert_eq!(
@@ -61,6 +62,7 @@ fn switch_routes_to_default_when_no_case_matches() {
             checks_green: Some(false),
             ..PolicyEvidence::default()
         },
+        evaluated_at: None,
     });
 
     assert_eq!(
@@ -95,6 +97,7 @@ fn switch_routes_missing_evidence_through_is_missing_cases() {
         action: PolicyAction::SubmitReview,
         subject: PolicySubject::default(),
         evidence: PolicyEvidence::default(),
+        evaluated_at: None,
     });
 
     assert_eq!(

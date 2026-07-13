@@ -9,6 +9,7 @@ fn workflow_entry_matches_reviews_auto_only() {
         action: PolicyAction::SubmitReview,
         subject: PolicySubject::default(),
         evidence: PolicyEvidence::default(),
+        evaluated_at: None,
     });
 
     assert_eq!(
@@ -26,6 +27,7 @@ fn direct_input_does_not_fallback_to_workflow_internal_action_gate() {
         action: PolicyAction::SubmitReview,
         subject: PolicySubject::default(),
         evidence: PolicyEvidence::default(),
+        evaluated_at: None,
     });
     assert!(
         direct.visited_node_ids.is_empty(),
@@ -38,6 +40,7 @@ fn direct_input_does_not_fallback_to_workflow_internal_action_gate() {
         action: PolicyAction::SubmitReview,
         subject: PolicySubject::default(),
         evidence: PolicyEvidence::default(),
+        evaluated_at: None,
     });
     assert_eq!(
         workflow.visited_node_ids,
@@ -56,6 +59,7 @@ fn compile_workflow_requires_a_matching_entry() {
         action: PolicyAction::SubmitReview,
         subject: PolicySubject::default(),
         evidence: PolicyEvidence::default(),
+        evaluated_at: None,
     };
     assert!(
         graph.compile_workflow("reviews_auto", &input).is_some(),
@@ -75,6 +79,7 @@ fn compile_workflow_emits_a_handoff_step_for_a_handoff_node() {
         action: PolicyAction::SubmitReview,
         subject: PolicySubject::default(),
         evidence: PolicyEvidence::default(),
+        evaluated_at: None,
     };
     let plan = graph
         .compile_workflow("reviews_auto", &input)
@@ -187,6 +192,7 @@ fn workflow_entry_matches_case_insensitively() {
         action: PolicyAction::SubmitReview,
         subject: PolicySubject::default(),
         evidence: PolicyEvidence::default(),
+        evaluated_at: None,
     });
 
     assert_eq!(
@@ -220,6 +226,7 @@ fn simulation_marks_wait_nodes_as_runtime_boundaries() {
         action: PolicyAction::MergePr,
         subject: PolicySubject::default(),
         evidence: PolicyEvidence::default(),
+        evaluated_at: None,
     });
 
     assert_eq!(result.boundaries.len(), 1);
@@ -249,6 +256,7 @@ fn promote_rejects_revision_without_matching_boundary_aware_simulation() {
                 action: PolicyAction::MergePr,
                 subject: PolicySubject::default(),
                 evidence: PolicyEvidence::default(),
+                evaluated_at: None,
             },
             seeded: false,
         });

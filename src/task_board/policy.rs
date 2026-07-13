@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use super::types::{AgentMode, TaskBoardPriority};
+
 // Keep the historical task-board identifier for persisted decisions, replay
 // history, and comparisons written before the public policy API rename.
 pub const POLICY_VERSION: &str = "task-board-policy-v1";
@@ -118,6 +120,17 @@ pub struct PolicySubject {
     pub pull_request: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub paths: Vec<String>,
+    // WP3 enrichment: task-board metadata carried into the spawn decision so the
+    // recorded feed can explain a gate result and future subject-match blocks can
+    // route on it. All additive and optional so pre-WP3 records still decode.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub priority: Option<TaskBoardPriority>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_mode: Option<AgentMode>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub target_project_types: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -129,6 +142,11 @@ pub struct PolicyInput {
     pub subject: PolicySubject,
     #[serde(default)]
     pub evidence: PolicyEvidence,
+    // WP3: caller-supplied evaluation timestamp. Dispatch injects `now`;
+    // simulation/replay pass the scenario-supplied or recorded value so those
+    // paths stay deterministic. Additive so pre-WP3 records decode as `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evaluated_at: Option<String>,
 }
 
 pub trait PolicyGate {
@@ -156,12 +174,19 @@ impl PolicyInput {
             action,
             subject: PolicySubject::default(),
             evidence: PolicyEvidence::default(),
+            evaluated_at: None,
         }
     }
 
     #[must_use]
     pub fn with_evidence(mut self, evidence: PolicyEvidence) -> Self {
         self.evidence = evidence;
+        self
+    }
+
+    #[must_use]
+    pub fn with_subject(mut self, subject: PolicySubject) -> Self {
+        self.subject = subject;
         self
     }
 }
@@ -290,6 +315,7 @@ fn dry_run_only(reason_code: PolicyReasonCode) -> PolicyDecision {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::task_board::types::{AgentMode, TaskBoardPriority};
 
     fn gate() -> BuiltInPolicyGate {
         BuiltInPolicyGate::new(40)
@@ -309,6 +335,51 @@ mod tests {
             risk_score: Some(20),
             ..PolicyEvidence::default()
         }
+    }
+
+    #[test]
+    fn subject_and_input_enrichment_fields_are_present_and_optional() {
+        let subject = PolicySubject {
+            task_board_item_id: Some("task-1".to_owned()),
+            tags: vec!["cli".to_owned(), "board".to_owned()],
+            priority: Some(TaskBoardPriority::High),
+            agent_mode: Some(AgentMode::Headless),
+            target_project_types: vec!["kuma".to_owned()],
+            ..PolicySubject::default()
+        };
+        let input = PolicyInput {
+            evaluated_at: Some("2026-07-13T00:00:00Z".to_owned()),
+            ..PolicyInput::new(PolicyAction::SpawnAgent)
+        }
+        .with_subject(subject);
+        assert_eq!(input.subject.tags, ["cli", "board"]);
+        assert_eq!(input.subject.priority, Some(TaskBoardPriority::High));
+        assert_eq!(input.subject.agent_mode, Some(AgentMode::Headless));
+        assert_eq!(input.subject.target_project_types, ["kuma"]);
+        assert_eq!(input.evaluated_at.as_deref(), Some("2026-07-13T00:00:00Z"));
+    }
+
+    #[test]
+    fn old_recorded_input_without_enrichment_still_deserializes() {
+        // A decision recorded before WP3 enrichment: no tags/priority/agent_mode/
+        // target_project_types on the subject and no evaluated_at on the input.
+        let legacy = serde_json::json!({
+            "action": "spawn_agent",
+            "subject": { "task_board_item_id": "task-legacy" },
+            "evidence": {}
+        });
+        let input: PolicyInput =
+            serde_json::from_value(legacy).expect("legacy policy input deserializes");
+        assert_eq!(input.action, PolicyAction::SpawnAgent);
+        assert_eq!(
+            input.subject.task_board_item_id.as_deref(),
+            Some("task-legacy")
+        );
+        assert!(input.subject.tags.is_empty());
+        assert!(input.subject.priority.is_none());
+        assert!(input.subject.agent_mode.is_none());
+        assert!(input.subject.target_project_types.is_empty());
+        assert!(input.evaluated_at.is_none());
     }
 
     #[test]

@@ -220,11 +220,13 @@ fn build_dispatch_plan_with_decision(item: &TaskBoardItem, policy: PolicyDecisio
 pub(crate) fn build_dispatch_plans_with_policy(
     items: &[TaskBoardItem],
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
+    evaluated_at: Option<&str>,
 ) -> Vec<DispatchPlan> {
     items
         .iter()
         .map(|item| {
-            let decision = dispatch_policy_from_graph(item, policy);
+            let decision =
+                dispatch_policy_from_graph(item, policy, evaluated_at.map(str::to_owned));
             build_dispatch_plan_with_decision(item, decision)
         })
         .collect()
@@ -313,9 +315,12 @@ pub(crate) fn machine_mismatch_plan_with_policy(
     item: &TaskBoardItem,
     machine: &Machine,
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
+    evaluated_at: Option<&str>,
 ) -> DispatchPlan {
-    let mut plan =
-        build_dispatch_plan_with_decision(item, dispatch_policy_from_graph(item, policy));
+    let mut plan = build_dispatch_plan_with_decision(
+        item,
+        dispatch_policy_from_graph(item, policy, evaluated_at.map(str::to_owned)),
+    );
     plan.readiness = blocked(DispatchBlockReason::MachineMismatch {
         required: item.target_project_types.clone(),
         declared: machine.project_types.clone(),
@@ -348,15 +353,31 @@ fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> DispatchReadiness
     DispatchReadiness::Ready
 }
 
-#[cfg(test)]
-fn dispatch_policy(item: &TaskBoardItem, policy_root: &Path) -> PolicyDecision {
+/// Build the `spawn_agent` policy input for a board item. Fills the WP3
+/// enrichment (tags, priority, agent mode, target project types) so the recorded
+/// decision can explain the gate result and future subject-match blocks can route
+/// on it. `evaluated_at` is the caller-supplied evaluation timestamp: dispatch
+/// passes `now`; simulation/replay pass scenario-supplied or recorded values so
+/// those paths stay deterministic.
+pub(crate) fn spawn_policy_input(item: &TaskBoardItem, evaluated_at: Option<String>) -> PolicyInput {
     let mut input = PolicyInput::new(PolicyAction::SpawnAgent);
+    input.evaluated_at = evaluated_at;
     input.subject = PolicySubject {
         task_board_item_id: Some(item.id.clone()),
         session_id: item.session_id.clone(),
         repository: item.project_id.clone(),
+        tags: item.tags.clone(),
+        priority: Some(item.priority),
+        agent_mode: Some(item.agent_mode),
+        target_project_types: item.target_project_types.clone(),
         ..PolicySubject::default()
     };
+    input
+}
+
+#[cfg(test)]
+fn dispatch_policy(item: &TaskBoardItem, policy_root: &Path) -> PolicyDecision {
+    let input = spawn_policy_input(item, None);
     if let Some(document) = resolve_gate_policy(policy_root)
         && document.mode != PolicyPipelineMode::Draft
     {
@@ -380,14 +401,9 @@ fn dispatch_policy(item: &TaskBoardItem, policy_root: &Path) -> PolicyDecision {
 fn dispatch_policy_from_graph(
     item: &TaskBoardItem,
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
+    evaluated_at: Option<String>,
 ) -> PolicyDecision {
-    let mut input = PolicyInput::new(PolicyAction::SpawnAgent);
-    input.subject = PolicySubject {
-        task_board_item_id: Some(item.id.clone()),
-        session_id: item.session_id.clone(),
-        repository: item.project_id.clone(),
-        ..PolicySubject::default()
-    };
+    let input = spawn_policy_input(item, evaluated_at);
     if let Some((canvas_id, document)) = policy
         && document.mode != PolicyPipelineMode::Draft
     {

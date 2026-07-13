@@ -93,6 +93,7 @@ impl GitHubMergeEvidence {
                 ..PolicySubject::default()
             },
             evidence: self.policy_evidence(config),
+            evaluated_at: None,
         }
     }
 

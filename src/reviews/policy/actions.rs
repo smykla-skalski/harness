@@ -165,6 +165,7 @@ pub(crate) fn authored_reviews_policy_plan_from_document(
         action: PolicyAction::SubmitReview,
         subject: policy_subject(target),
         evidence: review_target_policy_evidence(target),
+        evaluated_at: None,
     };
     let Some(compiled) = document.compile_workflow(&workflow_id, &input) else {
         return Ok(ReviewsPolicyPlan {

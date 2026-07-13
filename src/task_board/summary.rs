@@ -68,7 +68,7 @@ pub(crate) fn build_audit_summary_with_policy(
     items: &[TaskBoardItem],
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
 ) -> TaskBoardAuditSummary {
-    let plans = build_dispatch_plans_with_policy(items, policy);
+    let plans = build_dispatch_plans_with_policy(items, policy, None);
     audit_summary(items, &plans)
 }
 

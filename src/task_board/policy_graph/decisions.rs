@@ -134,6 +134,7 @@ mod tests {
             action: PolicyAction::MergePr,
             subject: Default::default(),
             evidence: Default::default(),
+            evaluated_at: None,
         }
     }
 
