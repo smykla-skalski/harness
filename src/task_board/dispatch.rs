@@ -35,6 +35,7 @@ const REVIEWER_CONSENSUS: u8 = 2;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DispatchPlan {
     pub board_item_id: String,
+    #[serde(default)]
     pub rendered_prompt: String,
     pub readiness: DispatchReadiness,
     pub session: SessionIntent,

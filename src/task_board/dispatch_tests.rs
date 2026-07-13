@@ -76,6 +76,21 @@ fn ready_dispatch_plan_maps_board_fields_to_session_task_intent() {
 }
 
 #[test]
+fn dispatch_plan_decodes_legacy_payload_without_rendered_prompt() {
+    let plan = build_dispatch_plan(&ready_item());
+    let mut value = serde_json::to_value(&plan).expect("serialize plan");
+    value
+        .as_object_mut()
+        .expect("plan object")
+        .remove("rendered_prompt");
+
+    let decoded: DispatchPlan =
+        serde_json::from_value(value).expect("decode legacy plan without rendered_prompt");
+
+    assert_eq!(decoded.rendered_prompt, String::new());
+}
+
+#[test]
 fn applied_lifecycle_preserves_follow_up_execution_order() {
     let plan = build_dispatch_plan(&ready_item());
 
