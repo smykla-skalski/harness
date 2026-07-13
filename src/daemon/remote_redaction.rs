@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -59,11 +60,22 @@ static KNOWN_SECRET_RULES: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(
 
 #[must_use]
 pub(crate) fn redact_known_secrets(value: &str) -> String {
-    KNOWN_SECRET_RULES
-        .iter()
-        .fold(value.to_string(), |redacted, (expression, replacement)| {
-            expression.replace_all(&redacted, *replacement).into_owned()
-        })
+    apply_redaction_rules(value.to_string(), &KNOWN_SECRET_RULES)
+}
+
+fn apply_redaction_rules(mut redacted: String, rules: &[(Regex, &'static str)]) -> String {
+    for (expression, replacement) in rules {
+        let replaced = {
+            match expression.replace_all(&redacted, *replacement) {
+                Cow::Borrowed(_) => None,
+                Cow::Owned(replaced) => Some(replaced),
+            }
+        };
+        if let Some(replaced) = replaced {
+            redacted = replaced;
+        }
+    }
+    redacted
 }
 
 pub(crate) fn redact_secret_detail(detail: &str) -> String {
@@ -101,7 +113,9 @@ fn is_secret_value_terminator(value_char: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::redact_known_secrets;
+    use regex::Regex;
+
+    use super::{apply_redaction_rules, redact_known_secrets};
 
     #[test]
     fn known_secret_redaction_matches_remote_client_policy() {
@@ -124,5 +138,18 @@ mod tests {
             assert!(!redacted.contains(secret), "secret remained: {secret}");
         }
         assert_eq!(redacted.matches("[redacted]").count(), 6);
+    }
+
+    #[test]
+    fn no_match_rule_preserves_the_owned_buffer() {
+        let mut value = String::with_capacity(64);
+        value.push_str("ordinary viewer title");
+        let original_buffer = value.as_ptr();
+        let rules = [(Regex::new(r"secret=").expect("test regex"), "[redacted]")];
+
+        let redacted = apply_redaction_rules(value, &rules);
+
+        assert_eq!(redacted.as_ptr(), original_buffer);
+        assert_eq!(redacted, "ordinary viewer title");
     }
 }

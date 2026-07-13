@@ -113,16 +113,20 @@ impl From<TaskBoardItem> for RemoteViewerTaskBoardItem {
 
 fn body_preview(body: &str) -> String {
     let redacted = redact_known_secrets(body.trim());
-    if redacted.chars().count() <= BODY_PREVIEW_CHAR_LIMIT {
-        return redacted;
+    let mut chars = redacted.chars();
+    let prefix = chars
+        .by_ref()
+        .take(BODY_PREVIEW_CHAR_LIMIT)
+        .collect::<String>();
+    if chars.next().is_none() {
+        return prefix;
     }
-    format!(
-        "{}...",
-        redacted
-            .chars()
-            .take(BODY_PREVIEW_PREFIX_LIMIT)
-            .collect::<String>()
-    )
+    let mut preview = prefix
+        .chars()
+        .take(BODY_PREVIEW_PREFIX_LIMIT)
+        .collect::<String>();
+    preview.push_str("...");
+    preview
 }
 
 #[cfg(test)]
@@ -138,5 +142,15 @@ mod tests {
         assert!(preview.starts_with("Bearer [redacted]"));
         assert!(preview.ends_with("..."));
         assert!(!preview.contains("abcdefghijklmnop"));
+    }
+
+    #[test]
+    fn viewer_body_preview_keeps_180_characters_and_truncates_181() {
+        let exact = "x".repeat(180);
+        assert_eq!(body_preview(&exact), exact);
+        assert_eq!(
+            body_preview(&"x".repeat(181)),
+            format!("{}...", "x".repeat(177))
+        );
     }
 }
