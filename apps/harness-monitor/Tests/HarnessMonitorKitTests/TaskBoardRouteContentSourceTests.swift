@@ -251,6 +251,11 @@ struct TaskBoardRouteContentSourceTests {
     )
     #expect(dashboardSource.contains("TaskBoardOperationsInspector("))
     #expect(!dashboardSource.contains("if operationsInspectorVisible {"))
+    #expect(
+      dashboardSource.contains(
+        "isVisible: operationsInspectorVisible && isRouteVisible"
+      )
+    )
     #expect(dashboardSource.contains("taskBoardItems: dashboardUI.taskBoardItems"))
     #expect(dashboardSource.contains("showsOperationsPanel: false"))
     #expect(dashboardSource.contains("isCommandFocusActive: isRouteVisible"))
@@ -260,6 +265,7 @@ struct TaskBoardRouteContentSourceTests {
         "operationsInspectorDispatcher.toggleInspector = toggleOperationsInspector"
       )
     )
+    #expect(dashboardSource.contains(".onAppear {"))
     #expect(dashboardSource.contains("operationsInspectorVisible.toggle()"))
     #expect(overviewHostSource.contains("showsOperationsPanel: Bool = true"))
     #expect(overviewSource.contains("if showsOperationsPanel, let store"))
@@ -274,6 +280,7 @@ struct TaskBoardRouteContentSourceTests {
     #expect(inspectorSource.contains(".accessibilityHidden(!isVisible)"))
     #expect(operationsPanelSource.contains("isActive: Bool = true"))
     #expect(operationsPanelSource.contains(".task(id: isActive)"))
+    #expect(operationsPanelSource.contains("catch is CancellationError"))
     #expect(dispatchCardSource.contains("isActive ? presentationInput : nil"))
     #expect(dispatchCardSource.contains(".task(id: activePresentationInput)"))
     #expect(dispatchCardSource.contains("guard let activePresentationInput else { return }"))

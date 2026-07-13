@@ -202,7 +202,7 @@ struct DashboardTaskBoardRouteView: View {
       TaskBoardOperationsInspector(
         store: store,
         taskBoardItems: dashboardUI.taskBoardItems,
-        isVisible: operationsInspectorVisible
+        isVisible: operationsInspectorVisible && isRouteVisible
       )
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -213,7 +213,7 @@ struct DashboardTaskBoardRouteView: View {
     .task(id: taskBoardInboxSessionIDs) {
       await refreshVisibleTaskBoardInboxSnapshot()
     }
-    .task {
+    .onAppear {
       operationsInspectorDispatcher.toggleInspector = toggleOperationsInspector
     }
     .onReceive(

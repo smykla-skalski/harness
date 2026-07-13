@@ -86,6 +86,8 @@ struct TaskBoardOperationsPanel: View {
     do {
       let snapshot = try await store.taskBoardHostSnapshot()
       localHostProjectTypes = snapshot.local.projectTypes
+    } catch is CancellationError {
+      return
     } catch {
       // Fail open: leave project types empty so dispatch shows every item.
       localHostProjectTypes = []
