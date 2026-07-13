@@ -5,15 +5,16 @@ import SwiftUI
 /// Dispatch operations card. Owns its own filter/project-dir/actor @State
 /// and hosts the dispatch confirmation dialog. Receives the unfiltered
 /// `taskBoardItems` plus the parent's resolved `localHostProjectTypes`.
-/// Host-aware filtering runs in a presentation worker so the operations
-/// card can update controls without scanning the whole board on the
-/// main actor.
+/// Board visibility, ordering, and host-aware filtering run in a presentation
+/// worker so the operations card can update controls without scanning the
+/// whole board on the main actor.
 struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
   let store: HarnessMonitorStore
   let metrics: TaskBoardOverviewMetrics
   let dashboard: HarnessMonitorStore.ContentDashboardSlice
   let taskBoardItems: [TaskBoardItem]
   let localHostProjectTypes: [String]
+  let isActive: Bool
 
   @Environment(\.fontScale)
   private var fontScale
@@ -26,6 +27,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
   @State private var pendingConfirmation: TaskBoardDispatchConfirmationPresentation?
   @State private var presentationWorker = TaskBoardOperationsDispatchPresentationWorker()
   @State private var cachedPresentation = TaskBoardOperationsDispatchPresentation.empty
+  @State private var presentedInput: TaskBoardOperationsDispatchPresentationInput?
   @State private var presentationGeneration: UInt64 = 0
 
   var captionFont: Font {
@@ -40,6 +42,15 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
       taskBoardItems: taskBoardItems,
       localHostProjectTypes: localHostProjectTypes
     )
+  }
+
+  private var activePresentationInput: TaskBoardOperationsDispatchPresentationInput? {
+    isActive ? presentationInput : nil
+  }
+
+  private var isPresentationCurrent: Bool {
+    guard isActive else { return false }
+    return presentedInput == presentationInput
   }
 
   var body: some View {
@@ -153,7 +164,8 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
               help: dryRun
                 ? "Preview how task-board items will dispatch"
                 : "Dispatch the selected board scope into live session work"
-            )
+            ),
+            isDisabled: !isPresentationCurrent
           ) {
             if request.dryRun {
               Task { @MainActor in
@@ -219,8 +231,9 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
         }
       }
     }
-    .task(id: presentationInput) {
-      await rebuildPresentation(input: presentationInput)
+    .task(id: activePresentationInput) {
+      guard let activePresentationInput else { return }
+      await rebuildPresentation(input: activePresentationInput)
     }
     .confirmationDialog(
       pendingConfirmation?.title ?? "Dispatch items?",
@@ -259,6 +272,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
     if cachedPresentation != presentation {
       cachedPresentation = presentation
     }
+    presentedInput = input
   }
 
   private var formattedLocalHostProjectTypes: String {

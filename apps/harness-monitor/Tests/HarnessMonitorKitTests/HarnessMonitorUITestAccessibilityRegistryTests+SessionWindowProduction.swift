@@ -24,6 +24,9 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let debuggingResultCard = try sourceFile(named: "DashboardDebuggingOCRResultCard.swift")
     let debuggingPreview = try sourceFile(named: "DashboardDebuggingOCRPreview.swift")
     let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
+    let taskBoardOperationsInspector = try sourceFile(
+      named: "TaskBoardOperationsInspector.swift"
+    )
 
     #expect(
       dashboardRoot.contains(
@@ -55,6 +58,16 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       auditView.contains("HarnessMonitorAccessibility.dashboardAuditScrollView"))
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
+    #expect(
+      taskBoardOperationsInspector.contains(
+        "HarnessMonitorAccessibility.taskBoardOperationsInspector"
+      )
+    )
+    #expect(
+      dashboardToolbar.contains(
+        "HarnessMonitorAccessibility.taskBoardOperationsInspectorToolbarButton"
+      )
+    )
     #expect(dashboardRouteContent.contains("DashboardAuditRouteView("))
     #expect(dashboardRouteContent.contains("DashboardReviewsRouteView("))
     #expect(dashboardToolbar.contains("SleepPreventionToolbarButton("))

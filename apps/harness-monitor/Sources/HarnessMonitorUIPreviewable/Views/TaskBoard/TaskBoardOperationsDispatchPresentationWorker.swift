@@ -54,8 +54,9 @@ actor TaskBoardOperationsDispatchPresentationWorker {
     }
 
     cachedInput = input
+    let visibleItems = TaskBoardVisibleItems.sorted(input.taskBoardItems)
     let dispatchableItems = TaskBoardHostMachine.dispatchableItems(
-      input.taskBoardItems,
+      visibleItems,
       machineProjectTypes: input.localHostProjectTypes
     )
     cachedOutput = TaskBoardOperationsDispatchPresentation(
@@ -63,7 +64,7 @@ actor TaskBoardOperationsDispatchPresentationWorker {
       dispatchableItemsByID: Dictionary(
         uniqueKeysWithValues: dispatchableItems.map { ($0.id, $0) }
       ),
-      didFilterOut: !input.taskBoardItems.isEmpty && dispatchableItems.isEmpty
+      didFilterOut: !visibleItems.isEmpty && dispatchableItems.isEmpty
     )
     return cachedOutput
   }

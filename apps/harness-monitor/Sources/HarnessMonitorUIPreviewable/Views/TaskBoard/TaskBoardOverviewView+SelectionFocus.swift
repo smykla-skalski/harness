@@ -1,6 +1,14 @@
 import HarnessMonitorKit
 
 extension TaskBoardOverviewView {
+  var taskBoardCommandFocus: TaskBoardCommandFocus? {
+    guard isCommandFocusActive else { return nil }
+    return TaskBoardCommandFocus(
+      selection: taskBoardSelectionFocus,
+      operationsInspector: operationsInspectorFocus
+    )
+  }
+
   var taskBoardSelectionFocus: TaskBoardSelectionFocus {
     TaskBoardSelectionFocus(
       selectionCount: orderedSelectedCardIDs.count,

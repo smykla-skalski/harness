@@ -17,8 +17,8 @@ struct HarnessMonitorAppCommands: Commands {
   private var searchFocusAction
   @FocusedValue(\.harnessSessionSidebarSelection)
   private var sidebarSelectionFocus
-  @FocusedValue(\.harnessTaskBoardSelection)
-  private var taskBoardSelectionFocus
+  @FocusedValue(\.harnessTaskBoardCommandFocus)
+  private var taskBoardCommandFocus
   @FocusedValue(\.dashboardAuditCopyCommand)
   private var dashboardAuditCopyFocus
   @FocusedValue(\.harnessPolicyCanvasCommandFocus)
@@ -75,6 +75,10 @@ struct HarnessMonitorAppCommands: Commands {
 
   private var searchCommandTitle: LocalizedStringKey {
     searchFocusAction?.menuLabel.localizedTitle ?? "Find"
+  }
+
+  private var taskBoardSelectionFocus: TaskBoardSelectionFocus? {
+    taskBoardCommandFocus?.selection
   }
 
   private var deleteSelectionCommandTitle: String {

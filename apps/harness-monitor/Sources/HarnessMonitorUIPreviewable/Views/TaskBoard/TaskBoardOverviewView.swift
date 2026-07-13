@@ -10,6 +10,9 @@ public struct TaskBoardOverviewView: View {
   let taskBoardSessionID: String?
   let contentHorizontalPadding: CGFloat
   let fillsAvailableHeight: Bool
+  let showsOperationsPanel: Bool
+  let isCommandFocusActive: Bool
+  let operationsInspectorFocus: TaskBoardOperationsInspectorFocus?
   let decisions: [Decision]
   let decisionsByID: [String: Decision]
   let decisionItems: [DecisionPresentationItem]
@@ -95,6 +98,9 @@ public struct TaskBoardOverviewView: View {
     taskBoardSessionID: String? = nil,
     contentHorizontalPadding: CGFloat = 24,
     fillsAvailableHeight: Bool = false,
+    showsOperationsPanel: Bool = true,
+    isCommandFocusActive: Bool = true,
+    operationsInspectorFocus: TaskBoardOperationsInspectorFocus? = nil,
     decisions: [Decision] = [],
     isActionInFlight: Bool = false,
     onOpenItem: @escaping (TaskBoardInboxItem) -> Void = { _ in },
@@ -126,6 +132,9 @@ public struct TaskBoardOverviewView: View {
     self.taskBoardSessionID = taskBoardSessionID
     self.contentHorizontalPadding = contentHorizontalPadding
     self.fillsAvailableHeight = fillsAvailableHeight
+    self.showsOperationsPanel = showsOperationsPanel
+    self.isCommandFocusActive = isCommandFocusActive
+    self.operationsInspectorFocus = operationsInspectorFocus
     self.decisions = decisions
     self.decisionsByID =
       decisionsByID ?? Dictionary(uniqueKeysWithValues: decisions.map { ($0.id, $0) })
@@ -168,8 +177,8 @@ public struct TaskBoardOverviewView: View {
       \.taskBoardLaneAppearance,
       TaskBoardLaneAppearance(rawValue: laneAppearancePreferencesRawValue)
     )
-    .harnessFocusedSceneValue(\.harnessTaskBoardSelection, taskBoardSelectionFocus)
-    .taskBoardSelectionForwardDeleteShortcut(taskBoardSelectionFocus)
+    .harnessFocusedSceneValue(\.harnessTaskBoardCommandFocus, taskBoardCommandFocus)
+    .taskBoardSelectionForwardDeleteShortcut(taskBoardCommandFocus?.selection)
     .taskBoardCardPreferences(projectLabelResolver: cachedPresentation.projectLabelResolver)
     .environment(relativeTimeClock)
     .sheet(item: taskBoardManagementSheet) { taskBoardManagementSheet in
@@ -230,7 +239,7 @@ extension TaskBoardOverviewView {
       }
     }
     taskBoardDetailRow { headerTitle }
-    if let store {
+    if showsOperationsPanel, let store {
       taskBoardDetailRow {
         TaskBoardOperationsPanel(store: store, taskBoardItems: cachedPresentation.taskBoardItems)
       }

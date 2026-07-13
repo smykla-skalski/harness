@@ -19,6 +19,14 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(
       HarnessMonitorAccessibility.dashboardOpenFolderButton == "harness.dashboard.open-folder")
     #expect(
+      HarnessMonitorAccessibility.taskBoardOperationsInspector
+        == "harness.task-board.operations.inspector"
+    )
+    #expect(
+      HarnessMonitorAccessibility.taskBoardOperationsInspectorToolbarButton
+        == "harness.task-board.operations.inspector.toolbar"
+    )
+    #expect(
       HarnessMonitorAccessibility.dashboardWindowRoute("taskBoard")
         == "harness.dashboard.route.taskboard"
     )
