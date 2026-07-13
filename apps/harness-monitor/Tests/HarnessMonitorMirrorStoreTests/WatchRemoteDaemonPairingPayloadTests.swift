@@ -99,12 +99,64 @@ final class WatchRemoteDaemonPairingPayloadTests: XCTestCase {
     XCTAssertFalse(paired)
     XCTAssertEqual(store.pairedCredentials, [credential])
   }
+
+  func testWatchForwardsSelectedCloudFallbackAmongMultipleStations() async throws {
+    let now = Date(timeIntervalSince1970: 1_752_124_400)
+    let phoneIdentity = MobileDeviceIdentity(
+      id: "phone-identity",
+      displayName: "Bart's iPhone",
+      createdAt: now.addingTimeInterval(-600)
+    )
+    let studio = watchCloudCredential(
+      stationID: "station-studio",
+      identityID: phoneIdentity.id,
+      defaultStation: true,
+      now: now.addingTimeInterval(-300)
+    )
+    let laptop = watchCloudCredential(
+      stationID: "station-laptop",
+      identityID: phoneIdentity.id,
+      defaultStation: false,
+      now: now.addingTimeInterval(-200)
+    )
+    let identityStore = InMemoryMobileDeviceIdentityStore(identities: [phoneIdentity])
+    let credentialStore = InMemoryMobilePairedStationCredentialStore(
+      credentials: [studio, laptop]
+    )
+    let pairer = RecordingWatchCredentialPairer(
+      identityStore: identityStore,
+      credentialStore: credentialStore,
+      credential: try watchRemoteCredential(now: now)
+    )
+    let store = MirrorStore(
+      demoModeEnabled: false,
+      profile: .watch,
+      identityStore: identityStore,
+      credentialStore: credentialStore,
+      syncClientFactory: WatchPairingSyncClientFactory(),
+      pairer: pairer,
+      sharedSnapshotStore: nil
+    )
+    await store.loadStoredPairings()
+    store.selectedStationID = laptop.stationID
+
+    let paired = await store.pairDirectWatchDaemon(
+      payload: try watchRemoteInvitationURL(now: now).absoluteString,
+      deviceName: "Bart's Apple Watch",
+      now: now
+    )
+
+    XCTAssertTrue(paired)
+    let capturedRequest = await pairer.lastRequest()
+    XCTAssertEqual(capturedRequest?.cloudFallbackStationID, laptop.stationID)
+  }
 }
 
 private struct FailingWatchCredentialPairer: MobileMonitorCredentialPairer {
   func pair(
     invitationURL: URL,
     deviceName: String,
+    cloudFallbackStationID: String?,
     now: Date
   ) async throws -> MobilePairedStationCredential {
     throw WatchPairingTestError.claimFailed
@@ -119,6 +171,7 @@ private actor RecordingWatchCredentialPairer: MobileMonitorCredentialPairer {
   struct Request: Sendable {
     var invitationURL: URL
     var deviceName: String
+    var cloudFallbackStationID: String?
     var now: Date
   }
 
@@ -140,9 +193,15 @@ private actor RecordingWatchCredentialPairer: MobileMonitorCredentialPairer {
   func pair(
     invitationURL: URL,
     deviceName: String,
+    cloudFallbackStationID: String?,
     now: Date
   ) async throws -> MobilePairedStationCredential {
-    request = Request(invitationURL: invitationURL, deviceName: deviceName, now: now)
+    request = Request(
+      invitationURL: invitationURL,
+      deviceName: deviceName,
+      cloudFallbackStationID: cloudFallbackStationID,
+      now: now
+    )
     try await identityStore.save(
       MobileDeviceIdentity(
         id: credential.deviceIdentityID,
@@ -228,6 +287,26 @@ private func watchRemoteCredential(now: Date) throws -> MobilePairedStationCrede
       serverSPKISHA256: pin,
       pairedAt: now
     )
+  )
+}
+
+private func watchCloudCredential(
+  stationID: String,
+  identityID: String,
+  defaultStation: Bool,
+  now: Date
+) -> MobilePairedStationCredential {
+  MobilePairedStationCredential(
+    stationID: stationID,
+    stationName: stationID,
+    endpoint: URL(string: "https://\(stationID).local/pair")!,
+    stationPublicKeyFingerprint: "00:11:22:33:44:55:66:77",
+    deviceIdentityID: identityID,
+    snapshotKeyID: "snapshot-key",
+    commandKeyID: "command-key",
+    symmetricKeyRawRepresentation: Data(repeating: 3, count: 32),
+    pairedAt: now,
+    defaultStation: defaultStation
   )
 }
 

@@ -24,12 +24,14 @@ actor LiveWatchRemoteDaemonCredentialPairer: MobileMonitorCredentialPairer {
   func pair(
     invitationURL: URL,
     deviceName: String,
+    cloudFallbackStationID: String?,
     now: Date
   ) async throws -> MobilePairedStationCredential {
     try await mutationGate.perform { [coordinator] in
       try await coordinator.pair(
         invitationURL: invitationURL,
         deviceName: deviceName,
+        cloudFallbackStationID: cloudFallbackStationID,
         now: now
       )
     }

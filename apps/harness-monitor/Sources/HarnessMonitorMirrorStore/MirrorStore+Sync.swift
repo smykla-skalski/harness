@@ -215,6 +215,7 @@ extension MirrorStore {
     }
     do {
       let pairingLink = try MobilePairingLink.decode(invitationURL, now: now)
+      let cloudFallbackStationID = cloudFallbackStationID(for: pairingLink)
       let wasDemoModeEnabled = demoModeEnabled
       demoModeEnabled = false
       if wasDemoModeEnabled {
@@ -225,6 +226,7 @@ extension MirrorStore {
       let credential = try await pairer.pair(
         invitationURL: invitationURL,
         deviceName: deviceName,
+        cloudFallbackStationID: cloudFallbackStationID,
         now: now
       )
       try await rebuildSyncClients(preferredStationID: credential.stationID)
@@ -237,6 +239,26 @@ extension MirrorStore {
     }
   }
 
+  private func cloudFallbackStationID(for pairingLink: MobilePairingLink) -> String? {
+    guard case .remote(let invitation) = pairingLink else {
+      return nil
+    }
+    let compatibleCredentials = pairedCredentials.filter { credential in
+      credential.hasCloudMirrorAccess
+        && (credential.remoteDaemonAccess == nil
+          || credential.remoteDaemonAccess?.endpoint == invitation.endpoint)
+    }
+    if let selected = compatibleCredentials.first(where: {
+      $0.stationID == selectedStationID
+    }) {
+      return selected.stationID
+    }
+    guard compatibleCredentials.count == 1 else {
+      return nil
+    }
+    return compatibleCredentials[0].stationID
+  }
+
   public func unpair(stationID: String) async {
     guard let identityStore, let credentialStore else {
       syncStatus = .stale("Pairing storage is unavailable.")
@@ -246,12 +268,14 @@ extension MirrorStore {
       let removedCredential = try await credentialStore.load(stationID: stationID)
       try await credentialStore.delete(stationID: stationID)
       let remainingCredentials = try await credentialStore.loadAll()
-      if let removedCredential,
-        !remainingCredentials.contains(where: {
-          $0.deviceIdentityID == removedCredential.deviceIdentityID
-        })
-      {
-        try await identityStore.delete(id: removedCredential.deviceIdentityID)
+      let retainedIdentityIDs = Set(
+        remainingCredentials.flatMap(\.referencedDeviceIdentityIDs)
+      )
+      if let removedCredential {
+        for identityID in removedCredential.referencedDeviceIdentityIDs
+        where !retainedIdentityIDs.contains(identityID) {
+          try await identityStore.delete(id: identityID)
+        }
       }
       syncClientsByStationID.removeValue(forKey: stationID)
       snapshot.commands.removeAll { $0.stationID == stationID }

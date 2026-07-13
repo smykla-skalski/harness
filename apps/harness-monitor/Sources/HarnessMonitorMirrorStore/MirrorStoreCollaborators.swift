@@ -8,6 +8,7 @@ public protocol MobileMonitorCredentialPairer: Sendable {
   func pair(
     invitationURL: URL,
     deviceName: String,
+    cloudFallbackStationID: String?,
     now: Date
   ) async throws -> MobilePairedStationCredential
 }

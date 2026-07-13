@@ -47,6 +47,7 @@ public enum MobileRemoteDaemonPairingError: Error, Equatable, Sendable {
   case invalidResponse
   case serverStatus(Int)
   case claimMismatch
+  case invalidCloudFallbackStation
 }
 
 public struct MobileRemoteDaemonPairingDevice: Equatable, Sendable {
@@ -62,8 +63,12 @@ public struct MobileRemoteDaemonPairingDevice: Equatable, Sendable {
   }
 
   public func owns(_ credential: MobilePairedStationCredential) -> Bool {
-    credential.deviceIdentityID == identityID
-      && credential.remoteDaemonAccess?.platform.caseInsensitiveCompare(platform) == .orderedSame
+    guard let access = credential.remoteDaemonAccess else {
+      return false
+    }
+    let remoteIdentityID = access.deviceIdentityID ?? credential.deviceIdentityID
+    return remoteIdentityID == identityID
+      && access.platform.caseInsensitiveCompare(platform) == .orderedSame
   }
 }
 
@@ -156,10 +161,18 @@ public actor MobileRemoteDaemonPairingCoordinator<Transport: MobileRemoteDaemonP
   public func pair(
     invitationURL: URL,
     deviceName: String,
+    cloudFallbackStationID: String? = nil,
     now: Date = .now
   ) async throws -> MobilePairedStationCredential {
     let invitation = try MobileRemoteDaemonPairingInvitation.decode(invitationURL, now: now)
     let identity = try await loadOrCreateIdentity(deviceName: deviceName, now: now)
+    let existing = try await credentialStore.loadAll()
+    let baseCredential = try remotePairingBaseCredential(
+      invitation: invitation,
+      identity: identity,
+      cloudFallbackStationID: cloudFallbackStationID,
+      existingCredentials: existing
+    )
     let clientID = try makeClientID(identity: identity)
     let claim = try await transport.claim(
       invitation: invitation,
@@ -178,49 +191,79 @@ public actor MobileRemoteDaemonPairingCoordinator<Transport: MobileRemoteDaemonP
       tokenHint: claim.tokenHint,
       serverSPKISHA256: invitation.serverSPKISHA256,
       pairedAt: claim.pairedAt,
-      reviewsQuery: claim.reviewsQuery
+      reviewsQuery: claim.reviewsQuery,
+      deviceIdentityID: identity.id
     )
-    let stationID = MobileRemoteDaemonStationID.make(endpoint: invitation.endpoint)
-    let existing = try await credentialStore.loadAll()
-    let existingCredential = existing.first { $0.stationID == stationID }
-    let credential = MobilePairedStationCredential(
-      stationID: stationID,
-      stationName: invitation.endpoint.host ?? invitation.endpoint.absoluteString,
-      endpoint: invitation.endpoint,
-      stationPublicKeyFingerprint: invitation.serverSPKISHA256.value,
-      deviceIdentityID: identity.id,
-      snapshotKeyID: "",
-      commandKeyID: "",
-      symmetricKeyRawRepresentation: Data(),
-      pairedAt: claim.pairedAt,
-      lastUsedAt: now,
-      defaultStation: existingCredential?.defaultStation ?? existing.isEmpty,
-      remoteDaemonAccess: access
+    let credential =
+      if let baseCredential {
+        updatedRemotePairingCredential(
+          baseCredential,
+          access: access,
+          now: now
+        )
+      } else {
+        newRemotePairingCredential(
+          invitation: invitation,
+          identity: identity,
+          access: access,
+          existingCredentials: existing,
+          now: now
+        )
+      }
+    let replacedCredentials = replacedCredentials(
+      from: existing,
+      with: credential,
+      remoteEndpoint: invitation.endpoint
     )
     try await credentialStore.save(credential)
-    try await removeReplacedIdentityIfUnused(
-      existingCredential: existingCredential,
+    for replaced in replacedCredentials where replaced.stationID != credential.stationID {
+      try await credentialStore.delete(stationID: replaced.stationID)
+    }
+    try await removeReplacedIdentitiesIfUnused(
+      replacedCredentials: replacedCredentials,
       existingCredentials: existing,
       replacement: credential
     )
     return credential
   }
 
-  private func removeReplacedIdentityIfUnused(
-    existingCredential: MobilePairedStationCredential?,
+  private func replacedCredentials(
+    from existingCredentials: [MobilePairedStationCredential],
+    with replacement: MobilePairedStationCredential,
+    remoteEndpoint: URL
+  ) -> [MobilePairedStationCredential] {
+    existingCredentials.filter { existing in
+      if existing.stationID == replacement.stationID {
+        return true
+      }
+      return replacement.hasCloudMirrorAccess
+        && !existing.hasCloudMirrorAccess
+        && existing.remoteDaemonAccess?.endpoint == remoteEndpoint
+        && device.owns(existing)
+    }
+  }
+
+  private func removeReplacedIdentitiesIfUnused(
+    replacedCredentials: [MobilePairedStationCredential],
     existingCredentials: [MobilePairedStationCredential],
     replacement: MobilePairedStationCredential
   ) async throws {
-    guard let existingCredential,
-      existingCredential.deviceIdentityID != replacement.deviceIdentityID,
-      !existingCredentials.contains(where: {
-        $0.stationID != replacement.stationID
-          && $0.deviceIdentityID == existingCredential.deviceIdentityID
-      })
-    else {
+    guard !replacedCredentials.isEmpty else {
       return
     }
-    try await identityStore.delete(id: existingCredential.deviceIdentityID)
+    let replacedStationIDs = Set(replacedCredentials.map(\.stationID))
+    let retainedIdentityIDs = Set(
+      existingCredentials
+        .filter { !replacedStationIDs.contains($0.stationID) }
+        .flatMap(\.referencedDeviceIdentityIDs)
+    ).union(replacement.referencedDeviceIdentityIDs)
+    let replacedIdentityIDs = Set(
+      replacedCredentials.flatMap(\.referencedDeviceIdentityIDs)
+    )
+    for identityID in replacedIdentityIDs
+    where !retainedIdentityIDs.contains(identityID) {
+      try await identityStore.delete(id: identityID)
+    }
   }
 
   private func loadOrCreateIdentity(

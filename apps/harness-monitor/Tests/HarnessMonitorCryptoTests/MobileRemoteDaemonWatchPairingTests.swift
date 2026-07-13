@@ -85,6 +85,54 @@ final class MobileRemoteDaemonWatchPairingTests: XCTestCase {
     let storedPhoneIdentity = try await identityStore.load(id: phoneIdentity.id)
     XCTAssertEqual(storedPhoneIdentity, phoneIdentity)
   }
+
+  func testWatchPairingPreservesCloudFallbackWithIndependentRemoteOwnership() async throws {
+    let now = Date(timeIntervalSince1970: 1_752_124_400)
+    let phoneIdentity = MobileDeviceIdentity(
+      id: "default-mobile-device",
+      displayName: "Bart's iPhone",
+      signingPrivateKeyRawRepresentation: Data(repeating: 1, count: 32),
+      agreementPrivateKeyRawRepresentation: Data(repeating: 2, count: 32),
+      createdAt: now.addingTimeInterval(-60)
+    )
+    var cloudFallback = try transferredPhoneCredential(identity: phoneIdentity, now: now)
+    cloudFallback.snapshotKeyID = "snapshot-key"
+    cloudFallback.commandKeyID = "command-key"
+    cloudFallback.symmetricKeyRawRepresentation = Data(repeating: 3, count: 32)
+    let identityStore = InMemoryMobileDeviceIdentityStore(identities: [phoneIdentity])
+    let credentialStore = InMemoryMobilePairedStationCredentialStore(
+      credentials: [cloudFallback]
+    )
+    let coordinator = MobileRemoteDaemonPairingCoordinator(
+      identityStore: identityStore,
+      credentialStore: credentialStore,
+      transport: RecordingWatchRemotePairingTransport(pairedAt: now),
+      device: .watchOS
+    )
+
+    let credential = try await coordinator.pair(
+      invitationURL: try watchRemoteInvitationURL(now: now),
+      deviceName: "Bart's Apple Watch",
+      now: now
+    )
+
+    XCTAssertEqual(credential.stationID, cloudFallback.stationID)
+    XCTAssertEqual(credential.deviceIdentityID, phoneIdentity.id)
+    XCTAssertEqual(credential.snapshotKeyID, cloudFallback.snapshotKeyID)
+    XCTAssertEqual(credential.commandKeyID, cloudFallback.commandKeyID)
+    XCTAssertEqual(
+      credential.symmetricKeyRawRepresentation,
+      cloudFallback.symmetricKeyRawRepresentation
+    )
+    XCTAssertTrue(credential.hasCloudMirrorAccess)
+    XCTAssertTrue(MobileRemoteDaemonPairingDevice.watchOS.owns(credential))
+    let storedWatchIdentity = try await identityStore.load(
+      id: MobileRemoteDaemonPairingDevice.watchOS.identityID
+    )
+    let storedPhoneIdentity = try await identityStore.load(id: phoneIdentity.id)
+    XCTAssertNotNil(storedWatchIdentity)
+    XCTAssertNotNil(storedPhoneIdentity)
+  }
 }
 
 private actor RecordingWatchRemotePairingTransport: MobileRemoteDaemonPairingTransport {
