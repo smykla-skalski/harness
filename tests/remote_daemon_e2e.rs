@@ -209,8 +209,11 @@ async fn pair_client(
     client_id: &str,
 ) -> Result<client::RemoteCredentials, String> {
     let invitation = daemon.create_pairing(role)?;
+    let pairing_id = required_string(&invitation, "pairing_id")?;
     let code = required_string(&invitation, "code")?;
+    client.expect_pairing_status(pairing_id, "pending").await?;
     let credentials = client.claim_pairing(code, client_id, role).await?;
+    client.expect_pairing_status(pairing_id, "claimed").await?;
     if credentials.role != role {
         return Err(format!(
             "pairing role mismatch: expected {role}, received {}",

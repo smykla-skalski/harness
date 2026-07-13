@@ -230,7 +230,11 @@ fn http_route_contract(method: &Method, route_path: &str) -> Option<&'static Htt
 }
 
 fn is_public_remote_http_route(method: &Method, route_path: &str) -> bool {
-    *method == Method::POST && route_path == http_paths::REMOTE_PAIR_CLAIM
+    *method == Method::POST
+        && matches!(
+            route_path,
+            http_paths::REMOTE_PAIR_CLAIM | http_paths::REMOTE_PAIR_STATUS
+        )
 }
 
 fn remote_http_limit_audit_target(

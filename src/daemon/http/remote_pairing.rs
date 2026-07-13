@@ -26,8 +26,12 @@ use crate::workspace::utc_now;
 use super::response::{extract_request_id, timed_json, timed_response};
 use super::{DaemonConnectInfo, DaemonHttpState};
 
+mod status;
+
 pub(super) fn remote_pairing_routes() -> Router<DaemonHttpState> {
-    Router::new().route(http_paths::REMOTE_PAIR_CLAIM, post(post_remote_pair_claim))
+    Router::new()
+        .route(http_paths::REMOTE_PAIR_CLAIM, post(post_remote_pair_claim))
+        .merge(status::remote_pairing_status_routes())
 }
 
 #[derive(Debug, Deserialize)]

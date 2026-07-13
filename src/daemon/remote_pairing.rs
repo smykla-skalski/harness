@@ -250,6 +250,26 @@ pub struct RemoteStoredPairing {
     pub reviews_query: Option<ReviewsQueryRequest>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RemotePairingStatus {
+    Pending,
+    Claimed,
+    Expired,
+    Unavailable,
+}
+
+impl RemotePairingStatus {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Claimed => "claimed",
+            Self::Expired => "expired",
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemotePairingClaimRequest {
     pub expected_domain: String,
