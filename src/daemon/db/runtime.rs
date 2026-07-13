@@ -32,14 +32,18 @@ impl DaemonDb {
         self.conn
             .execute(
                 "INSERT INTO codex_runs (
-                    run_id, session_id, session_agent_id, display_name,
+                    run_id, session_id, task_id, board_item_id, workflow_execution_id,
+                    session_agent_id, display_name,
                     project_dir, thread_id, turn_id, mode,
                     status, prompt, latest_summary, final_message, error,
                     pending_approvals_json, resolved_approvals_json, events_json,
                     created_at, updated_at, model, effort
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)
                 ON CONFLICT(run_id) DO UPDATE SET
                     session_id = excluded.session_id,
+                    task_id = excluded.task_id,
+                    board_item_id = excluded.board_item_id,
+                    workflow_execution_id = excluded.workflow_execution_id,
                     session_agent_id = excluded.session_agent_id,
                     display_name = excluded.display_name,
                     project_dir = excluded.project_dir,
@@ -60,6 +64,9 @@ impl DaemonDb {
                 rusqlite::params![
                     snapshot.run_id,
                     snapshot.session_id,
+                    snapshot.task_id,
+                    snapshot.board_item_id,
+                    snapshot.workflow_execution_id,
                     snapshot.session_agent_id,
                     snapshot.display_name,
                     snapshot.project_dir,
@@ -90,7 +97,8 @@ impl DaemonDb {
     /// Returns [`CliError`] on SQL or parse failures.
     pub fn codex_run(&self, run_id: &str) -> Result<Option<CodexRunSnapshot>, CliError> {
         let result = self.conn.query_row(
-            "SELECT run_id, session_id, session_agent_id, display_name,
+            "SELECT run_id, session_id, task_id, board_item_id, workflow_execution_id,
+                session_agent_id, display_name,
                 project_dir, thread_id, turn_id, mode,
                 status, prompt, latest_summary, final_message, error,
                 pending_approvals_json, resolved_approvals_json, events_json,
@@ -115,7 +123,8 @@ impl DaemonDb {
         let mut statement = self
             .conn
             .prepare(
-                "SELECT run_id, session_id, session_agent_id, display_name,
+                "SELECT run_id, session_id, task_id, board_item_id, workflow_execution_id,
+                    session_agent_id, display_name,
                     project_dir, thread_id, turn_id, mode,
                     status, prompt, latest_summary, final_message, error,
                     pending_approvals_json, resolved_approvals_json, events_json,
@@ -273,25 +282,28 @@ impl DaemonDb {
 }
 
 fn codex_run_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexRunSnapshot> {
-    let mode_raw: String = row.get(7)?;
-    let status_raw: String = row.get(8)?;
-    let pending_approvals_json: String = row.get(13)?;
-    let resolved_approvals_json: String = row.get(14)?;
-    let events_json: String = row.get(15)?;
+    let mode_raw: String = row.get(10)?;
+    let status_raw: String = row.get(11)?;
+    let pending_approvals_json: String = row.get(16)?;
+    let resolved_approvals_json: String = row.get(17)?;
+    let events_json: String = row.get(18)?;
     Ok(CodexRunSnapshot {
         run_id: row.get(0)?,
         session_id: row.get(1)?,
-        session_agent_id: row.get(2)?,
-        display_name: row.get(3)?,
-        project_dir: row.get(4)?,
-        thread_id: row.get(5)?,
-        turn_id: row.get(6)?,
+        task_id: row.get(2)?,
+        board_item_id: row.get(3)?,
+        workflow_execution_id: row.get(4)?,
+        session_agent_id: row.get(5)?,
+        display_name: row.get(6)?,
+        project_dir: row.get(7)?,
+        thread_id: row.get(8)?,
+        turn_id: row.get(9)?,
         mode: codex_mode_from_str(&mode_raw).map_err(parse_error_to_sql)?,
         status: codex_status_from_str(&status_raw).map_err(parse_error_to_sql)?,
-        prompt: row.get(9)?,
-        latest_summary: row.get(10)?,
-        final_message: row.get(11)?,
-        error: row.get(12)?,
+        prompt: row.get(12)?,
+        latest_summary: row.get(13)?,
+        final_message: row.get(14)?,
+        error: row.get(15)?,
         pending_approvals: serde_json::from_str(&pending_approvals_json)
             .map_err(|error| parse_error_to_sql(format!("parse codex approvals: {error}")))?,
         resolved_approvals: serde_json::from_str(&resolved_approvals_json).map_err(|error| {
@@ -299,10 +311,10 @@ fn codex_run_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexRunSnaps
         })?,
         events: serde_json::from_str(&events_json)
             .map_err(|error| parse_error_to_sql(format!("parse codex events: {error}")))?,
-        created_at: row.get(16)?,
-        updated_at: row.get(17)?,
-        model: row.get(18)?,
-        effort: row.get(19)?,
+        created_at: row.get(19)?,
+        updated_at: row.get(20)?,
+        model: row.get(21)?,
+        effort: row.get(22)?,
     })
 }
 

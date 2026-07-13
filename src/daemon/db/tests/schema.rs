@@ -181,6 +181,9 @@ fn fresh_schema_codex_runs_table_includes_agent_parity_columns() {
         "effort",
         "resolved_approvals_json",
         "events_json",
+        "task_id",
+        "board_item_id",
+        "workflow_execution_id",
     ] {
         assert!(
             columns.iter().any(|column| column == expected),

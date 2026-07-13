@@ -303,6 +303,9 @@ fn queued_run_snapshot(
     CodexRunSnapshot {
         run_id,
         session_id: session_id.to_string(),
+        task_id: request.task_id.clone(),
+        board_item_id: request.board_item_id.clone(),
+        workflow_execution_id: request.workflow_execution_id.clone(),
         session_agent_id: Some(session_agent_id),
         display_name: Some(display_name),
         project_dir,
@@ -412,7 +415,7 @@ mod tests {
     use crate::session::types::SessionRole;
 
     #[test]
-    fn queued_run_snapshot_normalizes_blank_model_and_effort() {
+    fn queued_run_snapshot_copies_binding_and_normalizes_optional_values() {
         let request = CodexRunRequest {
             actor: None,
             prompt: "investigate".to_string(),
@@ -423,9 +426,9 @@ mod tests {
             name: None,
             persona: None,
             resume_thread_id: None,
-            task_id: None,
-            board_item_id: None,
-            workflow_execution_id: None,
+            task_id: Some("task-1".to_string()),
+            board_item_id: Some("board-item-1".to_string()),
+            workflow_execution_id: Some("workflow-1".to_string()),
             model: Some("  ".to_string()),
             effort: Some(" high ".to_string()),
             allow_custom_model: false,
@@ -443,5 +446,9 @@ mod tests {
 
         assert_eq!(snapshot.model, None);
         assert_eq!(snapshot.effort.as_deref(), Some("high"));
+        let value = serde_json::to_value(snapshot).expect("serialize queued snapshot");
+        assert_eq!(value["task_id"], "task-1");
+        assert_eq!(value["board_item_id"], "board-item-1");
+        assert_eq!(value["workflow_execution_id"], "workflow-1");
     }
 }

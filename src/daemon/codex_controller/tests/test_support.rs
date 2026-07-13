@@ -137,6 +137,9 @@ pub(super) fn codex_run_snapshot(status: CodexRunStatus) -> CodexRunSnapshot {
     CodexRunSnapshot {
         run_id: "codex-run-1".into(),
         session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+        task_id: None,
+        board_item_id: None,
+        workflow_execution_id: None,
         session_agent_id: Some("agent-1".into()),
         display_name: Some("Codex Worker".into()),
         project_dir: "/tmp/harness".into(),
