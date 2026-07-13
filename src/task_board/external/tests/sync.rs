@@ -257,7 +257,7 @@ async fn sync_external_tasks_dry_run_reports_reconciliation_without_writing() {
 }
 
 #[tokio::test]
-async fn sync_external_tasks_resolves_stale_github_review_requests() {
+async fn stale_review_sync_records_remote_completion_without_overriding_local_status() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let item = super::support::github_review_request_item(
@@ -299,7 +299,7 @@ async fn sync_external_tasks_resolves_stale_github_review_requests() {
     let updated = board
         .get("github-owner-repo-71")
         .expect("load resolved review request");
-    assert_eq!(updated.status, TaskBoardStatus::Done);
+    assert_eq!(updated.status, TaskBoardStatus::AgenticReview);
     assert_eq!(
         updated.external_refs[0]
             .sync_state
@@ -307,6 +307,21 @@ async fn sync_external_tasks_resolves_stale_github_review_requests() {
             .and_then(|state| state.status),
         Some(TaskBoardStatus::Done)
     );
+
+    let repeated = sync_external_tasks(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::GitHub),
+            direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("repeat sync external tasks");
+    assert!(repeated.is_empty(), "recorded remote truth must not churn");
 }
 
 #[tokio::test]

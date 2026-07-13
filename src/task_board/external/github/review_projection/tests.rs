@@ -3,6 +3,50 @@ use tempfile::tempdir;
 use super::*;
 use crate::task_board::types::{ExternalRefSyncState, PlanningState, TaskBoardItem};
 
+fn review_sync_state(status: TaskBoardStatus, updated_at: &str) -> ExternalRefSyncState {
+    ExternalRefSyncState {
+        status: Some(status),
+        updated_at: Some(updated_at.to_owned()),
+        ..ExternalRefSyncState::default()
+    }
+}
+
+#[test]
+fn review_status_reconciliation_uses_the_last_sync_as_shared_truth() {
+    assert_eq!(
+        reconciled_review_status(
+            TaskBoardStatus::InProgress,
+            Some(TaskBoardStatus::Todo),
+            TaskBoardStatus::Todo,
+        ),
+        TaskBoardStatus::InProgress
+    );
+    assert_eq!(
+        reconciled_review_status(
+            TaskBoardStatus::Todo,
+            Some(TaskBoardStatus::Todo),
+            TaskBoardStatus::Done,
+        ),
+        TaskBoardStatus::Done
+    );
+    assert_eq!(
+        reconciled_review_status(
+            TaskBoardStatus::InProgress,
+            Some(TaskBoardStatus::Todo),
+            TaskBoardStatus::Done,
+        ),
+        TaskBoardStatus::InProgress
+    );
+    assert_eq!(
+        reconciled_review_status(
+            TaskBoardStatus::Done,
+            Some(TaskBoardStatus::Done),
+            TaskBoardStatus::Todo,
+        ),
+        TaskBoardStatus::Todo
+    );
+}
+
 #[test]
 fn shared_review_snapshot_completes_imported_review_request() {
     let temp = tempdir().expect("tempdir");
@@ -25,7 +69,10 @@ fn shared_review_snapshot_completes_imported_review_request() {
         provider: ExternalRefProvider::GitHub,
         external_id: "example/repo#42".into(),
         url: Some("https://github.com/example/repo/pull/42".into()),
-        sync_state: Some(ExternalRefSyncState::default()),
+        sync_state: Some(review_sync_state(
+            TaskBoardStatus::Todo,
+            "2026-07-11T10:00:00Z",
+        )),
     }];
     board.create("Old title", "Body", item).expect("create");
 
@@ -115,7 +162,10 @@ fn active_review_request_preserves_local_workflow_progress() {
         provider: ExternalRefProvider::GitHub,
         external_id: "example/repo#42".into(),
         url: Some("https://github.com/example/repo/pull/42".into()),
-        sync_state: None,
+        sync_state: Some(review_sync_state(
+            TaskBoardStatus::Todo,
+            "2026-07-11T10:00:00Z",
+        )),
     }];
     board.create("Review title", "Body", item).expect("create");
 
@@ -131,7 +181,7 @@ fn active_review_request_preserves_local_workflow_progress() {
     )
     .expect("reconcile");
 
-    assert!(!changed);
+    assert!(changed);
     assert_eq!(
         board
             .get("github-example-repo-42")
@@ -201,7 +251,10 @@ fn completed_remote_review_does_not_interrupt_active_execution() {
         provider: ExternalRefProvider::GitHub,
         external_id: "example/repo#42".into(),
         url: Some("https://github.com/example/repo/pull/42".into()),
-        sync_state: None,
+        sync_state: Some(review_sync_state(
+            TaskBoardStatus::Todo,
+            "2026-07-11T10:00:00Z",
+        )),
     }];
     board.create("Review title", "Body", item).expect("create");
 
@@ -217,13 +270,23 @@ fn completed_remote_review_does_not_interrupt_active_execution() {
     )
     .expect("reconcile");
 
-    assert!(!changed);
+    assert!(changed);
     assert_eq!(
         board
             .get("github-example-repo-42")
             .expect("review item")
             .status,
         TaskBoardStatus::InProgress
+    );
+    assert_eq!(
+        board
+            .get("github-example-repo-42")
+            .expect("review item")
+            .external_refs[0]
+            .sync_state
+            .as_ref()
+            .and_then(|state| state.status),
+        Some(TaskBoardStatus::Done)
     );
 }
 
@@ -244,7 +307,10 @@ fn candidate_projection_reloads_refs_edited_after_listing() {
         provider: ExternalRefProvider::GitHub,
         external_id: "example/repo#42".into(),
         url: Some("https://github.com/example/repo/pull/42".into()),
-        sync_state: None,
+        sync_state: Some(review_sync_state(
+            TaskBoardStatus::Todo,
+            "2026-07-11T10:00:00Z",
+        )),
     }];
     board.create("Review title", "Body", item).expect("create");
     let candidate_id = board.list(None).expect("list")[0].id.clone();
@@ -320,13 +386,16 @@ fn active_imported_reviews_are_discovered_for_exact_resolution() {
         "Body".into(),
         "2026-07-11T10:00:00Z".into(),
     );
-    active.status = TaskBoardStatus::Todo;
+    active.status = TaskBoardStatus::InProgress;
     active.imported_from_provider = Some(ExternalRefProvider::GitHub);
     active.external_refs = vec![ExternalRef {
         provider: ExternalRefProvider::GitHub,
         external_id: "Example/Repo#42".into(),
         url: Some("https://github.com/Example/Repo/pull/42".into()),
-        sync_state: None,
+        sync_state: Some(review_sync_state(
+            TaskBoardStatus::Todo,
+            "2026-07-11T10:00:00Z",
+        )),
     }];
     board
         .create("Active review", "Body", active)
@@ -344,7 +413,10 @@ fn active_imported_reviews_are_discovered_for_exact_resolution() {
         provider: ExternalRefProvider::GitHub,
         external_id: "example/repo#43".into(),
         url: Some("https://github.com/example/repo/pull/43".into()),
-        sync_state: None,
+        sync_state: Some(review_sync_state(
+            TaskBoardStatus::Done,
+            "2026-07-11T10:00:00Z",
+        )),
     }];
     board
         .create("Completed review", "Body", completed)

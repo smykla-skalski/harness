@@ -7,8 +7,8 @@ use crate::reviews::{
     ReviewsRefreshRequest,
 };
 use crate::task_board::{
-    ExternalRef, ExternalRefProvider, TaskBoardGitHubInboxConfig, TaskBoardItem,
-    TaskBoardOrchestratorSettings, TaskBoardStatus,
+    ExternalRef, ExternalRefProvider, ExternalRefSyncState, TaskBoardGitHubInboxConfig,
+    TaskBoardItem, TaskBoardOrchestratorSettings, TaskBoardStatus,
 };
 
 use super::super::{
@@ -207,6 +207,7 @@ async fn cached_reviews_query_creates_only_matching_task_board_reviews_idempoten
     assert_eq!(revision_after_second, revision_after_first);
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].title, "Review acme/api#17");
+    assert_eq!(items[0].status, TaskBoardStatus::Todo);
     assert_eq!(items[0].project_id.as_deref(), Some("acme/api"));
     assert_eq!(
         items[0].external_refs[0].external_id, "acme/api#17",
@@ -215,7 +216,7 @@ async fn cached_reviews_query_creates_only_matching_task_board_reviews_idempoten
 }
 
 #[tokio::test]
-async fn cached_reviews_projection_preserves_active_task_status() {
+async fn cached_reviews_projection_preserves_user_selected_status() {
     let _github_guard = crate::github_api::acquire_global_budget_test_lock().await;
     let dir = tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
@@ -237,21 +238,36 @@ async fn cached_reviews_projection_preserves_active_task_status() {
         .await
         .expect("initial cached projection");
     let item = db.list_task_board_items(None).await.expect("list board")[0].clone();
-    db.update_task_board_item(&item.id, |current| {
-        current.status = TaskBoardStatus::AgenticReview;
-        current.planning.summary = Some("Review the dependency update".to_owned());
-        Ok(true)
-    })
-    .await
-    .expect("mark task in progress");
-
-    let projected = query_reviews_with_database(&request, Some(&db))
+    for status in [
+        TaskBoardStatus::Umbrella,
+        TaskBoardStatus::Todo,
+        TaskBoardStatus::Planning,
+        TaskBoardStatus::InProgress,
+        TaskBoardStatus::AgenticReview,
+        TaskBoardStatus::Testing,
+        TaskBoardStatus::InReview,
+        TaskBoardStatus::ToReview,
+        TaskBoardStatus::HumanRequired,
+        TaskBoardStatus::Failed,
+        TaskBoardStatus::Done,
+    ] {
+        db.update_task_board_item(&item.id, |current| {
+            current.status = status;
+            current.planning.summary = Some("Review the dependency update".to_owned());
+            Ok(true)
+        })
         .await
-        .expect("repeat cached projection");
-    let updated = db.task_board_item(&item.id).await.expect("load task");
+        .expect("select local task status");
 
-    assert!(projected.from_cache);
-    assert_eq!(updated.status, TaskBoardStatus::AgenticReview);
+        let projected = query_reviews_with_database(&request, Some(&db))
+            .await
+            .expect("repeat cached projection");
+        let updated = db.task_board_item(&item.id).await.expect("load task");
+
+        assert!(projected.from_cache);
+        assert_eq!(updated.status, status, "sync must preserve the local lane");
+    }
+    let updated = db.task_board_item(&item.id).await.expect("load task");
     assert_eq!(
         updated.planning.summary.as_deref(),
         Some("Review the dependency update")
@@ -267,26 +283,29 @@ async fn cached_reviews_projection_reopens_done_task_when_review_is_requested_ag
         .expect("open database");
     configure_review_inbox(&db, &["status/reopened"], &[]).await;
     let request = cached_projection_request("status/reopened");
-    let response = ReviewsQueryResponse::new(
-        vec![requested_review_item(
-            "status/reopened",
-            "pr_status_reopened",
-            32,
-            &[],
-        )],
-        "2026-07-11T12:00:00Z".into(),
-    );
+    let review = requested_review_item("status/reopened", "pr_status_reopened", 32, &[]);
+    let refresh_request = ReviewsRefreshRequest {
+        targets: vec![review.target()],
+        ..ReviewsRefreshRequest::default()
+    };
+    let response = ReviewsQueryResponse::new(vec![review], "2026-07-11T12:00:00Z".into());
     store_cached_query_response(request.cache_key(), &response);
     query_reviews_with_database(&request, Some(&db))
         .await
         .expect("initial cached projection");
     let item = db.list_task_board_items(None).await.expect("list board")[0].clone();
-    db.update_task_board_item(&item.id, |current| {
-        current.status = TaskBoardStatus::Done;
-        Ok(true)
-    })
-    .await
-    .expect("complete task");
+    assert!(
+        reconcile_targeted_missing_task_board_reviews(
+            Some(&db),
+            &refresh_request,
+            &["pr_status_reopened".into()],
+            crate::github_api::GitHubProtectedClient::data_revision(),
+        )
+        .await
+        .expect("record external review completion")
+    );
+    let completed = db.task_board_item(&item.id).await.expect("load task");
+    assert_eq!(completed.status, TaskBoardStatus::Done);
 
     let projected = query_reviews_with_database(&request, Some(&db))
         .await
@@ -294,7 +313,7 @@ async fn cached_reviews_projection_reopens_done_task_when_review_is_requested_ag
     let updated = db.task_board_item(&item.id).await.expect("load task");
 
     assert!(projected.from_cache);
-    assert_eq!(updated.status, TaskBoardStatus::HumanRequired);
+    assert_eq!(updated.status, TaskBoardStatus::Todo);
 }
 
 #[tokio::test]
@@ -386,7 +405,13 @@ async fn targeted_missing_refresh_completes_only_matching_imported_review() {
         Some(TaskBoardStatus::Done)
     );
     assert_eq!(unrelated.status, TaskBoardStatus::HumanRequired);
-    assert!(unrelated.external_refs[0].sync_state.is_none());
+    assert_eq!(
+        unrelated.external_refs[0]
+            .sync_state
+            .as_ref()
+            .and_then(|state| state.status),
+        Some(TaskBoardStatus::HumanRequired)
+    );
 }
 
 async fn create_imported_review(db: &AsyncDaemonDb, item_id: &str, repository: &str, number: u64) {
@@ -403,7 +428,11 @@ async fn create_imported_review(db: &AsyncDaemonDb, item_id: &str, repository: &
         provider: ExternalRefProvider::GitHub,
         external_id: format!("{repository}#{number}"),
         url: Some(format!("https://github.com/{repository}/pull/{number}")),
-        sync_state: None,
+        sync_state: Some(ExternalRefSyncState {
+            status: Some(TaskBoardStatus::HumanRequired),
+            updated_at: Some("2026-07-11T12:00:00Z".into()),
+            ..ExternalRefSyncState::default()
+        }),
     }];
     db.create_task_board_item(item)
         .await

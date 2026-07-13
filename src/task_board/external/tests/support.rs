@@ -152,7 +152,7 @@ fn github_review_request_ref(external_id: &str) -> ExternalRef {
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Review requested".to_owned()),
         body: Some("Please review the pull request.".to_owned()),
-        status: Some(TaskBoardStatus::HumanRequired),
+        status: Some(TaskBoardStatus::Todo),
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_owned()),
         synced_at: Some("2026-05-14T03:00:00Z".to_owned()),

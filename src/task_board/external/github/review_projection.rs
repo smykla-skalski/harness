@@ -43,12 +43,12 @@ pub(crate) fn imported_review_pull_request_references(
     Ok(board
         .list(None)?
         .into_iter()
-        .filter(|item| is_imported_review(item) && is_review_inbox_status(item.status))
+        .filter(is_imported_review)
         .flat_map(|item| {
             item.external_refs
                 .clone()
                 .into_iter()
-                .filter(is_github_pull_request)
+                .filter(is_active_github_review_reference)
                 .filter_map(move |reference| normalized_reference(&item, &reference))
         })
         .collect::<BTreeSet<_>>()
@@ -59,11 +59,11 @@ pub(crate) fn imported_review_pull_request_references(
 pub(crate) fn imported_review_references_from_items(items: &[TaskBoardItem]) -> Vec<(String, u64)> {
     items
         .iter()
-        .filter(|item| is_imported_review(item) && is_review_inbox_status(item.status))
+        .filter(|item| is_imported_review(item))
         .flat_map(|item| {
             item.external_refs
                 .iter()
-                .filter(|reference| is_github_pull_request(reference))
+                .filter(|reference| is_active_github_review_reference(reference))
                 .filter_map(|reference| normalized_reference(item, reference))
         })
         .collect::<BTreeSet<_>>()
@@ -112,15 +112,24 @@ fn projection_patch(
     snapshots: &BTreeMap<String, &GitHubPullRequestSnapshot>,
 ) -> Option<TaskBoardItemPatch> {
     let (reference_index, snapshot) = matching_imported_review(item, snapshots)?;
-    let status = projected_status(snapshot, item.status);
-    if item.status == status {
+    let observed_status = observed_review_status(snapshot)?;
+    let last_synced_status = item.external_refs[reference_index]
+        .sync_state
+        .as_ref()
+        .and_then(|state| state.status);
+    let status = reconciled_review_status(item.status, last_synced_status, observed_status);
+    let mut external_refs = item.external_refs.clone();
+    let sync_state_changed = update_sync_state(
+        &mut external_refs[reference_index],
+        snapshot,
+        observed_status,
+    );
+    if item.status == status && !sync_state_changed {
         return None;
     }
-    let mut external_refs = item.external_refs.clone();
-    update_sync_state(&mut external_refs[reference_index], snapshot, status);
     Some(TaskBoardItemPatch {
-        status: Some(status),
-        external_refs: Some(external_refs),
+        status: (item.status != status).then_some(status),
+        external_refs: sync_state_changed.then_some(external_refs),
         ..TaskBoardItemPatch::default()
     })
 }
@@ -177,43 +186,55 @@ fn is_imported_review(item: &TaskBoardItem) -> bool {
         && item.external_refs.iter().any(is_github_pull_request)
 }
 
-fn projected_status(
-    snapshot: &GitHubPullRequestSnapshot,
-    current: TaskBoardStatus,
-) -> TaskBoardStatus {
+fn observed_review_status(snapshot: &GitHubPullRequestSnapshot) -> Option<TaskBoardStatus> {
     if snapshot.is_open == Some(false) || snapshot.viewer_review_requested == Some(false) {
-        return if is_review_inbox_status(current) {
-            TaskBoardStatus::Done
-        } else {
-            current
-        };
+        return Some(TaskBoardStatus::Done);
     }
-    if snapshot.viewer_review_requested == Some(true) && current == TaskBoardStatus::Done {
-        return TaskBoardStatus::Todo;
+    if snapshot.viewer_review_requested == Some(true) {
+        return Some(TaskBoardStatus::Todo);
     }
-    current
+    None
 }
 
-fn is_review_inbox_status(status: TaskBoardStatus) -> bool {
-    matches!(
-        status,
-        TaskBoardStatus::Todo
-            | TaskBoardStatus::HumanRequired
-            | TaskBoardStatus::AgenticReview
-            | TaskBoardStatus::NeedsYou
-            | TaskBoardStatus::PlanReview
-    )
+pub(crate) fn reconciled_review_status(
+    current: TaskBoardStatus,
+    last_synced: Option<TaskBoardStatus>,
+    observed: TaskBoardStatus,
+) -> TaskBoardStatus {
+    last_synced.map_or(current, |last_synced| {
+        if current == last_synced {
+            observed
+        } else {
+            current
+        }
+    })
+}
+
+fn is_active_github_review_reference(reference: &ExternalRef) -> bool {
+    is_github_pull_request(reference)
+        && reference
+            .sync_state
+            .as_ref()
+            .and_then(|state| state.status)
+            != Some(TaskBoardStatus::Done)
 }
 
 fn update_sync_state(
     reference: &mut ExternalRef,
     snapshot: &GitHubPullRequestSnapshot,
     status: TaskBoardStatus,
-) {
+) -> bool {
+    if reference.sync_state.as_ref().is_some_and(|state| {
+        state.status == Some(status)
+            && state.updated_at.as_deref() == Some(snapshot.updated_at.as_str())
+    }) {
+        return false;
+    }
     let state = reference.sync_state.get_or_insert_default();
     state.status = Some(status);
     state.updated_at = Some(snapshot.updated_at.clone());
     state.synced_at = Some(utc_now());
+    true
 }
 
 #[cfg(test)]
