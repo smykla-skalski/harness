@@ -16,6 +16,7 @@ pub mod store;
 pub mod summary;
 pub mod transport;
 pub mod types;
+mod worker_prompt;
 
 pub use dispatch::{
     DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchFailure,
@@ -114,3 +115,4 @@ pub use types::{
     TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowState,
     TaskBoardWorkflowStatus, TaskUsage,
 };
+pub(crate) use worker_prompt::{WorkerPromptContext, plan_worker_prompt, render_worker_prompt};

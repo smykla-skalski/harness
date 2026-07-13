@@ -63,6 +63,16 @@ fn ready_dispatch_plan_maps_board_fields_to_session_task_intent() {
         Some(("spawn_reviewer", "submit_for_review"))
     );
     assert!(plan.policy.is_allow());
+    assert!(
+        plan.rendered_prompt
+            .contains("Session task: <assigned-at-dispatch>")
+    );
+    assert!(plan.rendered_prompt.contains("Tags:\ncli, board"));
+    assert!(plan.rendered_prompt.contains("External refs:\ngithub:123"));
+    assert_eq!(
+        serde_json::to_value(&plan).expect("serialize plan")["rendered_prompt"],
+        plan.rendered_prompt
+    );
 }
 
 #[test]

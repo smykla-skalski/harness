@@ -3,7 +3,9 @@ use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking, run_termina
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, ManagedAgentSnapshot};
 use crate::errors::CliError;
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
-use crate::task_board::{AgentMode, DispatchAppliedTask, TaskBoardItem};
+use crate::task_board::{
+    AgentMode, DispatchAppliedTask, TaskBoardItem, WorkerPromptContext, render_worker_prompt,
+};
 
 const DEFAULT_INTERACTIVE_RUNTIME: &str = "codex";
 
@@ -27,9 +29,9 @@ async fn start_codex_worker(
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
-    let request = codex_worker_request(applied);
     let session_id = applied.session_id.clone();
     let run_id = codex_worker_id(dispatch_intent_id);
+    let request = codex_worker_request(applied, &run_id);
     let _guard = state
         .managed_agent_mutation_locks
         .lock(&session_id, "task-board:codex-worker")
@@ -48,8 +50,8 @@ async fn start_interactive_worker(
     dispatch_intent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
     let session_id = applied.session_id.clone();
-    let request = terminal_worker_request(applied);
     let tui_id = terminal_worker_id(dispatch_intent_id);
+    let request = terminal_worker_request(applied, &tui_id);
     let _guard = state
         .managed_agent_mutation_locks
         .lock(&session_id, "task-board:terminal-worker")
@@ -62,7 +64,7 @@ async fn start_interactive_worker(
     .await
 }
 
-fn codex_worker_request(applied: &DispatchAppliedTask) -> CodexRunRequest {
+fn codex_worker_request(applied: &DispatchAppliedTask, managed_run_id: &str) -> CodexRunRequest {
     let mode = match applied.item.agent_mode {
         AgentMode::Evaluate => CodexRunMode::Report,
         AgentMode::Headless | AgentMode::Planning | AgentMode::Interactive => {
@@ -71,7 +73,7 @@ fn codex_worker_request(applied: &DispatchAppliedTask) -> CodexRunRequest {
     };
     CodexRunRequest {
         actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
-        prompt: worker_prompt(applied),
+        prompt: worker_prompt(applied, managed_run_id),
         mode,
         role: SessionRole::Worker,
         fallback_role: Some(SessionRole::Observer),
@@ -88,14 +90,17 @@ fn codex_worker_request(applied: &DispatchAppliedTask) -> CodexRunRequest {
     }
 }
 
-fn terminal_worker_request(applied: &DispatchAppliedTask) -> AgentTuiStartRequest {
+fn terminal_worker_request(
+    applied: &DispatchAppliedTask,
+    managed_run_id: &str,
+) -> AgentTuiStartRequest {
     AgentTuiStartRequest {
         runtime: DEFAULT_INTERACTIVE_RUNTIME.to_string(),
         role: SessionRole::Worker,
         fallback_role: Some(SessionRole::Observer),
         capabilities: worker_capabilities(&applied.item),
         name: Some(worker_name(&applied.item)),
-        prompt: Some(worker_prompt(applied)),
+        prompt: Some(worker_prompt(applied, managed_run_id)),
         project_dir: None,
         argv: Vec::new(),
         rows: 24,
@@ -131,38 +136,18 @@ fn worker_capabilities(item: &TaskBoardItem) -> Vec<String> {
     capabilities
 }
 
-fn worker_prompt(applied: &DispatchAppliedTask) -> String {
-    let item = &applied.item;
-    let mut prompt = format!(
-        "Work on task-board item '{}'.\n\nBoard item: {}\nSession task: {}\nPriority: {:?}\nStatus: {:?}",
-        item.title, applied.board_item_id, applied.work_item_id, item.priority, item.status
-    );
-    push_optional_section(&mut prompt, "Project", item.project_id.as_deref());
-    push_optional_section(
-        &mut prompt,
-        "Planning summary",
-        item.planning.summary.as_deref(),
-    );
-    push_optional_section(&mut prompt, "Task body", non_empty(item.body.as_str()));
-    prompt.push_str(
-        "\n\nFollow the session task lifecycle: implement the requested work, keep changes scoped, run the smallest relevant validation, and submit the task for review when ready.",
-    );
-    prompt
-}
-
-fn push_optional_section(prompt: &mut String, title: &str, value: Option<&str>) {
-    let Some(value) = value else {
-        return;
-    };
-    prompt.push_str("\n\n");
-    prompt.push_str(title);
-    prompt.push_str(":\n");
-    prompt.push_str(value);
-}
-
-fn non_empty(value: &str) -> Option<&str> {
-    let trimmed = value.trim();
-    (!trimmed.is_empty()).then_some(trimmed)
+fn worker_prompt(applied: &DispatchAppliedTask, managed_run_id: &str) -> String {
+    render_worker_prompt(
+        &applied.item,
+        &WorkerPromptContext {
+            board_item_id: &applied.board_item_id,
+            work_item_id: &applied.work_item_id,
+            worktree: applied.item.workflow.worktree.as_deref(),
+            session_id: Some(&applied.session_id),
+            managed_run_id: Some(managed_run_id),
+            status: applied.item.status,
+        },
+    )
 }
 
 #[cfg(test)]
@@ -201,7 +186,7 @@ mod tests {
     fn codex_worker_request_carries_task_board_identity() {
         let applied = applied_task(AgentMode::Headless);
 
-        let request = codex_worker_request(&applied);
+        let request = codex_worker_request(&applied, "codex-dispatch-intent-1");
 
         assert_eq!(request.task_id.as_deref(), Some("task-1"));
         assert_eq!(request.board_item_id.as_deref(), Some("board-1"));
@@ -212,13 +197,33 @@ mod tests {
                 .contains(&"task-board:item:board-1".to_string())
         );
         assert!(request.prompt.contains("Session task: task-1"));
+        assert!(request.prompt.contains("Session id:\nsession-1"));
+        assert!(request.prompt.contains("Tags:\nbackend"));
+        assert!(request.prompt.contains("Worktree:\n/tmp/task-worktree"));
+        assert!(request.prompt.contains("External refs:\ngithub:123"));
+        assert!(
+            request
+                .prompt
+                .contains("Managed run id:\ncodex-dispatch-intent-1")
+        );
+        assert!(
+            request
+                .prompt
+                .contains("harness session task list session-1 --json")
+        );
+        assert!(
+            request
+                .prompt
+                .contains("harness session task submit-for-review session-1 task-1")
+        );
+        assert!(request.prompt.contains("authoritative safety net"));
     }
 
     #[test]
     fn interactive_worker_request_uses_terminal_runtime() {
         let applied = applied_task(AgentMode::Interactive);
 
-        let request = terminal_worker_request(&applied);
+        let request = terminal_worker_request(&applied, "agent-tui-dispatch-intent-1");
 
         assert_eq!(request.runtime, "codex");
         assert_eq!(request.task_id.as_deref(), Some("task-1"));
@@ -349,8 +354,15 @@ mod tests {
         item.status = TaskBoardStatus::InProgress;
         item.priority = TaskBoardPriority::High;
         item.tags = vec!["backend".into()];
+        item.external_refs = vec![crate::task_board::ExternalRef {
+            provider: crate::task_board::ExternalRefProvider::GitHub,
+            external_id: "123".into(),
+            url: Some("https://github.example/issues/123".into()),
+            sync_state: None,
+        }];
         item.workflow = TaskBoardWorkflowState {
             execution_id: Some("workflow-1".into()),
+            worktree: Some("/tmp/task-worktree".into()),
             ..TaskBoardWorkflowState::default()
         };
         DispatchAppliedTask {

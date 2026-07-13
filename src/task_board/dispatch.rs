@@ -35,6 +35,7 @@ const REVIEWER_CONSENSUS: u8 = 2;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DispatchPlan {
     pub board_item_id: String,
+    pub rendered_prompt: String,
     pub readiness: DispatchReadiness,
     pub session: SessionIntent,
     pub task: TaskCreationIntent,
@@ -202,6 +203,7 @@ fn build_dispatch_plan_with_decision(item: &TaskBoardItem, policy: PolicyDecisio
     let evaluator = evaluator_intent();
     DispatchPlan {
         board_item_id: item.id.clone(),
+        rendered_prompt: super::plan_worker_prompt(item),
         readiness: readiness(item, &policy),
         session: session_intent(item),
         task: task_creation_intent(item),
@@ -290,6 +292,7 @@ pub fn machine_mismatch_plan_with_policy_root(
     let evaluator = evaluator_intent();
     DispatchPlan {
         board_item_id: item.id.clone(),
+        rendered_prompt: super::plan_worker_prompt(item),
         readiness: blocked(DispatchBlockReason::MachineMismatch {
             required: item.target_project_types.clone(),
             declared: machine.project_types.clone(),
