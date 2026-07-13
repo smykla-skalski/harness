@@ -90,6 +90,11 @@ resolve_pinned_toolchain_channel() {
 #   - CARGO_BIN / RUSTC: re-resolution would bypass the rustup proxy.
 #   - SWIFT_DEBUG_INFORMATION_*: Xcode injects these and standalone swift CLI
 #     entrypoints warn on them.
+#   - non-macOS deployment targets: Xcode exports targets for every platform.
+#     aws-lc-sys probes clang and clang rejects conflicting iOS, tvOS, watchOS,
+#     xrOS, and DriverKit targets. Keep the macOS deployment target intact.
+#   - empty compiler overrides: Xcode exports empty CC settings. cc 1.2.67+
+#     treats those as an explicit compiler selection instead of using clang.
 # `RUSTUP_TOOLCHAIN` is replaced with the pinned channel so Xcode UI (no mise
 # activation) and `mise run` (mise exports its own) agree.
 run_daemon_cargo() {
@@ -107,7 +112,18 @@ run_daemon_cargo() {
     -u CARGO_ENCODED_RUSTFLAGS
     -u CARGO_BIN
     -u RUSTC
+    -u IPHONEOS_DEPLOYMENT_TARGET
+    -u TVOS_DEPLOYMENT_TARGET
+    -u WATCHOS_DEPLOYMENT_TARGET
+    -u XROS_DEPLOYMENT_TARGET
+    -u DRIVERKIT_DEPLOYMENT_TARGET
   )
+  local compiler_variable
+  for compiler_variable in CC CC_aarch64_apple_darwin CC_x86_64_apple_darwin; do
+    if [ -z "${!compiler_variable:-}" ]; then
+      env_args+=(-u "$compiler_variable")
+    fi
+  done
   if [ -z "$pinned_channel" ]; then
     env_args+=(-u RUSTUP_TOOLCHAIN)
   fi

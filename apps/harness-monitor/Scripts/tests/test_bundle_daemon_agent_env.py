@@ -210,6 +210,41 @@ class BuildDaemonBinaryTests(unittest.TestCase):
             self.assertNotIn("SWIFT_DEBUG_INFORMATION_FORMAT=", captured_env)
             self.assertNotIn("SWIFT_DEBUG_INFORMATION_VERSION=", captured_env)
 
+    def test_strips_non_macos_deployment_targets_before_cargo(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir, target_dir, captured_env_path, fake_cargo = _setup_fake_daemon_layout(
+                Path(tmp_dir)
+            )
+
+            run_build_helper(
+                f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_BIN="{fake_cargo}"; '
+                f'export CARGO_TARGET_DIR="{target_dir}"; '
+                f'export CAPTURED_ENV_PATH="{captured_env_path}"; '
+                'export MACOSX_DEPLOYMENT_TARGET="26.0"; '
+                'export IPHONEOS_DEPLOYMENT_TARGET="15.6"; '
+                'export TVOS_DEPLOYMENT_TARGET="20.4"; '
+                'export WATCHOS_DEPLOYMENT_TARGET="8.7"; '
+                'export XROS_DEPLOYMENT_TARGET="1.3"; '
+                'export DRIVERKIT_DEPLOYMENT_TARGET="20.4"; '
+                'export CC=""; '
+                'export CC_aarch64_apple_darwin=""; '
+                "build_daemon_binary >/dev/null"
+            )
+
+            captured_env = captured_env_path.read_text()
+            self.assertIn("MACOSX_DEPLOYMENT_TARGET=26.0", captured_env)
+            for target in (
+                "IPHONEOS_DEPLOYMENT_TARGET",
+                "TVOS_DEPLOYMENT_TARGET",
+                "WATCHOS_DEPLOYMENT_TARGET",
+                "XROS_DEPLOYMENT_TARGET",
+                "DRIVERKIT_DEPLOYMENT_TARGET",
+                "CC",
+                "CC_aarch64_apple_darwin",
+            ):
+                self.assertNotIn(f"{target}=", captured_env)
+
     def test_strips_rustflags_env_vars_before_cargo(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             project_dir, target_dir, captured_env_path, fake_cargo = _setup_fake_daemon_layout(
