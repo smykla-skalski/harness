@@ -53,6 +53,27 @@ pub(super) async fn dispatch_task_board_get(
 }
 
 fn connection_is_remote_viewer(connection: &Arc<Mutex<ConnectionState>>) -> bool {
-    let connection = connection.lock().expect("connection lock");
+    let Ok(connection) = connection.lock() else {
+        return true;
+    };
     is_remote_viewer(connection.remote_client())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    use super::*;
+
+    #[test]
+    fn poisoned_connection_lock_keeps_viewer_projection_enabled() {
+        let connection = Arc::new(Mutex::new(ConnectionState::new()));
+        let panic = catch_unwind(AssertUnwindSafe(|| {
+            let _guard = connection.lock().expect("connection lock");
+            panic!("poison connection lock");
+        }));
+
+        assert!(panic.is_err());
+        assert!(connection_is_remote_viewer(&connection));
+    }
 }
