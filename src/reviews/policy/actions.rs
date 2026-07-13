@@ -160,14 +160,7 @@ pub(crate) fn authored_reviews_policy_plan_from_document(
             )),
         });
     }
-    let input = PolicyInput {
-        workflow: Some(workflow_id.clone()),
-        action: PolicyAction::SubmitReview,
-        subject: policy_subject(target),
-        evidence: review_target_policy_evidence(target),
-        evaluated_at: None,
-        approvals: Vec::new(),
-    };
+    let input = submit_review_policy_input(&workflow_id, target);
     let Some(compiled) = document.compile_workflow(&workflow_id, &input) else {
         return Ok(ReviewsPolicyPlan {
             workflow_id: workflow_id.clone(),
@@ -304,6 +297,17 @@ fn policy_subject(target: &ReviewTarget) -> PolicySubject {
         repository: Some(target.repository.clone()),
         pull_request: Some(target.number.to_string()),
         ..PolicySubject::default()
+    }
+}
+
+fn submit_review_policy_input(workflow_id: &str, target: &ReviewTarget) -> PolicyInput {
+    PolicyInput {
+        workflow: Some(workflow_id.to_owned()),
+        action: PolicyAction::SubmitReview,
+        subject: policy_subject(target),
+        evidence: review_target_policy_evidence(target),
+        evaluated_at: None,
+        approvals: Vec::new(),
     }
 }
 

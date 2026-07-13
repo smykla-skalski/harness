@@ -2,10 +2,10 @@
 //!
 //! A `spawn_agent` input must never reach the evaluator's implicit
 //! default-allow fall-through: every route the spawn action can walk has to end
-//! at an explicit terminal node (Finish / SupervisorRule / HumanGate /
-//! ConsensusGate / DryRunGate, or an ApprovalGate whose approved branch itself
-//! reaches a terminal). This module walks the spawn-reachable subgraph and flags
-//! any non-terminal node that dead-ends the route.
+//! at an explicit terminal node (`Finish` / `SupervisorRule` / `HumanGate` /
+//! `ConsensusGate` / `DryRunGate`, or an `ApprovalGate` whose approved branch
+//! itself reaches a terminal). This module walks the spawn-reachable subgraph
+//! and flags any non-terminal node that dead-ends the route.
 
 use std::collections::{HashSet, VecDeque};
 

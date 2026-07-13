@@ -31,16 +31,17 @@ enum EvaluationStep {
     Terminal(PolicyDecision),
 }
 
+/// A completed graph evaluation: the decision, the visited node ids, the runtime
+/// wait boundaries, and the pending-grant requests emitted by approval gates.
+type EvaluationOutcome = (
+    PolicyDecision,
+    Vec<String>,
+    Vec<PolicyRuntimeBoundary>,
+    Vec<PolicyApprovalRequest>,
+);
+
 impl PolicyGraph {
-    pub(super) fn evaluate_graph(
-        &self,
-        input: &PolicyInput,
-    ) -> Option<(
-        PolicyDecision,
-        Vec<String>,
-        Vec<PolicyRuntimeBoundary>,
-        Vec<PolicyApprovalRequest>,
-    )> {
+    pub(super) fn evaluate_graph(&self, input: &PolicyInput) -> Option<EvaluationOutcome> {
         if !self.validate().is_valid() {
             return Some((
                 require_human(PolicyReasonCode::HumanRequired),
@@ -196,29 +197,7 @@ impl PolicyGraph {
                 EvaluationStep::Terminal(require_consensus(*reason_code))
             }
             PolicyGraphNodeKind::ApprovalGate(gate) => {
-                match input.approval_state(node.id.as_str()) {
-                    Some(PolicyApprovalState::Approved) => EvaluationStep::Continue(
-                        self.next_node_for_port(node.id.as_str(), PORT_APPROVED)
-                            .into_iter()
-                            .collect(),
-                    ),
-                    Some(PolicyApprovalState::Denied) => EvaluationStep::Terminal(
-                        supervisor_decision(PolicyGraphDecision::Deny, gate.reason_code),
-                    ),
-                    Some(PolicyApprovalState::Pending) => {
-                        EvaluationStep::Terminal(require_human(gate.reason_code))
-                    }
-                    None => {
-                        // No grant yet: ask the caller to create a pending grant
-                        // (fire-and-forget) and block the route for a human.
-                        effects.approval_requests.push(PolicyApprovalRequest {
-                            node_id: node.id.as_str().to_owned(),
-                            reason_code: gate.reason_code,
-                            expiry_seconds: gate.expiry_seconds,
-                        });
-                        EvaluationStep::Terminal(require_human(gate.reason_code))
-                    }
-                }
+                self.approval_gate_step(node, gate, input, effects)
             }
             PolicyGraphNodeKind::DryRunGate { reason_code } => {
                 EvaluationStep::Terminal(dry_run_only(*reason_code))
@@ -232,6 +211,41 @@ impl PolicyGraph {
             )),
             PolicyGraphNodeKind::Finish(finish) => {
                 EvaluationStep::Terminal(supervisor_decision(finish.decision, finish.reason_code))
+            }
+        }
+    }
+
+    /// Evaluate an approval gate against the caller-supplied grant state:
+    /// approved traverses the `approved` output, denied is terminal `Deny`,
+    /// pending is terminal `RequireHuman`, and no grant additionally emits a
+    /// fire-and-forget pending-grant request.
+    fn approval_gate_step(
+        &self,
+        node: &PolicyGraphNode,
+        gate: &super::PolicyApprovalGate,
+        input: &PolicyInput,
+        effects: &mut EvaluationEffects,
+    ) -> EvaluationStep {
+        match input.approval_state(node.id.as_str()) {
+            Some(PolicyApprovalState::Approved) => EvaluationStep::Continue(
+                self.next_node_for_port(node.id.as_str(), PORT_APPROVED)
+                    .into_iter()
+                    .collect(),
+            ),
+            Some(PolicyApprovalState::Denied) => EvaluationStep::Terminal(supervisor_decision(
+                PolicyGraphDecision::Deny,
+                gate.reason_code,
+            )),
+            Some(PolicyApprovalState::Pending) => {
+                EvaluationStep::Terminal(require_human(gate.reason_code))
+            }
+            None => {
+                effects.approval_requests.push(PolicyApprovalRequest {
+                    node_id: node.id.as_str().to_owned(),
+                    reason_code: gate.reason_code,
+                    expiry_seconds: gate.expiry_seconds,
+                });
+                EvaluationStep::Terminal(require_human(gate.reason_code))
             }
         }
     }

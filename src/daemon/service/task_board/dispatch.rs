@@ -16,14 +16,15 @@ use crate::session::types::CONTROL_PLANE_ACTOR_ID;
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
     DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, DispatchFailureKind,
-    DispatchPlan, Machine, TaskBoardItem, TaskBoardStatus, build_dispatch_plans_with_policy,
-    machine_mismatch_plan_with_policy,
+    DispatchPlan, Machine, SpawnGateSwitches, TaskBoardItem, TaskBoardStatus,
+    build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy,
 };
 #[cfg(test)]
 use crate::task_board::{
     SessionIntent, TaskBoardStore, TaskBoardWorkflowStatus, build_dispatch_summary_with_policy_root,
     filter_for_local_machine, machine_mismatch_plan_with_policy_root,
 };
+use crate::workspace::utc_now;
 
 use super::super::task_board_db::task_board_host_local_db;
 #[cfg(test)]
@@ -333,14 +334,13 @@ async fn build_dispatch_plans_for_request_async(
         .as_ref()
         .and_then(|workspace| workspace.active_live_canvas())
         .map(|(canvas, document)| (canvas.id.as_str(), document));
-    let switches = workspace.as_ref().map_or_else(
-        crate::task_board::SpawnGateSwitches::default,
-        |workspace| crate::task_board::SpawnGateSwitches {
+    let switches = workspace
+        .as_ref()
+        .map_or_else(SpawnGateSwitches::default, |workspace| SpawnGateSwitches {
             requires_live_policy: workspace.spawn_requires_live_policy,
             kill_switch: workspace.spawn_kill_switch,
-        },
-    );
-    let evaluated_at = crate::workspace::utc_now();
+        });
+    let evaluated_at = utc_now();
     let mut plans =
         build_dispatch_plans_with_policy(&kept, policy, Some(evaluated_at.as_str()), switches);
     plans.extend(rejected.iter().map(|(item, machine)| {

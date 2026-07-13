@@ -6,8 +6,8 @@
 use std::path::Path;
 
 use crate::task_board::policy::{
-    BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyGate, PolicyInput, PolicyReasonCode,
-    PolicySubject,
+    BuiltInPolicyGate, POLICY_VERSION, PolicyAction, PolicyDecision, PolicyGate, PolicyInput,
+    PolicyReasonCode, PolicySubject,
 };
 #[cfg(test)]
 use crate::task_board::policy_graph::resolve_gate_policy;
@@ -87,39 +87,75 @@ pub(super) fn dispatch_policy_from_graph(
 ) -> (PolicyDecision, Option<String>) {
     let input = spawn_policy_input(item, evaluated_at);
     if switches.kill_switch {
-        tracing::warn!(
-            target: "harness::task_board",
-            board_item_id = %item.id,
-            "spawn kill switch engaged; denying spawn dispatch",
-        );
-        return record_spawn_switch_deny(input, PolicyReasonCode::SpawnKillSwitchEngaged);
+        return deny_kill_switch(&item.id, input);
     }
     if let Some((canvas_id, document)) = policy
         && document.mode != PolicyPipelineMode::Draft
     {
-        let simulation = document.simulate(&input);
-        let decision = simulation.decision;
-        let record = RecordedPolicyDecision::new(
-            document.revision,
-            input,
-            decision.clone(),
-            simulation.visited_node_ids,
-            "task_board_dispatch",
-        )
-        .with_canvas_id(Some(canvas_id.to_string()));
-        let decision_id = record.id.clone();
-        record_policy_decision(record);
-        return (decision, Some(decision_id));
+        return graph_decision(canvas_id, document, input);
     }
     if switches.requires_live_policy {
-        tracing::info!(
-            target: "harness::task_board",
-            board_item_id = %item.id,
-            "spawn requires a live enforced policy but none is active; denying",
-        );
-        return record_spawn_switch_deny(input, PolicyReasonCode::SpawnPolicyRequired);
+        return deny_requires_live_policy(&item.id, input);
     }
     (BuiltInPolicyGate::default().evaluate(&input), None)
+}
+
+/// Evaluate the live graph, record the decision, and return it with its id.
+fn graph_decision(
+    canvas_id: &str,
+    document: &PolicyGraph,
+    input: PolicyInput,
+) -> (PolicyDecision, Option<String>) {
+    let simulation = document.simulate(&input);
+    let decision = simulation.decision;
+    let record = RecordedPolicyDecision::new(
+        document.revision,
+        input,
+        decision.clone(),
+        simulation.visited_node_ids,
+        "task_board_dispatch",
+    )
+    .with_canvas_id(Some(canvas_id.to_string()));
+    let decision_id = record.id.clone();
+    record_policy_decision(record);
+    (decision, Some(decision_id))
+}
+
+fn deny_kill_switch(board_item_id: &str, input: PolicyInput) -> (PolicyDecision, Option<String>) {
+    warn_kill_switch(board_item_id);
+    record_spawn_switch_deny(input, PolicyReasonCode::SpawnKillSwitchEngaged)
+}
+
+fn deny_requires_live_policy(
+    board_item_id: &str,
+    input: PolicyInput,
+) -> (PolicyDecision, Option<String>) {
+    info_requires_live_policy(board_item_id);
+    record_spawn_switch_deny(input, PolicyReasonCode::SpawnPolicyRequired)
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
+)]
+fn warn_kill_switch(board_item_id: &str) {
+    tracing::warn!(
+        target: "harness::task_board",
+        board_item_id = %board_item_id,
+        "spawn kill switch engaged; denying spawn dispatch",
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::info! macro expands into a chain clippy reads as branchy"
+)]
+fn info_requires_live_policy(board_item_id: &str) {
+    tracing::info!(
+        target: "harness::task_board",
+        board_item_id = %board_item_id,
+        "spawn requires a live enforced policy but none is active; denying",
+    );
 }
 
 /// Build and record a fail-closed spawn `Deny`, returning the decision and its
@@ -131,7 +167,7 @@ fn record_spawn_switch_deny(
 ) -> (PolicyDecision, Option<String>) {
     let decision = PolicyDecision::Deny {
         reason_code,
-        policy_version: crate::task_board::policy::POLICY_VERSION.to_string(),
+        policy_version: POLICY_VERSION.to_string(),
     };
     let record = RecordedPolicyDecision::new(
         0,

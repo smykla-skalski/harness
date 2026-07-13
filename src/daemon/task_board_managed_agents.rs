@@ -21,6 +21,14 @@ pub(crate) async fn start_worker_for_applied_task(
     // an already-prepared intent cannot start while the kill switch is engaged.
     // Transport-agnostic because it runs before stdio/bridge selection.
     ensure_spawn_kill_switch_clear(state, &applied.board_item_id).await?;
+    start_worker_by_mode(state, applied, dispatch_intent_id).await
+}
+
+async fn start_worker_by_mode(
+    state: &DaemonHttpState,
+    applied: &DispatchAppliedTask,
+    dispatch_intent_id: &str,
+) -> Result<ManagedAgentSnapshot, CliError> {
     match applied.item.agent_mode {
         AgentMode::Interactive => {
             start_interactive_worker(state, applied, dispatch_intent_id).await
@@ -41,17 +49,25 @@ async fn ensure_spawn_kill_switch_clear(
     let db = require_async_db(state, "task-board worker start kill-switch check")?;
     let workspace = db.load_policy_workspace().await?;
     if workspace.is_some_and(|workspace| workspace.spawn_kill_switch) {
-        tracing::warn!(
-            target: "harness::task_board",
-            board_item_id = %board_item_id,
-            "spawn kill switch engaged at worker start; refusing to launch worker",
-        );
+        warn_kill_switch_at_start(board_item_id);
         return Err(CliErrorKind::invalid_transition(
             "spawn kill switch engaged; worker start refused".to_string(),
         )
         .into());
     }
     Ok(())
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
+)]
+fn warn_kill_switch_at_start(board_item_id: &str) {
+    tracing::warn!(
+        target: "harness::task_board",
+        board_item_id = %board_item_id,
+        "spawn kill switch engaged at worker start; refusing to launch worker",
+    );
 }
 
 async fn start_codex_worker(
