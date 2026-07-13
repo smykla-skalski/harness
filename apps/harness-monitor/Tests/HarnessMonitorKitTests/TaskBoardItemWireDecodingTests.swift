@@ -7,8 +7,8 @@ import Testing
 /// generated from src/task_board/types.rs. The *Wire type owns the explicit
 /// snake_case decode through the plain decoder; the item endpoints now decode it and
 /// map to the rich hand TaskBoardItem. It references the adopted TaskBoardStatus
-/// /TaskBoardPriority/TaskBoardAgentMode enums bare and faithfully carries the fields
-/// the hand model renames or drops (sync_state, optional workflow).
+/// /TaskBoardPriority/TaskBoardAgentMode enums bare and faithfully carries sync state,
+/// provider provenance, and optional workflow into the hand model.
 @Suite("Task board item wire type")
 struct TaskBoardItemWireDecodingTests {
   private let decoder = PolicyWireCoding.decoder
@@ -76,6 +76,8 @@ struct TaskBoardItemWireDecodingTests {
     #expect(item.agentMode == .interactive)
     #expect(item.externalRefs.first?.provider == .gitHub)
     #expect(item.externalRefs.first?.url == "https://example.com/123")
+    #expect(item.externalRefs.first?.syncState?.status == .todo)
+    #expect(item.importedFromProvider == .gitHub)
     #expect(item.planning.approvedBy == "lead")
     let workflow = try #require(item.workflow)
     #expect(workflow.status == .running)
@@ -95,6 +97,7 @@ struct TaskBoardItemWireDecodingTests {
     )
     let item = TaskBoardItem(wire: wire)
     #expect(item.workflow == nil)
+    #expect(item.importedFromProvider == nil)
     #expect(item.status == .todo)
   }
 

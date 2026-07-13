@@ -312,6 +312,32 @@ public func formatRelativeUpdatedAt(_ value: String?, reference: Date = .now) ->
   return relativeUpdatedAtFormatter.localizedString(for: date, relativeTo: reference)
 }
 
+@MainActor
+public func formatCompactRelativeUpdatedAt(
+  _ value: String?,
+  reference: Date = .now
+) -> String {
+  guard let value, let date = parsedTimestampDate(from: value) else {
+    return ""
+  }
+
+  let secondsPerMinute = 60
+  let secondsPerHour = 60 * secondsPerMinute
+  let secondsPerDay = 24 * secondsPerHour
+  let elapsedSeconds = Int(max(reference.timeIntervalSince(date), 0))
+
+  if elapsedSeconds < secondsPerMinute {
+    return "just now"
+  }
+  if elapsedSeconds < secondsPerHour {
+    return "\(elapsedSeconds / secondsPerMinute)m ago"
+  }
+  if elapsedSeconds < secondsPerDay {
+    return "\(elapsedSeconds / secondsPerHour)h ago"
+  }
+  return "\(elapsedSeconds / secondsPerDay)d ago"
+}
+
 private let homeDirectory = FileManager.default.homeDirectoryForCurrentUser.path(
   percentEncoded: false)
 

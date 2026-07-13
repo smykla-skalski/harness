@@ -7,6 +7,35 @@ struct TaskBoardCardGlyph {
   let tint: Color
 }
 
+struct TaskBoardCardTitlePresentation: Equatable {
+  static let reviewLeadingText = "Review: "
+
+  let title: String
+  let leadingText: String?
+
+  init(item: TaskBoardItem) {
+    guard item.requiresViewerGitHubReview else {
+      self.title = item.title
+      self.leadingText = nil
+      return
+    }
+    self.title = Self.removingReviewPrefix(from: item.title)
+    self.leadingText = Self.reviewLeadingText
+  }
+
+  private static func removingReviewPrefix(from title: String) -> String {
+    let marker = "Review:"
+    guard title.count >= marker.count else {
+      return title
+    }
+    let markerEnd = title.index(title.startIndex, offsetBy: marker.count)
+    guard String(title[..<markerEnd]).caseInsensitiveCompare(marker) == .orderedSame else {
+      return title
+    }
+    return String(title[markerEnd...].drop(while: \.isWhitespace))
+  }
+}
+
 enum TaskBoardGitHubCardGlyph {
   static func resolve(for item: TaskBoardItem) -> TaskBoardCardGlyph? {
     guard item.hasGitHubSurface else {
@@ -38,6 +67,22 @@ enum TaskBoardGitHubCardGlyph {
 }
 
 extension TaskBoardItem {
+  var requiresViewerGitHubReview: Bool {
+    importedFromProvider == .gitHub
+      && externalRefs.contains {
+        $0.provider == .gitHub && $0.isActiveViewerReviewReference
+      }
+  }
+
+  var taskBoardGitHubURL: URL? {
+    for ref in externalRefs where ref.provider == .gitHub {
+      if let url = TaskBoardGitHubURL.resolve(ref.url) {
+        return url
+      }
+    }
+    return TaskBoardGitHubURL.resolve(workflow?.prUrl)
+  }
+
   var taskBoardBackgroundProviderSymbol: ProviderBrandSymbol? {
     taskBoardRepositoryOwner.flatMap(ProviderBrandSymbol.init(taskBoardOwner:))
   }
@@ -60,7 +105,7 @@ extension TaskBoardItem {
     externalRefs.filter { $0.provider == .gitHub }
   }
 
-  private var taskBoardRepositoryOwner: String? {
+  var taskBoardRepositoryOwner: String? {
     if let owner = TaskBoardGitHubRepositoryIdentity.owner(fromPathLike: projectId) {
       return owner
     }
@@ -71,7 +116,38 @@ extension TaskBoardItem {
   }
 }
 
+private enum TaskBoardGitHubURL {
+  static func resolve(_ rawValue: String?) -> URL? {
+    guard let rawValue else {
+      return nil
+    }
+    let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard
+      let url = URL(string: trimmed),
+      url.scheme?.lowercased() == "https",
+      isGitHubHost(url.host)
+    else {
+      return nil
+    }
+    return url
+  }
+
+  static func isGitHubHost(_ rawHost: String?) -> Bool {
+    guard let host = rawHost?.lowercased() else {
+      return false
+    }
+    return host == "github.com" || host == "www.github.com"
+  }
+}
+
 extension TaskBoardExternalRef {
+  fileprivate var isActiveViewerReviewReference: Bool {
+    guard let url = TaskBoardGitHubURL.resolve(url) else {
+      return false
+    }
+    return url.path.lowercased().contains("/pull/") && syncState?.status != .done
+  }
+
   fileprivate var repositoryOwner: String? {
     if let owner = TaskBoardGitHubRepositoryIdentity.owner(fromURLString: url) {
       return owner
@@ -100,11 +176,13 @@ extension TaskBoardExternalRef {
 
 private enum TaskBoardGitHubRepositoryIdentity {
   static func owner(fromURLString urlString: String?) -> String? {
+    guard let urlString else {
+      return nil
+    }
+    let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
     guard
-      let urlString,
-      let url = URL(string: urlString),
-      let host = url.host?.lowercased(),
-      host == "github.com" || host == "www.github.com"
+      let url = URL(string: trimmed),
+      TaskBoardGitHubURL.isGitHubHost(url.host)
     else {
       return nil
     }

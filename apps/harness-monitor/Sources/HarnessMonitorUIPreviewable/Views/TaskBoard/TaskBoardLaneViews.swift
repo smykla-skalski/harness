@@ -23,7 +23,8 @@ struct TaskBoardItemRow: View {
   private var cardID: TaskBoardCardID { .api(item.id) }
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
   var body: some View {
-    Button {
+    let titlePresentation = TaskBoardCardTitlePresentation(item: item)
+    return Button {
       onSelect(Self.currentEventModifiers)
       if Self.currentClickCount == 2 {
         onOpenItem(item)
@@ -32,14 +33,15 @@ struct TaskBoardItemRow: View {
       VStack(alignment: .leading, spacing: metrics.laneSpacing) {
         VStack(alignment: .leading, spacing: metrics.rowTextSpacing) {
           TaskBoardInlineCodeText(
-            item.title,
+            titlePresentation.title,
             font: titleTypography.font,
             codeFont: titleTypography.codeFont,
+            leadingText: titlePresentation.leadingText,
             foregroundStyle: HarnessMonitorTheme.ink,
             lineLimit: 2
           )
         }
-        TaskBoardCardFooter(repository: repositoryLabel) {
+        TaskBoardCardFooter(repository: repositoryLabel, updatedAt: item.updatedAt) {
           badgeContent
         }
       }
@@ -134,7 +136,7 @@ struct TaskBoardInboxItemRow: View {
             lineLimit: 2
           )
         }
-        TaskBoardCardFooter(repository: item.subtitle) {
+        TaskBoardCardFooter(repository: item.subtitle, updatedAt: item.task.updatedAt) {
           badgeContent
         }
       }

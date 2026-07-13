@@ -18,13 +18,15 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::store::{TaskBoardItemPatch, apply_patch};
 use crate::task_board::{
-    ExternalSyncConfig, Machine, PlanningState, TaskBoardItem, TaskBoardStatus, TaskBoardSyncStore,
-    TaskBoardWorkflowState, approve_plan, begin_planning, build_audit_summary_with_policy,
-    build_machine_summaries, build_project_summaries,
+    ExternalRef, ExternalSyncConfig, Machine, PlanningState, TaskBoardItem, TaskBoardStatus,
+    TaskBoardSyncStore, TaskBoardWorkflowState, approve_plan, begin_planning,
+    build_audit_summary_with_policy, build_machine_summaries, build_project_summaries,
     configured_sync_clients_without_review_requests, revoke_plan, submit_plan, sync_external_tasks,
 };
 use crate::workspace::utc_now;
 
+#[cfg(test)]
+mod external_ref_tests;
 mod reviews_sync;
 
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
@@ -90,7 +92,7 @@ pub(crate) async fn create_task_board_item_db(
     item.project_id.clone_from(&request.project_id);
     item.target_project_types
         .clone_from(&request.target_project_types);
-    item.external_refs.clone_from(&request.external_refs);
+    item.external_refs = replacement_external_refs(&[], &request.external_refs);
     item.planning.clone_from(&request.planning);
     if let Some(workflow) = &request.workflow {
         item.workflow.clone_from(workflow);
@@ -303,7 +305,9 @@ fn apply_update_request(item: &mut TaskBoardItem, request: &TaskBoardUpdateItemR
         &mut item.target_project_types,
         request.target_project_types.as_ref(),
     );
-    assign_if_some(&mut item.external_refs, request.external_refs.as_ref());
+    if let Some(replacements) = request.external_refs.as_deref() {
+        item.external_refs = replacement_external_refs(&item.external_refs, replacements);
+    }
     apply_optional_string(
         &mut item.project_id,
         request.project_id.as_ref(),
@@ -320,6 +324,27 @@ fn apply_update_request(item: &mut TaskBoardItem, request: &TaskBoardUpdateItemR
         request.clear_identity.clear_work_item_id,
     );
     apply_update_state(item, request);
+}
+
+fn replacement_external_refs(
+    current: &[ExternalRef],
+    replacements: &[ExternalRef],
+) -> Vec<ExternalRef> {
+    replacements
+        .iter()
+        .map(|replacement| ExternalRef {
+            provider: replacement.provider,
+            external_id: replacement.external_id.clone(),
+            url: replacement.url.clone(),
+            sync_state: current
+                .iter()
+                .find(|candidate| {
+                    candidate.provider == replacement.provider
+                        && candidate.external_id == replacement.external_id
+                })
+                .and_then(|candidate| candidate.sync_state.clone()),
+        })
+        .collect()
 }
 
 fn apply_update_state(item: &mut TaskBoardItem, request: &TaskBoardUpdateItemRequest) {

@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
@@ -7,6 +8,8 @@ struct TaskBoardCardContextMenuActions {
   let isActionInFlight: Bool
   let canOpen: (TaskBoardCardID) -> Bool
   let open: (TaskBoardCardID) -> Void
+  let githubURL: (TaskBoardCardID) -> URL?
+  let openGitHubURL: (URL) -> Void
   let canMove: ([TaskBoardCardID], TaskBoardInboxLane) -> Bool
   let move: ([TaskBoardCardID], TaskBoardInboxLane) -> Void
   let deletionTargets: ([TaskBoardCardID]) -> [TaskBoardDeletionTarget]
@@ -39,6 +42,13 @@ struct TaskBoardCardContextMenu: View {
         actions.open(scope.primaryID)
       }
       .disabled(!actions.canOpen(scope.primaryID))
+      if let githubURL = actions.githubURL(scope.primaryID) {
+        Button {
+          actions.openGitHubURL(githubURL)
+        } label: {
+          Label("Open on GitHub", systemImage: "arrow.up.right.square")
+        }
+      }
     }
     Button(scope.copyIDsLabel) {
       HarnessMonitorClipboard.copy(scope.clipboardText)

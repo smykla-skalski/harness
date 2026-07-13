@@ -86,11 +86,13 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
                     "isDraft": false,
                     "viewerCanMergeAsAdmin": true,
                     "reviewDecision": "REVIEW_REQUIRED",
+                    "viewerLatestReviewRequest": { "id": "RR_1" },
                     "headRefOid": "abc123",
                     "author": {
                         "login": "renovate[bot]",
                         "avatarUrl": "https://avatars.githubusercontent.com/in/2740?v=4"
                     },
+                    "viewerLatestReview": { "state": "APPROVED" },
                     "repository": {
                         "id": "R_1",
                         "nameWithOwner": "acme/api",
@@ -183,7 +185,8 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
         .into_iter()
         .next()
         .expect("fixture node");
-    let (item, _, _) = super::super::mapping::convert_node(node, None, None).expect("convert node");
+    let (mut item, _, _) = super::super::mapping::convert_node(node, None).expect("convert node");
+    super::super::mapping::apply_policy_review_metadata(std::slice::from_mut(&mut item));
 
     assert_eq!(item.checks.len(), 3);
     assert_eq!(item.checks[0].details_url.as_deref(), Some(check_run_url));
@@ -193,6 +196,12 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
     );
     assert_eq!(item.checks[2].details_url, None);
     assert!(item.viewer_can_merge_as_admin);
+    assert!(item.flags.viewer_is_requested_reviewer);
+    assert_eq!(item.viewer_has_active_approval, Some(true));
+    assert_eq!(
+        item.approval_requirement_satisfied_after_viewer_approval,
+        Some(true)
+    );
     assert_eq!(
         item.author_avatar_url.as_deref(),
         Some("https://avatars.githubusercontent.com/in/2740?v=4")
@@ -219,6 +228,10 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
     );
     assert_eq!(
         serialized["viewer_can_merge_as_admin"].as_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        serialized["viewer_has_active_approval"].as_bool(),
         Some(true)
     );
 }

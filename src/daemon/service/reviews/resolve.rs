@@ -62,13 +62,9 @@ pub(super) async fn fetch_pull_requests_by_reference(
             backport_patterns: request.normalized_backport_patterns(),
         };
         let client = ReviewsGitHubClient::new(&segment.token)?;
-        let viewer_login = client.fetch_viewer_login().await;
-        let fetch = client
-            .fetch_by_references(&segment_request, viewer_login.as_deref())
-            .await?;
-        if viewer_login.is_some() {
-            authoritative_viewer_keys.extend(fetch.items.iter().map(super::review_item_key));
-        }
+        let fetch = client.fetch_by_references(&segment_request).await?;
+        // GitHub returns both viewer-scoped values for the authenticated token.
+        authoritative_viewer_keys.extend(fetch.items.iter().map(super::review_item_key));
         items.extend(fetch.items);
         missing_references.extend(
             fetch

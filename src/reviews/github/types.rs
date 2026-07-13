@@ -71,8 +71,10 @@ pub(super) struct SearchNode {
     pub(super) author: Option<LoginNode>,
     #[serde(rename = "authorAssociation", default)]
     pub(super) author_association: Option<String>,
-    #[serde(rename = "reviewRequests", default)]
-    pub(super) review_requests: Option<ReviewRequestConnection>,
+    #[serde(rename = "viewerLatestReviewRequest", default)]
+    pub(super) viewer_latest_review_request: Option<ViewerLatestReviewRequestNode>,
+    #[serde(rename = "viewerLatestReview", default)]
+    pub(super) viewer_latest_review: Option<ViewerLatestReviewNode>,
     pub(super) repository: RepositoryNode,
     pub(super) commits: CommitConnection,
     #[serde(rename = "baseRef", default)]
@@ -217,45 +219,14 @@ pub(super) struct ReviewConnection {
 }
 
 #[derive(Debug, Deserialize)]
-pub(super) struct ReviewRequestConnection {
-    pub(super) nodes: Vec<ReviewRequestNode>,
+pub(super) struct ViewerLatestReviewRequestNode {
+    #[serde(rename = "id")]
+    pub(super) _id: String,
 }
 
 #[derive(Debug, Deserialize)]
-pub(super) struct ReviewRequestNode {
-    #[serde(rename = "requestedReviewer")]
-    pub(super) requested_reviewer: Option<RequestedReviewerNode>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub(super) enum RequestedReviewerNode {
-    User {
-        login: Option<String>,
-    },
-    Bot {
-        login: Option<String>,
-    },
-    Mannequin {
-        login: Option<String>,
-    },
-    Team {
-        #[serde(rename = "slug")]
-        _slug: Option<String>,
-        #[serde(rename = "name")]
-        _name: Option<String>,
-    },
-}
-
-impl RequestedReviewerNode {
-    pub(super) fn login(&self) -> Option<&str> {
-        match self {
-            Self::User { login } | Self::Bot { login } | Self::Mannequin { login } => {
-                login.as_deref()
-            }
-            Self::Team { .. } => None,
-        }
-    }
+pub(super) struct ViewerLatestReviewNode {
+    pub(super) state: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

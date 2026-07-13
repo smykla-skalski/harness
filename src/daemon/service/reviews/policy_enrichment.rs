@@ -58,7 +58,6 @@ async fn refresh_policy_targets(
     client: &ReviewsGitHubClient,
     indexed_targets: Vec<(usize, ReviewTarget)>,
 ) -> Vec<(usize, ReviewTarget)> {
-    let viewer_login = client.fetch_viewer_login().await;
     let targets = indexed_targets
         .iter()
         .map(|(_, target)| target.clone())
@@ -72,10 +71,7 @@ async fn refresh_policy_targets(
         backport_detection_enabled: false,
         backport_patterns: Vec::new(),
     };
-    let Ok(fetch) = client
-        .fetch_by_ids(&ids, &request, viewer_login.as_deref())
-        .await
-    else {
+    let Ok(fetch) = client.fetch_by_ids(&ids, &request).await else {
         return Vec::new();
     };
     let mut refreshed = fetch

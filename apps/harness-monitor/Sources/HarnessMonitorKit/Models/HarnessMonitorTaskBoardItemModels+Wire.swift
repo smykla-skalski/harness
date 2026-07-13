@@ -5,17 +5,33 @@ import Foundation
 // extensions adapt them to the app's renamed shape. TaskBoardItem.workflow stays
 // optional - the wire field is optional too (the daemon omits it when default,
 // `skip_serializing_if = "TaskBoardWorkflowState::is_default"`), so the
-// present-vs-absent distinction survives the mapping. The rich model drops the
-// imported_from_provider field and the external-ref sync_state the app does not use.
+// present-vs-absent distinction survives the mapping. Provider provenance and
+// external-ref sync state also survive because app behavior relies on both.
 
-extension TaskBoardExternalRef {
-  public init(wire: ExternalRefWire) {
-    let provider: TaskBoardExternalRefProvider =
-      switch wire.provider {
+extension TaskBoardExternalRefProvider {
+  public init(wire: ExternalRefProviderWire) {
+    self =
+      switch wire {
       case .gitHub: .gitHub
       case .todoist: .todoist
       }
-    self.init(provider: provider, externalId: wire.externalId, url: wire.url)
+  }
+}
+
+extension TaskBoardExternalRefSyncState {
+  public init(wire: ExternalRefSyncStateWire) {
+    self.init(status: wire.status)
+  }
+}
+
+extension TaskBoardExternalRef {
+  public init(wire: ExternalRefWire) {
+    self.init(
+      provider: TaskBoardExternalRefProvider(wire: wire.provider),
+      externalId: wire.externalId,
+      url: wire.url,
+      syncState: wire.syncState.map(TaskBoardExternalRefSyncState.init(wire:))
+    )
   }
 }
 
@@ -71,6 +87,7 @@ extension TaskBoardItem {
       targetProjectTypes: wire.targetProjectTypes,
       agentMode: wire.agentMode,
       externalRefs: wire.externalRefs.map(TaskBoardExternalRef.init(wire:)),
+      importedFromProvider: wire.importedFromProvider.map(TaskBoardExternalRefProvider.init(wire:)),
       planning: TaskBoardPlanningState(wire: wire.planning),
       workflow: wire.workflow.map(TaskBoardWorkflowState.init(wire:)),
       sessionId: wire.sessionId,

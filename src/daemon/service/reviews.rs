@@ -216,6 +216,7 @@ struct ReviewsFetchAccumulator {
     items_by_key: BTreeMap<String, ReviewItem>,
     repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>>,
     viewer_login: Option<String>,
+    /// Keys with authoritative `viewerLatestReviewRequest` values.
     authoritative_viewer_keys: HashSet<String>,
 }
 
@@ -252,21 +253,16 @@ async fn fetch_reviews_across_segments(
     let mut authoritative_viewer_keys = HashSet::new();
     for segment in segments {
         let client = ReviewsGitHubClient::new(&segment.token)?;
-        let segment_viewer_login = client.fetch_viewer_login().await;
         if viewer_login.is_none() {
-            viewer_login.clone_from(&segment_viewer_login);
+            viewer_login = client.fetch_viewer_login().await;
         }
-        let fetch = client
-            .fetch_updates(&segment.request, segment_viewer_login.as_deref())
-            .await?;
+        let fetch = client.fetch_updates(&segment.request).await?;
         for item in fetch.items {
             let key = review_item_key(&item);
-            if segment_viewer_login.is_some() {
-                authoritative_viewer_keys.insert(key.clone());
-                items_by_key.insert(key, item);
-            } else {
-                items_by_key.entry(key).or_insert(item);
-            }
+            // GitHub evaluates viewer-scoped review fields for the authenticated token,
+            // independently of the response-wide best-effort login lookup.
+            authoritative_viewer_keys.insert(key.clone());
+            items_by_key.insert(key, item);
         }
         merge_segment_repository_labels(&mut repository_labels, fetch.repository_labels);
     }

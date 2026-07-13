@@ -8,12 +8,13 @@ use serde_json::json;
 use super::*;
 
 #[test]
-fn github_inbox_search_queries_scope_assigned_issues_and_review_requests() {
+fn github_inbox_search_queries_use_github_all_state_issue_form() {
     let repository = parse_github_repository("owner/repo").expect("repository");
+    let assigned_query = assigned_issue_query(&repository, "octo-user");
 
     assert_eq!(
-        assigned_issue_query(&repository, "octo-user"),
-        "repo:owner/repo is:issue assignee:octo-user state:all"
+        assigned_query,
+        "repo:owner/repo is:issue assignee:octo-user state:open state:closed"
     );
     assert_eq!(
         review_request_query(&repository, "octo-user"),

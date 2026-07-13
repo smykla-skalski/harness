@@ -1,4 +1,5 @@
 use super::queries::{NODES_BY_IDS_QUERY, SEARCH_QUERY};
+use super::resolve::PULL_REQUEST_BY_REFERENCE_QUERY;
 use super::types::PageInfo;
 use super::types::RepositoryLabelNode;
 use super::*;
@@ -84,7 +85,7 @@ fn search_descriptor_marks_forced_refreshes_uncacheable() {
     let mut request = ReviewsQueryRequest {
         authors: Vec::new(),
         organizations: Vec::new(),
-        repositories: vec!["kong/kong-mesh".into()],
+        repositories: vec!["example/widgets".into()],
         exclude_repositories: Vec::new(),
         force_refresh: true,
         cache_max_age_seconds: 600,
@@ -175,30 +176,50 @@ fn append_repository_labels_preserves_color_into_response_struct() {
 }
 
 #[test]
-fn review_queries_request_author_association_and_review_requests() {
+fn review_queries_request_author_association_and_viewer_scoped_review_fields() {
     assert!(
         SEARCH_QUERY.contains("authorAssociation"),
         "search query must request authorAssociation for row halo semantics"
     );
     assert!(
-        SEARCH_QUERY.contains("reviewRequests(first: 100)"),
-        "search query must request reviewRequests for reviewer-specific needs-me state"
+        SEARCH_QUERY.contains("viewerLatestReview { state }"),
+        "search query must request the viewer-specific latest review"
     );
     assert!(
-        SEARCH_QUERY.contains("requestedReviewer"),
-        "search query must request requestedReviewer details"
+        SEARCH_QUERY.contains("viewerLatestReviewRequest"),
+        "search query must request the viewer-specific review request"
+    );
+    assert!(
+        !SEARCH_QUERY.contains("reviewRequests(first: 100)"),
+        "search query must avoid fetching every requested reviewer"
     );
     assert!(
         NODES_BY_IDS_QUERY.contains("authorAssociation"),
         "nodes query must request authorAssociation for refresh parity"
     );
     assert!(
-        NODES_BY_IDS_QUERY.contains("reviewRequests(first: 100)"),
-        "nodes query must request reviewRequests for refresh parity"
+        NODES_BY_IDS_QUERY.contains("viewerLatestReview { state }"),
+        "nodes query must request the viewer-specific latest review for refresh parity"
     );
     assert!(
-        NODES_BY_IDS_QUERY.contains("requestedReviewer"),
-        "nodes query must request requestedReviewer details for refresh parity"
+        NODES_BY_IDS_QUERY.contains("viewerLatestReviewRequest"),
+        "nodes query must request the viewer-specific review request for refresh parity"
+    );
+    assert!(
+        !NODES_BY_IDS_QUERY.contains("reviewRequests(first: 100)"),
+        "nodes query must avoid fetching every requested reviewer"
+    );
+    assert!(
+        PULL_REQUEST_BY_REFERENCE_QUERY.contains("viewerLatestReview { state }"),
+        "reference query must request the viewer-specific latest review"
+    );
+    assert!(
+        PULL_REQUEST_BY_REFERENCE_QUERY.contains("viewerLatestReviewRequest"),
+        "reference query must request the viewer-specific review request"
+    );
+    assert!(
+        !PULL_REQUEST_BY_REFERENCE_QUERY.contains("reviewRequests(first: 100)"),
+        "reference query must avoid fetching every requested reviewer"
     );
 }
 

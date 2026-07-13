@@ -1,4 +1,6 @@
+import Foundation
 import HarnessMonitorKit
+import Observation
 import SwiftUI
 
 struct TaskBoardLaneMetrics: Equatable {
@@ -167,12 +169,14 @@ struct TaskBoardCardTitleTypography {
 
 struct TaskBoardCardFooter<Badges: View>: View {
   let repository: String
+  let updatedAt: String
   let badges: Badges
   @Environment(\.fontScale)
   private var fontScale
 
-  init(repository: String, @ViewBuilder badges: () -> Badges) {
+  init(repository: String, updatedAt: String, @ViewBuilder badges: () -> Badges) {
     self.repository = repository
+    self.updatedAt = updatedAt
     self.badges = badges()
   }
 
@@ -180,12 +184,15 @@ struct TaskBoardCardFooter<Badges: View>: View {
   private var repositoryFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
   }
+  private var updatedAtFont: Font {
+    HarnessMonitorTextSize.scaledFont(.system(size: 8), by: fontScale)
+  }
 
   var body: some View {
     HStack(alignment: .bottom, spacing: metrics.laneBodyTopPadding) {
       Text(repository)
         .font(repositoryFont)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
         .lineLimit(1)
         .truncationMode(.middle)
         .multilineTextAlignment(.leading)
@@ -198,6 +205,66 @@ struct TaskBoardCardFooter<Badges: View>: View {
         badges
       }
       .layoutPriority(1)
+      TaskBoardCardUpdatedAtLabel(updatedAt: updatedAt, font: updatedAtFont)
+        .layoutPriority(3)
+    }
+  }
+}
+
+@MainActor
+@Observable
+final class TaskBoardRelativeTimeClock {
+  private(set) var referenceDate: Date
+
+  init(referenceDate: Date = .now) {
+    self.referenceDate = referenceDate
+  }
+
+  func refresh(at referenceDate: Date = .now) {
+    guard self.referenceDate != referenceDate else { return }
+    self.referenceDate = referenceDate
+  }
+
+  func run() async {
+    refresh()
+    while await Self.sleepUntilNextUpdate() {
+      refresh()
+    }
+  }
+
+  private static func sleepUntilNextUpdate() async -> Bool {
+    do {
+      try await Task.sleep(for: .seconds(60))
+      return !Task.isCancelled
+    } catch {
+      return false
+    }
+  }
+}
+
+private struct TaskBoardCardUpdatedAtLabel: View {
+  let updatedAt: String
+  let font: Font
+  @Environment(TaskBoardRelativeTimeClock.self)
+  private var relativeTimeClock
+
+  var body: some View {
+    let referenceDate = relativeTimeClock.referenceDate
+    let label = formatCompactRelativeUpdatedAt(
+      updatedAt,
+      reference: referenceDate
+    )
+    if !label.isEmpty {
+      let accessibleAge =
+        label == "just now"
+        ? label
+        : formatRelativeUpdatedAt(updatedAt, reference: referenceDate)
+      Text(label)
+        .font(font)
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk.opacity(0.8))
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityLabel("Updated \(accessibleAge)")
     }
   }
 }

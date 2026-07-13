@@ -47,7 +47,6 @@ impl ReviewsGitHubClient {
     pub(crate) async fn fetch_updates(
         &self,
         request: &ReviewsQueryRequest,
-        viewer_login: Option<&str>,
     ) -> Result<ReviewsFetch, CliError> {
         let mut deduped: BTreeMap<String, ReviewItem> = BTreeMap::new();
         let mut continuations: BTreeMap<String, NodeContinuation> = BTreeMap::new();
@@ -59,7 +58,6 @@ impl ReviewsGitHubClient {
                 request,
                 &scope,
                 backport_detector.as_ref(),
-                viewer_login,
                 &mut deduped,
                 &mut continuations,
                 &mut repository_labels,
@@ -74,7 +72,7 @@ impl ReviewsGitHubClient {
             }
         }
         let mut items = deduped.into_values().collect::<Vec<_>>();
-        apply_policy_review_metadata(&mut items, viewer_login);
+        apply_policy_review_metadata(&mut items);
         log_check_details_url_coverage(&items);
         Ok(ReviewsFetch {
             items,
@@ -91,7 +89,6 @@ impl ReviewsGitHubClient {
         request: &ReviewsQueryRequest,
         scope: &mapping::ScopeQuery,
         backport_detector: Option<&BackportDetector>,
-        viewer_login: Option<&str>,
         deduped: &mut BTreeMap<String, ReviewItem>,
         continuations: &mut BTreeMap<String, NodeContinuation>,
         repository_labels: &mut BTreeMap<String, Vec<ReviewRepositoryLabel>>,
@@ -102,7 +99,6 @@ impl ReviewsGitHubClient {
         let mut ingest_state = SearchIngestState {
             request,
             backport_detector,
-            viewer_login,
             deduped,
             continuations,
             repository_labels,
@@ -144,7 +140,6 @@ impl ReviewsGitHubClient {
         &self,
         ids: &[String],
         request: &ReviewsRefreshRequest,
-        viewer_login: Option<&str>,
     ) -> Result<ReviewsFetchByIds, CliError> {
         if ids.is_empty() {
             return Ok(ReviewsFetchByIds {
@@ -182,7 +177,6 @@ impl ReviewsGitHubClient {
                 response.nodes,
                 chunk,
                 backport_detector.as_ref(),
-                viewer_login,
                 &mut items,
                 &mut continuations,
                 &mut missing,
@@ -199,7 +193,7 @@ impl ReviewsGitHubClient {
                     .await?;
             }
         }
-        apply_policy_review_metadata(&mut items, viewer_login);
+        apply_policy_review_metadata(&mut items);
         log_check_details_url_coverage(&items);
         Ok(ReviewsFetchByIds {
             items,

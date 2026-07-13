@@ -101,7 +101,6 @@ pub(super) fn scopes(request: &ReviewsQueryRequest) -> Result<Vec<ScopeQuery>, C
 pub(super) fn convert_node(
     mut node: SearchNode,
     backport_detector: Option<&BackportDetector>,
-    viewer_login: Option<&str>,
 ) -> Result<(ReviewItem, Option<RepositoryLabelBundle>, NodeContinuation), CliError> {
     let created_at = parse_timestamp(node.created_at.as_str())?;
     let updated_at = parse_timestamp(node.updated_at.as_str())?;
@@ -149,7 +148,6 @@ pub(super) fn convert_node(
         },
         node,
         backport_detector,
-        viewer_login,
     );
     let continuation = NodeContinuation {
         pull_request_id,
@@ -200,7 +198,6 @@ fn build_review_item(
     ctx: NodeItemContext,
     node: SearchNode,
     backport_detector: Option<&BackportDetector>,
-    viewer_login: Option<&str>,
 ) -> ReviewItem {
     let (author_login, author_avatar_url) = node.author.map_or_else(
         || (String::new(), None),
@@ -211,19 +208,10 @@ fn build_review_item(
         .default_branch_ref
         .as_ref()
         .map(|branch| branch.name.clone());
-    let viewer_is_requested_reviewer = viewer_login.is_some_and(|viewer_login| {
-        node.review_requests
-            .as_ref()
-            .is_some_and(|review_requests| {
-                review_requests.nodes.iter().any(|review_request| {
-                    review_request
-                        .requested_reviewer
-                        .as_ref()
-                        .and_then(|reviewer| reviewer.login())
-                        .is_some_and(|login| login.eq_ignore_ascii_case(viewer_login))
-                })
-            })
+    let viewer_has_active_approval = node.viewer_latest_review.as_ref().is_some_and(|review| {
+        map_review_event_state(review.state.as_deref()) == ReviewReviewEventState::Approved
     });
+    let viewer_is_requested_reviewer = node.viewer_latest_review_request.is_some();
     let backport_detection =
         backport_detector.and_then(|detector| detector.detect(&ctx.repository_name, &node.title));
     let (title, backport_source) = backport_detection.map_or_else(
@@ -272,32 +260,27 @@ fn build_review_item(
             node.base_ref.as_ref(),
         )),
         has_conflict_markers: None,
-        viewer_has_active_approval: None,
+        viewer_has_active_approval: Some(viewer_has_active_approval),
         auto_merge_enabled: Some(node.auto_merge_request.is_some()),
         approval_requirement_satisfied_after_viewer_approval: None,
     }
 }
 
-pub(super) fn apply_policy_review_metadata(items: &mut [ReviewItem], viewer_login: Option<&str>) {
+pub(super) fn apply_policy_review_metadata(items: &mut [ReviewItem]) {
     for item in items {
         let latest_review_by_author = latest_review_by_author(&item.reviews);
         let active_approval_count = latest_review_by_author
             .values()
             .filter(|state| **state == ReviewReviewEventState::Approved)
             .count();
-        let viewer_has_active_approval = viewer_login.is_some_and(|login| {
-            latest_review_by_author
-                .get(&login.to_ascii_lowercase())
-                .is_some_and(|state| *state == ReviewReviewEventState::Approved)
-        });
-        item.viewer_has_active_approval = viewer_login.map(|_| viewer_has_active_approval);
+        let viewer_has_active_approval = item.viewer_has_active_approval.unwrap_or(false);
+        item.viewer_has_active_approval = Some(viewer_has_active_approval);
         item.approval_requirement_satisfied_after_viewer_approval =
-            approval_requirement_satisfied_after_viewer_approval(
+            Some(approval_requirement_satisfied_after_viewer_approval(
                 item.required_approving_review_count.unwrap_or(0),
                 active_approval_count,
-                viewer_login,
                 viewer_has_active_approval,
-            );
+            ));
     }
 }
 
@@ -318,16 +301,13 @@ fn latest_review_by_author(
 fn approval_requirement_satisfied_after_viewer_approval(
     required: u32,
     active_approval_count: usize,
-    viewer_login: Option<&str>,
     viewer_has_active_approval: bool,
-) -> Option<bool> {
+) -> bool {
     if required == 0 {
-        return Some(true);
+        return true;
     }
-    let viewer_login = viewer_login?;
-    let viewer_addition =
-        usize::from(!viewer_login.trim().is_empty() && !viewer_has_active_approval);
-    Some(active_approval_count.saturating_add(viewer_addition) >= required as usize)
+    let viewer_addition = usize::from(!viewer_has_active_approval);
+    active_approval_count.saturating_add(viewer_addition) >= required as usize
 }
 
 fn required_approving_review_count(base_ref: Option<&super::types::RefNode>) -> u32 {

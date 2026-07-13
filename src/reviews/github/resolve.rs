@@ -16,7 +16,7 @@ use super::pagination::resolve_continuation;
 use super::types::SearchNode;
 use super::{ReviewItem, ReviewRepositoryLabel, ReviewsPullRequestResolveRequest};
 
-const PULL_REQUEST_BY_REFERENCE_QUERY: &str = r"
+pub(super) const PULL_REQUEST_BY_REFERENCE_QUERY: &str = r"
 query ReviewPullRequestByReference($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
@@ -34,16 +34,8 @@ query ReviewPullRequestByReference($owner: String!, $name: String!, $number: Int
       baseRefName
       author { login avatarUrl }
       authorAssociation
-      reviewRequests(first: 100) {
-        nodes {
-          requestedReviewer {
-            ... on User { login }
-            ... on Bot { login }
-            ... on Mannequin { login }
-            ... on Team { slug name }
-          }
-        }
-      }
+      viewerLatestReview { state }
+      viewerLatestReviewRequest { id }
       repository {
         id
         nameWithOwner
@@ -126,7 +118,6 @@ impl ReviewsGitHubClient {
     pub(crate) async fn fetch_by_references(
         &self,
         request: &ReviewsPullRequestResolveRequest,
-        viewer_login: Option<&str>,
     ) -> Result<ReviewsFetchByIds, CliError> {
         let mut items: Vec<ReviewItem> = Vec::with_capacity(request.references.len());
         let mut continuations: Vec<NodeContinuation> = Vec::new();
@@ -151,7 +142,6 @@ impl ReviewsGitHubClient {
                 ],
                 &[key],
                 backport_detector.as_ref(),
-                viewer_login,
                 &mut items,
                 &mut continuations,
                 &mut missing,
@@ -168,7 +158,7 @@ impl ReviewsGitHubClient {
                     .await?;
             }
         }
-        apply_policy_review_metadata(&mut items, viewer_login);
+        apply_policy_review_metadata(&mut items);
         log_check_details_url_coverage(&items);
         Ok(ReviewsFetchByIds {
             items,

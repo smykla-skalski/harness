@@ -10,7 +10,6 @@ use super::{ReviewItem, ReviewRepositoryLabel, ReviewsQueryRequest};
 pub(super) struct SearchIngestState<'a> {
     pub request: &'a ReviewsQueryRequest,
     pub backport_detector: Option<&'a BackportDetector>,
-    pub viewer_login: Option<&'a str>,
     pub deduped: &'a mut BTreeMap<String, ReviewItem>,
     pub continuations: &'a mut BTreeMap<String, NodeContinuation>,
     pub repository_labels: &'a mut BTreeMap<String, Vec<ReviewRepositoryLabel>>,
@@ -21,8 +20,7 @@ pub(super) fn ingest_search_node(
     node: SearchNode,
     state: &mut SearchIngestState<'_>,
 ) -> Result<(), CliError> {
-    let (item, bundle, mut continuation) =
-        convert_node(node, state.backport_detector, state.viewer_login)?;
+    let (item, bundle, mut continuation) = convert_node(node, state.backport_detector)?;
     if state
         .request
         .normalized_exclude_repositories()
@@ -56,7 +54,6 @@ pub(super) fn ingest_nodes_chunk(
     nodes: Vec<Option<SearchNode>>,
     chunk: &[String],
     backport_detector: Option<&BackportDetector>,
-    viewer_login: Option<&str>,
     items: &mut Vec<ReviewItem>,
     continuations: &mut Vec<NodeContinuation>,
     missing: &mut Vec<String>,
@@ -70,7 +67,7 @@ pub(super) fn ingest_nodes_chunk(
             }
             continue;
         };
-        let (item, bundle, mut continuation) = convert_node(node, backport_detector, viewer_login)?;
+        let (item, bundle, mut continuation) = convert_node(node, backport_detector)?;
         if let Some(bundle) = bundle {
             merge_repository_label_bundle(repository_labels, bundle);
         }
