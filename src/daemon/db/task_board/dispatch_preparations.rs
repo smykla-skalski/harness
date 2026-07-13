@@ -236,8 +236,16 @@ impl AsyncDaemonDb {
             .to_string(),
         );
         item.workflow.attempts = item.workflow.attempts.saturating_add(1);
-        item.workflow
-            .push_policy_trace_id(format!("policy-trace-{}", Uuid::new_v4().simple()));
+        // Record the real recorded-decision id from evaluation so the workflow
+        // trace correlates with the decision feed. Fall back to a minted trace
+        // id only when the built-in fallback gate decided (no recorded id).
+        item.workflow.push_policy_trace_id(
+            preparation
+                .plan
+                .policy_decision_id
+                .clone()
+                .unwrap_or_else(|| format!("policy-trace-{}", Uuid::new_v4().simple())),
+        );
         item.status = TaskBoardStatus::InProgress;
         item.session_id = Some(preparation.session_id.clone());
         item.work_item_id = Some(preparation.work_item_id.clone());

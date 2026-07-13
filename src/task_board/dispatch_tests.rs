@@ -34,6 +34,37 @@ fn enforced_allow_graph() -> PolicyGraph {
 }
 
 #[test]
+fn graph_decision_threads_recorded_decision_id_into_the_plan() {
+    let graph = enforced_allow_graph();
+    let item = ready_item();
+    let plans = build_dispatch_plans_with_policy(
+        &[item],
+        Some(("canvas-1", &graph)),
+        None,
+        SpawnGateSwitches::default(),
+    );
+    let plan = plans.into_iter().next().expect("one plan");
+    let decision_id = plan
+        .policy_decision_id
+        .expect("graph decision records an id");
+    assert!(
+        decision_id.starts_with("policy-decision-"),
+        "threaded id must be the recorded decision id, got {decision_id}"
+    );
+}
+
+#[test]
+fn builtin_fallback_decision_has_no_recorded_id() {
+    let item = ready_item();
+    let plans = build_dispatch_plans_with_policy(&[item], None, None, SpawnGateSwitches::default());
+    let plan = plans.into_iter().next().expect("one plan");
+    assert!(
+        plan.policy_decision_id.is_none(),
+        "the built-in fallback gate records no decision, so no id is threaded"
+    );
+}
+
+#[test]
 fn kill_switch_denies_spawn_even_with_an_allowing_graph() {
     let graph = enforced_allow_graph();
     let decision = spawn_decision(
