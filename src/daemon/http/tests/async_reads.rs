@@ -62,6 +62,7 @@ async fn build_async_http_state(seed_timeline: bool) -> DaemonHttpState {
         remote_domain: None,
         remote_request_limits: None,
         remote_pairing_limiter: super::super::default_remote_pairing_limiter(),
+        remote_pairing_status_limiter: super::super::default_remote_pairing_status_limiter(),
         sender: sender.clone(),
         prepared_sender: broadcast::channel(8).0,
         manifest,

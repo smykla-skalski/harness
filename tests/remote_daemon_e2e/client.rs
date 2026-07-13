@@ -15,6 +15,9 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
 use tokio_tungstenite::{WebSocketStream, client_async};
 
+#[path = "client/pairing.rs"]
+mod pairing;
+
 const REMOTE_CLIENT_ID_HEADER: &str = "x-harness-remote-client-id";
 const REMOTE_REQUEST_BODY_LIMIT: usize = 4 * 1024 * 1024;
 
@@ -82,40 +85,6 @@ impl RemoteDaemonClient {
             tokio::time::sleep(Duration::from_millis(50).min(remaining)).await;
         }
         Err(format!("remote HTTPS listener not ready: {last_error}"))
-    }
-
-    pub async fn claim_pairing(
-        &self,
-        code: &str,
-        client_id: &str,
-        role: &str,
-    ) -> Result<RemoteCredentials, String> {
-        let response = self
-            .http
-            .post(self.url("/v1/remote/pair/claim"))
-            .json(&json!({
-                "code": code,
-                "domain": self.domain,
-                "client_id": client_id,
-                "display_name": format!("Remote E2E {role}"),
-                "platform": "e2e",
-            }))
-            .send()
-            .await
-            .map_err(|error| format!("claim remote pairing: {error}"))?;
-        let status = response.status();
-        let body = response
-            .json::<Value>()
-            .await
-            .map_err(|error| format!("decode pairing response: {error}"))?;
-        if !status.is_success() {
-            return Err(format!("pairing claim returned {status}: {body}"));
-        }
-        Ok(RemoteCredentials {
-            client_id: required_string(&body, "client_id")?.to_string(),
-            token: required_string(&body, "token")?.to_string(),
-            role: required_string(&body, "role")?.to_string(),
-        })
     }
 
     pub async fn expect_health(

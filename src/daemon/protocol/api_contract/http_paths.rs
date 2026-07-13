@@ -14,6 +14,7 @@ pub const RUNTIMES_PROBE: &str = "/v1/runtimes/probe";
 pub const WS: &str = "/v1/ws";
 pub const STREAM: &str = "/v1/stream";
 pub const REMOTE_PAIR_CLAIM: &str = "/v1/remote/pair/claim";
+pub const REMOTE_PAIR_STATUS: &str = "/v1/remote/pair/status";
 pub const SESSIONS: &str = "/v1/sessions";
 pub const SESSIONS_ADOPT: &str = "/v1/sessions/adopt";
 pub const SESSION_DETAIL: &str = "/v1/sessions/{session_id}";

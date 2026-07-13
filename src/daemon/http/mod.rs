@@ -27,7 +27,7 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
 use crate::daemon::protocol::StreamEvent;
-use crate::daemon::remote_pairing::RemotePairingRateLimiter;
+use crate::daemon::remote_pairing::{RemotePairingRateLimiter, RemotePairingStatusRateLimiter};
 use crate::daemon::service::{
     WakeDispatch, register_local_clone_progress_sender, run_local_clone_gc,
 };
@@ -201,6 +201,7 @@ pub struct DaemonHttpState {
     pub remote_domain: Option<String>,
     pub remote_request_limits: Option<RemoteRequestLimits>,
     pub remote_pairing_limiter: Arc<Mutex<RemotePairingRateLimiter>>,
+    pub remote_pairing_status_limiter: Arc<Mutex<RemotePairingStatusRateLimiter>>,
     pub sender: broadcast::Sender<StreamEvent>,
     /// Fan-out channel carrying events serialized once into a shared
     /// [`PreparedBroadcast`]. Connection relays and SSE streams subscribe here
@@ -227,6 +228,12 @@ pub struct DaemonHttpState {
 #[must_use]
 pub fn default_remote_pairing_limiter() -> Arc<Mutex<RemotePairingRateLimiter>> {
     Arc::new(Mutex::new(RemotePairingRateLimiter::new(5)))
+}
+
+/// Build the default public pairing-status limiter used by daemon HTTP state.
+#[must_use]
+pub fn default_remote_pairing_status_limiter() -> Arc<Mutex<RemotePairingStatusRateLimiter>> {
+    Arc::new(Mutex::new(RemotePairingStatusRateLimiter::new(30)))
 }
 
 impl DaemonHttpState {

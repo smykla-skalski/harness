@@ -1,6 +1,9 @@
+use std::time::{Duration, Instant};
+
 use super::{
     RemotePairingClaimRequest, RemotePairingCode, RemotePairingCodeHash, RemotePairingRateLimiter,
-    RemotePairingRecord, validate_pairing_domain,
+    RemotePairingRecord, RemotePairingStatusRateLimitDecision, RemotePairingStatusRateLimiter,
+    validate_pairing_domain,
 };
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::reviews::ReviewsQueryRequest;
@@ -230,5 +233,73 @@ fn remote_pairing_rate_limiter_bounds_tracked_attempts() {
     assert!(
         limiter.record_attempt("203.0.113.1", "code-1").is_ok(),
         "oldest entries are evicted when the limiter reaches its bound"
+    );
+}
+
+#[test]
+fn remote_pairing_status_rate_limiter_audits_only_first_denial() {
+    let now = Instant::now();
+    let mut limiter =
+        RemotePairingStatusRateLimiter::new_windowed_for_tests(2, 8, Duration::from_secs(60));
+
+    assert_eq!(
+        limiter.record_attempt_at_for_tests("203.0.113.10", "pairing-1", now),
+        RemotePairingStatusRateLimitDecision::Allowed
+    );
+    assert_eq!(
+        limiter.record_attempt_at_for_tests("203.0.113.10", "pairing-2", now),
+        RemotePairingStatusRateLimitDecision::Allowed
+    );
+    assert_eq!(
+        limiter.record_attempt_at_for_tests("203.0.113.10", "pairing-3", now),
+        RemotePairingStatusRateLimitDecision::Denied { audit: true }
+    );
+    assert_eq!(
+        limiter.record_attempt_at_for_tests("203.0.113.10", "pairing-4", now),
+        RemotePairingStatusRateLimitDecision::Denied { audit: false }
+    );
+}
+
+#[test]
+fn remote_pairing_status_rate_limiter_enforces_pairing_id_budget() {
+    let now = Instant::now();
+    let mut limiter =
+        RemotePairingStatusRateLimiter::new_windowed_for_tests(2, 8, Duration::from_secs(60));
+
+    assert_eq!(
+        limiter.record_attempt_at_for_tests("203.0.113.10", "pairing-1", now),
+        RemotePairingStatusRateLimitDecision::Allowed
+    );
+    assert_eq!(
+        limiter.record_attempt_at_for_tests("203.0.113.11", "pairing-1", now),
+        RemotePairingStatusRateLimitDecision::Allowed
+    );
+    assert_eq!(
+        limiter.record_attempt_at_for_tests("203.0.113.12", "pairing-1", now),
+        RemotePairingStatusRateLimitDecision::Denied { audit: true }
+    );
+    assert_eq!(
+        limiter.record_attempt_at_for_tests("203.0.113.13", "pairing-1", now),
+        RemotePairingStatusRateLimitDecision::Denied { audit: false }
+    );
+}
+
+#[test]
+fn remote_pairing_status_rate_limiter_resets_expired_windows() {
+    let now = Instant::now();
+    let window = Duration::from_secs(60);
+    let mut limiter = RemotePairingStatusRateLimiter::new_windowed_for_tests(1, 8, window);
+
+    assert_eq!(
+        limiter.record_attempt_at_for_tests("203.0.113.10", "pairing-1", now),
+        RemotePairingStatusRateLimitDecision::Allowed
+    );
+    assert_eq!(
+        limiter.record_attempt_at_for_tests("203.0.113.10", "pairing-2", now),
+        RemotePairingStatusRateLimitDecision::Denied { audit: true }
+    );
+    assert_eq!(
+        limiter.record_attempt_at_for_tests("203.0.113.10", "pairing-2", now + window,),
+        RemotePairingStatusRateLimitDecision::Allowed
     );
 }

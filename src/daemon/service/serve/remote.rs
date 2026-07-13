@@ -105,6 +105,7 @@ pub async fn serve_remote_https(
         remote_domain: config.remote_domain.clone(),
         remote_request_limits: Some(remote_request_limits),
         remote_pairing_limiter: http::default_remote_pairing_limiter(),
+        remote_pairing_status_limiter: http::default_remote_pairing_status_limiter(),
         sender,
         prepared_sender,
         manifest,

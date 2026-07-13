@@ -16,6 +16,8 @@ mod reviews;
 pub(crate) use reviews::normalize_remote_reviews_query;
 mod rate_limit;
 pub use rate_limit::RemotePairingRateLimiter;
+mod status_rate_limit;
+pub use status_rate_limit::{RemotePairingStatusRateLimitDecision, RemotePairingStatusRateLimiter};
 
 #[cfg(test)]
 #[path = "remote_pairing_tests.rs"]
@@ -248,6 +250,26 @@ pub struct RemoteStoredPairing {
     pub claimed_client_id: Option<String>,
     pub claim_remote_addr: Option<String>,
     pub reviews_query: Option<ReviewsQueryRequest>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RemotePairingStatus {
+    Pending,
+    Claimed,
+    Expired,
+    Unavailable,
+}
+
+impl RemotePairingStatus {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Claimed => "claimed",
+            Self::Expired => "expired",
+            Self::Unavailable => "unavailable",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
