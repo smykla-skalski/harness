@@ -397,6 +397,7 @@ async fn status_from_state(
     Ok(TaskBoardOrchestratorStatusResponse {
         enabled: state.enabled,
         running: state.running,
+        step_mode: settings.step_mode,
         current_tick: state.current_tick,
         last_run: state.last_run,
         workflow_execution_counts,
@@ -412,6 +413,9 @@ fn apply_settings_update(
     settings: &mut TaskBoardOrchestratorSettings,
     update: &TaskBoardOrchestratorSettingsUpdateRequest,
 ) {
+    if let Some(step_mode) = update.step_mode {
+        settings.step_mode = step_mode;
+    }
     if let Some(workflows) = &update.enabled_workflows {
         settings.enabled_workflows.clone_from(workflows);
     }
