@@ -69,6 +69,56 @@ fn external_ref_replacement_rejects_stale_explicit_sync_state() {
 }
 
 #[test]
+fn external_ref_replacement_rejects_sync_state_for_new_reference() {
+    let mut item = task_board_item();
+    let request = TaskBoardUpdateItemRequest {
+        external_refs: Some(vec![external_ref(
+            "review-42",
+            "https://github.com/example/project/pull/42",
+            Some(complete_sync_state("Spoofed client baseline")),
+        )]),
+        ..TaskBoardUpdateItemRequest::default()
+    };
+
+    apply_update_request(&mut item, &request);
+
+    assert_eq!(item.external_refs[0].sync_state, None);
+}
+
+#[tokio::test]
+async fn external_ref_creation_rejects_client_sync_state() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("open database");
+    let request = TaskBoardCreateItemRequest {
+        title: "Task".into(),
+        body: "Body".into(),
+        priority: Default::default(),
+        agent_mode: Default::default(),
+        tags: Vec::new(),
+        project_id: None,
+        target_project_types: Vec::new(),
+        external_refs: vec![external_ref(
+            "review-42",
+            "https://github.com/example/project/pull/42",
+            Some(complete_sync_state("Spoofed client baseline")),
+        )],
+        planning: PlanningState::default(),
+        workflow: None,
+        session_id: None,
+        work_item_id: None,
+        id: Some("task-ref-create".into()),
+    };
+
+    let item = create_task_board_item_db(&db, &request)
+        .await
+        .expect("create item");
+
+    assert_eq!(item.external_refs[0].sync_state, None);
+}
+
+#[test]
 fn empty_external_ref_replacement_clears_every_reference() {
     let mut item = task_board_item();
     item.external_refs = vec![external_ref(

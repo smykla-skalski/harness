@@ -92,7 +92,7 @@ pub(crate) async fn create_task_board_item_db(
     item.project_id.clone_from(&request.project_id);
     item.target_project_types
         .clone_from(&request.target_project_types);
-    item.external_refs.clone_from(&request.external_refs);
+    item.external_refs = replacement_external_refs(&[], &request.external_refs);
     item.planning.clone_from(&request.planning);
     if let Some(workflow) = &request.workflow {
         item.workflow.clone_from(workflow);
@@ -332,15 +332,17 @@ fn replacement_external_refs(
 ) -> Vec<ExternalRef> {
     replacements
         .iter()
-        .map(|replacement| {
-            let mut replacement = replacement.clone();
-            if let Some(candidate) = current.iter().find(|candidate| {
-                candidate.provider == replacement.provider
-                    && candidate.external_id == replacement.external_id
-            }) {
-                replacement.sync_state.clone_from(&candidate.sync_state);
-            }
-            replacement
+        .map(|replacement| ExternalRef {
+            provider: replacement.provider,
+            external_id: replacement.external_id.clone(),
+            url: replacement.url.clone(),
+            sync_state: current
+                .iter()
+                .find(|candidate| {
+                    candidate.provider == replacement.provider
+                        && candidate.external_id == replacement.external_id
+                })
+                .and_then(|candidate| candidate.sync_state.clone()),
         })
         .collect()
 }
