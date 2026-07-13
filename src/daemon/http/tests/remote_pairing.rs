@@ -191,7 +191,7 @@ async fn remote_pair_claim_rejects_replay_and_audits_without_leaking_code() {
 }
 
 #[tokio::test]
-async fn remote_pair_claim_rate_limits_repeated_bad_code_attempts() {
+async fn remote_pair_claim_rate_limits_one_ip_across_rotating_bad_codes() {
     let mut state = remote_pairing_state();
     state.remote_pairing_limiter = Arc::new(Mutex::new(RemotePairingRateLimiter::new_for_tests(2)));
     let db = state.db.get().expect("db slot").clone();
@@ -199,16 +199,15 @@ async fn remote_pair_claim_rate_limits_repeated_bad_code_attempts() {
     let client = reqwest::Client::new();
     let url = format!("{base_url}{}", http_paths::REMOTE_PAIR_CLAIM);
 
-    for expected_status in [
-        StatusCode::BAD_REQUEST,
-        StatusCode::BAD_REQUEST,
-        StatusCode::TOO_MANY_REQUESTS,
+    for (code, expected_status) in [
+        ("not-a-real-code-1", StatusCode::BAD_REQUEST),
+        ("not-a-real-code-2", StatusCode::BAD_REQUEST),
+        ("not-a-real-code-3", StatusCode::TOO_MANY_REQUESTS),
     ] {
         let response = client
             .post(&url)
-            .header("x-forwarded-for", "203.0.113.91")
             .json(&serde_json::json!({
-                "code": "not-a-real-code",
+                "code": code,
                 "domain": "daemon.example.com",
                 "client_id": "ios-rate-limit",
                 "display_name": "iPhone",

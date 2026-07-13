@@ -1,6 +1,6 @@
 use super::{
-    RemotePairingAttemptKey, RemotePairingClaimRequest, RemotePairingCode, RemotePairingCodeHash,
-    RemotePairingRateLimiter, RemotePairingRecord, validate_pairing_domain,
+    RemotePairingClaimRequest, RemotePairingCode, RemotePairingCodeHash, RemotePairingRateLimiter,
+    RemotePairingRecord, validate_pairing_domain,
 };
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::reviews::ReviewsQueryRequest;
@@ -175,48 +175,60 @@ fn remote_pairing_claim_request_rejects_blank_audit_event_id() {
 }
 
 #[test]
-fn remote_pairing_rate_limits_ip_and_code_attempts() {
+fn remote_pairing_rate_limiter_enforces_independent_ip_budget() {
     let mut limiter = RemotePairingRateLimiter::new_for_tests(2);
 
     assert!(limiter.record_attempt("203.0.113.10", "code-1").is_ok());
-    assert!(limiter.record_attempt("203.0.113.10", "code-1").is_ok());
-    assert!(limiter.record_attempt("203.0.113.10", "code-1").is_err());
-    assert!(limiter.record_attempt("203.0.113.11", "code-1").is_ok());
+    assert!(limiter.record_attempt("203.0.113.10", "code-2").is_ok());
+    assert!(limiter.record_attempt("203.0.113.10", "code-3").is_err());
+    assert!(limiter.record_attempt("203.0.113.11", "code-3").is_ok());
 }
 
 #[test]
-fn remote_pairing_rate_limiter_uses_tuple_keys_without_delimiter_collisions() {
+fn remote_pairing_rate_limiter_enforces_independent_code_budget() {
+    let mut limiter = RemotePairingRateLimiter::new_for_tests(2);
+
+    assert!(limiter.record_attempt("203.0.113.10", "code-1").is_ok());
+    assert!(limiter.record_attempt("203.0.113.11", "code-1").is_ok());
+    assert!(limiter.record_attempt("203.0.113.12", "code-1").is_err());
+    assert!(limiter.record_attempt("203.0.113.12", "code-2").is_ok());
+}
+
+#[test]
+fn remote_pairing_rate_limiter_treats_delimiters_as_key_content() {
     let mut limiter = RemotePairingRateLimiter::new_for_tests(1);
 
     assert!(limiter.record_attempt("addr\0part", "code").is_ok());
     assert!(
         limiter.record_attempt("addr", "part\0code").is_ok(),
-        "distinct address/code tuples must not collide"
+        "distinct addresses and code fingerprints must remain independent"
     );
     assert!(limiter.record_attempt("addr\0part", "code").is_err());
 }
 
 #[test]
-fn remote_pairing_attempt_key_debug_redacts_code_fingerprint() {
-    let key = RemotePairingAttemptKey::new("203.0.113.10", "raw-secret-code");
-    let debug = format!("{key:?}");
+fn remote_pairing_rate_limiter_debug_redacts_code_fingerprints() {
+    let mut limiter = RemotePairingRateLimiter::new_for_tests(2);
+    limiter
+        .record_attempt("203.0.113.10", "raw-secret-code")
+        .expect("record attempt");
+    let debug = format!("{limiter:?}");
 
-    assert!(debug.contains("203.0.113.10"));
     assert!(!debug.contains("raw-secret-code"));
-    assert!(debug.contains("<redacted>"));
+    assert!(debug.contains("tracked_code_fingerprints"));
 }
 
 #[test]
 fn remote_pairing_rate_limiter_bounds_tracked_attempts() {
     let mut limiter = RemotePairingRateLimiter::new_bounded_for_tests(1, 2);
 
-    assert!(limiter.record_attempt("203.0.113.1", "code").is_ok());
-    assert!(limiter.record_attempt("203.0.113.2", "code").is_ok());
-    assert!(limiter.record_attempt("203.0.113.3", "code").is_ok());
+    assert!(limiter.record_attempt("203.0.113.1", "code-1").is_ok());
+    assert!(limiter.record_attempt("203.0.113.2", "code-2").is_ok());
+    assert!(limiter.record_attempt("203.0.113.3", "code-3").is_ok());
 
-    assert_eq!(limiter.tracked_attempts_for_tests(), 2);
+    assert_eq!(limiter.tracked_attempts_for_tests(), (2, 2));
     assert!(
-        limiter.record_attempt("203.0.113.1", "code").is_ok(),
+        limiter.record_attempt("203.0.113.1", "code-1").is_ok(),
         "oldest entries are evicted when the limiter reaches its bound"
     );
 }
