@@ -127,7 +127,8 @@ struct HarnessMonitorStoreRemoteConnectionTests {
       profileCoordinator: RemoteDaemonProfileCoordinator(
         repository: repository,
         tokenStore: tokenStore,
-        claimant: EchoRemoteDaemonPairingClaimant()
+        claimant: EchoRemoteDaemonPairingClaimant(),
+        revoker: SuccessfulRemoteDaemonRevoker()
       )
     )
     let daemon = RecordingDaemonController()
@@ -188,6 +189,24 @@ struct HarnessMonitorStoreRemoteConnectionTests {
     #expect(await daemon.recordedWarmUpCallCount() == 1)
   }
 
+  @Test("Revocation failure keeps the remote profile and does not reconnect locally")
+  func revocationFailureKeepsRemoteConnection() async throws {
+    let fixture = try RemoteStoreFixture(revoker: FailingRemoteDaemonRevoker())
+    let daemon = RecordingDaemonController()
+    let store = HarnessMonitorStore(
+      daemonController: daemon,
+      remoteDaemonServices: fixture.services
+    )
+
+    store.forgetRemoteDaemon()
+    try await waitUntil { store.remoteDaemonActionState.errorMessage != nil }
+
+    #expect(store.usesRemoteDaemon)
+    #expect(store.remoteDaemonProfile == fixture.profile)
+    #expect(try fixture.tokenStore.loadToken(profileID: fixture.profile.id) != nil)
+    #expect(await daemon.recordedWarmUpCallCount() == 0)
+  }
+
   private func waitUntil(
     _ condition: @MainActor () -> Bool
   ) async throws {
@@ -206,7 +225,9 @@ private struct RemoteStoreFixture {
   let tokenStore: RecordingRemoteDaemonTokenStore
   let services: RemoteDaemonServices
 
-  init() throws {
+  init(
+    revoker: any RemoteDaemonClientRevoking = SuccessfulRemoteDaemonRevoker()
+  ) throws {
     let profile = try remoteProfileFixture()
     let repository = InMemoryRemoteDaemonProfileStore(
       state: RemoteDaemonProfileState(profiles: [profile], activeProfileID: profile.id)
@@ -224,7 +245,8 @@ private struct RemoteStoreFixture {
       profileCoordinator: RemoteDaemonProfileCoordinator(
         repository: repository,
         tokenStore: tokenStore,
-        claimant: NeverRemoteDaemonPairingClaimant()
+        claimant: NeverRemoteDaemonPairingClaimant(),
+        revoker: revoker
       )
     )
   }

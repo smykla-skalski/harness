@@ -20,7 +20,7 @@ fn every_non_exempt_http_route_has_a_ws_mapping() {
 #[test]
 fn explicit_non_rpc_exemptions_are_documented_and_stable() {
     let exemptions = explicit_exemptions();
-    assert_eq!(exemptions.len(), 8, "unexpected exemption count");
+    assert_eq!(exemptions.len(), 9, "unexpected exemption count");
     let exempt_paths: BTreeSet<_> = exemptions.iter().map(|route| route.path).collect();
     assert_eq!(
         exempt_paths,
@@ -28,6 +28,7 @@ fn explicit_non_rpc_exemptions_are_documented_and_stable() {
             http_paths::DAEMON_TELEMETRY,
             http_paths::REMOTE_PAIR_CLAIM,
             http_paths::REMOTE_PAIR_STATUS,
+            http_paths::REMOTE_CLIENT_SELF_REVOKE,
             http_paths::WS,
             http_paths::STREAM,
             http_paths::SESSION_STREAM,
@@ -41,6 +42,22 @@ fn explicit_non_rpc_exemptions_are_documented_and_stable() {
             .exemption_reason()
             .is_some_and(|reason| !reason.is_empty())
     }));
+}
+
+#[test]
+fn remote_client_self_revoke_is_a_read_scoped_swift_exemption() {
+    let route = HTTP_API_CONTRACT
+        .iter()
+        .find(|route| route.path == http_paths::REMOTE_CLIENT_SELF_REVOKE)
+        .expect("remote client self-revoke route should be registered");
+
+    assert_eq!(route.method, HttpRouteMethod::Post);
+    assert!(route.swift_client_exposed);
+    assert!(route.parity.exemption_reason().is_some());
+    assert_eq!(
+        remote_http_scopes(route),
+        Some(&[RemoteAccessScope::Read][..])
+    );
 }
 
 #[test]

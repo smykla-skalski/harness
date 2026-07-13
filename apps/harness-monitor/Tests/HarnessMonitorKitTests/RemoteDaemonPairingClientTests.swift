@@ -102,7 +102,8 @@ struct RemoteDaemonPairingClientTests {
     let coordinator = RemoteDaemonProfileCoordinator(
       repository: repository,
       tokenStore: tokenStore,
-      claimant: StubRemoteDaemonPairingClaimant(result: .success(try claimFixture()))
+      claimant: StubRemoteDaemonPairingClaimant(result: .success(try claimFixture())),
+      revoker: SuccessfulRemoteDaemonRevoker()
     )
 
     let forgotten = try await coordinator.forgetActiveProfile()

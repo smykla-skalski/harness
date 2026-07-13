@@ -17,4 +17,12 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         },
         swift_client_exposed: false,
     },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::REMOTE_CLIENT_SELF_REVOKE,
+        parity: HttpRouteParity::Exempt {
+            reason: "credential lifecycle action bound to the authenticated caller",
+        },
+        swift_client_exposed: true,
+    },
 ];

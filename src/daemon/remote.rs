@@ -65,7 +65,9 @@ pub fn remote_http_scopes(route: &HttpApiRouteContract) -> Option<&'static [Remo
         http_paths::READY | http_paths::WS | http_paths::STREAM | http_paths::SESSION_STREAM => {
             Some(READ_SCOPES)
         }
-        http_paths::REMOTE_PAIR_CLAIM | http_paths::REMOTE_PAIR_STATUS => Some(READ_SCOPES),
+        http_paths::REMOTE_PAIR_CLAIM
+        | http_paths::REMOTE_PAIR_STATUS
+        | http_paths::REMOTE_CLIENT_SELF_REVOKE => Some(READ_SCOPES),
         http_paths::DAEMON_TELEMETRY | http_paths::MANAGED_AGENT_ATTACH => Some(WRITE_SCOPES),
         _ => route.parity.ws_method().and_then(remote_ws_scopes),
     }

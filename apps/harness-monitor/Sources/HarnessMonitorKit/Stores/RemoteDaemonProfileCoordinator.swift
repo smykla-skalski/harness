@@ -4,6 +4,7 @@ public actor RemoteDaemonProfileCoordinator {
   private let repository: any RemoteDaemonProfilePersisting
   private let tokenStore: any RemoteDaemonTokenPersisting
   private let claimant: any RemoteDaemonPairingClaiming
+  private let revoker: any RemoteDaemonClientRevoking
   private let profileIDGenerator: @Sendable () -> UUID
   private let clientIDGenerator: @Sendable (UUID) -> String
 
@@ -11,6 +12,7 @@ public actor RemoteDaemonProfileCoordinator {
     repository: any RemoteDaemonProfilePersisting,
     tokenStore: any RemoteDaemonTokenPersisting,
     claimant: any RemoteDaemonPairingClaiming = HTTPRemoteDaemonPairingClient(),
+    revoker: any RemoteDaemonClientRevoking = HTTPRemoteDaemonRevocationClient(),
     profileIDGenerator: @escaping @Sendable () -> UUID = UUID.init,
     clientIDGenerator: @escaping @Sendable (UUID) -> String = {
       "macos-\($0.uuidString.lowercased())"
@@ -19,6 +21,7 @@ public actor RemoteDaemonProfileCoordinator {
     self.repository = repository
     self.tokenStore = tokenStore
     self.claimant = claimant
+    self.revoker = revoker
     self.profileIDGenerator = profileIDGenerator
     self.clientIDGenerator = clientIDGenerator
   }
@@ -59,7 +62,7 @@ public actor RemoteDaemonProfileCoordinator {
   }
 
   @discardableResult
-  public func forgetActiveProfile() throws -> RemoteDaemonProfile? {
+  public func forgetActiveProfile() async throws -> RemoteDaemonProfile? {
     let originalState = try repository.load()
     guard let activeProfileID = originalState.activeProfileID else {
       return nil
@@ -67,7 +70,13 @@ public actor RemoteDaemonProfileCoordinator {
     guard let profile = originalState.profiles.first(where: { $0.id == activeProfileID }) else {
       throw RemoteDaemonProfileError.profileNotFound
     }
-    let token = try? tokenStore.loadToken(profileID: activeProfileID)
+    let token = try tokenForForget(profile)
+    if profile.status == .active {
+      guard let token else {
+        throw RemoteDaemonProfileError.missingToken
+      }
+      try await revoker.revoke(profile: profile, token: token)
+    }
     var forgottenState = originalState
     forgottenState.profiles.removeAll { $0.id == activeProfileID }
     forgottenState.activeProfileID = nil
@@ -84,6 +93,18 @@ public actor RemoteDaemonProfileCoordinator {
       throw error
     }
     return profile
+  }
+
+  private func tokenForForget(_ profile: RemoteDaemonProfile) throws -> String? {
+    if profile.status == .revoked {
+      return try? tokenStore.loadToken(profileID: profile.id)
+    }
+    guard let token = try tokenStore.loadToken(profileID: profile.id),
+      !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else {
+      throw RemoteDaemonProfileError.missingToken
+    }
+    return token
   }
 
   private func activate(_ profile: RemoteDaemonProfile, token: String) throws {

@@ -105,7 +105,10 @@ struct SettingsRemoteDaemonSection: View {
       .disabled(actionState.isInFlight)
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("This removes the bearer token from Keychain and returns to the local daemon mode")
+      Text(
+        "This revokes this client on the server. "
+          + "It removes its bearer token from Keychain and returns to the local daemon mode."
+      )
     }
   }
 
