@@ -1,8 +1,6 @@
 use serde::Serialize;
 
 use crate::daemon::protocol::TaskBoardListItemsResponse;
-use crate::daemon::remote::RemoteRole;
-use crate::daemon::remote_identity::RemoteStoredClient;
 use crate::task_board::{AgentMode, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 
 use super::remote_redaction::redact_known_secrets;
@@ -48,11 +46,6 @@ pub(crate) struct RemoteViewerTaskBoardItem {
     work_item_id: Option<String>,
     created_at: String,
     updated_at: String,
-}
-
-#[must_use]
-pub(crate) fn is_remote_viewer(client: Option<&RemoteStoredClient>) -> bool {
-    client.is_some_and(|client| client.role == RemoteRole::Viewer)
 }
 
 #[must_use]

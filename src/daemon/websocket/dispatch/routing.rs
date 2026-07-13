@@ -20,7 +20,7 @@ use super::super::parity::{
     dispatch_voice_finish_session, dispatch_voice_start_session,
 };
 use super::super::queries::{
-    dispatch_read_query, handle_session_subscribe, handle_session_unsubscribe,
+    dispatch_read_query_with_projection, handle_session_subscribe, handle_session_unsubscribe,
     handle_stream_subscribe, handle_stream_unsubscribe,
 };
 use super::super::reviews::dispatch_reviews_method;
@@ -34,6 +34,7 @@ use super::mutation_handlers::{
     dispatch_task_respond_review, dispatch_task_submit_for_review, dispatch_task_submit_review,
     dispatch_task_update,
 };
+use super::remote_viewer_projection_required;
 
 #[expect(
     clippy::cognitive_complexity,
@@ -90,7 +91,7 @@ async fn dispatch_core_method(
     if let Some(response) = dispatch_misc_method(request, state, connection).await {
         return Some(response);
     }
-    dispatch_read_method(request, state).await
+    dispatch_read_method(request, state, connection).await
 }
 
 async fn dispatch_misc_method(
@@ -116,7 +117,11 @@ async fn dispatch_misc_method(
     }
 }
 
-async fn dispatch_read_method(request: &WsRequest, state: &DaemonHttpState) -> Option<WsResponse> {
+async fn dispatch_read_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> Option<WsResponse> {
     if matches!(
         request.method.as_str(),
         ws_methods::HEALTH
@@ -139,7 +144,14 @@ async fn dispatch_read_method(request: &WsRequest, state: &DaemonHttpState) -> O
             | ws_methods::MANAGED_AGENTS_ACP_TRANSCRIPT
             | ws_methods::OPENROUTER_LIST_MODELS
     ) {
-        Some(dispatch_read_query(request, state).await)
+        Some(
+            dispatch_read_query_with_projection(
+                request,
+                state,
+                remote_viewer_projection_required(connection),
+            )
+            .await,
+        )
     } else {
         None
     }

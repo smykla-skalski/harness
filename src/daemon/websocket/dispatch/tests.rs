@@ -192,8 +192,7 @@ async fn remote_ws_dispatch_scopes_authenticated_actor_identity() {
 }
 
 #[test]
-#[should_panic(expected = "connection lock")]
-fn remote_ws_dispatch_panics_on_poisoned_connection_lock() {
+fn remote_ws_dispatch_fails_closed_on_poisoned_connection_lock() {
     let connection = Arc::new(Mutex::new(ConnectionState::new()));
     let poisoned_connection = Arc::clone(&connection);
     let _ = thread::spawn(move || {
@@ -204,7 +203,8 @@ fn remote_ws_dispatch_panics_on_poisoned_connection_lock() {
     })
     .join();
 
-    let _ = remote_client_for_connection(&connection);
+    assert!(remote_client_for_connection(&connection).is_none());
+    assert!(remote_viewer_projection_required(&connection));
 }
 
 fn ws_request(id: &str, method: &str) -> WsRequest {

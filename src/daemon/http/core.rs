@@ -15,12 +15,14 @@ use crate::daemon::protocol::{
     DaemonTelemetryRequest, HostBridgeReconfigureRequest, ReadinessResponse,
     RuntimeSessionResolutionResponse, SetLogLevelRequest, http_paths,
 };
+use crate::daemon::remote_diagnostics::project_diagnostics_report;
+use crate::daemon::remote_viewer::is_remote_viewer;
 use crate::daemon::service;
 use crate::daemon::websocket::{build_config_payload, ws_upgrade_handler};
 use crate::errors::{CliError, CliErrorKind};
 
 use super::audit::get_audit_events;
-use super::auth::require_auth;
+use super::auth::{authenticated_remote_client, require_auth};
 use super::response::{extract_request_id, timed_json};
 use super::stream::stream_global;
 use super::{DaemonHttpState, require_async_db};
@@ -127,11 +129,15 @@ pub(super) async fn get_diagnostics(
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let remote_client = match authenticated_remote_client(&headers, &state) {
+        Ok(client) => client,
+        Err(response) => return *response,
+    };
+    let viewer = is_remote_viewer(remote_client.as_ref());
     let result = match require_async_db(&state, "diagnostics") {
-        Ok(async_db) => service::diagnostics_report_async(Some(async_db)).await,
+        Ok(async_db) => service::diagnostics_report_async(Some(async_db))
+            .await
+            .map(|report| project_diagnostics_report(report, viewer)),
         Err(error) => Err(error),
     };
     timed_json("GET", http_paths::DIAGNOSTICS, &request_id, start, result)

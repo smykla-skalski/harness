@@ -6,8 +6,10 @@ use std::time::Instant;
 use crate::daemon::protocol::{
     HarnessMonitorAuditDateRange, HarnessMonitorAuditEventsRequest, http_paths,
 };
+use crate::daemon::remote_diagnostics::project_audit_events;
+use crate::daemon::remote_viewer::is_remote_viewer;
 
-use super::auth::require_auth;
+use super::auth::authenticated_remote_client;
 use super::response::{extract_request_id, timed_json};
 use super::{DaemonHttpState, require_async_db};
 
@@ -50,12 +52,17 @@ pub(super) async fn get_audit_events(
 ) -> Response {
     let start = Instant::now();
     let request_id = extract_request_id(&headers);
-    if let Err(response) = require_auth(&headers, &state) {
-        return *response;
-    }
+    let remote_client = match authenticated_remote_client(&headers, &state) {
+        Ok(client) => client,
+        Err(response) => return *response,
+    };
+    let viewer = is_remote_viewer(remote_client.as_ref());
     let request = query.into_request();
     let result = match require_async_db(&state, "audit events") {
-        Ok(db) => db.load_audit_events(&request).await,
+        Ok(db) => db
+            .load_audit_events(&request)
+            .await
+            .map(|response| project_audit_events(response, viewer)),
         Err(error) => Err(error),
     };
     timed_json("GET", http_paths::AUDIT_EVENTS, &request_id, start, result)

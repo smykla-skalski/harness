@@ -13,6 +13,7 @@ use crate::daemon::remote_auth::{
 };
 use crate::daemon::remote_identity::RemoteStoredClient;
 use crate::daemon::remote_request_audit::RemoteAuthorizationAudit;
+use crate::daemon::remote_viewer::is_remote_viewer;
 use crate::errors::CliError;
 use crate::telemetry::{
     TelemetryBaggage, apply_parent_context_from_text_map, current_trace_id, with_active_baggage,
@@ -317,11 +318,20 @@ fn remote_client_for_connection(
 fn remote_connection_identity(
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> (Option<RemoteStoredClient>, Option<String>) {
-    let connection = connection.lock().expect("connection lock");
+    let Ok(connection) = connection.lock() else {
+        return (None, None);
+    };
     (
         connection.remote_client().cloned(),
         connection.remote_addr().map(ToOwned::to_owned),
     )
+}
+
+pub(crate) fn remote_viewer_projection_required(connection: &Arc<Mutex<ConnectionState>>) -> bool {
+    let Ok(connection) = connection.lock() else {
+        return true;
+    };
+    is_remote_viewer(connection.remote_client())
 }
 
 fn record_remote_ws_denial(
