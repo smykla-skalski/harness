@@ -5,6 +5,65 @@ use super::{AsyncDaemonDb, CliError, db_error};
 use crate::daemon::remote_identity::{RemoteAuditEvent, redact_remote_error_detail};
 
 impl AsyncDaemonDb {
+    /// Revoke a remote client and persist its lifecycle audit atomically.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failure or an audit/client identity mismatch.
+    pub(crate) async fn revoke_remote_client_with_audit(
+        &self,
+        client_id: &str,
+        revoked_at: &str,
+        audit: &RemoteAuditEvent,
+    ) -> Result<bool, CliError> {
+        if audit.client_id.as_deref() != Some(client_id) {
+            return Err(db_error("remote revoke audit client id mismatch"));
+        }
+        let mut transaction = self.pool().begin().await.map_err(|error| {
+            db_error(format!("begin remote client revoke transaction: {error}"))
+        })?;
+        let changed = query(
+            "UPDATE remote_clients
+             SET revoked_at = ?2
+             WHERE client_id = ?1 AND revoked_at IS NULL",
+        )
+        .bind(client_id)
+        .bind(revoked_at)
+        .execute(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("revoke remote client {client_id}: {error}")))?
+        .rows_affected();
+        if changed != 1 {
+            transaction.rollback().await.map_err(|error| {
+                db_error(format!("rollback unchanged remote client revoke: {error}"))
+            })?;
+            return Ok(false);
+        }
+        query(INSERT_REMOTE_AUDIT_EVENT_SQL)
+            .bind(&audit.event_id)
+            .bind(&audit.recorded_at)
+            .bind(audit.request_id.as_deref())
+            .bind(audit.client_id.as_deref())
+            .bind(&audit.route_or_method)
+            .bind(audit.scope.as_str())
+            .bind(audit.scope_decision.as_str())
+            .bind(audit.outcome.as_str())
+            .bind(audit.remote_addr.as_deref())
+            .bind(audit.error_detail())
+            .execute(transaction.as_mut())
+            .await
+            .map_err(|error| {
+                db_error(format!(
+                    "insert remote revoke audit event {}: {error}",
+                    audit.event_id
+                ))
+            })?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit remote client revoke: {error}")))?;
+        Ok(true)
+    }
+
     /// Persist a remote authorization audit without blocking a Tokio worker.
     ///
     /// # Errors

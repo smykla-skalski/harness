@@ -45,6 +45,7 @@ mod remote_actor;
 mod remote_authz;
 mod remote_authz_audit;
 mod remote_authz_audit_contention;
+mod remote_clients;
 mod remote_limits;
 mod remote_limits_support;
 mod remote_pairing;

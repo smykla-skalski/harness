@@ -45,6 +45,7 @@ mod improver;
 mod managed_agents;
 mod openrouter_models;
 mod recovery_snapshot_cache;
+mod remote_clients;
 mod remote_limits;
 mod remote_pairing;
 mod response;
@@ -402,6 +403,7 @@ fn daemon_http_router(state: DaemonHttpState) -> Router<()> {
         .merge(agents::agent_routes())
         .merge(managed_agents::managed_agent_routes())
         .merge(openrouter_models::openrouter_model_routes())
+        .merge(remote_clients::remote_client_routes())
         .merge(remote_pairing::remote_pairing_routes())
         .merge(signals::signal_routes())
         .merge(voice::voice_routes())
