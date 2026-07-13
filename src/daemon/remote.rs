@@ -252,6 +252,7 @@ const READ_WS_METHODS: &[&str] = &[
     ws_methods::REVIEWS_REPOSITORY_CATALOG,
     ws_methods::REVIEWS_CAPABILITIES,
     ws_methods::REVIEWS_QUERY,
+    ws_methods::REVIEWS_PULL_REQUEST_RESOLVE,
     ws_methods::REVIEWS_ACTION_PREVIEW,
     ws_methods::REVIEWS_POLICY_PREVIEW,
     ws_methods::REVIEWS_POLICY_STATUS,
