@@ -3,7 +3,7 @@ pub(super) fn assert_codex_worker_started(
     session_id: &str,
     board_item_id: &str,
     work_item_id: &str,
-) {
+) -> String {
     let runs = state
         .codex_controller
         .list_runs(session_id)
@@ -24,4 +24,5 @@ pub(super) fn assert_codex_worker_started(
             .as_deref()
             .is_some_and(|name| { name.starts_with("Task Board: ") })
     );
+    run.run_id.clone()
 }

@@ -86,18 +86,19 @@ async fn run_task_board_http_item_scope_flow(
         applied["item"]["workflow"]["status"].as_str(),
         Some("running")
     );
-    assert_codex_worker_started(state, &session_id, "board-http-dispatch", &work_item_id);
+    let managed_run_id =
+        assert_codex_worker_started(state, &session_id, "board-http-dispatch", &work_item_id);
     assert_board_item_unlinked(state, "board-http-dispatch-other").await;
     let other_dispatch =
         dispatch_http_item(client, base_url, "board-http-dispatch-other", project_dir).await;
-    let other_applied = first_applied(&other_dispatch);
-    let other_session_id = required_string(other_applied, "session_id");
-    let other_work_item_id = required_string(other_applied, "work_item_id");
-    join_leader(state, &session_id, project_dir).await;
-    join_leader(state, &other_session_id, project_dir).await;
-
-    mark_http_task_done(client, base_url, &session_id, &work_item_id).await;
-    mark_http_task_done(client, base_url, &other_session_id, &other_work_item_id).await;
+    let _ = first_applied(&other_dispatch);
+    post_json(
+        client,
+        base_url,
+        &format!("/v1/managed-agents/{managed_run_id}/stop"),
+        json!({}),
+    )
+    .await;
     let evaluation = post_json(
         client,
         base_url,
@@ -110,16 +111,16 @@ async fn run_task_board_http_item_scope_flow(
     )
     .await;
     assert_eq!(evaluation["updated"].as_u64(), Some(1));
-    assert_eq!(evaluation["completed"].as_u64(), Some(1));
+    assert_eq!(evaluation["blocked"].as_u64(), Some(1));
     assert_eq!(
         evaluation["records"][0]["item"]["workflow"]["status"].as_str(),
-        Some("completed")
+        Some("failed")
     );
     assert_eq!(
         evaluation["records"][0]["board_item_id"].as_str(),
         Some("board-http-dispatch")
     );
-    assert_board_item_status(state, "board-http-dispatch", TaskBoardStatus::Done).await;
+    assert_board_item_status(state, "board-http-dispatch", TaskBoardStatus::Failed).await;
     assert_board_item_status(
         state,
         "board-http-dispatch-other",
@@ -176,7 +177,7 @@ async fn run_task_board_http_run_once_flow(
             .is_some_and(|trace_ids| !trace_ids.is_empty())
     );
     let applied = &run_once["last_run"]["dispatch"]["applied"][0];
-    assert_codex_worker_started(
+    let _managed_run_id = assert_codex_worker_started(
         state,
         &required_string(applied, "session_id"),
         "board-http-run-once",

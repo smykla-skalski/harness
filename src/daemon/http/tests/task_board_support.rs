@@ -5,9 +5,6 @@ use serde_json::{Value, json};
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 
-use crate::daemon::protocol::SessionJoinRequest;
-use crate::daemon::service::join_session_direct_async;
-use crate::session::types::SessionRole;
 use crate::task_board::planning::{approve_plan, submit_plan};
 use crate::task_board::{AgentMode, TaskBoardItem, TaskBoardStatus};
 
@@ -29,48 +26,6 @@ pub(super) async fn dispatch_http_item(
         }),
     )
     .await
-}
-
-pub(super) async fn mark_http_task_done(
-    client: &reqwest::Client,
-    base_url: &str,
-    session_id: &str,
-    work_item_id: &str,
-) {
-    post_json(
-        client,
-        base_url,
-        &format!("/v1/sessions/{session_id}/tasks/{work_item_id}/status"),
-        json!({
-            "actor": "spoofed-client",
-            "status": "done",
-            "note": "completed by test"
-        }),
-    )
-    .await;
-}
-
-pub(super) async fn join_leader(
-    state: &crate::daemon::http::DaemonHttpState,
-    session_id: &str,
-    project_dir: &Path,
-) {
-    let async_db = state.async_db.get().expect("async db");
-    join_session_direct_async(
-        session_id,
-        &SessionJoinRequest {
-            runtime: "claude".into(),
-            role: SessionRole::Leader,
-            fallback_role: None,
-            capabilities: Vec::new(),
-            name: Some("leader".into()),
-            project_dir: project_dir.to_string_lossy().into_owned(),
-            persona: None,
-        },
-        async_db.as_ref(),
-    )
-    .await
-    .expect("join leader");
 }
 
 pub(super) async fn serve_http(
