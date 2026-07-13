@@ -65,7 +65,8 @@ pub use store::{
 };
 pub use store_canvas::{
     apply_create, apply_delete, apply_duplicate, apply_import, apply_rename, apply_set_active,
-    apply_set_global_enforcement,
+    apply_set_global_enforcement, apply_set_spawn_kill_switch,
+    apply_set_spawn_requires_live_policy,
 };
 pub(crate) use workspace::POLICY_CANVAS_WORKSPACE_VERSION;
 pub use workspace::{

@@ -13,7 +13,8 @@ use super::machines::Machine;
 use super::machines::{Machine, MachineRegistry};
 use super::planning::{PlanApprovalBlockReason, PlanApprovalGate, approval_gate};
 use super::policy::{
-    BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyGate, PolicyInput, PolicySubject,
+    BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyGate, PolicyInput, PolicyReasonCode,
+    PolicySubject,
 };
 #[cfg(test)]
 use super::policy_graph::resolve_gate_policy;
@@ -221,12 +222,13 @@ pub(crate) fn build_dispatch_plans_with_policy(
     items: &[TaskBoardItem],
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
     evaluated_at: Option<&str>,
+    switches: SpawnGateSwitches,
 ) -> Vec<DispatchPlan> {
     items
         .iter()
         .map(|item| {
             let decision =
-                dispatch_policy_from_graph(item, policy, evaluated_at.map(str::to_owned));
+                dispatch_policy_from_graph(item, policy, evaluated_at.map(str::to_owned), switches);
             build_dispatch_plan_with_decision(item, decision)
         })
         .collect()
@@ -316,10 +318,11 @@ pub(crate) fn machine_mismatch_plan_with_policy(
     machine: &Machine,
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
     evaluated_at: Option<&str>,
+    switches: SpawnGateSwitches,
 ) -> DispatchPlan {
     let mut plan = build_dispatch_plan_with_decision(
         item,
-        dispatch_policy_from_graph(item, policy, evaluated_at.map(str::to_owned)),
+        dispatch_policy_from_graph(item, policy, evaluated_at.map(str::to_owned), switches),
     );
     plan.readiness = blocked(DispatchBlockReason::MachineMismatch {
         required: item.target_project_types.clone(),
@@ -359,7 +362,10 @@ fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> DispatchReadiness
 /// on it. `evaluated_at` is the caller-supplied evaluation timestamp: dispatch
 /// passes `now`; simulation/replay pass scenario-supplied or recorded values so
 /// those paths stay deterministic.
-pub(crate) fn spawn_policy_input(item: &TaskBoardItem, evaluated_at: Option<String>) -> PolicyInput {
+pub(crate) fn spawn_policy_input(
+    item: &TaskBoardItem,
+    evaluated_at: Option<String>,
+) -> PolicyInput {
     let mut input = PolicyInput::new(PolicyAction::SpawnAgent);
     input.evaluated_at = evaluated_at;
     input.subject = PolicySubject {
@@ -398,12 +404,33 @@ fn dispatch_policy(item: &TaskBoardItem, policy_root: &Path) -> PolicyDecision {
     BuiltInPolicyGate::default().evaluate(&input)
 }
 
+/// Persisted spawn switches that gate the dispatch decision fail-closed,
+/// independently of the authored graph. Resolved from the policy workspace by
+/// the caller.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SpawnGateSwitches {
+    /// Deny spawning when no active live enforced graph exists instead of
+    /// falling back to the built-in allow gate.
+    pub requires_live_policy: bool,
+    /// Emergency kill switch: deny all spawning before graph evaluation.
+    pub kill_switch: bool,
+}
+
 fn dispatch_policy_from_graph(
     item: &TaskBoardItem,
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
     evaluated_at: Option<String>,
+    switches: SpawnGateSwitches,
 ) -> PolicyDecision {
     let input = spawn_policy_input(item, evaluated_at);
+    if switches.kill_switch {
+        tracing::warn!(
+            target: "harness::task_board",
+            board_item_id = %item.id,
+            "spawn kill switch engaged; denying spawn dispatch",
+        );
+        return record_spawn_switch_deny(input, PolicyReasonCode::SpawnKillSwitchEngaged);
+    }
     if let Some((canvas_id, document)) = policy
         && document.mode != PolicyPipelineMode::Draft
     {
@@ -421,7 +448,32 @@ fn dispatch_policy_from_graph(
         );
         return decision;
     }
+    if switches.requires_live_policy {
+        tracing::info!(
+            target: "harness::task_board",
+            board_item_id = %item.id,
+            "spawn requires a live enforced policy but none is active; denying",
+        );
+        return record_spawn_switch_deny(input, PolicyReasonCode::SpawnPolicyRequired);
+    }
     BuiltInPolicyGate::default().evaluate(&input)
+}
+
+/// Build and record a fail-closed spawn `Deny`. The decision is recorded to the
+/// feed with no canvas/revision because no live graph produced it.
+fn record_spawn_switch_deny(input: PolicyInput, reason_code: PolicyReasonCode) -> PolicyDecision {
+    let decision = PolicyDecision::Deny {
+        reason_code,
+        policy_version: super::policy::POLICY_VERSION.to_string(),
+    };
+    record_policy_decision(RecordedPolicyDecision::new(
+        0,
+        input,
+        decision.clone(),
+        Vec::new(),
+        "task_board_dispatch_switch",
+    ));
+    decision
 }
 
 fn session_intent(item: &TaskBoardItem) -> SessionIntent {

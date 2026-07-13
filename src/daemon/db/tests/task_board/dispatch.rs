@@ -25,9 +25,14 @@ async fn task_board_dispatch_intents_survive_until_worker_outcome() {
         .task_board_item("task-dispatch-ok")
         .await
         .expect("load item");
-    let lifecycle = build_dispatch_plans_with_policy(&[item], None, None)
-        .remove(0)
-        .applied_lifecycle();
+    let lifecycle = build_dispatch_plans_with_policy(
+        &[item],
+        None,
+        None,
+        crate::task_board::SpawnGateSwitches::default(),
+    )
+    .remove(0)
+    .applied_lifecycle();
     let applied = db
         .link_and_enqueue_task_board_dispatch("task-dispatch-ok", "session-1", "work-1", &lifecycle)
         .await
@@ -66,9 +71,14 @@ async fn task_board_dispatch_intents_survive_until_worker_outcome() {
         .task_board_item("task-dispatch-failed")
         .await
         .expect("load failed item");
-    let failed_lifecycle = build_dispatch_plans_with_policy(&[failed], None, None)
-        .remove(0)
-        .applied_lifecycle();
+    let failed_lifecycle = build_dispatch_plans_with_policy(
+        &[failed],
+        None,
+        None,
+        crate::task_board::SpawnGateSwitches::default(),
+    )
+    .remove(0)
+    .applied_lifecycle();
     db.link_and_enqueue_task_board_dispatch(
         "task-dispatch-failed",
         "session-2",
@@ -120,7 +130,13 @@ async fn task_board_dispatch_reservation_precedes_links_and_is_reclaimable() {
         .task_board_item("task-dispatch-reserved")
         .await
         .expect("load item");
-    let plan = build_dispatch_plans_with_policy(&[item], None, None).remove(0);
+    let plan = build_dispatch_plans_with_policy(
+        &[item],
+        None,
+        None,
+        crate::task_board::SpawnGateSwitches::default(),
+    )
+    .remove(0);
     let first = db
         .reserve_task_board_dispatch(&plan, "control-plane", Some("/tmp/project"), false)
         .await
@@ -229,7 +245,13 @@ async fn existing_session_without_work_item_is_reservable() {
         .task_board_item("task-existing-session")
         .await
         .expect("load item");
-    let plan = build_dispatch_plans_with_policy(&[item], None, None).remove(0);
+    let plan = build_dispatch_plans_with_policy(
+        &[item],
+        None,
+        None,
+        crate::task_board::SpawnGateSwitches::default(),
+    )
+    .remove(0);
 
     let reserved = db
         .reserve_task_board_dispatch(&plan, "control-plane", None, false)
@@ -323,9 +345,14 @@ async fn active_dispatch_intent_requires_matching_linkage() {
     .await
     .expect("create item");
     let item = db.task_board_item(item_id).await.expect("load item");
-    let lifecycle = build_dispatch_plans_with_policy(&[item], None, None)
-        .remove(0)
-        .applied_lifecycle();
+    let lifecycle = build_dispatch_plans_with_policy(
+        &[item],
+        None,
+        None,
+        crate::task_board::SpawnGateSwitches::default(),
+    )
+    .remove(0)
+    .applied_lifecycle();
     let original = db
         .link_and_enqueue_task_board_dispatch(item_id, "session-1", "work-1", &lifecycle)
         .await

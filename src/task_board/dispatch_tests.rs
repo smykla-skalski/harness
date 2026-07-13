@@ -20,6 +20,75 @@ fn ready_item() -> TaskBoardItem {
     approve_plan(&item, "lead", "2026-05-14T01:00:00Z").apply_to(&item)
 }
 
+fn spawn_decision(
+    policy: Option<(&str, &PolicyGraph)>,
+    switches: SpawnGateSwitches,
+) -> PolicyDecision {
+    let item = ready_item();
+    let plans = build_dispatch_plans_with_policy(&[item], policy, None, switches);
+    plans.into_iter().next().expect("one plan").policy
+}
+
+fn enforced_allow_graph() -> PolicyGraph {
+    PolicyGraph::seeded_v2().with_mode(PolicyGraphMode::Enforced)
+}
+
+#[test]
+fn kill_switch_denies_spawn_even_with_an_allowing_graph() {
+    let graph = enforced_allow_graph();
+    let decision = spawn_decision(
+        Some(("canvas-1", &graph)),
+        SpawnGateSwitches {
+            kill_switch: true,
+            requires_live_policy: false,
+        },
+    );
+    assert!(matches!(
+        decision,
+        PolicyDecision::Deny {
+            reason_code: PolicyReasonCode::SpawnKillSwitchEngaged,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn fail_closed_denies_spawn_when_no_live_policy_exists() {
+    let decision = spawn_decision(
+        None,
+        SpawnGateSwitches {
+            kill_switch: false,
+            requires_live_policy: true,
+        },
+    );
+    assert!(matches!(
+        decision,
+        PolicyDecision::Deny {
+            reason_code: PolicyReasonCode::SpawnPolicyRequired,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn fail_open_allows_spawn_when_no_live_policy_and_switch_off() {
+    let decision = spawn_decision(None, SpawnGateSwitches::default());
+    assert!(decision.is_allow());
+}
+
+#[test]
+fn fail_closed_defers_to_live_graph_when_present() {
+    let graph = enforced_allow_graph();
+    let decision = spawn_decision(
+        Some(("canvas-1", &graph)),
+        SpawnGateSwitches {
+            kill_switch: false,
+            requires_live_policy: true,
+        },
+    );
+    assert!(decision.is_allow());
+}
+
 #[test]
 fn spawn_policy_input_fills_subject_enrichment_and_evaluated_at() {
     let mut item = ready_item();

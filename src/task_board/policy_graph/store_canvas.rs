@@ -99,6 +99,18 @@ pub fn apply_set_global_enforcement(ws: &mut PolicyCanvasWorkspace, enabled: boo
     ws.global_policy_enforcement_enabled
 }
 
+/// Set the fail-closed "spawn requires a live enforced policy" switch.
+pub fn apply_set_spawn_requires_live_policy(ws: &mut PolicyCanvasWorkspace, enabled: bool) -> bool {
+    ws.spawn_requires_live_policy = enabled;
+    ws.spawn_requires_live_policy
+}
+
+/// Set the emergency spawn kill switch.
+pub fn apply_set_spawn_kill_switch(ws: &mut PolicyCanvasWorkspace, enabled: bool) -> bool {
+    ws.spawn_kill_switch = enabled;
+    ws.spawn_kill_switch
+}
+
 /// Delete a canvas while preserving at least one remaining canvas.
 ///
 /// # Errors

@@ -28,7 +28,13 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
                 .task_board_item("dispatch-crash-recovery")
                 .await
                 .expect("load task board item");
-            let plan = build_dispatch_plans_with_policy(&[item], None, None).remove(0);
+            let plan = build_dispatch_plans_with_policy(
+                &[item],
+                None,
+                None,
+                crate::task_board::SpawnGateSwitches::default(),
+            )
+            .remove(0);
             let reserved = db
                 .reserve_task_board_dispatch(
                     &plan,

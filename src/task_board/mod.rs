@@ -23,12 +23,14 @@ pub use dispatch::{
     DispatchFailureKind, DispatchPlan, DispatchReadiness, EvaluatorIntent, FollowUpPhase,
     ReviewerIntent, SessionIntent, TaskCreationIntent, WorkerIntent,
 };
+pub(crate) use dispatch::{
+    SpawnGateSwitches, build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy,
+};
 #[cfg(test)]
 pub use dispatch::{
     build_dispatch_plan, build_dispatch_plans, build_dispatch_plans_with_policy_root,
     filter_for_local_machine, machine_mismatch_plan_with_policy_root,
 };
-pub(crate) use dispatch::{build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy};
 pub use evaluation::{
     EvaluationSignalFailure, TaskBoardEvaluationDecision, TaskBoardEvaluationOutcome,
     TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, evaluate_task_board_item,

@@ -160,6 +160,8 @@ pub(crate) fn workspace_row(workspace: &PolicyCanvasWorkspace) -> Result<Workspa
         global_policy_enforcement_enabled: workspace.global_policy_enforcement_enabled,
         scenarios_json: to_json(&workspace.scenarios)?,
         scenarios_seeded: workspace.scenarios_seeded,
+        spawn_requires_live_policy: workspace.spawn_requires_live_policy,
+        spawn_kill_switch: workspace.spawn_kill_switch,
     })
 }
 
@@ -179,6 +181,8 @@ pub(crate) fn assemble_workspace(
             .review_screenshot_extraction_canvas_deleted,
         scenarios: from_json(&row.scenarios_json, "policy scenarios")?,
         scenarios_seeded: row.scenarios_seeded,
+        spawn_requires_live_policy: row.spawn_requires_live_policy,
+        spawn_kill_switch: row.spawn_kill_switch,
     })
 }
 

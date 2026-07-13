@@ -1,7 +1,9 @@
 use crate::daemon::agent_tui::AgentTuiStartRequest;
-use crate::daemon::http::{DaemonHttpState, run_codex_agent_blocking, run_terminal_agent_blocking};
+use crate::daemon::http::{
+    DaemonHttpState, require_async_db, run_codex_agent_blocking, run_terminal_agent_blocking,
+};
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, ManagedAgentSnapshot};
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{CONTROL_PLANE_ACTOR_ID, SessionRole};
 use crate::task_board::{
     AgentMode, DispatchAppliedTask, TaskBoardItem, WorkerPromptContext, render_worker_prompt,
@@ -14,6 +16,11 @@ pub(crate) async fn start_worker_for_applied_task(
     applied: &DispatchAppliedTask,
     dispatch_intent_id: &str,
 ) -> Result<ManagedAgentSnapshot, CliError> {
+    // Fail-closed recheck at the shared worker-start seam: this guards the
+    // claim+start path used by both the route executor and the recovery loop, so
+    // an already-prepared intent cannot start while the kill switch is engaged.
+    // Transport-agnostic because it runs before stdio/bridge selection.
+    ensure_spawn_kill_switch_clear(state, &applied.board_item_id).await?;
     match applied.item.agent_mode {
         AgentMode::Interactive => {
             start_interactive_worker(state, applied, dispatch_intent_id).await
@@ -22,6 +29,29 @@ pub(crate) async fn start_worker_for_applied_task(
             start_codex_worker(state, applied, dispatch_intent_id).await
         }
     }
+}
+
+/// Block the worker start when the persisted spawn kill switch is engaged. The
+/// caller (route executor or recovery loop) surfaces the error so the intent
+/// stays unstarted instead of launching a worker the operator has halted.
+async fn ensure_spawn_kill_switch_clear(
+    state: &DaemonHttpState,
+    board_item_id: &str,
+) -> Result<(), CliError> {
+    let db = require_async_db(state, "task-board worker start kill-switch check")?;
+    let workspace = db.load_policy_workspace().await?;
+    if workspace.is_some_and(|workspace| workspace.spawn_kill_switch) {
+        tracing::warn!(
+            target: "harness::task_board",
+            board_item_id = %board_item_id,
+            "spawn kill switch engaged at worker start; refusing to launch worker",
+        );
+        return Err(CliErrorKind::invalid_transition(
+            "spawn kill switch engaged; worker start refused".to_string(),
+        )
+        .into());
+    }
+    Ok(())
 }
 
 async fn start_codex_worker(

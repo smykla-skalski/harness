@@ -19,6 +19,8 @@ pub(crate) struct WorkspaceRow {
     pub global_policy_enforcement_enabled: bool,
     pub scenarios_json: String,
     pub scenarios_seeded: bool,
+    pub spawn_requires_live_policy: bool,
+    pub spawn_kill_switch: bool,
 }
 
 /// One row of `policy_canvases`. Document structure lives in the child tables;
