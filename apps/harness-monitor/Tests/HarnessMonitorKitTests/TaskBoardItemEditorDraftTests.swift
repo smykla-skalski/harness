@@ -176,8 +176,8 @@ struct TaskBoardItemEditorDraftTests {
     #expect(request.planning?.approvedAt == "2026-05-14T10:00:00Z")
   }
 
-  @Test("Monitor public UI hides Todoist refs while update payload preserves them")
-  func monitorPublicUIHidesTodoistRefsWhilePreservingPayload() {
+  @Test("Monitor hides Todoist refs while unchanged update preserves server refs")
+  func monitorHidesTodoistRefsWhileUnchangedUpdatePreservesServerRefs() {
     let item = sampleTaskBoardItem(
       externalRefs: [
         TaskBoardExternalRef(
@@ -188,7 +188,8 @@ struct TaskBoardItemEditorDraftTests {
         TaskBoardExternalRef(
           provider: .gitHub,
           externalId: "42",
-          url: "https://github.com/example/harness/issues/42"
+          url: "https://github.com/example/project/pull/42",
+          syncState: TaskBoardExternalRefSyncState(status: .done)
         ),
       ]
     )
@@ -197,7 +198,58 @@ struct TaskBoardItemEditorDraftTests {
 
     #expect(draft.monitorVisibleExternalRefIDs == [draft.externalRefs[1].id])
     #expect(draft.monitorVisibleExternalRefs.map(\.provider) == [.gitHub])
-    #expect(draft.updateRequest.externalRefs?.map(\.provider) == [.todoist, .gitHub])
+    #expect(draft.updateRequest.externalRefs == nil)
+  }
+
+  @Test("Editing an external ref sends a replacement vector")
+  func editingExternalRefSendsReplacementVector() throws {
+    var draft = TaskBoardItemEditorDraft(
+      item: sampleTaskBoardItem(
+        externalRefs: [
+          TaskBoardExternalRef(
+            provider: .gitHub,
+            externalId: "42",
+            url: "https://github.com/example/project/pull/42",
+            syncState: TaskBoardExternalRefSyncState(status: .done)
+          )
+        ]
+      )
+    )
+    draft.externalRefs[0].externalId = "43"
+    draft.externalRefs[0].url = "https://github.com/example/project/pull/43"
+
+    let refs = try #require(draft.updateRequest.externalRefs)
+
+    #expect(refs.map(\.externalId) == ["43"])
+    #expect(refs.first?.syncState == nil)
+  }
+
+  @Test("External ref replacement leaves sync state daemon-owned")
+  func externalRefReplacementLeavesSyncStateDaemonOwned() throws {
+    var draft = TaskBoardItemEditorDraft(
+      item: sampleTaskBoardItem(
+        externalRefs: [
+          TaskBoardExternalRef(
+            provider: .gitHub,
+            externalId: "issue-12",
+            url: "https://github.com/example/project/issues/12"
+          ),
+          TaskBoardExternalRef(
+            provider: .gitHub,
+            externalId: "review-42",
+            url: "https://github.com/example/project/pull/42",
+            syncState: TaskBoardExternalRefSyncState(status: .done)
+          ),
+        ]
+      )
+    )
+    draft.externalRefs[0].externalId = "issue-13"
+    draft.externalRefs[0].url = "https://github.com/example/project/issues/13"
+
+    let refs = try #require(draft.updateRequest.externalRefs)
+
+    #expect(refs[0].syncState == nil)
+    #expect(refs[1].syncState == nil)
   }
 
   private func sampleTaskBoardItem(

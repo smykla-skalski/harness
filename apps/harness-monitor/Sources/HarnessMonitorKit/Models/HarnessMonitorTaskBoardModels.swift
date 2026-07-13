@@ -141,15 +141,30 @@ public enum TaskBoardExternalRefProvider: String, Codable, Sendable {
   }
 }
 
+public struct TaskBoardExternalRefSyncState: Codable, Equatable, Sendable {
+  public let status: TaskBoardStatus?
+
+  public init(status: TaskBoardStatus? = nil) {
+    self.status = status
+  }
+}
+
 public struct TaskBoardExternalRef: Codable, Equatable, Sendable {
   public let provider: TaskBoardExternalRefProvider
   public let externalId: String
   public let url: String?
+  public let syncState: TaskBoardExternalRefSyncState?
 
-  public init(provider: TaskBoardExternalRefProvider, externalId: String, url: String? = nil) {
+  public init(
+    provider: TaskBoardExternalRefProvider,
+    externalId: String,
+    url: String? = nil,
+    syncState: TaskBoardExternalRefSyncState? = nil
+  ) {
     self.provider = provider
     self.externalId = externalId
     self.url = url
+    self.syncState = syncState
   }
 }
 
@@ -266,6 +281,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
   public let targetProjectTypes: [String]
   public let agentMode: TaskBoardAgentMode
   public let externalRefs: [TaskBoardExternalRef]
+  public let importedFromProvider: TaskBoardExternalRefProvider?
   public let planning: TaskBoardPlanningState
   public let workflow: TaskBoardWorkflowState?
   public let sessionId: String?
@@ -287,6 +303,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     targetProjectTypes: [String] = [],
     agentMode: TaskBoardAgentMode,
     externalRefs: [TaskBoardExternalRef],
+    importedFromProvider: TaskBoardExternalRefProvider? = nil,
     planning: TaskBoardPlanningState,
     workflow: TaskBoardWorkflowState?,
     sessionId: String?,
@@ -307,6 +324,7 @@ public struct TaskBoardItem: Codable, Equatable, Identifiable, Sendable {
     self.targetProjectTypes = targetProjectTypes
     self.agentMode = agentMode
     self.externalRefs = externalRefs
+    self.importedFromProvider = importedFromProvider
     self.planning = planning
     self.workflow = workflow
     self.sessionId = sessionId
@@ -331,6 +349,7 @@ extension TaskBoardItem {
     case targetProjectTypes
     case agentMode
     case externalRefs
+    case importedFromProvider
     case planning
     case workflow
     case sessionId
@@ -356,6 +375,11 @@ extension TaskBoardItem {
     self.agentMode = try container.decode(TaskBoardAgentMode.self, forKey: .agentMode)
     self.externalRefs =
       try container.decodeIfPresent([TaskBoardExternalRef].self, forKey: .externalRefs) ?? []
+    self.importedFromProvider =
+      try container.decodeIfPresent(
+        TaskBoardExternalRefProvider.self,
+        forKey: .importedFromProvider
+      )
     self.planning = try container.decode(TaskBoardPlanningState.self, forKey: .planning)
     self.workflow = try container.decodeIfPresent(TaskBoardWorkflowState.self, forKey: .workflow)
     self.sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)

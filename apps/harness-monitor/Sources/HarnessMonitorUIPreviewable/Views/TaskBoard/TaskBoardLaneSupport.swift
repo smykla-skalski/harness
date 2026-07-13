@@ -192,7 +192,7 @@ struct TaskBoardCardFooter<Badges: View>: View {
     HStack(alignment: .bottom, spacing: metrics.laneBodyTopPadding) {
       Text(repository)
         .font(repositoryFont)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
         .lineLimit(1)
         .truncationMode(.middle)
         .multilineTextAlignment(.leading)

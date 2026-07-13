@@ -7,17 +7,25 @@ private struct TaskBoardInlineCodeFragment: Equatable {
 }
 
 enum TaskBoardInlineCodeFormatter {
-  static func displayText(for rawText: String) -> String {
-    fragments(in: rawText).map(\.text).joined()
+  static func displayText(for rawText: String, leadingText: String? = nil) -> String {
+    (leadingText ?? "") + fragments(in: rawText).map(\.text).joined()
   }
 
   static func attributedText(
     for rawText: String,
     codeFont: Font,
+    leadingText: String? = nil,
+    leadingForeground: Color = HarnessMonitorTheme.tertiaryInk,
     codeForeground: Color = HarnessMonitorTheme.inlineCodeText,
     codeBackground: Color = HarnessMonitorTheme.inlineCodeBackground
   ) -> AttributedString {
-    fragments(in: rawText).reduce(into: AttributedString()) { result, fragment in
+    var result = AttributedString()
+    if let leadingText, leadingText.isEmpty == false {
+      var attributedLeadingText = AttributedString(leadingText)
+      attributedLeadingText.foregroundColor = leadingForeground
+      result += attributedLeadingText
+    }
+    return fragments(in: rawText).reduce(into: result) { result, fragment in
       var attributedFragment = AttributedString(fragment.text)
       if fragment.isCode {
         attributedFragment.font = codeFont
@@ -73,6 +81,8 @@ struct TaskBoardInlineCodeText: View {
   let text: String
   let font: Font
   let codeFont: Font
+  var leadingText: String?
+  var leadingForeground: Color = HarnessMonitorTheme.tertiaryInk
   var foregroundStyle: Color = .primary
   var codeForeground: Color = HarnessMonitorTheme.inlineCodeText
   var codeBackground: Color = HarnessMonitorTheme.inlineCodeBackground
@@ -84,6 +94,8 @@ struct TaskBoardInlineCodeText: View {
     _ text: String,
     font: Font,
     codeFont: Font,
+    leadingText: String? = nil,
+    leadingForeground: Color = HarnessMonitorTheme.tertiaryInk,
     foregroundStyle: Color = .primary,
     codeForeground: Color = HarnessMonitorTheme.inlineCodeText,
     codeBackground: Color = HarnessMonitorTheme.inlineCodeBackground,
@@ -94,6 +106,8 @@ struct TaskBoardInlineCodeText: View {
     self.text = text
     self.font = font
     self.codeFont = codeFont
+    self.leadingText = leadingText
+    self.leadingForeground = leadingForeground
     self.foregroundStyle = foregroundStyle
     self.codeForeground = codeForeground
     self.codeBackground = codeBackground
@@ -107,6 +121,8 @@ struct TaskBoardInlineCodeText: View {
       TaskBoardInlineCodeFormatter.attributedText(
         for: text,
         codeFont: codeFont,
+        leadingText: leadingText,
+        leadingForeground: leadingForeground,
         codeForeground: codeForeground,
         codeBackground: codeBackground
       )
@@ -116,6 +132,8 @@ struct TaskBoardInlineCodeText: View {
     .lineLimit(lineLimit)
     .truncationMode(truncationMode)
     .multilineTextAlignment(multilineTextAlignment)
-    .accessibilityLabel(TaskBoardInlineCodeFormatter.displayText(for: text))
+    .accessibilityLabel(
+      TaskBoardInlineCodeFormatter.displayText(for: text, leadingText: leadingText)
+    )
   }
 }

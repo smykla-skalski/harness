@@ -14,6 +14,7 @@ extension TaskBoardItem {
       targetProjectTypes: request.targetProjectTypes ?? targetProjectTypes,
       agentMode: request.agentMode ?? agentMode,
       externalRefs: request.externalRefs ?? externalRefs,
+      importedFromProvider: importedFromProvider,
       planning: request.clearPlanning
         ? TaskBoardPlanningState()
         : request.planning ?? planning,

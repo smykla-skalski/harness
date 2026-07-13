@@ -16,6 +16,7 @@ struct TaskBoardItemEditorDraft: Equatable {
   var workItemId = ""
   var approvedBy = ""
   var approvedAt = ""
+  private var initialExternalRefIdentities: [TaskBoardExternalRefIdentity]?
 
   init() {}
 
@@ -30,6 +31,7 @@ struct TaskBoardItemEditorDraft: Equatable {
     agentMode = item.agentMode
     planningSummary = item.planning.summary ?? ""
     externalRefs = item.externalRefs.map(TaskBoardExternalRefDraft.init(ref:))
+    initialExternalRefIdentities = item.externalRefs.map(TaskBoardExternalRefIdentity.init(ref:))
     sessionId = item.sessionId ?? ""
     workItemId = item.workItemId ?? ""
     approvedBy = item.planning.approvedBy ?? ""
@@ -79,7 +81,7 @@ struct TaskBoardItemEditorDraft: Equatable {
       projectId: normalized(projectId),
       clearProjectId: normalized(projectId) == nil,
       targetProjectTypes: targetProjectTypes,
-      externalRefs: materializedExternalRefs,
+      externalRefs: externalRefsForUpdate,
       planning: planningState,
       sessionId: normalized(sessionId),
       clearSessionId: normalized(sessionId) == nil,
@@ -97,6 +99,15 @@ struct TaskBoardItemEditorDraft: Equatable {
 
   var materializedExternalRefs: [TaskBoardExternalRef] {
     externalRefs.compactMap(\.externalRef)
+  }
+
+  private var externalRefsForUpdate: [TaskBoardExternalRef]? {
+    let materialized = materializedExternalRefs
+    guard let initialExternalRefIdentities else {
+      return materialized
+    }
+    let currentIdentities = materialized.map(TaskBoardExternalRefIdentity.init(ref:))
+    return currentIdentities == initialExternalRefIdentities ? nil : materialized
   }
 
   var monitorVisibleExternalRefs: [TaskBoardExternalRef] {
@@ -121,6 +132,19 @@ struct TaskBoardItemEditorDraft: Equatable {
   }
 }
 
+private struct TaskBoardExternalRefIdentity: Equatable {
+  let provider: TaskBoardExternalRefProvider
+  let externalId: String
+  let url: String?
+
+  init(ref: TaskBoardExternalRef) {
+    provider = ref.provider
+    externalId = ref.externalId.trimmingCharacters(in: .whitespacesAndNewlines)
+    let normalizedURL = ref.url?.trimmingCharacters(in: .whitespacesAndNewlines)
+    url = normalizedURL?.isEmpty == false ? normalizedURL : nil
+  }
+}
+
 struct TaskBoardExternalRefDraft: Equatable, Identifiable {
   var id = UUID()
   var provider: TaskBoardExternalRefProvider = .gitHub
@@ -141,7 +165,11 @@ struct TaskBoardExternalRefDraft: Equatable, Identifiable {
     guard !externalId.isEmpty else {
       return nil
     }
-    return TaskBoardExternalRef(provider: provider, externalId: externalId, url: url.nilIfEmpty)
+    return TaskBoardExternalRef(
+      provider: provider,
+      externalId: externalId,
+      url: url.nilIfEmpty
+    )
   }
 }
 

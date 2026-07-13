@@ -8,9 +8,24 @@ struct TaskBoardCardPresentationContractTests {
     let source = try taskBoardSource("TaskBoardLaneSupport.swift")
     let repository = try #require(source.range(of: "Text(repository)"))
     let badges = try #require(source.range(of: "HarnessMonitorWrapLayout("))
+    let repositoryBlock = source[repository.lowerBound..<badges.lowerBound]
 
     #expect(repository.lowerBound < badges.lowerBound)
+    #expect(repositoryBlock.contains("HarnessMonitorTheme.tertiaryInk"))
+    #expect(!repositoryBlock.contains("HarnessMonitorTheme.secondaryInk"))
     #expect(source.contains(".multilineTextAlignment(.leading)"))
+  }
+
+  @Test("Review prefix stays in the card title text flow with reduced emphasis")
+  func reviewPrefixStaysInCardTitleTextFlowWithReducedEmphasis() throws {
+    let rows = try taskBoardSource("TaskBoardLaneViews.swift")
+    let text = try taskBoardSource("TaskBoardInlineCodeText.swift")
+
+    #expect(rows.contains("titlePresentation.title"))
+    #expect(rows.contains("leadingText: titlePresentation.leadingText"))
+    #expect(text.contains("attributedLeadingText.foregroundColor = leadingForeground"))
+    #expect(text.contains("leadingForeground: Color = HarnessMonitorTheme.tertiaryInk"))
+    #expect(!rows.contains("Text(\"Review: \""))
   }
 
   @Test("Card update labels share one board-owned minute clock")

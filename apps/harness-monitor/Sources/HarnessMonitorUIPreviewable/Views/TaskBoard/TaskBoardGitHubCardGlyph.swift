@@ -7,6 +7,35 @@ struct TaskBoardCardGlyph {
   let tint: Color
 }
 
+struct TaskBoardCardTitlePresentation: Equatable {
+  static let reviewLeadingText = "Review: "
+
+  let title: String
+  let leadingText: String?
+
+  init(item: TaskBoardItem) {
+    guard item.requiresViewerGitHubReview else {
+      self.title = item.title
+      self.leadingText = nil
+      return
+    }
+    self.title = Self.removingReviewPrefix(from: item.title)
+    self.leadingText = Self.reviewLeadingText
+  }
+
+  private static func removingReviewPrefix(from title: String) -> String {
+    let marker = "Review:"
+    guard title.count >= marker.count else {
+      return title
+    }
+    let markerEnd = title.index(title.startIndex, offsetBy: marker.count)
+    guard String(title[..<markerEnd]).caseInsensitiveCompare(marker) == .orderedSame else {
+      return title
+    }
+    return String(title[markerEnd...].drop(while: \.isWhitespace))
+  }
+}
+
 enum TaskBoardGitHubCardGlyph {
   static func resolve(for item: TaskBoardItem) -> TaskBoardCardGlyph? {
     guard item.hasGitHubSurface else {
@@ -38,6 +67,13 @@ enum TaskBoardGitHubCardGlyph {
 }
 
 extension TaskBoardItem {
+  var requiresViewerGitHubReview: Bool {
+    importedFromProvider == .gitHub
+      && externalRefs.contains {
+        $0.provider == .gitHub && $0.isActiveViewerReviewReference
+      }
+  }
+
   var taskBoardGitHubURL: URL? {
     for ref in externalRefs where ref.provider == .gitHub {
       if let url = TaskBoardGitHubURL.resolve(ref.url) {
@@ -105,6 +141,10 @@ private enum TaskBoardGitHubURL {
 }
 
 extension TaskBoardExternalRef {
+  fileprivate var isActiveViewerReviewReference: Bool {
+    isPullRequestURL && syncState?.status != .done
+  }
+
   fileprivate var repositoryOwner: String? {
     if let owner = TaskBoardGitHubRepositoryIdentity.owner(fromURLString: url) {
       return owner
