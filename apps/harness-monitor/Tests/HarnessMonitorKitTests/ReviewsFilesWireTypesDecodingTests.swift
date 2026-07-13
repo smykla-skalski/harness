@@ -94,8 +94,11 @@ struct ReviewsFilesWireTypesDecodingTests {
 
   @Test("decodes the large-diff strategy and a local clone list entry")
   func decodesLargeDiffStrategyAndClonesEntry() throws {
-    // FilesLargeDiffStrategy is snake_case; serde splits the GitHub word so
-    // ForceGitHubRest serializes as force_git_hub_rest.
+    // The public wire name treats GitHub as one word.
+    #expect(
+      try decoder.decode(FilesLargeDiffStrategyWire.self, from: Data("\"force_github_rest\"".utf8))
+        == .forceGitHubRest
+    )
     #expect(
       try decoder.decode(FilesLargeDiffStrategyWire.self, from: Data("\"force_git_hub_rest\"".utf8))
         == .forceGitHubRest

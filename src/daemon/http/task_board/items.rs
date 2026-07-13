@@ -14,10 +14,13 @@ use crate::daemon::protocol::{
     TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardSyncRequest,
     TaskBoardUpdateItemRequest, http_paths,
 };
+use crate::daemon::remote_task_board::{
+    is_remote_viewer, project_task_board_item, project_task_board_list,
+};
 use crate::task_board::TaskBoardStatus;
 
 use super::super::DaemonHttpState;
-use super::super::auth::{authorize_control_request, require_auth};
+use super::super::auth::{authenticated_remote_client, authorize_control_request, require_auth};
 use super::super::response::{extract_request_id, timed_json};
 use super::super::task_board_route_executor;
 
@@ -83,19 +86,22 @@ pub(super) async fn get_task_board_items(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
+    let (start, request_id, viewer) = match authenticated_task_board_read(&headers, &state) {
         Ok(parts) => parts,
         Err(response) => return *response,
     };
     let request = TaskBoardListItemsRequest {
         status: query.status,
     };
+    let result = task_board_route_executor::list_items(&state, &request)
+        .await
+        .map(|response| project_task_board_list(response, viewer));
     timed_json(
         "GET",
         http_paths::TASK_BOARD_ITEMS,
         &request_id,
         start,
-        task_board_route_executor::list_items(&state, &request).await,
+        result,
     )
 }
 
@@ -104,16 +110,20 @@ pub(super) async fn get_task_board_item(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
+    let (start, request_id, viewer) = match authenticated_task_board_read(&headers, &state) {
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let result =
+        task_board_route_executor::get_item(&state, &TaskBoardGetItemRequest { id: item_id })
+            .await
+            .map(|item| project_task_board_item(item, viewer));
     timed_json(
         "GET",
         http_paths::TASK_BOARD_ITEM,
         &request_id,
         start,
-        task_board_route_executor::get_item(&state, &TaskBoardGetItemRequest { id: item_id }).await,
+        result,
     )
 }
 
@@ -427,6 +437,16 @@ pub(in super::super) fn authenticated_request(
     let request_id = extract_request_id(headers);
     require_auth(headers, state)?;
     Ok((start, request_id))
+}
+
+fn authenticated_task_board_read(
+    headers: &HeaderMap,
+    state: &DaemonHttpState,
+) -> Result<(Instant, String, bool), Box<Response>> {
+    let start = Instant::now();
+    let request_id = extract_request_id(headers);
+    let client = authenticated_remote_client(headers, state)?;
+    Ok((start, request_id, is_remote_viewer(client.as_ref())))
 }
 
 pub(in super::super) fn authorized_control_request_parts<T: ControlPlaneActorRequest>(

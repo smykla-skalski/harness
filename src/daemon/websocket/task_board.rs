@@ -1,21 +1,25 @@
+use std::sync::{Arc, Mutex};
+
 use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::daemon::protocol::{
     ControlPlaneActorRequest, TaskBoardAuditRequest, TaskBoardCatalogRequest,
     TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchRequest,
-    TaskBoardEvaluateRequest, TaskBoardGetItemRequest, TaskBoardGitSigningVerifyRequest,
-    TaskBoardHostSetProjectTypesRequest, TaskBoardListItemsRequest, TaskBoardPlanApproveRequest,
-    TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
-    TaskBoardSyncRequest, TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
+    TaskBoardEvaluateRequest, TaskBoardGitSigningVerifyRequest,
+    TaskBoardHostSetProjectTypesRequest, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
+    TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardSyncRequest,
+    TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::errors::CliError;
 use serde::de::DeserializeOwned;
 
+use super::connection::ConnectionState;
 use super::frames::error_response;
 use super::mutations::dispatch_query_result;
 
 mod orchestrator;
 mod policy;
+mod read;
 mod secret_handoff;
 
 #[expect(
@@ -25,14 +29,19 @@ mod secret_handoff;
 pub(crate) async fn dispatch_task_board_method(
     request: &WsRequest,
     state: &DaemonHttpState,
+    connection: &Arc<Mutex<ConnectionState>>,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
         ws_methods::TASK_BOARD_CREATE => Some(dispatch_task_board_create(request, state).await),
         ws_methods::TASK_BOARD_CAPABILITIES => {
-            Some(dispatch_task_board_capabilities(request, state).await)
+            Some(read::dispatch_task_board_capabilities(request, state).await)
         }
-        ws_methods::TASK_BOARD_LIST => Some(dispatch_task_board_list(request, state).await),
-        ws_methods::TASK_BOARD_GET => Some(dispatch_task_board_get(request, state).await),
+        ws_methods::TASK_BOARD_LIST => {
+            Some(read::dispatch_task_board_list(request, state, connection).await)
+        }
+        ws_methods::TASK_BOARD_GET => {
+            Some(read::dispatch_task_board_get(request, state, connection).await)
+        }
         ws_methods::TASK_BOARD_UPDATE => Some(dispatch_task_board_update(request, state).await),
         ws_methods::TASK_BOARD_DELETE => Some(dispatch_task_board_delete(request, state).await),
         ws_methods::TASK_BOARD_PLAN_BEGIN => {
@@ -116,16 +125,6 @@ pub(crate) async fn dispatch_task_board_method(
     }
 }
 
-async fn dispatch_task_board_capabilities(
-    request: &WsRequest,
-    state: &DaemonHttpState,
-) -> WsResponse {
-    dispatch_query_result(
-        &request.id,
-        task_board_route_executor::capabilities(state).await,
-    )
-}
-
 async fn dispatch_task_board_create(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<TaskBoardCreateItemRequest>(request) else {
         return invalid_params(request);
@@ -145,26 +144,6 @@ async fn dispatch_task_board_create(request: &WsRequest, state: &DaemonHttpState
     )
     .await;
     dispatch_query_result(&request.id, result)
-}
-
-async fn dispatch_task_board_list(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
-    let Ok(body) = parse_params_or_default::<TaskBoardListItemsRequest>(request) else {
-        return invalid_params(request);
-    };
-    dispatch_query_result(
-        &request.id,
-        task_board_route_executor::list_items(state, &body).await,
-    )
-}
-
-async fn dispatch_task_board_get(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardGetItemRequest>(request) else {
-        return invalid_params(request);
-    };
-    dispatch_query_result(
-        &request.id,
-        task_board_route_executor::get_item(state, &body).await,
-    )
 }
 
 async fn dispatch_task_board_update(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {

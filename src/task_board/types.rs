@@ -218,6 +218,8 @@ pub struct ExternalRef {
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ExternalRefProvider {
+    #[value(name = "github", alias = "git_hub")]
+    #[serde(rename = "github", alias = "git_hub")]
     GitHub,
     Todoist,
 }

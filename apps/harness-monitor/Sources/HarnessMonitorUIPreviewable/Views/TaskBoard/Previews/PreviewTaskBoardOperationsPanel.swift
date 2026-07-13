@@ -100,7 +100,7 @@ private enum TaskBoardOperationsPreviewFixtures {
         "total": 1,
         "providers": [
           {
-            "provider": "git_hub",
+            "provider": "github",
             "configured": true,
             "linked": 1,
             "pushable": 1,
@@ -110,7 +110,7 @@ private enum TaskBoardOperationsPreviewFixtures {
         ],
         "operations": [
           {
-            "provider": "git_hub",
+            "provider": "github",
             "action": "push",
             "boardItemId": "preview-board-only",
             "externalId": null,

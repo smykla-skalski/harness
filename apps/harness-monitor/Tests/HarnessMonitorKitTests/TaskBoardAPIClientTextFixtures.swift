@@ -126,7 +126,7 @@ let sampleTaskBoardSyncSummaryText =
     "total": 1,
     "providers": [
       {
-        "provider": "git_hub",
+        "provider": "github",
         "configured": true,
         "linked": 1,
         "pushable": 0,
@@ -136,7 +136,7 @@ let sampleTaskBoardSyncSummaryText =
     ],
     "operations": [
       {
-        "provider": "git_hub",
+        "provider": "github",
         "action": "push",
         "board_item_id": "board-1",
         "external_id": "123",

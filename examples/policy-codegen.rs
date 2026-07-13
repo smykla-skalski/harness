@@ -26,7 +26,14 @@ use syn::{
 /// raw value.
 struct SwiftStringEnum {
     name: String,
-    cases: Vec<(String, String)>,
+    cases: Vec<SwiftStringEnumCase>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SwiftStringEnumCase {
+    name: String,
+    raw_value: String,
+    aliases: Vec<String>,
 }
 
 /// A generated Swift struct field with its wire `CodingKey`, the decoder
@@ -85,11 +92,39 @@ fn emit_string_enum(out: &mut String, spec: &SwiftStringEnum) {
         spec.name
     )
     .unwrap();
-    for (case, raw) in &spec.cases {
-        writeln!(out, "  case {case} = \"{raw}\"").unwrap();
+    for case in &spec.cases {
+        writeln!(out, "  case {} = \"{}\"", case.name, case.raw_value).unwrap();
     }
     out.push_str("\n  public var id: String { rawValue }\n");
+    if spec.cases.iter().any(|case| !case.aliases.is_empty()) {
+        emit_string_enum_codable(out, spec);
+    }
     out.push_str("}\n");
+}
+
+fn emit_string_enum_codable(out: &mut String, spec: &SwiftStringEnum) {
+    out.push_str("\n  public init(from decoder: Decoder) throws {\n");
+    out.push_str("    let container = try decoder.singleValueContainer()\n");
+    out.push_str("    let rawValue = try container.decode(String.self)\n");
+    out.push_str("    switch rawValue {\n");
+    for case in &spec.cases {
+        write!(out, "    case \"{}\"", case.raw_value).unwrap();
+        for alias in &case.aliases {
+            write!(out, ", \"{alias}\"").unwrap();
+        }
+        writeln!(out, ": self = .{}", case.name).unwrap();
+    }
+    writeln!(
+        out,
+        "    default: throw DecodingError.dataCorruptedError(in: container, debugDescription: \"Cannot initialize {} from invalid String value \\(rawValue)\")",
+        spec.name
+    )
+    .unwrap();
+    out.push_str("    }\n  }\n\n");
+    out.push_str("  public func encode(to encoder: Encoder) throws {\n");
+    out.push_str("    var container = encoder.singleValueContainer()\n");
+    out.push_str("    try container.encode(rawValue)\n");
+    out.push_str("  }\n");
 }
 
 /// Wire enums the app keeps forward-compatible: an unrecognized daemon value
@@ -139,10 +174,10 @@ fn emit_open_enum(out: &mut String, spec: &SwiftStringEnum) {
     // Emitting both a `case unknown` and the `case unknown(String)` catch-all
     // is an invalid redeclaration, so drop the known case and let the catch-all
     // own it - matching the hand-written open enums.
-    let cases: Vec<&(String, String)> = spec
+    let cases: Vec<&SwiftStringEnumCase> = spec
         .cases
         .iter()
-        .filter(|(case, _)| case != "unknown")
+        .filter(|case| case.name != "unknown")
         .collect();
     writeln!(
         out,
@@ -150,24 +185,28 @@ fn emit_open_enum(out: &mut String, spec: &SwiftStringEnum) {
         spec.name
     )
     .unwrap();
-    for (case, _) in &cases {
-        writeln!(out, "  case {case}").unwrap();
+    for case in &cases {
+        writeln!(out, "  case {}", case.name).unwrap();
     }
     out.push_str("  case unknown(String)\n\n");
     let known = cases
         .iter()
-        .map(|(case, _)| format!(".{case}"))
+        .map(|case| format!(".{}", case.name))
         .collect::<Vec<_>>()
         .join(", ");
     writeln!(out, "  public static let allCases: [Self] = [{known}]\n").unwrap();
     out.push_str("  public var rawValue: String {\n    switch self {\n");
-    for (case, raw) in &cases {
-        writeln!(out, "    case .{case}: \"{raw}\"").unwrap();
+    for case in &cases {
+        writeln!(out, "    case .{}: \"{}\"", case.name, case.raw_value).unwrap();
     }
     out.push_str("    case .unknown(let raw): raw\n    }\n  }\n\n");
     out.push_str("  public init(rawValue: String) {\n    switch rawValue {\n");
-    for (case, raw) in &cases {
-        writeln!(out, "    case \"{raw}\": self = .{case}").unwrap();
+    for case in &cases {
+        write!(out, "    case \"{}\"", case.raw_value).unwrap();
+        for alias in &case.aliases {
+            write!(out, ", \"{alias}\"").unwrap();
+        }
+        writeln!(out, ": self = .{}", case.name).unwrap();
     }
     out.push_str("    default: self = .unknown(rawValue)\n    }\n  }\n\n");
     out.push_str("  public var id: String { rawValue }\n");
@@ -1554,6 +1593,11 @@ struct SerdeField {
     skip_serializing_if: Option<String>,
 }
 
+struct SerdeVariant {
+    rename: Option<String>,
+    aliases: Vec<String>,
+}
+
 /// The identifiers inside every `#[derive(...)]` on an item.
 fn derive_idents(attrs: &[Attribute]) -> Vec<String> {
     let mut idents = Vec::new();
@@ -1669,6 +1713,33 @@ fn serde_field(attrs: &[Attribute]) -> SerdeField {
         flatten,
         skip_serializing_if,
     }
+}
+
+/// Read the canonical wire name and decode-only aliases from an enum variant.
+fn serde_variant(attrs: &[Attribute]) -> SerdeVariant {
+    let mut rename = None;
+    let mut aliases = Vec::new();
+    for attr in attrs {
+        if !attr.path().is_ident("serde") {
+            continue;
+        }
+        let _ = attr.parse_nested_meta(|meta| {
+            let is_rename = meta.path.is_ident("rename");
+            let is_alias = meta.path.is_ident("alias");
+            if let Ok(value) = meta.value() {
+                let lit: Lit = value.parse()?;
+                if let Lit::Str(text) = lit {
+                    if is_rename {
+                        rename = Some(text.value());
+                    } else if is_alias {
+                        aliases.push(text.value());
+                    }
+                }
+            }
+            Ok(())
+        });
+    }
+    SerdeVariant { rename, aliases }
 }
 
 /// Parse the defaults sources, mapping each zero-argument default function to the
@@ -2057,10 +2128,14 @@ fn build_string_enum(item: &ItemEnum) -> SwiftStringEnum {
                 variant.ident
             );
             let name = variant.ident.to_string();
-            (
-                escape_keyword(pascal_to_camel(&name)),
-                variant_wire_value(&name, rename_all.as_deref()),
-            )
+            let serde = serde_variant(&variant.attrs);
+            SwiftStringEnumCase {
+                name: escape_keyword(pascal_to_camel(&name)),
+                raw_value: serde
+                    .rename
+                    .unwrap_or_else(|| variant_wire_value(&name, rename_all.as_deref())),
+                aliases: serde.aliases,
+            }
         })
         .collect();
     SwiftStringEnum {
@@ -3173,14 +3248,22 @@ fn main() {
 mod tests {
     use super::*;
 
+    fn string_enum_case(name: &str, raw_value: &str) -> SwiftStringEnumCase {
+        SwiftStringEnumCase {
+            name: name.to_string(),
+            raw_value: raw_value.to_string(),
+            aliases: Vec::new(),
+        }
+    }
+
     #[test]
     fn emits_string_backed_enum_with_snake_case_raw_values() {
         let spec = SwiftStringEnum {
             name: "PolicyGraphMode".to_string(),
             cases: vec![
-                ("draft".to_string(), "draft".to_string()),
-                ("dryRun".to_string(), "dry_run".to_string()),
-                ("enforced".to_string(), "enforced".to_string()),
+                string_enum_case("draft", "draft"),
+                string_enum_case("dryRun", "dry_run"),
+                string_enum_case("enforced", "enforced"),
             ],
         };
 
@@ -3195,9 +3278,9 @@ mod tests {
         let spec = SwiftStringEnum {
             name: "TaskBoardGitSigningMode".to_string(),
             cases: vec![
-                ("none".to_string(), "none".to_string()),
-                ("ssh".to_string(), "ssh".to_string()),
-                ("gpg".to_string(), "gpg".to_string()),
+                string_enum_case("none", "none"),
+                string_enum_case("ssh", "ssh"),
+                string_enum_case("gpg", "gpg"),
             ],
         };
 
@@ -3240,9 +3323,9 @@ mod tests {
         let spec = SwiftStringEnum {
             name: "ReviewMergeableState".to_string(),
             cases: vec![
-                ("mergeable".to_string(), "mergeable".to_string()),
-                ("conflicting".to_string(), "conflicting".to_string()),
-                ("unknown".to_string(), "unknown".to_string()),
+                string_enum_case("mergeable", "mergeable"),
+                string_enum_case("conflicting", "conflicting"),
+                string_enum_case("unknown", "unknown"),
             ],
         };
 
@@ -3367,10 +3450,36 @@ pub struct Drop { pub other: String }
         assert_eq!(
             spec.cases,
             vec![
-                ("speechToText".to_string(), "speechToText".to_string()),
-                ("raw".to_string(), "raw".to_string()),
+                string_enum_case("speechToText", "speechToText"),
+                string_enum_case("raw", "raw"),
             ]
         );
+    }
+
+    #[test]
+    fn variant_rename_is_canonical_and_alias_is_decode_only() {
+        let item: ItemEnum = syn::parse_str(
+            "#[serde(rename_all = \"snake_case\")] enum Provider { #[serde(rename = \"github\", alias = \"git_hub\")] GitHub, Todoist }",
+        )
+        .expect("enum parses");
+        let spec = build_string_enum(&item);
+        assert_eq!(
+            spec.cases,
+            vec![
+                SwiftStringEnumCase {
+                    name: "gitHub".to_string(),
+                    raw_value: "github".to_string(),
+                    aliases: vec!["git_hub".to_string()],
+                },
+                string_enum_case("todoist", "todoist"),
+            ]
+        );
+
+        let mut out = String::new();
+        emit_string_enum(&mut out, &spec);
+        assert!(out.contains("case gitHub = \"github\""));
+        assert!(out.contains("case \"github\", \"git_hub\": self = .gitHub"));
+        assert!(out.contains("try container.encode(rawValue)"));
     }
 
     #[test]

@@ -148,7 +148,10 @@ final class ReviewFileModelPatchTests: XCTestCase {
       FilesLargeDiffStrategy.self, from: Data(json.utf8))
     XCTAssertEqual(parsed, .autoLocalClone)
     let encoded = try JSONEncoder().encode(FilesLargeDiffStrategy.forceGitHubRest)
-    XCTAssertEqual(String(bytes: encoded, encoding: .utf8), "\"force_git_hub_rest\"")
+    XCTAssertEqual(String(bytes: encoded, encoding: .utf8), "\"force_github_rest\"")
+    let legacy = try JSONDecoder().decode(
+      FilesLargeDiffStrategy.self, from: Data("\"force_git_hub_rest\"".utf8))
+    XCTAssertEqual(legacy, .forceGitHubRest)
   }
 
   func testServedByValueRoundTripsSnakeCase() throws {

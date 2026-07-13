@@ -235,7 +235,7 @@ extension TaskBoardAPIClientTests {
     #expect(objectValue(calls[3].params, key: "clear_planning") == .bool(true))
     #expect(objectValue(calls[3].params, key: "clear_workflow") == .bool(true))
     #expect(objectValue(calls[5].params, key: "status") == .string("todo"))
-    #expect(objectValue(calls[5].params, key: "provider") == .string("git_hub"))
+    #expect(objectValue(calls[5].params, key: "provider") == .string("github"))
     #expect(objectValue(calls[5].params, key: "direction") == .string("push"))
     #expect(objectValue(calls[5].params, key: "dry_run") == .bool(false))
     #expect(objectValue(calls[6].params, key: "status") == .string("todo"))

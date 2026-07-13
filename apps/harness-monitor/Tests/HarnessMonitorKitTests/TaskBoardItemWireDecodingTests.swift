@@ -109,6 +109,15 @@ struct TaskBoardItemWireDecodingTests {
     #expect(items.first?.id == "task-1")
     #expect(items.first?.workflow?.status == .running)
   }
+
+  @Test("accepts the legacy GitHub provider spelling")
+  func decodesLegacyGitHubProvider() throws {
+    let provider = try decoder.decode(
+      ExternalRefProviderWire.self,
+      from: Data(#""git_hub""#.utf8)
+    )
+    #expect(provider == .gitHub)
+  }
 }
 
 private let fullItemPayloadFixture = """
@@ -125,13 +134,13 @@ private let fullItemPayloadFixture = """
     "agent_mode": "interactive",
     "external_refs": [
       {
-        "provider": "git_hub",
+        "provider": "github",
         "external_id": "123",
         "url": "https://example.com/123",
         "sync_state": { "title": "Synced", "status": "todo", "synced_at": "2026-06-17T10:00:00Z" }
       }
     ],
-    "imported_from_provider": "git_hub",
+    "imported_from_provider": "github",
     "planning": { "summary": "plan", "approved_by": "lead", "approved_at": "2026-06-17T09:00:00Z" },
     "workflow": {
       "execution_id": "exec-1",

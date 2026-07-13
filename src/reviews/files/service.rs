@@ -23,6 +23,7 @@ pub enum FilesLargeDiffStrategy {
     #[default]
     AutoLocalClone,
     /// Always use GitHub REST regardless of size (no local clones).
+    #[serde(rename = "force_github_rest", alias = "force_git_hub_rest")]
     ForceGitHubRest,
 }
 
@@ -224,6 +225,20 @@ mod tests {
         assert_eq!(config.strategy, FilesLargeDiffStrategy::AutoLocalClone);
         assert_eq!(config.local_clone_threshold_lines, 500);
         assert!(!config.local_clone_disabled_by_environment);
+    }
+
+    #[test]
+    fn github_strategy_uses_canonical_wire_name_and_accepts_legacy_value() {
+        assert_eq!(
+            serde_json::to_string(&FilesLargeDiffStrategy::ForceGitHubRest)
+                .expect("serialize strategy"),
+            r#""force_github_rest""#
+        );
+        assert_eq!(
+            serde_json::from_str::<FilesLargeDiffStrategy>(r#""force_git_hub_rest""#)
+                .expect("decode legacy strategy"),
+            FilesLargeDiffStrategy::ForceGitHubRest
+        );
     }
 
     #[test]
