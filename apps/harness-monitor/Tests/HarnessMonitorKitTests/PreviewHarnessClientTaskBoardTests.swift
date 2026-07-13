@@ -105,4 +105,116 @@ struct PreviewHarnessClientTaskBoardTests {
     #expect(!projects.isEmpty)
     #expect(!machines.isEmpty)
   }
+
+  @Test("Preview external ref replacement preserves matching stored sync state")
+  func previewExternalRefReplacementPreservesMatchingStoredSyncState() throws {
+    let storedSyncState = TaskBoardExternalRefSyncState(status: .done)
+    let item = taskBoardItem(
+      externalRefs: [
+        TaskBoardExternalRef(
+          provider: .gitHub,
+          externalId: "example/project#42",
+          url: "https://github.com/example/project/pull/42",
+          syncState: storedSyncState
+        )
+      ]
+    )
+
+    let updated = item.applyingPreviewUpdate(
+      TaskBoardUpdateItemRequest(
+        externalRefs: [
+          TaskBoardExternalRef(
+            provider: .gitHub,
+            externalId: "example/project#42",
+            url: "https://github.com/example/project/pull/42?view=files",
+            syncState: TaskBoardExternalRefSyncState(status: .todo)
+          )
+        ]
+      )
+    )
+    let replacement = try #require(updated.externalRefs.first)
+
+    #expect(replacement.url == "https://github.com/example/project/pull/42?view=files")
+    #expect(replacement.syncState == storedSyncState)
+  }
+
+  @Test("Preview external ref replacement rejects sync state for new identities")
+  func previewExternalRefReplacementRejectsNewIdentitySyncState() {
+    let item = taskBoardItem(
+      externalRefs: [
+        TaskBoardExternalRef(
+          provider: .gitHub,
+          externalId: "example/project#42",
+          syncState: TaskBoardExternalRefSyncState(status: .done)
+        )
+      ]
+    )
+    let clientSyncState = TaskBoardExternalRefSyncState(status: .todo)
+
+    let updated = item.applyingPreviewUpdate(
+      TaskBoardUpdateItemRequest(
+        externalRefs: [
+          TaskBoardExternalRef(
+            provider: .todoist,
+            externalId: "example/project#42",
+            syncState: clientSyncState
+          ),
+          TaskBoardExternalRef(
+            provider: .gitHub,
+            externalId: "EXAMPLE/PROJECT#42",
+            syncState: clientSyncState
+          ),
+          TaskBoardExternalRef(
+            provider: .gitHub,
+            externalId: "example/project#43",
+            syncState: clientSyncState
+          ),
+        ]
+      )
+    )
+
+    #expect(updated.externalRefs.count == 3)
+    #expect(updated.externalRefs.allSatisfy { $0.syncState == nil })
+  }
+
+  @Test("Preview external ref replacement distinguishes nil from empty")
+  func previewExternalRefReplacementDistinguishesNilFromEmpty() {
+    let refs = [
+      TaskBoardExternalRef(
+        provider: .gitHub,
+        externalId: "example/project#42",
+        syncState: TaskBoardExternalRefSyncState(status: .done)
+      )
+    ]
+    let item = taskBoardItem(externalRefs: refs)
+
+    let unchanged = item.applyingPreviewUpdate(TaskBoardUpdateItemRequest(status: .inProgress))
+    let cleared = item.applyingPreviewUpdate(TaskBoardUpdateItemRequest(externalRefs: []))
+
+    #expect(unchanged.externalRefs == refs)
+    #expect(cleared.externalRefs.isEmpty)
+  }
+
+  private func taskBoardItem(externalRefs: [TaskBoardExternalRef]) -> TaskBoardItem {
+    TaskBoardItem(
+      schemaVersion: 1,
+      id: "preview-external-ref-item",
+      title: "Preview item",
+      body: "Body",
+      status: .todo,
+      priority: .medium,
+      tags: [],
+      projectId: "example/project",
+      agentMode: .interactive,
+      externalRefs: externalRefs,
+      planning: TaskBoardPlanningState(),
+      workflow: nil,
+      sessionId: nil,
+      workItemId: nil,
+      usage: TaskBoardUsage(),
+      createdAt: "2026-07-13T10:00:00Z",
+      updatedAt: "2026-07-13T10:01:00Z",
+      deletedAt: nil
+    )
+  }
 }

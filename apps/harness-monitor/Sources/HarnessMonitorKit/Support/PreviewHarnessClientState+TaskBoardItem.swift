@@ -13,7 +13,7 @@ extension TaskBoardItem {
       projectId: request.clearProjectId ? nil : request.projectId ?? projectId,
       targetProjectTypes: request.targetProjectTypes ?? targetProjectTypes,
       agentMode: request.agentMode ?? agentMode,
-      externalRefs: request.externalRefs ?? externalRefs,
+      externalRefs: previewExternalRefs(replacingWith: request.externalRefs),
       importedFromProvider: importedFromProvider,
       planning: request.clearPlanning
         ? TaskBoardPlanningState()
@@ -26,6 +26,24 @@ extension TaskBoardItem {
       updatedAt: PreviewHarnessClientState.mutationTimestamp,
       deletedAt: deletedAt
     )
+  }
+
+  private func previewExternalRefs(
+    replacingWith replacements: [TaskBoardExternalRef]?
+  ) -> [TaskBoardExternalRef] {
+    guard let replacements else {
+      return externalRefs
+    }
+    return replacements.map { replacement in
+      TaskBoardExternalRef(
+        provider: replacement.provider,
+        externalId: replacement.externalId,
+        url: replacement.url,
+        syncState: externalRefs.first(where: {
+          $0.provider == replacement.provider && $0.externalId == replacement.externalId
+        })?.syncState
+      )
+    }
   }
 
   func applyingPreviewPlanning(
