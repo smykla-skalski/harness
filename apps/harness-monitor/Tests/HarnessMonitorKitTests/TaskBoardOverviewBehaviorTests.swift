@@ -176,7 +176,7 @@ struct TaskBoardOverviewBehaviorTests {
 
   @Test("Collapsed lane titles keep a consistent font size")
   func collapsedLaneTitlesKeepConsistentFontSize() throws {
-    let source = try taskBoardSource("TaskBoardLaneUnifiedColumn.swift")
+    let source = try taskBoardSource("TaskBoardCollapsedLane.swift")
     let start = try #require(
       source.range(of: "private var collapsedTitle: some View {")?.lowerBound
     )

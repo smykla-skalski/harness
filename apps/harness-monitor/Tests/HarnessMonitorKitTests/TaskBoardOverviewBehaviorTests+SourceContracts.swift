@@ -22,10 +22,12 @@ extension TaskBoardOverviewBehaviorTests {
     #expect(!needsYouRows.contains(".onHover {"))
   }
 
-  @Test("Expanded lane scroll owns its card content margins")
-  func expandedLaneScrollOwnsItsCardContentMargins() throws {
+  @Test("Expanded lane scroll content owns its padding")
+  func expandedLaneScrollContentOwnsItsPadding() throws {
     let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
     let laneChrome = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
+    let laneScrollViewSource =
+      "ScrollView(.vertical, showsIndicators: true) {\n        laneScrollContent\n      }"
 
     #expect(
       laneColumn.contains(
@@ -35,21 +37,20 @@ extension TaskBoardOverviewBehaviorTests {
         """
       )
     )
+    #expect(laneColumn.contains("private var laneScrollContent: some View"))
+    #expect(laneColumn.components(separatedBy: laneScrollViewSource).count == 3)
     #expect(
       laneColumn.contains(
-        ".contentMargins(.horizontal, metrics.laneInnerPadding, for: .scrollContent)"
+        """
+        laneRows
+              .padding(.horizontal, metrics.laneInnerPadding)
+              .padding(.top, metrics.laneHeaderBodyTopPadding)
+              .padding(.bottom, metrics.laneInnerPadding)
+              .frame(maxWidth: .infinity, alignment: .top)
+        """
       )
     )
-    #expect(
-      laneColumn.contains(
-        ".contentMargins(.top, metrics.laneHeaderBodyTopPadding, for: .scrollContent)"
-      )
-    )
-    #expect(
-      laneColumn.contains(
-        ".contentMargins(.bottom, metrics.laneInnerPadding, for: .scrollContent)"
-      )
-    )
+    #expect(!laneColumn.contains(".contentMargins("))
     #expect(
       laneColumn.contains(
         """
@@ -92,12 +93,12 @@ extension TaskBoardOverviewBehaviorTests {
 
   @Test("Expanded and collapsed lane titles use matching type size")
   func expandedAndCollapsedLaneTitlesUseMatchingTypeSize() throws {
-    let laneColumn = try taskBoardSourceFile(named: "TaskBoardLaneUnifiedColumn.swift")
+    let collapsedLane = try taskBoardSourceFile(named: "TaskBoardCollapsedLane.swift")
     let laneChrome = try taskBoardSourceFile(named: "TaskBoardLaneChrome.swift")
     let titleFontSource = ".title3.weight(.semibold)"
 
     #expect(laneChrome.contains(titleFontSource))
-    #expect(laneColumn.contains(titleFontSource))
+    #expect(collapsedLane.contains(titleFontSource))
   }
 
   @Test("Lane drops use the modern session plan for acceptance and action")
