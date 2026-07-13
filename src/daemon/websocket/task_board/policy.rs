@@ -7,9 +7,11 @@ mod pipeline;
 mod scenario;
 
 use self::canvas::{
+    dispatch_policy_approval_grant_resolve, dispatch_policy_approval_grants_list,
     dispatch_policy_canvas_create, dispatch_policy_canvas_delete, dispatch_policy_canvas_duplicate,
     dispatch_policy_canvas_rename, dispatch_policy_canvas_set_active,
-    dispatch_policy_canvas_set_global_enforcement, dispatch_policy_canvas_workspace_get,
+    dispatch_policy_canvas_set_global_enforcement, dispatch_policy_canvas_set_spawn_kill_switch,
+    dispatch_policy_canvas_set_spawn_requires_live_policy, dispatch_policy_canvas_workspace_get,
 };
 use self::io::{dispatch_policy_export, dispatch_policy_import};
 use self::pipeline::{
@@ -67,7 +69,10 @@ async fn dispatch_policy_canvas_method(
     if let Some(response) = dispatch_policy_canvas_read_method(request, state).await {
         return Some(response);
     }
-    dispatch_policy_canvas_mutate_method(request, state).await
+    if let Some(response) = dispatch_policy_canvas_mutate_method(request, state).await {
+        return Some(response);
+    }
+    dispatch_policy_spawn_gate_method(request, state).await
 }
 
 async fn dispatch_policy_canvas_read_method(
@@ -83,6 +88,9 @@ async fn dispatch_policy_canvas_read_method(
         }
         ws_methods::POLICY_CANVAS_DUPLICATE => {
             Some(dispatch_policy_canvas_duplicate(request, state).await)
+        }
+        ws_methods::POLICY_APPROVAL_GRANTS_LIST => {
+            Some(dispatch_policy_approval_grants_list(request, state).await)
         }
         _ => None,
     }
@@ -104,6 +112,24 @@ async fn dispatch_policy_canvas_mutate_method(
         }
         ws_methods::POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT => {
             Some(dispatch_policy_canvas_set_global_enforcement(request, state).await)
+        }
+        _ => None,
+    }
+}
+
+async fn dispatch_policy_spawn_gate_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::POLICY_CANVAS_SET_SPAWN_REQUIRES_LIVE_POLICY => {
+            Some(dispatch_policy_canvas_set_spawn_requires_live_policy(request, state).await)
+        }
+        ws_methods::POLICY_CANVAS_SET_SPAWN_KILL_SWITCH => {
+            Some(dispatch_policy_canvas_set_spawn_kill_switch(request, state).await)
+        }
+        ws_methods::POLICY_APPROVAL_GRANT_RESOLVE => {
+            Some(dispatch_policy_approval_grant_resolve(request, state).await)
         }
         _ => None,
     }

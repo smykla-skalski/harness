@@ -9,6 +9,7 @@ use super::task_board_orchestrator_handlers::merge_orchestrator_routes;
 mod items;
 mod policy;
 mod policy_io;
+mod policy_spawn_gate;
 
 pub(super) use self::items::{authenticated_request, authorized_control_request_parts};
 
@@ -23,6 +24,7 @@ use self::items::{
 };
 use self::policy::merge_policy_routes;
 use self::policy_io::merge_policy_io_routes;
+use self::policy_spawn_gate::merge_policy_spawn_gate_routes;
 
 fn task_board_host_routes() -> Router<DaemonHttpState> {
     Router::new()
@@ -99,5 +101,7 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
             get(get_task_board_machines),
         )
         .merge(task_board_host_routes());
-    merge_policy_io_routes(merge_policy_routes(merge_orchestrator_routes(router)))
+    merge_policy_spawn_gate_routes(merge_policy_io_routes(merge_policy_routes(
+        merge_orchestrator_routes(router),
+    )))
 }

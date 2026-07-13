@@ -52,6 +52,7 @@ mod dispatch_preparation;
 mod policy_canvas;
 mod policy_canvas_io;
 mod policy_canvas_response;
+mod policy_spawn_gate;
 mod sync;
 
 pub(crate) use dispatch_preparation::prepare_claimed_task_board_dispatch;
@@ -65,6 +66,10 @@ pub(crate) use policy_canvas::{
     simulate_policy_pipeline, update_policy_scenario,
 };
 pub(crate) use policy_canvas_io::{export_policy, import_policy};
+pub(crate) use policy_spawn_gate::{
+    list_policy_approval_grants, resolve_policy_approval_grant,
+    set_policy_canvas_spawn_kill_switch, set_policy_canvas_spawn_requires_live_policy,
+};
 
 /// Create a persisted task-board item.
 ///

@@ -357,9 +357,11 @@ pub use task_board::{
 pub(crate) use task_board::{
     audit_policy_pipeline, create_policy_canvas, create_policy_scenario, delete_policy_canvas,
     delete_policy_scenario, duplicate_policy_canvas, export_policy, go_live_diff_policy_pipeline,
-    import_policy, make_live_policy_pipeline, policy_canvas_workspace, policy_pipeline,
-    promote_policy_pipeline, rename_policy_canvas, replay_policy_pipeline, reset_policy_scenarios,
-    save_policy_pipeline_draft, set_active_policy_canvas, set_policy_canvas_global_enforcement,
+    import_policy, list_policy_approval_grants, make_live_policy_pipeline, policy_canvas_workspace,
+    policy_pipeline, promote_policy_pipeline, rename_policy_canvas, replay_policy_pipeline,
+    reset_policy_scenarios, resolve_policy_approval_grant, save_policy_pipeline_draft,
+    set_active_policy_canvas, set_policy_canvas_global_enforcement,
+    set_policy_canvas_spawn_kill_switch, set_policy_canvas_spawn_requires_live_policy,
     simulate_policy_pipeline, update_policy_scenario,
 };
 pub(crate) use task_board::{dispatch_task_board_async, pick_task_board_dispatch_async};

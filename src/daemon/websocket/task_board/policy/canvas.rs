@@ -1,8 +1,9 @@
 use crate::daemon::http::{DaemonHttpState, require_async_db, task_board_route_executor};
 use crate::daemon::protocol::{
-    PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest, PolicyCanvasDuplicateRequest,
-    PolicyCanvasRenameRequest, PolicyCanvasSetActiveRequest,
-    PolicyCanvasSetGlobalEnforcementRequest, PolicyPipelineGetRequest, WsRequest, WsResponse,
+    PolicyApprovalGrantResolveRequest, PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest,
+    PolicyCanvasDuplicateRequest, PolicyCanvasRenameRequest, PolicyCanvasSetActiveRequest,
+    PolicyCanvasSetGlobalEnforcementRequest, PolicyCanvasSetSpawnKillSwitchRequest,
+    PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyPipelineGetRequest, WsRequest, WsResponse,
 };
 use crate::daemon::websocket::mutations::dispatch_query_result;
 
@@ -169,6 +170,99 @@ pub(super) async fn dispatch_policy_canvas_set_global_enforcement(
         "Set global policy enforcement",
         None,
         serde_json::json!({ "enabled": body.enabled }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_policy_canvas_set_spawn_requires_live_policy(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params::<PolicyCanvasSetSpawnRequiresLivePolicyRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy canvas spawn requires live policy") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    let result =
+        task_board_route_executor::set_policy_canvas_spawn_requires_live_policy(db, &body).await;
+    super::super::record_task_board_audit_result(
+        state,
+        "policy_canvas.set_spawn_requires_live_policy",
+        "Set spawn requires live policy",
+        None,
+        serde_json::json!({ "enabled": body.enabled }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_policy_canvas_set_spawn_kill_switch(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params::<PolicyCanvasSetSpawnKillSwitchRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy canvas spawn kill switch") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    let result = task_board_route_executor::set_policy_canvas_spawn_kill_switch(db, &body).await;
+    super::super::record_task_board_audit_result(
+        state,
+        "policy_canvas.set_spawn_kill_switch",
+        "Set spawn kill switch",
+        None,
+        serde_json::json!({ "enabled": body.enabled }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_policy_approval_grants_list(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(_body) = parse_params_or_default::<PolicyPipelineGetRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy approval grants list") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::list_policy_approval_grants(db).await,
+    )
+}
+
+pub(super) async fn dispatch_policy_approval_grant_resolve(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params::<PolicyApprovalGrantResolveRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy approval grant resolve") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    let result = task_board_route_executor::resolve_policy_approval_grant(db, &body).await;
+    super::super::record_task_board_audit_result(
+        state,
+        "policy_canvas.approval_grant_resolve",
+        "Resolve policy approval grant",
+        Some(body.grant_id.as_str()),
+        serde_json::json!({
+            "grant_id": &body.grant_id,
+            "approve": body.approve,
+        }),
         &result,
     )
     .await;

@@ -93,6 +93,11 @@ pub const POLICY_CANVAS_RENAME: &str = "policy_canvas.rename";
 pub const POLICY_CANVAS_SET_ACTIVE: &str = "policy_canvas.set_active";
 pub const POLICY_CANVAS_DELETE: &str = "policy_canvas.delete";
 pub const POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT: &str = "policy_canvas.set_global_enforcement";
+pub const POLICY_CANVAS_SET_SPAWN_REQUIRES_LIVE_POLICY: &str =
+    "policy_canvas.set_spawn_requires_live_policy";
+pub const POLICY_CANVAS_SET_SPAWN_KILL_SWITCH: &str = "policy_canvas.set_spawn_kill_switch";
+pub const POLICY_APPROVAL_GRANTS_LIST: &str = "policy_canvas.approval_grants_list";
+pub const POLICY_APPROVAL_GRANT_RESOLVE: &str = "policy_canvas.approval_grant_resolve";
 pub const POLICY_PIPELINE_GET: &str = "policy_pipeline.get";
 pub const POLICY_PIPELINE_SAVE_DRAFT: &str = "policy_pipeline.save_draft";
 pub const POLICY_PIPELINE_SIMULATE: &str = "policy_pipeline.simulate";
@@ -259,6 +264,10 @@ pub const ALL: &[&str] = &[
     POLICY_CANVAS_SET_ACTIVE,
     POLICY_CANVAS_DELETE,
     POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT,
+    POLICY_CANVAS_SET_SPAWN_REQUIRES_LIVE_POLICY,
+    POLICY_CANVAS_SET_SPAWN_KILL_SWITCH,
+    POLICY_APPROVAL_GRANTS_LIST,
+    POLICY_APPROVAL_GRANT_RESOLVE,
     POLICY_PIPELINE_GET,
     POLICY_PIPELINE_SAVE_DRAFT,
     POLICY_PIPELINE_SIMULATE,

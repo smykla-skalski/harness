@@ -1,9 +1,10 @@
 use serde_json::{Value, json};
 
 use crate::daemon::protocol::{
-    PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest, PolicyCanvasDuplicateRequest,
-    PolicyCanvasExportRequest, PolicyCanvasImportRequest, PolicyCanvasRenameRequest,
-    PolicyCanvasSetActiveRequest, PolicyCanvasSetGlobalEnforcementRequest,
+    PolicyApprovalGrantResolveRequest, PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest,
+    PolicyCanvasDuplicateRequest, PolicyCanvasExportRequest, PolicyCanvasImportRequest,
+    PolicyCanvasRenameRequest, PolicyCanvasSetActiveRequest, PolicyCanvasSetGlobalEnforcementRequest,
+    PolicyCanvasSetSpawnKillSwitchRequest, PolicyCanvasSetSpawnRequiresLivePolicyRequest,
     PolicyPipelineAuditRequest, PolicyPipelineGetRequest, PolicyPipelineGoLiveDiffRequest,
     PolicyPipelineMakeLiveRequest, PolicyPipelinePromoteRequest, PolicyPipelineReplayRequest,
     PolicyPipelineSaveDraftRequest, PolicyPipelineSimulateRequest, PolicyScenarioCreateRequest,
@@ -17,8 +18,38 @@ use super::support::{
 
 pub(super) fn register(registry: &mut ToolRegistry) {
     register_descriptors(registry, &canvas_descriptors());
+    register_descriptors(registry, &spawn_gate_descriptors());
     register_descriptors(registry, &pipeline_descriptors());
     register_descriptors(registry, &scenario_descriptors());
+}
+
+fn spawn_gate_descriptors() -> [TaskBoardToolDescriptor; 4] {
+    [
+        TaskBoardToolDescriptor {
+            name: ws_methods::POLICY_CANVAS_SET_SPAWN_REQUIRES_LIVE_POLICY,
+            description: "Toggle the fail-closed spawn-requires-live-policy switch.",
+            input_schema: global_enforcement_schema,
+            normalize: validate_params::<PolicyCanvasSetSpawnRequiresLivePolicyRequest>,
+        },
+        TaskBoardToolDescriptor {
+            name: ws_methods::POLICY_CANVAS_SET_SPAWN_KILL_SWITCH,
+            description: "Toggle the emergency spawn kill switch.",
+            input_schema: global_enforcement_schema,
+            normalize: validate_params::<PolicyCanvasSetSpawnKillSwitchRequest>,
+        },
+        TaskBoardToolDescriptor {
+            name: ws_methods::POLICY_APPROVAL_GRANTS_LIST,
+            description: "List pending approval grants awaiting a decision.",
+            input_schema: empty_schema,
+            normalize: validate_empty_object,
+        },
+        TaskBoardToolDescriptor {
+            name: ws_methods::POLICY_APPROVAL_GRANT_RESOLVE,
+            description: "Approve or deny a pending approval grant.",
+            input_schema: grant_resolve_schema,
+            normalize: validate_params::<PolicyApprovalGrantResolveRequest>,
+        },
+    ]
 }
 
 fn canvas_descriptors() -> [TaskBoardToolDescriptor; 7] {
@@ -301,6 +332,19 @@ fn global_enforcement_schema() -> Value {
             "enabled": { "type": "boolean" }
         },
         "required": ["enabled"],
+        "additionalProperties": false
+    })
+}
+
+fn grant_resolve_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "grant_id": { "type": "string" },
+            "approve": { "type": "boolean" },
+            "actor": { "type": "string" }
+        },
+        "required": ["grant_id", "approve"],
         "additionalProperties": false
     })
 }

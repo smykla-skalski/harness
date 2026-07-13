@@ -8,6 +8,8 @@ pub(super) fn policy_canvas_workspace_response(
         schema_version: workspace.schema_version,
         active_canvas_id: workspace.active_canvas_id.clone(),
         global_policy_enforcement_enabled: workspace.global_policy_enforcement_enabled,
+        spawn_requires_live_policy: workspace.spawn_requires_live_policy,
+        spawn_kill_switch: workspace.spawn_kill_switch,
         canvases: workspace
             .canvases
             .iter()
