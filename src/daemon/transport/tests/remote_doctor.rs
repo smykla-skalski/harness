@@ -79,8 +79,13 @@ fn daemon_remote_doctor_reports_ready_state_without_secret_material() {
     assert_eq!(response.summary.active_client_count, 1);
     assert_eq!(response.summary.revoked_client_count, 1);
 
-    let json = serde_json::to_string(&response).expect("serialize response");
-    assert!(json.contains(&expected_fingerprint));
+    let json = serde_json::to_value(&response).expect("serialize response");
+    assert_eq!(
+        json.pointer("/summary/certificate_fingerprint")
+            .and_then(serde_json::Value::as_str),
+        Some(expected_fingerprint.as_str())
+    );
+    let json = json.to_string();
     assert!(!json.contains("account-key-secret"));
     assert!(!json.contains("key-secret"));
     assert!(!json.contains("cert-pem"));
