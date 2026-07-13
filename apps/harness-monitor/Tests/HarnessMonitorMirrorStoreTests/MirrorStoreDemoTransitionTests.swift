@@ -22,6 +22,7 @@ final class MirrorStoreDemoTransitionTests: XCTestCase {
     store.setDemoMode(false)
 
     XCTAssertFalse(store.demoModeEnabled)
+    XCTAssertEqual(store.presentedSyncStatus, .unpaired)
     XCTAssertTrue(store.snapshot.stations.isEmpty)
     XCTAssertEqual(store.selectedStationID, "")
     XCTAssertTrue(try XCTUnwrap(sharedStore.loadLatestSnapshot()).stations.isEmpty)

@@ -188,6 +188,7 @@ public final class MirrorStore {
     if !enabled {
       snapshot = .empty()
       selectedStationID = ""
+      syncStatus = stationIDsForRefresh().isEmpty ? .unpaired : .syncing
       persistSharedSnapshot(snapshot)
       reconcileLiveActivity(snapshot)
     }
