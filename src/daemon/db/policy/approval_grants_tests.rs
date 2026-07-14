@@ -1,7 +1,13 @@
+use std::collections::HashMap;
+
 use tempfile::{TempDir, tempdir};
 
 use super::*;
-use crate::task_board::{PolicyAction, PolicyApprovalState, PolicyReasonCode};
+use crate::daemon::db::ReservedTaskBoardDispatch;
+use crate::task_board::{
+    PolicyAction, PolicyApprovalState, PolicyReasonCode, TaskBoardItem, TaskBoardStatus,
+    build_dispatch_plans_with_policy,
+};
 
 async fn connect() -> (TempDir, AsyncDaemonDb) {
     let dir = tempdir().expect("tempdir");
@@ -159,4 +165,73 @@ async fn consume_in_tx_matches_the_pooled_consume() {
         .expect("read")
         .expect("grant present");
     assert!(after.consumed_at.is_some(), "consumed_at is stamped");
+}
+
+#[tokio::test]
+async fn stale_consumed_grant_prevents_dispatch_preparation_completion() {
+    let (_dir, db) = connect().await;
+    let item_id = "board-item-1";
+    db.create_task_board_item(TaskBoardItem::new(
+        item_id.to_owned(),
+        "Stale grant dispatch".to_owned(),
+        "Body".to_owned(),
+        "2026-07-14T10:00:00Z".to_owned(),
+    ))
+    .await
+    .expect("create item");
+    let grant = db
+        .ensure_pending_approval_grant(&sample_grant())
+        .await
+        .expect("create grant");
+    db.resolve_approval_grant(&grant.id, true, "operator")
+        .await
+        .expect("approve grant");
+
+    let item = db.task_board_item(item_id).await.expect("load item");
+    let mut plan = build_dispatch_plans_with_policy(
+        &[item],
+        None,
+        None,
+        crate::task_board::SpawnGateSwitches::default(),
+        &HashMap::new(),
+    )
+    .remove(0);
+    plan.consumed_approval_grant_id = Some(grant.id.clone());
+    let reserved = db
+        .reserve_task_board_dispatch(&plan, "control-plane", None, false)
+        .await
+        .expect("reserve dispatch");
+    let intent_id = match reserved {
+        ReservedTaskBoardDispatch::Preparing { intent_id, .. } => intent_id,
+        ReservedTaskBoardDispatch::Applied(_) => panic!("new reservation was already applied"),
+    };
+    let claim = db
+        .claim_task_board_dispatch_preparation(&intent_id)
+        .await
+        .expect("claim preparation")
+        .expect("pending preparation");
+    assert!(consume(&db, &grant.id).await, "race consumes grant first");
+
+    let error = db
+        .complete_task_board_dispatch_preparation(&claim, "harness/stale", "/tmp/stale")
+        .await
+        .expect_err("stale grant must reject completion");
+    assert!(
+        error.message().contains("approval grant already consumed"),
+        "unexpected error: {error:?}"
+    );
+
+    let published_intents: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM task_board_dispatch_intents
+         WHERE item_id = ?1 AND status IN ('held', 'pending', 'starting')",
+    )
+    .bind(item_id)
+    .fetch_one(db.pool())
+    .await
+    .expect("count published intents");
+    assert_eq!(published_intents, 0, "stale grant must publish no intent");
+    let unchanged = db.task_board_item(item_id).await.expect("reload item");
+    assert_eq!(unchanged.status, TaskBoardStatus::Todo);
+    assert!(unchanged.session_id.is_none());
+    assert!(unchanged.work_item_id.is_none());
 }

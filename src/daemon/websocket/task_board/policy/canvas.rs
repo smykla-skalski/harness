@@ -229,7 +229,7 @@ pub(super) async fn dispatch_policy_approval_grants_list(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    let Ok(_body) = parse_params_or_default::<PolicyPipelineGetRequest>(request) else {
+    let Ok(_params) = parse_params_or_default::<serde_json::Value>(request) else {
         return invalid_params(request);
     };
     let db = match require_async_db(state, "policy approval grants list") {

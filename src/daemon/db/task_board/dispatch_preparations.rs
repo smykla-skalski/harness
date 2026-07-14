@@ -256,7 +256,12 @@ impl AsyncDaemonDb {
         // transaction so a re-dispatch of the same item must obtain a fresh
         // approval. Nothing to consume on every non-approval dispatch path.
         if let Some(grant_id) = preparation.plan.consumed_approval_grant_id.as_deref() {
-            consume_approval_grant_in_tx(transaction.as_mut(), grant_id).await?;
+            let consumed = consume_approval_grant_in_tx(transaction.as_mut(), grant_id).await?;
+            if !consumed {
+                return Err(db_error(format!(
+                    "approval grant already consumed; rebuild plan (grant '{grant_id}')"
+                )));
+            }
         }
         let applied = DispatchAppliedTask {
             board_item_id: preparation.board_item_id.clone(),

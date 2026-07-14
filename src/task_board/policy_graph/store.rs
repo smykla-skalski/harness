@@ -131,6 +131,7 @@ pub struct PolicyPipelineAuditSummary {
     pub spawn_requires_live_policy: bool,
     #[serde(default)]
     pub spawn_kill_switch: bool,
+    /// Populated by the daemon service layer; pure audit callers receive zero.
     #[serde(default)]
     pub pending_approval_grant_count: usize,
 }
