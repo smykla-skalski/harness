@@ -1,8 +1,7 @@
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use std::os::unix::fs::PermissionsExt;
 
@@ -31,6 +30,17 @@ fn write_helper_script(path: &Path, body: &str) {
     let mut permissions = fs::metadata(path).expect("helper metadata").permissions();
     permissions.set_mode(0o755);
     fs::set_permissions(path, permissions).expect("set helper executable");
+}
+
+fn set_helper_modified(path: &Path, seconds: u64) {
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .open(path)
+        .expect("open helper for timestamp update");
+    file.set_times(
+        fs::FileTimes::new().set_modified(SystemTime::UNIX_EPOCH + Duration::from_secs(seconds)),
+    )
+    .expect("set helper timestamp");
 }
 
 fn valid_helper_script() -> &'static str {
@@ -272,8 +282,9 @@ async fn default_helper_candidate_prefers_newest_platform_build() {
     let release = build_root.join("arm64-apple-macosx/release/harness-monitor-input");
     let debug = build_root.join("arm64-apple-macosx/debug/harness-monitor-input");
     write_helper_script(&release, valid_helper_script());
-    thread::sleep(Duration::from_millis(20));
     write_helper_script(&debug, valid_helper_script());
+    set_helper_modified(&release, 1);
+    set_helper_modified(&debug, 2);
 
     let candidate = default_helper_candidate_in(temp.path()).await;
     assert_eq!(candidate, Some(debug));
@@ -288,8 +299,9 @@ async fn default_helper_candidate_skips_newer_non_viable_platform_build() {
     let release = build_root.join("arm64-apple-macosx/release/harness-monitor-input");
     let debug = build_root.join("arm64-apple-macosx/debug/harness-monitor-input");
     write_helper_script(&release, valid_helper_script());
-    thread::sleep(Duration::from_millis(20));
     write_helper_script(&debug, failing_helper_script());
+    set_helper_modified(&release, 1);
+    set_helper_modified(&debug, 2);
 
     let candidate = default_helper_candidate_in(temp.path()).await;
     assert_eq!(candidate, Some(release));
@@ -306,8 +318,9 @@ async fn default_helper_candidate_prefers_newest_viable_candidate_across_search_
         .path()
         .join("mcp-servers/harness-monitor-registry/.build/arm64-apple-macosx/debug/harness-monitor-input");
     write_helper_script(&older, valid_helper_script());
-    thread::sleep(Duration::from_millis(20));
     write_helper_script(&newer, valid_helper_script());
+    set_helper_modified(&older, 1);
+    set_helper_modified(&newer, 2);
 
     let candidate = default_helper_candidate_from_roots(&[
         first_root.path().to_path_buf(),

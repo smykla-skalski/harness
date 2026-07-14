@@ -561,7 +561,7 @@ run = "./scripts/host-metrics.sh build-darwin-exporter"
 [tasks."mcp:test"]
 description = "Run harness MCP server unit and integration tests"
 run = [
-  "./scripts/cargo-local.sh test --lib mcp::",
+  "./scripts/cargo-local.sh test --lib mcp:: -- --test-threads=1",
   "./scripts/cargo-local.sh test --test integration mcp:: -- --test-threads=1",
 ]
 
