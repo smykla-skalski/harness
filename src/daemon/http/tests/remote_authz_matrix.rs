@@ -64,6 +64,14 @@ async fn remote_http_authz_matrix_protects_every_sse_route() {
     let _ = server.await;
 }
 
+#[test]
+fn remote_http_authz_matrix_accepts_sse_content_type_parameters() {
+    assert!(is_sse_content_type("text/event-stream"));
+    assert!(is_sse_content_type("text/event-stream; charset=utf-8"));
+    assert!(is_sse_content_type("TEXT/EVENT-STREAM; charset=UTF-8"));
+    assert!(!is_sse_content_type("text/plain; charset=utf-8"));
+}
+
 fn assert_missing_credentials_denied(
     state: &crate::daemon::http::DaemonHttpState,
     route: &HttpApiRouteContract,
@@ -210,14 +218,22 @@ async fn assert_sse_status(
         .expect("send SSE request");
     assert_eq!(response.status(), expected, "GET {path}");
     if expected == StatusCode::OK {
-        assert_eq!(
-            response
-                .headers()
-                .get(reqwest::header::CONTENT_TYPE)
-                .and_then(|value| value.to_str().ok()),
-            Some("text/event-stream")
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok());
+        assert!(
+            content_type.is_some_and(is_sse_content_type),
+            "GET {path} returned invalid SSE Content-Type {content_type:?}"
         );
     }
+}
+
+fn is_sse_content_type(value: &str) -> bool {
+    value
+        .split(';')
+        .next()
+        .is_some_and(|media_type| media_type.trim().eq_ignore_ascii_case("text/event-stream"))
 }
 
 async fn serve_http(state: crate::daemon::http::DaemonHttpState) -> (String, JoinHandle<()>) {
