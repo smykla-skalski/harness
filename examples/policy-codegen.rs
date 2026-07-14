@@ -243,8 +243,10 @@ fn emit_struct(out: &mut String, spec: &SwiftStruct) {
         emit_decoder(out, spec);
     }
 
-    out.push('\n');
-    emit_coding_keys(out, spec);
+    if !spec.fields.is_empty() {
+        out.push('\n');
+        emit_coding_keys(out, spec);
+    }
     out.push_str("}\n");
 }
 
@@ -3826,6 +3828,24 @@ public struct Sample: Codable, Equatable, Sendable {
   }
 }
 ";
+        let mut out = String::new();
+        emit_struct(&mut out, &spec);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn emits_empty_struct_without_empty_coding_keys() {
+        let spec = SwiftStruct {
+            name: "EmptyRequest".to_string(),
+            fields: Vec::new(),
+        };
+
+        let expected = "\
+public struct EmptyRequest: Codable, Equatable, Sendable {
+
+  public init() {
+  }
+}\n";
         let mut out = String::new();
         emit_struct(&mut out, &spec);
         assert_eq!(out, expected);
