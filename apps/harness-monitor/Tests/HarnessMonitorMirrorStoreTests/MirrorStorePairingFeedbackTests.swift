@@ -40,6 +40,42 @@ final class MirrorStorePairingFeedbackTests: XCTestCase {
     XCTAssertEqual(store.presentedSyncStatus, store.syncStatus)
     XCTAssertEqual(store.pairingFailureStatus, pairingStoreUnavailableStatus)
   }
+
+  func testActiveSyncRecoveryWinsOverPriorPairingFailure() async throws {
+    let now = Date()
+    let store = MirrorStore(
+      pairer: PairingStoreUnavailablePairer(),
+      sharedSnapshotStore: nil
+    )
+
+    await store.handleOpenURL(try remoteInvitationURL(now: now), deviceName: "Test iPhone")
+    for status in [MirrorSyncStatus.localNetworkDenied, .iCloudAccountUnavailable] {
+      store.syncStatus = status
+      XCTAssertEqual(store.presentedSyncStatus, status)
+    }
+    XCTAssertEqual(store.pairingFailureStatus, pairingStoreUnavailableStatus)
+  }
+
+  func testPairingExitClearsPersistedDemoSnapshotOnFailure() async throws {
+    let now = Date()
+    let snapshotURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("mirror-store-pairing-demo-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: snapshotURL) }
+    let sharedStore = MobileSharedSnapshotStore(fileURL: snapshotURL)
+    let store = MirrorStore(
+      demoModeEnabled: true,
+      pairer: PairingStoreUnavailablePairer(),
+      sharedSnapshotStore: sharedStore
+    )
+    await store.refresh()
+    XCTAssertFalse(try XCTUnwrap(sharedStore.loadLatestSnapshot()).stations.isEmpty)
+
+    await store.handleOpenURL(try remoteInvitationURL(now: now), deviceName: "Test iPhone")
+
+    XCTAssertFalse(store.demoModeEnabled)
+    XCTAssertTrue(store.snapshot.stations.isEmpty)
+    XCTAssertTrue(try XCTUnwrap(sharedStore.loadLatestSnapshot()).stations.isEmpty)
+  }
 }
 
 private let pairingStoreUnavailableStatus = MirrorSyncStatus.pairingFailed(

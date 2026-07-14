@@ -222,6 +222,8 @@ extension MirrorStore {
       if wasDemoModeEnabled {
         snapshot = .empty()
         selectedStationID = ""
+        persistSharedSnapshot(snapshot)
+        reconcileLiveActivity(snapshot)
       }
       syncStatus = .pairing(pairingLink.stationName)
       let credential = try await pairer.pair(

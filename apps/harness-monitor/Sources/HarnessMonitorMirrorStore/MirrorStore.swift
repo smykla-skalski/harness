@@ -126,11 +126,10 @@ public final class MirrorStore {
       return syncStatus
     }
     switch syncStatus {
-    case .unpaired, .pairing, .pairingFailed, .syncing, .stale, .localNetworkDenied,
-      .iCloudAccountUnavailable:
+    case .unpaired, .pairing, .pairingFailed, .syncing, .stale:
       return pairingFailureStatus
-    case .demo, .live, .paired, .privacy, .commandQueued, .commandCompleted,
-      .commandCancelled, .commandFailed:
+    case .demo, .live, .localNetworkDenied, .iCloudAccountUnavailable, .paired, .privacy,
+      .commandQueued, .commandCompleted, .commandCancelled, .commandFailed:
       return syncStatus
     }
   }
