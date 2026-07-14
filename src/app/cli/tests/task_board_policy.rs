@@ -1,7 +1,9 @@
 use clap::{Parser, error::ErrorKind};
 
 use super::{Cli, task_board_command};
-use crate::task_board::transport::{TaskBoardCommand, TaskBoardPolicyCommand};
+use crate::task_board::transport::{
+    TaskBoardCommand, TaskBoardOrchestratorCommand, TaskBoardPolicyCommand,
+};
 
 #[test]
 fn parse_task_board_manual_dispatch_steps() {
@@ -29,6 +31,26 @@ fn parse_task_board_manual_dispatch_steps() {
             assert!(args.json);
         }
         _ => panic!("expected TaskBoard DispatchDeliver"),
+    }
+}
+
+#[test]
+fn parse_orchestrator_step_mode() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "orchestrator",
+        "settings",
+        "--step-mode",
+        "true",
+        "--json",
+    ])
+    .expect("parse orchestrator step mode");
+    match task_board_command(cli.command) {
+        TaskBoardCommand::Orchestrator {
+            command: TaskBoardOrchestratorCommand::Settings(args),
+        } => assert_eq!(args.step_mode, Some(true)),
+        _ => panic!("expected TaskBoard Orchestrator Settings"),
     }
 }
 
