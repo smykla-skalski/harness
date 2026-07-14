@@ -6,6 +6,7 @@ use axum::response::{IntoResponse, Response};
 use tracing::field::display;
 use uuid::Uuid;
 
+use crate::daemon::remote_identity::bounded_remote_request_id;
 use crate::errors::{CliError, CliErrorKind};
 use crate::telemetry::record_daemon_http_metrics;
 
@@ -147,5 +148,8 @@ pub(crate) fn extract_request_id(headers: &HeaderMap) -> String {
         .and_then(|value| value.to_str().ok())
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map_or_else(|| format!("daemon-{}", Uuid::new_v4()), ToString::to_string)
+        .map_or_else(
+            || format!("daemon-{}", Uuid::new_v4()),
+            bounded_remote_request_id,
+        )
 }

@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::sync::Arc;
 
 use uuid::Uuid;
@@ -8,9 +7,6 @@ use super::remote::RemoteAccessScope;
 use super::remote_identity::{RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision};
 use crate::errors::{CliError, CliErrorKind};
 use crate::workspace::utc_now;
-
-const REMOTE_AUDIT_REQUEST_ID_MAX_BYTES: usize = 256;
-const REMOTE_AUDIT_TRUNCATION_MARKER: &str = "...";
 
 pub(crate) struct RemoteAuthorizationAudit<'a> {
     request_id: &'a str,
@@ -113,12 +109,11 @@ impl<'a> RemoteAuthorizationAudit<'a> {
         db: Option<&Arc<AsyncDaemonDb>>,
     ) -> Result<RemoteAuthorizationAuditReceipt, CliError> {
         let db = db.ok_or_else(remote_audit_store_unavailable)?;
-        let request_id = bounded_request_id(self.request_id);
         let event_id = format!("remote-auth-{}", Uuid::new_v4());
         let event = RemoteAuditEvent::new(
             event_id.clone(),
             utc_now(),
-            Some(request_id.as_ref()),
+            Some(self.request_id),
             self.client_id,
             self.target,
             self.scope,
@@ -141,20 +136,6 @@ fn remote_audit_store_unavailable() -> CliError {
     ))
 }
 
-fn bounded_request_id(request_id: &str) -> Cow<'_, str> {
-    if request_id.len() <= REMOTE_AUDIT_REQUEST_ID_MAX_BYTES {
-        return Cow::Borrowed(request_id);
-    }
-    let mut boundary = REMOTE_AUDIT_REQUEST_ID_MAX_BYTES - REMOTE_AUDIT_TRUNCATION_MARKER.len();
-    while !request_id.is_char_boundary(boundary) {
-        boundary -= 1;
-    }
-    let mut bounded = String::with_capacity(REMOTE_AUDIT_REQUEST_ID_MAX_BYTES);
-    bounded.push_str(&request_id[..boundary]);
-    bounded.push_str(REMOTE_AUDIT_TRUNCATION_MARKER);
-    Cow::Owned(bounded)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -166,17 +147,6 @@ mod tests {
     use tempfile::tempdir;
 
     use super::super::db::DaemonDb;
-
-    #[test]
-    fn remote_authorization_audit_bounds_unicode_request_ids_on_a_character_boundary() {
-        let request_id = "\u{17c}".repeat(256);
-
-        let bounded = bounded_request_id(&request_id);
-
-        assert!(bounded.len() <= REMOTE_AUDIT_REQUEST_ID_MAX_BYTES);
-        assert!(bounded.ends_with(REMOTE_AUDIT_TRUNCATION_MARKER));
-        assert!(bounded.is_char_boundary(bounded.len()));
-    }
 
     #[tokio::test(flavor = "current_thread")]
     async fn remote_authorization_audit_yields_while_sqlite_writer_finishes() {

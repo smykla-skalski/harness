@@ -18,6 +18,8 @@ mod tests;
 const TOKEN_RANDOM_BYTES: usize = 32;
 const TOKEN_HINT_CHARS: usize = 6;
 const REDACTED_TOKEN_HINT: &str = "<redacted>";
+const REMOTE_REQUEST_ID_MAX_BYTES: usize = 256;
+const REMOTE_REQUEST_ID_TRUNCATION_MARKER: &str = "...";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RemoteIdentityError {
@@ -322,7 +324,7 @@ impl RemoteAuditEvent {
         Self {
             event_id: event_id.into(),
             recorded_at: recorded_at.into(),
-            request_id: request_id.map(ToOwned::to_owned),
+            request_id: request_id.map(bounded_remote_request_id),
             client_id: client_id.map(ToOwned::to_owned),
             route_or_method: route_or_method.into(),
             scope,
@@ -337,6 +339,20 @@ impl RemoteAuditEvent {
     pub fn error_detail(&self) -> Option<&str> {
         self.error_detail.as_deref()
     }
+}
+
+pub(crate) fn bounded_remote_request_id(request_id: &str) -> String {
+    if request_id.len() <= REMOTE_REQUEST_ID_MAX_BYTES {
+        return request_id.to_owned();
+    }
+    let mut boundary = REMOTE_REQUEST_ID_MAX_BYTES - REMOTE_REQUEST_ID_TRUNCATION_MARKER.len();
+    while !request_id.is_char_boundary(boundary) {
+        boundary -= 1;
+    }
+    let mut bounded = String::with_capacity(REMOTE_REQUEST_ID_MAX_BYTES);
+    bounded.push_str(&request_id[..boundary]);
+    bounded.push_str(REMOTE_REQUEST_ID_TRUNCATION_MARKER);
+    bounded
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

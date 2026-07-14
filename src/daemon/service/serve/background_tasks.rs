@@ -5,8 +5,10 @@ use tokio::sync::broadcast;
 use tokio::sync::watch as tokio_watch;
 use tokio::task::JoinHandle;
 
+use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::StreamEvent;
+use crate::daemon::remote_pairing_expiry_loop::spawn_remote_pairing_expiry_loop;
 use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer, run_broadcast_fanout};
 
 use super::acp_inspect_publisher::spawn_acp_inspect_publisher;
@@ -36,6 +38,7 @@ pub(super) struct BackgroundTaskHandles {
     pub _acp_inspect_push: JoinHandle<()>,
     pub _github_data_change_push: JoinHandle<()>,
     pub _machine_heartbeat: Option<JoinHandle<()>>,
+    pub _remote_pairing_expiry: Option<JoinHandle<()>>,
     pub _task_board_dispatch_loop: Option<JoinHandle<()>>,
     pub _task_board_orchestrator_loop: Option<JoinHandle<()>>,
 }
@@ -46,6 +49,13 @@ pub(super) fn spawn_background_tasks(
     shutdown_rx: tokio_watch::Receiver<bool>,
 ) -> BackgroundTaskHandles {
     let async_db = app_state.async_db.get().cloned();
+    let remote_pairing_expiry = if app_state.auth_mode == DaemonHttpAuthMode::Remote {
+        async_db
+            .as_ref()
+            .map(|db| spawn_remote_pairing_expiry_loop(Arc::clone(db), shutdown_rx.clone()))
+    } else {
+        None
+    };
     BackgroundTaskHandles {
         _acp_inspect_push: spawn_acp_inspect_publisher(
             app_state.sender.clone(),
@@ -59,6 +69,7 @@ pub(super) fn spawn_background_tasks(
         _machine_heartbeat: async_db
             .as_ref()
             .map(|db| spawn_machine_heartbeat_loop(Arc::clone(db), shutdown_rx.clone())),
+        _remote_pairing_expiry: remote_pairing_expiry,
         _task_board_dispatch_loop: async_db
             .as_ref()
             .map(|_| spawn_task_board_dispatch_loop(app_state.clone(), shutdown_rx.clone())),

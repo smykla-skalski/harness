@@ -131,6 +131,26 @@ fn remote_pairing_claim_request_separates_config_and_claim_domains() {
 }
 
 #[test]
+fn remote_pairing_claim_request_bounds_request_id() {
+    let request_id = "r".repeat(300);
+    let claim = RemotePairingClaimRequest::new(
+        "daemon.example.com",
+        "daemon.example.com",
+        "client-1",
+        "MacBook Pro",
+        "macos",
+        Some(request_id.as_str()),
+        Some("203.0.113.10"),
+        "audit-claim-bounded-request",
+    )
+    .expect("claim request");
+
+    let stored_request_id = claim.request_id.as_deref().expect("request id");
+    assert_eq!(stored_request_id.len(), 256);
+    assert!(stored_request_id.ends_with("..."));
+}
+
+#[test]
 fn remote_pairing_claim_request_rejects_blank_display_name_and_platform() {
     assert!(
         RemotePairingClaimRequest::new_for_tests(

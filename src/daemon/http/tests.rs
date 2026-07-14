@@ -50,6 +50,7 @@ mod remote_clients;
 mod remote_limits;
 mod remote_limits_support;
 mod remote_pairing;
+mod remote_pairing_audit;
 mod remote_pairing_status;
 mod remote_viewer_diagnostics;
 mod remote_viewer_support;
@@ -146,6 +147,20 @@ fn extract_request_id_preserves_supplied_header() {
     );
 
     assert_eq!(extract_request_id(&headers), "req-123");
+}
+
+#[test]
+fn extract_request_id_bounds_supplied_header() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "x-request-id",
+        "r".repeat(300).parse().expect("long request id header"),
+    );
+
+    let request_id = extract_request_id(&headers);
+
+    assert_eq!(request_id.len(), 256);
+    assert!(request_id.ends_with("..."));
 }
 
 #[test]

@@ -1,4 +1,3 @@
-use std::sync::{Arc, Mutex};
 use std::thread;
 
 use axum::http::StatusCode;
@@ -9,9 +8,7 @@ use crate::daemon::http::DaemonHttpAuthMode;
 use crate::daemon::protocol::http_paths;
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 use crate::daemon::remote_identity::{RemoteBearerToken, RemoteClientRegistration};
-use crate::daemon::remote_pairing::{
-    RemotePairingCode, RemotePairingRateLimiter, RemotePairingRecord,
-};
+use crate::daemon::remote_pairing::{RemotePairingCode, RemotePairingRecord};
 use crate::reviews::ReviewsQueryRequest;
 
 use super::test_http_state_with_db;
@@ -33,6 +30,7 @@ async fn remote_pair_claim_is_public_and_returns_one_time_client_token() {
 
     let response = reqwest::Client::new()
         .post(format!("{base_url}{}", http_paths::REMOTE_PAIR_CLAIM))
+        .header("x-request-id", "pairing-http-success-request")
         .header("x-forwarded-for", "203.0.113.90")
         .json(&serde_json::json!({
             "code": code.expose(),
@@ -72,6 +70,10 @@ async fn remote_pair_claim_is_public_and_returns_one_time_client_token() {
         .into_iter()
         .find(|event| event.route_or_method == "remote.pair.claim")
         .expect("claim audit event");
+    assert_eq!(
+        claim_event.request_id.as_deref(),
+        Some("pairing-http-success-request")
+    );
     assert_eq!(claim_event.remote_addr.as_deref(), Some("127.0.0.1"));
 
     server.abort();
@@ -123,113 +125,6 @@ async fn remote_pair_claim_returns_server_owned_reviews_query() {
     );
     assert_eq!(body["reviews_query"]["cache_max_age_seconds"], 45);
     assert!(!body.to_string().contains(code.expose()));
-
-    server.abort();
-    let _ = server.await;
-}
-
-#[tokio::test]
-async fn remote_pair_claim_rejects_replay_and_audits_without_leaking_code() {
-    let state = remote_pairing_state();
-    let code = seed_pairing_code(
-        &state,
-        "pairing-http-replay",
-        RemoteRole::Viewer,
-        &[],
-        "http-replay-secret",
-        "2026-06-21T18:00:00Z",
-        "2099-06-21T18:10:00Z",
-    );
-    let db = state.db.get().expect("db slot").clone();
-    let (base_url, server) = serve_http(state).await;
-    let client = reqwest::Client::new();
-    let url = format!("{base_url}{}", http_paths::REMOTE_PAIR_CLAIM);
-
-    let first = client
-        .post(&url)
-        .json(&serde_json::json!({
-            "code": code.expose(),
-            "domain": "daemon.example.com",
-            "client_id": "viewer-1",
-            "display_name": "Viewer iPhone",
-            "platform": "ios",
-        }))
-        .send()
-        .await
-        .expect("send first claim");
-    assert_eq!(first.status(), StatusCode::OK);
-
-    let replay = client
-        .post(&url)
-        .json(&serde_json::json!({
-            "code": code.expose(),
-            "domain": "daemon.example.com",
-            "client_id": "viewer-2",
-            "display_name": "Viewer iPad",
-            "platform": "ios",
-        }))
-        .send()
-        .await
-        .expect("send replay claim");
-
-    assert_eq!(replay.status(), StatusCode::CONFLICT);
-    let body = replay.json::<serde_json::Value>().await.expect("json body");
-    assert_eq!(body["error"]["code"], "REMOTE_PAIRING");
-    assert!(!body.to_string().contains(code.expose()));
-    let routes: Vec<_> = db
-        .lock()
-        .expect("db lock")
-        .load_remote_audit_events(10)
-        .expect("audit events")
-        .into_iter()
-        .map(|event| event.route_or_method)
-        .collect();
-    assert!(routes.contains(&"remote.pair.claim".to_string()));
-    assert!(routes.contains(&"remote.pair.replay".to_string()));
-
-    server.abort();
-    let _ = server.await;
-}
-
-#[tokio::test]
-async fn remote_pair_claim_rate_limits_one_ip_across_rotating_bad_codes() {
-    let mut state = remote_pairing_state();
-    state.remote_pairing_limiter = Arc::new(Mutex::new(RemotePairingRateLimiter::new_for_tests(2)));
-    let db = state.db.get().expect("db slot").clone();
-    let (base_url, server) = serve_http(state).await;
-    let client = reqwest::Client::new();
-    let url = format!("{base_url}{}", http_paths::REMOTE_PAIR_CLAIM);
-
-    for (code, expected_status) in [
-        ("not-a-real-code-1", StatusCode::BAD_REQUEST),
-        ("not-a-real-code-2", StatusCode::BAD_REQUEST),
-        ("not-a-real-code-3", StatusCode::TOO_MANY_REQUESTS),
-    ] {
-        let response = client
-            .post(&url)
-            .json(&serde_json::json!({
-                "code": code,
-                "domain": "daemon.example.com",
-                "client_id": "ios-rate-limit",
-                "display_name": "iPhone",
-                "platform": "ios",
-            }))
-            .send()
-            .await
-            .expect("send bad claim");
-        assert_eq!(response.status(), expected_status);
-    }
-
-    let routes: Vec<_> = db
-        .lock()
-        .expect("db lock")
-        .load_remote_audit_events(10)
-        .expect("audit events")
-        .into_iter()
-        .map(|event| event.route_or_method)
-        .collect();
-    assert!(routes.contains(&"remote.pair.unknown".to_string()));
-    assert!(routes.contains(&"remote.pair.rate_limit".to_string()));
 
     server.abort();
     let _ = server.await;
@@ -432,14 +327,14 @@ async fn remote_pair_claim_replaces_existing_stable_client() {
     let _ = server.await;
 }
 
-fn remote_pairing_state() -> crate::daemon::http::DaemonHttpState {
+pub(super) fn remote_pairing_state() -> crate::daemon::http::DaemonHttpState {
     let mut state = test_http_state_with_db();
     state.auth_mode = DaemonHttpAuthMode::Remote;
     state.remote_domain = Some("daemon.example.com".to_string());
     state
 }
 
-fn seed_pairing_code(
+pub(super) fn seed_pairing_code(
     state: &crate::daemon::http::DaemonHttpState,
     pairing_id: &str,
     role: RemoteRole,
@@ -489,7 +384,9 @@ fn seed_pairing_code_with_reviews_query(
     code
 }
 
-async fn serve_http(state: crate::daemon::http::DaemonHttpState) -> (String, JoinHandle<()>) {
+pub(super) async fn serve_http(
+    state: crate::daemon::http::DaemonHttpState,
+) -> (String, JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind listener");

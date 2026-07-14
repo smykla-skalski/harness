@@ -104,7 +104,7 @@ fn claim_remote_pairing_for_addr(
     request_id: &str,
     remote_addr: &str,
 ) -> Result<RemotePairClaimHttpResponse, RemotePairClaimHttpError> {
-    let claim = authorize_pairing_claim(state, request, remote_addr)?;
+    let claim = authorize_pairing_claim(state, request, request_id, remote_addr)?;
     let claimed = claim_pairing_client(state, request.code.as_str(), &claim)?;
     log_remote_pairing_claimed(request_id, claimed.client.client_id.as_str());
     Ok(remote_pair_claim_response(claimed))
@@ -121,11 +121,18 @@ fn log_remote_pairing_claimed(request_id: &str, client_id: &str) {
 fn authorize_pairing_claim(
     state: &DaemonHttpState,
     request: &RemotePairClaimHttpRequest,
+    request_id: &str,
     remote_addr: &str,
 ) -> Result<RemotePairingClaimRequest, RemotePairClaimHttpError> {
-    check_claim_rate_limit(state, request.code.as_str(), remote_addr)?;
+    check_claim_rate_limit(
+        state,
+        request.code.as_str(),
+        request.client_id.as_str(),
+        request_id,
+        remote_addr,
+    )?;
     let expected_domain = expected_remote_domain(state)?;
-    build_pairing_claim(expected_domain, request, remote_addr)
+    build_pairing_claim(expected_domain, request, request_id, remote_addr)
 }
 
 fn expected_remote_domain(state: &DaemonHttpState) -> Result<&str, RemotePairClaimHttpError> {
@@ -140,6 +147,7 @@ fn expected_remote_domain(state: &DaemonHttpState) -> Result<&str, RemotePairCla
 fn build_pairing_claim(
     expected_domain: &str,
     request: &RemotePairClaimHttpRequest,
+    request_id: &str,
     remote_addr: &str,
 ) -> Result<RemotePairingClaimRequest, RemotePairClaimHttpError> {
     let audit_event_id = format!("remote-pair-claim-{}", Uuid::new_v4());
@@ -149,6 +157,7 @@ fn build_pairing_claim(
         request.client_id.as_str(),
         request.display_name.as_str(),
         request.platform.as_str(),
+        Some(request_id),
         Some(remote_addr),
         audit_event_id,
     )
@@ -195,6 +204,8 @@ fn remote_pair_claim_response(claimed: RemotePairingClaimedClient) -> RemotePair
 fn check_claim_rate_limit(
     state: &DaemonHttpState,
     code: &str,
+    client_id: &str,
+    request_id: &str,
     remote_addr: &str,
 ) -> Result<(), RemotePairClaimHttpError> {
     let code_fingerprint = RemotePairingCodeHash::from_code(code).map_or_else(
@@ -205,21 +216,40 @@ fn check_claim_rate_limit(
         .remote_pairing_limiter
         .lock()
         .map_err(|_| RemotePairClaimHttpError::StoreUnavailable)?;
-    limiter
-        .record_attempt(remote_addr, code_fingerprint.as_str())
-        .map_err(|error| match error {
-            RemotePairingError::RateLimited => {
-                let _ = record_rate_limit_audit(state, remote_addr);
-                RemotePairClaimHttpError::RateLimited
+    let attempt = limiter.record_attempt(remote_addr, code_fingerprint.as_str());
+    drop(limiter);
+    attempt.map_err(|error| match error {
+        RemotePairingError::RateLimited => {
+            match record_rate_limit_audit(state, client_id, request_id, remote_addr) {
+                Ok(()) => RemotePairClaimHttpError::RateLimited,
+                Err(error) => {
+                    log_rate_limit_audit_failure(&error);
+                    RemotePairClaimHttpError::StoreUnavailable
+                }
             }
-            other => RemotePairClaimHttpError::Pairing(other),
-        })
+        }
+        other => RemotePairClaimHttpError::Pairing(other),
+    })
 }
 
-fn record_rate_limit_audit(state: &DaemonHttpState, remote_addr: &str) -> Result<(), CliError> {
-    let Some(db) = state.db.get() else {
-        return Ok(());
-    };
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_rate_limit_audit_failure(error: &CliError) {
+    tracing::error!(%error, "remote pairing rate-limit audit failed");
+}
+
+fn record_rate_limit_audit(
+    state: &DaemonHttpState,
+    client_id: &str,
+    request_id: &str,
+    remote_addr: &str,
+) -> Result<(), CliError> {
+    let db = state
+        .db
+        .get()
+        .ok_or_else(|| CliErrorKind::workflow_io("remote pairing audit store is unavailable"))?;
     let db = db
         .lock()
         .map_err(|error| CliErrorKind::workflow_io(format!("remote pairing db lock: {error}")))?;
@@ -227,8 +257,8 @@ fn record_rate_limit_audit(state: &DaemonHttpState, remote_addr: &str) -> Result
     db.record_remote_audit_event(&RemoteAuditEvent::new(
         event_id.as_str(),
         utc_now().as_str(),
-        None,
-        None,
+        Some(request_id),
+        Some(client_id),
         "remote.pair.rate_limit",
         RemoteAccessScope::Read,
         RemoteAuditScopeDecision::Denied,

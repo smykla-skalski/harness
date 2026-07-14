@@ -40,6 +40,7 @@ impl DaemonDb {
             return Ok(RemotePairingStatus::Claimed);
         }
         if pairing_is_expired(&expires_at, now)? {
+            self.record_remote_pairing_expiration(pairing_id, now)?;
             return Ok(RemotePairingStatus::Expired);
         }
         Ok(RemotePairingStatus::Pending)
