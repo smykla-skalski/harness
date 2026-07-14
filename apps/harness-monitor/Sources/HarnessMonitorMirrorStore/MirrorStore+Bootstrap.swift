@@ -59,6 +59,7 @@ extension MirrorStore {
   }
 
   private func leaveDemoModeForStoredWatchPairing() {
+    pairingFailureDescription = nil
     demoModeEnabled = false
     snapshot = .empty()
     selectedStationID = ""

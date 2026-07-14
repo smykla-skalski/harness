@@ -86,6 +86,19 @@ final class WatchRemoteDaemonPairingStoreTests: XCTestCase {
     XCTAssertFalse(store.shouldRunForegroundRefresh)
   }
 
+  func testWatchActivationClearsPriorPairingFailure() async throws {
+    let fixture = try WatchRemotePairingStoreFixture(
+      device: .iOS,
+      demoModeEnabled: true
+    )
+    fixture.store.pairingFailureDescription = "Previous pairing failed."
+
+    await fixture.store.refreshForegroundState()
+
+    XCTAssertNil(fixture.store.pairingFailureDescription)
+    XCTAssertNotEqual(fixture.store.presentedSyncStatus, .pairingFailed("Previous pairing failed."))
+  }
+
   func testWatchLoadReportsStoredPairingReadFailureInsteadOfDemo() async {
     let error = MobilePairedStationCredentialStoreError.unexpectedKeychainStatus(-50)
     let store = MirrorStore(
