@@ -1,6 +1,8 @@
 use std::future::Future;
 use std::sync::Arc;
 
+use tokio::sync::oneshot;
+
 use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use super::remote_acme_issuer::RemoteAcmeChallengeProvisioner;
 use super::remote_redaction::redact_secret_detail;
@@ -49,7 +51,8 @@ where
 
     pub(crate) fn cleanup_in_background(mut self) {
         if let Some(cleanup) = self.take_cleanup() {
-            drop(self.cleanup_tracker.spawn_cleanup(cleanup));
+            let completion = self.cleanup_tracker.spawn_cleanup(cleanup);
+            drop(tokio::spawn(observe_background_cleanup(completion)));
         }
     }
 
@@ -72,6 +75,24 @@ where
     }
 }
 
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+async fn observe_background_cleanup(completion: oneshot::Receiver<Result<(), String>>) {
+    match completion.await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => tracing::warn!(
+            error = %redact_secret_detail(&error),
+            "remote ACME challenge cleanup after successful issuance failed",
+        ),
+        Err(error) => tracing::warn!(
+            %error,
+            "observe remote ACME challenge cleanup after successful issuance",
+        ),
+    }
+}
+
 async fn cleanup_leases<P>(provisioner: Arc<P>, leases: Vec<P::Lease>) -> Result<(), String>
 where
     P: RemoteAcmeChallengeProvisioner + 'static,
@@ -88,3 +109,7 @@ where
         Err(failures.join("; "))
     }
 }
+
+#[cfg(test)]
+#[path = "remote_acme_lease_guard_tests.rs"]
+mod tests;
