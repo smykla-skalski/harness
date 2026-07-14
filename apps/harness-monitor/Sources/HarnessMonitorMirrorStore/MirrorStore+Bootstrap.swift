@@ -7,8 +7,9 @@ extension MirrorStore {
   /// cached snapshot to the paired stations, then refresh. The iOS app drives
   /// its own loadStoredPairings/refresh composition and does not call this.
   public func load() async {
+    let activatedStoredWatchPairing: Bool
     do {
-      _ = try await activateStoredWatchPairingIfNeeded()
+      activatedStoredWatchPairing = try await activateStoredWatchPairingIfNeeded()
     } catch {
       syncStatus = mobileMonitorSyncStatus(for: error)
       return
@@ -17,12 +18,18 @@ extension MirrorStore {
       await refresh()
       return
     }
-    do {
-      try await rebuildSyncClients()
-    } catch {
-      syncStatus = mobileMonitorSyncStatus(for: error)
-      return
+    if !activatedStoredWatchPairing {
+      do {
+        try await rebuildSyncClients()
+      } catch {
+        syncStatus = mobileMonitorSyncStatus(for: error)
+        return
+      }
     }
+    await finishLoadWithPreparedSyncClients()
+  }
+
+  private func finishLoadWithPreparedSyncClients() async {
     guard !pairedCredentials.isEmpty else {
       applyCachedSnapshotIfAvailable()
       syncStatus = snapshot.stations.isEmpty ? .unpaired : .stale("Waiting for iPhone pairing.")
@@ -39,21 +46,15 @@ extension MirrorStore {
       syncStatus = mobileMonitorSyncStatus(for: error)
       return
     }
-    await load()
+    await finishLoadWithPreparedSyncClients()
   }
 
   private func activateStoredWatchPairingIfNeeded() async throws -> Bool {
-    guard profile == .watch, demoModeEnabled, let identityStore, let credentialStore else {
+    guard profile == .watch, demoModeEnabled, identityStore != nil, credentialStore != nil else {
       return false
     }
-    let credentials = try await credentialStore.loadAll()
-    var hasUsableCredential = false
-    for credential in credentials
-    where try await identityStore.load(id: credential.deviceIdentityID) != nil {
-      hasUsableCredential = true
-      break
-    }
-    guard hasUsableCredential else { return false }
+    try await rebuildSyncClients()
+    guard !pairedCredentials.isEmpty else { return false }
     leaveDemoModeForStoredWatchPairing()
     return true
   }
@@ -62,7 +63,7 @@ extension MirrorStore {
     pairingFailureDescription = nil
     demoModeEnabled = false
     snapshot = .empty()
-    selectedStationID = ""
+    selectedStationID = defaultStationID ?? pairedCredentials.first?.stationID ?? ""
     syncStatus = .syncing
     persistSharedSnapshot(snapshot)
     reconcileLiveActivity(snapshot)

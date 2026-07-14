@@ -99,6 +99,25 @@ final class WatchRemoteDaemonPairingStoreTests: XCTestCase {
     XCTAssertNotEqual(fixture.store.presentedSyncStatus, .pairingFailed("Previous pairing failed."))
   }
 
+  func testWatchActivationReadsStoredCredentialsOnce() async throws {
+    let fixture = try WatchRemotePairingStoreFixture(device: .iOS)
+    let credentialStore = CountingWatchCredentialStore(credentials: [fixture.credential])
+    let store = MirrorStore(
+      demoModeEnabled: true,
+      profile: .watch,
+      identityStore: fixture.identityStore,
+      credentialStore: credentialStore,
+      syncClientFactory: WatchRemovalSyncClientFactory(),
+      sharedSnapshotStore: nil
+    )
+
+    await store.refreshForegroundState()
+    let loadAllCallCount = await credentialStore.loadAllCallCount
+
+    XCTAssertFalse(store.demoModeEnabled)
+    XCTAssertEqual(loadAllCallCount, 1)
+  }
+
   func testWatchLoadReportsStoredPairingReadFailureInsteadOfDemo() async {
     let error = MobilePairedStationCredentialStoreError.unexpectedKeychainStatus(-50)
     let store = MirrorStore(
@@ -337,6 +356,32 @@ private struct FailingWatchCredentialStore: MobilePairedStationCredentialStore {
 
   func delete(stationID: String) async throws {
     throw error
+  }
+}
+
+private actor CountingWatchCredentialStore: MobilePairedStationCredentialStore {
+  private let backing: InMemoryMobilePairedStationCredentialStore
+  private(set) var loadAllCallCount = 0
+
+  init(credentials: [MobilePairedStationCredential]) {
+    backing = InMemoryMobilePairedStationCredentialStore(credentials: credentials)
+  }
+
+  func save(_ credential: MobilePairedStationCredential) async throws {
+    try await backing.save(credential)
+  }
+
+  func load(stationID: String) async throws -> MobilePairedStationCredential? {
+    try await backing.load(stationID: stationID)
+  }
+
+  func loadAll() async throws -> [MobilePairedStationCredential] {
+    loadAllCallCount += 1
+    return try await backing.loadAll()
+  }
+
+  func delete(stationID: String) async throws {
+    try await backing.delete(stationID: stationID)
   }
 }
 
