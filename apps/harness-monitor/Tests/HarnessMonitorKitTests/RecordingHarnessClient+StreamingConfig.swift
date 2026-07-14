@@ -8,8 +8,13 @@ extension RecordingHarnessClient {
   ) {
     lock.withLock {
       globalStreamEvents = events
-      globalStreamError = error
-      globalStreamErrorRemainingUses = error == nil ? nil : failureCount
+      if let failureCount, failureCount <= 0 {
+        globalStreamError = nil
+        globalStreamErrorRemainingUses = nil
+      } else {
+        globalStreamError = error
+        globalStreamErrorRemainingUses = error == nil ? nil : failureCount
+      }
     }
   }
 
