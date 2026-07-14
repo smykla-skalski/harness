@@ -8,7 +8,7 @@
 
 use rusqlite::{params, types::Type};
 
-use super::{CliError, DaemonDb, OptionalExtension, db_error};
+use super::{CliError, Connection, DaemonDb, OptionalExtension, db_error};
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration,
@@ -21,6 +21,23 @@ INSERT INTO remote_clients (
     client_id, display_name, platform, role, scopes_json, token_hash, token_hint,
     created_at, last_seen_at, revoked_at, rotated_at, metadata_json
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, NULL, NULL, '{}')";
+
+const UPSERT_PAIRING_REMOTE_CLIENT_SQL: &str = "
+INSERT INTO remote_clients (
+    client_id, display_name, platform, role, scopes_json, token_hash, token_hint,
+    created_at, last_seen_at, revoked_at, rotated_at, metadata_json
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, NULL, NULL, '{}')
+ON CONFLICT(client_id) DO UPDATE SET
+    display_name = excluded.display_name,
+    platform = excluded.platform,
+    role = excluded.role,
+    scopes_json = excluded.scopes_json,
+    token_hash = excluded.token_hash,
+    token_hint = excluded.token_hint,
+    created_at = excluded.created_at,
+    last_seen_at = NULL,
+    revoked_at = NULL,
+    rotated_at = excluded.created_at";
 
 const SELECT_REMOTE_CLIENT_SQL: &str = "
 SELECT client_id, display_name, platform, role, scopes_json, token_hash, token_hint,
@@ -278,6 +295,43 @@ impl DaemonDb {
             .optional()
             .map_err(|error| db_error(format!("load remote client {client_id}: {error}")))
     }
+}
+
+pub(super) fn upsert_remote_client_for_pairing(
+    conn: &Connection,
+    registration: &RemoteClientRegistration,
+) -> Result<RemoteStoredClient, CliError> {
+    let scopes_json = scopes_to_json(&registration.scopes)?;
+    conn.execute(
+        UPSERT_PAIRING_REMOTE_CLIENT_SQL,
+        params![
+            registration.client_id,
+            registration.display_name,
+            registration.platform,
+            registration.role.as_str(),
+            scopes_json,
+            registration.token_hash.as_storage_value(),
+            registration.token_hint,
+            registration.created_at,
+        ],
+    )
+    .map_err(|error| {
+        db_error(format!(
+            "upsert paired remote client {}: {error}",
+            registration.client_id.as_str()
+        ))
+    })?;
+    conn.query_row(
+        SELECT_REMOTE_CLIENT_SQL,
+        [registration.client_id.as_str()],
+        remote_client_from_row,
+    )
+    .map_err(|error| {
+        db_error(format!(
+            "load paired remote client {}: {error}",
+            registration.client_id.as_str()
+        ))
+    })
 }
 
 fn remote_client_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RemoteStoredClient> {

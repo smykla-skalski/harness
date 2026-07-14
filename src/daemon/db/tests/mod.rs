@@ -23,6 +23,7 @@ mod remote_client_activity;
 mod remote_identity;
 mod remote_identity_async;
 mod remote_pairing;
+mod remote_pairing_repair;
 mod remote_pairing_reviews;
 mod remote_pairing_status;
 mod runtime;
