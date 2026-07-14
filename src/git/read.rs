@@ -96,6 +96,22 @@ impl GitRepository {
             .map_err(|error| GitError::read(self.path(), error))
     }
 
+    pub(crate) fn has_changes_including_untracked(&self) -> GitResult<bool> {
+        let repo = self.open_gix()?;
+        let platform = repo
+            .status(gix::progress::Discard)
+            .map_err(|error| GitError::read(self.path(), error))?;
+        let mut statuses = platform
+            .untracked_files(gix::status::UntrackedFiles::Files)
+            .into_iter(Vec::<gix::bstr::BString>::new())
+            .map_err(|error| GitError::read(self.path(), error))?;
+        match statuses.next() {
+            None => Ok(false),
+            Some(Ok(_)) => Ok(true),
+            Some(Err(error)) => Err(GitError::read(self.path(), error)),
+        }
+    }
+
     pub(crate) fn short_head_sha(&self, hex_len: usize) -> GitResult<Option<String>> {
         let repo = self.open_gix()?;
         let head = repo

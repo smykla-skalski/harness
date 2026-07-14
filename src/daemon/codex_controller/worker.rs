@@ -284,7 +284,7 @@ impl CodexRunWorker {
         self.touch_and_save()
     }
 
-    fn handle_turn_completed(
+    pub(super) fn handle_turn_completed(
         &mut self,
         status: Option<&str>,
         error_message: Option<String>,
@@ -296,11 +296,7 @@ impl CodexRunWorker {
                 if self.snapshot.final_message.is_none() && !self.agent_message_delta.is_empty() {
                     self.snapshot.final_message = Some(self.agent_message_delta.clone());
                 }
-                self.transition(
-                    CodexRunStatus::Completed,
-                    Some("Codex turn completed"),
-                    None,
-                )
+                self.finish_completed_turn("Codex turn completed")
             }
             "interrupted" => self.transition(
                 CodexRunStatus::Cancelled,
@@ -316,8 +312,20 @@ impl CodexRunWorker {
                     Some(message),
                 )
             }
-            _ => self.transition(CodexRunStatus::Completed, Some("Codex turn finished"), None),
+            _ => self.finish_completed_turn("Codex turn finished"),
         }
+    }
+
+    fn finish_completed_turn(&mut self, summary: &str) -> Result<(), CliError> {
+        if self
+            .controller
+            .completed_run_has_evidence(&self.snapshot)?
+        {
+            return self.transition(CodexRunStatus::Completed, Some(summary), None);
+        }
+        let error = super::completion_evidence::missing_completion_evidence_error(&self.snapshot);
+        let summary = error.clone();
+        self.transition(CodexRunStatus::Failed, Some(&summary), Some(error))
     }
 
     pub(super) fn clear_pending_approvals(&mut self) {

@@ -1,17 +1,18 @@
 use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, TaskBoardEvaluateRequest};
 use crate::daemon::service as daemon_service;
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::CliError;
 use crate::session::service as session_service;
-use crate::session::types::{
-    AgentStatus, CONTROL_PLANE_ACTOR_ID, ManagedAgentRef, SessionState, TaskStatus,
-};
+use crate::session::types::{AgentStatus, ManagedAgentRef, SessionState, TaskStatus};
 use crate::workspace::utc_now;
 
 use super::handle::{CodexControllerHandle, lock_db};
 use super::handle_orchestration_lifecycle::apply_bound_task_terminal_transition;
 use super::orchestration::{
-    orchestration_status_for_codex_run, remove_registered_codex_agent,
+    orchestration_status_for_codex_run, rollback_codex_registration,
     update_codex_orchestration_status,
+};
+use super::orchestration_registration::{
+    RegisteredOrchestrationAgent, RegistrationMutation,
 };
 
 fn should_reconcile_board_item(
@@ -35,11 +36,32 @@ impl CodexControllerHandle {
         &self,
         run: &CodexRunSnapshot,
     ) -> Result<(), CliError> {
+        let normalized = self.normalized_failed_completion(run)?;
+        let run = normalized.as_ref().unwrap_or(run);
         let status = orchestration_status_for_codex_run(run.status);
         if self.persist_orchestration_status_for_run(run, status)? {
             self.broadcast_session_snapshot_best_effort(&run.session_id);
         }
         Ok(())
+    }
+
+    pub(super) fn normalized_failed_completion(
+        &self,
+        run: &CodexRunSnapshot,
+    ) -> Result<Option<CodexRunSnapshot>, CliError> {
+        if run.status != crate::daemon::protocol::CodexRunStatus::Completed
+            || self.completed_run_has_evidence(run)?
+        {
+            return Ok(None);
+        }
+        let mut failed = run.clone();
+        let error = super::completion_evidence::missing_completion_evidence_error(run);
+        failed.status = crate::daemon::protocol::CodexRunStatus::Failed;
+        failed.latest_summary = Some(error.clone());
+        failed.error = Some(error);
+        failed.updated_at = utc_now();
+        self.save_and_broadcast(&failed)?;
+        Ok(Some(failed))
     }
 
     fn persist_orchestration_status_for_run(
@@ -95,6 +117,8 @@ impl CodexControllerHandle {
                 })
                 .await?;
             if changed {
+                daemon_service::sync_file_state_from_async_db(&async_db, &session_id_async)
+                    .await?;
                 async_db.bump_change(&session_id_async).await?;
                 async_db.bump_change("global").await?;
             }
@@ -199,94 +223,24 @@ impl CodexControllerHandle {
         run_id: &str,
         request: &CodexRunRequest,
         display_name: &str,
-    ) -> Result<String, CliError> {
+    ) -> Result<RegisteredOrchestrationAgent, CliError> {
         let managed_agent = ManagedAgentRef::codex(run_id);
-        let runtime_name = "codex";
-        let session_id_owned = session_id.to_string();
-        let display_name_owned = display_name.to_string();
-        let managed_agent_async = managed_agent.clone();
-        let request_async = request.clone();
-        if let Some(result) = self.run_with_async_db(|async_db| async move {
-            let now = utc_now();
-            let joined_agent_id = async_db
-                .update_session_state_immediate(&session_id_owned, |state| {
-                    let joined_role = session_service::resolve_join_role(
-                        &*state,
-                        request_async.role,
-                        request_async.fallback_role,
-                    )?;
-                    let agent_id = session_service::apply_join_session(
-                        &mut *state,
-                        &display_name_owned,
-                        runtime_name,
-                        joined_role,
-                        &request_async.capabilities,
-                        None,
-                        &now,
-                        request_async.persona.as_deref(),
-                        Some(managed_agent_async),
-                    )?;
-                    bind_requested_task(
-                        &mut *state,
-                        request_async.task_id.as_deref(),
-                        &agent_id,
-                        &now,
-                    )?;
-                    Ok((agent_id, joined_role))
-                })
-                .await?;
-            async_db
-                .append_log_entry(&daemon_service::build_log_entry(
-                    &session_id_owned,
-                    session_service::log_agent_joined(
-                        &joined_agent_id.0,
-                        joined_agent_id.1,
-                        runtime_name,
-                    ),
-                    None,
-                    None,
-                ))
-                .await?;
-            async_db.bump_change(&session_id_owned).await?;
-            async_db.bump_change("global").await?;
-            Ok(joined_agent_id.0)
-        }) {
+        if let Some(result) = super::orchestration_registration::register_async(
+            self,
+            session_id,
+            request,
+            display_name,
+            &managed_agent,
+        ) {
             return result;
         }
-
-        let db = self.db()?;
-        let db = lock_db(&db)?;
-        let Some(mut state) = db.load_session_state_for_mutation(session_id)? else {
-            return Err(daemon_service::session_not_found(session_id));
-        };
-        let now = utc_now();
-        let joined_role =
-            session_service::resolve_join_role(&state, request.role, request.fallback_role)?;
-        let agent_id = session_service::apply_join_session(
-            &mut state,
-            display_name,
-            runtime_name,
-            joined_role,
-            &request.capabilities,
-            None,
-            &now,
-            request.persona.as_deref(),
-            Some(managed_agent),
-        )?;
-        bind_requested_task(&mut state, request.task_id.as_deref(), &agent_id, &now)?;
-        let project_id = db
-            .project_id_for_session(session_id)?
-            .ok_or_else(|| daemon_service::session_not_found(session_id))?;
-        db.save_session_state(&project_id, &state)?;
-        db.append_log_entry(&daemon_service::build_log_entry(
+        super::orchestration_registration::register_sync(
+            self,
             session_id,
-            session_service::log_agent_joined(&agent_id, joined_role, runtime_name),
-            None,
-            None,
-        ))?;
-        db.bump_change(session_id)?;
-        db.bump_change("global")?;
-        Ok(agent_id)
+            request,
+            display_name,
+            &managed_agent,
+        )
     }
 
     #[expect(
@@ -296,26 +250,37 @@ impl CodexControllerHandle {
     pub(super) fn rollback_orchestration_agent_registration(
         &self,
         session_id: &str,
-        session_agent_id: Option<&str>,
+        session_agent_id: &str,
         managed_agent: &ManagedAgentRef,
+        mutation: &RegistrationMutation,
     ) {
-        let Some(session_agent_id) = session_agent_id else {
-            return;
-        };
         if self.rollback_orchestration_agent_registration_async(
             session_id,
             session_agent_id,
             managed_agent,
+            mutation,
         ) {
             return;
         }
 
-        if let Err(error) = self.rollback_orchestration_agent_registration_sync(
+        match self.rollback_orchestration_agent_registration_sync(
             session_id,
             session_agent_id,
             managed_agent,
+            mutation,
         ) {
-            tracing::warn!(%error, session_id, session_agent_id, "failed to roll back codex orchestration agent registration");
+            Err(error) => tracing::warn!(
+                %error,
+                session_id,
+                session_agent_id,
+                "failed to roll back codex orchestration agent registration"
+            ),
+            Ok(false) => tracing::warn!(
+                session_id,
+                session_agent_id,
+                "skipped codex registration rollback after concurrent session mutation"
+            ),
+            Ok(true) => {}
         }
     }
 
@@ -328,25 +293,44 @@ impl CodexControllerHandle {
         session_id: &str,
         session_agent_id: &str,
         managed_agent: &ManagedAgentRef,
+        mutation: &RegistrationMutation,
     ) -> bool {
         let session_id_for_task = session_id.to_string();
         let session_agent_id_for_task = session_agent_id.to_string();
         let session_id_for_log = session_id.to_string();
         let session_agent_id_for_log = session_agent_id.to_string();
         let managed_agent = managed_agent.clone();
+        let mutation = mutation.clone();
         let Some(result) = self.run_with_async_db(|async_db| async move {
             let now = utc_now();
             let removed = async_db
                 .update_session_state_immediate(&session_id_for_task, |state| {
-                    Ok(remove_registered_codex_agent(
+                    Ok(rollback_codex_registration(
                         state,
                         &session_agent_id_for_task,
                         &managed_agent,
+                        mutation.newly_joined,
+                        mutation.task_binding_rollback.as_ref(),
                         &now,
                     ))
                 })
                 .await?;
             if removed {
+                if mutation.newly_joined {
+                    async_db
+                        .append_log_entry(&daemon_service::build_log_entry(
+                            &session_id_for_task,
+                            session_service::log_agent_removed(&session_agent_id_for_task),
+                            None,
+                            Some("Codex startup rolled back before the run was persisted"),
+                        ))
+                        .await?;
+                }
+                daemon_service::sync_file_state_from_async_db(
+                    &async_db,
+                    &session_id_for_task,
+                )
+                .await?;
                 async_db.bump_change(&session_id_for_task).await?;
                 async_db.bump_change("global").await?;
             }
@@ -354,13 +338,19 @@ impl CodexControllerHandle {
         }) else {
             return false;
         };
-        if let Err(error) = result {
-            tracing::warn!(
+        match result {
+            Err(error) => tracing::warn!(
                 %error,
                 session_id = %session_id_for_log,
                 session_agent_id = %session_agent_id_for_log,
                 "failed to roll back codex orchestration agent registration"
-            );
+            ),
+            Ok(false) => tracing::warn!(
+                session_id = %session_id_for_log,
+                session_agent_id = %session_agent_id_for_log,
+                "skipped codex registration rollback after concurrent session mutation"
+            ),
+            Ok(true) => {}
         }
         true
     }
@@ -370,6 +360,7 @@ impl CodexControllerHandle {
         session_id: &str,
         session_agent_id: &str,
         managed_agent: &ManagedAgentRef,
+        mutation: &RegistrationMutation,
     ) -> Result<bool, CliError> {
         let db = self.db()?;
         let db = lock_db(&db)?;
@@ -377,68 +368,30 @@ impl CodexControllerHandle {
             return Ok(false);
         };
         let now = utc_now();
-        if !remove_registered_codex_agent(&mut state, session_agent_id, managed_agent, &now) {
+        if !rollback_codex_registration(
+            &mut state,
+            session_agent_id,
+            managed_agent,
+            mutation.newly_joined,
+            mutation.task_binding_rollback.as_ref(),
+            &now,
+        ) {
             return Ok(false);
         }
         let project_id = db
             .project_id_for_session(session_id)?
             .ok_or_else(|| daemon_service::session_not_found(session_id))?;
         db.save_session_state(&project_id, &state)?;
+        if mutation.newly_joined {
+            db.append_log_entry(&daemon_service::build_log_entry(
+                session_id,
+                session_service::log_agent_removed(session_agent_id),
+                None,
+                Some("Codex startup rolled back before the run was persisted"),
+            ))?;
+        }
         db.bump_change(session_id)?;
         db.bump_change("global")?;
         Ok(true)
     }
-}
-
-fn bind_requested_task(
-    state: &mut SessionState,
-    task_id: Option<&str>,
-    agent_id: &str,
-    now: &str,
-) -> Result<(), CliError> {
-    let Some(task_id) = task_id else {
-        return Ok(());
-    };
-    let task = state.tasks.get(task_id).ok_or_else(|| {
-        CliError::from(CliErrorKind::session_agent_conflict(format!(
-            "task '{task_id}' not found in session '{}'",
-            state.session_id
-        )))
-    })?;
-    if task.status == TaskStatus::InProgress && task.assigned_to.as_deref() == Some(agent_id) {
-        return Ok(());
-    }
-    if task.status != TaskStatus::Open
-        || task.assigned_to.as_deref().is_some_and(|id| id != agent_id)
-    {
-        return Err(CliErrorKind::session_agent_conflict(format!(
-            "task '{task_id}' cannot be bound to agent '{agent_id}' from status {:?} and assignee {:?}",
-            task.status, task.assigned_to
-        ))
-        .into());
-    }
-    let mut effects = Vec::new();
-    session_service::start_task_for_agent(
-        state,
-        task_id,
-        agent_id,
-        CONTROL_PLANE_ACTOR_ID,
-        now,
-        &mut effects,
-    )?;
-    let start_signal = effects.into_iter().find_map(|effect| match effect {
-        session_service::TaskDropEffect::Started(record) => Some(record.signal),
-        session_service::TaskDropEffect::Queued { .. } => None,
-    });
-    let started = start_signal.as_ref().and_then(|signal| {
-        session_service::apply_task_start_delivery(state, agent_id, signal, now)
-    });
-    if started.as_deref() != Some(task_id) {
-        return Err(CliErrorKind::session_agent_conflict(format!(
-            "task '{task_id}' could not be started for agent '{agent_id}'"
-        ))
-        .into());
-    }
-    session_service::refresh_session(state, now);
-    Ok(())
 }

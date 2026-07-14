@@ -3,12 +3,14 @@ use clap::Args;
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::client::DaemonClient;
 use crate::daemon::protocol::{
-    TaskArbitrateRequest, TaskClaimReviewRequest, TaskRespondReviewRequest,
-    TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
+    SessionDetail, TaskArbitrateRequest, TaskCheckpointRequest, TaskClaimReviewRequest,
+    TaskRespondReviewRequest, TaskSubmitForReviewRequest, TaskSubmitReviewRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::service;
-use crate::session::types::{ReviewPoint, ReviewVerdict, TaskSeverity, TaskSource, TaskStatus};
+use crate::session::types::{
+    ReviewPoint, ReviewVerdict, TaskCheckpoint, TaskSeverity, TaskSource, TaskStatus,
+};
 
 use super::support::{print_json, resolve_project_dir};
 
@@ -105,10 +107,19 @@ pub struct TaskListArgs {
 
 impl Execute for TaskListArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
-        let local_project = resolve_project_dir(self.project_dir.as_deref());
-        let project =
-            service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
-        let items = service::list_tasks(&self.session_id, self.status, &project)?;
+        let items = if let Some(client) = DaemonClient::try_connect() {
+            client
+                .get_session_detail(&self.session_id)?
+                .tasks
+                .into_iter()
+                .filter(|task| self.status.is_none_or(|status| task.status == status))
+                .collect()
+        } else {
+            let local_project = resolve_project_dir(self.project_dir.as_deref());
+            let project =
+                service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
+            service::list_tasks(&self.session_id, self.status, &project)?
+        };
         if self.json {
             print_json(&items)?;
         } else {
@@ -189,6 +200,19 @@ pub struct TaskCheckpointArgs {
 
 impl Execute for TaskCheckpointArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        if let Some(client) = DaemonClient::try_connect() {
+            let detail = client.checkpoint_task(
+                &self.session_id,
+                &self.task_id,
+                &TaskCheckpointRequest {
+                    actor: self.actor.clone(),
+                    summary: self.summary.clone(),
+                    progress: self.progress,
+                },
+            )?;
+            print_json(&checkpoint_from_detail(&detail, &self.task_id)?)?;
+            return Ok(0);
+        }
         let local_project = resolve_project_dir(self.project_dir.as_deref());
         let project =
             service::resolve_session_project_dir(&self.session_id, local_project.as_ref())?;
@@ -203,6 +227,30 @@ impl Execute for TaskCheckpointArgs {
         print_json(&checkpoint)?;
         Ok(0)
     }
+}
+
+fn checkpoint_from_detail(
+    detail: &SessionDetail,
+    task_id: &str,
+) -> Result<TaskCheckpoint, CliError> {
+    let summary = detail
+        .tasks
+        .iter()
+        .find(|task| task.task_id == task_id)
+        .and_then(|task| task.checkpoint_summary.as_ref())
+        .ok_or_else(|| {
+            CliErrorKind::session_agent_conflict(format!(
+                "daemon checkpoint response omitted task '{task_id}' checkpoint"
+            ))
+        })?;
+    Ok(TaskCheckpoint {
+        checkpoint_id: summary.checkpoint_id.clone(),
+        task_id: task_id.to_string(),
+        recorded_at: summary.recorded_at.clone(),
+        actor_id: summary.actor_id.clone(),
+        summary: summary.summary.clone(),
+        progress: summary.progress,
+    })
 }
 
 #[derive(Debug, Clone, Args)]

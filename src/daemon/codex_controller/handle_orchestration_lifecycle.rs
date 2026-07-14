@@ -56,13 +56,26 @@ pub(super) fn apply_bound_task_terminal_transition(
         return Ok(false);
     }
     match run.status {
-        CodexRunStatus::Completed => {
+        CodexRunStatus::Completed
+            if super::completion_evidence::worktree_changed_since_baseline(run) =>
+        {
             let summary = completion_summary(run.final_message.as_deref());
             session_service::apply_submit_for_review_for_managed_run(
                 state,
                 task_id,
                 agent_id,
                 Some(&summary),
+                now,
+            )?;
+        }
+        CodexRunStatus::Completed => {
+            let reason = super::completion_evidence::missing_completion_evidence_error(run);
+            session_service::apply_update_task_for_managed_run(
+                state,
+                task_id,
+                TaskStatus::Blocked,
+                Some(&reason),
+                CONTROL_PLANE_ACTOR_ID,
                 now,
             )?;
         }

@@ -1,7 +1,7 @@
 //! Review transport daemon-routing coverage.
 //!
-//! The five review task commands (`submit-for-review`, `claim-review`,
-//! `submit-review`, `respond-review`, `arbitrate`) and `improver apply`
+//! Worker lifecycle mutations (`checkpoint`, `submit-for-review`) plus the
+//! remaining review commands and `improver apply`
 //! must prefer the daemon client when a running daemon is reachable.
 //! The existing `review_cli` integration tests only exercise the
 //! file-backed fallback, so deleting the `DaemonClient::try_connect()`
@@ -22,12 +22,12 @@ use tempfile::tempdir;
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::client::test_support::install_fake_running_xdg_daemon;
 use crate::session::service;
-use crate::session::types::{ReviewVerdict, TaskSeverity, TaskSource};
+use crate::session::types::{ReviewVerdict, TaskSeverity, TaskSource, TaskStatus};
 
 use super::improver::SessionImproverApplyArgs;
 use super::task::{
-    TaskArbitrateArgs, TaskClaimReviewArgs, TaskRespondReviewArgs, TaskSubmitForReviewArgs,
-    TaskSubmitReviewArgs,
+    TaskArbitrateArgs, TaskCheckpointArgs, TaskClaimReviewArgs, TaskListArgs,
+    TaskRespondReviewArgs, TaskSubmitForReviewArgs, TaskSubmitReviewArgs,
 };
 
 struct CapturedRequest {
@@ -68,7 +68,22 @@ fn session_detail_response(session_id: &str) -> String {
             "metrics": {}
         },
         "agents": [],
-        "tasks": [],
+        "tasks": [{
+            "task_id": "task-1",
+            "title": "daemon-routed task",
+            "severity": "medium",
+            "status": "in_progress",
+            "assigned_to": "worker-1",
+            "created_at": "2026-04-24T00:00:00Z",
+            "updated_at": "2026-04-24T00:00:01Z",
+            "checkpoint_summary": {
+                "checkpoint_id": "checkpoint-1",
+                "recorded_at": "2026-04-24T00:00:01Z",
+                "actor_id": "worker-1",
+                "summary": "halfway",
+                "progress": 50
+            }
+        }],
         "signals": [],
         "observer": null,
         "agent_activity": []
@@ -145,7 +160,20 @@ fn spawn_daemon_server(
                 write_response(&mut stream, "{\"ready\":true,\"daemon_epoch\":\"t\"}");
                 continue;
             }
-            if first_line.starts_with("GET /v1/sessions") {
+            if first_line.starts_with("GET /v1/sessions/") {
+                let path = first_line
+                    .split_whitespace()
+                    .nth(1)
+                    .unwrap_or("")
+                    .to_string();
+                *captured_inner.lock().expect("lock") = Some(CapturedRequest {
+                    path,
+                    body: String::new(),
+                });
+                write_response(&mut stream, &response_body);
+                return;
+            }
+            if first_line.starts_with("GET /v1/sessions ") {
                 write_response(&mut stream, "[]");
                 continue;
             }
@@ -200,6 +228,44 @@ where
         let mut slot = captured.lock().expect("lock");
         slot.take().expect("daemon must capture POST")
     })
+}
+
+#[test]
+fn task_list_routes_through_daemon_client() {
+    let captured = run_against_fake_daemon("00000000-0000-4000-8000-00000000afff", || {
+        let args = TaskListArgs {
+            session_id: "00000000-0000-4000-8000-00000000afff".into(),
+            status: Some(TaskStatus::InProgress),
+            json: true,
+            project_dir: None,
+        };
+        assert_eq!(args.execute(&AppContext).expect("execute"), 0);
+    });
+    assert_eq!(
+        captured.path,
+        "/v1/sessions/00000000-0000-4000-8000-00000000afff"
+    );
+}
+
+#[test]
+fn checkpoint_args_route_through_daemon_client() {
+    let captured = run_against_fake_daemon("00000000-0000-4000-8000-00000000a000", || {
+        let args = TaskCheckpointArgs {
+            session_id: "00000000-0000-4000-8000-00000000a000".into(),
+            task_id: "task-1".into(),
+            actor: "worker-1".into(),
+            summary: "halfway".into(),
+            progress: 50,
+            project_dir: None,
+        };
+        assert_eq!(args.execute(&AppContext).expect("execute"), 0);
+    });
+    assert_eq!(
+        captured.path,
+        "/v1/sessions/00000000-0000-4000-8000-00000000a000/tasks/task-1/checkpoint"
+    );
+    assert!(captured.body.contains("\"actor\":\"worker-1\""));
+    assert!(captured.body.contains("\"progress\":50"));
 }
 
 #[test]

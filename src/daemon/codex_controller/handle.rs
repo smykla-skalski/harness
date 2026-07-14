@@ -140,7 +140,7 @@ impl CodexControllerHandle {
         self.preflight_websocket_probe(session_id)?;
         let project_dir = self.project_dir_for_session(session_id)?;
         let display_name = request.name.clone().unwrap_or_else(|| "Codex".to_string());
-        let session_agent_id =
+        let registration =
             self.register_orchestration_agent(session_id, &run_id, request, &display_name)?;
         let snapshot = queued_run_snapshot(
             session_id,
@@ -148,14 +148,15 @@ impl CodexControllerHandle {
             run_id,
             project_dir,
             prompt,
-            session_agent_id,
+            registration.agent_id.clone(),
             display_name,
         );
         if let Err(error) = self.save_and_broadcast(&snapshot) {
             self.rollback_orchestration_agent_registration(
                 session_id,
-                snapshot.session_agent_id.as_deref(),
+                &registration.agent_id,
                 &ManagedAgentRef::codex(snapshot.run_id.as_str()),
+                &registration.mutation,
             );
             return Err(error);
         }
@@ -300,7 +301,7 @@ fn queued_run_snapshot(
     display_name: String,
 ) -> CodexRunSnapshot {
     let now = utc_now();
-    CodexRunSnapshot {
+    let mut snapshot = CodexRunSnapshot {
         run_id,
         session_id: session_id.to_string(),
         task_id: request.task_id.clone(),
@@ -327,7 +328,9 @@ fn queued_run_snapshot(
         updated_at: now,
         model: non_empty_owned(request.model.as_deref()),
         effort: non_empty_owned(request.effort.as_deref()),
-    }
+    };
+    super::completion_evidence::record_clean_worktree_baseline(&mut snapshot);
+    snapshot
 }
 
 fn non_empty_owned(value: Option<&str>) -> Option<String> {
