@@ -51,6 +51,7 @@ pub(crate) mod remote_crypto;
 pub(crate) mod remote_diagnostics;
 pub mod remote_identity;
 pub mod remote_pairing;
+mod remote_pairing_expiry_loop;
 pub(crate) mod remote_redaction;
 pub(crate) mod remote_request_audit;
 pub(crate) mod remote_task_board;

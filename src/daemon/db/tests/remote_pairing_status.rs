@@ -55,6 +55,23 @@ fn remote_pairing_status_classifies_lifecycle_without_exposing_records() {
         RemotePairingStatus::Expired
     );
     assert_eq!(
+        db.load_remote_pairing_status("pairing-status-expired", now)
+            .expect("repeated expired status"),
+        RemotePairingStatus::Expired
+    );
+    let expiration_events = db
+        .load_remote_audit_events(20)
+        .expect("pairing expiration audits")
+        .into_iter()
+        .filter(|event| event.route_or_method == "remote.pair.expire")
+        .collect::<Vec<_>>();
+    assert_eq!(expiration_events.len(), 1);
+    assert_eq!(
+        expiration_events[0].event_id,
+        "remote-pair-expire-pairing-status-expired"
+    );
+    assert_eq!(expiration_events[0].recorded_at, "2026-07-13T12:01:00Z");
+    assert_eq!(
         db.load_remote_pairing_status("unknown-pairing-id", now)
             .expect("unknown status"),
         RemotePairingStatus::Unavailable

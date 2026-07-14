@@ -279,6 +279,7 @@ pub struct RemotePairingClaimRequest {
     pub client_id: String,
     pub display_name: String,
     pub platform: String,
+    pub request_id: Option<String>,
     pub remote_addr: Option<String>,
     pub audit_event_id: String,
 }
@@ -292,12 +293,17 @@ impl RemotePairingClaimRequest {
     /// # Errors
     /// Returns [`RemotePairingError`] when the domains, client id, display name,
     /// platform, or audit event id are blank.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "pairing claims keep client identity and audit provenance explicit"
+    )]
     pub fn new(
         expected_domain: impl Into<String>,
         claimed_domain: impl Into<String>,
         client_id: impl Into<String>,
         display_name: impl Into<String>,
         platform: impl Into<String>,
+        request_id: Option<&str>,
         remote_addr: Option<&str>,
         audit_event_id: impl Into<String>,
     ) -> Result<Self, RemotePairingError> {
@@ -326,6 +332,7 @@ impl RemotePairingClaimRequest {
             client_id,
             display_name,
             platform,
+            request_id: request_id.map(ToOwned::to_owned),
             remote_addr: remote_addr.map(ToOwned::to_owned),
             audit_event_id,
         })
@@ -347,6 +354,7 @@ impl RemotePairingClaimRequest {
             client_id,
             display_name,
             platform,
+            None,
             remote_addr,
             audit_event_id,
         )

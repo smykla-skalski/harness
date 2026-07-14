@@ -1,6 +1,7 @@
 use super::{
-    RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteBearerToken,
-    RemoteClientRegistration, RemoteTokenHash, expand_client_scopes,
+    REMOTE_AUDIT_REQUEST_ID_MAX_BYTES, REMOTE_AUDIT_TRUNCATION_MARKER, RemoteAuditEvent,
+    RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteBearerToken, RemoteClientRegistration,
+    RemoteTokenHash, expand_client_scopes,
 };
 use crate::daemon::remote::{RemoteAccessScope, RemoteRole};
 
@@ -98,4 +99,26 @@ fn remote_audit_event_redacts_secret_error_detail() {
         event.error_detail(),
         Some("upstream token=<redacted>&retry=1 secret=<redacted>")
     );
+}
+
+#[test]
+fn remote_audit_event_bounds_unicode_request_ids_on_a_character_boundary() {
+    let request_id = "\u{17c}".repeat(256);
+    let event = RemoteAuditEvent::new(
+        "event-bounded-request-id",
+        "2026-06-21T12:31:00Z",
+        Some(request_id.as_str()),
+        Some("client-1"),
+        "/v1/sessions",
+        RemoteAccessScope::Read,
+        RemoteAuditScopeDecision::Allowed,
+        RemoteAuditOutcome::Success,
+        Some("203.0.113.10"),
+        None,
+    );
+
+    let bounded = event.request_id.expect("bounded request id");
+    assert!(bounded.len() <= REMOTE_AUDIT_REQUEST_ID_MAX_BYTES);
+    assert!(bounded.ends_with(REMOTE_AUDIT_TRUNCATION_MARKER));
+    assert!(bounded.is_char_boundary(bounded.len()));
 }

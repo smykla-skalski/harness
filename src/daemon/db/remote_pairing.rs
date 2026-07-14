@@ -221,10 +221,12 @@ impl DaemonDb {
         {
             let error = RemotePairingError::Expired;
             let error_detail = error.to_string();
+            self.record_remote_pairing_expiration(pairing.pairing_id.as_str(), now)
+                .map_err(RemotePairingClaimCodeError::store)?;
             self.record_remote_audit_event(&RemoteAuditEvent::new(
                 claim.audit_event_id.as_str(),
                 now,
-                None,
+                claim.request_id.as_deref(),
                 Some(claim.client_id.as_str()),
                 ROUTE_REMOTE_PAIR_EXPIRE,
                 RemoteAccessScope::Read,
@@ -306,7 +308,7 @@ impl DaemonDb {
             &RemoteAuditEvent::new(
                 claim.audit_event_id.as_str(),
                 now,
-                None,
+                claim.request_id.as_deref(),
                 Some(claim.client_id.as_str()),
                 ROUTE_REMOTE_PAIR_CLAIM,
                 RemoteAccessScope::Read,
@@ -345,7 +347,7 @@ impl DaemonDb {
         self.record_remote_audit_event(&RemoteAuditEvent::new(
             claim.audit_event_id.as_str(),
             now,
-            None,
+            claim.request_id.as_deref(),
             Some(claim.client_id.as_str()),
             route_or_method,
             RemoteAccessScope::Read,
