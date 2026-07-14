@@ -2,7 +2,7 @@ import Foundation
 
 /// Per-platform constants the shared store stamps onto commands and demo data.
 /// The iOS app uses `.phone`; the watch uses `.watch`.
-public struct MirrorStoreProfile: Sendable {
+public struct MirrorStoreProfile: Equatable, Sendable {
   public var commandIDPrefix: String
   public var demoActorDeviceID: String
   public var pullRequestMergeAuditReason: String

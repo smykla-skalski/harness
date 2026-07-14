@@ -1,11 +1,39 @@
 import Foundation
 import HarnessMonitorCore
 @testable import HarnessMonitorCrypto
-import HarnessMonitorMirrorStore
+@testable import HarnessMonitorMirrorStore
 import XCTest
 
 @MainActor
 final class WatchRemoteDaemonPairingStoreTests: XCTestCase {
+  func testWatchLoadActivatesStoredPairingInsteadOfDemoFixtures() async throws {
+    let fixture = try WatchRemotePairingStoreFixture(
+      device: .iOS,
+      demoModeEnabled: true
+    )
+
+    await fixture.store.load()
+
+    XCTAssertFalse(fixture.store.demoModeEnabled)
+    XCTAssertEqual(fixture.store.pairedCredentials, [fixture.credential])
+    XCTAssertEqual(fixture.store.selectedStationID, fixture.credential.stationID)
+    XCTAssertNotEqual(fixture.store.presentedSyncStatus, .demo)
+  }
+
+  func testWatchForegroundRefreshActivatesStoredPairingInsteadOfDemoFixtures() async throws {
+    let fixture = try WatchRemotePairingStoreFixture(
+      device: .iOS,
+      demoModeEnabled: true
+    )
+
+    await fixture.store.refreshForegroundState()
+
+    XCTAssertFalse(fixture.store.demoModeEnabled)
+    XCTAssertEqual(fixture.store.pairedCredentials, [fixture.credential])
+    XCTAssertEqual(fixture.store.selectedStationID, fixture.credential.stationID)
+    XCTAssertNotEqual(fixture.store.presentedSyncStatus, .demo)
+  }
+
   func testRemovingDirectWatchPairingWaitsForPairingMutationGate() async throws {
     let mutationGate = MobilePairingMutationGate()
     let fixture = try WatchRemotePairingStoreFixture(
@@ -113,7 +141,8 @@ private struct WatchRemotePairingStoreFixture {
   init(
     device: MobileRemoteDaemonPairingDevice,
     mutationGate: MobilePairingMutationGate = MobilePairingMutationGate(),
-    cloudFallback: Bool = false
+    cloudFallback: Bool = false,
+    demoModeEnabled: Bool = false
   ) throws {
     let now = Date(timeIntervalSince1970: 1_752_124_400)
     let endpoint = URL(string: "https://daemon.example.com")!
@@ -166,7 +195,7 @@ private struct WatchRemotePairingStoreFixture {
     )
     credentialStore = InMemoryMobilePairedStationCredentialStore(credentials: [credential])
     store = MirrorStore(
-      demoModeEnabled: false,
+      demoModeEnabled: demoModeEnabled,
       profile: .watch,
       identityStore: identityStore,
       credentialStore: credentialStore,

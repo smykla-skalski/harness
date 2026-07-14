@@ -11,6 +11,8 @@ import WidgetKit
 struct HarnessMonitorWatchApp: App {
   @WKApplicationDelegateAdaptor(WatchAppDelegate.self)
   private var delegate
+  @Environment(\.scenePhase)
+  private var scenePhase
   @State private var store: MirrorStore
   private let pairingReceiver: WatchPairingSessionReceiver
 
@@ -79,6 +81,14 @@ struct HarnessMonitorWatchApp: App {
         .onReceive(
           NotificationCenter.default.publisher(for: .watchMirrorRemoteRefreshRequested)
         ) { _ in
+          Task {
+            await store.load()
+          }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+          guard newPhase == .active else {
+            return
+          }
           Task {
             await store.load()
           }

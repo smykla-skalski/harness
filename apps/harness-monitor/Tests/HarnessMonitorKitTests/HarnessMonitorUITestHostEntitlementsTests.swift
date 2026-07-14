@@ -141,6 +141,21 @@ struct HarnessMonitorAppBundleMetadataTests {
     #expect(transferReceiverSource.contains("try await mutationGate.perform"))
   }
 
+  @Test("Watch app reloads transferred pairing material on activation")
+  func watchAppReloadsTransferredPairingMaterialOnActivation() throws {
+    let appSource = try String(
+      contentsOf: monitorAppRoot().appendingPathComponent(
+        "Sources/HarnessMonitorWatch/HarnessMonitorWatchApp.swift"
+      ),
+      encoding: .utf8
+    )
+
+    #expect(appSource.contains("@Environment(\\.scenePhase)"))
+    #expect(appSource.contains(".onChange(of: scenePhase)"))
+    #expect(appSource.contains("guard newPhase == .active"))
+    #expect(appSource.contains("await store.load()"))
+  }
+
   @Test("Mobile widgets can refresh encrypted mirrors")
   func mobileWidgetsCanRefreshEncryptedMirrors() throws {
     let root = monitorAppRoot()
