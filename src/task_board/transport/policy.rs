@@ -1,4 +1,5 @@
 use clap::{ArgAction, Args, Subcommand};
+use serde::Serialize;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::protocol::{
@@ -6,7 +7,7 @@ use crate::daemon::protocol::{
     PolicyCanvasSetSpawnKillSwitchRequest, PolicyCanvasSetSpawnRequiresLivePolicyRequest,
     PolicyCanvasWorkspaceResponse,
 };
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{PolicyApprovalGrant, PolicyApprovalState};
 
 use super::{daemon_client, print_json};
@@ -72,7 +73,7 @@ impl Execute for TaskBoardPolicyJsonArgs {
         if self.json {
             print_json(&response)?;
         } else {
-            print_grants(&response);
+            print_grants(&response)?;
         }
         Ok(0)
     }
@@ -125,17 +126,29 @@ impl TaskBoardPolicyToggleArgs {
     }
 }
 
-fn print_grants(response: &PolicyApprovalGrantsListResponse) {
+fn print_grants(response: &PolicyApprovalGrantsListResponse) -> Result<(), CliError> {
     if response.grants.is_empty() {
         println!("no pending approval grants");
-        return;
+        return Ok(());
     }
     for grant in &response.grants {
         println!(
-            "[{:?}] {}: {} ({:?})",
-            grant.state, grant.id, grant.board_item_id, grant.action
+            "[{}] {}: {} ({})",
+            serialized_label(&grant.state)?,
+            grant.id,
+            grant.board_item_id,
+            serialized_label(&grant.action)?
         );
     }
+    Ok(())
+}
+
+fn serialized_label<T: Serialize>(value: &T) -> Result<String, CliError> {
+    let value = serde_json::to_value(value)
+        .map_err(|error| CliErrorKind::workflow_serialize(error.to_string()))?;
+    value.as_str().map(str::to_owned).ok_or_else(|| {
+        CliErrorKind::workflow_serialize("expected policy enum to serialize as a string").into()
+    })
 }
 
 fn print_resolved_grant(grant: &PolicyApprovalGrant) {
@@ -163,4 +176,22 @@ fn print_toggle(
         println!("{label}: {}", if enabled { "enabled" } else { "disabled" });
     }
     Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::task_board::PolicyAction;
+
+    #[test]
+    fn serialized_policy_labels_match_wire_values() {
+        assert_eq!(
+            serialized_label(&PolicyApprovalState::Pending).expect("serialize approval state"),
+            "pending"
+        );
+        assert_eq!(
+            serialized_label(&PolicyAction::SpawnAgent).expect("serialize policy action"),
+            "spawn_agent"
+        );
+    }
 }

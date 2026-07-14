@@ -33,7 +33,7 @@ fn parse_task_board_manual_dispatch_steps() {
 }
 
 #[test]
-fn parse_task_board_spawn_policy_controls() {
+fn parse_policy_grants() {
     let grants = Cli::try_parse_from(["harness", "task-board", "policy", "grants", "--json"])
         .expect("parse policy grants");
     match task_board_command(grants.command) {
@@ -42,7 +42,10 @@ fn parse_task_board_spawn_policy_controls() {
         } => assert!(args.json),
         _ => panic!("expected TaskBoard Policy Grants"),
     }
+}
 
+#[test]
+fn parse_policy_grant_resolve() {
     let resolve = Cli::try_parse_from([
         "harness",
         "task-board",
@@ -67,42 +70,51 @@ fn parse_task_board_spawn_policy_controls() {
         }
         _ => panic!("expected TaskBoard Policy GrantResolve"),
     }
+}
 
-    for (name, enabled) in [
-        ("spawn-requires-live-policy", true),
-        ("spawn-kill-switch", false),
-    ] {
-        let cli = Cli::try_parse_from([
-            "harness",
-            "task-board",
-            "policy",
-            name,
-            "--enabled",
-            if enabled { "true" } else { "false" },
-            "--json",
-        ])
-        .expect("parse policy toggle");
-        match (task_board_command(cli.command), name) {
-            (
-                TaskBoardCommand::Policy {
-                    command: TaskBoardPolicyCommand::SpawnRequiresLivePolicy(args),
-                },
-                "spawn-requires-live-policy",
-            ) => {
-                assert!(args.enabled);
-                assert!(args.json);
-            }
-            (
-                TaskBoardCommand::Policy {
-                    command: TaskBoardPolicyCommand::SpawnKillSwitch(args),
-                },
-                "spawn-kill-switch",
-            ) => {
-                assert!(!args.enabled);
-                assert!(args.json);
-            }
-            _ => panic!("expected TaskBoard Policy toggle"),
+#[test]
+fn parse_policy_spawn_requires_live_policy() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "policy",
+        "spawn-requires-live-policy",
+        "--enabled",
+        "true",
+        "--json",
+    ])
+    .expect("parse spawn requires live policy");
+    match task_board_command(cli.command) {
+        TaskBoardCommand::Policy {
+            command: TaskBoardPolicyCommand::SpawnRequiresLivePolicy(args),
+        } => {
+            assert!(args.enabled);
+            assert!(args.json);
         }
+        _ => panic!("expected TaskBoard Policy SpawnRequiresLivePolicy"),
+    }
+}
+
+#[test]
+fn parse_policy_spawn_kill_switch() {
+    let cli = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "policy",
+        "spawn-kill-switch",
+        "--enabled",
+        "false",
+        "--json",
+    ])
+    .expect("parse spawn kill switch");
+    match task_board_command(cli.command) {
+        TaskBoardCommand::Policy {
+            command: TaskBoardPolicyCommand::SpawnKillSwitch(args),
+        } => {
+            assert!(!args.enabled);
+            assert!(args.json);
+        }
+        _ => panic!("expected TaskBoard Policy SpawnKillSwitch"),
     }
 }
 

@@ -128,7 +128,7 @@ fn spawn_daemon(listener: TcpListener, response_body: String) -> FakeDaemon {
     }
 }
 
-fn run_command(command: TaskBoardCommand, response_body: String) -> CapturedRequest {
+fn run_command(command: &TaskBoardCommand, response_body: String) -> CapturedRequest {
     let temporary = tempdir().expect("tempdir");
     with_isolated_harness_env(temporary.path(), || {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind daemon");
@@ -234,7 +234,7 @@ fn dispatch_pick_returns_empty_selection_through_public_command() {
     let response = serde_json::to_string(&TaskBoardDispatchPickResponse { selection: None })
         .expect("serialize pick response");
     let captured = run_command(
-        TaskBoardCommand::DispatchPick(TaskBoardDispatchPickArgs { json: true }),
+        &TaskBoardCommand::DispatchPick(TaskBoardDispatchPickArgs { json: true }),
         response,
     );
 
@@ -256,7 +256,7 @@ fn dispatch_deliver_dry_run_routes_through_public_command() {
     })
     .expect("serialize deliver response");
     let captured = run_command(
-        TaskBoardCommand::DispatchDeliver(TaskBoardDispatchDeliverArgs {
+        &TaskBoardCommand::DispatchDeliver(TaskBoardDispatchDeliverArgs {
             item_id: "task-1".to_string(),
             dry_run: true,
             json: true,
@@ -278,7 +278,7 @@ fn policy_grants_list_routes_through_public_command() {
     })
     .expect("serialize grants response");
     let captured = run_command(
-        TaskBoardCommand::Policy {
+        &TaskBoardCommand::Policy {
             command: TaskBoardPolicyCommand::Grants(TaskBoardPolicyJsonArgs { json: true }),
         },
         response,
@@ -297,7 +297,7 @@ fn policy_grant_resolve_routes_through_public_command() {
     let response = serde_json::to_string(&PolicyApprovalGrantResolveResponse { grant })
         .expect("serialize grant response");
     let captured = run_command(
-        TaskBoardCommand::Policy {
+        &TaskBoardCommand::Policy {
             command: TaskBoardPolicyCommand::GrantResolve(TaskBoardPolicyGrantResolveArgs {
                 grant_id: "grant-1".to_string(),
                 approve: true,
@@ -321,7 +321,7 @@ fn policy_grant_resolve_routes_through_public_command() {
 fn spawn_requires_live_policy_toggle_routes_through_public_command() {
     let response = serde_json::to_string(&workspace(true, false)).expect("serialize workspace");
     let captured = run_command(
-        TaskBoardCommand::Policy {
+        &TaskBoardCommand::Policy {
             command: TaskBoardPolicyCommand::SpawnRequiresLivePolicy(TaskBoardPolicyToggleArgs {
                 enabled: true,
                 json: true,
@@ -343,7 +343,7 @@ fn spawn_requires_live_policy_toggle_routes_through_public_command() {
 fn spawn_kill_switch_toggle_routes_through_public_command() {
     let response = serde_json::to_string(&workspace(false, true)).expect("serialize workspace");
     let captured = run_command(
-        TaskBoardCommand::Policy {
+        &TaskBoardCommand::Policy {
             command: TaskBoardPolicyCommand::SpawnKillSwitch(TaskBoardPolicyToggleArgs {
                 enabled: true,
                 json: true,

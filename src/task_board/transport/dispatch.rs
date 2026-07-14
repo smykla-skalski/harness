@@ -119,6 +119,9 @@ fn print_dispatch_delivery(response: &TaskBoardDispatchDeliverResponse, dry_run:
         response.applied.session_id,
         response.applied.work_item_id
     );
+    if let Some(agent) = &response.started_agent {
+        println!("started agent: {}", agent.agent_id());
+    }
     println!("{}", response.rendered_prompt);
 }
 
