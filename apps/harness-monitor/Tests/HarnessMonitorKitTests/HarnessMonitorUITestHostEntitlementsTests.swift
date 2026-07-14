@@ -151,9 +151,12 @@ struct HarnessMonitorAppBundleMetadataTests {
     )
 
     #expect(appSource.contains("@Environment(\\.scenePhase)"))
-    #expect(appSource.contains(".onChange(of: scenePhase)"))
-    #expect(appSource.contains("guard newPhase == .active"))
-    #expect(appSource.contains("await store.load()"))
+    let activationHandlerStart = try #require(
+      appSource.range(of: ".onChange(of: scenePhase)")
+    )
+    let activationHandlerSource = appSource[activationHandlerStart.lowerBound...]
+    #expect(activationHandlerSource.contains("guard newPhase == .active"))
+    #expect(activationHandlerSource.contains("await store.load()"))
   }
 
   @Test("Mobile widgets can refresh encrypted mirrors")
