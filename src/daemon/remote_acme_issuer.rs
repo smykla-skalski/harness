@@ -1,9 +1,7 @@
 use std::env;
 use std::fmt;
-use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::thread;
 
 use async_trait::async_trait;
 use instant_acme::{
@@ -11,22 +9,23 @@ use instant_acme::{
     ChallengeType, Identifier, LetsEncrypt, NewAccount, NewOrder, Order, OrderStatus, RetryPolicy,
 };
 use rcgen::{CertificateParams, DistinguishedName, KeyPair};
-use tokio::runtime::{Handle, Runtime};
 
 use super::remote::{
     RemoteAcmeChallenge, RemoteDaemonServeConfig, RemoteDnsProvider, validate_remote_serve_config,
 };
-use super::remote_acme::{
-    RemoteAcmeAccountCredentials, RemoteAcmeRenewalIssuer, RemoteAcmeRenewalRequest,
-    RemoteCertificateBundle,
-};
-use super::remote_acme_challenge::SystemRemoteAcmeChallengeProvisioner;
+use super::remote_acme::{RemoteAcmeAccountCredentials, RemoteCertificateBundle};
 use super::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use super::remote_acme_lease_guard::RemoteAcmeChallengeLeaseGuard;
 use super::remote_redaction::redact_secret_detail;
 use super::remote_tls::ensure_rustls_provider;
 
 type AccountBuilderFactory = dyn Fn() -> Result<AccountBuilder, String> + Send + Sync + 'static;
+
+#[derive(Clone, Copy)]
+enum SuccessfulCleanupMode {
+    Await,
+    Track,
+}
 
 #[derive(Clone, PartialEq, Eq)]
 pub(crate) enum RemoteAcmeChallengeMaterial {
@@ -196,11 +195,12 @@ where
         config: &RemoteDaemonServeConfig,
         previous_private_key_pem: Option<&str>,
     ) -> Result<RemoteCertificateBundle, String> {
-        self.issue_certificate_with_cleanup(
+        self.issue_certificate_with_cleanup_mode(
             credentials,
             config,
             previous_private_key_pem,
             RemoteAcmeCleanupTracker::default(),
+            SuccessfulCleanupMode::Await,
         )
         .await
     }
@@ -212,6 +212,40 @@ where
         previous_private_key_pem: Option<&str>,
         cleanup_tracker: RemoteAcmeCleanupTracker,
     ) -> Result<RemoteCertificateBundle, String> {
+        self.issue_certificate_with_cleanup_mode(
+            credentials,
+            config,
+            previous_private_key_pem,
+            cleanup_tracker,
+            SuccessfulCleanupMode::Track,
+        )
+        .await
+    }
+
+    pub(crate) async fn issue_certificate_and_await_cleanup(
+        &self,
+        credentials: &RemoteAcmeAccountCredentials,
+        config: &RemoteDaemonServeConfig,
+        previous_private_key_pem: Option<&str>,
+    ) -> Result<RemoteCertificateBundle, String> {
+        self.issue_certificate_with_cleanup_mode(
+            credentials,
+            config,
+            previous_private_key_pem,
+            RemoteAcmeCleanupTracker::default(),
+            SuccessfulCleanupMode::Await,
+        )
+        .await
+    }
+
+    async fn issue_certificate_with_cleanup_mode(
+        &self,
+        credentials: &RemoteAcmeAccountCredentials,
+        config: &RemoteDaemonServeConfig,
+        previous_private_key_pem: Option<&str>,
+        cleanup_tracker: RemoteAcmeCleanupTracker,
+        cleanup_mode: SuccessfulCleanupMode,
+    ) -> Result<RemoteCertificateBundle, String> {
         validate_remote_serve_config(config).map_err(|error| error.to_string())?;
         let account = self.restore_account(credentials).await?;
         let identifiers = [Identifier::Dns(config.domain.trim().to_string())];
@@ -219,8 +253,45 @@ where
             .new_order(&NewOrder::new(&identifiers))
             .await
             .map_err(|error| redacted_acme_error(&error))?;
-        self.complete_authorizations(&mut order, config, cleanup_tracker)
+        let leases = self
+            .complete_authorizations(&mut order, config, cleanup_tracker)
             .await?;
+        let issuance = self
+            .finalize_certificate(&mut order, config, previous_private_key_pem)
+            .await;
+        Self::finish_issuance(issuance, leases, cleanup_mode).await
+    }
+
+    async fn finish_issuance(
+        issuance: Result<RemoteCertificateBundle, String>,
+        leases: RemoteAcmeChallengeLeaseGuard<P>,
+        cleanup_mode: SuccessfulCleanupMode,
+    ) -> Result<RemoteCertificateBundle, String> {
+        let bundle = match issuance {
+            Ok(bundle) => bundle,
+            Err(error) => return Self::cleanup_after_error(leases, error).await,
+        };
+        Self::finish_successful_cleanup(leases, cleanup_mode).await?;
+        Ok(bundle)
+    }
+
+    async fn finish_successful_cleanup(
+        leases: RemoteAcmeChallengeLeaseGuard<P>,
+        cleanup_mode: SuccessfulCleanupMode,
+    ) -> Result<(), String> {
+        match cleanup_mode {
+            SuccessfulCleanupMode::Await => leases.cleanup().await?,
+            SuccessfulCleanupMode::Track => leases.cleanup_in_background(),
+        }
+        Ok(())
+    }
+
+    async fn finalize_certificate(
+        &self,
+        order: &mut Order,
+        config: &RemoteDaemonServeConfig,
+        previous_private_key_pem: Option<&str>,
+    ) -> Result<RemoteCertificateBundle, String> {
         let private_key = previous_private_key_pem.map_or_else(
             || KeyPair::generate().map_err(|error| error.to_string()),
             |pem| KeyPair::from_pem(pem).map_err(|error| error.to_string()),
@@ -260,7 +331,7 @@ where
         order: &mut Order,
         config: &RemoteDaemonServeConfig,
         cleanup_tracker: RemoteAcmeCleanupTracker,
-    ) -> Result<(), String> {
+    ) -> Result<RemoteAcmeChallengeLeaseGuard<P>, String> {
         let mut leases =
             RemoteAcmeChallengeLeaseGuard::new(Arc::clone(&self.provisioner), cleanup_tracker);
         let authorization_result = self
@@ -280,12 +351,9 @@ where
                     Err(format!("remote ACME order became {status:?}"))
                 }
             });
-        match (poll_result, leases.cleanup().await) {
-            (Ok(()), Ok(())) => Ok(()),
-            (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
-            (Err(issue), Err(cleanup)) => Err(format!(
-                "{issue}; remote ACME challenge cleanup also failed: {cleanup}"
-            )),
+        match poll_result {
+            Ok(()) => Ok(leases),
+            Err(error) => Self::cleanup_after_error(leases, error).await,
         }
     }
 
@@ -328,10 +396,10 @@ where
         Ok(())
     }
 
-    async fn cleanup_after_error(
+    async fn cleanup_after_error<T>(
         leases: RemoteAcmeChallengeLeaseGuard<P>,
         issue: String,
-    ) -> Result<(), String> {
+    ) -> Result<T, String> {
         match leases.cleanup().await {
             Ok(()) => Err(issue),
             Err(cleanup) => Err(format!(
@@ -404,77 +472,10 @@ fn redacted_acme_error(error: &instant_acme::Error) -> String {
     redact_secret_detail(&error.to_string())
 }
 
-pub(crate) struct SystemRemoteAcmeIssuer;
+#[path = "remote_acme_system_issuer.rs"]
+mod system;
 
-impl SystemRemoteAcmeIssuer {
-    pub(crate) async fn create_account_async(
-        &self,
-        config: &RemoteDaemonServeConfig,
-    ) -> Result<RemoteAcmeAccountCredentials, String> {
-        let provisioner = SystemRemoteAcmeChallengeProvisioner::from_environment(config)?;
-        InstantAcmeIssuer::production(provisioner)
-            .create_account(config.acme_email.as_str())
-            .await
-    }
-
-    pub(crate) async fn renew_certificate_async(
-        &self,
-        request: &RemoteAcmeRenewalRequest,
-        cleanup_tracker: RemoteAcmeCleanupTracker,
-    ) -> Result<RemoteCertificateBundle, String> {
-        let provisioner =
-            SystemRemoteAcmeChallengeProvisioner::from_environment(request.serve_config())?;
-        InstantAcmeIssuer::production(provisioner)
-            .issue_certificate_with_cleanup(
-                request.account(),
-                request.serve_config(),
-                request.previous_private_key_pem(),
-                cleanup_tracker,
-            )
-            .await
-    }
-}
-
-impl RemoteAcmeRenewalIssuer for SystemRemoteAcmeIssuer {
-    fn create_account(
-        &self,
-        config: &RemoteDaemonServeConfig,
-    ) -> Result<RemoteAcmeAccountCredentials, String> {
-        run_acme_future(self.create_account_async(config))
-    }
-
-    fn renew_certificate(
-        &self,
-        request: &RemoteAcmeRenewalRequest,
-    ) -> Result<RemoteCertificateBundle, String> {
-        run_acme_future(self.renew_certificate_async(request, RemoteAcmeCleanupTracker::default()))
-    }
-}
-
-pub(crate) fn run_acme_future<T, F>(future: F) -> Result<T, String>
-where
-    T: Send,
-    F: Future<Output = Result<T, String>> + Send,
-{
-    if Handle::try_current().is_ok() {
-        return thread::scope(|scope| {
-            scope
-                .spawn(move || run_acme_future_on_runtime(future))
-                .join()
-                .map_err(|_| "remote ACME runtime thread panicked".to_string())?
-        });
-    }
-    run_acme_future_on_runtime(future)
-}
-
-fn run_acme_future_on_runtime<T, F>(future: F) -> Result<T, String>
-where
-    F: Future<Output = Result<T, String>>,
-{
-    Runtime::new()
-        .map_err(|error| format!("create remote ACME runtime: {error}"))?
-        .block_on(future)
-}
+pub(crate) use system::{SystemRemoteAcmeIssuer, run_acme_future};
 
 #[cfg(test)]
 #[path = "remote_acme_issuer_tests.rs"]

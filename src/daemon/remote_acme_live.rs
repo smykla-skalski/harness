@@ -142,6 +142,23 @@ impl LiveRemoteAcmeIssuer {
             )
             .await
     }
+
+    async fn issue_certificate_and_await_cleanup(
+        &self,
+        request: &RemoteAcmeRenewalRequest,
+    ) -> Result<RemoteCertificateBundle, String> {
+        let provisioner = LiveRemoteAcmeChallengeProvisioner::from_environment(
+            request.serve_config(),
+            self.tls.clone(),
+        )?;
+        InstantAcmeIssuer::production(provisioner)
+            .issue_certificate_and_await_cleanup(
+                request.account(),
+                request.serve_config(),
+                request.previous_private_key_pem(),
+            )
+            .await
+    }
 }
 
 impl RemoteAcmeRenewalIssuer for LiveRemoteAcmeIssuer {
@@ -156,7 +173,7 @@ impl RemoteAcmeRenewalIssuer for LiveRemoteAcmeIssuer {
         &self,
         request: &RemoteAcmeRenewalRequest,
     ) -> Result<RemoteCertificateBundle, String> {
-        run_acme_future(self.issue_certificate(request, RemoteAcmeCleanupTracker::default()))
+        run_acme_future(self.issue_certificate_and_await_cleanup(request))
     }
 }
 
