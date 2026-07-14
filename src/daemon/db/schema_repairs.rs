@@ -29,6 +29,10 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
     ("policy_canvases", "live_updated_at"),
     ("policy_nodes", "layout_source"),
     ("policy_decisions", "evaluated_at"),
+    (
+        "task_board_dispatch_intents",
+        "consumed_approval_grant_id",
+    ),
 ];
 
 const CURRENT_SCHEMA_CODEX_RUN_COLUMNS: &[(&str, &str)] = &[
@@ -146,6 +150,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v32::run(&db.conn)?;
     super::schema_v33::run(&db.conn)?;
     super::schema_v34::run(&db.conn)?;
+    super::schema_v35::run(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

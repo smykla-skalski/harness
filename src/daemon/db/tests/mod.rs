@@ -10,6 +10,7 @@ use support::*;
 
 mod agent_upserts;
 mod async_pool;
+mod async_pool_migrations;
 mod async_reads;
 mod audit_events;
 mod conversation;

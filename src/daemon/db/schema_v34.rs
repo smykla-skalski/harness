@@ -39,20 +39,13 @@ pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
         "policy_workspace",
         "spawn_requires_live_policy",
         "ALTER TABLE policy_workspace
-         ADD COLUMN spawn_requires_live_policy INTEGER NOT NULL DEFAULT 1",
+         ADD COLUMN spawn_requires_live_policy INTEGER NOT NULL DEFAULT 0",
     )?;
     add_column_if_missing(
         conn,
         "policy_workspace",
         "spawn_kill_switch",
         "ALTER TABLE policy_workspace ADD COLUMN spawn_kill_switch INTEGER NOT NULL DEFAULT 0",
-    )?;
-    add_column_if_missing(
-        conn,
-        "task_board_dispatch_intents",
-        "consumed_approval_grant_id",
-        "ALTER TABLE task_board_dispatch_intents
-         ADD COLUMN consumed_approval_grant_id TEXT",
     )?;
     stamp_schema_version(conn)
 }
@@ -113,7 +106,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn migration_defaults_existing_workspace_to_fail_closed_spawn() {
+    fn migration_preserves_original_spawn_policy_default() {
         let conn = Connection::open_in_memory().expect("open sqlite");
         conn.execute_batch(
             "CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -137,6 +130,6 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("read migrated switch");
-        assert!(requires_live, "migration must default existing rows closed");
+        assert!(!requires_live, "v34 migration checksum requires this default");
     }
 }
