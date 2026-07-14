@@ -126,6 +126,7 @@ async fn dispatch_read_method(
         request.method.as_str(),
         ws_methods::HEALTH
             | ws_methods::DIAGNOSTICS
+            | ws_methods::GITHUB_STATUS
             | ws_methods::CONFIG
             | ws_methods::AUDIT_EVENTS
             | ws_methods::DAEMON_STOP

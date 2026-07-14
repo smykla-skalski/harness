@@ -10,6 +10,8 @@ use crate::daemon::remote_identity::{
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+mod remote_authz_matrix;
+
 #[test]
 fn websocket_activity_logging_uses_debug_level() {
     assert_eq!(ws_activity_log_level(), tracing::Level::DEBUG);
