@@ -150,6 +150,20 @@ fn extract_request_id_preserves_supplied_header() {
 }
 
 #[test]
+fn extract_request_id_bounds_supplied_header() {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "x-request-id",
+        "r".repeat(300).parse().expect("long request id header"),
+    );
+
+    let request_id = extract_request_id(&headers);
+
+    assert_eq!(request_id.len(), 256);
+    assert!(request_id.ends_with("..."));
+}
+
+#[test]
 fn extract_request_id_generates_fallback_when_header_missing() {
     let first = extract_request_id(&HeaderMap::new());
     let second = extract_request_id(&HeaderMap::new());

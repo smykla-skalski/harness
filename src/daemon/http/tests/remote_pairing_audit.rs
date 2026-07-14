@@ -1,11 +1,13 @@
 use std::sync::{Arc, Mutex};
 
 use axum::http::StatusCode;
+use tracing_subscriber::prelude::*;
 
 use crate::daemon::protocol::http_paths;
 use crate::daemon::remote::RemoteRole;
 use crate::daemon::remote_pairing::RemotePairingRateLimiter;
 
+use super::SharedOutput;
 use super::remote_pairing::{remote_pairing_state, seed_pairing_code, serve_http};
 
 #[tokio::test]
@@ -209,6 +211,14 @@ async fn remote_pair_claim_rate_limit_fails_closed_without_audit_storage() {
         .connection()
         .execute("DROP TABLE remote_audit_events", [])
         .expect("drop remote audit table");
+    let output = SharedOutput::default();
+    let subscriber = tracing_subscriber::registry().with(
+        tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .with_target(false)
+            .with_writer(output.clone()),
+    );
+    let _subscriber_guard = tracing::subscriber::set_default(subscriber);
     let (base_url, server) = serve_http(state).await;
 
     let response = reqwest::Client::new()
@@ -236,6 +246,10 @@ async fn remote_pair_claim_rate_limit_fails_closed_without_audit_storage() {
         "remote pairing store is unavailable"
     );
     assert!(!body.to_string().contains("rate-limited-client"));
+    let logs = output.contents();
+    assert!(logs.contains("remote pairing rate-limit audit failed"));
+    assert!(!logs.contains("rate-limited-client"));
+    assert!(!logs.contains("rate-limited-code"));
 
     server.abort();
     let _ = server.await;

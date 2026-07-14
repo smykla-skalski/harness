@@ -1,5 +1,5 @@
 use super::{
-    REMOTE_AUDIT_REQUEST_ID_MAX_BYTES, REMOTE_AUDIT_TRUNCATION_MARKER, RemoteAuditEvent,
+    REMOTE_REQUEST_ID_MAX_BYTES, REMOTE_REQUEST_ID_TRUNCATION_MARKER, RemoteAuditEvent,
     RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteBearerToken, RemoteClientRegistration,
     RemoteTokenHash, expand_client_scopes,
 };
@@ -118,7 +118,7 @@ fn remote_audit_event_bounds_unicode_request_ids_on_a_character_boundary() {
     );
 
     let bounded = event.request_id.expect("bounded request id");
-    assert!(bounded.len() <= REMOTE_AUDIT_REQUEST_ID_MAX_BYTES);
-    assert!(bounded.ends_with(REMOTE_AUDIT_TRUNCATION_MARKER));
+    assert!(bounded.len() <= REMOTE_REQUEST_ID_MAX_BYTES);
+    assert!(bounded.ends_with(REMOTE_REQUEST_ID_TRUNCATION_MARKER));
     assert!(bounded.is_char_boundary(bounded.len()));
 }

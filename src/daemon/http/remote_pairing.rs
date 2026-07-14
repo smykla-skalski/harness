@@ -220,14 +220,24 @@ fn check_claim_rate_limit(
     drop(limiter);
     attempt.map_err(|error| match error {
         RemotePairingError::RateLimited => {
-            if record_rate_limit_audit(state, client_id, request_id, remote_addr).is_ok() {
-                RemotePairClaimHttpError::RateLimited
-            } else {
-                RemotePairClaimHttpError::StoreUnavailable
+            match record_rate_limit_audit(state, client_id, request_id, remote_addr) {
+                Ok(()) => RemotePairClaimHttpError::RateLimited,
+                Err(error) => {
+                    log_rate_limit_audit_failure(&error);
+                    RemotePairClaimHttpError::StoreUnavailable
+                }
             }
         }
         other => RemotePairClaimHttpError::Pairing(other),
     })
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_rate_limit_audit_failure(error: &CliError) {
+    tracing::error!(%error, "remote pairing rate-limit audit failed");
 }
 
 fn record_rate_limit_audit(

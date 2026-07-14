@@ -9,7 +9,9 @@ use super::remote::{RemoteAccessScope, RemoteRole};
 use super::remote_crypto::{
     parse_sha256_storage_digest, sha256_storage_value, verify_sha256_storage_value,
 };
-use super::remote_identity::{RemoteBearerToken, RemoteIdentityError, RemoteStoredClient};
+use super::remote_identity::{
+    RemoteBearerToken, RemoteIdentityError, RemoteStoredClient, bounded_remote_request_id,
+};
 use crate::reviews::ReviewsQueryRequest;
 
 mod reviews;
@@ -332,7 +334,7 @@ impl RemotePairingClaimRequest {
             client_id,
             display_name,
             platform,
-            request_id: request_id.map(ToOwned::to_owned),
+            request_id: request_id.map(bounded_remote_request_id),
             remote_addr: remote_addr.map(ToOwned::to_owned),
             audit_event_id,
         })
