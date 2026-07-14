@@ -6,7 +6,7 @@ use tempfile::{TempDir, tempdir};
 use tokio::sync::broadcast;
 
 use crate::daemon::codex_controller::CodexControllerHandle;
-use crate::daemon::db::DaemonDb;
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
 use crate::daemon::index::DiscoveredProject;
 use crate::daemon::protocol::{
     CodexApprovalRequest, CodexRunMode, CodexRunSnapshot, CodexRunStatus, StreamEvent,
@@ -62,6 +62,36 @@ pub(super) fn controller_with_session_state(
     (
         CodexControllerHandle::new(sender, db_slot, false),
         db,
+        tempdir,
+    )
+}
+
+pub(super) async fn controller_with_async_session_state(
+    state: SessionState,
+) -> (CodexControllerHandle, Arc<AsyncDaemonDb>, TempDir) {
+    let (sender, _) = broadcast::channel::<StreamEvent>(8);
+    let tempdir = tempdir().expect("temp dir");
+    let async_db = Arc::new(
+        AsyncDaemonDb::connect(&tempdir.path().join("harness.db"))
+            .await
+            .expect("open async db"),
+    );
+    async_db
+        .sync_project(&sample_project())
+        .await
+        .expect("sync project");
+    async_db
+        .save_session_state("project-1", &state)
+        .await
+        .expect("save session");
+    let db_slot = Arc::new(OnceLock::new());
+    let async_db_slot = Arc::new(OnceLock::new());
+    async_db_slot
+        .set(async_db.clone())
+        .expect("install async db");
+    (
+        CodexControllerHandle::new_with_async_db(sender, db_slot, async_db_slot, false),
+        async_db,
         tempdir,
     )
 }

@@ -1,4 +1,4 @@
-use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot};
+use crate::daemon::protocol::{CodexRunRequest, CodexRunSnapshot, TaskBoardEvaluateRequest};
 use crate::daemon::service as daemon_service;
 use crate::errors::{CliError, CliErrorKind};
 use crate::session::service as session_service;
@@ -58,7 +58,7 @@ impl CodexControllerHandle {
         self.run_with_async_db(|async_db| async move {
             let now = utc_now();
             let status_for_update = status.clone();
-            let changed = async_db
+            let (changed, task_changed) = async_db
                 .update_session_state_immediate(&session_id_async, |state| {
                     let task_changed =
                         apply_bound_task_terminal_transition(state, &run_async, &now)?;
@@ -72,12 +72,25 @@ impl CodexControllerHandle {
                     if task_changed || status_changed {
                         session_service::refresh_session(state, &now);
                     }
-                    Ok(task_changed || status_changed)
+                    Ok((task_changed || status_changed, task_changed))
                 })
                 .await?;
             if changed {
                 async_db.bump_change(&session_id_async).await?;
                 async_db.bump_change("global").await?;
+            }
+            if task_changed
+                && let Some(board_item_id) = run_async.board_item_id.clone()
+            {
+                daemon_service::evaluate_task_board_async(
+                    &TaskBoardEvaluateRequest {
+                        item_id: Some(board_item_id),
+                        status: None,
+                        dry_run: false,
+                    },
+                    &async_db,
+                )
+                .await?;
             }
             Ok(changed)
         })
