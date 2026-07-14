@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use serde_json::{Value, json};
 
 use crate::daemon::protocol::{CodexApprovalDecision, CodexApprovalRequest, CodexRunMode};
@@ -25,11 +27,29 @@ pub(super) fn turn_sandbox_policy(mode: CodexRunMode, project_dir: &str) -> Valu
         CodexRunMode::WorkspaceWrite => json!({
             "type": "workspaceWrite",
             "networkAccess": false,
-            "writableRoots": [project_dir],
+            "writableRoots": workspace_writable_roots(project_dir),
             "excludeTmpdirEnvVar": false,
             "excludeSlashTmp": false
         }),
     }
+}
+
+fn workspace_writable_roots(project_dir: &str) -> Vec<String> {
+    let project = Path::new(project_dir)
+        .canonicalize()
+        .unwrap_or_else(|_| Path::new(project_dir).to_path_buf());
+    let mut roots = vec![project.display().to_string()];
+    let Ok(repository) = gix::discover(&project) else {
+        return roots;
+    };
+    let common_dir = repository
+        .common_dir()
+        .canonicalize()
+        .unwrap_or_else(|_| repository.common_dir().to_path_buf());
+    if !common_dir.starts_with(&project) {
+        roots.push(common_dir.display().to_string());
+    }
+    roots
 }
 
 pub(super) fn mode_instructions(mode: CodexRunMode) -> &'static str {
@@ -244,9 +264,14 @@ fn permission_approval_result(decision: CodexApprovalDecision, params: &Value) -
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+    use tempfile::tempdir;
 
-    use super::{approval_policy, approval_result, thread_sandbox, turn_sandbox_policy};
+    use super::{
+        approval_policy, approval_result, thread_sandbox, turn_sandbox_policy,
+        workspace_writable_roots,
+    };
     use crate::daemon::protocol::{CodexApprovalDecision, CodexRunMode};
+    use crate::git::mutation::create_linked_worktree;
 
     #[test]
     fn approval_mode_uses_read_only_thread_sandbox() {
@@ -276,6 +301,36 @@ mod tests {
                 "excludeTmpdirEnvVar": false,
                 "excludeSlashTmp": false
             })
+        );
+    }
+
+    #[test]
+    fn linked_worktree_sandbox_allows_its_common_git_metadata() {
+        let root = tempdir().expect("tempdir");
+        let origin = root.path().join("origin");
+        let worker = root.path().join("worker");
+        harness_testkit::init_git_repo_with_seed(&origin);
+        let head = harness_testkit::git_head_sha(&origin, "HEAD");
+        create_linked_worktree(
+            &origin,
+            "worker",
+            &worker,
+            "harness/worker",
+            &head,
+        )
+        .expect("create linked worktree");
+
+        assert_eq!(
+            workspace_writable_roots(worker.to_str().expect("utf8 worker")),
+            vec![
+                worker.canonicalize().expect("canonical worker").display().to_string(),
+                origin
+                    .join(".git")
+                    .canonicalize()
+                    .expect("canonical common git dir")
+                    .display()
+                    .to_string(),
+            ]
         );
     }
 

@@ -14,6 +14,17 @@ use crate::infra::io::write_json_pretty;
 
 use super::*;
 
+#[test]
+fn stdio_child_path_prefers_the_running_harness_binary_directory() {
+    let expected = std::env::current_exe()
+        .expect("current executable")
+        .parent()
+        .expect("executable directory")
+        .to_path_buf();
+    let path = stdio_child_path().expect("stdio child path");
+    assert_eq!(std::env::split_paths(&path).next(), Some(expected));
+}
+
 fn with_isolated_env<F: FnOnce()>(f: F) {
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
