@@ -26,6 +26,7 @@ extension TaskBoardStepRailView {
       .init(title: "Evaluating task-board item") {
         let succeeded = await store.evaluateTaskBoard(request: request)
         await MainActor.run {
+          state.requestApprovalRefresh()
           if succeeded, step == 2 { state.resetFlow() }
           state.finish(step: step, succeeded: succeeded)
         }
@@ -60,25 +61,16 @@ extension TaskBoardStepRailView {
     let state = stepRailState
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Delivering task-board item") {
-        let isPrepared: Bool
-        if isAlreadyHeld {
-          isPrepared = true
-        } else {
-          isPrepared = await store.dispatchTaskBoard(
-            request: TaskBoardDispatchRequest(
-              itemId: itemID,
-              dryRun: false,
-              projectDir: projectDir
-            )
-          )
-        }
-        let delivery: TaskBoardDispatchDelivery?
-        if isPrepared {
-          delivery = await store.deliverTaskBoardDispatch(itemID: itemID)
-        } else {
-          delivery = nil
-        }
+        let delivery = await store.prepareAndDeliverTaskBoardDispatch(
+          request: TaskBoardDispatchRequest(
+            itemId: itemID,
+            dryRun: false,
+            projectDir: projectDir
+          ),
+          isAlreadyHeld: isAlreadyHeld
+        )
         await MainActor.run {
+          state.requestApprovalRefresh()
           state.delivery = delivery
           state.finish(step: 4, succeeded: delivery != nil)
         }

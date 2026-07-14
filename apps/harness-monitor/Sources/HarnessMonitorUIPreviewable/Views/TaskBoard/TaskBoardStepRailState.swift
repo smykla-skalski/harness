@@ -4,11 +4,24 @@ import Observation
 @MainActor
 @Observable
 final class TaskBoardStepRailState {
-  enum Confirmation: String, Identifiable {
+  enum Confirmation: Identifiable {
+    case externalSync
+    case evaluate(step: Int)
     case deliver
     case complete
 
-    var id: String { rawValue }
+    var id: String {
+      switch self {
+      case .externalSync:
+        "external-sync"
+      case .evaluate(let step):
+        "evaluate-\(step)"
+      case .deliver:
+        "deliver"
+      case .complete:
+        "complete"
+      }
+    }
   }
 
   var activeStep: Int?
@@ -16,6 +29,7 @@ final class TaskBoardStepRailState {
   var pickedSelection: TaskBoardDispatchSelection?
   var delivery: TaskBoardDispatchDelivery?
   var confirmation: Confirmation?
+  var approvalRefreshGeneration: UInt64 = 0
 
   var isBusy: Bool { activeStep != nil }
 
@@ -33,6 +47,10 @@ final class TaskBoardStepRailState {
     activeStep = nil
   }
 
+  func requestApprovalRefresh() {
+    approvalRefreshGeneration &+= 1
+  }
+
   func resetFlow() {
     pickedSelection = nil
     delivery = nil
@@ -45,5 +63,6 @@ final class TaskBoardStepRailState {
     pickedSelection = nil
     delivery = nil
     confirmation = nil
+    approvalRefreshGeneration = 0
   }
 }

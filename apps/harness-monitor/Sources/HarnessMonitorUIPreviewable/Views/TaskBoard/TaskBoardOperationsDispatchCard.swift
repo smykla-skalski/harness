@@ -170,9 +170,7 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
             isDisabled: !isPresentationCurrent
           ) {
             if request.dryRun {
-              Task { @MainActor in
-                await store.dispatchTaskBoard(request: request)
-              }
+              enqueueDispatch(request)
             } else {
               pendingConfirmation = TaskBoardDispatchConfirmationPresentation(
                 request: request,
@@ -251,10 +249,13 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
         if let donatedItem {
           HarnessMonitorIntentDonations.donateDispatch(items: [donatedItem])
         }
-        Task { @MainActor in
-          await store.dispatchTaskBoard(request: confirmation.request)
-        }
+        enqueueDispatch(confirmation.request)
       }
+      .disabled(
+        store.isDaemonActionInFlight
+          || store.contentUI.dashboard.connectionState != .online
+          || !isPresentationCurrent
+      )
       Button("Cancel", role: .cancel) {}
     } message: { confirmation in
       Text(confirmation.message)
@@ -275,6 +276,14 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
       cachedPresentation = presentation
     }
     presentedInput = input
+  }
+
+  private func enqueueDispatch(_ request: TaskBoardDispatchRequest) {
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: request.dryRun ? "Previewing task board dispatch" : "Dispatching task board") {
+        await store.dispatchTaskBoard(request: request)
+      }
+    )
   }
 
   /// Actionable variant of the shared applied-summary row: the spawned

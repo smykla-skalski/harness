@@ -9,6 +9,9 @@ struct TaskBoardRouteContentSourceTests {
   func boardOnlyTaskBoardItemsHaveManagementSurface() throws {
     let overviewSource = try taskBoardOverviewSource()
     let managementPanelSource = try taskBoardSourceFile(named: "TaskBoardItemManagementPanel.swift")
+    let managementActionsSource = try taskBoardSourceFile(
+      named: "TaskBoardItemLiveActionButtons.swift"
+    )
     let managementComponentsSource = try taskBoardSourceFile(
       named: "TaskBoardItemManagementPanel+Components.swift"
     )
@@ -24,7 +27,11 @@ struct TaskBoardRouteContentSourceTests {
     #expect(overviewSource.contains("TaskBoardItemManagementPanel("))
     #expect(overviewSource.contains(".sheet(item: taskBoardManagementSheet)"))
     #expect(managementPanelSource.contains("harness.task-board.manage-item"))
-    #expect(overviewSource.contains("TaskBoardOverviewItemBehavior.runOnceRequest(for: item)"))
+    #expect(
+      overviewSource.contains(
+        "TaskBoardOverviewItemBehavior.runOnceRequest(for: item, dryRun: runOnceDryRun)"
+      )
+    )
     #expect(overviewSource.contains("onEvaluateTaskBoardItem(item)"))
     #expect(!overviewSource.contains("if !item.hasLinkedSessionTask"))
     #expect(overviewSource.contains("TaskBoardOverviewItemBehavior.selectionAction("))
@@ -57,7 +64,9 @@ struct TaskBoardRouteContentSourceTests {
     #expect(managementSupportSource.contains("hasVisibleLabel: true"))
     #expect(managementSupportSource.contains("maxHeight: minHeight"))
     #expect(managementSupportSource.contains("harness.task-board.manage-item.body-preview"))
-    #expect(managementPanelSource.contains("Evaluate Item"))
+    #expect(managementActionsSource.contains("Evaluate Item Live"))
+    #expect(managementActionsSource.contains("Preview Run Once"))
+    #expect(managementActionsSource.contains(".confirmationDialog("))
     #expect(managementPanelSource.contains("TaskBoardPlanLifecycleActionButtons("))
     #expect(!managementPanelSource.contains("metrics.managementPanelCornerRadius"))
     #expect(managementSupportSource.contains("Label(\"Begin Plan\""))
@@ -312,6 +321,7 @@ struct TaskBoardRouteContentSourceTests {
     try [
       taskBoardSourceFile(named: "TaskBoardOverviewView.swift"),
       taskBoardSourceFile(named: "TaskBoardOverviewView+Support.swift"),
+      taskBoardSourceFile(named: "TaskBoardOverviewLiveOperations.swift"),
       taskBoardSourceFile(named: "TaskBoardOverviewView+Board.swift"),
       taskBoardSourceFile(named: "TaskBoardOverviewView+CardInteraction.swift"),
     ].joined(separator: "\n")

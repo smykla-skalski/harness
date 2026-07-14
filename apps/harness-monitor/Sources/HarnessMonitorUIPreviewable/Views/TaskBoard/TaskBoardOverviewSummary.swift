@@ -88,15 +88,14 @@ extension TaskBoardOverviewView {
     }
   }
 
-  /// Routes the board-level Evaluate action: a live evaluate goes through the
-  /// host closure (applies changes, updates the persisted summary), while a
-  /// dry run reads counts into a local preview strip without mutating state.
-  func triggerBoardEvaluate(_ liveEvaluate: @escaping () -> Void) {
-    guard evaluateDryRun, let store else {
-      evaluatePreviewSummaryValue = nil
-      liveEvaluate()
+  /// Routes board evaluation through a dry-run preview or a confirmation before
+  /// the live host closure applies changes and updates the persisted summary.
+  func triggerBoardEvaluate() {
+    guard evaluateDryRun else {
+      requestLiveBoardEvaluation()
       return
     }
+    guard let store else { return }
     let previewState = evaluatePreviewStateValue
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Previewing task-board evaluate") {

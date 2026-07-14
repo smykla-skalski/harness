@@ -55,15 +55,6 @@ extension HarnessMonitorStore {
     }
   }
 
-  func refreshTaskBoardDashboardSnapshot(
-    using client: any HarnessMonitorClientProtocol,
-    fallbackStatus: TaskBoardOrchestratorStatus? = nil
-  ) async {
-    cancelInitialTaskBoardConfirmationRefresh()
-    let snapshot = await Self.loadTaskBoardRefreshSnapshot(using: client)
-    applyTaskBoardDashboardSnapshot(snapshot, fallbackStatus: fallbackStatus)
-  }
-
   func applyTaskBoardDashboardSnapshot(
     _ snapshot: TaskBoardRefreshSnapshot,
     fallbackStatus: TaskBoardOrchestratorStatus? = nil

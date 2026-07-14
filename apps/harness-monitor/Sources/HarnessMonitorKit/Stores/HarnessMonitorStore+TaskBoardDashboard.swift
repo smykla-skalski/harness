@@ -261,7 +261,10 @@ extension HarnessMonitorStore {
         try await client.evaluateTaskBoard(request: request)
       }
       recordRequestSuccess()
+      cacheWriteSync.taskBoardEvaluationBaselineRunID =
+        globalTaskBoardOrchestratorStatus?.lastRun?.runId
       globalTaskBoardEvaluationSummary = measuredSummary.value
+      scheduleUISync([.contentDashboard])
       await refreshTaskBoardDashboardSnapshot(using: client)
       presentSuccessFeedback("Evaluated task board")
       return true
@@ -286,7 +289,10 @@ extension HarnessMonitorStore {
   }
 
   @discardableResult
-  public func dispatchTaskBoard(request: TaskBoardDispatchRequest) async -> Bool {
+  public func dispatchTaskBoard(
+    request: TaskBoardDispatchRequest,
+    refreshDashboard: Bool = true
+  ) async -> Bool {
     guard let client else {
       return false
     }
@@ -299,7 +305,9 @@ extension HarnessMonitorStore {
       }
       recordRequestSuccess()
       globalTaskBoardDispatchSummary = measuredSummary.value
-      await refreshTaskBoardDashboardSnapshot(using: client)
+      if refreshDashboard {
+        await refreshTaskBoardDashboardSnapshot(using: client)
+      }
       presentSuccessFeedback(
         request.dryRun ? "Prepared task board dispatch" : "Dispatched task board"
       )

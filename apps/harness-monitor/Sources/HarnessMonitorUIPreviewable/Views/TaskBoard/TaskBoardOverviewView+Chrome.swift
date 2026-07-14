@@ -4,11 +4,15 @@ import SwiftUI
 extension TaskBoardOverviewView {
   @ViewBuilder var boardChrome: some View {
     if hasRouteContent || store != nil {
-      if let orchestratorStatus {
+      if taskBoardSessionID == nil, let orchestratorStatus {
         taskBoardDetailRow {
           TaskBoardOrchestratorSummaryView(
             status: orchestratorStatus,
+            taskBoardItems: currentPresentation.taskBoardItems,
+            localHostProjectTypes: localHostRoutingStateValue.projectTypes,
             latestEvaluation: evaluationSummary,
+            latestEvaluationBaselineRunID: store?.contentUI.dashboard
+              .taskBoardEvaluationBaselineRunID,
             isActionInFlight: isActionInFlight,
             onStart: onStartTaskBoardOrchestrator,
             onStop: onStopTaskBoardOrchestrator,
@@ -20,11 +24,17 @@ extension TaskBoardOverviewView {
         taskBoardDetailRow { evaluationSummaryRow(evaluationSummary) }
       }
     }
-    if let orchestratorStatus, orchestratorStatus.stepMode, let store {
+    if taskBoardSessionID == nil,
+      let orchestratorStatus,
+      orchestratorStatus.enabled,
+      orchestratorStatus.stepMode,
+      let store
+    {
       taskBoardDetailRow {
         TaskBoardStepRailView(
           store: store,
           status: orchestratorStatus,
+          latestEvaluation: evaluationSummary,
           workspace: store.contentUI.dashboard.policyCanvasWorkspace,
           targetItem: stepRailTargetItem,
           isActionInFlight: isActionInFlight,
@@ -36,7 +46,7 @@ extension TaskBoardOverviewView {
       taskBoardDetailRow { evaluatePreviewRow(evaluatePreviewSummaryValue) }
     }
     taskBoardDetailRow { headerTitle }
-    if showsOperationsPanel, let store {
+    if taskBoardSessionID == nil, showsOperationsPanel, let store {
       taskBoardDetailRow {
         TaskBoardOperationsPanel(store: store, taskBoardItems: currentPresentation.taskBoardItems)
       }
@@ -90,7 +100,7 @@ extension TaskBoardOverviewView {
       .accessibilityIdentifier("harness.task-board.new-item")
     }
 
-    if let onEvaluateTaskBoard {
+    if onEvaluateTaskBoard != nil {
       if store != nil {
         Toggle("Dry run", isOn: $evaluateDryRun)
           .toggleStyle(.checkbox)
@@ -100,31 +110,38 @@ extension TaskBoardOverviewView {
           .accessibilityIdentifier("harness.task-board.evaluate.dry-run")
       }
       Button {
-        triggerBoardEvaluate(onEvaluateTaskBoard)
+        triggerBoardEvaluate()
       } label: {
-        Label(evaluateDryRun ? "Preview" : "Evaluate", systemImage: "checkmark.seal")
-          .font(captionSemibold)
+        Label(
+          evaluateDryRun ? "Preview Evaluate" : "Evaluate Live",
+          systemImage: "checkmark.seal"
+        )
+        .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       .disabled(isActionInFlight)
-      .help(evaluateDryRun ? "Preview evaluate results without applying" : "Evaluate board state")
+      .help(
+        evaluateDryRun
+          ? "Preview evaluate results without applying changes"
+          : "Evaluate and apply live board transitions after confirmation"
+      )
       .accessibilityIdentifier("harness.task-board.evaluate")
     }
 
-    if let onRefreshTaskBoard {
+    if onRefreshTaskBoard != nil {
       Button {
-        onRefreshTaskBoard()
+        requestTaskBoardSync()
       } label: {
-        Label("Sync", systemImage: "arrow.clockwise")
+        Label("Sync Live", systemImage: "arrow.clockwise")
           .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       .disabled(isActionInFlight)
-      .help("Sync task board")
+      .help("Pull external sources and apply live board changes after confirmation")
       .accessibilityIdentifier("harness.task-board.refresh")
     }
   }

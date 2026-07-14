@@ -47,16 +47,38 @@ struct TaskBoardOverviewHost: View {
   }
 
   var body: some View {
-    TaskBoardOverviewView(
+    overviewView
+  }
+
+  private var overviewView: TaskBoardOverviewView {
+    let dashboardCreateItem: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)? =
+      scope.isDashboard
+      ? { request, status in createTaskBoardItem(request, initialStatus: status) }
+      : nil
+    let dashboardEvaluate: (() -> Void)? = scope.isDashboard ? { evaluateTaskBoard() } : nil
+    let dashboardRefresh: (() -> Void)? = scope.isDashboard ? { refreshTaskBoard() } : nil
+    let dashboardStart: (() -> Void)? = scope.isDashboard ? { startTaskBoardOrchestrator() } : nil
+    let dashboardStop: (() -> Void)? = scope.isDashboard ? { stopTaskBoardOrchestrator() } : nil
+    let dashboardStepMode: (@MainActor @Sendable (Bool) -> Void)?
+    if scope.isDashboard {
+      let stepModeAction: @MainActor @Sendable (Bool) -> Void = { enabled in
+        setTaskBoardStepMode(enabled)
+      }
+      dashboardStepMode = stepModeAction
+    } else {
+      dashboardStepMode = nil
+    }
+
+    return TaskBoardOverviewView(
       snapshot: snapshot,
       taskBoardItems: taskBoardItems,
       store: store,
       orchestratorStatus: orchestratorStatus,
-      evaluationSummary: evaluationSummary,
+      evaluationSummary: scope.isDashboard ? evaluationSummary : nil,
       taskBoardSessionID: scope.sessionID,
       contentHorizontalPadding: scope.taskBoardContentHorizontalPadding,
       fillsAvailableHeight: scope.fillsAvailableHeight,
-      showsOperationsPanel: showsOperationsPanel,
+      showsOperationsPanel: scope.isDashboard && showsOperationsPanel,
       isCommandFocusActive: isCommandFocusActive,
       operationsInspectorFocus: operationsInspectorFocus,
       decisions: decisions,
@@ -66,25 +88,26 @@ struct TaskBoardOverviewHost: View {
       onMoveInboxItems: moveInboxItems,
       onMoveTaskBoardItems: moveTaskBoardItems,
       onOpenDecision: openDecision,
-      onCreateTaskBoardItem: createTaskBoardItem,
+      onCreateTaskBoardItem: dashboardCreateItem,
       onUpdateTaskBoardItem: updateTaskBoardItem,
       onDeleteTaskBoardItem: deleteTaskBoardItem,
       onDeleteTaskBoardTargets: deleteTaskBoardTargets,
-      onEvaluateTaskBoard: evaluateTaskBoard,
+      onEvaluateTaskBoard: dashboardEvaluate,
       onEvaluateTaskBoardItem: evaluateTaskBoardItem,
       onBeginTaskBoardPlan: beginTaskBoardPlan,
       onSubmitTaskBoardPlan: submitTaskBoardPlan,
       onApproveTaskBoardPlan: approveTaskBoardPlan,
       onRevokeTaskBoardPlan: revokeTaskBoardPlan,
-      onRefreshTaskBoard: refreshTaskBoard,
-      onStartTaskBoardOrchestrator: startTaskBoardOrchestrator,
-      onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator,
+      onRefreshTaskBoard: dashboardRefresh,
+      onStartTaskBoardOrchestrator: dashboardStart,
+      onStopTaskBoardOrchestrator: dashboardStop,
       onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce,
-      onSetTaskBoardStepMode: setTaskBoardStepMode,
+      onSetTaskBoardStepMode: dashboardStepMode,
       decisionItems: store.supervisorOpenDecisionPresentationItems,
       decisionsByID: store.supervisorOpenDecisionsByID
     )
   }
+
   private func openTaskBoardItem(_ item: TaskBoardItem) {
     switch scope {
     case .dashboard:
@@ -99,11 +122,11 @@ struct TaskBoardOverviewHost: View {
         store.presentedSheet = .taskActions(sessionID: sessionID, taskID: workItemID)
       }
     case .session(let sessionID):
-      guard let workItemID = item.workItemId else {
+      guard item.sessionId == sessionID, let workItemID = item.workItemId else {
         return
       }
       store.presentedSheet = .taskActions(
-        sessionID: item.sessionId ?? sessionID,
+        sessionID: sessionID,
         taskID: workItemID
       )
     }
@@ -119,9 +142,12 @@ struct TaskBoardOverviewHost: View {
           taskID: item.task.taskId
         )
       }
-    case .session:
+    case .session(let sessionID):
+      guard item.session.sessionId == sessionID else {
+        return
+      }
       store.presentedSheet = .taskActions(
-        sessionID: item.session.sessionId,
+        sessionID: sessionID,
         taskID: item.task.taskId
       )
     }
@@ -138,9 +164,12 @@ struct TaskBoardOverviewHost: View {
         await store.selectSession(sessionID)
       }
     case .session(let sessionID):
+      guard decision.sessionID == sessionID else {
+        return
+      }
       store.requestSessionRoute(
         .decision(
-          sessionID: decision.sessionID ?? sessionID,
+          sessionID: sessionID,
           decisionID: decision.id
         ),
         resetDecisionFilters: true
@@ -160,15 +189,19 @@ struct TaskBoardOverviewHost: View {
     _ request: TaskBoardCreateItemRequest,
     initialStatus: TaskBoardStatus
   ) {
-    Task { @MainActor in
-      await store.createTaskBoardItem(request: request, initialStatus: initialStatus)
-    }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Creating task board item") {
+        await store.createTaskBoardItem(request: request, initialStatus: initialStatus)
+      }
+    )
   }
 
   private func updateTaskBoardItem(_ itemID: String, request: TaskBoardUpdateItemRequest) {
-    Task { @MainActor in
-      await store.updateTaskBoardItem(id: itemID, request: request)
-    }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Updating task board item") {
+        await store.updateTaskBoardItem(id: itemID, request: request)
+      }
+    )
   }
 
   private func deleteTaskBoardItem(_ item: TaskBoardItem) {
@@ -188,28 +221,36 @@ struct TaskBoardOverviewHost: View {
   }
 
   private func evaluateTaskBoard() {
-    Task { @MainActor in
-      await store.evaluateTaskBoard()
-    }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Evaluating task board") {
+        await store.evaluateTaskBoard()
+      }
+    )
   }
 
   private func evaluateTaskBoardItem(_ item: TaskBoardItem) {
     let request = TaskBoardOverviewItemBehavior.evaluationRequest(for: item)
-    Task { @MainActor in
-      await store.evaluateTaskBoard(request: request)
-    }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Evaluating task board item") {
+        await store.evaluateTaskBoard(request: request)
+      }
+    )
   }
 
   private func beginTaskBoardPlan(_ item: TaskBoardItem) {
-    Task { @MainActor in
-      await store.beginTaskBoardPlan(id: item.id)
-    }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Beginning task board plan") {
+        await store.beginTaskBoardPlan(id: item.id)
+      }
+    )
   }
 
   private func submitTaskBoardPlan(_ item: TaskBoardItem, summary: String) {
-    Task { @MainActor in
-      await store.submitTaskBoardPlan(id: item.id, summary: summary)
-    }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Submitting task board plan") {
+        await store.submitTaskBoardPlan(id: item.id, summary: summary)
+      }
+    )
   }
 
   private func approveTaskBoardPlan(
@@ -218,13 +259,15 @@ struct TaskBoardOverviewHost: View {
     approvedAt: String?
   ) {
     HarnessMonitorIntentDonations.donateApprovePlan(items: [item])
-    Task { @MainActor in
-      await store.approveTaskBoardPlan(
-        id: item.id,
-        approvedBy: approvedBy,
-        approvedAt: approvedAt
-      )
-    }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Approving task board plan") {
+        await store.approveTaskBoardPlan(
+          id: item.id,
+          approvedBy: approvedBy,
+          approvedAt: approvedAt
+        )
+      }
+    )
   }
 
   private func revokeTaskBoardPlan(_ item: TaskBoardItem) {
@@ -236,27 +279,37 @@ struct TaskBoardOverviewHost: View {
   }
 
   private func refreshTaskBoard() {
-    Task { @MainActor in
-      await store.refreshTaskBoardDashboard()
-    }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Syncing task board") {
+        await store.refreshTaskBoardDashboard()
+      }
+    )
   }
 
   private func startTaskBoardOrchestrator() {
-    Task { @MainActor in
-      await store.startTaskBoardOrchestrator()
-    }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Starting task board orchestrator") {
+        await store.startTaskBoardOrchestrator()
+      }
+    )
   }
 
   private func stopTaskBoardOrchestrator() {
-    Task { @MainActor in
-      await store.stopTaskBoardOrchestrator()
-    }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Stopping task board orchestrator") {
+        await store.stopTaskBoardOrchestrator()
+      }
+    )
   }
 
   private func runTaskBoardOrchestratorOnce(_ request: TaskBoardOrchestratorRunOnceRequest) {
-    Task { @MainActor in
-      await store.runTaskBoardOrchestratorOnce(request: request)
-    }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(
+        title: request.dryRun == true ? "Previewing task board run" : "Running task board once"
+      ) {
+        await store.runTaskBoardOrchestratorOnce(request: request)
+      }
+    )
   }
 
   private func setTaskBoardStepMode(_ enabled: Bool) {
@@ -269,6 +322,10 @@ struct TaskBoardOverviewHost: View {
 }
 
 extension TaskBoardOverviewHost.Scope {
+  fileprivate var isDashboard: Bool {
+    self == .dashboard
+  }
+
   fileprivate var sessionID: String? {
     switch self {
     case .dashboard:

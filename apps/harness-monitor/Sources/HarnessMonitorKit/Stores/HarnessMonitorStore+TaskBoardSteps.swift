@@ -27,7 +27,8 @@ extension HarnessMonitorStore {
 
   public func deliverTaskBoardDispatch(
     itemID: String,
-    dryRun: Bool = false
+    dryRun: Bool = false,
+    refreshDashboard: Bool = true
   ) async -> TaskBoardDispatchDelivery? {
     guard let client else {
       return nil
@@ -45,14 +46,49 @@ extension HarnessMonitorStore {
       let delivery = measuredDelivery.value
       if !dryRun {
         mergeTaskBoardItem(delivery.applied.item)
+      }
+      if refreshDashboard && !dryRun {
         await refreshTaskBoardDashboardSnapshot(using: client)
       }
       presentSuccessFeedback(dryRun ? "Previewed task-board delivery" : "Delivered task-board item")
       return delivery
     } catch {
+      if refreshDashboard && !dryRun {
+        await refreshTaskBoardDashboardSnapshot(using: client)
+      }
       presentFailureFeedback(error.localizedDescription)
       return nil
     }
+  }
+
+  public func prepareAndDeliverTaskBoardDispatch(
+    request: TaskBoardDispatchRequest,
+    isAlreadyHeld: Bool = false
+  ) async -> TaskBoardDispatchDelivery? {
+    guard let client, let itemID = request.itemId else {
+      presentFailureFeedback("Task-board delivery requires a selected item")
+      return nil
+    }
+
+    beginTaskBoardDashboardRefreshDeferral()
+    let isPrepared: Bool
+    if isAlreadyHeld {
+      isPrepared = true
+    } else {
+      isPrepared = await dispatchTaskBoard(request: request, refreshDashboard: false)
+    }
+    let delivery: TaskBoardDispatchDelivery?
+    if isPrepared {
+      delivery = await deliverTaskBoardDispatch(
+        itemID: itemID,
+        dryRun: request.dryRun,
+        refreshDashboard: false
+      )
+    } else {
+      delivery = nil
+    }
+    await finishTaskBoardDashboardRefreshDeferral(using: client)
+    return delivery
   }
 
   @discardableResult
@@ -118,6 +154,31 @@ extension HarnessMonitorStore {
       }
       recordRequestSuccess()
       presentSuccessFeedback(approve ? "Approved policy grant" : "Denied policy grant")
+      return measuredGrant.value
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      return nil
+    }
+  }
+
+  public func revokePolicyApprovalGrant(
+    grantID: String,
+    actor: String? = nil
+  ) async -> PolicyApprovalGrant? {
+    guard let client else {
+      return nil
+    }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    do {
+      let measuredGrant = try await Self.measureOperation {
+        try await client.revokePolicyApprovalGrant(
+          request: PolicyApprovalGrantRevokeRequest(grantId: grantID, actor: actor)
+        )
+      }
+      recordRequestSuccess()
+      presentSuccessFeedback("Revoked policy grant")
       return measuredGrant.value
     } catch {
       presentFailureFeedback(error.localizedDescription)

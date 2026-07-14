@@ -53,9 +53,11 @@ public struct TaskBoardOverviewView: View {
   @State private var draggedCardIDs: [TaskBoardCardID] = []
   @State private var taskBoardSelectionDispatcher = TaskBoardSelectionDispatcher()
   @State private var relativeTimeClock = TaskBoardRelativeTimeClock()
+  @State private var localHostRoutingState = TaskBoardLocalHostRoutingState()
   @AppStorage(TaskBoardEvaluatePreferences.dryRunStorageKey)
   var evaluateDryRun = TaskBoardEvaluatePreferences.defaultDryRun
   @State private var evaluatePreviewState = TaskBoardEvaluatePreviewState()
+  @State private var pendingLiveOperation: TaskBoardOverviewLiveOperation?
   @AppStorage(TaskBoardLaneCollapsePreferences.storageKey)
   var laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.emptyRawValue
   @AppStorage(TaskBoardLaneAppearancePreferences.storageKey)
@@ -198,11 +200,28 @@ public struct TaskBoardOverviewView: View {
     .task {
       await relativeTimeClock.run()
     }
+    .task(id: store?.contentUI.dashboard.connectionState == .online) {
+      updateLocalHostRouting()
+    }
     .task(id: presentationInput) {
       await rebuildPresentation(input: presentationInput)
     }
     .onChange(of: taskBoardSelectionDispatcher.deleteRequestGeneration) {
       requestDeleteSelectedTaskBoardCards()
+    }
+    .confirmationDialog(
+      pendingLiveOperationValue?.title ?? "Run live task-board operation?",
+      isPresented: pendingLiveOperationIsPresented,
+      presenting: pendingLiveOperationValue
+    ) { operation in
+      Button(operation.actionTitle, role: .destructive) {
+        pendingLiveOperationValue = nil
+        performLiveOperation(operation)
+      }
+      .disabled(isActionInFlight)
+      Button("Cancel", role: .cancel) {}
+    } message: { operation in
+      Text(operation.message)
     }
   }
 
@@ -237,6 +256,15 @@ public struct TaskBoardOverviewView: View {
 
   var evaluatePreviewStateValue: TaskBoardEvaluatePreviewState {
     evaluatePreviewState
+  }
+
+  var localHostRoutingStateValue: TaskBoardLocalHostRoutingState {
+    localHostRoutingState
+  }
+
+  var pendingLiveOperationValue: TaskBoardOverviewLiveOperation? {
+    get { pendingLiveOperation }
+    nonmutating set { pendingLiveOperation = newValue }
   }
 }
 

@@ -4,6 +4,7 @@ import SwiftUI
 struct TaskBoardStepRailView: View {
   let store: HarnessMonitorStore
   let status: TaskBoardOrchestratorStatus
+  let latestEvaluation: TaskBoardEvaluationSummary?
   let workspace: PolicyCanvasWorkspace?
   let targetItem: TaskBoardItem?
   let isActionInFlight: Bool
@@ -24,7 +25,7 @@ struct TaskBoardStepRailView: View {
   }
 
   private var controlsDisabled: Bool {
-    isActionInFlight || state.isBusy
+    isActionInFlight || state.isBusy || store.contentUI.dashboard.connectionState != .online
   }
 
   var body: some View {
@@ -34,10 +35,21 @@ struct TaskBoardStepRailView: View {
           item: activeItem,
           isPicked: state.pickedSelection != nil
         )
+        Label("Live manual operations", systemImage: "bolt.shield.fill")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.caution)
+          .accessibilityIdentifier("harness.task-board.step.live-mode")
         stepControls
         if let selection = state.pickedSelection {
           TaskBoardStepPromptPreview(prompt: selection.plan.renderedPrompt)
         }
+        Divider()
+        TaskBoardApprovalGrantsView(
+          store: store,
+          workspace: workspace,
+          refreshID: approvalGrantRefreshID,
+          isDisabled: controlsDisabled
+        )
         Divider()
         HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingXL) {
           TaskBoardHeldDispatchesView(summary: status.heldDispatches)
@@ -79,23 +91,38 @@ struct TaskBoardStepRailView: View {
       alignment: .leading,
       spacing: HarnessMonitorTheme.spacingSM
     ) {
-      stepControl(1, "External Sync", "Pull external sources", "arrow.triangle.2.circlepath") {
-        enqueueExternalSync()
+      stepControl(
+        1,
+        "External Sync Live",
+        "Pull and apply external sources",
+        "arrow.triangle.2.circlepath"
+      ) {
+        state.confirmation = .externalSync
       }
-      stepControl(2, "Refresh / Evaluate", "Evaluate the current target", "checkmark.seal") {
-        enqueueEvaluation(step: 2)
+      stepControl(
+        2,
+        "Evaluate Live",
+        "Evaluate and apply the current target",
+        "checkmark.seal"
+      ) {
+        state.confirmation = .evaluate(step: 2)
       }
       stepControl(3, "Pick Top", "Preview the top Todo prompt", "arrow.up.to.line") {
         enqueuePick()
       }
-      stepControl(4, "Deliver", "Spawn the picked worker", "paperplane.fill") {
+      stepControl(4, "Deliver Live", "Spawn the picked worker", "paperplane.fill") {
         state.confirmation = .deliver
       }
       stepControl(5, "Watch", "Open the spawned agent", "eye") {
         openSpawnedAgent()
       }
-      stepControl(6, "Evaluate", "Refresh the delivered result", "waveform.path.ecg") {
-        enqueueEvaluation(step: 6)
+      stepControl(
+        6,
+        "Evaluate Live",
+        "Evaluate and apply the delivered result",
+        "waveform.path.ecg"
+      ) {
+        state.confirmation = .evaluate(step: 6)
       }
       stepControl(7, "Review", "Open linked task actions", "person.2.badge.gearshape") {
         openReview()
@@ -153,6 +180,10 @@ struct TaskBoardStepRailView: View {
 
   private var confirmationTitle: String {
     switch state.confirmation {
+    case .externalSync:
+      "Run live external sync?"
+    case .evaluate:
+      "Run live task-board evaluation?"
     case .deliver:
       "Deliver and spawn this item?"
     case .complete:
@@ -167,16 +198,30 @@ struct TaskBoardStepRailView: View {
     _ confirmation: TaskBoardStepRailState.Confirmation
   ) -> some View {
     switch confirmation {
+    case .externalSync:
+      Button("Sync Live", role: .destructive) {
+        state.confirmation = nil
+        enqueueExternalSync()
+      }
+      .disabled(controlsDisabled)
+    case .evaluate(let step):
+      Button("Evaluate Live", role: .destructive) {
+        state.confirmation = nil
+        enqueueEvaluation(step: step)
+      }
+      .disabled(controlsDisabled)
     case .deliver:
-      Button("Deliver", role: .destructive) {
+      Button("Deliver Live", role: .destructive) {
         state.confirmation = nil
         enqueueDelivery()
       }
+      .disabled(controlsDisabled)
     case .complete:
       Button("Complete", role: .destructive) {
         state.confirmation = nil
         enqueueCompletion()
       }
+      .disabled(controlsDisabled)
     }
     Button("Cancel", role: .cancel) {}
   }
@@ -184,10 +229,40 @@ struct TaskBoardStepRailView: View {
   private func confirmationMessage(_ confirmation: TaskBoardStepRailState.Confirmation) -> String {
     let title = activeItem?.title ?? "the current item"
     return switch confirmation {
+    case .externalSync:
+      "This pulls external task sources and applies changes to the live board."
+    case .evaluate:
+      "This evaluates \(title) and applies any resulting board transition."
     case .deliver:
       "This reserves \(title) in step mode and starts its managed worker."
     case .complete:
       "This moves \(title) to Done."
     }
+  }
+
+  private var approvalGrantRefreshID: TaskBoardApprovalGrantRefreshID {
+    let activeCanvas = workspace?.canvases.first { $0.canvasId == workspace?.activeCanvasId }
+    return TaskBoardApprovalGrantRefreshID(
+      heldIntentIDs: status.heldDispatches.items.map(\.intentId),
+      activeCanvasID: workspace?.activeCanvasId,
+      activeRevision: activeCanvas?.liveDocument?.revision ?? activeCanvas?.revision,
+      lastRunID: status.lastRun?.runId,
+      evaluationFingerprint: approvalEvaluationFingerprint,
+      localGeneration: state.approvalRefreshGeneration
+    )
+  }
+
+  private var approvalEvaluationFingerprint: [String] {
+    guard let latestEvaluation else { return [] }
+    var fingerprint = [
+      "\(latestEvaluation.total):\(latestEvaluation.evaluated):\(latestEvaluation.updated):"
+        + "\(latestEvaluation.blocked):\(latestEvaluation.failed)"
+    ]
+    fingerprint.append(
+      contentsOf: latestEvaluation.records.map {
+        "\($0.boardItemId):\($0.outcome.rawValue):\($0.updated)"
+      }
+    )
+    return fingerprint
   }
 }

@@ -326,6 +326,7 @@ extension HarnessMonitorStore {
     public var taskBoardSyncSummary: TaskBoardSyncSummary?
     public var taskBoardDispatchSummary: TaskBoardDispatchSummary?
     public var taskBoardEvaluationSummary: TaskBoardEvaluationSummary?
+    public var taskBoardEvaluationBaselineRunID: String?
     public var taskBoardItemAuditSummary: TaskBoardAuditSummary?
     public var taskBoardProjects: [TaskBoardProjectSummary]?
     public var taskBoardMachines: [TaskBoardMachineSummary]?
@@ -349,6 +350,10 @@ extension HarnessMonitorStore {
       Self.assign(&taskBoardSyncSummary, state.taskBoardSyncSummary)
       Self.assign(&taskBoardDispatchSummary, state.taskBoardDispatchSummary)
       Self.assign(&taskBoardEvaluationSummary, state.taskBoardEvaluationSummary)
+      Self.assign(
+        &taskBoardEvaluationBaselineRunID,
+        state.taskBoardEvaluationBaselineRunID
+      )
       Self.assign(&taskBoardItemAuditSummary, state.taskBoardItemAuditSummary)
       Self.assign(&taskBoardProjects, state.taskBoardProjects)
       Self.assign(&taskBoardMachines, state.taskBoardMachines)

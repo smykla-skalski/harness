@@ -305,6 +305,7 @@ struct TaskBoardPlanLifecycleActionButtons: View {
       Button("Revoke Plan", role: .destructive) {
         onRevokePlan?(item)
       }
+      .disabled(isActionInFlight || onRevokePlan == nil || !canRevoke)
       Button("Cancel", role: .cancel) {}
     } message: {
       Text("The plan summary and any approval are cleared. This cannot be undone.")

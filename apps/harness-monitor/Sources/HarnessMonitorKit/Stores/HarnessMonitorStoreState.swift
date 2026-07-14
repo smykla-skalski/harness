@@ -1,10 +1,15 @@
 import Foundation
 
 struct CacheWriteSyncState {
-  var githubDataTaskBoardRefreshTask: Task<Void, Never>?
-  var githubDataRefreshGeneration: UInt64 = 0
+  var taskBoardRefreshTask: Task<Void, Never>?
+  var taskBoardRefreshGeneration: UInt64 = 0
+  var taskBoardRefreshRequestGeneration: UInt64 = 0
+  var taskBoardRefreshCompletedGeneration: UInt64 = 0
+  var taskBoardRefreshDeferralDepth = 0
   var pendingTaskBoardItemsRefresh = false
   var pendingTaskBoardOrchestratorRefresh = false
+  var pendingTaskBoardFallbackStatus: TaskBoardOrchestratorStatus?
+  var taskBoardEvaluationBaselineRunID: String?
   var pendingCacheWriteTask: Task<Void, Never>?
   var pendingCacheWriteTaskToken: UInt64 = 0
   var pendingTaskBoardSnapshotCacheWriteTask: Task<Void, Never>?

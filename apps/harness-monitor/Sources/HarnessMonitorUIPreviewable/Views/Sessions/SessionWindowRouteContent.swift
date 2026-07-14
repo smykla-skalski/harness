@@ -49,6 +49,8 @@ struct SessionWindowOverview: View {
           orchestratorStatus: store.contentUI.dashboard.taskBoardOrchestratorStatus,
           evaluationSummary: store.contentUI.dashboard.taskBoardEvaluationSummary,
           isActionInFlight: store.contentUI.dashboard.isBusy
+            || store.contentUI.dashboard.connectionState != .online,
+          showsOperationsPanel: false
         )
       }
       .frame(maxWidth: .infinity, alignment: .leading)

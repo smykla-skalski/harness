@@ -3,7 +3,10 @@ import SwiftUI
 
 struct TaskBoardOrchestratorSummaryView: View {
   let status: TaskBoardOrchestratorStatus
+  let taskBoardItems: [TaskBoardItem]
+  let localHostProjectTypes: [String]?
   let latestEvaluation: TaskBoardEvaluationSummary?
+  let latestEvaluationBaselineRunID: String?
   let isActionInFlight: Bool
   let onStart: (() -> Void)?
   let onStop: (() -> Void)?
@@ -33,7 +36,10 @@ struct TaskBoardOrchestratorSummaryView: View {
 
   init(
     status: TaskBoardOrchestratorStatus,
+    taskBoardItems: [TaskBoardItem] = [],
+    localHostProjectTypes: [String]? = nil,
     latestEvaluation: TaskBoardEvaluationSummary? = nil,
+    latestEvaluationBaselineRunID: String? = nil,
     isActionInFlight: Bool = false,
     onStart: (() -> Void)? = nil,
     onStop: (() -> Void)? = nil,
@@ -41,7 +47,10 @@ struct TaskBoardOrchestratorSummaryView: View {
     onStepModeChange: (@MainActor @Sendable (Bool) -> Void)? = nil
   ) {
     self.status = status
+    self.taskBoardItems = taskBoardItems
+    self.localHostProjectTypes = localHostProjectTypes
     self.latestEvaluation = latestEvaluation
+    self.latestEvaluationBaselineRunID = latestEvaluationBaselineRunID
     self.isActionInFlight = isActionInFlight
     self.onStart = onStart
     self.onStop = onStop
@@ -50,18 +59,23 @@ struct TaskBoardOrchestratorSummaryView: View {
   }
 
   var body: some View {
-    Group {
-      if bodyFitsHorizontally {
-        HStack(spacing: HarnessMonitorTheme.spacingMD) {
-          summaryContent
-          Spacer(minLength: HarnessMonitorTheme.spacingMD)
-          controls
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      Group {
+        if bodyFitsHorizontally {
+          HStack(spacing: HarnessMonitorTheme.spacingMD) {
+            summaryContent
+            Spacer(minLength: HarnessMonitorTheme.spacingMD)
+            controls
+          }
+        } else {
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+            summaryContent
+            controls
+          }
         }
-      } else {
-        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          summaryContent
-          controls
-        }
+      }
+      if let lastRun = status.lastRun {
+        TaskBoardOrchestratorRunDetailsView(run: lastRun)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -87,10 +101,16 @@ struct TaskBoardOrchestratorSummaryView: View {
           tint: tickPhaseTint(for: currentTick.phase)
         )
       }
-      if let latestEvaluation {
-        evaluationPills(latestEvaluation)
-      } else if let lastRun = status.lastRun {
+      switch orchestratorPresentation.summarySource(
+        latestEvaluation: latestEvaluation,
+        baselineRunID: latestEvaluationBaselineRunID
+      ) {
+      case .lastRun(let lastRun):
         lastRunPills(lastRun)
+      case .standaloneEvaluation(let evaluation):
+        evaluationPills(evaluation)
+      case nil:
+        EmptyView()
       }
       ForEach(workflowCountSummaries) { item in
         summaryPill(
@@ -162,14 +182,14 @@ struct TaskBoardOrchestratorSummaryView: View {
       Button {
         onRunOnce()
       } label: {
-        Label("Run Once", systemImage: "playpause")
+        Label(runOnceTitle, systemImage: "playpause")
           .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       .disabled(isActionInFlight)
-      .help("Run one task-board orchestrator tick")
+      .help(runOnceHelp)
       .accessibilityIdentifier("harness.task-board.orchestrator.run-once")
     }
   }
@@ -177,7 +197,7 @@ struct TaskBoardOrchestratorSummaryView: View {
   @ViewBuilder
   private func lastRunPills(_ run: TaskBoardOrchestratorRunSummary) -> some View {
     summaryPill("Last", lastRunTitle(for: run), tint: runStatusTint(for: run.status))
-    let appliedCount = lastRunAppliedCount(for: run)
+    let appliedCount = TaskBoardOrchestratorPresentation.appliedItemCount(for: run)
     if appliedCount != 0 {
       summaryPill("Applied", "\(appliedCount)")
     }
@@ -218,6 +238,9 @@ struct TaskBoardOrchestratorSummaryView: View {
     if !status.enabled {
       return "Disabled"
     }
+    if status.stepMode {
+      return "Paused (Step Mode)"
+    }
     if status.running {
       return "Running"
     }
@@ -228,10 +251,23 @@ struct TaskBoardOrchestratorSummaryView: View {
     if !status.enabled {
       return HarnessMonitorTheme.secondaryInk
     }
+    if status.stepMode {
+      return HarnessMonitorTheme.caution
+    }
     if status.running {
       return HarnessMonitorTheme.accent
     }
     return HarnessMonitorTheme.caution
+  }
+
+  private var runOnceTitle: String {
+    status.settings.dryRunDefault ? "Preview Run Once" : "Run Once Live"
+  }
+
+  private var runOnceHelp: String {
+    status.settings.dryRunDefault
+      ? "Preview one orchestrator cycle without applying changes"
+      : "Run one live orchestrator cycle and apply changes"
   }
 
   private func lastRunTitle(for run: TaskBoardOrchestratorRunSummary) -> String {
@@ -281,21 +317,16 @@ struct TaskBoardOrchestratorSummaryView: View {
     }
   }
 
-  private func lastRunAppliedCount(for run: TaskBoardOrchestratorRunSummary) -> Int {
-    (run.dispatch?.applied.count ?? 0) + (run.evaluation?.updated ?? 0)
+  private var workflowCountSummaries: [TaskBoardWorkflowCountPresentation] {
+    orchestratorPresentation.workflowCounts
   }
 
-  private var workflowCountSummaries: [TaskBoardWorkflowCountPresentation] {
-    var totals: [TaskBoardWorkflowStatus: Int] = [:]
-    for item in status.workflowExecutionCounts where item.count >= 1 {
-      totals[item.status, default: 0] += item.count
-    }
-    return TaskBoardWorkflowStatus.allCases.compactMap { workflowStatus in
-      guard let count = totals[workflowStatus], count >= 1 else {
-        return nil
-      }
-      return TaskBoardWorkflowCountPresentation(status: workflowStatus, count: count)
-    }
+  private var orchestratorPresentation: TaskBoardOrchestratorPresentation {
+    TaskBoardOrchestratorPresentation(
+      status: status,
+      taskBoardItems: taskBoardItems,
+      localHostProjectTypes: localHostProjectTypes
+    )
   }
 
   private func workflowStatusTitle(for status: TaskBoardWorkflowStatus) -> String {
@@ -329,11 +360,4 @@ struct TaskBoardOrchestratorSummaryView: View {
       HarnessMonitorTheme.tertiaryInk
     }
   }
-}
-
-private struct TaskBoardWorkflowCountPresentation: Identifiable {
-  let status: TaskBoardWorkflowStatus
-  let count: Int
-
-  var id: String { status.rawValue }
 }
