@@ -88,7 +88,7 @@ async fn observe_background_cleanup(completion: oneshot::Receiver<Result<(), Str
         ),
         Err(error) => tracing::warn!(
             %error,
-            "observe remote ACME challenge cleanup after successful issuance",
+            "remote ACME challenge cleanup observation after successful issuance failed",
         ),
     }
 }

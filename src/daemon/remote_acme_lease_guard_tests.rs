@@ -7,7 +7,7 @@ use tokio::time::timeout;
 use tracing_subscriber::fmt::writer::MakeWriter;
 use tracing_subscriber::layer::SubscriberExt as _;
 
-use super::RemoteAcmeChallengeLeaseGuard;
+use super::{RemoteAcmeChallengeLeaseGuard, observe_background_cleanup};
 use crate::daemon::remote_acme_cleanup::RemoteAcmeCleanupTracker;
 use crate::daemon::remote_acme_issuer::{
     RemoteAcmeChallengeMaterial, RemoteAcmeChallengeProvisioner,
@@ -45,6 +45,28 @@ async fn background_cleanup_failure_has_accurate_redacted_log_context() {
     assert!(!logs.contains("after cancellation failed"));
     assert!(logs.contains("<redacted>"));
     assert!(!logs.contains("cleanup-secret"));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn background_cleanup_observation_failure_is_explicit() {
+    let output = SharedOutput::default();
+    let subscriber = tracing_subscriber::registry().with(
+        tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .with_target(false)
+            .with_writer(output.clone()),
+    );
+    let _subscriber = tracing::subscriber::set_default(subscriber);
+    let (completion, observation) = tokio::sync::oneshot::channel();
+    drop(completion);
+
+    observe_background_cleanup(observation).await;
+    let logs = output.contents();
+
+    assert!(
+        logs.contains("remote ACME challenge cleanup observation after successful issuance failed"),
+        "missing explicit observation failure context: {logs}"
+    );
 }
 
 async fn wait_for_log(output: &SharedOutput, expected: &str) -> String {
