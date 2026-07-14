@@ -209,6 +209,7 @@ public enum PolicyApprovalState: String, Codable, Equatable, Sendable, CaseItera
   case pending = "pending"
   case approved = "approved"
   case denied = "denied"
+  case revoked = "revoked"
 
   public var id: String { rawValue }
 }

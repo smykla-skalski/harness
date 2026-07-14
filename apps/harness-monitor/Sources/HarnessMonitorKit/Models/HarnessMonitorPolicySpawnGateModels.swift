@@ -43,3 +43,21 @@ public struct PolicyApprovalGrantResolveResponse: Codable, Equatable, Sendable {
     self.grant = grant
   }
 }
+
+public struct PolicyApprovalGrantRevokeRequest: Codable, Equatable, Sendable {
+  public let grantId: String
+  public let actor: String?
+
+  public init(grantId: String, actor: String? = nil) {
+    self.grantId = grantId
+    self.actor = actor
+  }
+}
+
+public struct PolicyApprovalGrantRevokeResponse: Codable, Equatable, Sendable {
+  public let grant: PolicyApprovalGrant
+
+  public init(grant: PolicyApprovalGrant) {
+    self.grant = grant
+  }
+}

@@ -49,4 +49,13 @@ extension WebSocketTransport {
     let response: PolicyApprovalGrantResolveResponse = try decodePolicyWire(value)
     return response.grant
   }
+
+  public func revokePolicyApprovalGrant(
+    request: PolicyApprovalGrantRevokeRequest
+  ) async throws -> PolicyApprovalGrant {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .policyApprovalGrantRevoke, params: params)
+    let response: PolicyApprovalGrantRevokeResponse = try decodePolicyWire(value)
+    return response.grant
+  }
 }

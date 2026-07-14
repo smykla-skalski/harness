@@ -104,6 +104,17 @@ extension HarnessMonitorAPIClient {
     return response.grant
   }
 
+  public func revokePolicyApprovalGrant(
+    request: PolicyApprovalGrantRevokeRequest
+  ) async throws -> PolicyApprovalGrant {
+    let response: PolicyApprovalGrantRevokeResponse = try await post(
+      "/v1/policy-approval-grants/revoke",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+    return response.grant
+  }
+
   public func createPolicyScenario(
     request: PolicyScenarioCreateRequest
   ) async throws -> PolicyCanvasWorkspace {

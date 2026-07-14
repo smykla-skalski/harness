@@ -86,6 +86,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case policyCanvasSetSpawnKillSwitch = "policy_canvas.set_spawn_kill_switch"
   case policyApprovalGrantsList = "policy_canvas.approval_grants_list"
   case policyApprovalGrantResolve = "policy_canvas.approval_grant_resolve"
+  case policyApprovalGrantRevoke = "policy_canvas.approval_grant_revoke"
   case policyScenarioCreate = "policy_scenario.create"
   case policyScenarioUpdate = "policy_scenario.update"
   case policyScenarioDelete = "policy_scenario.delete"

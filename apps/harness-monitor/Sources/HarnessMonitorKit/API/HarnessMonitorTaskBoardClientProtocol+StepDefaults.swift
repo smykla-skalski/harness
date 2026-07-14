@@ -34,4 +34,10 @@ extension HarnessMonitorTaskBoardClientProtocol {
   ) async throws -> PolicyApprovalGrant {
     throw HarnessMonitorAPIError.server(code: 501, message: "Policy approvals unavailable")
   }
+
+  public func revokePolicyApprovalGrant(
+    request _: PolicyApprovalGrantRevokeRequest
+  ) async throws -> PolicyApprovalGrant {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Policy approvals unavailable")
+  }
 }

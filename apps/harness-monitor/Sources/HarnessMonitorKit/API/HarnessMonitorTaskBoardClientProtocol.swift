@@ -105,6 +105,9 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func resolvePolicyApprovalGrant(
     request: PolicyApprovalGrantResolveRequest
   ) async throws -> PolicyApprovalGrant
+  func revokePolicyApprovalGrant(
+    request: PolicyApprovalGrantRevokeRequest
+  ) async throws -> PolicyApprovalGrant
   func createPolicyScenario(
     request: PolicyScenarioCreateRequest
   ) async throws -> PolicyCanvasWorkspace
