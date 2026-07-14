@@ -18,8 +18,10 @@ mod item_commands;
 mod orchestrator;
 mod orchestrator_tokens;
 mod planning;
+mod policy;
 mod sync;
 
+pub use dispatch::{TaskBoardDispatchDeliverArgs, TaskBoardDispatchPickArgs};
 pub use evaluate::TaskBoardEvaluateArgs;
 pub use host::TaskBoardHostCommand;
 use item_args::TaskBoardItemFieldArgs;
@@ -27,6 +29,10 @@ pub use orchestrator::TaskBoardOrchestratorCommand;
 pub use planning::{
     TaskBoardPlanApproveArgs, TaskBoardPlanBeginArgs, TaskBoardPlanRevokeArgs,
     TaskBoardPlanSubmitArgs,
+};
+pub use policy::{
+    TaskBoardPolicyCommand, TaskBoardPolicyGrantResolveArgs, TaskBoardPolicyJsonArgs,
+    TaskBoardPolicyToggleArgs,
 };
 
 #[derive(Debug, Clone, Subcommand)]
@@ -54,6 +60,12 @@ pub enum TaskBoardCommand {
     Sync(TaskBoardSyncArgs),
     /// Dispatch ready work into sessions.
     Dispatch(TaskBoardDispatchArgs),
+    /// Preview the highest-priority ready task-board dispatch.
+    #[command(visible_alias = "pick")]
+    DispatchPick(TaskBoardDispatchPickArgs),
+    /// Deliver one held task-board dispatch.
+    #[command(visible_alias = "deliver")]
+    DispatchDeliver(TaskBoardDispatchDeliverArgs),
     /// Evaluate linked session work and update board workflow state.
     Evaluate(TaskBoardEvaluateArgs),
     /// Print task-board audit data.
@@ -71,6 +83,11 @@ pub enum TaskBoardCommand {
     Orchestrator {
         #[command(subcommand)]
         command: TaskBoardOrchestratorCommand,
+    },
+    /// Manage task-board spawn policy and approval grants.
+    Policy {
+        #[command(subcommand)]
+        command: TaskBoardPolicyCommand,
     },
 }
 
@@ -221,12 +238,15 @@ impl Execute for TaskBoardCommand {
             Self::PlanRevoke(args) => args.execute(context),
             Self::Sync(args) => args.execute(context),
             Self::Dispatch(args) => args.execute(context),
+            Self::DispatchPick(args) => args.execute(context),
+            Self::DispatchDeliver(args) => args.execute(context),
             Self::Evaluate(args) => args.execute(context),
             Self::Audit(args) => args.execute(context),
             Self::Project(args) => args.execute_project(context),
             Self::Machine(args) => args.execute_machine(context),
             Self::Host { command } => command.execute(context),
             Self::Orchestrator { command } => command.execute(context),
+            Self::Policy { command } => command.execute(context),
         }
     }
 }

@@ -36,6 +36,7 @@ mod integration {
     mod policy_drift;
     mod preflight;
     mod sandbox;
+    mod task_board_cli;
     mod universal;
     mod workspace;
 }

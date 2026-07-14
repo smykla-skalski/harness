@@ -1,11 +1,32 @@
 use std::env;
 
+use clap::Args;
+
 use crate::app::command_context::{AppContext, Execute};
-use crate::daemon::protocol::TaskBoardDispatchRequest;
+use crate::daemon::protocol::{
+    TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
+    TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,
+};
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::dispatch::{DispatchExecutionSummary, DispatchReadiness};
 
 use super::{TaskBoardDispatchArgs, daemon_client, print_json};
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskBoardDispatchPickArgs {
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct TaskBoardDispatchDeliverArgs {
+    #[arg(long = "item-id", visible_alias = "id")]
+    pub item_id: String,
+    #[arg(long)]
+    pub dry_run: bool,
+    #[arg(long)]
+    pub json: bool,
+}
 
 impl Execute for TaskBoardDispatchArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
@@ -21,6 +42,34 @@ impl Execute for TaskBoardDispatchArgs {
             print_json(&summary)?;
         } else {
             print_dispatch_summary(&summary);
+        }
+        Ok(0)
+    }
+}
+
+impl Execute for TaskBoardDispatchPickArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let response = daemon_client()?.pick_task_board_dispatch()?;
+        if self.json {
+            print_json(&response)?;
+        } else {
+            print_dispatch_pick(&response);
+        }
+        Ok(0)
+    }
+}
+
+impl Execute for TaskBoardDispatchDeliverArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let response =
+            daemon_client()?.deliver_task_board_dispatch(&TaskBoardDispatchDeliverRequest {
+                item_id: self.item_id.clone(),
+                dry_run: self.dry_run,
+            })?;
+        if self.json {
+            print_json(&response)?;
+        } else {
+            print_dispatch_delivery(&response, self.dry_run);
         }
         Ok(0)
     }
@@ -50,6 +99,27 @@ fn print_dispatch_summary(summary: &DispatchExecutionSummary) {
     if !summary.applied.is_empty() {
         println!("applied {} task-board dispatches", summary.applied.len());
     }
+}
+
+fn print_dispatch_pick(response: &TaskBoardDispatchPickResponse) {
+    let Some(selection) = &response.selection else {
+        println!("no ready task-board dispatch");
+        return;
+    };
+    println!("{}: {}", selection.item.id, selection.item.title);
+    println!("{}", selection.plan.rendered_prompt);
+}
+
+fn print_dispatch_delivery(response: &TaskBoardDispatchDeliverResponse, dry_run: bool) {
+    let disposition = if dry_run { "previewed" } else { "started" };
+    println!(
+        "task-board dispatch {}: {} -> session {} task {} ({disposition})",
+        response.intent_id,
+        response.applied.board_item_id,
+        response.applied.session_id,
+        response.applied.work_item_id
+    );
+    println!("{}", response.rendered_prompt);
 }
 
 fn dispatch_readiness_label(readiness: &DispatchReadiness) -> &'static str {

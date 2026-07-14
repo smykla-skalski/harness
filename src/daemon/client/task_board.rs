@@ -2,11 +2,15 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::daemon::protocol::{
+    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
+    PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
+    PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
     TASK_BOARD_STORAGE_DATABASE, TaskBoardAuditRequest, TaskBoardAuditResponse,
     TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
-    TaskBoardDispatchRequest, TaskBoardDispatchResponse, TaskBoardEvaluateRequest,
-    TaskBoardEvaluationResponse, TaskBoardGitHubTokensSyncRequest,
-    TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig,
+    TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
+    TaskBoardDispatchPickRequest, TaskBoardDispatchPickResponse, TaskBoardDispatchRequest,
+    TaskBoardDispatchResponse, TaskBoardEvaluateRequest, TaskBoardEvaluationResponse,
+    TaskBoardGitHubTokensSyncRequest, TaskBoardGitHubTokensSyncResponse, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeConfigResponse, TaskBoardHostListResponse, TaskBoardHostLocalResponse,
     TaskBoardHostSetProjectTypesRequest, TaskBoardHostSetProjectTypesResponse,
     TaskBoardListItemsRequest, TaskBoardListItemsResponse, TaskBoardMachinesResponse,
@@ -115,6 +119,20 @@ impl DaemonClient {
         self.post(http_paths::TASK_BOARD_DISPATCH, request)
     }
 
+    pub fn deliver_task_board_dispatch(
+        &self,
+        request: &TaskBoardDispatchDeliverRequest,
+    ) -> Result<TaskBoardDispatchDeliverResponse, CliError> {
+        self.post(http_paths::TASK_BOARD_DISPATCH_DELIVER, request)
+    }
+
+    pub fn pick_task_board_dispatch(&self) -> Result<TaskBoardDispatchPickResponse, CliError> {
+        self.post(
+            http_paths::TASK_BOARD_DISPATCH_PICK,
+            &TaskBoardDispatchPickRequest::default(),
+        )
+    }
+
     pub fn evaluate_task_board(
         &self,
         request: &TaskBoardEvaluateRequest,
@@ -156,6 +174,36 @@ impl DaemonClient {
         request: &TaskBoardHostSetProjectTypesRequest,
     ) -> Result<TaskBoardHostSetProjectTypesResponse, CliError> {
         self.put(http_paths::TASK_BOARD_HOST_SET_PROJECT_TYPES, request)
+    }
+
+    pub fn set_policy_canvas_spawn_requires_live_policy(
+        &self,
+        request: &PolicyCanvasSetSpawnRequiresLivePolicyRequest,
+    ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
+        self.post(
+            http_paths::POLICY_CANVASES_SPAWN_REQUIRES_LIVE_POLICY,
+            request,
+        )
+    }
+
+    pub fn set_policy_canvas_spawn_kill_switch(
+        &self,
+        request: &PolicyCanvasSetSpawnKillSwitchRequest,
+    ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
+        self.post(http_paths::POLICY_CANVASES_SPAWN_KILL_SWITCH, request)
+    }
+
+    pub fn list_policy_approval_grants(
+        &self,
+    ) -> Result<PolicyApprovalGrantsListResponse, CliError> {
+        self.get(http_paths::POLICY_APPROVAL_GRANTS)
+    }
+
+    pub fn resolve_policy_approval_grant(
+        &self,
+        request: &PolicyApprovalGrantResolveRequest,
+    ) -> Result<PolicyApprovalGrantResolveResponse, CliError> {
+        self.post(http_paths::POLICY_APPROVAL_GRANT_RESOLVE, request)
     }
 
     pub fn task_board_orchestrator_status(
