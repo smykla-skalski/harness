@@ -41,6 +41,7 @@ extension TaskBoardStepRailView {
       .init(title: "Picking top task-board item") {
         let selection = await store.pickTaskBoardDispatch()
         await MainActor.run {
+          state.requestApprovalRefresh()
           state.pickedSelection = selection
           state.delivery = nil
           state.completedSteps.subtract([4, 5, 6, 7, 8])

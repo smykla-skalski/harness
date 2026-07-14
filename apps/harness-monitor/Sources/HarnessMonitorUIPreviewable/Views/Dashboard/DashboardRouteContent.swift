@@ -175,6 +175,7 @@ struct DashboardTaskBoardRouteView: View {
   @State private var perfScrollPosition = ScrollPosition()
   @State private var operationsInspectorDispatcher =
     TaskBoardOperationsInspectorFocusDispatcher()
+  @State private var policyWorkspaceLoadState = TaskBoardPolicyWorkspaceLoadState()
   private let perfScrollHookEnabled = HarnessMonitorPerfDashboardScrollBus.isActive()
 
   private var visibleTaskBoardSessions: [SessionSummary] {
@@ -212,6 +213,12 @@ struct DashboardTaskBoardRouteView: View {
     }
     .task(id: taskBoardInboxSessionIDs) {
       await refreshVisibleTaskBoardInboxSnapshot()
+    }
+    .onChange(of: isRouteVisible, initial: true) {
+      updatePolicyWorkspaceLoad()
+    }
+    .onChange(of: dashboardUI.connectionState, initial: true) {
+      updatePolicyWorkspaceLoad()
     }
     .onAppear {
       operationsInspectorDispatcher.toggleInspector = toggleOperationsInspector
@@ -307,6 +314,31 @@ struct DashboardTaskBoardRouteView: View {
     )
     guard !Task.isCancelled else { return }
     taskBoardInboxSnapshot = snapshot
+  }
+
+  private func updatePolicyWorkspaceLoad() {
+    let state = policyWorkspaceLoadState
+    guard isRouteVisible, dashboardUI.connectionState == .online else {
+      state.invalidate()
+      return
+    }
+    guard
+      let generation = state.beginLoad(
+        hasWorkspace: dashboardUI.policyCanvasWorkspace != nil
+      )
+    else { return }
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Loading task-board policy workspace") {
+        let workspace = await store.loadTaskBoardPolicyWorkspaceSnapshot()
+        await MainActor.run {
+          state.finishLoad(generation: generation) {
+            if let workspace {
+              store.adoptTaskBoardPolicyWorkspaceSnapshot(workspace)
+            }
+          }
+        }
+      }
+    )
   }
 
   @MainActor

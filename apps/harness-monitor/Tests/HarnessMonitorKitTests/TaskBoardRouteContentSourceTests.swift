@@ -240,7 +240,7 @@ struct TaskBoardRouteContentSourceTests {
       named: "DashboardRouteContent.swift"
     )
     let overviewHostSource = try taskBoardSourceFile(named: "TaskBoardOverviewHost.swift")
-    let overviewSource = try taskBoardSourceFile(named: "TaskBoardOverviewView.swift")
+    let overviewChromeSource = try taskBoardSourceFile(named: "TaskBoardOverviewView+Chrome.swift")
     let inspectorSource = try taskBoardSourceFile(named: "TaskBoardOperationsInspector.swift")
     let operationsPanelSource = try taskBoardSourceFile(named: "TaskBoardOperationsPanel.swift")
     let dispatchCardSource = try taskBoardSourceFile(
@@ -277,7 +277,7 @@ struct TaskBoardRouteContentSourceTests {
     #expect(dashboardSource.contains(".onAppear {"))
     #expect(dashboardSource.contains("operationsInspectorVisible.toggle()"))
     #expect(overviewHostSource.contains("showsOperationsPanel: Bool = true"))
-    #expect(overviewSource.contains("if showsOperationsPanel, let store"))
+    #expect(overviewChromeSource.contains("if taskBoardSessionID == nil, showsOperationsPanel"))
     #expect(inspectorSource.contains("static let defaultValue = false"))
     #expect(inspectorSource.contains("private static let width: CGFloat = 380"))
     #expect(inspectorSource.contains("ScrollView(.vertical)"))
@@ -297,6 +297,51 @@ struct TaskBoardRouteContentSourceTests {
     #expect(dispatchCardSource.contains("return presentedInput == presentationInput"))
     #expect(dispatchCardSource.contains("isDisabled: !isPresentationCurrent"))
     #expect(dispatchCardSource.contains("presentedInput = input"))
+  }
+
+  @Test("Pick Top refreshes policy approvals after its queued request finishes")
+  func pickTopRefreshesPolicyApprovals() throws {
+    let actionsSource = try taskBoardSourceFile(named: "TaskBoardStepRailView+Actions.swift")
+
+    #expect(actionsSource.contains("HarnessMonitorAsyncWorkQueue.shared.submit("))
+    #expect(
+      actionsSource.contains(
+        "await MainActor.run {\n          state.requestApprovalRefresh()"
+          + "\n          state.pickedSelection = selection"
+      )
+    )
+  }
+
+  @Test("Dashboard loads policy context through a generation-safe queued operation")
+  @MainActor
+  func dashboardLoadsPolicyContextThroughSharedQueue() throws {
+    let dashboardSource = try previewableSourceFile(
+      domain: "Dashboard",
+      named: "DashboardRouteContent.swift"
+    )
+    let state = TaskBoardPolicyWorkspaceLoadState()
+    let firstGeneration = try #require(state.beginLoad(hasWorkspace: false))
+    state.invalidate()
+    let currentGeneration = try #require(state.beginLoad(hasWorkspace: false))
+    var appliedGenerations: [UInt64] = []
+
+    state.finishLoad(generation: firstGeneration) {
+      appliedGenerations.append(firstGeneration)
+    }
+    #expect(state.isLoading)
+    #expect(appliedGenerations.isEmpty)
+    state.finishLoad(generation: currentGeneration) {
+      appliedGenerations.append(currentGeneration)
+    }
+    #expect(!state.isLoading)
+    #expect(appliedGenerations == [currentGeneration])
+    #expect(dashboardSource.contains("HarnessMonitorAsyncWorkQueue.shared.submit("))
+    #expect(
+      dashboardSource.contains("await store.loadTaskBoardPolicyWorkspaceSnapshot()")
+    )
+    #expect(!dashboardSource.contains("ensurePolicyCanvasWorkspaceLoadedForRuntimePolicies"))
+    #expect(dashboardSource.contains("store.adoptTaskBoardPolicyWorkspaceSnapshot(workspace)"))
+    #expect(dashboardSource.contains(".onChange(of: isRouteVisible, initial: true)"))
   }
 
   @Test("Task board lanes render every card instead of hiding overflow")
