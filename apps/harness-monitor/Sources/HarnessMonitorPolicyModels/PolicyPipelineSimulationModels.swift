@@ -325,6 +325,9 @@ extension PolicyPipelineValidationIssue {
     case .incompatiblePayloadEdge(let incompatibleEdgeId, _, _):
       code = "incompatible_payload_edge"
       edgeId = incompatibleEdgeId
+    case .spawnRouteMissingTerminal(let missingTerminalNodeId):
+      code = "spawn_route_missing_terminal"
+      nodeId = missingTerminalNodeId
     }
 
     self.init(

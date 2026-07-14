@@ -25,6 +25,12 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   ) async throws -> TaskBoardPlanningResponse
   func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary
   func dispatchTaskBoard(request: TaskBoardDispatchRequest) async throws -> TaskBoardDispatchSummary
+  func pickTaskBoardDispatch(
+    request: TaskBoardDispatchPickRequest
+  ) async throws -> TaskBoardDispatchPickResult
+  func deliverTaskBoardDispatch(
+    request: TaskBoardDispatchDeliverRequest
+  ) async throws -> TaskBoardDispatchDelivery
   func evaluateTaskBoard(request: TaskBoardEvaluateRequest) async throws
     -> TaskBoardEvaluationSummary
   func auditTaskBoard(status: TaskBoardStatus?) async throws -> TaskBoardAuditSummary
@@ -89,6 +95,16 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func setPolicyCanvasGlobalEnforcement(
     request: PolicyCanvasSetGlobalEnforcementRequest
   ) async throws -> PolicyCanvasWorkspace
+  func setPolicyCanvasSpawnRequiresLivePolicy(
+    request: PolicyCanvasSetSpawnRequiresLivePolicyRequest
+  ) async throws -> PolicyCanvasWorkspace
+  func setPolicyCanvasSpawnKillSwitch(
+    request: PolicyCanvasSetSpawnKillSwitchRequest
+  ) async throws -> PolicyCanvasWorkspace
+  func policyApprovalGrants() async throws -> [PolicyApprovalGrant]
+  func resolvePolicyApprovalGrant(
+    request: PolicyApprovalGrantResolveRequest
+  ) async throws -> PolicyApprovalGrant
   func createPolicyScenario(
     request: PolicyScenarioCreateRequest
   ) async throws -> PolicyCanvasWorkspace

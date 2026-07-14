@@ -20,6 +20,7 @@ extension HarnessMonitorStore {
   ) async throws -> TaskBoardOrchestratorSettings {
     let githubProject = settings.githubProject
     return TaskBoardOrchestratorSettings(
+      stepMode: settings.stepMode,
       enabledWorkflows: settings.enabledWorkflows,
       dryRunDefault: settings.dryRunDefault,
       dispatchStatusFilter: settings.dispatchStatusFilter,

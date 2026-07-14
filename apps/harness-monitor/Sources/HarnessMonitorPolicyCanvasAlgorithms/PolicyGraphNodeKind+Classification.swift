@@ -55,6 +55,7 @@ extension PolicyGraphNodeKind {
     case .hub: return "hub"
     case .humanGate: return "human_gate"
     case .consensusGate: return "consensus_gate"
+    case .approvalGate: return "approval_gate"
     case .dryRunGate: return "dry_run_gate"
     case .supervisorRule: return "supervisor_rule"
     case .finish: return "finish"

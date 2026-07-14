@@ -2,6 +2,7 @@ import Foundation
 import HarnessMonitorKit
 
 struct TaskBoardGitSettingsDraft: Equatable {
+  var stepMode = false
   var enabledWorkflows: Set<TaskBoardOrchestratorWorkflow> = []
   var dryRunDefault = true
   var dispatchStatusFilter: DispatchStatusFilterChoice = .all
@@ -57,7 +58,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
     let project = orchestrator.githubProject
     let runtime = snapshot.runtimeConfig
 
-    enabledWorkflows = Set(orchestrator.enabledWorkflows)
+    (stepMode, enabledWorkflows) = (orchestrator.stepMode, Set(orchestrator.enabledWorkflows))
     dryRunDefault = orchestrator.dryRunDefault
     dispatchStatusFilter = DispatchStatusFilterChoice(status: orchestrator.dispatchStatusFilter)
     projectDir = orchestrator.projectDir ?? ""
@@ -156,6 +157,7 @@ struct TaskBoardGitSettingsDraft: Equatable {
 
     return TaskBoardGitSettingsSnapshot(
       orchestratorSettings: TaskBoardOrchestratorSettings(
+        stepMode: stepMode,
         enabledWorkflows: enabledWorkflows.sorted(by: { $0.rawValue < $1.rawValue }),
         dryRunDefault: dryRunDefault,
         dispatchStatusFilter: dispatchStatusFilter.status,

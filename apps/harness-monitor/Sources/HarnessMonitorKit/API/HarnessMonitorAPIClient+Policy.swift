@@ -66,6 +66,44 @@ extension HarnessMonitorAPIClient {
     )
   }
 
+  public func setPolicyCanvasSpawnRequiresLivePolicy(
+    request: PolicyCanvasSetSpawnRequiresLivePolicyRequest
+  ) async throws -> PolicyCanvasWorkspace {
+    try await post(
+      "/v1/policy-canvases/spawn-requires-live-policy",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
+  public func setPolicyCanvasSpawnKillSwitch(
+    request: PolicyCanvasSetSpawnKillSwitchRequest
+  ) async throws -> PolicyCanvasWorkspace {
+    try await post(
+      "/v1/policy-canvases/spawn-kill-switch",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+  }
+
+  public func policyApprovalGrants() async throws -> [PolicyApprovalGrant] {
+    let response: PolicyApprovalGrantsListResponse = try await get(
+      "/v1/policy-approval-grants", decoder: PolicyWireCoding.decoder
+    )
+    return response.grants
+  }
+
+  public func resolvePolicyApprovalGrant(
+    request: PolicyApprovalGrantResolveRequest
+  ) async throws -> PolicyApprovalGrant {
+    let response: PolicyApprovalGrantResolveResponse = try await post(
+      "/v1/policy-approval-grants/resolve",
+      body: request,
+      decoder: PolicyWireCoding.decoder
+    )
+    return response.grant
+  }
+
   public func createPolicyScenario(
     request: PolicyScenarioCreateRequest
   ) async throws -> PolicyCanvasWorkspace {

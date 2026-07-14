@@ -132,6 +132,7 @@ public struct TaskBoardMachineSummary: Codable, Equatable, Identifiable, Sendabl
 
 public struct TaskBoardDispatchPlan: Codable, Equatable, Identifiable, Sendable {
   public let boardItemId: String
+  public let renderedPrompt: String
   public let readiness: TaskBoardDispatchReadiness
   public let session: TaskBoardSessionIntent
   public let task: TaskBoardTaskCreationIntent
@@ -139,6 +140,34 @@ public struct TaskBoardDispatchPlan: Codable, Equatable, Identifiable, Sendable 
   public let reviewer: TaskBoardReviewerIntent
   public let evaluator: TaskBoardEvaluatorIntent
   public let policy: PolicySimulationDecision?
+  public let policyDecisionId: String?
+  public let consumedApprovalGrantId: String?
+
+  public init(
+    boardItemId: String,
+    renderedPrompt: String = "",
+    readiness: TaskBoardDispatchReadiness,
+    session: TaskBoardSessionIntent,
+    task: TaskBoardTaskCreationIntent,
+    worker: TaskBoardWorkerIntent,
+    reviewer: TaskBoardReviewerIntent,
+    evaluator: TaskBoardEvaluatorIntent,
+    policy: PolicySimulationDecision?,
+    policyDecisionId: String? = nil,
+    consumedApprovalGrantId: String? = nil
+  ) {
+    self.boardItemId = boardItemId
+    self.renderedPrompt = renderedPrompt
+    self.readiness = readiness
+    self.session = session
+    self.task = task
+    self.worker = worker
+    self.reviewer = reviewer
+    self.evaluator = evaluator
+    self.policy = policy
+    self.policyDecisionId = policyDecisionId
+    self.consumedApprovalGrantId = consumedApprovalGrantId
+  }
 
   public var id: String { boardItemId }
 }

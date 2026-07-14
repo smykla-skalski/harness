@@ -126,13 +126,16 @@ extension TaskBoardDispatchPlan {
   public init(wire: DispatchPlanWire) {
     self.init(
       boardItemId: wire.boardItemId,
+      renderedPrompt: wire.renderedPrompt,
       readiness: TaskBoardDispatchReadiness(wire: wire.readiness),
       session: TaskBoardSessionIntent(wire: wire.session),
       task: TaskBoardTaskCreationIntent(wire: wire.task),
       worker: TaskBoardWorkerIntent(wire: wire.worker),
       reviewer: TaskBoardReviewerIntent(wire: wire.reviewer),
       evaluator: TaskBoardEvaluatorIntent(wire: wire.evaluator),
-      policy: PolicySimulationDecision(wire: wire.policy)
+      policy: PolicySimulationDecision(wire: wire.policy),
+      policyDecisionId: wire.policyDecisionId,
+      consumedApprovalGrantId: wire.consumedApprovalGrantId
     )
   }
 }

@@ -85,6 +85,9 @@ extension CodexRunSnapshot {
     self.init(
       runId: wire.runId,
       sessionId: wire.sessionId,
+      taskId: wire.taskId,
+      boardItemId: wire.boardItemId,
+      workflowExecutionId: wire.workflowExecutionId,
       sessionAgentId: wire.sessionAgentId,
       displayName: wire.displayName,
       projectDir: wire.projectDir,

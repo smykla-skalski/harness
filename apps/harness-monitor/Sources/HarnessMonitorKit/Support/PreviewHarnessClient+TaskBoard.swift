@@ -265,6 +265,8 @@ extension TaskBoardOrchestratorStatus {
     TaskBoardOrchestratorStatus(
       enabled: true,
       running: running,
+      stepMode: stepMode,
+      heldDispatches: heldDispatches,
       currentTick: running
         ? TaskBoardOrchestratorTickInfo(
           runId: "preview-running",
@@ -285,6 +287,8 @@ extension TaskBoardOrchestratorStatus {
     TaskBoardOrchestratorStatus(
       enabled: true,
       running: false,
+      stepMode: stepMode,
+      heldDispatches: heldDispatches,
       currentTick: nil,
       lastRun: run,
       workflowExecutionCounts: [

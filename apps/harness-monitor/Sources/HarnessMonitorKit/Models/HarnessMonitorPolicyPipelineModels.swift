@@ -73,6 +73,8 @@ public struct PolicyCanvasWorkspace: Codable, Equatable, Sendable {
   public var activeCanvasId: String
   public var canvases: [PolicyCanvasSummary]
   public var globalPolicyEnforcementEnabled: Bool
+  public var spawnRequiresLivePolicy: Bool
+  public var spawnKillSwitch: Bool
   public var scenarios: [PolicyScenario]
 
   private enum CodingKeys: String, CodingKey {
@@ -80,6 +82,8 @@ public struct PolicyCanvasWorkspace: Codable, Equatable, Sendable {
     case activeCanvasId = "active_canvas_id"
     case canvases
     case globalPolicyEnforcementEnabled = "global_policy_enforcement_enabled"
+    case spawnRequiresLivePolicy = "spawn_requires_live_policy"
+    case spawnKillSwitch = "spawn_kill_switch"
     case scenarios
   }
 
@@ -88,12 +92,16 @@ public struct PolicyCanvasWorkspace: Codable, Equatable, Sendable {
     activeCanvasId: String,
     canvases: [PolicyCanvasSummary],
     globalPolicyEnforcementEnabled: Bool = true,
+    spawnRequiresLivePolicy: Bool = false,
+    spawnKillSwitch: Bool = false,
     scenarios: [PolicyScenario] = []
   ) {
     self.schemaVersion = schemaVersion
     self.activeCanvasId = activeCanvasId
     self.canvases = canvases
     self.globalPolicyEnforcementEnabled = globalPolicyEnforcementEnabled
+    self.spawnRequiresLivePolicy = spawnRequiresLivePolicy
+    self.spawnKillSwitch = spawnKillSwitch
     self.scenarios = scenarios
   }
 
@@ -105,6 +113,10 @@ public struct PolicyCanvasWorkspace: Codable, Equatable, Sendable {
     self.globalPolicyEnforcementEnabled =
       try container.decodeIfPresent(Bool.self, forKey: .globalPolicyEnforcementEnabled)
       ?? true
+    self.spawnRequiresLivePolicy =
+      try container.decodeIfPresent(Bool.self, forKey: .spawnRequiresLivePolicy) ?? false
+    self.spawnKillSwitch =
+      try container.decodeIfPresent(Bool.self, forKey: .spawnKillSwitch) ?? false
     self.scenarios =
       try container.decodeIfPresent([PolicyScenario].self, forKey: .scenarios) ?? []
   }

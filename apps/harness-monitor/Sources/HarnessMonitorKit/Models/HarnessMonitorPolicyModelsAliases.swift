@@ -36,6 +36,8 @@ public typealias PolicyGraphMode = HarnessMonitorPolicyModels.PolicyGraphMode
 // without importing the models module directly.
 public typealias PolicyScenario = HarnessMonitorPolicyModels.PolicyScenario
 public typealias PolicyInput = HarnessMonitorPolicyModels.PolicyInput
+public typealias PolicyApprovalGrant = HarnessMonitorPolicyModels.PolicyApprovalGrant
+public typealias PolicyApprovalState = HarnessMonitorPolicyModels.PolicyApprovalState
 
 // The go-live decision diff is pure data (per-scenario live-vs-draft verdicts),
 // so the API client decodes the generated wire type directly the way the

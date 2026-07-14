@@ -169,6 +169,7 @@ extension HarnessMonitorStore {
     from settings: TaskBoardOrchestratorSettings
   ) -> TaskBoardOrchestratorSettingsUpdateRequest {
     TaskBoardOrchestratorSettingsUpdateRequest(
+      stepMode: settings.stepMode,
       enabledWorkflows: settings.enabledWorkflows,
       dryRunDefault: settings.dryRunDefault,
       dispatchStatusFilter: settings.dispatchStatusFilter,

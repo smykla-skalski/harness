@@ -10,6 +10,7 @@ extension PreviewHarnessClientState {
   ) -> TaskBoardOrchestratorSettings {
     let current = taskBoardOrchestratorSettings
     taskBoardOrchestratorSettings = TaskBoardOrchestratorSettings(
+      stepMode: request.stepMode ?? current.stepMode,
       enabledWorkflows: request.enabledWorkflows ?? current.enabledWorkflows,
       dryRunDefault: request.dryRunDefault ?? current.dryRunDefault,
       dispatchStatusFilter: request.clearDispatchStatusFilter

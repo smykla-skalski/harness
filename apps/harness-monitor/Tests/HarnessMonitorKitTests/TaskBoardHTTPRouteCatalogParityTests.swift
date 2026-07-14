@@ -86,23 +86,27 @@ private func daemonHTTPPathConstants() throws -> [String: String] {
 }
 
 private func swiftTaskBoardHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
-  let relativePath =
-    "apps/harness-monitor/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+TaskBoard.swift"
-  let source = try repoFileContents(relativePath: relativePath)
-  let matches = try captures(
-    in: source,
-    pattern: "\\b(get|post|put|delete)\\s*\\(\\s*\"([^\"]+)\""
-  )
-  let routes = matches.compactMap { capture -> TaskBoardHTTPRoute? in
-    let path = normalizedSwiftHTTPPath(capture[1])
-    guard path.hasPrefix("/v1/task-board/") else {
-      return nil
+  let relativePaths = [
+    "apps/harness-monitor/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+TaskBoard.swift",
+    "apps/harness-monitor/Sources/HarnessMonitorKit/API/HarnessMonitorAPIClient+Policy.swift",
+  ]
+  let routes = try relativePaths.flatMap { relativePath in
+    let source = try repoFileContents(relativePath: relativePath)
+    return try captures(
+      in: source,
+      pattern: "\\b(get|post|put|delete)\\s*\\(\\s*\"([^\"]+)\""
+    ).map { capture in
+      TaskBoardHTTPRoute(
+        method: capture[0].uppercased(),
+        path: normalizedSwiftHTTPPath(capture[1])
+      )
     }
-    return TaskBoardHTTPRoute(method: capture[0].uppercased(), path: path)
   }
 
   guard routes.isEmpty == false else {
-    throw TaskBoardHTTPRouteCatalogError.noRoutes(relativePath: relativePath)
+    throw TaskBoardHTTPRouteCatalogError.noRoutes(
+      relativePath: relativePaths.joined(separator: ", ")
+    )
   }
   return routes.sorted()
 }
