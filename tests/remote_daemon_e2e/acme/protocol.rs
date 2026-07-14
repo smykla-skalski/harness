@@ -7,7 +7,8 @@ use axum::http::{HeaderValue, Method, StatusCode, Uri};
 use axum::response::Response;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use rcgen::CertificateSigningRequestParams;
+use chrono::{Datelike as _, Duration as ChronoDuration, Utc};
+use rcgen::{CertificateSigningRequestParams, ExtendedKeyUsagePurpose, date_time_ymd};
 use rustls::pki_types::CertificateSigningRequestDer;
 use serde_json::{Value, json};
 
@@ -59,11 +60,7 @@ async fn route_acme_request(
             &json!({}),
             Some(format!("{}/acct/1", state.origin)),
         )),
-        "/new-order" => Ok(json_response(
-            StatusCode::CREATED,
-            &order_body(state, "pending", false),
-            Some(format!("{}/order/1", state.origin)),
-        )),
+        "/new-order" => begin_order(state),
         "/authz/1" => Ok(json_response(
             StatusCode::OK,
             &authorization_body(state),
@@ -89,6 +86,25 @@ async fn route_acme_request(
     }
 }
 
+fn begin_order(state: &FakeAcmeState) -> Result<Response<Body>, String> {
+    let mut progress = state
+        .progress
+        .lock()
+        .map_err(|_| "fake ACME progress lock poisoned".to_string())?;
+    progress.order_count += 1;
+    progress.challenge_validated = false;
+    progress.finalized = false;
+    progress.certificate_pem = None;
+    progress.certificate_downloaded = false;
+    progress.validation_error = None;
+    drop(progress);
+    Ok(json_response(
+        StatusCode::CREATED,
+        &order_body(state, "pending", false),
+        Some(format!("{}/order/1", state.origin)),
+    ))
+}
+
 fn order_status(state: &FakeAcmeState) -> Result<Response<Body>, String> {
     let finalized = state
         .progress
@@ -111,8 +127,28 @@ fn finalize_order(state: &FakeAcmeState, body: &[u8]) -> Result<Response<Body>, 
         .decode(csr)
         .map_err(|error| format!("decode fake ACME CSR: {error}"))?;
     let csr = CertificateSigningRequestDer::from(csr);
-    let request = CertificateSigningRequestParams::from_der(&csr)
+    let mut request = CertificateSigningRequestParams::from_der(&csr)
         .map_err(|error| format!("parse fake ACME CSR: {error}"))?;
+    let now = Utc::now().date_naive();
+    let not_before = now
+        .checked_sub_signed(ChronoDuration::days(1))
+        .ok_or_else(|| "build fake ACME certificate start date".to_string())?;
+    let validity_days = i64::try_from(state.config.certificate_validity_days)
+        .map_err(|_| "fake ACME certificate validity is too large".to_string())?;
+    let not_after = now
+        .checked_add_signed(ChronoDuration::days(validity_days))
+        .ok_or_else(|| "build fake ACME certificate expiry date".to_string())?;
+    request.params.not_before = date_time_ymd(
+        not_before.year(),
+        not_before.month() as u8,
+        not_before.day() as u8,
+    );
+    request.params.not_after = date_time_ymd(
+        not_after.year(),
+        not_after.month() as u8,
+        not_after.day() as u8,
+    );
+    request.params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
     let certificate = request
         .signed_by(&state.issuer)
         .map_err(|error| format!("sign fake ACME CSR: {error}"))?;
@@ -140,6 +176,8 @@ fn download_certificate(state: &FakeAcmeState) -> Result<Response<Body>, String>
         .clone()
         .ok_or_else(|| "fake ACME certificate requested before finalize".to_string())?;
     progress.certificate_downloaded = true;
+    progress.certificate_download_count += 1;
+    progress.issued_certificate_pems.push(certificate.clone());
     Ok(acme_response(
         StatusCode::OK,
         "application/pem-certificate-chain",

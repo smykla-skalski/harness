@@ -21,6 +21,8 @@ use rcgen::{
     BasicConstraints, CertificateParams, CertifiedIssuer, DistinguishedName, DnType, IsCa, KeyPair,
     KeyUsagePurpose,
 };
+use rustls::pki_types::CertificateDer;
+use rustls::pki_types::pem::PemObject as _;
 use serde_json::Value;
 use std::env;
 use std::time::Duration;
@@ -61,6 +63,7 @@ async fn run_aftermarket_failed_issuance_case() -> Result<(), String> {
         https_port: environment.https_port(),
         dns_log: environment.dns_log().to_path_buf(),
         ca_root: environment.acme_ca_root().to_path_buf(),
+        certificate_validity_days: 90,
     })
     .await?;
     let aftermarket = AftermarketDnsEnvironment {
@@ -111,6 +114,7 @@ async fn run_remote_daemon_case(challenge: AcmeChallenge) -> Result<(), String> 
         https_port: environment.https_port(),
         dns_log: environment.dns_log().to_path_buf(),
         ca_root: environment.acme_ca_root().to_path_buf(),
+        certificate_validity_days: 90,
     })
     .await?;
     let mut daemon = RemoteDaemonProcess::spawn(&environment, challenge, acme.directory_url())?;
@@ -158,6 +162,128 @@ async fn run_remote_daemon_case(challenge: AcmeChallenge) -> Result<(), String> 
     daemon.wait_for_exit().await?;
     acme.shutdown().await?;
     Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "run with mise run remote-daemon:e2e"]
+async fn remote_daemon_e2e_proves_automatic_acme_renewal() {
+    for challenge in AcmeChallenge::ALL {
+        run_automatic_renewal_case(challenge)
+            .await
+            .unwrap_or_else(|error| {
+                panic!(
+                    "{} automatic ACME renewal e2e failed: {error}",
+                    challenge.cli_name()
+                )
+            });
+    }
+}
+
+async fn run_automatic_renewal_case(challenge: AcmeChallenge) -> Result<(), String> {
+    let environment = RemoteDaemonEnvironment::new(challenge)?;
+    let acme = FakeAcmeServer::start(AcmeChallengeConfig {
+        challenge,
+        domain: DOMAIN.to_string(),
+        http_port: environment.http_port(),
+        https_port: environment.https_port(),
+        dns_log: environment.dns_log().to_path_buf(),
+        ca_root: environment.acme_ca_root().to_path_buf(),
+        certificate_validity_days: 7,
+    })
+    .await?;
+    let mut daemon = RemoteDaemonProcess::spawn(&environment, challenge, acme.directory_url())?;
+    acme.wait_for_certificate_downloads(2)
+        .await
+        .map_err(|error| format!("{error}; daemon output: {}", daemon.diagnostics()))?;
+    acme.assert_complete().await?;
+    daemon.ensure_running()?;
+    let issued = acme.issued_certificate_pems()?;
+    let [initial_pem, renewed_pem] = issued.as_slice() else {
+        return Err(format!(
+            "fake ACME issued {} certificates, expected exactly 2",
+            issued.len()
+        ));
+    };
+    let initial_leaf = leaf_certificate_der(initial_pem)?;
+    let renewed_leaf = leaf_certificate_der(renewed_pem)?;
+    if initial_leaf == renewed_leaf {
+        return Err("automatic renewal did not replace the leaf certificate".to_string());
+    }
+    if certificate_spki(&initial_leaf)? != certificate_spki(&renewed_leaf)? {
+        return Err("automatic renewal changed the pinned server SPKI".to_string());
+    }
+
+    let client = RemoteDaemonClient::new(DOMAIN, environment.https_port(), acme.ca_pem())?;
+    wait_for_served_certificate(&client, &renewed_leaf).await?;
+    let invitation = daemon.create_pairing("admin")?;
+    let expected_pin = certificate_spki_sha256_pin(&renewed_leaf)?;
+    if required_string(&invitation, "server_spki_sha256")? != expected_pin {
+        return Err("pairing invitation did not publish the renewed server SPKI".to_string());
+    }
+    let admin = client
+        .claim_pairing(
+            required_string(&invitation, "code")?,
+            "renewal-admin",
+            "admin",
+        )
+        .await
+        .map_err(|error| format!("{error}; daemon output: {}", daemon.diagnostics()))?;
+    client.expect_health(&admin, 200).await?;
+    let operator_invitation = daemon.create_pairing("operator")?;
+    let operator = client
+        .claim_pairing(
+            required_string(&operator_invitation, "code")?,
+            "renewal-operator",
+            "operator",
+        )
+        .await?;
+    client
+        .expect_websocket_health_and_admin_denial(&operator)
+        .await?;
+    client.stop(&admin).await?;
+    daemon.wait_for_exit().await?;
+    acme.shutdown().await
+}
+
+async fn wait_for_served_certificate(
+    client: &RemoteDaemonClient,
+    expected: &[u8],
+) -> Result<(), String> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        if client.verified_leaf_certificate_der().await.as_deref() == Ok(expected) {
+            return Ok(());
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err("remote TLS listener did not serve the renewed certificate".to_string());
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+}
+
+fn leaf_certificate_der(certificate_pem: &str) -> Result<Vec<u8>, String> {
+    CertificateDer::pem_slice_iter(certificate_pem.as_bytes())
+        .next()
+        .ok_or_else(|| "fake ACME certificate chain omitted leaf PEM".to_string())?
+        .map(|certificate| certificate.to_vec())
+        .map_err(|error| format!("parse fake ACME leaf PEM: {error}"))
+}
+
+fn certificate_spki(certificate_der: &[u8]) -> Result<Vec<u8>, String> {
+    let (_, certificate) = x509_parser::parse_x509_certificate(certificate_der)
+        .map_err(|error| format!("parse fake ACME leaf certificate: {error}"))?;
+    Ok(certificate.public_key().raw.to_vec())
+}
+
+fn certificate_spki_sha256_pin(certificate_der: &[u8]) -> Result<String, String> {
+    use base64::Engine as _;
+    use sha2::Digest as _;
+
+    let spki = certificate_spki(certificate_der)?;
+    Ok(format!(
+        "sha256/{}",
+        base64::engine::general_purpose::STANDARD.encode(sha2::Sha256::digest(spki))
+    ))
 }
 
 async fn expect_untrusted_ca_rejected(port: u16) -> Result<(), String> {

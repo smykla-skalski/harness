@@ -60,6 +60,7 @@ pub struct AcmeChallengeConfig {
     pub https_port: u16,
     pub dns_log: PathBuf,
     pub ca_root: PathBuf,
+    pub certificate_validity_days: u64,
 }
 
 pub struct FakeAcmeServer {
@@ -157,6 +158,44 @@ impl FakeAcmeServer {
         }
     }
 
+    pub async fn wait_for_certificate_downloads(&self, expected: usize) -> Result<(), String> {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            let (orders, downloads, validation_error) = {
+                let progress = self
+                    .state
+                    .progress
+                    .lock()
+                    .map_err(|_| "fake ACME progress lock poisoned".to_string())?;
+                (
+                    progress.order_count,
+                    progress.certificate_download_count,
+                    progress.validation_error.clone(),
+                )
+            };
+            if let Some(error) = validation_error {
+                return Err(format!("fake ACME validation failed: {error}"));
+            }
+            if downloads >= expected {
+                return Ok(());
+            }
+            if Instant::now() >= deadline {
+                return Err(format!(
+                    "fake ACME started {orders} orders and downloaded {downloads} certificates, expected {expected}"
+                ));
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+    }
+
+    pub fn issued_certificate_pems(&self) -> Result<Vec<String>, String> {
+        self.state
+            .progress
+            .lock()
+            .map_err(|_| "fake ACME progress lock poisoned".to_string())
+            .map(|progress| progress.issued_certificate_pems.clone())
+    }
+
     pub async fn shutdown(mut self) -> Result<(), String> {
         if let Some(shutdown) = self.shutdown.take() {
             let _ = shutdown.send(());
@@ -186,10 +225,13 @@ pub(super) struct FakeAcmeState {
 
 #[derive(Default)]
 pub(super) struct FakeAcmeProgress {
+    pub(super) order_count: usize,
     pub(super) challenge_validated: bool,
     pub(super) finalized: bool,
     pub(super) certificate_pem: Option<String>,
     pub(super) certificate_downloaded: bool,
+    pub(super) certificate_download_count: usize,
+    pub(super) issued_certificate_pems: Vec<String>,
     pub(super) validation_error: Option<String>,
 }
 
