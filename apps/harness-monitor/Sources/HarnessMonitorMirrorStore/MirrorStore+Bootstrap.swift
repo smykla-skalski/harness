@@ -7,7 +7,12 @@ extension MirrorStore {
   /// cached snapshot to the paired stations, then refresh. The iOS app drives
   /// its own loadStoredPairings/refresh composition and does not call this.
   public func load() async {
-    await activateStoredWatchPairingIfNeeded()
+    do {
+      try await activateStoredWatchPairingIfNeeded()
+    } catch {
+      syncStatus = mobileMonitorSyncStatus(for: error)
+      return
+    }
     guard !demoModeEnabled else {
       await refresh()
       return
@@ -27,13 +32,12 @@ extension MirrorStore {
     await refresh()
   }
 
-  private func activateStoredWatchPairingIfNeeded() async {
-    guard profile == .watch, demoModeEnabled, let credentialStore,
-      let credentials = try? await credentialStore.loadAll(),
-      !credentials.isEmpty
-    else {
+  private func activateStoredWatchPairingIfNeeded() async throws {
+    guard profile == .watch, demoModeEnabled, let credentialStore else {
       return
     }
+    let credentials = try await credentialStore.loadAll()
+    guard !credentials.isEmpty else { return }
     demoModeEnabled = false
   }
 

@@ -34,6 +34,24 @@ final class WatchRemoteDaemonPairingStoreTests: XCTestCase {
     XCTAssertNotEqual(fixture.store.presentedSyncStatus, .demo)
   }
 
+  func testWatchLoadReportsStoredPairingReadFailureInsteadOfDemo() async {
+    let error = MobilePairedStationCredentialStoreError.unexpectedKeychainStatus(-50)
+    let store = MirrorStore(
+      demoModeEnabled: true,
+      profile: .watch,
+      identityStore: InMemoryMobileDeviceIdentityStore(),
+      credentialStore: FailingWatchCredentialStore(error: error),
+      syncClientFactory: WatchRemovalSyncClientFactory(),
+      sharedSnapshotStore: nil
+    )
+
+    await store.load()
+
+    XCTAssertTrue(store.demoModeEnabled)
+    XCTAssertEqual(store.syncStatus, mobileMonitorSyncStatus(for: error))
+    XCTAssertNotEqual(store.presentedSyncStatus, .demo)
+  }
+
   func testRemovingDirectWatchPairingWaitsForPairingMutationGate() async throws {
     let mutationGate = MobilePairingMutationGate()
     let fixture = try WatchRemotePairingStoreFixture(
@@ -234,6 +252,26 @@ private struct WatchRemovalSyncClient: MobileMonitorSyncClient {
     now: Date
   ) async throws -> MobileCommandReceipt {
     throw MobileRemoteDaemonSyncError.commandsUnavailable
+  }
+}
+
+private struct FailingWatchCredentialStore: MobilePairedStationCredentialStore {
+  let error: MobilePairedStationCredentialStoreError
+
+  func save(_ credential: MobilePairedStationCredential) async throws {
+    throw error
+  }
+
+  func load(stationID: String) async throws -> MobilePairedStationCredential? {
+    throw error
+  }
+
+  func loadAll() async throws -> [MobilePairedStationCredential] {
+    throw error
+  }
+
+  func delete(stationID: String) async throws {
+    throw error
   }
 }
 
