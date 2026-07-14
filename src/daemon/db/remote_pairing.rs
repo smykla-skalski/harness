@@ -12,11 +12,12 @@ use std::fmt;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, types::Type};
 
+use super::remote_identity::upsert_remote_client_for_pairing;
 use super::{CliError, Connection, DaemonDb, OptionalExtension, db_error};
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_identity::{
     RemoteAuditEvent, RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteBearerToken,
-    RemoteClientRegistration, RemoteStoredClient, parse_remote_role, parse_remote_scope,
+    RemoteClientRegistration, parse_remote_role, parse_remote_scope,
 };
 use crate::daemon::remote_pairing::{
     RemotePairingClaimRequest, RemotePairingClaimedClient, RemotePairingCodeHash,
@@ -39,12 +40,6 @@ SELECT pairing_id, code_hash, role, scopes_json, created_at, expires_at,
        claimed_at, claimed_client_id, claim_remote_addr, metadata_json
 FROM remote_pairing_codes
 WHERE code_hash = ?1";
-
-const INSERT_PAIRING_REMOTE_CLIENT_SQL: &str = "
-INSERT INTO remote_clients (
-    client_id, display_name, platform, role, scopes_json, token_hash, token_hint,
-    created_at, last_seen_at, revoked_at, rotated_at, metadata_json
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, NULL, NULL, '{}')";
 
 const INSERT_PAIRING_REMOTE_AUDIT_EVENT_SQL: &str = "
 INSERT INTO remote_audit_events (
@@ -155,7 +150,7 @@ impl DaemonDb {
         Ok(stored)
     }
 
-    /// Claim a valid one-time remote pairing code and create a remote client.
+    /// Claim a valid one-time remote pairing code and create or replace a remote client.
     ///
     /// # Errors
     /// Returns [`CliError`] when the claim is invalid, expired, already used, or
@@ -269,7 +264,7 @@ impl DaemonDb {
             .unchecked_transaction()
             .map_err(|error| db_error(format!("begin remote pairing claim: {error}")))
             .map_err(RemotePairingClaimCodeError::store)?;
-        let client = insert_remote_client_for_pairing(&transaction, registration)
+        let client = upsert_remote_client_for_pairing(&transaction, registration)
             .map_err(RemotePairingClaimCodeError::store)?;
         let changed = transaction
             .execute(
@@ -360,45 +355,6 @@ impl DaemonDb {
             Some(error_detail),
         ))
     }
-}
-
-fn insert_remote_client_for_pairing(
-    conn: &Connection,
-    registration: &RemoteClientRegistration,
-) -> Result<RemoteStoredClient, CliError> {
-    let scopes_json = scopes_to_json(&registration.scopes)?;
-    conn.execute(
-        INSERT_PAIRING_REMOTE_CLIENT_SQL,
-        params![
-            registration.client_id,
-            registration.display_name,
-            registration.platform,
-            registration.role.as_str(),
-            scopes_json,
-            registration.token_hash.as_storage_value(),
-            registration.token_hint,
-            registration.created_at,
-        ],
-    )
-    .map_err(|error| {
-        db_error(format!(
-            "insert remote client {}: {error}",
-            registration.client_id.as_str()
-        ))
-    })?;
-    Ok(RemoteStoredClient {
-        client_id: registration.client_id.clone(),
-        display_name: registration.display_name.clone(),
-        platform: registration.platform.clone(),
-        role: registration.role,
-        scopes: registration.scopes.clone(),
-        token_hash: registration.token_hash.clone(),
-        token_hint: registration.token_hint.clone(),
-        created_at: registration.created_at.clone(),
-        last_seen_at: None,
-        revoked_at: None,
-        rotated_at: None,
-    })
 }
 
 fn record_remote_audit_event_for_pairing(

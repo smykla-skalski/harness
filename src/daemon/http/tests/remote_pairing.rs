@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 use axum::http::StatusCode;
 use tokio::net::TcpListener;
@@ -323,25 +324,12 @@ async fn remote_pair_claim_redacts_store_failures() {
         "2026-06-21T18:00:00Z",
         "2099-06-21T18:10:00Z",
     );
-    let duplicate_token = RemoteBearerToken::generate();
-    let registration = RemoteClientRegistration::new(
-        "duplicate-client",
-        "Existing Client",
-        "ios",
-        RemoteRole::Viewer,
-        &[RemoteAccessScope::Read],
-        duplicate_token.expose(),
-        "2026-06-21T18:01:00Z",
-    )
-    .expect("duplicate client registration");
-    state
-        .db
-        .get()
-        .expect("db slot")
-        .lock()
-        .expect("db lock")
-        .register_remote_client(&registration)
-        .expect("register duplicate client");
+    let db_slot = state.db.clone();
+    let _ = thread::spawn(move || {
+        let _guard = db_slot.get().expect("db slot").lock().expect("db lock");
+        panic!("poison remote pairing store with sensitive detail");
+    })
+    .join();
     let (base_url, server) = serve_http(state).await;
 
     let response = reqwest::Client::new()
@@ -349,13 +337,13 @@ async fn remote_pair_claim_redacts_store_failures() {
         .json(&serde_json::json!({
             "code": code.expose(),
             "domain": "daemon.example.com",
-            "client_id": "duplicate-client",
-            "display_name": "Duplicate Client",
+            "client_id": "store-failure-client",
+            "display_name": "Store Failure Client",
             "platform": "ios",
         }))
         .send()
         .await
-        .expect("send duplicate-client claim");
+        .expect("send store-failure claim");
 
     assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     let body = response
@@ -367,8 +355,78 @@ async fn remote_pair_claim_redacts_store_failures() {
         body["error"]["message"],
         "remote pairing store is unavailable"
     );
-    assert!(!body.to_string().contains("duplicate-client"));
-    assert!(!body.to_string().contains("UNIQUE"));
+    assert!(!body.to_string().contains("store-failure-client"));
+    assert!(!body.to_string().contains("sensitive detail"));
+
+    server.abort();
+    let _ = server.await;
+}
+
+#[tokio::test]
+async fn remote_pair_claim_replaces_existing_stable_client() {
+    let state = remote_pairing_state();
+    let code = seed_pairing_code(
+        &state,
+        "pairing-http-stable-client",
+        RemoteRole::Operator,
+        &[RemoteAccessScope::Read, RemoteAccessScope::Write],
+        "http-stable-client-secret",
+        "2026-07-14T00:00:00Z",
+        "2099-07-14T00:10:00Z",
+    );
+    let old_token = RemoteBearerToken::generate();
+    let registration = RemoteClientRegistration::new(
+        "stable-iphone",
+        "Old iPhone",
+        "watchos",
+        RemoteRole::Viewer,
+        &[],
+        old_token.expose(),
+        "2026-07-14T00:00:30Z",
+    )
+    .expect("existing client registration");
+    let db = state.db.get().expect("db slot").clone();
+    db.lock()
+        .expect("db lock")
+        .register_remote_client(&registration)
+        .expect("register existing client");
+    let (base_url, server) = serve_http(state).await;
+
+    let response = reqwest::Client::new()
+        .post(format!("{base_url}{}", http_paths::REMOTE_PAIR_CLAIM))
+        .json(&serde_json::json!({
+            "code": code.expose(),
+            "domain": "daemon.example.com",
+            "client_id": "stable-iphone",
+            "display_name": "Bart's iPhone",
+            "platform": "ios",
+        }))
+        .send()
+        .await
+        .expect("send stable-client claim");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response
+        .json::<serde_json::Value>()
+        .await
+        .expect("json body");
+    assert_eq!(body["client_id"], "stable-iphone");
+    assert_eq!(body["display_name"], "Bart's iPhone");
+    assert_eq!(body["platform"], "ios");
+    assert_eq!(body["role"], "operator");
+    assert_eq!(body["scopes"], serde_json::json!(["read", "write"]));
+    let replacement_token = body["token"].as_str().expect("replacement token");
+    let db = db.lock().expect("db lock");
+    assert!(
+        db.verify_remote_client_token("stable-iphone", old_token.expose())
+            .expect("verify old token")
+            .is_none()
+    );
+    assert!(
+        db.verify_remote_client_token("stable-iphone", replacement_token)
+            .expect("verify replacement token")
+            .is_some()
+    );
 
     server.abort();
     let _ = server.await;
