@@ -38,6 +38,10 @@ struct SettingsView: View {
             )
           )
           .harnessBalancedListSeparator()
+          if let pairingFailureStatus = store.pairingFailureStatus {
+            SyncStatusRow(status: pairingFailureStatus)
+              .harnessBalancedListSeparator()
+          }
           if store.syncStatus.opensAppSettingsForRecovery {
             SyncStatusRow(status: store.syncStatus)
               .harnessBalancedListSeparator()

@@ -15,7 +15,7 @@ struct TodayView: View {
     NavigationStack {
       List {
         Section {
-          SyncStatusRow(status: store.syncStatus)
+          SyncStatusRow(status: store.presentedSyncStatus)
         }
         Section {
           NeedsYouHeader(snapshot: store.snapshot)

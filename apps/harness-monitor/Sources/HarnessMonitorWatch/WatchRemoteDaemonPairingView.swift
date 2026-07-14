@@ -31,7 +31,7 @@ struct WatchRemoteDaemonPairingView: View {
       }
       if didAttemptPairing, !isPairing {
         Section {
-          Text(store.syncStatus.subtitle)
+          Text((store.pairingFailureStatus ?? store.syncStatus).subtitle)
             .foregroundStyle(.secondary)
         }
       }

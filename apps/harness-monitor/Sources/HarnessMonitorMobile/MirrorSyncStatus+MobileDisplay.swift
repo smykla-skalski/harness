@@ -9,6 +9,7 @@ extension MirrorSyncStatus {
     case .unpaired: String(localized: "No paired Mac")
     case .demo: String(localized: "Demo station")
     case .pairing: String(localized: "Pairing")
+    case .pairingFailed: String(localized: "Pairing failed")
     case .syncing: String(localized: "Syncing")
     case .live: String(localized: "Live")
     case .stale: String(localized: "Sync stale")
@@ -31,6 +32,8 @@ extension MirrorSyncStatus {
       String(localized: "App Review demo data is active")
     case .pairing(let stationName):
       String(localized: "Connecting to \(stationName)")
+    case .pairingFailed(let reason):
+      reason
     case .syncing:
       String(localized: "Fetching the latest encrypted mirror")
     case .live(let date):

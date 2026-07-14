@@ -12,6 +12,7 @@ public enum MirrorSyncStatus: Equatable, Sendable {
   case unpaired
   case demo
   case pairing(String)
+  case pairingFailed(String)
   case syncing
   case live(Date)
   case stale(String)
@@ -29,6 +30,7 @@ public enum MirrorSyncStatus: Equatable, Sendable {
     case .unpaired: "link.badge.plus"
     case .demo: "testtube.2"
     case .pairing: "qrcode.viewfinder"
+    case .pairingFailed: "xmark.icloud"
     case .syncing: "arrow.triangle.2.circlepath"
     case .live: "checkmark.icloud"
     case .stale: "exclamationmark.icloud"
@@ -52,11 +54,18 @@ public enum MirrorSyncStatus: Equatable, Sendable {
     return false
   }
 
+  public var isPairingFailure: Bool {
+    if case .pairingFailed = self {
+      return true
+    }
+    return false
+  }
+
   /// Whether the status reflects a sync failure the foreground loop should
   /// back off from. Drives the staleness-gated refresh interval on both apps.
   public var indicatesSyncFailure: Bool {
     switch self {
-    case .stale, .localNetworkDenied, .iCloudAccountUnavailable:
+    case .pairingFailed, .stale, .localNetworkDenied, .iCloudAccountUnavailable:
       true
     case .unpaired, .demo, .pairing, .syncing, .live, .paired, .privacy,
       .commandQueued, .commandCompleted, .commandCancelled, .commandFailed:
