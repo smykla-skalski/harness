@@ -14,7 +14,7 @@ use crate::daemon::remote_auth::{
 use crate::daemon::remote_request_audit::{
     RemoteAuthorizationAudit, RemoteAuthorizationAuditReceipt,
 };
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 
 use super::{DaemonConnectInfo, DaemonHttpState};
 
@@ -41,6 +41,7 @@ pub(super) struct RemoteHttpAuditContext {
     scope: RemoteAccessScope,
     remote_addr: Option<String>,
     marker: Option<RemoteHttpAuditMarker>,
+    receipt: OnceLock<RemoteAuthorizationAuditReceipt>,
 }
 
 impl RemoteHttpAuditContext {
@@ -58,6 +59,7 @@ impl RemoteHttpAuditContext {
                 .get::<ConnectInfo<DaemonConnectInfo>>()
                 .map(|ConnectInfo(info)| info.remote_addr().ip().to_string()),
             marker: request.extensions().get::<RemoteHttpAuditMarker>().cloned(),
+            receipt: OnceLock::new(),
         })
     }
 
@@ -134,11 +136,27 @@ impl RemoteHttpAuditContext {
         Ok(true)
     }
 
+    pub(super) async fn mark_handler_failure(
+        &self,
+        state: &DaemonHttpState,
+        error_detail: &str,
+    ) -> Result<(), CliError> {
+        let receipt = self.receipt.get().ok_or_else(|| {
+            CliError::from(CliErrorKind::workflow_io(
+                "remote authorization audit receipt is unavailable",
+            ))
+        })?;
+        receipt
+            .mark_failed(state.async_db.get(), error_detail)
+            .await
+    }
+
     fn finish_record(
         &self,
         result: Result<RemoteAuthorizationAuditReceipt, CliError>,
     ) -> Result<(), CliError> {
         let receipt = result?;
+        drop(self.receipt.set(receipt.clone()));
         if let Some(marker) = &self.marker {
             marker.mark_recorded(receipt);
         }

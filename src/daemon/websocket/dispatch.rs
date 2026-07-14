@@ -12,7 +12,9 @@ use crate::daemon::remote_auth::{
     RemoteAuthError, authorize_remote_ws_method, remote_ws_required_scope,
 };
 use crate::daemon::remote_identity::RemoteStoredClient;
-use crate::daemon::remote_request_audit::RemoteAuthorizationAudit;
+use crate::daemon::remote_request_audit::{
+    RemoteAuthorizationAudit, RemoteAuthorizationAuditReceipt,
+};
 use crate::daemon::remote_viewer::is_remote_viewer;
 use crate::errors::CliError;
 use crate::telemetry::{
@@ -184,25 +186,52 @@ async fn dispatch_inner(
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
 ) -> WsResponse {
-    if let Err(response) =
-        authorize_remote_ws_request(request, state, connection, RemoteWsAllowedAudit::Success).await
+    let audit_receipt = match authorize_remote_ws_request(
+        request,
+        state,
+        connection,
+        RemoteWsAllowedAudit::Success,
+    )
+    .await
     {
-        return *response;
-    }
-    if let Some(response) = with_connection_actor(
+        Ok(receipt) => receipt,
+        Err(response) => return *response,
+    };
+    let response = if let Some(response) = with_connection_actor(
         state,
         connection,
         routing::dispatch_known_method(request, state, connection),
     )
     .await
     {
+        response
+    } else {
+        error_response(
+            &request.id,
+            "UNKNOWN_METHOD",
+            &format!("unknown method: {}", request.method),
+        )
+    };
+    complete_remote_ws_audit(request, state, audit_receipt, response).await
+}
+
+async fn complete_remote_ws_audit(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+    receipt: Option<RemoteAuthorizationAuditReceipt>,
+    response: WsResponse,
+) -> WsResponse {
+    let (Some(receipt), Some(error)) = (receipt, response.error.as_ref()) else {
         return response;
+    };
+    let error_detail = format!("remote WebSocket handler returned error {}", error.code);
+    match receipt
+        .mark_failed(state.async_db.get(), &error_detail)
+        .await
+    {
+        Ok(()) => response,
+        Err(error) => *remote_ws_audit_error_response(request, &error),
     }
-    error_response(
-        &request.id,
-        "UNKNOWN_METHOD",
-        &format!("unknown method: {}", request.method),
-    )
 }
 
 async fn with_connection_actor<T>(
@@ -232,9 +261,9 @@ async fn authorize_remote_ws_request(
     state: &DaemonHttpState,
     connection: &Arc<Mutex<ConnectionState>>,
     allowed_audit: RemoteWsAllowedAudit<'_>,
-) -> Result<(), Box<WsResponse>> {
+) -> Result<Option<RemoteAuthorizationAuditReceipt>, Box<WsResponse>> {
     if state.auth_mode == DaemonHttpAuthMode::Local || !is_declared_ws_method(&request.method) {
-        return Ok(());
+        return Ok(None);
     }
     let required_scope = remote_ws_required_scope(&request.method)
         .map_err(|error| Box::new(remote_ws_auth_error_response(&request.id, error)))?;
@@ -290,10 +319,11 @@ async fn authorize_remote_ws_request(
                     )
                 }
             };
+            let track_handler_outcome = matches!(allowed_audit, RemoteWsAllowedAudit::Success);
             audit
                 .record(state.async_db.get())
                 .await
-                .map(|_| ())
+                .map(|receipt| track_handler_outcome.then_some(receipt))
                 .map_err(|error| remote_ws_audit_error_response(request, &error))
         }
         Err(error) => {

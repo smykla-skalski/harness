@@ -131,6 +131,14 @@ pub(crate) async fn authorize_remote_http_request(
     if state.auth_mode == DaemonHttpAuthMode::Local {
         return next.run(request).await;
     }
+    authorize_remote_http_request_inner(&state, request, next).await
+}
+
+async fn authorize_remote_http_request_inner(
+    state: &DaemonHttpState,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
     let Some(route_path) = request
         .extensions()
         .get::<MatchedPath>()
@@ -148,17 +156,39 @@ pub(crate) async fn authorize_remote_http_request(
         Ok(audit) => audit,
         Err(error) => return remote_auth_error_response(error),
     };
-    let verification = verify_remote_client(request.headers(), &state);
-    let client =
-        match authenticate_and_audit_remote_http_request(&audit, verification, &state, route).await
-        {
-            Ok(client) => client,
-            Err(response) => return *response,
-        };
+    let verification = verify_remote_client(request.headers(), state);
+    let client = match authenticate_and_audit_remote_http_request(
+        &audit,
+        verification,
+        state,
+        route,
+    )
+    .await
+    {
+        Ok(client) => client,
+        Err(response) => return *response,
+    };
     let actor = client.control_plane_actor_id();
-    REMOTE_HTTP_CLIENT
+    let response = REMOTE_HTTP_CLIENT
         .scope(client, with_control_plane_actor(actor, next.run(request)))
-        .await
+        .await;
+    complete_remote_http_audit(&audit, state, response).await
+}
+
+async fn complete_remote_http_audit(
+    audit: &RemoteHttpAuditContext,
+    state: &DaemonHttpState,
+    response: Response,
+) -> Response {
+    let status = response.status();
+    if !status.is_client_error() && !status.is_server_error() {
+        return response;
+    }
+    let error_detail = format!("remote HTTP handler returned status {}", status.as_u16());
+    match audit.mark_handler_failure(state, &error_detail).await {
+        Ok(()) => response,
+        Err(error) => auth_audit::unavailable_response(&error),
+    }
 }
 
 async fn authenticate_and_audit_remote_http_request(
