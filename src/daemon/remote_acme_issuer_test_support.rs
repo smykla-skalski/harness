@@ -2,7 +2,9 @@ use std::collections::VecDeque;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
+use async_trait::async_trait;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use bytes::Bytes;
@@ -16,8 +18,12 @@ use rcgen::{
 };
 use rustls::pki_types::CertificateSigningRequestDer;
 use tokio::sync::Notify;
+use tokio::time::sleep;
 
 use crate::daemon::remote::RemoteAcmeChallenge;
+use crate::daemon::remote_acme_issuer::{
+    RemoteAcmeChallengeMaterial, RemoteAcmeChallengeProvisioner,
+};
 
 pub(super) const DIRECTORY_URL: &str = "https://acme.test/directory";
 pub(super) const ACCOUNT_URL: &str = "https://acme.test/acct/1";
@@ -45,6 +51,118 @@ struct ScriptedAcmeHttpState {
     responses: VecDeque<ScriptedResponse>,
     requests: Vec<RecordedRequest>,
     issued_certificate: Option<String>,
+}
+
+#[derive(Clone, Default)]
+pub(super) struct RecordingProvisioner {
+    inner: Arc<Mutex<RecordingProvisionerState>>,
+}
+
+#[derive(Default)]
+struct RecordingProvisionerState {
+    materials: Vec<RemoteAcmeChallengeMaterial>,
+    cleanup_count: usize,
+    cleanup_delay: Duration,
+    cleanup_release: Option<Arc<Notify>>,
+    cleanup_started: bool,
+    cleanup_error: Option<String>,
+    wait_ready_error: Option<String>,
+}
+
+impl RecordingProvisioner {
+    pub(super) fn with_cleanup_error(error: &str) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(RecordingProvisionerState {
+                cleanup_error: Some(error.to_string()),
+                ..RecordingProvisionerState::default()
+            })),
+        }
+    }
+
+    pub(super) fn with_cleanup_delay(delay: Duration) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(RecordingProvisionerState {
+                cleanup_delay: delay,
+                ..RecordingProvisionerState::default()
+            })),
+        }
+    }
+
+    pub(super) fn with_cleanup_gate(release: Arc<Notify>) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(RecordingProvisionerState {
+                cleanup_release: Some(release),
+                ..RecordingProvisionerState::default()
+            })),
+        }
+    }
+
+    pub(super) fn with_wait_ready_error_and_cleanup_gate(
+        error: &str,
+        release: Arc<Notify>,
+    ) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(RecordingProvisionerState {
+                cleanup_release: Some(release),
+                wait_ready_error: Some(error.to_string()),
+                ..RecordingProvisionerState::default()
+            })),
+        }
+    }
+
+    pub(super) fn materials(&self) -> Vec<RemoteAcmeChallengeMaterial> {
+        self.inner
+            .lock()
+            .expect("lock provisioner")
+            .materials
+            .clone()
+    }
+
+    pub(super) fn cleanup_count(&self) -> usize {
+        self.inner.lock().expect("lock provisioner").cleanup_count
+    }
+
+    pub(super) fn cleanup_started(&self) -> bool {
+        self.inner.lock().expect("lock provisioner").cleanup_started
+    }
+}
+
+#[async_trait]
+impl RemoteAcmeChallengeProvisioner for RecordingProvisioner {
+    type Lease = ();
+
+    async fn present(&self, material: RemoteAcmeChallengeMaterial) -> Result<Self::Lease, String> {
+        self.inner
+            .lock()
+            .map_err(|error| error.to_string())?
+            .materials
+            .push(material);
+        Ok(())
+    }
+
+    async fn wait_ready(&self, _lease: &Self::Lease) -> Result<(), String> {
+        self.inner
+            .lock()
+            .map_err(|error| error.to_string())?
+            .wait_ready_error
+            .clone()
+            .map_or(Ok(()), Err)
+    }
+
+    async fn cleanup(&self, _lease: Self::Lease) -> Result<(), String> {
+        let (delay, release) = {
+            let mut state = self.inner.lock().map_err(|error| error.to_string())?;
+            state.cleanup_started = true;
+            (state.cleanup_delay, state.cleanup_release.clone())
+        };
+        if let Some(release) = release {
+            release.notified().await;
+        }
+        sleep(delay).await;
+        let mut state = self.inner.lock().map_err(|error| error.to_string())?;
+        state.cleanup_count += 1;
+        state.cleanup_error.clone().map_or(Ok(()), Err)
+    }
 }
 
 impl ScriptedAcmeHttp {

@@ -47,6 +47,12 @@ where
             .map_err(|error| format!("join remote ACME challenge cleanup: {error}"))?
     }
 
+    pub(crate) fn cleanup_in_background(mut self) {
+        if let Some(cleanup) = self.take_cleanup() {
+            drop(self.cleanup_tracker.spawn_cleanup(cleanup));
+        }
+    }
+
     fn take_cleanup(
         &mut self,
     ) -> Option<impl Future<Output = Result<(), String>> + Send + 'static> {
