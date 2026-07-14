@@ -190,6 +190,14 @@ pub(super) fn unavailable_response(error: &CliError) -> Response {
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
+pub(super) fn log_update_failure(error: &CliError) {
+    tracing::error!(error = %error, "remote authorization audit update failed");
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
 fn log_unavailable(error: &CliError) {
     tracing::error!(error = %error, "remote authorization audit failed");
 }

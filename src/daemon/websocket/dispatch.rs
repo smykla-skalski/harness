@@ -225,13 +225,13 @@ async fn complete_remote_ws_audit(
         return response;
     };
     let error_detail = format!("remote WebSocket handler returned error {}", error.code);
-    match receipt
+    if let Err(error) = receipt
         .mark_failed(state.async_db.get(), &error_detail)
         .await
     {
-        Ok(()) => response,
-        Err(error) => *remote_ws_audit_error_response(request, &error),
+        log_remote_ws_audit_error(request, &error);
     }
+    response
 }
 
 async fn with_connection_actor<T>(

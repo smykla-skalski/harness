@@ -1,4 +1,9 @@
+use axum::extract::State;
 use axum::http::{Request, StatusCode};
+use axum::middleware;
+use axum::response::IntoResponse;
+use axum::routing::get;
+use axum::{Json, Router};
 use futures_util::{Sink, SinkExt as _, Stream, StreamExt as _};
 use rusqlite::Connection;
 use serde_json::json;
@@ -115,6 +120,36 @@ async fn remote_authorization_audit_records_http_handler_failures() {
             .unwrap_or_default()
             .contains(MISSING_SESSION_ID)
     );
+
+    stop_server(server).await;
+}
+
+#[tokio::test]
+async fn remote_authorization_audit_update_failure_preserves_http_response() {
+    let state = remote_state_with_viewer();
+    let app = Router::new()
+        .route(http_paths::HEALTH, get(drop_audit_store_then_fail))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            super::super::auth::authorize_remote_http_request,
+        ))
+        .with_state(state);
+    let (base_url, server) = serve_router(app).await;
+
+    let response = reqwest::Client::new()
+        .get(format!("{base_url}{}", http_paths::HEALTH))
+        .header("x-request-id", "audit-http-update-failure")
+        .header(REMOTE_CLIENT_ID_HEADER, "viewer")
+        .bearer_auth(remote_token("viewer"))
+        .send()
+        .await
+        .expect("send request whose audit update fails");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = response
+        .json::<serde_json::Value>()
+        .await
+        .expect("handler error json");
+    assert_eq!(body["error"]["code"], "HANDLER_FAILURE");
 
     stop_server(server).await;
 }
@@ -370,6 +405,14 @@ fn drop_remote_audit_table(state: &DaemonHttpState) {
         .expect("drop remote audit table");
 }
 
+async fn drop_audit_store_then_fail(State(state): State<DaemonHttpState>) -> impl IntoResponse {
+    drop_remote_audit_table(&state);
+    (
+        StatusCode::BAD_REQUEST,
+        Json(json!({"error": {"code": "HANDLER_FAILURE"}})),
+    )
+}
+
 fn remote_token(client_id: &str) -> String {
     format!("remote-token-secret-{client_id}")
 }
@@ -430,11 +473,14 @@ where
 }
 
 async fn serve_remote(state: DaemonHttpState) -> (String, JoinHandle<()>) {
+    serve_router(super::super::daemon_http_router(state)).await
+}
+
+async fn serve_router(app: Router) -> (String, JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind listener");
     let addr = listener.local_addr().expect("listener address");
-    let app = super::super::daemon_http_router(state);
     let server = tokio::spawn(async move {
         axum::serve(
             listener,

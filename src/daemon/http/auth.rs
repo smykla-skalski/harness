@@ -185,10 +185,10 @@ async fn complete_remote_http_audit(
         return response;
     }
     let error_detail = format!("remote HTTP handler returned status {}", status.as_u16());
-    match audit.mark_handler_failure(state, &error_detail).await {
-        Ok(()) => response,
-        Err(error) => auth_audit::unavailable_response(&error),
+    if let Err(error) = audit.mark_handler_failure(state, &error_detail).await {
+        auth_audit::log_update_failure(&error);
     }
+    response
 }
 
 async fn authenticate_and_audit_remote_http_request(
