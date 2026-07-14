@@ -159,6 +159,53 @@ async fn completed_bound_run_advances_linked_board_item() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn completed_bound_run_advances_board_after_worker_submits_review() {
+    let (controller, db, _tempdir) =
+        controller_with_async_session_state(sample_session_state_with_open_task()).await;
+    let mut item = TaskBoardItem::new(
+        "board-1".into(),
+        "Board task".into(),
+        "Implement the board task".into(),
+        "2026-04-09T10:00:00Z".into(),
+    );
+    item.status = TaskBoardStatus::InProgress;
+    item.session_id = Some(SESSION_ID.into());
+    item.work_item_id = Some("task-1".into());
+    item.workflow.execution_id = Some("workflow-1".into());
+    item.workflow.status = TaskBoardWorkflowStatus::Running;
+    item.workflow.current_step_id = Some("worker_running".into());
+    db.create_task_board_item(item)
+        .await
+        .expect("create board item");
+
+    let agent_id = register_bound_worker(&controller);
+    db.update_session_state_immediate(SESSION_ID, |state| {
+        let task = state.tasks.get_mut("task-1").expect("bound task");
+        task.status = TaskStatus::AwaitingReview;
+        task.assigned_to = None;
+        Ok(true)
+    })
+    .await
+    .expect("worker submits task for review");
+    let mut run = codex_run_snapshot(CodexRunStatus::Completed);
+    run.task_id = Some("task-1".into());
+    run.board_item_id = Some("board-1".into());
+    run.session_agent_id = Some(agent_id);
+
+    controller
+        .sync_orchestration_status_for_run(&run)
+        .expect("bridge completed run");
+
+    let item = db.task_board_item("board-1").await.expect("board item");
+    assert_eq!(item.status, TaskBoardStatus::ToReview);
+    assert_eq!(item.workflow.status, TaskBoardWorkflowStatus::Running);
+    assert_eq!(
+        item.workflow.current_step_id.as_deref(),
+        Some("review_pending")
+    );
+}
+
 #[test]
 fn completed_bound_run_skips_when_agent_removed() {
     let (controller, db, _tempdir) =

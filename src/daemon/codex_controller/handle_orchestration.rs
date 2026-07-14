@@ -14,6 +14,22 @@ use super::orchestration::{
     update_codex_orchestration_status,
 };
 
+fn should_reconcile_board_item(
+    state: &SessionState,
+    run: &CodexRunSnapshot,
+    task_changed: bool,
+) -> bool {
+    if run.status.is_active() || run.board_item_id.is_none() {
+        return false;
+    }
+    task_changed
+        || run
+            .task_id
+            .as_deref()
+            .and_then(|task_id| state.tasks.get(task_id))
+            .is_some_and(|task| task.status != TaskStatus::InProgress)
+}
+
 impl CodexControllerHandle {
     pub(super) fn sync_orchestration_status_for_run(
         &self,
@@ -58,7 +74,7 @@ impl CodexControllerHandle {
         self.run_with_async_db(|async_db| async move {
             let now = utc_now();
             let status_for_update = status.clone();
-            let (changed, task_changed) = async_db
+            let (changed, reconcile_board_item) = async_db
                 .update_session_state_immediate(&session_id_async, |state| {
                     let task_changed =
                         apply_bound_task_terminal_transition(state, &run_async, &now)?;
@@ -72,14 +88,17 @@ impl CodexControllerHandle {
                     if task_changed || status_changed {
                         session_service::refresh_session(state, &now);
                     }
-                    Ok((task_changed || status_changed, task_changed))
+                    Ok((
+                        task_changed || status_changed,
+                        should_reconcile_board_item(state, &run_async, task_changed),
+                    ))
                 })
                 .await?;
             if changed {
                 async_db.bump_change(&session_id_async).await?;
                 async_db.bump_change("global").await?;
             }
-            if task_changed
+            if reconcile_board_item
                 && let Some(board_item_id) = run_async.board_item_id.clone()
             {
                 daemon_service::evaluate_task_board_async(
