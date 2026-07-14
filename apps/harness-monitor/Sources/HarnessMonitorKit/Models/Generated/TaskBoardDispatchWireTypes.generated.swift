@@ -372,9 +372,6 @@ public struct TaskBoardDispatchPickRequest: Codable, Equatable, Sendable {
 
   public init() {
   }
-
-  enum CodingKeys: String, CodingKey {
-  }
 }
 
 public struct TaskBoardDispatchPickResponse: Codable, Equatable, Sendable {
