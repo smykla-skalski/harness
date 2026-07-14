@@ -47,7 +47,8 @@ async fn wait_for_shutdown(shutdown_rx: &mut watch::Receiver<bool>) {
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
 async fn record_expired_pairings(db: &AsyncDaemonDb) {
-    match db.record_expired_remote_pairings(&utc_now()).await {
+    let now = utc_now();
+    match db.record_expired_remote_pairings(now.as_str()).await {
         Ok(0) => {}
         Ok(expired) => tracing::info!(expired, "recorded remote pairing expirations"),
         Err(error) => tracing::error!(%error, "record remote pairing expirations"),
