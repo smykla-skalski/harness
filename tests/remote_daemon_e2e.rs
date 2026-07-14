@@ -192,7 +192,7 @@ async fn run_automatic_renewal_case(challenge: AcmeChallenge) -> Result<(), Stri
     })
     .await?;
     let mut daemon = RemoteDaemonProcess::spawn(&environment, challenge, acme.directory_url())?;
-    acme.wait_for_certificate_downloads(2)
+    acme.wait_for_issued_certificates(2)
         .await
         .map_err(|error| format!("{error}; daemon output: {}", daemon.diagnostics()))?;
     acme.assert_complete().await?;

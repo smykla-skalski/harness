@@ -91,18 +91,21 @@ fn begin_order(state: &FakeAcmeState) -> Result<Response<Body>, String> {
         .progress
         .lock()
         .map_err(|_| "fake ACME progress lock poisoned".to_string())?;
-    progress.order_count += 1;
-    progress.challenge_validated = false;
-    progress.finalized = false;
-    progress.certificate_pem = None;
-    progress.certificate_downloaded = false;
-    progress.validation_error = None;
+    reset_for_new_order(&mut progress);
     drop(progress);
     Ok(json_response(
         StatusCode::CREATED,
         &order_body(state, "pending", false),
         Some(format!("{}/order/1", state.origin)),
     ))
+}
+
+fn reset_for_new_order(progress: &mut super::FakeAcmeProgress) {
+    progress.order_count += 1;
+    progress.challenge_validated = false;
+    progress.finalized = false;
+    progress.certificate_pem = None;
+    progress.certificate_downloaded = false;
 }
 
 fn order_status(state: &FakeAcmeState) -> Result<Response<Body>, String> {
@@ -175,15 +178,24 @@ fn download_certificate(state: &FakeAcmeState) -> Result<Response<Body>, String>
         .certificate_pem
         .clone()
         .ok_or_else(|| "fake ACME certificate requested before finalize".to_string())?;
-    progress.certificate_downloaded = true;
-    progress.certificate_download_count += 1;
-    progress.issued_certificate_pems.push(certificate.clone());
+    record_certificate_download(&mut progress, &certificate);
     Ok(acme_response(
         StatusCode::OK,
         "application/pem-certificate-chain",
         certificate,
         None,
     ))
+}
+
+fn record_certificate_download(progress: &mut super::FakeAcmeProgress, certificate: &str) {
+    let first_download_for_order = !progress.certificate_downloaded;
+    progress.certificate_downloaded = true;
+    progress.certificate_download_count += 1;
+    if first_download_for_order {
+        progress
+            .issued_certificate_pems
+            .push(certificate.to_string());
+    }
 }
 
 fn directory_body(origin: &str) -> Value {
@@ -286,4 +298,46 @@ fn jws_payload(body: &[u8]) -> Result<Value, String> {
         .map_err(|error| format!("decode fake ACME JWS payload: {error}"))?;
     serde_json::from_slice(&payload)
         .map_err(|error| format!("decode fake ACME JWS payload JSON: {error}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{record_certificate_download, reset_for_new_order};
+    use crate::acme::FakeAcmeProgress;
+
+    #[test]
+    fn new_order_preserves_prior_protocol_failure() {
+        let mut progress = FakeAcmeProgress {
+            validation_error: Some("challenge validation failed".to_string()),
+            ..FakeAcmeProgress::default()
+        };
+
+        reset_for_new_order(&mut progress);
+
+        assert_eq!(
+            progress.validation_error.as_deref(),
+            Some("challenge validation failed")
+        );
+    }
+
+    #[test]
+    fn certificate_download_retry_records_one_issued_chain_per_order() {
+        let mut progress = FakeAcmeProgress::default();
+        reset_for_new_order(&mut progress);
+
+        record_certificate_download(&mut progress, "first-chain");
+        record_certificate_download(&mut progress, "first-chain");
+
+        assert_eq!(progress.certificate_download_count, 2);
+        assert_eq!(progress.issued_certificate_pems, ["first-chain"]);
+
+        reset_for_new_order(&mut progress);
+        record_certificate_download(&mut progress, "second-chain");
+
+        assert_eq!(progress.certificate_download_count, 3);
+        assert_eq!(
+            progress.issued_certificate_pems,
+            ["first-chain", "second-chain"]
+        );
+    }
 }

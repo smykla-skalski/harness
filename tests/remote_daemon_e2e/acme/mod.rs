@@ -158,10 +158,10 @@ impl FakeAcmeServer {
         }
     }
 
-    pub async fn wait_for_certificate_downloads(&self, expected: usize) -> Result<(), String> {
+    pub async fn wait_for_issued_certificates(&self, expected: usize) -> Result<(), String> {
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
-            let (orders, downloads, validation_error) = {
+            let (orders, downloads, issued, validation_error) = {
                 let progress = self
                     .state
                     .progress
@@ -170,18 +170,19 @@ impl FakeAcmeServer {
                 (
                     progress.order_count,
                     progress.certificate_download_count,
+                    progress.issued_certificate_pems.len(),
                     progress.validation_error.clone(),
                 )
             };
             if let Some(error) = validation_error {
                 return Err(format!("fake ACME validation failed: {error}"));
             }
-            if downloads >= expected {
+            if issued >= expected {
                 return Ok(());
             }
             if Instant::now() >= deadline {
                 return Err(format!(
-                    "fake ACME started {orders} orders and downloaded {downloads} certificates, expected {expected}"
+                    "fake ACME started {orders} orders, handled {downloads} downloads, and issued {issued} certificates, expected {expected}"
                 ));
             }
             tokio::time::sleep(Duration::from_millis(25)).await;
