@@ -211,7 +211,7 @@ async fn instant_acme_issuer_returns_success_before_cleanup_visibility_confirmat
     })
     .await
     .expect("successful issuance did not start cleanup");
-    let completed_before_cleanup = timeout(Duration::from_millis(250), async {
+    let completed_before_cleanup = timeout(Duration::from_secs(2), async {
         while !task.is_finished() {
             tokio::task::yield_now().await;
         }

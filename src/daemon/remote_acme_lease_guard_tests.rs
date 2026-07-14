@@ -32,7 +32,11 @@ async fn background_cleanup_failure_has_accurate_redacted_log_context() {
     timeout(Duration::from_secs(2), tracker.wait_for_cleanup())
         .await
         .expect("background cleanup did not finish");
-    let logs = output.contents();
+    let logs = wait_for_log(
+        &output,
+        "remote ACME challenge cleanup after successful issuance failed",
+    )
+    .await;
 
     assert!(
         logs.contains("remote ACME challenge cleanup after successful issuance failed"),
@@ -41,6 +45,20 @@ async fn background_cleanup_failure_has_accurate_redacted_log_context() {
     assert!(!logs.contains("after cancellation failed"));
     assert!(logs.contains("<redacted>"));
     assert!(!logs.contains("cleanup-secret"));
+}
+
+async fn wait_for_log(output: &SharedOutput, expected: &str) -> String {
+    timeout(Duration::from_secs(2), async {
+        loop {
+            let logs = output.contents();
+            if logs.contains(expected) {
+                return logs;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("missing expected cleanup log: {}", output.contents()))
 }
 
 #[derive(Clone, Copy)]
