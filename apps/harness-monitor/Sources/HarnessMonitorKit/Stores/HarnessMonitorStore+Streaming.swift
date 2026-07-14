@@ -50,7 +50,7 @@ extension HarnessMonitorStore {
               kind: .reconnecting,
               detail: "Transport closed, re-bootstrapping global stream"
             )
-            await reconnect()
+            scheduleReconnectAfterStreamFailure()
             return
           }
         }
@@ -64,7 +64,7 @@ extension HarnessMonitorStore {
             kind: .reconnecting,
             detail: "Global stream failed \(attempt) times, re-bootstrapping"
           )
-          await reconnect()
+          scheduleReconnectAfterStreamFailure()
           return
         }
 
@@ -114,7 +114,7 @@ extension HarnessMonitorStore {
               kind: .reconnecting,
               detail: "Transport closed, re-bootstrapping session stream"
             )
-            await reconnect()
+            scheduleReconnectAfterStreamFailure()
             return
           }
         }
@@ -128,7 +128,7 @@ extension HarnessMonitorStore {
             kind: .reconnecting,
             detail: "Session stream failed \(attempt) times, re-bootstrapping"
           )
-          await reconnect()
+          scheduleReconnectAfterStreamFailure()
           return
         }
 

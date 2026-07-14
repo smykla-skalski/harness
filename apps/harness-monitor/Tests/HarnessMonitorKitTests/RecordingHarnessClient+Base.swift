@@ -130,7 +130,7 @@ extension RecordingHarnessClient {
   nonisolated func globalStream() -> DaemonPushEventStream {
     makeStream(
       events: configuredGlobalStreamEvents(),
-      error: configuredGlobalStreamError()
+      error: takeConfiguredGlobalStreamError()
     )
   }
 

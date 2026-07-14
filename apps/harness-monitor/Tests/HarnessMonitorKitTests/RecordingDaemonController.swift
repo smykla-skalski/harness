@@ -8,6 +8,7 @@ actor RecordingDaemonController: DaemonControlling {
   private let registrationStateOverride: DaemonLaunchAgentRegistrationState?
   private let statusReportOverride: DaemonStatusReport?
   private let bootstrapError: (any Error)?
+  private let bootstrapChecksCancellation: Bool
   private let warmUpError: (any Error)?
   private let deferredManagedLaunchAgentRefreshResult: Bool
   private var lastEventMessage = "daemon ready"
@@ -24,6 +25,7 @@ actor RecordingDaemonController: DaemonControlling {
     registrationState: DaemonLaunchAgentRegistrationState? = nil,
     statusReport: DaemonStatusReport? = nil,
     bootstrapError: (any Error)? = nil,
+    bootstrapChecksCancellation: Bool = false,
     warmUpError: (any Error)? = nil,
     usesWarmUpErrorForBootstrap: Bool = true,
     deferredManagedLaunchAgentRefreshResult: Bool = false
@@ -33,12 +35,16 @@ actor RecordingDaemonController: DaemonControlling {
     self.registrationStateOverride = registrationState
     self.statusReportOverride = statusReport
     self.bootstrapError = bootstrapError ?? (usesWarmUpErrorForBootstrap ? warmUpError : nil)
+    self.bootstrapChecksCancellation = bootstrapChecksCancellation
     self.warmUpError = warmUpError
     self.deferredManagedLaunchAgentRefreshResult = deferredManagedLaunchAgentRefreshResult
   }
 
   func bootstrapClient() async throws -> any HarnessMonitorClientProtocol {
     bootstrapCallCount += 1
+    if bootstrapChecksCancellation {
+      try Task.checkCancellation()
+    }
     if let bootstrapError {
       throw bootstrapError
     }
