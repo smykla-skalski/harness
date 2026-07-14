@@ -377,6 +377,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var hostBridgeStatusReport = BridgeStatusReport(running: false)
   var globalStreamEvents: [DaemonPushEvent] = []
   var globalStreamError: (any Error)?
+  var globalStreamErrorRemainingUses: Int?
   var sessionStreamEventsBySessionID: [String: [DaemonPushEvent]] = [:]
   var sessionStreamErrorsBySessionID: [String: any Error] = [:]
   var recordedShutdownCallCount = 0

@@ -312,31 +312,6 @@ extension RecordingHarnessClient {
     lock.withLock { timelineWindowErrorsBySessionID[sessionID] }
   }
 
-  func configureGlobalStream(
-    events: [DaemonPushEvent],
-    error: (any Error)? = nil
-  ) {
-    lock.withLock {
-      globalStreamEvents = events
-      globalStreamError = error
-    }
-  }
-
-  func configureSessionStream(
-    events: [DaemonPushEvent],
-    error: (any Error)? = nil,
-    for sessionID: String
-  ) {
-    lock.withLock {
-      sessionStreamEventsBySessionID[sessionID] = events
-      if let error {
-        sessionStreamErrorsBySessionID[sessionID] = error
-      } else {
-        sessionStreamErrorsBySessionID.removeValue(forKey: sessionID)
-      }
-    }
-  }
-
   func configureCodexRuns(_ runs: [CodexRunSnapshot], for sessionID: String) {
     lock.withLock {
       codexRunsBySessionID[sessionID] = runs

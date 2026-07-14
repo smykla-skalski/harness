@@ -175,8 +175,22 @@ extension RecordingHarnessClient {
     lock.withLock { globalStreamEvents }
   }
 
-  func configuredGlobalStreamError() -> (any Error)? {
-    lock.withLock { globalStreamError }
+  func takeConfiguredGlobalStreamError() -> (any Error)? {
+    lock.withLock {
+      guard let error = globalStreamError else {
+        return nil
+      }
+      guard let remainingUses = globalStreamErrorRemainingUses else {
+        return error
+      }
+      if remainingUses <= 1 {
+        globalStreamError = nil
+        globalStreamErrorRemainingUses = nil
+      } else {
+        globalStreamErrorRemainingUses = remainingUses - 1
+      }
+      return error
+    }
   }
 
   func configuredSessionStreamEvents(for sessionID: String) -> [DaemonPushEvent] {
