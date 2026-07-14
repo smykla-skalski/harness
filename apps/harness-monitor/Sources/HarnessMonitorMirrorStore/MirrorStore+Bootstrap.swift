@@ -7,16 +7,29 @@ extension MirrorStore {
   /// cached snapshot to the paired stations, then refresh. The iOS app drives
   /// its own loadStoredPairings/refresh composition and does not call this.
   public func load() async {
-    guard !demoModeEnabled else {
-      await refresh()
-      return
-    }
+    let activatedStoredWatchPairing: Bool
     do {
-      try await rebuildSyncClients()
+      activatedStoredWatchPairing = try await activateStoredWatchPairingIfNeeded()
     } catch {
       syncStatus = mobileMonitorSyncStatus(for: error)
       return
     }
+    guard !demoModeEnabled else {
+      await refresh()
+      return
+    }
+    if !activatedStoredWatchPairing {
+      do {
+        try await rebuildSyncClients()
+      } catch {
+        syncStatus = mobileMonitorSyncStatus(for: error)
+        return
+      }
+    }
+    await finishLoadWithPreparedSyncClients()
+  }
+
+  private func finishLoadWithPreparedSyncClients() async {
     guard !pairedCredentials.isEmpty else {
       applyCachedSnapshotIfAvailable()
       syncStatus = snapshot.stations.isEmpty ? .unpaired : .stale("Waiting for iPhone pairing.")
@@ -24,6 +37,36 @@ extension MirrorStore {
     }
     scopeToPairedStations()
     await refresh()
+  }
+
+  func loadStoredWatchPairingIfAvailable() async {
+    do {
+      guard try await activateStoredWatchPairingIfNeeded() else { return }
+    } catch {
+      syncStatus = mobileMonitorSyncStatus(for: error)
+      return
+    }
+    await finishLoadWithPreparedSyncClients()
+  }
+
+  private func activateStoredWatchPairingIfNeeded() async throws -> Bool {
+    guard profile == .watch, demoModeEnabled, identityStore != nil, credentialStore != nil else {
+      return false
+    }
+    try await rebuildSyncClients()
+    guard !pairedCredentials.isEmpty else { return false }
+    leaveDemoModeForStoredWatchPairing()
+    return true
+  }
+
+  private func leaveDemoModeForStoredWatchPairing() {
+    pairingFailureDescription = nil
+    demoModeEnabled = false
+    snapshot = .empty()
+    selectedStationID = defaultStationID ?? pairedCredentials.first?.stationID ?? ""
+    syncStatus = .syncing
+    persistSharedSnapshot(snapshot)
+    reconcileLiveActivity(snapshot)
   }
 
   /// Resets transient pairing state and reloads after the iPhone pushes new

@@ -1,11 +1,141 @@
 import Foundation
 import HarnessMonitorCore
 @testable import HarnessMonitorCrypto
-import HarnessMonitorMirrorStore
+@testable import HarnessMonitorMirrorStore
 import XCTest
 
 @MainActor
 final class WatchRemoteDaemonPairingStoreTests: XCTestCase {
+  func testWatchLoadActivatesStoredPairingInsteadOfDemoFixtures() async throws {
+    let fixture = try WatchRemotePairingStoreFixture(
+      device: .iOS,
+      demoModeEnabled: true
+    )
+
+    await fixture.store.load()
+
+    XCTAssertFalse(fixture.store.demoModeEnabled)
+    XCTAssertEqual(fixture.store.pairedCredentials, [fixture.credential])
+    XCTAssertEqual(fixture.store.selectedStationID, fixture.credential.stationID)
+    XCTAssertNotEqual(fixture.store.presentedSyncStatus, .demo)
+    XCTAssertTrue(fixture.store.snapshot.taskBoardItems.isEmpty)
+  }
+
+  func testWatchForegroundRefreshActivatesStoredPairingInsteadOfDemoFixtures() async throws {
+    let fixture = try WatchRemotePairingStoreFixture(
+      device: .iOS,
+      demoModeEnabled: true
+    )
+
+    await fixture.store.refreshForegroundState()
+
+    XCTAssertFalse(fixture.store.demoModeEnabled)
+    XCTAssertEqual(fixture.store.pairedCredentials, [fixture.credential])
+    XCTAssertEqual(fixture.store.selectedStationID, fixture.credential.stationID)
+    XCTAssertNotEqual(fixture.store.presentedSyncStatus, .demo)
+  }
+
+  func testWatchForegroundRefreshWithoutStoredPairingKeepsCurrentDemoSnapshot() async {
+    let snapshot = MobileMirrorSnapshot.empty(
+      now: Date(timeIntervalSince1970: 1_752_124_400)
+    )
+    let store = MirrorStore(
+      snapshot: snapshot,
+      demoModeEnabled: true,
+      profile: .watch,
+      identityStore: InMemoryMobileDeviceIdentityStore(),
+      credentialStore: InMemoryMobilePairedStationCredentialStore(),
+      syncClientFactory: WatchRemovalSyncClientFactory(),
+      sharedSnapshotStore: nil
+    )
+
+    await store.refreshForegroundState()
+
+    XCTAssertEqual(store.snapshot, snapshot)
+    XCTAssertEqual(store.syncStatus, .demo)
+  }
+
+  func testWatchForegroundRefreshKeepsDemoWhenStoredCredentialIdentityIsMissing() async throws {
+    let fixture = try WatchRemotePairingStoreFixture(device: .iOS)
+    let store = MirrorStore(
+      demoModeEnabled: true,
+      profile: .watch,
+      identityStore: InMemoryMobileDeviceIdentityStore(),
+      credentialStore: fixture.credentialStore,
+      syncClientFactory: WatchRemovalSyncClientFactory(),
+      sharedSnapshotStore: nil
+    )
+    let demoSnapshot = store.snapshot
+
+    await store.refreshForegroundState()
+
+    XCTAssertTrue(store.demoModeEnabled)
+    XCTAssertEqual(store.snapshot, demoSnapshot)
+    XCTAssertEqual(store.syncStatus, .demo)
+  }
+
+  func testWatchForegroundRefreshLoopRequiresBothPairingStores() {
+    let store = MirrorStore(
+      demoModeEnabled: true,
+      profile: .watch,
+      credentialStore: InMemoryMobilePairedStationCredentialStore(),
+      syncClientFactory: WatchRemovalSyncClientFactory(),
+      sharedSnapshotStore: nil
+    )
+
+    XCTAssertFalse(store.shouldRunForegroundRefresh)
+  }
+
+  func testWatchActivationClearsPriorPairingFailure() async throws {
+    let fixture = try WatchRemotePairingStoreFixture(
+      device: .iOS,
+      demoModeEnabled: true
+    )
+    fixture.store.pairingFailureDescription = "Previous pairing failed."
+
+    await fixture.store.refreshForegroundState()
+
+    XCTAssertNil(fixture.store.pairingFailureDescription)
+    XCTAssertNotEqual(fixture.store.presentedSyncStatus, .pairingFailed("Previous pairing failed."))
+  }
+
+  func testWatchActivationReadsStoredCredentialsOnce() async throws {
+    let fixture = try WatchRemotePairingStoreFixture(device: .iOS)
+    let credentialStore = CountingWatchCredentialStore(credentials: [fixture.credential])
+    let store = MirrorStore(
+      demoModeEnabled: true,
+      profile: .watch,
+      identityStore: fixture.identityStore,
+      credentialStore: credentialStore,
+      syncClientFactory: WatchRemovalSyncClientFactory(),
+      sharedSnapshotStore: nil
+    )
+
+    await store.refreshForegroundState()
+    let loadAllCallCount = await credentialStore.loadAllCallCount
+
+    XCTAssertFalse(store.demoModeEnabled)
+    XCTAssertEqual(loadAllCallCount, 1)
+  }
+
+  func testWatchLoadReportsStoredPairingReadFailureInsteadOfDemo() async {
+    let error = MobilePairedStationCredentialStoreError.unexpectedKeychainStatus(-50)
+    let store = MirrorStore(
+      demoModeEnabled: true,
+      profile: .watch,
+      identityStore: InMemoryMobileDeviceIdentityStore(),
+      credentialStore: FailingWatchCredentialStore(error: error),
+      syncClientFactory: WatchRemovalSyncClientFactory(),
+      sharedSnapshotStore: nil
+    )
+
+    await store.load()
+
+    XCTAssertTrue(store.demoModeEnabled)
+    XCTAssertEqual(store.syncStatus, mobileMonitorSyncStatus(for: error))
+    XCTAssertNotEqual(store.presentedSyncStatus, .demo)
+  }
+
   func testRemovingDirectWatchPairingWaitsForPairingMutationGate() async throws {
     let mutationGate = MobilePairingMutationGate()
     let fixture = try WatchRemotePairingStoreFixture(
@@ -113,7 +243,8 @@ private struct WatchRemotePairingStoreFixture {
   init(
     device: MobileRemoteDaemonPairingDevice,
     mutationGate: MobilePairingMutationGate = MobilePairingMutationGate(),
-    cloudFallback: Bool = false
+    cloudFallback: Bool = false,
+    demoModeEnabled: Bool = false
   ) throws {
     let now = Date(timeIntervalSince1970: 1_752_124_400)
     let endpoint = URL(string: "https://daemon.example.com")!
@@ -166,7 +297,7 @@ private struct WatchRemotePairingStoreFixture {
     )
     credentialStore = InMemoryMobilePairedStationCredentialStore(credentials: [credential])
     store = MirrorStore(
-      demoModeEnabled: false,
+      demoModeEnabled: demoModeEnabled,
       profile: .watch,
       identityStore: identityStore,
       credentialStore: credentialStore,
@@ -205,6 +336,52 @@ private struct WatchRemovalSyncClient: MobileMonitorSyncClient {
     now: Date
   ) async throws -> MobileCommandReceipt {
     throw MobileRemoteDaemonSyncError.commandsUnavailable
+  }
+}
+
+private struct FailingWatchCredentialStore: MobilePairedStationCredentialStore {
+  let error: MobilePairedStationCredentialStoreError
+
+  func save(_ credential: MobilePairedStationCredential) async throws {
+    throw error
+  }
+
+  func load(stationID: String) async throws -> MobilePairedStationCredential? {
+    throw error
+  }
+
+  func loadAll() async throws -> [MobilePairedStationCredential] {
+    throw error
+  }
+
+  func delete(stationID: String) async throws {
+    throw error
+  }
+}
+
+private actor CountingWatchCredentialStore: MobilePairedStationCredentialStore {
+  private let backing: InMemoryMobilePairedStationCredentialStore
+  private(set) var loadAllCallCount = 0
+
+  init(credentials: [MobilePairedStationCredential]) {
+    backing = InMemoryMobilePairedStationCredentialStore(credentials: credentials)
+  }
+
+  func save(_ credential: MobilePairedStationCredential) async throws {
+    try await backing.save(credential)
+  }
+
+  func load(stationID: String) async throws -> MobilePairedStationCredential? {
+    try await backing.load(stationID: stationID)
+  }
+
+  func loadAll() async throws -> [MobilePairedStationCredential] {
+    loadAllCallCount += 1
+    return try await backing.loadAll()
+  }
+
+  func delete(stationID: String) async throws {
+    try await backing.delete(stationID: stationID)
   }
 }
 

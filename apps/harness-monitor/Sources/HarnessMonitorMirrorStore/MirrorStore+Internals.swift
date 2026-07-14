@@ -157,7 +157,7 @@ extension MirrorStore {
       guard !Task.isCancelled, shouldRunForegroundRefresh else {
         continue
       }
-      await refresh()
+      await refreshForegroundState()
       if syncStatus.indicatesSyncFailure {
         backoff.recordFailure()
       } else {
@@ -166,8 +166,19 @@ extension MirrorStore {
     }
   }
 
-  private var shouldRunForegroundRefresh: Bool {
-    !demoModeEnabled && !stationIDsForRefresh().isEmpty
+  func refreshForegroundState() async {
+    if profile == .watch, demoModeEnabled {
+      await loadStoredWatchPairingIfAvailable()
+    } else {
+      await refresh()
+    }
+  }
+
+  var shouldRunForegroundRefresh: Bool {
+    if profile == .watch, demoModeEnabled {
+      return identityStore != nil && credentialStore != nil
+    }
+    return !demoModeEnabled && !stationIDsForRefresh().isEmpty
   }
 
   func applyPairedStationPlaceholders(
