@@ -124,7 +124,7 @@ pub fn evaluate_task_board_item(
             task,
             TaskBoardEvaluationOutcome::WorkerPending,
             TaskBoardStatus::InProgress,
-            "worker_pending",
+            pending_worker_step(item),
             None,
         ),
         TaskStatus::InProgress => running_decision(
@@ -252,6 +252,14 @@ fn running_decision(
         step,
         reason,
     )
+}
+
+fn pending_worker_step(item: &TaskBoardItem) -> &'static str {
+    if item.workflow.current_step_id.as_deref() == Some("awaiting_delivery") {
+        "awaiting_delivery"
+    } else {
+        "worker_pending"
+    }
 }
 
 fn in_review_decision(item: &TaskBoardItem, task: &WorkItem) -> TaskBoardEvaluationDecision {
@@ -388,6 +396,24 @@ mod tests {
         assert_eq!(decision.workflow.attempts, 2);
         assert_eq!(decision.workflow.policy_trace_ids, ["trace-1"]);
         assert!(decision.workflow.last_error.is_none());
+    }
+
+    #[test]
+    fn open_task_preserves_held_delivery_step() {
+        let mut item = item();
+        item.status = TaskBoardStatus::InProgress;
+        item.workflow.status = TaskBoardWorkflowStatus::Running;
+        item.workflow.current_step_id = Some("awaiting_delivery".to_string());
+
+        let decision = evaluate_task_board_item(&item, &task(TaskStatus::Open));
+
+        assert_eq!(decision.outcome, TaskBoardEvaluationOutcome::WorkerPending);
+        assert_eq!(decision.status, TaskBoardStatus::InProgress);
+        assert_eq!(decision.workflow.status, TaskBoardWorkflowStatus::Running);
+        assert_eq!(
+            decision.workflow.current_step_id.as_deref(),
+            Some("awaiting_delivery")
+        );
     }
 
     #[test]
