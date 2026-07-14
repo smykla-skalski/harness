@@ -168,7 +168,7 @@ extension MirrorStore {
 
   func refreshForegroundState() async {
     if profile == .watch, demoModeEnabled {
-      await load()
+      await loadStoredWatchPairingIfAvailable()
     } else {
       await refresh()
     }

@@ -8,7 +8,7 @@ extension MirrorStore {
   /// its own loadStoredPairings/refresh composition and does not call this.
   public func load() async {
     do {
-      try await activateStoredWatchPairingIfNeeded()
+      _ = try await activateStoredWatchPairingIfNeeded()
     } catch {
       syncStatus = mobileMonitorSyncStatus(for: error)
       return
@@ -32,13 +32,24 @@ extension MirrorStore {
     await refresh()
   }
 
-  private func activateStoredWatchPairingIfNeeded() async throws {
-    guard profile == .watch, demoModeEnabled, let credentialStore else {
+  func loadStoredWatchPairingIfAvailable() async {
+    do {
+      guard try await activateStoredWatchPairingIfNeeded() else { return }
+    } catch {
+      syncStatus = mobileMonitorSyncStatus(for: error)
       return
     }
+    await load()
+  }
+
+  private func activateStoredWatchPairingIfNeeded() async throws -> Bool {
+    guard profile == .watch, demoModeEnabled, let credentialStore else {
+      return false
+    }
     let credentials = try await credentialStore.loadAll()
-    guard !credentials.isEmpty else { return }
+    guard !credentials.isEmpty else { return false }
     demoModeEnabled = false
+    return true
   }
 
   /// Resets transient pairing state and reloads after the iPhone pushes new

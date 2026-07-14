@@ -34,6 +34,26 @@ final class WatchRemoteDaemonPairingStoreTests: XCTestCase {
     XCTAssertNotEqual(fixture.store.presentedSyncStatus, .demo)
   }
 
+  func testWatchForegroundRefreshWithoutStoredPairingKeepsCurrentDemoSnapshot() async {
+    let snapshot = MobileMirrorSnapshot.empty(
+      now: Date(timeIntervalSince1970: 1_752_124_400)
+    )
+    let store = MirrorStore(
+      snapshot: snapshot,
+      demoModeEnabled: true,
+      profile: .watch,
+      identityStore: InMemoryMobileDeviceIdentityStore(),
+      credentialStore: InMemoryMobilePairedStationCredentialStore(),
+      syncClientFactory: WatchRemovalSyncClientFactory(),
+      sharedSnapshotStore: nil
+    )
+
+    await store.refreshForegroundState()
+
+    XCTAssertEqual(store.snapshot, snapshot)
+    XCTAssertEqual(store.syncStatus, .demo)
+  }
+
   func testWatchLoadReportsStoredPairingReadFailureInsteadOfDemo() async {
     let error = MobilePairedStationCredentialStoreError.unexpectedKeychainStatus(-50)
     let store = MirrorStore(
