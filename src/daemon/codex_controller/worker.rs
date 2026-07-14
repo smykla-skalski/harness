@@ -202,6 +202,9 @@ impl CodexRunWorker {
     }
 
     fn handle_notification(&mut self, method: &str, params: &Value) -> Result<bool, CliError> {
+        if !self.notification_matches_active_turn(params) {
+            return Ok(false);
+        }
         let notification = wire::parse_notification(method, params);
         match notification {
             AppServerNotification::TurnStarted { turn_id } => {
@@ -249,6 +252,22 @@ impl CodexRunWorker {
                 self.touch_and_save().map(|()| false)
             }
         }
+    }
+
+    fn notification_matches_active_turn(&self, params: &Value) -> bool {
+        notification_id_matches(
+            self.snapshot.thread_id.as_deref(),
+            params
+                .get("threadId")
+                .and_then(Value::as_str)
+                .or_else(|| params.pointer("/thread/id").and_then(Value::as_str)),
+        ) && notification_id_matches(
+            self.snapshot.turn_id.as_deref(),
+            params
+                .get("turnId")
+                .and_then(Value::as_str)
+                .or_else(|| params.pointer("/turn/id").and_then(Value::as_str)),
+        )
     }
 
     fn handle_item_completed(&mut self, item: &wire::CompletedItem) -> Result<(), CliError> {
@@ -374,6 +393,10 @@ impl CodexRunWorker {
         )
         .await
     }
+}
+
+fn notification_id_matches(expected: Option<&str>, actual: Option<&str>) -> bool {
+    actual.is_none_or(|actual| expected.is_none_or(|expected| expected == actual))
 }
 
 #[cfg(test)]
