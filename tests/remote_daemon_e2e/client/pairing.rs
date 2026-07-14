@@ -22,7 +22,7 @@ impl RemoteDaemonClient {
             }))
             .send()
             .await
-            .map_err(|error| format!("claim remote pairing: {error}"))?;
+            .map_err(|error| format!("claim remote pairing: {error:?}"))?;
         let status = response.status();
         let body = response
             .json::<Value>()

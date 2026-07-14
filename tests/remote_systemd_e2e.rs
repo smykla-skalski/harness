@@ -45,6 +45,7 @@ async fn run_systemd_case() -> Result<(), String> {
         https_port: host.https_port(),
         dns_log: host.dns_log().to_path_buf(),
         ca_root: host.fake_ca_root().to_path_buf(),
+        certificate_validity_days: 90,
     })
     .await?;
     host.prepare(acme.directory_url(), acme.ca_pem())?;
