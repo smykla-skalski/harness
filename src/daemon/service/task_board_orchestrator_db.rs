@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
-    TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardEvaluateRequest, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorRunOnceResponse, TaskBoardOrchestratorSettingsResponse,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatusResponse,
     TaskBoardSyncRequest,
@@ -30,6 +30,7 @@ use super::task_board_db::{
 };
 use super::task_board_evaluation::evaluate_task_board_async;
 use super::task_board_github::run_task_board_github_automation_async;
+use super::task_board_orchestrator_step_mode::scoped_dispatch_request;
 
 pub(crate) async fn task_board_orchestrator_status_db(
     db: &AsyncDaemonDb,
@@ -122,7 +123,11 @@ async fn execute_run(
     ),
 ) -> Result<(DispatchExecutionSummary, TaskBoardEvaluationSummary), CliError> {
     sync_github_tasks(db, settings, prepared).await?;
-    let dispatch = dispatch_task_board_async(&dispatch_request(&prepared.input), db).await?;
+    let request = scoped_dispatch_request(db, settings, &prepared.input).await?;
+    let dispatch = match request.as_ref() {
+        Some(request) => dispatch_task_board_async(request, db).await?,
+        None => DispatchExecutionSummary::dry_run(Vec::new()),
+    };
     progress.0 = Some(dispatch.clone());
     record_tick(
         db,
@@ -134,7 +139,10 @@ async fn execute_run(
     .await?;
     let evaluation = evaluate_task_board_async(
         &TaskBoardEvaluateRequest {
-            item_id: prepared.input.item_id.clone(),
+            item_id: request
+                .as_ref()
+                .and_then(|request| request.item_id.clone())
+                .or_else(|| prepared.input.item_id.clone()),
             status: None,
             dry_run: prepared.input.dry_run,
         },
@@ -248,16 +256,6 @@ async fn items_for_input(
                 .is_none_or(|machine| machine.accepts_any(&item.target_project_types))
         })
         .collect())
-}
-
-fn dispatch_request(input: &TaskBoardOrchestratorDispatchInput) -> TaskBoardDispatchRequest {
-    TaskBoardDispatchRequest {
-        item_id: input.item_id.clone(),
-        status: input.status,
-        dry_run: input.dry_run,
-        project_dir: input.project_dir.clone(),
-        actor: input.actor.clone(),
-    }
 }
 
 async fn record_tick(

@@ -82,7 +82,7 @@ impl AsyncDaemonDb {
     }
 }
 
-async fn load_workspace_in_tx(
+pub(crate) async fn load_workspace_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
 ) -> Result<Option<PolicyCanvasWorkspace>, CliError> {
     let Some(workspace_row) = query_as::<_, WorkspaceRow>(SELECT_WORKSPACE)

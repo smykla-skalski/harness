@@ -394,7 +394,7 @@ pub use spawn_policy::SpawnGateSwitches;
 use spawn_policy::dispatch_policy;
 #[cfg(test)]
 pub(crate) use spawn_policy::spawn_policy_input;
-use spawn_policy::{consumed_grant_id, dispatch_policy_from_graph};
+pub(crate) use spawn_policy::{consumed_grant_id, dispatch_policy_from_graph};
 
 fn session_intent(item: &TaskBoardItem) -> SessionIntent {
     if let Some(session_id) = item.session_id.as_deref() {

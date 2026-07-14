@@ -128,6 +128,7 @@ pub(crate) async fn update_task_board_item_db(
     id: &str,
     request: &TaskBoardUpdateItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
+    super::task_board_completion::validate_linked_task_completion(db, id, request.status).await?;
     let mutation = db
         .update_task_board_item(id, |item| {
             apply_update_request(item, request);

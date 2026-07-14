@@ -65,11 +65,12 @@ pub(crate) async fn deliver(
             started_agent: None,
         });
     }
-    let claim = db.claim_held_task_board_dispatch(&request.item_id).await?;
+    let mut claim = db.claim_held_task_board_dispatch(&request.item_id).await?;
     let prompt = rendered_worker_prompt(&claim.applied, &claim.intent_id);
     match start_worker_for_applied_task(state, &claim.applied, &claim.intent_id).await {
         Ok(agent) => {
-            db.complete_task_board_dispatch(&claim.intent_id, &claim.claim_token)
+            claim.applied.item = db
+                .complete_task_board_dispatch(&claim.intent_id, &claim.claim_token)
                 .await?;
             Ok(TaskBoardDispatchDeliverResponse {
                 intent_id: claim.intent_id,
@@ -79,8 +80,13 @@ pub(crate) async fn deliver(
             })
         }
         Err(error) => {
-            db.fail_task_board_dispatch(&claim.intent_id, &claim.claim_token, &error.to_string())
-                .await?;
+            db.fail_task_board_dispatch(
+                &claim.intent_id,
+                &claim.claim_token,
+                claim.consumed_approval_grant_id.as_deref(),
+                &error.to_string(),
+            )
+            .await?;
             Err(error)
         }
     }
@@ -181,7 +187,7 @@ async fn start_claimed_workers(
     let mut kept = Vec::new();
     let mut failures = Vec::new();
     for task in applied {
-        let claim = match async_db
+        let mut claim = match async_db
             .claim_task_board_dispatch(&task.board_item_id)
             .await
         {
@@ -198,11 +204,12 @@ async fn start_claimed_workers(
         };
         match start_worker_for_applied_task(state, &claim.applied, &claim.intent_id).await {
             Ok(_) => {
-                if let Err(error) = async_db
+                match async_db
                     .complete_task_board_dispatch(&claim.intent_id, &claim.claim_token)
                     .await
                 {
-                    warn!(board_item_id = %task.board_item_id, %error, "task board worker started but intent completion failed");
+                    Ok(item) => claim.applied.item = item,
+                    Err(error) => warn!(board_item_id = %task.board_item_id, %error, "task board worker started but intent completion failed"),
                 }
                 kept.push(claim.applied);
             }
@@ -219,7 +226,12 @@ async fn record_worker_failure(
     failures: &mut Vec<DispatchFailure>,
 ) {
     let rollback = db
-        .fail_task_board_dispatch(&claim.intent_id, &claim.claim_token, &error.to_string())
+        .fail_task_board_dispatch(
+            &claim.intent_id,
+            &claim.claim_token,
+            claim.consumed_approval_grant_id.as_deref(),
+            &error.to_string(),
+        )
         .await;
     log_rollback_outcome(&claim.applied.board_item_id, rollback.err());
     failures.push(DispatchFailure {

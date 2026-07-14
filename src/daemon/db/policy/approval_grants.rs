@@ -38,7 +38,10 @@ const SELECT_LIVE_GRANT_SQL: &str = "
 SELECT id, board_item_id, action, canvas_id, canvas_revision, node_id, reason_code,
     state, resolved_by, resolved_at, consumed_at, expiry_seconds, created_at, updated_at
 FROM policy_approval_grants
-WHERE board_item_id = ?1 AND action = ?2 AND canvas_revision = ?3 AND consumed_at IS NULL
+WHERE board_item_id = ?1 AND action = ?2 AND canvas_revision = ?3
+  AND state IN ('pending', 'approved') AND consumed_at IS NULL
+  AND (expiry_seconds IS NULL
+       OR unixepoch(created_at) + expiry_seconds > unixepoch(?4))
 LIMIT 1";
 
 const SELECT_PENDING_GRANTS_SQL: &str = "
@@ -46,6 +49,8 @@ SELECT id, board_item_id, action, canvas_id, canvas_revision, node_id, reason_co
     state, resolved_by, resolved_at, consumed_at, expiry_seconds, created_at, updated_at
 FROM policy_approval_grants
 WHERE state = 'pending' AND consumed_at IS NULL
+  AND (expiry_seconds IS NULL
+       OR unixepoch(created_at) + expiry_seconds > unixepoch(?1))
 ORDER BY created_at ASC, id ASC";
 
 const SELECT_GRANT_BY_ID_SQL: &str = "
@@ -57,12 +62,32 @@ WHERE id = ?1";
 const RESOLVE_GRANT_SQL: &str = "
 UPDATE policy_approval_grants
 SET state = ?2, resolved_by = ?3, resolved_at = ?4, updated_at = ?4
-WHERE id = ?1 AND state = 'pending' AND consumed_at IS NULL";
+WHERE id = ?1 AND state = 'pending' AND consumed_at IS NULL
+  AND (expiry_seconds IS NULL
+       OR unixepoch(created_at) + expiry_seconds > unixepoch(?4))";
 
 const CONSUME_GRANT_SQL: &str = "
 UPDATE policy_approval_grants
 SET consumed_at = ?2, updated_at = ?2
-WHERE id = ?1 AND state = 'approved' AND consumed_at IS NULL";
+WHERE id = ?1 AND state = 'approved' AND consumed_at IS NULL
+  AND (expiry_seconds IS NULL
+       OR unixepoch(created_at) + expiry_seconds > unixepoch(?2))";
+
+const RETIRE_INACTIVE_GRANTS_SQL: &str = "
+UPDATE policy_approval_grants
+SET consumed_at = ?4, updated_at = ?4
+WHERE board_item_id = ?1 AND action = ?2 AND canvas_revision = ?3
+  AND consumed_at IS NULL
+  AND (state NOT IN ('pending', 'approved')
+       OR (expiry_seconds IS NOT NULL
+           AND unixepoch(created_at) + expiry_seconds <= unixepoch(?4)))";
+
+const RESTORE_CONSUMED_GRANT_SQL: &str = "
+UPDATE policy_approval_grants
+SET consumed_at = NULL, updated_at = ?2
+WHERE id = ?1 AND state = 'approved' AND consumed_at IS NOT NULL
+  AND (expiry_seconds IS NULL
+       OR unixepoch(created_at) + expiry_seconds > unixepoch(?2))";
 
 impl AsyncDaemonDb {
     /// Return the live grant for `grant`'s key, creating a pending one when none
@@ -74,14 +99,21 @@ impl AsyncDaemonDb {
         &self,
         grant: &NewApprovalGrant,
     ) -> Result<PolicyApprovalGrant, CliError> {
+        let now = utc_now();
+        self.retire_inactive_approval_grants(grant, &now).await?;
         if let Some(existing) = self
-            .live_approval_grant(&grant.board_item_id, grant.action, grant.canvas_revision)
+            .live_approval_grant_at(
+                &grant.board_item_id,
+                grant.action,
+                grant.canvas_revision,
+                &now,
+            )
             .await?
         {
             return Ok(existing);
         }
         let id = format!("policy-grant-{}", Uuid::new_v4().simple());
-        insert_pending_grant(self.pool(), &id, grant).await?;
+        insert_pending_grant_at(self.pool(), &id, grant, &now).await?;
         self.approval_grant(&id)
             .await?
             .ok_or_else(|| db_error("created approval grant vanished".to_string()))
@@ -97,10 +129,22 @@ impl AsyncDaemonDb {
         action: PolicyAction,
         canvas_revision: u64,
     ) -> Result<Option<PolicyApprovalGrant>, CliError> {
+        self.live_approval_grant_at(board_item_id, action, canvas_revision, &utc_now())
+            .await
+    }
+
+    async fn live_approval_grant_at(
+        &self,
+        board_item_id: &str,
+        action: PolicyAction,
+        canvas_revision: u64,
+        now: &str,
+    ) -> Result<Option<PolicyApprovalGrant>, CliError> {
         let row: Option<ApprovalGrantRow> = query_as(SELECT_LIVE_GRANT_SQL)
             .bind(board_item_id)
             .bind(enum_to_snake(&action)?)
             .bind(revision_to_i64(canvas_revision))
+            .bind(now)
             .fetch_optional(self.pool())
             .await
             .map_err(|error| db_error(format!("read live approval grant: {error}")))?;
@@ -130,7 +174,15 @@ impl AsyncDaemonDb {
     pub(crate) async fn list_pending_approval_grants(
         &self,
     ) -> Result<Vec<PolicyApprovalGrant>, CliError> {
+        self.list_pending_approval_grants_at(&utc_now()).await
+    }
+
+    async fn list_pending_approval_grants_at(
+        &self,
+        now: &str,
+    ) -> Result<Vec<PolicyApprovalGrant>, CliError> {
         let rows: Vec<ApprovalGrantRow> = query_as(SELECT_PENDING_GRANTS_SQL)
+            .bind(now)
             .fetch_all(self.pool())
             .await
             .map_err(|error| db_error(format!("list pending approval grants: {error}")))?;
@@ -147,6 +199,17 @@ impl AsyncDaemonDb {
         approve: bool,
         actor: &str,
     ) -> Result<PolicyApprovalGrant, CliError> {
+        self.resolve_approval_grant_at(id, approve, actor, &utc_now())
+            .await
+    }
+
+    async fn resolve_approval_grant_at(
+        &self,
+        id: &str,
+        approve: bool,
+        actor: &str,
+        now: &str,
+    ) -> Result<PolicyApprovalGrant, CliError> {
         let state = if approve {
             PolicyApprovalState::Approved
         } else {
@@ -156,7 +219,7 @@ impl AsyncDaemonDb {
             .bind(id)
             .bind(enum_to_snake(&state)?)
             .bind(actor)
-            .bind(utc_now())
+            .bind(now)
             .execute(self.pool())
             .await
             .map_err(|error| db_error(format!("resolve approval grant: {error}")))?
@@ -169,6 +232,22 @@ impl AsyncDaemonDb {
         self.approval_grant(id)
             .await?
             .ok_or_else(|| db_error("resolved approval grant vanished".to_string()))
+    }
+
+    async fn retire_inactive_approval_grants(
+        &self,
+        grant: &NewApprovalGrant,
+        now: &str,
+    ) -> Result<(), CliError> {
+        query(RETIRE_INACTIVE_GRANTS_SQL)
+            .bind(&grant.board_item_id)
+            .bind(enum_to_snake(&grant.action)?)
+            .bind(revision_to_i64(grant.canvas_revision))
+            .bind(now)
+            .execute(self.pool())
+            .await
+            .map_err(|error| db_error(format!("retire inactive approval grants: {error}")))?;
+        Ok(())
     }
 }
 
@@ -184,9 +263,20 @@ pub(crate) async fn consume_approval_grant_in_tx<'a, E>(
 where
     E: Executor<'a, Database = Sqlite>,
 {
+    consume_approval_grant_in_tx_at(executor, id, &utc_now()).await
+}
+
+pub(crate) async fn consume_approval_grant_in_tx_at<'a, E>(
+    executor: E,
+    id: &str,
+    now: &str,
+) -> Result<bool, CliError>
+where
+    E: Executor<'a, Database = Sqlite>,
+{
     let affected = query(CONSUME_GRANT_SQL)
         .bind(id)
-        .bind(utc_now())
+        .bind(now)
         .execute(executor)
         .await
         .map_err(|error| db_error(format!("consume approval grant in tx: {error}")))?
@@ -194,10 +284,50 @@ where
     Ok(affected > 0)
 }
 
-async fn insert_pending_grant<'a, E>(
+pub(crate) async fn live_approval_grant_in_tx_at<'a, E>(
+    executor: E,
+    board_item_id: &str,
+    action: PolicyAction,
+    canvas_revision: u64,
+    now: &str,
+) -> Result<Option<PolicyApprovalGrant>, CliError>
+where
+    E: Executor<'a, Database = Sqlite>,
+{
+    let row: Option<ApprovalGrantRow> = query_as(SELECT_LIVE_GRANT_SQL)
+        .bind(board_item_id)
+        .bind(enum_to_snake(&action)?)
+        .bind(revision_to_i64(canvas_revision))
+        .bind(now)
+        .fetch_optional(executor)
+        .await
+        .map_err(|error| db_error(format!("read live approval grant in tx: {error}")))?;
+    row.map(ApprovalGrantRow::into_grant).transpose()
+}
+
+pub(crate) async fn restore_consumed_approval_grant_in_tx_at<'a, E>(
+    executor: E,
+    id: &str,
+    now: &str,
+) -> Result<bool, CliError>
+where
+    E: Executor<'a, Database = Sqlite>,
+{
+    let affected = query(RESTORE_CONSUMED_GRANT_SQL)
+        .bind(id)
+        .bind(now)
+        .execute(executor)
+        .await
+        .map_err(|error| db_error(format!("restore consumed approval grant in tx: {error}")))?
+        .rows_affected();
+    Ok(affected > 0)
+}
+
+async fn insert_pending_grant_at<'a, E>(
     executor: E,
     id: &str,
     grant: &NewApprovalGrant,
+    now: &str,
 ) -> Result<(), CliError>
 where
     E: Executor<'a, Database = Sqlite>,
@@ -215,7 +345,7 @@ where
                 .expiry_seconds
                 .and_then(|value| i64::try_from(value).ok()),
         )
-        .bind(utc_now())
+        .bind(now)
         .execute(executor)
         .await
         .map_err(|error| db_error(format!("create approval grant: {error}")))?;

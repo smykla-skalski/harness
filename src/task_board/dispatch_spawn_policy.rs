@@ -91,7 +91,7 @@ pub(super) fn dispatch_policy(
     (BuiltInPolicyGate::default().evaluate(&input), None)
 }
 
-pub(super) fn dispatch_policy_from_graph(
+pub(crate) fn dispatch_policy_from_graph(
     item: &TaskBoardItem,
     policy: Option<(&str, &PolicyGraph)>,
     evaluated_at: Option<String>,
@@ -121,7 +121,7 @@ pub(super) fn dispatch_policy_from_graph(
 
 /// The durable grant this dispatch consumes: only an approved live grant whose
 /// gate the decision cleared. Everything else leaves nothing to consume.
-pub(super) fn consumed_grant_id(
+pub(crate) fn consumed_grant_id(
     grant: Option<&PolicyApprovalGrant>,
     decision: &PolicyDecision,
 ) -> Option<String> {

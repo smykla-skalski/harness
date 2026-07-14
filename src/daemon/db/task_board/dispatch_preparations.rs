@@ -252,10 +252,12 @@ impl AsyncDaemonDb {
         item.work_item_id = Some(preparation.work_item_id.clone());
         item.updated_at = utc_now();
         replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
-        // Consume the approved approval grant one-shot inside the reservation
-        // transaction so a re-dispatch of the same item must obtain a fresh
-        // approval. Nothing to consume on every non-approval dispatch path.
-        if let Some(grant_id) = preparation.plan.consumed_approval_grant_id.as_deref() {
+        // Immediate dispatch consumes its one-shot grant with publication.
+        // Step-mode dispatch deliberately keeps the grant live while held;
+        // delivery re-evaluates current policy and consumes atomically there.
+        if !preparation.hold_worker
+            && let Some(grant_id) = preparation.plan.consumed_approval_grant_id.as_deref()
+        {
             let consumed = consume_approval_grant_in_tx(transaction.as_mut(), grant_id).await?;
             if !consumed {
                 return Err(db_error(format!(
@@ -281,7 +283,8 @@ impl AsyncDaemonDb {
         query(
             "UPDATE task_board_dispatch_intents
              SET payload_json = ?3, status = ?4, claim_token = NULL,
-                 claimed_at = NULL, last_error = NULL, updated_at = ?5
+                 claimed_at = NULL, last_error = NULL, updated_at = ?5,
+                 consumed_approval_grant_id = ?6
              WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'preparing_claimed'",
         )
         .bind(&claim.intent_id)
@@ -289,6 +292,11 @@ impl AsyncDaemonDb {
         .bind(payload)
         .bind(published_status)
         .bind(utc_now())
+        .bind(if preparation.hold_worker {
+            None
+        } else {
+            preparation.plan.consumed_approval_grant_id.as_deref()
+        })
         .execute(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("complete task board preparation: {error}")))?;

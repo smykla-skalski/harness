@@ -39,13 +39,20 @@ pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
         "policy_workspace",
         "spawn_requires_live_policy",
         "ALTER TABLE policy_workspace
-         ADD COLUMN spawn_requires_live_policy INTEGER NOT NULL DEFAULT 0",
+         ADD COLUMN spawn_requires_live_policy INTEGER NOT NULL DEFAULT 1",
     )?;
     add_column_if_missing(
         conn,
         "policy_workspace",
         "spawn_kill_switch",
         "ALTER TABLE policy_workspace ADD COLUMN spawn_kill_switch INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "task_board_dispatch_intents",
+        "consumed_approval_grant_id",
+        "ALTER TABLE task_board_dispatch_intents
+         ADD COLUMN consumed_approval_grant_id TEXT",
     )?;
     stamp_schema_version(conn)
 }
@@ -99,4 +106,37 @@ fn stamp_schema_version(conn: &Connection) -> Result<(), CliError> {
     )
     .map(|_| ())
     .map_err(|error| db_error(format!("stamp schema v34: {error}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migration_defaults_existing_workspace_to_fail_closed_spawn() {
+        let conn = Connection::open_in_memory().expect("open sqlite");
+        conn.execute_batch(
+            "CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             INSERT INTO schema_meta (key, value) VALUES ('version', '33');
+             CREATE TABLE policy_workspace (
+                 singleton INTEGER PRIMARY KEY,
+                 active_canvas_id TEXT NOT NULL,
+                 workspace_schema_version INTEGER NOT NULL,
+                 updated_at TEXT NOT NULL
+             );
+             INSERT INTO policy_workspace VALUES (1, 'canvas-1', 1, '2026-07-14T10:00:00Z');",
+        )
+        .expect("seed v33 workspace");
+
+        run(&conn).expect("run v34 migration");
+
+        let requires_live: bool = conn
+            .query_row(
+                "SELECT spawn_requires_live_policy FROM policy_workspace WHERE singleton = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read migrated switch");
+        assert!(requires_live, "migration must default existing rows closed");
+    }
 }

@@ -26,6 +26,29 @@ async fn consume(db: &AsyncDaemonDb, id: &str) -> bool {
     consumed
 }
 
+async fn consume_at(db: &AsyncDaemonDb, id: &str, now: &str) -> bool {
+    let mut transaction = db.pool().begin().await.expect("begin tx");
+    let consumed = consume_approval_grant_in_tx_at(&mut *transaction, id, now)
+        .await
+        .expect("consume in tx at clock");
+    transaction.commit().await.expect("commit tx");
+    consumed
+}
+
+async fn set_grant_clock(db: &AsyncDaemonDb, id: &str, created_at: &str, expiry_seconds: i64) {
+    sqlx::query(
+        "UPDATE policy_approval_grants
+         SET created_at = ?2, updated_at = ?2, expiry_seconds = ?3
+         WHERE id = ?1",
+    )
+    .bind(id)
+    .bind(created_at)
+    .bind(expiry_seconds)
+    .execute(db.pool())
+    .await
+    .expect("set deterministic grant clock");
+}
+
 fn sample_grant() -> NewApprovalGrant {
     NewApprovalGrant {
         board_item_id: "board-item-1".to_owned(),
@@ -126,6 +149,115 @@ async fn a_denied_grant_cannot_be_consumed() {
         !consume(&db, &grant.id).await,
         "a denied grant does not consume"
     );
+}
+
+#[tokio::test]
+async fn expiry_boundary_excludes_grant_from_live_and_pending_reads() {
+    let (_dir, db) = connect().await;
+    let grant = db
+        .ensure_pending_approval_grant(&sample_grant())
+        .await
+        .expect("create");
+    set_grant_clock(&db, &grant.id, "2026-07-14T10:00:00Z", 60).await;
+
+    assert!(
+        db.live_approval_grant_at(
+            "board-item-1",
+            PolicyAction::SpawnAgent,
+            7,
+            "2026-07-14T10:00:59Z",
+        )
+        .await
+        .expect("live before expiry")
+        .is_some()
+    );
+    assert_eq!(
+        db.list_pending_approval_grants_at("2026-07-14T10:00:59Z")
+            .await
+            .expect("pending before expiry")
+            .len(),
+        1
+    );
+    assert!(
+        db.live_approval_grant_at(
+            "board-item-1",
+            PolicyAction::SpawnAgent,
+            7,
+            "2026-07-14T10:01:00Z",
+        )
+        .await
+        .expect("live at expiry")
+        .is_none()
+    );
+    assert!(
+        db.list_pending_approval_grants_at("2026-07-14T10:01:00Z")
+            .await
+            .expect("pending at expiry")
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn expired_grant_cannot_be_resolved_or_consumed() {
+    let (_dir, db) = connect().await;
+    let grant = db
+        .ensure_pending_approval_grant(&sample_grant())
+        .await
+        .expect("create");
+    set_grant_clock(&db, &grant.id, "2026-07-14T10:00:00Z", 60).await;
+
+    let error = db
+        .resolve_approval_grant_at(
+            &grant.id,
+            true,
+            "operator",
+            "2026-07-14T10:01:00Z",
+        )
+        .await
+        .expect_err("expired pending grant cannot resolve");
+    assert!(error.message().contains("not pending or does not exist"));
+
+    sqlx::query(
+        "UPDATE policy_approval_grants
+         SET state = 'approved', resolved_by = 'operator', resolved_at = ?2
+         WHERE id = ?1",
+    )
+    .bind(&grant.id)
+    .bind("2026-07-14T10:00:30Z")
+    .execute(db.pool())
+    .await
+    .expect("approve fixture directly");
+    assert!(
+        !consume_at(&db, &grant.id, "2026-07-14T10:01:00Z").await,
+        "expired approved grant must not consume"
+    );
+}
+
+#[tokio::test]
+async fn expired_or_revoked_grant_is_retired_before_replacement() {
+    let (_dir, db) = connect().await;
+    let expired = db
+        .ensure_pending_approval_grant(&sample_grant())
+        .await
+        .expect("create expiring grant");
+    set_grant_clock(&db, &expired.id, "2020-01-01T00:00:00Z", 1).await;
+    let replacement = db
+        .ensure_pending_approval_grant(&sample_grant())
+        .await
+        .expect("replace expired grant");
+    assert_ne!(replacement.id, expired.id);
+
+    sqlx::query("UPDATE policy_approval_grants SET state = 'revoked' WHERE id = ?1")
+        .bind(&replacement.id)
+        .execute(db.pool())
+        .await
+        .expect("revoke fixture");
+    let after_revoke = db
+        .ensure_pending_approval_grant(&sample_grant())
+        .await
+        .expect("replace revoked grant");
+    assert_ne!(after_revoke.id, replacement.id);
+    assert_eq!(after_revoke.state, PolicyApprovalState::Pending);
 }
 
 #[tokio::test]

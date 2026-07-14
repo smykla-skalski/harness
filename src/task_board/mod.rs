@@ -24,7 +24,8 @@ pub use dispatch::{
     ReviewerIntent, SessionIntent, TaskCreationIntent, WorkerIntent,
 };
 pub(crate) use dispatch::{
-    SpawnGateSwitches, build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy,
+    SpawnGateSwitches, build_dispatch_plans_with_policy, consumed_grant_id,
+    dispatch_policy_from_graph, machine_mismatch_plan_with_policy,
 };
 #[cfg(test)]
 pub use dispatch::{

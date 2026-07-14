@@ -338,8 +338,11 @@ async fn build_dispatch_plans_for_request_async(
         .as_ref()
         .and_then(|workspace| workspace.active_live_canvas())
         .map(|(canvas, document)| (canvas.id.as_str(), document));
-    let switches = workspace.as_ref().map_or_else(
-        SpawnGateSwitches::default,
+    let switches = workspace.as_ref().map_or(
+        SpawnGateSwitches {
+            requires_live_policy: true,
+            kill_switch: false,
+        },
         SpawnGateSwitches::from_workspace,
     );
     let grants = load_live_spawn_grants(db, policy, &kept, &rejected).await?;

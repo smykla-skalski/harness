@@ -4,6 +4,7 @@ use serde_json::json;
 use tempfile::tempdir;
 
 use crate::daemon::protocol::http_paths;
+use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{AgentMode, TaskBoardStatus};
 
 use super::task_board_managed_worker_assertions::assert_codex_worker_started;
@@ -68,6 +69,7 @@ async fn run_task_board_http_flow(sandbox: &Path) {
     let project_dir = sandbox.join("project");
     harness_testkit::init_git_repo_with_seed(&project_dir);
     let state = test_http_state_with_db();
+    allow_fallback_spawn_for_test(&state).await;
     let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
 
@@ -82,6 +84,7 @@ async fn run_task_board_step_mode_hold(sandbox: &Path) {
     let project_dir = sandbox.join("step-project");
     harness_testkit::init_git_repo_with_seed(&project_dir);
     let state = test_http_state_with_db();
+    allow_fallback_spawn_for_test(&state).await;
     let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
     put_json(
@@ -141,6 +144,10 @@ async fn run_task_board_step_mode_hold(sandbox: &Path) {
     )
     .await;
     assert!(delivered["started_agent"].is_object());
+    assert_eq!(
+        delivered["applied"]["item"]["workflow"]["current_step_id"].as_str(),
+        Some("worker_running")
+    );
     assert_codex_worker_started(
         &state,
         &session_id,
@@ -148,12 +155,47 @@ async fn run_task_board_step_mode_hold(sandbox: &Path) {
         &required_string(applied, "work_item_id"),
     );
 
+    seed_ready_board_item(&state, "board-step-broad-high", "Broad high item").await;
+    seed_ready_board_item(&state, "board-step-broad-low", "Broad low item").await;
+    put_json(
+        &client,
+        &base_url,
+        "/v1/task-board/items/board-step-broad-high",
+        json!({ "priority": "critical" }),
+    )
+    .await;
+    let broad = post_json(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
+        json!({
+            "status": "todo",
+            "dry_run": false,
+            "project_dir": project_dir,
+        }),
+    )
+    .await;
+    assert_eq!(
+        broad["last_run"]["dispatch"]["applied"]
+            .as_array()
+            .map(Vec::len),
+        Some(1),
+        "step-mode Run Once must hold only one ready item"
+    );
+    assert_eq!(
+        broad["held_dispatches"]["count"].as_u64(),
+        Some(1),
+        "only the newly selected item remains held"
+    );
+    assert_board_item_unlinked(&state, "board-step-broad-low").await;
+
     server.abort();
     let _ = server.await;
 }
 
 async fn run_task_board_pick_preview() {
     let state = test_http_state_with_db();
+    allow_fallback_spawn_for_test(&state).await;
     let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
     seed_ready_board_item(&state, "board-pick-low", "Low item").await;
@@ -189,6 +231,18 @@ async fn run_task_board_pick_preview() {
 
     server.abort();
     let _ = server.await;
+}
+
+async fn allow_fallback_spawn_for_test(state: &crate::daemon::http::DaemonHttpState) {
+    let mut workspace = PolicyCanvasWorkspace::seeded();
+    workspace.spawn_requires_live_policy = false;
+    state
+        .async_db
+        .get()
+        .expect("test async db")
+        .replace_policy_workspace(&workspace)
+        .await
+        .expect("configure explicit test fallback");
 }
 
 async fn run_task_board_http_item_scope_flow(
@@ -230,6 +284,7 @@ async fn run_task_board_http_item_scope_flow(
         json!({}),
     )
     .await;
+    assert_board_item_status(state, "board-http-dispatch", TaskBoardStatus::Failed).await;
     let evaluation = post_json(
         client,
         base_url,
@@ -241,17 +296,16 @@ async fn run_task_board_http_item_scope_flow(
         }),
     )
     .await;
-    assert_eq!(evaluation["updated"].as_u64(), Some(1));
+    assert_eq!(evaluation["updated"].as_u64(), Some(0));
     assert_eq!(evaluation["blocked"].as_u64(), Some(1));
     assert_eq!(
-        evaluation["records"][0]["item"]["workflow"]["status"].as_str(),
+        evaluation["records"][0]["workflow_status"].as_str(),
         Some("failed")
     );
     assert_eq!(
         evaluation["records"][0]["board_item_id"].as_str(),
         Some("board-http-dispatch")
     );
-    assert_board_item_status(state, "board-http-dispatch", TaskBoardStatus::Failed).await;
     assert_board_item_status(
         state,
         "board-http-dispatch-other",

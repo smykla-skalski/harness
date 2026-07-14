@@ -11,4 +11,8 @@ mod store_async;
 mod store_canvas_async;
 mod store_sync;
 
-pub(crate) use approval_grants::{NewApprovalGrant, consume_approval_grant_in_tx};
+pub(crate) use approval_grants::{
+    NewApprovalGrant, consume_approval_grant_in_tx, consume_approval_grant_in_tx_at,
+    live_approval_grant_in_tx_at, restore_consumed_approval_grant_in_tx_at,
+};
+pub(crate) use store_async::load_workspace_in_tx;

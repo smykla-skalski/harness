@@ -35,8 +35,13 @@ CREATE INDEX IF NOT EXISTS idx_policy_approval_grants_state
 
 -- D3: persisted, audited spawn switches on the singleton policy workspace.
 ALTER TABLE policy_workspace
-    ADD COLUMN spawn_requires_live_policy INTEGER NOT NULL DEFAULT 0;
+    ADD COLUMN spawn_requires_live_policy INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE policy_workspace
     ADD COLUMN spawn_kill_switch INTEGER NOT NULL DEFAULT 0;
+
+-- Retain the one-shot grant consumed by an immediate dispatch until worker
+-- startup succeeds, so a pre-start failure can atomically restore it.
+ALTER TABLE task_board_dispatch_intents
+    ADD COLUMN consumed_approval_grant_id TEXT;
 
 UPDATE schema_meta SET value = '34' WHERE key = 'version';

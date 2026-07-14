@@ -1,6 +1,7 @@
 use serde_json::{Value, json};
 
 use crate::task_board::planning::{approve_plan, submit_plan};
+use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus};
 
 use super::super::*;
@@ -19,6 +20,15 @@ fn websocket_task_board_dispatch_evaluate_and_run_once_use_real_state() {
             let state =
                 test_websocket_state_with_empty_async_db(&sandbox.path().join("daemon.sqlite"))
                     .await;
+            let mut workspace = PolicyCanvasWorkspace::seeded();
+            workspace.spawn_requires_live_policy = false;
+            state
+                .async_db
+                .get()
+                .expect("test async db")
+                .replace_policy_workspace(&workspace)
+                .await
+                .expect("configure explicit websocket fallback");
             let connection = Arc::new(Mutex::new(ConnectionState::new()));
 
             run_websocket_task_board_item_scope_flow(&state, &connection, &project_dir).await;

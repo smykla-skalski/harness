@@ -100,6 +100,7 @@ async fn task_board_dispatch_intents_survive_until_worker_outcome() {
     db.fail_task_board_dispatch(
         &failed_claim.intent_id,
         &failed_claim.claim_token,
+        None,
         "worker failed",
     )
     .await
@@ -486,5 +487,29 @@ async fn approved_grant_is_consumed_at_reservation() {
             .expect("live lookup")
             .is_none(),
         "reservation must consume the approved grant one-shot"
+    );
+    let worker_claim = db
+        .claim_task_board_dispatch("task-grant-consume")
+        .await
+        .expect("claim worker startup")
+        .expect("pending worker startup");
+    assert_eq!(
+        worker_claim.consumed_approval_grant_id.as_deref(),
+        Some(pending.id.as_str())
+    );
+    db.fail_task_board_dispatch(
+        &worker_claim.intent_id,
+        &worker_claim.claim_token,
+        worker_claim.consumed_approval_grant_id.as_deref(),
+        "worker failed before start",
+    )
+    .await
+    .expect("roll back worker startup");
+    assert!(
+        db.live_approval_grant("task-grant-consume", PolicyAction::SpawnAgent, 1)
+            .await
+            .expect("restored live lookup")
+            .is_some(),
+        "pre-start failure must restore the immediate dispatch grant"
     );
 }

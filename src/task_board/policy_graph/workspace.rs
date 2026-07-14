@@ -119,7 +119,7 @@ pub struct PolicyCanvasWorkspace {
     // live enforced graph exists, spawn dispatch fails closed instead of falling
     // back to the built-in gate. When `spawn_kill_switch` is on, spawning is
     // blocked at dispatch and re-checked fail-closed at the worker-start seam.
-    #[serde(default)]
+    #[serde(default = "default_spawn_requires_live_policy")]
     pub spawn_requires_live_policy: bool,
     #[serde(default)]
     pub spawn_kill_switch: bool,
@@ -148,7 +148,7 @@ impl PolicyCanvasWorkspace {
             review_screenshot_extraction_canvas_deleted: false,
             scenarios: default_seeded_scenarios(),
             scenarios_seeded: true,
-            spawn_requires_live_policy: false,
+            spawn_requires_live_policy: true,
             spawn_kill_switch: false,
         }
     }
@@ -316,6 +316,10 @@ impl PolicyCanvasWorkspace {
         }
         true
     }
+}
+
+const fn default_spawn_requires_live_policy() -> bool {
+    true
 }
 
 const fn default_global_policy_enforcement_enabled() -> bool {

@@ -3,12 +3,12 @@ use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
+use crate::daemon::db::policy::restore_consumed_approval_grant_in_tx_at;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::infra::io;
 use crate::task_board::dispatch::DispatchLifecycle;
 use crate::task_board::{
-    DispatchAppliedTask, TaskBoardHeldDispatchItem, TaskBoardHeldDispatchSummary, TaskBoardStatus,
-    TaskBoardWorkflowStatus,
+    DispatchAppliedTask, TaskBoardStatus, TaskBoardWorkflowStatus,
 };
 
 const CLAIM_LEASE_SECONDS: i64 = 30;
@@ -18,111 +18,10 @@ pub(crate) struct ClaimedTaskBoardDispatch {
     pub(crate) intent_id: String,
     pub(crate) claim_token: String,
     pub(crate) applied: DispatchAppliedTask,
-}
-
-#[derive(Debug)]
-pub(crate) struct HeldTaskBoardDispatch {
-    pub(crate) intent_id: String,
-    pub(crate) applied: DispatchAppliedTask,
+    pub(crate) consumed_approval_grant_id: Option<String>,
 }
 
 impl AsyncDaemonDb {
-    pub(crate) async fn held_task_board_dispatch_summary(
-        &self,
-    ) -> Result<TaskBoardHeldDispatchSummary, CliError> {
-        let rows = query_as::<_, (String, String, String, String)>(
-            "SELECT intent_id, item_id, session_id, work_item_id
-             FROM task_board_dispatch_intents WHERE status = 'held'
-             ORDER BY created_at, intent_id",
-        )
-        .fetch_all(self.pool())
-        .await
-        .map_err(|error| db_error(format!("list held task board dispatches: {error}")))?;
-        let items = rows
-            .into_iter()
-            .map(
-                |(intent_id, board_item_id, session_id, work_item_id)| TaskBoardHeldDispatchItem {
-                    intent_id,
-                    board_item_id,
-                    session_id,
-                    work_item_id,
-                },
-            )
-            .collect::<Vec<_>>();
-        Ok(TaskBoardHeldDispatchSummary {
-            count: items.len(),
-            items,
-        })
-    }
-
-    pub(crate) async fn held_task_board_dispatch(
-        &self,
-        board_item_id: &str,
-    ) -> Result<HeldTaskBoardDispatch, CliError> {
-        io::validate_safe_segment(board_item_id)?;
-        let row = query_as::<_, (String, String)>(
-            "SELECT intent_id, payload_json FROM task_board_dispatch_intents
-             WHERE item_id = ?1 AND status = 'held'",
-        )
-        .bind(board_item_id)
-        .fetch_optional(self.pool())
-        .await
-        .map_err(|error| db_error(format!("load held task board dispatch: {error}")))?
-        .ok_or_else(|| {
-            CliError::from(CliErrorKind::session_agent_conflict(format!(
-                "task-board dispatch for item '{board_item_id}' is not held"
-            )))
-        })?;
-        Ok(HeldTaskBoardDispatch {
-            intent_id: row.0,
-            applied: decode_applied(&row.1)?,
-        })
-    }
-
-    pub(crate) async fn claim_held_task_board_dispatch(
-        &self,
-        board_item_id: &str,
-    ) -> Result<ClaimedTaskBoardDispatch, CliError> {
-        io::validate_safe_segment(board_item_id)?;
-        let mut transaction = self
-            .begin_immediate_transaction("task board held dispatch delivery")
-            .await?;
-        let (intent_id, payload_json) = query_as::<_, (String, String)>(
-            "SELECT intent_id, payload_json FROM task_board_dispatch_intents
-             WHERE item_id = ?1 AND status = 'held'",
-        )
-        .bind(board_item_id)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load held task board delivery: {error}")))?
-        .ok_or_else(|| {
-            CliError::from(CliErrorKind::session_agent_conflict(format!(
-                "task-board dispatch for item '{board_item_id}' is not held"
-            )))
-        })?;
-        let claim_token = format!("dispatch-claim-{}", Uuid::new_v4().simple());
-        query(
-            "UPDATE task_board_dispatch_intents SET status = 'starting', attempts = attempts + 1,
-             claim_token = ?2, claimed_at = ?3, updated_at = ?3
-             WHERE intent_id = ?1 AND status = 'held'",
-        )
-        .bind(&intent_id)
-        .bind(&claim_token)
-        .bind(utc_now())
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("claim held task board dispatch: {error}")))?;
-        transaction
-            .commit()
-            .await
-            .map_err(|error| db_error(format!("commit held task board delivery: {error}")))?;
-        Ok(ClaimedTaskBoardDispatch {
-            intent_id,
-            claim_token,
-            applied: decode_applied(&payload_json)?,
-        })
-    }
-
     /// Atomically link a Task Board item to its created task and enqueue worker startup.
     #[expect(
         clippy::cognitive_complexity,
@@ -194,16 +93,18 @@ impl AsyncDaemonDb {
             .begin_immediate_transaction("task board dispatch claim")
             .await?;
         release_expired_claims(&mut transaction).await?;
-        let Some((intent_id, payload_json)) = query_as::<_, (String, String)>(
-            "SELECT intent_id, payload_json FROM task_board_dispatch_intents
-             WHERE item_id = ?1 AND status = 'pending'
-               AND datetime(available_at) <= datetime('now')
-             ORDER BY created_at, intent_id LIMIT 1",
-        )
-        .bind(board_item_id)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load pending task board dispatch: {error}")))?
+        let Some((intent_id, payload_json, consumed_approval_grant_id)) =
+            query_as::<_, (String, String, Option<String>)>(
+                "SELECT intent_id, payload_json, consumed_approval_grant_id
+                 FROM task_board_dispatch_intents
+                 WHERE item_id = ?1 AND status = 'pending'
+                   AND datetime(available_at) <= datetime('now')
+                 ORDER BY created_at, intent_id LIMIT 1",
+            )
+            .bind(board_item_id)
+            .fetch_optional(transaction.as_mut())
+            .await
+            .map_err(|error| db_error(format!("load pending task board dispatch: {error}")))?
         else {
             transaction.commit().await.map_err(|error| {
                 db_error(format!("commit empty task board dispatch claim: {error}"))
@@ -234,6 +135,7 @@ impl AsyncDaemonDb {
             intent_id,
             claim_token,
             applied: decode_applied(&payload_json)?,
+            consumed_approval_grant_id,
         }))
     }
 
@@ -263,8 +165,49 @@ impl AsyncDaemonDb {
         &self,
         intent_id: &str,
         claim_token: &str,
-    ) -> Result<(), CliError> {
-        finish_intent(self, intent_id, claim_token, None).await
+    ) -> Result<crate::task_board::TaskBoardItem, CliError> {
+        let mut transaction = self
+            .begin_immediate_transaction("task board dispatch completion")
+            .await?;
+        let (item_id, session_id, work_item_id, execution_id) =
+            claimed_intent_identity(&mut transaction, intent_id, claim_token).await?;
+        let (mut item, revision) = load_item_in_tx(&mut transaction, &item_id)
+            .await?
+            .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
+        let still_linked = item.session_id.as_deref() == Some(session_id.as_str())
+            && item.work_item_id.as_deref() == Some(work_item_id.as_str())
+            && item.workflow.execution_id.as_deref() == Some(execution_id.as_str());
+        if still_linked {
+            item.workflow.status = TaskBoardWorkflowStatus::Running;
+            item.workflow.current_step_id = Some("worker_running".to_string());
+            item.workflow.last_error = None;
+            item.updated_at = utc_now();
+            replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
+            bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+        }
+        let now = utc_now();
+        let changed = query(
+            "UPDATE task_board_dispatch_intents SET status = 'completed', last_error = NULL,
+             claim_token = NULL, claimed_at = NULL, updated_at = ?3, completed_at = ?3
+             WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'starting'",
+        )
+        .bind(intent_id)
+        .bind(claim_token)
+        .bind(now)
+        .execute(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("complete task board dispatch intent: {error}")))?
+        .rows_affected();
+        if changed != 1 {
+            return Err(db_error(format!(
+                "task board dispatch intent '{intent_id}' is not claimed"
+            )));
+        }
+        transaction
+            .commit()
+            .await
+            .map_err(|error| db_error(format!("commit task board dispatch completion: {error}")))?;
+        Ok(item)
     }
 
     /// Atomically mark worker startup failed and make the item dispatchable again.
@@ -276,6 +219,7 @@ impl AsyncDaemonDb {
         &self,
         intent_id: &str,
         claim_token: &str,
+        consumed_approval_grant_id: Option<&str>,
         reason: &str,
     ) -> Result<(), CliError> {
         let mut transaction = self
@@ -283,6 +227,14 @@ impl AsyncDaemonDb {
             .await?;
         let (item_id, session_id, work_item_id, execution_id) =
             claimed_intent_identity(&mut transaction, intent_id, claim_token).await?;
+        if let Some(grant_id) = consumed_approval_grant_id {
+            restore_consumed_approval_grant_in_tx_at(
+                transaction.as_mut(),
+                grant_id,
+                &utc_now(),
+            )
+            .await?;
+        }
         let (mut item, revision) = load_item_in_tx(&mut transaction, &item_id)
             .await?
             .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
@@ -427,42 +379,7 @@ async fn claimed_intent_identity(
     })
 }
 
-async fn finish_intent(
-    db: &AsyncDaemonDb,
-    intent_id: &str,
-    claim_token: &str,
-    error: Option<&str>,
-) -> Result<(), CliError> {
-    let status = if error.is_some() {
-        "failed"
-    } else {
-        "completed"
-    };
-    let now = utc_now();
-    let changed = query(
-        "UPDATE task_board_dispatch_intents SET status = ?3, last_error = ?4,
-         claim_token = NULL, claimed_at = NULL, updated_at = ?5, completed_at = ?5
-         WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'starting'",
-    )
-    .bind(intent_id)
-    .bind(claim_token)
-    .bind(status)
-    .bind(error)
-    .bind(now)
-    .execute(db.pool())
-    .await
-    .map_err(|error| db_error(format!("finish task board dispatch intent: {error}")))?
-    .rows_affected();
-    if changed == 1 {
-        Ok(())
-    } else {
-        Err(db_error(format!(
-            "task board dispatch intent '{intent_id}' is not claimed"
-        )))
-    }
-}
-
-fn decode_applied(payload: &str) -> Result<DispatchAppliedTask, CliError> {
+pub(super) fn decode_applied(payload: &str) -> Result<DispatchAppliedTask, CliError> {
     serde_json::from_str(payload)
         .map_err(|error| db_error(format!("decode task board dispatch intent: {error}")))
 }
