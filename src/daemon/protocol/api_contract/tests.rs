@@ -160,6 +160,23 @@ fn manual_dispatch_steps_have_remote_surface_scopes() {
 }
 
 #[test]
+fn policy_approval_grant_revoke_requires_remote_write_scope() {
+    let route = HTTP_API_CONTRACT
+        .iter()
+        .find(|route| route.path == http_paths::POLICY_APPROVAL_GRANT_REVOKE)
+        .expect("policy approval grant revoke route should be registered");
+
+    assert_eq!(
+        remote_http_scopes(route),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+    assert_eq!(
+        remote_ws_scopes(ws_methods::POLICY_APPROVAL_GRANT_REVOKE),
+        Some(&[RemoteAccessScope::Write][..])
+    );
+}
+
+#[test]
 fn every_mapped_ws_method_is_listed_in_ws_methods_all() {
     let declared_methods: BTreeSet<_> = ws_methods::ALL.iter().copied().collect();
 

@@ -2,9 +2,9 @@
 //!
 //! A grant is keyed by (board item, action, canvas revision). At most one live
 //! (unconsumed) grant exists per key, enforced by a partial unique index. The
-//! evaluation path creates pending grants fire-and-forget; a resolution route
-//! moves them to approved/denied; dispatch reservation consumes an approved
-//! grant exactly once.
+//! evaluation path creates pending grants fire-and-forget; resolution routes
+//! move them to approved/denied/revoked; dispatch reservation consumes an
+//! approved grant exactly once.
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -65,6 +65,13 @@ SET state = ?2, resolved_by = ?3, resolved_at = ?4, updated_at = ?4
 WHERE id = ?1 AND state = 'pending' AND consumed_at IS NULL
   AND (expiry_seconds IS NULL
        OR unixepoch(created_at) + expiry_seconds > unixepoch(?4))";
+
+const REVOKE_GRANT_SQL: &str = "
+UPDATE policy_approval_grants
+SET state = 'revoked', resolved_by = ?2, resolved_at = ?3, updated_at = ?3
+WHERE id = ?1 AND state IN ('pending', 'approved') AND consumed_at IS NULL
+  AND (expiry_seconds IS NULL
+       OR unixepoch(created_at) + expiry_seconds > unixepoch(?3))";
 
 const CONSUME_GRANT_SQL: &str = "
 UPDATE policy_approval_grants
@@ -232,6 +239,43 @@ impl AsyncDaemonDb {
         self.approval_grant(id)
             .await?
             .ok_or_else(|| db_error("resolved approval grant vanished".to_string()))
+    }
+
+    /// Revoke a live pending or approved grant, recording the actor.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] when the grant is missing, terminal, consumed, or
+    /// expired.
+    pub(crate) async fn revoke_approval_grant(
+        &self,
+        id: &str,
+        actor: &str,
+    ) -> Result<PolicyApprovalGrant, CliError> {
+        self.revoke_approval_grant_at(id, actor, &utc_now()).await
+    }
+
+    async fn revoke_approval_grant_at(
+        &self,
+        id: &str,
+        actor: &str,
+        now: &str,
+    ) -> Result<PolicyApprovalGrant, CliError> {
+        let affected = query(REVOKE_GRANT_SQL)
+            .bind(id)
+            .bind(actor)
+            .bind(now)
+            .execute(self.pool())
+            .await
+            .map_err(|error| db_error(format!("revoke approval grant: {error}")))?
+            .rows_affected();
+        if affected == 0 {
+            return Err(db_error(format!(
+                "approval grant '{id}' is not live or does not exist"
+            )));
+        }
+        self.approval_grant(id)
+            .await?
+            .ok_or_else(|| db_error("revoked approval grant vanished".to_string()))
     }
 
     async fn retire_inactive_approval_grants(

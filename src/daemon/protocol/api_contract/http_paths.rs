@@ -94,6 +94,7 @@ pub const POLICY_CANVASES_SPAWN_REQUIRES_LIVE_POLICY: &str =
 pub const POLICY_CANVASES_SPAWN_KILL_SWITCH: &str = "/v1/policy-canvases/spawn-kill-switch";
 pub const POLICY_APPROVAL_GRANTS: &str = "/v1/policy-approval-grants";
 pub const POLICY_APPROVAL_GRANT_RESOLVE: &str = "/v1/policy-approval-grants/resolve";
+pub const POLICY_APPROVAL_GRANT_REVOKE: &str = "/v1/policy-approval-grants/revoke";
 pub const POLICY_PIPELINE: &str = "/v1/policy-pipeline";
 pub const POLICY_SIMULATE: &str = "/v1/policy-pipeline/simulate";
 pub const POLICY_PROMOTE: &str = "/v1/policy-pipeline/promote";

@@ -1,9 +1,10 @@
 //! Service handlers for the WP3 spawn-gate controls: the two persisted spawn
-//! switches and the durable approval-grant list/resolve routes. Split out of
+//! switches and the durable approval-grant list/resolve/revoke routes. Split out of
 //! `policy_canvas.rs` to keep each file under the source-length cap.
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
+    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
@@ -15,7 +16,7 @@ use super::policy_canvas::{bump_change_policy, feed_gate_cache};
 use super::policy_canvas_response::policy_canvas_workspace_response;
 
 /// Default actor recorded on a grant resolution when the caller omits one.
-const DEFAULT_RESOLVE_ACTOR: &str = "operator";
+const DEFAULT_APPROVAL_ACTOR: &str = "operator";
 
 /// Toggle the fail-closed "spawn requires a live enforced policy" switch.
 ///
@@ -83,10 +84,27 @@ pub(crate) async fn resolve_policy_approval_grant(
     db: &AsyncDaemonDb,
     request: &PolicyApprovalGrantResolveRequest,
 ) -> Result<PolicyApprovalGrantResolveResponse, CliError> {
-    let actor = request.actor.as_deref().unwrap_or(DEFAULT_RESOLVE_ACTOR);
+    let actor = request.actor.as_deref().unwrap_or(DEFAULT_APPROVAL_ACTOR);
     let grant = db
         .resolve_approval_grant(&request.grant_id, request.approve, actor)
         .await?;
     bump_change_policy(db).await;
     Ok(PolicyApprovalGrantResolveResponse { grant })
+}
+
+/// Revoke a live pending or approved grant.
+///
+/// # Errors
+/// Returns `CliError` when the grant is missing, terminal, consumed, expired,
+/// or the write fails.
+pub(crate) async fn revoke_policy_approval_grant(
+    db: &AsyncDaemonDb,
+    request: &PolicyApprovalGrantRevokeRequest,
+) -> Result<PolicyApprovalGrantRevokeResponse, CliError> {
+    let actor = request.actor.as_deref().unwrap_or(DEFAULT_APPROVAL_ACTOR);
+    let grant = db
+        .revoke_approval_grant(&request.grant_id, actor)
+        .await?;
+    bump_change_policy(db).await;
+    Ok(PolicyApprovalGrantRevokeResponse { grant })
 }

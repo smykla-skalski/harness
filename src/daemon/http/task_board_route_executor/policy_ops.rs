@@ -1,5 +1,6 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
+    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
     PolicyApprovalGrantsListResponse, PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest,
     PolicyCanvasDuplicateRequest, PolicyCanvasExportRequest, PolicyCanvasExportResponse,
@@ -90,6 +91,13 @@ pub(crate) async fn resolve_policy_approval_grant(
     request: &PolicyApprovalGrantResolveRequest,
 ) -> Result<PolicyApprovalGrantResolveResponse, CliError> {
     service::resolve_policy_approval_grant(db, request).await
+}
+
+pub(crate) async fn revoke_policy_approval_grant(
+    db: &AsyncDaemonDb,
+    request: &PolicyApprovalGrantRevokeRequest,
+) -> Result<PolicyApprovalGrantRevokeResponse, CliError> {
+    service::revoke_policy_approval_grant(db, request).await
 }
 
 pub(crate) async fn policy_pipeline(

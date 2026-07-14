@@ -1,9 +1,9 @@
 use serde_json::{Value, json};
 
 use crate::daemon::protocol::{
-    PolicyApprovalGrantResolveRequest, PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest,
-    PolicyCanvasDuplicateRequest, PolicyCanvasExportRequest, PolicyCanvasImportRequest,
-    PolicyCanvasRenameRequest, PolicyCanvasSetActiveRequest,
+    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantRevokeRequest, PolicyCanvasCreateRequest,
+    PolicyCanvasDeleteRequest, PolicyCanvasDuplicateRequest, PolicyCanvasExportRequest,
+    PolicyCanvasImportRequest, PolicyCanvasRenameRequest, PolicyCanvasSetActiveRequest,
     PolicyCanvasSetGlobalEnforcementRequest, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyPipelineAuditRequest,
     PolicyPipelineGetRequest, PolicyPipelineGoLiveDiffRequest, PolicyPipelineMakeLiveRequest,
@@ -24,7 +24,7 @@ pub(super) fn register(registry: &mut ToolRegistry) {
     register_descriptors(registry, &scenario_descriptors());
 }
 
-fn spawn_gate_descriptors() -> [TaskBoardToolDescriptor; 4] {
+fn spawn_gate_descriptors() -> [TaskBoardToolDescriptor; 5] {
     [
         TaskBoardToolDescriptor {
             name: ws_methods::POLICY_CANVAS_SET_SPAWN_REQUIRES_LIVE_POLICY,
@@ -49,6 +49,12 @@ fn spawn_gate_descriptors() -> [TaskBoardToolDescriptor; 4] {
             description: "Approve or deny a pending approval grant.",
             input_schema: grant_resolve_schema,
             normalize: validate_params::<PolicyApprovalGrantResolveRequest>,
+        },
+        TaskBoardToolDescriptor {
+            name: ws_methods::POLICY_APPROVAL_GRANT_REVOKE,
+            description: "Revoke a live policy approval grant.",
+            input_schema: grant_revoke_schema,
+            normalize: validate_params::<PolicyApprovalGrantRevokeRequest>,
         },
     ]
 }
@@ -346,6 +352,18 @@ fn grant_resolve_schema() -> Value {
             "actor": { "type": "string" }
         },
         "required": ["grant_id", "approve"],
+        "additionalProperties": false
+    })
+}
+
+fn grant_revoke_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "grant_id": { "type": "string" },
+            "actor": { "type": "string" }
+        },
+        "required": ["grant_id"],
         "additionalProperties": false
     })
 }

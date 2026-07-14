@@ -67,7 +67,7 @@ pub(crate) use policy_canvas::{
 };
 pub(crate) use policy_canvas_io::{export_policy, import_policy};
 pub(crate) use policy_spawn_gate::{
-    list_policy_approval_grants, resolve_policy_approval_grant,
+    list_policy_approval_grants, resolve_policy_approval_grant, revoke_policy_approval_grant,
     set_policy_canvas_spawn_kill_switch, set_policy_canvas_spawn_requires_live_policy,
 };
 

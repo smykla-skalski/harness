@@ -98,6 +98,7 @@ pub const POLICY_CANVAS_SET_SPAWN_REQUIRES_LIVE_POLICY: &str =
 pub const POLICY_CANVAS_SET_SPAWN_KILL_SWITCH: &str = "policy_canvas.set_spawn_kill_switch";
 pub const POLICY_APPROVAL_GRANTS_LIST: &str = "policy_canvas.approval_grants_list";
 pub const POLICY_APPROVAL_GRANT_RESOLVE: &str = "policy_canvas.approval_grant_resolve";
+pub const POLICY_APPROVAL_GRANT_REVOKE: &str = "policy_canvas.approval_grant_revoke";
 pub const POLICY_PIPELINE_GET: &str = "policy_pipeline.get";
 pub const POLICY_PIPELINE_SAVE_DRAFT: &str = "policy_pipeline.save_draft";
 pub const POLICY_PIPELINE_SIMULATE: &str = "policy_pipeline.simulate";
@@ -268,6 +269,7 @@ pub const ALL: &[&str] = &[
     POLICY_CANVAS_SET_SPAWN_KILL_SWITCH,
     POLICY_APPROVAL_GRANTS_LIST,
     POLICY_APPROVAL_GRANT_RESOLVE,
+    POLICY_APPROVAL_GRANT_REVOKE,
     POLICY_PIPELINE_GET,
     POLICY_PIPELINE_SAVE_DRAFT,
     POLICY_PIPELINE_SIMULATE,

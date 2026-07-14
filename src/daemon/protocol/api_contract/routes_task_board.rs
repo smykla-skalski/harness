@@ -386,6 +386,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::POLICY_APPROVAL_GRANT_REVOKE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::POLICY_APPROVAL_GRANT_REVOKE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Get,
         path: http_paths::POLICY_PIPELINE,
         parity: HttpRouteParity::Rpc {

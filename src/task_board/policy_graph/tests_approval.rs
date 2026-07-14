@@ -143,6 +143,16 @@ fn approval_gate_denied_grant_terminates_as_deny() {
 }
 
 #[test]
+fn approval_gate_revoked_grant_terminates_as_deny() {
+    let graph = approval_spawn_graph(true);
+
+    let result = graph.simulate(&spawn_input(grant(PolicyApprovalState::Revoked)));
+
+    assert!(matches!(result.decision, PolicyDecision::Deny { .. }));
+    assert!(result.approval_requests.is_empty());
+}
+
+#[test]
 fn approval_spawn_graph_with_terminal_route_validates() {
     let report = approval_spawn_graph(true).validate();
     assert!(

@@ -216,9 +216,9 @@ impl PolicyGraph {
     }
 
     /// Evaluate an approval gate against the caller-supplied grant state:
-    /// approved traverses the `approved` output, denied is terminal `Deny`,
-    /// pending is terminal `RequireHuman`, and no grant additionally emits a
-    /// fire-and-forget pending-grant request.
+    /// approved traverses the `approved` output, denied or revoked is terminal
+    /// `Deny`, pending is terminal `RequireHuman`, and no grant additionally
+    /// emits a fire-and-forget pending-grant request.
     fn approval_gate_step(
         &self,
         node: &PolicyGraphNode,
@@ -232,10 +232,12 @@ impl PolicyGraph {
                     .into_iter()
                     .collect(),
             ),
-            Some(PolicyApprovalState::Denied) => EvaluationStep::Terminal(supervisor_decision(
-                PolicyGraphDecision::Deny,
-                gate.reason_code,
-            )),
+            Some(PolicyApprovalState::Denied | PolicyApprovalState::Revoked) => {
+                EvaluationStep::Terminal(supervisor_decision(
+                    PolicyGraphDecision::Deny,
+                    gate.reason_code,
+                ))
+            }
             Some(PolicyApprovalState::Pending) => {
                 EvaluationStep::Terminal(require_human(gate.reason_code))
             }

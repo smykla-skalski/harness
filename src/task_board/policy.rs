@@ -80,11 +80,13 @@ pub enum PolicyApprovalState {
     Pending,
     Approved,
     Denied,
+    Revoked,
 }
 
 /// A durable approval grant persisted by the daemon, keyed by board item,
 /// action, and the canvas revision that authored the gate. Moves pending ->
-/// approved | denied, then is consumed once at dispatch reservation.
+/// approved | denied | revoked, then an approved grant is consumed once at
+/// dispatch reservation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyApprovalGrant {
     pub id: String,

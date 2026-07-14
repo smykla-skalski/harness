@@ -1,5 +1,5 @@
 //! Wire types for the WP3 spawn-gate controls: the two persisted spawn switches
-//! and the durable approval-grant list/resolve routes. Split out of
+//! and the durable approval-grant list/resolve/revoke routes. Split out of
 //! `task_board.rs` to keep each file under the source-length cap.
 
 use serde::{Deserialize, Serialize};
@@ -32,5 +32,17 @@ pub struct PolicyApprovalGrantResolveRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicyApprovalGrantResolveResponse {
+    pub grant: PolicyApprovalGrant,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PolicyApprovalGrantRevokeRequest {
+    pub grant_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PolicyApprovalGrantRevokeResponse {
     pub grant: PolicyApprovalGrant,
 }

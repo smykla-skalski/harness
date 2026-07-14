@@ -1,9 +1,10 @@
 use crate::daemon::http::{DaemonHttpState, require_async_db, task_board_route_executor};
 use crate::daemon::protocol::{
-    PolicyApprovalGrantResolveRequest, PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest,
-    PolicyCanvasDuplicateRequest, PolicyCanvasRenameRequest, PolicyCanvasSetActiveRequest,
-    PolicyCanvasSetGlobalEnforcementRequest, PolicyCanvasSetSpawnKillSwitchRequest,
-    PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyPipelineGetRequest, WsRequest, WsResponse,
+    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantRevokeRequest, PolicyCanvasCreateRequest,
+    PolicyCanvasDeleteRequest, PolicyCanvasDuplicateRequest, PolicyCanvasRenameRequest,
+    PolicyCanvasSetActiveRequest, PolicyCanvasSetGlobalEnforcementRequest,
+    PolicyCanvasSetSpawnKillSwitchRequest, PolicyCanvasSetSpawnRequiresLivePolicyRequest,
+    PolicyPipelineGetRequest, WsRequest, WsResponse,
 };
 use crate::daemon::websocket::mutations::dispatch_query_result;
 
@@ -263,6 +264,30 @@ pub(super) async fn dispatch_policy_approval_grant_resolve(
             "grant_id": &body.grant_id,
             "approve": body.approve,
         }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
+}
+
+pub(super) async fn dispatch_policy_approval_grant_revoke(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params::<PolicyApprovalGrantRevokeRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy approval grant revoke") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    let result = task_board_route_executor::revoke_policy_approval_grant(db, &body).await;
+    super::super::record_task_board_audit_result(
+        state,
+        "policy_canvas.approval_grant_revoke",
+        "Revoke policy approval grant",
+        Some(body.grant_id.as_str()),
+        serde_json::json!({ "grant_id": &body.grant_id }),
         &result,
     )
     .await;

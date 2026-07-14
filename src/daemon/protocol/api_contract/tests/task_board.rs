@@ -310,6 +310,12 @@ fn task_board_routes_have_complete_ws_parity() {
                 true,
             ),
             (
+                HttpRouteMethod::Post,
+                http_paths::POLICY_APPROVAL_GRANT_REVOKE,
+                ws_methods::POLICY_APPROVAL_GRANT_REVOKE,
+                true,
+            ),
+            (
                 HttpRouteMethod::Get,
                 http_paths::POLICY_PIPELINE,
                 ws_methods::POLICY_PIPELINE_GET,

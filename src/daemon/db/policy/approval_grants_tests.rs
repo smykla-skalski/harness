@@ -152,6 +152,48 @@ async fn a_denied_grant_cannot_be_consumed() {
 }
 
 #[tokio::test]
+async fn a_revoked_grant_cannot_authorize_or_be_consumed() {
+    let (_dir, db) = connect().await;
+    let grant = db
+        .ensure_pending_approval_grant(&sample_grant())
+        .await
+        .expect("create");
+    set_grant_clock(&db, &grant.id, "2026-07-14T10:00:00Z", 60).await;
+    db.resolve_approval_grant_at(
+        &grant.id,
+        true,
+        "approver",
+        "2026-07-14T10:00:10Z",
+    )
+    .await
+    .expect("approve");
+
+    let revoked = db
+        .revoke_approval_grant_at(&grant.id, "revoker", "2026-07-14T10:00:20Z")
+        .await
+        .expect("revoke");
+
+    assert_eq!(revoked.state, PolicyApprovalState::Revoked);
+    assert_eq!(revoked.resolved_by.as_deref(), Some("revoker"));
+    assert!(
+        db.live_approval_grant_at(
+            "board-item-1",
+            PolicyAction::SpawnAgent,
+            7,
+            "2026-07-14T10:00:30Z",
+        )
+        .await
+        .expect("live lookup after revoke")
+        .is_none(),
+        "revoked grant must not authorize the spawn policy"
+    );
+    assert!(
+        !consume_at(&db, &grant.id, "2026-07-14T10:00:30Z").await,
+        "revoked grant must not be consumable"
+    );
+}
+
+#[tokio::test]
 async fn expiry_boundary_excludes_grant_from_live_and_pending_reads() {
     let (_dir, db) = connect().await;
     let grant = db
@@ -247,11 +289,11 @@ async fn expired_or_revoked_grant_is_retired_before_replacement() {
         .expect("replace expired grant");
     assert_ne!(replacement.id, expired.id);
 
-    sqlx::query("UPDATE policy_approval_grants SET state = 'revoked' WHERE id = ?1")
-        .bind(&replacement.id)
-        .execute(db.pool())
+    let revoked = db
+        .revoke_approval_grant(&replacement.id, "operator")
         .await
-        .expect("revoke fixture");
+        .expect("revoke pending grant");
+    assert_eq!(revoked.state, PolicyApprovalState::Revoked);
     let after_revoke = db
         .ensure_pending_approval_grant(&sample_grant())
         .await

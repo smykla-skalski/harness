@@ -156,6 +156,7 @@ fn print_resolved_grant(grant: &PolicyApprovalGrant) {
         PolicyApprovalState::Approved => "approved",
         PolicyApprovalState::Denied => "denied",
         PolicyApprovalState::Pending => "pending",
+        PolicyApprovalState::Revoked => "revoked",
     };
     println!(
         "approval grant {}: {resolution} by {}",

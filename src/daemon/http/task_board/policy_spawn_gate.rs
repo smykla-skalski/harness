@@ -1,5 +1,5 @@
 //! HTTP handlers for the WP3 spawn-gate controls: the two persisted spawn
-//! switches and the durable approval-grant list/resolve routes. Split out of
+//! switches and the durable approval-grant list/resolve/revoke routes. Split out of
 //! `policy.rs` to keep each file under the source-length cap.
 
 use axum::Json;
@@ -10,8 +10,9 @@ use axum::response::Response;
 use axum::routing::{get, post};
 
 use crate::daemon::protocol::{
-    PolicyApprovalGrantResolveRequest, PolicyCanvasSetSpawnKillSwitchRequest,
-    PolicyCanvasSetSpawnRequiresLivePolicyRequest, http_paths,
+    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantRevokeRequest,
+    PolicyCanvasSetSpawnKillSwitchRequest, PolicyCanvasSetSpawnRequiresLivePolicyRequest,
+    http_paths,
 };
 
 use super::super::response::timed_json;
@@ -37,6 +38,10 @@ pub(super) fn merge_policy_spawn_gate_routes(
         .route(
             http_paths::POLICY_APPROVAL_GRANT_RESOLVE,
             post(post_policy_approval_grant_resolve),
+        )
+        .route(
+            http_paths::POLICY_APPROVAL_GRANT_REVOKE,
+            post(post_policy_approval_grant_revoke),
         )
 }
 
@@ -129,5 +134,27 @@ pub(super) async fn post_policy_approval_grant_resolve(
         &request_id,
         start,
         resolved,
+    )
+}
+
+pub(super) async fn post_policy_approval_grant_revoke(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<PolicyApprovalGrantRevokeRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    let revoked = match require_async_db(&state, "policy approval grant revoke") {
+        Ok(db) => task_board_route_executor::revoke_policy_approval_grant(db, &request).await,
+        Err(error) => Err(error),
+    };
+    timed_json(
+        "POST",
+        http_paths::POLICY_APPROVAL_GRANT_REVOKE,
+        &request_id,
+        start,
+        revoked,
     )
 }

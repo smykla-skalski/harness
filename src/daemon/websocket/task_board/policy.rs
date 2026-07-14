@@ -7,9 +7,10 @@ mod pipeline;
 mod scenario;
 
 use self::canvas::{
-    dispatch_policy_approval_grant_resolve, dispatch_policy_approval_grants_list,
-    dispatch_policy_canvas_create, dispatch_policy_canvas_delete, dispatch_policy_canvas_duplicate,
-    dispatch_policy_canvas_rename, dispatch_policy_canvas_set_active,
+    dispatch_policy_approval_grant_resolve, dispatch_policy_approval_grant_revoke,
+    dispatch_policy_approval_grants_list, dispatch_policy_canvas_create,
+    dispatch_policy_canvas_delete, dispatch_policy_canvas_duplicate, dispatch_policy_canvas_rename,
+    dispatch_policy_canvas_set_active,
     dispatch_policy_canvas_set_global_enforcement, dispatch_policy_canvas_set_spawn_kill_switch,
     dispatch_policy_canvas_set_spawn_requires_live_policy, dispatch_policy_canvas_workspace_get,
 };
@@ -130,6 +131,9 @@ async fn dispatch_policy_spawn_gate_method(
         }
         ws_methods::POLICY_APPROVAL_GRANT_RESOLVE => {
             Some(dispatch_policy_approval_grant_resolve(request, state).await)
+        }
+        ws_methods::POLICY_APPROVAL_GRANT_REVOKE => {
+            Some(dispatch_policy_approval_grant_revoke(request, state).await)
         }
         _ => None,
     }
