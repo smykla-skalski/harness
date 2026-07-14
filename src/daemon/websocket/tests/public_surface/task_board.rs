@@ -207,7 +207,7 @@ async fn join_leader(
         &SessionJoinRequest {
             runtime: "claude".into(),
             role: SessionRole::Leader,
-            fallback_role: None,
+            fallback_role: Some(SessionRole::Worker),
             capabilities: Vec::new(),
             name: Some("leader".into()),
             project_dir: project_dir.to_string_lossy().into_owned(),
