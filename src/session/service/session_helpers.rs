@@ -343,9 +343,9 @@ pub(crate) fn require_active_worker_target_agent(
             "agent '{agent_id}' not found"
         )))
     })?;
-    if agent.role != SessionRole::Worker {
+    if !matches!(agent.role, SessionRole::Worker | SessionRole::Leader) {
         return Err(CliErrorKind::session_agent_conflict(format!(
-            "agent '{agent_id}' is a {:?}, not a worker",
+            "agent '{agent_id}' is a {:?}, not worker-capable",
             agent.role
         ))
         .into());

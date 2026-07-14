@@ -121,8 +121,11 @@ fn codex_worker_request(applied: &DispatchAppliedTask, managed_run_id: &str) -> 
         actor: Some(CONTROL_PLANE_ACTOR_ID.to_string()),
         prompt: worker_prompt(applied, managed_run_id),
         mode,
-        role: SessionRole::Worker,
-        fallback_role: Some(SessionRole::Observer),
+        // A newly-created task-board session has no leader yet. Requesting the
+        // leader role activates that session so lifecycle checkpoints work;
+        // existing sessions with a leader resolve to the worker fallback.
+        role: SessionRole::Leader,
+        fallback_role: Some(SessionRole::Worker),
         capabilities: worker_capabilities(&applied.item),
         name: Some(worker_name(&applied.item)),
         persona: None,
@@ -142,8 +145,8 @@ fn terminal_worker_request(
 ) -> AgentTuiStartRequest {
     AgentTuiStartRequest {
         runtime: DEFAULT_INTERACTIVE_RUNTIME.to_string(),
-        role: SessionRole::Worker,
-        fallback_role: Some(SessionRole::Observer),
+        role: SessionRole::Leader,
+        fallback_role: Some(SessionRole::Worker),
         capabilities: worker_capabilities(&applied.item),
         name: Some(worker_name(&applied.item)),
         prompt: Some(worker_prompt(applied, managed_run_id)),
@@ -228,6 +231,7 @@ mod tests {
     };
     use crate::daemon::state::{DaemonManifest, HostBridgeManifest};
     use crate::daemon::websocket::ReplayBuffer;
+    use crate::session::types::SessionRole;
     use crate::task_board::dispatch::DispatchLifecycle;
     use crate::task_board::{
         AgentMode, DispatchAppliedTask, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
@@ -249,6 +253,8 @@ mod tests {
         assert_eq!(request.task_id.as_deref(), Some("task-1"));
         assert_eq!(request.board_item_id.as_deref(), Some("board-1"));
         assert_eq!(request.workflow_execution_id.as_deref(), Some("workflow-1"));
+        assert_eq!(request.role, SessionRole::Leader);
+        assert_eq!(request.fallback_role, Some(SessionRole::Worker));
         assert!(
             request
                 .capabilities
@@ -286,6 +292,8 @@ mod tests {
         assert_eq!(request.runtime, "codex");
         assert_eq!(request.task_id.as_deref(), Some("task-1"));
         assert_eq!(request.board_item_id.as_deref(), Some("board-1"));
+        assert_eq!(request.role, SessionRole::Leader);
+        assert_eq!(request.fallback_role, Some(SessionRole::Worker));
         assert_eq!(request.rows, 24);
         assert_eq!(request.cols, 80);
     }

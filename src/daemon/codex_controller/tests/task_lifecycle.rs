@@ -1,5 +1,5 @@
 use crate::daemon::protocol::CodexRunStatus;
-use crate::session::types::TaskStatus;
+use crate::session::types::{SessionRole, SessionStatus, TaskStatus};
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus};
 
 use super::durable_run_request;
@@ -38,6 +38,36 @@ fn registration_assigns_bound_task_and_starts_it() {
     assert_eq!(
         state.agents[&agent_id].current_task_id.as_deref(),
         Some("task-1")
+    );
+}
+
+#[test]
+fn registration_assigns_task_to_session_activating_leader() {
+    let mut initial = sample_session_state_with_open_task();
+    initial.status = SessionStatus::AwaitingLeader;
+    let (controller, db, _tempdir) = controller_with_session_state(initial);
+    let mut request = durable_run_request();
+    request.role = SessionRole::Leader;
+    request.fallback_role = Some(SessionRole::Worker);
+    request.task_id = Some("task-1".into());
+
+    let agent_id = controller
+        .register_orchestration_agent(SESSION_ID, "codex-run-1", &request, "Codex Leader")
+        .expect("register bound session-activating leader");
+
+    let state = db
+        .lock()
+        .expect("db lock")
+        .load_session_state_for_mutation(SESSION_ID)
+        .expect("load session")
+        .expect("session");
+    assert_eq!(state.status, SessionStatus::Active);
+    assert_eq!(state.leader_id.as_deref(), Some(agent_id.as_str()));
+    assert_eq!(state.agents[&agent_id].role, SessionRole::Leader);
+    assert_eq!(state.tasks["task-1"].status, TaskStatus::InProgress);
+    assert_eq!(
+        state.tasks["task-1"].assigned_to.as_deref(),
+        Some(agent_id.as_str())
     );
 }
 
