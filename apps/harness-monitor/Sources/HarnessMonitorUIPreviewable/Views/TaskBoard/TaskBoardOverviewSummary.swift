@@ -97,9 +97,15 @@ extension TaskBoardOverviewView {
       liveEvaluate()
       return
     }
-    Task { @MainActor in
-      evaluatePreviewSummaryValue = await store.previewEvaluateTaskBoard()
-    }
+    let previewState = evaluatePreviewStateValue
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Previewing task-board evaluate") {
+        let summary = await store.previewEvaluateTaskBoard()
+        await MainActor.run {
+          previewState.summary = summary
+        }
+      }
+    )
   }
 
   func evaluatePreviewRow(_ summary: TaskBoardEvaluationSummary) -> some View {
@@ -155,4 +161,10 @@ extension TaskBoardOverviewView {
       )
     }
   }
+}
+
+@MainActor
+@Observable
+final class TaskBoardEvaluatePreviewState {
+  var summary: TaskBoardEvaluationSummary?
 }

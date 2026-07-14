@@ -8,6 +8,7 @@ struct TaskBoardOrchestratorSummaryView: View {
   let onStart: (() -> Void)?
   let onStop: (() -> Void)?
   let onRunOnce: (() -> Void)?
+  let onStepModeChange: (@MainActor @Sendable (Bool) -> Void)?
   @Environment(\.fontScale)
   private var fontScale
 
@@ -36,7 +37,8 @@ struct TaskBoardOrchestratorSummaryView: View {
     isActionInFlight: Bool = false,
     onStart: (() -> Void)? = nil,
     onStop: (() -> Void)? = nil,
-    onRunOnce: (() -> Void)? = nil
+    onRunOnce: (() -> Void)? = nil,
+    onStepModeChange: (@MainActor @Sendable (Bool) -> Void)? = nil
   ) {
     self.status = status
     self.latestEvaluation = latestEvaluation
@@ -44,6 +46,7 @@ struct TaskBoardOrchestratorSummaryView: View {
     self.onStart = onStart
     self.onStop = onStop
     self.onRunOnce = onRunOnce
+    self.onStepModeChange = onStepModeChange
   }
 
   var body: some View {
@@ -96,6 +99,9 @@ struct TaskBoardOrchestratorSummaryView: View {
           tint: workflowStatusTint(for: item.status)
         )
       }
+      if !status.heldDispatches.items.isEmpty {
+        summaryPill("Held", "\(status.heldDispatches.count)", tint: HarnessMonitorTheme.caution)
+      }
     }
   }
 
@@ -107,6 +113,21 @@ struct TaskBoardOrchestratorSummaryView: View {
   }
 
   @ViewBuilder private var controlButtons: some View {
+    if let onStepModeChange {
+      Toggle(
+        "Step Mode",
+        isOn: Binding(
+          get: { status.stepMode },
+          set: { enabled in onStepModeChange(enabled) }
+        )
+      )
+      .toggleStyle(.switch)
+      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+      .disabled(isActionInFlight)
+      .help("Pause the continuous loop and expose manual task-board stages")
+      .accessibilityIdentifier("harness.task-board.orchestrator.step-mode")
+    }
+
     if status.running {
       if let onStop {
         Button {

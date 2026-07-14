@@ -80,6 +80,7 @@ struct TaskBoardOverviewHost: View {
       onStartTaskBoardOrchestrator: startTaskBoardOrchestrator,
       onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator,
       onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce,
+      onSetTaskBoardStepMode: setTaskBoardStepMode,
       decisionItems: store.supervisorOpenDecisionPresentationItems,
       decisionsByID: store.supervisorOpenDecisionsByID
     )
@@ -256,6 +257,14 @@ struct TaskBoardOverviewHost: View {
     Task { @MainActor in
       await store.runTaskBoardOrchestratorOnce(request: request)
     }
+  }
+
+  private func setTaskBoardStepMode(_ enabled: Bool) {
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: enabled ? "Enabling task-board step mode" : "Disabling task-board step mode") {
+        await store.setTaskBoardStepMode(enabled: enabled)
+      }
+    )
   }
 }
 
