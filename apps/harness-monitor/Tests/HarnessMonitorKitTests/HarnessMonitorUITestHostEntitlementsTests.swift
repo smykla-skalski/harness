@@ -151,11 +151,17 @@ struct HarnessMonitorAppBundleMetadataTests {
     )
 
     #expect(appSource.contains("@Environment(\\.scenePhase)"))
+    #expect(appSource.contains("@State private var wasBackgrounded = false"))
     let activationHandlerStart = try #require(
       appSource.range(of: ".onChange(of: scenePhase)")
     )
     let activationHandlerSource = appSource[activationHandlerStart.lowerBound...]
-    #expect(activationHandlerSource.contains("guard newPhase == .active"))
+    #expect(activationHandlerSource.contains("if newPhase == .background"))
+    #expect(activationHandlerSource.contains("wasBackgrounded = true"))
+    #expect(
+      activationHandlerSource.contains("guard newPhase == .active, wasBackgrounded")
+    )
+    #expect(activationHandlerSource.contains("wasBackgrounded = false"))
     #expect(activationHandlerSource.contains("await store.load()"))
   }
 

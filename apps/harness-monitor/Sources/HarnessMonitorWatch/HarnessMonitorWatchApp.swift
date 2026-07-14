@@ -14,6 +14,7 @@ struct HarnessMonitorWatchApp: App {
   @Environment(\.scenePhase)
   private var scenePhase
   @State private var store: MirrorStore
+  @State private var wasBackgrounded = false
   private let pairingReceiver: WatchPairingSessionReceiver
 
   init() {
@@ -86,9 +87,14 @@ struct HarnessMonitorWatchApp: App {
           }
         }
         .onChange(of: scenePhase) { _, newPhase in
-          guard newPhase == .active else {
+          if newPhase == .background {
+            wasBackgrounded = true
             return
           }
+          guard newPhase == .active, wasBackgrounded else {
+            return
+          }
+          wasBackgrounded = false
           Task {
             await store.load()
           }
