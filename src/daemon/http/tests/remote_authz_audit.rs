@@ -1,4 +1,9 @@
+use axum::extract::State;
 use axum::http::{Request, StatusCode};
+use axum::middleware;
+use axum::response::IntoResponse;
+use axum::routing::get;
+use axum::{Json, Router};
 use futures_util::{Sink, SinkExt as _, Stream, StreamExt as _};
 use rusqlite::Connection;
 use serde_json::json;
@@ -73,6 +78,78 @@ async fn remote_authorization_audit_records_http_allow_and_deny() {
         denied.error_detail.as_deref(),
         Some("remote client scope is insufficient")
     );
+
+    stop_server(server).await;
+}
+
+#[tokio::test]
+async fn remote_authorization_audit_records_http_handler_failures() {
+    const MISSING_SESSION_ID: &str = "00000000-0000-4000-8000-000000000001";
+
+    let state = remote_state_with_viewer();
+    let audit_state = state.clone();
+    let (base_url, server) = serve_remote(state).await;
+
+    let response = reqwest::Client::new()
+        .get(format!("{base_url}/v1/sessions/{MISSING_SESSION_ID}"))
+        .header("x-request-id", "audit-http-handler-failure")
+        .header(REMOTE_CLIENT_ID_HEADER, "viewer")
+        .bearer_auth(remote_token("viewer"))
+        .send()
+        .await
+        .expect("send failing authorized request");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let events = remote_audits(&audit_state);
+    let event = audit_for_request(&events, "audit-http-handler-failure");
+    assert_eq!(
+        event.route_or_method,
+        format!("GET {}", http_paths::SESSION_DETAIL)
+    );
+    assert_eq!(event.scope, RemoteAccessScope::Read);
+    assert_eq!(event.scope_decision, RemoteAuditScopeDecision::Allowed);
+    assert_eq!(event.outcome, RemoteAuditOutcome::Failure);
+    assert_eq!(
+        event.error_detail.as_deref(),
+        Some("remote HTTP handler returned status 400")
+    );
+    assert!(
+        !event
+            .error_detail
+            .as_deref()
+            .unwrap_or_default()
+            .contains(MISSING_SESSION_ID)
+    );
+
+    stop_server(server).await;
+}
+
+#[tokio::test]
+async fn remote_authorization_audit_update_failure_preserves_http_response() {
+    let state = remote_state_with_viewer();
+    let app = Router::new()
+        .route(http_paths::HEALTH, get(drop_audit_store_then_fail))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            super::super::auth::authorize_remote_http_request,
+        ))
+        .with_state(state);
+    let (base_url, server) = serve_router(app).await;
+
+    let response = reqwest::Client::new()
+        .get(format!("{base_url}{}", http_paths::HEALTH))
+        .header("x-request-id", "audit-http-update-failure")
+        .header(REMOTE_CLIENT_ID_HEADER, "viewer")
+        .bearer_auth(remote_token("viewer"))
+        .send()
+        .await
+        .expect("send request whose audit update fails");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = response
+        .json::<serde_json::Value>()
+        .await
+        .expect("handler error json");
+    assert_eq!(body["error"]["code"], "HANDLER_FAILURE");
 
     stop_server(server).await;
 }
@@ -215,6 +292,44 @@ async fn remote_authorization_audit_records_websocket_methods() {
 }
 
 #[tokio::test]
+async fn remote_authorization_audit_records_websocket_handler_failures() {
+    let state = remote_state_with_viewer();
+    let audit_state = state.clone();
+    let (base_url, server) = serve_remote(state).await;
+    let request = remote_ws_request(&base_url, "viewer", "audit-ws-failure-handshake");
+    let (mut socket, _) = connect_async(request).await.expect("connect websocket");
+
+    let response = ws_rpc(
+        &mut socket,
+        "audit-ws-handler-failure",
+        ws_methods::SESSION_DETAIL,
+    )
+    .await;
+    assert_eq!(response["error"]["code"], "MISSING_PARAM");
+
+    let events = remote_audits(&audit_state);
+    let event = audit_for_request(&events, "audit-ws-handler-failure");
+    assert_eq!(event.route_or_method, ws_methods::SESSION_DETAIL);
+    assert_eq!(event.scope, RemoteAccessScope::Read);
+    assert_eq!(event.scope_decision, RemoteAuditScopeDecision::Allowed);
+    assert_eq!(event.outcome, RemoteAuditOutcome::Failure);
+    assert_eq!(
+        event.error_detail.as_deref(),
+        Some("remote WebSocket handler returned error MISSING_PARAM")
+    );
+    assert!(
+        !event
+            .error_detail
+            .as_deref()
+            .unwrap_or_default()
+            .contains("session_id")
+    );
+
+    let _ = socket.close(None).await;
+    stop_server(server).await;
+}
+
+#[tokio::test]
 async fn remote_authorization_audit_fails_closed_websocket_dispatch() {
     let state = remote_state_with_viewer();
     let audit_state = state.clone();
@@ -290,6 +405,14 @@ fn drop_remote_audit_table(state: &DaemonHttpState) {
         .expect("drop remote audit table");
 }
 
+async fn drop_audit_store_then_fail(State(state): State<DaemonHttpState>) -> impl IntoResponse {
+    drop_remote_audit_table(&state);
+    (
+        StatusCode::BAD_REQUEST,
+        Json(json!({"error": {"code": "HANDLER_FAILURE"}})),
+    )
+}
+
 fn remote_token(client_id: &str) -> String {
     format!("remote-token-secret-{client_id}")
 }
@@ -350,11 +473,14 @@ where
 }
 
 async fn serve_remote(state: DaemonHttpState) -> (String, JoinHandle<()>) {
+    serve_router(super::super::daemon_http_router(state)).await
+}
+
+async fn serve_router(app: Router) -> (String, JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind listener");
     let addr = listener.local_addr().expect("listener address");
-    let app = super::super::daemon_http_router(state);
     let server = tokio::spawn(async move {
         axum::serve(
             listener,

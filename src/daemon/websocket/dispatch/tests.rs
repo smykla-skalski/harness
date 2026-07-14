@@ -7,6 +7,7 @@ use crate::daemon::remote_identity::{
     RemoteAuditOutcome, RemoteAuditScopeDecision, RemoteClientRegistration, RemoteStoredClient,
     RemoteTokenHash,
 };
+use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -176,6 +177,35 @@ async fn remote_ws_dispatch_preserves_unknown_method_errors() {
     assert_eq!(error.code, "UNKNOWN_METHOD");
     assert!(error.message.contains("remote.unscoped"));
     assert_eq!(error.status_code, None);
+}
+
+#[tokio::test]
+async fn remote_ws_audit_update_failure_preserves_handler_response() {
+    let state = super::super::test_support::test_http_state_with_db();
+    let request = ws_request("req-audit-update-failure", ws_methods::PING);
+    let receipt = RemoteAuthorizationAudit::allowed(
+        &request.id,
+        "viewer",
+        &request.method,
+        RemoteAccessScope::Read,
+        Some("127.0.0.1"),
+    )
+    .record(state.async_db.get())
+    .await
+    .expect("record allowed websocket audit");
+    Connection::open(state.db_path.as_ref().expect("db path"))
+        .expect("open audit database")
+        .execute("DROP TABLE remote_audit_events", [])
+        .expect("drop remote audit table");
+    let handler_response =
+        error_response(&request.id, "HANDLER_FAILURE", "original handler failure");
+
+    let response =
+        complete_remote_ws_audit(&request, &state, Some(receipt), handler_response).await;
+    let error = response.error.expect("handler error");
+
+    assert_eq!(error.code, "HANDLER_FAILURE");
+    assert_eq!(error.message, "original handler failure");
 }
 
 #[tokio::test]
