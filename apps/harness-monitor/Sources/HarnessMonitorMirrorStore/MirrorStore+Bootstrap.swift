@@ -43,13 +43,28 @@ extension MirrorStore {
   }
 
   private func activateStoredWatchPairingIfNeeded() async throws -> Bool {
-    guard profile == .watch, demoModeEnabled, let credentialStore else {
+    guard profile == .watch, demoModeEnabled, let identityStore, let credentialStore else {
       return false
     }
     let credentials = try await credentialStore.loadAll()
-    guard !credentials.isEmpty else { return false }
-    demoModeEnabled = false
+    var hasUsableCredential = false
+    for credential in credentials
+    where try await identityStore.load(id: credential.deviceIdentityID) != nil {
+      hasUsableCredential = true
+      break
+    }
+    guard hasUsableCredential else { return false }
+    leaveDemoModeForStoredWatchPairing()
     return true
+  }
+
+  private func leaveDemoModeForStoredWatchPairing() {
+    demoModeEnabled = false
+    snapshot = .empty()
+    selectedStationID = ""
+    syncStatus = .syncing
+    persistSharedSnapshot(snapshot)
+    reconcileLiveActivity(snapshot)
   }
 
   /// Resets transient pairing state and reloads after the iPhone pushes new

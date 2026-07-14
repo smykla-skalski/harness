@@ -18,6 +18,7 @@ final class WatchRemoteDaemonPairingStoreTests: XCTestCase {
     XCTAssertEqual(fixture.store.pairedCredentials, [fixture.credential])
     XCTAssertEqual(fixture.store.selectedStationID, fixture.credential.stationID)
     XCTAssertNotEqual(fixture.store.presentedSyncStatus, .demo)
+    XCTAssertTrue(fixture.store.snapshot.taskBoardItems.isEmpty)
   }
 
   func testWatchForegroundRefreshActivatesStoredPairingInsteadOfDemoFixtures() async throws {
@@ -52,6 +53,37 @@ final class WatchRemoteDaemonPairingStoreTests: XCTestCase {
 
     XCTAssertEqual(store.snapshot, snapshot)
     XCTAssertEqual(store.syncStatus, .demo)
+  }
+
+  func testWatchForegroundRefreshKeepsDemoWhenStoredCredentialIdentityIsMissing() async throws {
+    let fixture = try WatchRemotePairingStoreFixture(device: .iOS)
+    let store = MirrorStore(
+      demoModeEnabled: true,
+      profile: .watch,
+      identityStore: InMemoryMobileDeviceIdentityStore(),
+      credentialStore: fixture.credentialStore,
+      syncClientFactory: WatchRemovalSyncClientFactory(),
+      sharedSnapshotStore: nil
+    )
+    let demoSnapshot = store.snapshot
+
+    await store.refreshForegroundState()
+
+    XCTAssertTrue(store.demoModeEnabled)
+    XCTAssertEqual(store.snapshot, demoSnapshot)
+    XCTAssertEqual(store.syncStatus, .demo)
+  }
+
+  func testWatchForegroundRefreshLoopRequiresBothPairingStores() {
+    let store = MirrorStore(
+      demoModeEnabled: true,
+      profile: .watch,
+      credentialStore: InMemoryMobilePairedStationCredentialStore(),
+      syncClientFactory: WatchRemovalSyncClientFactory(),
+      sharedSnapshotStore: nil
+    )
+
+    XCTAssertFalse(store.shouldRunForegroundRefresh)
   }
 
   func testWatchLoadReportsStoredPairingReadFailureInsteadOfDemo() async {

@@ -174,9 +174,9 @@ extension MirrorStore {
     }
   }
 
-  private var shouldRunForegroundRefresh: Bool {
+  var shouldRunForegroundRefresh: Bool {
     if profile == .watch, demoModeEnabled {
-      return credentialStore != nil
+      return identityStore != nil && credentialStore != nil
     }
     return !demoModeEnabled && !stationIDsForRefresh().isEmpty
   }
