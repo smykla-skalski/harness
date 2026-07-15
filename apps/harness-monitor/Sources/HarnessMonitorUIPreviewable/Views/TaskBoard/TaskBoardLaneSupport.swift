@@ -120,21 +120,64 @@ struct TaskBoardCardLeadingIcon: View {
   }
 }
 
+enum TaskBoardCardPillDensity {
+  case standard
+  case compact
+}
+
+extension EnvironmentValues {
+  @Entry var taskBoardCardPillDensity: TaskBoardCardPillDensity = .standard
+}
+
 struct TaskBoardCardPill: View {
   let label: String
   let tint: Color
   var systemImage: String?
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.taskBoardCardPillDensity)
+  private var pillDensity
 
   private var metrics: TaskBoardLaneMetrics { TaskBoardLaneMetrics(fontScale: fontScale) }
   private var pillFont: Font {
-    HarnessMonitorTextSize.scaledFont(.caption2.weight(.bold), by: fontScale)
+    switch pillDensity {
+    case .standard:
+      HarnessMonitorTextSize.scaledFont(.caption2.weight(.bold), by: fontScale)
+    case .compact:
+      HarnessMonitorTextSize.scaledFont(
+        .system(size: 8, weight: .semibold),
+        by: fontScale
+      )
+    }
+  }
+  private var contentSpacing: CGFloat {
+    switch pillDensity {
+    case .standard:
+      HarnessMonitorTheme.spacingXS
+    case .compact:
+      metrics.rowTextSpacing * 0.5
+    }
+  }
+  private var horizontalPadding: CGFloat {
+    switch pillDensity {
+    case .standard:
+      metrics.pillHorizontalPadding
+    case .compact:
+      max(HarnessMonitorTheme.spacingXS, metrics.pillHorizontalPadding * 0.5)
+    }
+  }
+  private var verticalPadding: CGFloat {
+    switch pillDensity {
+    case .standard:
+      metrics.pillVerticalPadding
+    case .compact:
+      max(1, metrics.pillVerticalPadding * 0.25)
+    }
   }
 
   var body: some View {
     let pillFont = pillFont
-    return HStack(spacing: HarnessMonitorTheme.spacingXS) {
+    return HStack(spacing: contentSpacing) {
       if let systemImage {
         Image(systemName: systemImage)
           .font(pillFont)
@@ -145,8 +188,8 @@ struct TaskBoardCardPill: View {
     }
     .foregroundStyle(tint)
     .lineLimit(1)
-    .padding(.horizontal, metrics.pillHorizontalPadding)
-    .padding(.vertical, metrics.pillVerticalPadding)
+    .padding(.horizontal, horizontalPadding)
+    .padding(.vertical, verticalPadding)
     .harnessContentPill(tint: tint)
   }
 }
@@ -189,7 +232,7 @@ struct TaskBoardCardFooter<Badges: View>: View {
   }
 
   var body: some View {
-    HStack(alignment: .bottom, spacing: metrics.laneBodyTopPadding) {
+    HStack(alignment: .center, spacing: metrics.rowTextSpacing) {
       Text(repository)
         .font(repositoryFont)
         .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
@@ -197,13 +240,14 @@ struct TaskBoardCardFooter<Badges: View>: View {
         .truncationMode(.middle)
         .multilineTextAlignment(.leading)
         .layoutPriority(2)
-      Spacer(minLength: metrics.laneBodyTopPadding)
       HarnessMonitorWrapLayout(
-        spacing: metrics.laneBodyTopPadding,
-        lineSpacing: metrics.laneBodyTopPadding
+        spacing: metrics.rowTextSpacing,
+        lineSpacing: metrics.rowTextSpacing
       ) {
         badges
       }
+      .environment(\.taskBoardCardPillDensity, .compact)
+      .frame(maxWidth: .infinity, alignment: .leading)
       .layoutPriority(1)
       TaskBoardCardUpdatedAtLabel(updatedAt: updatedAt, font: updatedAtFont)
         .layoutPriority(3)
