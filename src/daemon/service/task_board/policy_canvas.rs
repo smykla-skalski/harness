@@ -66,14 +66,18 @@ pub(super) fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
     let _ = workspace;
 }
 
-/// Emit the `policy_pipeline` change event so websocket subscribers re-query.
+/// Emit the `task_board:policy_pipeline` change event so websocket subscribers
+/// re-query.
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
 )]
 pub(super) async fn bump_change_policy(db: &AsyncDaemonDb) {
     if let Err(error) = db.bump_change(POLICY_PIPELINE_CHANGE_CHANNEL).await {
-        tracing::warn!(%error, "failed to bump policy_pipeline change marker");
+        tracing::warn!(
+            %error,
+            "failed to bump task_board:policy_pipeline change marker"
+        );
     }
 }
 

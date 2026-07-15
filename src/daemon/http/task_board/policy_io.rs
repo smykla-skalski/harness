@@ -14,19 +14,23 @@ use super::super::response::timed_json;
 use super::super::{DaemonHttpState, require_async_db, task_board_route_executor};
 use super::authenticated_request;
 
+const POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
+
 pub(super) fn merge_policy_io_routes(router: Router<DaemonHttpState>) -> Router<DaemonHttpState> {
-    // Remote requests are bounded by the runtime-configured body middleware
-    // before extraction; local daemon requests intentionally ignore remote limits.
+    // Keep a finite last-resort ceiling for every buffered transfer request.
+    // Remote requests are also bounded by the runtime-configured middleware.
     router
         .route(http_paths::POLICY_CANVAS_EXPORT, post(post_policy_export))
         .route(http_paths::POLICY_CANVAS_IMPORT, post(post_policy_import))
         .route(
             http_paths::POLICIES_DUMP,
-            post(post_policy_dump).layer(DefaultBodyLimit::disable()),
+            post(post_policy_dump)
+                .layer(DefaultBodyLimit::max(POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES)),
         )
         .route(
             http_paths::POLICIES_IMPORT,
-            post(post_policy_import_batch).layer(DefaultBodyLimit::disable()),
+            post(post_policy_import_batch)
+                .layer(DefaultBodyLimit::max(POLICY_TRANSFER_HTTP_BODY_LIMIT_BYTES)),
         )
 }
 
