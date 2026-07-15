@@ -2,6 +2,7 @@
 //! policy canvases; `mapper` converts between the domain `PolicyGraph` /
 //! `PolicyCanvasRecord` / `PolicyCanvasWorkspace` and the row structs in `rows`.
 
+mod approval_grants;
 mod decisions_async;
 mod mapper;
 mod rows;
@@ -9,3 +10,9 @@ mod sql;
 mod store_async;
 mod store_canvas_async;
 mod store_sync;
+
+pub(crate) use approval_grants::{
+    NewApprovalGrant, consume_approval_grant_in_tx, consume_approval_grant_in_tx_at,
+    live_approval_grant_in_tx_at, restore_consumed_approval_grant_in_tx_at,
+};
+pub(crate) use store_async::load_workspace_in_tx;

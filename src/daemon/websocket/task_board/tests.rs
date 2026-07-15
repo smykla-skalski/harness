@@ -77,6 +77,29 @@ async fn ws_unknown_task_board_method_returns_none() {
     assert!(response.is_none());
 }
 
+#[tokio::test]
+async fn ws_task_board_dispatch_pick_accepts_omitted_params() {
+    let state = test_http_state_with_db();
+    let connection = Arc::new(Mutex::new(ConnectionState::new()));
+    let request: WsRequest = serde_json::from_value(json!({
+        "id": "ws-dispatch-pick-default-params",
+        "method": ws_methods::TASK_BOARD_DISPATCH_PICK,
+    }))
+    .expect("deserialize dispatch-pick request");
+    assert!(request.params.is_null());
+
+    let response = dispatch_task_board_method(&request, &state, &connection)
+        .await
+        .expect("dispatch-pick response");
+
+    assert!(
+        response.error.is_none(),
+        "omitted dispatch-pick params returned an error: {:?}",
+        response.error
+    );
+    assert_eq!(response.result, Some(json!({})));
+}
+
 #[test]
 fn ws_task_board_sync_persists_exactly_one_audit_event() {
     let sandbox = tempdir().expect("tempdir");

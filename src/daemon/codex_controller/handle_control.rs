@@ -211,6 +211,7 @@ impl CodexControllerHandle {
         snapshot.error = None;
         snapshot.pending_approvals.clear();
         snapshot.updated_at = utc_now();
+        super::completion_evidence::record_clean_worktree_baseline(&mut snapshot);
         self.save_and_broadcast(&snapshot)?;
         self.sync_orchestration_status_for_run(&snapshot)?;
         Ok(snapshot)

@@ -25,6 +25,8 @@ use super::{
 const NODE_WIDTH: i32 = 168;
 const NODE_HEIGHT: i32 = 96;
 
+#[path = "tests_approval.rs"]
+mod approval_routing;
 #[path = "tests_workspace.rs"]
 mod canvas_workspace;
 #[path = "tests_golive.rs"]

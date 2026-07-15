@@ -113,6 +113,13 @@ pub const POLICY_NODE_KIND_DESCRIPTORS: &[PolicyNodeKindDescriptor] = &[
         &[],
     ),
     descriptor(
+        "approval_gate",
+        "Approval gate",
+        PolicyNodeCategory::Review,
+        &["in"],
+        &["approved"],
+    ),
+    descriptor(
         "action_step",
         "Action step",
         PolicyNodeCategory::Transform,
@@ -234,6 +241,7 @@ impl PolicyGraphNodeKind {
             Self::Hub => "hub",
             Self::HumanGate { .. } => "human_gate",
             Self::ConsensusGate { .. } => "consensus_gate",
+            Self::ApprovalGate(_) => "approval_gate",
             Self::DryRunGate { .. } => "dry_run_gate",
             Self::SupervisorRule { .. } => "supervisor_rule",
             Self::Finish(_) => "finish",
@@ -297,7 +305,7 @@ mod tests {
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), total, "node-kind descriptor ids must be unique");
-        assert_eq!(total, 21, "catalog covers every node kind");
+        assert_eq!(total, 22, "catalog covers every node kind");
     }
 
     #[test]
@@ -370,7 +378,7 @@ mod tests {
 
     #[test]
     fn descriptor_template_ports_match_the_canvas_palette() {
-        let expected: [(&str, &[&str], &[&str]); 21] = [
+        let expected: [(&str, &[&str], &[&str]); 22] = [
             ("trigger", &[], &["event"]),
             ("workflow_entry", &[], &["out"]),
             ("review_screenshot_paste", &[], &["image"]),
@@ -385,6 +393,7 @@ mod tests {
             ),
             ("human_gate", &["in"], &[]),
             ("consensus_gate", &["in"], &[]),
+            ("approval_gate", &["in"], &["approved"]),
             ("action_step", &["in"], &["out"]),
             ("ocr_image", &["in"], &["text"]),
             ("resolve_review_pull_requests", &["in"], &["pull_requests"]),

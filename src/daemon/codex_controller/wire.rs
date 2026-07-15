@@ -61,7 +61,9 @@ pub(super) fn initialize_params(version: &str) -> Result<Value, CliError> {
 #[derive(Clone, Copy)]
 pub(super) struct ThreadParamsInput<'a> {
     pub(super) cwd: &'a str,
-    pub(super) sandbox: &'a str,
+    pub(super) runtime_workspace_roots: &'a [String],
+    pub(super) permissions: &'a str,
+    pub(super) config: Option<&'a Value>,
     pub(super) approval_policy: &'a str,
     pub(super) developer_instructions: &'a str,
     pub(super) thread_id: Option<&'a str>,
@@ -73,7 +75,9 @@ pub(super) fn thread_params(input: ThreadParamsInput<'_>) -> Result<Value, CliEr
         "codex thread params",
         &ThreadParams {
             cwd: input.cwd,
-            sandbox: input.sandbox,
+            runtime_workspace_roots: input.runtime_workspace_roots,
+            permissions: input.permissions,
+            config: input.config,
             approval_policy: input.approval_policy,
             approvals_reviewer: "user",
             developer_instructions: input.developer_instructions,
@@ -86,9 +90,9 @@ pub(super) fn thread_params(input: ThreadParamsInput<'_>) -> Result<Value, CliEr
 pub(super) fn turn_start_params(
     thread_id: &str,
     cwd: &str,
+    runtime_workspace_roots: &[String],
     prompt: &str,
     approval_policy: &str,
-    sandbox_policy: Value,
     model: Option<&str>,
     effort: Option<&str>,
 ) -> Result<Value, CliError> {
@@ -97,10 +101,10 @@ pub(super) fn turn_start_params(
         &TurnStartParams {
             thread_id,
             cwd,
+            runtime_workspace_roots,
             input: vec![InputItem::Text { text: prompt }],
             approval_policy,
             approvals_reviewer: "user",
-            sandbox_policy,
             model,
             effort,
         },
@@ -233,7 +237,10 @@ struct InitializeCapabilities {
 #[serde(rename_all = "camelCase")]
 struct ThreadParams<'a> {
     cwd: &'a str,
-    sandbox: &'a str,
+    runtime_workspace_roots: &'a [String],
+    permissions: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    config: Option<&'a Value>,
     approval_policy: &'a str,
     approvals_reviewer: &'a str,
     developer_instructions: &'a str,
@@ -248,10 +255,10 @@ struct ThreadParams<'a> {
 struct TurnStartParams<'a> {
     thread_id: &'a str,
     cwd: &'a str,
+    runtime_workspace_roots: &'a [String],
     input: Vec<InputItem<'a>>,
     approval_policy: &'a str,
     approvals_reviewer: &'a str,
-    sandbox_policy: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     model: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]

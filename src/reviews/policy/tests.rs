@@ -199,6 +199,8 @@ fn reviews_auto_workflow_does_not_handle_plain_review_approval() {
         action: PolicyAction::SubmitReview,
         subject: PolicySubject::default(),
         evidence: PolicyEvidence::default(),
+        evaluated_at: None,
+        approvals: Vec::new(),
     });
 
     assert_eq!(

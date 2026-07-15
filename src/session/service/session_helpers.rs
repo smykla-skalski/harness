@@ -67,6 +67,17 @@ pub(crate) fn require_active(state: &SessionState) -> Result<(), CliError> {
     Ok(())
 }
 
+pub(crate) fn require_managed_run_mutation(state: &SessionState) -> Result<(), CliError> {
+    if !state.status.allows_managed_run_mutation() {
+        return Err(CliErrorKind::session_not_active(format!(
+            "session '{}' is {:?}; managed-run mutations require an active or leaderless degraded session",
+            state.session_id, state.status
+        ))
+        .into());
+    }
+    Ok(())
+}
+
 pub(crate) fn require_endable_session(state: &SessionState) -> Result<(), CliError> {
     if !state.status.allows_end_session() {
         return Err(CliErrorKind::session_not_active(format!(
@@ -343,9 +354,9 @@ pub(crate) fn require_active_worker_target_agent(
             "agent '{agent_id}' not found"
         )))
     })?;
-    if agent.role != SessionRole::Worker {
+    if !matches!(agent.role, SessionRole::Worker | SessionRole::Leader) {
         return Err(CliErrorKind::session_agent_conflict(format!(
-            "agent '{agent_id}' is a {:?}, not a worker",
+            "agent '{agent_id}' is a {:?}, not worker-capable",
             agent.role
         ))
         .into());

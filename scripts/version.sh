@@ -231,8 +231,12 @@ check_sync() {
   lock_aff_version="$(lock_package_version "$CARGO_LOCK" "aff")"
   marketing_version="$(build_settings_marketing_version)"
   current_version="$(build_settings_current_version)"
-  daemon_version="$(daemon_plist_version)"
-  daemon_build_version="$(daemon_plist_build_version)"
+  if [ "$(uname -s)" = "Darwin" ]; then
+    daemon_version="$(daemon_plist_version)"
+    daemon_build_version="$(daemon_plist_build_version)"
+  else
+    echo "version: skipping daemon plist version check off macOS"
+  fi
 
   [ "$testkit_version" = "$version" ] || errors+=("testkit/Cargo.toml version $testkit_version != Cargo.toml version $version")
   [ "$aff_version" = "$version" ] || errors+=("aff/Cargo.toml version $aff_version != Cargo.toml version $version")
@@ -241,8 +245,10 @@ check_sync() {
   [ "$lock_aff_version" = "$version" ] || errors+=("Cargo.lock aff version $lock_aff_version != Cargo.toml version $version")
   [ "$marketing_version" = "$version" ] || errors+=("apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift MARKETING_VERSION $marketing_version != Cargo.toml version $version")
   [ "$current_version" = "$version" ] || errors+=("apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift CURRENT_PROJECT_VERSION $current_version != Cargo.toml version $version")
-  [ "$daemon_version" = "$version" ] || errors+=("apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist version $daemon_version != Cargo.toml version $version")
-  [ "$daemon_build_version" = "$version" ] || errors+=("apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist build version $daemon_build_version != Cargo.toml version $version")
+  if [ "$(uname -s)" = "Darwin" ]; then
+    [ "$daemon_version" = "$version" ] || errors+=("apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist version $daemon_version != Cargo.toml version $version")
+    [ "$daemon_build_version" = "$version" ] || errors+=("apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist build version $daemon_build_version != Cargo.toml version $version")
+  fi
 
   if generated_monitor_pbxproj_exists; then
     while IFS= read -r generated_marketing_version; do

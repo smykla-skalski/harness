@@ -107,6 +107,8 @@ impl TaskBoardOrchestrator {
         Ok(TaskBoardOrchestratorStatus {
             enabled: state.enabled,
             running: state.running,
+            step_mode: false,
+            held_dispatches: TaskBoardHeldDispatchSummary::default(),
             current_tick: None,
             last_run: None,
             workflow_execution_counts: Vec::new(),
@@ -316,13 +318,16 @@ impl TaskBoardOrchestrator {
         &self,
         state: TaskBoardOrchestratorState,
     ) -> Result<TaskBoardOrchestratorStatus, CliError> {
+        let settings = self.settings()?;
         Ok(TaskBoardOrchestratorStatus {
             enabled: state.enabled,
             running: state.running,
+            step_mode: settings.step_mode,
+            held_dispatches: TaskBoardHeldDispatchSummary::default(),
             current_tick: state.current_tick,
             last_run: state.last_run,
             workflow_execution_counts: self.workflow_execution_counts()?,
-            settings: self.settings()?,
+            settings,
         })
     }
 

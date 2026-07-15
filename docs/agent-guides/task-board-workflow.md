@@ -31,11 +31,14 @@ dispatch readiness, and overview reporting.
 | `approve` | Approve a submitted plan and move the item to ready work. |
 | `sync` | Preview or apply external synchronization. |
 | `dispatch` | Print session dispatch plans for board tasks, or apply ready plans. |
+| `dispatch-pick` | Preview the highest-priority ready task and rendered worker prompt. |
+| `dispatch-deliver` | Preview or start one held worker dispatch. |
 | `evaluate` | Reconcile linked session work back into board workflow state. |
 | `audit` | Print task-board totals, ready count, blocked count, and status counts. |
 | `project` | Print project overview counts. |
 | `machine` | Print worker-mode overview counts. |
 | `orchestrator` | Manage autonomous task-board ticks and durable settings. |
+| `policy` | Manage spawn-policy switches and pending approval grants. |
 
 Common read flag: `--json`.
 
@@ -148,6 +151,17 @@ automatically resolved on the next pull sync.
    attaches the board item id, session task id, workflow execution id, and
    task-board capabilities to the started agent.
 
+   Step-mode dispatches can be inspected and delivered separately. `dispatch-pick`
+   returns the highest-priority ready todo plus its rendered prompt without
+   reserving it. `dispatch-deliver --dry-run` previews an already-held intent;
+   omit `--dry-run` to start its worker.
+
+   ```bash
+   harness task-board dispatch-pick --json
+   harness task-board dispatch-deliver --item-id <task-id> --dry-run --json
+   harness task-board dispatch-deliver --item-id <task-id> --json
+   ```
+
 3. Mark active work explicitly when work starts outside applied dispatch.
 
    ```bash
@@ -202,6 +216,8 @@ harness task-board project --json [--status <status>]
 harness task-board machine --json [--status <status>]
 harness task-board sync --json [--provider <provider>] [--direction <pull|push|both>] [--apply]
 harness task-board dispatch --dry-run --json [--item-id <id>] [--status <status>]
+harness task-board dispatch-pick --json
+harness task-board dispatch-deliver --item-id <id> --dry-run --json
 harness task-board evaluate --json [--item-id <id>] [--status <status>]
 harness task-board orchestrator status --json
 harness task-board orchestrator settings --json
@@ -348,6 +364,18 @@ Merge evidence predicates are:
 | `risk_score` | less than or equal to threshold `40` | dry-run-only `risk_above_threshold` |
 
 Missing merge evidence requires a human. Invalid graphs also require a human.
+
+Spawn gating has two fail-closed switches and durable approval grants. Toggle
+the switches with explicit boolean values, list pending grants, then approve or
+deny one grant with an optional actor identity:
+
+```bash
+harness task-board policy spawn-requires-live-policy --enabled true --json
+harness task-board policy spawn-kill-switch --enabled true --json
+harness task-board policy grants --json
+harness task-board policy grant-resolve <grant-id> --approve --actor <actor> --json
+harness task-board policy grant-resolve <grant-id> --deny --actor <actor> --json
+```
 
 ## Operating Rules
 

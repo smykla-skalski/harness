@@ -1,13 +1,16 @@
 mod active_runs;
 mod approvals;
+mod completion_evidence;
 mod effort;
 mod events;
 mod handle;
 mod handle_control;
 mod handle_orchestration;
+mod handle_orchestration_lifecycle;
 mod handle_preflight;
 mod handle_storage;
 mod orchestration;
+mod orchestration_registration;
 mod rpc;
 mod transcript;
 mod wire;

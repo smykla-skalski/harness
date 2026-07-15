@@ -16,18 +16,22 @@ pub mod store;
 pub mod summary;
 pub mod transport;
 pub mod types;
+mod worker_prompt;
 
 pub use dispatch::{
     DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchFailure,
     DispatchFailureKind, DispatchPlan, DispatchReadiness, EvaluatorIntent, FollowUpPhase,
     ReviewerIntent, SessionIntent, TaskCreationIntent, WorkerIntent,
 };
+pub(crate) use dispatch::{
+    SpawnGateSwitches, build_dispatch_plans_with_policy, consumed_grant_id,
+    dispatch_policy_from_graph, machine_mismatch_plan_with_policy,
+};
 #[cfg(test)]
 pub use dispatch::{
     build_dispatch_plan, build_dispatch_plans, build_dispatch_plans_with_policy_root,
     filter_for_local_machine, machine_mismatch_plan_with_policy_root,
 };
-pub(crate) use dispatch::{build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy};
 pub use evaluation::{
     EvaluationSignalFailure, TaskBoardEvaluationDecision, TaskBoardEvaluationOutcome,
     TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, evaluate_task_board_item,
@@ -58,7 +62,8 @@ pub use machines::MachineRegistry;
 #[cfg(test)]
 pub use orchestrator::TaskBoardOrchestrator;
 pub use orchestrator::{
-    TaskBoardGitHubInboxConfig, TaskBoardGitHubProjectConfig, TaskBoardOrchestratorDispatchInput,
+    TaskBoardGitHubInboxConfig, TaskBoardGitHubProjectConfig, TaskBoardHeldDispatchItem,
+    TaskBoardHeldDispatchSummary, TaskBoardOrchestratorDispatchInput,
     TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorRunStatus,
     TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorState,
@@ -70,8 +75,9 @@ pub use planning::{
     begin_planning, revoke_plan, submit_plan,
 };
 pub use policy::{
-    BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput,
-    PolicyReasonCode, PolicySubject,
+    BuiltInPolicyGate, PolicyAction, PolicyApprovalGrant, PolicyApprovalGrantState,
+    PolicyApprovalState, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput, PolicyReasonCode,
+    PolicySubject,
 };
 pub use policy_graph::{
     GraphPolicyGate, POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PolicyCanvasPoint,
@@ -114,3 +120,4 @@ pub use types::{
     TaskBoardItem, TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowState,
     TaskBoardWorkflowStatus, TaskUsage,
 };
+pub(crate) use worker_prompt::{WorkerPromptContext, plan_worker_prompt, render_worker_prompt};

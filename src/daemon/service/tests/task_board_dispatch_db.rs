@@ -2,6 +2,8 @@ use super::*;
 
 use crate::daemon::db::ReservedTaskBoardDispatch;
 use crate::daemon::protocol::SessionStartRequest;
+use std::collections::HashMap;
+
 use crate::task_board::{TaskBoardItem, build_dispatch_plans_with_policy};
 
 #[test]
@@ -28,12 +30,20 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
                 .task_board_item("dispatch-crash-recovery")
                 .await
                 .expect("load task board item");
-            let plan = build_dispatch_plans_with_policy(&[item], None).remove(0);
+            let plan = build_dispatch_plans_with_policy(
+                &[item],
+                None,
+                None,
+                crate::task_board::SpawnGateSwitches::default(),
+                &HashMap::new(),
+            )
+            .remove(0);
             let reserved = db
                 .reserve_task_board_dispatch(
                     &plan,
                     crate::session::types::CONTROL_PLANE_ACTOR_ID,
                     Some(project.to_string_lossy().as_ref()),
+                    false,
                 )
                 .await
                 .expect("reserve dispatch");
@@ -125,6 +135,14 @@ fn prepared_dispatch_resumes_without_duplicate_session_or_task() {
             assert_eq!(
                 linked.work_item_id.as_deref(),
                 Some(preparation.work_item_id.as_str())
+            );
+            assert_eq!(
+                linked.workflow.branch.as_deref(),
+                Some(resolved.state.branch_ref.as_str())
+            );
+            assert_eq!(
+                linked.workflow.worktree.as_deref(),
+                resolved.state.worktree_path.to_str()
             );
         });
     });

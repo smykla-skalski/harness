@@ -1,4 +1,9 @@
 use super::*;
+
+#[test]
+fn seeded_workspace_requires_live_spawn_policy() {
+    assert!(PolicyCanvasWorkspace::seeded().spawn_requires_live_policy);
+}
 #[test]
 fn switching_active_canvas_changes_active_policy_document() {
     let mut ws = PolicyCanvasWorkspace::seeded();

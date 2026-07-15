@@ -160,12 +160,7 @@ pub(crate) fn authored_reviews_policy_plan_from_document(
             )),
         });
     }
-    let input = PolicyInput {
-        workflow: Some(workflow_id.clone()),
-        action: PolicyAction::SubmitReview,
-        subject: policy_subject(target),
-        evidence: review_target_policy_evidence(target),
-    };
+    let input = submit_review_policy_input(&workflow_id, target);
     let Some(compiled) = document.compile_workflow(&workflow_id, &input) else {
         return Ok(ReviewsPolicyPlan {
             workflow_id: workflow_id.clone(),
@@ -305,6 +300,17 @@ fn policy_subject(target: &ReviewTarget) -> PolicySubject {
     }
 }
 
+fn submit_review_policy_input(workflow_id: &str, target: &ReviewTarget) -> PolicyInput {
+    PolicyInput {
+        workflow: Some(workflow_id.to_owned()),
+        action: PolicyAction::SubmitReview,
+        subject: policy_subject(target),
+        evidence: review_target_policy_evidence(target),
+        evaluated_at: None,
+        approvals: Vec::new(),
+    }
+}
+
 fn policy_reason_message(reason_code: PolicyReasonCode) -> &'static str {
     match reason_code {
         PolicyReasonCode::DefaultAllow => {
@@ -337,6 +343,16 @@ fn policy_reason_message(reason_code: PolicyReasonCode) -> &'static str {
         }
         PolicyReasonCode::DryRunRequired => {
             "reviews policy workflow is configured for dry-run only"
+        }
+        PolicyReasonCode::ApprovalRequired => {
+            "workflow requires a spawn approval before continuing"
+        }
+        PolicyReasonCode::ApprovalDenied => "workflow spawn approval was denied",
+        PolicyReasonCode::SpawnPolicyRequired => {
+            "spawn is blocked because no live enforced policy is active"
+        }
+        PolicyReasonCode::SpawnKillSwitchEngaged => {
+            "spawn is blocked because the kill switch is engaged"
         }
     }
 }

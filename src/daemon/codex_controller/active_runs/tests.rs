@@ -8,6 +8,9 @@ fn snapshot(run_id: &str) -> CodexRunSnapshot {
     CodexRunSnapshot {
         run_id: run_id.to_string(),
         session_id: "session-1".to_string(),
+        task_id: None,
+        board_item_id: None,
+        workflow_execution_id: None,
         session_agent_id: None,
         display_name: Some("Codex".to_string()),
         project_dir: "/tmp/project".to_string(),

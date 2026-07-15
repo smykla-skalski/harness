@@ -5,30 +5,47 @@ use tracing::warn;
 mod decisions;
 
 use super::{
-    PORT_DEFAULT, PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField,
-    PolicyEvidencePredicate, PolicyGraph, PolicyGraphDecision, PolicyGraphEdgeCondition,
-    PolicyGraphNode, PolicyGraphNodeId, PolicyGraphNodeKind, PolicyIfThenElseCondition,
-    PolicyReasonCode, PolicyRuntimeBoundary, PolicySwitchArm, PolicySwitchNode,
+    PORT_APPROVED, PORT_DEFAULT, PolicyApprovalRequest, PolicyDecision, PolicyEvidenceCheck,
+    PolicyEvidenceField, PolicyEvidencePredicate, PolicyGraph, PolicyGraphDecision,
+    PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeId, PolicyGraphNodeKind,
+    PolicyIfThenElseCondition, PolicyReasonCode, PolicyRuntimeBoundary, PolicySwitchArm,
+    PolicySwitchNode,
 };
-use crate::task_board::policy::{PolicyAction, PolicyInput};
+use crate::task_board::policy::{PolicyAction, PolicyApprovalState, PolicyInput};
 
 use decisions::{
     dry_run_only, require_consensus, require_human, supervisor_decision, supervisor_reason_code,
 };
+
+/// Side-effect signals collected while the pure evaluator walks the graph: the
+/// runtime wait boundaries and the pending-grant requests emitted by approval
+/// gates that had no existing grant.
+#[derive(Default)]
+struct EvaluationEffects {
+    boundaries: Vec<PolicyRuntimeBoundary>,
+    approval_requests: Vec<PolicyApprovalRequest>,
+}
 
 enum EvaluationStep {
     Continue(Vec<String>),
     Terminal(PolicyDecision),
 }
 
+/// A completed graph evaluation: the decision, the visited node ids, the runtime
+/// wait boundaries, and the pending-grant requests emitted by approval gates.
+type EvaluationOutcome = (
+    PolicyDecision,
+    Vec<String>,
+    Vec<PolicyRuntimeBoundary>,
+    Vec<PolicyApprovalRequest>,
+);
+
 impl PolicyGraph {
-    pub(super) fn evaluate_graph(
-        &self,
-        input: &PolicyInput,
-    ) -> Option<(PolicyDecision, Vec<String>, Vec<PolicyRuntimeBoundary>)> {
+    pub(super) fn evaluate_graph(&self, input: &PolicyInput) -> Option<EvaluationOutcome> {
         if !self.validate().is_valid() {
             return Some((
                 require_human(PolicyReasonCode::HumanRequired),
+                Vec::new(),
                 Vec::new(),
                 Vec::new(),
             ));
@@ -36,7 +53,7 @@ impl PolicyGraph {
         let mut pending = VecDeque::from([self.entry_node(input)?.id.clone()]);
         let mut visited = Vec::new();
         let mut visited_ids: HashSet<String> = HashSet::new();
-        let mut boundaries = Vec::new();
+        let mut effects = EvaluationEffects::default();
         let safety_cap = self.nodes.len().saturating_mul(4).max(4);
         while let Some(node_id) = pending.pop_front() {
             if visited_ids.contains(node_id.as_str()) {
@@ -45,24 +62,37 @@ impl PolicyGraph {
             if let Some(bailout) =
                 Self::traversal_bailout(node_id.as_str(), &visited, &mut visited_ids, safety_cap)
             {
-                return Some((bailout.0, bailout.1, boundaries));
+                return Some((
+                    bailout.0,
+                    bailout.1,
+                    effects.boundaries,
+                    effects.approval_requests,
+                ));
             }
             let node = self
                 .nodes
                 .iter()
                 .find(|candidate| candidate.id == node_id)?;
             visited.push(node.id.as_str().to_owned());
-            match self.evaluation_step(node, input, &mut boundaries) {
+            match self.evaluation_step(node, input, &mut effects) {
                 EvaluationStep::Continue(next_node_ids) => {
                     pending.extend(next_node_ids.into_iter().map(PolicyGraphNodeId::from));
                 }
-                EvaluationStep::Terminal(decision) => return Some((decision, visited, boundaries)),
+                EvaluationStep::Terminal(decision) => {
+                    return Some((
+                        decision,
+                        visited,
+                        effects.boundaries,
+                        effects.approval_requests,
+                    ));
+                }
             }
         }
         Some((
             supervisor_decision(PolicyGraphDecision::Allow, PolicyReasonCode::DefaultAllow),
             visited,
-            boundaries,
+            effects.boundaries,
+            effects.approval_requests,
         ))
     }
 
@@ -93,7 +123,7 @@ impl PolicyGraph {
         &self,
         node: &PolicyGraphNode,
         input: &PolicyInput,
-        boundaries: &mut Vec<PolicyRuntimeBoundary>,
+        effects: &mut EvaluationEffects,
     ) -> EvaluationStep {
         match &node.kind {
             PolicyGraphNodeKind::Trigger { .. }
@@ -112,7 +142,7 @@ impl PolicyGraph {
                 EvaluationStep::Terminal(require_human(PolicyReasonCode::HumanRequired))
             }
             PolicyGraphNodeKind::WaitStep(step) => {
-                boundaries.push(PolicyRuntimeBoundary {
+                effects.boundaries.push(PolicyRuntimeBoundary {
                     node_id: node.id.as_str().to_owned(),
                     resume_key: step.resume_key.clone(),
                     wait: step.wait.clone(),
@@ -166,6 +196,9 @@ impl PolicyGraph {
             PolicyGraphNodeKind::ConsensusGate { reason_code } => {
                 EvaluationStep::Terminal(require_consensus(*reason_code))
             }
+            PolicyGraphNodeKind::ApprovalGate(gate) => {
+                self.approval_gate_step(node, gate, input, effects)
+            }
             PolicyGraphNodeKind::DryRunGate { reason_code } => {
                 EvaluationStep::Terminal(dry_run_only(*reason_code))
             }
@@ -178,6 +211,43 @@ impl PolicyGraph {
             )),
             PolicyGraphNodeKind::Finish(finish) => {
                 EvaluationStep::Terminal(supervisor_decision(finish.decision, finish.reason_code))
+            }
+        }
+    }
+
+    /// Evaluate an approval gate against the caller-supplied grant state:
+    /// approved traverses the `approved` output, denied or revoked is terminal
+    /// `Deny`, pending is terminal `RequireHuman`, and no grant additionally
+    /// emits a fire-and-forget pending-grant request.
+    fn approval_gate_step(
+        &self,
+        node: &PolicyGraphNode,
+        gate: &super::PolicyApprovalGate,
+        input: &PolicyInput,
+        effects: &mut EvaluationEffects,
+    ) -> EvaluationStep {
+        match input.approval_state(node.id.as_str()) {
+            Some(PolicyApprovalState::Approved) => EvaluationStep::Continue(
+                self.next_node_for_port(node.id.as_str(), PORT_APPROVED)
+                    .into_iter()
+                    .collect(),
+            ),
+            Some(PolicyApprovalState::Denied | PolicyApprovalState::Revoked) => {
+                EvaluationStep::Terminal(supervisor_decision(
+                    PolicyGraphDecision::Deny,
+                    gate.reason_code,
+                ))
+            }
+            Some(PolicyApprovalState::Pending) => {
+                EvaluationStep::Terminal(require_human(gate.reason_code))
+            }
+            None => {
+                effects.approval_requests.push(PolicyApprovalRequest {
+                    node_id: node.id.as_str().to_owned(),
+                    reason_code: gate.reason_code,
+                    expiry_seconds: gate.expiry_seconds,
+                });
+                EvaluationStep::Terminal(require_human(gate.reason_code))
             }
         }
     }
@@ -301,184 +371,14 @@ impl PolicyGraph {
     }
 }
 
-fn is_workflow_entry_node(node: &PolicyGraphNode) -> bool {
-    matches!(
-        node.kind,
-        PolicyGraphNodeKind::Trigger { .. } | PolicyGraphNodeKind::WorkflowEntry(_)
-    )
-}
-
-fn evidence_condition(
-    checks: &[PolicyEvidenceCheck],
-    input: &PolicyInput,
-) -> PolicyGraphEdgeCondition {
-    for check in checks {
-        let Some(value) = evidence_value(check.field, input) else {
-            return PolicyGraphEdgeCondition::EvidenceMissing;
-        };
-        if !predicate_passes(check.pass, value) {
-            if check.fail_reason_code == PolicyReasonCode::ProtectedPathTouched {
-                return PolicyGraphEdgeCondition::EvidenceConsensus {
-                    reason_code: check.fail_reason_code,
-                };
-            }
-            return PolicyGraphEdgeCondition::EvidenceFailure {
-                reason_code: check.fail_reason_code,
-            };
-        }
-    }
-    PolicyGraphEdgeCondition::EvidencePass
-}
-
-fn if_then_else_condition(
-    condition: PolicyIfThenElseCondition,
-    input: &PolicyInput,
-) -> PolicyGraphEdgeCondition {
-    let passes =
-        predicate_matches_evidence(condition.predicate, evidence_value(condition.field, input));
-    if passes {
-        PolicyGraphEdgeCondition::ConditionTrue
-    } else {
-        PolicyGraphEdgeCondition::ConditionFalse
-    }
-}
-
-fn switch_port<'a>(switch: &'a PolicySwitchNode, input: &PolicyInput) -> &'a str {
-    switch
-        .arms
-        .iter()
-        .find(|arm| switch_arm_matches(arm, input))
-        .map_or(PORT_DEFAULT, |arm| arm.port.as_str())
-}
-
-fn switch_arm_matches(arm: &PolicySwitchArm, input: &PolicyInput) -> bool {
-    predicate_matches_evidence(arm.predicate, evidence_value(arm.field, input))
-}
-
-fn risk_condition(
-    field: PolicyEvidenceField,
-    threshold: u8,
-    input: &PolicyInput,
-) -> PolicyGraphEdgeCondition {
-    let Some(risk_score) = risk_value(field, input) else {
-        return PolicyGraphEdgeCondition::RiskMissing;
-    };
-    if risk_score > threshold {
-        PolicyGraphEdgeCondition::RiskHigh
-    } else {
-        PolicyGraphEdgeCondition::RiskLowOrEqual
-    }
-}
-
-fn evidence_value(field: PolicyEvidenceField, input: &PolicyInput) -> Option<u32> {
-    match field {
-        PolicyEvidenceField::ChecksGreen => input.evidence.checks_green.map(u32::from),
-        PolicyEvidenceField::BranchProtectionAllowsMerge => {
-            input.evidence.branch_protection_allows_merge.map(u32::from)
-        }
-        PolicyEvidenceField::ReviewerVerdictApproved => {
-            input.evidence.reviewer_verdict_approved.map(u32::from)
-        }
-        PolicyEvidenceField::UnresolvedRequestedChanges => {
-            input.evidence.unresolved_requested_changes
-        }
-        PolicyEvidenceField::ProtectedPathTouched => {
-            input.evidence.protected_path_touched.map(u32::from)
-        }
-        PolicyEvidenceField::RiskScore => input.evidence.risk_score.map(u32::from),
-        PolicyEvidenceField::ReviewIsOpen => input.evidence.review_is_open.map(u32::from),
-        PolicyEvidenceField::ReviewIsDraft => input.evidence.review_is_draft.map(u32::from),
-        PolicyEvidenceField::ReviewReviewRequired => {
-            input.evidence.review_review_required.map(u32::from)
-        }
-        PolicyEvidenceField::ReviewHasNoDecision => {
-            input.evidence.review_has_no_decision.map(u32::from)
-        }
-        PolicyEvidenceField::ReviewHasMergeConflicts => {
-            input.evidence.review_has_merge_conflicts.map(u32::from)
-        }
-        PolicyEvidenceField::ReviewPolicyBlocked => {
-            input.evidence.review_policy_blocked.map(u32::from)
-        }
-        PolicyEvidenceField::ReviewViewerCanUpdate => {
-            input.evidence.review_viewer_can_update.map(u32::from)
-        }
-        PolicyEvidenceField::ReviewHasConflictMarkers => {
-            input.evidence.review_has_conflict_markers.map(u32::from)
-        }
-        PolicyEvidenceField::ReviewViewerHasActiveApproval => input
-            .evidence
-            .review_viewer_has_active_approval
-            .map(u32::from),
-        PolicyEvidenceField::ReviewAutoMergeEnabled => {
-            input.evidence.review_auto_merge_enabled.map(u32::from)
-        }
-        PolicyEvidenceField::ReviewRequiredApprovalsSatisfiedAfterViewerApproval => input
-            .evidence
-            .review_required_approvals_satisfied_after_viewer_approval
-            .map(u32::from),
-    }
-}
-
-fn risk_value(field: PolicyEvidenceField, input: &PolicyInput) -> Option<u8> {
-    match field {
-        PolicyEvidenceField::RiskScore => input.evidence.risk_score,
-        _ => evidence_value(field, input).and_then(|value| u8::try_from(value).ok()),
-    }
-}
-
-pub(super) const fn predicate_passes(predicate: PolicyEvidencePredicate, value: u32) -> bool {
-    match predicate {
-        PolicyEvidencePredicate::IsTrue => value == 1,
-        PolicyEvidencePredicate::IsFalse | PolicyEvidencePredicate::IsZero => value == 0,
-        PolicyEvidencePredicate::IsPositive => value > 0,
-        PolicyEvidencePredicate::IsPresent => true,
-        PolicyEvidencePredicate::IsMissing => false,
-    }
-}
-
-const fn predicate_matches_evidence(
-    predicate: PolicyEvidencePredicate,
-    value: Option<u32>,
-) -> bool {
-    match value {
-        Some(value) => predicate_passes(predicate, value),
-        None => matches!(predicate, PolicyEvidencePredicate::IsMissing),
-    }
-}
-
-fn edge_condition_matches(
-    candidate: &PolicyGraphEdgeCondition,
-    target: &PolicyGraphEdgeCondition,
-) -> bool {
-    match (candidate, target) {
-        (PolicyGraphEdgeCondition::Always, PolicyGraphEdgeCondition::Always)
-        | (PolicyGraphEdgeCondition::ConditionTrue, PolicyGraphEdgeCondition::ConditionTrue)
-        | (PolicyGraphEdgeCondition::ConditionFalse, PolicyGraphEdgeCondition::ConditionFalse)
-        | (PolicyGraphEdgeCondition::EvidencePass, PolicyGraphEdgeCondition::EvidencePass)
-        | (PolicyGraphEdgeCondition::EvidenceMissing, PolicyGraphEdgeCondition::EvidenceMissing)
-        | (PolicyGraphEdgeCondition::RiskHigh, PolicyGraphEdgeCondition::RiskHigh)
-        | (PolicyGraphEdgeCondition::RiskLowOrEqual, PolicyGraphEdgeCondition::RiskLowOrEqual)
-        | (PolicyGraphEdgeCondition::RiskMissing, PolicyGraphEdgeCondition::RiskMissing) => true,
-        (
-            PolicyGraphEdgeCondition::EvidenceFailure {
-                reason_code: candidate,
-            },
-            PolicyGraphEdgeCondition::EvidenceFailure {
-                reason_code: target,
-            },
-        )
-        | (
-            PolicyGraphEdgeCondition::EvidenceConsensus {
-                reason_code: candidate,
-            },
-            PolicyGraphEdgeCondition::EvidenceConsensus {
-                reason_code: target,
-            },
-        ) => candidate == target,
-        _ => false,
-    }
-}
+#[path = "evaluation_conditions.rs"]
+mod conditions;
+#[cfg(test)]
+pub(super) use conditions::predicate_passes;
+use conditions::{
+    edge_condition_matches, evidence_condition, if_then_else_condition, is_workflow_entry_node,
+    risk_condition, switch_port,
+};
 
 #[expect(
     clippy::cognitive_complexity,

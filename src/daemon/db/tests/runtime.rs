@@ -14,6 +14,9 @@ fn codex_runs_round_trip_and_list_newest_first() {
 
     let mut older = sample_codex_run("codex-run-1", "2026-04-09T10:00:00Z");
     older.status = CodexRunStatus::Completed;
+    older.task_id = Some("task-1".into());
+    older.board_item_id = Some("board-item-1".into());
+    older.workflow_execution_id = Some("workflow-1".into());
     older.final_message = Some("Done.".into());
     older.model = Some("gpt-5.5".into());
     older.effort = Some("low".into());
@@ -45,6 +48,9 @@ fn codex_runs_round_trip_and_list_newest_first() {
         .expect("load codex run")
         .expect("present");
     assert_eq!(loaded.status, CodexRunStatus::Completed);
+    assert_eq!(loaded.task_id.as_deref(), Some("task-1"));
+    assert_eq!(loaded.board_item_id.as_deref(), Some("board-item-1"));
+    assert_eq!(loaded.workflow_execution_id.as_deref(), Some("workflow-1"));
     assert_eq!(loaded.final_message.as_deref(), Some("Done."));
     assert_eq!(loaded.session_agent_id.as_deref(), Some("codex-worker"));
     assert_eq!(loaded.model.as_deref(), Some("gpt-5.5"));
@@ -101,6 +107,9 @@ async fn async_codex_runs_round_trip_and_list_newest_first() {
 
     let mut older = sample_codex_run("codex-run-1", "2026-04-09T10:00:00Z");
     older.status = CodexRunStatus::Completed;
+    older.task_id = Some("task-1".into());
+    older.board_item_id = Some("board-item-1".into());
+    older.workflow_execution_id = Some("workflow-1".into());
     older.final_message = Some("Done.".into());
     older.model = Some("gpt-5.5".into());
     older.effort = Some("low".into());
@@ -140,6 +149,9 @@ async fn async_codex_runs_round_trip_and_list_newest_first() {
         .expect("load codex run")
         .expect("present");
     assert_eq!(loaded.status, CodexRunStatus::Completed);
+    assert_eq!(loaded.task_id.as_deref(), Some("task-1"));
+    assert_eq!(loaded.board_item_id.as_deref(), Some("board-item-1"));
+    assert_eq!(loaded.workflow_execution_id.as_deref(), Some("workflow-1"));
     assert_eq!(loaded.final_message.as_deref(), Some("Done."));
     assert_eq!(loaded.session_agent_id.as_deref(), Some("codex-worker"));
     assert_eq!(loaded.model.as_deref(), Some("gpt-5.5"));

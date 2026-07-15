@@ -9,9 +9,15 @@ use tokio::time::{MissedTickBehavior, interval};
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::errors::CliError;
-use crate::task_board::{
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorState, TaskBoardOrchestratorStatus,
-};
+#[cfg(test)]
+use crate::task_board::TaskBoardOrchestratorState;
+use crate::task_board::{TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorStatus};
+
+struct AutonomousOrchestratorIntent {
+    enabled: bool,
+    running: bool,
+    step_mode: bool,
+}
 
 pub(super) fn spawn_task_board_orchestrator_loop(
     state: DaemonHttpState,
@@ -64,8 +70,14 @@ async fn run_logged_tick(state: &DaemonHttpState, db: &AsyncDaemonDb) {
     log_tick_result(result);
 }
 
-async fn orchestrator_state(db: &AsyncDaemonDb) -> Result<TaskBoardOrchestratorState, CliError> {
-    db.task_board_orchestrator_state().await
+async fn orchestrator_state(db: &AsyncDaemonDb) -> Result<AutonomousOrchestratorIntent, CliError> {
+    let state = db.task_board_orchestrator_state().await?;
+    let settings = db.task_board_orchestrator_settings().await?;
+    Ok(AutonomousOrchestratorIntent {
+        enabled: state.enabled,
+        running: state.running,
+        step_mode: settings.step_mode,
+    })
 }
 
 #[expect(
@@ -86,12 +98,12 @@ async fn drive_task_board_orchestrator_once<StatusFn, StatusFuture, RunFn, RunFu
 ) -> Result<bool, CliError>
 where
     StatusFn: FnOnce() -> StatusFuture,
-    StatusFuture: Future<Output = Result<TaskBoardOrchestratorState, CliError>>,
+    StatusFuture: Future<Output = Result<AutonomousOrchestratorIntent, CliError>>,
     RunFn: FnOnce() -> RunFuture,
     RunFuture: Future<Output = Result<TaskBoardOrchestratorStatus, CliError>>,
 {
     let state = status().await?;
-    if !state.enabled || !state.running {
+    if !state.enabled || !state.running || state.step_mode {
         return Ok(false);
     }
     run_once().await?;
@@ -108,7 +120,7 @@ mod tests {
     #[tokio::test]
     async fn autonomous_tick_skips_when_not_enabled_or_running() {
         let did_run = drive_task_board_orchestrator_once(
-            || async { Ok(state(false, false)) },
+            || async { Ok(intent(false, false, false)) },
             || async { panic!("stopped orchestrator must not run") },
         )
         .await
@@ -120,13 +132,25 @@ mod tests {
     #[tokio::test]
     async fn autonomous_tick_runs_when_start_intent_is_active() {
         let did_run = drive_task_board_orchestrator_once(
-            || async { Ok(state(true, true)) },
+            || async { Ok(intent(true, true, false)) },
             || async { Ok(status(true, true)) },
         )
         .await
         .expect("drive tick");
 
         assert!(did_run);
+    }
+
+    #[tokio::test]
+    async fn autonomous_tick_skips_in_step_mode() {
+        let did_run = drive_task_board_orchestrator_once(
+            || async { Ok(intent(true, true, true)) },
+            || async { panic!("step mode orchestrator must not run autonomously") },
+        )
+        .await
+        .expect("drive tick");
+
+        assert!(!did_run);
     }
 
     #[tokio::test]
@@ -161,10 +185,20 @@ mod tests {
         }
     }
 
+    fn intent(enabled: bool, running: bool, step_mode: bool) -> AutonomousOrchestratorIntent {
+        AutonomousOrchestratorIntent {
+            enabled,
+            running,
+            step_mode,
+        }
+    }
+
     fn status(enabled: bool, running: bool) -> TaskBoardOrchestratorStatus {
         TaskBoardOrchestratorStatus {
             enabled,
             running,
+            step_mode: false,
+            held_dispatches: crate::task_board::TaskBoardHeldDispatchSummary::default(),
             current_tick: None,
             last_run: None,
             workflow_execution_counts: Vec::new(),

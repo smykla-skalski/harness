@@ -9,14 +9,18 @@ use crate::daemon::db::runtime::{
 };
 
 const UPSERT_CODEX_RUN_SQL: &str = "INSERT INTO codex_runs (
-    run_id, session_id, session_agent_id, display_name,
+    run_id, session_id, task_id, board_item_id, workflow_execution_id,
+    session_agent_id, display_name,
     project_dir, thread_id, turn_id, mode,
     status, prompt, latest_summary, final_message, error,
     pending_approvals_json, resolved_approvals_json, events_json,
     created_at, updated_at, model, effort
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)
 ON CONFLICT(run_id) DO UPDATE SET
     session_id = excluded.session_id,
+    task_id = excluded.task_id,
+    board_item_id = excluded.board_item_id,
+    workflow_execution_id = excluded.workflow_execution_id,
     session_agent_id = excluded.session_agent_id,
     display_name = excluded.display_name,
     project_dir = excluded.project_dir,
@@ -34,14 +38,18 @@ ON CONFLICT(run_id) DO UPDATE SET
     updated_at = excluded.updated_at,
     model = excluded.model,
     effort = excluded.effort";
-const CODEX_RUN_SQL: &str = "SELECT run_id, session_id, session_agent_id, display_name,
+const CODEX_RUN_SQL: &str =
+    "SELECT run_id, session_id, task_id, board_item_id, workflow_execution_id,
+    session_agent_id, display_name,
     project_dir, thread_id, turn_id, mode,
     status, prompt, latest_summary, final_message, error,
     pending_approvals_json, resolved_approvals_json, events_json,
     created_at, updated_at, model, effort
  FROM codex_runs
  WHERE run_id = ?1";
-const LIST_CODEX_RUNS_SQL: &str = "SELECT run_id, session_id, session_agent_id, display_name,
+const LIST_CODEX_RUNS_SQL: &str =
+    "SELECT run_id, session_id, task_id, board_item_id, workflow_execution_id,
+    session_agent_id, display_name,
     project_dir, thread_id, turn_id, mode,
     status, prompt, latest_summary, final_message, error,
     pending_approvals_json, resolved_approvals_json, events_json,
@@ -103,6 +111,9 @@ impl AsyncDaemonDb {
         query(UPSERT_CODEX_RUN_SQL)
             .bind(&snapshot.run_id)
             .bind(&snapshot.session_id)
+            .bind(&snapshot.task_id)
+            .bind(&snapshot.board_item_id)
+            .bind(&snapshot.workflow_execution_id)
             .bind(&snapshot.session_agent_id)
             .bind(&snapshot.display_name)
             .bind(&snapshot.project_dir)
@@ -255,6 +266,9 @@ impl AsyncDaemonDb {
 struct AsyncCodexRunRow {
     run_id: String,
     session_id: String,
+    task_id: Option<String>,
+    board_item_id: Option<String>,
+    workflow_execution_id: Option<String>,
     session_agent_id: Option<String>,
     display_name: Option<String>,
     project_dir: String,
@@ -280,6 +294,9 @@ impl AsyncCodexRunRow {
         Ok(CodexRunSnapshot {
             run_id: self.run_id,
             session_id: self.session_id,
+            task_id: self.task_id,
+            board_item_id: self.board_item_id,
+            workflow_execution_id: self.workflow_execution_id,
             session_agent_id: self.session_agent_id,
             display_name: self.display_name,
             project_dir: self.project_dir,

@@ -18,12 +18,14 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::store::{TaskBoardItemPatch, apply_patch};
 use crate::task_board::{
-    ExternalRef, ExternalSyncConfig, Machine, PlanningState, TaskBoardItem, TaskBoardStatus,
-    TaskBoardSyncStore, TaskBoardWorkflowState, approve_plan, begin_planning,
+    ExternalRef, ExternalSyncConfig, Machine, PlanningState, SpawnGateSwitches, TaskBoardItem,
+    TaskBoardStatus, TaskBoardSyncStore, TaskBoardWorkflowState, approve_plan, begin_planning,
     build_audit_summary_with_policy, build_machine_summaries, build_project_summaries,
     configured_sync_clients_without_review_requests, revoke_plan, submit_plan, sync_external_tasks,
 };
 use crate::workspace::utc_now;
+
+use super::task_board::load_live_spawn_grants;
 
 #[cfg(test)]
 mod external_ref_tests;
@@ -128,6 +130,7 @@ pub(crate) async fn update_task_board_item_db(
     id: &str,
     request: &TaskBoardUpdateItemRequest,
 ) -> Result<TaskBoardItem, CliError> {
+    super::task_board_completion::validate_linked_task_completion(db, id, request.status).await?;
     let mutation = db
         .update_task_board_item(id, |item| {
             apply_update_request(item, request);
@@ -190,7 +193,15 @@ pub(crate) async fn audit_task_board_db(
         .as_ref()
         .and_then(|workspace| workspace.active_live_canvas())
         .map(|(canvas, document)| (canvas.id.as_str(), document));
-    Ok(build_audit_summary_with_policy(&items, policy))
+    let switches = workspace
+        .as_ref()
+        .map(SpawnGateSwitches::from_workspace)
+        .unwrap_or_default();
+    let grants = load_live_spawn_grants(db, policy, &items, &[]).await?;
+    let evaluated_at = utc_now();
+    Ok(build_audit_summary_with_policy(
+        &items, policy, &evaluated_at, switches, &grants,
+    ))
 }
 
 pub(crate) async fn list_task_board_projects_db(

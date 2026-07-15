@@ -38,6 +38,22 @@ fn run_git(dir: &std::path::Path, args: &[&str]) {
     );
 }
 
+fn git_stdout(dir: &std::path::Path, args: &[&str]) -> String {
+    let output = Command::new("git")
+        .args(["-C"])
+        .arg(dir)
+        .args(args)
+        .output()
+        .expect("run git");
+    assert!(
+        output.status.success(),
+        "git {:?} failed: {}",
+        args,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).expect("git stdout is utf8")
+}
+
 fn init_checkout_with_upstream_remote() -> TempDir {
     let upstream = TempDir::new().unwrap();
 
@@ -107,6 +123,7 @@ fn creates_worktree_and_branch() {
     WorktreeController::create(origin.path(), &layout, None).expect("create");
     assert!(layout.workspace().join("README.md").exists());
     assert!(layout.memory().exists());
+    assert_eq!(git_stdout(&layout.workspace(), &["status", "--porcelain"]), "");
 }
 
 #[test]

@@ -97,7 +97,12 @@ async fn finish_claim(
         }
         Err(error) => {
             if let Err(rollback_error) = db
-                .fail_task_board_dispatch(&claim.intent_id, &claim.claim_token, &error.to_string())
+                .fail_task_board_dispatch(
+                    &claim.intent_id,
+                    &claim.claim_token,
+                    claim.consumed_approval_grant_id.as_deref(),
+                    &error.to_string(),
+                )
                 .await
             {
                 warn!(board_item_id = %claim.applied.board_item_id, %rollback_error, "task board dispatch recovery rollback failed");

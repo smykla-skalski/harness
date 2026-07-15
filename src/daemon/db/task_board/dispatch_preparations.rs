@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
+use crate::daemon::db::policy::consume_approval_grant_in_tx;
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error, utc_now};
 use crate::infra::io;
 use crate::session::types::TaskSeverity;
@@ -23,6 +24,8 @@ pub(crate) struct TaskBoardDispatchPreparation {
     pub(crate) actor: String,
     pub(crate) project_dir: Option<String>,
     pub(crate) plan: DispatchPlan,
+    #[serde(default)]
+    pub(crate) hold_worker: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +55,7 @@ impl AsyncDaemonDb {
         plan: &DispatchPlan,
         actor: &str,
         project_dir: Option<&str>,
+        hold_worker: bool,
     ) -> Result<ReservedTaskBoardDispatch, CliError> {
         io::validate_safe_segment(&plan.board_item_id)?;
         let mut transaction = self
@@ -86,6 +90,7 @@ impl AsyncDaemonDb {
             actor: actor.to_string(),
             project_dir: project_dir.map(ToString::to_string),
             plan: plan.clone(),
+            hold_worker,
         };
         insert_preparation(&mut transaction, &intent_id, &preparation).await?;
         transaction.commit().await.map_err(|error| {
@@ -202,6 +207,8 @@ impl AsyncDaemonDb {
     pub(crate) async fn complete_task_board_dispatch_preparation(
         &self,
         claim: &ClaimedTaskBoardDispatchPreparation,
+        branch: &str,
+        worktree: &str,
     ) -> Result<DispatchAppliedTask, CliError> {
         let mut transaction = self
             .begin_immediate_transaction("task board dispatch preparation completion")
@@ -218,16 +225,46 @@ impl AsyncDaemonDb {
             })?;
         validate_reservable_item(&item, &preparation.plan)?;
         item.workflow.execution_id = Some(preparation.workflow_execution_id.clone());
+        item.workflow.branch = Some(branch.to_string());
+        item.workflow.worktree = Some(worktree.to_string());
         item.workflow.status = TaskBoardWorkflowStatus::Running;
-        item.workflow.current_step_id = Some("dispatch".to_string());
+        item.workflow.current_step_id = Some(
+            if preparation.hold_worker {
+                "awaiting_delivery"
+            } else {
+                "dispatch"
+            }
+            .to_string(),
+        );
         item.workflow.attempts = item.workflow.attempts.saturating_add(1);
-        item.workflow
-            .push_policy_trace_id(format!("policy-trace-{}", Uuid::new_v4().simple()));
+        // Record the real recorded-decision id from evaluation so the workflow
+        // trace correlates with the decision feed. Fall back to a minted trace
+        // id only when the built-in fallback gate decided (no recorded id).
+        item.workflow.push_policy_trace_id(
+            preparation
+                .plan
+                .policy_decision_id
+                .clone()
+                .unwrap_or_else(|| format!("policy-trace-{}", Uuid::new_v4().simple())),
+        );
         item.status = TaskBoardStatus::InProgress;
         item.session_id = Some(preparation.session_id.clone());
         item.work_item_id = Some(preparation.work_item_id.clone());
         item.updated_at = utc_now();
         replace_item_in_tx(&mut transaction, &item, revision + 1).await?;
+        // Immediate dispatch consumes its one-shot grant with publication.
+        // Step-mode dispatch deliberately keeps the grant live while held;
+        // delivery re-evaluates current policy and consumes atomically there.
+        if !preparation.hold_worker
+            && let Some(grant_id) = preparation.plan.consumed_approval_grant_id.as_deref()
+        {
+            let consumed = consume_approval_grant_in_tx(transaction.as_mut(), grant_id).await?;
+            if !consumed {
+                return Err(db_error(format!(
+                    "approval grant already consumed; rebuild plan (grant '{grant_id}')"
+                )));
+            }
+        }
         let applied = DispatchAppliedTask {
             board_item_id: preparation.board_item_id.clone(),
             session_id: preparation.session_id.clone(),
@@ -238,16 +275,28 @@ impl AsyncDaemonDb {
         let payload = serde_json::to_string(&applied).map_err(|error| {
             db_error(format!("serialize prepared task board dispatch: {error}"))
         })?;
+        let published_status = if preparation.hold_worker {
+            "held"
+        } else {
+            "pending"
+        };
         query(
             "UPDATE task_board_dispatch_intents
-             SET payload_json = ?3, status = 'pending', claim_token = NULL,
-                 claimed_at = NULL, last_error = NULL, updated_at = ?4
+             SET payload_json = ?3, status = ?4, claim_token = NULL,
+                 claimed_at = NULL, last_error = NULL, updated_at = ?5,
+                 consumed_approval_grant_id = ?6
              WHERE intent_id = ?1 AND claim_token = ?2 AND status = 'preparing_claimed'",
         )
         .bind(&claim.intent_id)
         .bind(&claim.claim_token)
         .bind(payload)
+        .bind(published_status)
         .bind(utc_now())
+        .bind(if preparation.hold_worker {
+            None
+        } else {
+            preparation.plan.consumed_approval_grant_id.as_deref()
+        })
         .execute(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("complete task board preparation: {error}")))?;
@@ -295,7 +344,7 @@ async fn active_reservation(
     let row = query_as::<_, (String, String, String)>(
         "SELECT intent_id, status, payload_json FROM task_board_dispatch_intents
          WHERE item_id = ?1
-           AND status IN ('preparing', 'preparing_claimed', 'pending', 'starting')
+           AND status IN ('preparing', 'preparing_claimed', 'held', 'pending', 'starting')
          ORDER BY created_at DESC LIMIT 1",
     )
     .bind(item_id)
@@ -388,6 +437,10 @@ async fn ensure_preparation_claim(
 fn validate_reservable_item(item: &TaskBoardItem, plan: &DispatchPlan) -> Result<(), CliError> {
     let body = item.body.trim();
     let body = (!body.is_empty()).then_some(body);
+    let session_matches = match &plan.session {
+        SessionIntent::Existing { session_id } => item.session_id.as_deref() == Some(session_id),
+        SessionIntent::Create { .. } => item.session_id.is_none(),
+    };
     let matches_plan = item.id == plan.board_item_id
         && item.title == plan.task.title
         && body == plan.task.context.as_deref()
@@ -396,7 +449,7 @@ fn validate_reservable_item(item: &TaskBoardItem, plan: &DispatchPlan) -> Result
         && item.tags == plan.task.tags
         && item.external_refs == plan.task.external_refs
         && item.status == TaskBoardStatus::Todo
-        && item.session_id.is_none()
+        && session_matches
         && item.work_item_id.is_none()
         && !item.is_deleted();
     if matches_plan {

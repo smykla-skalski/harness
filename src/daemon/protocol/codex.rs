@@ -175,6 +175,12 @@ pub struct CodexRunSnapshot {
     pub run_id: String,
     pub session_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub board_item_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_execution_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_agent_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,

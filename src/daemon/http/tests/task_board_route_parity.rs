@@ -3,6 +3,7 @@ use tempfile::tempdir;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{http_paths, ws_methods};
+use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 
 use super::task_board_route_parity_support::*;
 
@@ -17,6 +18,15 @@ fn task_board_http_and_ws_workflow_routes_match() {
 
 async fn run_task_board_workflow_parity() {
     let state = super::test_http_state_with_db();
+    let mut workspace = PolicyCanvasWorkspace::seeded();
+    workspace.spawn_requires_live_policy = false;
+    state
+        .async_db
+        .get()
+        .expect("test async db")
+        .replace_policy_workspace(&workspace)
+        .await
+        .expect("configure explicit parity fallback");
     seed_ready_board_item(&state, "parity-workflow", "Parity workflow item").await;
     let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();

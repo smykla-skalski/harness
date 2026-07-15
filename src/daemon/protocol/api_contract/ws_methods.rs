@@ -53,6 +53,8 @@ pub const TASK_BOARD_PLAN_APPROVE: &str = "task_board.plan_approve";
 pub const TASK_BOARD_PLAN_REVOKE: &str = "task_board.plan_revoke";
 pub const TASK_BOARD_SYNC: &str = "task_board.sync";
 pub const TASK_BOARD_DISPATCH: &str = "task_board.dispatch";
+pub const TASK_BOARD_DISPATCH_DELIVER: &str = "task_board.dispatch_deliver";
+pub const TASK_BOARD_DISPATCH_PICK: &str = "task_board.dispatch_pick";
 pub const TASK_BOARD_EVALUATE: &str = "task_board.evaluate";
 pub const TASK_BOARD_AUDIT: &str = "task_board.audit";
 pub const TASK_BOARD_PROJECTS: &str = "task_board.projects";
@@ -91,6 +93,12 @@ pub const POLICY_CANVAS_RENAME: &str = "policy_canvas.rename";
 pub const POLICY_CANVAS_SET_ACTIVE: &str = "policy_canvas.set_active";
 pub const POLICY_CANVAS_DELETE: &str = "policy_canvas.delete";
 pub const POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT: &str = "policy_canvas.set_global_enforcement";
+pub const POLICY_CANVAS_SET_SPAWN_REQUIRES_LIVE_POLICY: &str =
+    "policy_canvas.set_spawn_requires_live_policy";
+pub const POLICY_CANVAS_SET_SPAWN_KILL_SWITCH: &str = "policy_canvas.set_spawn_kill_switch";
+pub const POLICY_APPROVAL_GRANTS_LIST: &str = "policy_canvas.approval_grants_list";
+pub const POLICY_APPROVAL_GRANT_RESOLVE: &str = "policy_canvas.approval_grant_resolve";
+pub const POLICY_APPROVAL_GRANT_REVOKE: &str = "policy_canvas.approval_grant_revoke";
 pub const POLICY_PIPELINE_GET: &str = "policy_pipeline.get";
 pub const POLICY_PIPELINE_SAVE_DRAFT: &str = "policy_pipeline.save_draft";
 pub const POLICY_PIPELINE_SIMULATE: &str = "policy_pipeline.simulate";
@@ -225,6 +233,8 @@ pub const ALL: &[&str] = &[
     TASK_BOARD_PLAN_REVOKE,
     TASK_BOARD_SYNC,
     TASK_BOARD_DISPATCH,
+    TASK_BOARD_DISPATCH_DELIVER,
+    TASK_BOARD_DISPATCH_PICK,
     TASK_BOARD_EVALUATE,
     TASK_BOARD_AUDIT,
     TASK_BOARD_PROJECTS,
@@ -255,6 +265,11 @@ pub const ALL: &[&str] = &[
     POLICY_CANVAS_SET_ACTIVE,
     POLICY_CANVAS_DELETE,
     POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT,
+    POLICY_CANVAS_SET_SPAWN_REQUIRES_LIVE_POLICY,
+    POLICY_CANVAS_SET_SPAWN_KILL_SWITCH,
+    POLICY_APPROVAL_GRANTS_LIST,
+    POLICY_APPROVAL_GRANT_RESOLVE,
+    POLICY_APPROVAL_GRANT_REVOKE,
     POLICY_PIPELINE_GET,
     POLICY_PIPELINE_SAVE_DRAFT,
     POLICY_PIPELINE_SIMULATE,

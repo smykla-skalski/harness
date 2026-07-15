@@ -90,6 +90,10 @@ mod schema_v28;
 mod schema_v29;
 mod schema_v30;
 mod schema_v31;
+mod schema_v32;
+mod schema_v33;
+mod schema_v34;
+mod schema_v35;
 #[allow(dead_code)]
 mod task_board;
 pub(crate) use task_board::{
@@ -114,6 +118,7 @@ use conversation::{
 };
 #[allow(unused_imports)]
 use diagnostics::import_daemon_events;
+pub(crate) use policy::NewApprovalGrant;
 pub(crate) use remote_acme::RemoteAcmeStoredState;
 pub(crate) use remote_pairing::RemotePairingClaimCodeError;
 pub(crate) use runtime::ensure_shared_db;
@@ -289,7 +294,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "31";
+pub(crate) const SCHEMA_VERSION: &str = "35";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

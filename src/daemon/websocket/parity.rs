@@ -1,3 +1,5 @@
+#[cfg(not(target_os = "macos"))]
+use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use serde_json::json;
@@ -103,7 +105,7 @@ pub(crate) async fn dispatch_session_adopt(
 
         #[cfg(not(target_os = "macos"))]
         {
-            adopt_session(std::path::Path::new(&body.session_root))
+            adopt_session(Path::new(&body.session_root))
         }
     };
 

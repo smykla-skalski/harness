@@ -3,6 +3,7 @@
 mod aggregates;
 mod dispatch_intents;
 mod dispatch_preparations;
+mod held_dispatch;
 mod import_lifecycle;
 mod imports;
 mod items;

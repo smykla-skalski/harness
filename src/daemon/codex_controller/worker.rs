@@ -5,13 +5,13 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 
 use crate::daemon::codex_transport::CodexTransport;
-use crate::daemon::protocol::{CodexRunSnapshot, CodexRunStatus};
+use crate::daemon::protocol::{CodexRunMode, CodexRunSnapshot, CodexRunStatus};
 use crate::errors::{CliError, CliErrorKind};
 
 use super::active_runs::CodexControlMessage;
 use super::approvals::{
-    approval_from_request, approval_policy, mode_instructions, thread_sandbox, trim_summary,
-    turn_sandbox_policy, upsert_pending_approval,
+    approval_from_request, approval_policy, mode_instructions, permission_profile,
+    runtime_workspace_roots, trim_summary, upsert_pending_approval, workspace_permission_config,
 };
 use super::handle::CodexControllerHandle;
 use super::rpc::CodexJsonRpc;
@@ -102,9 +102,15 @@ impl CodexRunWorker {
         } else {
             wire::METHOD_THREAD_START
         };
+        let runtime_workspace_roots = runtime_workspace_roots(&self.snapshot.project_dir);
+        let uses_workspace_profile = self.snapshot.mode == CodexRunMode::WorkspaceWrite;
+        let permission_config = uses_workspace_profile
+            .then(|| workspace_permission_config(&self.snapshot.project_dir));
         let params = wire::thread_params(wire::ThreadParamsInput {
             cwd: &self.snapshot.project_dir,
-            sandbox: thread_sandbox(self.snapshot.mode),
+            runtime_workspace_roots: &runtime_workspace_roots,
+            permissions: permission_profile(self.snapshot.mode),
+            config: permission_config.as_ref(),
             approval_policy: approval_policy(self.snapshot.mode),
             developer_instructions: mode_instructions(self.snapshot.mode),
             thread_id: self.snapshot.thread_id.as_deref(),
@@ -124,12 +130,13 @@ impl CodexRunWorker {
 
     async fn start_turn(&mut self, rpc: &mut CodexJsonRpc) -> Result<(), CliError> {
         let thread_id = self.thread_id()?;
+        let runtime_workspace_roots = runtime_workspace_roots(&self.snapshot.project_dir);
         let params = wire::turn_start_params(
             &thread_id,
             &self.snapshot.project_dir,
+            &runtime_workspace_roots,
             &self.snapshot.prompt,
             approval_policy(self.snapshot.mode),
-            turn_sandbox_policy(self.snapshot.mode, &self.snapshot.project_dir),
             self.snapshot.model.as_deref(),
             self.snapshot.effort.as_deref(),
         )?;
@@ -195,6 +202,9 @@ impl CodexRunWorker {
     }
 
     fn handle_notification(&mut self, method: &str, params: &Value) -> Result<bool, CliError> {
+        if !self.notification_matches_active_turn(params) {
+            return Ok(false);
+        }
         let notification = wire::parse_notification(method, params);
         match notification {
             AppServerNotification::TurnStarted { turn_id } => {
@@ -244,6 +254,22 @@ impl CodexRunWorker {
         }
     }
 
+    fn notification_matches_active_turn(&self, params: &Value) -> bool {
+        notification_id_matches(
+            self.snapshot.thread_id.as_deref(),
+            params
+                .get("threadId")
+                .and_then(Value::as_str)
+                .or_else(|| params.pointer("/thread/id").and_then(Value::as_str)),
+        ) && notification_id_matches(
+            self.snapshot.turn_id.as_deref(),
+            params
+                .get("turnId")
+                .and_then(Value::as_str)
+                .or_else(|| params.pointer("/turn/id").and_then(Value::as_str)),
+        )
+    }
+
     fn handle_item_completed(&mut self, item: &wire::CompletedItem) -> Result<(), CliError> {
         if item.kind.as_deref() != Some("agentMessage") {
             return Ok(());
@@ -258,7 +284,7 @@ impl CodexRunWorker {
         self.touch_and_save()
     }
 
-    fn handle_turn_completed(
+    pub(super) fn handle_turn_completed(
         &mut self,
         status: Option<&str>,
         error_message: Option<String>,
@@ -270,11 +296,7 @@ impl CodexRunWorker {
                 if self.snapshot.final_message.is_none() && !self.agent_message_delta.is_empty() {
                     self.snapshot.final_message = Some(self.agent_message_delta.clone());
                 }
-                self.transition(
-                    CodexRunStatus::Completed,
-                    Some("Codex turn completed"),
-                    None,
-                )
+                self.finish_completed_turn("Codex turn completed")
             }
             "interrupted" => self.transition(
                 CodexRunStatus::Cancelled,
@@ -290,8 +312,20 @@ impl CodexRunWorker {
                     Some(message),
                 )
             }
-            _ => self.transition(CodexRunStatus::Completed, Some("Codex turn finished"), None),
+            _ => self.finish_completed_turn("Codex turn finished"),
         }
+    }
+
+    fn finish_completed_turn(&mut self, summary: &str) -> Result<(), CliError> {
+        if self
+            .controller
+            .completed_run_has_evidence(&self.snapshot)?
+        {
+            return self.transition(CodexRunStatus::Completed, Some(summary), None);
+        }
+        let error = super::completion_evidence::missing_completion_evidence_error(&self.snapshot);
+        let summary = error.clone();
+        self.transition(CodexRunStatus::Failed, Some(&summary), Some(error))
     }
 
     pub(super) fn clear_pending_approvals(&mut self) {
@@ -367,6 +401,10 @@ impl CodexRunWorker {
         )
         .await
     }
+}
+
+fn notification_id_matches(expected: Option<&str>, actual: Option<&str>) -> bool {
+    expected.is_none_or(|expected| actual.is_some_and(|actual| actual == expected))
 }
 
 #[cfg(test)]

@@ -140,7 +140,7 @@ impl CodexControllerHandle {
         self.preflight_websocket_probe(session_id)?;
         let project_dir = self.project_dir_for_session(session_id)?;
         let display_name = request.name.clone().unwrap_or_else(|| "Codex".to_string());
-        let session_agent_id =
+        let registration =
             self.register_orchestration_agent(session_id, &run_id, request, &display_name)?;
         let snapshot = queued_run_snapshot(
             session_id,
@@ -148,14 +148,15 @@ impl CodexControllerHandle {
             run_id,
             project_dir,
             prompt,
-            session_agent_id,
+            registration.agent_id.clone(),
             display_name,
         );
         if let Err(error) = self.save_and_broadcast(&snapshot) {
             self.rollback_orchestration_agent_registration(
                 session_id,
-                snapshot.session_agent_id.as_deref(),
+                &registration.agent_id,
                 &ManagedAgentRef::codex(snapshot.run_id.as_str()),
+                &registration.mutation,
             );
             return Err(error);
         }
@@ -300,9 +301,12 @@ fn queued_run_snapshot(
     display_name: String,
 ) -> CodexRunSnapshot {
     let now = utc_now();
-    CodexRunSnapshot {
+    let mut snapshot = CodexRunSnapshot {
         run_id,
         session_id: session_id.to_string(),
+        task_id: request.task_id.clone(),
+        board_item_id: request.board_item_id.clone(),
+        workflow_execution_id: request.workflow_execution_id.clone(),
         session_agent_id: Some(session_agent_id),
         display_name: Some(display_name),
         project_dir,
@@ -324,7 +328,9 @@ fn queued_run_snapshot(
         updated_at: now,
         model: non_empty_owned(request.model.as_deref()),
         effort: non_empty_owned(request.effort.as_deref()),
-    }
+    };
+    super::completion_evidence::record_clean_worktree_baseline(&mut snapshot);
+    snapshot
 }
 
 fn non_empty_owned(value: Option<&str>) -> Option<String> {
@@ -412,7 +418,7 @@ mod tests {
     use crate::session::types::SessionRole;
 
     #[test]
-    fn queued_run_snapshot_normalizes_blank_model_and_effort() {
+    fn queued_run_snapshot_copies_binding_and_normalizes_optional_values() {
         let request = CodexRunRequest {
             actor: None,
             prompt: "investigate".to_string(),
@@ -423,9 +429,9 @@ mod tests {
             name: None,
             persona: None,
             resume_thread_id: None,
-            task_id: None,
-            board_item_id: None,
-            workflow_execution_id: None,
+            task_id: Some("task-1".to_string()),
+            board_item_id: Some("board-item-1".to_string()),
+            workflow_execution_id: Some("workflow-1".to_string()),
             model: Some("  ".to_string()),
             effort: Some(" high ".to_string()),
             allow_custom_model: false,
@@ -443,5 +449,9 @@ mod tests {
 
         assert_eq!(snapshot.model, None);
         assert_eq!(snapshot.effort.as_deref(), Some("high"));
+        let value = serde_json::to_value(snapshot).expect("serialize queued snapshot");
+        assert_eq!(value["task_id"], "task-1");
+        assert_eq!(value["board_item_id"], "board-item-1");
+        assert_eq!(value["workflow_execution_id"], "workflow-1");
     }
 }

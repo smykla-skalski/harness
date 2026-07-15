@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 #[cfg(test)]
 use std::path::Path;
 
@@ -12,12 +13,7 @@ use super::machines::Machine;
 #[cfg(test)]
 use super::machines::{Machine, MachineRegistry};
 use super::planning::{PlanApprovalBlockReason, PlanApprovalGate, approval_gate};
-use super::policy::{
-    BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyGate, PolicyInput, PolicySubject,
-};
-#[cfg(test)]
-use super::policy_graph::resolve_gate_policy;
-use super::policy_graph::{PolicyPipelineMode, RecordedPolicyDecision, record_policy_decision};
+use super::policy::{PolicyApprovalGrant, PolicyDecision};
 #[cfg(test)]
 use super::store::TaskBoardStore;
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
@@ -35,6 +31,8 @@ const REVIEWER_CONSENSUS: u8 = 2;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DispatchPlan {
     pub board_item_id: String,
+    #[serde(default)]
+    pub rendered_prompt: String,
     pub readiness: DispatchReadiness,
     pub session: SessionIntent,
     pub task: TaskCreationIntent,
@@ -43,6 +41,18 @@ pub struct DispatchPlan {
     pub evaluator: EvaluatorIntent,
     pub lifecycle: DispatchLifecycle,
     pub policy: PolicyDecision,
+    /// Id of the recorded policy decision that produced `policy`, threaded into
+    /// reservation so the board workflow stores the real decision id instead of
+    /// an unrelated random trace. `None` when the built-in fallback gate decided
+    /// (no decision is recorded on that path).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy_decision_id: Option<String>,
+    /// Id of the durable approval grant this dispatch will consume at reservation.
+    /// Set only when an approved live grant matched the spawn evaluation and the
+    /// decision allowed; the reservation transaction consumes it one-shot so a
+    /// re-dispatch needs a fresh approval. `None` on every non-approval path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub consumed_approval_grant_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -190,11 +200,16 @@ pub fn build_dispatch_plan_with_policy_root(
     item: &TaskBoardItem,
     policy_root: &Path,
 ) -> DispatchPlan {
-    let policy = dispatch_policy(item, policy_root);
-    build_dispatch_plan_with_decision(item, policy)
+    let (policy, policy_decision_id) = dispatch_policy(item, policy_root);
+    build_dispatch_plan_with_decision(item, policy, policy_decision_id, None)
 }
 
-fn build_dispatch_plan_with_decision(item: &TaskBoardItem, policy: PolicyDecision) -> DispatchPlan {
+fn build_dispatch_plan_with_decision(
+    item: &TaskBoardItem,
+    policy: PolicyDecision,
+    policy_decision_id: Option<String>,
+    consumed_approval_grant_id: Option<String>,
+) -> DispatchPlan {
     let worker = WorkerIntent {
         mode: item.agent_mode,
     };
@@ -202,6 +217,7 @@ fn build_dispatch_plan_with_decision(item: &TaskBoardItem, policy: PolicyDecisio
     let evaluator = evaluator_intent();
     DispatchPlan {
         board_item_id: item.id.clone(),
+        rendered_prompt: super::plan_worker_prompt(item),
         readiness: readiness(item, &policy),
         session: session_intent(item),
         task: task_creation_intent(item),
@@ -210,6 +226,8 @@ fn build_dispatch_plan_with_decision(item: &TaskBoardItem, policy: PolicyDecisio
         reviewer,
         evaluator,
         policy,
+        policy_decision_id,
+        consumed_approval_grant_id,
     }
 }
 
@@ -217,12 +235,23 @@ fn build_dispatch_plan_with_decision(item: &TaskBoardItem, policy: PolicyDecisio
 pub(crate) fn build_dispatch_plans_with_policy(
     items: &[TaskBoardItem],
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
+    evaluated_at: Option<&str>,
+    switches: SpawnGateSwitches,
+    grants: &HashMap<String, PolicyApprovalGrant>,
 ) -> Vec<DispatchPlan> {
     items
         .iter()
         .map(|item| {
-            let decision = dispatch_policy_from_graph(item, policy);
-            build_dispatch_plan_with_decision(item, decision)
+            let grant = grants.get(&item.id);
+            let (decision, decision_id) = dispatch_policy_from_graph(
+                item,
+                policy,
+                evaluated_at.map(str::to_owned),
+                switches,
+                grant,
+            );
+            let consumed = consumed_grant_id(grant, &decision);
+            build_dispatch_plan_with_decision(item, decision, decision_id, consumed)
         })
         .collect()
 }
@@ -288,8 +317,10 @@ pub fn machine_mismatch_plan_with_policy_root(
     };
     let reviewer = reviewer_intent();
     let evaluator = evaluator_intent();
+    let (policy, policy_decision_id) = dispatch_policy(item, policy_root);
     DispatchPlan {
         board_item_id: item.id.clone(),
+        rendered_prompt: super::plan_worker_prompt(item),
         readiness: blocked(DispatchBlockReason::MachineMismatch {
             required: item.target_project_types.clone(),
             declared: machine.project_types.clone(),
@@ -300,7 +331,9 @@ pub fn machine_mismatch_plan_with_policy_root(
         worker,
         reviewer,
         evaluator,
-        policy: dispatch_policy(item, policy_root),
+        policy,
+        policy_decision_id,
+        consumed_approval_grant_id: None,
     }
 }
 
@@ -309,9 +342,19 @@ pub(crate) fn machine_mismatch_plan_with_policy(
     item: &TaskBoardItem,
     machine: &Machine,
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
+    evaluated_at: Option<&str>,
+    switches: SpawnGateSwitches,
+    grant: Option<&PolicyApprovalGrant>,
 ) -> DispatchPlan {
-    let mut plan =
-        build_dispatch_plan_with_decision(item, dispatch_policy_from_graph(item, policy));
+    let (decision, decision_id) = dispatch_policy_from_graph(
+        item,
+        policy,
+        evaluated_at.map(str::to_owned),
+        switches,
+        grant,
+    );
+    let consumed = consumed_grant_id(grant, &decision);
+    let mut plan = build_dispatch_plan_with_decision(item, decision, decision_id, consumed);
     plan.readiness = blocked(DispatchBlockReason::MachineMismatch {
         required: item.target_project_types.clone(),
         declared: machine.project_types.clone(),
@@ -344,65 +387,14 @@ fn readiness(item: &TaskBoardItem, policy: &PolicyDecision) -> DispatchReadiness
     DispatchReadiness::Ready
 }
 
+#[path = "dispatch_spawn_policy.rs"]
+mod spawn_policy;
+pub use spawn_policy::SpawnGateSwitches;
 #[cfg(test)]
-fn dispatch_policy(item: &TaskBoardItem, policy_root: &Path) -> PolicyDecision {
-    let mut input = PolicyInput::new(PolicyAction::SpawnAgent);
-    input.subject = PolicySubject {
-        task_board_item_id: Some(item.id.clone()),
-        session_id: item.session_id.clone(),
-        repository: item.project_id.clone(),
-        ..PolicySubject::default()
-    };
-    if let Some(document) = resolve_gate_policy(policy_root)
-        && document.mode != PolicyPipelineMode::Draft
-    {
-        let simulation = document.simulate(&input);
-        let decision = simulation.decision;
-        record_policy_decision(
-            RecordedPolicyDecision::new(
-                document.revision,
-                input,
-                decision.clone(),
-                simulation.visited_node_ids,
-                "task_board_dispatch",
-            )
-            .with_canvas_id(document.canvas_id.clone()),
-        );
-        return decision;
-    }
-    BuiltInPolicyGate::default().evaluate(&input)
-}
-
-fn dispatch_policy_from_graph(
-    item: &TaskBoardItem,
-    policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
-) -> PolicyDecision {
-    let mut input = PolicyInput::new(PolicyAction::SpawnAgent);
-    input.subject = PolicySubject {
-        task_board_item_id: Some(item.id.clone()),
-        session_id: item.session_id.clone(),
-        repository: item.project_id.clone(),
-        ..PolicySubject::default()
-    };
-    if let Some((canvas_id, document)) = policy
-        && document.mode != PolicyPipelineMode::Draft
-    {
-        let simulation = document.simulate(&input);
-        let decision = simulation.decision;
-        record_policy_decision(
-            RecordedPolicyDecision::new(
-                document.revision,
-                input,
-                decision.clone(),
-                simulation.visited_node_ids,
-                "task_board_dispatch",
-            )
-            .with_canvas_id(Some(canvas_id.to_string())),
-        );
-        return decision;
-    }
-    BuiltInPolicyGate::default().evaluate(&input)
-}
+use spawn_policy::dispatch_policy;
+#[cfg(test)]
+pub(crate) use spawn_policy::spawn_policy_input;
+pub(crate) use spawn_policy::{consumed_grant_id, dispatch_policy_from_graph};
 
 fn session_intent(item: &TaskBoardItem) -> SessionIntent {
     if let Some(session_id) = item.session_id.as_deref() {

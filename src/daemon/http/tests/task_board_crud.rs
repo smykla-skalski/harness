@@ -111,10 +111,15 @@ async fn run_flow() {
         &client,
         &base_url,
         http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
-        json!({ "dry_run_default": false, "dispatch_status_filter": "todo" }),
+        json!({
+            "dry_run_default": false,
+            "dispatch_status_filter": "todo",
+            "step_mode": true
+        }),
     )
     .await;
     assert_eq!(settings["dry_run_default"].as_bool(), Some(false));
+    assert_eq!(settings["step_mode"].as_bool(), Some(true));
     let loaded_settings = get_json(
         &client,
         &base_url,
@@ -122,6 +127,14 @@ async fn run_flow() {
     )
     .await;
     assert_eq!(loaded_settings["dry_run_default"].as_bool(), Some(false));
+    assert_eq!(loaded_settings["step_mode"].as_bool(), Some(true));
+    let status = get_json(
+        &client,
+        &base_url,
+        http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
+    )
+    .await;
+    assert_eq!(status["step_mode"].as_bool(), Some(true));
     let runtime_config = put_json(
         &client,
         &base_url,

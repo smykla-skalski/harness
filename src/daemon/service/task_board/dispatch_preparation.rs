@@ -26,12 +26,13 @@ pub(super) async fn reserve_and_prepare_task_board_dispatch(
     db: &AsyncDaemonDb,
     request: &TaskBoardDispatchRequest,
     plan: &DispatchPlan,
+    hold_worker: bool,
 ) -> Result<DispatchAppliedTask, (DispatchFailureKind, CliError)> {
     let project_dir = dispatch_project_dir(request, plan)
         .map_err(|error| (DispatchFailureKind::CreateSession, error))?;
     let actor = request.actor.as_deref().unwrap_or(CONTROL_PLANE_ACTOR_ID);
     let reserved = db
-        .reserve_task_board_dispatch(plan, actor, project_dir.as_deref())
+        .reserve_task_board_dispatch(plan, actor, project_dir.as_deref(), hold_worker)
         .await
         .map_err(|error| (DispatchFailureKind::LinkItem, error))?;
     let (intent_id, _) = match reserved {
@@ -79,23 +80,44 @@ pub(crate) async fn prepare_claimed_task_board_dispatch(
             return Err((DispatchFailureKind::LinkItem, heartbeat_error(result)));
         }
     };
-    prepared?;
-    db.complete_task_board_dispatch_preparation(claim)
+    let checkout = prepared?;
+    db.complete_task_board_dispatch_preparation(claim, &checkout.branch, &checkout.worktree)
         .await
         .map_err(|error| (DispatchFailureKind::LinkItem, error))
+}
+
+struct DispatchCheckout {
+    branch: String,
+    worktree: String,
 }
 
 async fn prepare_dispatch_side_effects(
     db: &AsyncDaemonDb,
     claim: &ClaimedTaskBoardDispatchPreparation,
-) -> Result<(), (DispatchFailureKind, CliError)> {
+) -> Result<DispatchCheckout, (DispatchFailureKind, CliError)> {
     ensure_dispatch_session(db, claim)
         .await
         .map_err(|error| (DispatchFailureKind::CreateSession, error))?;
     ensure_dispatch_task(db, claim)
         .await
         .map_err(|error| (DispatchFailureKind::CreateTask, error))?;
-    Ok(())
+    let resolved = db
+        .resolve_session(&claim.preparation.session_id)
+        .await
+        .map_err(|error| (DispatchFailureKind::CreateSession, error))?
+        .ok_or_else(|| {
+            (
+                DispatchFailureKind::CreateSession,
+                CliError::from(CliErrorKind::session_not_active(format!(
+                    "dispatch session '{}' no longer exists",
+                    claim.preparation.session_id
+                ))),
+            )
+        })?;
+    Ok(DispatchCheckout {
+        branch: resolved.state.branch_ref,
+        worktree: resolved.state.worktree_path.to_string_lossy().into_owned(),
+    })
 }
 
 async fn maintain_preparation_claim(

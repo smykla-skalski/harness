@@ -15,7 +15,9 @@ use crate::daemon::protocol::{
     TaskBoardPlanSubmitRequest, TaskBoardPlanningResponse, TaskBoardProjectsResponse,
     TaskBoardSyncRequest, TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
 };
-use crate::daemon::protocol::{TaskBoardDispatchRequest, TaskBoardDispatchResponse};
+use crate::daemon::protocol::{
+    TaskBoardDispatchPickResponse, TaskBoardDispatchRequest, TaskBoardDispatchResponse,
+};
 use crate::errors::CliError;
 #[cfg(test)]
 use crate::errors::CliErrorKind;
@@ -50,8 +52,10 @@ mod dispatch_preparation;
 mod policy_canvas;
 mod policy_canvas_io;
 mod policy_canvas_response;
+mod policy_spawn_gate;
 mod sync;
 
+pub(crate) use dispatch::load_live_spawn_grants;
 pub(crate) use dispatch_preparation::prepare_claimed_task_board_dispatch;
 
 pub(crate) use policy_canvas::{
@@ -63,6 +67,10 @@ pub(crate) use policy_canvas::{
     simulate_policy_pipeline, update_policy_scenario,
 };
 pub(crate) use policy_canvas_io::{export_policy, import_policy};
+pub(crate) use policy_spawn_gate::{
+    list_policy_approval_grants, resolve_policy_approval_grant, revoke_policy_approval_grant,
+    set_policy_canvas_spawn_kill_switch, set_policy_canvas_spawn_requires_live_policy,
+};
 
 /// Create a persisted task-board item.
 ///
@@ -290,6 +298,12 @@ pub(crate) async fn dispatch_task_board_async(
     async_db: &AsyncDaemonDb,
 ) -> Result<TaskBoardDispatchResponse, CliError> {
     dispatch::dispatch_task_board_async(request, async_db).await
+}
+
+pub(crate) async fn pick_task_board_dispatch_async(
+    async_db: &AsyncDaemonDb,
+) -> Result<TaskBoardDispatchPickResponse, CliError> {
+    dispatch::pick_task_board_dispatch_async(async_db).await
 }
 
 /// Build task-board audit counts.

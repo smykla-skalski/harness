@@ -64,6 +64,8 @@ impl DaemonDb {
                     global_policy_enforcement_enabled: row.get(5)?,
                     scenarios_json: row.get(6)?,
                     scenarios_seeded: row.get(7)?,
+                    spawn_requires_live_policy: row.get(8)?,
+                    spawn_kill_switch: row.get(9)?,
                 })
             })
             .optional()

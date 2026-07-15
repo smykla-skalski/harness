@@ -107,6 +107,9 @@ impl CodexControllerHandle {
             );
             self.save_and_broadcast(&run)?;
         }
+        if let Some(failed) = self.normalized_failed_completion(&run)? {
+            run = failed;
+        }
         self.sync_orchestration_status_for_run(&run)?;
         Ok(run)
     }

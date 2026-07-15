@@ -8,11 +8,11 @@ use serde::Deserialize;
 
 use crate::daemon::protocol::{
     ControlPlaneActorRequest, TaskBoardAuditRequest, TaskBoardCatalogRequest,
-    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchRequest,
-    TaskBoardEvaluateRequest, TaskBoardGetItemRequest, TaskBoardHostSetProjectTypesRequest,
-    TaskBoardListItemsRequest, TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest,
-    TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest, TaskBoardSyncRequest,
-    TaskBoardUpdateItemRequest, http_paths,
+    TaskBoardCreateItemRequest, TaskBoardDeleteItemRequest, TaskBoardDispatchDeliverRequest,
+    TaskBoardDispatchPickRequest, TaskBoardDispatchRequest, TaskBoardEvaluateRequest,
+    TaskBoardGetItemRequest, TaskBoardHostSetProjectTypesRequest, TaskBoardListItemsRequest,
+    TaskBoardPlanApproveRequest, TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest,
+    TaskBoardPlanSubmitRequest, TaskBoardSyncRequest, TaskBoardUpdateItemRequest, http_paths,
 };
 use crate::daemon::remote_task_board::{project_task_board_item, project_task_board_list};
 use crate::daemon::remote_viewer::is_remote_viewer;
@@ -290,6 +290,42 @@ pub(super) async fn post_task_board_dispatch(
         &request_id,
         start,
         result,
+    )
+}
+
+pub(super) async fn post_task_board_dispatch_deliver(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardDispatchDeliverRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_DISPATCH_DELIVER,
+        &request_id,
+        start,
+        task_board_route_executor::deliver(&state, &request).await,
+    )
+}
+
+pub(super) async fn post_task_board_dispatch_pick(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    _body: Option<Json<TaskBoardDispatchPickRequest>>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_DISPATCH_PICK,
+        &request_id,
+        start,
+        task_board_route_executor::pick(&state).await,
     )
 }
 

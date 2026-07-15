@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use super::super::{
     AgentStatus, AwaitingReview, CliError, CliErrorKind, SessionAction, SessionState, TaskStatus,
     clear_agent_current_task, ensure_task_not_deleted, refresh_session, require_active,
-    require_permission, task_not_found, task_status_label, touch_agent,
+    require_managed_run_mutation, require_permission, task_not_found, task_status_label, touch_agent,
 };
 use crate::session::types::{
     Review, ReviewClaim, ReviewConsensus, ReviewPoint, ReviewVerdict, ReviewerEntry, WorkItem,
@@ -32,6 +32,29 @@ pub(crate) fn apply_submit_for_review(
     require_active(state)?;
     require_permission(state, actor_id, SessionAction::UpdateTaskStatus)?;
 
+    apply_submit_for_review_fields(state, task_id, actor_id, summary, now)
+}
+
+/// Submit a daemon-managed worker task even when its leaderless session is degraded.
+pub(crate) fn apply_submit_for_review_for_managed_run(
+    state: &mut SessionState,
+    task_id: &str,
+    actor_id: &str,
+    summary: Option<&str>,
+    now: &str,
+) -> Result<(), CliError> {
+    require_managed_run_mutation(state)?;
+    require_permission(state, actor_id, SessionAction::UpdateTaskStatus)?;
+    apply_submit_for_review_fields(state, task_id, actor_id, summary, now)
+}
+
+fn apply_submit_for_review_fields(
+    state: &mut SessionState,
+    task_id: &str,
+    actor_id: &str,
+    summary: Option<&str>,
+    now: &str,
+) -> Result<(), CliError> {
     let task = state
         .tasks
         .get(task_id)

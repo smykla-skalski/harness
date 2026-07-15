@@ -5,9 +5,11 @@
 use tokio::sync::mpsc;
 
 use crate::daemon::db::AsyncDaemonDb;
+use crate::daemon::db::NewApprovalGrant;
 use crate::errors::CliError;
 use crate::task_board::policy_graph::{
-    PolicyCanvasWorkspace, RecordedPolicyDecision, install_decision_sink,
+    PolicyCanvasWorkspace, PolicyPendingGrantRequest, RecordedPolicyDecision,
+    install_decision_sink, install_pending_grant_sink,
 };
 
 /// Wire policy storage at daemon boot and seed the database-backed workspace.
@@ -16,6 +18,7 @@ use crate::task_board::policy_graph::{
 /// Returns `CliError` when the database read/seed fails.
 pub(super) async fn bootstrap_policy_storage(async_db: &AsyncDaemonDb) -> Result<(), CliError> {
     install_decision_recording(async_db);
+    install_pending_grant_recording(async_db);
     ensure_policy_workspace(async_db).await?;
     Ok(())
 }
@@ -59,6 +62,47 @@ fn install_decision_recording(async_db: &AsyncDaemonDb) {
     install_decision_sink(Box::new(move |decision| {
         let _ = sender.send(decision);
     }));
+}
+
+/// Wire the fire-and-forget pending-grant creation seam.
+///
+/// Spawn evaluation emits a [`PolicyPendingGrantRequest`] for each approval gate
+/// it reaches with no live grant. A background task owns a cloned async handle
+/// and idempotently creates the pending grant per request, so the synchronous
+/// evaluation path only enqueues and never blocks on the database. Creation
+/// failures are logged, never propagated.
+fn install_pending_grant_recording(async_db: &AsyncDaemonDb) {
+    let db = async_db.clone();
+    let (sender, mut receiver) = mpsc::unbounded_channel::<PolicyPendingGrantRequest>();
+    tokio::spawn(async move {
+        while let Some(request) = receiver.recv().await {
+            record_one_pending_grant(&db, request).await;
+        }
+    });
+    install_pending_grant_sink(Box::new(move |request| {
+        let _ = sender.send(request);
+    }));
+}
+
+/// Idempotently create the pending grant for one request, logging and
+/// swallowing any failure so a write fault never disturbs dispatch.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
+)]
+async fn record_one_pending_grant(db: &AsyncDaemonDb, request: PolicyPendingGrantRequest) {
+    let grant = NewApprovalGrant {
+        board_item_id: request.board_item_id,
+        action: request.action,
+        canvas_id: request.canvas_id,
+        canvas_revision: request.canvas_revision,
+        node_id: request.node_id,
+        reason_code: request.reason_code,
+        expiry_seconds: request.expiry_seconds,
+    };
+    if let Err(error) = db.ensure_pending_approval_grant(&grant).await {
+        tracing::warn!(%error, "failed to create pending approval grant");
+    }
 }
 
 /// Trim the recorded-decision feed back to `POLICY_DECISION_RETENTION` rows,

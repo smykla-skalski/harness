@@ -276,6 +276,9 @@ pub(crate) fn is_worker_free(state: &SessionState, agent_id: &str) -> bool {
         return false;
     };
     agent.status.accepts_assignment()
-        && agent.role == SessionRole::Worker
+        // Leaders remain excluded from automatic worker selection, but a
+        // task-board managed agent may activate a leaderless session and bind
+        // its explicitly requested task as that session's leader.
+        && matches!(agent.role, SessionRole::Worker | SessionRole::Leader)
         && agent.current_task_id.is_none()
 }

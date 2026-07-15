@@ -99,6 +99,22 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_DISPATCH_DELIVER,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_DISPATCH_DELIVER,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_DISPATCH_PICK,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_DISPATCH_PICK,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
         path: http_paths::TASK_BOARD_EVALUATE,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::TASK_BOARD_EVALUATE,
@@ -334,6 +350,46 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         path: http_paths::POLICY_CANVASES_GLOBAL_ENFORCEMENT,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::POLICY_CANVASES_SPAWN_REQUIRES_LIVE_POLICY,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::POLICY_CANVAS_SET_SPAWN_REQUIRES_LIVE_POLICY,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::POLICY_CANVASES_SPAWN_KILL_SWITCH,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::POLICY_CANVAS_SET_SPAWN_KILL_SWITCH,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
+        path: http_paths::POLICY_APPROVAL_GRANTS,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::POLICY_APPROVAL_GRANTS_LIST,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::POLICY_APPROVAL_GRANT_RESOLVE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::POLICY_APPROVAL_GRANT_RESOLVE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::POLICY_APPROVAL_GRANT_REVOKE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::POLICY_APPROVAL_GRANT_REVOKE,
         },
         swift_client_exposed: true,
     },

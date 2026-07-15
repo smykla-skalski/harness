@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
-    TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardEvaluateRequest, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorRunOnceResponse, TaskBoardOrchestratorSettingsResponse,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatusResponse,
     TaskBoardSyncRequest,
@@ -14,21 +14,23 @@ use crate::task_board::github::GitHubAutomation;
 use crate::task_board::orchestrator::TaskBoardOrchestratorPreparedRun;
 use crate::task_board::{
     DispatchExecutionSummary, ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
-    TaskBoardAuditSummary, TaskBoardEvaluationSummary, TaskBoardGitHubInboxConfig, TaskBoardItem,
-    TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorRunStatus,
-    TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
-    TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase, TaskBoardStatus,
-    TaskBoardTodoistInboxConfig, TaskBoardWorkflowExecutionCount, TaskBoardWorkflowStatus,
-    build_audit_summary_with_policy, build_sync_summary, normalize_repository_slug,
+    SpawnGateSwitches, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
+    TaskBoardGitHubInboxConfig, TaskBoardItem, TaskBoardOrchestratorDispatchInput,
+    TaskBoardOrchestratorRunStatus, TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
+    TaskBoardOrchestratorState, TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase,
+    TaskBoardStatus, TaskBoardTodoistInboxConfig, TaskBoardWorkflowExecutionCount,
+    TaskBoardWorkflowStatus, build_audit_summary_with_policy, build_sync_summary,
+    normalize_repository_slug,
 };
 use crate::workspace::utc_now;
 
-use super::task_board::dispatch_task_board_async;
+use super::task_board::{dispatch_task_board_async, load_live_spawn_grants};
 use super::task_board_db::{
     active_external_sync_config_db, sync_task_board_for_orchestrator_db, task_board_host_local_db,
 };
 use super::task_board_evaluation::evaluate_task_board_async;
 use super::task_board_github::run_task_board_github_automation_async;
+use super::task_board_orchestrator_step_mode::scoped_dispatch_request;
 
 pub(crate) async fn task_board_orchestrator_status_db(
     db: &AsyncDaemonDb,
@@ -74,10 +76,11 @@ pub(crate) async fn run_task_board_orchestrator_once_db(
 ) -> Result<TaskBoardOrchestratorRunOnceResponse, CliError> {
     let settings = db.task_board_orchestrator_settings().await?;
     let mut prepared = prepare_run(db, request, &settings).await?;
-    match execute_run(db, &settings, &mut prepared).await {
+    let mut progress = (None, None);
+    match execute_run(db, &settings, &mut prepared, &mut progress).await {
         Ok((dispatch, evaluation)) => complete_run(db, prepared, dispatch, evaluation).await,
         Err(error) => {
-            record_failed_run(db, &prepared, &error).await?;
+            record_failed_run(db, &prepared, progress, &error).await?;
             Err(error)
         }
     }
@@ -114,9 +117,18 @@ async fn execute_run(
     db: &AsyncDaemonDb,
     settings: &TaskBoardOrchestratorSettings,
     prepared: &mut TaskBoardOrchestratorPreparedRun,
+    progress: &mut (
+        Option<DispatchExecutionSummary>,
+        Option<TaskBoardEvaluationSummary>,
+    ),
 ) -> Result<(DispatchExecutionSummary, TaskBoardEvaluationSummary), CliError> {
     sync_github_tasks(db, settings, prepared).await?;
-    let dispatch = dispatch_task_board_async(&dispatch_request(&prepared.input), db).await?;
+    let request = scoped_dispatch_request(db, settings, &prepared.input).await?;
+    let dispatch = match request.as_ref() {
+        Some(request) => dispatch_task_board_async(request, db).await?,
+        None => DispatchExecutionSummary::dry_run(Vec::new()),
+    };
+    progress.0 = Some(dispatch.clone());
     record_tick(
         db,
         &prepared.run_id,
@@ -127,13 +139,17 @@ async fn execute_run(
     .await?;
     let evaluation = evaluate_task_board_async(
         &TaskBoardEvaluateRequest {
-            item_id: prepared.input.item_id.clone(),
+            item_id: request
+                .as_ref()
+                .and_then(|request| request.item_id.clone())
+                .or_else(|| prepared.input.item_id.clone()),
             status: None,
             dry_run: prepared.input.dry_run,
         },
         db,
     )
     .await?;
+    progress.1 = Some(evaluation.clone());
     let items = items_for_input(db, &prepared.input).await?;
     run_task_board_github_automation_async(settings, &prepared.input, &items, db).await?;
     Ok((dispatch, evaluation))
@@ -187,7 +203,15 @@ async fn audit_summary(
         .as_ref()
         .and_then(|workspace| workspace.active_live_canvas())
         .map(|(canvas, document)| (canvas.id.as_str(), document));
-    Ok(build_audit_summary_with_policy(items, policy))
+    let switches = workspace
+        .as_ref()
+        .map(SpawnGateSwitches::from_workspace)
+        .unwrap_or_default();
+    let grants = load_live_spawn_grants(db, policy, items, &[]).await?;
+    let evaluated_at = utc_now();
+    Ok(build_audit_summary_with_policy(
+        items, policy, &evaluated_at, switches, &grants,
+    ))
 }
 
 fn dispatch_input(
@@ -238,16 +262,6 @@ async fn items_for_input(
         .collect())
 }
 
-fn dispatch_request(input: &TaskBoardOrchestratorDispatchInput) -> TaskBoardDispatchRequest {
-    TaskBoardDispatchRequest {
-        item_id: input.item_id.clone(),
-        status: input.status,
-        dry_run: input.dry_run,
-        project_dir: input.project_dir.clone(),
-        actor: input.actor.clone(),
-    }
-}
-
 async fn record_tick(
     db: &AsyncDaemonDb,
     run_id: &str,
@@ -287,12 +301,16 @@ async fn complete_run(
 async fn record_failed_run(
     db: &AsyncDaemonDb,
     prepared: &TaskBoardOrchestratorPreparedRun,
+    progress: (
+        Option<DispatchExecutionSummary>,
+        Option<TaskBoardEvaluationSummary>,
+    ),
     error: &CliError,
 ) -> Result<(), CliError> {
     let summary = run_summary(
         prepared.clone(),
-        None,
-        None,
+        progress.0,
+        progress.1,
         Some(error.to_string()),
         TaskBoardOrchestratorRunStatus::Failed,
     );
@@ -377,6 +395,7 @@ async fn status_from_state(
     state: TaskBoardOrchestratorState,
 ) -> Result<TaskBoardOrchestratorStatusResponse, CliError> {
     let settings = db.task_board_orchestrator_settings().await?;
+    let held_dispatches = db.held_task_board_dispatch_summary().await?;
     let machine = task_board_host_local_db(db).await.ok();
     let items = db.list_task_board_items(None).await?;
     let items = items.iter().filter(|item| {
@@ -397,6 +416,8 @@ async fn status_from_state(
     Ok(TaskBoardOrchestratorStatusResponse {
         enabled: state.enabled,
         running: state.running,
+        step_mode: settings.step_mode,
+        held_dispatches,
         current_tick: state.current_tick,
         last_run: state.last_run,
         workflow_execution_counts,
@@ -412,6 +433,9 @@ fn apply_settings_update(
     settings: &mut TaskBoardOrchestratorSettings,
     update: &TaskBoardOrchestratorSettingsUpdateRequest,
 ) {
+    if let Some(step_mode) = update.step_mode {
+        settings.step_mode = step_mode;
+    }
     if let Some(workflows) = &update.enabled_workflows {
         settings.enabled_workflows.clone_from(workflows);
     }

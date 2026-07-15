@@ -26,6 +26,8 @@ pub struct TaskBoardTodoistInboxConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardOrchestratorSettings {
+    #[serde(default)]
+    pub step_mode: bool,
     #[serde(default = "default_enabled_workflows")]
     pub enabled_workflows: Vec<TaskBoardOrchestratorWorkflow>,
     #[serde(default = "default_dry_run_default")]
@@ -46,6 +48,8 @@ pub struct TaskBoardOrchestratorSettings {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskBoardOrchestratorSettingsUpdateRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step_mode: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enabled_workflows: Option<Vec<TaskBoardOrchestratorWorkflow>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -116,12 +120,31 @@ pub struct TaskBoardOrchestratorPreparedRun {
 pub struct TaskBoardOrchestratorStatus {
     pub enabled: bool,
     pub running: bool,
+    #[serde(default)]
+    pub step_mode: bool,
+    #[serde(default)]
+    pub held_dispatches: TaskBoardHeldDispatchSummary,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_tick: Option<TaskBoardOrchestratorTickInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_run: Option<TaskBoardOrchestratorRunSummary>,
     pub workflow_execution_counts: Vec<TaskBoardWorkflowExecutionCount>,
     pub settings: TaskBoardOrchestratorSettings,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardHeldDispatchSummary {
+    pub count: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub items: Vec<TaskBoardHeldDispatchItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardHeldDispatchItem {
+    pub intent_id: String,
+    pub board_item_id: String,
+    pub session_id: String,
+    pub work_item_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -193,6 +216,7 @@ pub struct TaskBoardWorkflowExecutionCount {
 impl Default for TaskBoardOrchestratorSettings {
     fn default() -> Self {
         Self {
+            step_mode: false,
             enabled_workflows: default_enabled_workflows(),
             dry_run_default: default_dry_run_default(),
             dispatch_status_filter: Some(TaskBoardStatus::Todo),

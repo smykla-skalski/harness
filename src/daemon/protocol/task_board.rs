@@ -312,6 +312,10 @@ pub struct PolicyCanvasWorkspaceResponse {
     #[serde(default = "default_global_policy_enforcement_enabled")]
     pub global_policy_enforcement_enabled: bool,
     #[serde(default)]
+    pub spawn_requires_live_policy: bool,
+    #[serde(default)]
+    pub spawn_kill_switch: bool,
+    #[serde(default)]
     pub scenarios: Vec<PolicyScenario>,
 }
 
@@ -395,6 +399,7 @@ pub struct TaskBoardHostSetProjectTypesRequest {
     pub project_types: Vec<String>,
 }
 pub type TaskBoardDispatchResponse = DispatchExecutionSummary;
+
 pub type TaskBoardEvaluationResponse = TaskBoardEvaluationSummary;
 pub type TaskBoardAuditResponse = TaskBoardAuditSummary;
 pub type TaskBoardOrchestratorStatusResponse = TaskBoardOrchestratorStatus;

@@ -1,6 +1,6 @@
 use std::env;
 
-use clap::{Args, Subcommand, ValueEnum};
+use clap::{ArgAction, Args, Subcommand, ValueEnum};
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::protocol::{
@@ -68,6 +68,8 @@ pub struct TaskBoardOrchestratorRunOnceArgs {
 pub struct TaskBoardOrchestratorSettingsArgs {
     #[arg(long)]
     pub json: bool,
+    #[arg(long, action = ArgAction::Set)]
+    pub step_mode: Option<bool>,
     #[arg(long)]
     pub dry_run_default: Option<bool>,
     #[arg(long, value_enum)]
@@ -200,7 +202,8 @@ impl Execute for TaskBoardOrchestratorSettingsArgs {
             print_json(&settings)?;
         } else {
             println!(
-                "task-board orchestrator settings: dry_run_default={}, project_dir={}",
+                "task-board orchestrator settings: step_mode={}, dry_run_default={}, project_dir={}",
+                settings.step_mode,
                 settings.dry_run_default,
                 settings.project_dir.as_deref().unwrap_or("<unset>")
             );
@@ -211,7 +214,8 @@ impl Execute for TaskBoardOrchestratorSettingsArgs {
 
 impl TaskBoardOrchestratorSettingsArgs {
     fn has_update(&self) -> bool {
-        self.dry_run_default.is_some()
+        self.step_mode.is_some()
+            || self.dry_run_default.is_some()
             || self.dispatch_status_filter.is_some()
             || self.clear_dispatch_status_filter
             || self.project_dir.is_some()
@@ -220,6 +224,7 @@ impl TaskBoardOrchestratorSettingsArgs {
 
     fn update_request(&self) -> TaskBoardOrchestratorSettingsUpdateRequest {
         TaskBoardOrchestratorSettingsUpdateRequest {
+            step_mode: self.step_mode,
             dry_run_default: self.dry_run_default,
             dispatch_status_filter: self.dispatch_status_filter,
             clear_dispatch_status_filter: self.clear_dispatch_status_filter,

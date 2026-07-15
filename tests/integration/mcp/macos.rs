@@ -10,7 +10,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use assert_cmd::cargo::cargo_bin;
-use harness::daemon::protocol::task_board_mcp_methods;
+use harness::daemon::protocol::{task_board_mcp_methods, ws_methods};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
@@ -232,7 +232,7 @@ fn mcp_serve_initialize_lists_all_registered_tools() {
         .iter()
         .filter_map(|t| t.get("name").and_then(Value::as_str))
         .collect();
-    let mut expected = vec![
+    let expected_monitor = [
         "list_windows",
         "list_elements",
         "get_element",
@@ -245,8 +245,25 @@ fn mcp_serve_initialize_lists_all_registered_tools() {
         "type_text",
         "screenshot_window",
     ];
-    expected.extend(task_board_mcp_methods());
-    assert_eq!(names, expected,);
+    assert!(
+        names.len() >= expected_monitor.len(),
+        "expected at least {} registered Monitor tools, got {}: {names:?}",
+        expected_monitor.len(),
+        names.len(),
+    );
+    assert_eq!(&names[..expected_monitor.len()], &expected_monitor);
+
+    let mut actual_task_board = names[expected_monitor.len()..].to_vec();
+    let mut expected_task_board: Vec<&str> = task_board_mcp_methods()
+        .into_iter()
+        .filter(|method| {
+            *method != ws_methods::TASK_BOARD_CAPABILITIES
+                && *method != ws_methods::TASK_BOARD_GIT_RUNTIME_KEY_MATERIAL_SYNC
+        })
+        .collect();
+    actual_task_board.sort_unstable();
+    expected_task_board.sort_unstable();
+    assert_eq!(actual_task_board, expected_task_board);
 
     drop(reader);
     drop(stdout);

@@ -9,6 +9,7 @@ mod basics;
 mod leave_signals;
 mod liveness;
 mod liveness_interactive;
+mod managed_run_guards;
 mod permissions;
 mod review_guards;
 mod signal_reconciliation;

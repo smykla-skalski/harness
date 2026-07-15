@@ -10,7 +10,10 @@ use super::{
 use crate::daemon::protocol::{CodexRunMode, CodexRunRequest, CodexRunStatus};
 use crate::session::types::{AgentStatus, SessionRole};
 
+mod completion_evidence;
+mod registration_recovery;
 mod request_validation;
+mod task_lifecycle;
 mod test_support;
 
 use self::test_support::{
@@ -419,8 +422,8 @@ fn durable_run_request() -> CodexRunRequest {
         actor: Some("task-board".into()),
         prompt: "Investigate".into(),
         mode: CodexRunMode::WorkspaceWrite,
-        role: SessionRole::Worker,
-        fallback_role: None,
+        role: SessionRole::Leader,
+        fallback_role: Some(SessionRole::Worker),
         capabilities: Vec::new(),
         name: Some("Codex Worker".into()),
         persona: None,

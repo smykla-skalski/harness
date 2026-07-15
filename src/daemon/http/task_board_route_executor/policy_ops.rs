@@ -1,11 +1,14 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
-    PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest, PolicyCanvasDuplicateRequest,
-    PolicyCanvasExportRequest, PolicyCanvasExportResponse, PolicyCanvasImportRequest,
-    PolicyCanvasImportResponse, PolicyCanvasRenameRequest, PolicyCanvasSetActiveRequest,
-    PolicyCanvasSetGlobalEnforcementRequest, PolicyCanvasWorkspaceResponse,
-    PolicyPipelineAuditRequest, PolicyPipelineAuditResponse, PolicyPipelineGetRequest,
-    PolicyPipelineGoLiveDiffRequest, PolicyPipelineGoLiveDiffResponse,
+    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
+    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
+    PolicyApprovalGrantsListResponse, PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest,
+    PolicyCanvasDuplicateRequest, PolicyCanvasExportRequest, PolicyCanvasExportResponse,
+    PolicyCanvasImportRequest, PolicyCanvasImportResponse, PolicyCanvasRenameRequest,
+    PolicyCanvasSetActiveRequest, PolicyCanvasSetGlobalEnforcementRequest,
+    PolicyCanvasSetSpawnKillSwitchRequest, PolicyCanvasSetSpawnRequiresLivePolicyRequest,
+    PolicyCanvasWorkspaceResponse, PolicyPipelineAuditRequest, PolicyPipelineAuditResponse,
+    PolicyPipelineGetRequest, PolicyPipelineGoLiveDiffRequest, PolicyPipelineGoLiveDiffResponse,
     PolicyPipelineMakeLiveRequest, PolicyPipelineMakeLiveResponse, PolicyPipelinePromoteRequest,
     PolicyPipelinePromoteResponse, PolicyPipelineReplayRequest, PolicyPipelineReplayResponse,
     PolicyPipelineResponse, PolicyPipelineSaveDraftRequest, PolicyPipelineSaveDraftResponse,
@@ -61,6 +64,40 @@ pub(crate) async fn set_policy_canvas_global_enforcement(
     request: &PolicyCanvasSetGlobalEnforcementRequest,
 ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
     service::set_policy_canvas_global_enforcement(db, request).await
+}
+
+pub(crate) async fn set_policy_canvas_spawn_requires_live_policy(
+    db: &AsyncDaemonDb,
+    request: &PolicyCanvasSetSpawnRequiresLivePolicyRequest,
+) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
+    service::set_policy_canvas_spawn_requires_live_policy(db, request).await
+}
+
+pub(crate) async fn set_policy_canvas_spawn_kill_switch(
+    db: &AsyncDaemonDb,
+    request: &PolicyCanvasSetSpawnKillSwitchRequest,
+) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
+    service::set_policy_canvas_spawn_kill_switch(db, request).await
+}
+
+pub(crate) async fn list_policy_approval_grants(
+    db: &AsyncDaemonDb,
+) -> Result<PolicyApprovalGrantsListResponse, CliError> {
+    service::list_policy_approval_grants(db).await
+}
+
+pub(crate) async fn resolve_policy_approval_grant(
+    db: &AsyncDaemonDb,
+    request: &PolicyApprovalGrantResolveRequest,
+) -> Result<PolicyApprovalGrantResolveResponse, CliError> {
+    service::resolve_policy_approval_grant(db, request).await
+}
+
+pub(crate) async fn revoke_policy_approval_grant(
+    db: &AsyncDaemonDb,
+    request: &PolicyApprovalGrantRevokeRequest,
+) -> Result<PolicyApprovalGrantRevokeResponse, CliError> {
+    service::revoke_policy_approval_grant(db, request).await
 }
 
 pub(crate) async fn policy_pipeline(

@@ -12,6 +12,8 @@ fn if_then_else_routes_true_checks_to_the_then_branch() {
             checks_green: Some(true),
             ..PolicyEvidence::default()
         },
+        evaluated_at: None,
+        approvals: Vec::new(),
     });
 
     assert_eq!(
@@ -43,12 +45,16 @@ fn if_then_else_routes_failed_or_missing_checks_to_the_else_branch() {
             checks_green: Some(false),
             ..PolicyEvidence::default()
         },
+        evaluated_at: None,
+        approvals: Vec::new(),
     });
     let missing = graph.simulate(&PolicyInput {
         workflow: Some("reviews_auto".to_owned()),
         action: PolicyAction::SubmitReview,
         subject: PolicySubject::default(),
         evidence: PolicyEvidence::default(),
+        evaluated_at: None,
+        approvals: Vec::new(),
     });
 
     for simulation in [failed, missing] {
@@ -82,6 +88,8 @@ fn if_then_else_routes_numeric_zero_predicates_through_the_then_branch() {
             unresolved_requested_changes: Some(0),
             ..PolicyEvidence::default()
         },
+        evaluated_at: None,
+        approvals: Vec::new(),
     });
     let positive = graph.simulate(&PolicyInput {
         workflow: Some("reviews_auto".to_owned()),
@@ -91,6 +99,8 @@ fn if_then_else_routes_numeric_zero_predicates_through_the_then_branch() {
             unresolved_requested_changes: Some(2),
             ..PolicyEvidence::default()
         },
+        evaluated_at: None,
+        approvals: Vec::new(),
     });
 
     assert_eq!(
@@ -137,12 +147,16 @@ fn if_then_else_routes_present_evidence_through_the_then_branch() {
             checks_green: Some(false),
             ..PolicyEvidence::default()
         },
+        evaluated_at: None,
+        approvals: Vec::new(),
     });
     let missing = graph.simulate(&PolicyInput {
         workflow: Some("reviews_auto".to_owned()),
         action: PolicyAction::SubmitReview,
         subject: PolicySubject::default(),
         evidence: PolicyEvidence::default(),
+        evaluated_at: None,
+        approvals: Vec::new(),
     });
 
     assert_eq!(

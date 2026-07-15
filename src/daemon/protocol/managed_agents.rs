@@ -125,6 +125,9 @@ mod tests {
         let codex = ManagedAgentSnapshot::Codex(CodexRunSnapshot {
             run_id: "run-1".into(),
             session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
+            task_id: None,
+            board_item_id: None,
+            workflow_execution_id: None,
             session_agent_id: Some("worker-codex".into()),
             display_name: Some("Codex".into()),
             project_dir: "/tmp/project".into(),

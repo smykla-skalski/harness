@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 #[cfg(test)]
 use std::path::Path;
 
@@ -7,6 +8,7 @@ use super::dispatch::{DispatchPlan, build_dispatch_plans_with_policy};
 #[cfg(test)]
 use super::dispatch::{build_dispatch_plans, build_dispatch_plans_with_policy_root};
 use super::external::{ExternalProvider, ExternalSyncConfig, ExternalSyncOperation};
+use super::policy::PolicyApprovalGrant;
 use super::types::{AgentMode, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,8 +69,12 @@ pub fn build_audit_summary(items: &[TaskBoardItem]) -> TaskBoardAuditSummary {
 pub(crate) fn build_audit_summary_with_policy(
     items: &[TaskBoardItem],
     policy: Option<(&str, &super::policy_graph::PolicyGraph)>,
+    evaluated_at: &str,
+    switches: super::dispatch::SpawnGateSwitches,
+    grants: &HashMap<String, PolicyApprovalGrant>,
 ) -> TaskBoardAuditSummary {
-    let plans = build_dispatch_plans_with_policy(items, policy);
+    let plans =
+        build_dispatch_plans_with_policy(items, policy, Some(evaluated_at), switches, grants);
     audit_summary(items, &plans)
 }
 
@@ -265,6 +271,7 @@ fn status_counts(items: &[TaskBoardItem]) -> Vec<TaskBoardStatusCount> {
 mod tests {
     use super::*;
     use crate::task_board::planning::{approve_plan, submit_plan};
+    use crate::task_board::{PolicyAction, PolicyApprovalState, PolicyReasonCode};
 
     #[test]
     fn summaries_group_projects_and_modes() {
@@ -389,6 +396,92 @@ mod tests {
             .find(|entry| entry.status == TaskBoardStatus::Todo)
             .expect("todo count");
         assert_eq!(todo_count.count, 1);
+    }
+
+    #[test]
+    fn audit_summary_counts_approved_gated_item_as_ready() {
+        let item = ready_item("task-1", "owner/repo", AgentMode::Headless);
+        let graph = approval_spawn_graph();
+        let grant = PolicyApprovalGrant {
+            id: "grant-1".into(),
+            board_item_id: item.id.clone(),
+            action: PolicyAction::SpawnAgent,
+            canvas_id: Some("canvas-1".into()),
+            canvas_revision: graph.revision,
+            node_id: "approve-spawn".into(),
+            reason_code: PolicyReasonCode::ApprovalRequired,
+            state: PolicyApprovalState::Approved,
+            resolved_by: Some("operator".into()),
+            resolved_at: Some("2026-07-14T00:00:01Z".into()),
+            consumed_at: None,
+            expiry_seconds: None,
+            created_at: "2026-07-14T00:00:00Z".into(),
+            updated_at: "2026-07-14T00:00:01Z".into(),
+        };
+        let grants = HashMap::from([(item.id.clone(), grant)]);
+
+        let summary = build_audit_summary_with_policy(
+            &[item],
+            Some(("canvas-1", &graph)),
+            "2026-07-14T00:00:02Z",
+            super::super::dispatch::SpawnGateSwitches::default(),
+            &grants,
+        );
+
+        assert_eq!(summary.ready, 1);
+        assert_eq!(summary.blocked, 0);
+    }
+
+    fn approval_spawn_graph() -> super::super::policy_graph::PolicyGraph {
+        serde_json::from_value(serde_json::json!({
+            "schema_version": 2,
+            "revision": 1,
+            "mode": "enforced",
+            "nodes": [
+                {
+                    "id": "gate-spawn",
+                    "label": "Spawn gate",
+                    "kind": { "kind": "action_gate", "actions": ["spawn_agent"] },
+                    "input_ports": ["in"],
+                    "output_ports": ["match", "default"]
+                },
+                {
+                    "id": "approve-spawn",
+                    "label": "Approve spawn",
+                    "kind": { "kind": "approval_gate", "reason_code": "approval_required" },
+                    "input_ports": ["in"],
+                    "output_ports": ["approved"]
+                },
+                {
+                    "id": "finish-allow",
+                    "label": "Allow",
+                    "kind": { "kind": "finish", "decision": "allow", "reason_code": "default_allow" },
+                    "input_ports": ["in"],
+                    "output_ports": []
+                }
+            ],
+            "edges": [
+                {
+                    "id": "edge-gate-to-approval",
+                    "from_node": "gate-spawn",
+                    "from_port": "match",
+                    "to_node": "approve-spawn",
+                    "to_port": "in",
+                    "condition": { "condition": "action_in", "actions": ["spawn_agent"] }
+                },
+                {
+                    "id": "edge-approval-to-finish",
+                    "from_node": "approve-spawn",
+                    "from_port": "approved",
+                    "to_node": "finish-allow",
+                    "to_port": "in",
+                    "condition": { "condition": "always" }
+                }
+            ],
+            "groups": [],
+            "layout": {}
+        }))
+        .expect("approval spawn graph")
     }
 
     fn ready_item(id: &str, project_id: &str, mode: AgentMode) -> TaskBoardItem {

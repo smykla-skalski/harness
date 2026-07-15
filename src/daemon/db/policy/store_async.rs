@@ -82,7 +82,7 @@ impl AsyncDaemonDb {
     }
 }
 
-async fn load_workspace_in_tx(
+pub(crate) async fn load_workspace_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
 ) -> Result<Option<PolicyCanvasWorkspace>, CliError> {
     let Some(workspace_row) = query_as::<_, WorkspaceRow>(SELECT_WORKSPACE)
@@ -171,6 +171,8 @@ async fn write_workspace_in_tx(
         .bind(row.global_policy_enforcement_enabled)
         .bind(row.scenarios_json)
         .bind(row.scenarios_seeded)
+        .bind(row.spawn_requires_live_policy)
+        .bind(row.spawn_kill_switch)
         .bind(utc_now())
         .execute(transaction.as_mut())
         .await
@@ -364,8 +366,8 @@ fn group_by<T>(rows: Vec<T>, key: impl Fn(&T) -> String) -> HashMap<String, Vec<
 
 const UPSERT_WORKSPACE: &str = "INSERT INTO policy_workspace (singleton, active_canvas_id, workspace_schema_version, \
     manual_ocr_paste_canvas_deleted, review_text_paste_dry_run_canvas_deleted, review_screenshot_extraction_canvas_deleted, \
-    global_policy_enforcement_enabled, scenarios_json, scenarios_seeded, updated_at) \
-    VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
+    global_policy_enforcement_enabled, scenarios_json, scenarios_seeded, spawn_requires_live_policy, spawn_kill_switch, updated_at) \
+    VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) \
     ON CONFLICT(singleton) DO UPDATE SET \
     active_canvas_id = excluded.active_canvas_id, \
     workspace_schema_version = excluded.workspace_schema_version, \
@@ -375,6 +377,8 @@ const UPSERT_WORKSPACE: &str = "INSERT INTO policy_workspace (singleton, active_
     global_policy_enforcement_enabled = excluded.global_policy_enforcement_enabled, \
     scenarios_json = excluded.scenarios_json, \
     scenarios_seeded = excluded.scenarios_seeded, \
+    spawn_requires_live_policy = excluded.spawn_requires_live_policy, \
+    spawn_kill_switch = excluded.spawn_kill_switch, \
     updated_at = excluded.updated_at";
 const INSERT_CANVAS: &str = "INSERT INTO policy_canvases (canvas_id, position, title, \
     is_manual_ocr_paste_canvas, is_review_text_paste_dry_run_canvas, is_review_screenshot_extraction_canvas, \

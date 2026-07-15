@@ -95,6 +95,18 @@ fn task_board_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_DISPATCH_DELIVER,
+                ws_methods::TASK_BOARD_DISPATCH_DELIVER,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_DISPATCH_PICK,
+                ws_methods::TASK_BOARD_DISPATCH_PICK,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
                 http_paths::TASK_BOARD_EVALUATE,
                 ws_methods::TASK_BOARD_EVALUATE,
                 true,
@@ -271,6 +283,36 @@ fn task_board_routes_have_complete_ws_parity() {
                 HttpRouteMethod::Post,
                 http_paths::POLICY_CANVASES_GLOBAL_ENFORCEMENT,
                 ws_methods::POLICY_CANVAS_SET_GLOBAL_ENFORCEMENT,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::POLICY_CANVASES_SPAWN_REQUIRES_LIVE_POLICY,
+                ws_methods::POLICY_CANVAS_SET_SPAWN_REQUIRES_LIVE_POLICY,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::POLICY_CANVASES_SPAWN_KILL_SWITCH,
+                ws_methods::POLICY_CANVAS_SET_SPAWN_KILL_SWITCH,
+                true,
+            ),
+            (
+                HttpRouteMethod::Get,
+                http_paths::POLICY_APPROVAL_GRANTS,
+                ws_methods::POLICY_APPROVAL_GRANTS_LIST,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::POLICY_APPROVAL_GRANT_RESOLVE,
+                ws_methods::POLICY_APPROVAL_GRANT_RESOLVE,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::POLICY_APPROVAL_GRANT_REVOKE,
+                ws_methods::POLICY_APPROVAL_GRANT_REVOKE,
                 true,
             ),
             (

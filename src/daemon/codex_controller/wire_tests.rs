@@ -9,7 +9,9 @@ use super::{
 fn thread_params_serialize_harness_owned_app_server_shape() {
     let value = thread_params(ThreadParamsInput {
         cwd: "/tmp/project",
-        sandbox: "read-only",
+        runtime_workspace_roots: &["/tmp/project".to_string(), "/tmp/repo/.git".to_string()],
+        permissions: ":read-only",
+        config: None,
         approval_policy: "on-request",
         developer_instructions: "follow harness mode",
         thread_id: Some("thread-1"),
@@ -21,7 +23,8 @@ fn thread_params_serialize_harness_owned_app_server_shape() {
         value,
         json!({
             "cwd": "/tmp/project",
-            "sandbox": "read-only",
+            "runtimeWorkspaceRoots": ["/tmp/project", "/tmp/repo/.git"],
+            "permissions": ":read-only",
             "approvalPolicy": "on-request",
             "approvalsReviewer": "user",
             "developerInstructions": "follow harness mode",
@@ -32,13 +35,13 @@ fn thread_params_serialize_harness_owned_app_server_shape() {
 }
 
 #[test]
-fn turn_start_params_serialize_text_input_and_sandbox_policy() {
+fn turn_start_params_inherit_thread_permission_profile() {
     let value = turn_start_params(
         "thread-1",
         "/tmp/project",
+        &["/tmp/project".to_string(), "/tmp/repo/.git".to_string()],
         "hello",
         "never",
-        json!({ "type": "readOnly" }),
         Some("gpt-5.5"),
         Some("high"),
     )
@@ -49,10 +52,10 @@ fn turn_start_params_serialize_text_input_and_sandbox_policy() {
         json!({
             "threadId": "thread-1",
             "cwd": "/tmp/project",
+            "runtimeWorkspaceRoots": ["/tmp/project", "/tmp/repo/.git"],
             "input": [{ "type": "text", "text": "hello" }],
             "approvalPolicy": "never",
             "approvalsReviewer": "user",
-            "sandboxPolicy": { "type": "readOnly" },
             "model": "gpt-5.5",
             "effort": "high",
         })

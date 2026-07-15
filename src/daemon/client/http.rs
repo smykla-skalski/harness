@@ -181,6 +181,7 @@ pub(super) fn mutation_timeout_for_path(path: &str) -> Duration {
         path,
         "/v1/task-board/sync"
             | "/v1/task-board/dispatch"
+            | "/v1/task-board/dispatch/deliver"
             | "/v1/task-board/evaluate"
             | "/v1/task-board/orchestrator/run-once"
     ) {

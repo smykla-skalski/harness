@@ -193,6 +193,18 @@ impl DaemonDb {
         if version_number <= 30 {
             self.migrate_v30_to_v31()?;
         }
+        if version_number <= 31 {
+            self.migrate_v31_to_v32()?;
+        }
+        if version_number <= 32 {
+            self.migrate_v32_to_v33()?;
+        }
+        if version_number <= 33 {
+            self.migrate_v33_to_v34()?;
+        }
+        if version_number <= 34 {
+            self.migrate_v34_to_v35()?;
+        }
         Ok(())
     }
 
@@ -308,6 +320,22 @@ impl DaemonDb {
 
     fn migrate_v30_to_v31(&self) -> Result<(), CliError> {
         super::schema_v31::run(&self.conn)
+    }
+
+    fn migrate_v31_to_v32(&self) -> Result<(), CliError> {
+        super::schema_v32::run(&self.conn)
+    }
+
+    fn migrate_v32_to_v33(&self) -> Result<(), CliError> {
+        super::schema_v33::run(&self.conn)
+    }
+
+    fn migrate_v33_to_v34(&self) -> Result<(), CliError> {
+        super::schema_v34::run(&self.conn)
+    }
+
+    fn migrate_v34_to_v35(&self) -> Result<(), CliError> {
+        super::schema_v35::run(&self.conn)
     }
 }
 

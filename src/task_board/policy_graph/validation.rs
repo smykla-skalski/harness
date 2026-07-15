@@ -7,6 +7,9 @@ use super::{
     PolicyGraphValidationReport, UNSAFE_HIGH_RISK_ACTIONS,
 };
 
+#[path = "validation_spawn_terminal.rs"]
+mod spawn_terminal;
+
 pub(super) fn validate(graph: &PolicyGraph) -> PolicyGraphValidationReport {
     let mut issues = Vec::new();
     if graph.schema_version != POLICY_GRAPH_SCHEMA_VERSION {
@@ -26,6 +29,7 @@ pub(super) fn validate(graph: &PolicyGraph) -> PolicyGraphValidationReport {
     issues.extend(payload_compatibility_issues(graph, &nodes_by_id));
     issues.extend(cycle_issues(graph, &nodes_by_id));
     issues.extend(unsafe_action_issues(graph, &nodes_by_id));
+    issues.extend(spawn_terminal::spawn_route_issues(graph));
     PolicyGraphValidationReport { issues }
 }
 

@@ -92,7 +92,7 @@ fn checkout_head(repo: &gix::Repository, error_path: &Path) -> GitResult<()> {
         .tree_id()
         .map_err(|error| GitError::mutation(error_path, error))?;
 
-    let index = repo
+    let mut index = repo
         .index_from_tree(&tree_id)
         .map_err(|error| GitError::mutation(error_path, error))?;
 
@@ -106,7 +106,7 @@ fn checkout_head(repo: &gix::Repository, error_path: &Path) -> GitResult<()> {
     };
 
     state::checkout(
-        &mut index.into(),
+        &mut index,
         workdir,
         repo.objects.clone().into_arc().expect("object cache"),
         &Discard,
@@ -115,6 +115,10 @@ fn checkout_head(repo: &gix::Repository, error_path: &Path) -> GitResult<()> {
         options,
     )
     .map_err(|error| GitError::mutation(error_path, error))?;
+
+    index
+        .write(gix::index::write::Options::default())
+        .map_err(|error| GitError::mutation(error_path, error))?;
 
     Ok(())
 }

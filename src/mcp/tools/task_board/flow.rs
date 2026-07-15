@@ -1,9 +1,9 @@
 use serde_json::{Value, json};
 
 use crate::daemon::protocol::{
-    TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardDispatchRequest,
-    TaskBoardEvaluateRequest, TaskBoardHostSetProjectTypesRequest, TaskBoardSyncRequest,
-    ws_methods,
+    TaskBoardAuditRequest, TaskBoardCatalogRequest, TaskBoardDispatchDeliverRequest,
+    TaskBoardDispatchRequest, TaskBoardEvaluateRequest, TaskBoardHostSetProjectTypesRequest,
+    TaskBoardSyncRequest, ws_methods,
 };
 use crate::mcp::tool::ToolRegistry;
 
@@ -26,6 +26,18 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 description: "Dispatch task-board work through the daemon.",
                 input_schema: dispatch_schema,
                 normalize: validate_params::<TaskBoardDispatchRequest>,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_DISPATCH_DELIVER,
+                description: "Deliver a held task-board dispatch through the daemon.",
+                input_schema: dispatch_deliver_schema,
+                normalize: validate_params::<TaskBoardDispatchDeliverRequest>,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_DISPATCH_PICK,
+                description: "Preview the highest-priority ready task-board dispatch.",
+                input_schema: empty_object_schema,
+                normalize: validate_empty_object,
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_EVALUATE,
@@ -128,6 +140,18 @@ fn dispatch_schema() -> Value {
             "project_dir": { "type": "string" },
             "actor": { "type": "string" }
         },
+        "additionalProperties": false
+    })
+}
+
+fn dispatch_deliver_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "item_id": { "type": "string" },
+            "dry_run": { "type": "boolean" }
+        },
+        "required": ["item_id"],
         "additionalProperties": false
     })
 }

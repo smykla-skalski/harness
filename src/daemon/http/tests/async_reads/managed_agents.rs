@@ -17,6 +17,9 @@ async fn get_managed_agents_merges_terminal_and_codex_snapshots_when_sync_db_is_
         .save_codex_run(&CodexRunSnapshot {
             run_id: "codex-run-3".into(),
             session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
+            task_id: None,
+            board_item_id: None,
+            workflow_execution_id: None,
             session_agent_id: Some("codex-worker".into()),
             display_name: Some("Codex".into()),
             project_dir: "/tmp/harness".into(),
@@ -98,6 +101,9 @@ async fn get_managed_agent_wraps_codex_run_when_sync_db_is_unavailable() {
         .save_codex_run(&CodexRunSnapshot {
             run_id: "codex-run-4".into(),
             session_id: "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4".into(),
+            task_id: None,
+            board_item_id: None,
+            workflow_execution_id: None,
             session_agent_id: Some("codex-worker".into()),
             display_name: Some("Codex".into()),
             project_dir: "/tmp/harness".into(),

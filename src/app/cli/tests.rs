@@ -39,6 +39,8 @@ mod session_review;
 mod session_task;
 #[path = "tests/setup.rs"]
 mod setup;
+#[path = "tests/task_board_policy.rs"]
+mod task_board_policy;
 
 fn expect_cluster_args(command: Command) -> ClusterArgs {
     match command {

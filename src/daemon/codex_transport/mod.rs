@@ -1,4 +1,5 @@
 use std::env;
+use std::ffi::OsString;
 use std::pin::Pin;
 use std::process::Stdio;
 
@@ -198,10 +199,12 @@ impl StdioCodexTransport {
     /// stdio handles cannot be captured.
     pub fn spawn() -> Result<Self, CliError> {
         let bin = env::var("HARNESS_CODEX_BIN").unwrap_or_else(|_| "codex".to_string());
-        let mut child = Command::new(bin)
-            .arg("app-server")
-            .arg("--listen")
-            .arg("stdio://")
+        let mut command = Command::new(bin);
+        if let Some(path) = stdio_child_path() {
+            command.env("PATH", path);
+        }
+        let mut child = command
+            .args(["app-server", "--listen", "stdio://"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -253,6 +256,19 @@ impl StdioCodexTransport {
             reader: Box::pin(BufReader::new(reader)),
         }
     }
+}
+
+fn stdio_child_path() -> Option<OsString> {
+    let executable_dir = env::current_exe().ok()?.parent()?.to_path_buf();
+    let mut paths = vec![executable_dir.clone()];
+    paths.extend(
+        env::var_os("PATH")
+            .as_deref()
+            .into_iter()
+            .flat_map(env::split_paths)
+            .filter(|path| path != &executable_dir),
+    );
+    env::join_paths(paths).ok()
 }
 
 #[async_trait]

@@ -15,6 +15,8 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
         "review_screenshot_extraction_canvas_deleted",
     ),
     ("policy_workspace", "global_policy_enforcement_enabled"),
+    ("policy_workspace", "spawn_requires_live_policy"),
+    ("policy_workspace", "spawn_kill_switch"),
     ("policy_workspace", "scenarios_json"),
     ("policy_workspace", "scenarios_seeded"),
     ("policy_canvases", "is_manual_ocr_paste_canvas"),
@@ -26,6 +28,17 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
     ("policy_canvases", "live_document_json"),
     ("policy_canvases", "live_updated_at"),
     ("policy_nodes", "layout_source"),
+    ("policy_decisions", "evaluated_at"),
+    (
+        "task_board_dispatch_intents",
+        "consumed_approval_grant_id",
+    ),
+];
+
+const CURRENT_SCHEMA_CODEX_RUN_COLUMNS: &[(&str, &str)] = &[
+    ("codex_runs", "task_id"),
+    ("codex_runs", "board_item_id"),
+    ("codex_runs", "workflow_execution_id"),
 ];
 
 const DEPRECATED_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] =
@@ -72,6 +85,7 @@ pub(super) fn current_schema_shape_needs_repair(
         "policy_handoff_outbox",
         "policy_notification_outbox",
         "policy_task_creation_outbox",
+        "policy_approval_grants",
         "task_board_dispatch_intents",
         "task_board_imports",
     ] {
@@ -83,6 +97,14 @@ pub(super) fn current_schema_shape_needs_repair(
         if !column_exists(conn, table, column)? {
             return Ok(true);
         }
+    }
+    for (table, column) in CURRENT_SCHEMA_CODEX_RUN_COLUMNS {
+        if !column_exists(conn, table, column)? {
+            return Ok(true);
+        }
+    }
+    if !table_sql_contains(conn, "task_board_dispatch_intents", "'held'")? {
+        return Ok(true);
     }
     for (table, column) in CURRENT_SCHEMA_REMOTE_ACME_COLUMNS {
         if !column_exists(conn, table, column)? {
@@ -125,6 +147,10 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v29::run(&db.conn)?;
     super::schema_v30::run(&db.conn)?;
     super::schema_v31::run(&db.conn)?;
+    super::schema_v32::run(&db.conn)?;
+    super::schema_v33::run(&db.conn)?;
+    super::schema_v34::run(&db.conn)?;
+    super::schema_v35::run(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
@@ -269,6 +295,20 @@ fn trigger_exists(conn: &super::Connection, trigger_name: &str) -> Result<bool, 
     )
     .map(|count| count > 0)
     .map_err(|error| db_error(format!("check {trigger_name} trigger existence: {error}")))
+}
+
+fn table_sql_contains(
+    conn: &super::Connection,
+    table_name: &str,
+    expected: &str,
+) -> Result<bool, CliError> {
+    conn.query_row(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1",
+        [table_name],
+        |row| row.get::<_, String>(0),
+    )
+    .map(|sql| sql.contains(expected))
+    .map_err(|error| db_error(format!("read {table_name} table definition: {error}")))
 }
 
 fn column_exists(

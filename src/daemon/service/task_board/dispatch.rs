@@ -1,27 +1,34 @@
+use std::collections::HashMap;
+
 use crate::daemon::db::AsyncDaemonDb;
 #[cfg(test)]
 use crate::daemon::db::DaemonDb;
 #[cfg(test)]
 use crate::daemon::protocol::{SessionDetail, SessionStartRequest, TaskCreateRequest};
-use crate::daemon::protocol::{TaskBoardDispatchRequest, TaskBoardDispatchResponse};
+use crate::daemon::protocol::{
+    TaskBoardDispatchPickResponse, TaskBoardDispatchPickSelection, TaskBoardDispatchRequest,
+    TaskBoardDispatchResponse,
+};
 use crate::errors::CliError;
 #[cfg(test)]
 use crate::errors::CliErrorKind;
 #[cfg(test)]
 use crate::session::types::CONTROL_PLANE_ACTOR_ID;
+use crate::task_board::policy_graph::PolicyGraph;
 #[cfg(test)]
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
     DispatchAppliedTask, DispatchExecutionSummary, DispatchFailure, DispatchFailureKind,
-    DispatchPlan, Machine, TaskBoardItem, build_dispatch_plans_with_policy,
-    machine_mismatch_plan_with_policy,
+    DispatchPlan, Machine, PolicyAction, PolicyApprovalGrant, SpawnGateSwitches, TaskBoardItem,
+    TaskBoardStatus, build_dispatch_plans_with_policy, machine_mismatch_plan_with_policy,
 };
 #[cfg(test)]
 use crate::task_board::{
-    SessionIntent, TaskBoardStatus, TaskBoardStore, TaskBoardWorkflowStatus,
+    SessionIntent, TaskBoardStore, TaskBoardWorkflowStatus,
     build_dispatch_summary_with_policy_root, filter_for_local_machine,
     machine_mismatch_plan_with_policy_root,
 };
+use crate::workspace::utc_now;
 
 use super::super::task_board_db::task_board_host_local_db;
 #[cfg(test)]
@@ -83,8 +90,9 @@ pub async fn dispatch_task_board_async(
     }
     let mut applied = Vec::new();
     let mut failures = Vec::new();
+    let hold_worker = async_db.task_board_orchestrator_settings().await?.step_mode;
     for plan in plans.iter().filter(|plan| plan.is_ready()) {
-        match apply_dispatch_plan_async(request, async_db, plan).await {
+        match apply_dispatch_plan_async(request, async_db, plan, hold_worker).await {
             Ok(task) => applied.push(task),
             Err((kind, error)) => {
                 failures.push(DispatchFailure {
@@ -100,6 +108,32 @@ pub async fn dispatch_task_board_async(
         applied,
         failures,
     })
+}
+
+/// Preview the highest-priority ready todo item without reserving it.
+///
+/// # Errors
+/// Returns `CliError` when board items or policy state cannot be loaded.
+pub async fn pick_task_board_dispatch_async(
+    db: &AsyncDaemonDb,
+) -> Result<TaskBoardDispatchPickResponse, CliError> {
+    let request = TaskBoardDispatchRequest {
+        item_id: None,
+        status: Some(TaskBoardStatus::Todo),
+        dry_run: true,
+        project_dir: None,
+        actor: None,
+    };
+    let plans = build_dispatch_plans_for_request_async(db, &request).await?;
+    let selection = if let Some(plan) = plans.into_iter().find(DispatchPlan::is_ready) {
+        Some(TaskBoardDispatchPickSelection {
+            item: db.task_board_item(&plan.board_item_id).await?,
+            plan,
+        })
+    } else {
+        None
+    };
+    Ok(TaskBoardDispatchPickResponse { selection })
 }
 
 #[cfg(test)]
@@ -166,8 +200,9 @@ async fn apply_dispatch_plan_async(
     request: &TaskBoardDispatchRequest,
     async_db: &AsyncDaemonDb,
     plan: &DispatchPlan,
+    hold_worker: bool,
 ) -> Result<DispatchAppliedTask, (DispatchFailureKind, CliError)> {
-    reserve_and_prepare_task_board_dispatch(async_db, request, plan).await
+    reserve_and_prepare_task_board_dispatch(async_db, request, plan, hold_worker).await
 }
 
 #[cfg(test)]
@@ -303,13 +338,60 @@ async fn build_dispatch_plans_for_request_async(
         .as_ref()
         .and_then(|workspace| workspace.active_live_canvas())
         .map(|(canvas, document)| (canvas.id.as_str(), document));
-    let mut plans = build_dispatch_plans_with_policy(&kept, policy);
-    plans.extend(
-        rejected
-            .iter()
-            .map(|(item, machine)| machine_mismatch_plan_with_policy(item, machine, policy)),
+    let switches = workspace.as_ref().map_or(
+        SpawnGateSwitches {
+            requires_live_policy: true,
+            kill_switch: false,
+        },
+        SpawnGateSwitches::from_workspace,
     );
+    let grants = load_live_spawn_grants(db, policy, &kept, &rejected).await?;
+    let evaluated_at = utc_now();
+    let mut plans = build_dispatch_plans_with_policy(
+        &kept,
+        policy,
+        Some(evaluated_at.as_str()),
+        switches,
+        &grants,
+    );
+    plans.extend(rejected.iter().map(|(item, machine)| {
+        machine_mismatch_plan_with_policy(
+            item,
+            machine,
+            policy,
+            Some(evaluated_at.as_str()),
+            switches,
+            grants.get(&item.id),
+        )
+    }));
     Ok(plans)
+}
+
+/// Load the live (unconsumed) spawn approval grant for every item under
+/// evaluation, keyed by board item id. Only meaningful when a live enforced
+/// graph exists (a grant is keyed to that graph's revision); returns an empty
+/// map otherwise so no injection happens on the built-in fallback path.
+pub(crate) async fn load_live_spawn_grants(
+    db: &AsyncDaemonDb,
+    policy: Option<(&str, &PolicyGraph)>,
+    kept: &[TaskBoardItem],
+    rejected: &[(TaskBoardItem, Machine)],
+) -> Result<HashMap<String, PolicyApprovalGrant>, CliError> {
+    let mut grants = HashMap::new();
+    let Some((_canvas_id, document)) = policy else {
+        return Ok(grants);
+    };
+    let revision = document.revision;
+    let items = kept.iter().chain(rejected.iter().map(|(item, _)| item));
+    for item in items {
+        if let Some(grant) = db
+            .live_approval_grant(&item.id, PolicyAction::SpawnAgent, revision)
+            .await?
+        {
+            grants.insert(item.id.clone(), grant);
+        }
+    }
+    Ok(grants)
 }
 
 fn filter_for_machine(

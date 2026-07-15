@@ -1,11 +1,16 @@
-use serde_json::{Value, json};
+use std::path::Path;
+
+use serde_json::{Map, Value, json};
 
 use crate::daemon::protocol::{CodexApprovalDecision, CodexApprovalRequest, CodexRunMode};
 
-pub(super) fn thread_sandbox(mode: CodexRunMode) -> &'static str {
+pub(super) const WORKSPACE_PERMISSION_PROFILE: &str = "harness-workspace-write";
+const READ_ONLY_PERMISSION_PROFILE: &str = ":read-only";
+
+pub(super) fn permission_profile(mode: CodexRunMode) -> &'static str {
     match mode {
-        CodexRunMode::Report | CodexRunMode::Approval => "read-only",
-        CodexRunMode::WorkspaceWrite => "workspace-write",
+        CodexRunMode::Report | CodexRunMode::Approval => READ_ONLY_PERMISSION_PROFILE,
+        CodexRunMode::WorkspaceWrite => WORKSPACE_PERMISSION_PROFILE,
     }
 }
 
@@ -16,20 +21,78 @@ pub(super) fn approval_policy(mode: CodexRunMode) -> &'static str {
     }
 }
 
-pub(super) fn turn_sandbox_policy(mode: CodexRunMode, project_dir: &str) -> Value {
-    match mode {
-        CodexRunMode::Report | CodexRunMode::Approval => json!({
-            "type": "readOnly",
-            "networkAccess": false
-        }),
-        CodexRunMode::WorkspaceWrite => json!({
-            "type": "workspaceWrite",
-            "networkAccess": false,
-            "writableRoots": [project_dir],
-            "excludeTmpdirEnvVar": false,
-            "excludeSlashTmp": false
-        }),
+pub(super) fn runtime_workspace_roots(project_dir: &str) -> Vec<String> {
+    let project = Path::new(project_dir)
+        .canonicalize()
+        .unwrap_or_else(|_| Path::new(project_dir).to_path_buf());
+    let mut roots = vec![project.display().to_string()];
+    let Ok(repository) = gix::discover(&project) else {
+        return roots;
+    };
+    let common_dir = repository
+        .common_dir()
+        .canonicalize()
+        .unwrap_or_else(|_| repository.common_dir().to_path_buf());
+    if !common_dir.starts_with(&project) {
+        roots.push(common_dir.display().to_string());
     }
+    roots
+}
+
+pub(super) fn workspace_permission_config(project_dir: &str) -> Value {
+    let signing_socket = std::env::var_os("SSH_AUTH_SOCK");
+    workspace_permission_config_with_signing_socket(
+        project_dir,
+        signing_socket.as_deref().map(Path::new),
+    )
+}
+
+fn workspace_permission_config_with_signing_socket(
+    project_dir: &str,
+    signing_socket: Option<&Path>,
+) -> Value {
+    let mut filesystem = Map::new();
+    for path in workspace_git_metadata_roots(project_dir) {
+        filesystem.insert(path, Value::String("write".to_string()));
+    }
+    let mut profile = json!({
+        "extends": ":workspace",
+        "filesystem": filesystem
+    });
+    if let Some(signing_socket) = signing_socket.filter(|path| path.is_absolute()) {
+        profile["network"] = json!({
+            "enabled": true,
+            "unix_sockets": {
+                (signing_socket.display().to_string()): "allow"
+            }
+        });
+    }
+    json!({
+        "permissions": {
+            (WORKSPACE_PERMISSION_PROFILE): profile
+        }
+    })
+}
+
+fn workspace_git_metadata_roots(project_dir: &str) -> Vec<String> {
+    let project = Path::new(project_dir)
+        .canonicalize()
+        .unwrap_or_else(|_| Path::new(project_dir).to_path_buf());
+    let Ok(repository) = gix::discover(&project) else {
+        return Vec::new();
+    };
+    let mut roots = Vec::new();
+    for path in [repository.git_dir(), repository.common_dir()] {
+        let path = path
+            .canonicalize()
+            .unwrap_or_else(|_| path.to_path_buf())
+            .display()
+            .to_string();
+        if !roots.contains(&path) {
+            roots.push(path);
+        }
+    }
+    roots
 }
 
 pub(super) fn mode_instructions(mode: CodexRunMode) -> &'static str {
@@ -244,38 +307,126 @@ fn permission_approval_result(decision: CodexApprovalDecision, params: &Value) -
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+    use tempfile::tempdir;
 
-    use super::{approval_policy, approval_result, thread_sandbox, turn_sandbox_policy};
+    use super::{
+        approval_policy, approval_result, permission_profile, runtime_workspace_roots,
+        workspace_permission_config_with_signing_socket, WORKSPACE_PERMISSION_PROFILE,
+    };
     use crate::daemon::protocol::{CodexApprovalDecision, CodexRunMode};
+    use crate::git::mutation::create_linked_worktree;
 
     #[test]
-    fn approval_mode_uses_read_only_thread_sandbox() {
-        assert_eq!(thread_sandbox(CodexRunMode::Approval), "read-only");
+    fn report_and_approval_modes_use_modern_read_only_profile() {
+        assert_eq!(permission_profile(CodexRunMode::Report), ":read-only");
+        assert_eq!(permission_profile(CodexRunMode::Approval), ":read-only");
     }
 
     #[test]
-    fn approval_mode_keeps_on_request_policy_and_read_only_turn_sandbox() {
+    fn approval_mode_keeps_on_request_policy() {
         assert_eq!(approval_policy(CodexRunMode::Approval), "on-request");
         assert_eq!(
-            turn_sandbox_policy(CodexRunMode::Approval, "/tmp/project"),
+            permission_profile(CodexRunMode::WorkspaceWrite),
+            WORKSPACE_PERMISSION_PROFILE
+        );
+    }
+
+    #[test]
+    fn linked_worktree_runtime_roots_include_common_git_metadata() {
+        let root = tempdir().expect("tempdir");
+        let origin = root.path().join("origin");
+        let worker = root.path().join("worker");
+        harness_testkit::init_git_repo_with_seed(&origin);
+        let head = harness_testkit::git_head_sha(&origin, "HEAD");
+        create_linked_worktree(
+            &origin,
+            "worker",
+            &worker,
+            "harness/worker",
+            &head,
+        )
+        .expect("create linked worktree");
+
+        assert_eq!(
+            runtime_workspace_roots(worker.to_str().expect("utf8 worker")),
+            vec![
+                worker.canonicalize().expect("canonical worker").display().to_string(),
+                origin
+                    .join(".git")
+                    .canonicalize()
+                    .expect("canonical common git dir")
+                    .display()
+                    .to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn linked_worktree_permission_profile_explicitly_writes_git_metadata() {
+        let root = tempdir().expect("tempdir");
+        let origin = root.path().join("origin");
+        let worker = root.path().join("worker");
+        harness_testkit::init_git_repo_with_seed(&origin);
+        let head = harness_testkit::git_head_sha(&origin, "HEAD");
+        create_linked_worktree(&origin, "worker", &worker, "harness/worker", &head)
+            .expect("create linked worktree");
+
+        let git_dir = origin
+            .join(".git/worktrees/worker")
+            .canonicalize()
+            .expect("canonical linked git dir")
+            .display()
+            .to_string();
+        let common_dir = origin
+            .join(".git")
+            .canonicalize()
+            .expect("canonical common git dir")
+            .display()
+            .to_string();
+        assert_eq!(
+            workspace_permission_config_with_signing_socket(
+                worker.to_str().expect("utf8 worker"),
+                None,
+            ),
             json!({
-                "type": "readOnly",
-                "networkAccess": false
+                "permissions": {
+                    (WORKSPACE_PERMISSION_PROFILE): {
+                        "extends": ":workspace",
+                        "filesystem": {
+                            (git_dir): "write",
+                            (common_dir): "write"
+                        }
+                    }
+                }
             })
         );
     }
 
     #[test]
-    fn workspace_write_turn_sandbox_uses_current_app_server_shape() {
+    fn workspace_permission_profile_starts_proxy_for_signing_socket() {
+        let root = tempdir().expect("tempdir");
+        let origin = root.path().join("origin");
+        harness_testkit::init_git_repo_with_seed(&origin);
+        let socket = root.path().join("agent.sock");
+
+        let config = workspace_permission_config_with_signing_socket(
+            origin.to_str().expect("utf8 origin"),
+            Some(&socket),
+        );
+
         assert_eq!(
-            turn_sandbox_policy(CodexRunMode::WorkspaceWrite, "/tmp/project"),
-            json!({
-                "type": "workspaceWrite",
-                "networkAccess": false,
-                "writableRoots": ["/tmp/project"],
-                "excludeTmpdirEnvVar": false,
-                "excludeSlashTmp": false
-            })
+            config["permissions"][WORKSPACE_PERMISSION_PROFILE]["network"]["unix_sockets"]
+                [&socket.display().to_string()],
+            json!("allow")
+        );
+        assert_eq!(
+            config["permissions"][WORKSPACE_PERMISSION_PROFILE]["network"]["enabled"],
+            json!(true)
+        );
+        assert!(
+            config["permissions"][WORKSPACE_PERMISSION_PROFILE]["network"]
+                .get("domains")
+                .is_none()
         );
     }
 

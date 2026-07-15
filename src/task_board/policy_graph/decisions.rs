@@ -16,7 +16,7 @@ use std::sync::OnceLock;
 
 use uuid::Uuid;
 
-use crate::task_board::{PolicyDecision, PolicyInput};
+use crate::task_board::{PolicyAction, PolicyDecision, PolicyInput, PolicyReasonCode};
 
 /// One real policy evaluation captured at the enforced gate.
 ///
@@ -107,6 +107,42 @@ pub(crate) fn record_policy_decision(decision: RecordedPolicyDecision) {
     }
 }
 
+/// A durable-grant creation request emitted when spawn evaluation reaches an
+/// approval gate with no existing grant. Combines the graph's per-node approval
+/// request with the dispatch context (board item, action, canvas revision) that
+/// keys the grant. The daemon's sink creates the pending grant fire-and-forget
+/// so evaluation stays non-blocking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PolicyPendingGrantRequest {
+    pub board_item_id: String,
+    pub action: PolicyAction,
+    pub canvas_id: Option<String>,
+    pub canvas_revision: u64,
+    pub node_id: String,
+    pub reason_code: PolicyReasonCode,
+    pub expiry_seconds: Option<u64>,
+}
+
+type PendingGrantSink = Box<dyn Fn(PolicyPendingGrantRequest) + Send + Sync>;
+
+static PENDING_GRANT_SINK: OnceLock<PendingGrantSink> = OnceLock::new();
+
+/// Install the process-global pending-grant sink. Called once at daemon boot; a
+/// second call is ignored so tests and re-entrant boots stay safe.
+pub(crate) fn install_pending_grant_sink(sink: PendingGrantSink) {
+    let _ = PENDING_GRANT_SINK.set(sink);
+}
+
+/// Forward `request` to the installed sink, or drop it when none is installed.
+///
+/// Fire-and-forget like [`record_policy_decision`]: the daemon's sink only
+/// enqueues, so the synchronous evaluation path never blocks on the database.
+pub(crate) fn record_pending_grant(request: PolicyPendingGrantRequest) {
+    if let Some(sink) = PENDING_GRANT_SINK.get() {
+        sink(request);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Mutex;
@@ -134,6 +170,8 @@ mod tests {
             action: PolicyAction::MergePr,
             subject: Default::default(),
             evidence: Default::default(),
+            evaluated_at: None,
+            approvals: Vec::new(),
         }
     }
 

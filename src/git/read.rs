@@ -96,6 +96,23 @@ impl GitRepository {
             .map_err(|error| GitError::read(self.path(), error))
     }
 
+    pub(crate) fn has_changes_including_untracked(&self) -> GitResult<bool> {
+        let repo = self.open_gix()?;
+        let platform = repo
+            .status(gix::progress::Discard)
+            .map_err(|error| GitError::read(self.path(), error))?;
+        let mut statuses = platform
+            .untracked_files(gix::status::UntrackedFiles::Files)
+            .into_iter(Vec::<gix::bstr::BString>::new())
+            .map_err(|error| GitError::read(self.path(), error))?;
+        let has_untracked = match statuses.next() {
+            None => false,
+            Some(Ok(_)) => true,
+            Some(Err(error)) => return Err(GitError::read(self.path(), error)),
+        };
+        Ok(self.is_dirty()? || has_untracked)
+    }
+
     pub(crate) fn short_head_sha(&self, hex_len: usize) -> GitResult<Option<String>> {
         let repo = self.open_gix()?;
         let head = repo
@@ -139,5 +156,18 @@ mod tests {
             repo.path(),
             repo_root.canonicalize().expect("canonicalize repo root")
         );
+    }
+
+    #[test]
+    fn tracked_only_edit_is_reported_as_change() {
+        let tmp = tempdir().expect("tempdir");
+        let repo_root = tmp.path().join("repo");
+        harness_testkit::init_git_repo_with_seed(&repo_root);
+        let repo = GitRepository::from_path(&repo_root);
+        assert!(!repo.has_changes_including_untracked().expect("clean repo"));
+
+        fs::write(repo_root.join("README.md"), "tracked edit\n").expect("edit tracked file");
+
+        assert!(repo.has_changes_including_untracked().expect("dirty repo"));
     }
 }

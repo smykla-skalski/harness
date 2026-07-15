@@ -229,6 +229,10 @@ fn mutation_timeout_uses_longer_deadlines_for_slow_operations() {
         Duration::from_secs(120)
     );
     assert_eq!(
+        mutation_timeout_for_path("/v1/task-board/dispatch/deliver"),
+        Duration::from_secs(120)
+    );
+    assert_eq!(
         mutation_timeout_for_path("/v1/sessions/eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23/task"),
         Duration::from_secs(5)
     );

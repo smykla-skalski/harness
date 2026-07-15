@@ -6,7 +6,7 @@
 
 pub(super) const SELECT_WORKSPACE: &str = "SELECT active_canvas_id, workspace_schema_version, manual_ocr_paste_canvas_deleted, \
     review_text_paste_dry_run_canvas_deleted, review_screenshot_extraction_canvas_deleted, global_policy_enforcement_enabled, \
-    scenarios_json, scenarios_seeded \
+    scenarios_json, scenarios_seeded, spawn_requires_live_policy, spawn_kill_switch \
     FROM policy_workspace WHERE singleton = 1";
 pub(super) const SELECT_CANVASES: &str = "SELECT canvas_id, position, title, is_manual_ocr_paste_canvas, \
     is_review_text_paste_dry_run_canvas, is_review_screenshot_extraction_canvas, graph_schema_version, revision, mode, \

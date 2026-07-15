@@ -117,7 +117,10 @@ fn remote_client_activity_migrates_v30_databases() {
     drop(conn);
 
     let db = DaemonDb::open(&path).expect("migrate v30 database");
-    assert_eq!(db.schema_version().expect("schema version"), "31");
+    assert_eq!(
+        db.schema_version().expect("schema version"),
+        crate::daemon::db::SCHEMA_VERSION
+    );
     assert_eq!(activity_trigger_count(&db), 1);
     db.record_remote_audit_event(&activity_event(
         "activity-after-migration",

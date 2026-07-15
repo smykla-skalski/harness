@@ -18,13 +18,13 @@ const INSERT_POLICY_DECISION_SQL: &str = "
 INSERT INTO policy_decisions (
     id, recorded_at, canvas_id, revision, action, decision_tag, reason_code,
     policy_version, workflow, subject_json, evidence_json, visited_node_ids_json,
-    source, enforced
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)";
+    source, enforced, evaluated_at
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)";
 
 const SELECT_RECENT_POLICY_DECISIONS_FOR_CANVAS_SQL: &str = "
 SELECT id, recorded_at, canvas_id, revision, action, decision_tag, reason_code,
     policy_version, workflow, subject_json, evidence_json, visited_node_ids_json,
-    source, enforced
+    source, enforced, evaluated_at
 FROM policy_decisions
 WHERE canvas_id = ?1 OR canvas_id IS NULL
 ORDER BY recorded_at DESC, id DESC
@@ -70,6 +70,7 @@ impl AsyncDaemonDb {
             .bind(visited_json)
             .bind(&decision.source)
             .bind(i64::from(decision.enforced))
+            .bind(decision.input.evaluated_at.as_deref())
             .execute(self.pool())
             .await
             .map_err(|error| {
@@ -174,6 +175,7 @@ struct PolicyDecisionRow {
     visited_node_ids_json: String,
     source: String,
     enforced: bool,
+    evaluated_at: Option<String>,
 }
 
 impl PolicyDecisionRow {
@@ -197,6 +199,8 @@ impl PolicyDecisionRow {
                 action,
                 subject,
                 evidence,
+                evaluated_at: self.evaluated_at,
+                approvals: Vec::new(),
             },
             decision,
             visited_node_ids,
@@ -271,6 +275,8 @@ mod tests {
                 checks_green: Some(false),
                 ..PolicyEvidence::default()
             },
+            evaluated_at: None,
+            approvals: Vec::new(),
         };
         let decision = PolicyDecision::Deny {
             reason_code: PolicyReasonCode::ChecksNotGreen,
