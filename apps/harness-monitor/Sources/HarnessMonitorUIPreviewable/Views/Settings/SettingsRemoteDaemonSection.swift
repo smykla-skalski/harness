@@ -128,6 +128,8 @@ struct SettingsRemoteDaemonSection: View {
     LabeledContent("Token", value: profile.tokenHint)
     LabeledContent("Server SPKI") {
       Text(profile.serverSPKISHA256.value)
+        .lineLimit(1)
+        .truncationMode(.middle)
         .multilineTextAlignment(.trailing)
         .textSelection(.enabled)
     }
