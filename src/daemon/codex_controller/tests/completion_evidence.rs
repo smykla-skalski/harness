@@ -122,7 +122,34 @@ fn dirty_follow_up_start_does_not_reuse_an_older_clean_baseline() {
     assert!(worktree_changed_since_baseline(&run));
 
     record_clean_worktree_baseline(&mut run);
+    let event = run.events.last().expect("dirty baseline event");
+    assert_eq!(
+        event.summary,
+        "Worker worktree was not clean at turn start"
+    );
+    assert!(event.payload["tree"].is_null());
     assert!(!worktree_changed_since_baseline(&run));
+}
+
+#[test]
+fn not_a_repository_reports_unavailable_worktree_baseline() {
+    let worktree = tempfile::tempdir().expect("worktree");
+    let mut run = codex_run_snapshot(CodexRunStatus::Completed);
+    run.project_dir = worktree.path().display().to_string();
+
+    record_clean_worktree_baseline(&mut run);
+
+    let event = run.events.last().expect("unavailable baseline event");
+    assert_eq!(event.kind, "agent/worktree_baseline");
+    assert_eq!(
+        event.summary,
+        "Worker worktree baseline could not be computed at turn start"
+    );
+    assert_ne!(
+        event.summary,
+        "Worker worktree was not clean at turn start"
+    );
+    assert!(event.payload["tree"].is_null());
 }
 
 #[test]

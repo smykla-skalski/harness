@@ -10,6 +10,12 @@ use super::handle::{CodexControllerHandle, lock_db, record_snapshot_event};
 const WORKTREE_BASELINE_EVENT: &str = "agent/worktree_baseline";
 const COMPLETION_DETAIL_LIMIT: usize = 2_000;
 
+enum WorktreeBaseline {
+    Clean(String),
+    Dirty,
+    Unavailable,
+}
+
 impl CodexControllerHandle {
     pub(super) fn completed_run_has_evidence(
         &self,
@@ -43,17 +49,21 @@ impl CodexControllerHandle {
 }
 
 pub(super) fn record_clean_worktree_baseline(snapshot: &mut CodexRunSnapshot) {
-    let tree = clean_worktree_tree(&snapshot.project_dir);
+    let (tree, summary) = match clean_worktree_tree(&snapshot.project_dir) {
+        WorktreeBaseline::Clean(tree) => {
+            (Some(tree), "Recorded clean worker worktree baseline")
+        }
+        WorktreeBaseline::Dirty => (None, "Worker worktree was not clean at turn start"),
+        WorktreeBaseline::Unavailable => (
+            None,
+            "Worker worktree baseline could not be computed at turn start",
+        ),
+    };
     let payload = json!({ "tree": tree });
     record_snapshot_event(
         snapshot,
         WORKTREE_BASELINE_EVENT,
-        if tree.is_some() {
-            "Recorded clean worker worktree baseline"
-        } else {
-            "Worker worktree was not clean at turn start"
-        }
-        .to_string(),
+        summary.to_string(),
         &payload,
     );
 }
@@ -113,9 +123,12 @@ fn baseline_tree(run: &CodexRunSnapshot) -> Option<&str> {
         .and_then(|value| value.as_str())
 }
 
-fn clean_worktree_tree(project_dir: &str) -> Option<String> {
-    let (tree, clean) = current_worktree_state(project_dir)?;
-    clean.then_some(tree)
+fn clean_worktree_tree(project_dir: &str) -> WorktreeBaseline {
+    match current_worktree_state(project_dir) {
+        Some((tree, true)) => WorktreeBaseline::Clean(tree),
+        Some((_, false)) => WorktreeBaseline::Dirty,
+        None => WorktreeBaseline::Unavailable,
+    }
 }
 
 fn current_worktree_state(project_dir: &str) -> Option<(String, bool)> {
