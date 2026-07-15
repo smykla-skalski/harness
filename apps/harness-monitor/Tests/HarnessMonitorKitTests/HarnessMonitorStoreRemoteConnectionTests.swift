@@ -25,43 +25,6 @@ struct HarnessMonitorStoreRemoteConnectionTests {
     #expect(await daemon.recordedLaunchAgentStateCallCount() == 0)
   }
 
-  @Test("Remote stream closure reconnects after a server restart")
-  func remoteStreamClosureReconnectsAfterServerRestart() async throws {
-    let fixture = try RemoteStoreFixture()
-    let client = RecordingHarnessClient()
-    let daemon = RecordingDaemonController(
-      client: client,
-      bootstrapChecksCancellation: true
-    )
-    let store = HarnessMonitorStore(
-      daemonController: daemon,
-      remoteDaemonServices: fixture.services
-    )
-
-    await store.bootstrap()
-    #expect(store.connectionState == .online)
-    #expect(await daemon.recordedBootstrapCallCount() == 1)
-
-    client.configureGlobalStream(
-      events: [],
-      error: WebSocketTransportError.connectionClosed,
-      failureCount: 1
-    )
-    store.startGlobalStream(using: client)
-
-    for _ in 0..<100 {
-      if await daemon.recordedBootstrapCallCount() >= 2, !store.isReconnecting {
-        break
-      }
-      try await Task.sleep(for: .milliseconds(20))
-    }
-
-    #expect(await daemon.recordedBootstrapCallCount() == 2)
-    #expect(store.connectionState == .online)
-    #expect(store.globalStreamTask != nil)
-    await store.prepareForTermination()
-  }
-
   @Test("Mobile relay uses the remote client without local daemon warm-up")
   func mobileRelayUsesRemoteClient() async throws {
     let fixture = try RemoteStoreFixture()
@@ -93,6 +56,8 @@ struct HarnessMonitorStoreRemoteConnectionTests {
 
     #expect(store.remoteDaemonProfile?.status == .revoked)
     #expect(try fixture.tokenStore.loadToken(profileID: fixture.profile.id) == nil)
+    #expect(store.remoteDaemonReconnectTask == nil)
+    #expect(await daemon.recordedBootstrapCallCount() == 1)
     if case .offline(let reason) = store.connectionState {
       #expect(reason.localizedCaseInsensitiveContains("unauthorized"))
     } else {
@@ -257,7 +222,7 @@ struct HarnessMonitorStoreRemoteConnectionTests {
   }
 }
 
-private struct RemoteStoreFixture {
+struct RemoteStoreFixture {
   let profile: RemoteDaemonProfile
   let tokenStore: RecordingRemoteDaemonTokenStore
   let services: RemoteDaemonServices

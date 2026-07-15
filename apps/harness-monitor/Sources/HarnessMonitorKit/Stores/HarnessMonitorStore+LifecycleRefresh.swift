@@ -10,6 +10,7 @@ extension HarnessMonitorStore {
   private struct RefreshSnapshotLoadError: LocalizedError, Sendable {
     let source: RefreshSnapshotSource
     let failureDescription: String
+    let underlyingError: any Error
 
     var errorDescription: String? {
       "Startup snapshot \(source.rawValue) failed: \(failureDescription)"
@@ -33,10 +34,8 @@ extension HarnessMonitorStore {
   }
 
   func connect(using client: any HarnessMonitorClientProtocol) async {
-    if isAppLifecycleSuspended {
-      await client.shutdown()
-      self.client = nil
-      connectionState = .idle
+    if shouldAbandonConnectionAttempt {
+      await abandonConnectionAttempt(using: client, wasAdopted: false)
       return
     }
     do {
@@ -45,7 +44,15 @@ extension HarnessMonitorStore {
       await client.shutdown()
       self.client = nil
       taskBoardDatabaseInstanceID = nil
-      markConnectionOffline(Self.describeRefreshSnapshotError(error))
+      guard !shouldAbandonConnectionAttempt else {
+        connectionState = .idle
+        return
+      }
+      await applyConnectionFailure(error)
+      return
+    }
+    guard !shouldAbandonConnectionAttempt else {
+      await abandonConnectionAttempt(using: client, wasAdopted: false)
       return
     }
     self.client = client
@@ -60,18 +67,29 @@ extension HarnessMonitorStore {
     do {
       try await performPreviewConnectRefresh(using: client, preserveSelection: true)
     } catch {
-      _ = disconnectActiveConnection()
-      markConnectionOffline(Self.describeRefreshSnapshotError(error))
-      await restorePersistedSessionState()
+      await discardActiveConnection()
+      guard !shouldAbandonConnectionAttempt else {
+        connectionState = .idle
+        return
+      }
+      await applyConnectionFailure(error)
       return
     }
 
+    guard !shouldAbandonConnectionAttempt else {
+      await abandonConnectionAttempt(using: client, wasAdopted: true)
+      return
+    }
     withUISyncBatch {
       connectionState = .online
     }
   }
 
   private func connectLive(using client: any HarnessMonitorClientProtocol) async {
+    guard !shouldAbandonConnectionAttempt else {
+      await abandonConnectionAttempt(using: client, wasAdopted: true)
+      return
+    }
     withUISyncBatch {
       connectionState = .connecting
     }
@@ -82,12 +100,19 @@ extension HarnessMonitorStore {
     do {
       try await performInitialConnectRefresh(using: client, preserveSelection: true)
     } catch {
-      _ = disconnectActiveConnection()
-      markConnectionOffline(Self.describeRefreshSnapshotError(error))
-      await restorePersistedSessionState()
+      await discardActiveConnection()
+      guard !shouldAbandonConnectionAttempt else {
+        connectionState = .idle
+        return
+      }
+      await applyConnectionFailure(error)
       return
     }
 
+    guard !shouldAbandonConnectionAttempt else {
+      await abandonConnectionAttempt(using: client, wasAdopted: true)
+      return
+    }
     withUISyncBatch {
       connectionState = .online
       markConnectionOnline()
@@ -127,9 +152,12 @@ extension HarnessMonitorStore {
         isInitialConnect: false
       )
     } catch {
-      _ = disconnectActiveConnection()
-      markConnectionOffline(Self.describeRefreshSnapshotError(error))
-      await restorePersistedSessionState()
+      await discardActiveConnection()
+      guard !shouldAbandonConnectionAttempt else {
+        connectionState = .idle
+        return
+      }
+      await applyConnectionFailure(error)
     }
   }
 
@@ -309,7 +337,8 @@ extension HarnessMonitorStore {
   ) -> RefreshSnapshotLoadError {
     let wrapped = RefreshSnapshotLoadError(
       source: source,
-      failureDescription: RefreshSnapshotErrorFormatting.describeUnderlying(error)
+      failureDescription: RefreshSnapshotErrorFormatting.describeUnderlying(error),
+      underlyingError: error
     )
     HarnessMonitorLogger.store.warning(
       "\(wrapped.localizedDescription, privacy: .public)"
@@ -317,7 +346,16 @@ extension HarnessMonitorStore {
     return wrapped
   }
 
-  nonisolated private static func describeRefreshSnapshotError(_ error: any Error) -> String {
+  nonisolated static func underlyingRefreshSnapshotError(
+    _ error: any Error
+  ) -> any Error {
+    if let wrapped = error as? RefreshSnapshotLoadError {
+      return wrapped.underlyingError
+    }
+    return error
+  }
+
+  nonisolated static func describeRefreshSnapshotError(_ error: any Error) -> String {
     if let wrapped = error as? RefreshSnapshotLoadError {
       return wrapped.localizedDescription
     }

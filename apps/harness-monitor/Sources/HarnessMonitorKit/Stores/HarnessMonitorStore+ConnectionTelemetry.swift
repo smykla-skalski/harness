@@ -204,6 +204,9 @@ extension HarnessMonitorStore {
     }
     connectionMetrics.connectedSince = recordedAt
     connectionMetrics.disconnectedSince = nil
+    if usesRemoteDaemon {
+      stopRemoteDaemonReconnect()
+    }
     dismissDaemonDisconnectDecisionsAfterReconnect()
     refreshExternalManifestDiscoveryTask()
   }

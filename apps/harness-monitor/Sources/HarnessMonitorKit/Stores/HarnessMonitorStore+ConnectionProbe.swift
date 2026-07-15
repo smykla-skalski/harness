@@ -67,7 +67,7 @@ extension HarnessMonitorStore {
               kind: .reconnecting,
               detail: "Probe failed \(consecutiveFailures) times, re-bootstrapping"
             )
-            await reconnect()
+            scheduleReconnectAfterConnectionFailure()
             return
           }
         }

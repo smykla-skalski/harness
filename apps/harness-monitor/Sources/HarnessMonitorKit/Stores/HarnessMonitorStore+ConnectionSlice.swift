@@ -29,6 +29,11 @@ extension HarnessMonitorStore {
         onChanged?(.remoteDaemon)
       }
     }
+    @ObservationIgnored var remoteDaemonReconnectTask: Task<Void, Never>?
+    @ObservationIgnored var remoteDaemonReconnectGeneration: UInt64 = 0
+    @ObservationIgnored var connectionRecoveryTask: Task<Void, Never>?
+    @ObservationIgnored var connectionRecoveryGeneration: UInt64 = 0
+    @ObservationIgnored var isPreparingForTermination = false
     public var connectionState: ConnectionState = .idle {
       didSet {
         guard oldValue != connectionState else { return }
