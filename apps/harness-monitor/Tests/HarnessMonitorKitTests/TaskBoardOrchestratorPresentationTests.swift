@@ -184,6 +184,44 @@ struct TaskBoardOrchestratorPresentationTests {
     #expect(visibleRun.runId == "run-current")
   }
 
+  @Test("Evaluation pins the refreshed run when status was initially unavailable")
+  @MainActor
+  func evaluationPinsRefreshedRunAfterNilStatus() async throws {
+    let client = RecordingHarnessClient()
+    let store = await makeBootstrappedStore(client: client)
+    store.globalTaskBoardOrchestratorStatus = nil
+
+    #expect(await store.evaluateTaskBoard())
+
+    let dashboard = store.contentUI.dashboard
+    let refreshedStatus = try #require(dashboard.taskBoardOrchestratorStatus)
+    let refreshedRunID = try #require(refreshedStatus.lastRun?.runId)
+    let evaluation = try #require(dashboard.taskBoardEvaluationSummary)
+    let baselineRunID = try #require(dashboard.taskBoardEvaluationBaselineRunID)
+    #expect(refreshedRunID == "run-1")
+    #expect(baselineRunID == refreshedRunID)
+
+    let refreshedSource = TaskBoardOrchestratorPresentation(
+      status: refreshedStatus,
+      taskBoardItems: []
+    ).summarySource(latestEvaluation: evaluation, baselineRunID: baselineRunID)
+    guard case .standaloneEvaluation(let visibleEvaluation) = refreshedSource else {
+      Issue.record("Expected the evaluation to remain visible after the initial status refresh")
+      return
+    }
+    #expect(visibleEvaluation == evaluation)
+
+    let laterSource = TaskBoardOrchestratorPresentation(
+      status: orchestratorStatus(lastRun: orchestratorRun(runID: "run-2")),
+      taskBoardItems: []
+    ).summarySource(latestEvaluation: evaluation, baselineRunID: baselineRunID)
+    guard case .lastRun(let visibleRun) = laterSource else {
+      Issue.record("Expected a later orchestrator run to supersede the evaluation")
+      return
+    }
+    #expect(visibleRun.runId == "run-2")
+  }
+
   private func orchestratorStatus(
     lastRun: TaskBoardOrchestratorRunSummary? = nil,
     workflowCounts: [TaskBoardWorkflowExecutionCount] = []

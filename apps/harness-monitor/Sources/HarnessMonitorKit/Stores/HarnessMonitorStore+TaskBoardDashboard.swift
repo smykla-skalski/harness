@@ -261,11 +261,13 @@ extension HarnessMonitorStore {
         try await client.evaluateTaskBoard(request: request)
       }
       recordRequestSuccess()
-      cacheWriteSync.taskBoardEvaluationBaselineRunID =
-        globalTaskBoardOrchestratorStatus?.lastRun?.runId
+      let preRefreshBaselineRunID = globalTaskBoardOrchestratorStatus?.lastRun?.runId
       globalTaskBoardEvaluationSummary = measuredSummary.value
       scheduleUISync([.contentDashboard])
       await refreshTaskBoardDashboardSnapshot(using: client)
+      cacheWriteSync.taskBoardEvaluationBaselineRunID =
+        preRefreshBaselineRunID ?? globalTaskBoardOrchestratorStatus?.lastRun?.runId
+      scheduleUISync([.contentDashboard])
       presentSuccessFeedback("Evaluated task board")
       return true
     } catch {
