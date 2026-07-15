@@ -314,7 +314,7 @@ pub(super) async fn post_task_board_dispatch_deliver(
 pub(super) async fn post_task_board_dispatch_pick(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
-    Json(_request): Json<TaskBoardDispatchPickRequest>,
+    _body: Option<Json<TaskBoardDispatchPickRequest>>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,

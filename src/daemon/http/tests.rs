@@ -61,6 +61,7 @@ mod shutdown;
 mod support;
 mod task_board;
 mod task_board_crud;
+mod task_board_dispatch_pick;
 mod task_board_managed_worker_assertions;
 mod task_board_parity;
 mod task_board_policy_grant_route_parity;
