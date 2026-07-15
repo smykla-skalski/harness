@@ -43,6 +43,23 @@ Choose one delivery mode before creating the editing worktree, then keep that mo
 
 ## `pr`
 
+### Large features and PR series
+
+When a feature is expected to exceed about 5,000 Copilot-reviewable changed lines, record an ordered PR-series plan before implementation. Treat 5,000 lines as a soft per-PR ceiling, never a quota, hard product limit, or reason to pad a smaller coherent slice.
+
+1. Measure additions plus deletions from the current merge base of the proposed branch and PR base for every text file GitHub Copilot code review does not exclude under its [documented rules](https://docs.github.com/en/copilot/reference/review-excluded-files). Report the complete diff and excluded generated, vendored, mechanically generated dependency metadata, lockfile, snapshot, binary, or other mechanical volume separately; never use exclusions to hide an oversized authored diff or separate required derived output from its source.
+2. Record each planned PR's outcome, predecessor, owned behavior and surfaces, estimated reviewable lines, planned overlap, validation, non-goals, and status.
+3. Give each slice one durable outcome and leave the repository buildable, tested, and operationally safe when it merges. Include the tests, documentation, migrations, compatibility behavior, cleanup, and approved version change required by that outcome; no test or runtime path may depend on an unmerged future PR.
+4. Use a foundation slice only when it establishes a stable, tested, independently useful boundary. Forbid dormant scaffolding, placeholders, half-exposed behavior, temporary review-only adapters, deferred known fixes, and other work planned for replacement.
+5. Let later slices consume or extend a stable earlier contract, but never knowingly repair, replace, rename, remove, or substantially redesign it. Combine, reorder, or redesign the boundary before publication when the plan predicts such rework. Judge overlap by behavior rather than filenames: small additive integration in the same file is valid, but each behavior, migration, and schema transition needs one owning PR.
+6. Obtain explicit user approval for an operationally necessary staged transition such as expand, migrate, and contract. Record every production-safe intermediate state and planned removal before implementation; staged rollout needs do not justify ordinary implementation churn.
+7. Deliver dependent or semantically overlapping slices serially. Complete exact-head Copilot review, user merge, and normal closeout before implementing the next slice from current `upstream/main`; read-only planning may continue while waiting.
+8. Run slices in parallel only as separate agent sessions, each with its own worktree and lane, and only when they share no code contract, migration, runtime dependency, or semantic ownership and remain correct and mergeable in either order.
+9. Give every slice its own dedicated branch, reservation, complete PR review loop, and terminal state. Within one session, reuse that session's worktree and build, test, and runtime lane across serial slices.
+10. Recalculate the review budget before publication and the first Copilot request. Reslice when a sound boundary exists; when the smallest self-contained slice still exceeds the budget, stop for explicit user approval and record why an artificial split would be worse. Do not add an automated size gate.
+11. After each merge, record the exact merged contract and commit, then reassess the remaining boundaries, estimates, overlap, and validation before implementation continues.
+12. Use the final slice to prove the complete acceptance path and finish only whole-feature documentation, versioning, and integration not required by an earlier outcome; never use it to repair an earlier slice or defer that slice's obligations. A closed-unmerged prerequisite blocks dependent work, and the feature is complete only after every planned slice merges, required validation and cleanup finish, and local `main`, `upstream/main`, and the reusable worktree align.
+
 ### Prepare and publish
 
 1. Fetch and prune `upstream`, then require a clean `local main == upstream/main`. Fast-forward clean local `main` if it is behind `upstream/main`; stop for direction if local `main` is ahead or diverged.
