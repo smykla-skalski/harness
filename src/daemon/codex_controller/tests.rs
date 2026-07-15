@@ -59,7 +59,7 @@ fn command_approval_uses_callback_approval_id_when_present() {
             "approvalId": "approval-1",
             "itemId": "item-1",
             "cwd": "/tmp/harness",
-            "command": "rtk touch approved.txt",
+            "command": "touch approved.txt",
         }),
     )
     .expect("command approval should be parsed");
@@ -70,7 +70,7 @@ fn command_approval_uses_callback_approval_id_when_present() {
             "approvalId": "approval-2",
             "itemId": "item-1",
             "cwd": "/tmp/harness",
-            "command": "rtk touch approved.txt",
+            "command": "touch approved.txt",
         }),
     )
     .expect("command approval should be parsed");
@@ -89,7 +89,7 @@ fn command_approval_falls_back_to_item_id_without_callback_id() {
         &json!({
             "itemId": "item-1",
             "cwd": "/tmp/harness",
-            "command": "rtk touch approved.txt",
+            "command": "touch approved.txt",
         }),
     )
     .expect("command approval should be parsed");

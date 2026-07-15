@@ -12,8 +12,8 @@ CALLER_PWD="$(pwd -P)"
 source "$SCRIPT_DIR/lib/monitor-lanes.sh"
 # shellcheck source=apps/harness-monitor/Scripts/lib/non-indexable-roots.sh
 source "$SCRIPT_DIR/lib/non-indexable-roots.sh"
-# shellcheck source=apps/harness-monitor/Scripts/lib/rtk-shell.sh
-source "$SCRIPT_DIR/lib/rtk-shell.sh"
+# shellcheck source=apps/harness-monitor/Scripts/lib/xcodebuild-support.sh
+source "$SCRIPT_DIR/lib/xcodebuild-support.sh"
 
 STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
 FAILURE_REPORT_DIR="${HARNESS_MONITOR_FAILURE_REPORT_DIR:-$COMMON_REPO_ROOT/tmp/scan}"

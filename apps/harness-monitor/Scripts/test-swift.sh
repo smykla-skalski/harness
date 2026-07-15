@@ -8,8 +8,8 @@ source "$CHECKOUT_ROOT/scripts/lib/common-repo-root.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 # shellcheck source=apps/harness-monitor/Scripts/lib/xcodebuild-destination.sh
 source "$ROOT/Scripts/lib/xcodebuild-destination.sh"
-# shellcheck source=apps/harness-monitor/Scripts/lib/rtk-shell.sh
-source "$ROOT/Scripts/lib/rtk-shell.sh"
+# shellcheck source=apps/harness-monitor/Scripts/lib/xcodebuild-support.sh
+source "$ROOT/Scripts/lib/xcodebuild-support.sh"
 # shellcheck source=apps/harness-monitor/Scripts/lib/monitor-lanes.sh
 source "$ROOT/Scripts/lib/monitor-lanes.sh"
 # shellcheck source=apps/harness-monitor/Scripts/lib/build-for-testing-reuse.sh

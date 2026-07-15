@@ -126,7 +126,7 @@ Canonical harness version source:
 
 - `Cargo.toml`.
 
-Derived surfaces maintained by `rtk mise run version:*`:
+Derived surfaces maintained by `mise run version:*`:
 
 - `testkit/Cargo.toml`.
 - `Cargo.lock` package entries for `harness` and `harness-testkit`.

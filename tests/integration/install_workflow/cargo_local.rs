@@ -250,10 +250,6 @@ fn cargo_local_script_uses_cargo_for_supported_subcommands() {
     let log_path = tmp.path().join("fake-script.log");
 
     write_fake_shell_tool(
-        &fake_bin.join("rtk"),
-        "#!/bin/sh\nset -eu\nprintf 'RTK=%s\\n' \"$*\" >\"$FAKE_SCRIPT_LOG\"\n",
-    );
-    write_fake_shell_tool(
         &fake_bin.join("cargo"),
         "#!/bin/sh\nset -eu\nprintf 'CARGO=%s\\n' \"$*\" >\"$FAKE_SCRIPT_LOG\"\n",
     );
@@ -281,16 +277,12 @@ fn cargo_local_script_uses_cargo_for_supported_subcommands() {
 }
 
 #[test]
-fn cargo_local_script_keeps_run_subcommand_raw_when_rtk_is_available() {
+fn cargo_local_script_uses_cargo_for_run_subcommand() {
     let tmp = tempdir().expect("tempdir");
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let fake_bin = tmp.path().join("fake-bin");
     let log_path = tmp.path().join("fake-script.log");
 
-    write_fake_shell_tool(
-        &fake_bin.join("rtk"),
-        "#!/bin/sh\nset -eu\nprintf 'RTK=%s\\n' \"$*\" >\"$FAKE_SCRIPT_LOG\"\n",
-    );
     write_fake_shell_tool(
         &fake_bin.join("cargo"),
         "#!/bin/sh\nset -eu\nprintf 'CARGO=%s\\n' \"$*\" >\"$FAKE_SCRIPT_LOG\"\n",
@@ -328,10 +320,6 @@ fn cargo_local_script_uses_cargo_for_fmt_subcommand() {
     let fake_bin = tmp.path().join("fake-bin");
     let log_path = tmp.path().join("fake-script.log");
 
-    write_fake_shell_tool(
-        &fake_bin.join("rtk"),
-        "#!/bin/sh\nset -eu\nprintf 'RTK=%s\\n' \"$*\" >\"$FAKE_SCRIPT_LOG\"\n",
-    );
     write_fake_shell_tool(
         &fake_bin.join("cargo"),
         "#!/bin/sh\nset -eu\nprintf 'CARGO=%s\\n' \"$*\" >\"$FAKE_SCRIPT_LOG\"\n",

@@ -162,7 +162,7 @@ fn turn_completed_clears_pending_approval_state() {
         turn_id: Some("turn-1".to_string()),
         item_id: Some("item-1".to_string()),
         cwd: Some("/tmp/harness".to_string()),
-        command: Some("rtk touch approved.txt".to_string()),
+        command: Some("touch approved.txt".to_string()),
         file_path: None,
     });
     let mut worker = CodexRunWorker::new(controller_without_db(), snapshot, control_rx);

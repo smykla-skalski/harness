@@ -38,7 +38,7 @@ pub(super) fn codex_approval_request(
         turn_id: Some("turn-1".to_string()),
         item_id: Some(approval_id.to_string()),
         cwd: Some("/tmp/harness".to_string()),
-        command: Some("rtk touch approved.txt".to_string()),
+        command: Some("touch approved.txt".to_string()),
         file_path: None,
     }
 }

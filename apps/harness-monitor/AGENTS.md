@@ -1,19 +1,12 @@
 # AGENTS.md
 
-This file governs the Harness Monitor macOS app. The repo-root `AGENTS.md`
-still applies; this file adds app-specific build, lane, SwiftUI, and daemon
-rules.
+This file governs the Harness Monitor macOS app. The repo-root `AGENTS.md` still applies; this file adds app-specific build, lane, SwiftUI, and daemon rules.
 
 ## How to use this file
 
-1. Apply the repo-root contract first, especially worktrees, `mise`, signed
-   path-limited commits, and final replay to local `main`.
-2. Use this file for mandatory Monitor rules: Tuist generation, lanes,
-   validation, SwiftUI/UX, and daemon ownership.
-3. Load `../../docs/agent-guides/monitor-reference.md` only for detailed lane,
-   daemon, performance, preview, or SwiftUI rationale. Load
-   `../../docs/agent-guides/monitor-mobile-reference.md` only for iOS, watch,
-   CloudKit, or mobile mirror work.
+1. Apply the repo-root contract first, including the selected `pr` or `replay` delivery mode, worktree rules, `mise`, and signed path-limited commits.
+2. Use this file for mandatory Monitor rules: Tuist generation, lanes, validation, SwiftUI/UX, and daemon ownership.
+3. Load `../../docs/agent-guides/monitor-reference.md` only for detailed lane, daemon, performance, preview, or SwiftUI rationale. Load `../../docs/agent-guides/monitor-mobile-reference.md` only for iOS, watch, CloudKit, or mobile mirror work.
 
 ## Task routing
 
@@ -49,27 +42,16 @@ workspace settings and explicit CLI env.
 
 ## Worktrees and lanes
 
-Full git worktrees are mandatory for parallel Monitor work. Any agent or user
-that edits Monitor files, regenerates Tuist projects, builds/tests, launches a
-daemon/bridge, or uses XcodeBuildMCP needs a separate checkout.
+Full git worktrees are mandatory for parallel Monitor work. Any agent or user that edits Monitor files, regenerates Tuist projects, builds or tests, launches a daemon or bridge, or uses XcodeBuildMCP needs a separate checkout.
 
-For any goal or longer work split into smaller chunks, keep using one assigned
-custom worktree and one lane. After every commit in that worktree, rebase the
-worktree branch onto current local `main` and resolve conflicts in the worktree
-before replaying to `main`; this keeps the final replay simple. Reusing the
-same build/test/runtime lane keeps DerivedData, daemon state, and ports warm
-instead of forcing cold rebuilds.
+Keep one assigned custom worktree and one build/test/runtime lane for the whole session. Reusing them keeps DerivedData, daemon state, and ports warm instead of forcing cold rebuilds.
 
-Those worktrees are temporary isolation only. Finished Monitor work must be
-replayed into the local `main` checkout before handoff. If the work is fully in
-local `main`, remove the temporary worktree and branch afterward.
+The root-selected delivery mode controls integration: `replay` uses local `main`, while `pr` uses `upstream/main` and the review lifecycle. Keep the Monitor worktree and lane available through the mode's terminal state and until session end or explicit cleanup.
 
 Inside a worktree:
 
-- `HARNESS_MONITOR_BUILD_LANE=<name>` isolates DerivedData under
-  `xcode-derived-lanes/<name>`.
-- `HARNESS_MONITOR_RUNTIME_LANE=<name>` isolates daemon roots, ports, launchd
-  labels, bridge state, and MCP runtime state.
+- `HARNESS_MONITOR_BUILD_LANE=<name>` isolates DerivedData under `xcode-derived-lanes/<name>`.
+- `HARNESS_MONITOR_RUNTIME_LANE=<name>` isolates daemon roots, ports, launchd labels, bridge state, and MCP runtime state.
 
 Use `mise run monitor:*` tasks and add the lane env vars above when an agent needs isolated build or runtime state.
 
@@ -168,6 +150,12 @@ duplicating that effect on individual content/detail panes, keep session scroll
 edges soft, apply glass to navigation/control surfaces only, and never stack
 glass on glass. See
 `../../docs/agent-guides/monitor-reference.md` for the full macOS 26 notes.
+
+## UI delivery rules
+
+- **Decompose on touch.** When a delivery touches a multi-section view and adds more than 20 lines or new `@State` or `@AppStorage` to one section, extract that section into a file-private view in the same file before delivery. Apply this rule on the next touch, not preemptively.
+- **Ship the real producer with the UI.** A badge, sparkline, transcript row, status pill, or other signal view must not land until its data path is wired end to end and exercised by at least one non-empty fixture in the same delivery.
+- A hand-built fixture is sufficient for a deterministic contract fully encoded by its types. Use a real `_artifacts/runs/<slug>/` recording when timing, cross-source ordering, emitted format quirks, or another tacit shape affects the contract.
 
 Use the relevant skill before writing or reviewing Swift code here:
 

@@ -19,11 +19,12 @@ fn session_start_cli_reads_project_policy_file() {
         .assert()
         .success()
         .stdout(contains("\"hookEventName\":\"SessionStart\""))
-        .stdout(contains("mise tasks ls"))
-        .stdout(contains("mise run <task>"))
+        .stdout(contains("nearest applicable `AGENTS.md`"))
+        .stdout(contains("`pr` (default)"))
+        .stdout(contains("user-confirmed `replay`"))
+        .stdout(contains("docs/agent-guides/delivery-workflows.md"))
         .stdout(contains("git commit -sS"))
-        .stdout(contains("explicit user approval"))
-        .stdout(contains("local binary must be reinstalled"));
+        .stdout(contains("explicit approval"));
 }
 
 #[test]
@@ -47,7 +48,7 @@ fn session_start_cli_uses_custom_ancestor_policy_file() {
         .success();
     let stdout = String::from_utf8_lossy(&assert.get_output().stdout);
     assert!(stdout.contains("custom session-start sentinel"));
-    assert!(!stdout.contains("local binary must be reinstalled"));
+    assert!(!stdout.contains("docs/agent-guides/delivery-workflows.md"));
 }
 
 #[test]
@@ -62,7 +63,7 @@ fn denied_commands_contain_replacement() {
             &["mise run setup:bootstrap -- --agents codex"],
         ),
         (
-            "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests \
+            "env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests \
              bash -lc 'mise run monitor:test'",
             &["XCODE_ONLY_TESTING=", "mise run monitor:test"],
         ),

@@ -39,6 +39,7 @@ free of `#Preview`; preview code belongs in the nearest `Previews/` folder.
 5. Keep preview-only helpers private and next to the preview file unless reused
    by multiple preview files in the same domain. Only then promote them to a
    clearly named support file such as `SettingsPreviewSupport.swift`.
+6. Before finishing a layout change, confirm that every file containing `#Preview` lives under the nearest `Previews/` folder.
 
 ## Domain notes
 
