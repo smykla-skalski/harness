@@ -20,7 +20,7 @@ fn every_non_exempt_http_route_has_a_ws_mapping() {
 #[test]
 fn explicit_non_rpc_exemptions_are_documented_and_stable() {
     let exemptions = explicit_exemptions();
-    assert_eq!(exemptions.len(), 9, "unexpected exemption count");
+    assert_eq!(exemptions.len(), 11, "unexpected exemption count");
     let exempt_paths: BTreeSet<_> = exemptions.iter().map(|route| route.path).collect();
     assert_eq!(
         exempt_paths,
@@ -29,6 +29,8 @@ fn explicit_non_rpc_exemptions_are_documented_and_stable() {
             http_paths::REMOTE_PAIR_CLAIM,
             http_paths::REMOTE_PAIR_STATUS,
             http_paths::REMOTE_CLIENT_SELF_REVOKE,
+            http_paths::POLICIES_DUMP,
+            http_paths::POLICIES_IMPORT,
             http_paths::WS,
             http_paths::STREAM,
             http_paths::SESSION_STREAM,
@@ -42,6 +44,26 @@ fn explicit_non_rpc_exemptions_are_documented_and_stable() {
             .exemption_reason()
             .is_some_and(|reason| !reason.is_empty())
     }));
+}
+
+#[test]
+fn policy_transfer_routes_have_remote_read_write_scopes() {
+    let scope_for = |path| {
+        let route = HTTP_API_CONTRACT
+            .iter()
+            .find(|route| route.path == path)
+            .unwrap_or_else(|| panic!("missing policy transfer route {path}"));
+        remote_http_scopes(route)
+    };
+
+    assert_eq!(
+        scope_for(http_paths::POLICIES_DUMP),
+        Some(&[RemoteAccessScope::Read][..])
+    );
+    assert_eq!(
+        scope_for(http_paths::POLICIES_IMPORT),
+        Some(&[RemoteAccessScope::Write][..])
+    );
 }
 
 #[test]

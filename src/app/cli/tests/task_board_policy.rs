@@ -6,6 +6,74 @@ use crate::task_board::transport::{
 };
 
 #[test]
+fn parse_policy_dump_filters_and_export_alias() {
+    let dump = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "policy",
+        "dump",
+        "--canvas-id",
+        "canvas-a",
+        "--canvas-id",
+        "canvas-b",
+    ])
+    .expect("parse policy dump");
+    match task_board_command(dump.command) {
+        TaskBoardCommand::Policy {
+            command: TaskBoardPolicyCommand::Dump(args),
+        } => assert_eq!(args.canvas_ids, ["canvas-a", "canvas-b"]),
+        _ => panic!("expected TaskBoard Policy Dump"),
+    }
+
+    let export = Cli::try_parse_from(["harness", "task-board", "policy", "export"])
+        .expect("parse policy export alias");
+    match task_board_command(export.command) {
+        TaskBoardCommand::Policy {
+            command: TaskBoardPolicyCommand::Dump(args),
+        } => assert!(args.canvas_ids.is_empty()),
+        _ => panic!("expected TaskBoard Policy Dump through export alias"),
+    }
+}
+
+#[test]
+fn parse_policy_import_defaults_and_options() {
+    let stdin = Cli::try_parse_from(["harness", "task-board", "policy", "import"])
+        .expect("parse policy import from stdin");
+    match task_board_command(stdin.command) {
+        TaskBoardCommand::Policy {
+            command: TaskBoardPolicyCommand::Import(args),
+        } => {
+            assert_eq!(args.inputs, ["-"]);
+            assert!(!args.replace_all);
+            assert!(!args.json);
+        }
+        _ => panic!("expected TaskBoard Policy Import"),
+    }
+
+    let files = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "policy",
+        "import",
+        "first.json",
+        "second.json",
+        "--replace-all",
+        "--json",
+    ])
+    .expect("parse policy import files");
+    match task_board_command(files.command) {
+        TaskBoardCommand::Policy {
+            command: TaskBoardPolicyCommand::Import(args),
+        } => {
+            assert_eq!(args.inputs, ["first.json", "second.json"]);
+            assert!(args.replace_all);
+            assert!(args.json);
+        }
+        _ => panic!("expected TaskBoard Policy Import"),
+    }
+}
+
+#[test]
 fn parse_task_board_manual_dispatch_steps() {
     let pick = Cli::try_parse_from(["harness", "task-board", "dispatch-pick", "--json"])
         .expect("parse dispatch pick");

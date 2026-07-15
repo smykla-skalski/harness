@@ -170,7 +170,7 @@ extension WebSocketProtocolTests {
         "session_id": null,
         "payload": {
           "revision": 14,
-          "scopes": ["task_board:items", "task_board:orchestrator"]
+          "scopes": ["task_board:items", "task_board:orchestrator", "task_board:policy_pipeline"]
         }
       }
       """#
@@ -183,6 +183,9 @@ extension WebSocketProtocolTests {
       return
     }
     #expect(payload.revision == 14)
-    #expect(payload.scopes == ["task_board:items", "task_board:orchestrator"])
+    #expect(
+      payload.scopes
+        == ["task_board:items", "task_board:orchestrator", "task_board:policy_pipeline"]
+    )
   }
 }

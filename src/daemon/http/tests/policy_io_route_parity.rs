@@ -14,6 +14,87 @@ fn task_board_http_and_ws_policy_io_routes_match() {
     });
 }
 
+#[test]
+fn policy_transfer_http_routes_dump_and_import_batches() {
+    let sandbox = tempdir().expect("tempdir");
+    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(run_policy_transfer_routes());
+    });
+}
+
+async fn run_policy_transfer_routes() {
+    let state = super::test_http_state_with_db();
+    let test_db = state.async_db.get().expect("test async db").clone();
+    let mut workspace = crate::task_board::policy_graph::PolicyCanvasWorkspace::seeded();
+    workspace.canvases[0].id = "policy,one".to_string();
+    workspace.active_canvas_id = workspace.canvases[0].id.clone();
+    test_db
+        .replace_policy_workspace(&workspace)
+        .await
+        .expect("seed policy workspace");
+    let (base_url, server) = serve_http(state).await;
+    let client = reqwest::Client::new();
+
+    let dump = post_json(&client, &base_url, http_paths::POLICIES_DUMP, json!({})).await;
+    assert_eq!(dump["format"], "harness-policy-transfer");
+    assert_eq!(dump["version"], 1);
+    let policy_count = dump["policies"]
+        .as_array()
+        .expect("dumped policy list")
+        .len();
+    assert!(
+        policy_count > 1,
+        "all-policy dump should contain seeded policies"
+    );
+
+    let selected = post_json(
+        &client,
+        &base_url,
+        http_paths::POLICIES_DUMP,
+        json!({ "policy_ids": ["policy,one"] }),
+    )
+    .await;
+    assert_eq!(selected["policies"].as_array().map(Vec::len), Some(1));
+    assert_eq!(selected["policies"][0]["id"], "policy,one");
+    assert!(selected["workspace"].is_null());
+
+    let padded_import = post_json(
+        &client,
+        &base_url,
+        http_paths::POLICIES_IMPORT,
+        json!({
+            "bundle": selected,
+            "replace_all": false,
+            "padding": "x".repeat(2 * 1024 * 1024 + 64),
+        }),
+    )
+    .await;
+    assert!(
+        padded_import["canvases"]
+            .as_array()
+            .is_some_and(|canvases| !canvases.is_empty())
+    );
+
+    let imported = post_json(
+        &client,
+        &base_url,
+        http_paths::POLICIES_IMPORT,
+        json!({ "bundle": dump, "replace_all": true }),
+    )
+    .await;
+    assert_eq!(
+        imported["canvases"]
+            .as_array()
+            .expect("imported policy summaries")
+            .len(),
+        policy_count,
+    );
+
+    server.abort();
+    let _ = server.await;
+}
+
 async fn run_policy_io_parity() {
     let state = super::test_http_state_with_db();
     let test_db = state.async_db.get().expect("test async db").clone();

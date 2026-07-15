@@ -11,11 +11,17 @@ use crate::daemon::protocol::{
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{PolicyApprovalGrant, PolicyApprovalState};
 
+use super::policy_io::{TaskBoardPolicyDumpArgs, TaskBoardPolicyImportArgs};
 use super::{daemon_client, print_json};
 
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]
 pub enum TaskBoardPolicyCommand {
+    /// Dump policy canvases as a portable JSON bundle.
+    #[command(visible_alias = "export")]
+    Dump(TaskBoardPolicyDumpArgs),
+    /// Import policy canvases from JSON files or standard input.
+    Import(TaskBoardPolicyImportArgs),
     /// List pending approval grants.
     #[command(visible_alias = "approval-grants-list")]
     Grants(TaskBoardPolicyJsonArgs),
@@ -72,6 +78,8 @@ pub struct TaskBoardPolicyToggleArgs {
 impl Execute for TaskBoardPolicyCommand {
     fn execute(&self, context: &AppContext) -> Result<i32, CliError> {
         match self {
+            Self::Dump(args) => args.execute(context),
+            Self::Import(args) => args.execute(context),
             Self::Grants(args) => args.execute(context),
             Self::GrantResolve(args) => args.execute(context),
             Self::GrantRevoke(args) => args.execute(context),

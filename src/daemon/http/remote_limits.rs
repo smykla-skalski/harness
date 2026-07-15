@@ -21,6 +21,7 @@ use crate::daemon::remote_tls::{
 use crate::errors::{CliError, CliErrorKind};
 
 const REMOTE_LIMIT_ERROR_CODE: &str = "REMOTE_LIMITS";
+pub(crate) const DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RemoteRequestLimitConfig {
@@ -40,7 +41,7 @@ pub struct RemoteRequestLimitConfig {
 impl Default for RemoteRequestLimitConfig {
     fn default() -> Self {
         Self {
-            max_http_body_bytes: 4 * 1024 * 1024,
+            max_http_body_bytes: DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES,
             max_http_header_bytes: 64 * 1024,
             max_http_uri_bytes: 8 * 1024,
             max_http_concurrency: 32,

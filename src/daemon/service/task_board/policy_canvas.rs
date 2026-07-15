@@ -19,7 +19,7 @@ use super::policy_canvas_response::policy_canvas_workspace_response;
 #[cfg(test)]
 mod tests;
 
-const POLICY_PIPELINE_CHANGE_CHANNEL: &str = "policy_pipeline";
+const POLICY_PIPELINE_CHANGE_CHANNEL: &str = "task_board:policy_pipeline";
 
 /// Default and ceiling for how many recorded decisions a replay re-simulates.
 const DEFAULT_REPLAY_LIMIT: u32 = 50;

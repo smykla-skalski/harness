@@ -7,19 +7,23 @@ extension HarnessMonitorStoreUpdateStreamTests {
   func taskBoardPushScopesSelectAffectedData() {
     #expect(
       HarnessMonitorStore.taskBoardPushRefreshSelection(scopes: ["task_board:items"])
-        == .init(items: true, orchestratorStatus: false)
+        == .init(items: true, orchestratorStatus: false, policyPipeline: false)
     )
     #expect(
       HarnessMonitorStore.taskBoardPushRefreshSelection(scopes: ["task_board:orchestrator"])
-        == .init(items: false, orchestratorStatus: true)
+        == .init(items: false, orchestratorStatus: true, policyPipeline: false)
+    )
+    #expect(
+      HarnessMonitorStore.taskBoardPushRefreshSelection(scopes: ["task_board:policy_pipeline"])
+        == .init(items: false, orchestratorStatus: false, policyPipeline: true)
     )
     #expect(
       HarnessMonitorStore.taskBoardPushRefreshSelection(scopes: ["task_board:runtime_config"])
-        == .init(items: false, orchestratorStatus: false)
+        == .init(items: false, orchestratorStatus: false, policyPipeline: false)
     )
     #expect(
       HarnessMonitorStore.taskBoardPushRefreshSelection(scopes: ["task_board:future"])
-        == .init(items: true, orchestratorStatus: true)
+        == .init(items: true, orchestratorStatus: true, policyPipeline: true)
     )
   }
 

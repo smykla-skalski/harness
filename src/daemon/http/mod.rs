@@ -76,7 +76,9 @@ pub(crate) use managed_agents::{
     run_terminal_agent_blocking,
 };
 pub use recovery_snapshot_cache::RecoverySnapshotCache;
-pub(crate) use remote_limits::prepare_remote_websocket_upgrade;
+pub(crate) use remote_limits::{
+    DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES, prepare_remote_websocket_upgrade,
+};
 pub use remote_limits::{RemoteRequestLimitConfig, RemoteRequestLimits};
 pub(crate) use response::{error_status_and_body, extract_request_id};
 pub(crate) use sessions_adopt::{
