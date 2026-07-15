@@ -197,8 +197,87 @@ public enum PolicyReasonCode: String, Codable, Equatable, Sendable, CaseIterable
   case riskAboveThreshold = "risk_above_threshold"
   case humanRequired = "human_required"
   case dryRunRequired = "dry_run_required"
+  case approvalRequired = "approval_required"
+  case approvalDenied = "approval_denied"
+  case spawnPolicyRequired = "spawn_policy_required"
+  case spawnKillSwitchEngaged = "spawn_kill_switch_engaged"
 
   public var id: String { rawValue }
+}
+
+public enum PolicyApprovalState: String, Codable, Equatable, Sendable, CaseIterable, Identifiable {
+  case pending = "pending"
+  case approved = "approved"
+  case denied = "denied"
+  case revoked = "revoked"
+
+  public var id: String { rawValue }
+}
+
+public struct PolicyApprovalGrant: Codable, Equatable, Sendable {
+  public var id: String
+  public var boardItemId: String
+  public var action: PolicyAction
+  public var canvasId: String?
+  public var canvasRevision: UInt64
+  public var nodeId: String
+  public var reasonCode: PolicyReasonCode
+  public var state: PolicyApprovalState
+  public var resolvedBy: String?
+  public var resolvedAt: String?
+  public var consumedAt: String?
+  public var expirySeconds: UInt64?
+  public var createdAt: String
+  public var updatedAt: String
+
+  public init(id: String, boardItemId: String, action: PolicyAction, canvasId: String? = nil, canvasRevision: UInt64, nodeId: String, reasonCode: PolicyReasonCode, state: PolicyApprovalState, resolvedBy: String? = nil, resolvedAt: String? = nil, consumedAt: String? = nil, expirySeconds: UInt64? = nil, createdAt: String, updatedAt: String) {
+    self.id = id
+    self.boardItemId = boardItemId
+    self.action = action
+    self.canvasId = canvasId
+    self.canvasRevision = canvasRevision
+    self.nodeId = nodeId
+    self.reasonCode = reasonCode
+    self.state = state
+    self.resolvedBy = resolvedBy
+    self.resolvedAt = resolvedAt
+    self.consumedAt = consumedAt
+    self.expirySeconds = expirySeconds
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case boardItemId = "board_item_id"
+    case action
+    case canvasId = "canvas_id"
+    case canvasRevision = "canvas_revision"
+    case nodeId = "node_id"
+    case reasonCode = "reason_code"
+    case state
+    case resolvedBy = "resolved_by"
+    case resolvedAt = "resolved_at"
+    case consumedAt = "consumed_at"
+    case expirySeconds = "expiry_seconds"
+    case createdAt = "created_at"
+    case updatedAt = "updated_at"
+  }
+}
+
+public struct PolicyApprovalGrantState: Codable, Equatable, Sendable {
+  public var nodeId: String
+  public var state: PolicyApprovalState
+
+  public init(nodeId: String, state: PolicyApprovalState) {
+    self.nodeId = nodeId
+    self.state = state
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case nodeId = "node_id"
+    case state
+  }
 }
 
 public struct PolicyEvidence: Codable, Equatable, Sendable {
@@ -269,8 +348,12 @@ public struct PolicySubject: Codable, Equatable, Sendable {
   public var branch: String?
   public var pullRequest: String?
   public var paths: [String]
+  public var tags: [String]
+  public var priority: TaskBoardPriority?
+  public var agentMode: TaskBoardAgentMode?
+  public var targetProjectTypes: [String]
 
-  public init(taskBoardItemId: String? = nil, sessionId: String? = nil, agentId: String? = nil, repository: String? = nil, branch: String? = nil, pullRequest: String? = nil, paths: [String] = []) {
+  public init(taskBoardItemId: String? = nil, sessionId: String? = nil, agentId: String? = nil, repository: String? = nil, branch: String? = nil, pullRequest: String? = nil, paths: [String] = [], tags: [String] = [], priority: TaskBoardPriority? = nil, agentMode: TaskBoardAgentMode? = nil, targetProjectTypes: [String] = []) {
     self.taskBoardItemId = taskBoardItemId
     self.sessionId = sessionId
     self.agentId = agentId
@@ -278,6 +361,10 @@ public struct PolicySubject: Codable, Equatable, Sendable {
     self.branch = branch
     self.pullRequest = pullRequest
     self.paths = paths
+    self.tags = tags
+    self.priority = priority
+    self.agentMode = agentMode
+    self.targetProjectTypes = targetProjectTypes
   }
 
   public init(from decoder: Decoder) throws {
@@ -289,6 +376,10 @@ public struct PolicySubject: Codable, Equatable, Sendable {
     branch = try container.decodeIfPresent(String.self, forKey: .branch)
     pullRequest = try container.decodeIfPresent(String.self, forKey: .pullRequest)
     paths = try container.decodeIfPresent([String].self, forKey: .paths) ?? []
+    tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+    priority = try container.decodeIfPresent(TaskBoardPriority.self, forKey: .priority)
+    agentMode = try container.decodeIfPresent(TaskBoardAgentMode.self, forKey: .agentMode)
+    targetProjectTypes = try container.decodeIfPresent([String].self, forKey: .targetProjectTypes) ?? []
   }
 
   enum CodingKeys: String, CodingKey {
@@ -299,6 +390,10 @@ public struct PolicySubject: Codable, Equatable, Sendable {
     case branch
     case pullRequest = "pull_request"
     case paths
+    case tags
+    case priority
+    case agentMode = "agent_mode"
+    case targetProjectTypes = "target_project_types"
   }
 }
 
@@ -307,12 +402,16 @@ public struct PolicyInput: Codable, Equatable, Sendable {
   public var action: PolicyAction
   public var subject: PolicySubject
   public var evidence: PolicyEvidence
+  public var evaluatedAt: String?
+  public var approvals: [PolicyApprovalGrantState]
 
-  public init(workflow: String? = nil, action: PolicyAction, subject: PolicySubject = PolicySubject(), evidence: PolicyEvidence = PolicyEvidence()) {
+  public init(workflow: String? = nil, action: PolicyAction, subject: PolicySubject = PolicySubject(), evidence: PolicyEvidence = PolicyEvidence(), evaluatedAt: String? = nil, approvals: [PolicyApprovalGrantState] = []) {
     self.workflow = workflow
     self.action = action
     self.subject = subject
     self.evidence = evidence
+    self.evaluatedAt = evaluatedAt
+    self.approvals = approvals
   }
 
   public init(from decoder: Decoder) throws {
@@ -321,6 +420,8 @@ public struct PolicyInput: Codable, Equatable, Sendable {
     action = try container.decode(PolicyAction.self, forKey: .action)
     subject = try container.decodeIfPresent(PolicySubject.self, forKey: .subject) ?? PolicySubject()
     evidence = try container.decodeIfPresent(PolicyEvidence.self, forKey: .evidence) ?? PolicyEvidence()
+    evaluatedAt = try container.decodeIfPresent(String.self, forKey: .evaluatedAt)
+    approvals = try container.decodeIfPresent([PolicyApprovalGrantState].self, forKey: .approvals) ?? []
   }
 
   enum CodingKeys: String, CodingKey {
@@ -328,6 +429,8 @@ public struct PolicyInput: Codable, Equatable, Sendable {
     case action
     case subject
     case evidence
+    case evaluatedAt = "evaluated_at"
+    case approvals
   }
 }
 
@@ -440,6 +543,7 @@ public enum PolicyGraphNodeKind: Codable, Equatable, Sendable {
   case hub
   case humanGate(reasonCode: PolicyReasonCode)
   case consensusGate(reasonCode: PolicyReasonCode)
+  case approvalGate(PolicyApprovalGate)
   case dryRunGate(reasonCode: PolicyReasonCode)
   case supervisorRule(decision: PolicyGraphDecision, reasonCodes: [PolicyReasonCode])
   case finish(PolicyFinishNode)
@@ -494,6 +598,8 @@ public enum PolicyGraphNodeKind: Codable, Equatable, Sendable {
       self = .humanGate(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode))
     case "consensus_gate":
       self = .consensusGate(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode))
+    case "approval_gate":
+      self = .approvalGate(try PolicyApprovalGate(from: decoder))
     case "dry_run_gate":
       self = .dryRunGate(reasonCode: try container.decode(PolicyReasonCode.self, forKey: .reasonCode))
     case "supervisor_rule":
@@ -560,6 +666,9 @@ public enum PolicyGraphNodeKind: Codable, Equatable, Sendable {
     case .consensusGate(let reasonCode):
       try container.encode("consensus_gate", forKey: .kind)
       try container.encode(reasonCode, forKey: .reasonCode)
+    case .approvalGate(let value):
+      try container.encode("approval_gate", forKey: .kind)
+      try value.encode(to: encoder)
     case .dryRunGate(let reasonCode):
       try container.encode("dry_run_gate", forKey: .kind)
       try container.encode(reasonCode, forKey: .reasonCode)
@@ -963,6 +1072,7 @@ public enum PolicyGraphValidationIssue: Codable, Equatable, Sendable {
   case cycle(nodeIds: [String])
   case unsafeHighRiskAction(action: PolicyAction)
   case incompatiblePayloadEdge(edgeId: String, provided: String, required: String)
+  case spawnRouteMissingTerminal(nodeId: String)
 
   enum CodingKeys: String, CodingKey {
     case issue
@@ -998,6 +1108,8 @@ public enum PolicyGraphValidationIssue: Codable, Equatable, Sendable {
       self = .unsafeHighRiskAction(action: try container.decode(PolicyAction.self, forKey: .action))
     case "incompatible_payload_edge":
       self = .incompatiblePayloadEdge(edgeId: try container.decode(String.self, forKey: .edgeId), provided: try container.decode(String.self, forKey: .provided), required: try container.decode(String.self, forKey: .required))
+    case "spawn_route_missing_terminal":
+      self = .spawnRouteMissingTerminal(nodeId: try container.decode(String.self, forKey: .nodeId))
     default:
       throw DecodingError.dataCorruptedError(forKey: .issue, in: container, debugDescription: "unknown PolicyGraphValidationIssue issue \(issue)")
     }
@@ -1035,6 +1147,9 @@ public enum PolicyGraphValidationIssue: Codable, Equatable, Sendable {
       try container.encode(edgeId, forKey: .edgeId)
       try container.encode(provided, forKey: .provided)
       try container.encode(required, forKey: .required)
+    case .spawnRouteMissingTerminal(let nodeId):
+      try container.encode("spawn_route_missing_terminal", forKey: .issue)
+      try container.encode(nodeId, forKey: .nodeId)
     }
   }
 }
@@ -1053,14 +1168,16 @@ public struct PolicyGraphSimulation: Codable, Equatable, Sendable {
   public var visitedNodeIds: [String]
   public var policyTraceIds: [String]
   public var boundaries: [PolicyRuntimeBoundary]
+  public var approvalRequests: [PolicyApprovalRequest]
 
-  public init(mode: PolicyGraphMode, decision: PolicyDecision, trace: PolicySimulationTrace = PolicySimulationTrace(), visitedNodeIds: [String] = [], policyTraceIds: [String] = [], boundaries: [PolicyRuntimeBoundary] = []) {
+  public init(mode: PolicyGraphMode, decision: PolicyDecision, trace: PolicySimulationTrace = PolicySimulationTrace(), visitedNodeIds: [String] = [], policyTraceIds: [String] = [], boundaries: [PolicyRuntimeBoundary] = [], approvalRequests: [PolicyApprovalRequest] = []) {
     self.mode = mode
     self.decision = decision
     self.trace = trace
     self.visitedNodeIds = visitedNodeIds
     self.policyTraceIds = policyTraceIds
     self.boundaries = boundaries
+    self.approvalRequests = approvalRequests
   }
 
   public init(from decoder: Decoder) throws {
@@ -1071,6 +1188,7 @@ public struct PolicyGraphSimulation: Codable, Equatable, Sendable {
     visitedNodeIds = try container.decodeIfPresent([String].self, forKey: .visitedNodeIds) ?? []
     policyTraceIds = try container.decodeIfPresent([String].self, forKey: .policyTraceIds) ?? []
     boundaries = try container.decodeIfPresent([PolicyRuntimeBoundary].self, forKey: .boundaries) ?? []
+    approvalRequests = try container.decodeIfPresent([PolicyApprovalRequest].self, forKey: .approvalRequests) ?? []
   }
 
   enum CodingKeys: String, CodingKey {
@@ -1080,6 +1198,7 @@ public struct PolicyGraphSimulation: Codable, Equatable, Sendable {
     case visitedNodeIds = "visited_node_ids"
     case policyTraceIds = "policy_trace_ids"
     case boundaries
+    case approvalRequests = "approval_requests"
   }
 }
 
@@ -1418,6 +1537,39 @@ public struct PolicyFinishNode: Codable, Equatable, Sendable {
   }
 }
 
+public struct PolicyApprovalGate: Codable, Equatable, Sendable {
+  public var reasonCode: PolicyReasonCode
+  public var expirySeconds: UInt64?
+
+  public init(reasonCode: PolicyReasonCode, expirySeconds: UInt64? = nil) {
+    self.reasonCode = reasonCode
+    self.expirySeconds = expirySeconds
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case reasonCode = "reason_code"
+    case expirySeconds = "expiry_seconds"
+  }
+}
+
+public struct PolicyApprovalRequest: Codable, Equatable, Sendable {
+  public var nodeId: String
+  public var reasonCode: PolicyReasonCode
+  public var expirySeconds: UInt64?
+
+  public init(nodeId: String, reasonCode: PolicyReasonCode, expirySeconds: UInt64? = nil) {
+    self.nodeId = nodeId
+    self.reasonCode = reasonCode
+    self.expirySeconds = expirySeconds
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case nodeId = "node_id"
+    case reasonCode = "reason_code"
+    case expirySeconds = "expiry_seconds"
+  }
+}
+
 public struct PolicyPipelineGoLiveDiffEntry: Codable, Equatable, Sendable {
   public var scenarioId: String
   public var scenarioName: String
@@ -1563,14 +1715,20 @@ public struct PolicyPipelineAuditSummaryWire: Codable, Equatable, Sendable {
   public var latestTraceId: String?
   public var latestSimulation: PolicyPipelineSimulationResultWire?
   public var validation: PolicyGraphValidationReport
+  public var spawnRequiresLivePolicy: Bool
+  public var spawnKillSwitch: Bool
+  public var pendingApprovalGrantCount: UInt
 
-  public init(activeRevision: UInt64, mode: PolicyGraphMode, globalPolicyEnforcementEnabled: Bool = true, latestTraceId: String? = nil, latestSimulation: PolicyPipelineSimulationResultWire? = nil, validation: PolicyGraphValidationReport) {
+  public init(activeRevision: UInt64, mode: PolicyGraphMode, globalPolicyEnforcementEnabled: Bool = true, latestTraceId: String? = nil, latestSimulation: PolicyPipelineSimulationResultWire? = nil, validation: PolicyGraphValidationReport, spawnRequiresLivePolicy: Bool = false, spawnKillSwitch: Bool = false, pendingApprovalGrantCount: UInt = 0) {
     self.activeRevision = activeRevision
     self.mode = mode
     self.globalPolicyEnforcementEnabled = globalPolicyEnforcementEnabled
     self.latestTraceId = latestTraceId
     self.latestSimulation = latestSimulation
     self.validation = validation
+    self.spawnRequiresLivePolicy = spawnRequiresLivePolicy
+    self.spawnKillSwitch = spawnKillSwitch
+    self.pendingApprovalGrantCount = pendingApprovalGrantCount
   }
 
   public init(from decoder: Decoder) throws {
@@ -1581,6 +1739,9 @@ public struct PolicyPipelineAuditSummaryWire: Codable, Equatable, Sendable {
     latestTraceId = try container.decodeIfPresent(String.self, forKey: .latestTraceId)
     latestSimulation = try container.decodeIfPresent(PolicyPipelineSimulationResultWire.self, forKey: .latestSimulation)
     validation = try container.decode(PolicyGraphValidationReport.self, forKey: .validation)
+    spawnRequiresLivePolicy = try container.decodeIfPresent(Bool.self, forKey: .spawnRequiresLivePolicy) ?? false
+    spawnKillSwitch = try container.decodeIfPresent(Bool.self, forKey: .spawnKillSwitch) ?? false
+    pendingApprovalGrantCount = try container.decodeIfPresent(UInt.self, forKey: .pendingApprovalGrantCount) ?? 0
   }
 
   enum CodingKeys: String, CodingKey {
@@ -1590,6 +1751,9 @@ public struct PolicyPipelineAuditSummaryWire: Codable, Equatable, Sendable {
     case latestTraceId = "latest_trace_id"
     case latestSimulation = "latest_simulation"
     case validation
+    case spawnRequiresLivePolicy = "spawn_requires_live_policy"
+    case spawnKillSwitch = "spawn_kill_switch"
+    case pendingApprovalGrantCount = "pending_approval_grant_count"
   }
 }
 

@@ -347,8 +347,11 @@ enum TaskBoardOverviewItemBehavior {
     return .selectBoardItem
   }
 
-  static func runOnceRequest(for item: TaskBoardItem) -> TaskBoardOrchestratorRunOnceRequest {
-    TaskBoardOrchestratorRunOnceRequest(itemId: item.id, status: item.status)
+  static func runOnceRequest(
+    for item: TaskBoardItem,
+    dryRun: Bool? = nil
+  ) -> TaskBoardOrchestratorRunOnceRequest {
+    TaskBoardOrchestratorRunOnceRequest(itemId: item.id, dryRun: dryRun, status: item.status)
   }
 
   static func evaluationRequest(for item: TaskBoardItem) -> TaskBoardEvaluateRequest {

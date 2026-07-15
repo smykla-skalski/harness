@@ -121,7 +121,7 @@ enum PolicyCanvasInspectorFieldSchema {
     for policyKind: PolicyGraphNodeKind
   ) -> [PolicyInspectorField]? {
     switch policyKind.discriminator {
-    case "human_gate", "consensus_gate", "dry_run_gate": [.reasonCode]
+    case "human_gate", "consensus_gate", "approval_gate", "dry_run_gate": [.reasonCode]
     case "supervisor_rule": [.gateDecision]
     case "finish": [.finishDecision, .reasonCode]
     default: nil

@@ -49,46 +49,6 @@ extension HarnessMonitorStore {
     )
   }
 
-  func scheduleGitHubTaskBoardRefresh(
-    using client: any HarnessMonitorClientProtocol,
-    includeItems: Bool = true,
-    includeOrchestratorStatus: Bool = true
-  ) {
-    cacheWriteSync.pendingTaskBoardItemsRefresh =
-      cacheWriteSync.pendingTaskBoardItemsRefresh || includeItems
-    cacheWriteSync.pendingTaskBoardOrchestratorRefresh =
-      cacheWriteSync.pendingTaskBoardOrchestratorRefresh || includeOrchestratorStatus
-    cacheWriteSync.githubDataRefreshGeneration &+= 1
-    let generation = cacheWriteSync.githubDataRefreshGeneration
-    cacheWriteSync.githubDataTaskBoardRefreshTask?.cancel()
-    cacheWriteSync.githubDataTaskBoardRefreshTask = Task { @MainActor [weak self] in
-      do {
-        try await Task.sleep(for: .milliseconds(50))
-      } catch {
-        return
-      }
-      guard let self, self.cacheWriteSync.githubDataRefreshGeneration == generation else { return }
-      let includeItems = self.cacheWriteSync.pendingTaskBoardItemsRefresh
-      let includeOrchestratorStatus =
-        self.cacheWriteSync.pendingTaskBoardOrchestratorRefresh
-      let snapshot = await Self.loadTaskBoardRefreshSnapshot(
-        using: client,
-        includeItems: includeItems,
-        includeOrchestratorStatus: includeOrchestratorStatus
-      )
-      guard self.cacheWriteSync.githubDataRefreshGeneration == generation else { return }
-      self.cancelInitialTaskBoardConfirmationRefresh()
-      self.applyTaskBoardDashboardSnapshot(snapshot)
-      if includeItems {
-        self.cacheWriteSync.pendingTaskBoardItemsRefresh = false
-      }
-      if includeOrchestratorStatus {
-        self.cacheWriteSync.pendingTaskBoardOrchestratorRefresh = false
-      }
-      self.cacheWriteSync.githubDataTaskBoardRefreshTask = nil
-    }
-  }
-
   func recoverGitHubDataPushState(using client: any HarnessMonitorClientProtocol) async {
     do {
       let githubStatus = try await client.githubStatus()

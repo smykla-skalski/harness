@@ -277,6 +277,7 @@ extension HarnessMonitorStore {
     public var taskBoardSyncSummary: TaskBoardSyncSummary?
     public var taskBoardDispatchSummary: TaskBoardDispatchSummary?
     public var taskBoardEvaluationSummary: TaskBoardEvaluationSummary?
+    public var taskBoardEvaluationBaselineRunID: String?
     public var taskBoardItemAuditSummary: TaskBoardAuditSummary?
     public var taskBoardProjects: [TaskBoardProjectSummary]?
     public var taskBoardMachines: [TaskBoardMachineSummary]?

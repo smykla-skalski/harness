@@ -261,11 +261,19 @@ struct TaskBoardPlanLifecycleActionButtons: View {
   let onBeginPlan: ((TaskBoardItem) -> Void)?
   let onSubmitPlan: ((TaskBoardItem, String) -> Void)?
   let onApprovePlan: ((TaskBoardItem, String, String?) -> Void)?
+  let onRevokePlan: ((TaskBoardItem) -> Void)?
   @Environment(\.fontScale)
   private var fontScale
+  @State private var isConfirmingRevoke = false
 
   private var labelFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+
+  // Revoke only makes sense once a plan has been submitted or approved;
+  // there is nothing to undo before that.
+  private var canRevoke: Bool {
+    item.planApprovalState != .notApproved
   }
 
   var body: some View {
@@ -273,6 +281,35 @@ struct TaskBoardPlanLifecycleActionButtons: View {
     beginPlanButton(labelFont: labelFont)
     submitPlanButton(labelFont: labelFont)
     approvePlanButton(labelFont: labelFont)
+    revokePlanButton(labelFont: labelFont)
+  }
+
+  private func revokePlanButton(labelFont: Font) -> some View {
+    Button(role: .destructive) {
+      isConfirmingRevoke = true
+    } label: {
+      Label("Revoke Plan", systemImage: "arrow.uturn.backward")
+        .font(labelFont)
+    }
+    .frame(minHeight: metrics.controlMinHeight)
+    .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.caution)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+    .disabled(isActionInFlight || onRevokePlan == nil || !canRevoke)
+    .help("Revoke this plan and return the item to unapproved planning")
+    .accessibilityIdentifier("harness.task-board.manage-item.revoke-plan")
+    .confirmationDialog(
+      "Revoke this plan?",
+      isPresented: $isConfirmingRevoke,
+      titleVisibility: .visible
+    ) {
+      Button("Revoke Plan", role: .destructive) {
+        onRevokePlan?(item)
+      }
+      .disabled(isActionInFlight || onRevokePlan == nil || !canRevoke)
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("The plan summary and any approval are cleared. This cannot be undone.")
+    }
   }
 
   private func beginPlanButton(labelFont: Font) -> some View {

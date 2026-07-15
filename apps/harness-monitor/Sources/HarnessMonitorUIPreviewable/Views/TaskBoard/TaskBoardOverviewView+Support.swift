@@ -62,6 +62,8 @@ extension TaskBoardOverviewView {
         item: taskBoardManagementItem(for: sheet),
         metrics: metrics,
         isActionInFlight: isActionInFlight,
+        runOnceDryRun: runOnceDryRun,
+        evaluateDryRun: evaluateDryRun,
         store: store,
         onCreate: onCreateTaskBoardItem,
         onUpdate: onUpdateTaskBoardItem,
@@ -71,6 +73,7 @@ extension TaskBoardOverviewView {
         onBeginPlan: onBeginTaskBoardPlan,
         onSubmitPlan: onSubmitTaskBoardPlan,
         onApprovePlan: onApproveTaskBoardPlan,
+        onRevokePlan: onRevokeTaskBoardPlan,
         onRefresh: onRefreshTaskBoard,
         onClose: clearSelectedTaskBoardItem
       )
@@ -162,11 +165,13 @@ extension TaskBoardOverviewView {
   }
 
   func runOrchestratorOnce() {
-    onRunTaskBoardOrchestratorOnce?(TaskBoardOrchestratorRunOnceRequest())
+    requestRunOnce(TaskBoardOrchestratorRunOnceRequest(dryRun: runOnceDryRun))
   }
 
   func runOrchestratorOnceForItem(_ item: TaskBoardItem) {
-    onRunTaskBoardOrchestratorOnce?(TaskBoardOverviewItemBehavior.runOnceRequest(for: item))
+    onRunTaskBoardOrchestratorOnce?(
+      TaskBoardOverviewItemBehavior.runOnceRequest(for: item, dryRun: runOnceDryRun)
+    )
   }
 
   var selectedTaskBoardItemEvaluateAction: ((TaskBoardItem) -> Void)? {
@@ -177,12 +182,7 @@ extension TaskBoardOverviewView {
   }
 
   func evaluateSelectedTaskBoardItem(_ item: TaskBoardItem) {
-    if let onEvaluateTaskBoardItem {
-      onEvaluateTaskBoardItem(item)
-    } else {
-      onEvaluateTaskBoard?()
-    }
-    selectedTaskBoardItemIDValue = item.id
+    requestTaskBoardItemEvaluation(item)
   }
 
   private func taskBoardManagementItem(for sheet: TaskBoardManagementSheet) -> TaskBoardItem? {

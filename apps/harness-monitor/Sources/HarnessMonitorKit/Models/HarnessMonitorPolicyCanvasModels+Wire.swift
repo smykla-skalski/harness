@@ -35,6 +35,8 @@ extension PolicyCanvasWorkspace {
       activeCanvasId: wire.activeCanvasId,
       canvases: wire.canvases.map(PolicyCanvasSummary.init(wire:)),
       globalPolicyEnforcementEnabled: wire.globalPolicyEnforcementEnabled,
+      spawnRequiresLivePolicy: wire.spawnRequiresLivePolicy,
+      spawnKillSwitch: wire.spawnKillSwitch,
       scenarios: wire.scenarios
     )
   }

@@ -19,6 +19,9 @@ struct CodexWireTypesDecodingTests {
     {
       "run_id": "run-1",
       "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+      "task_id": "task-1",
+      "board_item_id": "board-1",
+      "workflow_execution_id": "workflow-1",
       "session_agent_id": "worker-codex",
       "display_name": "Codex",
       "project_dir": "/tmp/project",
@@ -59,6 +62,9 @@ struct CodexWireTypesDecodingTests {
     let run = CodexRunSnapshot(wire: wire)
 
     #expect(run.runId == "run-1")
+    #expect(run.taskId == "task-1")
+    #expect(run.boardItemId == "board-1")
+    #expect(run.workflowExecutionId == "workflow-1")
     #expect(run.sessionAgentId == "worker-codex")
     #expect(run.mode == .report)
     #expect(run.status == .running)

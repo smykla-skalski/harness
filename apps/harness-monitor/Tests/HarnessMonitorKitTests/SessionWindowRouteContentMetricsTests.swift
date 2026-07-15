@@ -171,8 +171,8 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(dashboardSource.contains("HarnessMonitorColumnScrollView("))
   }
 
-  @Test("Overview and dashboard expose task board orchestrator controls")
-  func overviewAndDashboardExposeTaskBoardOrchestratorControls() throws {
+  @Test("Dashboard owns global task board controls while sessions retain item actions")
+  func dashboardOwnsGlobalTaskBoardControls() throws {
     let routeContentSource = try sourceFile(named: "SessionWindowRouteContent.swift")
     let dashboardSource = try previewableSourceFile(
       domain: "Dashboard",
@@ -181,8 +181,16 @@ struct SessionWindowRouteContentMetricsTests {
     let hostSource = try taskBoardSourceFile(named: "TaskBoardOverviewHost.swift")
 
     for source in [hostSource] {
-      #expect(source.contains("onStartTaskBoardOrchestrator: startTaskBoardOrchestrator"))
-      #expect(source.contains("onStopTaskBoardOrchestrator: stopTaskBoardOrchestrator"))
+      #expect(
+        source.contains(
+          "onStartTaskBoardOrchestrator: scope.isDashboard ? startTaskBoardOrchestrator : nil"
+        )
+      )
+      #expect(
+        source.contains(
+          "onStopTaskBoardOrchestrator: scope.isDashboard ? stopTaskBoardOrchestrator : nil"
+        )
+      )
       #expect(source.contains("onRunTaskBoardOrchestratorOnce: runTaskBoardOrchestratorOnce"))
       #expect(source.contains("onMoveTaskBoardItems: moveTaskBoardItems"))
       #expect(source.contains("onMoveInboxItems: moveInboxItems"))
@@ -198,6 +206,8 @@ struct SessionWindowRouteContentMetricsTests {
 
     #expect(routeContentSource.contains("TaskBoardOverviewHost("))
     #expect(routeContentSource.contains("store.contentUI.dashboard.taskBoardOrchestratorStatus"))
+    #expect(routeContentSource.contains("showsOperationsPanel: false"))
+    #expect(hostSource.contains("onRefreshTaskBoard: scope.isDashboard ? refreshTaskBoard : nil"))
     #expect(dashboardSource.contains("TaskBoardOverviewHost("))
     #expect(dashboardSource.contains("dashboardUI.taskBoardOrchestratorStatus"))
   }
@@ -208,16 +218,24 @@ struct SessionWindowRouteContentMetricsTests {
     let orchestratorSource = try taskBoardSourceFile(
       named: "TaskBoardOrchestratorSummaryView.swift"
     )
-    let managementPanelSource = try taskBoardSourceFile(named: "TaskBoardItemManagementPanel.swift")
+    let managementActionsSource = try taskBoardSourceFile(
+      named: "TaskBoardItemLiveActionButtons.swift"
+    )
 
-    #expect(overviewSource.contains("Label(\"Sync\", systemImage: \"arrow.clockwise\")"))
+    #expect(overviewSource.contains("Label(\"Sync Live\", systemImage: \"arrow.clockwise\")"))
     #expect(
       overviewSource.contains(
         ".harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)"
       )
     )
     #expect(orchestratorSource.contains(".harnessActionButtonStyle(variant: .prominent"))
-    #expect(managementPanelSource.contains("Label(\"Refresh\", systemImage: \"arrow.clockwise\")"))
+    #expect(
+      managementActionsSource.contains(
+        "Label(\"Sync Live\", systemImage: \"arrow.clockwise\")"
+      )
+    )
+    #expect(managementActionsSource.contains("Run Once Live"))
+    #expect(managementActionsSource.contains("Evaluate Item Live"))
     #expect(overviewSource.contains("boardAccessoryRow"))
     #expect(overviewSource.contains("headerActionButtons"))
   }
@@ -293,6 +311,7 @@ struct SessionWindowRouteContentMetricsTests {
     try [
       taskBoardSourceFile(named: "TaskBoardOverviewView.swift"),
       taskBoardSourceFile(named: "TaskBoardOverviewView+Support.swift"),
+      taskBoardSourceFile(named: "TaskBoardOverviewView+Chrome.swift"),
     ].joined(separator: "\n")
   }
 

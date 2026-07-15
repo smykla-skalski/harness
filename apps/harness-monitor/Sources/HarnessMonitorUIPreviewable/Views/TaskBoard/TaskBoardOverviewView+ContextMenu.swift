@@ -9,6 +9,8 @@ extension TaskBoardOverviewView {
       isActionInFlight: isActionInFlight,
       canOpen: canOpenCard,
       open: openCard,
+      canOpenAgent: canOpenSpawnedAgent,
+      openAgent: openSpawnedAgent,
       githubURL: githubURL,
       openGitHubURL: { url in
         openURL(url)
@@ -83,6 +85,40 @@ extension TaskBoardOverviewView {
         onOpenItem(item)
       }
     }
+  }
+
+  private func spawnedSessionLink(
+    for cardID: TaskBoardCardID
+  ) -> (sessionID: String, workItemID: String?)? {
+    switch cardID {
+    case .api(let itemID):
+      guard
+        let item = currentPresentation.taskBoardItem(id: itemID),
+        let sessionID = item.sessionId,
+        !sessionID.isEmpty
+      else {
+        return nil
+      }
+      return (sessionID, item.workItemId)
+    case .inbox(let sessionID, let taskID):
+      return sessionID.isEmpty ? nil : (sessionID, taskID)
+    }
+  }
+
+  func canOpenSpawnedAgent(_ cardID: TaskBoardCardID) -> Bool {
+    store != nil && spawnedSessionLink(for: cardID) != nil
+  }
+
+  func openSpawnedAgent(_ cardID: TaskBoardCardID) {
+    guard let store, let link = spawnedSessionLink(for: cardID) else {
+      return
+    }
+    TaskBoardSpawnedSessionNavigator.open(
+      store: store,
+      openWindow: openWindow,
+      sessionID: link.sessionID,
+      workItemID: link.workItemID
+    )
   }
 
   private func githubURL(for cardID: TaskBoardCardID) -> URL? {

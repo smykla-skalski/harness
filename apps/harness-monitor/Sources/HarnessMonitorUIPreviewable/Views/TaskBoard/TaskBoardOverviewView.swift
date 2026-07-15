@@ -31,14 +31,18 @@ public struct TaskBoardOverviewView: View {
   let onBeginTaskBoardPlan: ((TaskBoardItem) -> Void)?
   let onSubmitTaskBoardPlan: ((TaskBoardItem, String) -> Void)?
   let onApproveTaskBoardPlan: ((TaskBoardItem, String, String?) -> Void)?
+  let onRevokeTaskBoardPlan: ((TaskBoardItem) -> Void)?
   let onRefreshTaskBoard: (() -> Void)?
   let onStartTaskBoardOrchestrator: (() -> Void)?
   let onStopTaskBoardOrchestrator: (() -> Void)?
   let onRunTaskBoardOrchestratorOnce: ((TaskBoardOrchestratorRunOnceRequest) -> Void)?
+  let onSetTaskBoardStepMode: (@MainActor @Sendable (Bool) -> Void)?
   @Environment(\.fontScale)
   var fontScale
   @Environment(\.openURL)
   var openURL
+  @Environment(\.openWindow)
+  var openWindow
   @State private var selectedTaskBoardItemID: String?
   @State private var isCreatingTaskBoardItem = false
   @State private var evaluationSummaryFitsHorizontally = true
@@ -49,6 +53,11 @@ public struct TaskBoardOverviewView: View {
   @State private var draggedCardIDs: [TaskBoardCardID] = []
   @State private var taskBoardSelectionDispatcher = TaskBoardSelectionDispatcher()
   @State private var relativeTimeClock = TaskBoardRelativeTimeClock()
+  @State private var localHostRoutingState = TaskBoardLocalHostRoutingState()
+  @AppStorage(TaskBoardEvaluatePreferences.dryRunStorageKey)
+  var evaluateDryRun = TaskBoardEvaluatePreferences.defaultDryRun
+  @State private var evaluatePreviewState = TaskBoardEvaluatePreviewState()
+  @State private var pendingLiveOperation: TaskBoardOverviewLiveOperation?
   @AppStorage(TaskBoardLaneCollapsePreferences.storageKey)
   var laneCollapsePreferencesRawValue = TaskBoardLaneCollapsePreferences.emptyRawValue
   @AppStorage(TaskBoardLaneAppearancePreferences.storageKey)
@@ -117,10 +126,12 @@ public struct TaskBoardOverviewView: View {
     onBeginTaskBoardPlan: ((TaskBoardItem) -> Void)? = nil,
     onSubmitTaskBoardPlan: ((TaskBoardItem, String) -> Void)? = nil,
     onApproveTaskBoardPlan: ((TaskBoardItem, String, String?) -> Void)? = nil,
+    onRevokeTaskBoardPlan: ((TaskBoardItem) -> Void)? = nil,
     onRefreshTaskBoard: (() -> Void)? = nil,
     onStartTaskBoardOrchestrator: (() -> Void)? = nil,
     onStopTaskBoardOrchestrator: (() -> Void)? = nil,
     onRunTaskBoardOrchestratorOnce: ((TaskBoardOrchestratorRunOnceRequest) -> Void)? = nil,
+    onSetTaskBoardStepMode: (@MainActor @Sendable (Bool) -> Void)? = nil,
     decisionItems: [DecisionPresentationSnapshot]? = nil,
     decisionsByID: [String: Decision]? = nil
   ) {
@@ -154,10 +165,12 @@ public struct TaskBoardOverviewView: View {
     self.onBeginTaskBoardPlan = onBeginTaskBoardPlan
     self.onSubmitTaskBoardPlan = onSubmitTaskBoardPlan
     self.onApproveTaskBoardPlan = onApproveTaskBoardPlan
+    self.onRevokeTaskBoardPlan = onRevokeTaskBoardPlan
     self.onRefreshTaskBoard = onRefreshTaskBoard
     self.onStartTaskBoardOrchestrator = onStartTaskBoardOrchestrator
     self.onStopTaskBoardOrchestrator = onStopTaskBoardOrchestrator
     self.onRunTaskBoardOrchestratorOnce = onRunTaskBoardOrchestratorOnce
+    self.onSetTaskBoardStepMode = onSetTaskBoardStepMode
   }
 
   public var body: some View {
@@ -187,11 +200,28 @@ public struct TaskBoardOverviewView: View {
     .task {
       await relativeTimeClock.run()
     }
+    .task(id: store?.contentUI.dashboard.connectionState == .online) {
+      updateLocalHostRouting()
+    }
     .task(id: presentationInput) {
       await rebuildPresentation(input: presentationInput)
     }
     .onChange(of: taskBoardSelectionDispatcher.deleteRequestGeneration) {
       requestDeleteSelectedTaskBoardCards()
+    }
+    .confirmationDialog(
+      pendingLiveOperationValue?.title ?? "Run live task-board operation?",
+      isPresented: pendingLiveOperationIsPresented,
+      presenting: pendingLiveOperationValue
+    ) { operation in
+      Button(operation.actionTitle, role: .destructive) {
+        pendingLiveOperationValue = nil
+        performLiveOperation(operation)
+      }
+      .disabled(isActionInFlight)
+      Button("Cancel", role: .cancel) {}
+    } message: { operation in
+      Text(operation.message)
     }
   }
 
@@ -218,119 +248,27 @@ public struct TaskBoardOverviewView: View {
   var taskBoardSelectionDispatcherValue: TaskBoardSelectionDispatcher {
     taskBoardSelectionDispatcher
   }
+
+  var evaluatePreviewSummaryValue: TaskBoardEvaluationSummary? {
+    get { evaluatePreviewState.summary }
+    nonmutating set { evaluatePreviewState.summary = newValue }
+  }
+
+  var evaluatePreviewStateValue: TaskBoardEvaluatePreviewState {
+    evaluatePreviewState
+  }
+
+  var localHostRoutingStateValue: TaskBoardLocalHostRoutingState {
+    localHostRoutingState
+  }
+
+  var pendingLiveOperationValue: TaskBoardOverviewLiveOperation? {
+    get { pendingLiveOperation }
+    nonmutating set { pendingLiveOperation = newValue }
+  }
 }
 
 extension TaskBoardOverviewView {
-  @ViewBuilder var boardChrome: some View {
-    if hasRouteContent || store != nil {
-      if let orchestratorStatus {
-        taskBoardDetailRow {
-          TaskBoardOrchestratorSummaryView(
-            status: orchestratorStatus,
-            latestEvaluation: evaluationSummary,
-            isActionInFlight: isActionInFlight,
-            onStart: onStartTaskBoardOrchestrator,
-            onStop: onStopTaskBoardOrchestrator,
-            onRunOnce: runOrchestratorOnce
-          )
-        }
-      } else if let evaluationSummary {
-        taskBoardDetailRow { evaluationSummaryRow(evaluationSummary) }
-      }
-    }
-    taskBoardDetailRow { headerTitle }
-    if showsOperationsPanel, let store {
-      taskBoardDetailRow {
-        TaskBoardOperationsPanel(store: store, taskBoardItems: cachedPresentation.taskBoardItems)
-      }
-    }
-  }
-
-  var headerTitle: some View {
-    Label("Board", systemImage: "rectangle.3.group")
-      .font(titleHeaderFont)
-      .accessibilityAddTraits(.isHeader)
-  }
-
-  var headerActions: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      headerActionButtons
-    }
-    .fixedSize(horizontal: true, vertical: false)
-  }
-
-  var boardAccessoryRow: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
-      if hasAggregateSummary {
-        aggregateSummaryRow
-      }
-      if hasAggregateSummary && hasHeaderActions {
-        Spacer(minLength: HarnessMonitorTheme.spacingMD)
-      }
-      if hasHeaderActions {
-        headerActions
-      }
-    }
-  }
-
-  var hasHeaderActions: Bool {
-    onCreateTaskBoardItem != nil || onEvaluateTaskBoard != nil || onRefreshTaskBoard != nil
-  }
-
-  @ViewBuilder var headerActionButtons: some View {
-    if onCreateTaskBoardItem != nil {
-      Button {
-        startTaskBoardItemCreation()
-      } label: {
-        Label("New Item", systemImage: "plus.circle")
-          .font(captionSemibold)
-      }
-      .frame(minHeight: metrics.controlMinHeight)
-      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isActionInFlight)
-      .help("Create board item")
-      .accessibilityIdentifier("harness.task-board.new-item")
-    }
-
-    if let onEvaluateTaskBoard {
-      Button {
-        onEvaluateTaskBoard()
-      } label: {
-        Label("Evaluate", systemImage: "checkmark.seal")
-          .font(captionSemibold)
-      }
-      .frame(minHeight: metrics.controlMinHeight)
-      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isActionInFlight)
-      .help("Evaluate board state")
-      .accessibilityIdentifier("harness.task-board.evaluate")
-    }
-
-    if let onRefreshTaskBoard {
-      Button {
-        onRefreshTaskBoard()
-      } label: {
-        Label("Sync", systemImage: "arrow.clockwise")
-          .font(captionSemibold)
-      }
-      .frame(minHeight: metrics.controlMinHeight)
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isActionInFlight)
-      .help("Sync task board")
-      .accessibilityIdentifier("harness.task-board.refresh")
-    }
-  }
-
-  var aggregateSummaryRow: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      aggregateSummaryContent
-    }
-    .fixedSize(horizontal: true, vertical: false)
-  }
-
   func evaluationSummaryRow(_ summary: TaskBoardEvaluationSummary) -> some View {
     Group {
       if evaluationSummaryFitsHorizontally {
@@ -353,21 +291,6 @@ extension TaskBoardOverviewView {
       }
     }
     .accessibilityIdentifier("harness.task-board.evaluation-summary")
-  }
-
-  var hasBoardContent: Bool {
-    cachedPresentation.hasBoardContent
-  }
-
-  var boardSection: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      if hasAggregateSummary || hasHeaderActions {
-        boardAccessoryRow
-      }
-      boardContent
-        .frame(maxHeight: fillsAvailableHeight ? .infinity : nil)
-    }
-    .frame(maxHeight: fillsAvailableHeight ? .infinity : nil)
   }
 
   @MainActor

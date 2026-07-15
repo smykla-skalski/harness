@@ -27,6 +27,7 @@ struct TaskBoardOrchestratorWireDecodingTests {
   func settingsMapping() throws {
     let payload = #"""
       {
+        "step_mode": true,
         "enabled_workflows": ["default_task", "pr_fix", "pr_review", "review"],
         "dry_run_default": false,
         "dispatch_status_filter": "todo",
@@ -42,6 +43,7 @@ struct TaskBoardOrchestratorWireDecodingTests {
     let settings = TaskBoardOrchestratorSettings(wire: wire)
 
     #expect(settings.enabledWorkflows == [.defaultTask, .prFix, .prReview, .review])
+    #expect(settings.stepMode)
     #expect(settings.dryRunDefault == false)
     #expect(settings.dispatchStatusFilter == .todo)
     #expect(settings.projectDir == "/work/proj")
@@ -59,6 +61,16 @@ struct TaskBoardOrchestratorWireDecodingTests {
       {
         "enabled": true,
         "running": true,
+        "step_mode": true,
+        "held_dispatches": {
+          "count": 1,
+          "items": [
+            {
+              "intent_id": "intent-1", "board_item_id": "task-1",
+              "session_id": "session-1", "work_item_id": "work-1"
+            }
+          ]
+        },
         "current_tick": {
           "run_id": "r1", "phase": "dispatch", "started_at": "2026-06-18T00:00:00Z",
           "completed_at": null, "dry_run": true
@@ -75,6 +87,7 @@ struct TaskBoardOrchestratorWireDecodingTests {
           {"status": "completed", "count": 7}
         ],
         "settings": {
+          "step_mode": true,
           "enabled_workflows": ["default_task"],
           "dry_run_default": true,
           "github_project": \#(githubProjectJSON),
@@ -88,6 +101,9 @@ struct TaskBoardOrchestratorWireDecodingTests {
 
     #expect(status.enabled)
     #expect(status.running)
+    #expect(status.stepMode)
+    #expect(status.heldDispatches.count == 1)
+    #expect(status.heldDispatches.items.first?.boardItemId == "task-1")
     #expect(status.currentTick?.phase == .dispatch)
     #expect(status.currentTick?.completedAt == nil)
     #expect(status.lastRun?.status == .completed)

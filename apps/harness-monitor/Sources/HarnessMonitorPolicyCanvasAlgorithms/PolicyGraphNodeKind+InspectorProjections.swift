@@ -77,6 +77,8 @@ extension PolicyGraphNodeKind {
     switch self {
     case .humanGate(let code), .consensusGate(let code), .dryRunGate(let code):
       return code.rawValue
+    case .approvalGate(let gate):
+      return gate.reasonCode.rawValue
     case .finish(let node):
       return node.reasonCode.rawValue
     default:

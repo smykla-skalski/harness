@@ -120,6 +120,18 @@ extension RecordingHarnessClient {
     )
   }
 
+  func revokeTaskBoardPlan(
+    id: String,
+    request: TaskBoardPlanRevokeRequest
+  ) async throws -> TaskBoardPlanningResponse {
+    calls.append(.revokeTaskBoardPlan(id: id, actor: request.actor))
+    return try updateTaskBoardPlanning(
+      id: id,
+      toStatus: .planning,
+      planning: TaskBoardPlanningState()
+    )
+  }
+
   func syncTaskBoard(request: TaskBoardSyncRequest) async throws -> TaskBoardSyncSummary {
     calls.append(
       .syncTaskBoard(

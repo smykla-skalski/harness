@@ -60,13 +60,17 @@ public struct PolicyCanvasWorkspaceResponseWire: Codable, Equatable, Sendable {
   public var activeCanvasId: String
   public var canvases: [PolicyCanvasSummaryWire]
   public var globalPolicyEnforcementEnabled: Bool
+  public var spawnRequiresLivePolicy: Bool
+  public var spawnKillSwitch: Bool
   public var scenarios: [PolicyScenario]
 
-  public init(schemaVersion: UInt32, activeCanvasId: String, canvases: [PolicyCanvasSummaryWire] = [], globalPolicyEnforcementEnabled: Bool = true, scenarios: [PolicyScenario] = []) {
+  public init(schemaVersion: UInt32, activeCanvasId: String, canvases: [PolicyCanvasSummaryWire] = [], globalPolicyEnforcementEnabled: Bool = true, spawnRequiresLivePolicy: Bool = false, spawnKillSwitch: Bool = false, scenarios: [PolicyScenario] = []) {
     self.schemaVersion = schemaVersion
     self.activeCanvasId = activeCanvasId
     self.canvases = canvases
     self.globalPolicyEnforcementEnabled = globalPolicyEnforcementEnabled
+    self.spawnRequiresLivePolicy = spawnRequiresLivePolicy
+    self.spawnKillSwitch = spawnKillSwitch
     self.scenarios = scenarios
   }
 
@@ -76,6 +80,8 @@ public struct PolicyCanvasWorkspaceResponseWire: Codable, Equatable, Sendable {
     activeCanvasId = try container.decode(String.self, forKey: .activeCanvasId)
     canvases = try container.decodeIfPresent([PolicyCanvasSummaryWire].self, forKey: .canvases) ?? []
     globalPolicyEnforcementEnabled = try container.decodeIfPresent(Bool.self, forKey: .globalPolicyEnforcementEnabled) ?? true
+    spawnRequiresLivePolicy = try container.decodeIfPresent(Bool.self, forKey: .spawnRequiresLivePolicy) ?? false
+    spawnKillSwitch = try container.decodeIfPresent(Bool.self, forKey: .spawnKillSwitch) ?? false
     scenarios = try container.decodeIfPresent([PolicyScenario].self, forKey: .scenarios) ?? []
   }
 
@@ -84,6 +90,8 @@ public struct PolicyCanvasWorkspaceResponseWire: Codable, Equatable, Sendable {
     case activeCanvasId = "active_canvas_id"
     case canvases
     case globalPolicyEnforcementEnabled = "global_policy_enforcement_enabled"
+    case spawnRequiresLivePolicy = "spawn_requires_live_policy"
+    case spawnKillSwitch = "spawn_kill_switch"
     case scenarios
   }
 }

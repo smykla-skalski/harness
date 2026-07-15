@@ -72,9 +72,12 @@ struct TaskBoardOperationsPanelInventoryCard: View {
       accessibilityIdentifier: "harness.task-board.audit.run",
       help: "Load board status audit counts"
     ) {
-      Task { @MainActor in
-        await store.auditTaskBoard(status: inventoryStatusChoice.status)
-      }
+      let status = inventoryStatusChoice.status
+      HarnessMonitorAsyncWorkQueue.shared.submit(
+        .init(title: "Loading task board audit") {
+          await store.auditTaskBoard(status: status)
+        }
+      )
     }
     actionButton(
       title: "Projects",
@@ -82,9 +85,12 @@ struct TaskBoardOperationsPanelInventoryCard: View {
       accessibilityIdentifier: "harness.task-board.projects.run",
       help: "Load task-board project summary counts"
     ) {
-      Task { @MainActor in
-        await store.refreshTaskBoardProjects(status: inventoryStatusChoice.status)
-      }
+      let status = inventoryStatusChoice.status
+      HarnessMonitorAsyncWorkQueue.shared.submit(
+        .init(title: "Loading task board projects") {
+          await store.refreshTaskBoardProjects(status: status)
+        }
+      )
     }
     actionButton(
       title: "Machines",
@@ -92,9 +98,12 @@ struct TaskBoardOperationsPanelInventoryCard: View {
       accessibilityIdentifier: "harness.task-board.machines.run",
       help: "Load task-board machine summary counts"
     ) {
-      Task { @MainActor in
-        await store.refreshTaskBoardMachines(status: inventoryStatusChoice.status)
-      }
+      let status = inventoryStatusChoice.status
+      HarnessMonitorAsyncWorkQueue.shared.submit(
+        .init(title: "Loading task board machines") {
+          await store.refreshTaskBoardMachines(status: status)
+        }
+      )
     }
   }
 
@@ -112,8 +121,14 @@ struct TaskBoardOperationsPanelInventoryCard: View {
     .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
     .harnessNativeFormControl()
     .fixedSize(horizontal: true, vertical: true)
-    .disabled(store.isDaemonActionInFlight)
-    .help(help)
+    .disabled(
+      store.isDaemonActionInFlight || store.contentUI.dashboard.connectionState != .online
+    )
+    .help(
+      store.contentUI.dashboard.connectionState == .online
+        ? help
+        : "Connect to the Harness daemon to run this action"
+    )
     .accessibilityIdentifier(accessibilityIdentifier)
   }
 

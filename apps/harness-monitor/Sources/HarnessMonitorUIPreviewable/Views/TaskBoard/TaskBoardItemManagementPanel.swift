@@ -6,6 +6,8 @@ struct TaskBoardItemManagementPanel: View {
   let item: TaskBoardItem?
   let metrics: TaskBoardOverviewMetrics
   let isActionInFlight: Bool
+  let runOnceDryRun: Bool
+  let evaluateDryRun: Bool
   let store: HarnessMonitorStore?
   let onCreate: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)?
   let onUpdate: ((String, TaskBoardUpdateItemRequest) -> Void)?
@@ -15,6 +17,7 @@ struct TaskBoardItemManagementPanel: View {
   let onBeginPlan: ((TaskBoardItem) -> Void)?
   let onSubmitPlan: ((TaskBoardItem, String) -> Void)?
   let onApprovePlan: ((TaskBoardItem, String, String?) -> Void)?
+  let onRevokePlan: ((TaskBoardItem) -> Void)?
   let onRefresh: (() -> Void)?
   let onClose: () -> Void
 
@@ -40,6 +43,8 @@ struct TaskBoardItemManagementPanel: View {
     item: TaskBoardItem?,
     metrics: TaskBoardOverviewMetrics,
     isActionInFlight: Bool,
+    runOnceDryRun: Bool = true,
+    evaluateDryRun: Bool = true,
     store: HarnessMonitorStore? = nil,
     onCreate: ((TaskBoardCreateItemRequest, TaskBoardStatus) -> Void)?,
     onUpdate: ((String, TaskBoardUpdateItemRequest) -> Void)?,
@@ -49,12 +54,15 @@ struct TaskBoardItemManagementPanel: View {
     onBeginPlan: ((TaskBoardItem) -> Void)?,
     onSubmitPlan: ((TaskBoardItem, String) -> Void)?,
     onApprovePlan: ((TaskBoardItem, String, String?) -> Void)?,
+    onRevokePlan: ((TaskBoardItem) -> Void)?,
     onRefresh: (() -> Void)?,
     onClose: @escaping () -> Void
   ) {
     self.item = item
     self.metrics = metrics
     self.isActionInFlight = isActionInFlight
+    self.runOnceDryRun = runOnceDryRun
+    self.evaluateDryRun = evaluateDryRun
     self.store = store
     self.onCreate = onCreate
     self.onUpdate = onUpdate
@@ -64,6 +72,7 @@ struct TaskBoardItemManagementPanel: View {
     self.onBeginPlan = onBeginPlan
     self.onSubmitPlan = onSubmitPlan
     self.onApprovePlan = onApprovePlan
+    self.onRevokePlan = onRevokePlan
     self.onRefresh = onRefresh
     self.onClose = onClose
     _draft = State(
@@ -274,31 +283,20 @@ struct TaskBoardItemManagementPanel: View {
         isActionInFlight: isActionInFlight,
         onBeginPlan: onBeginPlan,
         onSubmitPlan: onSubmitPlan,
-        onApprovePlan: onApprovePlan
+        onApprovePlan: onApprovePlan,
+        onRevokePlan: onRevokePlan
       )
 
-      Button {
-        onRunOnce?(item)
-      } label: {
-        Label("Run Once", systemImage: "play.circle")
-          .font(captionSemibold)
-      }
-      .frame(minHeight: metrics.controlMinHeight)
-      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isActionInFlight || onRunOnce == nil)
-
-      Button {
-        onEvaluate?(item)
-      } label: {
-        Label("Evaluate Item", systemImage: "checkmark.seal")
-          .font(captionSemibold)
-      }
-      .frame(minHeight: metrics.controlMinHeight)
-      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
-      .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      .disabled(isActionInFlight || onEvaluate == nil)
-      .help("Evaluate this board item")
+      TaskBoardItemLiveActionButtons(
+        item: item,
+        metrics: metrics,
+        captionFont: captionSemibold,
+        isActionInFlight: isActionInFlight,
+        runOnceDryRun: runOnceDryRun,
+        evaluateDryRun: evaluateDryRun,
+        onRunOnce: onRunOnce,
+        onEvaluate: onEvaluate
+      )
 
       Button(role: .destructive) {
         onDelete?(item)
@@ -312,18 +310,12 @@ struct TaskBoardItemManagementPanel: View {
       .disabled(isActionInFlight || onDelete == nil)
     }
 
-    Button {
-      onRefresh?()
-    } label: {
-      Label("Refresh", systemImage: "arrow.clockwise")
-        .font(captionSemibold)
-    }
-    .frame(minHeight: metrics.controlMinHeight)
-    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-    .disabled(isActionInFlight || onRefresh == nil)
-    .help("Refresh task board")
-    .accessibilityIdentifier("harness.task-board.manage-item.refresh")
+    TaskBoardItemSyncActionButton(
+      metrics: metrics,
+      captionFont: captionSemibold,
+      isActionInFlight: isActionInFlight,
+      onSync: onRefresh
+    )
   }
 
   var isCreating: Bool {

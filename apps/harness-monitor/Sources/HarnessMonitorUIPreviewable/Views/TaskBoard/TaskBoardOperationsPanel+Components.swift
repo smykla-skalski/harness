@@ -172,8 +172,16 @@ extension TaskBoardOperationsHost {
     )
     .harnessNativeFormControl()
     .fixedSize(horizontal: true, vertical: true)
-    .disabled(store.isDaemonActionInFlight || isDisabled)
-    .help(descriptor.help)
+    .disabled(
+      store.isDaemonActionInFlight
+        || store.contentUI.dashboard.connectionState != .online
+        || isDisabled
+    )
+    .help(
+      store.contentUI.dashboard.connectionState == .online
+        ? descriptor.help
+        : "Connect to the Harness daemon to run this action"
+    )
     .accessibilityIdentifier(descriptor.accessibilityIdentifier)
   }
 

@@ -43,6 +43,7 @@ public struct TaskBoardTodoistInboxConfigWire: Codable, Equatable, Sendable {
 }
 
 public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
+  public var stepMode: Bool
   public var enabledWorkflows: [TaskBoardOrchestratorWorkflow]
   public var dryRunDefault: Bool
   public var dispatchStatusFilter: TaskBoardStatus?
@@ -52,7 +53,8 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
   public var todoistInbox: TaskBoardTodoistInboxConfigWire
   public var policyVersion: String
 
-  public init(enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [], dryRunDefault: Bool = true, dispatchStatusFilter: TaskBoardStatus? = nil, projectDir: String? = nil, githubProject: GitHubProjectConfigWire, githubInbox: TaskBoardGitHubInboxConfigWire = TaskBoardGitHubInboxConfigWire(), todoistInbox: TaskBoardTodoistInboxConfigWire = TaskBoardTodoistInboxConfigWire(), policyVersion: String = "task-board-policy-v1") {
+  public init(stepMode: Bool = false, enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [], dryRunDefault: Bool = true, dispatchStatusFilter: TaskBoardStatus? = nil, projectDir: String? = nil, githubProject: GitHubProjectConfigWire, githubInbox: TaskBoardGitHubInboxConfigWire = TaskBoardGitHubInboxConfigWire(), todoistInbox: TaskBoardTodoistInboxConfigWire = TaskBoardTodoistInboxConfigWire(), policyVersion: String = "task-board-policy-v1") {
+    self.stepMode = stepMode
     self.enabledWorkflows = enabledWorkflows
     self.dryRunDefault = dryRunDefault
     self.dispatchStatusFilter = dispatchStatusFilter
@@ -65,6 +67,7 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    stepMode = try container.decodeIfPresent(Bool.self, forKey: .stepMode) ?? false
     enabledWorkflows = try container.decodeIfPresent([TaskBoardOrchestratorWorkflow].self, forKey: .enabledWorkflows) ?? []
     dryRunDefault = try container.decodeIfPresent(Bool.self, forKey: .dryRunDefault) ?? true
     dispatchStatusFilter = try container.decodeIfPresent(TaskBoardStatus.self, forKey: .dispatchStatusFilter)
@@ -76,6 +79,7 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
   }
 
   enum CodingKeys: String, CodingKey {
+    case stepMode = "step_mode"
     case enabledWorkflows = "enabled_workflows"
     case dryRunDefault = "dry_run_default"
     case dispatchStatusFilter = "dispatch_status_filter"
@@ -90,27 +94,87 @@ public struct TaskBoardOrchestratorSettingsWire: Codable, Equatable, Sendable {
 public struct TaskBoardOrchestratorStatusWire: Codable, Equatable, Sendable {
   public var enabled: Bool
   public var running: Bool
+  public var stepMode: Bool
+  public var heldDispatches: TaskBoardHeldDispatchSummary
   public var currentTick: TaskBoardOrchestratorTickInfoWire?
   public var lastRun: TaskBoardOrchestratorRunSummaryWire?
   public var workflowExecutionCounts: [TaskBoardWorkflowExecutionCountWire]
   public var settings: TaskBoardOrchestratorSettingsWire
 
-  public init(enabled: Bool, running: Bool, currentTick: TaskBoardOrchestratorTickInfoWire? = nil, lastRun: TaskBoardOrchestratorRunSummaryWire? = nil, workflowExecutionCounts: [TaskBoardWorkflowExecutionCountWire], settings: TaskBoardOrchestratorSettingsWire) {
+  public init(enabled: Bool, running: Bool, stepMode: Bool = false, heldDispatches: TaskBoardHeldDispatchSummary = TaskBoardHeldDispatchSummary(), currentTick: TaskBoardOrchestratorTickInfoWire? = nil, lastRun: TaskBoardOrchestratorRunSummaryWire? = nil, workflowExecutionCounts: [TaskBoardWorkflowExecutionCountWire], settings: TaskBoardOrchestratorSettingsWire) {
     self.enabled = enabled
     self.running = running
+    self.stepMode = stepMode
+    self.heldDispatches = heldDispatches
     self.currentTick = currentTick
     self.lastRun = lastRun
     self.workflowExecutionCounts = workflowExecutionCounts
     self.settings = settings
   }
 
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    enabled = try container.decode(Bool.self, forKey: .enabled)
+    running = try container.decode(Bool.self, forKey: .running)
+    stepMode = try container.decodeIfPresent(Bool.self, forKey: .stepMode) ?? false
+    heldDispatches = try container.decodeIfPresent(TaskBoardHeldDispatchSummary.self, forKey: .heldDispatches) ?? TaskBoardHeldDispatchSummary()
+    currentTick = try container.decodeIfPresent(TaskBoardOrchestratorTickInfoWire.self, forKey: .currentTick)
+    lastRun = try container.decodeIfPresent(TaskBoardOrchestratorRunSummaryWire.self, forKey: .lastRun)
+    workflowExecutionCounts = try container.decode([TaskBoardWorkflowExecutionCountWire].self, forKey: .workflowExecutionCounts)
+    settings = try container.decode(TaskBoardOrchestratorSettingsWire.self, forKey: .settings)
+  }
+
   enum CodingKeys: String, CodingKey {
     case enabled
     case running
+    case stepMode = "step_mode"
+    case heldDispatches = "held_dispatches"
     case currentTick = "current_tick"
     case lastRun = "last_run"
     case workflowExecutionCounts = "workflow_execution_counts"
     case settings
+  }
+}
+
+public struct TaskBoardHeldDispatchSummary: Codable, Equatable, Sendable {
+  public var count: UInt
+  public var items: [TaskBoardHeldDispatchItem]
+
+  public init(count: UInt = 0, items: [TaskBoardHeldDispatchItem] = []) {
+    self.count = count
+    self.items = items
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    count = try container.decode(UInt.self, forKey: .count)
+    items = try container.decodeIfPresent([TaskBoardHeldDispatchItem].self, forKey: .items) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case count
+    case items
+  }
+}
+
+public struct TaskBoardHeldDispatchItem: Codable, Equatable, Sendable {
+  public var intentId: String
+  public var boardItemId: String
+  public var sessionId: String
+  public var workItemId: String
+
+  public init(intentId: String, boardItemId: String, sessionId: String, workItemId: String) {
+    self.intentId = intentId
+    self.boardItemId = boardItemId
+    self.sessionId = sessionId
+    self.workItemId = workItemId
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case intentId = "intent_id"
+    case boardItemId = "board_item_id"
+    case sessionId = "session_id"
+    case workItemId = "work_item_id"
   }
 }
 

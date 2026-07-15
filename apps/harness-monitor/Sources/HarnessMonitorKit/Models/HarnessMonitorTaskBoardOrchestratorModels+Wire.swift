@@ -20,6 +20,7 @@ extension TaskBoardTodoistInboxConfig {
 extension TaskBoardOrchestratorSettings {
   init(wire: TaskBoardOrchestratorSettingsWire) {
     self.init(
+      stepMode: wire.stepMode,
       enabledWorkflows: wire.enabledWorkflows,
       dryRunDefault: wire.dryRunDefault,
       dispatchStatusFilter: wire.dispatchStatusFilter,
@@ -73,6 +74,8 @@ extension TaskBoardOrchestratorStatus {
     self.init(
       enabled: wire.enabled,
       running: wire.running,
+      stepMode: wire.stepMode,
+      heldDispatches: wire.heldDispatches,
       currentTick: wire.currentTick.map(TaskBoardOrchestratorTickInfo.init(wire:)),
       lastRun: wire.lastRun.map(TaskBoardOrchestratorRunSummary.init(wire:)),
       workflowExecutionCounts: wire.workflowExecutionCounts

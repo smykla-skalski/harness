@@ -251,6 +251,9 @@ public struct CodexRunEvent: Codable, Equatable, Identifiable, Sendable {
 public struct CodexRunSnapshot: Codable, Equatable, Identifiable, Sendable {
   public let runId: String
   public let sessionId: String
+  public let taskId: String?
+  public let boardItemId: String?
+  public let workflowExecutionId: String?
   public let sessionAgentId: String?
   public let displayName: String?
   public let projectDir: String
@@ -273,6 +276,9 @@ public struct CodexRunSnapshot: Codable, Equatable, Identifiable, Sendable {
   enum CodingKeys: String, CodingKey {
     case runId
     case sessionId
+    case taskId
+    case boardItemId
+    case workflowExecutionId
     case sessionAgentId
     case displayName
     case projectDir
@@ -296,6 +302,9 @@ public struct CodexRunSnapshot: Codable, Equatable, Identifiable, Sendable {
   public init(
     runId: String,
     sessionId: String,
+    taskId: String? = nil,
+    boardItemId: String? = nil,
+    workflowExecutionId: String? = nil,
     sessionAgentId: String? = nil,
     displayName: String? = nil,
     projectDir: String,
@@ -317,6 +326,9 @@ public struct CodexRunSnapshot: Codable, Equatable, Identifiable, Sendable {
   ) {
     self.runId = runId
     self.sessionId = sessionId
+    self.taskId = taskId
+    self.boardItemId = boardItemId
+    self.workflowExecutionId = workflowExecutionId
     self.sessionAgentId = sessionAgentId
     self.displayName = displayName
     self.projectDir = projectDir
@@ -341,6 +353,9 @@ public struct CodexRunSnapshot: Codable, Equatable, Identifiable, Sendable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     runId = try container.decode(String.self, forKey: .runId)
     sessionId = try container.decode(String.self, forKey: .sessionId)
+    taskId = try container.decodeIfPresent(String.self, forKey: .taskId)
+    boardItemId = try container.decodeIfPresent(String.self, forKey: .boardItemId)
+    workflowExecutionId = try container.decodeIfPresent(String.self, forKey: .workflowExecutionId)
     sessionAgentId = try container.decodeIfPresent(String.self, forKey: .sessionAgentId)
     displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
     projectDir = try container.decode(String.self, forKey: .projectDir)

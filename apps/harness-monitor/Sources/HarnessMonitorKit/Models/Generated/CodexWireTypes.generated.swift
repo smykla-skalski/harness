@@ -336,6 +336,9 @@ public struct CodexRunEventWire: Codable, Equatable, Sendable {
 public struct CodexRunSnapshotWire: Codable, Equatable, Sendable {
   public var runId: String
   public var sessionId: String
+  public var taskId: String?
+  public var boardItemId: String?
+  public var workflowExecutionId: String?
   public var sessionAgentId: String?
   public var displayName: String?
   public var projectDir: String
@@ -355,9 +358,12 @@ public struct CodexRunSnapshotWire: Codable, Equatable, Sendable {
   public var model: String?
   public var effort: String?
 
-  public init(runId: String, sessionId: String, sessionAgentId: String? = nil, displayName: String? = nil, projectDir: String, threadId: String? = nil, turnId: String? = nil, mode: CodexRunModeWire, status: CodexRunStatusWire, prompt: String, latestSummary: String? = nil, finalMessage: String? = nil, error: String? = nil, pendingApprovals: [CodexApprovalRequestWire], resolvedApprovals: [CodexResolvedApprovalWire] = [], events: [CodexRunEventWire] = [], createdAt: String, updatedAt: String, model: String? = nil, effort: String? = nil) {
+  public init(runId: String, sessionId: String, taskId: String? = nil, boardItemId: String? = nil, workflowExecutionId: String? = nil, sessionAgentId: String? = nil, displayName: String? = nil, projectDir: String, threadId: String? = nil, turnId: String? = nil, mode: CodexRunModeWire, status: CodexRunStatusWire, prompt: String, latestSummary: String? = nil, finalMessage: String? = nil, error: String? = nil, pendingApprovals: [CodexApprovalRequestWire], resolvedApprovals: [CodexResolvedApprovalWire] = [], events: [CodexRunEventWire] = [], createdAt: String, updatedAt: String, model: String? = nil, effort: String? = nil) {
     self.runId = runId
     self.sessionId = sessionId
+    self.taskId = taskId
+    self.boardItemId = boardItemId
+    self.workflowExecutionId = workflowExecutionId
     self.sessionAgentId = sessionAgentId
     self.displayName = displayName
     self.projectDir = projectDir
@@ -382,6 +388,9 @@ public struct CodexRunSnapshotWire: Codable, Equatable, Sendable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     runId = try container.decode(String.self, forKey: .runId)
     sessionId = try container.decode(String.self, forKey: .sessionId)
+    taskId = try container.decodeIfPresent(String.self, forKey: .taskId)
+    boardItemId = try container.decodeIfPresent(String.self, forKey: .boardItemId)
+    workflowExecutionId = try container.decodeIfPresent(String.self, forKey: .workflowExecutionId)
     sessionAgentId = try container.decodeIfPresent(String.self, forKey: .sessionAgentId)
     displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
     projectDir = try container.decode(String.self, forKey: .projectDir)
@@ -405,6 +414,9 @@ public struct CodexRunSnapshotWire: Codable, Equatable, Sendable {
   enum CodingKeys: String, CodingKey {
     case runId = "run_id"
     case sessionId = "session_id"
+    case taskId = "task_id"
+    case boardItemId = "board_item_id"
+    case workflowExecutionId = "workflow_execution_id"
     case sessionAgentId = "session_agent_id"
     case displayName = "display_name"
     case projectDir = "project_dir"

@@ -158,6 +158,8 @@ extension HarnessMonitorStore {
         globalTaskBoardOrchestratorStatus = TaskBoardOrchestratorStatus(
           enabled: status.enabled,
           running: status.running,
+          stepMode: status.stepMode,
+          heldDispatches: status.heldDispatches,
           currentTick: status.currentTick,
           lastRun: status.lastRun,
           workflowExecutionCounts: status.workflowExecutionCounts,

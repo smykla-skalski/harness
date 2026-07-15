@@ -112,6 +112,24 @@ extension HarnessMonitorAPIClient {
     return TaskBoardDispatchSummary(wire: wire)
   }
 
+  public func pickTaskBoardDispatch(
+    request: TaskBoardDispatchPickRequest = TaskBoardDispatchPickRequest()
+  ) async throws -> TaskBoardDispatchPickResult {
+    let wire: TaskBoardDispatchPickResponse = try await post(
+      "/v1/task-board/dispatch/pick", body: request, decoder: PolicyWireCoding.decoder
+    )
+    return TaskBoardDispatchPickResult(wire: wire)
+  }
+
+  public func deliverTaskBoardDispatch(
+    request: TaskBoardDispatchDeliverRequest
+  ) async throws -> TaskBoardDispatchDelivery {
+    let wire: TaskBoardDispatchDeliverResponse = try await post(
+      "/v1/task-board/dispatch/deliver", body: request, decoder: PolicyWireCoding.decoder
+    )
+    return try TaskBoardDispatchDelivery(wire: wire)
+  }
+
   public func evaluateTaskBoard(request: TaskBoardEvaluateRequest) async throws
     -> TaskBoardEvaluationSummary
   {

@@ -17,6 +17,7 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
   @State private var statusChoice = TaskBoardStatusFilterChoice.all
   @State private var direction = TaskBoardExternalSyncDirection.both
   @State private var dryRun = true
+  @State private var pendingLiveRequest: TaskBoardSyncRequest?
 
   var captionFont: Font {
     HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
@@ -90,7 +91,7 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
           content: {
             actionButton(
               TaskBoardActionButtonDescriptor(
-                title: dryRun ? "Preview Sync" : "Run Sync",
+                title: dryRun ? "Preview Sync" : "Sync Live",
                 systemImage: dryRun ? "eye" : "arrow.triangle.2.circlepath",
                 tint: dryRun ? .secondary : nil,
                 prominent: !dryRun,
@@ -98,15 +99,16 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
                 help: "Preview or apply external task-board sync operations"
               )
             ) {
-              Task { @MainActor in
-                await store.syncTaskBoard(
-                  request: TaskBoardSyncRequest(
-                    status: statusChoice.status,
-                    provider: providerChoice.provider,
-                    direction: direction,
-                    dryRun: dryRun
-                  )
-                )
+              let request = TaskBoardSyncRequest(
+                status: statusChoice.status,
+                provider: providerChoice.provider,
+                direction: direction,
+                dryRun: dryRun
+              )
+              if request.dryRun {
+                enqueueSync(request)
+              } else {
+                pendingLiveRequest = request
               }
             }
           }
@@ -160,6 +162,33 @@ struct TaskBoardOperationsSyncCard: View, TaskBoardOperationsHost {
         }
       }
     }
+    .confirmationDialog(
+      "Sync the live task board?",
+      isPresented: Binding(
+        get: { pendingLiveRequest != nil },
+        set: { if !$0 { pendingLiveRequest = nil } }
+      ),
+      presenting: pendingLiveRequest
+    ) { request in
+      Button("Sync Live", role: .destructive) {
+        pendingLiveRequest = nil
+        enqueueSync(request)
+      }
+      .disabled(
+        store.isDaemonActionInFlight || store.contentUI.dashboard.connectionState != .online
+      )
+      Button("Cancel", role: .cancel) {}
+    } message: { _ in
+      Text("This syncs external sources and applies changes to the live task board.")
+    }
+  }
+
+  private func enqueueSync(_ request: TaskBoardSyncRequest) {
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: request.dryRun ? "Previewing task board sync" : "Syncing task board") {
+        await store.syncTaskBoard(request: request)
+      }
+    )
   }
 }
 

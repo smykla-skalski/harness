@@ -8,6 +8,8 @@ struct TaskBoardCardContextMenuActions {
   let isActionInFlight: Bool
   let canOpen: (TaskBoardCardID) -> Bool
   let open: (TaskBoardCardID) -> Void
+  let canOpenAgent: (TaskBoardCardID) -> Bool
+  let openAgent: (TaskBoardCardID) -> Void
   let githubURL: (TaskBoardCardID) -> URL?
   let openGitHubURL: (URL) -> Void
   let canMove: ([TaskBoardCardID], TaskBoardInboxLane) -> Bool
@@ -42,6 +44,13 @@ struct TaskBoardCardContextMenu: View {
         actions.open(scope.primaryID)
       }
       .disabled(!actions.canOpen(scope.primaryID))
+      if actions.canOpenAgent(scope.primaryID) {
+        Button {
+          actions.openAgent(scope.primaryID)
+        } label: {
+          Label("Open Agent", systemImage: "arrow.up.forward.app")
+        }
+      }
       if let githubURL = actions.githubURL(scope.primaryID) {
         Button {
           actions.openGitHubURL(githubURL)

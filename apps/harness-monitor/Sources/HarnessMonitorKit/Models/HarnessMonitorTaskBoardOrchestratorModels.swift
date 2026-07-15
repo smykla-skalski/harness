@@ -38,6 +38,7 @@ public enum TaskBoardOrchestratorWorkflow: TaskBoardOpenEnum, CaseIterable, Iden
 }
 
 public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
+  public let stepMode: Bool
   public let enabledWorkflows: [TaskBoardOrchestratorWorkflow]
   public let dryRunDefault: Bool
   public let dispatchStatusFilter: TaskBoardStatus?
@@ -48,6 +49,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
   public let policyVersion: String
 
   public init(
+    stepMode: Bool = false,
     enabledWorkflows: [TaskBoardOrchestratorWorkflow] = [],
     dryRunDefault: Bool = true,
     dispatchStatusFilter: TaskBoardStatus? = nil,
@@ -57,6 +59,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
     todoistInbox: TaskBoardTodoistInboxConfig = TaskBoardTodoistInboxConfig(),
     policyVersion: String
   ) {
+    self.stepMode = stepMode
     self.enabledWorkflows = enabledWorkflows
     self.dryRunDefault = dryRunDefault
     self.dispatchStatusFilter = dispatchStatusFilter
@@ -68,6 +71,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
   }
 
   enum CodingKeys: String, CodingKey {
+    case stepMode
     case enabledWorkflows
     case dryRunDefault
     case dispatchStatusFilter
@@ -81,6 +85,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.init(
+      stepMode: try container.decodeIfPresent(Bool.self, forKey: .stepMode) ?? false,
       enabledWorkflows: try container.decode(
         [TaskBoardOrchestratorWorkflow].self,
         forKey: .enabledWorkflows
@@ -109,6 +114,7 @@ public struct TaskBoardOrchestratorSettings: Codable, Equatable, Sendable {
 }
 
 public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Sendable {
+  public let stepMode: Bool?
   public let enabledWorkflows: [TaskBoardOrchestratorWorkflow]?
   public let dryRunDefault: Bool?
   public let dispatchStatusFilter: TaskBoardStatus?
@@ -121,6 +127,7 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
   public let policyVersion: String?
 
   public init(
+    stepMode: Bool? = nil,
     enabledWorkflows: [TaskBoardOrchestratorWorkflow]? = nil,
     dryRunDefault: Bool? = nil,
     dispatchStatusFilter: TaskBoardStatus? = nil,
@@ -132,6 +139,7 @@ public struct TaskBoardOrchestratorSettingsUpdateRequest: Codable, Equatable, Se
     todoistInbox: TaskBoardTodoistInboxConfig? = nil,
     policyVersion: String? = nil
   ) {
+    self.stepMode = stepMode
     self.enabledWorkflows = enabledWorkflows
     self.dryRunDefault = dryRunDefault
     self.dispatchStatusFilter = dispatchStatusFilter
@@ -291,6 +299,8 @@ public struct TaskBoardWorkflowExecutionCount: Codable, Equatable, Sendable {
 public struct TaskBoardOrchestratorStatus: Codable, Equatable, Sendable {
   public let enabled: Bool
   public let running: Bool
+  public let stepMode: Bool
+  public let heldDispatches: TaskBoardHeldDispatchSummary
   public let currentTick: TaskBoardOrchestratorTickInfo?
   public let lastRun: TaskBoardOrchestratorRunSummary?
   public let workflowExecutionCounts: [TaskBoardWorkflowExecutionCount]
@@ -299,6 +309,8 @@ public struct TaskBoardOrchestratorStatus: Codable, Equatable, Sendable {
   public init(
     enabled: Bool,
     running: Bool,
+    stepMode: Bool = false,
+    heldDispatches: TaskBoardHeldDispatchSummary = TaskBoardHeldDispatchSummary(),
     currentTick: TaskBoardOrchestratorTickInfo? = nil,
     lastRun: TaskBoardOrchestratorRunSummary? = nil,
     workflowExecutionCounts: [TaskBoardWorkflowExecutionCount] = [],
@@ -306,10 +318,49 @@ public struct TaskBoardOrchestratorStatus: Codable, Equatable, Sendable {
   ) {
     self.enabled = enabled
     self.running = running
+    self.stepMode = stepMode
+    self.heldDispatches = heldDispatches
     self.currentTick = currentTick
     self.lastRun = lastRun
     self.workflowExecutionCounts = workflowExecutionCounts
     self.settings = settings
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case enabled
+    case running
+    case stepMode
+    case heldDispatches
+    case currentTick
+    case lastRun
+    case workflowExecutionCounts
+    case settings
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      enabled: try container.decode(Bool.self, forKey: .enabled),
+      running: try container.decode(Bool.self, forKey: .running),
+      stepMode: try container.decodeIfPresent(Bool.self, forKey: .stepMode) ?? false,
+      heldDispatches: try container.decodeIfPresent(
+        TaskBoardHeldDispatchSummary.self,
+        forKey: .heldDispatches
+      ) ?? TaskBoardHeldDispatchSummary(),
+      currentTick: try container.decodeIfPresent(
+        TaskBoardOrchestratorTickInfo.self,
+        forKey: .currentTick
+      ),
+      lastRun: try container.decodeIfPresent(
+        TaskBoardOrchestratorRunSummary.self,
+        forKey: .lastRun
+      ),
+      workflowExecutionCounts: try container.decode(
+        [TaskBoardWorkflowExecutionCount].self,
+        forKey: .workflowExecutionCounts
+      ),
+      settings: try container.decode(TaskBoardOrchestratorSettings.self, forKey: .settings)
+    )
   }
 }
 

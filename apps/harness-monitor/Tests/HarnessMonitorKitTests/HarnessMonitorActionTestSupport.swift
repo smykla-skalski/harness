@@ -193,6 +193,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case beginTaskBoardPlan(id: String)
     case submitTaskBoardPlan(id: String, summary: String)
     case approveTaskBoardPlan(id: String, approvedBy: String, approvedAt: String?)
+    case revokeTaskBoardPlan(id: String, actor: String?)
     case updateTaskBoardOrchestratorSettings(
       policyVersion: String?,
       clearProjectDir: Bool,

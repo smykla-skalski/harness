@@ -161,6 +161,22 @@ extension PolicyCanvasNodeKind {
     defaultPolicyKind: .consensusGate(reasonCode: .protectedPathTouched)
   )
 
+  public static let approvalGate = Self(
+    rawValue: "approval_gate",
+    title: "Approval gate",
+    subtitle: "Durable approval required",
+    symbolName: "person.badge.key.fill",
+    category: .review,
+    librarySection: .reviewGates,
+    inputPortTitles: ["in"],
+    outputPortTitles: [],
+    libraryTitle: "Approval gate",
+    librarySubtitle: "Require a durable approval grant",
+    defaultPolicyKind: .approvalGate(
+      PolicyApprovalGate(reasonCode: .approvalRequired)
+    )
+  )
+
   public static let actionStep = Self(
     rawValue: "action_step",
     title: "Action step",
@@ -328,6 +344,7 @@ extension PolicyCanvasNodeKind {
     .riskClassifier,
     .humanGate,
     .consensusGate,
+    .approvalGate,
     .actionStep,
     .ocrImage,
     .resolveReviewPullRequests,

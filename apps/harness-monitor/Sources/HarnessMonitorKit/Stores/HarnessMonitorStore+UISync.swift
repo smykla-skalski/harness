@@ -257,6 +257,7 @@ extension HarnessMonitorStore {
         taskBoardSyncSummary: globalTaskBoardSyncSummary,
         taskBoardDispatchSummary: globalTaskBoardDispatchSummary,
         taskBoardEvaluationSummary: globalTaskBoardEvaluationSummary,
+        taskBoardEvaluationBaselineRunID: cacheWriteSync.taskBoardEvaluationBaselineRunID,
         taskBoardItemAuditSummary: globalTaskBoardItemAuditSummary,
         taskBoardProjects: globalTaskBoardProjects,
         taskBoardMachines: globalTaskBoardMachines,

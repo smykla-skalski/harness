@@ -14,6 +14,17 @@ func priorityColor(for priority: TaskBoardPriority) -> Color {
   }
 }
 
+func taskBoardApprovalColor(for state: TaskBoardPlanApprovalState) -> Color {
+  switch state {
+  case .approved:
+    HarnessMonitorTheme.success
+  case .submitted:
+    HarnessMonitorTheme.caution
+  case .notApproved:
+    HarnessMonitorTheme.secondaryInk
+  }
+}
+
 func taskBoardStatusColor(for status: TaskBoardStatus) -> Color {
   switch status {
   case .failed, .blocked:

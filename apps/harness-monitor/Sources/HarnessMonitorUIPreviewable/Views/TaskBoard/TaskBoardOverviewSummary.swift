@@ -88,6 +88,53 @@ extension TaskBoardOverviewView {
     }
   }
 
+  /// Routes board evaluation through a dry-run preview or a confirmation before
+  /// the live host closure applies changes and updates the persisted summary.
+  func triggerBoardEvaluate() {
+    guard evaluateDryRun else {
+      requestLiveBoardEvaluation()
+      return
+    }
+    guard let store else { return }
+    let previewState = evaluatePreviewStateValue
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      .init(title: "Previewing task-board evaluate") {
+        let summary = await store.previewEvaluateTaskBoard()
+        await MainActor.run {
+          previewState.summary = summary
+        }
+      }
+    )
+  }
+
+  func evaluatePreviewRow(_ summary: TaskBoardEvaluationSummary) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      TaskBoardSummaryPill(
+        value: "Preview",
+        label: "Dry Run",
+        systemImage: "eye",
+        tint: HarnessMonitorTheme.caution
+      )
+      evaluationSummaryContent(summary)
+      Spacer(minLength: HarnessMonitorTheme.spacingSM)
+      Button {
+        evaluatePreviewSummaryValue = nil
+      } label: {
+        Image(systemName: "xmark.circle.fill")
+          .foregroundStyle(.secondary)
+          .contentShape(.circle)
+          .accessibilityHidden(true)
+      }
+      .harnessDismissButtonStyle()
+      .help("Dismiss the evaluate preview")
+      .accessibilityLabel("Dismiss preview")
+      .accessibilityIdentifier("harness.task-board.evaluate.preview.dismiss")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("harness.task-board.evaluate.preview")
+  }
+
   @ViewBuilder
   func evaluationSummaryContent(_ summary: TaskBoardEvaluationSummary) -> some View {
     TaskBoardSummaryPill(
@@ -113,4 +160,10 @@ extension TaskBoardOverviewView {
       )
     }
   }
+}
+
+@MainActor
+@Observable
+final class TaskBoardEvaluatePreviewState {
+  var summary: TaskBoardEvaluationSummary?
 }
