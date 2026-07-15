@@ -252,17 +252,7 @@ struct TaskBoardStepRailView: View {
     )
   }
 
-  private var approvalEvaluationFingerprint: [String] {
-    guard let latestEvaluation else { return [] }
-    var fingerprint = [
-      "\(latestEvaluation.total):\(latestEvaluation.evaluated):\(latestEvaluation.updated):"
-        + "\(latestEvaluation.blocked):\(latestEvaluation.failed)"
-    ]
-    fingerprint.append(
-      contentsOf: latestEvaluation.records.map {
-        "\($0.boardItemId):\($0.outcome.rawValue):\($0.updated)"
-      }.sorted()
-    )
-    return fingerprint
+  private var approvalEvaluationFingerprint: TaskBoardApprovalEvaluationFingerprint? {
+    latestEvaluation.map { TaskBoardApprovalEvaluationFingerprint(evaluation: $0) }
   }
 }

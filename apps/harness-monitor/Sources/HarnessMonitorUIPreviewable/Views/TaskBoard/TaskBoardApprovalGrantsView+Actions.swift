@@ -1,10 +1,15 @@
 import HarnessMonitorKit
 
 extension TaskBoardApprovalGrantsView {
-  func enqueueRefresh() {
+  func enqueueRefresh(
+    submit: (HarnessMonitorAsyncWorkQueue.WorkItem) -> Void = {
+      HarnessMonitorAsyncWorkQueue.shared.submit($0)
+    }
+  ) {
+    guard store.connectionState == .online else { return }
     let state = state
     guard let generation = state.requestRefresh() else { return }
-    HarnessMonitorAsyncWorkQueue.shared.submit(
+    submit(
       .init(title: "Loading policy approval grants") {
         var activeGeneration: UInt64? = generation
         while let refreshGeneration = activeGeneration {

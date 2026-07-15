@@ -7,8 +7,32 @@ struct TaskBoardApprovalGrantRefreshID: Hashable {
   let activeCanvasID: String?
   let activeRevision: UInt64?
   let lastRunID: String?
-  let evaluationFingerprint: [String]
+  let evaluationFingerprint: TaskBoardApprovalEvaluationFingerprint?
   let localGeneration: UInt64
+}
+
+struct TaskBoardApprovalEvaluationFingerprint: Hashable, Sendable {
+  let recordCount: Int
+  let contentFingerprint: Int
+
+  init(evaluation: TaskBoardEvaluationSummary) {
+    var summaryHasher = Hasher()
+    summaryHasher.combine(evaluation.total)
+    summaryHasher.combine(evaluation.evaluated)
+    summaryHasher.combine(evaluation.updated)
+    summaryHasher.combine(evaluation.blocked)
+    summaryHasher.combine(evaluation.failed)
+    var combined = summaryHasher.finalize()
+    for record in evaluation.records {
+      var recordHasher = Hasher()
+      recordHasher.combine(record.boardItemId)
+      recordHasher.combine(record.outcome.rawValue)
+      recordHasher.combine(record.updated)
+      combined = combined &+ recordHasher.finalize()
+    }
+    self.recordCount = evaluation.records.count
+    self.contentFingerprint = combined
+  }
 }
 
 struct TaskBoardApprovalGrantPresentation: Identifiable, Sendable {
