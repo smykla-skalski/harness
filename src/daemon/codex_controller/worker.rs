@@ -404,7 +404,7 @@ impl CodexRunWorker {
 }
 
 fn notification_id_matches(expected: Option<&str>, actual: Option<&str>) -> bool {
-    actual.is_none_or(|actual| expected.is_none_or(|expected| expected == actual))
+    expected.is_none_or(|expected| actual.is_some_and(|actual| actual == expected))
 }
 
 #[cfg(test)]

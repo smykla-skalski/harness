@@ -202,6 +202,12 @@ fn register_all_registers_monitor_and_task_board_tools() {
         "type_text",
         "screenshot_window",
     ];
+    assert!(
+        names.len() >= expected_monitor.len(),
+        "expected at least {} registered Monitor tools, got {}: {names:?}",
+        expected_monitor.len(),
+        names.len(),
+    );
     assert_eq!(&names[..expected_monitor.len()], &expected_monitor[..]);
     // The task-board tools are compared as a set: MCP registration groups them by
     // descriptor family (canvas, spawn-gate, pipeline, scenario) while the HTTP

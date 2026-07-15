@@ -291,6 +291,34 @@ fn child_thread_completion_does_not_finish_parent_worker() {
     assert!(worker.snapshot.events.is_empty());
 }
 
+#[test]
+fn completion_missing_active_notification_id_does_not_finish_worker() {
+    let (_control_tx, control_rx) = mpsc::unbounded_channel();
+    let mut snapshot = running_snapshot_without_ids();
+    snapshot.thread_id = Some("thread-parent".to_string());
+    snapshot.turn_id = Some("turn-parent".to_string());
+    let mut worker = CodexRunWorker::new(controller_without_db(), snapshot, control_rx);
+    let incomplete_notifications = [
+        json!({
+            "turn": { "id": "turn-parent", "status": "completed" }
+        }),
+        json!({
+            "threadId": "thread-parent",
+            "turn": { "status": "completed" }
+        }),
+    ];
+
+    for params in incomplete_notifications {
+        let should_stop = worker
+            .handle_notification("turn/completed", &params)
+            .expect("incomplete completion should be ignored");
+        assert!(!should_stop, "missing active id matched notification: {params}");
+    }
+
+    assert_eq!(worker.snapshot.status, CodexRunStatus::Running);
+    assert!(worker.snapshot.events.is_empty());
+}
+
 #[tokio::test(start_paused = true)]
 async fn startup_request_times_out_when_app_server_does_not_answer() {
     let task = tokio::spawn(with_startup_timeout("initialize", async {

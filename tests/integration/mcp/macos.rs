@@ -245,6 +245,12 @@ fn mcp_serve_initialize_lists_all_registered_tools() {
         "type_text",
         "screenshot_window",
     ];
+    assert!(
+        names.len() >= expected_monitor.len(),
+        "expected at least {} registered Monitor tools, got {}: {names:?}",
+        expected_monitor.len(),
+        names.len(),
+    );
     assert_eq!(&names[..expected_monitor.len()], &expected_monitor);
 
     let mut actual_task_board = names[expected_monitor.len()..].to_vec();
