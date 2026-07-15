@@ -96,6 +96,42 @@ struct TaskBoardOrchestratorPresentationTests {
     #expect(counts == [TaskBoardWorkflowCountPresentation(status: .idle, count: 1)])
   }
 
+  @Test("Local-host routing failure hides Idle until a successful empty load")
+  @MainActor
+  func localHostRoutingFailureHidesIdleUntilSuccessfulEmptyLoad() throws {
+    let status = orchestratorStatus(
+      workflowCounts: [TaskBoardWorkflowExecutionCount(status: .idle, count: 1)]
+    )
+    let state = TaskBoardLocalHostRoutingState()
+    let failedGeneration = try #require(state.beginLoad())
+
+    state.finishLoadFailure(generation: failedGeneration)
+
+    #expect(state.projectTypes == nil)
+    #expect(!state.isLoading)
+    #expect(
+      TaskBoardOrchestratorPresentation(
+        status: status,
+        taskBoardItems: [],
+        localHostProjectTypes: state.projectTypes
+      ).workflowCounts.isEmpty
+    )
+
+    let successfulGeneration = try #require(state.beginLoad())
+    state.finishLoad(projectTypes: [], generation: successfulGeneration)
+
+    #expect(state.projectTypes?.isEmpty == true)
+    #expect(!state.isLoading)
+    #expect(
+      TaskBoardOrchestratorPresentation(
+        status: status,
+        taskBoardItems: [],
+        localHostProjectTypes: state.projectTypes
+      ).workflowCounts
+        == [TaskBoardWorkflowCountPresentation(status: .idle, count: 1)]
+    )
+  }
+
   @Test("Failed stage follows the last durable stage present in the run")
   func failedStageUsesDurableRunStages() {
     let dispatch = TaskBoardDispatchSummary(plans: [], applied: [])

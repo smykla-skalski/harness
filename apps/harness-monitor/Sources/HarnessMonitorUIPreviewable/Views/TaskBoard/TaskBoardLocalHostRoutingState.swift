@@ -21,6 +21,12 @@ final class TaskBoardLocalHostRoutingState {
     isLoading = false
   }
 
+  func finishLoadFailure(generation: UInt64) {
+    guard self.generation == generation else { return }
+    projectTypes = nil
+    isLoading = false
+  }
+
   func reset() {
     generation &+= 1
     projectTypes = nil
@@ -41,14 +47,15 @@ extension TaskBoardOverviewView {
     guard let generation = state.beginLoad() else { return }
     HarnessMonitorAsyncWorkQueue.shared.submit(
       .init(title: "Loading task-board host routing") {
-        let projectTypes: [String]
         do {
-          projectTypes = try await store.taskBoardHostSnapshot().local.projectTypes
+          let projectTypes = try await store.taskBoardHostSnapshot().local.projectTypes
+          await MainActor.run {
+            state.finishLoad(projectTypes: projectTypes, generation: generation)
+          }
         } catch {
-          projectTypes = []
-        }
-        await MainActor.run {
-          state.finishLoad(projectTypes: projectTypes, generation: generation)
+          await MainActor.run {
+            state.finishLoadFailure(generation: generation)
+          }
         }
       }
     )
