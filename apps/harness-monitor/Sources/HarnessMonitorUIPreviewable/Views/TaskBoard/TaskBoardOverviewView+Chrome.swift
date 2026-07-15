@@ -132,18 +132,18 @@ extension TaskBoardOverviewView {
       .accessibilityIdentifier("harness.task-board.evaluate")
     }
 
-    if onRefreshTaskBoard != nil {
+    if let onRefreshTaskBoard {
       Button {
-        requestTaskBoardSync()
+        onRefreshTaskBoard()
       } label: {
-        Label("Sync Live", systemImage: "arrow.clockwise")
+        Label("Sync", systemImage: "arrow.clockwise")
           .font(captionSemibold)
       }
       .frame(minHeight: metrics.controlMinHeight)
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       .disabled(isActionInFlight)
-      .help("Pull external sources and apply live board changes after confirmation")
+      .help("Pull external sources and apply changes to the task board")
       .accessibilityIdentifier("harness.task-board.refresh")
     }
   }

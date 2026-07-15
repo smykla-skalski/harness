@@ -2,14 +2,11 @@ import HarnessMonitorKit
 import SwiftUI
 
 enum TaskBoardOverviewLiveOperation {
-  case sync
   case evaluateBoard
   case runOnce(TaskBoardOrchestratorRunOnceRequest)
 
   var title: String {
     switch self {
-    case .sync:
-      "Sync the live task board?"
     case .evaluateBoard:
       "Evaluate the live task board?"
     case .runOnce:
@@ -19,8 +16,6 @@ enum TaskBoardOverviewLiveOperation {
 
   var actionTitle: String {
     switch self {
-    case .sync:
-      "Sync Live"
     case .evaluateBoard:
       "Evaluate Live"
     case .runOnce:
@@ -30,8 +25,6 @@ enum TaskBoardOverviewLiveOperation {
 
   var message: String {
     switch self {
-    case .sync:
-      "This pulls external task sources and applies changes to the live board."
     case .evaluateBoard:
       "This evaluates the board and applies any resulting item transitions."
     case .runOnce:
@@ -50,11 +43,6 @@ extension TaskBoardOverviewView {
 
   var runOnceDryRun: Bool {
     orchestratorStatus?.settings.dryRunDefault ?? true
-  }
-
-  func requestTaskBoardSync() {
-    guard onRefreshTaskBoard != nil else { return }
-    pendingLiveOperationValue = .sync
   }
 
   func requestLiveBoardEvaluation() {
@@ -88,8 +76,6 @@ extension TaskBoardOverviewView {
 
   func performLiveOperation(_ operation: TaskBoardOverviewLiveOperation) {
     switch operation {
-    case .sync:
-      onRefreshTaskBoard?()
     case .evaluateBoard:
       onEvaluateTaskBoard?()
     case .runOnce(let request):

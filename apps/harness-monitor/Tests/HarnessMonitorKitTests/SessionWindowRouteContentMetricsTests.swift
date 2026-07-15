@@ -222,7 +222,7 @@ struct SessionWindowRouteContentMetricsTests {
       named: "TaskBoardItemLiveActionButtons.swift"
     )
 
-    #expect(overviewSource.contains("Label(\"Sync Live\", systemImage: \"arrow.clockwise\")"))
+    #expect(overviewSource.contains("Label(\"Sync\", systemImage: \"arrow.clockwise\")"))
     #expect(
       overviewSource.contains(
         ".harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)"
@@ -238,6 +238,31 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(managementActionsSource.contains("Evaluate Item Live"))
     #expect(overviewSource.contains("boardAccessoryRow"))
     #expect(overviewSource.contains("headerActionButtons"))
+  }
+
+  @Test("Task board header sync bypasses live confirmation")
+  func taskBoardHeaderSyncBypassesLiveConfirmation() throws {
+    let overviewSource = try taskBoardOverviewSource()
+    let liveOperationsSource = try taskBoardSourceFile(
+      named: "TaskBoardOverviewLiveOperations.swift"
+    )
+
+    #expect(overviewSource.contains("if let onRefreshTaskBoard {"))
+    #expect(overviewSource.contains("onRefreshTaskBoard()"))
+    #expect(!overviewSource.contains("requestTaskBoardSync()"))
+    #expect(
+      overviewSource.contains(
+        ".help(\"Pull external sources and apply changes to the task board\")"
+      )
+    )
+    #expect(
+      !overviewSource.contains(
+        "Pull external sources and apply live board changes after confirmation"
+      )
+    )
+    #expect(!liveOperationsSource.contains("case sync"))
+    #expect(liveOperationsSource.contains("case evaluateBoard"))
+    #expect(liveOperationsSource.contains("case runOnce"))
   }
 
   @Test("Task board operations panel prefers a three-card row")
