@@ -56,7 +56,7 @@ pub(crate) const ENFORCEMENT_EXAMPLES: &[EnforcementExample] = &[
         replacement: "mise run version:check",
     },
     EnforcementExample {
-        command: "rtk env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests bash -lc 'mise run monitor:test'",
+        command: "env XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests bash -lc 'mise run monitor:test'",
         replacement: "XCODE_ONLY_TESTING=HarnessMonitorKitTests/SupervisorServiceTests mise run monitor:test",
     },
     EnforcementExample {

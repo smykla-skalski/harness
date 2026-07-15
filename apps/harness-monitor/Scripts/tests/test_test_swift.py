@@ -35,7 +35,7 @@ class TestSwiftScriptTests(unittest.TestCase):
         override_runner: bool = False,
         test_scheme: str | None = None,
         precreated_xctestruns: list[str] | None = None,
-    ) -> tuple[subprocess.CompletedProcess[str], list[list[str]], str]:
+    ) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
             app_root = temp_root / "HarnessMonitor"
@@ -46,7 +46,6 @@ class TestSwiftScriptTests(unittest.TestCase):
             build_for_testing_script = scripts_root / "build-for-testing.sh"
             fake_log = temp_root / "log"
             runner_calls = temp_root / "runner-calls.log"
-            rtk_calls = temp_root / "rtk-calls.log"
 
             build_products_path.mkdir(parents=True, exist_ok=True)
             for filename in precreated_xctestruns or []:
@@ -188,15 +187,6 @@ shift
 """,
             )
             write_executable(fake_log, "#!/bin/bash\nset -euo pipefail\n")
-            write_executable(
-                fake_bin / "rtk",
-                f"""#!/bin/bash
-set -euo pipefail
-printf '%s\\n' "$*" >> "{rtk_calls}"
-exit 1
-""",
-            )
-
             env = os.environ.copy()
             env.update(
                 {
@@ -206,7 +196,6 @@ exit 1
                     "HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE": "1",
                     "PATH": f"{fake_bin}:/usr/bin:/bin",
                     "BASH_ENV": "/dev/null",
-                    "RTK_BIN": str(fake_bin / "rtk"),
                     "XCODEBUILD_BIN": str(fake_runner),
                     "TMPDIR": str(temp_root),
                     "HARNESS_SKIP_STALE_CHECK": "1",
@@ -230,8 +219,7 @@ exit 1
             calls = []
             if runner_calls.exists():
                 calls = [line.split() for line in runner_calls.read_text().splitlines() if line]
-            rtk_log = rtk_calls.read_text() if rtk_calls.exists() else ""
-            return completed, calls, rtk_log
+            return completed, calls
 
     def _spawn_signalled_during_build_for_testing(
         self,
@@ -386,7 +374,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             )
 
     def test_passes_only_testing_selector_to_test_without_building_invocation(self) -> None:
-        completed, calls, rtk_log = self.run_script(
+        completed, calls = self.run_script(
             only_testing="HarnessMonitorKitTests/PolicyGapRuleTests"
         )
 
@@ -412,10 +400,9 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             calls[2],
             "explicit only-testing selector must not be overridden by default skips",
         )
-        self.assertEqual(rtk_log, "")
 
     def test_skips_ui_test_targets_by_default_to_avoid_tcc_prompts(self) -> None:
-        completed, calls, rtk_log = self.run_script()
+        completed, calls = self.run_script()
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(len(calls), 2)
@@ -424,10 +411,9 @@ exec "{fake_bin / "xcodebuild"}" "$@"
         self.assertIn("test-without-building", calls[1])
         self.assertIn("-skip-testing:HarnessMonitorUITests", calls[1])
         self.assertIn("-skip-testing:HarnessMonitorAgentsE2ETests", calls[1])
-        self.assertEqual(rtk_log, "")
 
     def test_uses_overridden_test_scheme_for_test_without_building(self) -> None:
-        completed, calls, _ = self.run_script(
+        completed, calls = self.run_script(
             test_scheme="HarnessMonitorPolicyCanvasTests"
         )
 
@@ -441,7 +427,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
         )
 
     def test_overridden_scheme_does_not_reuse_unrelated_xctestrun(self) -> None:
-        completed, calls, _ = self.run_script(
+        completed, calls = self.run_script(
             test_scheme="HarnessMonitorPolicyCanvasTests",
             precreated_xctestruns=["HarnessMonitor_macosx26.5-arm64.xctestrun"],
         )
@@ -455,7 +441,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
         )
 
     def test_default_scheme_does_not_reuse_policy_canvas_xctestrun(self) -> None:
-        completed, calls, _ = self.run_script(
+        completed, calls = self.run_script(
             precreated_xctestruns=[
                 "HarnessMonitorPolicyCanvasTests_macosx26.5-arm64.xctestrun"
             ],
@@ -470,7 +456,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
         )
 
     def test_default_scheme_reuses_matching_xctestrun(self) -> None:
-        completed, calls, _ = self.run_script(
+        completed, calls = self.run_script(
             precreated_xctestruns=["HarnessMonitor_macosx26.5-arm64.xctestrun"],
         )
 
@@ -480,7 +466,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
         self.assertIn("reuse-build-for-testing: skipping build", completed.stderr)
 
     def test_overridden_scheme_reuses_matching_xctestrun(self) -> None:
-        completed, calls, _ = self.run_script(
+        completed, calls = self.run_script(
             test_scheme="HarnessMonitorPolicyCanvasTests",
             precreated_xctestruns=[
                 "HarnessMonitorPolicyCanvasTests_macosx26.5-arm64.xctestrun"
@@ -493,7 +479,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
         self.assertIn("reuse-build-for-testing: skipping build", completed.stderr)
 
     def test_splits_comma_separated_only_testing_selectors(self) -> None:
-        completed, calls, rtk_log = self.run_script(
+        completed, calls = self.run_script(
             only_testing=(
                 "HarnessMonitorKitTests/PolicyGapRuleTests,"
                 "HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow"
@@ -514,10 +500,9 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             "-only-testing:HarnessMonitorUITests/HarnessMonitorUITests/testToolbarOpensSettingsWindow",
             calls[2],
         )
-        self.assertEqual(rtk_log, "")
 
     def test_expands_xctest_class_only_testing_selector_to_methods(self) -> None:
-        completed, calls, rtk_log = self.run_script(
+        completed, calls = self.run_script(
             only_testing="HarnessMonitorKitTests/BackgroundGalleryPrefetchPlanTests"
         )
 
@@ -540,10 +525,9 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             "testVisibleTileChurnDoesNotChangeGalleryPrefetchPlan()",
             calls[2],
         )
-        self.assertEqual(rtk_log, "")
 
     def test_expands_swift_testing_suite_selector_to_methods(self) -> None:
-        completed, calls, rtk_log = self.run_script(
+        completed, calls = self.run_script(
             only_testing="HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests"
         )
 
@@ -559,10 +543,9 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             "acpPermissionBatchWaitsForSnapshotAndRemainsPresented()",
             calls[2],
         )
-        self.assertEqual(rtk_log, "")
 
     def test_normalizes_swift_testing_method_selector_without_parentheses(self) -> None:
-        completed, calls, rtk_log = self.run_script(
+        completed, calls = self.run_script(
             only_testing=(
                 "HarnessMonitorKitTests/HarnessMonitorStoreUpdateStreamTests/"
                 "acpPermissionBatchWaitsForSnapshotAndRemainsPresented"
@@ -576,10 +559,9 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             "acpPermissionBatchWaitsForSnapshotAndRemainsPresented()",
             calls[1],
         )
-        self.assertEqual(rtk_log, "")
 
     def test_normalizes_xcode_test_url_selector(self) -> None:
-        completed, calls, rtk_log = self.run_script(
+        completed, calls = self.run_script(
             only_testing=(
                 "test://com.apple.xcode/HarnessMonitor/HarnessMonitorKitTests/"
                 "HarnessMonitorStoreUpdateStreamTests/"
@@ -594,15 +576,13 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             "acpPermissionBatchWaitsForSnapshotAndRemainsPresented()",
             calls[1],
         )
-        self.assertEqual(rtk_log, "")
 
     def test_rejects_xcodebuild_runner_override(self) -> None:
-        completed, calls, rtk_log = self.run_script(override_runner=True)
+        completed, calls = self.run_script(override_runner=True)
 
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("XCODEBUILD_RUNNER override is unsupported", completed.stderr)
         self.assertEqual(calls, [])
-        self.assertEqual(rtk_log, "")
 
     def test_test_lane_defaults_to_fast_feedback_env(self) -> None:
         script = SCRIPT_PATH.read_text(encoding="utf-8")

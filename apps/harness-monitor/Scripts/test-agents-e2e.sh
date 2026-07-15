@@ -13,8 +13,8 @@ DERIVED_DATA_PATH="${XCODEBUILD_DERIVED_DATA_PATH:-$COMMON_REPO_ROOT/xcode-deriv
 CANONICAL_XCODEBUILD_RUNNER="$ROOT/Scripts/monitor-xcodebuild.sh"
 XCODEBUILD_RUNNER="${XCODEBUILD_RUNNER:-$CANONICAL_XCODEBUILD_RUNNER}"
 STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
-# shellcheck source=apps/harness-monitor/Scripts/lib/rtk-shell.sh
-source "$ROOT/Scripts/lib/rtk-shell.sh"
+# shellcheck source=apps/harness-monitor/Scripts/lib/xcodebuild-support.sh
+source "$ROOT/Scripts/lib/xcodebuild-support.sh"
 # shellcheck source=apps/harness-monitor/Scripts/lib/swift-tool-env.sh
 source "$ROOT/Scripts/lib/swift-tool-env.sh"
 # shellcheck source=apps/harness-monitor/Scripts/lib/swift-package-freshness.sh

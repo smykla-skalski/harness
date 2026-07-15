@@ -3,7 +3,6 @@ use crate::command_intent::{
 };
 
 /// Supported wrapper boundary:
-/// - optional leading `rtk`
 /// - `env VAR=... <command ...>` wrappers
 /// - `bash|sh|zsh|fish -c|-lc|-ic|-lc '<command ...>'` wrappers
 ///
@@ -15,7 +14,6 @@ use crate::command_intent::{
 pub(super) fn wrapped_command(
     words: &[String],
 ) -> Result<Option<(Vec<String>, ParsedCommand)>, String> {
-    let words = strip_rtk(words);
     if words.is_empty() {
         return Ok(None);
     }
@@ -42,17 +40,6 @@ pub(super) fn split_env_prefix<'a>(
     (env_prefix, &segment[env_prefix_len..])
 }
 
-fn strip_rtk(words: &[String]) -> &[String] {
-    if words
-        .first()
-        .is_some_and(|word| normalized_binary_name(word) == "rtk")
-    {
-        &words[1..]
-    } else {
-        words
-    }
-}
-
 fn parse_env_wrapper(words: &[String]) -> Result<Option<(Vec<String>, ParsedCommand)>, String> {
     let assignment_len = words
         .iter()
@@ -67,7 +54,6 @@ fn parse_env_wrapper(words: &[String]) -> Result<Option<(Vec<String>, ParsedComm
 
     let env_prefix = words[..assignment_len].to_vec();
     let nested_words = &words[assignment_len..];
-    let nested_words = strip_rtk(nested_words);
     if nested_words.is_empty() {
         return Err(
             "unsupported wrapped shell command shape: env wrapper must include a nested command"

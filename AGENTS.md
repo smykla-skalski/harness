@@ -5,13 +5,14 @@ This is the repo-level contract for agents working in `harness`. Direct system, 
 ## How to use this file
 
 1. Start with the task-routing table and load the deepest relevant `AGENTS.md` before editing.
-2. Treat the hard rules here as mandatory: `mise` workflows, isolated session-scoped worktrees and lanes for editing work, path-limited signed commits, scoped validation, and final replay onto local `main`.
-3. Load reference docs only when the task touches that area. Keep the prompt path short; this file is the contract, not the full design archive.
+2. Treat the hard rules here as mandatory: `mise` workflows, an explicitly selected delivery mode, isolated session-scoped worktrees and lanes, path-limited signed commits, and scoped validation.
+3. Select the delivery mode before creating the editing worktree, then read `docs/agent-guides/delivery-workflows.md` before integration or publication. Stop if the guide is unavailable.
 
 ## Task routing
 
 | Work area | Start here |
 | --- | --- |
+| Delivery selection, replay, PR review, and closeout | `docs/agent-guides/delivery-workflows.md` |
 | Rust CLI, hooks, orchestration, runtime bootstrap | This file, then `docs/agent-guides/root-reference.md` when details are needed |
 | Harness Monitor macOS app | `apps/harness-monitor/AGENTS.md` |
 | Monitor previewable SwiftUI layer | `apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/AGENTS.md` |
@@ -23,15 +24,17 @@ Discover repo workflows with `mise tasks ls`. Run repo logic through `mise run <
 
 If several commands could apply, choose the smallest one that proves the change. Use broad gates only when the change affects shared behavior or before a final handoff that needs them.
 
-## Parallel worktrees
+## Delivery and worktrees
 
-Every parallel user or agent session that edits files, generates projects, builds, tests, runs daemons, or drives XcodeBuildMCP must use its own full git worktree. Build/runtime lanes isolate caches, daemon state, ports, labels, and sockets inside a worktree; they do not replace a separate checkout.
+Use exactly one terminal delivery mode: `pr` or `replay`. `pr` is the default. Use `replay` only when the user explicitly requests it or explicitly confirms the agent's proposal for a small task such as a version bump, documentation change, or Git-history repair. Record the mode in substantial plans and handoffs.
 
-Assign one custom worktree and one build/runtime lane to the whole agent session, not to each individual task. Reuse that same worktree and lane across the session so caches stay warm and cleanup stays predictable.
+Every user or agent session that edits files, generates projects, builds, tests, runs daemons, or drives XcodeBuildMCP must use its own full git worktree. Assign one custom worktree and one build/runtime lane to the whole session and reuse them so caches stay warm. Build/runtime lanes isolate side effects but never replace a separate checkout.
 
-After every commit in that session worktree, immediately rebase the worktree branch onto current local `main` and resolve any conflicts inside the worktree first. Replay to `main` only from committed worktree state; do not replay dirty files. Before replaying to `main`, make sure the finished change builds or passes the smallest relevant validation in the worktree, but only for code surfaces the change actually affects; helper scripts, docs, and files outside an app/codebase do not require app builds or unrelated gates. Then replay the finished task commit into local `main`. Keep the replay mechanical by resolving divergence in the worktree, not during the later replay. This is a hard rule.
+Commit and validate affected surfaces in the worktree. Unrelated dirty files may exist temporarily outside the task's explicit paths, but the worktree must be clean before rebase or delivery, and only committed state may be integrated or published. Keep the worktree and lane until session end or explicit cleanup.
 
-Do not clean up the session worktree or lane after each task. Keep them until the agent session ends or the user explicitly asks for cleanup. Once the session ends and the work is fully present in local `main`, remove the session worktree, its branch, and any no-longer-needed lane state.
+Stay read-only outside the assigned worktree except for repository or remote state changes explicitly required by the selected delivery workflow; any other outside write needs explicit user approval. If another agent blocks progress for five minutes, ask the user.
+
+A `replay` task ends only when clean local `main` and the session worktree point to the same commit, with any `upstream/main` difference reported. Successful `pr` delivery ends only after the user merges, local `main`, `upstream/main`, and the clean reusable worktree match, and stale upstream tracking is removed; a closed-unmerged PR uses the guide's explicit undelivered terminal state. The agent never merges the PR.
 
 ## UI test failures
 
@@ -118,8 +121,9 @@ Hook landing rule: a new hook lands with observable handler behavior, or behind 
 - Errors use `CliErrorKind` variants with typed fields via `thiserror`.
 - Hook messages use `HookMessage` with `into_result()`.
 - Diagnostic output uses `tracing` macros. Default filter: `RUST_LOG=harness=info`. Do not add `eprintln!` diagnostics.
+- Keep Rust files under 520 lines and functions under 100 lines.
 - Commit messages: `{type}({scope}): {message}` with `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, or `perf`.
-- Never create merge commits. Keep history flat with rebase or cherry-pick. The no-rebase/no-amend/no-force-push restriction applies when working directly in local `main`. In an assigned worktree, rebase onto local `main` and amend only your own unpublished commits when needed to keep the branch easy to replay; never rewrite local `main` history or force-push shared branches.
+- Never create merge commits or rewrite local `main`. In `replay`, perform the final rebase onto local `main` in the worktree and integrate only by fast-forward. In `pr`, base the branch on `upstream/main`; after publication, prefer additive commits and use `--force-with-lease` only for an unavoidable rewrite of the dedicated session branch. Never plain-force or rewrite a shared branch.
 
 ## Commit signing
 
@@ -135,13 +139,13 @@ The sign-off trailer must be exactly:
 Signed-off-by: Bart Smykla <bartek@smykla.com>
 ```
 
-Never bypass signing with `--no-gpg-sign`, `-c commit.gpgsign=false`, `--no-verify`, or another key. If 1Password signing is unavailable, stop and wait for the user.
+Never bypass signing with `--no-gpg-sign`, `-c commit.gpgsign=false`, `--no-verify`, or another key. On macOS, use the configured 1Password SSH signer and stop if it is unavailable. On Smycracker Linux, run `/usr/local/bin/smycracker-git-signing-doctor` before the first commit and use only the managed public key and Git signing wrapper. On other Linux hosts, stop unless the user explicitly approved another GitHub-registered signer. See the delivery guide for the full platform contract.
 
 ## Closeout and versioning
 
-Every finished task must end with the final work present in the local `main` checkout with clean, flat history. Use the assigned session worktree for isolated development, but before handoff commit the task in the worktree, make sure the change builds or passes the smallest relevant validation there, and replay only that committed worktree state into local `main`. Never replay dirty files. Run only validations for surfaces the change actually affects; helper scripts, docs, and files outside an app/codebase do not require app builds or unrelated gates before commit, replay, or handoff. After replay onto `main`, do not rerun builds or checks there just because of the replay; continue unless the user asks for more validation or a new affected surface appears. Resolve conflicts in the assigned worktree during the post-commit rebase onto current local `main`, not during the final replay when you can avoid it. Do not remove the session worktree or lane after each task; keep them until the session ends or the user asks for cleanup.
+Finish through the selected mode in `docs/agent-guides/delivery-workflows.md`. Before integration or publication, commit the task and run only the smallest validation for affected surfaces in the worktree; helper scripts, docs, and files outside an app or codebase need no unrelated app gate. Do not rerun builds or checks on `main` merely because replay or merge closeout succeeded.
 
-Every change must evaluate semver. Do not bump versions without explicit user approval. Docs-only changes normally require no version bump. If shipped `harness` or `aff` behavior changes enough that the local binary must be reinstalled, a version bump is required after approval.
+Every change must evaluate semver. Do not bump versions without explicit user approval. Docs-only changes normally require no version bump. Include any approved required bump in the same delivery rather than adding unreviewed work afterward. If shipped `harness` or `aff` behavior changes enough that the local binary must be reinstalled, a version bump is required after approval.
 
 Use `mise run version:set -- <version>` for approved bumps, or `mise run version:sync` after any direct canonical-version edit. See `docs/agent-guides/root-reference.md` for derived version surfaces.
 

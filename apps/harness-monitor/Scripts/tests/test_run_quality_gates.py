@@ -38,7 +38,7 @@ class RunQualityGatesTests(unittest.TestCase):
         app_entitlements: Path | None = None,
         daemon_entitlements: Path | None = None,
         override_runner: bool = False,
-    ) -> tuple[subprocess.CompletedProcess[str], str, str]:
+    ) -> tuple[subprocess.CompletedProcess[str], str]:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
             app_root = temp_root / "HarnessMonitor"
@@ -46,7 +46,6 @@ class RunQualityGatesTests(unittest.TestCase):
             scripts_root.mkdir(parents=True)
             derived_data_path = temp_root / "derived"
             runner_args_log = temp_root / "xcodebuild-args.log"
-            rtk_calls_log = temp_root / "rtk-args.log"
             build_for_testing = scripts_root / "build-for-testing.sh"
             fake_log = temp_root / "log"
 
@@ -91,15 +90,13 @@ chmod 755 "$daemon_dir/harness"
                 env=env,
             )
             args = runner_args_log.read_text() if runner_args_log.exists() else ""
-            rtk_args = rtk_calls_log.read_text() if rtk_calls_log.exists() else ""
-            return completed, args, rtk_args
+            return completed, args
 
     def test_build_for_testing_disables_code_signing(self) -> None:
-        completed, runner_args, rtk_args = self.run_script()
+        completed, runner_args = self.run_script()
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(runner_args, "build-for-testing-script-called\n")
-        self.assertEqual(rtk_args, "")
 
     def test_fails_when_required_app_entitlement_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -112,7 +109,7 @@ chmod 755 "$daemon_dir/harness"
                 },
             )
 
-            completed, _, _ = self.run_script(app_entitlements=entitlements_path)
+            completed, _ = self.run_script(app_entitlements=entitlements_path)
 
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn(
@@ -133,7 +130,7 @@ chmod 755 "$daemon_dir/harness"
                 },
             )
 
-            completed, _, _ = self.run_script(daemon_entitlements=entitlements_path)
+            completed, _ = self.run_script(daemon_entitlements=entitlements_path)
 
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn(
@@ -151,7 +148,7 @@ chmod 755 "$daemon_dir/harness"
                 },
             )
 
-            completed, _, _ = self.run_script(daemon_entitlements=entitlements_path)
+            completed, _ = self.run_script(daemon_entitlements=entitlements_path)
 
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn(
@@ -160,11 +157,10 @@ chmod 755 "$daemon_dir/harness"
         )
 
     def test_rejects_xcodebuild_runner_override(self) -> None:
-        completed, runner_args, rtk_args = self.run_script(override_runner=True)
+        completed, runner_args = self.run_script(override_runner=True)
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertNotEqual(runner_args, "")
-        self.assertEqual(rtk_args, "")
 
 
 if __name__ == "__main__":
