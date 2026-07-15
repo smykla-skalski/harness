@@ -28,6 +28,8 @@ If several commands could apply, choose the smallest one that proves the change.
 
 Use exactly one terminal delivery mode: `pr` or `replay`. `pr` is the default. Use `replay` only when the user explicitly requests it or explicitly confirms the agent's proposal for a small task such as a version bump, documentation change, or Git-history repair. Record the mode in substantial plans and handoffs.
 
+Treat a feature expected to exceed about 5,000 Copilot-reviewable changed lines as an ordered PR series. Plan self-contained slices before implementation; each slice must remain independently valid and may be consumed or extended, but not knowingly repaired, replaced, or redesigned, by later slices. Complete Copilot review, user merge, and post-merge closeout for each dependent slice before implementing the next from current `upstream/main`, and stop for explicit user approval when no sound boundary fits the review budget.
+
 Every user or agent session that edits files, generates projects, builds, tests, runs daemons, or drives XcodeBuildMCP must use its own full git worktree. Assign one custom worktree and one build/runtime lane to the whole session and reuse them so caches stay warm. Build/runtime lanes isolate side effects but never replace a separate checkout.
 
 Commit and validate affected surfaces in the worktree. Unrelated dirty files may exist temporarily outside the task's explicit paths, but the worktree must be clean before rebase or delivery, and only committed state may be integrated or published. Keep the worktree and lane until session end or explicit cleanup.
