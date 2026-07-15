@@ -16,6 +16,8 @@ pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
             [],
         )
         .map_err(|error| db_error(format!("add v35 dispatch grant tracking: {error}")))?;
+    }
+    if table_exists(conn, "policy_workspace")? {
         conn.execute(
             "UPDATE policy_workspace SET spawn_requires_live_policy = 1",
             [],
@@ -87,5 +89,43 @@ mod tests {
             )
             .expect("inspect dispatch schema")
         );
+    }
+
+    #[test]
+    fn migration_closes_spawn_policy_when_grant_tracking_already_exists() {
+        let conn = Connection::open_in_memory().expect("open sqlite");
+        conn.execute_batch(
+            "CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             INSERT INTO schema_meta (key, value) VALUES ('version', '34');
+             CREATE TABLE policy_workspace (
+                 singleton INTEGER PRIMARY KEY,
+                 spawn_requires_live_policy INTEGER NOT NULL DEFAULT 0
+             );
+             INSERT INTO policy_workspace VALUES (1, 0);
+             CREATE TABLE task_board_dispatch_intents (
+                 intent_id TEXT PRIMARY KEY,
+                 consumed_approval_grant_id TEXT
+             );",
+        )
+        .expect("seed partially migrated v34 schema");
+        assert!(
+            column_exists(
+                &conn,
+                "task_board_dispatch_intents",
+                "consumed_approval_grant_id"
+            )
+            .expect("inspect seeded dispatch schema")
+        );
+
+        run(&conn).expect("run v35 migration");
+
+        let requires_live: bool = conn
+            .query_row(
+                "SELECT spawn_requires_live_policy FROM policy_workspace WHERE singleton = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read migrated switch");
+        assert!(requires_live, "v35 migration must always fail closed");
     }
 }

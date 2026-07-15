@@ -67,6 +67,17 @@ pub(crate) fn require_active(state: &SessionState) -> Result<(), CliError> {
     Ok(())
 }
 
+pub(crate) fn require_managed_run_mutation(state: &SessionState) -> Result<(), CliError> {
+    if !state.status.allows_managed_run_mutation() {
+        return Err(CliErrorKind::session_not_active(format!(
+            "session '{}' is {:?}; managed-run mutations require an active or leaderless degraded session",
+            state.session_id, state.status
+        ))
+        .into());
+    }
+    Ok(())
+}
+
 pub(crate) fn require_endable_session(state: &SessionState) -> Result<(), CliError> {
     if !state.status.allows_end_session() {
         return Err(CliErrorKind::session_not_active(format!(

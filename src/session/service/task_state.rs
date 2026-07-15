@@ -6,7 +6,7 @@ use super::{
     TaskQueuePolicy, TaskSpec, TaskStatus, Utc, Value, WorkItem, agent_status_label,
     apply_drop_task_on_agent, clear_agent_current_task, free_worker_ids, generate_checkpoint_id,
     generate_signal_id, next_task_id, protocol, rank_workers_for_task, refresh_session,
-    require_active, require_permission, require_task_creation_state,
+    require_active, require_managed_run_mutation, require_permission, require_task_creation_state,
     start_next_locked_task_for_worker, start_task_for_agent, task_not_found, task_status_label,
     touch_agent,
 };
@@ -280,6 +280,7 @@ pub(crate) fn apply_update_task_for_managed_run(
     actor_id: &str,
     now: &str,
 ) -> Result<TaskStatus, CliError> {
+    require_managed_run_mutation(state)?;
     require_permission(state, actor_id, SessionAction::UpdateTaskStatus)?;
     apply_update_task_fields(state, task_id, status, note, actor_id, now)
 }

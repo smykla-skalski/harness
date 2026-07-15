@@ -204,6 +204,11 @@ impl SessionStatus {
     }
 
     #[must_use]
+    pub const fn allows_managed_run_mutation(self) -> bool {
+        matches!(self, Self::Active | Self::LeaderlessDegraded)
+    }
+
+    #[must_use]
     pub const fn allows_end_session(self) -> bool {
         !matches!(self, Self::Ended)
     }
