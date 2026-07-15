@@ -166,12 +166,25 @@ struct TaskBoardCardPill: View {
       max(HarnessMonitorTheme.spacingXS, metrics.pillHorizontalPadding * 0.5)
     }
   }
-  private var verticalPadding: CGFloat {
+  private var compactVerticalPadding: CGFloat {
+    max(1, metrics.pillVerticalPadding * 0.25)
+  }
+  private var verticalInsets: EdgeInsets {
     switch pillDensity {
     case .standard:
-      metrics.pillVerticalPadding
+      EdgeInsets(
+        top: metrics.pillVerticalPadding,
+        leading: 0,
+        bottom: metrics.pillVerticalPadding,
+        trailing: 0
+      )
     case .compact:
-      max(1, metrics.pillVerticalPadding * 0.25)
+      EdgeInsets(
+        top: compactVerticalPadding + 1,
+        leading: 0,
+        bottom: max(0, compactVerticalPadding - 1),
+        trailing: 0
+      )
     }
   }
 
@@ -189,7 +202,7 @@ struct TaskBoardCardPill: View {
     .foregroundStyle(tint)
     .lineLimit(1)
     .padding(.horizontal, horizontalPadding)
-    .padding(.vertical, verticalPadding)
+    .padding(verticalInsets)
     .harnessContentPill(tint: tint)
   }
 }
@@ -239,6 +252,7 @@ struct TaskBoardCardFooter<Badges: View>: View {
         .lineLimit(1)
         .truncationMode(.middle)
         .multilineTextAlignment(.leading)
+        .harnessOpticalTextCenter()
         .layoutPriority(2)
       HarnessMonitorWrapLayout(
         spacing: metrics.rowTextSpacing,
@@ -309,6 +323,7 @@ private struct TaskBoardCardUpdatedAtLabel: View {
         .lineLimit(1)
         .fixedSize(horizontal: true, vertical: false)
         .accessibilityLabel("Updated \(accessibleAge)")
+        .harnessOpticalTextCenter()
     }
   }
 }
