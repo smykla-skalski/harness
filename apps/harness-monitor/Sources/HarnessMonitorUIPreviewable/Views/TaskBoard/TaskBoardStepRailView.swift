@@ -243,7 +243,7 @@ struct TaskBoardStepRailView: View {
   private var approvalGrantRefreshID: TaskBoardApprovalGrantRefreshID {
     let activeCanvas = workspace?.canvases.first { $0.canvasId == workspace?.activeCanvasId }
     return TaskBoardApprovalGrantRefreshID(
-      heldIntentIDs: status.heldDispatches.items.map(\.intentId),
+      heldIntentIDs: status.heldDispatches.items.map(\.intentId).sorted(),
       activeCanvasID: workspace?.activeCanvasId,
       activeRevision: activeCanvas?.liveDocument?.revision ?? activeCanvas?.revision,
       lastRunID: status.lastRun?.runId,
@@ -261,7 +261,7 @@ struct TaskBoardStepRailView: View {
     fingerprint.append(
       contentsOf: latestEvaluation.records.map {
         "\($0.boardItemId):\($0.outcome.rawValue):\($0.updated)"
-      }
+      }.sorted()
     )
     return fingerprint
   }
