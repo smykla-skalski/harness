@@ -130,16 +130,8 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
     init_git_repo(&project);
 
     let mut daemon = ManagedChild::spawn(
-        Command::new(harness_binary())
-            .args([
-                "daemon",
-                "serve",
-                "--host",
-                "127.0.0.1",
-                "--port",
-                "0",
-                "--sandboxed",
-            ])
+        Command::new(daemon_binary())
+            .args(["serve", "--host", "127.0.0.1", "--port", "0", "--sandboxed"])
             .env("HARNESS_HOST_HOME", &home)
             .env("HOME", &home)
             .env("XDG_DATA_HOME", &xdg)
@@ -296,8 +288,8 @@ fn recover_leader_starts_managed_tui_with_policy_preset_prompt() {
     let path_env = prefixed_path_env(&mock_bin);
 
     let mut daemon = ManagedChild::spawn(
-        Command::new(harness_binary())
-            .args(["daemon", "serve", "--host", "127.0.0.1", "--port", "0"])
+        Command::new(daemon_binary())
+            .args(["serve", "--host", "127.0.0.1", "--port", "0"])
             .env("HARNESS_HOST_HOME", &home)
             .env("HOME", &home)
             .env("XDG_DATA_HOME", &xdg)

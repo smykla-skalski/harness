@@ -144,29 +144,59 @@ run = "./scripts/check-scripts.sh --lint"
 description = "Run repo-local helper script regression tests"
 run = "HARNESS_CHECK_SCRIPTS_STEP_TIMEOUT_SECONDS=180 ./scripts/check-scripts.sh --tests"
 
+[tasks."test:scripts:release-install"]
+description = "Run the release build coordinator and atomic installer shell tests"
+run = "./scripts/tests/test-release-install.sh"
+
 [tasks."test:unit"]
 description = "Run unit tests"
-run = "./scripts/cargo-local.sh test --quiet --lib -- --format terse"
+run = [
+  "./scripts/cargo-local.sh test --quiet --lib --features full-runtime -- --test-threads=1 --format terse",
+  "./scripts/cargo-local.sh test --quiet -p harness-command -p harness-daemon-client -p harness-protocol -p harness-telemetry",
+]
 
 [tasks."test:integration"]
 description = "Run integration tests (fast only, single-threaded for env safety)"
-run = "./scripts/cargo-local.sh test --quiet --test integration -- --test-threads=1 --format terse"
+run = [
+  "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
+  "./scripts/cargo-local.sh test --quiet --test integration --features full-runtime -- --test-threads=1 --format terse",
+]
+
+[tasks."test:workers"]
+description = "Run standalone worker integration and parity tests"
+run = [
+  "./scripts/cargo-local.sh test --quiet -p harness-daemon -p harness-bridge --test standalone_parity -- --format terse",
+  "./scripts/cargo-local.sh test --quiet -p harness-hook --test standalone -- --format terse",
+  "./scripts/cargo-local.sh test --quiet -p harness-mcp --test cli --test dependency_guard -- --format terse",
+]
 
 [tasks."test:slow"]
 description = "Run ignored slow tests (fake toolchain, ENV_LOCK)"
-run = "./scripts/cargo-local.sh test --quiet --test integration -- --ignored --test-threads=1 --format terse"
+run = [
+  "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
+  "./scripts/cargo-local.sh test --quiet --test integration --features full-runtime -- --ignored --test-threads=1 --format terse",
+]
 
 [tasks."remote-daemon:e2e"]
 description = "Run the real remote daemon ACME, HTTPS, WSS, pairing, and revocation proof"
-run = "./scripts/cargo-local.sh test --quiet --test remote_daemon_e2e -- --ignored --test-threads=1 --format terse"
+run = [
+  "./scripts/cargo-local.sh build -p harness-daemon",
+  "./scripts/cargo-local.sh test --quiet --test remote_daemon_e2e --features full-runtime -- --ignored --test-threads=1 --format terse",
+]
 
 [tasks."remote-daemon:public-acme-e2e"]
 description = "Run the Linux Let's Encrypt staging proof for TLS-ALPN-01, HTTP-01, and DNS-01"
-run = "./scripts/cargo-local.sh test --quiet --test remote_daemon_public_acme_e2e remote_daemon_public_acme_staging_proves_all_challenges -- --ignored --nocapture --test-threads=1"
+run = [
+  "./scripts/cargo-local.sh build -p harness-daemon",
+  "./scripts/cargo-local.sh test --quiet --test remote_daemon_public_acme_e2e --features full-runtime remote_daemon_public_acme_staging_proves_all_challenges -- --ignored --nocapture --test-threads=1",
+]
 
 [tasks."remote-daemon:systemd-e2e"]
 description = "Run the real Linux systemd lifecycle and effective security proof"
-run = "./scripts/cargo-local.sh test --quiet --test remote_systemd_e2e -- --ignored --nocapture --test-threads=1"
+run = [
+  "./scripts/cargo-local.sh build -p harness-daemon",
+  "./scripts/cargo-local.sh test --quiet --test remote_systemd_e2e --features full-runtime -- --ignored --nocapture --test-threads=1",
+]
 
 [tasks.codegen]
 description = "Regenerate every Rust -> Swift wire-type module from the Rust sources"
@@ -181,7 +211,7 @@ run = [
 
 [tasks.test]
 description = "Run all fast tests"
-depends = ["test:unit", "test:integration", "codegen:check"]
+depends = ["test:unit", "test:integration", "test:workers", "codegen:check"]
 
 [tasks."setup:bootstrap"]
 description = "Write runtime bootstrap configs and install the repo-aware wrapper (pass harness setup args after --)"
@@ -193,6 +223,9 @@ depends = [
   "harness:check:stale-state",
   "harness:check:version",
   "harness:check:scripts",
+  "harness:check:binary-contracts",
+  "harness:check:source-size",
+  "harness:check:feature-isolation",
   "harness:check:rust",
 ]
 
@@ -208,9 +241,34 @@ run = "./scripts/version.sh check"
 hide = true
 depends = ["check:scripts"]
 
+[tasks."harness:check:binary-contracts"]
+hide = true
+run = "./scripts/check-binary-contracts.sh"
+
+[tasks."harness:check:source-size"]
+hide = true
+run = "./scripts/check-rust-source-size.sh"
+
+[tasks."harness:check:feature-isolation"]
+hide = true
+run = [
+  "./scripts/cargo-local.sh check --all-targets -p harness-command",
+  "./scripts/cargo-local.sh check --all-targets -p harness-daemon-client",
+  "./scripts/cargo-local.sh check --all-targets -p harness-protocol",
+  "./scripts/cargo-local.sh check --all-targets -p harness-telemetry",
+  "./scripts/cargo-local.sh check -p harness --bin harness",
+  "./scripts/cargo-local.sh check -p harness-hook --bin harness-hook",
+  "./scripts/cargo-local.sh check -p harness-bridge --bin harness-bridge",
+  "./scripts/cargo-local.sh check -p harness-mcp --bin harness-mcp",
+  "./scripts/cargo-local.sh check -p harness-daemon --bin harness-daemon",
+]
+
 [tasks."harness:check:rust"]
 hide = true
-run = "./scripts/cargo-local.sh clippy -p harness --lib --bins"
+run = [
+  "./scripts/cargo-local.sh clippy -p harness --lib --bins",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-protocol -p harness-telemetry -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook",
+]
 
 [tasks."aff:check"]
 description = "Run aff-only quality gates"
@@ -232,24 +290,16 @@ description = "Format and apply clippy fixes"
 run = ["./scripts/cargo-local.sh fmt", "./scripts/cargo-local.sh clippy --fix --allow-dirty --allow-staged"]
 
 [tasks.install]
-description = "Build and install both harness and aff"
-depends = ["harness:install", "aff:install"]
+description = "Build the complete release set concurrently, sign it, and activate it atomically"
+run = "./scripts/build-and-install-release-set.sh all"
 
 [tasks."harness:install"]
-description = "Build the harness binary, sign it, install it to ~/.local/bin, reconcile stale shadowed harness binaries on PATH, and validate the installed binary"
-run = [
-  "./scripts/cargo-local.sh build --release --features tokio-console",
-  "./scripts/cargo-local.sh build --release --manifest-path crates/harness-codex-acp/Cargo.toml",
-  "./scripts/cargo-local.sh build --release --manifest-path crates/harness-openrouter-agent/Cargo.toml",
-  "./scripts/install-harness-release.sh",
-]
+description = "Build the Harness CLI/runtime binaries and isolated adapters concurrently, then activate the signed set atomically"
+run = "./scripts/build-and-install-release-set.sh harness"
 
 [tasks."aff:install"]
-description = "Build the aff binary, sign it, install it to ~/.local/bin, and validate the installed binary"
-run = [
-  "./scripts/cargo-local.sh build --release -p aff",
-  "./scripts/install-aff-release.sh",
-]
+description = "Build aff only, then activate it in the signed versioned release set"
+run = "./scripts/build-and-install-release-set.sh aff"
 
 [tasks."aff:test"]
 description = "Run aff package tests only"
@@ -370,12 +420,12 @@ description = "Quit Harness Monitor and reset current-lane stale bridge/daemon s
 run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 apps/harness-monitor/Scripts/monitor-runtime-env.sh ./scripts/clean-stale-state.sh"
 
 [tasks."monitor:daemon:dev"]
-description = "Run `harness daemon dev` with the current Harness Monitor runtime lane"
+description = "Run `harness-daemon dev` with the current Harness Monitor runtime lane"
 env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn" }
 run = "apps/harness-monitor/Scripts/run-daemon-dev.sh"
 
 [tasks."monitor:bridge:start"]
-description = "Run `harness bridge start` with the current Harness Monitor runtime lane"
+description = "Run `harness-bridge start` with the current Harness Monitor runtime lane"
 env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn" }
 run = "apps/harness-monitor/Scripts/run-bridge-start.sh"
 
@@ -561,7 +611,7 @@ run = "./scripts/host-metrics.sh build-darwin-exporter"
 [tasks."mcp:test"]
 description = "Run harness MCP server unit and integration tests"
 run = [
-  "./scripts/cargo-local.sh test --lib mcp:: -- --test-threads=1",
+  "./scripts/cargo-local.sh test -p harness-mcp --all-targets -- --test-threads=1",
   "./scripts/cargo-local.sh test --test integration mcp:: -- --test-threads=1",
 ]
 
@@ -592,11 +642,11 @@ description = "Print the resolved accessibility socket path"
 run = "./scripts/mcp-socket-path.sh"
 
 [tasks."mcp:serve"]
-description = "Run harness mcp serve on stdio (for manual debugging with MCP Inspector etc.)"
-run = "harness mcp serve"
+description = "Run harness-mcp serve on stdio (for manual debugging with MCP Inspector etc.)"
+run = "harness-mcp serve"
 
 [tasks."mcp:smoke"]
-description = "Drive harness mcp serve through initialize + tools/list (pass a tool name as arg to also tools/call it)"
+description = "Drive harness-mcp serve through initialize + tools/list (pass a tool name as arg to also tools/call it)"
 run = "./scripts/mcp-smoke.sh"
 
 [tasks."mcp:doctor"]

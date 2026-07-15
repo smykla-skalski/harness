@@ -6,8 +6,8 @@ use crate::agents::runtime::RuntimeCapabilities;
 
 use super::{
     AgentPersona, AgentRegistration, AgentStatus, CURRENT_VERSION, PersonaSymbol, SessionMetrics,
-    SessionRole, SessionState, SessionStatus, TaskQueuePolicy, TaskSeverity, TaskSource,
-    TaskStatus, WorkItem,
+    SessionPolicy, SessionRole, SessionState, SessionStatus, TaskQueuePolicy, TaskSeverity,
+    TaskSource, TaskStatus, WorkItem,
 };
 
 pub(super) fn agent_registration(
@@ -61,7 +61,7 @@ pub(super) fn session_state(
         title: "test title".into(),
         context: "ctx".into(),
         status: SessionStatus::Active,
-        policy: Default::default(),
+        policy: SessionPolicy::default(),
         created_at: "2026-03-28T12:00:00Z".into(),
         updated_at: "2026-03-28T12:00:00Z".into(),
         agents,

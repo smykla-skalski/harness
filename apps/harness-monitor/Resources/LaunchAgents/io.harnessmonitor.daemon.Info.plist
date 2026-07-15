@@ -7,7 +7,7 @@
 	<key>CFBundleDisplayName</key>
 	<string>Harness Monitor Daemon</string>
 	<key>CFBundleExecutable</key>
-	<string>harness</string>
+	<string>harness-daemon</string>
 	<key>CFBundleIdentifier</key>
 	<string>Q498EB36N4.io.harnessmonitor.daemon</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>47.1.0</string>
+	<string>48.0.0</string>
 	<key>CFBundleVersion</key>
-	<string>47.1.0</string>
+	<string>48.0.0</string>
 	<key>LSBackgroundOnly</key>
 	<true/>
 </dict>

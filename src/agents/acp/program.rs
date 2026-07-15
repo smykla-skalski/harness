@@ -1,12 +1,14 @@
 use std::env::{self, var_os};
+use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::workspace::host_home_dir;
 
-#[must_use]
-pub(super) fn resolve_program(program: &str) -> Option<PathBuf> {
-    resolve_current_harness_program(program)
-        .or_else(|| resolve_program_in_dirs(program, search_dirs()))
+pub(super) fn resolve_program(program: &str) -> io::Result<PathBuf> {
+    if harness_owned_program(program) {
+        return resolve_current_harness_program(program);
+    }
+    Ok(resolve_program_in_dirs(program, search_dirs()).unwrap_or_else(|| PathBuf::from(program)))
 }
 
 fn resolve_program_in_dirs(program: &str, search_dirs: Vec<PathBuf>) -> Option<PathBuf> {
@@ -21,20 +23,29 @@ fn resolve_program_in_dirs(program: &str, search_dirs: Vec<PathBuf>) -> Option<P
     })
 }
 
-fn resolve_current_harness_program(program: &str) -> Option<PathBuf> {
-    let current = env::current_exe().ok()?;
-    resolve_harness_program_from_current_exe(program, &current)
+fn resolve_current_harness_program(program: &str) -> io::Result<PathBuf> {
+    let current = env::current_exe()?;
+    resolve_harness_program_from_current_exe(program, &current).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "managed Harness program '{program}' is not executable beside {}",
+                current.display()
+            ),
+        )
+    })
 }
 
 fn resolve_harness_program_from_current_exe(program: &str, current_exe: &Path) -> Option<PathBuf> {
-    if program == "harness" {
-        return is_executable(current_exe).then(|| current_exe.to_path_buf());
-    }
-    if !program.starts_with("harness-") {
+    if !harness_owned_program(program) {
         return None;
     }
     let candidate = current_exe.parent()?.join(program);
     is_executable(&candidate).then_some(candidate)
+}
+
+fn harness_owned_program(program: &str) -> bool {
+    program == "harness" || program.starts_with("harness-")
 }
 
 fn search_dirs() -> Vec<PathBuf> {
@@ -130,19 +141,39 @@ mod tests {
             ],
             || {
                 assert_eq!(
-                    resolve_program("fake-acp").as_deref(),
-                    Some(binary.as_path())
+                    resolve_program("fake-acp").expect("resolve fake ACP"),
+                    binary
                 );
             },
         );
     }
 
     #[test]
-    fn resolve_program_uses_current_harness_binary_for_harness_command() {
-        let current = std::env::current_exe().expect("current executable");
+    fn resolve_program_uses_sibling_harness_binary_for_harness_command() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let current = temp.path().join("harness-daemon");
+        let sibling = temp.path().join("harness");
+        fs_err::write(&current, "#!/bin/sh\nexit 0\n").expect("write current binary");
+        fs_err::write(&sibling, "#!/bin/sh\nexit 0\n").expect("write sibling binary");
+        make_executable(&current);
+        make_executable(&sibling);
         assert_eq!(
-            resolve_current_harness_program("harness").as_deref(),
-            Some(current.as_path())
+            resolve_harness_program_from_current_exe("harness", &current).as_deref(),
+            Some(sibling.as_path())
+        );
+    }
+
+    #[test]
+    fn harness_owned_programs_never_fall_back_to_path() {
+        let path_dir = tempfile::tempdir().expect("path tempdir");
+        let binary = path_dir.path().join("harness-codex-acp");
+        fs_err::write(&binary, "#!/bin/sh\nexit 0\n").expect("write binary");
+        make_executable(&binary);
+        let missing_sibling = path_dir.path().join("nested/harness-daemon");
+
+        assert_eq!(
+            resolve_harness_program_from_current_exe("harness-codex-acp", &missing_sibling),
+            None
         );
     }
 
@@ -160,6 +191,42 @@ mod tests {
             resolve_harness_program_from_current_exe("harness-codex-acp", &current).as_deref(),
             Some(sibling.as_path())
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn managed_identity_and_spawn_never_use_a_path_decoy() {
+        use crate::agents::acp::connection::SpawnConfig;
+
+        let path_dir = tempfile::tempdir().expect("path tempdir");
+        let managed_name = "harness-acp-path-decoy-781e91c9";
+        let external_name = "external-acp-path-decoy-781e91c9";
+        for name in [managed_name, external_name] {
+            let binary = path_dir.path().join(name);
+            fs_err::write(&binary, "#!/bin/sh\nexit 0\n").expect("write path decoy");
+            make_executable(&binary);
+        }
+
+        let config = |command: &str| SpawnConfig {
+            command: command.to_string(),
+            args: Vec::new(),
+            env_passthrough: Vec::new(),
+            env_overrides: vec![("PATH".to_string(), path_dir.path().display().to_string())],
+            working_dir: path_dir.path().to_path_buf(),
+        };
+
+        let managed = config(managed_name);
+        let identity_error = managed
+            .resolved_command_for_identity()
+            .expect_err("managed identity must fail closed");
+        assert_eq!(identity_error.kind(), io::ErrorKind::NotFound);
+        let spawn_error = managed.spawn().expect_err("managed spawn must fail closed");
+        assert_eq!(spawn_error.kind(), io::ErrorKind::NotFound);
+
+        let mut child = config(external_name)
+            .spawn()
+            .expect("external program may use PATH");
+        assert!(child.wait().expect("wait for external decoy").success());
     }
 
     #[cfg(unix)]

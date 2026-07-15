@@ -7,7 +7,7 @@ mod common;
 mod create_observe;
 mod hook_message;
 mod run_setup;
-#[cfg(test)]
+#[cfg(all(test, not(feature = "standalone-worker")))]
 mod tests;
 mod workflow;
 

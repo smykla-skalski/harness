@@ -10,7 +10,7 @@ struct SettingsActionButtons: View {
   let startDaemon: @MainActor @Sendable () async -> Void
   let installLaunchAgent: @MainActor @Sendable () async -> Void
 
-  private static let externalDaemonCommand = "harness daemon dev"
+  private static let externalDaemonCommand = "harness-daemon dev"
 
   var body: some View {
     HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {

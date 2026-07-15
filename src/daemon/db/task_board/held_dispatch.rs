@@ -1,4 +1,4 @@
-use sqlx::{query, query_as};
+use sqlx::{SqliteConnection, query, query_as};
 use uuid::Uuid;
 
 use super::ITEMS_CHANGE_SCOPE;
@@ -9,6 +9,7 @@ use crate::daemon::db::policy::{
 };
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::infra::io;
+use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 use crate::task_board::{
     DispatchAppliedTask, PolicyAction, SpawnGateSwitches, TaskBoardHeldDispatchItem,
     TaskBoardHeldDispatchSummary, consumed_grant_id, dispatch_policy_from_graph,
@@ -79,15 +80,8 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board held dispatch delivery")
             .await?;
-        let (intent_id, payload_json) = query_as::<_, (String, String)>(
-            "SELECT intent_id, payload_json FROM task_board_dispatch_intents
-             WHERE item_id = ?1 AND status = 'held'",
-        )
-        .bind(board_item_id)
-        .fetch_optional(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("load held task board delivery: {error}")))?
-        .ok_or_else(|| held_conflict(board_item_id))?;
+        let (intent_id, payload_json) =
+            load_held_delivery(transaction.as_mut(), board_item_id).await?;
         let mut applied = decode_applied(&payload_json)?;
         let (mut item, revision) = load_item_in_tx(&mut transaction, board_item_id)
             .await?
@@ -95,13 +89,7 @@ impl AsyncDaemonDb {
         ensure_held_linkage(&applied, &item)?;
         let now = utc_now();
         let workspace = load_workspace_in_tx(&mut transaction).await?;
-        let switches = workspace.as_ref().map_or(
-            SpawnGateSwitches {
-                requires_live_policy: true,
-                kill_switch: false,
-            },
-            SpawnGateSwitches::from_workspace,
-        );
+        let switches = spawn_gate_switches(workspace.as_ref());
         let live_policy = workspace
             .as_ref()
             .and_then(|workspace| workspace.active_live_canvas())
@@ -137,12 +125,8 @@ impl AsyncDaemonDb {
         }
         let consumed_approval_grant_id = consumed_grant_id(grant.as_ref(), &decision);
         if let Some(grant_id) = consumed_approval_grant_id.as_deref() {
-            let consumed = consume_approval_grant_in_tx_at(
-                transaction.as_mut(),
-                grant_id,
-                &now,
-            )
-            .await?;
+            let consumed =
+                consume_approval_grant_in_tx_at(transaction.as_mut(), grant_id, &now).await?;
             if !consumed {
                 return Err(db_error(format!(
                     "approval grant expired or was consumed during delivery (grant '{grant_id}')"
@@ -187,6 +171,31 @@ impl AsyncDaemonDb {
             consumed_approval_grant_id,
         })
     }
+}
+
+async fn load_held_delivery(
+    connection: &mut SqliteConnection,
+    board_item_id: &str,
+) -> Result<(String, String), CliError> {
+    query_as::<_, (String, String)>(
+        "SELECT intent_id, payload_json FROM task_board_dispatch_intents
+         WHERE item_id = ?1 AND status = 'held'",
+    )
+    .bind(board_item_id)
+    .fetch_optional(connection)
+    .await
+    .map_err(|error| db_error(format!("load held task board delivery: {error}")))?
+    .ok_or_else(|| held_conflict(board_item_id))
+}
+
+fn spawn_gate_switches(workspace: Option<&PolicyCanvasWorkspace>) -> SpawnGateSwitches {
+    workspace.map_or(
+        SpawnGateSwitches {
+            requires_live_policy: true,
+            kill_switch: false,
+        },
+        SpawnGateSwitches::from_workspace,
+    )
 }
 
 fn held_conflict(board_item_id: &str) -> CliError {

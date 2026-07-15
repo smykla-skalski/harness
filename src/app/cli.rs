@@ -4,17 +4,12 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 use tracing::field::{Empty, display};
 
-use crate::agents::transport::AgentsCommand;
 use crate::app::command_context::{AppContext, Execute};
 use crate::create::{
     ApprovalBeginArgs, CreateBeginArgs, CreateResetArgs, CreateSaveArgs, CreateShowArgs,
     CreateValidateArgs,
 };
-use crate::daemon::bridge::BridgeCommand;
-use crate::daemon::transport::DaemonCommand;
-use crate::errors::CliError;
-use crate::hooks::{self, HookArgs};
-use crate::mcp::McpCommand;
+use crate::errors::{CliError, CliErrorKind};
 use crate::observe::ObserveArgs;
 use crate::run::{
     ApplyArgs, CaptureArgs, CloseoutArgs, ClusterCheckArgs, DiffArgs, DoctorArgs, EnvoyArgs,
@@ -23,12 +18,11 @@ use crate::run::{
     ValidateArgs,
 };
 use crate::session::transport::SessionCommand;
-use crate::setup::{
-    BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs, PreCompactArgs, SecretsArgs,
-    SessionStartArgs, SessionStopArgs,
-};
+use crate::setup::{BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs, SecretsArgs};
 use crate::task_board::transport::TaskBoardCommand;
 use crate::telemetry::{current_trace_id, runtime_service_from_current_process};
+
+use super::worker_routes::{BridgeRoute, DaemonRoute};
 
 /// Harness CLI.
 #[derive(Debug, Parser)]
@@ -99,9 +93,6 @@ pub enum SetupCommand {
 #[derive(Debug, Subcommand)]
 #[non_exhaustive]
 pub enum Command {
-    /// Run a harness hook for a skill.
-    Hook(HookArgs),
-
     /// Suite:run commands grouped by domain.
     Run {
         #[command(subcommand)]
@@ -119,24 +110,6 @@ pub enum Command {
         #[command(subcommand)]
         command: SetupCommand,
     },
-
-    /// Shared harness-managed agent lifecycle commands.
-    Agents {
-        #[command(subcommand)]
-        command: AgentsCommand,
-    },
-
-    /// Handle session start hook.
-    #[command(hide = true)]
-    SessionStart(SessionStartArgs),
-
-    /// Handle session stop cleanup.
-    #[command(hide = true)]
-    SessionStop(SessionStopArgs),
-
-    /// Save compact handoff before compaction.
-    #[command(hide = true)]
-    PreCompact(PreCompactArgs),
 
     /// Observe and classify harness-managed agent session logs.
     Observe(Box<ObserveArgs>),
@@ -156,19 +129,13 @@ pub enum Command {
     /// Local daemon for the Harness app.
     Daemon {
         #[command(subcommand)]
-        command: DaemonCommand,
+        command: DaemonRoute,
     },
 
     /// Supervise host capabilities for sandboxed Codex and terminal agent flows.
     Bridge {
         #[command(subcommand)]
-        command: BridgeCommand,
-    },
-
-    /// Model Context Protocol server for driving the Harness Monitor app.
-    Mcp {
-        #[command(subcommand)]
-        command: McpCommand,
+        command: BridgeRoute,
     },
 }
 
@@ -177,48 +144,44 @@ pub enum Command {
 /// # Errors
 /// Returns `CliError` when the selected command fails.
 pub fn dispatch(command: &Command) -> Result<i32, CliError> {
-    #[cfg(target_os = "macos")]
-    {
-        use crate::sandbox::migration::run_startup_migration;
-        run_startup_migration();
+    if !matches!(command, Command::Daemon { .. } | Command::Bridge { .. }) {
+        super::run_startup_migrations();
     }
 
     let ctx = AppContext::production();
     match command {
-        Command::Hook(_) => unreachable!("hooks are handled separately"),
         Command::Run { command } => dispatch_run(&ctx, command),
         Command::Create { command } => dispatch_create(&ctx, command),
         Command::Setup { command } => dispatch_setup(&ctx, command),
-        Command::Agents { command } => command.execute(&ctx),
-        Command::SessionStart(args) => args.execute(&ctx),
-        Command::SessionStop(args) => args.execute(&ctx),
-        Command::PreCompact(args) => args.execute(&ctx),
         Command::Observe(args) => args.execute(&ctx),
         Command::Session { command } => command.execute(&ctx),
         Command::TaskBoard { command } => command.execute(&ctx),
-        Command::Daemon { command } => command.execute(&ctx),
-        Command::Bridge { command } => command.execute(&ctx),
-        Command::Mcp { command } => command.execute(&ctx),
+        Command::Daemon { .. } => delegate("daemon", "harness-daemon"),
+        Command::Bridge { .. } => delegate("bridge", "harness-bridge"),
     }
 }
 
 fn command_name(command: &Command) -> &'static str {
     match command {
-        Command::Hook(_) => "hook",
         Command::Run { .. } => "run",
         Command::Create { .. } => "create",
         Command::Setup { .. } => "setup",
-        Command::Agents { .. } => "agents",
-        Command::SessionStart(_) => "session-start",
-        Command::SessionStop(_) => "session-stop",
-        Command::PreCompact(_) => "pre-compact",
         Command::Observe(_) => "observe",
         Command::Session { .. } => "session",
         Command::TaskBoard { .. } => "task-board",
         Command::Daemon { .. } => "daemon",
         Command::Bridge { .. } => "bridge",
-        Command::Mcp { .. } => "mcp",
     }
+}
+
+fn delegate(route: &str, worker: &str) -> Result<i32, CliError> {
+    let args = harness_command::routed_args(route).map_err(|error| worker_error(&error))?;
+    harness_command::exec_worker(worker, env!("CARGO_PKG_VERSION"), args)
+        .map_err(|error| worker_error(&error))
+}
+
+fn worker_error(error: &harness_command::WorkerError) -> CliError {
+    CliErrorKind::workflow_io(error.to_string()).into()
 }
 
 fn dispatch_run(ctx: &AppContext, command: &RunCommand) -> Result<i32, CliError> {
@@ -304,10 +267,7 @@ fn record_trace_id(span: &tracing::Span) {
 }
 
 fn command_exit_code(command: &Command) -> Result<i32, CliError> {
-    match command {
-        Command::Hook(args) => Ok(hooks::run_hook_command(args.agent, &args.skill, &args.hook)),
-        other => dispatch(other),
-    }
+    dispatch(command)
 }
 
 #[cfg(test)]

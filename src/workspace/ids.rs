@@ -34,4 +34,5 @@ fn is_canonical_lowercase_uuid(id: &str) -> bool {
 }
 
 #[cfg(test)]
+#[path = "ids/tests.rs"]
 mod tests;

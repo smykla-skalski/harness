@@ -160,7 +160,7 @@ fn write_doctor_project(project_dir: &Path, legacy_lifecycle: bool) {
             r#"{{"hooks":{{"SessionStart":[{{"hooks":[{{"type":"command","command":"{session_start}"}}]}}]}}}}"#
         )
     } else {
-        r#"{"hooks":{"PreCompact":[{"hooks":[{"type":"command","command":"harness pre-compact --project-dir \"$CLAUDE_PROJECT_DIR\""}]}],"SessionStart":[{"hooks":[{"type":"command","command":"harness agents session-start --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""}]}],"Stop":[{"hooks":[{"type":"command","command":"harness agents session-stop --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""}]}]}}"#
+        r#"{"hooks":{"PreCompact":[{"hooks":[{"type":"command","command":"harness-hook pre-compact --project-dir \"$CLAUDE_PROJECT_DIR\""}]}],"SessionStart":[{"hooks":[{"type":"command","command":"harness-hook session-start --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""}]}],"Stop":[{"hooks":[{"type":"command","command":"harness-hook session-stop --agent claude --project-dir \"$CLAUDE_PROJECT_DIR\""}]}]}}"#
             .to_string()
     };
     fs::write(hooks_dir.join("hooks.json"), hooks_json).unwrap();

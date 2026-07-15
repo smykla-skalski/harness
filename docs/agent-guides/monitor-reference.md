@@ -376,15 +376,14 @@ WebSocket path. For an isolated runtime lane, prefix daemon and bridge commands 
 `HARNESS_MONITOR_RUNTIME_LANE=<name>`. For isolated CLI builds/tests, use
 `HARNESS_MONITOR_BUILD_LANE=<name>`.
 
-Debug the dev daemon with `lldb -- harness daemon dev` or
-`cargo run --bin harness -- daemon dev`. The scheme sets
+Debug the dev daemon with `lldb -- harness-daemon dev`. The scheme sets
 `HARNESS_MONITOR_EXTERNAL_DAEMON=1` and a 60s warm-up timeout. Starting the app
 before the daemon also works; the manifest watcher reconnects on first manifest
 write. Production builds can also switch future launches to external mode in
 **Settings > General > Startup daemon mode**, or by setting
 `HARNESS_MONITOR_EXTERNAL_DAEMON=1` before launch.
 
-If a `harness bridge start` process is already running for the same runtime
+If a `harness-bridge start` process is already running for the same runtime
 lane, stop it before using dev mode unless you are intentionally testing the
 WebSocket bridge path. In sandboxed production builds, keep external daemons in
 an app-group-accessible runtime root by using `HARNESS_MONITOR_RUNTIME_LANE`,
@@ -401,7 +400,7 @@ port env.
 
 Codex threads inside Agents use WebSocket transport when sandboxed. The daemon
 connects to a Codex capability published by the unified host bridge. Users start
-the bridge with `harness bridge start` or install it as a login item with
+the bridge with `harness-bridge start` or install it as a login item with
 `harness bridge install-launch-agent`. The bridge publishes capability state in
 the daemon manifest; the Monitor app and daemon use that state to reconfigure
 and surface recovery hints.

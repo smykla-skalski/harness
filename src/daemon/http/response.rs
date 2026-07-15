@@ -34,7 +34,7 @@ pub(crate) fn error_status_and_body(error: &CliError) -> (StatusCode, serde_json
             serde_json::json!({
                 "error": "codex-unavailable",
                 "endpoint": endpoint,
-                "hint": "run: harness bridge start",
+                "hint": "run: harness-bridge start",
             }),
         );
     }

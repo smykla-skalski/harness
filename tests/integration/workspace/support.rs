@@ -31,9 +31,13 @@ pub fn harness_binary() -> PathBuf {
     assert_cmd::cargo::cargo_bin("harness")
 }
 
+fn daemon_binary() -> PathBuf {
+    assert_cmd::cargo::cargo_bin("harness-daemon")
+}
+
 pub fn spawn_daemon_serve(home: &Path, xdg: &Path) -> super::super::helpers::ManagedChild {
-    let mut cmd = Command::new(harness_binary());
-    cmd.args(["daemon", "serve", "--host", "127.0.0.1", "--port", "0"])
+    let mut cmd = Command::new(daemon_binary());
+    cmd.args(["serve", "--host", "127.0.0.1", "--port", "0"])
         .env("HARNESS_HOST_HOME", home)
         .env("HOME", home)
         .env("XDG_DATA_HOME", xdg)

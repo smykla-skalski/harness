@@ -62,7 +62,7 @@ mod routes_tasks_agents_voice;
 mod tests;
 #[cfg(test)]
 mod tests_reviews_parity;
-pub mod ws_methods;
+pub use harness_protocol::daemon::ws_methods;
 
 pub use routes::HTTP_API_CONTRACT;
 

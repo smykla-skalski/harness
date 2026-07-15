@@ -8,7 +8,7 @@ use crate::session::types::{
     SessionState, SessionStatus,
 };
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::{broadcast, mpsc};
 
 #[test]
@@ -143,12 +143,15 @@ async fn spawn_event_forwarder_persists_live_acp_batches_to_db() {
         db.sync_session(&sample_project().project_id, &sample_session_state())
             .expect("sync session");
     }
+    let db_slot = Arc::new(OnceLock::new());
+    assert!(db_slot.set(Arc::clone(&db)).is_ok());
+    let manager = AcpAgentManagerHandle::new(sender.clone(), db_slot);
 
     let task = spawn_event_forwarder(
         sender,
         rx,
         Some(LiveEventPersistence::new(
-            Arc::clone(&db),
+            manager.live_event_port(),
             "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
             "gemini-worker",
             "gemini",

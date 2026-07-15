@@ -6,14 +6,14 @@ use crate::session::storage as session_storage;
 use crate::session::types::{AgentStatus, SessionRole, SessionStatus, TaskStatus};
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus};
 
+use super::super::completion_evidence::record_clean_worktree_baseline;
+use super::super::worker::CodexRunWorker;
 use super::durable_run_request;
 use super::test_support::{
     assert_worker_checkpoint, codex_run_snapshot, controller_with_async_session_state,
     controller_with_session_state, sample_session_state_with_open_task,
     sample_session_state_with_open_task_and_codex_agent, with_isolated_async_harness_env,
 };
-use super::super::completion_evidence::record_clean_worktree_baseline;
-use super::super::worker::CodexRunWorker;
 
 const SESSION_ID: &str = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
 
@@ -86,19 +86,23 @@ async fn registration_mirrors_worker_assignment_to_session_file() {
         let (controller, _db, tempdir) =
             controller_with_async_session_state(sample_session_state_with_open_task()).await;
         let agent_id = register_bound_worker(&controller);
-        let layout = session_storage::layout_from_project_dir(
-            &tempdir.path().join("project"),
-            SESSION_ID,
-        )
-        .expect("session layout");
+        let layout =
+            session_storage::layout_from_project_dir(&tempdir.path().join("project"), SESSION_ID)
+                .expect("session layout");
 
         let state = session_storage::load_state(&layout)
             .expect("load mirrored session")
             .expect("mirrored session state");
         assert_eq!(state.agents.len(), 1);
-        assert_eq!(state.agents[&agent_id].current_task_id.as_deref(), Some("task-1"));
+        assert_eq!(
+            state.agents[&agent_id].current_task_id.as_deref(),
+            Some("task-1")
+        );
         assert_eq!(state.tasks["task-1"].status, TaskStatus::InProgress);
-        assert_eq!(state.tasks["task-1"].assigned_to.as_deref(), Some(agent_id.as_str()));
+        assert_eq!(
+            state.tasks["task-1"].assigned_to.as_deref(),
+            Some(agent_id.as_str())
+        );
     })
     .await;
 }
@@ -108,14 +112,11 @@ async fn registration_mirror_failure_rolls_back_agent_and_task_assignment() {
     with_isolated_async_harness_env(|_| async move {
         let (controller, db, tempdir) =
             controller_with_async_session_state(sample_session_state_with_open_task()).await;
-        let layout = session_storage::layout_from_project_dir(
-            &tempdir.path().join("project"),
-            SESSION_ID,
-        )
-        .expect("session layout");
+        let layout =
+            session_storage::layout_from_project_dir(&tempdir.path().join("project"), SESSION_ID)
+                .expect("session layout");
         fs_err::remove_dir_all(layout.session_root()).expect("remove session mirror root");
-        fs_err::write(layout.session_root(), "not a directory")
-            .expect("block session mirror root");
+        fs_err::write(layout.session_root(), "not a directory").expect("block session mirror root");
         let mut request = durable_run_request();
         request.task_id = Some("task-1".into());
 
@@ -140,24 +141,16 @@ async fn registration_mirror_failure_rolls_back_new_binding_only() {
     with_isolated_async_harness_env(|_| async move {
         let initial = sample_session_state_with_open_task_and_codex_agent();
         let (controller, db, tempdir) = controller_with_async_session_state(initial).await;
-        let layout = session_storage::layout_from_project_dir(
-            &tempdir.path().join("project"),
-            SESSION_ID,
-        )
-        .expect("session layout");
+        let layout =
+            session_storage::layout_from_project_dir(&tempdir.path().join("project"), SESSION_ID)
+                .expect("session layout");
         fs_err::remove_dir_all(layout.session_root()).expect("remove session mirror root");
-        fs_err::write(layout.session_root(), "not a directory")
-            .expect("block session mirror root");
+        fs_err::write(layout.session_root(), "not a directory").expect("block session mirror root");
 
         let mut request = durable_run_request();
         request.task_id = Some("task-1".into());
         controller
-            .register_orchestration_agent(
-                SESSION_ID,
-                "codex-run-1",
-                &request,
-                "Codex Worker",
-            )
+            .register_orchestration_agent(SESSION_ID, "codex-run-1", &request, "Codex Worker")
             .expect_err("session mirror failure must fail existing-agent binding");
 
         let resolved = db
@@ -258,8 +251,7 @@ async fn completed_bound_run_advances_linked_board_item() {
         harness_testkit::init_git_repo_with_seed(worktree.path());
         run.project_dir = worktree.path().display().to_string();
         record_clean_worktree_baseline(&mut run);
-        fs_err::write(worktree.path().join("implemented.txt"), "done\n")
-            .expect("change worktree");
+        fs_err::write(worktree.path().join("implemented.txt"), "done\n").expect("change worktree");
 
         controller
             .sync_orchestration_status_for_run(&run)
@@ -362,9 +354,8 @@ async fn blocked_final_without_work_fails_run_and_does_not_advance_board() {
         run.board_item_id = Some("board-1".into());
         run.session_agent_id = Some(agent_id);
         run.project_dir = worktree.path().display().to_string();
-        run.final_message = Some(
-            "Blocked by the execution environment: every command fails before launch.".into(),
-        );
+        run.final_message =
+            Some("Blocked by the execution environment: every command fails before launch.".into());
         record_clean_worktree_baseline(&mut run);
         let (_control, control_rx) = mpsc::unbounded_channel();
         let mut worker = CodexRunWorker::new(controller, run, control_rx);
@@ -393,11 +384,9 @@ async fn blocked_final_without_work_fails_run_and_does_not_advance_board() {
             .expect("load session")
             .expect("session");
         assert_eq!(session.state.tasks["task-1"].status, TaskStatus::Blocked);
-        let layout = session_storage::layout_from_project_dir(
-            &tempdir.path().join("project"),
-            SESSION_ID,
-        )
-        .expect("session layout");
+        let layout =
+            session_storage::layout_from_project_dir(&tempdir.path().join("project"), SESSION_ID)
+                .expect("session layout");
         let mirrored = session_storage::load_state(&layout)
             .expect("load mirrored failed session")
             .expect("mirrored failed session");

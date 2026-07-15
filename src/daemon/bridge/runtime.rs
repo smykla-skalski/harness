@@ -80,7 +80,7 @@ pub(super) fn matches_running_config(config: &ResolvedBridgeConfig) -> Result<bo
 pub(super) fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, CliError> {
     state::ensure_daemon_dirs()?;
     // Acquire the bridge lock BEFORE unlinking the socket so a racing second
-    // `harness bridge start` cannot unlink the live socket of the first
+    // `harness-bridge start` cannot unlink the live socket of the first
     // instance before failing its own lock acquisition.
     let _bridge_lock = acquire_bridge_lock_exclusive()?;
     tracing::info!(path = %bridge_lock_path().display(), "bridge lock acquired");

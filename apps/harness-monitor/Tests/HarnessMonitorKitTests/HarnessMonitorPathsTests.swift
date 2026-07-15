@@ -145,7 +145,7 @@ struct HarnessMonitorPathsTests {
       HARNESS_DAEMON_DATA_HOME='\(expectedRoot.path)' \
       HARNESS_CODEX_WS_PORT='\(expectedPort!)'
       """
-    let expectedCommand = "\(expectedPrefix) harness bridge start"
+    let expectedCommand = "\(expectedPrefix) harness-bridge start"
 
     #expect(expectedPort != nil)
     #expect(
@@ -153,7 +153,7 @@ struct HarnessMonitorPathsTests {
         == expectedPrefix
     )
     #expect(
-      HarnessMonitorPaths.shellCommand("harness bridge start", using: environment)
+      HarnessMonitorPaths.shellCommand("harness-bridge start", using: environment)
         == expectedCommand
     )
   }

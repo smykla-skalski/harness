@@ -1,11 +1,10 @@
-use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::agents::acp::catalog::{AcpAgentDescriptor, AcpSpawnConfiguration};
 use crate::agents::acp::connection::SpawnConfig;
 use crate::agents::runtime::{AgentRuntime, runtime_for_name};
 use crate::daemon::agent_acp::protocol::AcpSessionRequestConfig;
-use crate::daemon::state::task_board_openrouter_token;
+use crate::daemon::agent_acp::spawn_credential::SpawnCredential;
 use crate::errors::{CliError, CliErrorKind};
 
 const OPENROUTER_DESCRIPTOR_ID: &str = "openrouter";
@@ -14,6 +13,7 @@ pub(super) fn build_spawn_config(
     descriptor: &AcpAgentDescriptor,
     session_config: &AcpSessionRequestConfig,
     project_dir: &Path,
+    openrouter_token: Option<&str>,
 ) -> Result<SpawnConfig, CliError> {
     let runtime = resolve_spawn_runtime(descriptor)?;
     let model = session_config.requested_model();
@@ -40,7 +40,7 @@ pub(super) fn build_spawn_config(
     if !session_config.effort_via_session() {
         push_effort_args(&mut args, runtime, effort);
     }
-    args.extend(descriptor_credential_args(descriptor)?);
+    validate_descriptor_credential(descriptor, openrouter_token)?;
     let env_overrides = effort_env_overrides(session_config, runtime, effort);
 
     Ok(SpawnConfig {
@@ -52,66 +52,44 @@ pub(super) fn build_spawn_config(
     })
 }
 
-/// Append per-descriptor secret arguments. Today only the `OpenRouter` shim
-/// needs one (`--api-key-file PATH`); other catalog entries expect zero extra
-/// args. The shim reads the file immediately and unlinks it, so the credential
-/// never lives on disk longer than one `stat()` interval.
-fn descriptor_credential_args(descriptor: &AcpAgentDescriptor) -> Result<Vec<String>, CliError> {
+/// Create the one-shot credential only after process-pool reuse is ruled out.
+pub(super) fn prepare_spawn_credential(
+    spawn: &mut SpawnConfig,
+    descriptor: &AcpAgentDescriptor,
+    openrouter_token: Option<&str>,
+) -> Result<Option<SpawnCredential>, CliError> {
+    validate_descriptor_credential(descriptor, openrouter_token)?;
     if descriptor.id.as_str() != OPENROUTER_DESCRIPTOR_ID {
-        return Ok(Vec::new());
+        return Ok(None);
     }
-    let token = task_board_openrouter_token().ok_or_else(|| {
-        CliErrorKind::workflow_io(
-            "OpenRouter API key is not configured. Set it via Harness Monitor → Settings → OpenRouter or run `harness setup secrets set --kind openrouter`.",
-        )
-    })?;
-    let path = write_openrouter_api_key_file(&token)?;
-    Ok(vec![
-        "--api-key-file".to_string(),
-        path.display().to_string(),
-    ])
+    let credential = SpawnCredential::openrouter(openrouter_token.expect("validated token"))?;
+    spawn.args.push("--api-key-file".to_string());
+    spawn.args.push(credential.path().display().to_string());
+    Ok(Some(credential))
 }
 
-/// Write the `OpenRouter` API key into a mode-0600 file inside a freshly-created
-/// per-spawn random tempdir. The shim unlinks the file at startup. The
-/// surrounding directory lingers until the OS or daemon shutdown sweeps it,
-/// which is acceptable because the secret itself is gone after the unlink.
-fn write_openrouter_api_key_file(token: &str) -> Result<PathBuf, CliError> {
-    let dir = tempfile::Builder::new()
-        .prefix("harness-openrouter-")
-        .tempdir()
-        .map_err(|err| {
-            CliErrorKind::workflow_io(format!("create openrouter credential tempdir: {err}"))
-        })?;
-    let dir_path = dir.keep();
-    let file_path = dir_path.join("api-key");
-    write_credential_bytes(&file_path, token).map_err(|err| {
-        CliErrorKind::workflow_io(format!(
-            "write openrouter credential file `{}`: {err}",
-            file_path.display()
-        ))
-    })?;
-    Ok(file_path)
-}
-
-#[cfg(unix)]
-fn write_credential_bytes(path: &Path, token: &str) -> io::Result<()> {
-    use std::fs::OpenOptions;
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-    let mut file = OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .mode(0o600)
-        .open(path)?;
-    file.write_all(token.as_bytes())?;
-    file.sync_all()
-}
-
-#[cfg(not(unix))]
-fn write_credential_bytes(path: &Path, token: &str) -> io::Result<()> {
-    use std::fs;
-    fs::write(path, token)
+fn validate_descriptor_credential(
+    descriptor: &AcpAgentDescriptor,
+    openrouter_token: Option<&str>,
+) -> Result<(), CliError> {
+    if descriptor.id.as_str() != OPENROUTER_DESCRIPTOR_ID {
+        return openrouter_token.map_or(Ok(()), |_| {
+            Err(CliErrorKind::workflow_parse(format!(
+                "OpenRouter credential cannot be used with ACP descriptor '{}'",
+                descriptor.id
+            ))
+            .into())
+        });
+    }
+    openrouter_token.map_or_else(
+        || {
+            Err(CliErrorKind::workflow_io(
+                "OpenRouter API key is not configured. Set it via Harness Monitor → Settings → OpenRouter or run `harness setup secrets set --kind openrouter`.",
+            )
+            .into())
+        },
+        |_| Ok(()),
+    )
 }
 
 fn push_model_args(
@@ -239,7 +217,7 @@ mod tests {
             ..AcpAgentStartRequest::default()
         };
         let session_config = AcpSessionRequestConfig::from_request(&request, &descriptor);
-        let spawn = build_spawn_config(&descriptor, &session_config, Path::new("/tmp"))
+        let spawn = build_spawn_config(&descriptor, &session_config, Path::new("/tmp"), None)
             .expect("build spawn config");
 
         assert_eq!(spawn.args, vec!["--acp"]);
@@ -260,7 +238,7 @@ mod tests {
             ..AcpAgentStartRequest::default()
         };
         let session_config = AcpSessionRequestConfig::from_request(&request, &descriptor);
-        let spawn = build_spawn_config(&descriptor, &session_config, Path::new("/tmp"))
+        let spawn = build_spawn_config(&descriptor, &session_config, Path::new("/tmp"), None)
             .expect("build spawn config");
 
         assert_eq!(
@@ -290,22 +268,86 @@ mod tests {
             ..AcpAgentStartRequest::default()
         };
         let session_config = AcpSessionRequestConfig::from_request(&request, &descriptor);
-        let error = build_spawn_config(&descriptor, &session_config, Path::new("/tmp"))
+        let error = build_spawn_config(&descriptor, &session_config, Path::new("/tmp"), None)
             .expect_err("missing model delivery path should fail");
 
         assert!(format!("{error}").contains("model delivery path"));
     }
 
     #[test]
-    fn descriptor_credential_args_empty_for_non_openrouter_descriptors() {
+    fn descriptor_credential_is_absent_for_non_openrouter_descriptors() {
         for id in ["claude", "codex", "copilot", "gemini"] {
             let descriptor = descriptor(id);
-            let args = descriptor_credential_args(&descriptor)
+            let mut spawn = SpawnConfig {
+                command: descriptor.launch_command.clone(),
+                args: descriptor.launch_args.clone(),
+                env_passthrough: Vec::new(),
+                env_overrides: Vec::new(),
+                working_dir: Path::new("/tmp").to_path_buf(),
+            };
+            let credential = prepare_spawn_credential(&mut spawn, &descriptor, None)
                 .expect("non-openrouter descriptors never need credentials");
-            assert!(
-                args.is_empty(),
-                "descriptor `{id}` unexpectedly produced credential args: {args:?}"
+            assert!(credential.is_none());
+            assert_eq!(spawn.args, vec!["--acp"]);
+        }
+    }
+
+    #[test]
+    fn openrouter_credential_is_written_to_a_private_request_scoped_file() {
+        let descriptor = descriptor(OPENROUTER_DESCRIPTOR_ID);
+        let request = AcpAgentStartRequest::default();
+        let session_config = AcpSessionRequestConfig::from_request(&request, &descriptor);
+        let mut spawn = build_spawn_config(
+            &descriptor,
+            &session_config,
+            Path::new("/tmp"),
+            Some("sk-request-scoped"),
+        )
+        .expect("build spawn config");
+        assert_eq!(spawn.args, vec!["--acp"]);
+
+        let credential =
+            prepare_spawn_credential(&mut spawn, &descriptor, Some("sk-request-scoped"))
+                .expect("OpenRouter credential")
+                .expect("credential guard");
+        assert_eq!(spawn.args.first().map(String::as_str), Some("--acp"));
+        assert_eq!(
+            spawn.args.get(1).map(String::as_str),
+            Some("--api-key-file")
+        );
+
+        let credential_path =
+            std::path::PathBuf::from(spawn.args.get(2).expect("credential path argument"));
+        assert_eq!(
+            std::fs::read_to_string(&credential_path).expect("read credential"),
+            "sk-request-scoped"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            assert_eq!(
+                std::fs::metadata(&credential_path)
+                    .expect("credential metadata")
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o600
             );
         }
+        let parent = credential_path
+            .parent()
+            .expect("credential parent")
+            .to_path_buf();
+        drop(credential);
+        assert!(!credential_path.exists());
+        assert!(!parent.exists());
+    }
+
+    #[test]
+    fn openrouter_credential_is_rejected_for_other_descriptors() {
+        let error = validate_descriptor_credential(&descriptor("claude"), Some("must-not-leak"))
+            .expect_err("credential must be descriptor-scoped");
+        assert_eq!(error.code(), "WORKFLOW_PARSE");
+        assert!(!format!("{error:?}").contains("must-not-leak"));
     }
 }

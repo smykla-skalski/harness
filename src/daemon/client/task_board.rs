@@ -2,8 +2,8 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::daemon::protocol::{
-    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
+    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
     PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,

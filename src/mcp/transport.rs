@@ -1,4 +1,4 @@
-//! CLI subcommand entry points for `harness mcp ...`.
+//! CLI subcommand entry points for `harness-mcp ...`.
 
 #[cfg(target_os = "macos")]
 use std::io;
@@ -32,7 +32,7 @@ impl Execute for McpCommand {
     }
 }
 
-/// Options for `harness mcp serve`.
+/// Options for `harness-mcp serve`.
 #[derive(Debug, Clone, Args)]
 pub struct McpServeArgs {
     /// Override the accessibility registry socket path. Normally inferred
@@ -50,7 +50,7 @@ impl Execute for McpServeArgs {
     #[cfg(not(target_os = "macos"))]
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
         Err(CliError::from(CliErrorKind::workflow_io(
-            "harness mcp serve requires macOS (uses CGEvent-backed input \
+            "harness-mcp serve requires macOS (uses CGEvent-backed input \
              helpers and the Harness Monitor app-group socket)",
         )))
     }
@@ -112,27 +112,27 @@ mod transport_tests {
     use clap::Parser;
 
     use super::{McpCommand, McpServeArgs};
-    use crate::app::cli::{Cli, Command};
+
+    #[derive(Debug, Parser)]
+    #[command(name = "harness-mcp")]
+    struct TestCli {
+        #[command(subcommand)]
+        command: McpCommand,
+    }
 
     #[test]
     fn cli_parses_harness_mcp_serve_with_socket_override() {
         let cli =
-            Cli::try_parse_from(["harness", "mcp", "serve", "--socket", "/tmp/override.sock"])
+            TestCli::try_parse_from(["harness-mcp", "serve", "--socket", "/tmp/override.sock"])
                 .expect("parse");
-        let McpCommand::Serve(args) = match cli.command {
-            Command::Mcp { command } => command,
-            other => panic!("expected Mcp command, got {other:?}"),
-        };
+        let McpCommand::Serve(args) = cli.command;
         assert_eq!(args.socket, Some(PathBuf::from("/tmp/override.sock")));
     }
 
     #[test]
     fn cli_parses_harness_mcp_serve_without_socket() {
-        let cli = Cli::try_parse_from(["harness", "mcp", "serve"]).expect("parse");
-        let McpCommand::Serve(args) = match cli.command {
-            Command::Mcp { command } => command,
-            other => panic!("expected Mcp command, got {other:?}"),
-        };
+        let cli = TestCli::try_parse_from(["harness-mcp", "serve"]).expect("parse");
+        let McpCommand::Serve(args) = cli.command;
         assert!(args.socket.is_none());
     }
 

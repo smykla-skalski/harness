@@ -100,7 +100,7 @@ mod tests {
 
     use super::super::DEFAULT_COLS;
     use super::super::DEFAULT_ROWS;
-    use super::super::model::AgentTuiStartRequest;
+    use super::super::model::{AgentTuiStartRequest, AgentTuiStartRequestExt};
     use crate::session::types::SessionRole;
 
     fn base_request(runtime: &str) -> AgentTuiStartRequest {

@@ -1,8 +1,7 @@
 //! Image-preview blob fetch endpoint.
 
-use serde::Deserialize;
-
 use crate::errors::{CliError, CliErrorKind};
+use crate::reviews::files::blob::BlobTextProjection;
 use crate::reviews::{
     ReviewImageMime, ReviewsFilesBlobRequest, ReviewsFilesBlobResponse, ReviewsGitHubClient,
     image_mime_for_path,
@@ -10,19 +9,6 @@ use crate::reviews::{
 use crate::workspace::utc_now;
 
 use super::token::{github_token, missing_token_error};
-
-/// Lightweight projection of one GraphQL blob fetch. Lives here (not on
-/// the client) so the handler can decode both text and base64-text bodies
-/// uniformly.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub(crate) struct BlobTextProjection {
-    #[serde(default)]
-    pub repository_full_name: Option<String>,
-    pub content_base64: String,
-    pub byte_size: u64,
-    pub is_truncated: bool,
-    pub is_too_large: bool,
-}
 
 /// Fetch an image blob's bytes for inline preview.
 ///

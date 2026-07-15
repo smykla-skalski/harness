@@ -1353,6 +1353,7 @@ const SKIP_TYPES: &[&str] = &[
     "RepoKey",
     "RegistryEntry",
     "LocalCloneRegistry",
+    "BlobTextProjection",
     // websocket probe/inspect push payloads still pending: WsRuntimeProbeUpdate wraps the
     // now-generated AcpRuntimeProbeResponse but has no decode reroute yet, and WsAcpInspect
     // references the still-unmigrated AcpAgentInspectResponse. WsConfigPayload itself is now
@@ -1450,6 +1451,7 @@ const TYPE_RENAMES: &[(&str, &str)] = &[
     // permission options as raw JSON) maps to JSONValue. Both tokens are acp-permission only.
     ("AcpPermissionBatchDecode", "AcpPermissionBatchWire"),
     ("PermissionOption", "JSONValue"),
+    ("AcpPermissionOption", "JSONValue"),
     // acp snapshot: AcpAgentSnapshotDecode emits as AcpAgentSnapshotWire, and its
     // pending_permission_batches: Vec<AcpPermissionBatch> field reference resolves to the
     // generated AcpPermissionBatchWire (the public AcpPermissionBatch has no derive).
@@ -1926,6 +1928,16 @@ const OMITTED_WIRE_FIELDS: &[(&str, &str)] = &[
     // lists (Vec<ExternalSyncField>, a daemon-only enum with no Swift mirror).
     ("ExternalSyncOperation", "changed_fields"),
     ("ExternalSyncOperation", "unsupported_fields"),
+    // task-board automation: the current Monitor hand models do not surface the daemon's v36
+    // workflow identity or automation settings yet. Keep their wire adapters on the existing app
+    // shape; JSONDecoder safely ignores these additional response keys.
+    ("TaskBoardItem", "workflow_kind"),
+    ("TaskBoardItem", "execution_repository"),
+    ("TaskBoardOrchestratorSettings", "scheduling"),
+    ("TaskBoardOrchestratorSettings", "retry"),
+    ("TaskBoardOrchestratorSettings", "reviewers"),
+    ("TaskBoardOrchestratorSettings", "repositories"),
+    ("TaskBoardOrchestratorSettings", "execution_hosts"),
 ];
 
 /// Whether `(struct_name, field_name)` is in `OMITTED_WIRE_FIELDS`.
@@ -2279,6 +2291,7 @@ const POLICY_STORE_SOURCE: &str = include_str!("../src/task_board/policy_graph/s
 const POLICY_SCENARIO_SOURCE: &str = include_str!("../src/task_board/policy_graph/scenario.rs");
 const POLICY_REPLAY_SOURCE: &str = include_str!("../src/task_board/policy_graph/replay.rs");
 const SUMMARIES_SOURCE: &str = include_str!("../src/daemon/protocol/summaries.rs");
+const SHARED_DAEMON_SOURCE: &str = include_str!("../crates/harness-protocol/src/daemon.rs");
 const HOOKS_PAYLOADS_SOURCE: &str = include_str!("../src/hooks/protocol/payloads.rs");
 const SUMMARIES_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SummariesWireTypes.generated.swift";
 /// summaries.rs is a 51-type mega-file whose session/observe/timeline/github
@@ -2390,12 +2403,22 @@ const GIT_IDENTITY_DEFAULTS_SOURCE: &str =
 const OPENROUTER_SOURCE: &str = include_str!("../src/daemon/protocol/openrouter_models.rs");
 const VOICE_SOURCE: &str = include_str!("../src/daemon/protocol/voice.rs");
 const AUDIT_SOURCE: &str = include_str!("../src/daemon/protocol/audit.rs");
-// agent_tui: mod.rs supplies the DEFAULT_ROWS/DEFAULT_COLS consts that the
-// start-request default fns resolve to (collected by the symbol table); model.rs
-// holds the snapshot/request types; screen.rs holds TerminalScreenSnapshot.
-const AGENT_TUI_MOD_SOURCE: &str = include_str!("../src/daemon/agent_tui/mod.rs");
-const AGENT_TUI_MODEL_SOURCE: &str = include_str!("../src/daemon/agent_tui/model.rs");
-const AGENT_TUI_SCREEN_SOURCE: &str = include_str!("../src/daemon/agent_tui/screen.rs");
+// The shared protocol package owns the managed terminal snapshot/request types
+// and their defaults. Runtime-only PTY behavior remains in daemon/agent_tui.
+const AGENT_TUI_MODEL_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/managed_agents/tui.rs");
+const AGENT_TUI_RUNTIME_MODEL_SOURCE: &str = include_str!("../src/daemon/agent_tui/model.rs");
+const AGENT_TUI_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentTuiWireTypes.generated.swift";
+const AGENT_TUI_EMIT_ONLY: &[&str] = &[
+    "TerminalScreenSnapshot",
+    "AgentTuiSize",
+    "AgentTuiLaunchProfile",
+    "AgentTuiStatus",
+    "AgentTuiStartRequest",
+    "AgentTuiResizeRequest",
+    "AgentTuiListResponse",
+    "AgentTuiSnapshot",
+];
 const AGENT_TUI_INPUT_SOURCE: &str = include_str!("../src/daemon/agent_tui/input_request.rs");
 const AGENT_TUI_INPUT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentTuiInputRequestWireTypes.generated.swift";
 // The agent-tui input request body (sendManagedAgentInput). The public AgentTuiInputRequest has
@@ -2461,6 +2484,15 @@ const REVIEWS_LOGIC_SOURCE: &str = include_str!("../src/reviews/logic.rs");
 // until those subsystems land. serde_json::Value -> JSONValue, the request's
 // trace_context is a String dict.
 const WEBSOCKET_SOURCE: &str = include_str!("../src/daemon/protocol/websocket.rs");
+const WEBSOCKET_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/WebSocketWireTypes.generated.swift";
+const WEBSOCKET_EMIT_ONLY: &[&str] = &[
+    "WsRequest",
+    "WsResponse",
+    "WsErrorPayload",
+    "WsPushEvent",
+    "WsChunkFrame",
+    "WsConfigPayload",
+];
 // session tasks: the WorkItem task-board core + its review-flow structs. Fully
 // self-contained (no imports; fields are primitives or in-file types). 10 structs
 // generate as *Wire (generate-only); the 6 closed enums (TaskSeverity/TaskStatus/
@@ -2565,7 +2597,9 @@ const POLICY_CANVAS_EMIT_ONLY: &[&str] = &[
     "PolicyCanvasWorkspaceResponse",
     "PolicyCanvasExportResponse",
 ];
-const ACP_PROBE_SOURCE: &str = include_str!("../src/agents/acp/probe.rs");
+const ACP_MODELS_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/managed_agents/acp/models.rs");
+const ACP_PROBE_SOURCE: &str = ACP_MODELS_SOURCE;
 const ACP_PROBE_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpProbeWireTypes.generated.swift";
 // The runtime-doctor probe response (probe.rs) backing /v1/runtimes/probe and the
 // MonitorConfiguration.runtimeProbe field. AcpAuthState is a closed single-word
@@ -2580,7 +2614,8 @@ const AGENT_PERSONA_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorK
 // keeps the try_from/untagged agents.rs types (AgentRegistration/AgentStatus) out of the
 // emit builders - the same file already parses for the session-state module.
 const AGENT_PERSONA_EMIT_ONLY: &[&str] = &["AgentPersona", "PersonaSymbol"];
-const RUNTIME_MODELS_SOURCE: &str = include_str!("../src/agents/runtime/models/mod.rs");
+const RUNTIME_MODELS_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/managed_agents/runtime_models.rs");
 const RUNTIME_MODELS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/RuntimeModelCatalogWireTypes.generated.swift";
 // The runtime model catalog (models/mod.rs) backing MonitorConfiguration.runtimeModels
 // and AcpAgentDescriptor.modelCatalog. RuntimeModelTier (fast/balanced/max) and EffortKind
@@ -2588,7 +2623,7 @@ const RUNTIME_MODELS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitor
 // with explicit snake_case raw values, so the wire references them bare; the effort_kind
 // default resolves to .none via the same-file defaults source.
 const RUNTIME_MODELS_EMIT_ONLY: &[&str] = &["RuntimeModelCatalog", "RuntimeModel"];
-const ACP_DESCRIPTOR_SOURCE: &str = include_str!("../src/agents/acp/catalog/mod.rs");
+const ACP_DESCRIPTOR_SOURCE: &str = ACP_MODELS_SOURCE;
 const ACP_DESCRIPTOR_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpAgentDescriptorWireTypes.generated.swift";
 // The acp agent descriptor (catalog/mod.rs) backing MonitorConfiguration.acpAgents. The
 // daemon-only spawn_configuration/session_configuration fields (their AcpSpawnConfiguration
@@ -2596,9 +2631,8 @@ const ACP_DESCRIPTOR_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitor
 // the allow-list need only emit the descriptor and its DoctorProbe; model_catalog reuses the
 // RuntimeModelCatalogWire and capabilities is the CapabilityTag = String alias (TYPE_RENAMES).
 const ACP_DESCRIPTOR_EMIT_ONLY: &[&str] = &["AcpAgentDescriptor", "DoctorProbe"];
-const ACP_INSPECT_MANAGER_SOURCE: &str = include_str!("../src/daemon/agent_acp/manager.rs");
 const ACP_INSPECT_WIRE_SOURCE: &str =
-    include_str!("../src/daemon/agent_acp/manager/snapshot_wire.rs");
+    include_str!("../crates/harness-protocol/src/managed_agents/acp/snapshot_wire.rs");
 const ACP_INSPECT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpInspectWireTypes.generated.swift";
 // The acp inspect response backing /v1/managed-agents/acp/inspect. The rich AcpAgentSnapshot
 // /AcpAgentInspectSnapshot carry NO serde derive (borrowed-serialize optimization), so the
@@ -2606,13 +2640,12 @@ const ACP_INSPECT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit
 // emit THAT under the AcpAgentInspectSnapshotWire name (TYPE_RENAMES) and rename the response's
 // `AcpAgentInspectSnapshot` field reference to it. managed_agent_family (ManagedAgentKind) is
 // dropped via OMITTED_WIRE_FIELDS (the hand snapshot does not model it), so the only deps are
-// primitives. available's default_acp_inspect_available -> true resolves from the manager source.
+// primitives. available's default_acp_inspect_available -> true resolves from models.rs.
 const ACP_INSPECT_EMIT_ONLY: &[&str] =
     &["AcpAgentInspectResponse", "AcpAgentInspectSnapshotDecode"];
-const ACP_PERMISSION_ITEM_SOURCE: &str =
-    include_str!("../src/daemon/agent_acp/permission_bridge.rs");
+const ACP_PERMISSION_ITEM_SOURCE: &str = ACP_MODELS_SOURCE;
 const ACP_PERMISSION_WIRE_SOURCE: &str =
-    include_str!("../src/daemon/agent_acp/permission_bridge/wire.rs");
+    include_str!("../crates/harness-protocol/src/managed_agents/acp/permission_wire.rs");
 const ACP_PERMISSION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpPermissionWireTypes.generated.swift";
 // The acp permission batch/item carried by AcpAgentSnapshot.pending_permission_batches. The
 // public AcpPermissionBatch has no serde derive (borrowed-serialize), so its owned
@@ -2633,12 +2666,12 @@ const ACP_SNAPSHOT_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKi
 // plus the disconnect reason/stderr_tail the daemon nests in the status object.
 const ACP_SNAPSHOT_EMIT_ONLY: &[&str] = &["AcpAgentSnapshotDecode"];
 const ACP_START_REQUEST_SOURCE: &str =
-    include_str!("../src/daemon/agent_acp/manager/request_wire.rs");
+    include_str!("../crates/harness-protocol/src/managed_agents/acp/request_wire.rs");
 const ACP_START_REQUEST_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AcpAgentStartRequestWireTypes.generated.swift";
 // The acp managed-agent start request body. The public AcpAgentStartRequest has no serde derive
 // (hand Serialize/Deserialize via proxy structs); its owned AcpAgentStartRequestDecode carries
 // the derive and emits as AcpAgentStartRequestWire. descriptor_id maps to the hand `agent` field;
-// role defaults via default_acp_role (resolved from manager.rs).
+// role defaults via default_acp_role (resolved from models.rs).
 const ACP_START_REQUEST_EMIT_ONLY: &[&str] = &["AcpAgentStartRequestDecode"];
 const MANAGED_AGENTS_SOURCE: &str = include_str!("../src/daemon/protocol/managed_agents.rs");
 const MANAGED_AGENTS_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/ManagedAgentSnapshotWireTypes.generated.swift";
@@ -2668,7 +2701,9 @@ const DAEMON_STATE_EMIT_ONLY: &[&str] = &[
     "DaemonDiagnostics",
     "LaunchAgentStatus",
 ];
-const SESSION_SIGNAL_SOURCE: &str = include_str!("../src/agents/runtime/signal/mod.rs");
+const SHARED_AGENT_MODELS_SOURCE: &str =
+    include_str!("../crates/harness-protocol/src/agent_models.rs");
+const SESSION_SIGNAL_SOURCE: &str = SHARED_AGENT_MODELS_SOURCE;
 const SESSION_EVENTS_SOURCE: &str = include_str!("../src/session/types/events.rs");
 const SESSION_SIGNAL_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionSignalWireTypes.generated.swift";
 // The session signal record (events.rs SessionSignalRecord) + the runtime signal cluster it nests
@@ -2685,7 +2720,7 @@ const SESSION_SIGNAL_EMIT_ONLY: &[&str] = &[
     "SignalAck",
 ];
 const AGENT_REGISTRATION_WIRE_SOURCE: &str = include_str!("../src/session/types/agents/wire.rs");
-const AGENT_RUNTIME_SOURCE: &str = include_str!("../src/agents/runtime/mod.rs");
+const AGENT_RUNTIME_SOURCE: &str = SHARED_AGENT_MODELS_SOURCE;
 const AGENT_REGISTRATION_OUTPUT: &str = "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentRegistrationWireTypes.generated.swift";
 // The SessionDetail.agents member. The public AgentRegistration is `#[serde(try_from)]` its owned
 // wire::AgentRegistrationWire (agents/wire.rs) - that already-named *Wire companion carries the
@@ -2843,7 +2878,11 @@ fn modules() -> Vec<GeneratedModule> {
             output: SUMMARIES_OUTPUT,
             description: "the Rust daemon health, summary and tool-activity types",
             defaults: &[SUMMARIES_SOURCE],
-            sources: &[SUMMARIES_SOURCE, HOOKS_PAYLOADS_SOURCE],
+            sources: &[
+                SUMMARIES_SOURCE,
+                SHARED_DAEMON_SOURCE,
+                HOOKS_PAYLOADS_SOURCE,
+            ],
         },
         GeneratedModule {
             output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/TaskBoardGitWireTypes.generated.swift",
@@ -2870,14 +2909,10 @@ fn modules() -> Vec<GeneratedModule> {
             sources: &[AUDIT_SOURCE],
         },
         GeneratedModule {
-            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/AgentTuiWireTypes.generated.swift",
+            output: AGENT_TUI_OUTPUT,
             description: "the Rust managed terminal agent protocol",
             defaults: &[AGENT_TUI_MODEL_SOURCE],
-            sources: &[
-                AGENT_TUI_MOD_SOURCE,
-                AGENT_TUI_SCREEN_SOURCE,
-                AGENT_TUI_MODEL_SOURCE,
-            ],
+            sources: &[AGENT_TUI_MODEL_SOURCE, AGENT_TUI_RUNTIME_MODEL_SOURCE],
         },
         GeneratedModule {
             output: AGENT_TUI_INPUT_OUTPUT,
@@ -2944,10 +2979,10 @@ fn modules() -> Vec<GeneratedModule> {
             ],
         },
         GeneratedModule {
-            output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/WebSocketWireTypes.generated.swift",
+            output: WEBSOCKET_OUTPUT,
             description: "the Rust websocket transport frame types",
             defaults: &[],
-            sources: &[WEBSOCKET_SOURCE],
+            sources: &[SHARED_DAEMON_SOURCE, WEBSOCKET_SOURCE],
         },
         GeneratedModule {
             output: "apps/harness-monitor/Sources/HarnessMonitorKit/Models/Generated/SessionTasksWireTypes.generated.swift",
@@ -3046,8 +3081,8 @@ fn modules() -> Vec<GeneratedModule> {
         GeneratedModule {
             output: ACP_INSPECT_OUTPUT,
             description: "the Rust acp inspect response and its owned snapshot decode",
-            defaults: &[ACP_INSPECT_MANAGER_SOURCE],
-            sources: &[ACP_INSPECT_MANAGER_SOURCE, ACP_INSPECT_WIRE_SOURCE],
+            defaults: &[ACP_MODELS_SOURCE],
+            sources: &[ACP_MODELS_SOURCE, ACP_INSPECT_WIRE_SOURCE],
         },
         GeneratedModule {
             output: ACP_PERMISSION_OUTPUT,
@@ -3064,8 +3099,8 @@ fn modules() -> Vec<GeneratedModule> {
         GeneratedModule {
             output: ACP_START_REQUEST_OUTPUT,
             description: "the Rust acp managed-agent start request from its owned decode struct",
-            defaults: &[ACP_INSPECT_MANAGER_SOURCE],
-            sources: &[ACP_START_REQUEST_SOURCE, ACP_INSPECT_MANAGER_SOURCE],
+            defaults: &[ACP_MODELS_SOURCE],
+            sources: &[ACP_START_REQUEST_SOURCE, ACP_MODELS_SOURCE],
         },
         GeneratedModule {
             output: MANAGED_AGENTS_OUTPUT,
@@ -3202,7 +3237,9 @@ fn generate_module(module: &GeneratedModule) -> String {
         ACP_PERMISSION_OUTPUT => ACP_PERMISSION_EMIT_ONLY,
         ACP_SNAPSHOT_OUTPUT => ACP_SNAPSHOT_EMIT_ONLY,
         ACP_START_REQUEST_OUTPUT => ACP_START_REQUEST_EMIT_ONLY,
+        AGENT_TUI_OUTPUT => AGENT_TUI_EMIT_ONLY,
         AGENT_TUI_INPUT_OUTPUT => AGENT_TUI_INPUT_EMIT_ONLY,
+        WEBSOCKET_OUTPUT => WEBSOCKET_EMIT_ONLY,
         MANAGED_AGENTS_OUTPUT => MANAGED_AGENTS_EMIT_ONLY,
         DAEMON_STATE_OUTPUT => DAEMON_STATE_EMIT_ONLY,
         SESSION_SIGNAL_OUTPUT => SESSION_SIGNAL_EMIT_ONLY,

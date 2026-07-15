@@ -63,12 +63,12 @@ stale_scan_ensure_ps() {
 }
 
 # Print pids whose ps line matches the requested bucket:
-#   build - any cargo-built harness daemon/bridge under target/{debug,release,dev/*/(debug|release)}
-#   live  - installed harness daemon serve / bridge start on PATH
+#   build - any cargo-built harness-daemon/harness-bridge under target/{debug,release,dev/*/(debug|release)}
+#   live  - installed harness-daemon serve / harness-bridge start on PATH
 #   gate  - repo-local check/lint/build runners driven by mise or scripts/
 # build and live match the leading command token (argv[0]), so a supervisor
 # wrapper that only passes the harness path as a later argument - e.g.
-# run-harness-command.py for `daemon dev` - is not mistaken for the daemon
+# run-harness-command.py for `harness-daemon dev` - is not mistaken for the daemon
 # and reaped as an orphan.
 stale_scan_matching_pids() {
   local process_kind="$1"
@@ -79,8 +79,16 @@ stale_scan_matching_pids() {
       $1 = ""; $2 = ""; $3 = ""
       sub(/^ +/, "", $0)
       matched = 0
-      if (process_kind == "build" && $0 ~ /^[^ ]*\/target\/(debug|release|dev\/[^ ]+\/(debug|release))\/harness (daemon|bridge)( |$)/) matched = 1
-      if (process_kind == "live"  && $0 ~ /^([^ ]*\/)?harness (daemon serve|bridge start)( |$)/) matched = 1
+      if (process_kind == "build") {
+        if ($0 ~ /^[^ ]*\/target\/(debug|release|dev\/[^ ]+\/(debug|release))\/harness-(daemon|bridge)( |$)/) matched = 1
+        # Keep detecting v47 workers so an upgrade can reap abandoned processes.
+        if ($0 ~ /^[^ ]*\/target\/(debug|release|dev\/[^ ]+\/(debug|release))\/harness (daemon|bridge)( |$)/) matched = 1
+      }
+      if (process_kind == "live") {
+        if ($0 ~ /^([^ ]*\/)?(harness-daemon serve|harness-bridge start)( |$)/) matched = 1
+        # Keep detecting v47 workers so an upgrade can reap abandoned processes.
+        if ($0 ~ /^([^ ]*\/)?harness (daemon serve|bridge start)( |$)/) matched = 1
+      }
       if (process_kind == "gate") {
         if ($0 ~ /(^| )mise run (check|check:scripts)( |$)/) matched = 1
         if ($0 ~ /(^| )mise run monitor:(xcodebuild|build|lint|audit|audit:from-ref)( |$)/) matched = 1
@@ -328,7 +336,7 @@ stale_scan_pid_holds_harness_lock() {
   return 1
 }
 
-# Cargo-built harness daemon/bridge processes are only stale "orphans" when
+# Cargo-built harness-daemon/harness-bridge processes are only stale "orphans" when
 # they are no longer anchoring a real Harness daemon/bridge root. Live bridges
 # started through `monitor:bridge:start` still match the build bucket, but they
 # must survive clean:stale while holding their lock.

@@ -312,7 +312,10 @@ fn completion_missing_active_notification_id_does_not_finish_worker() {
         let should_stop = worker
             .handle_notification("turn/completed", &params)
             .expect("incomplete completion should be ignored");
-        assert!(!should_stop, "missing active id matched notification: {params}");
+        assert!(
+            !should_stop,
+            "missing active id matched notification: {params}"
+        );
     }
 
     assert_eq!(worker.snapshot.status, CodexRunStatus::Running);

@@ -1,7 +1,9 @@
 /// Minimum text length to bother displaying in dump mode.
+#[cfg(not(feature = "standalone-daemon"))]
 pub(crate) const MIN_DUMP_TEXT_LENGTH: usize = 5;
 
 /// Maximum characters shown per dump line.
+#[cfg(not(feature = "standalone-daemon"))]
 pub(crate) const DUMP_TRUNCATE_LENGTH: usize = 500;
 
 /// Maximum characters stored in issue detail fields.

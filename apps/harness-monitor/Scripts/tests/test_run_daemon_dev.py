@@ -67,13 +67,13 @@ class RunDaemonDevScriptTests(unittest.TestCase):
             / "manifest.json"
         )
 
-    def write_fake_harness(self, path: Path, mode: str) -> None:
+    def write_fake_daemon(self, path: Path, mode: str) -> None:
         content = """#!/usr/bin/env bash
 set -euo pipefail
 
 mode="__MODE__"
 
-if [[ "${1:-}" != "daemon" || "${2:-}" != "dev" ]]; then
+if [[ "$#" -ne 1 || "${1:-}" != "dev" ]]; then
   printf 'unexpected args: %s\\n' "$*" >&2
   exit 64
 fi
@@ -122,8 +122,8 @@ esac
         send_signal: int | None = None,
         extra_env: dict[str, str] | None = None,
     ) -> tuple[subprocess.Popen[str], str, str, Path, Path]:
-        fake_harness = temp_root / f"fake-harness-{mode}.sh"
-        self.write_fake_harness(fake_harness, mode)
+        fake_daemon = temp_root / f"fake-harness-daemon-{mode}.sh"
+        self.write_fake_daemon(fake_daemon, mode)
 
         home_dir = temp_root / f"home-{lane}"
         home_dir.mkdir(parents=True, exist_ok=True)
@@ -136,7 +136,7 @@ esac
             {
                 "HOME": str(home_dir),
                 "HARNESS_MONITOR_RUNTIME_LANE": lane,
-                "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_harness),
+                "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_daemon),
                 "HARNESS_MONITOR_DAEMON_DEV_LOG_DIR": str(log_dir),
                 "TMPDIR": str(temp_root),
                 "BASH_ENV": "/dev/null",
@@ -188,8 +188,8 @@ esac
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
             lane = "monitor-daemon-xattr"
-            fake_harness = temp_root / "fake-harness-xattr.sh"
-            self.write_fake_harness(fake_harness, "success")
+            fake_daemon = temp_root / "fake-harness-daemon-xattr.sh"
+            self.write_fake_daemon(fake_daemon, "success")
 
             home_dir = temp_root / f"home-{lane}"
             runtime_root = (
@@ -217,7 +217,7 @@ esac
                 {
                     "HOME": str(home_dir),
                     "HARNESS_MONITOR_RUNTIME_LANE": lane,
-                    "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_harness),
+                    "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_daemon),
                     "HARNESS_MONITOR_DAEMON_DEV_LOG_DIR": str(log_dir),
                     "TMPDIR": str(temp_root),
                     "BASH_ENV": "/dev/null",
@@ -262,8 +262,8 @@ esac
     def test_interrupt_cleanup_streams_startup_output_before_exit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
-            fake_harness = temp_root / "fake-harness-interrupt-streams.sh"
-            self.write_fake_harness(fake_harness, "interrupt-cleans")
+            fake_daemon = temp_root / "fake-harness-daemon-interrupt-streams.sh"
+            self.write_fake_daemon(fake_daemon, "interrupt-cleans")
 
             home_dir = temp_root / "home-monitor-daemon-streams"
             home_dir.mkdir(parents=True, exist_ok=True)
@@ -276,7 +276,7 @@ esac
                 {
                     "HOME": str(home_dir),
                     "HARNESS_MONITOR_RUNTIME_LANE": "monitor-daemon-streams",
-                    "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_harness),
+                    "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_daemon),
                     "HARNESS_MONITOR_DAEMON_DEV_LOG_DIR": str(log_dir),
                     "TMPDIR": str(temp_root),
                     "BASH_ENV": "/dev/null",
@@ -311,16 +311,16 @@ esac
     def test_repeated_interrupt_reaches_same_child_and_cleans_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
-            fake_harness = temp_root / "fake-harness-interrupt-needs-second.py"
+            fake_daemon = temp_root / "fake-harness-daemon-interrupt-needs-second.py"
             write_executable(
-                fake_harness,
+                fake_daemon,
                 """#!/usr/bin/env python3
 import os
 import signal
 import sys
 from pathlib import Path
 
-if sys.argv[1:] != ["daemon", "dev"]:
+if sys.argv[1:] != ["dev"]:
     print(f"unexpected args: {' '.join(sys.argv[1:])}", file=sys.stderr)
     raise SystemExit(64)
 
@@ -358,7 +358,7 @@ while True:
                 {
                     "HOME": str(home_dir),
                     "HARNESS_MONITOR_RUNTIME_LANE": "monitor-daemon-second-interrupt",
-                    "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_harness),
+                    "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_daemon),
                     "HARNESS_MONITOR_DAEMON_DEV_LOG_DIR": str(log_dir),
                     "TMPDIR": str(temp_root),
                     "BASH_ENV": "/dev/null",
@@ -398,8 +398,8 @@ while True:
     def test_ctrl_c_from_tty_exits_zero_and_cleans_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
-            fake_harness = temp_root / "fake-harness-tty-interrupt.sh"
-            self.write_fake_harness(fake_harness, "interrupt-cleans")
+            fake_daemon = temp_root / "fake-harness-daemon-tty-interrupt.sh"
+            self.write_fake_daemon(fake_daemon, "interrupt-cleans")
 
             home_dir = temp_root / "home-monitor-daemon-tty"
             home_dir.mkdir(parents=True, exist_ok=True)
@@ -412,7 +412,7 @@ while True:
                 {
                     "HOME": str(home_dir),
                     "HARNESS_MONITOR_RUNTIME_LANE": "monitor-daemon-tty",
-                    "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_harness),
+                    "HARNESS_MONITOR_DAEMON_DEV_BIN": str(fake_daemon),
                     "HARNESS_MONITOR_DAEMON_DEV_LOG_DIR": str(log_dir),
                     "TMPDIR": str(temp_root),
                     "BASH_ENV": "/dev/null",

@@ -8,8 +8,8 @@ fn main() -> ExitCode {
     let telemetry_guard = match init_tracing_subscriber() {
         Ok(guard) => guard,
         Err(error) => {
-            eprintln!("{}", errors::render_error(&error));
-            return ExitCode::from(u8::try_from(error.exit_code()).unwrap_or(1));
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
         }
     };
 

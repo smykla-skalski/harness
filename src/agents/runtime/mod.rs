@@ -11,7 +11,9 @@
 mod claude;
 mod codex;
 mod copilot;
-pub mod event;
+pub mod event {
+    pub use harness_protocol::agent::{ConversationEvent, ConversationEventKind};
+}
 mod gemini;
 pub mod liveness;
 pub mod models;
@@ -20,8 +22,6 @@ pub mod signal;
 mod vibe;
 
 use std::path::{Path, PathBuf};
-
-use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
 use crate::hooks::adapters::HookAgent;
@@ -35,6 +35,11 @@ use self::opencode::OpenCodeRuntime;
 use self::signal::{Signal, SignalAck};
 use self::vibe::VibeRuntime;
 
+pub use harness_protocol::agent::{
+    HookIntegrationDescriptor, RuntimeCapabilities, hook_agent_for_runtime_name,
+};
+
+#[allow(unused_imports)]
 pub(crate) use self::claude::parse_common_jsonl as parse_canonical_conversation_line;
 
 /// Describes when during an agent's tool-use cycle signals can be intercepted.
@@ -45,32 +50,6 @@ pub struct HookIntegrationPoint {
     /// Typical latency before signal pickup in seconds.
     pub typical_latency_seconds: u64,
     /// Whether this point can inject context into the agent.
-    pub supports_context_injection: bool,
-}
-
-/// Serializable runtime capability metadata exposed to session state and the daemon.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "each bool is an independent capability flag in a serialized protocol type"
-)]
-pub struct RuntimeCapabilities {
-    pub runtime: String,
-    pub supports_native_transcript: bool,
-    pub supports_signal_delivery: bool,
-    pub supports_context_injection: bool,
-    pub typical_signal_latency_seconds: u64,
-    #[serde(default)]
-    pub supports_readiness_signal: bool,
-    #[serde(default)]
-    pub hook_points: Vec<HookIntegrationDescriptor>,
-}
-
-/// One user-visible hook interception point for signal pickup.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct HookIntegrationDescriptor {
-    pub name: String,
-    pub typical_latency_seconds: u64,
     pub supports_context_injection: bool,
 }
 
@@ -267,20 +246,6 @@ pub fn runtime_for(agent: HookAgent) -> &'static dyn AgentRuntime {
         HookAgent::Copilot => &COPILOT,
         HookAgent::Vibe => &VIBE,
         HookAgent::OpenCode => &OPENCODE,
-    }
-}
-
-/// Resolve a hook agent from a runtime name, including legacy aliases.
-#[must_use]
-pub fn hook_agent_for_runtime_name(name: &str) -> Option<HookAgent> {
-    match name {
-        "claude" => Some(HookAgent::Claude),
-        "codex" => Some(HookAgent::Codex),
-        "gemini" => Some(HookAgent::Gemini),
-        "copilot" => Some(HookAgent::Copilot),
-        "vibe" => Some(HookAgent::Vibe),
-        "opencode" => Some(HookAgent::OpenCode),
-        _ => None,
     }
 }
 

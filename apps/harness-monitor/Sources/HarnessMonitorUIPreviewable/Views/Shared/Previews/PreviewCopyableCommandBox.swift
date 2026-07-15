@@ -3,7 +3,7 @@ import SwiftUI
 
 #Preview("CopyableCommandBox - short") {
   CopyableCommandBox(
-    command: "harness bridge start",
+    command: "harness-bridge start",
     accessibilityIdentifier: "preview-short"
   )
   .padding()
@@ -12,7 +12,7 @@ import SwiftUI
 
 #Preview("CopyableCommandBox - long") {
   CopyableCommandBox(
-    command: "harness bridge start --capability agent-tui --capability codex",
+    command: "harness-bridge start --capability agent-tui --capability codex",
     accessibilityIdentifier: "preview-long"
   )
   .padding()

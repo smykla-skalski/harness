@@ -39,6 +39,15 @@ const OTLP_REACHABILITY_TIMEOUT: Duration = Duration::from_millis(500);
 /// when the tracing subscriber cannot be initialized.
 pub fn init_tracing_subscriber() -> Result<TelemetryGuard, CliError> {
     let service = runtime_service_from_current_process();
+    init_tracing_subscriber_for(service)
+}
+
+/// Initialize tracing for an explicitly selected executable service.
+///
+/// # Errors
+/// Returns an error when telemetry export configuration cannot be resolved or
+/// the tracing subscriber cannot be initialized.
+pub fn init_tracing_subscriber_for(service: RuntimeService) -> Result<TelemetryGuard, CliError> {
     let filter = crate::resolved_log_filter_for_service(service)?;
     let (filter_layer, handle) = reload::Layer::new(filter);
     crate::set_log_filter_handle(handle);

@@ -23,6 +23,7 @@ pub use evidence::{
     GitHubMergeEvidence, GitHubPullRequestEvidence, GitHubReviewEvidence, GitHubReviewState,
 };
 pub use publication::GitHubBranchState;
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use publication::{SigningVerifyOutcome, verify_signing_for_profile};
 pub use risk::{GitHubRiskClassification, GitHubRiskReason, classify_github_merge_risk};
 

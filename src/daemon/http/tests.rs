@@ -60,6 +60,7 @@ mod session_archive_tests;
 mod shutdown;
 mod support;
 mod task_board;
+mod task_board_catalog;
 mod task_board_crud;
 mod task_board_dispatch_pick;
 mod task_board_managed_worker_assertions;
@@ -81,7 +82,7 @@ async fn map_json_maps_codex_unavailable_to_503() {
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(body["error"], "codex-unavailable");
     assert_eq!(body["endpoint"], "ws://127.0.0.1:4500");
-    assert_eq!(body["hint"], "run: harness bridge start");
+    assert_eq!(body["hint"], "run: harness-bridge start");
 }
 
 #[tokio::test]

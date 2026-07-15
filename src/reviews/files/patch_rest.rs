@@ -21,5 +21,6 @@ mod parsing;
 #[cfg(test)]
 mod tests;
 
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use fetcher::{any_patch_matches, fetch_patches};
 pub(crate) use parsing::split_repo_full_name;

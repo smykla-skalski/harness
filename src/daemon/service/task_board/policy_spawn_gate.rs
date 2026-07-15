@@ -4,8 +4,8 @@
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
-    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
+    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
 };
@@ -102,9 +102,7 @@ pub(crate) async fn revoke_policy_approval_grant(
     request: &PolicyApprovalGrantRevokeRequest,
 ) -> Result<PolicyApprovalGrantRevokeResponse, CliError> {
     let actor = request.actor.as_deref().unwrap_or(DEFAULT_APPROVAL_ACTOR);
-    let grant = db
-        .revoke_approval_grant(&request.grant_id, actor)
-        .await?;
+    let grant = db.revoke_approval_grant(&request.grant_id, actor).await?;
     bump_change_policy(db).await;
     Ok(PolicyApprovalGrantRevokeResponse { grant })
 }

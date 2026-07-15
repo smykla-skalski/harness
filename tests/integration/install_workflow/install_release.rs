@@ -5,8 +5,7 @@ use std::process::Command;
 use tempfile::tempdir;
 
 use super::support::{
-    run_harness_version, write_fake_harness_binary, write_fake_managed_adapters,
-    write_fake_shell_tool,
+    run_harness_version, write_fake_harness_binary, write_fake_harness_release_set,
 };
 
 #[test]
@@ -18,11 +17,9 @@ fn install_script_reconciles_shadowed_harness_binary_for_stale_shell_paths() {
     let shadow_dir = home.join("shadow/bin");
     let cargo_home = home.join(".cargo");
     let target_dir = tmp.path().join("cargo-target");
-    let build_binary = target_dir.join("release/harness");
     let version = env!("CARGO_PKG_VERSION");
     std::fs::create_dir_all(&install_dir).expect("create install dir");
-    write_fake_harness_binary(&build_binary, version);
-    write_fake_managed_adapters(&target_dir);
+    write_fake_harness_release_set(&target_dir, version);
     let shadow_binary = shadow_dir.join("harness");
     write_fake_harness_binary(&shadow_binary, "18.2.3");
 
@@ -73,21 +70,10 @@ fn install_script_installs_managed_codex_adapter_binary() {
     let home = tmp.path().join("home");
     let install_dir = home.join(".local/bin");
     let target_dir = tmp.path().join("cargo-target");
-    let build_binary = target_dir.join("release/harness");
-    let build_codex_adapter = target_dir.join("release/harness-codex-acp");
-    let build_openrouter_adapter = target_dir.join("release/harness-openrouter-agent");
     let version = env!("CARGO_PKG_VERSION");
 
     std::fs::create_dir_all(&install_dir).expect("create install dir");
-    write_fake_harness_binary(&build_binary, version);
-    write_fake_shell_tool(
-        &build_codex_adapter,
-        "#!/bin/sh\nif [ \"$1\" = \"--probe\" ]; then\n  exit 0\nfi\nexit 1\n",
-    );
-    write_fake_shell_tool(
-        &build_openrouter_adapter,
-        "#!/bin/sh\nif [ \"$1\" = \"--probe\" ]; then\n  exit 0\nfi\nexit 1\n",
-    );
+    write_fake_harness_release_set(&target_dir, version);
 
     let output = Command::new("/bin/bash")
         .arg(repo.join("scripts/install-harness-release.sh"))
@@ -146,12 +132,10 @@ fn install_script_reconciles_shadowed_cargo_harness_binary_in_place() {
     let cargo_home = home.join(".cargo");
     let cargo_dir = home.join(".cargo/bin");
     let target_dir = tmp.path().join("cargo-target");
-    let build_binary = target_dir.join("release/harness");
     let cargo_binary = cargo_dir.join("harness");
     let version = env!("CARGO_PKG_VERSION");
 
-    write_fake_harness_binary(&build_binary, version);
-    write_fake_managed_adapters(&target_dir);
+    write_fake_harness_release_set(&target_dir, version);
     write_fake_harness_binary(&cargo_binary, "18.2.3");
 
     let output = Command::new("/bin/bash")
@@ -206,13 +190,11 @@ fn install_script_fails_when_shadowed_harness_binary_cannot_be_reconciled() {
     let install_dir = home.join(".local/bin");
     let shadow_dir = tmp.path().join("locked-shadow/bin");
     let target_dir = tmp.path().join("cargo-target");
-    let build_binary = target_dir.join("release/harness");
     let shadow_binary = shadow_dir.join("harness");
     let version = env!("CARGO_PKG_VERSION");
 
     std::fs::create_dir_all(&install_dir).expect("create install dir");
-    write_fake_harness_binary(&build_binary, version);
-    write_fake_managed_adapters(&target_dir);
+    write_fake_harness_release_set(&target_dir, version);
     write_fake_harness_binary(&shadow_binary, "18.2.3");
     std::fs::set_permissions(&shadow_dir, std::fs::Permissions::from_mode(0o555))
         .expect("lock shadow dir");

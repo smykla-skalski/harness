@@ -77,7 +77,7 @@ final class DecisionActionHandlerSupervisorCustomTests: XCTestCase {
     let feedback = try XCTUnwrap(store.toast.activeFeedback.first)
     XCTAssertEqual(feedback.title, "Start background helper")
     XCTAssertEqual(feedback.severity, .warning)
-    XCTAssertTrue(feedback.details?.command?.contains("harness daemon dev") == true)
+    XCTAssertTrue(feedback.details?.command?.contains("harness-daemon dev") == true)
     let resolved = try await decisions.decision(id: "daemon-restart-external")
     XCTAssertEqual(resolved?.statusRaw, "resolved")
   }

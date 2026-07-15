@@ -191,12 +191,7 @@ pub fn codex_transport_from_env(sandboxed: bool) -> CodexTransportKind {
 /// Returns true when `HARNESS_SANDBOXED` is set to a truthy value (`1`, `true`, `yes`, `on`).
 #[must_use]
 pub fn sandboxed_from_env() -> bool {
-    env::var("HARNESS_SANDBOXED").ok().is_some_and(|value| {
-        matches!(
-            value.trim(),
-            "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
-        )
-    })
+    super::sandboxed_from_env()
 }
 
 /// Returns true when the current working directory is under
@@ -329,7 +324,6 @@ pub(crate) use reviews::{
     reviews_policy_history_with_audit_db, reviews_policy_status_with_audit_db,
     start_reviews_policy_run_with_audit_db,
 };
-pub(crate) use reviews_files::BlobTextProjection;
 pub use reviews_files::{
     GcReport, delete_review_local_clone, fetch_review_file_blob, list_review_files,
     list_review_local_clones, mark_review_files_viewed, patch_review_files, preview_review_files,

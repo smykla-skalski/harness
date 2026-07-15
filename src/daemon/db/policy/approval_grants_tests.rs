@@ -159,14 +159,9 @@ async fn a_revoked_grant_cannot_authorize_or_be_consumed() {
         .await
         .expect("create");
     set_grant_clock(&db, &grant.id, "2026-07-14T10:00:00Z", 60).await;
-    db.resolve_approval_grant_at(
-        &grant.id,
-        true,
-        "approver",
-        "2026-07-14T10:00:10Z",
-    )
-    .await
-    .expect("approve");
+    db.resolve_approval_grant_at(&grant.id, true, "approver", "2026-07-14T10:00:10Z")
+        .await
+        .expect("approve");
 
     let revoked = db
         .revoke_approval_grant_at(&grant.id, "revoker", "2026-07-14T10:00:20Z")
@@ -263,13 +258,9 @@ async fn pending_count_matches_list_with_expired_and_revoked_rows() {
     insert_pending_grant_at(db.pool(), "policy-grant-revoked", &revoked, created_at)
         .await
         .expect("insert revoked grant");
-    db.revoke_approval_grant_at(
-        "policy-grant-revoked",
-        "operator",
-        "2026-07-14T10:00:30Z",
-    )
-    .await
-    .expect("revoke grant");
+    db.revoke_approval_grant_at("policy-grant-revoked", "operator", "2026-07-14T10:00:30Z")
+        .await
+        .expect("revoke grant");
 
     let pending = db
         .list_pending_approval_grants_at(evaluated_at)
@@ -295,12 +286,7 @@ async fn expired_grant_cannot_be_resolved_or_consumed() {
     set_grant_clock(&db, &grant.id, "2026-07-14T10:00:00Z", 60).await;
 
     let error = db
-        .resolve_approval_grant_at(
-            &grant.id,
-            true,
-            "operator",
-            "2026-07-14T10:01:00Z",
-        )
+        .resolve_approval_grant_at(&grant.id, true, "operator", "2026-07-14T10:01:00Z")
         .await
         .expect_err("expired pending grant cannot resolve");
     assert!(error.message().contains("not pending or does not exist"));

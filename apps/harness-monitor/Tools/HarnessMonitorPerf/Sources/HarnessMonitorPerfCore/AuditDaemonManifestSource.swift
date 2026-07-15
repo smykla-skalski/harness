@@ -8,7 +8,7 @@ extension AuditRunner {
     public static let auditTargetOwnershipSegment = "external"
 
     /// Candidate subdirs to probe for the source manifest in priority order.
-    /// `external` matches the live `harness daemon dev` instance the audit
+    /// `external` matches the live `harness-daemon dev` instance the audit
     /// targets; `managed` is a defensive fallback for environments where
     /// only the SMAppService-installed daemon is running and the user
     /// pointed `HARNESS_MONITOR_AUDIT_DAEMON_DATA_HOME` at its data home;

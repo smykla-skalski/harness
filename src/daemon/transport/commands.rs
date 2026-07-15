@@ -129,7 +129,7 @@ impl Execute for DaemonRestartArgs {
         adopt_daemon_root_for_transport_command("daemon-restart");
         let binary = current_exe().map_err(|error| {
             CliError::from(CliErrorKind::workflow_io(format!(
-                "resolve current harness binary: {error}"
+                "resolve current harness-daemon binary: {error}"
             )))
         })?;
         let response = restart_daemon(&binary)?;
@@ -218,7 +218,7 @@ impl DaemonServeArgs {
 /// Default macOS app group identifier for the sandboxed Harness Monitor app.
 /// The unsandboxed dev daemon writes its manifest into this group's container
 /// so the sandboxed `SwiftUI` app can read it without extra env plumbing.
-pub const HARNESS_MONITOR_APP_GROUP_ID: &str = "Q498EB36N4.io.harnessmonitor";
+pub use crate::daemon::HARNESS_MONITOR_APP_GROUP_ID;
 
 #[derive(Debug, Clone, Args)]
 pub struct DaemonDevArgs {
@@ -246,7 +246,7 @@ pub struct DaemonDevArgs {
     pub disable_acp: bool,
 }
 
-/// Describes how `harness daemon dev` resolves its in-process daemon runtime.
+/// Describes how `harness-daemon dev` resolves its in-process daemon runtime.
 #[derive(Debug, Clone)]
 pub(super) struct DaemonDevExecutionPlan {
     pub(super) daemon_root_base: PathBuf,
@@ -259,8 +259,8 @@ impl DaemonDevArgs {
     pub(super) fn ensure_not_sandboxed() -> Result<(), CliError> {
         if service::sandboxed_from_env() {
             return Err(CliError::from(CliErrorKind::workflow_io(
-                "cannot run `harness daemon dev` while HARNESS_SANDBOXED is set; \
-                 unset it or use `harness daemon serve` instead",
+                "cannot run `harness-daemon dev` while HARNESS_SANDBOXED is set; \
+                 unset it or use `harness-daemon serve` instead",
             )));
         }
         Ok(())
@@ -422,7 +422,7 @@ fn execute_daemon_service(
 
 #[derive(Debug, Clone, Args)]
 pub struct DaemonInstallLaunchAgentArgs {
-    /// Explicit path to the harness binary. Defaults to the current executable.
+    /// Explicit path to the `harness-daemon` binary. Defaults to the current executable.
     #[arg(long)]
     pub binary_path: Option<PathBuf>,
     /// Print the full post-install `launchd` status as JSON.
@@ -438,7 +438,7 @@ impl Execute for DaemonInstallLaunchAgentArgs {
             .map_or_else(current_exe, Ok)
             .map_err(|error| {
                 CliError::from(CliErrorKind::workflow_io(format!(
-                    "resolve current harness binary: {error}"
+                    "resolve current harness-daemon binary: {error}"
                 )))
             })?;
         let path = launchd::install_launch_agent(service::sandboxed_from_env(), &binary)?;

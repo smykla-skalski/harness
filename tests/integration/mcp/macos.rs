@@ -19,16 +19,16 @@ fn spawn_server() -> std::process::Child {
 }
 
 fn spawn_server_with_env(envs: &[(&str, &Path)]) -> std::process::Child {
-    let mut command = Command::new(cargo_bin("harness"));
+    let mut command = Command::new(cargo_bin("harness-mcp"));
     command
-        .args(["mcp", "serve"])
+        .arg("serve")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
     for (key, value) in envs {
         command.env(key, value);
     }
-    command.spawn().expect("spawn harness mcp serve")
+    command.spawn().expect("spawn harness-mcp serve")
 }
 
 fn write_helper_script(dir: &TempDir) -> (PathBuf, PathBuf) {

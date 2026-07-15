@@ -26,7 +26,7 @@ pub use metrics::{
     record_hook_metrics, with_active_baggage,
 };
 pub use profiler::DaemonProfiler;
-pub use subscriber::init_tracing_subscriber;
+pub use subscriber::{init_tracing_subscriber, init_tracing_subscriber_for};
 
 #[cfg(test)]
 pub(crate) fn telemetry_test_guard() -> MutexGuard<'static, ()> {

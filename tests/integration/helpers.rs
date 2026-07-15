@@ -3,11 +3,11 @@
 
 #![allow(dead_code)]
 
-use std::borrow::Borrow;
 use std::process::{Child, Command as ProcessCommand, ExitStatus, Output};
 use std::sync::Mutex;
 
 use harness::app::cli::{self, Command, CreateCommand, RunCommand, SetupCommand};
+use harness::app::{AppContext, Execute};
 use harness::create::{ApprovalBeginArgs, CreateBeginArgs, CreateSaveArgs, CreateValidateArgs};
 use harness::errors::CliError;
 use harness::run::{
@@ -116,10 +116,38 @@ impl Drop for ManagedChild {
     }
 }
 
-pub fn run_command(command: impl Borrow<Command>) -> Result<i32, CliError> {
+pub fn run_command(command: impl IntegrationCommand) -> Result<i32, CliError> {
     temp_env::with_var("HARNESS_KUBERNETES_RUNTIME", Some("kubectl-cli"), || {
-        cli::dispatch(command.borrow())
+        command.dispatch_for_test()
     })
+}
+
+pub trait IntegrationCommand {
+    fn dispatch_for_test(self) -> Result<i32, CliError>;
+}
+
+impl IntegrationCommand for Command {
+    fn dispatch_for_test(self) -> Result<i32, CliError> {
+        cli::dispatch(&self)
+    }
+}
+
+impl IntegrationCommand for PreCompactArgs {
+    fn dispatch_for_test(self) -> Result<i32, CliError> {
+        Execute::execute(&self, &AppContext::production())
+    }
+}
+
+impl IntegrationCommand for SessionStartArgs {
+    fn dispatch_for_test(self) -> Result<i32, CliError> {
+        Execute::execute(&self, &AppContext::production())
+    }
+}
+
+impl IntegrationCommand for SessionStopArgs {
+    fn dispatch_for_test(self) -> Result<i32, CliError> {
+        Execute::execute(&self, &AppContext::production())
+    }
 }
 
 pub fn run_cmd(command: RunCommand) -> Command {
@@ -205,8 +233,8 @@ pub fn kumactl_cmd(args: KumactlArgs) -> Command {
     }))
 }
 
-pub fn pre_compact_cmd(args: PreCompactArgs) -> Command {
-    Command::PreCompact(args)
+pub fn pre_compact_cmd(args: PreCompactArgs) -> PreCompactArgs {
+    args
 }
 
 pub fn preflight_cmd(args: PreflightArgs) -> Command {
@@ -239,23 +267,23 @@ pub fn start_cmd(args: StartArgs) -> Command {
     run_cmd(RunCommand::Start(args))
 }
 
-pub fn session_start_cmd(args: SessionStartArgs) -> Command {
-    Command::SessionStart(args)
+pub fn session_start_cmd(args: SessionStartArgs) -> SessionStartArgs {
+    args
 }
 
-pub fn session_stop_cmd(args: SessionStopArgs) -> Command {
-    Command::SessionStop(args)
+pub fn session_stop_cmd(args: SessionStopArgs) -> SessionStopArgs {
+    args
 }
 
 pub fn validate_cmd(args: ValidateArgs) -> Command {
     run_cmd(RunCommand::Validate(args))
 }
 
-pub trait CommandExt {
+pub trait CommandExt: IntegrationCommand + Sized {
     fn execute(self) -> Result<i32, CliError>;
 }
 
-impl CommandExt for Command {
+impl<T: IntegrationCommand> CommandExt for T {
     fn execute(self) -> Result<i32, CliError> {
         run_command(self)
     }

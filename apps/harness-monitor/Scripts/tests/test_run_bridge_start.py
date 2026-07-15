@@ -20,13 +20,13 @@ def write_executable(path: Path, content: str) -> None:
 
 
 class RunBridgeStartScriptTests(unittest.TestCase):
-    def write_fake_harness(self, path: Path, mode: str) -> None:
+    def write_fake_bridge(self, path: Path, mode: str) -> None:
         content = """#!/usr/bin/env bash
 set -euo pipefail
 
 mode="__MODE__"
 
-if [[ "${1:-}" != "bridge" || "${2:-}" != "start" ]]; then
+if [[ "${1:-}" != "start" || "${2:-}" != "" ]]; then
   printf 'unexpected args: %s\\n' "$*" >&2
   exit 64
 fi
@@ -56,8 +56,8 @@ esac
         write_executable(path, content.replace("__MODE__", mode))
 
     def script_env(self, temp_root: Path, *, mode: str, lane: str) -> tuple[dict[str, str], Path]:
-        fake_harness = temp_root / f"fake-bridge-{mode}.sh"
-        self.write_fake_harness(fake_harness, mode)
+        fake_bridge = temp_root / f"fake-bridge-{mode}.sh"
+        self.write_fake_bridge(fake_bridge, mode)
 
         home_dir = temp_root / f"home-{lane}"
         home_dir.mkdir(parents=True, exist_ok=True)
@@ -69,7 +69,7 @@ esac
             {
                 "HOME": str(home_dir),
                 "HARNESS_MONITOR_RUNTIME_LANE": lane,
-                "HARNESS_MONITOR_BRIDGE_START_BIN": str(fake_harness),
+                "HARNESS_MONITOR_BRIDGE_START_BIN": str(fake_bridge),
                 "HARNESS_MONITOR_BRIDGE_START_LOG_DIR": str(log_dir),
                 "TMPDIR": str(temp_root),
                 "BASH_ENV": "/dev/null",

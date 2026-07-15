@@ -4,4 +4,6 @@ pub mod roles;
 pub mod service;
 pub mod storage;
 pub mod transport;
-pub mod types;
+pub mod types {
+    pub use harness_protocol::session::*;
+}

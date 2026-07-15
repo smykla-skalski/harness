@@ -382,7 +382,7 @@ pub(super) fn spawn_daemon(sandboxed: bool, binary: &Path) -> Result<Child, CliE
         })?;
 
     Command::new(binary)
-        .args(["daemon", "serve", "--host", "127.0.0.1", "--port", "0"])
+        .args(["serve", "--host", "127.0.0.1", "--port", "0"])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::from(stderr_file))

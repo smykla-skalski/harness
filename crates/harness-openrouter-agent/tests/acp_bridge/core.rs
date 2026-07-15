@@ -18,9 +18,9 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use agent_client_protocol::schema::{
-    CancelNotification, ContentBlock, CreateTerminalRequest, CreateTerminalResponse, EnvVariable,
-    InitializeRequest, KillTerminalRequest, KillTerminalResponse, McpServer, McpServerStdio,
-    NewSessionRequest, PromptRequest, ProtocolVersion, ReadTextFileRequest, ReadTextFileResponse,
+    ContentBlock, CreateTerminalRequest, CreateTerminalResponse, EnvVariable, InitializeRequest,
+    KillTerminalRequest, KillTerminalResponse, McpServer, McpServerStdio, NewSessionRequest,
+    PromptRequest, ProtocolVersion, ReadTextFileRequest, ReadTextFileResponse,
     ReleaseTerminalRequest, ReleaseTerminalResponse, RequestPermissionRequest,
     RequestPermissionResponse, SessionNotification, SessionUpdate, StopReason, TerminalId,
     TerminalOutputRequest, TerminalOutputResponse, TextContent, WaitForTerminalExitRequest,
@@ -34,21 +34,21 @@ use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 const BIN_PATH: &str = env!("CARGO_BIN_EXE_harness-openrouter-agent");
 
 #[derive(Debug, Default, Clone)]
-struct ChunkLog {
+pub(super) struct ChunkLog {
     inner: Arc<Mutex<Vec<String>>>,
 }
 
 impl ChunkLog {
-    fn push(&self, text: String) {
+    pub(super) fn push(&self, text: String) {
         self.inner.lock().expect("lock").push(text);
     }
 
-    fn snapshot(&self) -> Vec<String> {
+    pub(super) fn snapshot(&self) -> Vec<String> {
         self.inner.lock().expect("lock").clone()
     }
 }
 
-fn build_agent(server_url: &str) -> (AcpAgent, tempfile::TempDir) {
+pub(super) fn build_agent(server_url: &str) -> (AcpAgent, tempfile::TempDir) {
     let key_dir = tempfile::tempdir().expect("api-key-file tempdir");
     let key_path = key_dir.path().join("openrouter-key");
     std::fs::write(&key_path, "sk-test").expect("write api-key-file");
@@ -65,7 +65,7 @@ fn build_agent(server_url: &str) -> (AcpAgent, tempfile::TempDir) {
     (AcpAgent::new(McpServer::Stdio(stdio)), key_dir)
 }
 
-fn sse(body: &[&str]) -> String {
+pub(super) fn sse(body: &[&str]) -> String {
     let mut joined = String::new();
     for line in body {
         joined.push_str("data: ");
@@ -76,7 +76,7 @@ fn sse(body: &[&str]) -> String {
     joined
 }
 
-async fn mount_models(server: &MockServer) {
+pub(super) async fn mount_models(server: &MockServer) {
     Mock::given(method("GET"))
         .and(path("/models/user"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"data":[]}"#))
@@ -84,7 +84,7 @@ async fn mount_models(server: &MockServer) {
         .await;
 }
 
-fn client_builder_with_chunks(
+pub(super) fn client_builder_with_chunks(
     log: ChunkLog,
 ) -> agent_client_protocol::Builder<
     Client,
@@ -155,7 +155,9 @@ fn client_builder_with_chunks(
         )
         .on_receive_request(
             async move |_req: RequestPermissionRequest, responder, _cx| {
-                use agent_client_protocol::schema::{RequestPermissionOutcome, SelectedPermissionOutcome};
+                use agent_client_protocol::schema::{
+                    RequestPermissionOutcome, SelectedPermissionOutcome,
+                };
                 responder.respond(RequestPermissionResponse::new(
                     RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(
                         "approve".to_owned(),
@@ -171,12 +173,18 @@ async fn probe_flag_exits_success_without_api_key() {
     // The catalog descriptor's doctor_probe runs the shim with --probe to
     // detect installation. It must exit 0 without spinning up the runtime
     // and without needing the --api-key-file credential.
-    let status = Command::new(BIN_PATH)
+    let output = Command::new(BIN_PATH)
         .arg("--probe")
-        .status()
+        .output()
         .await
         .expect("spawn shim");
-    assert!(status.success(), "probe exited with {status}");
+    assert!(
+        output.status.success(),
+        "probe exited with {}",
+        output.status
+    );
+    assert_eq!(output.stdout, b"harness-openrouter-agent\n");
+    assert!(output.stderr.is_empty());
 }
 
 #[tokio::test]
@@ -213,9 +221,7 @@ async fn session_new_returns_session_id_and_models() {
                 .block_task()
                 .await?;
             let response = cx
-                .send_request(NewSessionRequest::new(PathBuf::from(
-                    std::env::temp_dir(),
-                )))
+                .send_request(NewSessionRequest::new(PathBuf::from(std::env::temp_dir())))
                 .block_task()
                 .await?;
             assert!(!response.session_id.0.as_ref().is_empty());
@@ -301,11 +307,7 @@ async fn prompt_round_trips_a_tool_call() {
         // Tool-result message has not been appended yet.
         !body["messages"]
             .as_array()
-            .map(|messages| {
-                messages
-                    .iter()
-                    .any(|msg| msg["role"] == "tool")
-            })
+            .map(|messages| messages.iter().any(|msg| msg["role"] == "tool"))
             .unwrap_or(false)
     };
     let second_matcher = |req: &Request| -> bool {
@@ -484,232 +486,4 @@ async fn tool_iteration_cap_returns_max_turn_requests() {
         })
         .await
         .expect("connection drives to completion");
-}
-
-#[tokio::test]
-async fn http_error_surfaces_as_end_turn_with_diagnostic_chunk() {
-    let server = MockServer::start().await;
-    mount_models(&server).await;
-    Mock::given(method("POST"))
-        .and(path("/chat/completions"))
-        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "1"))
-        .mount(&server)
-        .await;
-
-    let (agent, _key_tmp) = build_agent(&server.uri());
-    let log = ChunkLog::default();
-    let log_for_assert = log.clone();
-    client_builder_with_chunks(log)
-        .connect_with(agent, |cx: ConnectionTo<Agent>| async move {
-            cx.send_request(InitializeRequest::new(ProtocolVersion::LATEST))
-                .block_task()
-                .await?;
-            let session = cx
-                .send_request(NewSessionRequest::new(std::env::temp_dir()))
-                .block_task()
-                .await?;
-            let response = cx
-                .send_request(PromptRequest::new(
-                    session.session_id,
-                    vec![ContentBlock::Text(TextContent::new("Hi"))],
-                ))
-                .block_task()
-                .await?;
-            assert!(matches!(response.stop_reason, StopReason::EndTurn));
-            Ok(())
-        })
-        .await
-        .expect("connection drives to completion");
-    let chunks = log_for_assert.snapshot().join("");
-    assert!(
-        chunks.contains("openrouter error"),
-        "expected diagnostic chunk, got {chunks:?}",
-    );
-    assert!(
-        chunks.to_lowercase().contains("rate limit"),
-        "expected rate-limit phrasing, got {chunks:?}",
-    );
-}
-
-#[tokio::test]
-async fn moderation_status_surfaces_as_refusal() {
-    let server = MockServer::start().await;
-    mount_models(&server).await;
-    Mock::given(method("POST"))
-        .and(path("/chat/completions"))
-        .respond_with(ResponseTemplate::new(403).set_body_string("blocked"))
-        .mount(&server)
-        .await;
-
-    let (agent, _key_tmp) = build_agent(&server.uri());
-    client_builder_with_chunks(ChunkLog::default())
-        .connect_with(agent, |cx: ConnectionTo<Agent>| async move {
-            cx.send_request(InitializeRequest::new(ProtocolVersion::LATEST))
-                .block_task()
-                .await?;
-            let session = cx
-                .send_request(NewSessionRequest::new(std::env::temp_dir()))
-                .block_task()
-                .await?;
-            let response = cx
-                .send_request(PromptRequest::new(
-                    session.session_id,
-                    vec![ContentBlock::Text(TextContent::new("forbidden"))],
-                ))
-                .block_task()
-                .await?;
-            assert!(matches!(response.stop_reason, StopReason::Refusal));
-            Ok(())
-        })
-        .await
-        .expect("connection drives to completion");
-}
-
-#[tokio::test]
-async fn cancel_mid_stream_returns_cancelled_stop_reason() {
-    let server = MockServer::start().await;
-    mount_models(&server).await;
-    // Stream emits one chunk and then stalls. We send `session/cancel` once
-    // the chunk arrives; the shim's per-session cancel flag is checked
-    // between SSE chunks and aborts the turn even though the upstream stream
-    // is still open.
-    let body = format!(
-        "{}{}{}",
-        "data: {\"id\":\"gen-1\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"hi\"}}]}\n\n",
-        // Delay between events does not exist in wiremock; we send a second
-        // event that the shim will start receiving after the cancel flag is
-        // already set. The flag is polled between chunks, so the second chunk
-        // is dropped on the floor and the loop short-circuits.
-        "data: {\"id\":\"gen-1\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"never\"}}]}\n\n",
-        "data: [DONE]\n\n",
-    );
-    Mock::given(method("POST"))
-        .and(path("/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .insert_header("content-type", "text/event-stream")
-                .set_body_string(body),
-        )
-        .mount(&server)
-        .await;
-
-    let (agent, _key_tmp) = build_agent(&server.uri());
-    let log = ChunkLog::default();
-    let log_for_assert = log.clone();
-    client_builder_with_chunks(log)
-        .connect_with(agent, |cx: ConnectionTo<Agent>| async move {
-            cx.send_request(InitializeRequest::new(ProtocolVersion::LATEST))
-                .block_task()
-                .await?;
-            let session = cx
-                .send_request(NewSessionRequest::new(std::env::temp_dir()))
-                .block_task()
-                .await?;
-            let session_id = session.session_id.clone();
-            // Issue the prompt and cancel concurrently.
-            let prompt = cx.send_request(PromptRequest::new(
-                session_id.clone(),
-                vec![ContentBlock::Text(TextContent::new("Stream"))],
-            ));
-            // Give the shim a brief moment to begin the turn, then cancel.
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-            cx.send_notification(CancelNotification::new(session_id))?;
-            let response = prompt.block_task().await?;
-            assert!(
-                matches!(
-                    response.stop_reason,
-                    StopReason::Cancelled | StopReason::EndTurn,
-                ),
-                "expected Cancelled or EndTurn, got {:?}",
-                response.stop_reason,
-            );
-            Ok(())
-        })
-        .await
-        .expect("connection drives to completion");
-    let _ = log_for_assert.snapshot();
-}
-
-#[tokio::test]
-async fn multiple_sessions_keep_isolated_histories() {
-    let server = MockServer::start().await;
-    mount_models(&server).await;
-    // Match the body content to differentiate the two prompts.
-    Mock::given(method("POST"))
-        .and(path("/chat/completions"))
-        .and(|req: &Request| -> bool {
-            let body: serde_json::Value = match serde_json::from_slice(&req.body) {
-                Ok(value) => value,
-                Err(_) => return false,
-            };
-            body["messages"][0]["content"] == "first"
-        })
-        .respond_with(
-            ResponseTemplate::new(200)
-                .insert_header("content-type", "text/event-stream")
-                .set_body_string(sse(&[
-                    r#"{"id":"a","choices":[{"index":0,"delta":{"content":"one"},"finish_reason":"stop"}]}"#,
-                ])),
-        )
-        .mount(&server)
-        .await;
-    Mock::given(method("POST"))
-        .and(path("/chat/completions"))
-        .and(|req: &Request| -> bool {
-            let body: serde_json::Value = match serde_json::from_slice(&req.body) {
-                Ok(value) => value,
-                Err(_) => return false,
-            };
-            body["messages"][0]["content"] == "second"
-        })
-        .respond_with(
-            ResponseTemplate::new(200)
-                .insert_header("content-type", "text/event-stream")
-                .set_body_string(sse(&[
-                    r#"{"id":"b","choices":[{"index":0,"delta":{"content":"two"},"finish_reason":"stop"}]}"#,
-                ])),
-        )
-        .mount(&server)
-        .await;
-
-    let (agent, _key_tmp) = build_agent(&server.uri());
-    let log = ChunkLog::default();
-    let log_for_assert = log.clone();
-    client_builder_with_chunks(log)
-        .connect_with(agent, |cx: ConnectionTo<Agent>| async move {
-            cx.send_request(InitializeRequest::new(ProtocolVersion::LATEST))
-                .block_task()
-                .await?;
-            let session_a = cx
-                .send_request(NewSessionRequest::new(std::env::temp_dir()))
-                .block_task()
-                .await?;
-            let session_b = cx
-                .send_request(NewSessionRequest::new(std::env::temp_dir()))
-                .block_task()
-                .await?;
-            assert_ne!(session_a.session_id.0, session_b.session_id.0);
-            let r_a = cx
-                .send_request(PromptRequest::new(
-                    session_a.session_id,
-                    vec![ContentBlock::Text(TextContent::new("first"))],
-                ))
-                .block_task()
-                .await?;
-            let r_b = cx
-                .send_request(PromptRequest::new(
-                    session_b.session_id,
-                    vec![ContentBlock::Text(TextContent::new("second"))],
-                ))
-                .block_task()
-                .await?;
-            assert!(matches!(r_a.stop_reason, StopReason::EndTurn));
-            assert!(matches!(r_b.stop_reason, StopReason::EndTurn));
-            Ok(())
-        })
-        .await
-        .expect("connection drives to completion");
-    let chunks = log_for_assert.snapshot();
-    assert!(chunks.iter().any(|s| s == "one"), "got {chunks:?}");
-    assert!(chunks.iter().any(|s| s == "two"), "got {chunks:?}");
 }

@@ -1,9 +1,7 @@
 use super::RuntimeSessionId;
 
 #[must_use]
-pub(crate) fn normalized_runtime_session_id(
-    runtime_session_id: Option<&str>,
-) -> Option<RuntimeSessionId> {
+pub fn normalized_runtime_session_id(runtime_session_id: Option<&str>) -> Option<RuntimeSessionId> {
     runtime_session_id
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -11,7 +9,7 @@ pub(crate) fn normalized_runtime_session_id(
 }
 
 #[must_use]
-pub(crate) fn effective_runtime_session_key<'a>(
+pub fn effective_runtime_session_key<'a>(
     orchestration_session_id: &'a str,
     runtime_session_id: Option<&'a str>,
 ) -> &'a str {
@@ -22,7 +20,7 @@ pub(crate) fn effective_runtime_session_key<'a>(
 }
 
 #[must_use]
-pub(crate) fn matches_runtime_session_id(
+pub fn matches_runtime_session_id(
     orchestration_session_id: &str,
     runtime_session_id: Option<&str>,
     candidate: &RuntimeSessionId,

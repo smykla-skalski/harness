@@ -36,9 +36,10 @@ pub const POLICY_GRAPH_INITIAL_REVISION: u64 = 1;
 
 pub use compiler::{CompiledWorkflowPlan, CompiledWorkflowStep};
 pub(crate) use decisions::{
-    PolicyPendingGrantRequest, RecordedPolicyDecision, install_decision_sink,
-    install_pending_grant_sink, record_pending_grant, record_policy_decision,
+    PolicyPendingGrantRequest, RecordedPolicyDecision, record_pending_grant, record_policy_decision,
 };
+#[cfg(any(test, feature = "daemon-runtime"))]
+pub(crate) use decisions::{install_decision_sink, install_pending_grant_sink};
 #[cfg(test)]
 pub(crate) use gate_cache::{
     CachedGatePolicy, cached_gate_policy, resolve_gate_policy, store_database_gate_policy_entry,
@@ -71,6 +72,7 @@ pub use store_canvas::{
     apply_set_global_enforcement, apply_set_spawn_kill_switch,
     apply_set_spawn_requires_live_policy,
 };
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use workspace::POLICY_CANVAS_WORKSPACE_VERSION;
 pub use workspace::{
     DEFAULT_POLICY_CANVAS_TITLE, MANUAL_OCR_PASTE_CANVAS_TITLE, PolicyCanvasRecord,

@@ -13,13 +13,13 @@ public enum DaemonSpawner {
     }
   }
 
-  /// Spawn `harness daemon serve --sandboxed --host 127.0.0.1 --port 0`, redirect stdout+stderr to `logURL`, and wait for the daemon to answer `daemon status`.
+  /// Spawn `harness-daemon serve --sandboxed --host 127.0.0.1 --port 0`, redirect stdout+stderr to `logURL`, and wait for the control CLI to answer `daemon status`.
   public static func spawn(client: HarnessClient, logURL: URL, readinessTimeout: TimeInterval = 30)
     throws -> Process
   {
     let process = Process()
-    process.executableURL = client.binary
-    process.arguments = ["daemon", "serve", "--sandboxed", "--host", "127.0.0.1", "--port", "0"]
+    process.executableURL = client.daemonBinary
+    process.arguments = ["serve", "--sandboxed", "--host", "127.0.0.1", "--port", "0"]
     process.environment = client.mergedEnvironment()
 
     try FileManager.default.createDirectory(

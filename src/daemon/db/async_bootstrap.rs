@@ -23,7 +23,10 @@ INSERT INTO _sqlx_migrations (version, description, success, checksum, execution
 VALUES (?1, ?2, TRUE, ?3, 0)";
 const UPDATE_SQLX_MIGRATION_METADATA_SQL: &str =
     "UPDATE _sqlx_migrations SET description = ?2, checksum = ?3 WHERE version = ?1";
+#[cfg(not(feature = "standalone-daemon"))]
 static DAEMON_DB_MIGRATOR: Migrator = sqlx::migrate!("./src/daemon/db/migrations");
+#[cfg(feature = "standalone-daemon")]
+static DAEMON_DB_MIGRATOR: Migrator = sqlx::migrate!("../../src/daemon/db/migrations");
 
 pub(super) async fn ensure_async_schema(pool: &SqlitePool) -> Result<(), CliError> {
     if !table_exists(pool, "schema_meta").await? {

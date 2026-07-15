@@ -112,6 +112,7 @@ mod tasks;
 #[cfg(test)]
 mod tests;
 
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use lifecycle::{apply_leave_session, apply_update_session_title};
 pub use lifecycle::{
     assign_role, end_session, join_session, join_session_with_fallback, leave_session,

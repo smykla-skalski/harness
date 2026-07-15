@@ -1,0 +1,61 @@
+[package]
+name = "harness-bridge"
+version = "48.0.0"
+edition = "2024"
+rust-version = "1.94"
+
+[lib]
+test = false
+
+[[bin]]
+name = "harness-bridge"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+agent-client-protocol = { version = "=0.12.1", features = ["unstable_session_model"] }
+async-trait = "0.1.83"
+base64 = "0.22.1"
+chrono = { version = "0.4.44", features = ["serde"] }
+clap = { version = "4.6.0", features = ["derive", "env"] }
+crossterm = "0.29.0"
+fs2 = "0.4.3"
+fs-err = "3.3.0"
+harness-hook = { path = "../harness-hook", version = "48.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "48.0.0" }
+harness-telemetry = { path = "../harness-telemetry", version = "48.0.0" }
+hex = "0.4.3"
+nix = { version = "0.31", features = ["signal"] }
+notify = "8.2.0"
+portable-pty = "0.9.0"
+regex = "1.11.1"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+sha2 = "0.11.0"
+signal-hook = "0.4"
+tempfile = "3.27.0"
+thiserror = "2.0.18"
+tokio = { version = "1.50.0", features = ["rt-multi-thread", "time", "process", "io-std", "io-util", "sync", "macros", "net"] }
+tokio-util = { version = "0.7.18", features = ["compat"] }
+tracing = "0.1.44"
+user_dirs = "0.2.0"
+uuid = { version = "1.18.1", features = ["serde", "v4"] }
+uzers = { version = "0.12.2", default-features = false }
+vt100 = "0.16.2"
+
+[dev-dependencies]
+temp-env = { version = "=0.3.6", features = ["async_closure"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+
+[features]
+default = ["bridge-runtime"]
+bridge-runtime = []
+daemon-runtime = []
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

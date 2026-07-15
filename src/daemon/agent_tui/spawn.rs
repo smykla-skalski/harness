@@ -11,6 +11,7 @@ use crate::agents::runtime::{
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags::RuntimeHookFlags;
+#[cfg(feature = "daemon-runtime")]
 use crate::session::types::SessionRole;
 use crate::setup::wrapper;
 use crate::workspace::{dirs_home, host_home_dir};
@@ -130,6 +131,7 @@ pub(crate) fn send_initial_prompt(process: &AgentTuiProcess, prompt: &str) -> Re
     clippy::too_many_arguments,
     reason = "auto-join prompt generation needs to thread join flags explicitly"
 )]
+#[cfg(feature = "daemon-runtime")]
 pub(crate) fn build_auto_join_prompt(
     runtime: &str,
     session_id: &str,

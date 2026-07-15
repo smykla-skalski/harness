@@ -9,7 +9,7 @@ private enum DaemonRecoveryToastPreview {
     "HARNESS_MONITOR_RUNTIME_LANE='monitor' "
     + "HARNESS_DAEMON_DATA_HOME='/Users/monitor/Library/Group Containers/"
     + "Q498EB36N4.io.harnessmonitor/runtime-lanes/monitor' "
-    + "HARNESS_CODEX_WS_PORT='20336' harness daemon dev"
+    + "HARNESS_CODEX_WS_PORT='20336' harness-daemon dev"
 
   @MainActor
   static func makeToast() -> ToastSlice {

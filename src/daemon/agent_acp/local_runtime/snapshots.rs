@@ -121,6 +121,7 @@ pub(super) fn stream_event(event: &str, payload: &impl Serialize) -> Option<Stre
     })
 }
 
+#[cfg(feature = "daemon-runtime")]
 pub(super) fn preferred_project_dir(
     worktree_path: &Path,
     project_dir: Option<&Path>,

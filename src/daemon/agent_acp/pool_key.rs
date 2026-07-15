@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::io;
 use std::path::Path;
 
 use sha2::{Digest, Sha256};
@@ -42,6 +43,7 @@ struct IdentityPayload {
     effort: Option<String>,
     allow_custom_model: bool,
     env_fingerprint: String,
+    credential_fingerprint: Option<String>,
 }
 
 impl AcpProcessPoolKey {
@@ -63,7 +65,8 @@ impl AcpProcessPoolKey {
         _session_id: &str,
         spawn: &SpawnConfig,
         project_dir: &Path,
-    ) -> Self {
+        credential_token: Option<&str>,
+    ) -> io::Result<Self> {
         let mode = if request.record_permissions {
             "recording"
         } else {
@@ -80,8 +83,8 @@ impl AcpProcessPoolKey {
             .to_string();
         let payload = IdentityPayload {
             agent_descriptor_id: descriptor.id.clone(),
-            resolved_command: spawn.resolved_command_for_identity(),
-            args: spawn.args.clone(),
+            resolved_command: spawn.resolved_command_for_identity()?,
+            args: spawn_args_for_identity(descriptor.id.as_str(), &spawn.args),
             canonical_root,
             protocol_version: "v1".to_string(),
             // Stage-1 ACP runtime emits text/event stream mode only.
@@ -91,14 +94,36 @@ impl AcpProcessPoolKey {
             effort: request.effort.clone(),
             allow_custom_model: request.allow_custom_model,
             env_fingerprint,
+            credential_fingerprint: credential_token.map(secret_hash),
         };
         let canonical = format!("acp-process-{}", hash_identity_payload(&payload));
-        Self { canonical }
+        Ok(Self { canonical })
     }
 
     pub(super) fn as_str(&self) -> &str {
         &self.canonical
     }
+}
+
+fn spawn_args_for_identity(descriptor_id: &str, args: &[String]) -> Vec<String> {
+    if descriptor_id != "openrouter" {
+        return args.to_vec();
+    }
+    let mut normalized = Vec::with_capacity(args.len());
+    let mut args = args.iter();
+    while let Some(arg) = args.next() {
+        if arg == "--api-key-file" {
+            normalized.push(arg.clone());
+            if args.next().is_some() {
+                normalized.push("[one-shot-credential]".to_string());
+            }
+        } else if arg.starts_with("--api-key-file=") {
+            normalized.push("--api-key-file=[one-shot-credential]".to_string());
+        } else {
+            normalized.push(arg.clone());
+        }
+    }
+    normalized
 }
 
 fn hash_identity_environment(
@@ -205,23 +230,96 @@ mod tests {
             "session",
             &spawn,
             Path::new("/tmp"),
-        );
+            None,
+        )
+        .expect("build base process key");
         let custom_key = AcpProcessPoolKey::from_spawn_inputs(
             &descriptor,
             &custom,
             "session",
             &spawn,
             Path::new("/tmp"),
-        );
+            None,
+        )
+        .expect("build custom process key");
         let effort_key = AcpProcessPoolKey::from_spawn_inputs(
             &descriptor,
             &higher_effort,
             "session",
             &spawn,
             Path::new("/tmp"),
-        );
+            None,
+        )
+        .expect("build effort process key");
 
         assert_ne!(base_key.as_str(), custom_key.as_str());
         assert_ne!(base_key.as_str(), effort_key.as_str());
+    }
+
+    #[test]
+    fn openrouter_pool_key_ignores_random_path_and_rotates_with_token() {
+        let descriptor = AcpAgentDescriptor {
+            id: "openrouter".to_string(),
+            display_name: "OpenRouter".to_string(),
+            capabilities: Vec::new(),
+            launch_command: "harness-openrouter-agent".to_string(),
+            launch_args: Vec::new(),
+            env_passthrough: Vec::new(),
+            spawn_configuration: Default::default(),
+            model_catalog: None,
+            install_hint: None,
+            session_configuration: Default::default(),
+            doctor_probe: crate::agents::acp::catalog::DoctorProbe {
+                command: "harness-openrouter-agent".to_string(),
+                args: vec!["--version".to_string()],
+            },
+            prompt_timeout_seconds: None,
+            excluded_from_initial_default: false,
+            bundled_with_harness: true,
+        };
+        let spawn = |path: &str| SpawnConfig {
+            command: "/tmp/harness-openrouter-agent".to_string(),
+            args: vec!["--api-key-file".to_string(), path.to_string()],
+            env_passthrough: Vec::new(),
+            env_overrides: Vec::new(),
+            working_dir: Path::new("/tmp").to_path_buf(),
+        };
+        let request = AcpAgentStartRequest {
+            agent: "openrouter".to_string(),
+            ..AcpAgentStartRequest::default()
+        };
+        let first_spawn = spawn("/tmp/harness-openrouter-first/api-key");
+        let second_spawn = spawn("/tmp/harness-openrouter-second/api-key");
+        let first = AcpProcessPoolKey::from_spawn_inputs(
+            &descriptor,
+            &request,
+            "session",
+            &first_spawn,
+            Path::new("/tmp"),
+            Some("sk-stable"),
+        )
+        .expect("build first process key");
+        let same_token = AcpProcessPoolKey::from_spawn_inputs(
+            &descriptor,
+            &request,
+            "session",
+            &second_spawn,
+            Path::new("/tmp"),
+            Some("sk-stable"),
+        )
+        .expect("build same-token process key");
+        let rotated_token = AcpProcessPoolKey::from_spawn_inputs(
+            &descriptor,
+            &request,
+            "session",
+            &second_spawn,
+            Path::new("/tmp"),
+            Some("sk-rotated"),
+        )
+        .expect("build rotated-token process key");
+
+        assert_eq!(first, same_token);
+        assert_ne!(first, rotated_token);
+        assert!(!first.as_str().contains("sk-stable"));
     }
 }

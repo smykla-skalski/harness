@@ -32,7 +32,7 @@ atomic_write() {
 
 add_entry() {
   ensure_file
-  jq '.mcpServers //= {} | .mcpServers["harness-monitor"] = {"command":"harness","args":["mcp","serve"]}' \
+  jq '.mcpServers //= {} | .mcpServers["harness-monitor"] = {"command":"harness-mcp","args":["serve"]}' \
     "$target_file" | atomic_write
   printf 'registered harness-monitor in %s\n' "$target_file"
 }

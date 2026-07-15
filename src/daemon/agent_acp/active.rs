@@ -9,14 +9,13 @@ use crate::agents::acp::connection::EventBatch;
 use crate::agents::acp::supervision::{AcpSessionSupervisor, watchdog_loop};
 use crate::agents::kind::DisconnectReason;
 use crate::agents::runtime::event::ConversationEvent;
-use crate::daemon::db::DaemonDb;
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::CliError;
 use crate::session::types::{AgentStatus, ManagedAgentKind};
 use crate::workspace::utc_now;
 
 use super::event_frame::AcpEventBatchPayload;
-use super::manager::{AcpAgentManagerHandle, AcpAgentSnapshot};
+use super::manager::{AcpAgentManagerHandle, AcpAgentSnapshot, AcpManagerPort};
 
 const STDERR_TAIL_LIMIT: usize = 16 * 1024;
 const STDERR_READER_JOIN_GRACE: Duration = Duration::from_millis(100);
@@ -61,7 +60,7 @@ fn recover_lock<'a, T>(mutex: &'a Mutex<T>, label: &str) -> MutexGuard<'a, T> {
 
 #[derive(Clone)]
 pub(super) struct LiveEventPersistence {
-    db: Arc<Mutex<DaemonDb>>,
+    port: Arc<dyn AcpManagerPort>,
     session_id: String,
     agent_id: String,
     runtime: String,
@@ -69,13 +68,13 @@ pub(super) struct LiveEventPersistence {
 
 impl LiveEventPersistence {
     pub(super) fn new(
-        db: Arc<Mutex<DaemonDb>>,
+        port: Arc<dyn AcpManagerPort>,
         session_id: &str,
         agent_id: &str,
         runtime: &str,
     ) -> Self {
         Self {
-            db,
+            port,
             session_id: session_id.to_string(),
             agent_id: agent_id.to_string(),
             runtime: runtime.to_string(),
@@ -83,7 +82,7 @@ impl LiveEventPersistence {
     }
 
     fn persist(&self, events: &[ConversationEvent]) -> Result<(), CliError> {
-        recover_lock(&self.db, "acp-live-events").append_conversation_events(
+        self.port.persist_conversation_events(
             &self.session_id,
             &self.agent_id,
             &self.runtime,
@@ -201,7 +200,7 @@ fn process_incident_event(snapshot: &AcpAgentSnapshot) -> Option<StreamEvent> {
         | DisconnectReason::Unknown { .. } => return None,
     };
     let (exit_code, exit_signal) = match reason {
-        DisconnectReason::ProcessExited { code, signal } => (*code, *signal),
+        DisconnectReason::ProcessExited { code, signal } => (code.to_owned(), signal.to_owned()),
         _ => (None, None),
     };
     let payload = AcpProcessIncidentPayload {
@@ -255,5 +254,5 @@ fn reason_kind(reason: &DisconnectReason) -> String {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod tests;

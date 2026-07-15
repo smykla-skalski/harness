@@ -1,7 +1,7 @@
 //! End-to-end coverage for `bridge.lock` acquisition and the regression where
 //! the sandboxed daemon deleted `bridge.json` on a spurious watcher trigger.
 //!
-//! Commit 2 tests: lock lifecycle during `harness bridge start`.
+//! Commit 2 tests: lock lifecycle during `harness-bridge start`.
 //! Commit 3 tests: `bridge_json_survives_synthetic_watcher_trigger`.
 
 #![cfg(target_os = "macos")]
@@ -55,8 +55,8 @@ fn wait_until<F: Fn() -> bool>(predicate: F) -> Result<(), String> {
     }
 }
 
-fn harness_binary() -> PathBuf {
-    assert_cmd::cargo::cargo_bin("harness")
+fn bridge_binary() -> PathBuf {
+    assert_cmd::cargo::cargo_bin("harness-bridge")
 }
 
 fn legacy_codex_capabilities() -> std::collections::BTreeMap<String, HostBridgeCapabilityManifest> {
@@ -214,8 +214,8 @@ impl Drop for LegacyBridgeServer {
     }
 }
 
-/// `harness bridge start` must create `bridge.lock` and hold it exclusively
-/// while serving. A second concurrent `harness bridge start` must fail with
+/// `harness-bridge start` must create `bridge.lock` and hold it exclusively
+/// while serving. A second concurrent `harness-bridge start` must fail with
 /// a non-zero exit code.
 #[test]
 fn bridge_start_holds_exclusive_bridge_lock_while_serving() {
@@ -232,8 +232,8 @@ fn bridge_start_holds_exclusive_bridge_lock_while_serving() {
     let host_home = host_home.to_str().expect("utf8 host home").to_string();
 
     let mut first_bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
-            .args(["bridge", "start", "--capability", "agent-tui"])
+        Command::new(bridge_binary())
+            .args(["start", "--capability", "agent-tui"])
             .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
             .env("HARNESS_HOST_HOME", &host_home)
             .env("HOME", &host_home)
@@ -273,8 +273,8 @@ fn bridge_start_holds_exclusive_bridge_lock_while_serving() {
     }
 
     // Second bridge start must fail because the lock is held.
-    let second_status = Command::new(harness_binary())
-        .args(["bridge", "start", "--capability", "agent-tui"])
+    let second_status = Command::new(bridge_binary())
+        .args(["start", "--capability", "agent-tui"])
         .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
         .env("HARNESS_HOST_HOME", &host_home)
         .env("HOME", &host_home)
@@ -300,7 +300,7 @@ fn bridge_start_holds_exclusive_bridge_lock_while_serving() {
 /// A synthetic `bridge.json` with a fake pid is written to the daemon root.
 /// A real `bridge.lock` flock is held to simulate a live bridge. The daemon
 /// watcher logic (`apply_bridge_state_to_manifest` / `load_running_bridge_state`)
-/// is exercised via `harness daemon status` — a command that reads the manifest
+/// is exercised via `harness-bridge status` — a command that reads the manifest
 /// without requiring a live daemon socket. The test then verifies:
 ///
 /// 1. `bridge.json` still exists (the consumer path never deletes it).
@@ -351,10 +351,10 @@ fn bridge_json_survives_synthetic_watcher_trigger() {
     )
     .expect("write bridge-config.json");
 
-    // Run `harness bridge status` — this exercises load_running_bridge_state
+    // Run `harness-bridge status` — this exercises load_running_bridge_state
     // on the host-CLI path. bridge.json should survive regardless.
-    let status = Command::new(harness_binary())
-        .args(["bridge", "status"])
+    let status = Command::new(bridge_binary())
+        .arg("status")
         .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
         .env("HARNESS_HOST_HOME", &host_home)
         .env("HOME", &host_home)
@@ -364,7 +364,7 @@ fn bridge_json_survives_synthetic_watcher_trigger() {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .expect("run harness bridge status");
+        .expect("run harness-bridge status");
     // status may succeed or fail (no live socket) but must not crash.
     let _ = status;
 
@@ -377,8 +377,8 @@ fn bridge_json_survives_synthetic_watcher_trigger() {
     // still not be deleted by a consumer-path read.
     drop(lock_file);
 
-    let _status2 = Command::new(harness_binary())
-        .args(["bridge", "status"])
+    let _status2 = Command::new(bridge_binary())
+        .arg("status")
         .env("HARNESS_DAEMON_DATA_HOME", &daemon_data_home)
         .env("HARNESS_HOST_HOME", &host_home)
         .env("HOME", &host_home)
@@ -388,7 +388,7 @@ fn bridge_json_survives_synthetic_watcher_trigger() {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .expect("run harness bridge status after lock release");
+        .expect("run harness-bridge status after lock release");
 
     // Even after the lock is released, load_running_bridge_state must not
     // delete bridge.json. This locks in the stronger invariant: the loader

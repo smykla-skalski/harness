@@ -67,7 +67,7 @@ Because the handshake uses the local network, the iOS app surfaces a dedicated `
 
 ### Phone to remote daemon (internet)
 
-`harness daemon remote pair create` produces a short-lived `harness://remote-pair` invitation containing the HTTPS endpoint, one-time code, requested role/scopes, expiry, and the daemon certificate's SPKI SHA-256 pin. The phone accepts the same QR, deep-link, and manual-entry flows as local pairing. `URLSessionMobileRemoteDaemonPairingTransport` claims `POST /v1/remote/pair/claim` through a pinning URLSession and binds the claim to a stable client id derived from the phone identity.
+`harness-daemon remote pair create` produces a short-lived `harness://remote-pair` invitation containing the HTTPS endpoint, one-time code, requested role/scopes, expiry, and the daemon certificate's SPKI SHA-256 pin. The phone accepts the same QR, deep-link, and manual-entry flows as local pairing. `URLSessionMobileRemoteDaemonPairingTransport` claims `POST /v1/remote/pair/claim` through a pinning URLSession and binds the claim to a stable client id derived from the phone identity.
 
 The daemon returns an opaque per-client bearer token. `MobileRemoteDaemonPairingCoordinator` stores it only inside the existing Keychain-backed `MobilePairedStationCredential`, together with the endpoint, client id, role/scopes, token hint, paired time, and SPKI pin. Invitation endpoints must be plain HTTPS origins with no credentials, query, fragment, or path.
 

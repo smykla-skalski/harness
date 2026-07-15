@@ -4,7 +4,7 @@ import SwiftUI
 @MainActor
 private enum FeedbackToastBalancePreviewData {
   static let restartCommand =
-    "HARNESS_MONITOR_RUNTIME_LANE='monitor' harness daemon dev"
+    "HARNESS_MONITOR_RUNTIME_LANE='monitor' harness-daemon dev"
 
   static func makeCompactToast() -> ToastSlice {
     let toast = makeToast()

@@ -120,4 +120,5 @@ pub fn shorten_path(path: &Path) -> String {
 }
 
 #[cfg(test)]
+#[path = "paths/tests.rs"]
 mod tests;

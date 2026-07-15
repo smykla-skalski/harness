@@ -6,6 +6,7 @@ mod file_comment;
 pub(crate) mod files;
 mod github;
 mod logic;
+#[cfg(feature = "daemon-runtime")]
 pub(crate) mod policy;
 pub(crate) mod review_thread_resolve;
 pub(crate) mod timeline;
@@ -26,7 +27,9 @@ pub use file_comment::{
 };
 #[allow(unused_imports)] // RegistryEntry + RepoKey are used by daemon-service tests.
 pub(crate) use files::local_clone::{LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey};
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use files::preview_from_patch;
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use files::viewed::{ViewedMutation, classify_outcome};
 pub use files::{
     FilesLargeDiffStrategy, HarnessCodeLanguage, LocalCloneListEntry, ReviewFile,
@@ -38,6 +41,7 @@ pub use files::{
     ReviewsFilesViewedRequest, ReviewsFilesViewedResponse, ReviewsRateLimitSnapshot,
     image_mime_for_path, infer_language,
 };
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use github::ReviewsGitHubClient;
 pub use types::{
     PullRequestReview, ReviewActionPreviewTarget, ReviewActionResult, ReviewBackportSource,

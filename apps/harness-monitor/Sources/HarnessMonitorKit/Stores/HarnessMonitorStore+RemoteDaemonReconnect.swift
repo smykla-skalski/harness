@@ -1,5 +1,15 @@
 import Foundation
 
+protocol RemoteDaemonReconnectSleeping: Sendable {
+  func sleep(for delay: Duration) async throws
+}
+
+struct LiveRemoteDaemonReconnectSleeper: RemoteDaemonReconnectSleeping {
+  func sleep(for delay: Duration) async throws {
+    try await Task.sleep(for: delay)
+  }
+}
+
 extension HarnessMonitorStore {
   var remoteDaemonReconnectTask: Task<Void, Never>? {
     get { connection.remoteDaemonReconnectTask }
@@ -46,7 +56,7 @@ extension HarnessMonitorStore {
         detail: "Remote daemon unavailable; retrying after \(delay) (attempt \(attempt + 1))"
       )
       do {
-        try await Task.sleep(for: delay)
+        try await connection.remoteDaemonReconnectSleeper.sleep(for: delay)
       } catch {
         return
       }
@@ -86,10 +96,11 @@ extension HarnessMonitorStore {
     guard let error else {
       return true
     }
+    // A disconnected URLSession/WebSocket can surface URLError.cancelled even
+    // though the store's observation lifecycle is still active. The task and
+    // lifecycle guards above distinguish that transport error from an
+    // intentional cancellation.
     if error is CancellationError || error is RemoteDaemonProfileError {
-      return false
-    }
-    if let urlError = error as? URLError, urlError.code == .cancelled {
       return false
     }
     if let apiError = error as? HarnessMonitorAPIError,

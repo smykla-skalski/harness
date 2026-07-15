@@ -5,7 +5,7 @@ use std::process::{Command, Stdio};
 
 use sha2::{Digest, Sha256};
 
-use crate::daemon::service;
+use crate::daemon::sandboxed_from_env;
 use crate::daemon::state::{self, HostBridgeCapabilityManifest, HostBridgeManifest};
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::{read_json_typed, write_json_pretty};
@@ -61,7 +61,7 @@ impl fmt::Debug for BridgeLockGuard {
 /// Acquire the exclusive `bridge.lock` for the current process lifetime.
 ///
 /// Must be called before `run_bridge_server` binds the Unix socket so that a
-/// racing second `harness bridge start` cannot unlink the live socket before
+/// racing second `harness-bridge start` cannot unlink the live socket before
 /// its own lock acquisition fails.
 ///
 /// # Errors
@@ -72,7 +72,7 @@ pub(crate) fn acquire_bridge_lock_exclusive() -> Result<BridgeLockGuard, CliErro
     state::acquire_flock_exclusive(&bridge_lock_path(), "bridge")
         .map_err(|_| {
             CliErrorKind::workflow_io(format!(
-                "another `harness bridge` instance is already running at {}",
+                "another `harness-bridge` instance is already running at {}",
                 bridge_lock_path().display()
             ))
             .into()
@@ -246,7 +246,7 @@ fn resolve_running_bridge_from_rpc(
 
 #[must_use]
 fn should_use_pid_fallback(mode: LivenessMode) -> bool {
-    matches!(mode, LivenessMode::HostAuthoritative) && !service::sandboxed_from_env()
+    matches!(mode, LivenessMode::HostAuthoritative) && !sandboxed_from_env()
 }
 
 fn resolve_running_bridge_from_pid(
@@ -430,7 +430,7 @@ pub fn codex_websocket_endpoint() -> Result<Option<String>, CliError> {
 /// # Errors
 /// Returns `SANDBOX001` when the current process is sandboxed.
 pub fn ensure_host_context(feature: &'static str) -> Result<(), CliError> {
-    if service::sandboxed_from_env() {
+    if sandboxed_from_env() {
         return Err(CliErrorKind::sandbox_feature_disabled(feature).into());
     }
     Ok(())

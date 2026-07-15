@@ -17,8 +17,8 @@ use crate::daemon::service as daemon_service;
 use crate::session::service::{self as session_service, TaskSpec};
 use crate::session::storage as session_storage;
 use crate::session::types::{
-    AgentRegistration, AgentStatus, ManagedAgentRef, SessionMetrics, SessionRole, SessionState,
-    SessionStatus, TaskSeverity, TaskSource, CURRENT_VERSION,
+    AgentRegistration, AgentStatus, CURRENT_VERSION, ManagedAgentRef, SessionMetrics, SessionRole,
+    SessionState, SessionStatus, TaskSeverity, TaskSource,
 };
 
 static ASYNC_HARNESS_ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -110,9 +110,7 @@ pub(super) async fn controller_with_async_session_state(
     )
 }
 
-pub(super) async fn with_isolated_async_harness_env<T, F>(
-    action: impl FnOnce(PathBuf) -> F,
-) -> T
+pub(super) async fn with_isolated_async_harness_env<T, F>(action: impl FnOnce(PathBuf) -> F) -> T
 where
     F: Future<Output = T>,
 {

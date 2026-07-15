@@ -37,7 +37,7 @@ Roles: `leader`, `observer`, `worker`, `reviewer`, `improver`.
 ## Task board
 
 Task-board commands require a running daemon with database-backed task-board
-storage. Start Harness Monitor or run `harness daemon dev` first.
+storage. Start Harness Monitor or run `harness-daemon dev` first.
 
 ```
 harness task-board create --title "..." [--body "..."] [--priority <priority>] [--agent-mode <mode>] [--project-id <id>] [--tag <tag>] [--id <id>]

@@ -5,7 +5,7 @@ import Foundation
 /// - `managed`: Harness Monitor registers and starts the daemon via
 ///   `SMAppService`.
 /// - `external`: the daemon is launched by the developer in a terminal
-///   via `harness daemon dev`; the app only reads the manifest and
+///   via `harness-daemon dev`; the app only reads the manifest and
 ///   connects. Supported in development and production when the app can
 ///   resolve the daemon manifest through the shared runtime root.
 public enum DaemonOwnership: String, Equatable, Hashable, Sendable, CaseIterable {

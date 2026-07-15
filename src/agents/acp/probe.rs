@@ -1,41 +1,18 @@
 use std::io;
-use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use std::sync::{LazyLock, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use serde::{Deserialize, Serialize};
+pub use harness_protocol::managed_agents::acp::{
+    AcpAuthState, AcpRuntimeProbe, AcpRuntimeProbeResponse,
+};
 use tracing::warn;
 
 use crate::workspace::utc_now;
 
 use super::catalog::{AcpAgentDescriptor, acp_agents};
 use super::program::resolve_program;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct AcpRuntimeProbeResponse {
-    pub probes: Vec<AcpRuntimeProbe>,
-    pub checked_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct AcpRuntimeProbe {
-    pub agent_id: String,
-    pub display_name: String,
-    pub binary_present: bool,
-    pub auth_state: AcpAuthState,
-    pub version: Option<String>,
-    pub install_hint: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum AcpAuthState {
-    Ready,
-    Unknown,
-    Unavailable,
-}
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 const PROBE_CACHE_TTL: Duration = Duration::from_secs(30);
@@ -74,6 +51,17 @@ pub fn probe_acp_agents_cached() -> AcpRuntimeProbeResponse {
 /// Panics if the process-wide probe cache mutex is poisoned.
 #[must_use]
 pub fn cached_probe_snapshot() -> Option<AcpRuntimeProbeResponse> {
+    cached_probe_snapshot_with(spawn_routed_probe_cache_refresh)
+}
+
+/// Return the latest process-local probe snapshot, scheduling a background
+/// refresh in this process when needed.
+#[must_use]
+pub(crate) fn local_cached_probe_snapshot() -> Option<AcpRuntimeProbeResponse> {
+    cached_probe_snapshot_with(spawn_local_probe_cache_refresh)
+}
+
+fn cached_probe_snapshot_with(spawn_refresh: fn()) -> Option<AcpRuntimeProbeResponse> {
     let mut should_refresh = false;
     let snapshot = {
         let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
@@ -101,7 +89,7 @@ pub fn cached_probe_snapshot() -> Option<AcpRuntimeProbeResponse> {
     };
 
     if should_refresh {
-        spawn_probe_cache_refresh();
+        spawn_refresh();
     }
 
     snapshot
@@ -112,6 +100,10 @@ pub fn cached_probe_snapshot() -> Option<AcpRuntimeProbeResponse> {
 /// # Panics
 /// Panics if the process-wide probe cache mutex is poisoned.
 pub fn schedule_probe_cache_refresh() {
+    schedule_probe_cache_refresh_with(spawn_routed_probe_cache_refresh);
+}
+
+fn schedule_probe_cache_refresh_with(spawn_refresh: fn()) {
     let should_refresh = {
         let mut cache = PROBE_CACHE.lock().expect("ACP probe cache lock");
         let entry_is_fresh = cache.entry.as_ref().is_some_and(probe_cache_entry_is_fresh);
@@ -124,7 +116,47 @@ pub fn schedule_probe_cache_refresh() {
     };
 
     if should_refresh {
-        spawn_probe_cache_refresh();
+        spawn_refresh();
+    }
+}
+
+#[cfg(feature = "daemon-runtime")]
+fn bridge_cached_probe_snapshot() -> Result<Option<AcpRuntimeProbeResponse>, crate::errors::CliError>
+{
+    use crate::daemon::bridge::{BridgeCapability, BridgeClient};
+
+    BridgeClient::for_capability(BridgeCapability::Acp).and_then(|bridge| bridge.acp_probe())
+}
+
+fn spawn_routed_probe_cache_refresh() {
+    #[cfg(feature = "daemon-runtime")]
+    if crate::daemon::sandboxed_from_env() {
+        spawn_bridge_probe_cache_refresh();
+        return;
+    }
+    spawn_local_probe_cache_refresh();
+}
+
+#[cfg(feature = "daemon-runtime")]
+fn spawn_bridge_probe_cache_refresh() {
+    let result = thread::Builder::new()
+        .name("acp-bridge-probe-refresh".to_string())
+        .spawn(refresh_probe_cache_from_bridge);
+    if let Err(error) = result {
+        clear_probe_cache_refresh_flag();
+        warn!(%error, "failed to spawn host bridge ACP probe refresh");
+    }
+}
+
+#[cfg(feature = "daemon-runtime")]
+fn refresh_probe_cache_from_bridge() {
+    match bridge_cached_probe_snapshot() {
+        Ok(Some(response)) => store_probe_cache(response),
+        Ok(None) => clear_probe_cache_refresh_flag(),
+        Err(error) => {
+            clear_probe_cache_refresh_flag();
+            warn!(%error, "failed to refresh ACP runtime probe from host bridge");
+        }
     }
 }
 
@@ -170,8 +202,7 @@ pub fn probe_descriptor(descriptor: &AcpAgentDescriptor) -> AcpRuntimeProbe {
 }
 
 fn run_probe_command(descriptor: &AcpAgentDescriptor) -> io::Result<Output> {
-    let program = resolve_program(&descriptor.doctor_probe.command)
-        .unwrap_or_else(|| PathBuf::from(&descriptor.doctor_probe.command));
+    let program = resolve_program(&descriptor.doctor_probe.command)?;
     let mut child = Command::new(program)
         .args(&descriptor.doctor_probe.args)
         .stdout(Stdio::piped())
@@ -203,14 +234,14 @@ fn probe_cache_entry_is_fresh(entry: &ProbeCacheEntry) -> bool {
     clippy::cognitive_complexity,
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
-fn spawn_probe_cache_refresh() {
-    if let Err(error) = spawn_probe_cache_refresh_thread() {
+fn spawn_local_probe_cache_refresh() {
+    if let Err(error) = spawn_local_probe_cache_refresh_thread() {
         clear_probe_cache_refresh_flag();
         warn!(%error, "failed to spawn ACP runtime probe refresh");
     }
 }
 
-fn spawn_probe_cache_refresh_thread() -> io::Result<()> {
+fn spawn_local_probe_cache_refresh_thread() -> io::Result<()> {
     thread::Builder::new()
         .name("acp-probe-refresh".to_string())
         .spawn(|| {
@@ -305,6 +336,30 @@ mod tests {
         let probe = probe_descriptor(&descriptor("printf", &["fake 1.2.3\n"]));
         assert!(probe.binary_present);
         assert_eq!(probe.version.as_deref(), Some("fake 1.2.3"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn probe_never_uses_a_path_decoy_for_a_managed_program() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path_dir = tempfile::tempdir().expect("path tempdir");
+        let command = "harness-probe-path-decoy-781e91c9";
+        let binary = path_dir.path().join(command);
+        fs_err::write(&binary, "#!/bin/sh\nprintf 'decoy 1.0.0\\n'\n").expect("write path decoy");
+        let mut permissions = binary.metadata().expect("decoy metadata").permissions();
+        permissions.set_mode(0o755);
+        fs_err::set_permissions(&binary, permissions).expect("make path decoy executable");
+
+        let probe = temp_env::with_var(
+            "PATH",
+            Some(path_dir.path().to_str().expect("path tempdir string")),
+            || probe_descriptor(&descriptor(command, &[])),
+        );
+
+        assert!(!probe.binary_present);
+        assert_eq!(probe.auth_state, AcpAuthState::Unavailable);
+        assert_eq!(probe.version, None);
     }
 
     #[test]

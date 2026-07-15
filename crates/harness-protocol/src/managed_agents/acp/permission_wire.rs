@@ -1,8 +1,8 @@
 use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{AcpPermissionBatch, AcpPermissionItem};
-use crate::session::types::ManagedAgentKind;
+use super::models::{AcpPermissionBatch, AcpPermissionItem};
+use crate::session::ManagedAgentKind;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]

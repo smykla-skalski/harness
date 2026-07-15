@@ -16,9 +16,10 @@ use super::*;
 
 #[test]
 fn render_launch_agent_plist_contains_expected_fields() {
-    let plist = render_launch_agent_plist(Path::new("/usr/local/bin/harness"));
+    let plist = render_launch_agent_plist(Path::new("/usr/local/bin/harness-daemon"));
     assert!(plist.contains(LAUNCH_AGENT_LABEL));
-    assert!(plist.contains("<string>daemon</string>"));
+    assert!(plist.contains("<string>/usr/local/bin/harness-daemon</string>"));
+    assert!(!plist.contains("<string>daemon</string>"));
     assert!(plist.contains("<string>serve</string>"));
 }
 

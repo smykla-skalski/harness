@@ -79,7 +79,7 @@ collect_stale_lines() {
   stale_scan_refresh_ps
   stale_lines=()
 
-  # 1. Orphan cargo-built harness daemon/bridge processes from any target dir
+  # 1. Orphan cargo-built harness-daemon/harness-bridge processes from any target dir
   #    (covers debug, release, and dev/<triple>/{debug,release}). Live bridges
   #    that still hold a Harness lock are foreground work, not stale orphans.
   local orphans
@@ -92,7 +92,7 @@ collect_stale_lines() {
   monitor_wrapper_orphans="$(stale_scan_orphan_monitor_wrapper_pids)"
   append_pid_block "orphan xcodebuild wrapper shells with no lock metadata" "$monitor_wrapper_orphans"
 
-  # 2. Live unscoped harness daemon/bridge processes only count as stale when
+  # 2. Live unscoped harness-daemon/harness-bridge processes only count as stale when
   #    they still hold the well-known locks under the real Harness roots.
   #    Lane-scoped bridges/daemons are deliberate isolated work and must not
   #    be swept by shared stale cleanup.

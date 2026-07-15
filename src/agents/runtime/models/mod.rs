@@ -23,83 +23,14 @@ mod catalogs;
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
-use serde::{Deserialize, Serialize};
+pub use harness_protocol::managed_agents::runtime_models::{
+    EffortKind, RuntimeModel, RuntimeModelCatalog, RuntimeModelTier,
+};
 
 use self::catalogs::{
     claude_catalog, codex_catalog, copilot_catalog, gemini_catalog, opencode_catalog,
     openrouter_catalog, vibe_catalog,
 };
-
-/// Coarse cost/speed tier used by the UI for ordering and by E2E tests for
-/// picking the cheapest/fastest model.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RuntimeModelTier {
-    /// Cheapest and fastest tier - used for E2E tests.
-    Fast,
-    /// Default day-to-day tier balancing cost and capability.
-    Balanced,
-    /// Maximum capability tier.
-    Max,
-}
-
-/// Reasoning/thinking parameter family exposed by a model. The UI uses this
-/// to decide which CLI parameter name to show next to the effort picker and
-/// whether to show it at all.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EffortKind {
-    /// No reasoning/thinking parameter accepted - the effort picker is hidden.
-    None,
-    /// Anthropic- and Google-style thinking budget (token-count based, but
-    /// the UI exposes coarse levels mapped to budgets internally).
-    ThinkingBudget,
-    /// `OpenAI`-style `reasoning_effort` parameter with named levels.
-    ReasoningEffort,
-}
-
-/// One model offered by a runtime.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RuntimeModel {
-    /// Provider-specific model identifier passed back to the runtime.
-    pub id: String,
-    /// Human-readable name for the picker.
-    pub display_name: String,
-    /// Cost/speed tier metadata.
-    pub tier: RuntimeModelTier,
-    /// Family of reasoning parameter the model accepts.
-    #[serde(default = "effort_kind_none")]
-    pub effort_kind: EffortKind,
-    /// Allowed effort level names (empty when `effort_kind` is `None`).
-    /// Ordered low → high so the UI can default to the first entry.
-    #[serde(default)]
-    pub effort_values: Vec<String>,
-}
-
-fn effort_kind_none() -> EffortKind {
-    EffortKind::None
-}
-
-impl RuntimeModel {
-    /// Whether this model accepts a reasoning/thinking parameter at all.
-    #[must_use]
-    pub fn supports_effort(&self) -> bool {
-        !matches!(self.effort_kind, EffortKind::None)
-    }
-}
-
-/// All models a single runtime can spawn with.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RuntimeModelCatalog {
-    /// Runtime name (claude, codex, gemini, copilot, vibe, opencode).
-    pub runtime: String,
-    /// Models the user can choose from.
-    pub models: Vec<RuntimeModel>,
-    /// Identifier of the default model when none is explicitly requested.
-    pub default: String,
-    /// Identifier of the cheapest/fastest model (E2E tests use this).
-    pub cheapest_fastest: String,
-}
 
 static REGISTRY: LazyLock<BTreeMap<&'static str, RuntimeModelCatalog>> = LazyLock::new(|| {
     let mut map = BTreeMap::new();

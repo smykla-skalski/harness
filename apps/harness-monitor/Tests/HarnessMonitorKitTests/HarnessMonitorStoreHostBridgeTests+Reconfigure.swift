@@ -243,7 +243,7 @@ extension HarnessMonitorStoreHostBridgeTests {
     #expect(result == .failed)
     let failureMessage = store.currentFailureFeedbackMessage ?? ""
     #expect(failureMessage.contains("Restart `"))
-    #expect(failureMessage.contains("harness daemon dev"))
+    #expect(failureMessage.contains("harness-daemon dev"))
     #expect(failureMessage.contains("and try again"))
     #expect(await daemon.recordedOperations() == ["warm-up"])
   }
@@ -275,7 +275,7 @@ extension HarnessMonitorStoreHostBridgeTests {
       store.hostBridgeStartCommand(
         for: "agent-tui",
         environment: hostBridgeCommandTestEnvironment
-      ) == "harness bridge start"
+      ) == "harness-bridge start"
     )
     #expect(store.daemonStatus?.manifest?.hostBridge.running == false)
   }

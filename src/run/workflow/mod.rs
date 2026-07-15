@@ -124,5 +124,5 @@ pub fn next_action(state: Option<&RunnerWorkflowState>) -> RunnerNextAction {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "standalone-worker")))]
 mod tests;

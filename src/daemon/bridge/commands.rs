@@ -95,8 +95,8 @@ fn should_skip_daemon_root_adoption(profile: &OsStr) -> bool {
 
 /// Adopt the running daemon's root for the duration of this bridge
 /// subcommand so its state writes target whatever daemon is actually
-/// running (sandboxed managed, `harness daemon dev`, or a plain
-/// `daemon serve`), regardless of which env vars the calling terminal
+/// running (sandboxed managed, `harness-daemon dev`, or a plain
+/// `harness-daemon serve`), regardless of which env vars the calling terminal
 /// had set. See [`crate::daemon::discovery`] for the scan algorithm and
 /// the strict family rules that prevent agent ↔ user lane crosstalk.
 ///
@@ -199,7 +199,7 @@ impl Execute for BridgeStartArgs {
                 return Ok(0);
             }
             return Err(CliErrorKind::workflow_io(
-                "bridge is already running with the requested configuration; use `harness bridge stop` before running it in the foreground",
+                "bridge is already running with the requested configuration; use `harness-bridge stop` before running it in the foreground",
             )
             .into());
         }
@@ -245,10 +245,10 @@ impl Execute for BridgeInstallLaunchAgentArgs {
         cleanup_legacy_bridge_artifacts();
         let config = self.config.resolve()?;
         write_bridge_config(&config.persisted)?;
-        let harness_binary = current_exe().map_err(|error| {
-            CliErrorKind::workflow_io(format!("resolve current harness binary: {error}"))
+        let bridge_binary = current_exe().map_err(|error| {
+            CliErrorKind::workflow_io(format!("resolve current harness-bridge binary: {error}"))
         })?;
-        let plist = render_launch_agent_plist(&harness_binary);
+        let plist = render_launch_agent_plist(&bridge_binary);
         let plist_path = launch_agent_plist_path()?;
         if let Some(parent) = plist_path.parent() {
             fs::create_dir_all(parent).map_err(|error| {

@@ -1,15 +1,15 @@
 //! End-to-end coverage for daemon root discovery during
-//! `harness bridge start`.
+//! `harness-bridge start`.
 //!
 //! Regression test for the bug where a plain terminal running
-//! `harness bridge start` without `HARNESS_APP_GROUP_ID` would write
+//! `harness-bridge start` without `HARNESS_APP_GROUP_ID` would write
 //! `bridge.json` to the XDG default while the sandboxed managed daemon
 //! watches the macOS app group container.
 //!
 //! The test stands up a fake running daemon at the group container path
 //! (an empty `daemon.lock` file with an exclusive flock held by the parent
 //! test process) and a distinct empty `XDG_DATA_HOME`. It then runs
-//! `harness bridge start` in a subprocess with no env vars pointing at
+//! `harness-bridge start` in a subprocess with no env vars pointing at
 //! either location and asserts the bridge state file lands at the
 //! (adopted) group container path.
 
@@ -50,9 +50,8 @@ fn bridge_start_adopts_group_container_when_xdg_is_empty() {
     let codex_port_text = codex_port.to_string();
 
     let mut bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
+        Command::new(bridge_binary())
             .args([
-                "bridge",
                 "start",
                 "--capability",
                 "codex",
@@ -88,7 +87,7 @@ fn bridge_start_adopts_group_container_when_xdg_is_empty() {
 
     // Shut the bridge down through its own control plane so the adopted
     // short socket path is unlinked instead of being stranded under `/tmp`.
-    let stop_output = run_bridge(home, &xdg, &["bridge", "stop"]);
+    let stop_output = run_bridge(home, &xdg, &["stop"]);
     let stop_text = output_text(&stop_output);
     let stop_ok = stop_output.status.success();
     let bridge_exit = wait_for_bridge_exit(&mut bridge);
@@ -132,10 +131,9 @@ fn bridge_start_personal_profile_adopts_group_container_when_profile_root_is_emp
     let codex_port = unused_local_port();
     let codex_port_text = codex_port.to_string();
 
-    let mut command = Command::new(harness_binary());
+    let mut command = Command::new(bridge_binary());
     command
         .args([
-            "bridge",
             "start",
             "--capability",
             "codex",
@@ -167,8 +165,7 @@ fn bridge_start_personal_profile_adopts_group_container_when_profile_root_is_emp
     wait_for_state_at(&adopted_state_path)
         .expect("bridge state file did not appear at adopted root");
 
-    let stop_output =
-        run_bridge_with_profile(home, &xdg, profile, &profile_data_home, &["bridge", "stop"]);
+    let stop_output = run_bridge_with_profile(home, &xdg, profile, &profile_data_home, &["stop"]);
     let stop_text = output_text(&stop_output);
     let stop_ok = stop_output.status.success();
     let bridge_exit = wait_for_bridge_exit(&mut bridge);
@@ -198,10 +195,9 @@ fn bridge_start_personal_profile_keeps_profile_root_when_no_running_daemon_exist
     let codex_port = unused_local_port();
     let codex_port_text = codex_port.to_string();
 
-    let mut command = Command::new(harness_binary());
+    let mut command = Command::new(bridge_binary());
     command
         .args([
-            "bridge",
             "start",
             "--capability",
             "codex",
@@ -233,8 +229,7 @@ fn bridge_start_personal_profile_keeps_profile_root_when_no_running_daemon_exist
     wait_for_state_at(&profile_state_path)
         .expect("bridge state file did not appear at personal profile root");
 
-    let stop_output =
-        run_bridge_with_profile(home, &xdg, profile, &profile_data_home, &["bridge", "stop"]);
+    let stop_output = run_bridge_with_profile(home, &xdg, profile, &profile_data_home, &["stop"]);
     let stop_text = output_text(&stop_output);
     let stop_ok = stop_output.status.success();
     let bridge_exit = wait_for_bridge_exit(&mut bridge);
@@ -265,10 +260,9 @@ fn bridge_start_agent_profile_keeps_profile_root_when_group_daemon_is_running() 
     let codex_port = unused_local_port();
     let codex_port_text = codex_port.to_string();
 
-    let mut command = Command::new(harness_binary());
+    let mut command = Command::new(bridge_binary());
     command
         .args([
-            "bridge",
             "start",
             "--capability",
             "codex",
@@ -300,8 +294,7 @@ fn bridge_start_agent_profile_keeps_profile_root_when_group_daemon_is_running() 
     wait_for_state_at(&profile_state_path)
         .expect("bridge state file did not appear at agent profile root");
 
-    let stop_output =
-        run_bridge_with_profile(home, &xdg, profile, &profile_data_home, &["bridge", "stop"]);
+    let stop_output = run_bridge_with_profile(home, &xdg, profile, &profile_data_home, &["stop"]);
     let stop_text = output_text(&stop_output);
     let stop_ok = stop_output.status.success();
     let bridge_exit = wait_for_bridge_exit(&mut bridge);
@@ -436,7 +429,7 @@ PY
 }
 
 fn run_bridge(home: &Path, xdg: &Path, args: &[&str]) -> Output {
-    Command::new(harness_binary())
+    Command::new(bridge_binary())
         .args(args)
         .env("XDG_DATA_HOME", xdg)
         .env("HOME", home)
@@ -446,7 +439,7 @@ fn run_bridge(home: &Path, xdg: &Path, args: &[&str]) -> Output {
         .env_remove("HARNESS_DAEMON_DATA_HOME")
         .env_remove("HARNESS_SANDBOXED")
         .output()
-        .expect("run harness")
+        .expect("run harness-bridge")
 }
 
 fn run_bridge_with_profile(
@@ -456,7 +449,7 @@ fn run_bridge_with_profile(
     profile_data_home: &Path,
     args: &[&str],
 ) -> Output {
-    Command::new(harness_binary())
+    Command::new(bridge_binary())
         .args(args)
         .env("XDG_DATA_HOME", xdg)
         .env("HOME", home)
@@ -467,11 +460,11 @@ fn run_bridge_with_profile(
         .env_remove("HARNESS_APP_GROUP_ID")
         .env_remove("HARNESS_SANDBOXED")
         .output()
-        .expect("run harness")
+        .expect("run harness-bridge")
 }
 
-fn harness_binary() -> PathBuf {
-    assert_cmd::cargo::cargo_bin("harness")
+fn bridge_binary() -> PathBuf {
+    assert_cmd::cargo::cargo_bin("harness-bridge")
 }
 
 fn unused_local_port() -> u16 {

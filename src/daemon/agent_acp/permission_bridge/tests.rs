@@ -75,6 +75,16 @@ fn unwrap_err<T: std::fmt::Debug, E: std::fmt::Debug>(result: Result<T, E>, cont
     error
 }
 
+#[test]
+fn runtime_permission_options_match_protocol_wire_schema() {
+    for option in standard_permission_options() {
+        let runtime_json = unwrap_ok(serde_json::to_value(&option), "runtime serialization");
+        let wire = permission_option_to_wire(&option);
+        let wire_json = unwrap_ok(serde_json::to_value(wire), "wire serialization");
+        assert_eq!(wire_json, runtime_json);
+    }
+}
+
 async fn recv_permission_result(
     rx: oneshot::Receiver<PermissionBridgeResult>,
 ) -> PermissionBridgeResult {

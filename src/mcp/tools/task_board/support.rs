@@ -3,7 +3,6 @@ use std::fs;
 
 use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
-use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
@@ -18,7 +17,6 @@ use crate::daemon::state;
 use crate::mcp::protocol::ToolResult;
 use crate::mcp::tool::{Tool, ToolError, ToolRegistry};
 
-pub(super) type NormalizeFn = fn(Value) -> Result<Value, ToolError>;
 type InputSchemaFn = fn() -> Value;
 
 #[derive(Clone, Copy)]
@@ -26,7 +24,6 @@ pub(super) struct TaskBoardToolDescriptor {
     pub name: &'static str,
     pub description: &'static str,
     pub input_schema: InputSchemaFn,
-    pub normalize: NormalizeFn,
 }
 
 pub(super) fn register_descriptors(
@@ -63,24 +60,125 @@ impl Tool for TaskBoardProxyTool {
     }
 
     async fn call(&self, params: Value) -> Result<ToolResult, ToolError> {
-        let normalized = (self.descriptor.normalize)(params)?;
+        let normalized = validate_params(params, &(self.descriptor.input_schema)())?;
         proxy_task_board_call(self.descriptor.name, normalized).await
     }
 }
 
-pub(super) fn validate_params<T: DeserializeOwned>(params: Value) -> Result<Value, ToolError> {
+fn validate_params(params: Value, schema: &Value) -> Result<Value, ToolError> {
     let normalized = normalize_null_object(params);
-    serde_json::from_value::<T>(normalized.clone())
-        .map_err(|error| ToolError::invalid(error.to_string()))?;
+    validate_value("arguments", &normalized, schema)?;
     Ok(normalized)
 }
 
-pub(super) fn validate_empty_object(params: Value) -> Result<Value, ToolError> {
-    let normalized = normalize_null_object(params);
-    match normalized {
-        Value::Object(map) if map.is_empty() => Ok(Value::Object(map)),
-        Value::Object(_) => Err(ToolError::invalid("this tool does not accept arguments")),
-        _ => Err(ToolError::invalid("arguments must be a JSON object")),
+fn validate_value(path: &str, value: &Value, schema: &Value) -> Result<(), ToolError> {
+    if let Some(expected) = schema.get("type").and_then(Value::as_str)
+        && !matches_schema_type(value, expected)
+    {
+        return Err(ToolError::invalid(format!(
+            "{path} must be {expected}, got {}",
+            value_type(value)
+        )));
+    }
+
+    if let Some(allowed) = schema.get("enum").and_then(Value::as_array)
+        && !allowed.contains(value)
+    {
+        return Err(ToolError::invalid(format!(
+            "{path} must match one of the advertised values"
+        )));
+    }
+
+    match value {
+        Value::Object(object) => validate_object(path, object, schema),
+        Value::Array(items) => validate_array(path, items, schema),
+        Value::Number(number) => validate_number(path, number, schema),
+        _ => Ok(()),
+    }
+}
+
+fn validate_object(
+    path: &str,
+    object: &Map<String, Value>,
+    schema: &Value,
+) -> Result<(), ToolError> {
+    if let Some(required) = schema.get("required").and_then(Value::as_array) {
+        for field in required.iter().filter_map(Value::as_str) {
+            if !object.contains_key(field) {
+                return Err(ToolError::invalid(format!(
+                    "{path} is missing required field `{field}`"
+                )));
+            }
+        }
+    }
+
+    let properties = schema.get("properties").and_then(Value::as_object);
+    for (field, field_value) in object {
+        let field_path = format!("{path}.{field}");
+        if let Some(field_schema) = properties.and_then(|items| items.get(field)) {
+            validate_value(&field_path, field_value, field_schema)?;
+            continue;
+        }
+        match schema.get("additionalProperties") {
+            Some(Value::Bool(false)) => {
+                return Err(ToolError::invalid(format!(
+                    "{path} contains unknown field `{field}`"
+                )));
+            }
+            Some(additional_schema @ Value::Object(_)) => {
+                validate_value(&field_path, field_value, additional_schema)?;
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn validate_array(path: &str, items: &[Value], schema: &Value) -> Result<(), ToolError> {
+    if let Some(item_schema) = schema.get("items") {
+        for (index, item) in items.iter().enumerate() {
+            validate_value(&format!("{path}[{index}]"), item, item_schema)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_number(
+    path: &str,
+    number: &serde_json::Number,
+    schema: &Value,
+) -> Result<(), ToolError> {
+    if let Some(minimum) = schema.get("minimum").and_then(Value::as_f64)
+        && number.as_f64().is_some_and(|value| value < minimum)
+    {
+        return Err(ToolError::invalid(format!(
+            "{path} must be at least {minimum}"
+        )));
+    }
+    Ok(())
+}
+
+fn matches_schema_type(value: &Value, expected: &str) -> bool {
+    match expected {
+        "array" => value.is_array(),
+        "boolean" => value.is_boolean(),
+        "integer" => value.as_i64().is_some() || value.as_u64().is_some(),
+        "number" => value.is_number(),
+        "object" => value.is_object(),
+        "string" => value.is_string(),
+        _ => true,
+    }
+}
+
+fn value_type(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(number) if number.is_i64() || number.is_u64() => "integer",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
     }
 }
 
@@ -217,4 +315,97 @@ fn format_ws_error(method: &str, error: &WsErrorPayload) -> String {
         let _ = write!(message, " [{}]", error.details.join("; "));
     }
     message
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use serde_json::{Value, json};
+
+    use super::validate_params;
+
+    #[test]
+    fn null_arguments_normalize_to_an_empty_object() {
+        let schema = json!({
+            "type": "object",
+            "additionalProperties": false
+        });
+
+        assert_eq!(
+            validate_params(Value::Null, &schema).expect("normalize null"),
+            json!({})
+        );
+    }
+
+    #[test]
+    fn required_type_and_enum_constraints_are_enforced() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["todo", "done"]
+                }
+            },
+            "required": ["status"],
+            "additionalProperties": false
+        });
+
+        assert!(validate_params(json!({}), &schema).is_err());
+        assert!(validate_params(json!({ "status": 2 }), &schema).is_err());
+        assert!(validate_params(json!({ "status": "blocked" }), &schema).is_err());
+        assert!(validate_params(json!({ "status": "todo" }), &schema).is_ok());
+    }
+
+    #[test]
+    fn empty_object_schema_rejects_unknown_fields() {
+        let schema = json!({
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+        });
+
+        assert!(validate_params(json!({ "unexpected": true }), &schema).is_err());
+    }
+
+    #[test]
+    fn array_items_are_validated_recursively() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "tags": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                }
+            },
+            "additionalProperties": false
+        });
+
+        assert!(validate_params(json!({ "tags": ["mcp", "cli"] }), &schema).is_ok());
+        assert!(validate_params(json!({ "tags": ["mcp", 1] }), &schema).is_err());
+    }
+
+    #[test]
+    fn valid_payload_is_forwarded_without_rewriting() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "title": { "type": "string" },
+                "tags": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                }
+            },
+            "required": ["title"],
+            "additionalProperties": false
+        });
+        let payload = json!({
+            "title": "Split the MCP worker",
+            "tags": ["mcp", "isolation"]
+        });
+
+        assert_eq!(
+            validate_params(payload.clone(), &schema).expect("validate payload"),
+            payload
+        );
+    }
 }

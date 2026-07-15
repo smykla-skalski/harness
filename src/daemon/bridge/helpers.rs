@@ -229,10 +229,9 @@ pub(super) fn launch_agent_plist_path() -> Result<PathBuf, CliError> {
         .join(format!("{BRIDGE_LAUNCH_AGENT_LABEL}.plist")))
 }
 
-pub(super) fn render_launch_agent_plist(harness_binary: &Path) -> String {
+pub(super) fn render_launch_agent_plist(bridge_binary: &Path) -> String {
     let args = [
-        format!("<string>{}</string>", harness_binary.display()),
-        "<string>bridge</string>".to_string(),
+        format!("<string>{}</string>", bridge_binary.display()),
         "<string>start</string>".to_string(),
     ];
     format!(

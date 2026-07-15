@@ -10,8 +10,8 @@ For the internal module map, see [ARCHITECTURE.md](ARCHITECTURE.md).
 mise run install
 ```
 
-Builds release binaries and installs both `harness` and `aff` to `~/.local/bin`. Requires Rust 1.94+.
-The install step also reconciles stale same-tool `harness` binaries found earlier on `PATH`, including stale `~/.cargo/bin/harness` shadows; if a conflicting shadow path cannot be rewritten safely, install fails and prints the path that needs manual cleanup.
+Builds the Harness control CLI, dedicated runtime binaries, ACP adapters, and `aff` concurrently under one shared job budget. It validates and signs the complete release set before atomically activating it through `~/.local/bin`. Requires Rust 1.94+.
+The install step also reconciles stale Harness-owned binaries found earlier on `PATH`, including stale `~/.cargo/bin/harness` shadows; if a conflicting shadow path cannot be rewritten safely, install fails and prints the path that needs manual cleanup.
 
 ## Fast Local Rust Workflow
 
@@ -22,7 +22,8 @@ The repo `mise` tasks route Rust compilation through the shared local cargo wrap
 - Build jobs default to a conservative local cap instead of saturating every CPU. Agent sessions use an even lower default so multiple workers can compile in parallel without swamping the host. Override with `HARNESS_CARGO_JOBS=<n>` or `CARGO_BUILD_JOBS=<n>`.
 - Concurrent wrapper invocations automatically reduce their default job budgets based on the number of active local Rust builds, so a second or third agent does not assume it owns the whole machine.
 - Agent sessions get isolated target directories under the shared git-common-root `target/dev/agent-<session-id>` using `CODEX_SESSION_ID`, `CLAUDE_SESSION_ID`, and the other supported runtime session env vars. Non-agent local shells use the shared `target/dev/local`, so extra worktrees reuse the same artifacts instead of cloning a new `target/` tree per checkout.
-- Full release installs still sign and install the binary locally, but now respect `CARGO_TARGET_DIR` so the build and install steps stay aligned.
+- Full release installs build each configured Harness executable, the isolated ACP adapters, and `aff` as independent concurrent leaves, while one coordinator keeps their combined Cargo job count within the configured local budget.
+- Every release binary is staged, signed, and identity-checked before the installer atomically switches the active set. Binaries derived from the canonical workspace package are also version-checked; independently versioned adapters are not. A failed build or validation leaves the previous set active.
 
 Without `sccache`, isolated target directories trade lock contention for duplicate compilation across agents. Install `sccache` if you want multi-agent sessions to reuse most compile work instead of rebuilding the same crates in parallel.
 
@@ -121,12 +122,12 @@ Four modes:
 - `dump` prints raw events without classification. Supports line ranges, text and role filters, tool name filters, and raw JSON output.
 - `doctor` validates observe wiring, session pointers, and compact handoff state.
 
-### agents - cross-agent lifecycle
+### harness-hook - cross-agent lifecycle
 
 ```
-harness agents session-start --agent <agent> [--session-id <id>]
-harness agents session-stop --agent <agent>
-harness agents prompt-submit --agent <agent>
+harness-hook session-start --agent <agent> [--session-id <id>]
+harness-hook session-stop --agent <agent>
+harness-hook prompt-submit --agent <agent>
 ```
 
 Runtime API for cross-agent coordination. Generated hooks call these commands to register sessions, record prompt events, and clean up state. The shared agent ledger lives under the harness project directory, not in host-native transcript storage.
@@ -151,9 +152,9 @@ harness session list [--json]
 
 Coordinates multiple AI agents within a shared session. `start` creates a leaderless session. `join` registers agents with roles (leader, observer, worker, reviewer, improver). Each role has a permission set controlling which commands it can invoke. `observe` scans all agent logs through the existing classifier pipeline and creates work items for detected issues. With `--poll-interval`, it runs continuously with periodic sweeps that create dual work items (one for the issue, one to improve heuristics that missed it). Signals between agents use file-based delivery picked up during hook callbacks.
 
-### Hidden commands
+### Dedicated lifecycle commands
 
-`session-start`, `session-stop`, and `pre-compact` are top-level commands that hooks and lifecycle integrations call. You do not run them by hand.
+`harness-hook session-start`, `session-stop`, `prompt-submit`, and `pre-compact` are lifecycle entrypoints. Generated runtime integrations call them; you do not run them by hand.
 
 ## Workflow
 
@@ -253,7 +254,7 @@ mise run aff:install
 
 ### Runtime
 
-Bootstrap-installed hooks call back into `harness agents session-start`, `session-stop`, and `prompt-submit`. They do not keep their own durable state. The shared agent ledger under the harness project directory is the runtime source of truth.
+Bootstrap-installed hooks call `harness-hook session-start`, `session-stop`, and `prompt-submit`. They do not keep their own durable state. The shared agent ledger under the harness project directory is the runtime source of truth.
 
 Built-in ACP adapters currently ship for GitHub Copilot, Gemini CLI, Claude Code, and Codex. Codex ACP is installed as the harness-managed `harness-codex-acp` sibling binary, so `mise run install` gives harness its own adapter without requiring a separate global `codex-acp` install. The adapter still reads Codex-native auth and config (`~/.codex/config.toml`, `CODEX_HOME`, `CODEX_API_KEY`, `OPENAI_API_KEY`) while Harness applies the selected model and effort through ACP session configuration.
 
@@ -385,6 +386,6 @@ The test presents a real TXT record, waits for authoritative visibility, forces 
 The macOS Harness Monitor app lives under `apps/harness-monitor/`. The Xcode project is generated from the Tuist manifests (`Project.swift`, `Tuist/Package.swift`); the generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are not tracked. Run `mise run monitor:generate` to materialize them before opening the project in Xcode.
 Its fast lint lane runs `swift format` directly and runs `swiftlint lint` outside the Xcode build graph with a shared cache. Build-based sandbox and daemon validation now live in `mise run monitor:quality-gate`, so routine linting stays off the daemon/Xcode path.
 
-Only bump the release version with explicit user approval. Small changes can skip it unless they change shipped `harness` or `aff` logic enough that the local binary must be reinstalled. After approval, update the canonical package version with `mise run version:set -- <version>` or `./scripts/version.sh set <version>`. That syncs the derived surfaces in `testkit/`, the marker-anchored version literals in `apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift`, and the bundled daemon plist. `mise run version:check` fails fast if any of those derived files drift out of sync with `Cargo.toml`.
+Only bump the release version with explicit user approval. Small changes can skip it unless they change shipped `harness` or `aff` logic enough that the local binary must be reinstalled. After approval, update the canonical package version with `mise run version:set -- <version>` or `./scripts/version.sh set <version>`. That syncs the core workspace packages, `aff`, `testkit`, the marker-anchored version literals in `apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift`, and the bundled daemon plist. The isolated ACP adapters retain their own versions. `mise run version:check` validates the version surfaces derived from the canonical workspace package; it does not compare those independently versioned adapters.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the internal module map.

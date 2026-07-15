@@ -29,7 +29,10 @@ log_dir="${HARNESS_MONITOR_DAEMON_DEV_LOG_DIR:-$CHECKOUT_ROOT/tmp/logs}"
 mkdir -p "$log_dir"
 log="$log_dir/$(date +%y%m%d%H%M)-monitor-daemon-dev.log"
 prepare_daemon_runtime_root
-binary="$(resolve_local_harness_binary "$CHECKOUT_ROOT" HARNESS_MONITOR_DAEMON_DEV_BIN)"
+binary="$(resolve_local_harness_binary \
+  "$CHECKOUT_ROOT" \
+  HARNESS_MONITOR_DAEMON_DEV_BIN \
+  harness-daemon)"
 manifest_path="$(daemon_manifest_path)"
 
 exec python3 "$SCRIPT_DIR/run-harness-command.py" \
@@ -38,4 +41,4 @@ exec python3 "$SCRIPT_DIR/run-harness-command.py" \
   --cleanup-path "$manifest_path" \
   --cleanup-description "daemon interrupt cleanup" \
   --child-new-session \
-  -- "$binary" daemon dev
+  -- "$binary" dev

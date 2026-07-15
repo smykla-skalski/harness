@@ -31,6 +31,7 @@ pub mod verify_question;
 pub mod verify_write;
 mod write_surface;
 
+pub use self::adapters::HookAgent;
 pub use self::application::GuardContext;
 pub use self::effects::{HookEffect, HookOutcome};
 pub use self::protocol::{context, hook_result, output, payloads, result};

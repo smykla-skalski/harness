@@ -48,7 +48,10 @@ async fn run_revoke_route_parity() {
 
     assert_eq!(http["grant"]["state"], "revoked");
     assert_eq!(ws["grant"]["state"], "revoked");
-    assert_eq!(normalized_revoke_response(http), normalized_revoke_response(ws));
+    assert_eq!(
+        normalized_revoke_response(http),
+        normalized_revoke_response(ws)
+    );
     server.abort();
     let _ = server.await;
 }

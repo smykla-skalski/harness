@@ -10,7 +10,7 @@ impl Execute for PreCompactArgs {
     }
 }
 
-/// Arguments for `harness pre-compact`.
+/// Arguments for `harness-hook pre-compact`.
 #[derive(Debug, Clone, Args)]
 pub struct PreCompactArgs {
     /// Project directory to save the compact handoff for.

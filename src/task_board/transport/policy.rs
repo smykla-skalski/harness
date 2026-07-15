@@ -4,9 +4,8 @@ use serde::Serialize;
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::protocol::{
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantRevokeRequest,
-    PolicyApprovalGrantsListResponse,
-    PolicyCanvasSetSpawnKillSwitchRequest, PolicyCanvasSetSpawnRequiresLivePolicyRequest,
-    PolicyCanvasWorkspaceResponse,
+    PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
+    PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{PolicyApprovalGrant, PolicyApprovalState};

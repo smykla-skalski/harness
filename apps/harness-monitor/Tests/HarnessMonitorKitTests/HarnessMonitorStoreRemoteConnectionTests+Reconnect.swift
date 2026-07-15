@@ -9,10 +9,13 @@ extension HarnessMonitorStoreRemoteConnectionTests {
     let fixture = try RemoteStoreFixture()
     let initialClient = RecordingHarnessClient()
     let replacementClient = RecordingHarnessClient()
+    let sleeper = RecordingRemoteDaemonReconnectSleeper(behavior: .immediate)
     let daemon = RecordingDaemonController(
       bootstrapOutcomes: [
         .success(initialClient),
+        .failure(URLError(.cancelled)),
         .failure(URLError(.cannotConnectToHost)),
+        .failure(URLError(.networkConnectionLost)),
         .success(replacementClient),
       ],
       bootstrapChecksCancellation: true
@@ -21,6 +24,7 @@ extension HarnessMonitorStoreRemoteConnectionTests {
       daemonController: daemon,
       remoteDaemonServices: fixture.services
     )
+    store.connection.remoteDaemonReconnectSleeper = sleeper
 
     await store.bootstrap()
     #expect(store.connectionState == .online)
@@ -36,22 +40,25 @@ extension HarnessMonitorStoreRemoteConnectionTests {
       error: WebSocketTransportError.connectionClosed,
       for: PreviewFixtures.summary.sessionId
     )
-    let disconnectedAt = ContinuousClock.now
     store.startGlobalStream(using: initialClient)
     store.startSessionStream(using: initialClient, sessionID: PreviewFixtures.summary.sessionId)
 
-    for _ in 0..<100 {
-      if await daemon.recordedBootstrapCallCount() >= 3,
+    try await waitForRemoteReconnect {
+      if await daemon.recordedBootstrapCallCount() >= 5,
         store.connectionState == .online,
         !store.isReconnecting
       {
-        break
+        return true
       }
-      try await Task.sleep(for: .milliseconds(20))
+      return false
     }
 
-    #expect(disconnectedAt.duration(to: .now) >= .milliseconds(450))
-    #expect(await daemon.recordedBootstrapCallCount() == 3)
+    #expect(await daemon.recordedBootstrapCallCount() == 5)
+    #expect(
+      await sleeper.recordedDelays() == [
+        .milliseconds(500), .seconds(1), .seconds(2),
+      ]
+    )
     #expect(store.connectionState == .online)
     #expect((store.apiClient as? RecordingHarnessClient) === replacementClient)
     #expect(store.globalStreamTask != nil)
@@ -239,19 +246,61 @@ extension HarnessMonitorStoreRemoteConnectionTests {
     #expect(store.remoteDaemonReconnectTask == nil)
   }
 
-  @Test("Remote cancelled request does not retry")
-  func remoteCancelledRequestDoesNotRetry() async throws {
+  @Test("Remote transport cancellation retries while observation remains active")
+  func remoteTransportCancellationRetriesWhileObservationRemainsActive() async throws {
     let fixture = try RemoteStoreFixture()
-    let daemon = RecordingDaemonController(bootstrapError: URLError(.cancelled))
+    let replacementClient = RecordingHarnessClient()
+    let sleeper = RecordingRemoteDaemonReconnectSleeper(behavior: .immediate)
+    let daemon = RecordingDaemonController(
+      bootstrapOutcomes: [
+        .failure(URLError(.cancelled)),
+        .success(replacementClient),
+      ]
+    )
     let store = HarnessMonitorStore(
       daemonController: daemon,
       remoteDaemonServices: fixture.services
     )
+    store.connection.remoteDaemonReconnectSleeper = sleeper
 
     await store.bootstrap()
+    try await waitForRemoteReconnect {
+      store.connectionState == .online
+    }
 
     #expect(store.remoteDaemonReconnectTask == nil)
-    #expect(await daemon.recordedBootstrapCallCount() == 1)
+    #expect(await daemon.recordedBootstrapCallCount() == 2)
+    #expect(await sleeper.recordedDelays() == [.milliseconds(500)])
+    #expect((store.apiClient as? RecordingHarnessClient) === replacementClient)
+    await store.prepareForTermination()
+  }
+
+  @Test("A cancelled observer task cannot start remote reconnect")
+  func cancelledObserverTaskCannotStartRemoteReconnect() async throws {
+    let fixture = try RemoteStoreFixture()
+    let sleeper = RecordingRemoteDaemonReconnectSleeper(behavior: .immediate)
+    let daemon = RecordingDaemonController()
+    let store = HarnessMonitorStore(
+      daemonController: daemon,
+      remoteDaemonServices: fixture.services
+    )
+    store.connection.remoteDaemonReconnectSleeper = sleeper
+    store.connectionState = .offline("remote unavailable")
+
+    let observer = Task { @MainActor in
+      do {
+        try await Task.sleep(for: .seconds(30))
+      } catch {}
+      #expect(Task.isCancelled)
+      store.scheduleRemoteDaemonReconnect(after: CancellationError())
+    }
+    await Task.yield()
+    observer.cancel()
+    await observer.value
+
+    #expect(store.remoteDaemonReconnectTask == nil)
+    #expect(await sleeper.recordedDelays().isEmpty)
+    #expect(await daemon.recordedBootstrapCallCount() == 0)
   }
 
   @Test("Remote reconnect uses capped exponential backoff")
@@ -270,29 +319,54 @@ extension HarnessMonitorStoreRemoteConnectionTests {
 
   @Test("Termination cancels pending remote reconnect backoff")
   func terminationCancelsPendingRemoteReconnectBackoff() async throws {
-    let (store, daemon) = try await makePendingReconnectStore()
+    let (store, daemon, sleeper) = try await makePendingReconnectStore()
 
-    #expect(await daemon.recordedBootstrapCallCount() == 2)
+    #expect(await daemon.recordedBootstrapCallCount() == 0)
     #expect(store.remoteDaemonReconnectTask != nil)
 
     await store.prepareForTermination()
-    try await Task.sleep(for: .milliseconds(600))
+    try await waitForRemoteReconnect {
+      await sleeper.recordedCancellationCount() == 1
+    }
 
     #expect(store.remoteDaemonReconnectTask == nil)
-    #expect(await daemon.recordedBootstrapCallCount() == 2)
+    #expect(await daemon.recordedBootstrapCallCount() == 0)
   }
 
   @Test("App inactivity cancels pending remote reconnect backoff")
   func appInactivityCancelsPendingRemoteReconnectBackoff() async throws {
-    let (store, daemon) = try await makePendingReconnectStore()
+    let (store, daemon, sleeper) = try await makePendingReconnectStore()
     store.appInactivitySuspendDelay = .zero
 
     await store.suspendLiveConnectionForAppInactivity()
-    try await Task.sleep(for: .milliseconds(600))
+    try await waitForRemoteReconnect {
+      await sleeper.recordedCancellationCount() == 1
+    }
 
     #expect(store.isAppLifecycleSuspended)
     #expect(store.remoteDaemonReconnectTask == nil)
-    #expect(await daemon.recordedBootstrapCallCount() == 2)
+    #expect(await daemon.recordedBootstrapCallCount() == 0)
+  }
+
+  @Test("Repeated remote failures share one reconnect loop")
+  func repeatedRemoteFailuresShareOneReconnectLoop() async throws {
+    let (store, daemon, sleeper) = try await makePendingReconnectStore()
+    let generation = store.remoteDaemonReconnectGeneration
+
+    store.scheduleRemoteDaemonReconnect(after: URLError(.timedOut))
+    store.scheduleRemoteDaemonReconnect(after: URLError(.networkConnectionLost))
+    for _ in 0..<10 {
+      await Task.yield()
+    }
+
+    #expect(store.remoteDaemonReconnectGeneration == generation)
+    #expect(await sleeper.recordedDelays() == [.milliseconds(500)])
+    #expect(await daemon.recordedBootstrapCallCount() == 0)
+
+    store.stopRemoteDaemonReconnect()
+    try await waitForRemoteReconnect {
+      await sleeper.recordedCancellationCount() == 1
+    }
   }
 
   @Test(
@@ -317,38 +391,72 @@ extension HarnessMonitorStoreRemoteConnectionTests {
   }
 
   private func makePendingReconnectStore() async throws -> (
-    HarnessMonitorStore, RecordingDaemonController
+    HarnessMonitorStore, RecordingDaemonController, RecordingRemoteDaemonReconnectSleeper
   ) {
     let fixture = try RemoteStoreFixture()
-    let initialClient = RecordingHarnessClient()
-    let daemon = RecordingDaemonController(
-      bootstrapOutcomes: [
-        .success(initialClient),
-        .failure(URLError(.cannotConnectToHost)),
-        .success(RecordingHarnessClient()),
-      ],
-      bootstrapChecksCancellation: true
-    )
+    let daemon = RecordingDaemonController()
+    let sleeper = RecordingRemoteDaemonReconnectSleeper(behavior: .suspended)
     let store = HarnessMonitorStore(
       daemonController: daemon,
       remoteDaemonServices: fixture.services
     )
-    await store.bootstrap()
-    initialClient.configureGlobalStream(
-      events: [],
-      error: WebSocketTransportError.connectionClosed,
-      failureCount: 1
-    )
-    store.startGlobalStream(using: initialClient)
-
-    for _ in 0..<100 {
-      if await daemon.recordedBootstrapCallCount() == 2,
-        store.remoteDaemonReconnectTask != nil
-      {
-        break
-      }
-      try await Task.sleep(for: .milliseconds(20))
+    store.connection.remoteDaemonReconnectSleeper = sleeper
+    store.connectionState = .offline("remote unavailable")
+    store.scheduleRemoteDaemonReconnect(after: URLError(.cannotConnectToHost))
+    try await waitForRemoteReconnect {
+      await sleeper.recordedDelays() == [.milliseconds(500)]
     }
-    return (store, daemon)
+    return (store, daemon, sleeper)
+  }
+
+  private func waitForRemoteReconnect(
+    _ condition: @escaping @MainActor () async -> Bool
+  ) async throws {
+    for _ in 0..<100 {
+      if await condition() {
+        return
+      }
+      try await Task.sleep(for: .milliseconds(5))
+    }
+    Issue.record("Timed out waiting for remote daemon reconnect state")
+  }
+}
+
+private actor RecordingRemoteDaemonReconnectSleeper: RemoteDaemonReconnectSleeping {
+  enum Behavior: Sendable {
+    case immediate
+    case suspended
+  }
+
+  private let behavior: Behavior
+  private var delays: [Duration] = []
+  private var cancellationCount = 0
+
+  init(behavior: Behavior) {
+    self.behavior = behavior
+  }
+
+  func sleep(for delay: Duration) async throws {
+    delays.append(delay)
+    switch behavior {
+    case .immediate:
+      await Task.yield()
+      try Task.checkCancellation()
+    case .suspended:
+      do {
+        try await Task.sleep(for: .seconds(3_600))
+      } catch {
+        cancellationCount += 1
+        throw error
+      }
+    }
+  }
+
+  func recordedDelays() -> [Duration] {
+    delays
+  }
+
+  func recordedCancellationCount() -> Int {
+    cancellationCount
   }
 }

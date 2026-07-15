@@ -7,7 +7,7 @@ mod metadata;
 mod preflight;
 mod repository;
 mod snapshots;
-#[cfg(test)]
+#[cfg(all(test, not(feature = "standalone-worker")))]
 mod tests;
 mod validated;
 

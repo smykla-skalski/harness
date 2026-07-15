@@ -1,0 +1,37 @@
+[package]
+name = "harness-mcp"
+version = "48.0.0"
+edition = "2024"
+rust-version = "1.94"
+
+[[bin]]
+name = "harness-mcp"
+path = "src/main.rs"
+
+[dependencies]
+async-trait = "0.1.83"
+base64 = "0.22.1"
+clap = { version = "4.6.0", features = ["derive", "env"] }
+futures-util = "0.3.31"
+harness-daemon-client = { path = "../harness-daemon-client", version = "48.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "48.0.0" }
+harness-telemetry = { path = "../harness-telemetry", version = "48.0.0" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+thiserror = "2.0.18"
+tokio = { version = "1.50.0", features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt", "sync", "test-util", "time"] }
+tokio-tungstenite = { version = "0.29.0", default-features = false, features = ["connect"] }
+tracing = "0.1.44"
+uuid = { version = "1.18.1", features = ["v4"] }
+
+[dev-dependencies]
+axum = { version = "0.8.7", features = ["ws"] }
+harness-daemon-client = { path = "../harness-daemon-client", version = "48.0.0", features = ["test-support"] }
+temp-env = { version = "0.3.6", features = ["async_closure"] }
+tempfile = "3.27.0"
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

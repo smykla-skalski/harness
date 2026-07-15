@@ -9,7 +9,7 @@ dispatch readiness, and overview reporting.
 - Treat the task board as daemon-owned Harness state. Read and mutate it only
   through `harness task-board ...` commands.
 - Task-board commands require a running daemon that advertises database-backed
-  task-board storage. Start Harness Monitor or run `harness daemon dev` first.
+  task-board storage. Start Harness Monitor or run `harness-daemon dev` first.
 - Use `--json` for machine-readable reads. Do not access the daemon database
   directly.
 - Keep titles short and imperative. Put scope, constraints, acceptance

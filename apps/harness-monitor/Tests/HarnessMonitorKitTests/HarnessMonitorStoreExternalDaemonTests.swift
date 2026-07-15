@@ -182,7 +182,7 @@ struct HarnessMonitorStoreExternalDaemonTests {
     #expect(warnings.isEmpty == false)
     let warning = warnings.first
     #expect(warning?.kind == .error)
-    #expect(warning?.detail.contains("harness daemon dev") == true)
+    #expect(warning?.detail.contains("harness-daemon dev") == true)
   }
 
   @Test("External bootstrap without SMAppService does not emit conflict warning")

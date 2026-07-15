@@ -2,6 +2,7 @@ mod scrub;
 mod summarize;
 mod types;
 
+#[cfg(any(test, feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub use scrub::scrub;
 pub use summarize::{normalize_tool_output, summarize_tool_input};
 pub use types::{AuditAppendRequest, AuditEntry, AuditPhaseContext};
@@ -284,5 +285,5 @@ fn append_jsonl_line(path: &Path, line: &str) -> Result<(), CliError> {
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "standalone-worker")))]
 mod tests;

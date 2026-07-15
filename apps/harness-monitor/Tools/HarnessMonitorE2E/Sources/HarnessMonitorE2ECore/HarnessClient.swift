@@ -3,10 +3,23 @@ import Foundation
 /// Minimal client that runs `harness <args>` with the same env contract `run_harness` enforces in test-agents-e2e.sh.
 public struct HarnessClient {
   public let binary: URL
+  public let daemonBinary: URL
+  public let bridgeBinary: URL
   public let dataHome: URL
 
-  public init(binary: URL, dataHome: URL) {
+  public init(
+    binary: URL,
+    daemonBinary: URL? = nil,
+    bridgeBinary: URL? = nil,
+    dataHome: URL
+  ) {
     self.binary = binary
+    self.daemonBinary =
+      daemonBinary
+      ?? binary.deletingLastPathComponent().appendingPathComponent("harness-daemon")
+    self.bridgeBinary =
+      bridgeBinary
+      ?? binary.deletingLastPathComponent().appendingPathComponent("harness-bridge")
     self.dataHome = dataHome
   }
 
@@ -17,27 +30,7 @@ public struct HarnessClient {
   }
 
   public func run(_ arguments: [String]) -> Output {
-    let process = Process()
-    process.executableURL = binary
-    process.arguments = arguments
-    process.environment = mergedEnvironment()
-    let stdout = Pipe()
-    let stderr = Pipe()
-    process.standardOutput = stdout
-    process.standardError = stderr
-    do {
-      try process.run()
-    } catch {
-      return Output(
-        exitStatus: 127, stdout: Data(),
-        stderr: Data("failed to launch \(binary.path): \(error)".utf8))
-    }
-    process.waitUntilExit()
-    return Output(
-      exitStatus: process.terminationStatus,
-      stdout: stdout.fileHandleForReading.readDataToEndOfFile(),
-      stderr: stderr.fileHandleForReading.readDataToEndOfFile()
-    )
+    run(binary: binary, arguments: arguments)
   }
 
   public func mergedEnvironment(extra: [String: String] = [:]) -> [String: String] {
@@ -60,9 +53,13 @@ public struct HarnessClient {
   }
 
   public func bridgeReady() -> Bool {
-    let result = run(["bridge", "status"])
+    let result = runBridge(["status"])
     guard result.exitStatus == 0 else { return false }
     return BridgeReadiness.isReady(fromJSON: result.stdout)
+  }
+
+  private func runBridge(_ arguments: [String]) -> Output {
+    run(binary: bridgeBinary, arguments: arguments)
   }
 
   public func startSession(
@@ -88,5 +85,29 @@ public struct HarnessClient {
       let path = json["worktree_path"] as? String, !path.isEmpty
     else { return nil }
     return path
+  }
+
+  private func run(binary: URL, arguments: [String]) -> Output {
+    let process = Process()
+    process.executableURL = binary
+    process.arguments = arguments
+    process.environment = mergedEnvironment()
+    let stdout = Pipe()
+    let stderr = Pipe()
+    process.standardOutput = stdout
+    process.standardError = stderr
+    do {
+      try process.run()
+    } catch {
+      return Output(
+        exitStatus: 127, stdout: Data(),
+        stderr: Data("failed to launch \(binary.path): \(error)".utf8))
+    }
+    process.waitUntilExit()
+    return Output(
+      exitStatus: process.terminationStatus,
+      stdout: stdout.fileHandleForReading.readDataToEndOfFile(),
+      stderr: stderr.fileHandleForReading.readDataToEndOfFile()
+    )
   }
 }

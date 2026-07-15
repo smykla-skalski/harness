@@ -11,6 +11,19 @@ SCRIPT_PATH = APP_ROOT / "Scripts" / "test-agents-e2e.sh"
 
 
 class TestAgentsE2EScriptTests(unittest.TestCase):
+    def test_builds_runtime_siblings_from_selected_packages(self) -> None:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+        self.assertIn(
+            '"$CHECKOUT_ROOT/scripts/cargo-local.sh" build \\\n'
+            "  --package harness \\\n"
+            "  --package harness-daemon \\\n"
+            "  --package harness-bridge \\\n"
+            "  --bins",
+            script,
+            "agents e2e must build every runtime used by prepare from its workspace package",
+        )
+
     def test_build_for_testing_skips_daemon_bundle_version_check(self) -> None:
         script = SCRIPT_PATH.read_text(encoding="utf-8")
         # Both xcodebuild invocations (build-for-testing and test-without-building) must

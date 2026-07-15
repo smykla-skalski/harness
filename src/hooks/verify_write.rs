@@ -171,6 +171,6 @@ fn is_suite_source_write(
     true
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "standalone-worker")))]
 #[path = "verify_write/tests.rs"]
 mod tests;

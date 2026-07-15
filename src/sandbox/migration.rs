@@ -342,7 +342,7 @@ fn write_marker(new_root: &Path, old_root: &Path) -> Result<(), MigrationError> 
 }
 
 /// Run the startup data-root migration on macOS. Logs failures and returns;
-/// never panics. Callers invoke this once from `dispatch()` at process start.
+/// never panics. Callers invoke this through `app::run_startup_migrations()`.
 #[cfg(target_os = "macos")]
 #[expect(
     clippy::cognitive_complexity,
@@ -356,4 +356,5 @@ pub fn run_startup_migration() {
 }
 
 #[cfg(test)]
+#[path = "migration/tests.rs"]
 mod tests;

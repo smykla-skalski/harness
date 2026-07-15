@@ -8,14 +8,15 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use self::rollback::rollback_registration_best_effort;
-use self::snapshots::{
-    StartedSnapshotInput, preferred_project_dir, started_snapshot, stream_event,
-};
+#[cfg(feature = "daemon-runtime")]
+use self::snapshots::preferred_project_dir;
+use self::snapshots::{StartedSnapshotInput, started_snapshot, stream_event};
 use crate::agents::acp::catalog::AcpAgentDescriptor;
 use crate::agents::acp::connection::SpawnConfig;
 use crate::agents::acp::permission::{PermissionMode, recording_log_path_for_session};
 use crate::agents::acp::supervision::{AcpSessionSupervisor, SupervisionConfig};
 use crate::agents::kind::DisconnectReason;
+#[cfg(feature = "daemon-runtime")]
 use crate::daemon::index;
 use crate::daemon::protocol::StreamEvent;
 use crate::errors::{CliError, CliErrorKind};
@@ -34,6 +35,7 @@ use super::prompt_gate::{PromptGate, PromptOwner, prompt_text};
 use super::protocol::{
     AcpSessionRequestConfig, SpawnProtocolInput, SpawnedAcpProtocol, spawn_protocol_task,
 };
+use super::spawn_credential::SpawnCredential;
 
 mod reused_session;
 mod rollback;
@@ -41,10 +43,10 @@ mod sandbox_state;
 mod snapshots;
 mod spawn_config;
 
-use self::spawn_config::build_spawn_config;
+use self::spawn_config::{build_spawn_config, prepare_spawn_credential};
 
 impl AcpAgentManagerHandle {
-    #[cfg(test)]
+    #[cfg(all(test, feature = "daemon-runtime"))]
     pub(super) fn start_descriptor(
         &self,
         session_id: &str,
@@ -54,6 +56,7 @@ impl AcpAgentManagerHandle {
         self.start_descriptor_with_pooling_disabled(session_id, request, descriptor, false)
     }
 
+    #[cfg(all(test, feature = "daemon-runtime"))]
     pub(in crate::daemon::agent_acp) fn start_descriptor_with_pooling_disabled(
         &self,
         session_id: &str,
@@ -61,17 +64,36 @@ impl AcpAgentManagerHandle {
         descriptor: &AcpAgentDescriptor,
         disable_pooling: bool,
     ) -> Result<AcpAgentSnapshot, CliError> {
+        self.start_descriptor_with_pooling_and_openrouter_token(
+            session_id,
+            request,
+            descriptor,
+            disable_pooling,
+            None,
+        )
+    }
+
+    pub(in crate::daemon) fn start_descriptor_with_pooling_and_openrouter_token(
+        &self,
+        session_id: &str,
+        request: &AcpAgentStartRequest,
+        descriptor: &AcpAgentDescriptor,
+        disable_pooling: bool,
+        openrouter_token: Option<&str>,
+    ) -> Result<AcpAgentSnapshot, CliError> {
         let project_dir = self.resolve_project_dir(session_id, request.project_dir.as_deref())?;
         let acp_id = format!("agent-acp-{}", Uuid::new_v4());
         let session_config = AcpSessionRequestConfig::from_request(request, descriptor);
-        let spawn = build_spawn_config(descriptor, &session_config, &project_dir)?;
+        let mut spawn =
+            build_spawn_config(descriptor, &session_config, &project_dir, openrouter_token)?;
         let process_key = AcpProcessPoolKey::from_spawn_inputs(
             descriptor,
             request,
             session_id,
             &spawn,
             &project_dir,
-        );
+            openrouter_token,
+        )?;
         if process_fault_policy_enabled() {
             self.ensure_process_key_start_allowed(process_key.as_str())?;
         }
@@ -98,13 +120,15 @@ impl AcpAgentManagerHandle {
         if let Some(snapshot) = self.try_start_reused_session(input)? {
             return Ok(snapshot);
         }
-        self.start_new_process_session(input, &spawn)
+        let credential = prepare_spawn_credential(&mut spawn, descriptor, openrouter_token)?;
+        self.start_new_process_session(input, &spawn, credential)
     }
 
     fn start_new_process_session(
         &self,
         input: DescriptorStartInput<'_>,
         spawn: &SpawnConfig,
+        credential: Option<SpawnCredential>,
     ) -> Result<AcpAgentSnapshot, CliError> {
         let mut child = spawn.spawn().map_err(|error| {
             CliErrorKind::workflow_io(format!(
@@ -113,7 +137,8 @@ impl AcpAgentManagerHandle {
             ))
         })?;
         let context = self.build_started_process_context(input, &mut child);
-        let protocol = self.attach_protocol_for_started_process(input, &context, &mut child)?;
+        let protocol =
+            self.attach_protocol_for_started_process(input, &context, &mut child, credential)?;
         let registration = self.register_started_orchestration_agent(
             input,
             input.descriptor.id.as_str(),
@@ -124,11 +149,11 @@ impl AcpAgentManagerHandle {
         let event_task = spawn_event_forwarder(
             self.sender(),
             protocol.events,
-            self.live_event_persistence(
+            Some(self.live_event_persistence(
                 input.session_id,
                 &registration.agent_id,
                 &input.descriptor.id,
-            ),
+            )),
         );
         if protocol.start.send(()).is_err() {
             protocol.protocol.abort();
@@ -233,6 +258,7 @@ impl AcpAgentManagerHandle {
         input: DescriptorStartInput<'_>,
         context: &StartedProcessContext,
         child: &mut Child,
+        credential: Option<SpawnCredential>,
     ) -> Result<SpawnedAcpProtocol, CliError> {
         let initial_prompt_lease = prompt_text(input.request.prompt.as_deref())
             .map(|_| {
@@ -263,6 +289,7 @@ impl AcpAgentManagerHandle {
                 permission_mode,
                 initial_prompt_lease,
                 manager: self.clone(),
+                credential,
             },
         )
         .map_err(|error| {
@@ -377,7 +404,7 @@ impl AcpAgentManagerHandle {
     }
 
     pub(super) fn sender(&self) -> broadcast::Sender<StreamEvent> {
-        self.state.sender.clone()
+        self.state.port.event_sender()
     }
 
     fn live_event_persistence(
@@ -385,12 +412,8 @@ impl AcpAgentManagerHandle {
         session_id: &str,
         agent_id: &str,
         runtime: &str,
-    ) -> Option<LiveEventPersistence> {
-        self.state
-            .db
-            .get()
-            .cloned()
-            .map(|db| LiveEventPersistence::new(db, session_id, agent_id, runtime))
+    ) -> LiveEventPersistence {
+        LiveEventPersistence::new(self.live_event_port(), session_id, agent_id, runtime)
     }
 
     #[expect(
@@ -411,7 +434,7 @@ impl AcpAgentManagerHandle {
     }
 
     pub(super) fn broadcast(&self, event: &str, payload: &impl Serialize) {
-        Self::broadcast_event(stream_event(event, payload), event, &self.state.sender);
+        Self::broadcast_event(stream_event(event, payload), event, &self.sender());
     }
 
     pub(super) fn resolve_project_dir(
@@ -425,21 +448,27 @@ impl AcpAgentManagerHandle {
         if let Some(path) = self.project_dir_from_db(session_id)? {
             return Ok(PathBuf::from(path));
         }
-        let resolved = index::resolve_session(session_id)?;
-        Ok(preferred_project_dir(
-            &resolved.state.worktree_path,
-            resolved.project.project_dir.as_deref(),
-            resolved.project.repository_root.as_deref(),
-            &resolved.project.context_root,
-        ))
+        #[cfg(feature = "daemon-runtime")]
+        {
+            let resolved = index::resolve_session(session_id)?;
+            Ok(preferred_project_dir(
+                &resolved.state.worktree_path,
+                resolved.project.project_dir.as_deref(),
+                resolved.project.repository_root.as_deref(),
+                &resolved.project.context_root,
+            ))
+        }
+        #[cfg(not(feature = "daemon-runtime"))]
+        {
+            Err(CliErrorKind::session_not_active(format!(
+                "bridge start for session '{session_id}' requires an explicit project directory"
+            ))
+            .into())
+        }
     }
 
     pub(super) fn project_dir_from_db(&self, session_id: &str) -> Result<Option<String>, CliError> {
-        let Some(db) = self.state.db.get() else {
-            return Ok(None);
-        };
-        let db = Self::daemon_db_guard(db)?;
-        db.project_dir_for_session(session_id)
+        self.state.port.project_dir_for_session(session_id)
     }
 }
 

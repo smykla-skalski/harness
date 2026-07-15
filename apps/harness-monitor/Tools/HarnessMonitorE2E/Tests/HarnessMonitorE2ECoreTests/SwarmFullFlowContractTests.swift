@@ -2,6 +2,29 @@ import Foundation
 import XCTest
 
 final class SwarmFullFlowContractTests: XCTestCase {
+  func testSwarmBuildSelectsRootAndDaemonPackages() throws {
+    let source = try String(
+      contentsOf: repoRoot().appendingPathComponent(
+        "apps/harness-monitor/Tools/HarnessMonitorE2E/Sources/HarnessMonitorE2ECore/SwarmFullFlowOrchestrator.swift"
+      ),
+      encoding: .utf8
+    )
+
+    let buildArguments = try extractFirstCapture(
+      in: source,
+      pattern: #"scripts/cargo-local\.sh"\),\s*arguments: \[([^\]]+)\]"#,
+      description: "swarm Cargo build arguments"
+    )
+
+    XCTAssertTrue(buildArguments.contains(#""--package", "harness""#))
+    XCTAssertTrue(buildArguments.contains(#""--package", "harness-daemon""#))
+    XCTAssertTrue(buildArguments.contains(#""--bins""#))
+    XCTAssertFalse(
+      buildArguments.contains(#""--bin""#),
+      "swarm must select package binary targets instead of assuming they belong to the root package"
+    )
+  }
+
   func testSwarmFullFlowXCUITestIsNotDisabledAtClassSetup() throws {
     let source = try String(
       contentsOf: repoRoot().appendingPathComponent(

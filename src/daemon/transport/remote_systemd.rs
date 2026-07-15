@@ -46,7 +46,7 @@ pub struct DaemonRemoteSystemdInstallArgs {
     pub serve: DaemonRemoteServeArgs,
     #[command(flatten)]
     pub systemd: DaemonRemoteSystemdUnitArgs,
-    /// Explicit path to the harness binary. Defaults to the current executable.
+    /// Explicit path to the `harness-daemon` binary. Defaults to the current executable.
     #[arg(long)]
     pub binary_path: Option<PathBuf>,
     /// Path for the `EnvironmentFile` referenced by the service unit.
@@ -154,7 +154,7 @@ impl DaemonRemoteSystemdInstallArgs {
             || {
                 current_exe().map_err(|error| {
                     CliError::from(CliErrorKind::workflow_io(format!(
-                        "resolve current harness binary: {error}"
+                        "resolve current harness-daemon binary: {error}"
                     )))
                 })
             },
@@ -353,7 +353,6 @@ fn render_unit(
 fn remote_serve_command(binary_path: &Path, config: &RemoteDaemonServeConfig) -> Vec<String> {
     let mut command = vec![
         binary_path.display().to_string(),
-        "daemon".to_string(),
         "remote".to_string(),
         "serve".to_string(),
         "--domain".to_string(),

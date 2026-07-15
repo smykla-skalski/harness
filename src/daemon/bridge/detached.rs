@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use fs_err as fs;
 
-use crate::daemon::service;
+use crate::daemon::sandboxed_from_env;
 use crate::daemon::state;
 use crate::errors::{CliError, CliErrorKind};
 
@@ -20,8 +20,8 @@ use super::core::{BridgeResponse, ResolvedBridgeConfig};
 use super::types::{DETACHED_START_POLL_INTERVAL, DETACHED_START_TIMEOUT, STOP_POLL_INTERVAL};
 
 pub(super) fn start_detached(config: &ResolvedBridgeConfig) -> Result<i32, CliError> {
-    let harness = current_exe().map_err(|error| {
-        CliErrorKind::workflow_io(format!("resolve current harness binary: {error}"))
+    let bridge = current_exe().map_err(|error| {
+        CliErrorKind::workflow_io(format!("resolve current bridge binary: {error}"))
     })?;
     state::ensure_daemon_dirs()?;
     let stdout_path = state::daemon_root().join("bridge.stdout.log");
@@ -32,9 +32,9 @@ pub(super) fn start_detached(config: &ResolvedBridgeConfig) -> Result<i32, CliEr
     let stderr = File::create(&stderr_path).map_err(|error| {
         CliErrorKind::workflow_io(format!("create {}: {error}", stderr_path.display()))
     })?;
-    let mut command = Command::new(&harness);
+    let mut command = Command::new(&bridge);
     write_bridge_config(&config.persisted)?;
-    command.arg("bridge").arg("start");
+    command.arg("start");
     let mut child = command
         .stdin(Stdio::null())
         .stdout(stdout)
@@ -154,7 +154,7 @@ fn force_stop_via_signal_if_possible(
     grace: Duration,
     wait_for_stop: impl Fn() -> bool,
 ) -> Result<bool, CliError> {
-    if service::sandboxed_from_env() || !pid_alive(running.state.pid) {
+    if sandboxed_from_env() || !pid_alive(running.state.pid) {
         return Ok(false);
     }
     send_sigterm(running.state.pid)?;

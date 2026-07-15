@@ -11,9 +11,7 @@ use super::orchestration::{
     orchestration_status_for_codex_run, rollback_codex_registration,
     update_codex_orchestration_status,
 };
-use super::orchestration_registration::{
-    RegisteredOrchestrationAgent, RegistrationMutation,
-};
+use super::orchestration_registration::{RegisteredOrchestrationAgent, RegistrationMutation};
 
 fn should_reconcile_board_item(
     state: &SessionState,
@@ -117,14 +115,11 @@ impl CodexControllerHandle {
                 })
                 .await?;
             if changed {
-                daemon_service::sync_file_state_from_async_db(&async_db, &session_id_async)
-                    .await?;
+                daemon_service::sync_file_state_from_async_db(&async_db, &session_id_async).await?;
                 async_db.bump_change(&session_id_async).await?;
                 async_db.bump_change("global").await?;
             }
-            if reconcile_board_item
-                && let Some(board_item_id) = run_async.board_item_id.clone()
-            {
+            if reconcile_board_item && let Some(board_item_id) = run_async.board_item_id.clone() {
                 daemon_service::evaluate_task_board_async(
                     &TaskBoardEvaluateRequest {
                         item_id: Some(board_item_id),
@@ -326,11 +321,8 @@ impl CodexControllerHandle {
                         ))
                         .await?;
                 }
-                daemon_service::sync_file_state_from_async_db(
-                    &async_db,
-                    &session_id_for_task,
-                )
-                .await?;
+                daemon_service::sync_file_state_from_async_db(&async_db, &session_id_for_task)
+                    .await?;
                 async_db.bump_change(&session_id_for_task).await?;
                 async_db.bump_change("global").await?;
             }

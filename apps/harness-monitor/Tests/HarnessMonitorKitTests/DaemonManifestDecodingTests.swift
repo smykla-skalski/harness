@@ -52,7 +52,7 @@ struct DaemonManifestDecodingTests {
         "revision": 7,
         "updated_at": "2026-04-11T15:30:00Z",
         "binary_stamp": {
-          "helper_path": "/Applications/Harness Monitor.app/Contents/Helpers/harness",
+          "helper_path": "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon",
           "device_identifier": 41,
           "inode": 84,
           "file_size": 16384,
@@ -72,7 +72,7 @@ struct DaemonManifestDecodingTests {
     #expect(
       manifest.binaryStamp
         == DaemonBinaryStamp(
-          helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness",
+          helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon",
           deviceIdentifier: 41,
           inode: 84,
           fileSize: 16_384,
@@ -94,7 +94,7 @@ struct DaemonManifestDecodingTests {
       revision: 42,
       updatedAt: "2026-04-11T15:30:00Z",
       binaryStamp: DaemonBinaryStamp(
-        helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness",
+        helperPath: "/Applications/Harness Monitor.app/Contents/Helpers/harness-daemon",
         deviceIdentifier: 41,
         inode: 84,
         fileSize: 16_384,

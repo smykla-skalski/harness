@@ -1,9 +1,8 @@
 use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::{AcpAgentInspectSnapshot, AcpAgentSnapshot};
-use crate::daemon::agent_acp::AcpPermissionBatch;
-use crate::session::types::{AgentStatus, ManagedAgentKind};
+use super::models::{AcpAgentInspectSnapshot, AcpAgentSnapshot, AcpPermissionBatch};
+use crate::session::{AgentStatus, ManagedAgentKind};
 
 #[derive(Serialize)]
 struct AcpAgentSnapshotWire<'a> {
@@ -247,7 +246,7 @@ mod tests {
             session_id: "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc".into(),
             agent_id: "worker-1".into(),
             display_name: "Copilot".into(),
-            status: crate::session::types::AgentStatus::Active,
+            status: crate::session::AgentStatus::Active,
             pid: 42,
             pgid: 42,
             project_dir: "/tmp/project".into(),

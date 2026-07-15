@@ -130,6 +130,9 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("read migrated switch");
-        assert!(!requires_live, "v34 migration checksum requires this default");
+        assert!(
+            !requires_live,
+            "v34 migration checksum requires this default"
+        );
     }
 }

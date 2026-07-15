@@ -13,7 +13,8 @@
 //! for local proxying or branding.
 
 use std::env;
-use std::path::{Path, PathBuf};
+use std::io::ErrorKind;
+use std::path::Path;
 
 use thiserror::Error;
 
@@ -102,22 +103,48 @@ impl AgentConfig {
 /// Unlink the credential file. Called by the shim after [`AgentConfig::from_api_key_file`]
 /// so the key never lingers on disk longer than one stat() interval.
 ///
-/// Errors are logged at warn level and not propagated — losing the unlink is
-/// not worth aborting the session for, and the daemon already created the
-/// file in a per-spawn tempdir that gets reaped on supervisor shutdown.
+/// Managed credential directories are removed too. Errors are logged at warn
+/// level and not propagated because the daemon retains an independent RAII
+/// cleanup guard until protocol initialization finishes.
 pub fn discard_api_key_file(path: &Path) {
-    if let Err(err) = std::fs::remove_file(path) {
-        tracing::warn!(
-            path = %path.display(),
-            error = %err,
-            "failed to unlink api-key-file after read"
-        );
+    match std::fs::remove_file(path) {
+        Ok(()) => remove_managed_credential_directory(path),
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            remove_managed_credential_directory(path);
+        }
+        Err(error) => {
+            tracing::warn!(
+                path = %path.display(),
+                %error,
+                "failed to unlink api-key-file after read"
+            );
+        }
     }
 }
 
-/// Convenience that calls [`discard_api_key_file`] on an owned `PathBuf`.
-pub fn discard_api_key_pathbuf(path: PathBuf) {
-    discard_api_key_file(&path);
+fn remove_managed_credential_directory(path: &Path) {
+    let Some(parent) = path.parent().filter(|parent| {
+        path.file_name().is_some_and(|name| name == "api-key")
+            && parent
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("harness-openrouter-"))
+    }) else {
+        return;
+    };
+    match std::fs::remove_dir(parent) {
+        Ok(()) => {}
+        Err(error)
+            if matches!(
+                error.kind(),
+                ErrorKind::NotFound | ErrorKind::DirectoryNotEmpty
+            ) => {}
+        Err(error) => tracing::warn!(
+            path = %parent.display(),
+            %error,
+            "failed to remove managed api-key directory after read"
+        ),
+    }
 }
 
 fn env_string(name: &str) -> Option<String> {
@@ -205,5 +232,22 @@ mod tests {
         assert!(path.exists());
         discard_api_key_file(&path);
         assert!(!path.exists());
+        assert!(dir.path().exists());
+    }
+
+    #[test]
+    fn discard_api_key_file_removes_managed_directory() {
+        let dir = tempfile::Builder::new()
+            .prefix("harness-openrouter-")
+            .tempdir()
+            .expect("tempdir");
+        let directory = dir.path().to_path_buf();
+        let path = directory.join("api-key");
+        std::fs::write(&path, "sk-ephemeral").expect("write");
+
+        discard_api_key_file(&path);
+
+        assert!(!path.exists());
+        assert!(!directory.exists());
     }
 }

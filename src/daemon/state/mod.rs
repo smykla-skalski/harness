@@ -31,6 +31,7 @@ pub use config::{
     replace_task_board_todoist_token, task_board_github_repository_token, task_board_github_token,
     task_board_openrouter_token, task_board_todoist_token,
 };
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use config::{
     load_runtime_config_raw, overlay_task_board_git_runtime_profile_secrets,
     overlay_task_board_git_runtime_secret_flags, overlay_task_board_git_runtime_secrets,
@@ -41,6 +42,7 @@ pub use config::{
     load_task_board_git_runtime_config, persist_task_board_git_runtime_config,
     task_board_git_runtime_profile,
 };
+#[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use config_migration::{
     remove_migrated_task_board_config_after_ack, remove_migrated_task_board_config_if_safe,
     task_board_git_runtime_secret_handoff_digest,
@@ -59,6 +61,7 @@ pub use paths::{
     set_daemon_root_override,
 };
 
+#[cfg(any(test, feature = "bridge-runtime", feature = "daemon-runtime"))]
 pub(crate) use locks::{acquire_flock_exclusive, flock_is_held_at};
 
 const LAUNCH_AGENTS_DIR: &str = "LaunchAgents";

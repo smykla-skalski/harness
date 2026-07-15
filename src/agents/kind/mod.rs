@@ -158,7 +158,7 @@ impl From<HookAgent> for RuntimeKind {
 /// registration. Test fixtures and the deserializer's `Legacy` arm use this
 /// path intentionally; live-registration code paths must not depend on it.
 impl From<&str> for RuntimeKind {
-    #[expect(
+    #[allow(
         clippy::cognitive_complexity,
         reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
     )]
@@ -311,8 +311,8 @@ mod tests {
 
     #[test]
     fn partial_eq_with_str_compares_runtime_name() {
-        assert!(RuntimeKind::Tui(HookAgent::Codex) == "codex");
+        assert_eq!(RuntimeKind::Tui(HookAgent::Codex), "codex");
         assert!(RuntimeKind::Tui(HookAgent::Claude) != "codex");
-        assert!(RuntimeKind::Acp(AcpAgentId::new("copilot")) == "copilot");
+        assert_eq!(RuntimeKind::Acp(AcpAgentId::new("copilot")), "copilot");
     }
 }

@@ -96,4 +96,5 @@ pub fn sessions_root(data_root: &Path) -> PathBuf {
 }
 
 #[cfg(test)]
+#[path = "layout/tests.rs"]
 mod tests;

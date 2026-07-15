@@ -10,7 +10,7 @@ fn remote_systemd_unit_is_hardened_and_runs_remote_serve() {
 
     assert!(plan.needs_bind_capability);
     assert!(plan.unit_contents.contains(
-        "ExecStart=/usr/local/bin/harness daemon remote serve --domain daemon.example.com"
+        "ExecStart=/usr/local/bin/harness-daemon remote serve --domain daemon.example.com"
     ));
     for value in [
         "--https-port 443",
@@ -116,7 +116,7 @@ fn remote_systemd_high_ports_isolate_users_without_bind_capability() {
 fn unit_plan(args: &DaemonRemoteSystemdInstallArgs) -> RemoteSystemdInstallPlan {
     RemoteSystemdInstallPlan::for_tests(
         args,
-        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/usr/local/bin/harness-daemon"),
         PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
         PathBuf::from("/etc/harness/harness-remote-daemon.env"),
     )

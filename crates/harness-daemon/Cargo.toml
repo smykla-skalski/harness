@@ -1,0 +1,100 @@
+[package]
+name = "harness-daemon"
+version = "48.0.0"
+edition = "2024"
+rust-version = "1.94"
+
+[lib]
+test = false
+
+[[bin]]
+name = "harness-daemon"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+agent-client-protocol = { version = "=0.12.1", features = ["unstable_session_model"] }
+arc-swap = "1.9.1"
+async-stream = "0.3.6"
+async-trait = "0.1.83"
+axum = { version = "0.8.7", features = ["json", "ws"] }
+base64 = "0.22.1"
+bytes = "1.10.1"
+chrono = { version = "0.4.44", features = ["serde"] }
+clap = { version = "4.6.0", features = ["derive", "env"] }
+crossterm = "0.29.0"
+fs2 = "0.4.3"
+fs-err = "3.3.0"
+futures-util = "0.3.31"
+gix = { version = "0.83.0", features = ["status", "worktree-mutation", "index", "blocking-http-transport-reqwest-rust-tls"] }
+gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
+harness-hook = { path = "../harness-hook", version = "48.0.0" }
+harness-protocol = { path = "../harness-protocol", version = "48.0.0" }
+harness-telemetry = { path = "../harness-telemetry", version = "48.0.0" }
+hex = "0.4.3"
+hickory-resolver = "0.26.1"
+hmac = "0.13.0"
+http = "1.4.2"
+http-body-util = "0.1"
+instant-acme = { version = "0.8.5", default-features = false, features = ["hyper-rustls", "rcgen", "ring"] }
+libc = "0.2"
+nix = { version = "0.31", features = ["signal"] }
+notify = "8.2.0"
+portable-pty = "0.9.0"
+pathdiff = "0.2.3"
+pgp = { version = "0.19.0", default-features = false }
+rand_core06 = { package = "rand_core", version = "0.6.4", features = ["std"] }
+rcgen = { version = "0.14.8", default-features = false, features = ["pem", "ring", "x509-parser"] }
+regex = "1.11.1"
+reqwest = { version = "0.13.2", features = ["json"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
+rustls = { version = "0.23.37", features = ["ring"] }
+sea-query = { version = "1.0.0-rc.33", default-features = false, features = ["backend-sqlite"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+serde_urlencoded = "0.7.1"
+sha1 = "0.11.0"
+sha2 = "0.11.0"
+shell-words = "1.1.0"
+signal-hook = "0.4"
+similar = "3.0"
+sqlx = { version = "0.9.0-alpha.1", default-features = false, features = ["sqlite", "sqlite-bundled", "runtime-tokio", "tls-rustls-ring", "migrate", "macros", "chrono", "uuid", "json"] }
+ssh-key = { version = "0.7.0-rc.10", features = ["crypto", "encryption"] }
+tar = "0.4.44"
+tempfile = "3.27.0"
+thiserror = "2.0.18"
+tokio = { version = "1.50.0", features = ["rt-multi-thread", "time", "process", "io-std", "io-util", "sync", "macros", "net", "tracing", "test-util"] }
+tokio-rustls = "0.26.4"
+tokio-tungstenite = { version = "0.29.0", default-features = false, features = ["connect"] }
+tokio-util = { version = "0.7.18", features = ["compat"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+user_dirs = "0.2.0"
+uuid = { version = "1.18.1", features = ["serde", "v4"] }
+uzers = { version = "0.12.2", default-features = false }
+vt100 = "0.16.2"
+walkdir = "2.5.0"
+x509-parser = "=0.18.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+security-framework = "3"
+
+[dev-dependencies]
+temp-env = { version = "=0.3.6", features = ["async_closure"] }
+tempfile = "=3.27.0"
+
+[features]
+default = ["daemon-runtime", "standalone-daemon", "standalone-worker"]
+bridge-runtime = []
+daemon-runtime = ["bridge-runtime"]
+standalone-daemon = []
+standalone-worker = []
+tokio-console = ["harness-telemetry/tokio-console"]
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }
+unexpected_cfgs = { level = "deny", priority = 2, check-cfg = ['cfg(feature, values("bridge-runtime", "daemon-runtime", "standalone-daemon", "tokio-console"))'] }

@@ -6,10 +6,18 @@ use chrono::DateTime;
 use tempfile::tempdir;
 
 use super::{BridgeClient, BridgeResponse};
+use crate::agents::acp::probe::{
+    AcpAuthState, AcpRuntimeProbe, AcpRuntimeProbeResponse, lock_probe_cache_for_tests,
+    replace_probe_cache_for_tests,
+};
 use crate::daemon::agent_acp::{AcpAgentStartRequest, AcpPermissionDecision};
+use crate::daemon::bridge::acp_rpc::BridgeAcpProbeResponse;
 use crate::daemon::bridge::acp_rpc::BridgeAcpStartRequest;
-use crate::daemon::bridge::core::BridgeAcpEventBuffer;
+use crate::daemon::bridge::core::{BridgeAcpEventBuffer, BridgeHandleResult};
+use crate::daemon::bridge::server::BridgeServer;
+use crate::daemon::bridge::types::{BRIDGE_CAPABILITY_ACP, PersistedBridgeConfig};
 use crate::daemon::protocol::StreamEvent;
+use crate::daemon::state::HostBridgeCapabilityManifest;
 use crate::errors::{CliError, CliErrorKind};
 
 fn stream_event(event: &str, session_id: &str) -> StreamEvent {
@@ -178,6 +186,52 @@ fn bridge_client_acp_events_since_uses_expected_capability_payload() {
 }
 
 #[test]
+fn bridge_acp_probe_returns_its_process_local_cached_snapshot() {
+    let _guard = lock_probe_cache_for_tests();
+    let probe = AcpRuntimeProbeResponse {
+        probes: vec![AcpRuntimeProbe {
+            agent_id: "openrouter".to_string(),
+            display_name: "OpenRouter".to_string(),
+            binary_present: true,
+            auth_state: AcpAuthState::Ready,
+            version: Some("48.0.0".to_string()),
+            install_hint: None,
+        }],
+        checked_at: "2026-07-16T08:00:00Z".to_string(),
+    };
+    replace_probe_cache_for_tests(Some(probe.clone()), std::time::Duration::ZERO, false);
+    let capabilities = std::collections::BTreeMap::from([(
+        BRIDGE_CAPABILITY_ACP.to_string(),
+        HostBridgeCapabilityManifest {
+            enabled: true,
+            healthy: true,
+            transport: "stdio".to_string(),
+            endpoint: None,
+            metadata: std::collections::BTreeMap::new(),
+        },
+    )]);
+    let server = BridgeServer::new(
+        "test-token".to_string(),
+        tempdir().expect("tempdir").path().join("bridge.sock"),
+        PersistedBridgeConfig::default(),
+        capabilities,
+    );
+
+    let result = temp_env::with_var("HARNESS_SANDBOXED", Some("1"), || {
+        server.handle_acp("probe", serde_json::json!({}))
+    })
+    .expect("probe action");
+    let BridgeHandleResult::Response(response) = result else {
+        panic!("probe should return a regular bridge response");
+    };
+    let response: BridgeAcpProbeResponse =
+        serde_json::from_value(response.payload.expect("probe response payload"))
+            .expect("decode probe response");
+    assert_eq!(response.probe, Some(probe));
+    replace_probe_cache_for_tests(None, std::time::Duration::ZERO, false);
+}
+
+#[test]
 fn acp_start_request_defaults_pooling_enabled_for_legacy_payloads() {
     let legacy: BridgeAcpStartRequest = serde_json::from_value(serde_json::json!({
         "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
@@ -212,11 +266,13 @@ fn bridge_client_acp_methods_use_expected_capability_actions() {
     let listener = UnixListener::bind(&socket_path).expect("bind socket");
     let server = thread::spawn(move || {
         let expected = [
+            ("probe", serde_json::json!({})),
             (
                 "start",
                 serde_json::json!({
                     "session_id": "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
-                    "disable_pooling": true
+                    "disable_pooling": true,
+                    "openrouter_token": "sk-bridge-request"
                 }),
             ),
             (
@@ -271,14 +327,20 @@ fn bridge_client_acp_methods_use_expected_capability_actions() {
         token: "test-token".to_string(),
     };
     let start_request = AcpAgentStartRequest {
-        agent: "claude".to_string(),
+        agent: "openrouter".to_string(),
         prompt: Some("hello".to_string()),
         project_dir: Some("/tmp/project".to_string()),
         ..AcpAgentStartRequest::default()
     };
+    assert!(client.acp_probe().is_err());
     assert!(
         client
-            .acp_start("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc", &start_request, true)
+            .acp_start(
+                "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc",
+                &start_request,
+                true,
+                Some("sk-bridge-request"),
+            )
             .is_err()
     );
     assert!(

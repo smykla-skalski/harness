@@ -488,5 +488,5 @@ fn u64_to_state(val: u64) -> WatchdogState {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "daemon-runtime"))]
 mod tests;

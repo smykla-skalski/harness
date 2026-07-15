@@ -75,7 +75,7 @@ pub(crate) fn migrate_legacy_daemon_root(
 
 /// Run migration with explicit parent and target paths. Useful when the
 /// caller computes paths outside the env-driven default resolver (notably
-/// `harness daemon dev`, which falls back to its own app group default).
+/// `harness-daemon dev`, which falls back to its own app group default).
 ///
 /// # Errors
 /// Returns [`CliError`] only on filesystem failures encountered during the

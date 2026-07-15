@@ -1,7 +1,7 @@
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
-    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
+    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
     PolicyApprovalGrantsListResponse, PolicyCanvasCreateRequest, PolicyCanvasDeleteRequest,
     PolicyCanvasDuplicateRequest, PolicyCanvasExportRequest, PolicyCanvasExportResponse,
     PolicyCanvasImportRequest, PolicyCanvasImportResponse, PolicyCanvasRenameRequest,

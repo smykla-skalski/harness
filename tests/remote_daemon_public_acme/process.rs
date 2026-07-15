@@ -115,9 +115,7 @@ impl PublicAcmeProcess<'_> {
     pub fn create_pairing(&self, role: &str) -> Result<Value, String> {
         self.environment.run_json(
             self.config,
-            &[
-                "daemon", "remote", "pair", "create", "--role", role, "--ttl", "10m",
-            ],
+            &["remote", "pair", "create", "--role", role, "--ttl", "10m"],
         )
     }
 
@@ -188,7 +186,6 @@ pub fn remote_daemon_args(
     challenge: PublicAcmeChallenge,
 ) -> Vec<String> {
     let mut args = [
-        "daemon",
         "remote",
         "serve",
         "--domain",
@@ -241,8 +238,8 @@ fn apply_environment(
 fn prepare_capable_binary(root: &Path) -> Result<PathBuf, String> {
     use std::os::unix::fs::PermissionsExt as _;
 
-    let source = assert_cmd::cargo::cargo_bin("harness");
-    let binary = root.join("harness-public-acme");
+    let source = assert_cmd::cargo::cargo_bin("harness-daemon");
+    let binary = root.join("harness-daemon-public-acme");
     fs::copy(&source, &binary).map_err(|error| {
         format!(
             "copy public ACME harness binary from {}: {error}",
@@ -341,7 +338,7 @@ mod tests {
     #[test]
     fn getcap_failure_reports_status_and_stderr() {
         let error = capability_verification_error(
-            Path::new("/tmp/harness-public-acme"),
+            Path::new("/tmp/harness-daemon-public-acme"),
             "exit status: 1",
             b"",
             b"permission denied",
@@ -362,7 +359,6 @@ mod tests {
         assert_eq!(
             args,
             [
-                "daemon",
                 "remote",
                 "serve",
                 "--domain",
@@ -403,7 +399,7 @@ mod tests {
     fn public_acme_environment_pins_staging_and_isolated_state() {
         let temp = tempfile::tempdir().expect("environment tempdir");
         let config = test_config();
-        let mut command = Command::new("harness");
+        let mut command = Command::new("harness-daemon");
         apply_environment(
             &mut command,
             &config,

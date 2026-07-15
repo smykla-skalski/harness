@@ -33,11 +33,10 @@ fn state_for_session(
 
 #[test]
 fn idempotent_registration_does_not_duplicate_join_log() {
-    let (controller, db, _tempdir) =
-        controller_with_session_state(state_for_session(
-            IDEMPOTENT_SESSION_ID,
-            sample_session_state_with_open_task(),
-        ));
+    let (controller, db, _tempdir) = controller_with_session_state(state_for_session(
+        IDEMPOTENT_SESSION_ID,
+        sample_session_state_with_open_task(),
+    ));
     let request = bound_request();
     for _ in 0..2 {
         controller
@@ -66,11 +65,10 @@ fn idempotent_registration_does_not_duplicate_join_log() {
 
 #[test]
 fn snapshot_failure_rollback_compensates_join_log() {
-    let (controller, db, _tempdir) =
-        controller_with_session_state(state_for_session(
-            COMPENSATION_SESSION_ID,
-            sample_session_state_with_open_task(),
-        ));
+    let (controller, db, _tempdir) = controller_with_session_state(state_for_session(
+        COMPENSATION_SESSION_ID,
+        sample_session_state_with_open_task(),
+    ));
     let registration = controller
         .register_orchestration_agent(
             COMPENSATION_SESSION_ID,
@@ -96,17 +94,22 @@ fn snapshot_failure_rollback_compensates_join_log() {
     let entries = db
         .load_session_log(COMPENSATION_SESSION_ID)
         .expect("load session log");
-    assert!(matches!(entries[0].transition, SessionTransition::AgentJoined { .. }));
-    assert!(matches!(entries[1].transition, SessionTransition::AgentRemoved { .. }));
+    assert!(matches!(
+        entries[0].transition,
+        SessionTransition::AgentJoined { .. }
+    ));
+    assert!(matches!(
+        entries[1].transition,
+        SessionTransition::AgentRemoved { .. }
+    ));
 }
 
 #[test]
 fn snapshot_failure_rollback_preserves_concurrent_task_update() {
-    let (controller, db, _tempdir) =
-        controller_with_session_state(state_for_session(
-            TASK_UPDATE_SESSION_ID,
-            sample_session_state_with_open_task(),
-        ));
+    let (controller, db, _tempdir) = controller_with_session_state(state_for_session(
+        TASK_UPDATE_SESSION_ID,
+        sample_session_state_with_open_task(),
+    ));
     let registration = controller
         .register_orchestration_agent(
             TASK_UPDATE_SESSION_ID,
@@ -121,11 +124,16 @@ fn snapshot_failure_rollback_preserves_concurrent_task_update() {
             .load_session_state_for_mutation(TASK_UPDATE_SESSION_ID)
             .expect("load session")
             .expect("session");
-        state.tasks.get_mut("task-1").expect("task").notes.push(TaskNote {
-            timestamp: "2026-04-09T10:00:04Z".into(),
-            agent_id: Some(registration.agent_id.clone()),
-            text: "Concurrent checkpoint detail".into(),
-        });
+        state
+            .tasks
+            .get_mut("task-1")
+            .expect("task")
+            .notes
+            .push(TaskNote {
+                timestamp: "2026-04-09T10:00:04Z".into(),
+                agent_id: Some(registration.agent_id.clone()),
+                text: "Concurrent checkpoint detail".into(),
+            });
         db.save_session_state("project-1", &state)
             .expect("save concurrent update");
     }
@@ -150,11 +158,10 @@ fn snapshot_failure_rollback_preserves_concurrent_task_update() {
 
 #[test]
 fn snapshot_failure_rollback_preserves_concurrent_agent_update() {
-    let (controller, db, _tempdir) =
-        controller_with_session_state(state_for_session(
-            AGENT_UPDATE_SESSION_ID,
-            sample_session_state_with_open_task(),
-        ));
+    let (controller, db, _tempdir) = controller_with_session_state(state_for_session(
+        AGENT_UPDATE_SESSION_ID,
+        sample_session_state_with_open_task(),
+    ));
     let registration = controller
         .register_orchestration_agent(
             AGENT_UPDATE_SESSION_ID,
@@ -208,14 +215,11 @@ async fn failed_registration_restores_preexisting_queued_task() {
         task.queued_at = Some("2026-04-09T10:00:03Z".into());
         let expected = task.clone();
         let (controller, db, tempdir) = controller_with_async_session_state(initial).await;
-        let layout = session_storage::layout_from_project_dir(
-            &tempdir.path().join("project"),
-            SESSION_ID,
-        )
-        .expect("session layout");
+        let layout =
+            session_storage::layout_from_project_dir(&tempdir.path().join("project"), SESSION_ID)
+                .expect("session layout");
         fs_err::remove_dir_all(layout.session_root()).expect("remove session mirror root");
-        fs_err::write(layout.session_root(), "not a directory")
-            .expect("block session mirror root");
+        fs_err::write(layout.session_root(), "not a directory").expect("block session mirror root");
 
         controller
             .register_orchestration_agent(

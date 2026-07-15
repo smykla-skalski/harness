@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn bridge_status_reports_not_running_when_clean() {
     let tmp = tempdir().expect("tempdir");
-    let output = run_bridge(&tmp, &["bridge", "status"]);
+    let output = run_bridge(&tmp, &["status"]);
     assert!(output.status.success(), "status: {}", output_text(&output));
 
     let report: BridgeStatusReport = serde_json::from_slice(&output.stdout).expect("parse");
@@ -15,15 +15,15 @@ fn bridge_status_reports_not_running_when_clean() {
 fn bridge_start_refuses_when_sandboxed() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
-    let output = Command::new(harness_binary())
-        .args(["bridge", "start", "--capability", "agent-tui"])
+    let output = Command::new(bridge_binary())
+        .args(["start", "--capability", "agent-tui"])
         .env("HARNESS_SANDBOXED", "1")
         .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
         .env("XDG_DATA_HOME", tmp.path())
         .env("HARNESS_HOST_HOME", &host_home)
         .env("HOME", &host_home)
         .output()
-        .expect("run harness");
+        .expect("run harness-bridge");
     assert!(!output.status.success());
 
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -39,8 +39,8 @@ fn bridge_start_publishes_agent_tui_capability_and_stops_cleanly() {
     let host_home = ensure_host_home(tmp.path());
 
     let mut bridge = ManagedChild::spawn(
-        Command::new(harness_binary())
-            .args(["bridge", "start", "--capability", "agent-tui"])
+        Command::new(bridge_binary())
+            .args(["start", "--capability", "agent-tui"])
             .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
             .env("XDG_DATA_HOME", tmp.path())
             .env("HARNESS_HOST_HOME", &host_home)
@@ -75,7 +75,7 @@ fn bridge_start_publishes_agent_tui_capability_and_stops_cleanly() {
         Some("0")
     );
 
-    let status_output = run_bridge(&tmp, &["bridge", "status"]);
+    let status_output = run_bridge(&tmp, &["status"]);
     assert!(
         status_output.status.success(),
         "status: {}",
@@ -86,7 +86,7 @@ fn bridge_start_publishes_agent_tui_capability_and_stops_cleanly() {
     assert!(report.capabilities.contains_key("agent-tui"));
     assert!(!report.capabilities.contains_key("codex"));
 
-    let stop_output = run_bridge(&tmp, &["bridge", "stop"]);
+    let stop_output = run_bridge(&tmp, &["stop"]);
     assert!(
         stop_output.status.success(),
         "stop: {}",
@@ -119,7 +119,7 @@ fn bridge_start_daemon_uses_short_socket_path_for_long_data_home() {
 
     let output = run_bridge_with_data_home(
         &data_home,
-        &["bridge", "start", "--daemon", "--capability", "agent-tui"],
+        &["start", "--daemon", "--capability", "agent-tui"],
     );
     assert!(output.status.success(), "start: {}", output_text(&output));
 
@@ -130,7 +130,7 @@ fn bridge_start_daemon_uses_short_socket_path_for_long_data_home() {
         "socket path should fit unix-domain limits: {}",
         state.socket_path
     );
-    let status_output = run_bridge_with_data_home(&data_home, &["bridge", "status"]);
+    let status_output = run_bridge_with_data_home(&data_home, &["status"]);
     assert!(
         status_output.status.success(),
         "status: {}",
@@ -147,7 +147,7 @@ fn bridge_start_daemon_uses_short_socket_path_for_long_data_home() {
         Some(state.socket_path.as_str())
     );
 
-    let stop_output = run_bridge_with_data_home(&data_home, &["bridge", "stop"]);
+    let stop_output = run_bridge_with_data_home(&data_home, &["stop"]);
     assert!(
         stop_output.status.success(),
         "stop: {}",

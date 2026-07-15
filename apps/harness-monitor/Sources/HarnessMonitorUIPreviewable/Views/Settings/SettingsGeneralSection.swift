@@ -119,7 +119,7 @@ public struct SettingsGeneralSection: View {
     self.liveState = liveState
   }
 
-  private static let externalDaemonCommand = "harness daemon dev"
+  private static let externalDaemonCommand = "harness-daemon dev"
 
   @ViewBuilder private var daemonModeRow: some View {
     LabeledContent("Daemon mode") {

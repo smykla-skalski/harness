@@ -1,13 +1,13 @@
 //! Daemon root discovery and adoption.
 //!
-//! Short-lived `harness` CLI commands (notably the `harness bridge *` family)
+//! Short-lived bridge control commands (the `harness-bridge *` family)
 //! must interact with whatever Harness daemon is currently running on the
 //! host, regardless of which terminal they were launched from. The sandboxed
 //! managed daemon writes its state into
 //! `~/Library/Group Containers/Q498EB36N4.io.harnessmonitor/harness/daemon`;
 //! a plain terminal without `HARNESS_APP_GROUP_ID` defaults to
 //! `~/.local/share/harness/daemon`. Without discovery, a user running
-//! `harness bridge start` in a fresh terminal would land bridge state at
+//! `harness-bridge start` in a fresh terminal would land bridge state at
 //! the XDG path while the sandboxed daemon watches the app group container,
 //! and the bridge would never be picked up.
 //!
@@ -29,8 +29,8 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::daemon::HARNESS_MONITOR_APP_GROUP_ID;
 use crate::daemon::state;
-use crate::daemon::transport::HARNESS_MONITOR_APP_GROUP_ID;
 use crate::workspace::{harness_data_root, host_home_dir};
 
 /// Marker directory the runtime-profile shell helpers use under the macOS
@@ -113,7 +113,7 @@ pub enum DaemonLocationKind {
     /// set before the CLI launched.
     NaturalDefault,
     /// The Harness Monitor app group container, used by the sandboxed
-    /// managed daemon and by `harness daemon dev`.
+    /// managed daemon and by `harness-daemon dev`.
     AppGroupContainer {
         /// Group identifier baked into the path.
         app_group_id: &'static str,

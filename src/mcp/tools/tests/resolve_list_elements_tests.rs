@@ -1,5 +1,14 @@
 use super::*;
 
+fn counted_empty_helper(
+    helper_calls: &AtomicUsize,
+    _window_id: Option<i64>,
+    _kind: Option<ElementKind>,
+) -> std::future::Ready<Result<ListElementsResult, AccessibilityQueryError>> {
+    helper_calls.fetch_add(1, Ordering::Relaxed);
+    std::future::ready(Ok(ListElementsResult { elements: vec![] }))
+}
+
 #[tokio::test]
 async fn resolve_list_elements_uses_helper_when_registry_is_empty() {
     async fn helper(
@@ -73,15 +82,6 @@ async fn resolve_list_elements_preserves_empty_success_when_helper_fails() {
 async fn resolve_list_elements_retries_window_scoped_empty_results_until_registry_populates() {
     let helper_calls = AtomicUsize::new(0);
 
-    async fn helper(
-        helper_calls: &AtomicUsize,
-        _window_id: Option<i64>,
-        _kind: Option<ElementKind>,
-    ) -> Result<ListElementsResult, AccessibilityQueryError> {
-        helper_calls.fetch_add(1, Ordering::Relaxed);
-        Ok(ListElementsResult { elements: vec![] })
-    }
-
     let dir = TempDir::new().unwrap();
     let path = socket_path(&dir);
     let server = spawn_response_sequence(
@@ -94,7 +94,7 @@ async fn resolve_list_elements_retries_window_scoped_empty_results_until_registr
     );
     let client = RegistryClient::with_socket_path(path);
     let result = resolve_list_elements_with(&client, Some(42), None, |window_id, kind| {
-        helper(&helper_calls, window_id, kind)
+        counted_empty_helper(&helper_calls, window_id, kind)
     })
     .await
     .expect("registry eventually populates");

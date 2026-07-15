@@ -57,7 +57,7 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
             '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist"',
             '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"',
             '"$(PROJECT_DIR)/HarnessMonitorDaemon.entitlements"',
-            '"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness.cstemp"',
+            '"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/harness-daemon.cstemp"',
             'inputPaths: variant.inputPaths + ["$(TARGET_BUILD_DIR)/$(FULL_PRODUCT_NAME)"]',
         )
 

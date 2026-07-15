@@ -7,9 +7,7 @@ use crate::daemon::db::policy::restore_consumed_approval_grant_in_tx_at;
 use crate::daemon::db::{AsyncDaemonDb, CliError, CliErrorKind, db_error, utc_now};
 use crate::infra::io;
 use crate::task_board::dispatch::DispatchLifecycle;
-use crate::task_board::{
-    DispatchAppliedTask, TaskBoardStatus, TaskBoardWorkflowStatus,
-};
+use crate::task_board::{DispatchAppliedTask, TaskBoardStatus, TaskBoardWorkflowStatus};
 
 const CLAIM_LEASE_SECONDS: i64 = 30;
 
@@ -228,12 +226,8 @@ impl AsyncDaemonDb {
         let (item_id, session_id, work_item_id, execution_id) =
             claimed_intent_identity(&mut transaction, intent_id, claim_token).await?;
         if let Some(grant_id) = consumed_approval_grant_id {
-            restore_consumed_approval_grant_in_tx_at(
-                transaction.as_mut(),
-                grant_id,
-                &utc_now(),
-            )
-            .await?;
+            restore_consumed_approval_grant_in_tx_at(transaction.as_mut(), grant_id, &utc_now())
+                .await?;
         }
         let (mut item, revision) = load_item_in_tx(&mut transaction, &item_id)
             .await?

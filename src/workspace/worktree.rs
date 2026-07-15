@@ -150,4 +150,5 @@ fn resolve_remote_head(
 }
 
 #[cfg(test)]
+#[path = "worktree/tests.rs"]
 mod tests;

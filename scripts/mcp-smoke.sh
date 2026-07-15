@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Send initialize + tools/list to `harness mcp serve` over stdio and print
-# the pretty-printed responses. Passes through to `harness` on $PATH; the
+# Send initialize + tools/list to `harness-mcp serve` over stdio and print
+# the pretty-printed responses. Passes through to `harness-mcp` on $PATH; the
 # socket can be overridden with HARNESS_MONITOR_MCP_SOCKET.
 #
 # Usage:
@@ -9,10 +9,10 @@
 set -euo pipefail
 
 hash -r 2>/dev/null || true
-if [[ -n "${HARNESS_MCP_SMOKE_HARNESS_BIN:-}" ]]; then
-  harness_bin="$HARNESS_MCP_SMOKE_HARNESS_BIN"
-elif ! harness_bin=$(command -v harness 2>/dev/null); then
-  printf "error: \`harness\` not on PATH. Run \`mise run install\` first.\n" >&2
+if [[ -n "${HARNESS_MCP_SMOKE_BIN:-}" ]]; then
+  mcp_bin="$HARNESS_MCP_SMOKE_BIN"
+elif ! mcp_bin=$(command -v harness-mcp 2>/dev/null); then
+  printf "error: \`harness-mcp\` not on PATH. Run \`mise run install\` first.\n" >&2
   exit 2
 fi
 
@@ -34,7 +34,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-printf '%s\n' "$requests" | "$harness_bin" mcp serve >"$raw_output"
+printf '%s\n' "$requests" | "$mcp_bin" serve >"$raw_output"
 
 while IFS= read -r line; do
   if command -v jq >/dev/null 2>&1; then

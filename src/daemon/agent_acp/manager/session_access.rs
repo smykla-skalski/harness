@@ -1,21 +1,29 @@
+#[cfg(feature = "daemon-runtime")]
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+#[cfg(feature = "daemon-runtime")]
 use std::thread;
 
-use super::service;
+#[cfg(feature = "daemon-runtime")]
+use super::port::AcpWakeAcceptRequest;
 use super::{
     AcpAgentManagerHandle, AcpAgentSnapshot, AcpPermissionBatch, AcpPermissionDecision,
     ActiveAcpSession,
 };
+#[cfg(feature = "daemon-runtime")]
 use crate::agents::runtime::AgentRuntime;
+#[cfg(feature = "daemon-runtime")]
 use crate::agents::runtime::signal::{AckResult, SignalAck, acknowledge_signal};
+#[cfg(feature = "daemon-runtime")]
 use crate::daemon::service::{WakeEventLevel, record_wake_event};
 use crate::errors::{CliError, CliErrorKind};
+#[cfg(feature = "daemon-runtime")]
 use crate::workspace::utc_now;
 
 /// Wake-prompt invocation context. Bundles the protocol coordinates and the
 /// signal-side identity needed to synthesise an `Accept` ack on success.
 #[derive(Debug)]
+#[cfg(feature = "daemon-runtime")]
 pub struct AcpWakePrompt {
     pub acp_id: String,
     pub orchestration_session_id: String,
@@ -28,20 +36,15 @@ pub struct AcpWakePrompt {
 }
 
 impl AcpAgentManagerHandle {
+    #[cfg(feature = "daemon-runtime")]
     pub(crate) fn ensure_session_accepts_acp_start(
         &self,
         session_id: &str,
     ) -> Result<(), CliError> {
-        let db = self.db()?;
-        let db = Self::daemon_db_guard(&db)?;
-        if db.load_session_state_for_mutation(session_id)?.is_some()
-            && db.session_accepts_managed_agent_start(session_id)?
-        {
-            return Ok(());
-        }
-        Err(service::session_not_found(session_id))
+        self.state.port.ensure_session_accepts_start(session_id)
     }
 
+    #[cfg(feature = "daemon-runtime")]
     pub(crate) fn stop_session_acp_agents(
         &self,
         session_id: &str,
@@ -70,6 +73,7 @@ impl AcpAgentManagerHandle {
     /// a single live wake per signal even under a storm of `task.drop` calls.
     /// Coalesced wakes return immediately at `info!`. The agent will still
     /// see the file signal on its next poll.
+    #[cfg(feature = "daemon-runtime")]
     pub fn dispatch_wake_prompt(&self, runtime: &'static dyn AgentRuntime, prompt: AcpWakePrompt) {
         let session = match self.session(&prompt.acp_id) {
             Ok(session) => session,
@@ -113,6 +117,7 @@ impl AcpAgentManagerHandle {
         }
     }
 
+    #[cfg(feature = "daemon-runtime")]
     fn try_reserve_wake(&self, acp_id: &str, signal_id: &str) -> bool {
         let mut guard = match self.state.wake_in_flight.lock() {
             Ok(guard) => guard,
@@ -121,6 +126,7 @@ impl AcpAgentManagerHandle {
         guard.insert((acp_id.to_string(), signal_id.to_string()))
     }
 
+    #[cfg(feature = "daemon-runtime")]
     fn release_wake(&self, acp_id: &str, signal_id: &str) {
         let mut guard = match self.state.wake_in_flight.lock() {
             Ok(guard) => guard,
@@ -139,7 +145,7 @@ impl AcpAgentManagerHandle {
         batch_id: &str,
         decision: &AcpPermissionDecision,
     ) -> Result<AcpAgentSnapshot, CliError> {
-        if service::sandboxed_from_env() {
+        if crate::daemon::sandboxed_from_env() {
             return self.resolve_permission_batch_via_bridge(acp_id, batch_id, decision);
         }
         let session = self.session(acp_id)?;
@@ -157,7 +163,7 @@ impl AcpAgentManagerHandle {
     #[must_use]
     /// Return the number of pending ACP permission prompts for one ACP session.
     pub fn pending_permission_count(&self, acp_id: &str) -> Option<usize> {
-        if service::sandboxed_from_env() {
+        if crate::daemon::sandboxed_from_env() {
             return self.pending_permission_count_via_bridge(acp_id);
         }
         let sessions = self.sessions_guard().ok()?;
@@ -169,7 +175,7 @@ impl AcpAgentManagerHandle {
     #[must_use]
     /// Return the queued ACP permission batches for one ACP session.
     pub fn pending_permission_batches(&self, acp_id: &str) -> Option<Vec<AcpPermissionBatch>> {
-        if service::sandboxed_from_env() {
+        if crate::daemon::sandboxed_from_env() {
             return self.pending_permission_batches_via_bridge(acp_id);
         }
         let sessions = self.sessions_guard().ok()?;
@@ -200,6 +206,7 @@ impl AcpAgentManagerHandle {
     }
 }
 
+#[cfg(feature = "daemon-runtime")]
 fn run_wake_prompt(
     manager: &AcpAgentManagerHandle,
     runtime: &'static dyn AgentRuntime,
@@ -286,6 +293,7 @@ fn run_wake_prompt(
     manager.release_wake(&acp_id, &signal_id);
 }
 
+#[cfg(feature = "daemon-runtime")]
 fn sync_returned_runtime_session(
     manager: &AcpAgentManagerHandle,
     runtime_name: &str,
@@ -338,6 +346,7 @@ fn sync_returned_runtime_session(
     }
 }
 
+#[cfg(feature = "daemon-runtime")]
 fn record_wake_accept(
     orchestration_session_id: &str,
     signal_session_id: &str,
@@ -386,6 +395,7 @@ fn record_wake_accept(
     }
 }
 
+#[cfg(feature = "daemon-runtime")]
 fn sync_wake_accept_to_daemon(
     manager: &AcpAgentManagerHandle,
     orchestration_session_id: &str,
@@ -394,45 +404,13 @@ fn sync_wake_accept_to_daemon(
     project_dir: &Path,
     acp_id: &str,
 ) {
-    let db = match manager.db() {
-        Ok(db) => db,
-        Err(error) => {
-            record_wake_event(
-                WakeEventLevel::Warn,
-                "ack_sync_skipped",
-                &[
-                    ("managed_agent_id", &acp_id),
-                    ("signal_id", &signal_id),
-                    ("error", &error),
-                ],
-            );
-            return;
-        }
-    };
-    let db = match db.lock() {
-        Ok(guard) => guard,
-        Err(error) => {
-            record_wake_event(
-                WakeEventLevel::Warn,
-                "ack_sync_lock_poisoned",
-                &[
-                    ("managed_agent_id", &acp_id),
-                    ("signal_id", &signal_id),
-                    ("error", &error),
-                ],
-            );
-            error.into_inner()
-        }
-    };
-    if let Err(error) = service::record_signal_ack_and_broadcast(
-        orchestration_session_id,
+    if let Err(error) = manager.state.port.sync_wake_accept(AcpWakeAcceptRequest {
+        session_id: orchestration_session_id,
         agent_id,
         signal_id,
-        AckResult::Accepted,
+        result: AckResult::Accepted,
         project_dir,
-        Some(&db),
-        Some(&manager.state.sender),
-    ) {
+    }) {
         record_wake_event(
             WakeEventLevel::Warn,
             "ack_sync_failed",

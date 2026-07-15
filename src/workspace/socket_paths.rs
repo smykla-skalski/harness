@@ -78,4 +78,5 @@ pub fn socket_root(data_root: &Path) -> PathBuf {
 }
 
 #[cfg(test)]
+#[path = "socket_paths/tests.rs"]
 mod tests;

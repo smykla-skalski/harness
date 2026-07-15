@@ -117,7 +117,7 @@ dependencies = [
 
 [[package]]
 name = "aff"
-version = "47.1.0"
+version = "48.0.0"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -595,20 +595,6 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
-]
-
-[[package]]
-name = "backoff"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b62ddb9cb1ec0a098ad4bbf9344d0713fa193ae1a80af55febcff2627b6a00c1"
-dependencies = [
- "futures-core",
- "getrandom 0.2.17",
- "instant",
- "pin-project-lite",
- "rand 0.8.7",
- "tokio",
 ]
 
 [[package]]
@@ -3610,7 +3596,7 @@ dependencies = [
 
 [[package]]
 name = "harness"
-version = "47.1.0"
+version = "48.0.0"
 dependencies = [
  "agent-client-protocol",
  "arc-swap",
@@ -3618,14 +3604,12 @@ dependencies = [
  "async-stream",
  "async-trait",
  "axum",
- "backoff",
  "base64 0.22.1",
  "bollard",
  "bytes",
  "chrono",
  "clap",
  "compose_spec",
- "console-subscriber",
  "core-foundation 0.10.1",
  "crossterm",
  "fs-err",
@@ -3633,6 +3617,10 @@ dependencies = [
  "futures-util",
  "gix",
  "gray_matter",
+ "harness-command",
+ "harness-mcp",
+ "harness-protocol",
+ "harness-telemetry",
  "harness-testkit",
  "hex",
  "hickory-resolver",
@@ -3649,14 +3637,11 @@ dependencies = [
  "notify",
  "noyalib",
  "opentelemetry",
- "opentelemetry-appender-tracing",
- "opentelemetry-otlp",
  "opentelemetry_sdk",
  "pathdiff",
  "pgp",
  "portable-pty",
  "predicates",
- "pyroscope",
  "rand_core 0.6.4",
  "rayon",
  "rcgen",
@@ -3687,7 +3672,6 @@ dependencies = [
  "tokio-rustls",
  "tokio-tungstenite 0.29.0",
  "tokio-util",
- "tonic",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
@@ -3700,8 +3684,230 @@ dependencies = [
 ]
 
 [[package]]
+name = "harness-bridge"
+version = "48.0.0"
+dependencies = [
+ "agent-client-protocol",
+ "async-trait",
+ "base64 0.22.1",
+ "chrono",
+ "clap",
+ "crossterm",
+ "fs-err",
+ "fs2",
+ "harness-hook",
+ "harness-protocol",
+ "harness-telemetry",
+ "hex",
+ "libc",
+ "nix 0.31.3",
+ "notify",
+ "portable-pty",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "signal-hook 0.4.4",
+ "temp-env",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "user_dirs",
+ "uuid",
+ "uzers",
+ "vt100",
+]
+
+[[package]]
+name = "harness-command"
+version = "48.0.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
+name = "harness-daemon"
+version = "48.0.0"
+dependencies = [
+ "agent-client-protocol",
+ "arc-swap",
+ "async-stream",
+ "async-trait",
+ "axum",
+ "base64 0.22.1",
+ "bytes",
+ "chrono",
+ "clap",
+ "core-foundation 0.10.1",
+ "crossterm",
+ "fs-err",
+ "fs2",
+ "futures-util",
+ "gix",
+ "gray_matter",
+ "harness-hook",
+ "harness-protocol",
+ "harness-telemetry",
+ "hex",
+ "hickory-resolver",
+ "hmac 0.13.0",
+ "http",
+ "http-body-util",
+ "instant-acme",
+ "libc",
+ "nix 0.31.3",
+ "notify",
+ "pathdiff",
+ "pgp",
+ "portable-pty",
+ "rand_core 0.6.4",
+ "rcgen",
+ "regex",
+ "reqwest",
+ "rusqlite",
+ "rustls",
+ "sea-query",
+ "security-framework",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "sha1 0.11.0",
+ "sha2 0.11.0",
+ "shell-words",
+ "signal-hook 0.4.4",
+ "similar 3.1.1",
+ "sqlx",
+ "ssh-key",
+ "tar",
+ "temp-env",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-rustls",
+ "tokio-tungstenite 0.29.0",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "user_dirs",
+ "uuid",
+ "uzers",
+ "vt100",
+ "walkdir",
+ "x509-parser",
+]
+
+[[package]]
+name = "harness-daemon-client"
+version = "48.0.0"
+dependencies = [
+ "fs2",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tracing",
+ "user_dirs",
+ "uzers",
+]
+
+[[package]]
+name = "harness-hook"
+version = "48.0.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "fs-err",
+ "fs2",
+ "gix",
+ "gray_matter",
+ "harness-daemon-client",
+ "harness-protocol",
+ "harness-telemetry",
+ "hex",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "shell-words",
+ "temp-env",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "user_dirs",
+ "uuid",
+ "uzers",
+ "walkdir",
+]
+
+[[package]]
+name = "harness-mcp"
+version = "48.0.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64 0.22.1",
+ "clap",
+ "futures-util",
+ "harness-daemon-client",
+ "harness-protocol",
+ "harness-telemetry",
+ "serde",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-tungstenite 0.29.0",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "harness-protocol"
+version = "48.0.0"
+dependencies = [
+ "clap",
+ "serde",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "harness-telemetry"
+version = "48.0.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "console-subscriber",
+ "opentelemetry",
+ "opentelemetry-appender-tracing",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "pyroscope",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "temp-env",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tonic",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "user_dirs",
+]
+
+[[package]]
 name = "harness-testkit"
-version = "47.1.0"
+version = "48.0.0"
 dependencies = [
  "assert_cmd",
  "harness",
@@ -4336,15 +4542,6 @@ dependencies = [
  "once_cell",
  "similar 2.7.0",
  "tempfile",
-]
-
-[[package]]
-name = "instant"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
-dependencies = [
- "cfg-if",
 ]
 
 [[package]]
