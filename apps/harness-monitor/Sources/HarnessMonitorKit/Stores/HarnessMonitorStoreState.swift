@@ -6,6 +6,7 @@ struct CacheWriteSyncState {
   var taskBoardRefreshRequestGeneration: UInt64 = 0
   var taskBoardRefreshCompletedGeneration: UInt64 = 0
   var taskBoardRefreshDeferralDepth = 0
+  var taskBoardRefreshCompletionWaiters: [UInt64: [CheckedContinuation<Void, Never>]] = [:]
   var pendingTaskBoardItemsRefresh = false
   var pendingTaskBoardOrchestratorRefresh = false
   var pendingTaskBoardFallbackStatus: TaskBoardOrchestratorStatus?

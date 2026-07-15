@@ -61,13 +61,36 @@ extension HarnessMonitorStore {
     return requestGeneration
   }
 
-  private func waitForTaskBoardDashboardSnapshotRefresh(
+  func waitForTaskBoardDashboardSnapshotRefresh(
     _ requestGeneration: UInt64
   ) async {
-    while cacheWriteSync.taskBoardRefreshCompletedGeneration < requestGeneration,
-      let refreshTask = cacheWriteSync.taskBoardRefreshTask
-    {
-      await refreshTask.value
+    while cacheWriteSync.taskBoardRefreshCompletedGeneration < requestGeneration {
+      if let refreshTask = cacheWriteSync.taskBoardRefreshTask {
+        await refreshTask.value
+      } else {
+        await withCheckedContinuation { continuation in
+          if cacheWriteSync.taskBoardRefreshCompletedGeneration >= requestGeneration {
+            continuation.resume()
+          } else {
+            cacheWriteSync.taskBoardRefreshCompletionWaiters[requestGeneration, default: []]
+              .append(continuation)
+          }
+        }
+      }
+    }
+  }
+
+  func resumeCompletedTaskBoardDashboardSnapshotRefreshWaiters() {
+    let completedGeneration = cacheWriteSync.taskBoardRefreshCompletedGeneration
+    let generations = cacheWriteSync.taskBoardRefreshCompletionWaiters.keys
+      .filter { $0 <= completedGeneration }
+      .sorted()
+    for generation in generations {
+      let waiters = cacheWriteSync.taskBoardRefreshCompletionWaiters
+        .removeValue(forKey: generation) ?? []
+      for waiter in waiters {
+        waiter.resume()
+      }
     }
   }
 
@@ -111,6 +134,7 @@ extension HarnessMonitorStore {
       self.applyTaskBoardDashboardSnapshot(snapshot, fallbackStatus: fallbackStatus)
       self.cacheWriteSync.taskBoardRefreshCompletedGeneration =
         completedRequestGeneration
+      self.resumeCompletedTaskBoardDashboardSnapshotRefreshWaiters()
       self.cacheWriteSync.taskBoardRefreshTask = nil
 
       if self.cacheWriteSync.pendingTaskBoardItemsRefresh

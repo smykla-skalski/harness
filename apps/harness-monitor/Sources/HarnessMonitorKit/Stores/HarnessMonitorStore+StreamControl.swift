@@ -9,6 +9,7 @@ extension HarnessMonitorStore {
     cacheWriteSync.taskBoardRefreshTask = nil
     cacheWriteSync.taskBoardRefreshCompletedGeneration =
       cacheWriteSync.taskBoardRefreshRequestGeneration
+    resumeCompletedTaskBoardDashboardSnapshotRefreshWaiters()
     cacheWriteSync.taskBoardRefreshDeferralDepth = 0
     cacheWriteSync.pendingTaskBoardItemsRefresh = false
     cacheWriteSync.pendingTaskBoardOrchestratorRefresh = false
