@@ -3,6 +3,16 @@ import Foundation
 @testable import HarnessMonitorKit
 
 extension RecordingHarnessClient {
+  var calls: [Call] {
+    get { lock.withLock { callsStorage } }
+    set { lock.withLock { callsStorage = newValue } }
+  }
+
+  var detail: SessionDetail {
+    get { lock.withLock { detailStorage } }
+    set { lock.withLock { detailStorage = newValue } }
+  }
+
   private func acpInspectResponseKey(_ sessionID: String?) -> String {
     sessionID ?? "__all__"
   }

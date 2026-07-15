@@ -31,10 +31,11 @@ extension SessionSwiftUISourceTests {
       source.components(separatedBy: "private func profileRows").last?
         .components(separatedBy: "private var pairingInput").first
     )
+    let spkiRowStart =
+      "HStack(alignment: .firstTextBaseline, spacing: "
+      + "HarnessMonitorTheme.spacingMD) {"
     let spkiRow = try #require(
-      profileRows.components(
-        separatedBy: "HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {"
-      ).dropFirst().first
+      profileRows.components(separatedBy: spkiRowStart).dropFirst().first
     )
     let valueModifiers = try #require(
       spkiRow.components(separatedBy: "Text(profile.serverSPKISHA256.value)")
