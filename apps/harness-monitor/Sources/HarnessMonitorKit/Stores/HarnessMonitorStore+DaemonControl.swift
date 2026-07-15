@@ -6,14 +6,6 @@ extension HarnessMonitorStore {
     }
   }
 
-  var hasLiveConnectionActivity: Bool {
-    client != nil
-      || globalStreamTask != nil
-      || connectionProbeTask != nil
-      || isBootstrapping
-      || isReconnecting
-  }
-
   func cancelPendingAppInactivitySuspend() {
     appInactivitySuspendTask?.cancel()
     appInactivitySuspendTask = nil
@@ -28,6 +20,7 @@ extension HarnessMonitorStore {
     }
 
     isAppLifecycleSuspended = true
+    stopRemoteDaemonReconnect()
     stopManifestWatcher()
     stopAllStreams()
 

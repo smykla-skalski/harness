@@ -47,9 +47,11 @@ extension HarnessMonitorStore {
   }
 
   public func prepareForTermination() async {
+    connection.isPreparingForTermination = true
     await flushSessionWindowsOpenAtQuit()
     toast.dismissAll()
     cancelPendingAppInactivitySuspend()
+    stopRemoteDaemonReconnect()
     stopAllStreams()
     stopManifestWatcher()
     #if HARNESS_FEATURE_OTEL

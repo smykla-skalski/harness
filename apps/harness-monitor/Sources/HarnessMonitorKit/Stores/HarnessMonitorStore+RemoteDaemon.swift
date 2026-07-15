@@ -98,6 +98,9 @@ extension HarnessMonitorStore {
       remoteDaemonProfile = nil
       remoteDaemonActionState = .failed(error.localizedDescription)
     }
+    if remoteDaemonProfile?.status != .active {
+      stopRemoteDaemonReconnect()
+    }
   }
 
   func handleRemoteDaemonConnectionFailure(_ error: any Error) {
@@ -123,12 +126,14 @@ extension HarnessMonitorStore {
   }
 
   private func completeRemoteDaemonPairing(_ profile: RemoteDaemonProfile) async {
+    stopRemoteDaemonReconnect()
     remoteDaemonProfile = profile
     remoteDaemonActionState = .idle
     await reconnect()
   }
 
   private func completeRemoteDaemonForget() async {
+    stopRemoteDaemonReconnect()
     remoteDaemonProfile = nil
     remoteDaemonActionState = .idle
     resetLocalManifestURL()

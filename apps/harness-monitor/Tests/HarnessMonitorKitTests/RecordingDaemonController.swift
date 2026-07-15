@@ -3,7 +3,13 @@ import Foundation
 @testable import HarnessMonitorKit
 
 actor RecordingDaemonController: DaemonControlling {
+  enum BootstrapOutcome: Sendable {
+    case success(any HarnessMonitorClientProtocol)
+    case failure(any Error)
+  }
+
   private let client: any HarnessMonitorClientProtocol
+  private var bootstrapOutcomes: [BootstrapOutcome]
   private var launchAgentInstalled: Bool
   private let registrationStateOverride: DaemonLaunchAgentRegistrationState?
   private let statusReportOverride: DaemonStatusReport?
@@ -21,6 +27,7 @@ actor RecordingDaemonController: DaemonControlling {
 
   init(
     client: any HarnessMonitorClientProtocol = PreviewHarnessClient(),
+    bootstrapOutcomes: [BootstrapOutcome] = [],
     launchAgentInstalled: Bool = true,
     registrationState: DaemonLaunchAgentRegistrationState? = nil,
     statusReport: DaemonStatusReport? = nil,
@@ -31,6 +38,7 @@ actor RecordingDaemonController: DaemonControlling {
     deferredManagedLaunchAgentRefreshResult: Bool = false
   ) {
     self.client = client
+    self.bootstrapOutcomes = bootstrapOutcomes
     self.launchAgentInstalled = launchAgentInstalled
     self.registrationStateOverride = registrationState
     self.statusReportOverride = statusReport
@@ -44,6 +52,14 @@ actor RecordingDaemonController: DaemonControlling {
     bootstrapCallCount += 1
     if bootstrapChecksCancellation {
       try Task.checkCancellation()
+    }
+    if !bootstrapOutcomes.isEmpty {
+      switch bootstrapOutcomes.removeFirst() {
+      case .success(let client):
+        return client
+      case .failure(let error):
+        throw error
+      }
     }
     if let bootstrapError {
       throw bootstrapError

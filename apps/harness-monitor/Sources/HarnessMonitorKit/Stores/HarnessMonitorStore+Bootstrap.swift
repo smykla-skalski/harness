@@ -277,9 +277,14 @@ extension HarnessMonitorStore {
         await connect(using: client)
       }
     } catch {
+      guard !shouldAbandonConnectionAttempt, !(error is CancellationError) else {
+        connectionState = .idle
+        return
+      }
       handleRemoteDaemonConnectionFailure(error)
       markConnectionOffline(error.localizedDescription)
       await restorePersistedSessionState()
+      scheduleRemoteDaemonReconnect(after: error)
     }
   }
 

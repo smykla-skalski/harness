@@ -11,7 +11,7 @@ extension HarnessMonitorStore {
     if hasSeenReady {
       guard await syncStoredTaskBoardCredentialsForNewDaemon(using: client) else {
         markConnectionOffline("Connected daemon has no database-backed Task Board")
-        await reconnect()
+        scheduleReconnectAfterConnectionFailure()
         return false
       }
     } else {
