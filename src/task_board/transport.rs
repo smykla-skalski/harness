@@ -31,8 +31,8 @@ pub use planning::{
     TaskBoardPlanSubmitArgs,
 };
 pub use policy::{
-    TaskBoardPolicyCommand, TaskBoardPolicyGrantResolveArgs, TaskBoardPolicyJsonArgs,
-    TaskBoardPolicyToggleArgs,
+    TaskBoardPolicyCommand, TaskBoardPolicyGrantResolveArgs, TaskBoardPolicyGrantRevokeArgs,
+    TaskBoardPolicyJsonArgs, TaskBoardPolicyToggleArgs,
 };
 
 #[derive(Debug, Clone, Subcommand)]

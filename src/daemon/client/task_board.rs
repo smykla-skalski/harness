@@ -2,6 +2,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::daemon::protocol::{
+    PolicyApprovalGrantRevokeRequest, PolicyApprovalGrantRevokeResponse,
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
@@ -204,6 +205,13 @@ impl DaemonClient {
         request: &PolicyApprovalGrantResolveRequest,
     ) -> Result<PolicyApprovalGrantResolveResponse, CliError> {
         self.post(http_paths::POLICY_APPROVAL_GRANT_RESOLVE, request)
+    }
+
+    pub fn revoke_policy_approval_grant(
+        &self,
+        request: &PolicyApprovalGrantRevokeRequest,
+    ) -> Result<PolicyApprovalGrantRevokeResponse, CliError> {
+        self.post(http_paths::POLICY_APPROVAL_GRANT_REVOKE, request)
     }
 
     pub fn task_board_orchestrator_status(

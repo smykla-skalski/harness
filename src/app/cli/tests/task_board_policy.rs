@@ -95,6 +95,31 @@ fn parse_policy_grant_resolve() {
 }
 
 #[test]
+fn parse_policy_grant_revoke() {
+    let revoke = Cli::try_parse_from([
+        "harness",
+        "task-board",
+        "policy",
+        "grant-revoke",
+        "grant-1",
+        "--actor",
+        "lead",
+        "--json",
+    ])
+    .expect("parse policy grant revoke");
+    match task_board_command(revoke.command) {
+        TaskBoardCommand::Policy {
+            command: TaskBoardPolicyCommand::GrantRevoke(args),
+        } => {
+            assert_eq!(args.grant_id, "grant-1");
+            assert_eq!(args.actor.as_deref(), Some("lead"));
+            assert!(args.json);
+        }
+        _ => panic!("expected TaskBoard Policy GrantRevoke"),
+    }
+}
+
+#[test]
 fn parse_policy_spawn_requires_live_policy() {
     let cli = Cli::try_parse_from([
         "harness",

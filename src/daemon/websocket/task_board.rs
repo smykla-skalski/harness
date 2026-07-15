@@ -336,7 +336,7 @@ async fn dispatch_task_board_dispatch_pick(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> WsResponse {
-    if parse_params::<TaskBoardDispatchPickRequest>(request).is_err() {
+    if parse_params_or_default::<TaskBoardDispatchPickRequest>(request).is_err() {
         return invalid_params(request);
     }
     dispatch_query_result(&request.id, task_board_route_executor::pick(state).await)

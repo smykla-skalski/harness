@@ -5,15 +5,16 @@ use std::thread;
 
 use harness::app::{AppContext, Execute};
 use harness::daemon::protocol::{
-    PolicyApprovalGrantResolveResponse, PolicyApprovalGrantsListResponse,
+    PolicyApprovalGrantResolveResponse, PolicyApprovalGrantRevokeResponse,
+    PolicyApprovalGrantsListResponse,
     PolicyCanvasWorkspaceResponse, TaskBoardDispatchDeliverResponse, TaskBoardDispatchPickResponse,
 };
 use harness::daemon::state::{self, DaemonManifest, DaemonOwnership, HostBridgeManifest};
 use harness::task_board::dispatch::DispatchLifecycle;
 use harness::task_board::transport::{
     TaskBoardCommand, TaskBoardDispatchDeliverArgs, TaskBoardDispatchPickArgs,
-    TaskBoardPolicyCommand, TaskBoardPolicyGrantResolveArgs, TaskBoardPolicyJsonArgs,
-    TaskBoardPolicyToggleArgs,
+    TaskBoardPolicyCommand, TaskBoardPolicyGrantResolveArgs, TaskBoardPolicyGrantRevokeArgs,
+    TaskBoardPolicyJsonArgs, TaskBoardPolicyToggleArgs,
 };
 use harness::task_board::{
     AgentMode, DispatchAppliedTask, EvaluatorIntent, FollowUpPhase, PolicyAction,
@@ -315,6 +316,32 @@ fn policy_grant_resolve_routes_through_public_command() {
     assert_eq!(body["grant_id"], "grant-1");
     assert_eq!(body["approve"], true);
     assert_eq!(body["actor"], "lead");
+}
+
+#[test]
+fn policy_grant_revoke_routes_through_public_command() {
+    let mut grant = pending_grant();
+    grant.state = PolicyApprovalState::Revoked;
+    grant.resolved_by = Some("lead".to_string());
+    let response = serde_json::to_string(&PolicyApprovalGrantRevokeResponse { grant })
+        .expect("serialize grant response");
+    let captured = run_command(
+        &TaskBoardCommand::Policy {
+            command: TaskBoardPolicyCommand::GrantRevoke(TaskBoardPolicyGrantRevokeArgs {
+                grant_id: "grant-1".to_string(),
+                actor: Some("lead".to_string()),
+                json: true,
+            }),
+        },
+        response,
+    );
+
+    assert_eq!(captured.method, "POST");
+    assert_eq!(captured.path, "/v1/policy-approval-grants/revoke");
+    let body: Value = serde_json::from_str(&captured.body).expect("grant revoke body");
+    assert_eq!(body["grant_id"], "grant-1");
+    assert_eq!(body["actor"], "lead");
+    assert!(body.get("approve").is_none());
 }
 
 #[test]

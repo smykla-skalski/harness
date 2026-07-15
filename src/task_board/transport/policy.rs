@@ -3,7 +3,8 @@ use serde::Serialize;
 
 use crate::app::command_context::{AppContext, Execute};
 use crate::daemon::protocol::{
-    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantsListResponse,
+    PolicyApprovalGrantResolveRequest, PolicyApprovalGrantRevokeRequest,
+    PolicyApprovalGrantsListResponse,
     PolicyCanvasSetSpawnKillSwitchRequest, PolicyCanvasSetSpawnRequiresLivePolicyRequest,
     PolicyCanvasWorkspaceResponse,
 };
@@ -21,6 +22,9 @@ pub enum TaskBoardPolicyCommand {
     /// Approve or deny one pending approval grant.
     #[command(visible_alias = "approval-grant-resolve")]
     GrantResolve(TaskBoardPolicyGrantResolveArgs),
+    /// Revoke one approval grant.
+    #[command(visible_alias = "approval-grant-revoke")]
+    GrantRevoke(TaskBoardPolicyGrantRevokeArgs),
     /// Toggle the fail-closed live-policy requirement for worker spawning.
     #[command(visible_alias = "set-spawn-requires-live-policy")]
     SpawnRequiresLivePolicy(TaskBoardPolicyToggleArgs),
@@ -49,6 +53,15 @@ pub struct TaskBoardPolicyGrantResolveArgs {
 }
 
 #[derive(Debug, Clone, Args)]
+pub struct TaskBoardPolicyGrantRevokeArgs {
+    pub grant_id: String,
+    #[arg(long)]
+    pub actor: Option<String>,
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Clone, Args)]
 pub struct TaskBoardPolicyToggleArgs {
     #[arg(long, action = ArgAction::Set, required = true)]
     pub enabled: bool,
@@ -61,6 +74,7 @@ impl Execute for TaskBoardPolicyCommand {
         match self {
             Self::Grants(args) => args.execute(context),
             Self::GrantResolve(args) => args.execute(context),
+            Self::GrantRevoke(args) => args.execute(context),
             Self::SpawnRequiresLivePolicy(args) => args.execute_spawn_requires_live_policy(context),
             Self::SpawnKillSwitch(args) => args.execute_spawn_kill_switch(context),
         }
@@ -85,6 +99,22 @@ impl Execute for TaskBoardPolicyGrantResolveArgs {
             daemon_client()?.resolve_policy_approval_grant(&PolicyApprovalGrantResolveRequest {
                 grant_id: self.grant_id.clone(),
                 approve: self.approve,
+                actor: self.actor.clone(),
+            })?;
+        if self.json {
+            print_json(&response)?;
+        } else {
+            print_resolved_grant(&response.grant);
+        }
+        Ok(0)
+    }
+}
+
+impl Execute for TaskBoardPolicyGrantRevokeArgs {
+    fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let response =
+            daemon_client()?.revoke_policy_approval_grant(&PolicyApprovalGrantRevokeRequest {
+                grant_id: self.grant_id.clone(),
                 actor: self.actor.clone(),
             })?;
         if self.json {
