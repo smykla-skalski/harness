@@ -169,7 +169,41 @@ public struct TaskBoardDispatchPlan: Codable, Equatable, Identifiable, Sendable 
     self.consumedApprovalGrantId = consumedApprovalGrantId
   }
 
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      boardItemId: try container.decode(String.self, forKey: .boardItemId),
+      renderedPrompt: try container.decodeIfPresent(String.self, forKey: .renderedPrompt) ?? "",
+      readiness: try container.decode(TaskBoardDispatchReadiness.self, forKey: .readiness),
+      session: try container.decode(TaskBoardSessionIntent.self, forKey: .session),
+      task: try container.decode(TaskBoardTaskCreationIntent.self, forKey: .task),
+      worker: try container.decode(TaskBoardWorkerIntent.self, forKey: .worker),
+      reviewer: try container.decode(TaskBoardReviewerIntent.self, forKey: .reviewer),
+      evaluator: try container.decode(TaskBoardEvaluatorIntent.self, forKey: .evaluator),
+      policy: try container.decodeIfPresent(PolicySimulationDecision.self, forKey: .policy),
+      policyDecisionId: try container.decodeIfPresent(String.self, forKey: .policyDecisionId),
+      consumedApprovalGrantId: try container.decodeIfPresent(
+        String.self,
+        forKey: .consumedApprovalGrantId
+      )
+    )
+  }
+
   public var id: String { boardItemId }
+
+  private enum CodingKeys: String, CodingKey {
+    case boardItemId
+    case renderedPrompt
+    case readiness
+    case session
+    case task
+    case worker
+    case reviewer
+    case evaluator
+    case policy
+    case policyDecisionId
+    case consumedApprovalGrantId
+  }
 }
 
 public struct TaskBoardDispatchSummary: Codable, Equatable, Sendable {

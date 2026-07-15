@@ -84,6 +84,24 @@ struct TaskBoardDispatchWireDecodingTests {
     #expect(applied.item.id == "task-9")
   }
 
+  @Test("cached dispatch plan defaults an omitted rendered prompt")
+  func cachedDispatchPlanDefaultsOmittedRenderedPrompt() throws {
+    let wire = try decoder.decode(
+      DispatchExecutionSummaryWire.self, from: Data(dispatchSummaryFixture.utf8)
+    )
+    let plan = try #require(TaskBoardDispatchSummary(wire: wire).plans.first)
+    var object = try #require(
+      JSONSerialization.jsonObject(with: Codecs.encoder.encode(plan)) as? [String: Any]
+    )
+    object.removeValue(forKey: "renderedPrompt")
+    let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+    let decoded = try Codecs.decoder.decode(TaskBoardDispatchPlan.self, from: legacyData)
+
+    #expect(decoded.boardItemId == plan.boardItemId)
+    #expect(decoded.renderedPrompt.isEmpty)
+  }
+
   @Test("maps pick and deliver responses with the exact rendered prompt")
   func mapsStepRouteResponses() throws {
     let pickWire = try decoder.decode(
