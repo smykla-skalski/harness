@@ -235,24 +235,15 @@ struct TaskBoardOrchestratorSummaryView: View {
   }
 
   private var stateTitle: String {
-    if !status.enabled {
-      return "Disabled"
-    }
-    if status.stepMode {
-      return "Paused (Step Mode)"
-    }
-    if status.running {
-      return "Running"
-    }
-    return "Idle"
+    TaskBoardOrchestratorPresentation.stateTitle(for: status)
   }
 
   private var stateTint: Color {
-    if !status.enabled {
-      return HarnessMonitorTheme.secondaryInk
-    }
     if status.stepMode {
       return HarnessMonitorTheme.caution
+    }
+    if !status.enabled {
+      return HarnessMonitorTheme.secondaryInk
     }
     if status.running {
       return HarnessMonitorTheme.accent

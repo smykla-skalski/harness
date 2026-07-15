@@ -39,6 +39,10 @@ struct TaskBoardStepRailView: View {
           .font(.caption.weight(.semibold))
           .foregroundStyle(HarnessMonitorTheme.caution)
           .accessibilityIdentifier("harness.task-board.step.live-mode")
+        Text("Use these controls one stage at a time; Start is not required while Step Mode is on.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .accessibilityIdentifier("harness.task-board.step.manual-mode-explanation")
         stepControls
         if let selection = state.pickedSelection {
           TaskBoardStepPromptPreview(prompt: selection.plan.renderedPrompt)

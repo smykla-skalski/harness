@@ -38,6 +38,51 @@ struct TaskBoardOrchestratorPresentationTests {
     #expect(TaskBoardOrchestratorPresentation.appliedItemCount(for: run) == 1)
   }
 
+  @Test("Step mode exposes manual steps without starting autonomous scheduling")
+  func stepModeExposesManualStepsWhileOrchestratorIsDisabled() {
+    let disabledStepMode = orchestratorStatus(enabled: false, stepMode: true)
+
+    #expect(
+      TaskBoardOrchestratorPresentation.showsManualSteps(
+        for: disabledStepMode,
+        scopeSessionID: nil,
+        hasStore: true
+      )
+    )
+    #expect(
+      TaskBoardOrchestratorPresentation.stateTitle(for: disabledStepMode)
+        == "Paused (Step Mode)"
+    )
+  }
+
+  @Test("Manual steps stay dashboard-only and require live step mode state")
+  func manualStepsRespectDashboardScopeAndStoreAvailability() {
+    let stepMode = orchestratorStatus(enabled: true, stepMode: true)
+    let automaticMode = orchestratorStatus(enabled: true, stepMode: false)
+
+    #expect(
+      !TaskBoardOrchestratorPresentation.showsManualSteps(
+        for: automaticMode,
+        scopeSessionID: nil,
+        hasStore: true
+      )
+    )
+    #expect(
+      !TaskBoardOrchestratorPresentation.showsManualSteps(
+        for: stepMode,
+        scopeSessionID: "session-1",
+        hasStore: true
+      )
+    )
+    #expect(
+      !TaskBoardOrchestratorPresentation.showsManualSteps(
+        for: stepMode,
+        scopeSessionID: nil,
+        hasStore: false
+      )
+    )
+  }
+
   @Test("Idle workflow count excludes completed board items with idle workflow state")
   func idleWorkflowCountExcludesCompletedItems() {
     let items = [
@@ -223,15 +268,19 @@ struct TaskBoardOrchestratorPresentationTests {
   }
 
   private func orchestratorStatus(
+    enabled: Bool = true,
+    running: Bool = false,
+    stepMode: Bool = false,
     lastRun: TaskBoardOrchestratorRunSummary? = nil,
     workflowCounts: [TaskBoardWorkflowExecutionCount] = []
   ) -> TaskBoardOrchestratorStatus {
     TaskBoardOrchestratorStatus(
-      enabled: true,
-      running: false,
+      enabled: enabled,
+      running: running,
+      stepMode: stepMode,
       lastRun: lastRun,
       workflowExecutionCounts: workflowCounts,
-      settings: TaskBoardOrchestratorSettings(policyVersion: "v1")
+      settings: TaskBoardOrchestratorSettings(stepMode: stepMode, policyVersion: "v1")
     )
   }
 
