@@ -55,6 +55,7 @@ mod policy_canvas_response;
 mod policy_spawn_gate;
 mod sync;
 
+pub(crate) use dispatch::load_live_spawn_grants;
 pub(crate) use dispatch_preparation::prepare_claimed_task_board_dispatch;
 
 pub(crate) use policy_canvas::{

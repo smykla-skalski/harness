@@ -24,7 +24,7 @@ use crate::task_board::{
 };
 use crate::workspace::utc_now;
 
-use super::task_board::dispatch_task_board_async;
+use super::task_board::{dispatch_task_board_async, load_live_spawn_grants};
 use super::task_board_db::{
     active_external_sync_config_db, sync_task_board_for_orchestrator_db, task_board_host_local_db,
 };
@@ -207,7 +207,11 @@ async fn audit_summary(
         .as_ref()
         .map(SpawnGateSwitches::from_workspace)
         .unwrap_or_default();
-    Ok(build_audit_summary_with_policy(items, policy, switches))
+    let grants = load_live_spawn_grants(db, policy, items, &[]).await?;
+    let evaluated_at = utc_now();
+    Ok(build_audit_summary_with_policy(
+        items, policy, &evaluated_at, switches, &grants,
+    ))
 }
 
 fn dispatch_input(

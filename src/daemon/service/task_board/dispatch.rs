@@ -371,7 +371,7 @@ async fn build_dispatch_plans_for_request_async(
 /// evaluation, keyed by board item id. Only meaningful when a live enforced
 /// graph exists (a grant is keyed to that graph's revision); returns an empty
 /// map otherwise so no injection happens on the built-in fallback path.
-async fn load_live_spawn_grants(
+pub(crate) async fn load_live_spawn_grants(
     db: &AsyncDaemonDb,
     policy: Option<(&str, &PolicyGraph)>,
     kept: &[TaskBoardItem],

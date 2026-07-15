@@ -25,6 +25,8 @@ use crate::task_board::{
 };
 use crate::workspace::utc_now;
 
+use super::task_board::load_live_spawn_grants;
+
 #[cfg(test)]
 mod external_ref_tests;
 mod reviews_sync;
@@ -195,7 +197,11 @@ pub(crate) async fn audit_task_board_db(
         .as_ref()
         .map(SpawnGateSwitches::from_workspace)
         .unwrap_or_default();
-    Ok(build_audit_summary_with_policy(&items, policy, switches))
+    let grants = load_live_spawn_grants(db, policy, &items, &[]).await?;
+    let evaluated_at = utc_now();
+    Ok(build_audit_summary_with_policy(
+        &items, policy, &evaluated_at, switches, &grants,
+    ))
 }
 
 pub(crate) async fn list_task_board_projects_db(
