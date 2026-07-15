@@ -126,12 +126,16 @@ struct SettingsRemoteDaemonSection: View {
     LabeledContent("Scopes", value: profile.scopes.joined(separator: ", "))
       .textSelection(.enabled)
     LabeledContent("Token", value: profile.tokenHint)
-    LabeledContent("Server SPKI") {
+    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
+      Text("Server SPKI")
+        .fixedSize(horizontal: true, vertical: false)
       Text(profile.serverSPKISHA256.value)
         .lineLimit(1)
         .truncationMode(.middle)
-        .multilineTextAlignment(.trailing)
+        .foregroundStyle(.secondary)
         .textSelection(.enabled)
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)
+        .clipped()
     }
   }
 

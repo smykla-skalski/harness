@@ -24,17 +24,32 @@ extension SessionSwiftUISourceTests {
     #expect(source.contains("returns to the local daemon mode"))
   }
 
-  @Test("Server SPKI middle-truncates while retaining its full selectable value")
-  func serverSPKIRetainsFullSelectableValue() throws {
+  @Test("Server SPKI stays inline while retaining its full selectable value")
+  func serverSPKIStaysInlineWithFullSelectableValue() throws {
     let source = try sourceFile(at: "Views/Settings/SettingsRemoteDaemonSection.swift")
-    let row = try #require(
-      source.components(separatedBy: "LabeledContent(\"Server SPKI\") {").last?
-        .components(separatedBy: "    }").first
+    let profileRows = try #require(
+      source.components(separatedBy: "private func profileRows").last?
+        .components(separatedBy: "  private var pairingInput").first
     )
 
-    #expect(row.contains("Text(profile.serverSPKISHA256.value)"))
-    #expect(row.contains(".lineLimit(1)"))
-    #expect(row.contains(".truncationMode(.middle)"))
-    #expect(row.contains(".textSelection(.enabled)"))
+    #expect(!profileRows.contains("LabeledContent(\"Server SPKI\")"))
+    #expect(
+      profileRows.contains(
+        """
+        HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
+              Text("Server SPKI")
+                .fixedSize(horizontal: true, vertical: false)
+              Text(profile.serverSPKISHA256.value)
+        """
+      )
+    )
+    #expect(profileRows.contains(".lineLimit(1)"))
+    #expect(profileRows.contains(".truncationMode(.middle)"))
+    #expect(profileRows.contains(".foregroundStyle(.secondary)"))
+    #expect(profileRows.contains(".textSelection(.enabled)"))
+    #expect(
+      profileRows.contains(".frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)")
+    )
+    #expect(profileRows.contains(".clipped()"))
   }
 }
