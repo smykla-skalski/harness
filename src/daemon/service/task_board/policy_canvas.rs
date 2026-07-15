@@ -468,6 +468,6 @@ pub(crate) async fn audit_policy_pipeline(
 ) -> Result<PolicyPipelineAuditResponse, CliError> {
     let workspace = load_or_seed_workspace(db).await?;
     let mut summary = policy_graph::audit_summary(&workspace, request.canvas_id.as_deref())?;
-    summary.pending_approval_grant_count = db.list_pending_approval_grants().await?.len();
+    summary.pending_approval_grant_count = db.count_pending_approval_grants().await?;
     Ok(summary)
 }

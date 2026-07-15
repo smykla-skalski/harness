@@ -240,6 +240,52 @@ async fn expiry_boundary_excludes_grant_from_live_and_pending_reads() {
 }
 
 #[tokio::test]
+async fn pending_count_matches_list_with_expired_and_revoked_rows() {
+    let (_dir, db) = connect().await;
+    let created_at = "2026-07-14T10:00:00Z";
+    let evaluated_at = "2026-07-14T10:01:00Z";
+
+    let mut live = sample_grant();
+    live.board_item_id = "board-item-live".to_owned();
+    insert_pending_grant_at(db.pool(), "policy-grant-live", &live, created_at)
+        .await
+        .expect("insert live grant");
+
+    let mut expired = sample_grant();
+    expired.board_item_id = "board-item-expired".to_owned();
+    expired.expiry_seconds = Some(60);
+    insert_pending_grant_at(db.pool(), "policy-grant-expired", &expired, created_at)
+        .await
+        .expect("insert expired grant");
+
+    let mut revoked = sample_grant();
+    revoked.board_item_id = "board-item-revoked".to_owned();
+    insert_pending_grant_at(db.pool(), "policy-grant-revoked", &revoked, created_at)
+        .await
+        .expect("insert revoked grant");
+    db.revoke_approval_grant_at(
+        "policy-grant-revoked",
+        "operator",
+        "2026-07-14T10:00:30Z",
+    )
+    .await
+    .expect("revoke grant");
+
+    let pending = db
+        .list_pending_approval_grants_at(evaluated_at)
+        .await
+        .expect("list pending grants");
+    let count = db
+        .count_pending_approval_grants_at(evaluated_at)
+        .await
+        .expect("count pending grants");
+
+    assert_eq!(pending.len(), 1, "only the unexpired pending grant is live");
+    assert_eq!(pending[0].id, "policy-grant-live");
+    assert_eq!(count, pending.len(), "COUNT must match the list predicate");
+}
+
+#[tokio::test]
 async fn expired_grant_cannot_be_resolved_or_consumed() {
     let (_dir, db) = connect().await;
     let grant = db

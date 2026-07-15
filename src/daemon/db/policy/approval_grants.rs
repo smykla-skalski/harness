@@ -9,10 +9,10 @@
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use sqlx::{Executor, FromRow, Sqlite, query, query_as};
+use sqlx::{Executor, FromRow, Sqlite, query, query_as, query_scalar};
 use uuid::Uuid;
 
-use super::super::{AsyncDaemonDb, CliError, db_error};
+use super::super::{AsyncDaemonDb, CliError, db_error, usize_from_i64};
 use crate::task_board::{PolicyAction, PolicyApprovalGrant, PolicyApprovalState, PolicyReasonCode};
 use crate::workspace::utc_now;
 
@@ -52,6 +52,13 @@ WHERE state = 'pending' AND consumed_at IS NULL
   AND (expiry_seconds IS NULL
        OR unixepoch(created_at) + expiry_seconds > unixepoch(?1))
 ORDER BY created_at ASC, id ASC";
+
+const COUNT_PENDING_GRANTS_SQL: &str = "
+SELECT COUNT(*)
+FROM policy_approval_grants
+WHERE state = 'pending' AND consumed_at IS NULL
+  AND (expiry_seconds IS NULL
+       OR unixepoch(created_at) + expiry_seconds > unixepoch(?1))";
 
 const SELECT_GRANT_BY_ID_SQL: &str = "
 SELECT id, board_item_id, action, canvas_id, canvas_revision, node_id, reason_code,
@@ -194,6 +201,23 @@ impl AsyncDaemonDb {
             .await
             .map_err(|error| db_error(format!("list pending approval grants: {error}")))?;
         rows.into_iter().map(ApprovalGrantRow::into_grant).collect()
+    }
+
+    /// Count pending, unconsumed grants awaiting a human decision.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failure.
+    pub(crate) async fn count_pending_approval_grants(&self) -> Result<usize, CliError> {
+        self.count_pending_approval_grants_at(&utc_now()).await
+    }
+
+    async fn count_pending_approval_grants_at(&self, now: &str) -> Result<usize, CliError> {
+        let count: i64 = query_scalar(COUNT_PENDING_GRANTS_SQL)
+            .bind(now)
+            .fetch_one(self.pool())
+            .await
+            .map_err(|error| db_error(format!("count pending approval grants: {error}")))?;
+        Ok(usize_from_i64(count))
     }
 
     /// Resolve a pending grant to approved or denied, recording the actor.
