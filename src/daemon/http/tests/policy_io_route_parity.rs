@@ -36,6 +36,51 @@ fn policy_transfer_http_routes_honor_larger_configured_remote_body_limits() {
     });
 }
 
+#[test]
+fn policy_transfer_http_dump_is_not_bounded_by_the_inbound_body_limit() {
+    let sandbox = tempdir().expect("tempdir");
+    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(run_policy_transfer_dump_above_remote_body_limit());
+    });
+}
+
+async fn run_policy_transfer_dump_above_remote_body_limit() {
+    let configured_limit = 512;
+    let state = remote_state_with_viewer_config(RemoteRequestLimitConfig {
+        max_http_body_bytes: configured_limit,
+        ..RemoteRequestLimitConfig::default()
+    });
+    state
+        .async_db
+        .get()
+        .expect("test async db")
+        .replace_policy_workspace(
+            &crate::task_board::policy_graph::PolicyCanvasWorkspace::seeded(),
+        )
+        .await
+        .expect("seed policy workspace");
+    let (base_url, server) = serve_http(state).await;
+    let response = reqwest::Client::new()
+        .post(format!("{base_url}{}", http_paths::POLICIES_DUMP))
+        .header(REMOTE_CLIENT_ID_HEADER, "viewer")
+        .bearer_auth(remote_token("viewer"))
+        .json(&json!({}))
+        .send()
+        .await
+        .expect("send transfer dump request");
+
+    let status = response.status();
+    let body = response.bytes().await.expect("read transfer response");
+    assert_eq!(status, reqwest::StatusCode::OK);
+    assert!(
+        body.len() > configured_limit,
+        "dump response should exceed the inbound body limit"
+    );
+    server.abort();
+    let _ = server.await;
+}
+
 async fn run_policy_transfer_larger_remote_body() {
     let configured_limit = DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES + 256 * 1024;
     let state = remote_state_with_viewer_config(RemoteRequestLimitConfig {
