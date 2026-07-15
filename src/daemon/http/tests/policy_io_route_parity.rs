@@ -1,8 +1,12 @@
 use serde_json::{Value, json};
 use tempfile::tempdir;
 
+use crate::daemon::http::RemoteRequestLimitConfig;
+use crate::daemon::http::remote_limits::DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES;
 use crate::daemon::protocol::{http_paths, ws_methods};
+use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
 
+use super::remote_limits_support::{remote_state_with_viewer_config, remote_token};
 use super::task_board_route_parity_support::*;
 
 #[test]
@@ -21,6 +25,49 @@ fn policy_transfer_http_routes_dump_and_import_batches() {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(run_policy_transfer_routes());
     });
+}
+
+#[test]
+fn policy_transfer_http_routes_honor_larger_configured_remote_body_limits() {
+    let sandbox = tempdir().expect("tempdir");
+    harness_testkit::with_isolated_harness_env(sandbox.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(run_policy_transfer_larger_remote_body());
+    });
+}
+
+async fn run_policy_transfer_larger_remote_body() {
+    let configured_limit = DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES + 256 * 1024;
+    let state = remote_state_with_viewer_config(RemoteRequestLimitConfig {
+        max_http_body_bytes: configured_limit,
+        ..RemoteRequestLimitConfig::default()
+    });
+    state
+        .async_db
+        .get()
+        .expect("test async db")
+        .replace_policy_workspace(
+            &crate::task_board::policy_graph::PolicyCanvasWorkspace::seeded(),
+        )
+        .await
+        .expect("seed policy workspace");
+    let (base_url, server) = serve_http(state).await;
+    let response = reqwest::Client::new()
+        .post(format!("{base_url}{}", http_paths::POLICIES_DUMP))
+        .header(REMOTE_CLIENT_ID_HEADER, "viewer")
+        .bearer_auth(remote_token("viewer"))
+        .json(&json!({
+            "padding": "x".repeat(DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES + 1),
+        }))
+        .send()
+        .await
+        .expect("send transfer request above the default body limit");
+
+    let status = response.status();
+    let body = response.text().await.expect("read transfer response");
+    assert_eq!(status, reqwest::StatusCode::OK, "unexpected body: {body}");
+    server.abort();
+    let _ = server.await;
 }
 
 async fn run_policy_transfer_routes() {

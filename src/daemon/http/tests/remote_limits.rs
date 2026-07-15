@@ -8,7 +8,8 @@ use tokio::time::{Duration, timeout};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message};
 
-use crate::daemon::http::{DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES, RemoteRequestLimitConfig};
+use crate::daemon::http::RemoteRequestLimitConfig;
+use crate::daemon::http::remote_limits::DEFAULT_REMOTE_HTTP_BODY_LIMIT_BYTES;
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::daemon::remote::RemoteAccessScope;
 use crate::daemon::remote_auth::REMOTE_CLIENT_ID_HEADER;
