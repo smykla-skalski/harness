@@ -67,6 +67,9 @@ private func daemonTaskBoardHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
     guard let path = pathConstants[pathConstant] else {
       throw TaskBoardHTTPRouteCatalogError.missingPathConstant(pathConstant)
     }
+    guard path.hasPrefix("/v1/task-board/") else {
+      continue
+    }
     routes.append(TaskBoardHTTPRoute(method: method.uppercased(), path: path))
   }
 
@@ -95,10 +98,14 @@ private func swiftTaskBoardHTTPRoutes() throws -> [TaskBoardHTTPRoute] {
     return try captures(
       in: source,
       pattern: "\\b(get|post|put|delete)\\s*\\(\\s*\"([^\"]+)\""
-    ).map { capture in
-      TaskBoardHTTPRoute(
+    ).compactMap { capture -> TaskBoardHTTPRoute? in
+      let path = normalizedSwiftHTTPPath(capture[1])
+      guard path.hasPrefix("/v1/task-board/") else {
+        return nil
+      }
+      return TaskBoardHTTPRoute(
         method: capture[0].uppercased(),
-        path: normalizedSwiftHTTPPath(capture[1])
+        path: path
       )
     }
   }
