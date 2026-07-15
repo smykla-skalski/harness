@@ -5,6 +5,10 @@ use super::super::evaluation::TaskBoardEvaluationSummary;
 use super::super::policy::POLICY_VERSION;
 use super::super::summary::{TaskBoardAuditSummary, TaskBoardSyncSummary};
 use super::super::types::{TaskBoardStatus, TaskBoardWorkflowStatus};
+use super::super::{
+    TaskBoardAutomationRetrySettings, TaskBoardAutomationSchedulingSettings,
+    TaskBoardExecutionHostConfig, TaskBoardRepositoryAutomationConfig, TaskBoardReviewerSettings,
+};
 
 pub use crate::task_board::github::GitHubProjectConfig as TaskBoardGitHubProjectConfig;
 
@@ -42,6 +46,16 @@ pub struct TaskBoardOrchestratorSettings {
     pub github_inbox: TaskBoardGitHubInboxConfig,
     #[serde(default)]
     pub todoist_inbox: TaskBoardTodoistInboxConfig,
+    #[serde(default)]
+    pub scheduling: TaskBoardAutomationSchedulingSettings,
+    #[serde(default)]
+    pub retry: TaskBoardAutomationRetrySettings,
+    #[serde(default)]
+    pub reviewers: TaskBoardReviewerSettings,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub repositories: Vec<TaskBoardRepositoryAutomationConfig>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub execution_hosts: Vec<TaskBoardExecutionHostConfig>,
     #[serde(default = "default_policy_version")]
     pub policy_version: String,
 }
@@ -68,6 +82,16 @@ pub struct TaskBoardOrchestratorSettingsUpdateRequest {
     pub github_inbox: Option<TaskBoardGitHubInboxConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub todoist_inbox: Option<TaskBoardTodoistInboxConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduling: Option<TaskBoardAutomationSchedulingSettings>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry: Option<TaskBoardAutomationRetrySettings>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewers: Option<TaskBoardReviewerSettings>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repositories: Option<Vec<TaskBoardRepositoryAutomationConfig>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_hosts: Option<Vec<TaskBoardExecutionHostConfig>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub policy_version: Option<String>,
 }
@@ -224,6 +248,11 @@ impl Default for TaskBoardOrchestratorSettings {
             github_project: TaskBoardGitHubProjectConfig::default(),
             github_inbox: TaskBoardGitHubInboxConfig::default(),
             todoist_inbox: TaskBoardTodoistInboxConfig::default(),
+            scheduling: TaskBoardAutomationSchedulingSettings::default(),
+            retry: TaskBoardAutomationRetrySettings::default(),
+            reviewers: TaskBoardReviewerSettings::default(),
+            repositories: Vec::new(),
+            execution_hosts: Vec::new(),
             policy_version: default_policy_version(),
         }
     }

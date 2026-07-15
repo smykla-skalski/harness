@@ -205,6 +205,9 @@ impl DaemonDb {
         if version_number <= 34 {
             self.migrate_v34_to_v35()?;
         }
+        if version_number <= 35 {
+            self.migrate_v35_to_v36()?;
+        }
         Ok(())
     }
 
@@ -336,6 +339,10 @@ impl DaemonDb {
 
     fn migrate_v34_to_v35(&self) -> Result<(), CliError> {
         super::schema_v35::run(&self.conn)
+    }
+
+    fn migrate_v35_to_v36(&self) -> Result<(), CliError> {
+        super::schema_v36::run(&self.conn)
     }
 }
 

@@ -90,10 +90,8 @@ const fn migration_effect_column(migration_version: i64) -> Option<(&'static str
         22 => Some(("remote_acme_state", "domain")),
         23 => Some(("remote_acme_state", "account_credentials_json")),
         24 => Some(("task_board_items", "revision")),
-        29 => Some((
-            "task_board_dispatch_intents",
-            "consumed_approval_grant_id",
-        )),
+        29 => Some(("task_board_dispatch_intents", "consumed_approval_grant_id")),
+        30 => Some(("task_board_items", "workflow_kind")),
         _ => None,
     }
 }
@@ -131,6 +129,7 @@ const fn migration_floor_version(migration_version: i64) -> u64 {
         27 => 33,
         28 => 34,
         29 => 35,
+        30 => 36,
         _ => u64::MAX,
     }
 }

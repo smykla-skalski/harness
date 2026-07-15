@@ -4,8 +4,7 @@ use tempfile::tempdir;
 
 use super::*;
 
-const ORIGINAL_V34_CHECKSUM: &str =
-    "8FCF9F433E6EAC486506DB75C5618B21D7F8D9AD7AEBA2CB32ED7B4AF60042A3B9A36C8030A7FDB646224CC69FAB4D83";
+const ORIGINAL_V34_CHECKSUM: &str = "8FCF9F433E6EAC486506DB75C5618B21D7F8D9AD7AEBA2CB32ED7B4AF60042A3B9A36C8030A7FDB646224CC69FAB4D83";
 
 #[tokio::test]
 async fn connect_upgrades_applied_original_v34_migration() {
@@ -75,7 +74,7 @@ async fn connect_upgrades_applied_original_v34_migration() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        (1..=29).collect::<Vec<i64>>()
+        (1..=30).collect::<Vec<i64>>()
     );
     let requires_live = query_scalar::<_, bool>(
         "SELECT spawn_requires_live_policy FROM policy_workspace WHERE singleton = 1",
@@ -165,13 +164,14 @@ fn shipped_daemon_async_migration_checksums_remain_stable() {
             "0017_daemon_v23_drop_policy_enforcement_snapshot.sql",
             "51CC1C253ED07B4482E6B7B2E91405CECDBE151AD36F87F86EA3698A581FA8A01456C1602659CE3E8B44422235B6B847",
         ),
-        (
-            "0028_daemon_v34_spawn_policy.sql",
-            ORIGINAL_V34_CHECKSUM,
-        ),
+        ("0028_daemon_v34_spawn_policy.sql", ORIGINAL_V34_CHECKSUM),
         (
             "0029_daemon_v35_dispatch_grant_tracking.sql",
             "1D392CEFB28441A88B9ADBC5E3D6A300D66804A874C96432858283BFDC7FA7BB4405C5F024DE500B78343D55A1859A80",
+        ),
+        (
+            "0030_daemon_v36_task_board_automation.sql",
+            "10587AC9F726A588A6B57955793ED4BA4AE8EE53CE787411B7B2E7CE967F14C9F00A740837BF73828A345756C068237B",
         ),
     ];
     let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/daemon/db/migrations");

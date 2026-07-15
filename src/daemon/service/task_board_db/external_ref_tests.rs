@@ -96,6 +96,8 @@ async fn external_ref_creation_rejects_client_sync_state() {
         body: "Body".into(),
         priority: Default::default(),
         agent_mode: Default::default(),
+        workflow_kind: Default::default(),
+        execution_repository: None,
         tags: Vec::new(),
         project_id: None,
         target_project_types: Vec::new(),

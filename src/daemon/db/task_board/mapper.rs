@@ -6,7 +6,7 @@ use super::rows::{ExternalRefRow, ItemRow, MachineRow};
 use crate::daemon::db::{CliError, db_error};
 use crate::task_board::{
     AgentMode, ExternalRef, ExternalRefProvider, Machine, PlanningState, TaskBoardItem,
-    TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowState, TaskUsage,
+    TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowKind, TaskBoardWorkflowState, TaskUsage,
 };
 
 pub(super) fn item_from_rows(
@@ -31,6 +31,8 @@ pub(super) fn item_from_rows(
                 "task board project types",
             )?,
             agent_mode: parse_label(&row.agent_mode, "task board agent mode")?,
+            workflow_kind: parse_label(&row.workflow_kind, "task board workflow kind")?,
+            execution_repository: row.execution_repository,
             external_refs: external_refs
                 .into_iter()
                 .map(external_ref_from_row)
@@ -103,6 +105,7 @@ fn assert_mapper_types_are_used(
     _status: TaskBoardStatus,
     _priority: TaskBoardPriority,
     _mode: AgentMode,
+    _workflow_kind: TaskBoardWorkflowKind,
     _provider: ExternalRefProvider,
     _planning: PlanningState,
     _workflow: TaskBoardWorkflowState,

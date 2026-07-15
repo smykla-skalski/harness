@@ -9,18 +9,17 @@ use crate::daemon::protocol::{
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardOrchestratorStatusResponse,
     TaskBoardSyncRequest,
 };
-use crate::errors::{CliError, CliErrorKind};
+use crate::errors::CliError;
 use crate::task_board::github::GitHubAutomation;
 use crate::task_board::orchestrator::TaskBoardOrchestratorPreparedRun;
 use crate::task_board::{
     DispatchExecutionSummary, ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection,
-    SpawnGateSwitches, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
-    TaskBoardGitHubInboxConfig, TaskBoardItem, TaskBoardOrchestratorDispatchInput,
-    TaskBoardOrchestratorRunStatus, TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings,
-    TaskBoardOrchestratorState, TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase,
-    TaskBoardStatus, TaskBoardTodoistInboxConfig, TaskBoardWorkflowExecutionCount,
-    TaskBoardWorkflowStatus, build_audit_summary_with_policy, build_sync_summary,
-    normalize_repository_slug,
+    SpawnGateSwitches, TaskBoardAuditSummary, TaskBoardEvaluationSummary, TaskBoardItem,
+    TaskBoardOrchestratorDispatchInput, TaskBoardOrchestratorRunStatus,
+    TaskBoardOrchestratorRunSummary, TaskBoardOrchestratorSettings, TaskBoardOrchestratorState,
+    TaskBoardOrchestratorTickInfo, TaskBoardOrchestratorTickPhase, TaskBoardStatus,
+    TaskBoardWorkflowExecutionCount, TaskBoardWorkflowStatus, build_audit_summary_with_policy,
+    build_sync_summary,
 };
 use crate::workspace::utc_now;
 
@@ -30,6 +29,9 @@ use super::task_board_db::{
 };
 use super::task_board_evaluation::evaluate_task_board_async;
 use super::task_board_github::run_task_board_github_automation_async;
+use super::task_board_orchestrator_settings::{
+    apply_settings_update, normalize_github_inbox, normalize_todoist_inbox,
+};
 use super::task_board_orchestrator_step_mode::scoped_dispatch_request;
 
 pub(crate) async fn task_board_orchestrator_status_db(
@@ -210,7 +212,11 @@ async fn audit_summary(
     let grants = load_live_spawn_grants(db, policy, items, &[]).await?;
     let evaluated_at = utc_now();
     Ok(build_audit_summary_with_policy(
-        items, policy, &evaluated_at, switches, &grants,
+        items,
+        policy,
+        &evaluated_at,
+        switches,
+        &grants,
     ))
 }
 
@@ -423,85 +429,6 @@ async fn status_from_state(
         workflow_execution_counts,
         settings,
     })
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "settings patch semantics intentionally distinguish omitted, set, and explicit clear fields"
-)]
-fn apply_settings_update(
-    settings: &mut TaskBoardOrchestratorSettings,
-    update: &TaskBoardOrchestratorSettingsUpdateRequest,
-) {
-    if let Some(step_mode) = update.step_mode {
-        settings.step_mode = step_mode;
-    }
-    if let Some(workflows) = &update.enabled_workflows {
-        settings.enabled_workflows.clone_from(workflows);
-    }
-    if let Some(dry_run_default) = update.dry_run_default {
-        settings.dry_run_default = dry_run_default;
-    }
-    if update.clear_dispatch_status_filter {
-        settings.dispatch_status_filter = None;
-    } else if let Some(status) = update.dispatch_status_filter {
-        settings.dispatch_status_filter = Some(status.canonical_persisted_status());
-    }
-    if update.clear_project_dir {
-        settings.project_dir = None;
-    } else if let Some(project_dir) = &update.project_dir {
-        settings.project_dir = Some(project_dir.clone());
-    }
-    if let Some(github_project) = &update.github_project {
-        settings.github_project.clone_from(github_project);
-    }
-    if let Some(github_inbox) = &update.github_inbox {
-        settings.github_inbox.clone_from(github_inbox);
-    }
-    if let Some(todoist_inbox) = &update.todoist_inbox {
-        settings.todoist_inbox.clone_from(todoist_inbox);
-    }
-    if let Some(policy_version) = &update.policy_version {
-        settings.policy_version.clone_from(policy_version);
-    }
-}
-
-fn normalize_github_inbox(
-    inbox: &TaskBoardGitHubInboxConfig,
-) -> Result<TaskBoardGitHubInboxConfig, CliError> {
-    let mut repositories = Vec::with_capacity(inbox.repositories.len());
-    let mut seen = BTreeSet::new();
-    for repository in &inbox.repositories {
-        let Some(repository) = normalize_repository_slug(Some(repository.as_str())) else {
-            return Err(CliError::from(CliErrorKind::workflow_parse(format!(
-                "invalid task-board github inbox repository '{repository}', expected owner/repo"
-            ))));
-        };
-        if seen.insert(repository.clone()) {
-            repositories.push(repository);
-        }
-    }
-    Ok(TaskBoardGitHubInboxConfig {
-        repositories,
-        label_filter: normalize_strings(&inbox.label_filter),
-    })
-}
-
-fn normalize_todoist_inbox(inbox: &TaskBoardTodoistInboxConfig) -> TaskBoardTodoistInboxConfig {
-    TaskBoardTodoistInboxConfig {
-        project_filter: normalize_strings(&inbox.project_filter),
-    }
-}
-
-fn normalize_strings(values: &[String]) -> Vec<String> {
-    let mut seen = BTreeSet::new();
-    values
-        .iter()
-        .filter_map(|value| {
-            let value = value.trim();
-            (!value.is_empty() && seen.insert(value.to_owned())).then(|| value.to_owned())
-        })
-        .collect()
 }
 
 const fn workflow_statuses() -> [TaskBoardWorkflowStatus; 6] {

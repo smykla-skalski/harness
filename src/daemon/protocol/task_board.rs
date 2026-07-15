@@ -15,7 +15,7 @@ use crate::task_board::{
     PolicyPipelineReplayResult, PolicyPipelineSaveResponse, PolicyPipelineSimulationResult,
     PolicyScenario, TaskBoardAuditSummary, TaskBoardEvaluationSummary,
     TaskBoardGitIdentityDefaults, TaskBoardItem, TaskBoardMachineSummary, TaskBoardPriority,
-    TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary,
+    TaskBoardProjectSummary, TaskBoardStatus, TaskBoardSyncSummary, TaskBoardWorkflowKind,
 };
 
 pub use crate::task_board::{
@@ -39,6 +39,10 @@ pub struct TaskBoardCreateItemRequest {
     pub priority: TaskBoardPriority,
     #[serde(default)]
     pub agent_mode: AgentMode,
+    #[serde(default)]
+    pub workflow_kind: TaskBoardWorkflowKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_repository: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -83,6 +87,10 @@ pub struct TaskBoardUpdateItemRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_mode: Option<AgentMode>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_kind: Option<TaskBoardWorkflowKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_repository: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
@@ -108,6 +116,8 @@ pub struct TaskBoardUpdateItemRequest {
 pub struct TaskBoardUpdateIdentityClears {
     #[serde(default)]
     pub clear_project_id: bool,
+    #[serde(default)]
+    pub clear_execution_repository: bool,
     #[serde(default)]
     pub clear_session_id: bool,
     #[serde(default)]

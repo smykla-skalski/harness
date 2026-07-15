@@ -22,6 +22,12 @@ pub(crate) struct TaskBoardMutation {
     pub(crate) change_revision: i64,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct TaskBoardItemSnapshot {
+    pub(crate) item: TaskBoardItem,
+    pub(crate) item_revision: i64,
+}
+
 impl AsyncDaemonDb {
     /// Insert one new Task Board item.
     pub(crate) async fn create_task_board_item(
@@ -54,21 +60,33 @@ impl AsyncDaemonDb {
 
     /// Load one Task Board item, including tombstones.
     pub(crate) async fn task_board_item(&self, item_id: &str) -> Result<TaskBoardItem, CliError> {
+        self.task_board_item_snapshot(item_id)
+            .await
+            .map(|snapshot| snapshot.item)
+    }
+
+    /// Load one Task Board item with the row revision used by automation CAS.
+    pub(crate) async fn task_board_item_snapshot(
+        &self,
+        item_id: &str,
+    ) -> Result<TaskBoardItemSnapshot, CliError> {
         io::validate_safe_segment(item_id)?;
         let mut transaction = self
             .pool()
             .begin()
             .await
             .map_err(|error| db_error(format!("begin task board item load: {error}")))?;
-        let item = load_item_in_tx(&mut transaction, item_id)
+        let (item, item_revision) = load_item_in_tx(&mut transaction, item_id)
             .await?
-            .map(|(item, _)| item)
             .ok_or_else(|| db_error(format!("task-board item '{item_id}' not found")))?;
         transaction
             .commit()
             .await
             .map_err(|error| db_error(format!("commit task board item load: {error}")))?;
-        Ok(item)
+        Ok(TaskBoardItemSnapshot {
+            item,
+            item_revision,
+        })
     }
 
     /// List active Task Board items in the legacy stable ordering.
@@ -212,11 +230,11 @@ pub(super) async fn insert_item_in_tx(
     query(
         "INSERT INTO task_board_items (
         item_id, schema_version, title, body, status, priority, tags_json, project_id,
-        target_project_types_json, agent_mode, imported_from_provider, planning_json,
-        workflow_json, session_id, work_item_id, usage_json, created_at, updated_at,
-        deleted_at, revision
+        target_project_types_json, agent_mode, workflow_kind, execution_repository,
+        imported_from_provider, planning_json, workflow_json, session_id, work_item_id,
+        usage_json, created_at, updated_at, deleted_at, revision
     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-        ?15, ?16, ?17, ?18, ?19, ?20)",
+        ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
     )
     .bind(&item.id)
     .bind(i64::from(item.schema_version))
@@ -231,6 +249,8 @@ pub(super) async fn insert_item_in_tx(
         "task board project types",
     )?)
     .bind(label(item.agent_mode, "task board agent mode")?)
+    .bind(label(item.workflow_kind, "task board workflow kind")?)
+    .bind(&item.execution_repository)
     .bind(
         item.imported_from_provider
             .map(|provider| label(provider, "task board imported provider"))
@@ -261,9 +281,10 @@ pub(super) async fn replace_item_in_tx(
         "UPDATE task_board_items SET
         schema_version = ?2, title = ?3, body = ?4, status = ?5, priority = ?6,
         tags_json = ?7, project_id = ?8, target_project_types_json = ?9,
-        agent_mode = ?10, imported_from_provider = ?11, planning_json = ?12,
-        workflow_json = ?13, session_id = ?14, work_item_id = ?15, usage_json = ?16,
-        created_at = ?17, updated_at = ?18, deleted_at = ?19, revision = ?20
+        agent_mode = ?10, workflow_kind = ?11, execution_repository = ?12,
+        imported_from_provider = ?13, planning_json = ?14, workflow_json = ?15,
+        session_id = ?16, work_item_id = ?17, usage_json = ?18, created_at = ?19,
+        updated_at = ?20, deleted_at = ?21, revision = ?22
         WHERE item_id = ?1",
     )
     .bind(&item.id)
@@ -279,6 +300,8 @@ pub(super) async fn replace_item_in_tx(
         "task board project types",
     )?)
     .bind(label(item.agent_mode, "task board agent mode")?)
+    .bind(label(item.workflow_kind, "task board workflow kind")?)
+    .bind(&item.execution_repository)
     .bind(
         item.imported_from_provider
             .map(|provider| label(provider, "task board imported provider"))

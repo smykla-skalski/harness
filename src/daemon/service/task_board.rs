@@ -334,6 +334,11 @@ fn patch_from_request(request: &TaskBoardUpdateItemRequest) -> TaskBoardItemPatc
         ),
         target_project_types: request.target_project_types.clone(),
         agent_mode: request.agent_mode,
+        workflow_kind: request.workflow_kind,
+        execution_repository: optional_string_patch(
+            request.execution_repository.as_ref(),
+            request.clear_identity.clear_execution_repository,
+        ),
         external_refs: request.external_refs.clone(),
         planning: request.planning.clone(),
         clear_planning: request.clear_state.clear_planning,

@@ -140,6 +140,21 @@ pub(super) fn apply_settings_update(
     if let Some(todoist_inbox) = &update.todoist_inbox {
         settings.todoist_inbox.clone_from(todoist_inbox);
     }
+    if let Some(scheduling) = &update.scheduling {
+        settings.scheduling.clone_from(scheduling);
+    }
+    if let Some(retry) = &update.retry {
+        settings.retry.clone_from(retry);
+    }
+    if let Some(reviewers) = &update.reviewers {
+        settings.reviewers.clone_from(reviewers);
+    }
+    if let Some(repositories) = &update.repositories {
+        settings.repositories.clone_from(repositories);
+    }
+    if let Some(execution_hosts) = &update.execution_hosts {
+        settings.execution_hosts.clone_from(execution_hosts);
+    }
     if let Some(policy_version) = &update.policy_version {
         settings.policy_version.clone_from(policy_version);
     }

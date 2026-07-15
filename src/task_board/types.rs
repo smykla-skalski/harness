@@ -1,6 +1,8 @@
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
+use super::automation::TaskBoardWorkflowKind;
+
 pub const CURRENT_TASK_BOARD_ITEM_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -22,6 +24,10 @@ pub struct TaskBoardItem {
     pub target_project_types: Vec<String>,
     #[serde(default)]
     pub agent_mode: AgentMode,
+    #[serde(default)]
+    pub workflow_kind: TaskBoardWorkflowKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_repository: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub external_refs: Vec<ExternalRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -56,6 +62,8 @@ impl TaskBoardItem {
             project_id: None,
             target_project_types: Vec::new(),
             agent_mode: AgentMode::Headless,
+            workflow_kind: TaskBoardWorkflowKind::DefaultTask,
+            execution_repository: None,
             external_refs: Vec::new(),
             imported_from_provider: None,
             planning: PlanningState::default(),

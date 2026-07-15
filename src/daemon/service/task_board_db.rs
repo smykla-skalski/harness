@@ -95,6 +95,9 @@ pub(crate) async fn create_task_board_item_db(
     );
     item.priority = request.priority;
     item.agent_mode = request.agent_mode;
+    item.workflow_kind = request.workflow_kind;
+    item.execution_repository
+        .clone_from(&request.execution_repository);
     item.tags.clone_from(&request.tags);
     item.project_id.clone_from(&request.project_id);
     item.target_project_types
@@ -200,7 +203,11 @@ pub(crate) async fn audit_task_board_db(
     let grants = load_live_spawn_grants(db, policy, &items, &[]).await?;
     let evaluated_at = utc_now();
     Ok(build_audit_summary_with_policy(
-        &items, policy, &evaluated_at, switches, &grants,
+        &items,
+        policy,
+        &evaluated_at,
+        switches,
+        &grants,
     ))
 }
 
@@ -350,6 +357,7 @@ fn apply_update_request(item: &mut TaskBoardItem, request: &TaskBoardUpdateItemR
     assign_copy_if_some(&mut item.status, request.status);
     assign_copy_if_some(&mut item.priority, request.priority);
     assign_copy_if_some(&mut item.agent_mode, request.agent_mode);
+    assign_copy_if_some(&mut item.workflow_kind, request.workflow_kind);
     assign_if_some(&mut item.tags, request.tags.as_ref());
     assign_if_some(
         &mut item.target_project_types,
@@ -362,6 +370,11 @@ fn apply_update_request(item: &mut TaskBoardItem, request: &TaskBoardUpdateItemR
         &mut item.project_id,
         request.project_id.as_ref(),
         request.clear_identity.clear_project_id,
+    );
+    apply_optional_string(
+        &mut item.execution_repository,
+        request.execution_repository.as_ref(),
+        request.clear_identity.clear_execution_repository,
     );
     apply_optional_string(
         &mut item.session_id,

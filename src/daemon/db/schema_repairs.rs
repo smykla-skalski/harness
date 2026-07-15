@@ -29,10 +29,9 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
     ("policy_canvases", "live_updated_at"),
     ("policy_nodes", "layout_source"),
     ("policy_decisions", "evaluated_at"),
-    (
-        "task_board_dispatch_intents",
-        "consumed_approval_grant_id",
-    ),
+    ("task_board_dispatch_intents", "consumed_approval_grant_id"),
+    ("task_board_items", "workflow_kind"),
+    ("task_board_items", "execution_repository"),
 ];
 
 const CURRENT_SCHEMA_CODEX_RUN_COLUMNS: &[(&str, &str)] = &[
@@ -88,6 +87,16 @@ pub(super) fn current_schema_shape_needs_repair(
         "policy_approval_grants",
         "task_board_dispatch_intents",
         "task_board_imports",
+        "task_board_orchestrator_control",
+        "task_board_orchestrator_runs",
+        "task_board_workflow_executions",
+        "task_board_execution_attempts",
+        "task_board_admission_leases",
+        "task_board_provider_scope_state",
+        "task_board_sync_conflicts",
+        "task_board_execution_hosts",
+        "task_board_remote_assignments",
+        "task_board_orchestrator_wake_events",
     ] {
         if !table_exists(conn, table)? {
             return Ok(true);
@@ -151,6 +160,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v33::run(&db.conn)?;
     super::schema_v34::run(&db.conn)?;
     super::schema_v35::run(&db.conn)?;
+    super::schema_v36::run(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

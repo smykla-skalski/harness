@@ -12,6 +12,8 @@ pub(super) struct ItemRow {
     pub(super) project_id: Option<String>,
     pub(super) target_project_types_json: String,
     pub(super) agent_mode: String,
+    pub(super) workflow_kind: String,
+    pub(super) execution_repository: Option<String>,
     pub(super) imported_from_provider: Option<String>,
     pub(super) planning_json: String,
     pub(super) workflow_json: String,

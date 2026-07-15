@@ -94,11 +94,13 @@ mod schema_v32;
 mod schema_v33;
 mod schema_v34;
 mod schema_v35;
+mod schema_v36;
 #[allow(dead_code)]
 mod task_board;
+#[allow(unused_imports)]
 pub(crate) use task_board::{
     ClaimedTaskBoardDispatch, ClaimedTaskBoardDispatchPreparation, ReservedTaskBoardDispatch,
-    TaskBoardImportMarker,
+    TaskBoardImportMarker, TaskBoardItemSnapshot,
 };
 mod session_data;
 mod signals;
@@ -294,7 +296,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "35";
+pub(crate) const SCHEMA_VERSION: &str = "36";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

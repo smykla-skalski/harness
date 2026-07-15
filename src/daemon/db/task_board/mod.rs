@@ -19,7 +19,7 @@ pub(crate) use dispatch_preparations::{
 #[allow(unused_imports)]
 pub(crate) use imports::{TaskBoardImportMarker, TaskBoardImportResult};
 #[allow(unused_imports)]
-pub(crate) use items::TaskBoardMutation;
+pub(crate) use items::{TaskBoardItemSnapshot, TaskBoardMutation};
 
 pub(crate) const ITEMS_CHANGE_SCOPE: &str = "task_board:items";
 pub(crate) const MACHINES_CHANGE_SCOPE: &str = "task_board:machines";

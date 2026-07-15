@@ -260,8 +260,8 @@ mod signals_async_send;
 mod status;
 mod sync_support;
 mod task_board;
-mod task_board_db;
 mod task_board_completion;
+mod task_board_db;
 mod task_board_evaluation;
 mod task_board_github;
 #[cfg(test)]
@@ -269,6 +269,7 @@ mod task_board_host;
 #[cfg(test)]
 mod task_board_orchestrator;
 mod task_board_orchestrator_db;
+mod task_board_orchestrator_settings;
 mod task_board_orchestrator_step_mode;
 mod task_board_runtime;
 #[cfg(test)]

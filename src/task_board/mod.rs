@@ -1,3 +1,4 @@
+pub mod automation;
 pub mod dispatch;
 pub mod evaluation;
 pub mod external;
@@ -18,6 +19,7 @@ pub mod transport;
 pub mod types;
 mod worker_prompt;
 
+pub use automation::*;
 pub use dispatch::{
     DispatchAppliedTask, DispatchBlockReason, DispatchExecutionSummary, DispatchFailure,
     DispatchFailureKind, DispatchPlan, DispatchReadiness, EvaluatorIntent, FollowUpPhase,
