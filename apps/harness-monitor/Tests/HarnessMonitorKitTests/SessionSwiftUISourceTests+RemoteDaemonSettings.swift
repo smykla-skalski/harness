@@ -29,40 +29,32 @@ extension SessionSwiftUISourceTests {
     let source = try sourceFile(at: "Views/Settings/SettingsRemoteDaemonSection.swift")
     let profileRows = try #require(
       source.components(separatedBy: "private func profileRows").last?
-        .components(separatedBy: "  private var pairingInput").first
+        .components(separatedBy: "private var pairingInput").first
+    )
+    let spkiRow = try #require(
+      profileRows.components(
+        separatedBy: "HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {"
+      ).dropFirst().first
+    )
+    let valueModifiers = try #require(
+      spkiRow.components(separatedBy: "Text(profile.serverSPKISHA256.value)")
+        .dropFirst().first?
+        .components(separatedBy: ".clipped()").first
     )
 
     #expect(!profileRows.contains("LabeledContent(\"Server SPKI\")"))
+    #expect(spkiRow.contains("Text(\"Server SPKI\")"))
+    #expect(spkiRow.contains(".fixedSize(horizontal: true, vertical: false)"))
+    #expect(valueModifiers.contains(".lineLimit(1)"))
+    #expect(valueModifiers.contains(".truncationMode(.middle)"))
+    #expect(valueModifiers.contains(".foregroundStyle(.secondary)"))
+    #expect(valueModifiers.contains(".textSelection(.enabled)"))
     #expect(
-      profileRows.contains(
-        """
-        HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
-              Text("Server SPKI")
-                .fixedSize(horizontal: true, vertical: false)
-        """
-      )
+      valueModifiers.contains(".frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)")
     )
-    #expect(
-      profileRows.contains(
-        """
-        Text(profile.serverSPKISHA256.value)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-                .frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)
-                .clipped()
-        """
-      )
-    )
-    #expect(
-      profileRows.contains(
-        """
-        .accessibilityElement(children: .combine)
-            .accessibilityLabel("Server SPKI")
-            .accessibilityValue(profile.serverSPKISHA256.value)
-        """
-      )
-    )
+    #expect(spkiRow.contains(".clipped()"))
+    #expect(spkiRow.contains(".accessibilityElement(children: .combine)"))
+    #expect(spkiRow.contains(".accessibilityLabel(\"Server SPKI\")"))
+    #expect(spkiRow.contains(".accessibilityValue(profile.serverSPKISHA256.value)"))
   }
 }
