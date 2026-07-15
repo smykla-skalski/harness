@@ -23,4 +23,18 @@ extension SessionSwiftUISourceTests {
     #expect(source.contains("removes its bearer token from Keychain"))
     #expect(source.contains("returns to the local daemon mode"))
   }
+
+  @Test("Server SPKI middle-truncates while retaining its full selectable value")
+  func serverSPKIRetainsFullSelectableValue() throws {
+    let source = try sourceFile(at: "Views/Settings/SettingsRemoteDaemonSection.swift")
+    let row = try #require(
+      source.components(separatedBy: "LabeledContent(\"Server SPKI\") {").last?
+        .components(separatedBy: "    }").first
+    )
+
+    #expect(row.contains("Text(profile.serverSPKISHA256.value)"))
+    #expect(row.contains(".lineLimit(1)"))
+    #expect(row.contains(".truncationMode(.middle)"))
+    #expect(row.contains(".textSelection(.enabled)"))
+  }
 }
