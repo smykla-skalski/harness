@@ -39,17 +39,30 @@ extension SessionSwiftUISourceTests {
         HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
               Text("Server SPKI")
                 .fixedSize(horizontal: true, vertical: false)
-              Text(profile.serverSPKISHA256.value)
         """
       )
     )
-    #expect(profileRows.contains(".lineLimit(1)"))
-    #expect(profileRows.contains(".truncationMode(.middle)"))
-    #expect(profileRows.contains(".foregroundStyle(.secondary)"))
-    #expect(profileRows.contains(".textSelection(.enabled)"))
     #expect(
-      profileRows.contains(".frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)")
+      profileRows.contains(
+        """
+        Text(profile.serverSPKISHA256.value)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)
+                .clipped()
+        """
+      )
     )
-    #expect(profileRows.contains(".clipped()"))
+    #expect(
+      profileRows.contains(
+        """
+        .accessibilityElement(children: .combine)
+            .accessibilityLabel("Server SPKI")
+            .accessibilityValue(profile.serverSPKISHA256.value)
+        """
+      )
+    )
   }
 }

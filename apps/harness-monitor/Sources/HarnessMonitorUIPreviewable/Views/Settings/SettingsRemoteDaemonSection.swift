@@ -137,6 +137,9 @@ struct SettingsRemoteDaemonSection: View {
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .trailing)
         .clipped()
     }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Server SPKI")
+    .accessibilityValue(profile.serverSPKISHA256.value)
   }
 
   private var pairingInput: RemoteDaemonPairingInput {
