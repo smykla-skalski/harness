@@ -6,6 +6,7 @@ use crate::daemon::protocol::{
     PolicyApprovalGrantResolveRequest, PolicyApprovalGrantResolveResponse,
     PolicyApprovalGrantsListResponse, PolicyCanvasSetSpawnKillSwitchRequest,
     PolicyCanvasSetSpawnRequiresLivePolicyRequest, PolicyCanvasWorkspaceResponse,
+    PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
     TASK_BOARD_STORAGE_DATABASE, TaskBoardAuditRequest, TaskBoardAuditResponse,
     TaskBoardCapabilitiesResponse, TaskBoardCatalogRequest, TaskBoardCreateItemRequest,
     TaskBoardDispatchDeliverRequest, TaskBoardDispatchDeliverResponse,
@@ -192,6 +193,20 @@ impl DaemonClient {
         request: &PolicyCanvasSetSpawnKillSwitchRequest,
     ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
         self.post(http_paths::POLICY_CANVASES_SPAWN_KILL_SWITCH, request)
+    }
+
+    pub fn dump_policy_transfer(
+        &self,
+        request: &PolicyTransferDumpRequest,
+    ) -> Result<PolicyTransferBundle, CliError> {
+        self.post(http_paths::POLICIES_DUMP, request)
+    }
+
+    pub fn import_policy_transfer(
+        &self,
+        request: &PolicyTransferImportRequest,
+    ) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
+        self.post(http_paths::POLICIES_IMPORT, request)
     }
 
     pub fn list_policy_approval_grants(

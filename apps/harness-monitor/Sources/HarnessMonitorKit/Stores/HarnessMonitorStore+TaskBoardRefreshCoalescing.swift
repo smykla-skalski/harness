@@ -18,12 +18,14 @@ extension HarnessMonitorStore {
   func scheduleGitHubTaskBoardRefresh(
     using client: any HarnessMonitorClientProtocol,
     includeItems: Bool = true,
-    includeOrchestratorStatus: Bool = true
+    includeOrchestratorStatus: Bool = true,
+    includePolicyPipeline: Bool = false
   ) {
     _ = scheduleTaskBoardDashboardSnapshotRefresh(
       using: client,
       includeItems: includeItems,
-      includeOrchestratorStatus: includeOrchestratorStatus
+      includeOrchestratorStatus: includeOrchestratorStatus,
+      includePolicyPipeline: includePolicyPipeline
     )
   }
 
@@ -46,6 +48,7 @@ extension HarnessMonitorStore {
     using client: any HarnessMonitorClientProtocol,
     includeItems: Bool = true,
     includeOrchestratorStatus: Bool = true,
+    includePolicyPipeline: Bool = false,
     fallbackStatus: TaskBoardOrchestratorStatus? = nil
   ) -> UInt64 {
     cacheWriteSync.taskBoardRefreshRequestGeneration &+= 1
@@ -54,6 +57,8 @@ extension HarnessMonitorStore {
       cacheWriteSync.pendingTaskBoardItemsRefresh || includeItems
     cacheWriteSync.pendingTaskBoardOrchestratorRefresh =
       cacheWriteSync.pendingTaskBoardOrchestratorRefresh || includeOrchestratorStatus
+    cacheWriteSync.pendingTaskBoardPolicyPipelineRefresh =
+      cacheWriteSync.pendingTaskBoardPolicyPipelineRefresh || includePolicyPipeline
     if let fallbackStatus {
       cacheWriteSync.pendingTaskBoardFallbackStatus = fallbackStatus
     }
@@ -86,7 +91,8 @@ extension HarnessMonitorStore {
       .filter { $0 <= completedGeneration }
       .sorted()
     for generation in generations {
-      let waiters = cacheWriteSync.taskBoardRefreshCompletionWaiters
+      let waiters =
+        cacheWriteSync.taskBoardRefreshCompletionWaiters
         .removeValue(forKey: generation) ?? []
       for waiter in waiters {
         waiter.resume()
@@ -116,11 +122,14 @@ extension HarnessMonitorStore {
       let includeItems = self.cacheWriteSync.pendingTaskBoardItemsRefresh
       let includeOrchestratorStatus =
         self.cacheWriteSync.pendingTaskBoardOrchestratorRefresh
+      let includePolicyPipeline =
+        self.cacheWriteSync.pendingTaskBoardPolicyPipelineRefresh
       let fallbackStatus = self.cacheWriteSync.pendingTaskBoardFallbackStatus
       let completedRequestGeneration =
         self.cacheWriteSync.taskBoardRefreshRequestGeneration
       self.cacheWriteSync.pendingTaskBoardItemsRefresh = false
       self.cacheWriteSync.pendingTaskBoardOrchestratorRefresh = false
+      self.cacheWriteSync.pendingTaskBoardPolicyPipelineRefresh = false
       self.cacheWriteSync.pendingTaskBoardFallbackStatus = nil
 
       let snapshot = await Self.loadTaskBoardRefreshSnapshot(
@@ -132,6 +141,10 @@ extension HarnessMonitorStore {
 
       self.cancelInitialTaskBoardConfirmationRefresh()
       self.applyTaskBoardDashboardSnapshot(snapshot, fallbackStatus: fallbackStatus)
+      if includePolicyPipeline {
+        await self.refreshPolicyPipeline()
+      }
+      guard self.cacheWriteSync.taskBoardRefreshGeneration == generation else { return }
       self.cacheWriteSync.taskBoardRefreshCompletedGeneration =
         completedRequestGeneration
       self.resumeCompletedTaskBoardDashboardSnapshotRefreshWaiters()
@@ -139,6 +152,7 @@ extension HarnessMonitorStore {
 
       if self.cacheWriteSync.pendingTaskBoardItemsRefresh
         || self.cacheWriteSync.pendingTaskBoardOrchestratorRefresh
+        || self.cacheWriteSync.pendingTaskBoardPolicyPipelineRefresh
       {
         self.startTaskBoardDashboardSnapshotRefreshIfNeeded(using: client)
       }

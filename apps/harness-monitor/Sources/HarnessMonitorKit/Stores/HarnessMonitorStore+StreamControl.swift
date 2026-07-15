@@ -13,6 +13,7 @@ extension HarnessMonitorStore {
     cacheWriteSync.taskBoardRefreshDeferralDepth = 0
     cacheWriteSync.pendingTaskBoardItemsRefresh = false
     cacheWriteSync.pendingTaskBoardOrchestratorRefresh = false
+    cacheWriteSync.pendingTaskBoardPolicyPipelineRefresh = false
     cacheWriteSync.pendingTaskBoardFallbackStatus = nil
   }
 

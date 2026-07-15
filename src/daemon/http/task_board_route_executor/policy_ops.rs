@@ -13,7 +13,8 @@ use crate::daemon::protocol::{
     PolicyPipelinePromoteResponse, PolicyPipelineReplayRequest, PolicyPipelineReplayResponse,
     PolicyPipelineResponse, PolicyPipelineSaveDraftRequest, PolicyPipelineSaveDraftResponse,
     PolicyPipelineSimulateRequest, PolicyPipelineSimulationResponse, PolicyScenarioCreateRequest,
-    PolicyScenarioDeleteRequest, PolicyScenarioUpdateRequest,
+    PolicyScenarioDeleteRequest, PolicyScenarioUpdateRequest, PolicyTransferBundle,
+    PolicyTransferDumpRequest, PolicyTransferImportRequest,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -168,6 +169,20 @@ pub(crate) async fn import_policy_canvas(
     request: &PolicyCanvasImportRequest,
 ) -> Result<PolicyCanvasImportResponse, CliError> {
     service::import_policy(db, request).await
+}
+
+pub(crate) async fn dump_policy_transfer(
+    db: &AsyncDaemonDb,
+    request: &PolicyTransferDumpRequest,
+) -> Result<PolicyTransferBundle, CliError> {
+    service::dump_policies(db, request).await
+}
+
+pub(crate) async fn import_policy_transfer(
+    db: &AsyncDaemonDb,
+    request: &PolicyTransferImportRequest,
+) -> Result<PolicyCanvasWorkspaceResponse, CliError> {
+    service::import_policies(db, request).await
 }
 
 pub(crate) async fn create_policy_scenario(

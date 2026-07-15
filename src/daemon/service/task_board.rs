@@ -53,6 +53,7 @@ mod policy_canvas;
 mod policy_canvas_io;
 mod policy_canvas_response;
 mod policy_spawn_gate;
+mod policy_transfer;
 mod sync;
 
 pub(crate) use dispatch::load_live_spawn_grants;
@@ -71,6 +72,7 @@ pub(crate) use policy_spawn_gate::{
     list_policy_approval_grants, resolve_policy_approval_grant, revoke_policy_approval_grant,
     set_policy_canvas_spawn_kill_switch, set_policy_canvas_spawn_requires_live_policy,
 };
+pub(crate) use policy_transfer::{dump_policies, import_policies};
 
 /// Create a persisted task-board item.
 ///

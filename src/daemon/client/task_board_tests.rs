@@ -4,7 +4,10 @@ use std::thread;
 
 use super::DaemonClient;
 use super::test_support::{read_http_request, write_http_response};
-use crate::daemon::protocol::{TaskBoardListItemsRequest, TaskBoardUpdateItemRequest};
+use crate::daemon::protocol::{
+    PolicyTransferBundle, PolicyTransferDumpRequest, PolicyTransferImportRequest,
+    TaskBoardListItemsRequest, TaskBoardUpdateItemRequest,
+};
 use crate::task_board::{TaskBoardItem, TaskBoardStatus};
 
 fn client_with(endpoint: String) -> DaemonClient {
@@ -157,5 +160,55 @@ fn task_board_update_uses_put_item_route() {
     assert_eq!(
         *request_line.lock().expect("request line"),
         "PUT /v1/task-board/items/task-1 HTTP/1.1"
+    );
+}
+
+#[test]
+fn policy_transfer_dump_uses_bulk_post_route() {
+    let (endpoint, request_line, handle) = spawn_mock(
+        "200 OK",
+        r#"{"format":"harness-policy-transfer","version":1,"policies":[],"workspace":null}"#.into(),
+    );
+
+    let bundle = client_with(endpoint)
+        .dump_policy_transfer(&PolicyTransferDumpRequest {
+            policy_ids: vec!["canvas-a".into(), "canvas-b".into()],
+        })
+        .expect("dump policy transfer");
+    handle.join().expect("server");
+
+    assert_eq!(bundle.format, "harness-policy-transfer");
+    assert_eq!(bundle.version, 1);
+    assert_eq!(
+        *request_line.lock().expect("request line"),
+        "POST /v1/policies/dump HTTP/1.1"
+    );
+}
+
+#[test]
+fn policy_transfer_import_uses_batch_route() {
+    let (endpoint, request_line, handle) = spawn_mock(
+        "200 OK",
+        r#"{"schema_version":1,"active_canvas_id":"","canvases":[]}"#.into(),
+    );
+    let request = PolicyTransferImportRequest {
+        bundle: PolicyTransferBundle {
+            format: "harness-policy-transfer".into(),
+            version: 1,
+            policies: Vec::new(),
+            workspace: None,
+        },
+        replace_all: false,
+    };
+
+    let workspace = client_with(endpoint)
+        .import_policy_transfer(&request)
+        .expect("import policy transfer");
+    handle.join().expect("server");
+
+    assert!(workspace.canvases.is_empty());
+    assert_eq!(
+        *request_line.lock().expect("request line"),
+        "POST /v1/policies/import HTTP/1.1"
     );
 }

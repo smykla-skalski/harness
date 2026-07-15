@@ -19,7 +19,7 @@ use super::policy_canvas_response::policy_canvas_workspace_response;
 #[cfg(test)]
 mod tests;
 
-const POLICY_PIPELINE_CHANGE_CHANNEL: &str = "policy_pipeline";
+const POLICY_PIPELINE_CHANGE_CHANNEL: &str = "task_board:policy_pipeline";
 
 /// Default and ceiling for how many recorded decisions a replay re-simulates.
 const DEFAULT_REPLAY_LIMIT: u32 = 50;
@@ -66,14 +66,18 @@ pub(super) fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
     let _ = workspace;
 }
 
-/// Emit the `policy_pipeline` change event so websocket subscribers re-query.
+/// Emit the `task_board:policy_pipeline` change event so websocket subscribers
+/// re-query.
 #[expect(
     clippy::cognitive_complexity,
     reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
 )]
 pub(super) async fn bump_change_policy(db: &AsyncDaemonDb) {
     if let Err(error) = db.bump_change(POLICY_PIPELINE_CHANGE_CHANNEL).await {
-        tracing::warn!(%error, "failed to bump policy_pipeline change marker");
+        tracing::warn!(
+            %error,
+            "failed to bump task_board:policy_pipeline change marker"
+        );
     }
 }
 

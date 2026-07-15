@@ -19,6 +19,7 @@ mod orchestrator;
 mod orchestrator_tokens;
 mod planning;
 mod policy;
+mod policy_io;
 mod sync;
 
 pub use dispatch::{TaskBoardDispatchDeliverArgs, TaskBoardDispatchPickArgs};
@@ -34,6 +35,7 @@ pub use policy::{
     TaskBoardPolicyCommand, TaskBoardPolicyGrantResolveArgs, TaskBoardPolicyGrantRevokeArgs,
     TaskBoardPolicyJsonArgs, TaskBoardPolicyToggleArgs,
 };
+pub use policy_io::{TaskBoardPolicyDumpArgs, TaskBoardPolicyImportArgs};
 
 #[derive(Debug, Clone, Subcommand)]
 #[non_exhaustive]

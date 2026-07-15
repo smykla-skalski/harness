@@ -2,8 +2,9 @@ extension HarnessMonitorStore {
   struct TaskBoardPushRefreshSelection: Equatable, Sendable {
     let items: Bool
     let orchestratorStatus: Bool
+    let policyPipeline: Bool
 
-    var hasWork: Bool { items || orchestratorStatus }
+    var hasWork: Bool { items || orchestratorStatus || policyPipeline }
   }
 
   func applyGlobalDataPushEventFromStream(_ event: DaemonPushEvent) async -> Bool {
@@ -22,7 +23,8 @@ extension HarnessMonitorStore {
         scheduleGitHubTaskBoardRefresh(
           using: client,
           includeItems: selection.items,
-          includeOrchestratorStatus: selection.orchestratorStatus
+          includeOrchestratorStatus: selection.orchestratorStatus,
+          includePolicyPipeline: selection.policyPipeline
         )
       }
     default:
@@ -38,6 +40,7 @@ extension HarnessMonitorStore {
       "task_board:items",
       "task_board:machines",
       "task_board:orchestrator",
+      "task_board:policy_pipeline",
       "task_board:policy_runtime",
       "task_board:runtime_config",
     ])
@@ -45,7 +48,8 @@ extension HarnessMonitorStore {
     let hasUnknown = values.isEmpty || !values.isSubset(of: known)
     return TaskBoardPushRefreshSelection(
       items: hasUnknown || values.contains("task_board:items"),
-      orchestratorStatus: hasUnknown || values.contains("task_board:orchestrator")
+      orchestratorStatus: hasUnknown || values.contains("task_board:orchestrator"),
+      policyPipeline: hasUnknown || values.contains("task_board:policy_pipeline")
     )
   }
 
@@ -77,6 +81,9 @@ extension HarnessMonitorStore {
         "websocket reconnect Task Board revision refresh failed: \(err, privacy: .public)"
       )
     }
-    scheduleGitHubTaskBoardRefresh(using: client)
+    scheduleGitHubTaskBoardRefresh(
+      using: client,
+      includePolicyPipeline: globalPolicyCanvasWorkspace != nil
+    )
   }
 }

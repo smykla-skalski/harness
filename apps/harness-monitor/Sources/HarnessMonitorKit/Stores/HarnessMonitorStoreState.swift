@@ -9,6 +9,7 @@ struct CacheWriteSyncState {
   var taskBoardRefreshCompletionWaiters: [UInt64: [CheckedContinuation<Void, Never>]] = [:]
   var pendingTaskBoardItemsRefresh = false
   var pendingTaskBoardOrchestratorRefresh = false
+  var pendingTaskBoardPolicyPipelineRefresh = false
   var pendingTaskBoardFallbackStatus: TaskBoardOrchestratorStatus?
   var taskBoardEvaluationBaselineRunID: String?
   var pendingCacheWriteTask: Task<Void, Never>?

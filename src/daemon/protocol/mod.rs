@@ -4,6 +4,7 @@ mod binding;
 mod codex;
 mod managed_agents;
 mod openrouter_models;
+mod policy_transfer;
 mod reviews;
 mod session_requests;
 mod summaries;
@@ -24,6 +25,7 @@ pub use binding::{
 pub use codex::*;
 pub use managed_agents::*;
 pub use openrouter_models::*;
+pub use policy_transfer::*;
 pub use reviews::*;
 pub use session_requests::*;
 pub use summaries::*;
