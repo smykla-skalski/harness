@@ -24,10 +24,12 @@ extension TaskBoardOverviewView {
         taskBoardDetailRow { evaluationSummaryRow(evaluationSummary) }
       }
     }
-    if taskBoardSessionID == nil,
-      let orchestratorStatus,
-      orchestratorStatus.enabled,
-      orchestratorStatus.stepMode,
+    if let orchestratorStatus,
+      TaskBoardOrchestratorPresentation.showsManualSteps(
+        for: orchestratorStatus,
+        scopeSessionID: taskBoardSessionID,
+        hasStore: store != nil
+      ),
       let store
     {
       taskBoardDetailRow {

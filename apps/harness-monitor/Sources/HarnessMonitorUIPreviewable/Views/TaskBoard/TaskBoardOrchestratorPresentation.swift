@@ -93,6 +93,27 @@ struct TaskBoardOrchestratorPresentation {
     guard run.evaluation != nil else { return .evaluation }
     return .automation
   }
+
+  static func showsManualSteps(
+    for status: TaskBoardOrchestratorStatus,
+    scopeSessionID: String?,
+    hasStore: Bool
+  ) -> Bool {
+    scopeSessionID == nil && hasStore && status.stepMode
+  }
+
+  static func stateTitle(for status: TaskBoardOrchestratorStatus) -> String {
+    if status.stepMode {
+      return "Paused (Step Mode)"
+    }
+    if !status.enabled {
+      return "Disabled"
+    }
+    if status.running {
+      return "Running"
+    }
+    return "Idle"
+  }
 }
 
 struct TaskBoardWorkflowCountPresentation: Identifiable, Equatable {
