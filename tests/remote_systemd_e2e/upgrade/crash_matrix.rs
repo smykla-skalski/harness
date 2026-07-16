@@ -48,6 +48,7 @@ const CRASH_CASES: [CrashCase; 3] = [
 
 struct CrashContext<'a> {
     upgrade: &'a RemoteSystemdUpgrade,
+    controller_path: &'a Path,
     binary_path: &'a Path,
     unit: &'a str,
     env_path: &'a Path,
@@ -58,6 +59,7 @@ struct CrashContext<'a> {
 
 pub(super) fn prove_runtime_permit_crash_matrix(
     upgrade: &RemoteSystemdUpgrade,
+    controller_path: &Path,
     binary_path: &Path,
     unit: &str,
     env_path: &Path,
@@ -70,6 +72,7 @@ pub(super) fn prove_runtime_permit_crash_matrix(
     }
     let context = CrashContext {
         upgrade,
+        controller_path,
         binary_path,
         unit,
         env_path,
@@ -87,7 +90,7 @@ impl CrashContext<'_> {
     fn run_case(&self, case: CrashCase) -> Result<(), String> {
         establish_live_canary(self.state_path, CRASH_ORIGINAL)?;
         let mut coordinator = CrashCoordinator::start(
-            &self.upgrade.crash_coordinator_path,
+            self.controller_path,
             self.binary_path,
             self.unit,
             self.env_path,

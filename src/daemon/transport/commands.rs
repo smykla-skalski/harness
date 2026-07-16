@@ -19,7 +19,6 @@ use super::control::{
     restart_daemon, stop_daemon,
 };
 use super::remote::DaemonRemoteCommand;
-use super::remote_systemd::{ensure_linux_systemd, systemd_daemon_root};
 
 /// Local daemon operations and remote-daemon scaffolding.
 #[derive(Debug, Clone, Subcommand)]
@@ -92,10 +91,7 @@ fn execute_remote_command(
     context: &AppContext,
 ) -> Result<i32, CliError> {
     let _root_override = systemd_unit
-        .map(|unit| {
-            ensure_linux_systemd()?;
-            systemd_daemon_root(unit)
-        })
+        .map(super::systemd_state::daemon_root)
         .transpose()?
         .map(|root| state::ScopedDaemonRootOverride::set(Some(root)));
     command.execute(context)

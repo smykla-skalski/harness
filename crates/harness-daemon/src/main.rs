@@ -20,6 +20,12 @@ struct Cli {
 }
 
 fn main() -> ExitCode {
+    if let Some(result) = delegate_systemd_lifecycle() {
+        return match result {
+            Ok(code) => exit_code(code),
+            Err(error) => render_error(&error),
+        };
+    }
     let (persisted_log_level, persisted_log_error) = startup_persisted_log_level();
     let telemetry_guard = match init_daemon_tracing_subscriber(persisted_log_level.as_deref()) {
         Ok(guard) => guard,
@@ -42,6 +48,66 @@ fn main() -> ExitCode {
         Ok(code) => exit_code(code),
         Err(error) => render_error(&error),
     }
+}
+
+fn delegate_systemd_lifecycle() -> Option<Result<i32, errors::CliError>> {
+    let arguments = harness_command::routed_args("remote").ok()?;
+    let mut arguments = match strip_daemon_only_globals(arguments) {
+        Ok(arguments) => arguments,
+        Err(error) => return Some(Err(error)),
+    };
+    let command = arguments.first()?.to_str()?;
+    let direct = match command {
+        "install-systemd" => "install",
+        "upgrade-systemd" => "upgrade",
+        "rollback-systemd" => "rollback",
+        "recover-systemd" => "recover",
+        "uninstall-systemd" => "uninstall",
+        "status" => "status",
+        _ => return None,
+    };
+    arguments[0] = direct.into();
+    Some(
+        harness_command::exec_trusted_worker(
+            "harness-systemd",
+            env!("CARGO_PKG_VERSION"),
+            arguments,
+        )
+        .map_err(|error| worker_error(&error)),
+    )
+}
+
+fn strip_daemon_only_globals(
+    arguments: Vec<std::ffi::OsString>,
+) -> Result<Vec<std::ffi::OsString>, errors::CliError> {
+    let mut arguments = arguments.into_iter();
+    let mut direct = Vec::new();
+    let mut options_ended = false;
+    while let Some(argument) = arguments.next() {
+        if options_ended {
+            direct.push(argument);
+        } else if argument == "--" {
+            options_ended = true;
+            direct.push(argument);
+        } else if argument == "--systemd-unit" {
+            arguments.next().ok_or_else(|| {
+                errors::CliError::from(errors::CliErrorKind::workflow_parse(
+                    "missing value for daemon --systemd-unit while delegating lifecycle command"
+                        .to_string(),
+                ))
+            })?;
+        } else if !argument
+            .to_str()
+            .is_some_and(|value| value.starts_with("--systemd-unit="))
+        {
+            direct.push(argument);
+        }
+    }
+    Ok(direct)
+}
+
+fn worker_error(error: &harness_command::WorkerError) -> errors::CliError {
+    errors::CliErrorKind::workflow_io(error.to_string()).into()
 }
 
 fn startup_persisted_log_level() -> (Option<String>, Option<errors::CliError>) {

@@ -7,6 +7,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod trusted;
+
+pub use trusted::{exec_trusted_worker, resolve_trusted_worker};
+
 /// Explicit worker-directory override used by development and integration tests.
 pub const WORKER_DIR_ENV: &str = "HARNESS_WORKER_DIR";
 

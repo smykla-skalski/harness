@@ -1,5 +1,3 @@
-use std::fs;
-use std::os::unix::fs::PermissionsExt as _;
 use std::path::Path;
 use std::process::Command;
 use std::str;
@@ -24,7 +22,7 @@ pub(super) struct CrashCoordinator {
 
 impl CrashCoordinator {
     pub(super) fn start(
-        coordinator_path: &Path,
+        controller_path: &Path,
         binary_path: &Path,
         unit: &str,
         env_path: &Path,
@@ -32,7 +30,6 @@ impl CrashCoordinator {
         boundary: CrashBoundary,
         occurrence: usize,
     ) -> Result<Self, String> {
-        prepare_coordinator(binary_path, coordinator_path)?;
         let service = boundary.transient_service_name(unit);
         let mut coordinator = Self {
             service: service.clone(),
@@ -51,8 +48,8 @@ impl CrashCoordinator {
                 boundary.selector(occurrence)
             ))
             .arg("--")
-            .arg(coordinator_path)
-            .args(["remote", "upgrade-systemd", "--unit", unit])
+            .arg(controller_path)
+            .args(["upgrade", "--unit", unit])
             .arg("--candidate-path")
             .arg(candidate_path)
             .arg("--binary-path")
@@ -112,7 +109,7 @@ impl CrashCoordinator {
         if command
             .stdout
             .split(|byte| *byte == 0)
-            .any(|argument| argument == b"upgrade-systemd")
+            .any(|argument| argument == b"upgrade")
         {
             Ok(())
         } else {
@@ -183,29 +180,6 @@ fn sigkill_command(service: &str) -> Command {
     let mut command = sudo(["systemctl", "kill", "--kill-whom=all", "--signal=SIGKILL"]);
     command.arg(service);
     command
-}
-
-fn prepare_coordinator(source: &Path, destination: &Path) -> Result<(), String> {
-    fs::copy(source, destination).map_err(|error| {
-        format!(
-            "copy crash upgrade coordinator {}: {error}",
-            destination.display()
-        )
-    })?;
-    fs::set_permissions(destination, fs::Permissions::from_mode(0o755)).map_err(|error| {
-        format!(
-            "make crash upgrade coordinator executable {}: {error}",
-            destination.display()
-        )
-    })?;
-    fs::File::open(destination)
-        .and_then(|file| file.sync_all())
-        .map_err(|error| {
-            format!(
-                "sync crash upgrade coordinator {}: {error}",
-                destination.display()
-            )
-        })
 }
 
 fn wait_for_coordinator_pid(service: &str) -> Result<u32, String> {

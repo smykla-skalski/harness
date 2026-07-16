@@ -143,6 +143,10 @@ start_leaf() {
           build --release --locked -p harness-daemon --bin harness-daemon \
           --features tokio-console
         ;;
+      systemd)
+        exec "$ROOT/scripts/cargo-local.sh" \
+          build --release --locked -p harness-systemd --bin harness-systemd
+        ;;
       bridge)
         exec "$ROOT/scripts/cargo-local.sh" \
           build --release --locked -p harness-bridge --bin harness-bridge

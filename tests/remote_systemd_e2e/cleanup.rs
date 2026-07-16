@@ -40,7 +40,7 @@ pub(super) struct SystemdCleanup {
 
 impl SystemdCleanup {
     pub(super) fn new(
-        cleanup_binary: &Path,
+        cleanup_controller: &Path,
         unit: &str,
         unit_path: &Path,
         environment_path: &Path,
@@ -75,7 +75,7 @@ impl SystemdCleanup {
         let runtime_permit_directory =
             Path::new("/run/systemd/system.control").join(format!("{unit}.service.d"));
         Ok(Self {
-            cleanup_binary: cleanup_binary.to_path_buf(),
+            cleanup_binary: cleanup_controller.to_path_buf(),
             unit: unit.to_string(),
             environment_path: environment_path.to_path_buf(),
             transaction_path: transaction_path.to_path_buf(),
@@ -87,6 +87,7 @@ impl SystemdCleanup {
                 unit_path.to_path_buf(),
                 environment_path.to_path_buf(),
                 ca_path.to_path_buf(),
+                cleanup_controller.to_path_buf(),
                 binary_path.to_path_buf(),
                 recovery_service_path,
                 recovery_timer_path,
@@ -174,13 +175,7 @@ impl SystemdCleanup {
 
     fn uninstall_managed_unit(&self) -> Result<(), String> {
         let mut command = sudo([self.cleanup_binary.as_os_str()]);
-        command.args([
-            "remote",
-            "uninstall-systemd",
-            "--unit",
-            &self.unit,
-            "--json",
-        ]);
+        command.args(["uninstall", "--unit", &self.unit, "--json"]);
         command.arg("--env-file").arg(&self.environment_path);
         checked(command, "release systemd E2E managed installation").map(|_| ())
     }

@@ -31,6 +31,27 @@ case "$status" in
 esac
 
 set +e
+matches=$(rg -n '#\[path[^\n]*src/daemon|remote recover-systemd' \
+  "$repo_root/crates/harness-systemd" --glob '*.rs')
+status=$?
+set -e
+
+case "$status" in
+  0)
+    printf 'harness-systemd still path-includes daemon code or uses legacy recovery routing:\n%s\n' \
+      "$matches" >&2
+    exit 1
+    ;;
+  1)
+    ;;
+  *)
+    printf 'Failed to scan harness-systemd extraction contracts (rg status %s).\n' \
+      "$status" >&2
+    exit "$status"
+    ;;
+esac
+
+set +e
 matches=$(rg -n "$root_dependency_pattern" "$repo_root/crates" --glob 'Cargo.toml')
 status=$?
 set -e

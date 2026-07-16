@@ -18,6 +18,7 @@ CORE_PACKAGE_MANIFESTS=(
   "$ROOT/crates/harness-mcp/Cargo.toml"
   "$ROOT/crates/harness-hook/Cargo.toml"
   "$ROOT/crates/harness-protocol/Cargo.toml"
+  "$ROOT/crates/harness-systemd/Cargo.toml"
   "$ROOT/crates/harness-telemetry/Cargo.toml"
 )
 CORE_PACKAGE_NAMES=(
@@ -28,6 +29,7 @@ CORE_PACKAGE_NAMES=(
   "harness-mcp"
   "harness-hook"
   "harness-protocol"
+  "harness-systemd"
   "harness-telemetry"
 )
 CARGO_LOCK="$ROOT/Cargo.lock"

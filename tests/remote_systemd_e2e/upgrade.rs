@@ -29,7 +29,6 @@ const STATE_POLL_INTERVAL: Duration = Duration::from_millis(250);
 pub struct RemoteSystemdUpgrade {
     valid_candidate_path: PathBuf,
     crash_candidate_path: PathBuf,
-    crash_coordinator_path: PathBuf,
     spoofed_candidate_path: PathBuf,
     transaction_path: PathBuf,
 }
@@ -38,7 +37,6 @@ impl RemoteSystemdUpgrade {
     pub fn new(binary_source: &Path, temp: &Path, unit: &str) -> Result<Self, String> {
         let valid_candidate_path = temp.join("valid-harness-candidate");
         let crash_candidate_path = temp.join("crash-harness-candidate");
-        let crash_coordinator_path = temp.join("crash-harness-coordinator");
         let spoofed_candidate_path = temp.join("spoofed-harness-candidate");
         prepare_candidates(
             binary_source,
@@ -49,7 +47,6 @@ impl RemoteSystemdUpgrade {
         Ok(Self {
             valid_candidate_path,
             crash_candidate_path,
-            crash_coordinator_path,
             spoofed_candidate_path,
             transaction_path: PathBuf::from(format!("/var/lib/harness/remote-systemd/{unit}")),
         })
@@ -78,13 +75,14 @@ impl RemoteSystemdUpgrade {
 
     pub fn run(
         &self,
+        controller_path: &Path,
         binary_path: &Path,
         unit: &str,
         env_path: &Path,
         candidate_path: &Path,
     ) -> Result<(i32, Value), String> {
-        let mut command = sudo([binary_path.as_os_str()]);
-        let upgrade_command = ["remote", "upgrade-systemd", "--unit", unit, "--json"];
+        let mut command = sudo([controller_path.as_os_str()]);
+        let upgrade_command = ["upgrade", "--unit", unit, "--json"];
         command.args(upgrade_command);
         command
             .arg("--candidate-path")
@@ -102,19 +100,13 @@ impl RemoteSystemdUpgrade {
 
     pub fn rollback(
         &self,
+        controller_path: &Path,
         binary_path: &Path,
         unit: &str,
         env_path: &Path,
     ) -> Result<(i32, Value), String> {
-        let mut command = sudo([binary_path.as_os_str()]);
-        command.args([
-            "remote",
-            "rollback-systemd",
-            "--unit",
-            unit,
-            "--confirm-data-loss",
-            "--json",
-        ]);
+        let mut command = sudo([controller_path.as_os_str()]);
+        command.args(["rollback", "--unit", unit, "--confirm-data-loss", "--json"]);
         command
             .arg("--binary-path")
             .arg(binary_path)
@@ -129,6 +121,7 @@ impl RemoteSystemdUpgrade {
 
     fn prove_coordinator_crash_recovery(
         &self,
+        controller_path: &Path,
         binary_path: &Path,
         unit: &str,
         env_path: &Path,
@@ -137,6 +130,7 @@ impl RemoteSystemdUpgrade {
     ) -> Result<(), String> {
         prove_runtime_permit_crash_matrix(
             self,
+            controller_path,
             binary_path,
             unit,
             env_path,
@@ -149,7 +143,12 @@ impl RemoteSystemdUpgrade {
 impl RemoteSystemdHost {
     pub fn rollback(&self) -> Result<(i32, Value), String> {
         self.upgrade
-            .rollback(&self.binary_path, &self.unit, &self.env_path)
+            .rollback(
+                &self.controller_path,
+                &self.binary_path,
+                &self.unit,
+                &self.env_path,
+            )
             .map_err(|error| self.with_diagnostics(error))
     }
 
@@ -159,6 +158,7 @@ impl RemoteSystemdHost {
     ) -> Result<(), String> {
         self.upgrade
             .prove_coordinator_crash_recovery(
+                &self.controller_path,
                 &self.binary_path,
                 &self.unit,
                 &self.env_path,

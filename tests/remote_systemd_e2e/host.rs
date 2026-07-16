@@ -16,7 +16,9 @@ pub struct RemoteSystemdHost {
     pub(super) unit: String,
     service: String,
     domain: String,
-    binary_source: PathBuf,
+    controller_source: PathBuf,
+    daemon_source: PathBuf,
+    pub(super) controller_path: PathBuf,
     pub(super) binary_path: PathBuf,
     pub(super) upgrade: RemoteSystemdUpgrade,
     pub(super) env_path: PathBuf,
@@ -44,15 +46,17 @@ impl RemoteSystemdHost {
         let port_lease = LowPortPairLease::acquire()?;
         let https_port = port_lease.https_port();
         let http_port = port_lease.http_port();
-        let binary_source = assert_cmd::cargo::cargo_bin("harness-daemon");
-        let upgrade = RemoteSystemdUpgrade::new(&binary_source, temp.path(), &unit)?;
+        let controller_source = assert_cmd::cargo::cargo_bin("harness-systemd");
+        let daemon_source = assert_cmd::cargo::cargo_bin("harness-daemon");
+        let upgrade = RemoteSystemdUpgrade::new(&daemon_source, temp.path(), &unit)?;
+        let controller_path = PathBuf::from(format!("/usr/local/libexec/{unit}-systemd"));
         let binary_path = PathBuf::from(format!("/usr/local/libexec/{unit}"));
         let unit_path = PathBuf::from(format!("/etc/systemd/system/{unit}.service"));
         let env_path = PathBuf::from(format!("/etc/harness/{unit}.env"));
         let ca_path = PathBuf::from(format!("/etc/harness/{unit}-ca.pem"));
         let state_path = PathBuf::from(format!("/var/lib/private/{unit}"));
         let cleanup = SystemdCleanup::new(
-            &binary_source,
+            &controller_path,
             &unit,
             &unit_path,
             &env_path,
@@ -62,7 +66,9 @@ impl RemoteSystemdHost {
             upgrade.transaction_path(),
         )?;
         Ok(Self {
-            binary_source,
+            controller_source,
+            daemon_source,
+            controller_path,
             binary_path,
             upgrade,
             env_path,
@@ -146,7 +152,8 @@ impl RemoteSystemdHost {
             ]),
             "create systemd e2e install directories",
         )?;
-        install_file(&self.binary_source, &self.binary_path, "0755")?;
+        install_file(&self.controller_source, &self.controller_path, "0755")?;
+        install_file(&self.daemon_source, &self.binary_path, "0755")?;
         let ca_source = self.fake_ca_root.with_file_name("installed-ca.pem");
         fs::write(&ca_source, ca_pem)
             .map_err(|error| format!("write systemd e2e CA source: {error}"))?;
@@ -162,10 +169,9 @@ impl RemoteSystemdHost {
     }
 
     pub fn install(&self) -> Result<Value, String> {
-        let mut command = sudo([self.binary_path.as_os_str()]);
+        let mut command = sudo([self.controller_path.as_os_str()]);
         command.args([
-            "remote",
-            "install-systemd",
+            "install",
             "--unit",
             &self.unit,
             "--domain",
@@ -191,20 +197,15 @@ impl RemoteSystemdHost {
     }
 
     pub fn uninstall(&self) -> Result<Value, String> {
-        let mut command = sudo([self.binary_path.as_os_str()]);
-        command.args([
-            "remote",
-            "uninstall-systemd",
-            "--unit",
-            &self.unit,
-            "--json",
-        ]);
+        let mut command = sudo([self.controller_path.as_os_str()]);
+        command.args(["uninstall", "--unit", &self.unit, "--json"]);
         command.arg("--env-file").arg(&self.env_path);
         json_output(command, "uninstall remote systemd unit")
     }
 
     pub fn upgrade(&self, candidate_path: &Path) -> Result<(i32, Value), String> {
         self.upgrade.run(
+            &self.controller_path,
             &self.binary_path,
             &self.unit,
             &self.env_path,
@@ -258,8 +259,8 @@ impl RemoteSystemdHost {
     }
 
     pub fn assert_cli_status(&self) -> Result<(), String> {
-        let mut command = sudo([self.binary_path.as_os_str()]);
-        command.args(["remote", "status", "--unit", &self.unit, "--json"]);
+        let mut command = sudo([self.controller_path.as_os_str()]);
+        command.args(["status", "--unit", &self.unit, "--json"]);
         command.arg("--env-file").arg(&self.env_path);
         let value = json_output(command, "query remote systemd status")?;
         if value["exit_code"].as_i64() == Some(0) {

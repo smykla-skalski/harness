@@ -85,6 +85,7 @@ sleep "${FAKE_CARGO_SLEEP:-0.2}"
 case "$leaf" in
   harness) binary=harness ;;
   daemon) binary=harness-daemon ;;
+  systemd) binary=harness-systemd ;;
   bridge) binary=harness-bridge ;;
   mcp) binary=harness-mcp ;;
   hook) binary=harness-hook ;;
@@ -261,6 +262,8 @@ scenario_build_group_allocates_one_budget() {
     "$(command cat "$events")" || ok=0
   assert_contains "--locked -p harness-daemon --bin harness-daemon --features tokio-console" \
     "$(command cat "$events")" || ok=0
+  assert_contains "--locked -p harness-systemd --bin harness-systemd" \
+    "$(command cat "$events")" || ok=0
   assert_contains "--locked --manifest-path crates/harness-codex-acp/Cargo.toml" \
     "$(command cat "$events")" || ok=0
   assert_not_contains "--workspace --bins" "$(command cat "$events")" || ok=0
@@ -331,7 +334,7 @@ scenario_build_group_cancels_siblings() {
     BASH_ENV=/dev/null \
     HARNESS_CARGO_BIN="$sandbox/fake-bin/cargo" \
     CARGO_TARGET_DIR="$sandbox/target" \
-    CARGO_BUILD_JOBS=8 \
+    CARGO_BUILD_JOBS="${#HARNESS_RELEASE_ALL_BUILD_LEAVES[@]}" \
     CODEX_SESSION_ID="release-failure-test-$$" \
     FAKE_CARGO_EVENTS="$events" \
     FAKE_CARGO_FAIL_LEAF=codex \

@@ -28,6 +28,7 @@ fs-err = "3.3.0"
 futures-util = "0.3.31"
 gix = { version = "0.83.0", features = ["status", "worktree-mutation", "index", "blocking-http-transport-reqwest-rust-tls"] }
 gray_matter = { version = "0.3.2", default-features = false, features = ["yaml"] }
+harness-command = { path = "../harness-command", version = "48.0.0" }
 harness-hook = { path = "../harness-hook", version = "48.0.0" }
 harness-protocol = { path = "../harness-protocol", version = "48.0.0" }
 harness-systemd-protocol = { path = "../harness-systemd-protocol", version = "48.0.0", optional = true }
@@ -82,6 +83,7 @@ core-foundation = "0.10"
 security-framework = "3"
 
 [dev-dependencies]
+assert_cmd = "=2.2.0"
 temp-env = { version = "=0.3.6", features = ["async_closure"] }
 tempfile = "=3.27.0"
 
@@ -89,7 +91,6 @@ tempfile = "=3.27.0"
 default = ["daemon-runtime", "standalone-daemon", "standalone-worker"]
 bridge-runtime = []
 daemon-runtime = ["bridge-runtime", "dep:harness-systemd-protocol"]
-remote-systemd-e2e-faults = []
 standalone-daemon = []
 standalone-worker = []
 tokio-console = ["harness-telemetry/tokio-console"]
@@ -99,4 +100,4 @@ pedantic = { level = "deny", priority = 1 }
 
 [lints.rust]
 unused = { level = "deny", priority = 1 }
-unexpected_cfgs = { level = "deny", priority = 2, check-cfg = ['cfg(feature, values("bridge-runtime", "daemon-runtime", "remote-systemd-e2e-faults", "standalone-daemon", "tokio-console"))'] }
+unexpected_cfgs = { level = "deny", priority = 2, check-cfg = ['cfg(feature, values("bridge-runtime", "daemon-runtime", "standalone-daemon", "tokio-console"))'] }

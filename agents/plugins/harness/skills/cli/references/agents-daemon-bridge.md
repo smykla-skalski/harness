@@ -38,7 +38,8 @@ Sources: `src/setup/wrapper/registrations.rs:4-37`; `src/setup/wrapper/registrat
 | --- | --- | --- |
 | `harness-daemon serve` | Serve the local daemon HTTP API | `--host <HOST>`, `--port <PORT>`, `--refresh-seconds <REFRESH_SECONDS>`, `--observe-seconds <OBSERVE_SECONDS>`, `--sandboxed`, `--codex-ws-url <URL>` |
 | `harness-daemon dev` | Serve an unsandboxed dev daemon for the Harness Monitor app | `--host <HOST>`, `--port <PORT>`, `--app-group-id <APP_GROUP_ID>`, `--codex-ws-url <URL>` |
-| `harness-daemon remote ...` | Serve and administer an internet-reachable daemon | `serve`, `pair`, `clients`, `acme`, `doctor`, and systemd lifecycle subcommands |
+| `harness-daemon remote ...` | Serve and administer an internet-reachable daemon | `serve`, `pair`, `clients`, `acme`, and `doctor` |
+| `harness-systemd ...` | Operate the Linux service lifecycle for the remote daemon | `install`, `upgrade`, `rollback`, `recover`, `uninstall`, and `status` |
 | `harness daemon status` | Show daemon manifest and project/session counts | no command-specific flags |
 | `harness daemon stop` | Stop the local daemon | `--json` |
 | `harness daemon restart` | Restart the local daemon | `--json` |
@@ -49,7 +50,9 @@ Sources: `src/setup/wrapper/registrations.rs:4-37`; `src/setup/wrapper/registrat
 
 `harness-daemon dev` is the unsandboxed wrapper over `harness-daemon serve`; its default app-group ID is `Q498EB36N4.io.harnessmonitor`. The root `harness daemon` surface is control-only; runtime routes (`serve`, `dev`, and `remote`) must invoke `harness-daemon` directly.
 
-Sources: `harness-daemon --help`; `harness-daemon serve --help`; `harness-daemon dev --help`; `harness-daemon remote --help`; `harness daemon --help`; `crates/harness-daemon/src/main.rs`; `src/daemon/transport/commands.rs`.
+The legacy `harness-daemon remote install-systemd|upgrade-systemd|rollback-systemd|recover-systemd|uninstall-systemd|status` routes sibling-exec `harness-systemd` for compatibility. New operator workflows should invoke `harness-systemd` directly.
+
+Sources: `harness-daemon --help`; `harness-daemon serve --help`; `harness-daemon dev --help`; `harness-daemon remote --help`; `harness-systemd --help`; `harness daemon --help`; `crates/harness-daemon/src/main.rs`; `crates/harness-systemd/src/main.rs`; `src/daemon/transport/commands.rs`.
 
 ## Bridge command map
 

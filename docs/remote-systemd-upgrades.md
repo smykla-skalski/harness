@@ -4,18 +4,22 @@ This runbook covers the Linux systemd lifecycle for a production Harness remote 
 
 ## Install and upgrade are different operations
 
-Use `harness-daemon remote install-systemd` for the first installation and for an idempotent check of that installation. Installation creates the hardened unit and its environment file. It is not a binary upgrade command.
+Use `harness-systemd install` for the first installation and for an idempotent check of that installation. Installation creates the hardened unit and its environment file, records the root-owned controller/daemon release pair, and starts `harness-daemon remote serve`. It is not a binary upgrade command.
 
-Use `harness-daemon remote upgrade-systemd` when replacing the binary used by an existing unit. The candidate is the new executable to validate and install; the target is the executable path owned by the installed service. A typical unattended invocation is:
+Use `harness-systemd upgrade` when replacing the daemon binary used by an existing unit. The candidate is the new `harness-daemon` executable to validate and install; the target is the executable path owned by the installed service. A typical unattended invocation is:
 
 ```bash
-sudo /usr/local/bin/harness-daemon remote upgrade-systemd \
-  --candidate-path /path/to/new/harness \
+sudo /usr/local/bin/harness-systemd upgrade \
+  --candidate-path /path/to/new/harness-daemon \
   --binary-path /usr/local/bin/harness-daemon \
   --json
 ```
 
-Always execute the currently installed binary as the coordinator. Never invoke the new candidate with `sudo`; Harness rejects a coordinator whose SHA-256 digest does not match the installed service binary before creating transaction state.
+Always execute the controller path recorded by `harness-systemd install`. Never invoke the new daemon candidate with `sudo`; the controller validates candidate bytes as data and rejects any controller path, controller digest, daemon path, daemon digest, release identity, or lifecycle protocol version that does not match the root-owned pair record before creating transaction state.
+
+After installing a newer trusted `harness-systemd` executable, rerun `harness-systemd install` while the lifecycle is idle to rotate the controller side of the pair record. Rotation preserves the proven unit and daemon binding, requires a strictly newer controller release, and rejects same-release, stale, or writable controller candidates. An armed transaction is never rotated: its immutable copied controller and existing recovery arm remain authoritative until recovery completes.
+
+The compatibility routes `harness-daemon remote install-systemd|upgrade-systemd|rollback-systemd|recover-systemd|uninstall-systemd|status` sibling-exec `harness-systemd` with the original raw arguments. The daemon package does not compile or execute lifecycle implementation code.
 
 Do not overwrite the target by hand and then restart the unit. That bypasses the database snapshot, staged SHA-256 verification, readiness checks, and automatic rollback described below.
 
@@ -29,7 +33,7 @@ The global lock serializes Harness operations, not arbitrary root-level configur
 
 An upgrade is one durable transaction. Before the candidate starts, Harness:
 
-1. proves that the coordinator is the currently installed, known-good binary;
+1. proves that the controller and installed daemon match the root-owned release pair;
 2. copies the candidate into a root-only pending journal and records its SHA-256 digest without executing the candidate as root;
 3. persists a root-only recovery controller and arm record, starts a repeating recovery timer, and disables the daemon's boot enablement;
 4. installs and validates a durable Harness-owned start inhibitor, stops the service, then proves its control group is quiescent;
@@ -59,7 +63,7 @@ Restore reserve files preallocate the transaction's measured block and inode dem
 
 ## Explicit rollback and data loss
 
-Use `harness-daemon remote rollback-systemd --confirm-data-loss` to restore the retained generation. Select the unit and review the transaction recorded by the retained upgrade JSON report before confirming it.
+Use `harness-systemd rollback --confirm-data-loss` to restore the retained generation. Select the unit and review the transaction recorded by the retained upgrade JSON report before confirming it.
 
 An explicit rollback restores the binary and the full state snapshot as a pair. It therefore discards database writes and other state changes made after that snapshot. Harness requires an explicit data-loss confirmation for a committed generation; never work around that guard by swapping only the binary. If the new service has accepted important work, preserve the current state separately and reconcile it at the application level before rolling back.
 
@@ -77,7 +81,7 @@ Retain the JSON report with the deployment record. It is the safest source for t
 
 Lifecycle transactions are journaled and watched by a per-unit systemd timer. The recovery controller tries the same nonblocking operation lock as the live lifecycle command. A busy lock is a normal defer, so the timer cannot roll back an intentional candidate start. If the lifecycle process exits or is killed, the next timer tick restores the complete previous generation. On reboot the daemon remains disabled until recovery finishes.
 
-No operator command is required to resume recovery: the repeating timer invokes the persisted controller automatically, and the timer stays installed and enabled after a transaction completes. Before arming a transaction, Harness proves that the recovery service and timer were loaded from their exact managed fragment paths without drop-ins and that the enabled timer is active. Its recovery service has `ConditionPathExists=` on the durable arm, so it is idle between transactions while remaining available across every crash boundary. Operators may still rerun a lifecycle command after investigating an interruption; it enters the identical recovery state machine before attempting a new operation.
+No operator command is required to resume recovery: the repeating timer invokes the immutable copied controller directly as `recover --store-path ...`, and the timer stays installed and enabled after a transaction completes. Recovery-arm schema v3 binds the copied controller digest; schema v2 is accepted only when resuming an already-armed legacy transaction. Before arming a transaction, Harness proves that the recovery service and timer were loaded from their exact managed fragment paths without drop-ins and that the enabled timer is active. Its recovery service has `ConditionPathExists=` on the durable arm, so it is idle between transactions while remaining available across every crash boundary. Operators may still rerun a lifecycle command after investigating an interruption; it enters the identical recovery state machine before attempting a new operation.
 
 If the durable generation rename committed before interruption, recovery verifies the committed generation and installed digest, restores enablement, and disarms without rolling back. Corrupt or mismatched recovery material fails closed: the daemon remains disabled, the timer remains armed, and evidence is retained. Failed-candidate state is kept below the root-only transaction store; retries reapply its private ownership and mode before recovery continues.
 
@@ -89,4 +93,4 @@ If automatic recovery reports that rollback failed:
 4. correct any external cause such as exhausted capacity, then let the still-enabled recovery timer retry the same armed transaction; and
 5. verify status and remote health before re-enabling deployment automation.
 
-`rollback-systemd` does not accept an arbitrary generation path and will first retry any armed recovery, so it is not an escape hatch for corrupt transaction evidence. Do not start the previous binary against a database already migrated by the candidate, edit the SQLite schema, or copy only `harness.db` out of a generation. If verified managed recovery still cannot restore service, copy the entire backup root before manual investigation and recover only a complete paired binary, unit, environment, and state generation so the original evidence remains intact.
+`harness-systemd rollback` does not accept an arbitrary generation path and will first retry any armed recovery, so it is not an escape hatch for corrupt transaction evidence. Do not start the previous binary against a database already migrated by the candidate, edit the SQLite schema, or copy only `harness.db` out of a generation. If verified managed recovery still cannot restore service, copy the entire backup root before manual investigation and recover only a complete paired binary, unit, environment, and state generation so the original evidence remains intact.

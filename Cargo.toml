@@ -9,6 +9,7 @@ members = [
   "crates/harness-hook",
   "crates/harness-mcp",
   "crates/harness-protocol",
+  "crates/harness-systemd",
   "crates/harness-systemd-protocol",
   "crates/harness-telemetry",
   "testkit",

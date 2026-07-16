@@ -10,7 +10,7 @@ For the internal module map, see [ARCHITECTURE.md](ARCHITECTURE.md).
 mise run install
 ```
 
-Builds the Harness control CLI, dedicated runtime binaries, ACP adapters, and `aff` concurrently under one shared job budget. It validates and signs the complete release set before atomically activating it through `~/.local/bin`. Requires Rust 1.94+.
+Builds the Harness control CLI, dedicated runtime binaries including the standalone `harness-systemd` lifecycle controller, ACP adapters, and `aff` concurrently under one shared job budget. It validates and signs the complete release set before atomically activating it through `~/.local/bin`. Requires Rust 1.94+.
 The install step also reconciles stale Harness-owned binaries found earlier on `PATH`, including stale `~/.cargo/bin/harness` shadows; if a conflicting shadow path cannot be rewritten safely, install fails and prints the path that needs manual cleanup.
 
 ## Fast Local Rust Workflow

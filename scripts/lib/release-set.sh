@@ -7,6 +7,7 @@
 HARNESS_RELEASE_BINARIES=(
   harness
   harness-daemon
+  harness-systemd
   harness-bridge
   harness-mcp
   harness-hook
@@ -17,6 +18,7 @@ HARNESS_RELEASE_BINARIES=(
 HARNESS_RELEASE_BUILD_LEAVES=(
   harness
   daemon
+  systemd
   bridge
   mcp
   hook
