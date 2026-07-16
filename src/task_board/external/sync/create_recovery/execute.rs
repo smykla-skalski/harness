@@ -1,7 +1,7 @@
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
-    ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
-    ExternalProviderScopeAttempt, ExternalProviderScopeIdentity, ExternalSyncClient,
+    ExternalCreateRecoveryClient, ExternalCreateRequest, ExternalProviderScopeAttempt,
+    ExternalProviderScopeIdentity, ExternalSyncClient,
 };
 use crate::task_board::{
     ExternalCreateOutcome, ExternalProvider, ExternalSyncAction, ExternalSyncOperation,
@@ -14,6 +14,7 @@ use super::super::lookup::{OperationDraft, operation};
 use super::super::merge::sync_state_from_task;
 use super::super::{SyncClientError, TaskBoardSyncStore};
 use super::lease::ScopeCreateLease;
+use super::provider_call::{create_started, recover_existing};
 use super::reload_intent;
 
 pub(crate) struct DurableCreateResult {
@@ -44,7 +45,7 @@ async fn recover_scope_intent(
     operations: &mut Vec<ExternalSyncOperation>,
     follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
 ) -> Result<(), SyncClientError> {
-    lease.renew().await.map_err(SyncClientError::Local)?;
+    lease.renew_scope().await.map_err(SyncClientError::Local)?;
     let current = reload_intent(board, listed)
         .await
         .map_err(SyncClientError::Local)?;
@@ -234,69 +235,6 @@ async fn attached_marker_is_linked(
         }))
 }
 
-async fn create_started(
-    board: &dyn TaskBoardSyncStore,
-    capability: &dyn ExternalCreateRecoveryClient,
-    lease: &ScopeCreateLease<'_>,
-    intent: &TaskBoardExternalCreateIntent,
-    operations: &mut Vec<ExternalSyncOperation>,
-    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
-) -> Result<Option<TaskBoardItem>, SyncClientError> {
-    lease.renew().await.map_err(SyncClientError::Local)?;
-    let current = reload_intent(board, intent)
-        .await
-        .map_err(SyncClientError::Local)?;
-    if !matches!(current.state, TaskBoardExternalCreateIntentState::InFlight) {
-        return finish_reloaded_intent(board, &current, operations, follow_ups)
-            .await
-            .map_err(SyncClientError::Local);
-    }
-    lease.begin_provider_call();
-    let task = capability
-        .create_started(&request_from_intent(&current), lease)
-        .await
-        .map_err(|error| lease.classify_provider_call(error).into_sync_client_error())?;
-    persist_exact_task(board, &current, task, operations, follow_ups)
-        .await
-        .map_err(SyncClientError::Local)
-}
-
-async fn recover_existing(
-    board: &dyn TaskBoardSyncStore,
-    capability: &dyn ExternalCreateRecoveryClient,
-    lease: &ScopeCreateLease<'_>,
-    intent: &TaskBoardExternalCreateIntent,
-    operations: &mut Vec<ExternalSyncOperation>,
-    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
-) -> Result<Option<TaskBoardItem>, SyncClientError> {
-    lease.renew().await.map_err(SyncClientError::Local)?;
-    let current = reload_intent(board, intent)
-        .await
-        .map_err(SyncClientError::Local)?;
-    if !matches!(current.state, TaskBoardExternalCreateIntentState::InFlight) {
-        return finish_reloaded_intent(board, &current, operations, follow_ups)
-            .await
-            .map_err(SyncClientError::Local);
-    }
-    lease.begin_provider_call();
-    let probe = capability
-        .recover_existing(&request_from_intent(&current), lease)
-        .await
-        .map_err(|error| lease.classify_provider_call(error).into_sync_client_error())?;
-    let ExternalCreateProbe::Found(task) = probe else {
-        return Err(SyncClientError::Provider(
-            CliErrorKind::workflow_io(format!(
-                "provider create recovery found no task for '{}'",
-                current.item_id
-            ))
-            .into(),
-        ));
-    };
-    persist_exact_task(board, &current, task, operations, follow_ups)
-        .await
-        .map_err(SyncClientError::Local)
-}
-
 async fn recover_remote_intent(
     board: &dyn TaskBoardSyncStore,
     client: &dyn ExternalSyncClient,
@@ -311,7 +249,7 @@ async fn recover_remote_intent(
         .map(|_| ())
 }
 
-async fn finish_reloaded_intent(
+pub(super) async fn finish_reloaded_intent(
     board: &dyn TaskBoardSyncStore,
     intent: &TaskBoardExternalCreateIntent,
     operations: &mut Vec<ExternalSyncOperation>,
@@ -332,7 +270,7 @@ async fn finish_reloaded_intent(
     }
 }
 
-async fn persist_exact_task(
+pub(super) async fn persist_exact_task(
     board: &dyn TaskBoardSyncStore,
     intent: &TaskBoardExternalCreateIntent,
     task: ExternalTask,
@@ -439,7 +377,7 @@ fn create_operation(intent: &TaskBoardExternalCreateIntent) -> ExternalSyncOpera
     })
 }
 
-fn request_from_intent(intent: &TaskBoardExternalCreateIntent) -> ExternalCreateRequest {
+pub(super) fn request_from_intent(intent: &TaskBoardExternalCreateIntent) -> ExternalCreateRequest {
     ExternalCreateRequest::new(
         &intent.item_id,
         &intent.create_key,

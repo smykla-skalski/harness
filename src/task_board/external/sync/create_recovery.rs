@@ -13,6 +13,7 @@ use super::TaskBoardSyncStore;
 
 mod execute;
 mod lease;
+mod provider_call;
 pub(super) use execute::{
     create_item_durably, recover_scope_intents, suppress_known_create_markers,
 };

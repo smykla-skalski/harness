@@ -10,7 +10,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
-    ExternalProviderScopeIdentity,
+    ExternalProviderScopeHealth, ExternalProviderScopeIdentity,
 };
 use crate::task_board::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConflictPolicy, ExternalSyncDirection,
@@ -222,6 +222,93 @@ async fn dry_run_success_and_failure_leave_provider_state_unchanged() {
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
 
+#[tokio::test]
+async fn neutral_release_preserves_failure_count_without_backoff() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("database");
+    let scope_id = "v1:todoist:write:7:scope-a";
+    let initial = start_attempt_for(
+        &db,
+        ExternalProvider::Todoist,
+        scope_id,
+        "2026-07-16T13:00:00Z",
+    )
+    .await;
+    db.complete_task_board_provider_scope_failure(&initial, "2026-07-16T13:00:00Z")
+        .await
+        .expect("seed failure");
+    query(
+        "UPDATE task_board_provider_scope_state
+         SET backoff_until = '2000-01-01T00:00:00Z'
+         WHERE provider = 'todoist' AND scope_id = ?1",
+    )
+    .bind(scope_id)
+    .execute(db.pool())
+    .await
+    .expect("expire backoff");
+    let current = start_attempt_for(
+        &db,
+        ExternalProvider::Todoist,
+        scope_id,
+        "2026-07-16T13:10:01Z",
+    )
+    .await;
+    let revision_before = db
+        .task_board_revision()
+        .await
+        .expect("revision before release");
+
+    db.release_task_board_provider_scope_attempt(&current, "2026-07-16T13:10:02Z")
+        .await
+        .expect("release attempt");
+
+    let state = db
+        .task_board_provider_scope_state(ExternalProvider::Todoist, scope_id)
+        .await
+        .expect("scope state");
+    assert_eq!(state.health, ExternalProviderScopeHealth::Healthy);
+    assert_eq!(state.failure_count, 1);
+    assert_eq!(state.backoff_until, None);
+    assert!(
+        db.task_board_revision()
+            .await
+            .expect("revision after release")
+            > revision_before
+    );
+}
+
+#[tokio::test]
+async fn neutral_release_removes_a_new_attempt_row() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("database");
+    let scope_id = "v1:todoist:write:7:scope-b";
+    let attempt = start_attempt_for(
+        &db,
+        ExternalProvider::Todoist,
+        scope_id,
+        "2026-07-16T14:00:00Z",
+    )
+    .await;
+
+    db.release_task_board_provider_scope_attempt(&attempt, "2026-07-16T14:00:01Z")
+        .await
+        .expect("release attempt");
+
+    let rows = query_as::<_, (i64,)>(
+        "SELECT COUNT(*) FROM task_board_provider_scope_state
+         WHERE provider = 'todoist' AND scope_id = ?1",
+    )
+    .bind(scope_id)
+    .fetch_one(db.pool())
+    .await
+    .expect("count scope rows");
+    assert_eq!(rows.0, 0);
+}
+
 async fn start_attempt(
     db: &AsyncDaemonDb,
     scope_id: &str,
@@ -229,6 +316,22 @@ async fn start_attempt(
 ) -> ExternalProviderScopeAttempt {
     match db
         .begin_task_board_provider_scope_attempt(ExternalProvider::GitHub, scope_id, now)
+        .await
+        .expect("begin provider attempt")
+    {
+        ExternalProviderScopeAttemptDecision::Started(attempt) => attempt,
+        other => panic!("expected started attempt, got {other:?}"),
+    }
+}
+
+async fn start_attempt_for(
+    db: &AsyncDaemonDb,
+    provider: ExternalProvider,
+    scope_id: &str,
+    now: &str,
+) -> ExternalProviderScopeAttempt {
+    match db
+        .begin_task_board_provider_scope_attempt(provider, scope_id, now)
         .await
         .expect("begin provider attempt")
     {

@@ -27,6 +27,16 @@ impl TaskBoardSyncItemSnapshot {
     }
 }
 
+pub(crate) enum TaskBoardSyncCoordinatorFenceDecision {
+    Current,
+    Cancelled(CliError),
+}
+
+#[async_trait]
+pub(crate) trait TaskBoardSyncCoordinatorFence: Send + Sync {
+    async fn check(&self) -> Result<TaskBoardSyncCoordinatorFenceDecision, CliError>;
+}
+
 #[async_trait]
 pub(crate) trait TaskBoardExternalCreateStore: Send + Sync {
     async fn begin_external_create_intent(
@@ -118,6 +128,24 @@ pub(crate) trait TaskBoardSyncStore: TaskBoardExternalCreateStore {
         attempt: &ExternalProviderScopeAttempt,
         now: &str,
     ) -> Result<(), CliError>;
+
+    async fn check_coordinator_fence(
+        &self,
+    ) -> Result<TaskBoardSyncCoordinatorFenceDecision, CliError> {
+        Ok(TaskBoardSyncCoordinatorFenceDecision::Current)
+    }
+
+    fn coordinator_cancelled(&self) -> bool {
+        false
+    }
+
+    async fn release_provider_scope_attempt(
+        &self,
+        _attempt: &ExternalProviderScopeAttempt,
+        _released_at: &str,
+    ) -> Result<(), CliError> {
+        Err(CliErrorKind::workflow_io("neutral provider-scope release is unavailable").into())
+    }
 
     async fn complete_provider_scope_success(
         &self,

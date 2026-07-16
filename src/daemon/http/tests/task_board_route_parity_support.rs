@@ -182,6 +182,14 @@ pub(super) async fn assert_run_once_routes_match(
     assert_run_once_parity(http, ws);
 }
 
+pub(super) async fn assert_no_durable_runs(state: &crate::daemon::http::DaemonHttpState) {
+    let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM task_board_orchestrator_runs")
+        .fetch_one(state.async_db.get().expect("test async db").pool())
+        .await
+        .expect("count durable runs");
+    assert_eq!(count, 0, "flag-off routes must stay on legacy state");
+}
+
 fn assert_run_once_parity(http: Value, ws: Value) {
     assert_eq!(http["dry_run"], ws["dry_run"]);
     assert_eq!(http["sync"]["operations"], ws["sync"]["operations"]);

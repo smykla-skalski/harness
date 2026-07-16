@@ -100,7 +100,7 @@ impl SyncExecutionMetrics {
         self.operations.iter().any(|operation| operation.applied)
     }
 
-    pub(super) const fn failed_scope_count(&self) -> usize {
+    pub(in crate::daemon::service::task_board_db) const fn failed_scope_count(&self) -> usize {
         self.failed_scope_count
     }
 

@@ -86,6 +86,39 @@ async fn capability_lease_io_failure_remains_a_terminal_local_error() {
 }
 
 #[tokio::test]
+async fn coordinator_cancellation_releases_scope_without_failure_backoff() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut item = unlinked_item("task-coordinator-cancel");
+    item.project_id = Some("provider-project".into());
+    let store = DurableCreateStore::coordinator_cancelled(item);
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(DurableCreateClient::new(
+        ExternalProvider::Todoist,
+        "provider-project",
+        Arc::clone(&calls),
+    ))];
+
+    let batch =
+        sync_external_tasks_scoped(&store, push_options(ExternalProvider::Todoist), &clients)
+            .await
+            .expect("coordinator cancellation retains scope evidence");
+
+    assert!(batch.terminal_error.is_some());
+    assert!(batch.first_provider_failure.is_none());
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert_eq!(store.failure_completions.load(Ordering::SeqCst), 0);
+    assert_eq!(store.neutral_releases.load(Ordering::SeqCst), 1);
+    assert_eq!(store.coordinator_checks.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        *store.fence_order.lock().expect("fence order"),
+        vec!["provider", "provider", "coordinator"]
+    );
+    assert!(matches!(
+        store.intent().state,
+        TaskBoardExternalCreateIntentState::InFlight
+    ));
+}
+
+#[tokio::test]
 async fn create_then_close_uses_the_finalized_current_item_status() {
     let calls = Arc::new(AtomicUsize::new(0));
     let mut item = unlinked_item("task-finalized-done");

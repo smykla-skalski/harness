@@ -3,11 +3,53 @@ use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardOpenRouterTokenSyncRequest, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardTodoistTokenSyncRequest, WsRequest,
-    WsResponse,
+    WsResponse, ws_methods,
 };
 
 use super::super::mutations::dispatch_query_result;
 use super::{invalid_params, parse_control_plane_params, parse_params};
+
+pub(super) async fn dispatch_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::TASK_BOARD_ORCHESTRATOR_STATUS => {
+            Some(dispatch_task_board_orchestrator_status(request, state).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_START => {
+            Some(dispatch_task_board_orchestrator_start(request, state).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_STOP => {
+            Some(dispatch_task_board_orchestrator_stop(request, state).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_ONCE => {
+            Some(Box::pin(dispatch_task_board_orchestrator_run_once(request, state)).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_GET => {
+            Some(dispatch_task_board_orchestrator_settings_get(request, state).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_UPDATE => {
+            Some(dispatch_task_board_orchestrator_settings_update(request, state).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_GET => {
+            Some(dispatch_task_board_orchestrator_runtime_config_get(request, state).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG_UPDATE => {
+            Some(dispatch_task_board_orchestrator_runtime_config_update(request, state).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS_SYNC => {
+            Some(dispatch_task_board_orchestrator_github_tokens_sync(request, state).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN_SYNC => {
+            Some(dispatch_task_board_orchestrator_todoist_token_sync(request, state).await)
+        }
+        ws_methods::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC => {
+            Some(dispatch_task_board_orchestrator_openrouter_token_sync(request, state).await)
+        }
+        _ => None,
+    }
+}
 
 pub(super) async fn dispatch_task_board_orchestrator_status(
     request: &WsRequest,
@@ -61,7 +103,7 @@ pub(super) async fn dispatch_task_board_orchestrator_run_once(
     else {
         return invalid_params(request);
     };
-    let result = task_board_route_executor::run_once(state, body).await;
+    let result = Box::pin(task_board_route_executor::run_once(state, body)).await;
     super::record_task_board_audit_result(
         state,
         "task_board.orchestrator_run_once",

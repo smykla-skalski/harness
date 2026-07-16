@@ -85,6 +85,7 @@ impl TaskBoardSyncAuditTrigger {
     }
 }
 
+#[cfg(test)]
 pub(super) async fn record_request_result(
     db: &AsyncDaemonDb,
     request: &TaskBoardSyncRequest,
@@ -92,9 +93,24 @@ pub(super) async fn record_request_result(
     result: &Result<TaskBoardSyncResponse, CliError>,
     metrics: &SyncExecutionMetrics,
 ) -> Result<(), CliError> {
+    record_request_result_with_correlation(db, request, trigger, None, result, metrics).await
+}
+
+pub(super) async fn record_request_result_with_correlation(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardSyncRequest,
+    trigger: TaskBoardSyncAuditTrigger,
+    correlation_id: Option<&str>,
+    result: &Result<TaskBoardSyncResponse, CliError>,
+    metrics: &SyncExecutionMetrics,
+) -> Result<(), CliError> {
     let _audit_lane = acquire_audit_lane(db, trigger).await;
     let observation = AuditObservation::for_request(result.as_ref().err(), metrics);
-    let Some(pending) = plan_audit(db, trigger, observation) else {
+    let pending = correlation_id.map_or_else(
+        || plan_audit(db, trigger, observation),
+        |_| Some(PendingAudit::untracked()),
+    );
+    let Some(pending) = pending else {
         return Ok(());
     };
     let mut payload = request_payload(request, trigger);
@@ -104,7 +120,7 @@ pub(super) async fn record_request_result(
         add_summary_counts(&mut payload, summary.total, &summary.operations);
     }
     let classification = SyncAuditClassification::for_request(result, metrics);
-    persist_sync_audit_result(db, trigger, payload, classification, result).await?;
+    persist_sync_audit_result(db, trigger, correlation_id, payload, classification, result).await?;
     pending.commit();
     Ok(())
 }
@@ -172,7 +188,7 @@ async fn persist_reviews_audit(
 ) {
     let classification = SyncAuditClassification::for_result(result);
     if let Err(error) =
-        persist_sync_audit_result(db, trigger, payload, classification, result).await
+        persist_sync_audit_result(db, trigger, None, payload, classification, result).await
     {
         log_reviews_audit_failure(trigger, &error);
         return;
@@ -229,3 +245,7 @@ mod tests;
 #[cfg(test)]
 #[path = "sync_audit_acceptance_tests.rs"]
 mod acceptance_tests;
+
+#[cfg(test)]
+#[path = "sync_audit_correlation_tests.rs"]
+mod correlation_tests;

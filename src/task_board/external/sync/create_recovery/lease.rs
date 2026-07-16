@@ -3,7 +3,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use async_trait::async_trait;
 
 use crate::errors::CliError;
-use crate::task_board::external::{ExternalCreateLease, ExternalProviderScopeAttempt};
+use crate::task_board::external::{
+    ExternalCreateLease, ExternalProviderScopeAttempt, TaskBoardSyncCoordinatorFenceDecision,
+};
 use crate::workspace::utc_now;
 
 use super::super::{SyncClientError, TaskBoardSyncStore};
@@ -42,6 +44,20 @@ impl<'a> ScopeCreateLease<'a> {
             RecoveryCallError::Provider(error)
         }
     }
+
+    pub(super) async fn renew_scope(&self) -> Result<(), CliError> {
+        self.board
+            .renew_provider_scope_attempt(self.attempt, &utc_now())
+            .await
+    }
+
+    pub(super) async fn renew_before_provider_call(&self) -> Result<(), CliError> {
+        self.renew_scope().await?;
+        match self.board.check_coordinator_fence().await? {
+            TaskBoardSyncCoordinatorFenceDecision::Current => Ok(()),
+            TaskBoardSyncCoordinatorFenceDecision::Cancelled(error) => Err(error),
+        }
+    }
 }
 
 impl RecoveryCallError {
@@ -56,10 +72,7 @@ impl RecoveryCallError {
 #[async_trait]
 impl ExternalCreateLease for ScopeCreateLease<'_> {
     async fn renew(&self) -> Result<(), CliError> {
-        let result = self
-            .board
-            .renew_provider_scope_attempt(self.attempt, &utc_now())
-            .await;
+        let result = self.renew_before_provider_call().await;
         if result.is_err() {
             self.local_failure.store(true, Ordering::SeqCst);
         }

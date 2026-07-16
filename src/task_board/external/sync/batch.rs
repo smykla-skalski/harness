@@ -282,6 +282,10 @@ async fn record_terminal_local_failure(
     error: CliError,
     batch: &mut BatchAccumulator,
 ) {
+    if board.coordinator_cancelled() {
+        record_coordinator_cancellation(board, attempt, provider, scope_id, error, batch).await;
+        return;
+    }
     let terminal_error = if let Some(attempt) = attempt {
         match board
             .complete_provider_scope_failure(attempt, &utc_now())
@@ -289,6 +293,33 @@ async fn record_terminal_local_failure(
         {
             Ok(_) => error,
             Err(finalization_error) => combined_local_failure(error, &finalization_error),
+        }
+    } else {
+        error
+    };
+    batch.scope_outcomes.push(ExternalSyncScopeOutcome::failed(
+        provider,
+        scope_id,
+        &terminal_error,
+    ));
+    batch.terminal_error = Some(terminal_error);
+}
+
+async fn record_coordinator_cancellation(
+    board: &dyn TaskBoardSyncStore,
+    attempt: Option<&ExternalProviderScopeAttempt>,
+    provider: ExternalProvider,
+    scope_id: String,
+    error: CliError,
+    batch: &mut BatchAccumulator,
+) {
+    let terminal_error = if let Some(attempt) = attempt {
+        match board
+            .release_provider_scope_attempt(attempt, &utc_now())
+            .await
+        {
+            Ok(()) => error,
+            Err(release_error) => combined_neutral_release_failure(error, &release_error),
         }
     } else {
         error
@@ -311,6 +342,21 @@ fn combined_local_failure(local_error: CliError, finalization_error: &CliError) 
         None => finalization_details,
     };
     local_error.with_details(details)
+}
+
+fn combined_neutral_release_failure(
+    cancellation_error: CliError,
+    release_error: &CliError,
+) -> CliError {
+    let release_details = format!(
+        "neutral provider scope release also failed with {}",
+        error_with_details(release_error)
+    );
+    let details = match cancellation_error.details() {
+        Some(details) => format!("{details}; {release_details}"),
+        None => release_details,
+    };
+    cancellation_error.with_details(details)
 }
 
 fn error_with_details(error: &CliError) -> String {

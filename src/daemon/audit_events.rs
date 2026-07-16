@@ -117,7 +117,7 @@ async fn persist_audit_event(async_db: &AsyncDaemonDb, event: &HarnessMonitorAud
     clippy::cognitive_complexity,
     reason = "audit push broadcasting has explicit early returns for each failure mode"
 )]
-fn broadcast_audit_event(event: &HarnessMonitorAuditEvent) {
+pub(crate) fn broadcast_audit_event(event: &HarnessMonitorAuditEvent) {
     let Some(sender) = observe_sender() else {
         return;
     };

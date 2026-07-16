@@ -3,8 +3,9 @@ use tempfile::tempdir;
 
 use super::*;
 use crate::task_board::{
-    DispatchAppliedTask, TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, TaskBoardItem,
-    TaskBoardStatus, TaskBoardWorkflowStatus, build_dispatch_plan,
+    DispatchAppliedTask, ExternalProvider, ExternalSyncAction, ExternalSyncOperation,
+    TaskBoardEvaluationRecord, TaskBoardEvaluationSummary, TaskBoardItem, TaskBoardStatus,
+    TaskBoardWorkflowStatus, build_dispatch_plan,
 };
 
 #[test]
@@ -190,6 +191,32 @@ fn complete_run_records_evaluation_and_trace_ids() {
         last_run.policy_trace_ids,
         vec!["trace-eval-a".to_string(), "trace-eval-b".to_string()]
     );
+    assert_eq!(status.last_run_applied_count(), 1);
+}
+
+#[test]
+fn applied_count_includes_provider_mutations() {
+    let temp = tempdir().expect("tempdir");
+    let orchestrator = TaskBoardOrchestrator::new(temp.path().join("board"));
+    let mut prepared = orchestrator
+        .prepare_run(&TaskBoardOrchestratorRunOnceRequest::default())
+        .expect("prepare run");
+    prepared.sync.operations.push(ExternalSyncOperation {
+        provider: ExternalProvider::GitHub,
+        action: ExternalSyncAction::Pull,
+        board_item_id: Some("task-neutral".into()),
+        external_id: Some("item-17".into()),
+        url: None,
+        dry_run: false,
+        applied: true,
+        changed_fields: Vec::new(),
+        unsupported_fields: Vec::new(),
+    });
+
+    let status = orchestrator
+        .complete_run(prepared, DispatchExecutionSummary::dry_run(Vec::new()))
+        .expect("complete run");
+
     assert_eq!(status.last_run_applied_count(), 1);
 }
 

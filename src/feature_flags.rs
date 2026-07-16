@@ -12,6 +12,8 @@
 //! - `HARNESS_FEATURE_REVIEWS_BACKGROUND_AUTO=1` enables background Reviews
 //!   policy runs. It is off by default because it can approve or merge GitHub
 //!   pull requests without a same-moment user confirmation.
+//! - `HARNESS_FEATURE_TASK_BOARD_AUTOMATION_V2=1` enables the durable Task Board
+//!   automation engine while it completes staged rollout validation.
 //! - `harness-daemon serve --disable-acp` / `--enable-acp` applies the same
 //!   gate as a process-scoped override without mutating the caller shell env.
 //!
@@ -36,6 +38,8 @@ pub const SUITE_HOOKS_ENV: &str = "HARNESS_FEATURE_SUITE_HOOKS";
 pub const ACP_ENV: &str = "HARNESS_FEATURE_ACP";
 /// Env var that enables background Reviews policy runs.
 pub const REVIEWS_BACKGROUND_AUTO_ENV: &str = "HARNESS_FEATURE_REVIEWS_BACKGROUND_AUTO";
+/// Env var that enables the durable Task Board automation engine.
+pub const TASK_BOARD_AUTOMATION_V2_ENV: &str = "HARNESS_FEATURE_TASK_BOARD_AUTOMATION_V2";
 
 static ACP_RUNTIME_OVERRIDE: Mutex<Option<bool>> = Mutex::new(None);
 
@@ -52,6 +56,12 @@ pub fn acp_enabled_from_env() -> bool {
 #[must_use]
 pub fn reviews_background_auto_enabled_from_env() -> bool {
     env_truthy(REVIEWS_BACKGROUND_AUTO_ENV)
+}
+
+/// Whether the durable Task Board automation engine may admit work.
+#[must_use]
+pub fn task_board_automation_v2_enabled_from_env() -> bool {
+    env_truthy(TASK_BOARD_AUTOMATION_V2_ENV)
 }
 
 /// Apply a process-scoped ACP enablement override for the lifetime of the guard.
@@ -151,6 +161,7 @@ mod tests {
                 (SUITE_HOOKS_ENV, None::<&str>),
                 (ACP_ENV, None::<&str>),
                 (REVIEWS_BACKGROUND_AUTO_ENV, None::<&str>),
+                (TASK_BOARD_AUTOMATION_V2_ENV, None::<&str>),
             ],
             body,
         )
@@ -163,6 +174,7 @@ mod tests {
             assert!(!flags.suite_hooks);
             assert!(acp_enabled_from_env());
             assert!(!reviews_background_auto_enabled_from_env());
+            assert!(!task_board_automation_v2_enabled_from_env());
         });
     }
 
@@ -228,6 +240,16 @@ mod tests {
         });
         temp_env::with_var(REVIEWS_BACKGROUND_AUTO_ENV, Some("false"), || {
             assert!(!reviews_background_auto_enabled_from_env());
+        });
+    }
+
+    #[test]
+    fn task_board_automation_v2_flag_uses_same_truthy_env_convention() {
+        temp_env::with_var(TASK_BOARD_AUTOMATION_V2_ENV, Some("1"), || {
+            assert!(task_board_automation_v2_enabled_from_env());
+        });
+        temp_env::with_var(TASK_BOARD_AUTOMATION_V2_ENV, Some("false"), || {
+            assert!(!task_board_automation_v2_enabled_from_env());
         });
     }
 

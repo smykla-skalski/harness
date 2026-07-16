@@ -6,6 +6,9 @@ use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 
 use super::task_board_route_parity_support::*;
+use super::task_board_support::{
+    assert_task_board_capabilities_match, without_durable_task_board_automation,
+};
 
 #[test]
 fn task_board_http_and_ws_workflow_routes_match() {
@@ -161,7 +164,9 @@ fn task_board_http_and_ws_orchestrator_routes_match() {
     let sandbox = tempdir().expect("tempdir");
     harness_testkit::with_isolated_harness_env(sandbox.path(), || {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
-        runtime.block_on(run_task_board_orchestrator_parity());
+        without_durable_task_board_automation(|| {
+            runtime.block_on(run_task_board_orchestrator_parity());
+        });
     });
 }
 
@@ -170,24 +175,7 @@ async fn run_task_board_orchestrator_parity() {
     let (base_url, server) = serve_http(state.clone()).await;
     let client = reqwest::Client::new();
 
-    let capabilities = get_json(&client, &base_url, http_paths::TASK_BOARD_CAPABILITIES).await;
-    assert_eq!(capabilities["storage"], "database");
-    assert!(capabilities["revision"].as_i64().is_some());
-    assert!(
-        capabilities["instance_id"]
-            .as_str()
-            .is_some_and(|value| value.starts_with("task-board-"))
-    );
-    assert_eq!(
-        capabilities,
-        ws_result(
-            &base_url,
-            "req-task-board-capabilities",
-            ws_methods::TASK_BOARD_CAPABILITIES,
-            json!({}),
-        )
-        .await
-    );
+    assert_task_board_capabilities_match(&client, &base_url).await;
 
     let http_status = get_json(
         &client,
@@ -213,6 +201,7 @@ async fn run_task_board_orchestrator_parity() {
     )
     .await;
     assert_run_once_routes_match(&client, &base_url, &state).await;
+    assert_no_durable_runs(&state).await;
     assert_settings_routes_match(&client, &base_url).await;
     assert_runtime_config_routes_match(&client, &base_url).await;
     assert_http_ws_put_match(

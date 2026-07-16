@@ -24,12 +24,18 @@ use crate::workspace::utc_now;
 
 use super::task_board::load_live_spawn_grants;
 
+pub(crate) use crate::task_board::external::{
+    TaskBoardSyncCoordinatorFence, TaskBoardSyncCoordinatorFenceDecision,
+};
+
 #[cfg(test)]
 mod external_ref_tests;
+mod provider_sync_context_store;
 mod provider_sync_execution;
 mod provider_sync_store;
 mod reviews_sync;
 mod sync_audit;
+mod sync_run_context;
 
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
 use reviews_sync::shared_review_request_clients;
@@ -38,6 +44,7 @@ pub(crate) use sync_audit::{
     ReviewsProjectionAuditSummary, record_reviews_projection_result,
     record_targeted_reviews_projection_result,
 };
+pub(crate) use sync_run_context::TaskBoardSyncRunContext;
 
 pub(crate) async fn create_task_board_item_db(
     db: &AsyncDaemonDb,
@@ -222,34 +229,46 @@ pub(crate) async fn sync_task_board_db(
     db: &AsyncDaemonDb,
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
-    sync_task_board_db_with_trigger(
-        db,
-        request,
-        sync_audit::TaskBoardSyncAuditTrigger::Requested,
-    )
-    .await
+    sync_task_board_db_with_context(db, request, &TaskBoardSyncRunContext::requested()).await
 }
 
 pub(crate) async fn sync_task_board_for_orchestrator_db(
     db: &AsyncDaemonDb,
     request: &TaskBoardSyncRequest,
 ) -> Result<TaskBoardSyncResponse, CliError> {
-    sync_task_board_db_with_trigger(
+    sync_task_board_for_orchestrator_with_context_db(
         db,
         request,
-        sync_audit::TaskBoardSyncAuditTrigger::Orchestrator,
+        &TaskBoardSyncRunContext::orchestrator(None, None, None),
     )
     .await
 }
 
-async fn sync_task_board_db_with_trigger(
+pub(crate) async fn sync_task_board_for_orchestrator_with_context_db(
     db: &AsyncDaemonDb,
     request: &TaskBoardSyncRequest,
-    trigger: sync_audit::TaskBoardSyncAuditTrigger,
+    context: &TaskBoardSyncRunContext,
+) -> Result<TaskBoardSyncResponse, CliError> {
+    sync_task_board_db_with_context(db, request, context).await
+}
+
+async fn sync_task_board_db_with_context(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardSyncRequest,
+    context: &TaskBoardSyncRunContext,
 ) -> Result<TaskBoardSyncResponse, CliError> {
     let mut metrics = SyncExecutionMetrics::default();
-    let result = provider_sync_execution::execute(db, request, &mut metrics).await;
-    let audit = sync_audit::record_request_result(db, request, trigger, &result, &metrics).await;
+    let result = provider_sync_execution::execute(db, request, context, &mut metrics).await;
+    context.observe_sync_metrics(&metrics);
+    let audit = sync_audit::record_request_result_with_correlation(
+        db,
+        request,
+        context.trigger(),
+        context.correlation_id(),
+        &result,
+        &metrics,
+    )
+    .await;
     combine_sync_and_audit_results(result, audit)
 }
 

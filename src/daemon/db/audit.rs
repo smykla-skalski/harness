@@ -1,5 +1,5 @@
 use serde_json::Value;
-use sqlx::{QueryBuilder, Sqlite, query};
+use sqlx::{QueryBuilder, Sqlite, Transaction, query};
 
 use crate::daemon::protocol::{
     HarnessMonitorAuditEvent, HarnessMonitorAuditEventsRequest, HarnessMonitorAuditEventsResponse,
@@ -85,6 +85,36 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("query audit events: {error}")))?;
         audit_response(rows, limit)
     }
+}
+
+pub(in crate::daemon::db) async fn upsert_audit_event_in_tx(
+    transaction: &mut Transaction<'_, Sqlite>,
+    event: &HarnessMonitorAuditEvent,
+) -> Result<(), CliError> {
+    let payload_json = event.payload_json.as_ref().map(Value::to_string);
+    let related_urls_json = serde_json::to_string(&event.related_urls)
+        .map_err(|error| db_error(format!("serialize audit related urls: {error}")))?;
+    query(UPSERT_AUDIT_EVENT_SQL)
+        .bind(&event.id)
+        .bind(&event.recorded_at)
+        .bind(&event.source)
+        .bind(&event.category)
+        .bind(&event.kind)
+        .bind(&event.severity)
+        .bind(&event.outcome)
+        .bind(&event.title)
+        .bind(&event.summary)
+        .bind(event.subject.as_deref())
+        .bind(event.actor.as_deref())
+        .bind(event.correlation_id.as_deref())
+        .bind(event.action_key.as_deref())
+        .bind(payload_json.as_deref())
+        .bind(event.legacy_message.as_deref())
+        .bind(&related_urls_json)
+        .execute(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("upsert audit event {}: {error}", event.id)))?;
+    Ok(())
 }
 
 #[derive(Debug, sqlx::FromRow)]

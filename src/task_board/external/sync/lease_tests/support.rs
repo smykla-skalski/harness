@@ -1,12 +1,13 @@
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
-    TaskBoardExternalCreateStore, TaskBoardSyncItemSnapshot, TaskBoardSyncStore,
+    TaskBoardExternalCreateStore, TaskBoardSyncCoordinatorFenceDecision, TaskBoardSyncItemSnapshot,
+    TaskBoardSyncStore,
 };
 use crate::task_board::store::{TaskBoardItemPatch, apply_patch};
 use crate::task_board::{
@@ -25,8 +26,12 @@ pub(super) struct DurableCreateStore {
     finalize_error: Option<&'static str>,
     completion_error: Option<&'static str>,
     conflict_error: Option<&'static str>,
+    coordinator_cancel_error: Option<&'static str>,
     status_on_finalize: Option<TaskBoardStatus>,
+    coordinator_cancelled: AtomicBool,
     pub(super) failure_completions: AtomicUsize,
+    pub(super) neutral_releases: AtomicUsize,
+    pub(super) coordinator_checks: AtomicUsize,
     pub(super) record_calls: AtomicUsize,
     pub(super) finalize_calls: AtomicUsize,
     pub(super) supersede_calls: AtomicUsize,
@@ -35,6 +40,7 @@ pub(super) struct DurableCreateStore {
     renew_calls: AtomicUsize,
     pub(super) resolved_fields: Mutex<Vec<ExternalSyncField>>,
     pub(super) success_base_revision: Mutex<Option<Option<String>>>,
+    pub(super) fence_order: Mutex<Vec<&'static str>>,
 }
 
 impl DurableCreateStore {
@@ -79,6 +85,12 @@ impl DurableCreateStore {
         Self::new(item, None, Some("local CAS failed"), None, None, None)
     }
 
+    pub(super) fn coordinator_cancelled(item: TaskBoardItem) -> Self {
+        let mut store = Self::new(item, None, None, None, None, None);
+        store.coordinator_cancel_error = Some("coordinator run was cancelled");
+        store
+    }
+
     pub(super) fn new(
         item: TaskBoardItem,
         renew_error: Option<(&'static str, bool, usize)>,
@@ -94,8 +106,12 @@ impl DurableCreateStore {
             finalize_error,
             completion_error,
             conflict_error,
+            coordinator_cancel_error: None,
             status_on_finalize,
+            coordinator_cancelled: AtomicBool::new(false),
             failure_completions: AtomicUsize::new(0),
+            neutral_releases: AtomicUsize::new(0),
+            coordinator_checks: AtomicUsize::new(0),
             record_calls: AtomicUsize::new(0),
             finalize_calls: AtomicUsize::new(0),
             supersede_calls: AtomicUsize::new(0),
@@ -104,6 +120,7 @@ impl DurableCreateStore {
             renew_calls: AtomicUsize::new(0),
             resolved_fields: Mutex::new(Vec::new()),
             success_base_revision: Mutex::new(None),
+            fence_order: Mutex::new(Vec::new()),
         }
     }
 
@@ -383,6 +400,10 @@ impl TaskBoardSyncStore for DurableCreateStore {
         _attempt: &ExternalProviderScopeAttempt,
         _now: &str,
     ) -> Result<(), CliError> {
+        self.fence_order
+            .lock()
+            .expect("fence order")
+            .push("provider");
         let call = self.renew_calls.fetch_add(1, Ordering::SeqCst);
         match self.renew_error {
             Some((message, true, fail_at)) if call == fail_at => {
@@ -393,6 +414,38 @@ impl TaskBoardSyncStore for DurableCreateStore {
             }
             Some(_) | None => Ok(()),
         }
+    }
+
+    async fn check_coordinator_fence(
+        &self,
+    ) -> Result<TaskBoardSyncCoordinatorFenceDecision, CliError> {
+        self.coordinator_checks.fetch_add(1, Ordering::SeqCst);
+        self.fence_order
+            .lock()
+            .expect("fence order")
+            .push("coordinator");
+        self.coordinator_cancel_error.map_or_else(
+            || Ok(TaskBoardSyncCoordinatorFenceDecision::Current),
+            |message| {
+                self.coordinator_cancelled.store(true, Ordering::SeqCst);
+                Ok(TaskBoardSyncCoordinatorFenceDecision::Cancelled(
+                    CliErrorKind::concurrent_modification(message).into(),
+                ))
+            },
+        )
+    }
+
+    fn coordinator_cancelled(&self) -> bool {
+        self.coordinator_cancelled.load(Ordering::SeqCst)
+    }
+
+    async fn release_provider_scope_attempt(
+        &self,
+        _attempt: &ExternalProviderScopeAttempt,
+        _released_at: &str,
+    ) -> Result<(), CliError> {
+        self.neutral_releases.fetch_add(1, Ordering::SeqCst);
+        Ok(())
     }
 
     async fn complete_provider_scope_success(
