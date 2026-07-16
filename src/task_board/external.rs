@@ -10,6 +10,7 @@ use crate::errors::{CliError, CliErrorKind};
 use super::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
 mod capabilities;
+mod create_recovery;
 mod github;
 mod scopes;
 mod sync;
@@ -20,6 +21,12 @@ pub use capabilities::{
     ExternalProviderCapabilities, ExternalSyncConflictPolicy, ExternalSyncField,
     ExternalTaskUpdate, ExternalUpdateOutcome,
 };
+pub(crate) use create_recovery::ExternalCreateRecoveryClient;
+#[allow(
+    unused_imports,
+    reason = "shared contract is consumed by follow-up provider recovery slices"
+)]
+pub(crate) use create_recovery::{ExternalCreateLease, ExternalCreateProbe, ExternalCreateRequest};
 pub use github::{GitHubInboxSyncClient, GitHubSyncClient};
 pub(crate) use github::{
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
@@ -340,6 +347,19 @@ fn normalize_string_list(values: &[String]) -> Vec<String> {
 pub trait ExternalSyncClient: Send + Sync {
     #[must_use]
     fn provider(&self) -> ExternalProvider;
+
+    /// Return the crash-safe provider-create capability when implemented.
+    ///
+    /// Absence is fail-closed by the recovery engine; it never authorizes a
+    /// create or treats an existing durable attempt as recovered.
+    #[must_use]
+    #[allow(
+        private_interfaces,
+        reason = "provider-create recovery is intentionally crate-private"
+    )]
+    fn external_create_recovery(&self) -> Option<&dyn ExternalCreateRecoveryClient> {
+        None
+    }
 
     #[must_use]
     fn scope_id(&self) -> String {
