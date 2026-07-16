@@ -199,66 +199,6 @@ pub(super) fn setup_session_with_worker_logs(
     }
 }
 
-#[derive(Clone, Copy)]
-pub(super) enum IdleSignalScriptBehavior {
-    AckOnWake,
-    IgnoreWake,
-}
-
-pub(super) fn write_idle_signal_script(
-    project: &Path,
-    signal_dir: &Path,
-    runtime_session_id: &str,
-    orchestration_session_id: &str,
-    behavior: IdleSignalScriptBehavior,
-) -> std::path::PathBuf {
-    let script_path = project.join(match behavior {
-        IdleSignalScriptBehavior::AckOnWake => "idle-signal-ack.sh",
-        IdleSignalScriptBehavior::IgnoreWake => "idle-signal-ignore.sh",
-    });
-    let wake_behavior = match behavior {
-        IdleSignalScriptBehavior::AckOnWake => format!(
-            r#"attempt=0
-while [ "$attempt" -lt 100 ]; do
-  for signal_file in "{signal_dir}/pending"/*.json; do
-if [ -e "$signal_file" ]; then
-  signal_id=$(basename "$signal_file" .json)
-  ack_dir="{signal_dir}/acknowledged"
-  mkdir -p "$ack_dir"
-  cat > "$ack_dir/$signal_id.ack.json" <<EOF
-{{"signal_id":"$signal_id","acknowledged_at":"2026-04-13T00:00:00Z","result":"accepted","agent":"{runtime_session_id}","session_id":"{orchestration_session_id}"}}
-EOF
-  mv "$signal_file" "$ack_dir/$signal_id.json"
-  exit 0
-fi
-  done
-  attempt=$((attempt + 1))
-  sleep 0.05
-done
-exit 1
-"#,
-            signal_dir = signal_dir.display(),
-            runtime_session_id = runtime_session_id,
-            orchestration_session_id = orchestration_session_id
-        ),
-        IdleSignalScriptBehavior::IgnoreWake => "sleep 2\nexit 0\n".to_string(),
-    };
-    let script = format!(
-        r"#!/bin/sh
-while IFS= read -r _line; do
-  {wake_behavior}
-done
-"
-    );
-    fs::write(&script_path, script).expect("write idle signal script");
-    let mut permissions = fs::metadata(&script_path)
-        .expect("script metadata")
-        .permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(&script_path, permissions).expect("set script executable");
-    script_path
-}
-
 /// Build an in-memory DB with a project and session loaded from files.
 pub(super) fn setup_db_with_session(
     project: &Path,

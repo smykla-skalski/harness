@@ -1,4 +1,3 @@
-use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::thread;
@@ -16,7 +15,7 @@ use serde_json::{Value, json};
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 
-use super::helpers::{ManagedChild, test_session_uuid};
+use super::helpers::{ManagedChild, TcpPortLease, test_session_uuid};
 
 mod bridge;
 mod daemon_api;

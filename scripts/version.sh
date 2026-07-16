@@ -237,12 +237,18 @@ set_build_settings_current_version() {
 
 set_daemon_plist_version() {
   local version="$1"
-  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$MONITOR_DAEMON_INFO_PLIST"
+  PLIST_KEY="CFBundleShortVersionString" NEW_VERSION="$version" perl -0pi -e '
+    my $count = s{(<key>\Q$ENV{PLIST_KEY}\E</key>\s*<string>)[^<]+(</string>)}{$1.$ENV{NEW_VERSION}.$2}e;
+    die "failed to update $ENV{PLIST_KEY} in $ARGV\n" unless $count;
+  ' "$MONITOR_DAEMON_INFO_PLIST"
 }
 
 set_daemon_plist_build_version() {
   local version="$1"
-  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $version" "$MONITOR_DAEMON_INFO_PLIST"
+  PLIST_KEY="CFBundleVersion" NEW_VERSION="$version" perl -0pi -e '
+    my $count = s{(<key>\Q$ENV{PLIST_KEY}\E</key>\s*<string>)[^<]+(</string>)}{$1.$ENV{NEW_VERSION}.$2}e;
+    die "failed to update $ENV{PLIST_KEY} in $ARGV\n" unless $count;
+  ' "$MONITOR_DAEMON_INFO_PLIST"
 }
 
 sync_generated_monitor_project() {

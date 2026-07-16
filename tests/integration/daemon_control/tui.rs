@@ -129,22 +129,28 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
     std::fs::create_dir_all(&xdg).expect("create xdg");
     init_git_repo(&project);
 
-    let mut daemon = ManagedChild::spawn(
-        Command::new(daemon_binary())
-            .args(["serve", "--host", "127.0.0.1", "--port", "0", "--sandboxed"])
-            .env("HARNESS_HOST_HOME", &home)
-            .env("HOME", &home)
-            .env("XDG_DATA_HOME", &xdg)
-            .env("HARNESS_APP_GROUP_ID", HARNESS_MONITOR_APP_GROUP_ID)
-            .env("HARNESS_SANDBOXED", "1")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null()),
-    )
-    .expect("spawn app-group daemon");
+    let mut daemon_command = Command::new(daemon_binary());
+    daemon_command
+        .args(["serve", "--host", "127.0.0.1", "--port", "0", "--sandboxed"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    configure_app_group_daemon_env(
+        &mut daemon_command,
+        &home,
+        &xdg,
+        HARNESS_MONITOR_APP_GROUP_ID,
+    );
+    daemon_command.env("HARNESS_SANDBOXED", "1");
+    let mut daemon = ManagedChild::spawn(&mut daemon_command).expect("spawn app-group daemon");
 
     let _manifest = wait_for_app_group_daemon_ready(&home);
-    let status_output = run_harness(&home, &xdg, &["daemon", "status"]);
+    let status_output = run_harness_in_app_group(
+        &home,
+        &xdg,
+        &["daemon", "status"],
+        HARNESS_MONITOR_APP_GROUP_ID,
+    );
     assert!(
         status_output.status.success(),
         "daemon status failed: {}",
@@ -157,8 +163,20 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
         "daemon status should discover the running app-group daemon"
     );
 
-    let mut bridge = spawn_bridge_with_mock_codex(&home, &xdg, tmp.path(), "agent-tui", &[]);
-    let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["agent-tui"]);
+    let mut bridge = spawn_app_group_bridge_with_mock_codex(
+        &home,
+        &xdg,
+        tmp.path(),
+        "agent-tui",
+        &[],
+        HARNESS_MONITOR_APP_GROUP_ID,
+    );
+    let _bridge_status = wait_for_app_group_bridge_capabilities(
+        &home,
+        &xdg,
+        &["agent-tui"],
+        HARNESS_MONITOR_APP_GROUP_ID,
+    );
 
     let project_arg = project.to_str().expect("utf8 project");
     let session_id = session_uuid("app-group-cli-tui");
@@ -180,7 +198,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
         "unexpected session status: {session_body}"
     );
 
-    let start_output = run_harness_with_timeout(
+    let start_output = run_harness_in_app_group_with_timeout(
         &home,
         &xdg,
         &[
@@ -200,6 +218,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
             "--arg=cat",
         ],
         COMMAND_WAIT_TIMEOUT,
+        HARNESS_MONITOR_APP_GROUP_ID,
     );
     assert!(
         start_output.status.success(),
@@ -209,7 +228,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
     let started = parse_terminal_agent_output(&start_output.stdout);
     assert_eq!(started.status, AgentTuiStatus::Running);
 
-    let text_output = run_harness(
+    let text_output = run_harness_in_app_group(
         &home,
         &xdg,
         &[
@@ -220,6 +239,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
             "--text",
             "bridge ok",
         ],
+        HARNESS_MONITOR_APP_GROUP_ID,
     );
     assert!(
         text_output.status.success(),
@@ -227,7 +247,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
         output_text(&text_output)
     );
 
-    let enter_output = run_harness(
+    let enter_output = run_harness_in_app_group(
         &home,
         &xdg,
         &[
@@ -238,6 +258,7 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
             "--key",
             "enter",
         ],
+        HARNESS_MONITOR_APP_GROUP_ID,
     );
     assert!(
         enter_output.status.success(),
@@ -247,10 +268,11 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
     let echoed = parse_terminal_agent_output(&enter_output.stdout);
     assert!(echoed.screen.text.contains("bridge ok"));
 
-    let stop_output = run_harness(
+    let stop_output = run_harness_in_app_group(
         &home,
         &xdg,
         &["session", "agents", "stop", started.tui_id.as_str()],
+        HARNESS_MONITOR_APP_GROUP_ID,
     );
     assert!(
         stop_output.status.success(),
@@ -260,7 +282,12 @@ fn cli_tui_commands_follow_running_app_group_daemon_root() {
     let stopped = parse_terminal_agent_output(&stop_output.stdout);
     assert_eq!(stopped.status, AgentTuiStatus::Stopped);
 
-    let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
+    let bridge_stop_output = run_harness_in_app_group(
+        &home,
+        &xdg,
+        &["bridge", "stop"],
+        HARNESS_MONITOR_APP_GROUP_ID,
+    );
     assert!(
         bridge_stop_output.status.success(),
         "bridge stop failed: {}",
@@ -287,18 +314,15 @@ fn recover_leader_starts_managed_tui_with_policy_preset_prompt() {
     write_mock_codex_tui(&mock_bin);
     let path_env = prefixed_path_env(&mock_bin);
 
-    let mut daemon = ManagedChild::spawn(
-        Command::new(daemon_binary())
-            .args(["serve", "--host", "127.0.0.1", "--port", "0"])
-            .env("HARNESS_HOST_HOME", &home)
-            .env("HOME", &home)
-            .env("XDG_DATA_HOME", &xdg)
-            .env("PATH", &path_env)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null()),
-    )
-    .expect("spawn daemon serve");
+    let mut daemon_command = Command::new(daemon_binary());
+    daemon_command
+        .args(["serve", "--host", "127.0.0.1", "--port", "0"])
+        .env("PATH", &path_env)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    configure_isolated_daemon_env(&mut daemon_command, &home, &xdg);
+    let mut daemon = ManagedChild::spawn(&mut daemon_command).expect("spawn daemon serve");
 
     let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
     let project_arg = project.to_str().expect("utf8 project");

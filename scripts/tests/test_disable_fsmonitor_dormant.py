@@ -48,6 +48,7 @@ class DisableFsmonitorDormantTests(unittest.TestCase):
             completed = run_script("--root", str(root), "--days", "30")
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn(f"dormant   gitdir={git_dir}", completed.stdout)
+            self.assertIn("no_signal=0", completed.stdout)
             self.assertIn("dormant=1", completed.stdout)
             self.assertIn("Dry-run", completed.stdout)
             # config must not have been modified by dry-run

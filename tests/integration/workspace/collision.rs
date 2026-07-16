@@ -2,6 +2,9 @@
 // distinct project names in the sessions layout.  The second resolves to
 // `project-<4hex>` so sessions never collide.
 
+use std::path::Path;
+
+use harness::session::types::SessionState;
 use harness_testkit::init_git_repo_with_seed;
 use tempfile::tempdir;
 
@@ -9,6 +12,10 @@ use super::support::{
     layout_for_state, output_text, run_harness, spawn_daemon_serve, start_session_try,
     start_session_via_http, wait_for_daemon_ready,
 };
+
+const COLLISION_SESSION_A: &str = "40000000-0000-4000-8000-000000000001";
+const COLLISION_SESSION_B: &str = "40000000-0000-4000-8000-000000000002";
+const INVALID_PROJECT_SESSION: &str = "40000000-0000-4000-8000-000000000003";
 
 /// Slow: spawns daemon.
 #[ignore = "slow integration test that spawns a real daemon"]
@@ -31,8 +38,8 @@ fn two_origins_same_basename_get_distinct_project_names() {
     wait_for_daemon_ready(&home, &xdg);
 
     // Start one session from each origin.
-    let state_a = start_session_via_http(&home, &xdg, &origin_a, "col-same-a1234567");
-    let state_b = start_session_via_http(&home, &xdg, &origin_b, "col-same-b1234567");
+    let state_a = start_session_via_http(&home, &xdg, &origin_a, COLLISION_SESSION_A);
+    let state_b = start_session_via_http(&home, &xdg, &origin_b, COLLISION_SESSION_B);
 
     // Project names must differ even though both basenames are "project".
     assert_ne!(
@@ -58,8 +65,14 @@ fn two_origins_same_basename_get_distinct_project_names() {
         "hash suffix must be 4 hex chars"
     );
 
-    // Both sessions must appear in the list.
-    let list_out = run_harness(&home, &xdg, &["session", "list", "--json"]);
+    assert_sessions_listed(&home, &xdg);
+    assert_origin_markers(&xdg, &state_a, &state_b, &origin_a, &origin_b);
+
+    daemon.kill().expect("kill daemon");
+}
+
+fn assert_sessions_listed(home: &Path, xdg: &Path) {
+    let list_out = run_harness(home, xdg, &["session", "list", "--json"]);
     assert!(
         list_out.status.success(),
         "session list failed: {}",
@@ -72,19 +85,27 @@ fn two_origins_same_basename_get_distinct_project_names() {
         .filter_map(|s| s["session_id"].as_str())
         .collect();
     assert!(
-        session_ids.contains(&"col-same-a1234567"),
+        session_ids.contains(&COLLISION_SESSION_A),
         "session A must appear in list; found: {session_ids:?}"
     );
     assert!(
-        session_ids.contains(&"col-same-b1234567"),
+        session_ids.contains(&COLLISION_SESSION_B),
         "session B must appear in list; found: {session_ids:?}"
     );
+}
 
+fn assert_origin_markers(
+    xdg: &Path,
+    state_a: &SessionState,
+    state_b: &SessionState,
+    origin_a: &Path,
+    origin_b: &Path,
+) {
     // Verify .origin marker content for both sessions.
     // Session-level marker is written by WorktreeController::create; project-level
     // marker is written by session_setup::prepare_session for collision detection.
-    let layout_a = layout_for_state(&xdg, &state_a);
-    let layout_b = layout_for_state(&xdg, &state_b);
+    let layout_a = layout_for_state(xdg, state_a);
+    let layout_b = layout_for_state(xdg, state_b);
     let origin_text_a =
         std::fs::read_to_string(layout_a.origin_marker()).expect("read .origin for session A");
     let origin_text_b =
@@ -128,8 +149,6 @@ fn two_origins_same_basename_get_distinct_project_names() {
         canonical_b,
         "project-level .origin for B must hold canonical origin path"
     );
-
-    daemon.kill().expect("kill daemon");
 }
 
 /// Slow: spawns daemon.
@@ -148,8 +167,9 @@ fn invalid_project_dir_returns_error_status() {
 
     // A path that does not exist on the filesystem cannot be canonicalized.
     let nonexistent = tmp.path().join("does-not-exist").join("project");
-    let (status, _body) = start_session_try(&home, &xdg, &nonexistent, "col-bad-a1234567", None)
-        .expect_err("start with nonexistent project_dir must fail");
+    let (status, _body) =
+        start_session_try(&home, &xdg, &nonexistent, INVALID_PROJECT_SESSION, None)
+            .expect_err("start with nonexistent project_dir must fail");
     // Daemon returns 400 for all validation/workflow errors (see src/daemon/http/response.rs).
     assert_eq!(
         status, 400,

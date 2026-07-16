@@ -12,15 +12,25 @@ use super::support::{
 };
 use super::{LAUNCH_AGENT_LABEL, LEGACY_LAUNCH_AGENT_LABEL, render_launch_agent_plist};
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion; tokio-rs/tracing#553"
-)]
 pub(super) fn restart_launch_agent_with<F>(runner: &F) -> Result<(), CliError>
 where
     F: Fn(&[String]) -> Result<CommandOutput, CliError>,
 {
-    if !cfg!(target_os = "macos") {
+    restart_launch_agent_with_platform(runner, cfg!(target_os = "macos"))
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+pub(super) fn restart_launch_agent_with_platform<F>(
+    runner: &F,
+    is_macos: bool,
+) -> Result<(), CliError>
+where
+    F: Fn(&[String]) -> Result<CommandOutput, CliError>,
+{
+    if !is_macos {
         return Err(CliError::from(CliErrorKind::workflow_io(
             "launchd is only supported on macOS",
         )));
@@ -49,8 +59,19 @@ pub(super) fn install_launch_agent_with<F>(
 where
     F: Fn(&[String]) -> Result<CommandOutput, CliError>,
 {
+    install_launch_agent_with_platform(binary_path, runner, cfg!(target_os = "macos"))
+}
+
+pub(super) fn install_launch_agent_with_platform<F>(
+    binary_path: &Path,
+    runner: &F,
+    is_macos: bool,
+) -> Result<PathBuf, CliError>
+where
+    F: Fn(&[String]) -> Result<CommandOutput, CliError>,
+{
     state::ensure_daemon_dirs()?;
-    remove_legacy_launch_agent_with(runner)?;
+    remove_legacy_launch_agent_with(runner, is_macos)?;
     let path = state::launch_agent_path();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
@@ -60,7 +81,7 @@ where
         })?;
     }
     write_text(&path, &render_launch_agent_plist(binary_path))?;
-    if cfg!(target_os = "macos") {
+    if is_macos {
         best_effort_bootout(runner)?;
         bootstrap_launch_agent(&path, runner)?;
         kickstart_launch_agent(runner)?;
@@ -72,9 +93,19 @@ pub(super) fn remove_launch_agent_with<F>(runner: &F) -> Result<bool, CliError>
 where
     F: Fn(&[String]) -> Result<CommandOutput, CliError>,
 {
-    let mut removed = remove_legacy_launch_agent_with(runner)?;
+    remove_launch_agent_with_platform(runner, cfg!(target_os = "macos"))
+}
+
+pub(super) fn remove_launch_agent_with_platform<F>(
+    runner: &F,
+    is_macos: bool,
+) -> Result<bool, CliError>
+where
+    F: Fn(&[String]) -> Result<CommandOutput, CliError>,
+{
+    let mut removed = remove_legacy_launch_agent_with(runner, is_macos)?;
     let path = state::launch_agent_path();
-    removed |= if cfg!(target_os = "macos") {
+    removed |= if is_macos {
         best_effort_bootout(runner)?
     } else {
         false
@@ -116,11 +147,11 @@ where
     ensure_launchctl_success("kickstart launch agent", &output)
 }
 
-fn remove_legacy_launch_agent_with<F>(runner: &F) -> Result<bool, CliError>
+fn remove_legacy_launch_agent_with<F>(runner: &F, is_macos: bool) -> Result<bool, CliError>
 where
     F: Fn(&[String]) -> Result<CommandOutput, CliError>,
 {
-    let mut removed = if cfg!(target_os = "macos") {
+    let mut removed = if is_macos {
         best_effort_bootout_for(LEGACY_LAUNCH_AGENT_LABEL, runner)?
     } else {
         false

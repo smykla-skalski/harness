@@ -18,6 +18,8 @@ mod acme;
 mod client;
 #[path = "remote_systemd_e2e/host.rs"]
 mod host;
+#[path = "remote_systemd_e2e/ports.rs"]
+mod ports;
 
 use acme::{AcmeChallenge, AcmeChallengeConfig, FakeAcmeServer};
 use client::RemoteDaemonClient;

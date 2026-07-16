@@ -22,12 +22,14 @@ use harness::setup::{
 use sha2::{Digest, Sha256};
 
 mod hook;
+mod port_lease;
 mod run;
 
 // Keep lightweight fixtures in testkit and root-coupled fixtures local so
 // integration tests can continue importing everything through `helpers::*`.
 pub use harness_testkit::*;
 pub use hook::*;
+pub use port_lease::*;
 pub use run::*;
 
 /// Deterministically derive a valid UUID from a readable test label.
@@ -40,25 +42,38 @@ pub fn test_session_uuid(label: &str) -> String {
     uuid::Uuid::from_bytes(bytes).to_string()
 }
 
-/// Global lock for tests that modify the process environment via `with_env_vars`.
+/// Safety net for ad hoc libtest runs that share one process.
 ///
-/// All integration test modules that set PATH (or other env vars) must acquire
-/// this lock so that concurrent tests never observe a partially-modified
-/// environment. Per-module locks are insufficient because Rust runs tests from
-/// different modules on the same thread pool.
+/// Canonical tasks use nextest process isolation, so this lock does not
+/// serialize integration cases in the supported parallel test workflow.
 pub static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 pub struct ManagedChild {
     child: Option<Child>,
+    _retained_port_leases: Vec<TcpPortLease>,
 }
 
 impl ManagedChild {
     pub fn new(child: Child) -> Self {
-        Self { child: Some(child) }
+        Self {
+            child: Some(child),
+            _retained_port_leases: Vec::new(),
+        }
     }
 
     pub fn spawn(command: &mut ProcessCommand) -> std::io::Result<Self> {
         command.spawn().map(Self::new)
+    }
+
+    pub fn spawn_with_port_lease(
+        command: &mut ProcessCommand,
+        port_lease: TcpPortLease,
+    ) -> std::io::Result<Self> {
+        port_lease.release_listener()?;
+        command.spawn().map(|child| Self {
+            child: Some(child),
+            _retained_port_leases: vec![port_lease],
+        })
     }
 
     pub fn id(&self) -> u32 {

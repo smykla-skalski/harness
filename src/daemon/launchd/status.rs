@@ -19,9 +19,16 @@ pub(super) fn launch_agent_status_with<F>(runner: &F) -> LaunchAgentStatus
 where
     F: Fn(&[String]) -> Result<CommandOutput, CliError>,
 {
+    launch_agent_status_with_platform(runner, cfg!(target_os = "macos"))
+}
+
+pub(super) fn launch_agent_status_with_platform<F>(runner: &F, is_macos: bool) -> LaunchAgentStatus
+where
+    F: Fn(&[String]) -> Result<CommandOutput, CliError>,
+{
     let current_path = state::launch_agent_path();
     let mut status = launch_agent_status_template(LAUNCH_AGENT_LABEL, &current_path);
-    if !cfg!(target_os = "macos") {
+    if !is_macos {
         status.status_error = Some("launchd is only supported on macOS".to_string());
         return status;
     }

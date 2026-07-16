@@ -32,10 +32,10 @@ cat >"$LOGS_DIR/daemon.log" <<'EOM'
 EOM
 
 # Two markers: act1.ready 10s after recording-started, act2.ready 5s later.
-touch -d '2026-04-25T10:00:15Z' "$MARKER_DIR/act1.ready"
-touch -d '2026-04-25T10:00:20Z' "$MARKER_DIR/act2.ready"
-touch -d '2026-04-25T10:00:15.500000Z' "$MARKER_DIR/act1.ack"
-touch -d '2026-04-25T10:00:20.200000Z' "$MARKER_DIR/act2.ack"
+recording_triage_test_set_mtime "$MARKER_DIR/act1.ready" '2026-04-25T10:00:15Z'
+recording_triage_test_set_mtime "$MARKER_DIR/act2.ready" '2026-04-25T10:00:20Z'
+recording_triage_test_set_mtime "$MARKER_DIR/act1.ack" '2026-04-25T10:00:15.500000Z'
+recording_triage_test_set_mtime "$MARKER_DIR/act2.ack" '2026-04-25T10:00:20.200000Z'
 
 "$WRAPPER" --run "$RUN_DIR" >/dev/null
 REPORT="$RUN_DIR/recording-triage/act-timing.json"

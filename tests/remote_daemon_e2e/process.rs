@@ -1,10 +1,12 @@
-use std::fs::{self, File};
+use std::fs::{self, DirBuilder, File, OpenOptions};
 use std::net::TcpListener;
-use std::os::unix::fs::PermissionsExt as _;
+use std::os::unix::fs::{DirBuilderExt as _, MetadataExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use fs2::FileExt as _;
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -20,8 +22,8 @@ pub struct RemoteDaemonEnvironment {
     acme_ca_root: PathBuf,
     daemon_stdout: PathBuf,
     daemon_stderr: PathBuf,
-    https_port: u16,
-    http_port: u16,
+    https_port: PortLease,
+    http_port: PortLease,
 }
 
 pub struct AftermarketDnsEnvironment<'a> {
@@ -60,8 +62,8 @@ impl RemoteDaemonEnvironment {
             acme_ca_root,
             daemon_stdout: PathBuf::from("daemon.stdout.log"),
             daemon_stderr: PathBuf::from("daemon.stderr.log"),
-            https_port: unused_port()?,
-            http_port: unused_port()?,
+            https_port: PortLease::acquire()?,
+            http_port: PortLease::acquire()?,
         }
         .with_log_paths())
     }
@@ -72,12 +74,12 @@ impl RemoteDaemonEnvironment {
         self
     }
 
-    pub const fn https_port(&self) -> u16 {
-        self.https_port
+    pub fn https_port(&self) -> u16 {
+        self.https_port.port
     }
 
-    pub const fn http_port(&self) -> u16 {
-        self.http_port
+    pub fn http_port(&self) -> u16 {
+        self.http_port.port
     }
 
     pub fn dns_log(&self) -> &Path {
@@ -102,6 +104,86 @@ impl RemoteDaemonEnvironment {
             .env("HARNESS_REMOTE_ACME_DNS_LOG", &self.dns_log)
             .env("RUST_LOG", "harness=debug");
     }
+
+    fn release_port_reservations(&self) -> Result<(), String> {
+        self.https_port.release_socket()?;
+        self.http_port.release_socket()
+    }
+}
+
+struct PortLease {
+    port: u16,
+    listener: Mutex<Option<TcpListener>>,
+    _lock_file: File,
+}
+
+impl PortLease {
+    fn acquire() -> Result<Self, String> {
+        for _ in 0..32 {
+            let listener = TcpListener::bind(("127.0.0.1", 0))
+                .map_err(|error| format!("reserve local port: {error}"))?;
+            let port = listener
+                .local_addr()
+                .map_err(|error| format!("read reserved local port: {error}"))?
+                .port();
+            let lock_path = port_lock_root()?.join(format!("tcp-{port}.lock"));
+            let lock_file = OpenOptions::new()
+                .create(true)
+                .read(true)
+                .write(true)
+                .truncate(false)
+                .open(&lock_path)
+                .map_err(|error| format!("open port lease {}: {error}", lock_path.display()))?;
+            match lock_file.try_lock_exclusive() {
+                Ok(()) => {
+                    return Ok(Self {
+                        port,
+                        listener: Mutex::new(Some(listener)),
+                        _lock_file: lock_file,
+                    });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+                Err(error) => {
+                    return Err(format!("lock port lease {}: {error}", lock_path.display()));
+                }
+            }
+        }
+        Err("could not reserve a unique local port after 32 attempts".to_string())
+    }
+
+    fn release_socket(&self) -> Result<(), String> {
+        self.listener
+            .lock()
+            .map_err(|_| "port reservation lock poisoned".to_string())?
+            .take();
+        Ok(())
+    }
+}
+
+fn port_lock_root() -> Result<PathBuf, String> {
+    let uid = uzers::get_current_uid();
+    let root = PathBuf::from("/tmp").join(format!("harness-test-port-leases-{uid}"));
+    match DirBuilder::new().mode(0o700).create(&root) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+        Err(error) => {
+            return Err(format!(
+                "create port lease root {}: {error}",
+                root.display()
+            ));
+        }
+    }
+    let metadata = fs::symlink_metadata(&root)
+        .map_err(|error| format!("inspect port lease root {}: {error}", root.display()))?;
+    if !metadata.file_type().is_dir() || metadata.uid() != uid {
+        return Err(format!(
+            "port lease root must be an owned directory: {}",
+            root.display()
+        ));
+    }
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o700))
+        .map_err(|error| format!("secure port lease root {}: {error}", root.display()))?;
+    Ok(root)
 }
 
 pub struct RemoteDaemonProcess {
@@ -163,6 +245,7 @@ impl RemoteDaemonProcess {
         directory_url: &str,
         mut command: Command,
     ) -> Result<Self, String> {
+        environment.release_port_reservations()?;
         let stdout = File::create(&environment.daemon_stdout)
             .map_err(|error| format!("create daemon stdout log: {error}"))?;
         let stderr = File::create(&environment.daemon_stderr)
@@ -332,9 +415,9 @@ fn remote_daemon_command(
         "--host",
         "127.0.0.1",
         "--https-port",
-        &environment.https_port.to_string(),
+        &environment.https_port().to_string(),
         "--http-port",
-        &environment.http_port.to_string(),
+        &environment.http_port().to_string(),
         "--acme-email",
         "remote-e2e@example.com",
         "--acme-challenge",
@@ -344,13 +427,6 @@ fn remote_daemon_command(
         command.args(["--acme-dns-provider", provider]);
     }
     command
-}
-
-fn unused_port() -> Result<u16, String> {
-    TcpListener::bind(("127.0.0.1", 0))
-        .and_then(|listener| listener.local_addr())
-        .map(|address| address.port())
-        .map_err(|error| format!("select unused local port: {error}"))
 }
 
 fn write_dns_hook(path: &Path) -> Result<(), String> {

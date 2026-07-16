@@ -1,19 +1,21 @@
 use super::*;
 
 pub(super) fn wait_for_daemon_ready(home: &Path, xdg: &Path) -> DaemonStatusReport {
+    let manifest_path = isolated_daemon_manifest_path(xdg);
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
-        let retry_reason = match try_daemon_status(home, xdg) {
-            Ok(status) => {
-                if let Some(manifest) = status.manifest.as_ref() {
-                    match readiness_issue(&manifest.endpoint, &manifest.token_path) {
-                        None => return status,
-                        Some(issue) => issue,
-                    }
-                } else {
-                    "daemon status did not report a manifest yet".to_string()
-                }
-            }
+        let retry_reason = match read_manifest_value(&manifest_path) {
+            Ok(manifest) => match manifest_endpoint_and_token_path(&manifest) {
+                Ok((endpoint, token_path)) => match readiness_issue(endpoint, token_path) {
+                    None => match try_daemon_status(home, xdg) {
+                        Ok(status) if status.manifest.is_some() => return status,
+                        Ok(_) => "daemon status did not report a manifest".to_string(),
+                        Err(error) => error,
+                    },
+                    Some(issue) => issue,
+                },
+                Err(error) => error,
+            },
             Err(error) => error,
         };
         assert!(
@@ -29,10 +31,8 @@ pub(super) fn wait_for_app_group_daemon_ready(home: &Path) -> Value {
     let manifest_path = root.join("manifest.json");
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
-        if let Ok(data) = std::fs::read_to_string(&manifest_path)
-            && let Ok(manifest) = serde_json::from_str::<Value>(&data)
-            && let Some(endpoint) = manifest.get("endpoint").and_then(Value::as_str)
-            && let Some(token_path) = manifest.get("token_path").and_then(Value::as_str)
+        if let Ok(manifest) = read_manifest_value(&manifest_path)
+            && let Ok((endpoint, token_path)) = manifest_endpoint_and_token_path(&manifest)
             && endpoint_is_healthy(endpoint, token_path)
         {
             return manifest;
@@ -46,21 +46,17 @@ pub(super) fn wait_for_app_group_daemon_ready(home: &Path) -> Value {
     }
 }
 
-pub(super) fn wait_for_daemon_stopped(home: &Path, xdg: &Path) {
+pub(super) fn wait_for_daemon_stopped(_home: &Path, xdg: &Path) {
+    let manifest_path = isolated_daemon_manifest_path(xdg);
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
-        let retry_reason = match try_daemon_status(home, xdg) {
-            Ok(status) => {
-                if status.manifest.is_none() {
-                    return;
-                }
-                "daemon status still reports a manifest".to_string()
-            }
-            Err(error) => error,
-        };
+        if !manifest_path.exists() {
+            return;
+        }
         assert!(
             Instant::now() < deadline,
-            "daemon did not stop before timeout: {retry_reason}"
+            "daemon did not remove its manifest before timeout at {}",
+            manifest_path.display()
         );
         thread::sleep(DAEMON_WAIT_INTERVAL);
     }
@@ -71,9 +67,31 @@ pub(super) fn wait_for_bridge_capabilities(
     xdg: &Path,
     required_capabilities: &[&str],
 ) -> BridgeStatusReport {
+    wait_for_bridge_capabilities_at_root(home, xdg, required_capabilities, None)
+}
+
+pub(super) fn wait_for_app_group_bridge_capabilities(
+    home: &Path,
+    xdg: &Path,
+    required_capabilities: &[&str],
+    app_group_id: &str,
+) -> BridgeStatusReport {
+    wait_for_bridge_capabilities_at_root(home, xdg, required_capabilities, Some(app_group_id))
+}
+
+fn wait_for_bridge_capabilities_at_root(
+    home: &Path,
+    xdg: &Path,
+    required_capabilities: &[&str],
+    app_group_id: Option<&str>,
+) -> BridgeStatusReport {
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
-        let output = run_harness(home, xdg, &["bridge", "status"]);
+        let output = if let Some(app_group_id) = app_group_id {
+            run_harness_in_app_group(home, xdg, &["bridge", "status"], app_group_id)
+        } else {
+            run_harness(home, xdg, &["bridge", "status"])
+        };
         if output.status.success() {
             let report: BridgeStatusReport =
                 serde_json::from_slice(&output.stdout).expect("parse bridge status");
@@ -334,16 +352,14 @@ pub(super) fn join_session_leader_via_http(
         .state
 }
 
-pub(super) fn current_daemon_endpoint_and_token(home: &Path, xdg: &Path) -> (String, String) {
+pub(super) fn current_daemon_endpoint_and_token(_home: &Path, xdg: &Path) -> (String, String) {
+    let manifest_path = isolated_daemon_manifest_path(xdg);
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
-        if let Ok(status) = try_daemon_status(home, xdg)
-            && let Some(manifest) = status.manifest.as_ref()
+        if let Ok(manifest) = read_manifest_value(&manifest_path)
+            && let Ok((endpoint, token_path)) = manifest_endpoint_and_token_path(&manifest)
         {
-            return (
-                manifest.endpoint.clone(),
-                read_daemon_token(&manifest.token_path),
-            );
+            return (endpoint.to_string(), read_daemon_token(token_path));
         }
 
         assert!(
@@ -352,6 +368,32 @@ pub(super) fn current_daemon_endpoint_and_token(home: &Path, xdg: &Path) -> (Str
         );
         thread::sleep(DAEMON_WAIT_INTERVAL);
     }
+}
+
+fn isolated_daemon_manifest_path(xdg: &Path) -> PathBuf {
+    xdg.join("harness")
+        .join("daemon")
+        .join("managed")
+        .join("manifest.json")
+}
+
+fn read_manifest_value(path: &Path) -> Result<Value, String> {
+    let data = std::fs::read_to_string(path)
+        .map_err(|error| format!("read daemon manifest {}: {error}", path.display()))?;
+    serde_json::from_str(&data)
+        .map_err(|error| format!("parse daemon manifest {}: {error}", path.display()))
+}
+
+fn manifest_endpoint_and_token_path(manifest: &Value) -> Result<(&str, &str), String> {
+    let endpoint = manifest
+        .get("endpoint")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "daemon manifest has no endpoint".to_string())?;
+    let token_path = manifest
+        .get("token_path")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "daemon manifest has no token path".to_string())?;
+    Ok((endpoint, token_path))
 }
 
 fn read_session_status(

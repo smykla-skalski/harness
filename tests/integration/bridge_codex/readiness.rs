@@ -5,11 +5,12 @@ fn bridge_start_waits_for_codex_readiness_before_publishing_state() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
-    let codex_port = unused_local_port();
+    let codex_port_lease = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port = codex_port_lease.port();
     let codex_port_text = codex_port.to_string();
     let codex_endpoint = format!("ws://127.0.0.1:{codex_port}");
 
-    let mut bridge = ManagedChild::spawn(
+    let mut bridge = ManagedChild::spawn_with_port_lease(
         Command::new(bridge_binary())
             .args([
                 "start",
@@ -30,6 +31,7 @@ fn bridge_start_waits_for_codex_readiness_before_publishing_state() {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
+        codex_port_lease,
     )
     .expect("spawn bridge");
 
@@ -72,28 +74,31 @@ fn bridge_start_records_error_when_codex_exits_before_readiness() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
-    let codex_port = unused_local_port();
+    let codex_port_lease = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port = codex_port_lease.port();
     let codex_port_text = codex_port.to_string();
 
-    let output = Command::new(bridge_binary())
-        .args([
-            "start",
-            "--capability",
-            "codex",
-            "--codex-port",
-            &codex_port_text,
-            "--codex-path",
-        ])
-        .arg(&mock_codex)
-        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
-        .env("XDG_DATA_HOME", tmp.path())
-        .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
-        .env("MOCK_CODEX_EXIT_BEFORE_READY", "1")
-        .env("MOCK_CODEX_EXIT_STATUS", "23")
-        .env_remove("HARNESS_APP_GROUP_ID")
-        .env_remove("HARNESS_SANDBOXED")
-        .output()
+    let output = codex_port_lease
+        .output(
+            Command::new(bridge_binary())
+                .args([
+                    "start",
+                    "--capability",
+                    "codex",
+                    "--codex-port",
+                    &codex_port_text,
+                    "--codex-path",
+                ])
+                .arg(&mock_codex)
+                .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+                .env("XDG_DATA_HOME", tmp.path())
+                .env("HARNESS_HOST_HOME", &host_home)
+                .env("HOME", &host_home)
+                .env("MOCK_CODEX_EXIT_BEFORE_READY", "1")
+                .env("MOCK_CODEX_EXIT_STATUS", "23")
+                .env_remove("HARNESS_APP_GROUP_ID")
+                .env_remove("HARNESS_SANDBOXED"),
+        )
         .expect("run bridge");
 
     assert!(!output.status.success(), "bridge unexpectedly succeeded");
@@ -176,27 +181,30 @@ fn bridge_start_records_error_when_codex_readiness_times_out() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
-    let codex_port = unused_local_port();
+    let codex_port_lease = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port = codex_port_lease.port();
     let codex_port_text = codex_port.to_string();
 
-    let output = Command::new(bridge_binary())
-        .args([
-            "start",
-            "--capability",
-            "codex",
-            "--codex-port",
-            &codex_port_text,
-            "--codex-path",
-        ])
-        .arg(&mock_codex)
-        .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
-        .env("XDG_DATA_HOME", tmp.path())
-        .env("HARNESS_HOST_HOME", &host_home)
-        .env("HOME", &host_home)
-        .env("MOCK_CODEX_READY_DELAY_MS", "11000")
-        .env_remove("HARNESS_APP_GROUP_ID")
-        .env_remove("HARNESS_SANDBOXED")
-        .output()
+    let output = codex_port_lease
+        .output(
+            Command::new(bridge_binary())
+                .args([
+                    "start",
+                    "--capability",
+                    "codex",
+                    "--codex-port",
+                    &codex_port_text,
+                    "--codex-path",
+                ])
+                .arg(&mock_codex)
+                .env("HARNESS_DAEMON_DATA_HOME", tmp.path())
+                .env("XDG_DATA_HOME", tmp.path())
+                .env("HARNESS_HOST_HOME", &host_home)
+                .env("HOME", &host_home)
+                .env("MOCK_CODEX_READY_DELAY_MS", "11000")
+                .env_remove("HARNESS_APP_GROUP_ID")
+                .env_remove("HARNESS_SANDBOXED"),
+        )
         .expect("run bridge");
 
     assert!(!output.status.success(), "bridge unexpectedly succeeded");

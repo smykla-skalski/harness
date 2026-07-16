@@ -1,12 +1,13 @@
 use std::ffi::OsStr;
 use std::fs;
-use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 use tempfile::TempDir;
+
+use super::ports::LowPortPairLease;
 
 pub struct RemoteSystemdHost {
     _temp: TempDir,
@@ -23,6 +24,7 @@ pub struct RemoteSystemdHost {
     dns_log: PathBuf,
     https_port: u16,
     http_port: u16,
+    _port_lease: LowPortPairLease,
 }
 
 impl RemoteSystemdHost {
@@ -36,7 +38,9 @@ impl RemoteSystemdHost {
             .map_err(|error| format!("read system clock: {error}"))?
             .as_nanos();
         let unit = format!("harness-remote-e2e-{}-{nonce}", std::process::id());
-        let (https_port, http_port) = available_low_port_pair()?;
+        let port_lease = LowPortPairLease::acquire()?;
+        let https_port = port_lease.https_port();
+        let http_port = port_lease.http_port();
         Ok(Self {
             binary_source: assert_cmd::cargo::cargo_bin("harness-daemon"),
             binary_path: PathBuf::from(format!("/usr/local/libexec/{unit}")),
@@ -51,6 +55,7 @@ impl RemoteSystemdHost {
             unit,
             https_port,
             http_port,
+            _port_lease: port_lease,
             _temp: temp,
         })
     }
@@ -371,23 +376,6 @@ fn install_file(source: &Path, destination: &Path, mode: &str) -> Result<(), Str
         &format!("install {}", destination.display()),
     )?;
     Ok(())
-}
-
-fn available_low_port_pair() -> Result<(u16, u16), String> {
-    for pair in [(944, 908), (943, 907), (942, 906), (941, 905)] {
-        if !tcp_port_accepts(pair.0) && !tcp_port_accepts(pair.1) {
-            return Ok(pair);
-        }
-    }
-    Err("no free low-port pair available for systemd e2e".to_string())
-}
-
-fn tcp_port_accepts(port: u16) -> bool {
-    TcpStream::connect_timeout(
-        &SocketAddr::from(([127, 0, 0, 1], port)),
-        Duration::from_millis(100),
-    )
-    .is_ok()
 }
 
 fn assert_non_root_uid(status: &str) -> Result<(), String> {

@@ -35,8 +35,8 @@ cat >"$LOGS_DIR/daemon.log" <<'EOM'
 EOM
 
 # tiny.mov is 0.2s long; pick mtimes inside the window.
-touch -d '2026-04-25T10:00:00.040Z' "$MARKER_DIR/act1.ready"
-touch -d '2026-04-25T10:00:00.140Z' "$MARKER_DIR/act2.ready"
+recording_triage_test_set_mtime "$MARKER_DIR/act1.ready" '2026-04-25T10:00:00.040Z'
+recording_triage_test_set_mtime "$MARKER_DIR/act2.ready" '2026-04-25T10:00:00.140Z'
 
 # Ground-truth snapshots reuse a frame from the same recording so distance is
 # small/zero.

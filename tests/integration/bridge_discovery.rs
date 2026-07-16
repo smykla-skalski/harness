@@ -15,7 +15,6 @@
 
 #![cfg(target_os = "macos")]
 
-use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::thread;
@@ -25,7 +24,7 @@ use fs2::FileExt;
 use harness::daemon::bridge::BridgeState;
 use tempfile::tempdir;
 
-use super::helpers::ManagedChild;
+use super::helpers::{ManagedChild, TcpPortLease};
 
 const BRIDGE_WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 const BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(100);
@@ -46,10 +45,10 @@ fn bridge_start_adopts_group_container_when_xdg_is_empty() {
     let lock_file = hold_running_daemon_lock(&group_daemon_root);
 
     let mock_codex = create_mock_codex(home);
-    let codex_port = unused_local_port();
-    let codex_port_text = codex_port.to_string();
+    let codex_port = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port_text = codex_port.port().to_string();
 
-    let mut bridge = ManagedChild::spawn(
+    let mut bridge = ManagedChild::spawn_with_port_lease(
         Command::new(bridge_binary())
             .args([
                 "start",
@@ -70,6 +69,7 @@ fn bridge_start_adopts_group_container_when_xdg_is_empty() {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
+        codex_port,
     )
     .expect("spawn bridge");
 
@@ -128,8 +128,8 @@ fn bridge_start_personal_profile_adopts_group_container_when_profile_root_is_emp
     let lock_file = hold_running_daemon_lock(&group_daemon_root);
 
     let mock_codex = create_mock_codex(home);
-    let codex_port = unused_local_port();
-    let codex_port_text = codex_port.to_string();
+    let codex_port = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port_text = codex_port.port().to_string();
 
     let mut command = Command::new(bridge_binary());
     command
@@ -153,7 +153,8 @@ fn bridge_start_personal_profile_adopts_group_container_when_profile_root_is_emp
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut bridge = ManagedChild::spawn(&mut command).expect("spawn bridge");
+    let mut bridge =
+        ManagedChild::spawn_with_port_lease(&mut command, codex_port).expect("spawn bridge");
 
     let adopted_state_path = group_daemon_root.join("bridge.json");
     let profile_state_path = profile_data_home
@@ -192,8 +193,8 @@ fn bridge_start_personal_profile_keeps_profile_root_when_no_running_daemon_exist
     std::fs::create_dir_all(&profile_data_home).expect("create profile data home");
 
     let mock_codex = create_mock_codex(home);
-    let codex_port = unused_local_port();
-    let codex_port_text = codex_port.to_string();
+    let codex_port = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port_text = codex_port.port().to_string();
 
     let mut command = Command::new(bridge_binary());
     command
@@ -217,7 +218,8 @@ fn bridge_start_personal_profile_keeps_profile_root_when_no_running_daemon_exist
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut bridge = ManagedChild::spawn(&mut command).expect("spawn bridge");
+    let mut bridge =
+        ManagedChild::spawn_with_port_lease(&mut command, codex_port).expect("spawn bridge");
 
     let profile_state_path = profile_data_home
         .join("harness")
@@ -257,8 +259,8 @@ fn bridge_start_agent_profile_keeps_profile_root_when_group_daemon_is_running() 
     let lock_file = hold_running_daemon_lock(&group_daemon_root);
 
     let mock_codex = create_mock_codex(home);
-    let codex_port = unused_local_port();
-    let codex_port_text = codex_port.to_string();
+    let codex_port = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port_text = codex_port.port().to_string();
 
     let mut command = Command::new(bridge_binary());
     command
@@ -282,7 +284,8 @@ fn bridge_start_agent_profile_keeps_profile_root_when_group_daemon_is_running() 
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut bridge = ManagedChild::spawn(&mut command).expect("spawn bridge");
+    let mut bridge =
+        ManagedChild::spawn_with_port_lease(&mut command, codex_port).expect("spawn bridge");
 
     let profile_state_path = profile_data_home
         .join("harness")
@@ -465,14 +468,6 @@ fn run_bridge_with_profile(
 
 fn bridge_binary() -> PathBuf {
     assert_cmd::cargo::cargo_bin("harness-bridge")
-}
-
-fn unused_local_port() -> u16 {
-    TcpListener::bind(("127.0.0.1", 0))
-        .expect("bind local port")
-        .local_addr()
-        .expect("read local addr")
-        .port()
 }
 
 fn wait_for_bridge_exit(bridge: &mut ManagedChild) -> Result<(), String> {

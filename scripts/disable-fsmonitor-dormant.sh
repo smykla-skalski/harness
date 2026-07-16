@@ -124,6 +124,24 @@ is_excluded() {
   return 1
 }
 
+# Print a file's modification time as Unix seconds. BSD stat uses -f while
+# GNU stat uses -c; validate the BSD-shaped result before accepting it because
+# GNU stat -f can emit filesystem details even though that invocation fails.
+file_mtime() {
+  local path="$1"
+  local m
+
+  m="$(/usr/bin/stat -f '%m' "$path" 2>/dev/null || true)"
+  if [[ "$m" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "$m"
+    return 0
+  fi
+
+  m="$(/usr/bin/stat -c '%Y' "$path" 2>/dev/null || true)"
+  [[ "$m" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "$m"
+}
+
 # Returns days-since-most-recent of HEAD/FETCH_HEAD. Empty if neither
 # exists.
 days_since_activity() {
@@ -131,8 +149,7 @@ days_since_activity() {
   local mtime=0 f m now days
   for f in "$gitdir/HEAD" "$gitdir/FETCH_HEAD"; do
     if [[ -e "$f" ]]; then
-      m="$(/usr/bin/stat -f '%m' "$f" 2>/dev/null || echo 0)"
-      if [[ "$m" =~ ^[0-9]+$ ]] && (( m > mtime )); then
+      if m="$(file_mtime "$f")" && (( m > mtime )); then
         mtime=$m
       fi
     fi

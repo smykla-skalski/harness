@@ -38,25 +38,30 @@ fn daemon_binary() -> PathBuf {
 pub fn spawn_daemon_serve(home: &Path, xdg: &Path) -> super::super::helpers::ManagedChild {
     let mut cmd = Command::new(daemon_binary());
     cmd.args(["serve", "--host", "127.0.0.1", "--port", "0"])
-        .env("HARNESS_HOST_HOME", home)
-        .env("HOME", home)
-        .env("XDG_DATA_HOME", xdg)
-        .env_remove("CLAUDE_SESSION_ID")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    configure_isolated_daemon_env(&mut cmd, home, xdg);
     super::super::helpers::ManagedChild::spawn(&mut cmd).expect("spawn daemon serve")
 }
 
 pub fn run_harness(home: &Path, xdg: &Path, args: &[&str]) -> Output {
-    Command::new(harness_binary())
-        .args(args)
+    let mut command = Command::new(harness_binary());
+    command.args(args);
+    configure_isolated_daemon_env(&mut command, home, xdg);
+    command.output().expect("run harness")
+}
+
+fn configure_isolated_daemon_env(command: &mut Command, home: &Path, xdg: &Path) {
+    command
         .env("HARNESS_HOST_HOME", home)
         .env("HOME", home)
         .env("XDG_DATA_HOME", xdg)
-        .env_remove("CLAUDE_SESSION_ID")
-        .output()
-        .expect("run harness")
+        .env("HARNESS_DAEMON_DATA_HOME", xdg)
+        .env_remove("HARNESS_APP_GROUP_ID")
+        .env_remove("HARNESS_DAEMON_OWNERSHIP")
+        .env_remove("HARNESS_SANDBOXED")
+        .env_remove("CLAUDE_SESSION_ID");
 }
 
 pub fn output_text(output: &Output) -> String {
@@ -65,13 +70,12 @@ pub fn output_text(output: &Output) -> String {
     format!("stdout={stdout:?} stderr={stderr:?}")
 }
 
-pub fn wait_for_daemon_ready(home: &Path, xdg: &Path) {
+pub fn wait_for_daemon_ready(_home: &Path, xdg: &Path) {
+    let manifest_path = daemon_manifest_path(xdg);
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
-        let output = run_harness(home, xdg, &["daemon", "status"]);
-        if output.status.success()
-            && let Ok(status) = serde_json::from_slice::<serde_json::Value>(&output.stdout)
-            && status.get("manifest").is_some_and(|v| !v.is_null())
+        if let Ok((endpoint, token)) = read_daemon_endpoint_and_token(&manifest_path)
+            && daemon_endpoint_is_healthy(&endpoint, &token)
         {
             return;
         }
@@ -83,22 +87,12 @@ pub fn wait_for_daemon_ready(home: &Path, xdg: &Path) {
     }
 }
 
-pub fn current_daemon_endpoint_and_token(home: &Path, xdg: &Path) -> (String, String) {
+pub fn current_daemon_endpoint_and_token(_home: &Path, xdg: &Path) -> (String, String) {
+    let manifest_path = daemon_manifest_path(xdg);
     let deadline = Instant::now() + DAEMON_WAIT_TIMEOUT;
     loop {
-        let output = run_harness(home, xdg, &["daemon", "status"]);
-        if output.status.success()
-            && let Ok(status) = serde_json::from_slice::<serde_json::Value>(&output.stdout)
-            && let (Some(endpoint), Some(token_path)) = (
-                status["manifest"]["endpoint"].as_str(),
-                status["manifest"]["token_path"].as_str(),
-            )
-            && let Ok(token) = std::fs::read_to_string(token_path)
-        {
-            let token = token.trim().to_string();
-            if !token.is_empty() {
-                return (endpoint.to_string(), token);
-            }
+        if let Ok(endpoint_and_token) = read_daemon_endpoint_and_token(&manifest_path) {
+            return endpoint_and_token;
         }
         assert!(
             Instant::now() < deadline,
@@ -106,6 +100,46 @@ pub fn current_daemon_endpoint_and_token(home: &Path, xdg: &Path) -> (String, St
         );
         thread::sleep(DAEMON_WAIT_INTERVAL);
     }
+}
+
+fn daemon_manifest_path(xdg: &Path) -> PathBuf {
+    xdg.join("harness")
+        .join("daemon")
+        .join("managed")
+        .join("manifest.json")
+}
+
+fn read_daemon_endpoint_and_token(manifest_path: &Path) -> Result<(String, String), String> {
+    let data = std::fs::read_to_string(manifest_path)
+        .map_err(|error| format!("read {}: {error}", manifest_path.display()))?;
+    let manifest: Value = serde_json::from_str(&data)
+        .map_err(|error| format!("parse {}: {error}", manifest_path.display()))?;
+    let endpoint = manifest["endpoint"]
+        .as_str()
+        .ok_or_else(|| "daemon manifest has no endpoint".to_string())?;
+    let token_path = manifest["token_path"]
+        .as_str()
+        .ok_or_else(|| "daemon manifest has no token path".to_string())?;
+    let token = std::fs::read_to_string(token_path)
+        .map_err(|error| format!("read daemon token {token_path}: {error}"))?;
+    let token = token.trim().to_string();
+    if token.is_empty() {
+        return Err("daemon token is empty".to_string());
+    }
+    Ok((endpoint.to_string(), token))
+}
+
+fn daemon_endpoint_is_healthy(endpoint: &str, token: &str) -> bool {
+    let url = format!("{}/v1/health", endpoint.trim_end_matches('/'));
+    runtime().block_on(async {
+        reqwest::Client::new()
+            .get(url)
+            .bearer_auth(token)
+            .timeout(DAEMON_HTTP_TIMEOUT)
+            .send()
+            .await
+            .is_ok_and(|response| response.status().is_success())
+    })
 }
 
 /// Attempt a session start and return `Ok(state)` on 200, or `Err((status, body))` on any

@@ -68,7 +68,13 @@ cargo fmt --check
 cargo clippy --lib
 ```
 
-Unit tests are in-crate `#[test]` blocks. Integration tests live in `tests/integration/` and run single-threaded for environment safety. Tests that read XDG paths must isolate state with `temp_env::with_vars`, setting both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`. Tests use real filesystem state.
+Unit tests are in-crate `#[test]` blocks. Integration tests live in
+`tests/integration/`. Canonical Rust test tasks use nextest process isolation
+and parallel scheduling. Tests must not require runner-wide serialization;
+isolate their environment, filesystem paths, ports, and external resource
+names instead. Tests that read XDG paths must isolate state with
+`temp_env::with_vars`, setting both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`.
+Tests use real filesystem state.
 
 Pre-commit gate: `mise run check`. Add `mise run aff:check` when the task touches `aff` or aff-owned runtime hooks.
 

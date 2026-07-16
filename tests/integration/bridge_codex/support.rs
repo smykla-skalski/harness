@@ -173,14 +173,6 @@ pub(super) fn ensure_host_home(data_home: &Path) -> PathBuf {
     host_home
 }
 
-pub(super) fn unused_local_port() -> u16 {
-    TcpListener::bind(("127.0.0.1", 0))
-        .expect("bind local port")
-        .local_addr()
-        .expect("read local addr")
-        .port()
-}
-
 pub(super) fn bridge_binary() -> PathBuf {
     assert_cmd::cargo::cargo_bin("harness-bridge")
 }

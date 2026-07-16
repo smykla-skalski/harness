@@ -1,14 +1,12 @@
 // Compact/fingerprint integration tests.
 // Tests compact handoff lifecycle (build, save, consume, session start/stop).
 //
-// All env-dependent tests are combined into one #[test] to avoid races
-// from parallel test execution mutating the same env vars (XDG_DATA_HOME,
-// CLAUDE_SESSION_ID, HOME). See workspace tests for the same pattern.
+// Environment-dependent checks run as separate nextest processes so they can
+// execute concurrently without sharing XDG, session, HOME, or PATH state.
 
 use std::env;
 use std::fs;
 use std::path::Path;
-use std::sync::PoisonError;
 
 use harness::setup::{PreCompactArgs, SessionStartArgs, SessionStopArgs};
 use harness::workspace::compact::{
@@ -18,6 +16,7 @@ use harness::workspace::compact::{
 use super::helpers::*;
 
 mod fingerprints;
+mod lifecycle_tests;
 
 // Build a runner handoff for testing.
 fn test_runner() -> RunnerHandoff<'static> {
@@ -70,7 +69,6 @@ fn setup_env() -> (tempfile::TempDir, tempfile::TempDir) {
 }
 
 fn with_compact_env(session_id: &str, test: impl FnOnce(&Path)) {
-    let _lock = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     let (xdg, project) = setup_env();
     let orig_path = env::var("PATH").unwrap_or_default();
     let path_with_bin = format!("{}:{orig_path}", xdg.path().join("bin").display());
@@ -90,9 +88,7 @@ fn with_compact_env(session_id: &str, test: impl FnOnce(&Path)) {
 // ============================================================================
 // Compact handoff tests
 //
-// All env-dependent tests live in one function to prevent env var races.
-// Each logical test is a standalone helper called sequentially inside a
-// single with_env_vars scope.
+// Each logical lifecycle check gets its own isolated nextest process.
 // ============================================================================
 
 // build_compact_handoff returns runner: None by default.
@@ -458,28 +454,4 @@ fn compact_runner_handoff_roundtrip_smoke() {
         "compact-runner-roundtrip",
         check_build_compact_includes_runner,
     );
-}
-
-#[test]
-#[ignore = "slow: spawns fake toolchain processes"]
-fn compact_handoff_lifecycle() {
-    with_compact_env("compact-lifecycle", |project| {
-        check_build_compact_includes_runner(project);
-        check_build_compact_worktree_project(project);
-        check_build_compact_includes_create(project);
-        check_build_compact_create_fallback(project);
-        check_save_consume_compact_handoff(project);
-        check_pre_compact_persists(project);
-        check_session_start_compact_hydrates(project);
-        check_session_start_compact_worktree(project);
-        check_session_start_compact_aborted_resume(project);
-        check_session_start_compact_restores_create(project);
-        check_session_start_compact_divergence_warning(project);
-        check_session_start_restores_project(project);
-        check_session_start_restores_worktree(project);
-        check_session_start_cross_project(project);
-        check_session_start_without_pending_handoff(project);
-        check_session_stop_without_pointer(project);
-        check_session_start_no_replay(project);
-    });
 }

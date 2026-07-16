@@ -2,6 +2,15 @@
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+host_os="$(uname -s)"
+case "$host_os" in
+  Darwin|Linux)
+    ;;
+  *)
+    printf 'error: unsupported script-test host OS: %s\n' "$host_os" >&2
+    exit 1
+    ;;
+esac
 
 if (( $# > 1 )); then
   printf 'usage: %s [--all|--lint|--tests]\n' "${0##*/}" >&2
@@ -100,7 +109,13 @@ python_scripts=(
   "$ROOT"/scripts/lib/*.py
   "$ROOT"/scripts/tests/test_*.py
 )
-root_python_tests=("$ROOT"/scripts/tests/test_*.py)
+portable_root_python_tests=(
+  "$ROOT"/scripts/tests/test_disable_fsmonitor_dormant.py
+)
+macos_root_python_tests=(
+  "$ROOT"/scripts/tests/test_clean_stale_fsmonitor.py
+  "$ROOT"/scripts/tests/test_launchd_fsmonitor.py
+)
 monitor_shell_scripts=(
   "$ROOT"/apps/harness-monitor/ci_scripts/*.sh
   "$ROOT"/apps/harness-monitor/Scripts/*.sh
@@ -111,7 +126,7 @@ monitor_python_scripts=(
   "$ROOT"/apps/harness-monitor/Scripts/lib/*.py
 )
 monitor_python_tests_dir="$ROOT/apps/harness-monitor/Scripts/tests"
-monitor_python_tests=("$ROOT"/apps/harness-monitor/Scripts/tests/*.py)
+monitor_python_tests=("$ROOT"/apps/harness-monitor/Scripts/tests/test_*.py)
 monitor_python_fast_tests=()
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -124,6 +139,12 @@ if [[ "$mode" != "--tests" ]]; then
     printf "error: shellcheck is required. Install tools with \`mise install\`.\n" >&2
     exit 1
   fi
+  if ! command -v rg >/dev/null 2>&1; then
+    printf "error: ripgrep is required. Install tools with \`mise install\`.\n" >&2
+    exit 1
+  fi
+
+  "$ROOT/scripts/check-parallel-rust-tests.sh"
 
   for script_path in "${shell_scripts[@]}"; do
     bash -n "$script_path"
@@ -150,27 +171,38 @@ if [[ "$mode" != "--tests" ]]; then
   fi
 fi
 
-if [[ "$mode" != "--lint" ]] && (( ${#root_python_tests[@]} > 0 )); then
-  run_quiet_step \
-    "root python script tests" \
-    env PYTHONDONTWRITEBYTECODE=1 \
-    python3 -m unittest discover -s "$ROOT/scripts/tests" -p 'test_*.py'
-fi
-if [[ "$mode" != "--lint" ]] && (( ${#monitor_python_tests[@]} > 0 )); then
-  for test_path in "${monitor_python_tests[@]}"; do
-    case "$(basename -- "$test_path")" in
-      test_xcodebuild_with_lock.py|test_test_swift.py)
-        ;;
-      *)
-        monitor_python_fast_tests+=("$test_path")
-        ;;
-    esac
-  done
-  if (( ${#monitor_python_fast_tests[@]} > 0 )); then
+if [[ "$mode" != "--lint" ]]; then
+  if (( ${#portable_root_python_tests[@]} > 0 )); then
     run_quiet_step \
-      "monitor python script tests (fast subset)" \
-      env "PYTHONPATH=$monitor_python_tests_dir${PYTHONPATH:+:$PYTHONPATH}" \
-      python3 -m unittest "${monitor_python_fast_tests[@]}"
+      "portable root python script tests" \
+      env PYTHONDONTWRITEBYTECODE=1 \
+      python3 -m unittest "${portable_root_python_tests[@]}"
+  fi
+  if [[ "$host_os" == "Darwin" ]]; then
+    if (( ${#macos_root_python_tests[@]} > 0 )); then
+      run_quiet_step \
+        "root macOS python script tests" \
+        env PYTHONDONTWRITEBYTECODE=1 \
+        python3 -m unittest "${macos_root_python_tests[@]}"
+    fi
+    for test_path in "${monitor_python_tests[@]}"; do
+      case "$(basename -- "$test_path")" in
+        test_test_swift.py)
+          ;;
+        *)
+          monitor_python_fast_tests+=("$test_path")
+          ;;
+      esac
+    done
+    if (( ${#monitor_python_fast_tests[@]} > 0 )); then
+      run_quiet_step \
+        "monitor macOS python script tests (fast subset)" \
+        env "PYTHONPATH=$monitor_python_tests_dir${PYTHONPATH:+:$PYTHONPATH}" \
+        python3 -m unittest "${monitor_python_fast_tests[@]}"
+    fi
+  else
+    printf 'ok: root macOS python script tests (skipped on %s)\n' "$host_os"
+    printf 'ok: monitor macOS python script tests (skipped on %s)\n' "$host_os"
   fi
 fi
 

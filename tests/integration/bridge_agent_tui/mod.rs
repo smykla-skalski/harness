@@ -21,7 +21,7 @@ use self::support::{
     bridge_binary, ensure_host_home, output_text, run_bridge, run_bridge_with_data_home,
     wait_for_bridge_exit, wait_for_bridge_state,
 };
-use super::helpers::{ManagedChild, test_session_uuid};
+use super::helpers::{ManagedChild, TcpPortLease, test_session_uuid};
 
 const BRIDGE_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
 const BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(100);

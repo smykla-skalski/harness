@@ -1,3 +1,4 @@
+#![cfg(target_os = "linux")]
 #![allow(
     clippy::absolute_paths,
     reason = "the public ACME proof keeps system-bound collaborators explicit"

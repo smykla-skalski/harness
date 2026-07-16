@@ -81,16 +81,16 @@ async fn get_managed_agents_merges_terminal_and_codex_snapshots_when_sync_db_is_
         panic!("expected managed agent list response");
     };
     assert_eq!(agents.len(), 2);
-    assert_eq!(agents[0]["kind"].as_str(), Some("terminal"));
-    assert_eq!(
-        agents[0]["snapshot"]["tui_id"].as_str(),
-        Some("agent-tui-3")
-    );
-    assert_eq!(agents[1]["kind"].as_str(), Some("codex"));
-    assert_eq!(
-        agents[1]["snapshot"]["run_id"].as_str(),
-        Some("codex-run-3")
-    );
+    let terminal = agents
+        .iter()
+        .find(|agent| agent["kind"].as_str() == Some("terminal"))
+        .expect("terminal snapshot");
+    assert_eq!(terminal["snapshot"]["tui_id"].as_str(), Some("agent-tui-3"));
+    let codex = agents
+        .iter()
+        .find(|agent| agent["kind"].as_str() == Some("codex"))
+        .expect("codex snapshot");
+    assert_eq!(codex["snapshot"]["run_id"].as_str(), Some("codex-run-3"));
 }
 
 #[tokio::test]

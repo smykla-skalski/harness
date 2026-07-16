@@ -9,6 +9,13 @@ use super::support::{
     spawn_daemon_serve, start_session_via_http, wait_for_daemon_ready,
 };
 
+const PARALLEL_SESSION_A: &str = "10000000-0000-4000-8000-000000000001";
+const PARALLEL_SESSION_B: &str = "10000000-0000-4000-8000-000000000002";
+const DELETE_SESSION_A: &str = "20000000-0000-4000-8000-000000000001";
+const DELETE_SESSION_B: &str = "20000000-0000-4000-8000-000000000002";
+const ACTIVE_SESSION_A: &str = "30000000-0000-4000-8000-000000000001";
+const ACTIVE_SESSION_B: &str = "30000000-0000-4000-8000-000000000002";
+
 /// Slow: spawns daemon.
 #[ignore = "slow integration test that spawns a real daemon"]
 #[test]
@@ -24,8 +31,8 @@ fn two_sessions_same_origin_get_distinct_workspaces() {
     let mut daemon = spawn_daemon_serve(&home, &xdg);
     wait_for_daemon_ready(&home, &xdg);
 
-    let state_a = start_session_via_http(&home, &xdg, &project, "wk-par-a1234567");
-    let state_b = start_session_via_http(&home, &xdg, &project, "wk-par-b1234567");
+    let state_a = start_session_via_http(&home, &xdg, &project, PARALLEL_SESSION_A);
+    let state_b = start_session_via_http(&home, &xdg, &project, PARALLEL_SESSION_B);
 
     // Session ids must be distinct.
     assert_ne!(
@@ -58,11 +65,11 @@ fn two_sessions_same_origin_get_distinct_workspaces() {
     // Both branches must be present in the origin repo.
     let branches = git_branches_matching(&project, "harness/");
     assert!(
-        branches.contains(&"harness/wk-par-a1234567".to_string()),
+        branches.contains(&format!("harness/{PARALLEL_SESSION_A}")),
         "branch A must exist; found: {branches:?}"
     );
     assert!(
-        branches.contains(&"harness/wk-par-b1234567".to_string()),
+        branches.contains(&format!("harness/{PARALLEL_SESSION_B}")),
         "branch B must exist; found: {branches:?}"
     );
 
@@ -80,11 +87,11 @@ fn two_sessions_same_origin_get_distinct_workspaces() {
         .filter_map(|s| s["session_id"].as_str())
         .collect();
     assert!(
-        session_ids.contains(&"wk-par-a1234567"),
+        session_ids.contains(&PARALLEL_SESSION_A),
         "session A must appear in list; found: {session_ids:?}"
     );
     assert!(
-        session_ids.contains(&"wk-par-b1234567"),
+        session_ids.contains(&PARALLEL_SESSION_B),
         "session B must appear in list; found: {session_ids:?}"
     );
 
@@ -106,11 +113,11 @@ fn deleting_one_session_leaves_other_intact() {
     let mut daemon = spawn_daemon_serve(&home, &xdg);
     wait_for_daemon_ready(&home, &xdg);
 
-    let state_a = start_session_via_http(&home, &xdg, &project, "wk-del-a7654321");
-    let state_b = start_session_via_http(&home, &xdg, &project, "wk-del-b7654321");
+    let state_a = start_session_via_http(&home, &xdg, &project, DELETE_SESSION_A);
+    let state_b = start_session_via_http(&home, &xdg, &project, DELETE_SESSION_B);
 
     // Delete only session A.
-    let http_status = delete_session_via_http(&home, &xdg, "wk-del-a7654321");
+    let http_status = delete_session_via_http(&home, &xdg, DELETE_SESSION_A);
     assert_eq!(http_status, 204, "DELETE A must return 204");
 
     // Session A's worktree is gone.
@@ -130,11 +137,11 @@ fn deleting_one_session_leaves_other_intact() {
     // Branch A gone, branch B present.
     let branches = git_branches_matching(&project, "harness/");
     assert!(
-        !branches.contains(&"harness/wk-del-a7654321".to_string()),
+        !branches.contains(&format!("harness/{DELETE_SESSION_A}")),
         "branch A must be deleted; found: {branches:?}"
     );
     assert!(
-        branches.contains(&"harness/wk-del-b7654321".to_string()),
+        branches.contains(&format!("harness/{DELETE_SESSION_B}")),
         "branch B must still exist; found: {branches:?}"
     );
 
@@ -152,11 +159,11 @@ fn deleting_one_session_leaves_other_intact() {
         .filter_map(|s| s["session_id"].as_str())
         .collect();
     assert!(
-        !session_ids.contains(&"wk-del-a7654321"),
+        !session_ids.contains(&DELETE_SESSION_A),
         "session A must not appear in list after delete; found: {session_ids:?}"
     );
     assert!(
-        session_ids.contains(&"wk-del-b7654321"),
+        session_ids.contains(&DELETE_SESSION_B),
         "session B must still appear in list; found: {session_ids:?}"
     );
 
@@ -178,8 +185,8 @@ fn active_json_tracks_each_session() {
     let mut daemon = spawn_daemon_serve(&home, &xdg);
     wait_for_daemon_ready(&home, &xdg);
 
-    let state_a = start_session_via_http(&home, &xdg, &project, "wk-act-a2468ace");
-    let state_b = start_session_via_http(&home, &xdg, &project, "wk-act-b2468ace");
+    let state_a = start_session_via_http(&home, &xdg, &project, ACTIVE_SESSION_A);
+    let state_b = start_session_via_http(&home, &xdg, &project, ACTIVE_SESSION_B);
 
     let active_a = layout_for_state(&xdg, &state_a).active_registry();
     let active_b = layout_for_state(&xdg, &state_b).active_registry();
@@ -192,7 +199,7 @@ fn active_json_tracks_each_session() {
     );
     let active_text_a = std::fs::read_to_string(&active_a).expect("read .active.json A");
     assert!(
-        active_text_a.contains("wk-act-a2468ace"),
+        active_text_a.contains(ACTIVE_SESSION_A),
         ".active.json A must contain session A; content: {active_text_a}"
     );
 
@@ -204,7 +211,7 @@ fn active_json_tracks_each_session() {
     );
     let active_text_b = std::fs::read_to_string(&active_b).expect("read .active.json B");
     assert!(
-        active_text_b.contains("wk-act-b2468ace"),
+        active_text_b.contains(ACTIVE_SESSION_B),
         ".active.json B must contain session B; content: {active_text_b}"
     );
 

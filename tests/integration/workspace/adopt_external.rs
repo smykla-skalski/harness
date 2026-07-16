@@ -13,13 +13,15 @@ use serde_json::{Value, json};
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 
+use harness::session::types::CURRENT_VERSION;
+
 use super::support::{
     DAEMON_HTTP_TIMEOUT, DAEMON_WAIT_INTERVAL, DAEMON_WAIT_TIMEOUT,
     current_daemon_endpoint_and_token, spawn_daemon_serve, wait_for_daemon_ready,
 };
 
-// Current schema version — must match `CURRENT_VERSION` in `session::types`.
-const SCHEMA_VERSION: u32 = 9;
+const IDEMPOTENT_SESSION_ID: &str = "72026b9c-9f8f-5a76-a6cf-a05cbb5741ee";
+const EXTERNAL_SESSION_ID: &str = "72026b9c-9f8f-5a76-a6cf-a05cbb5741ef";
 
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 
@@ -38,7 +40,7 @@ fn write_b_layout_session(project_dir: &Path, sid: &str, origin: &Path) -> PathB
 
     let origin_str = origin.to_string_lossy();
     let state = json!({
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": CURRENT_VERSION,
         "state_version": 0,
         "session_id": sid,
         "project_name": project_dir.file_name().unwrap().to_string_lossy(),
@@ -214,7 +216,7 @@ fn adopt_external_is_idempotent_with_409() {
 
         let project_dir = xdg.join("harness").join("sessions").join("kuma");
         fs::create_dir_all(&project_dir).unwrap();
-        let session_root = write_b_layout_session(&project_dir, "abcdabcd", &origin);
+        let session_root = write_b_layout_session(&project_dir, IDEMPOTENT_SESSION_ID, &origin);
 
         let mut daemon = spawn_daemon_serve(&home, &xdg);
         wait_for_daemon_ready(&home, &xdg);
@@ -238,7 +240,7 @@ fn adopt_external_is_idempotent_with_409() {
         );
         assert_eq!(
             second_body["session_id"].as_str(),
-            Some("abcdabcd"),
+            Some(IDEMPOTENT_SESSION_ID),
             "session_id must be echoed in the conflict body"
         );
 
@@ -267,7 +269,7 @@ fn adopt_external_outside_sessions_root_sets_flag() {
         // External project dir — lives completely outside `xdg/harness/sessions/`.
         let external_project = tmp.path().join("external-root").join("kuma");
         fs::create_dir_all(&external_project).unwrap();
-        let session_root = write_b_layout_session(&external_project, "ffff0000", &origin);
+        let session_root = write_b_layout_session(&external_project, EXTERNAL_SESSION_ID, &origin);
 
         let mut daemon = spawn_daemon_serve(&home, &xdg);
         wait_for_daemon_ready(&home, &xdg);

@@ -8,7 +8,7 @@ use harness::daemon::bridge::{BridgeState, BridgeStatusReport};
 use harness::daemon::state::DaemonOwnership;
 use tempfile::tempdir;
 
-use super::helpers::ManagedChild;
+use super::helpers::{ManagedChild, TcpPortLease};
 
 mod readiness;
 mod reconfigure;
@@ -75,11 +75,12 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
-    let codex_port = unused_local_port();
+    let codex_port_lease = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port = codex_port_lease.port();
     let codex_port_text = codex_port.to_string();
     let codex_endpoint = format!("ws://127.0.0.1:{codex_port}");
 
-    let mut bridge = ManagedChild::spawn(
+    let mut bridge = ManagedChild::spawn_with_port_lease(
         Command::new(bridge_binary())
             .args([
                 "start",
@@ -99,6 +100,7 @@ fn bridge_start_with_mock_codex_publishes_codex_capability() {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
+        codex_port_lease,
     )
     .expect("spawn bridge");
 
@@ -150,10 +152,11 @@ fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
-    let codex_port = unused_local_port();
+    let codex_port_lease = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port = codex_port_lease.port();
     let codex_port_text = codex_port.to_string();
 
-    let mut bridge = ManagedChild::spawn(
+    let mut bridge = ManagedChild::spawn_with_port_lease(
         Command::new(bridge_binary())
             .args(["start", "--codex-port", &codex_port_text, "--codex-path"])
             .arg(&mock_codex)
@@ -166,6 +169,7 @@ fn bridge_start_without_capability_flag_enables_all_compiled_capabilities() {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
+        codex_port_lease,
     )
     .expect("spawn bridge");
 

@@ -252,6 +252,7 @@ mod sessions;
 mod signals;
 mod signals_async;
 mod signals_async_send;
+mod signals_timeout;
 mod status;
 mod sync_support;
 mod task_board;

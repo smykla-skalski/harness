@@ -6,9 +6,7 @@ use tempfile::tempdir;
 
 use super::*;
 
-/// Reset the daemon root override. Every test should call this in its
-/// teardown because tests run single-threaded and the override is
-/// process-global.
+/// Reset the process-global daemon root override within each isolated case.
 fn reset_override() {
     state::set_daemon_root_override(None);
 }
@@ -75,11 +73,9 @@ fn candidate_daemon_locations_dedupes_when_env_points_at_xdg() {
     );
 }
 
+#[cfg(target_os = "macos")]
 #[test]
 fn candidate_daemon_locations_on_macos_includes_group_container() {
-    if !cfg!(target_os = "macos") {
-        return;
-    }
     let tmp = tempdir().expect("tempdir");
     temp_env::with_vars(
         [
@@ -166,11 +162,9 @@ fn running_daemon_location_picks_xdg_when_only_xdg_is_live() {
     );
 }
 
+#[cfg(target_os = "macos")]
 #[test]
 fn running_daemon_location_picks_group_container_when_only_it_is_live() {
-    if !cfg!(target_os = "macos") {
-        return;
-    }
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
     let group_root = home
@@ -231,15 +225,13 @@ fn adopt_is_noop_when_default_is_live() {
     );
 }
 
+#[cfg(target_os = "macos")]
 #[test]
 #[expect(
     clippy::cognitive_complexity,
     reason = "one happy-path test covering adopt + assert + second-call idempotency"
 )]
 fn adopt_switches_override_when_default_is_empty_and_alt_is_live() {
-    if !cfg!(target_os = "macos") {
-        return;
-    }
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
     let group_root = home
@@ -345,11 +337,9 @@ fn families_compatible_blocks_cross_family_adoption() {
     assert!(!families_compatible(&non_agent, &agent_b));
 }
 
+#[cfg(target_os = "macos")]
 #[test]
 fn adopt_refuses_to_cross_agent_to_non_agent_boundary() {
-    if !cfg!(target_os = "macos") {
-        return;
-    }
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
     // Agent lane sets explicit HARNESS_DAEMON_DATA_HOME so its
@@ -400,11 +390,9 @@ fn adopt_refuses_to_cross_agent_to_non_agent_boundary() {
     );
 }
 
+#[cfg(target_os = "macos")]
 #[test]
 fn adopt_refuses_to_cross_non_agent_to_agent_boundary() {
-    if !cfg!(target_os = "macos") {
-        return;
-    }
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
     // Live agent daemon at runtime-profiles/agent-bar.

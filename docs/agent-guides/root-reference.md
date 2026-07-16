@@ -71,10 +71,12 @@ hooks.
 ## Testing details
 
 Integration tests live in `tests/integration/` and cover hooks, commands, and
-workflows end to end. They run with `--test-threads=1` for environment safety.
-Tests that read XDG paths must isolate state with `temp_env::with_vars`, setting
-both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`. Avoid mocks; tests use real
-filesystem state.
+workflows end to end. Canonical Rust test tasks use nextest process isolation
+and parallel scheduling. A test must isolate its environment, filesystem
+paths, ports, and external resource names instead of requiring runner-wide
+serialization. Tests that read XDG paths must isolate state with
+`temp_env::with_vars`, setting both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`.
+Avoid mocks; tests use real filesystem state.
 
 ## Build lane and fsmonitor cleanup
 

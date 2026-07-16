@@ -64,7 +64,13 @@ pub fn git_branches_matching(repo_path: &Path, prefix: &str) -> Vec<String> {
     let output = run_git_output(repo_path, &["branch", "--list", &format!("{prefix}*")]);
     output
         .lines()
-        .map(|line| line.trim().trim_start_matches("* ").to_string())
+        .map(|line| {
+            let line = line.trim();
+            line.strip_prefix("* ")
+                .or_else(|| line.strip_prefix("+ "))
+                .unwrap_or(line)
+                .to_string()
+        })
         .filter(|name| !name.is_empty())
         .collect()
 }

@@ -22,6 +22,9 @@ use harness::session::types::{SessionRole, TaskSeverity};
 use harness_testkit::{init_git_repo_with_seed, with_isolated_harness_env};
 
 const SAMPLE_COUNT: usize = 10;
+const SESSION_A: &str = "60000000-0000-4000-8000-000000000001";
+const SESSION_B: &str = "60000000-0000-4000-8000-000000000002";
+const STATUS_SESSION: &str = "60000000-0000-4000-8000-000000000003";
 
 fn with_perf_test_env<T>(
     base: &std::path::Path,
@@ -168,10 +171,20 @@ fn seed_workspace(tmp: &std::path::Path) {
         init_git_repo_with_seed(project);
     }
 
-    let state_a =
-        session_service::start_session("", "perf-test", &project_a, Some("s1")).expect("start s1");
+    session_service::start_session("", "perf-test", &project_a, Some(SESSION_A))
+        .expect("start performance session A");
+    let state_a = session_service::join_session(
+        SESSION_A,
+        SessionRole::Leader,
+        "claude",
+        &[],
+        None,
+        &project_a,
+        None,
+    )
+    .expect("join performance leader A");
     session_service::join_session(
-        "s1",
+        SESSION_A,
         SessionRole::Worker,
         "codex",
         &[],
@@ -179,22 +192,28 @@ fn seed_workspace(tmp: &std::path::Path) {
         &project_a,
         None,
     )
-    .expect("join s1");
+    .expect("join performance session A");
 
-    let state_b = session_service::start_session("", "perf-test-2", &project_b, Some("s2"))
-        .expect("start s2");
+    session_service::start_session("", "perf-test-2", &project_b, Some(SESSION_B))
+        .expect("start performance session B");
+    let state_b = session_service::join_session(
+        SESSION_B,
+        SessionRole::Leader,
+        "claude",
+        &[],
+        None,
+        &project_b,
+        None,
+    )
+    .expect("join performance leader B");
 
     let sessions = [
-        ("s1", project_a.as_path(), &state_a),
-        ("s2", project_b.as_path(), &state_b),
+        (SESSION_A, project_a.as_path(), &state_a),
+        (SESSION_B, project_b.as_path(), &state_b),
     ];
 
     for (session_id, project_dir, session_state) in &sessions {
-        let leader = session_state
-            .agents
-            .keys()
-            .find(|id| id.starts_with("claude"))
-            .expect("leader agent");
+        let leader = session_state.leader_id.as_deref().expect("leader agent");
         for i in 0..3 {
             session_service::create_task(
                 session_id,
@@ -225,13 +244,15 @@ async fn daemon_http_endpoint_performance_budgets() {
     let daemon = start_test_daemon(Some(db)).await;
     let client = Client::new();
 
-    let endpoints: Vec<(&str, &str, f64)> = vec![
+    let session_detail_path = format!("/v1/sessions/{SESSION_A}");
+    let timeline_path = format!("/v1/sessions/{SESSION_A}/timeline");
+    let endpoints = [
         ("health", "/v1/health", 5.0),
         ("projects", "/v1/projects", 10.0),
         ("sessions", "/v1/sessions", 10.0),
         ("diagnostics", "/v1/diagnostics", 10.0),
-        ("session_detail", "/v1/sessions/s1", 30.0),
-        ("timeline", "/v1/sessions/s1/timeline", 50.0),
+        ("session_detail", session_detail_path.as_str(), 30.0),
+        ("timeline", timeline_path.as_str(), 50.0),
     ];
 
     let mut results = Vec::new();
@@ -257,7 +278,9 @@ async fn daemon_http_endpoint_performance_budgets() {
     let perf_dir = std::path::Path::new("tmp/perf");
     let _ = fs_err::create_dir_all(perf_dir);
     let json = serde_json::to_string_pretty(&results).expect("serialize results");
-    let _ = fs_err::write(perf_dir.join("daemon-http-perf.json"), &json);
+    let result_path = perf_dir.join(format!("daemon-http-perf-{}.json", std::process::id()));
+    let _ = fs_err::write(&result_path, &json);
+    println!("performance artifact: {}", result_path.display());
 
     for result in &results {
         let status = if result.passed { "PASS" } else { "FAIL" };
@@ -284,7 +307,7 @@ fn daemon_status_report_within_budget() {
         state::ensure_daemon_dirs().expect("dirs");
         let project = tmp.path().join("project");
         init_git_repo_with_seed(&project);
-        session_service::start_session("", "status-perf", &project, Some("sp1"))
+        session_service::start_session("", "status-perf", &project, Some(STATUS_SESSION))
             .expect("start session");
     });
 
