@@ -1,0 +1,21 @@
+[package]
+name = "policy-codegen"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[[bin]]
+name = "policy-codegen"
+# Keep the established source path so generated provenance and include paths
+# remain stable. This publish-disabled tool is intentionally not packageable.
+path = "../../examples/policy-codegen.rs"
+
+[dependencies]
+syn = { version = "=2.0.117", features = ["full"] }
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+
+[lints.rust]
+unused = { level = "deny", priority = 1 }

@@ -117,7 +117,7 @@ fn cargo_local_script_isolates_sccache_server_socket() {
 
     write_fake_shell_tool(
         &fake_bin.join("sccache"),
-        "#!/bin/sh\nset -eu\nif [ \"$1\" = \"cc\" ] && [ \"$2\" = \"--version\" ]; then\n  echo 'sccache fake cc'\n  exit 0\nfi\nexit 1\n",
+        "#!/bin/sh\nset -eu\nif [ \"$1\" = \"--version\" ]; then\n  echo 'sccache 0.16.0'\n  exit 0\nfi\nexit 1\n",
     );
 
     let output = Command::new("/bin/bash")
@@ -131,6 +131,12 @@ fn cargo_local_script_isolates_sccache_server_socket() {
         .env_remove("SCCACHE_SERVER_UDS")
         .env_remove("SCCACHE_SERVER_PORT")
         .env_remove("SCCACHE_NO_DAEMON")
+        .env_remove("SCCACHE_BASEDIRS")
+        .env_remove("SCCACHE_IDLE_TIMEOUT")
+        .env_remove("SCCACHE_CACHE_SIZE")
+        .env_remove("SCCACHE_BIN")
+        .env_remove("SCCACHE_VERSION")
+        .env_remove("HARNESS_SCCACHE_TMPDIR")
         .env_remove("CODEX_SESSION_ID")
         .env_remove("CODEX_THREAD_ID")
         .env_remove("CLAUDE_SESSION_ID")
@@ -168,9 +174,15 @@ fn cargo_local_script_isolates_sccache_server_socket() {
         "expected socket parent to exist: {socket}"
     );
     assert_eq!(
-        env.get("RUSTC_WRAPPER").expect("RUSTC_WRAPPER line"),
+        env.get("SCCACHE_BIN").expect("SCCACHE_BIN line"),
         &fake_bin.join("sccache").display().to_string()
     );
+    assert_eq!(
+        env.get("SCCACHE_VERSION").expect("SCCACHE_VERSION line"),
+        "0.16.0"
+    );
+    assert_eq!(env.get("RUSTC_WRAPPER").expect("RUSTC_WRAPPER line"), "");
+    assert_eq!(env.get("CACHE_MODE").expect("CACHE_MODE line"), "sccache");
 }
 
 #[test]

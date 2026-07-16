@@ -5,9 +5,7 @@ use std::sync::PoisonError;
 use harness::run::PreflightArgs;
 use harness::run::RunDirArgs;
 use harness::run::workflow::{RunnerPhase, read_runner_state};
-use harness_testkit::{
-    FakeToolchain, GroupBuilder, RunDirBuilder, SuiteBuilder, init_run_with_suite,
-};
+use harness_testkit::{FakeToolchain, GroupBuilder, SuiteBuilder};
 
 use super::super::helpers::*;
 

@@ -3,7 +3,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::*;
-use crate::infra::blocks::{FakeProcessExecutor, FakeProcessMethod, FakeResponse};
+use crate::infra::blocks::{
+    FakeProcessExecutor, FakeProcessMethod, FakeResponse, StdProcessExecutor,
+};
 use crate::infra::exec::CommandResult;
 
 fn success_result(args: &[&str]) -> CommandResult {
@@ -143,6 +145,10 @@ fn fake_build_system_returns_custom_result() {
 mod contracts {
     use super::*;
 
+    fn production_build() -> ProcessBuildSystem {
+        ProcessBuildSystem::new(Arc::new(StdProcessExecutor))
+    }
+
     fn contract_name_is_non_empty(build: &dyn BuildSystem) {
         assert!(!build.name().is_empty(), "block name should not be empty");
     }
@@ -179,5 +185,23 @@ mod contracts {
     #[test]
     fn fake_satisfies_run_target_streaming_does_not_panic() {
         contract_run_target_streaming_does_not_panic(&FakeBuildSystem::success());
+    }
+
+    #[test]
+    #[ignore = "needs make on PATH"]
+    fn production_satisfies_name_is_non_empty() {
+        contract_name_is_non_empty(&production_build());
+    }
+
+    #[test]
+    #[ignore = "needs make on PATH"]
+    fn production_satisfies_denied_binaries_is_stable() {
+        contract_denied_binaries_is_stable(&production_build());
+    }
+
+    #[test]
+    #[ignore = "needs make on PATH"]
+    fn production_satisfies_run_target_does_not_panic() {
+        contract_run_target_does_not_panic(&production_build());
     }
 }

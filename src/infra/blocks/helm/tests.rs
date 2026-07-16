@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use super::*;
+use crate::infra::blocks::StdProcessExecutor;
 
 #[test]
 fn helm_setting_parses_cli_arg() {
@@ -62,6 +64,10 @@ fn helm_types_are_send_sync() {
 mod contracts {
     use super::*;
 
+    fn production_deployer() -> HelmDeployer {
+        HelmDeployer::new(Arc::new(StdProcessExecutor))
+    }
+
     fn contract_upgrade_install_returns_deploy_result(deployer: &dyn PackageDeployer) {
         let result = deployer
             .upgrade_install(
@@ -100,5 +106,11 @@ mod contracts {
     #[test]
     fn fake_satisfies_run_target() {
         contract_run_target_returns_result(&FakePackageDeployer::new());
+    }
+
+    #[test]
+    #[ignore = "needs Helm on PATH"]
+    fn production_satisfies_uninstall_nonexistent() {
+        contract_uninstall_nonexistent_is_tolerant(&production_deployer());
     }
 }

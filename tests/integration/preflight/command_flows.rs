@@ -4,7 +4,7 @@ use std::sync::PoisonError;
 
 use harness::run::RunDirArgs;
 use harness::run::{ApplyArgs, CaptureArgs, PreflightArgs, ValidateArgs};
-use harness_testkit::{FakeToolchain, init_run_with_suite};
+use harness_testkit::FakeToolchain;
 
 use super::super::helpers::*;
 

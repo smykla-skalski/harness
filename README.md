@@ -15,17 +15,17 @@ The install step also reconciles stale Harness-owned binaries found earlier on `
 
 ## Fast Local Rust Workflow
 
-The repo `mise` tasks route Rust compilation through the shared local cargo wrapper. Use `mise run cargo:local -- <cargo-args...>` when you need a wrapper-backed command outside the canned `mise` tasks. This keeps local development responsive and avoids multi-agent target-dir lock contention.
+The repo `mise` tasks route Rust compilation through the shared local cargo wrapper. Run `mise install` once to install the pinned Rust build tools, then use `mise run cargo:local -- <cargo-args...>` when you need a wrapper-backed command outside the canned `mise` tasks. This keeps local development responsive and avoids multi-agent target-dir lock contention.
 
-- If `sccache` is installed, the wrapper enables it automatically through `RUSTC_WRAPPER`.
-- Plain `cargo` invocations also pick up local compiler caching through [`.cargo/config.toml`](.cargo/config.toml), which dispatches to the repo's Rust compiler cache wrapper and falls back cleanly when `sccache` is unavailable.
+- The wrapper enables the pinned `sccache` through the stable repository `RUSTC_WRAPPER`, isolates each build lane's server socket, and normalizes worktree roots for cache reuse.
+- Plain `cargo` invocations still use the stable compiler wrapper from [`.cargo/config.toml`](.cargo/config.toml). Outside `mise`, it uses a supported Homebrew `sccache` when present and otherwise falls back cleanly to direct compilation.
 - Build jobs default to a conservative local cap instead of saturating every CPU. Agent sessions use an even lower default so multiple workers can compile in parallel without swamping the host. Override with `HARNESS_CARGO_JOBS=<n>` or `CARGO_BUILD_JOBS=<n>`.
 - Concurrent wrapper invocations automatically reduce their default job budgets based on the number of active local Rust builds, so a second or third agent does not assume it owns the whole machine.
 - Agent sessions get isolated target directories under the shared git-common-root `target/dev/agent-<session-id>` using `CODEX_SESSION_ID`, `CLAUDE_SESSION_ID`, and the other supported runtime session env vars. Non-agent local shells use the shared `target/dev/local`, so extra worktrees reuse the same artifacts instead of cloning a new `target/` tree per checkout.
 - Full release installs build each configured Harness executable, the isolated ACP adapters, and `aff` as independent concurrent leaves, while one coordinator keeps their combined Cargo job count within the configured local budget.
 - Every release binary is staged, signed, and identity-checked before the installer atomically switches the active set. Binaries derived from the canonical workspace package are also version-checked; independently versioned adapters are not. A failed build or validation leaves the previous set active.
 
-Without `sccache`, isolated target directories trade lock contention for duplicate compilation across agents. Install `sccache` if you want multi-agent sessions to reuse most compile work instead of rebuilding the same crates in parallel.
+Without a supported `sccache`, isolated target directories trade lock contention for duplicate compilation across agents. Re-run `mise install` if `mise run cargo:env` reports `CACHE_MODE=none`.
 
 Linked git worktrees share the same wrapper-managed `target/`, `xcode-derived/`, `xcode-derived-e2e/`, and `xcode-derived-instruments/` roots under the repository common dir. Repo scripts and `mise` tasks resolve those shared paths automatically, so routine worktree use does not spray duplicate build trees across each checkout.
 
@@ -35,11 +35,15 @@ Inspect the current wrapper settings with:
 mise run cargo:env
 ```
 
-For the best local experience, install `sccache` once:
+For reproducible compile and per-test timing measurements, use the diagnostic profiling tasks:
 
 ```bash
-brew install sccache
+mise run test:profile:compile
+mise run test:profile:unit
+mise run test:profile:integration
 ```
+
+These tasks keep the normal test gates unchanged and write metadata, logs, Cargo timing reports, JUnit data, and sccache snapshots under the shared `target/profile-rust-tests/` directory.
 
 When you need full debug symbols for LLDB instead of faster incremental builds, temporarily override:
 

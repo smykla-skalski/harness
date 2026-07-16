@@ -49,8 +49,13 @@ sweep_dead_sccache_sockets() {
   local dir="$1"
   local live_sockets sock
   [[ -d "$dir" ]] || return 0
+  command -v lsof >/dev/null 2>&1 || return 0
 
-  live_sockets="$(lsof -U -F n 2>/dev/null | awk '/^n\// {print substr($0,2)}' | sort -u || true)"
+  if ! live_sockets="$(lsof -U -F n 2>/dev/null \
+    | awk '/^n\// {print substr($0,2)}' \
+    | sort -u)"; then
+    return 0
+  fi
 
   for sock in "$dir"/*.sock; do
     [[ -e "$sock" ]] || continue
@@ -63,6 +68,8 @@ sweep_dead_sccache_sockets() {
 
 configure_sccache_socket() {
   local socket_root socket_id safe_user
+
+  [[ -n "${SCCACHE_BIN:-}" ]] || return 0
 
   if [[ -n "${SCCACHE_SERVER_UDS:-}" ]] \
     || [[ -n "${SCCACHE_SERVER_PORT:-}" ]] \
@@ -93,6 +100,18 @@ configure_sccache_socket() {
   export SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-30G}"
 }
 
+configure_sccache_tmpdir() {
+  local candidate="${HARNESS_SCCACHE_TMPDIR:-${TMPDIR:-/tmp}}"
+  candidate="${candidate%/}"
+
+  if (( ${#candidate} > 60 )) || ! tmpdir_is_usable "$candidate"; then
+    candidate="/tmp"
+  fi
+  tmpdir_is_usable "$candidate" || return 1
+
+  export HARNESS_SCCACHE_TMPDIR="$candidate"
+}
+
 cargo_bin_usable() {
   local candidate="${1:-}"
   [[ -n "$candidate" ]] || return 1
@@ -103,8 +122,71 @@ cargo_bin_usable() {
 sccache_bin_usable() {
   local candidate="${1:-}"
   [[ -n "$candidate" ]] || return 1
-  command -v "$candidate" >/dev/null 2>&1 || return 1
-  "$candidate" cc --version >/dev/null 2>&1
+  [[ -x "$candidate" ]] || return 1
+  "$candidate" --version >/dev/null 2>&1
+}
+
+sccache_version_supported() {
+  local version="${1#v}" major minor patch
+  version="${version%%[-+]*}"
+  IFS=. read -r major minor patch <<<"$version"
+  major="${major:-0}"
+  minor="${minor:-0}"
+  patch="${patch:-0}"
+
+  [[ "$major" =~ ^[0-9]+$ ]] \
+    && [[ "$minor" =~ ^[0-9]+$ ]] \
+    && [[ "$patch" =~ ^[0-9]+$ ]] \
+    && (( major > 0 || minor >= 14 ))
+}
+
+resolve_sccache_candidate() {
+  local candidate="$1"
+
+  if [[ "$candidate" == */* ]]; then
+    [[ -x "$candidate" ]] || return 1
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
+  command -v "$candidate"
+}
+
+resolve_sccache_bin() {
+  local requested="${SCCACHE_BIN:-}" candidate resolved output version
+
+  if [[ -n "$requested" ]]; then
+    candidate="$requested"
+    resolved="$(resolve_sccache_candidate "$candidate" 2>/dev/null || true)"
+    if [[ -n "$resolved" ]] && sccache_bin_usable "$resolved"; then
+      output="$("$resolved" --version 2>/dev/null)"
+      version="${output##* }"
+      if sccache_version_supported "$version"; then
+        export SCCACHE_BIN="$resolved"
+        export SCCACHE_VERSION="$version"
+        return 0
+      fi
+    fi
+    export SCCACHE_BIN=""
+    unset SCCACHE_VERSION
+    return 1
+  fi
+
+  for candidate in sccache /opt/homebrew/bin/sccache /usr/local/bin/sccache; do
+    resolved="$(resolve_sccache_candidate "$candidate" 2>/dev/null || true)"
+    [[ -n "$resolved" ]] || continue
+    sccache_bin_usable "$resolved" || continue
+    output="$("$resolved" --version 2>/dev/null)"
+    version="${output##* }"
+    sccache_version_supported "$version" || continue
+    export SCCACHE_BIN="$resolved"
+    export SCCACHE_VERSION="$version"
+    return 0
+  done
+
+  export SCCACHE_BIN=""
+  unset SCCACHE_VERSION
+  return 1
 }
 
 tmpdir_is_usable() {
@@ -254,15 +336,19 @@ if ! tmpdir_is_usable "${TMPDIR:-}"; then
   export TMPDIR="$tmpdir_fallback/"
 fi
 
-configure_sccache_socket || true
+resolve_sccache_bin || true
+if [[ -n "${SCCACHE_BIN:-}" ]]; then
+  export SCCACHE_BASEDIRS="${SCCACHE_BASEDIRS:-$ROOT:$COMMON_REPO_ROOT}"
+  if configure_sccache_tmpdir; then
+    configure_sccache_socket || true
+  else
+    export SCCACHE_BIN=""
+    unset SCCACHE_VERSION
+  fi
+fi
 
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/dev/$target_segment}}"
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${HARNESS_CARGO_JOBS:-$(default_jobs)}}"
-
-if [[ -z "${RUSTC_WRAPPER:-}" ]] && sccache_bin_usable sccache; then
-  export RUSTC_WRAPPER
-  RUSTC_WRAPPER="$(command -v sccache)"
-fi
 
 if [[ "${1:-}" == "--print-env" ]]; then
   printf 'CARGO_TARGET_DIR=%s\n' "$CARGO_TARGET_DIR"
@@ -278,9 +364,16 @@ if [[ "${1:-}" == "--print-env" ]]; then
   printf 'SCCACHE_SERVER_UDS=%s\n' "${SCCACHE_SERVER_UDS:-}"
   printf 'SCCACHE_IDLE_TIMEOUT=%s\n' "${SCCACHE_IDLE_TIMEOUT:-}"
   printf 'SCCACHE_CACHE_SIZE=%s\n' "${SCCACHE_CACHE_SIZE:-}"
+  printf 'SCCACHE_BIN=%s\n' "${SCCACHE_BIN:-}"
+  printf 'SCCACHE_VERSION=%s\n' "${SCCACHE_VERSION:-}"
+  printf 'SCCACHE_BASEDIRS=%s\n' "${SCCACHE_BASEDIRS:-}"
+  printf 'HARNESS_SCCACHE_TMPDIR=%s\n' "${HARNESS_SCCACHE_TMPDIR:-}"
+  printf 'CARGO_INCREMENTAL=%s\n' "${CARGO_INCREMENTAL:-}"
   printf 'RUSTC_WRAPPER=%s\n' "${RUSTC_WRAPPER:-}"
-  if [[ -n "${RUSTC_WRAPPER:-}" ]]; then
+  if [[ -n "${SCCACHE_BIN:-}" ]] && [[ -z "${RUSTC_WRAPPER:-}" ]]; then
     printf 'CACHE_MODE=sccache\n'
+  elif [[ -n "${RUSTC_WRAPPER:-}" ]]; then
+    printf 'CACHE_MODE=custom-wrapper\n'
   else
     printf 'CACHE_MODE=none\n'
   fi

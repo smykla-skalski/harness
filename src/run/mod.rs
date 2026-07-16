@@ -13,6 +13,8 @@ pub(crate) mod services;
 pub mod specs;
 pub mod state_capture;
 pub mod status;
+#[cfg(test)]
+pub(crate) mod test_support;
 pub mod workflow;
 
 pub use application::RunApplication;

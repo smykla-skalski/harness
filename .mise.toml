@@ -3,9 +3,12 @@
 # rustup's toolchain-file resolution agree. Mismatch invalidates the daemon
 # cargo cache on every context switch.
 rust = "nightly-2026-05-19"
+ripgrep = "15.1.0"
 shellcheck = "0.11.0"
 tuist = "4.195.0"
 xcbeautify = "3.2.1"
+"aqua:mozilla/sccache" = "0.16.0"
+"aqua:nextest-rs/nextest/cargo-nextest" = "0.9.140"
 
 [env]
 HARNESS_APP_GROUP_ID = "Q498EB36N4.io.harnessmonitor"
@@ -152,7 +155,7 @@ run = "./scripts/tests/test-release-install.sh"
 description = "Run unit tests"
 run = [
   "./scripts/cargo-local.sh test --quiet --lib --features full-runtime -- --test-threads=1 --format terse",
-  "./scripts/cargo-local.sh test --quiet -p harness-command -p harness-daemon-client -p harness-protocol -p harness-telemetry",
+  "./scripts/cargo-local.sh test --quiet -p harness-command -p harness-daemon-client -p harness-protocol -p harness-telemetry -p harness-testkit",
 ]
 
 [tasks."test:integration"]
@@ -177,6 +180,18 @@ run = [
   "./scripts/cargo-local.sh test --quiet --test integration --features full-runtime -- --ignored --test-threads=1 --format terse",
 ]
 
+[tasks."test:profile:compile"]
+description = "Profile reproducible Rust test compilation and capture Cargo/sccache artifacts"
+run = "./scripts/profile-rust-tests.sh compile"
+
+[tasks."test:profile:unit"]
+description = "Profile root Rust unit tests serially with nextest timing artifacts"
+run = "./scripts/profile-rust-tests.sh unit"
+
+[tasks."test:profile:integration"]
+description = "Profile root Rust integration tests serially with nextest timing artifacts"
+run = "./scripts/profile-rust-tests.sh integration"
+
 [tasks."remote-daemon:e2e"]
 description = "Run the real remote daemon ACME, HTTPS, WSS, pairing, and revocation proof"
 run = [
@@ -200,13 +215,13 @@ run = [
 
 [tasks.codegen]
 description = "Regenerate every Rust -> Swift wire-type module from the Rust sources"
-run = "./scripts/cargo-local.sh run --quiet --example policy-codegen"
+run = "./scripts/cargo-local.sh run --quiet -p policy-codegen --bin policy-codegen"
 
 [tasks."codegen:check"]
 description = "Fail if any generated Swift wire-type module drifts from the Rust sources or the emitter tests fail"
 run = [
-  "./scripts/cargo-local.sh test --quiet --example policy-codegen",
-  "./scripts/cargo-local.sh run --quiet --example policy-codegen -- --check",
+  "./scripts/cargo-local.sh test --quiet -p policy-codegen --bin policy-codegen",
+  "./scripts/cargo-local.sh run --quiet -p policy-codegen --bin policy-codegen -- --check",
 ]
 
 [tasks.test]
@@ -267,7 +282,7 @@ run = [
 hide = true
 run = [
   "./scripts/cargo-local.sh clippy -p harness --lib --bins",
-  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-protocol -p harness-telemetry -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook",
+  "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-protocol -p harness-telemetry -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p policy-codegen",
 ]
 
 [tasks."aff:check"]

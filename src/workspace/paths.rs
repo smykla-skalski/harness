@@ -4,6 +4,10 @@ use std::path::{Path, PathBuf};
 
 /// Prefix used for harness-owned resources (containers, networks, temp dirs).
 pub const HARNESS_PREFIX: &str = "harness-";
+#[allow(
+    dead_code,
+    reason = "shared facade crates do not all use host-home resolution"
+)]
 const HARNESS_HOST_HOME_ENV: &str = "HARNESS_HOST_HOME";
 
 fn fallback_home_dir() -> PathBuf {
@@ -22,6 +26,10 @@ pub fn dirs_home() -> PathBuf {
 }
 
 #[must_use]
+#[allow(
+    dead_code,
+    reason = "shared facade crates do not all use host-home resolution"
+)]
 pub(crate) fn host_home_dir() -> PathBuf {
     if let Some(value) = normalized_env_value(HARNESS_HOST_HOME_ENV) {
         return PathBuf::from(value);
@@ -32,6 +40,10 @@ pub(crate) fn host_home_dir() -> PathBuf {
 }
 
 #[cfg(unix)]
+#[allow(
+    dead_code,
+    reason = "shared facade crates do not all use host-home resolution"
+)]
 fn account_home_dir() -> Option<PathBuf> {
     use uzers::os::unix::UserExt as _;
 
@@ -39,6 +51,10 @@ fn account_home_dir() -> Option<PathBuf> {
 }
 
 #[cfg(not(unix))]
+#[allow(
+    dead_code,
+    reason = "shared facade crates do not all use host-home resolution"
+)]
 fn account_home_dir() -> Option<PathBuf> {
     None
 }

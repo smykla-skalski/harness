@@ -3,10 +3,10 @@ use crate::hooks::application::GuardContext as HookContext;
 use crate::hooks::protocol::hook_result::Decision;
 use crate::hooks::protocol::payloads::HookEnvelopePayload;
 use crate::run::context::RunContext;
+use crate::run::test_support::build_test_run_dir;
 use crate::run::workflow::{
     ManifestFixDecision, PreflightState, PreflightStatus, RunnerPhase, SuiteFixState,
 };
-use harness_testkit::RunDirBuilder;
 
 #[test]
 fn verify_suite_create_empty_amendments_denies() {
@@ -30,7 +30,7 @@ fn verify_suite_create_nonempty_amendments_allows() {
 #[test]
 fn verify_suite_runner_accumulates_suite_and_amendments_writes() {
     let tempdir = tempfile::tempdir().unwrap();
-    let (run_dir, suite_dir) = RunDirBuilder::new(tempdir.path(), "r01").build();
+    let (run_dir, suite_dir) = build_test_run_dir(tempdir.path(), "r01");
     let suite_manifest = suite_dir.join("suite.md");
     let amendments = suite_dir.join("amendments.md");
     fs::write(&amendments, "changes\n").unwrap();
