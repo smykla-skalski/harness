@@ -6,15 +6,23 @@ use super::*;
 use crate::errors::CliErrorKind;
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
+    TaskBoardSyncItemSnapshot,
 };
+use crate::task_board::store::apply_patch;
 use crate::task_board::{ExternalRefSyncState, TaskBoardSyncConflict};
 
 #[tokio::test]
 async fn linked_push_is_not_applied_when_required_local_persistence_fails() {
     let item = linked_item();
+    let mut listed_item = item.clone();
+    listed_item.title = "Stale local edit".into();
     let store = FailingStore {
         item: item.clone(),
+        listed_item,
         conflicts: Mutex::new(Vec::new()),
+        updated_items: Mutex::new(Vec::new()),
+        update_succeeds: false,
+        conflict_error: None,
     };
     let client = UpdateClient;
     let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
@@ -40,7 +48,125 @@ async fn linked_push_is_not_applied_when_required_local_persistence_fails() {
     assert_eq!(operations.len(), 1);
     assert_eq!(operations[0].action, ExternalSyncAction::Push);
     assert!(!operations[0].applied);
-    assert_eq!(store.conflicts.lock().expect("conflicts").len(), 1);
+    let conflicts = store.conflicts.lock().expect("conflicts");
+    assert_eq!(conflicts.len(), 1);
+    assert_eq!(conflicts[0].local_value, serde_json::json!("Local edit"));
+    assert_eq!(conflicts[0].item_revision, 2);
+}
+
+#[tokio::test]
+async fn remote_update_evidence_survives_conflict_persistence_failure() {
+    let item = linked_item();
+    let store = failing_store(&item, false, Some("conflict persistence failed"));
+    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let mut operations = Vec::new();
+
+    let error = persist_linked_update(
+        &store,
+        &UpdateClient,
+        &item,
+        reference.clone(),
+        AppliedRemoteUpdate {
+            reference,
+            provider_revision: Some("provider-revision-2".into()),
+        },
+        vec![ExternalSyncField::Title],
+        Vec::new(),
+        &mut operations,
+    )
+    .await
+    .expect_err("local update and conflict persistence must fail");
+
+    assert!(matches!(error, SyncClientError::Local(_)));
+    assert_eq!(operations.len(), 1);
+    assert!(!operations[0].applied);
+}
+
+#[tokio::test]
+async fn applied_remote_update_evidence_survives_cleanup_failure() {
+    let item = linked_item();
+    let store = failing_store(&item, true, Some("conflict cleanup failed"));
+    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let mut operations = Vec::new();
+
+    let error = persist_linked_update(
+        &store,
+        &UpdateClient,
+        &item,
+        reference.clone(),
+        AppliedRemoteUpdate {
+            reference,
+            provider_revision: Some("provider-revision-2".into()),
+        },
+        vec![ExternalSyncField::Title],
+        Vec::new(),
+        &mut operations,
+    )
+    .await
+    .expect_err("conflict cleanup must fail");
+
+    assert!(matches!(error, SyncClientError::Local(_)));
+    assert_eq!(operations.len(), 1);
+    assert!(operations[0].applied);
+}
+
+#[tokio::test]
+async fn missing_provider_revision_stays_unknown_in_conflict_evidence() {
+    let item = linked_item();
+    let store = failing_store(&item, false, None);
+    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let mut operations = Vec::new();
+
+    persist_linked_update(
+        &store,
+        &UpdateClient,
+        &item,
+        reference.clone(),
+        AppliedRemoteUpdate {
+            reference,
+            provider_revision: None,
+        },
+        vec![ExternalSyncField::Title],
+        Vec::new(),
+        &mut operations,
+    )
+    .await
+    .expect_err("local persistence must fail");
+
+    let conflicts = store.conflicts.lock().expect("conflicts");
+    assert_eq!(conflicts.len(), 1);
+    assert_eq!(conflicts[0].provider_revision, None);
+}
+
+#[tokio::test]
+async fn successful_local_sync_retains_known_revision_when_provider_omits_one() {
+    let item = linked_item();
+    let store = failing_store(&item, true, None);
+    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let mut operations = Vec::new();
+
+    let result = persist_linked_update(
+        &store,
+        &UpdateClient,
+        &item,
+        reference.clone(),
+        AppliedRemoteUpdate {
+            reference,
+            provider_revision: None,
+        },
+        vec![ExternalSyncField::Title],
+        Vec::new(),
+        &mut operations,
+    )
+    .await;
+    assert!(result.is_ok(), "local sync persistence");
+
+    let updated_items = store.updated_items.lock().expect("updated items");
+    let state = updated_items[0].external_refs[0]
+        .sync_state
+        .as_ref()
+        .expect("updated sync state");
+    assert_eq!(state.updated_at.as_deref(), Some("provider-revision-1"));
 }
 
 fn linked_item() -> TaskBoardItem {
@@ -82,8 +208,14 @@ impl ExternalSyncClient for UpdateClient {
 
 struct FailingStore {
     item: TaskBoardItem,
+    listed_item: TaskBoardItem,
     conflicts: Mutex<Vec<TaskBoardSyncConflict>>,
+    updated_items: Mutex<Vec<TaskBoardItem>>,
+    update_succeeds: bool,
+    conflict_error: Option<&'static str>,
 }
+
+impl crate::task_board::TaskBoardExternalCreateStore for FailingStore {}
 
 #[async_trait]
 impl TaskBoardSyncStore for FailingStore {
@@ -91,11 +223,11 @@ impl TaskBoardSyncStore for FailingStore {
         &self,
         _status: Option<TaskBoardStatus>,
     ) -> Result<Vec<TaskBoardItem>, CliError> {
-        Ok(vec![self.item.clone()])
+        Ok(vec![self.listed_item.clone()])
     }
 
     async fn list_items_including_deleted(&self) -> Result<Vec<TaskBoardItem>, CliError> {
-        Ok(vec![self.item.clone()])
+        Ok(vec![self.listed_item.clone()])
     }
 
     async fn create_item(&self, _item: TaskBoardItem) -> Result<TaskBoardItem, CliError> {
@@ -104,14 +236,23 @@ impl TaskBoardSyncStore for FailingStore {
 
     async fn update_item(
         &self,
-        _expected_item: &TaskBoardItem,
-        _patch: TaskBoardItemPatch,
+        expected_item: &TaskBoardItem,
+        patch: TaskBoardItemPatch,
     ) -> Result<TaskBoardItem, CliError> {
+        if self.update_succeeds {
+            let mut updated = expected_item.clone();
+            apply_patch(&mut updated, patch);
+            self.updated_items
+                .lock()
+                .expect("updated items")
+                .push(updated.clone());
+            return Ok(updated);
+        }
         Err(CliErrorKind::concurrent_modification("local CAS failed").into())
     }
 
-    async fn item_revision(&self, _item_id: &str) -> Result<i64, CliError> {
-        Ok(2)
+    async fn item_snapshot(&self, _item_id: &str) -> Result<TaskBoardSyncItemSnapshot, CliError> {
+        Ok(TaskBoardSyncItemSnapshot::new(self.item.clone(), 2))
     }
 
     async fn provider_scope_state(
@@ -128,6 +269,14 @@ impl TaskBoardSyncStore for FailingStore {
         _scope_id: &str,
         _now: &str,
     ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
+        unreachable!("direct persistence test")
+    }
+
+    async fn renew_provider_scope_attempt(
+        &self,
+        _attempt: &ExternalProviderScopeAttempt,
+        _now: &str,
+    ) -> Result<(), CliError> {
         unreachable!("direct persistence test")
     }
 
@@ -153,9 +302,41 @@ impl TaskBoardSyncStore for FailingStore {
         _item_id: &str,
         _provider: ExternalProvider,
         _external_ref: &str,
+        _item_revision: i64,
         conflicts: &[TaskBoardSyncConflict],
     ) -> Result<(), CliError> {
+        if let Some(message) = self.conflict_error {
+            return Err(CliErrorKind::workflow_io(message).into());
+        }
         *self.conflicts.lock().expect("conflicts") = conflicts.to_vec();
         Ok(())
+    }
+
+    async fn supersede_open_sync_conflicts(
+        &self,
+        _item_id: &str,
+        _provider: ExternalProvider,
+        _external_ref: &str,
+        _item_revision: i64,
+        _resolved_fields: &[ExternalSyncField],
+    ) -> Result<(), CliError> {
+        self.conflict_error.map_or(Ok(()), |message| {
+            Err(CliErrorKind::workflow_io(message).into())
+        })
+    }
+}
+
+fn failing_store(
+    item: &TaskBoardItem,
+    update_succeeds: bool,
+    conflict_error: Option<&'static str>,
+) -> FailingStore {
+    FailingStore {
+        item: item.clone(),
+        listed_item: item.clone(),
+        conflicts: Mutex::new(Vec::new()),
+        updated_items: Mutex::new(Vec::new()),
+        update_succeeds,
+        conflict_error,
     }
 }

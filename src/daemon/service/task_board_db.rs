@@ -14,13 +14,11 @@ use crate::daemon::protocol::{
     TaskBoardUpdateItemRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
-use crate::task_board::external::sync_external_tasks_scoped;
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::{
     ExternalRef, ExternalSyncConfig, Machine, PlanningState, SpawnGateSwitches, TaskBoardItem,
     TaskBoardWorkflowState, approve_plan, begin_planning, build_audit_summary_with_policy,
-    build_machine_summaries, build_project_summaries,
-    configured_sync_clients_without_review_requests, revoke_plan, submit_plan,
+    build_machine_summaries, build_project_summaries, revoke_plan, submit_plan,
 };
 use crate::workspace::utc_now;
 
@@ -28,12 +26,13 @@ use super::task_board::load_live_spawn_grants;
 
 #[cfg(test)]
 mod external_ref_tests;
+mod provider_sync_execution;
 mod provider_sync_store;
 mod reviews_sync;
 mod sync_audit;
 
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
-use reviews_sync::shared_review_request_client;
+use reviews_sync::shared_review_request_clients;
 use sync_audit::SyncExecutionMetrics;
 pub(crate) use sync_audit::{
     ReviewsProjectionAuditSummary, record_reviews_projection_result,
@@ -249,32 +248,9 @@ async fn sync_task_board_db_with_trigger(
     trigger: sync_audit::TaskBoardSyncAuditTrigger,
 ) -> Result<TaskBoardSyncResponse, CliError> {
     let mut metrics = SyncExecutionMetrics::default();
-    let result = sync_task_board_db_inner(db, request, &mut metrics).await;
+    let result = provider_sync_execution::execute(db, request, &mut metrics).await;
     let audit = sync_audit::record_request_result(db, request, trigger, &result, &metrics).await;
     combine_sync_and_audit_results(result, audit)
-}
-
-async fn sync_task_board_db_inner(
-    db: &AsyncDaemonDb,
-    request: &TaskBoardSyncRequest,
-    metrics: &mut SyncExecutionMetrics,
-) -> Result<TaskBoardSyncResponse, CliError> {
-    let config = active_external_sync_config_db(db).await?;
-    let mut clients = configured_sync_clients_without_review_requests(&config, request.provider)?;
-    if let Some(shared_reviews) = shared_review_request_client(db, request).await? {
-        clients.push(Box::new(shared_reviews));
-    }
-    super::task_board::log_sync_request(request, &config, clients.len());
-    super::task_board::ensure_sync_request_can_run(request, &config, &clients)?;
-    let batch =
-        sync_external_tasks_scoped(db, super::task_board::sync_options(request), &clients).await?;
-    metrics.capture(&batch);
-    let batch = batch.into_completed()?;
-    let items = db.list_task_board_items(request.status).await?;
-    let summary =
-        super::task_board::build_sync_response_from_items(&items, &config, batch.operations);
-    super::task_board::log_sync_completion(&summary);
-    Ok(summary)
 }
 
 fn combine_sync_and_audit_results(

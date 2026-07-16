@@ -11,15 +11,20 @@ use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
 use super::targeting::github_repository_for_item;
 use super::{
-    ExternalProvider, ExternalProviderCapabilities, ExternalSyncClient, ExternalSyncConfig,
-    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
+    ExternalCreateOutcome, ExternalCreateRecoveryClient, ExternalProvider,
+    ExternalProviderCapabilities, ExternalSyncClient, ExternalSyncConfig, ExternalSyncField,
+    ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
     GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_REPOSITORY_ENV, non_empty_body, normalize_token,
 };
 
+mod create_marker;
+mod create_recovery;
 mod errors;
 mod graphql;
 mod inbox;
 mod review_projection;
+#[cfg(test)]
+mod test_support;
 mod write;
 
 use errors::warn_github_message;
@@ -173,6 +178,14 @@ impl ExternalSyncClient for GitHubSyncClient {
         ExternalProvider::GitHub
     }
 
+    #[allow(
+        private_interfaces,
+        reason = "provider-create recovery is intentionally crate-private"
+    )]
+    fn external_create_recovery(&self) -> Option<&dyn ExternalCreateRecoveryClient> {
+        Some(self)
+    }
+
     fn scope_id(&self) -> String {
         self.repository.as_ref().map_or_else(
             || "linked".into(),
@@ -215,13 +228,16 @@ impl ExternalSyncClient for GitHubSyncClient {
     }
 
     async fn push_task(&self, item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
+        Ok(self.push_task_with_outcome(item).await?.reference)
+    }
+
+    async fn push_task_with_outcome(
+        &self,
+        item: &TaskBoardItem,
+    ) -> Result<ExternalCreateOutcome, CliError> {
         let repository = self.repository_for(Some(item))?;
         let issue = self.create_issue(&repository, item).await?;
-        Ok(ExternalTaskRef::new(
-            ExternalProvider::GitHub,
-            github_external_id(&repository, issue.number),
-        )
-        .with_url(issue.html_url))
+        Ok(created_issue_outcome(&repository, issue))
     }
 
     async fn update_task(
@@ -299,6 +315,21 @@ impl GitHubRepository {
     }
 }
 
+fn created_issue_outcome(
+    repository: &GitHubRepository,
+    issue: write::GitHubIssueResponse,
+) -> ExternalCreateOutcome {
+    ExternalCreateOutcome {
+        reference: ExternalTaskRef::new(
+            ExternalProvider::GitHub,
+            github_external_id(repository, issue.number),
+        )
+        .with_url(issue.html_url),
+        provider_revision: issue.updated_at,
+        provider_project_id: Some(repository.slug()),
+    }
+}
+
 fn parse_github_repository(value: &str) -> Result<GitHubRepository, CliError> {
     let mut parts = value.split('/');
     let owner = parts.next().unwrap_or_default().trim();
@@ -318,7 +349,7 @@ fn parse_github_repository(value: &str) -> Result<GitHubRepository, CliError> {
 fn missing_github_repository_error() -> CliError {
     CliErrorKind::workflow_io(format!(
         "task-board github repository missing; set {HARNESS_GITHUB_REPOSITORY_ENV}, \
-         {GITHUB_REPOSITORY_ENV}, or item project_id as owner/repo"
+         {GITHUB_REPOSITORY_ENV}, or item execution_repository as owner/repo"
     ))
     .into()
 }

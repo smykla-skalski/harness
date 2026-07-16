@@ -100,8 +100,28 @@ impl SyncExecutionMetrics {
         self.operations.iter().any(|operation| operation.applied)
     }
 
+    pub(super) const fn failed_scope_count(&self) -> usize {
+        self.failed_scope_count
+    }
+
+    pub(super) const fn backing_off_scope_count(&self) -> usize {
+        self.backing_off_scope_count
+    }
+
+    pub(super) const fn all_scopes_backing_off(&self) -> bool {
+        self.result_scope_count > 0
+            && self.backing_off_scope_count == self.result_scope_count
+            && self.failed_scope_count == 0
+            && self.succeeded_scope_count == 0
+    }
+
     pub(super) fn scope_outcomes(&self) -> &[ScopeAuditEvidence] {
         &self.scope_outcomes
+    }
+
+    #[cfg(test)]
+    pub(in crate::daemon::service::task_board_db) fn operations(&self) -> &[ExternalSyncOperation] {
+        &self.operations
     }
 }
 

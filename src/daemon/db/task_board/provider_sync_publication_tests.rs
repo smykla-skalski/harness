@@ -68,6 +68,7 @@ async fn conflict_only_changes_publish_without_identical_write_churn() {
         "task-conflict-publication",
         ExternalProvider::GitHub,
         "acme/widgets#17",
+        item_revision,
         &[conflict.clone()],
     )
     .await
@@ -78,6 +79,7 @@ async fn conflict_only_changes_publish_without_identical_write_churn() {
         "task-conflict-publication",
         ExternalProvider::GitHub,
         "acme/widgets#17",
+        item_revision,
         &[conflict.clone()],
     )
     .await
@@ -92,6 +94,7 @@ async fn conflict_only_changes_publish_without_identical_write_churn() {
         "task-conflict-publication",
         ExternalProvider::GitHub,
         "acme/widgets#17",
+        item_revision,
         &[conflict],
     )
     .await
@@ -102,6 +105,7 @@ async fn conflict_only_changes_publish_without_identical_write_churn() {
         "task-conflict-publication",
         ExternalProvider::GitHub,
         "acme/widgets#17",
+        item_revision,
         &[],
     )
     .await
@@ -119,6 +123,7 @@ async fn conflict_only_changes_publish_without_identical_write_churn() {
         "task-conflict-publication",
         ExternalProvider::GitHub,
         "acme/widgets#17",
+        item_revision,
         &[],
     )
     .await

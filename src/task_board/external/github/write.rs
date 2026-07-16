@@ -17,9 +17,20 @@ impl GitHubSyncClient {
         repository: &GitHubRepository,
         item: &TaskBoardItem,
     ) -> Result<GitHubIssueResponse, CliError> {
+        let body = non_empty_body(&item.body);
+        self.create_issue_fields(repository, &item.title, body.as_deref())
+            .await
+    }
+
+    pub(super) async fn create_issue_fields(
+        &self,
+        repository: &GitHubRepository,
+        title: &str,
+        body_text: Option<&str>,
+    ) -> Result<GitHubIssueResponse, CliError> {
         let mut body = serde_json::Map::new();
-        body.insert("title".into(), serde_json::json!(item.title));
-        if let Some(body_text) = non_empty_body(&item.body) {
+        body.insert("title".into(), serde_json::json!(title));
+        if let Some(body_text) = body_text {
             body.insert("body".into(), serde_json::json!(body_text));
         }
         let route = format!("/repos/{}/{}/issues", repository.owner, repository.repo);

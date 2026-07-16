@@ -93,6 +93,7 @@ pub(super) fn current_schema_shape_needs_repair(
         "task_board_execution_attempts",
         "task_board_admission_leases",
         "task_board_provider_scope_state",
+        "task_board_external_create_intents",
         "task_board_sync_conflicts",
         "task_board_execution_hosts",
         "task_board_remote_assignments",
@@ -112,6 +113,7 @@ pub(super) fn current_schema_shape_needs_repair(
             return Ok(true);
         }
     }
+    super::schema_repairs_external_creates::require_table_shape(conn)?;
     if !table_sql_contains(conn, "task_board_dispatch_intents", "'held'")? {
         return Ok(true);
     }
@@ -129,6 +131,9 @@ pub(super) fn current_schema_shape_needs_repair(
         if !trigger_exists(conn, trigger)? {
             return Ok(true);
         }
+    }
+    if super::schema_repairs_external_creates::indexes_need_repair(conn)? {
+        return Ok(true);
     }
     Ok(false)
 }
@@ -162,6 +167,8 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v35::run(&db.conn)?;
     super::schema_v36::run(&db.conn)?;
     super::schema_v37::run(&db.conn)?;
+    super::schema_v38::run(&db.conn)?;
+    super::schema_repairs_external_creates::require_complete_shape(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

@@ -42,14 +42,17 @@ pub(super) async fn reconcile_stale_github_review_requests(
         .collect::<Vec<_>>();
 
     for (item, reference) in stale_items {
-        operations.push(stale_review_request_operation(
-            provider, &item, &reference, options,
-        ));
         if options.dry_run {
+            operations.push(stale_review_request_operation(
+                provider, &item, &reference, options,
+            ));
             continue;
         }
         let patch = stale_review_request_patch(&item, &reference);
         board.update_item(&item, patch).await?;
+        operations.push(stale_review_request_operation(
+            provider, &item, &reference, options,
+        ));
     }
 
     Ok(())

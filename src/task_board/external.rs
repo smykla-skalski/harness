@@ -10,6 +10,7 @@ use crate::errors::{CliError, CliErrorKind};
 use super::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 
 mod capabilities;
+mod create_recovery;
 mod github;
 mod scopes;
 mod sync;
@@ -20,6 +21,12 @@ pub use capabilities::{
     ExternalProviderCapabilities, ExternalSyncConflictPolicy, ExternalSyncField,
     ExternalTaskUpdate, ExternalUpdateOutcome,
 };
+pub(crate) use create_recovery::ExternalCreateRecoveryClient;
+#[allow(
+    unused_imports,
+    reason = "shared contract is consumed by follow-up provider recovery slices"
+)]
+pub(crate) use create_recovery::{ExternalCreateLease, ExternalCreateProbe, ExternalCreateRequest};
 pub use github::{GitHubInboxSyncClient, GitHubSyncClient};
 pub(crate) use github::{
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
@@ -29,13 +36,18 @@ pub(crate) use scopes::{
     ExternalProviderScopeAvailability, ExternalProviderScopeHealth, ExternalProviderScopeIdentity,
     ExternalProviderScopeState, ExternalSyncBatch, ExternalSyncScopeOutcome,
 };
+#[cfg(test)]
+pub(crate) use sync::sync_external_tasks_scoped;
 pub use sync::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
     configured_sync_clients,
 };
 pub(crate) use sync::{
-    TaskBoardSyncStore, configured_sync_clients_without_review_requests, sync_external_tasks,
-    sync_external_tasks_scoped,
+    TaskBoardExternalCreateStore, TaskBoardSyncItemSnapshot, TaskBoardSyncStore,
+    assign_external_create_recovery, blocked_external_create_follow_ups,
+    blocked_external_create_recovery, configured_sync_clients_without_review_requests,
+    load_external_create_recovery_work, prepare_external_create_recovery, sync_external_tasks,
+    sync_external_tasks_scoped_with_recovery,
 };
 pub use todoist::TodoistSyncClient;
 
@@ -125,6 +137,13 @@ impl ExternalTaskRef {
             sync_state: None,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExternalCreateOutcome {
+    pub reference: ExternalTaskRef,
+    pub provider_revision: Option<String>,
+    pub provider_project_id: Option<String>,
 }
 
 impl From<ExternalRef> for ExternalTaskRef {
@@ -334,6 +353,19 @@ pub trait ExternalSyncClient: Send + Sync {
     #[must_use]
     fn provider(&self) -> ExternalProvider;
 
+    /// Return the crash-safe provider-create capability when implemented.
+    ///
+    /// Absence is fail-closed by the recovery engine; it never authorizes a
+    /// create or treats an existing durable attempt as recovered.
+    #[must_use]
+    #[allow(
+        private_interfaces,
+        reason = "provider-create recovery is intentionally crate-private"
+    )]
+    fn external_create_recovery(&self) -> Option<&dyn ExternalCreateRecoveryClient> {
+        None
+    }
+
     #[must_use]
     fn scope_id(&self) -> String {
         self.provider().to_string()
@@ -382,6 +414,23 @@ pub trait ExternalSyncClient: Send + Sync {
     /// # Errors
     /// Returns provider or transport errors surfaced by the implementation.
     async fn push_task(&self, item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError>;
+
+    /// Push one task-board item and return provider state needed for later writes.
+    ///
+    /// # Errors
+    /// Returns provider or transport errors surfaced by the implementation.
+    async fn push_task_with_outcome(
+        &self,
+        item: &TaskBoardItem,
+    ) -> Result<ExternalCreateOutcome, CliError> {
+        Ok(ExternalCreateOutcome {
+            reference: self.push_task(item).await?,
+            provider_revision: None,
+            provider_project_id: (self.provider() != ExternalProvider::GitHub)
+                .then(|| item.project_id.clone())
+                .flatten(),
+        })
+    }
 
     /// Update one linked provider task.
     ///

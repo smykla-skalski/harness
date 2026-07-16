@@ -3,6 +3,7 @@ use chrono::DateTime;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::{ExternalProvider, ExternalSyncClient, ExternalSyncOperation};
+use crate::task_board::TaskBoardExternalCreateIntent;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ExternalProviderScopeIdentity {
@@ -16,6 +17,8 @@ impl ExternalProviderScopeIdentity {
         let resource_id = normalize_resource_id(provider, &client.scope_id());
         let role = if client.allows_push() {
             "write"
+        } else if client.authoritative_review_inbox() {
+            "authoritative_read"
         } else {
             "read"
         };
@@ -180,12 +183,16 @@ impl ExternalSyncScopeOutcome {
     }
 
     pub(crate) fn failed(provider: ExternalProvider, scope_id: String, error: &CliError) -> Self {
+        let message = error.details().map_or_else(
+            || error.message(),
+            |details| format!("{}; {details}", error.message()),
+        );
         Self {
             provider,
             scope_id,
             kind: ExternalSyncScopeOutcomeKind::Failed,
             error_code: Some(error.code().to_owned()),
-            error: Some(error.message()),
+            error: Some(message),
         }
     }
 
@@ -203,12 +210,17 @@ impl ExternalSyncScopeOutcome {
 #[derive(Debug)]
 pub(crate) struct ExternalSyncBatch {
     pub(crate) operations: Vec<ExternalSyncOperation>,
+    pub(crate) external_create_follow_ups: Vec<TaskBoardExternalCreateIntent>,
     pub(crate) scope_outcomes: Vec<ExternalSyncScopeOutcome>,
     pub(crate) first_provider_failure: Option<CliError>,
+    pub(crate) terminal_error: Option<CliError>,
 }
 
 impl ExternalSyncBatch {
     pub(crate) fn into_completed(mut self) -> Result<Self, CliError> {
+        if let Some(error) = self.terminal_error.take() {
+            return Err(error);
+        }
         if self.succeeded_scope_count() == 0
             && let Some(error) = self.first_provider_failure.take()
         {
@@ -282,16 +294,19 @@ mod tests {
             provider: ExternalProvider::GitHub,
             scope_id: " Acme/Widgets ",
             allows_push: true,
+            authoritative_review_inbox: false,
         };
         let inbox = ScopeClient {
             provider: ExternalProvider::GitHub,
             scope_id: "acme/widgets",
             allows_push: false,
+            authoritative_review_inbox: false,
         };
         let todoist = ScopeClient {
             provider: ExternalProvider::Todoist,
             scope_id: "acme/widgets",
             allows_push: true,
+            authoritative_review_inbox: false,
         };
 
         let repository_scope = ExternalProviderScopeIdentity::for_client(&repository_sync);
@@ -305,6 +320,32 @@ mod tests {
         assert_eq!(inbox_scope.scope_id(), "v1:github:read:12:acme/widgets");
         assert_ne!(repository_scope, inbox_scope);
         assert_ne!(repository_scope, todoist_scope);
+    }
+
+    #[test]
+    fn authoritative_review_reader_has_distinct_scope_role() {
+        let shared_review = ScopeClient {
+            provider: ExternalProvider::GitHub,
+            scope_id: "org/repository",
+            allows_push: false,
+            authoritative_review_inbox: false,
+        };
+        let assigned_inbox = ScopeClient {
+            provider: ExternalProvider::GitHub,
+            scope_id: "org/repository",
+            allows_push: false,
+            authoritative_review_inbox: true,
+        };
+
+        let shared_scope = ExternalProviderScopeIdentity::for_client(&shared_review);
+        let assigned_scope = ExternalProviderScopeIdentity::for_client(&assigned_inbox);
+
+        assert_eq!(shared_scope.scope_id(), "v1:github:read:14:org/repository");
+        assert_eq!(
+            assigned_scope.scope_id(),
+            "v1:github:authoritative_read:14:org/repository"
+        );
+        assert_ne!(shared_scope, assigned_scope);
     }
 
     #[test]
@@ -330,6 +371,7 @@ mod tests {
         provider: ExternalProvider,
         scope_id: &'static str,
         allows_push: bool,
+        authoritative_review_inbox: bool,
     }
 
     #[async_trait]
@@ -344,6 +386,10 @@ mod tests {
 
         fn allows_push(&self) -> bool {
             self.allows_push
+        }
+
+        fn authoritative_review_inbox(&self) -> bool {
+            self.authoritative_review_inbox
         }
 
         async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {

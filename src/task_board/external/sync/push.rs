@@ -1,54 +1,74 @@
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::github_api::republish_current_data_change;
+use crate::task_board::external::ExternalProviderScopeAttempt;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
 use super::conflicts::build_sync_conflicts;
+use super::create_recovery::create_item_durably;
 use super::lookup::{OperationDraft, operation, provider_ref};
 use super::merge::{
     has_reported_conflict, local_update_fields, matching_ref, push_create_fields,
-    replace_synced_ref, split_supported_fields, synced_ref_from_item,
+    replace_synced_ref, split_supported_fields,
 };
 use super::{
     ExternalProvider, ExternalSyncAction, ExternalSyncClient, ExternalSyncField,
     ExternalSyncOperation, ExternalSyncOptions, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
-    ExternalUpdateOutcome, SyncClientError, TaskBoardSyncStore, canonical_external_status,
+    ExternalUpdateOutcome, SyncClientError, TaskBoardExternalCreateIntent, TaskBoardSyncStore,
+    canonical_external_status,
 };
 
 pub(super) async fn push_board_tasks(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
     operations: &mut Vec<ExternalSyncOperation>,
-) -> Result<(), SyncClientError> {
+    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
+) -> Result<bool, SyncClientError> {
     let items = board
         .list_items(options.status)
         .await
         .map_err(SyncClientError::Local)?;
     let scope_id = client.scope_id();
+    let mut created = false;
     for item in &items {
-        push_board_item(board, options, client, item, &scope_id, operations).await?;
+        created |= push_board_item(
+            board, options, client, attempt, item, &scope_id, operations, follow_ups,
+        )
+        .await?;
     }
-    Ok(())
+    Ok(created)
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one item push needs the admitted scope plus operation and durable follow-up sinks"
+)]
 async fn push_board_item(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
     item: &TaskBoardItem,
     scope_id: &str,
     operations: &mut Vec<ExternalSyncOperation>,
-) -> Result<(), SyncClientError> {
+    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
+) -> Result<bool, SyncClientError> {
     if !super::client_owns_item(client, item, scope_id)
         || has_reported_conflict(operations, client.provider(), &item.id)
     {
-        return Ok(());
+        return Ok(false);
     }
     if let Some(reference) = provider_ref(item, client.provider()) {
-        update_linked_remote(board, options, client, item, reference, operations).await
+        update_linked_remote(board, options, client, attempt, item, reference, operations)
+            .await
+            .map(|()| false)
     } else {
-        create_remote_item(board, options, client, item, operations).await
+        create_remote_item(
+            board, options, client, attempt, item, operations, follow_ups,
+        )
+        .await
     }
 }
 
@@ -56,10 +76,12 @@ async fn create_remote_item(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
     item: &TaskBoardItem,
     operations: &mut Vec<ExternalSyncOperation>,
-) -> Result<(), SyncClientError> {
-    let changed_fields = push_create_fields(item);
+    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
+) -> Result<bool, SyncClientError> {
+    let changed_fields = push_create_fields(item, client.provider());
     if options.dry_run {
         operations.push(push_operation(
             client.provider(),
@@ -70,62 +92,47 @@ async fn create_remote_item(
             changed_fields,
             Vec::new(),
         ));
-        return Ok(());
+        return Ok(false);
     }
-    let reference = client
-        .push_task(item)
-        .await
-        .map_err(SyncClientError::Provider)?;
-    let mut refs = item.external_refs.clone();
-    refs.push(synced_ref_from_item(reference.clone(), item, None));
-    let linked = match board
-        .update_item(
-            item,
-            TaskBoardItemPatch {
-                external_refs: Some(refs),
-                ..TaskBoardItemPatch::default()
-            },
-        )
-        .await
-    {
-        Ok(linked) => linked,
-        Err(error) => {
-            let remote = created_remote_task(item, reference.clone());
-            persist_push_conflicts(board, item, &remote, &changed_fields)
-                .await
-                .map_err(SyncClientError::Local)?;
-            operations.push(push_operation(
-                client.provider(),
-                item,
-                reference,
-                false,
-                false,
-                changed_fields,
-                Vec::new(),
-            ));
-            return Err(SyncClientError::Local(error));
-        }
+    let Some(attempt) = attempt else {
+        return Err(SyncClientError::Local(
+            CliErrorKind::workflow_io("durable provider create requires a persisted scope attempt")
+                .into(),
+        ));
+    };
+    let result = create_item_durably(board, client, attempt, item, operations, follow_ups).await?;
+    let Some(linked) = result.linked_item else {
+        return Ok(result.durable_create);
     };
     republish_github_board_ready(client.provider());
-    operations.push(push_operation(
-        client.provider(),
-        item,
-        reference.clone(),
-        false,
-        true,
-        changed_fields,
-        Vec::new(),
-    ));
-    if canonical_external_status(item.status) == TaskBoardStatus::Done {
-        update_linked_remote(board, options, client, &linked, reference, operations).await?;
+    if linked.status == TaskBoardStatus::Done {
+        let reference = provider_ref(&linked, client.provider()).ok_or_else(|| {
+            SyncClientError::Local(
+                CliErrorKind::concurrent_modification(
+                    "finalized provider create has no linked reference",
+                )
+                .into(),
+            )
+        })?;
+        update_linked_remote(
+            board,
+            options,
+            client,
+            Some(attempt),
+            &linked,
+            reference,
+            operations,
+        )
+        .await?;
     }
-    Ok(())
+    Ok(result.durable_create)
 }
 
 async fn update_linked_remote(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
     item: &TaskBoardItem,
     reference: ExternalTaskRef,
     operations: &mut Vec<ExternalSyncOperation>,
@@ -148,8 +155,10 @@ async fn update_linked_remote(
         ));
         return Ok(());
     }
-    let Some(applied) =
-        execute_provider_update(board, client, item, &reference, &supported, operations).await?
+    let Some(applied) = execute_provider_update(
+        board, client, attempt, item, &reference, &supported, operations,
+    )
+    .await?
     else {
         return Ok(());
     };
@@ -174,6 +183,7 @@ struct AppliedRemoteUpdate {
 async fn execute_provider_update(
     board: &dyn TaskBoardSyncStore,
     client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
     item: &TaskBoardItem,
     reference: &ExternalTaskRef,
     supported: &[ExternalSyncField],
@@ -182,6 +192,7 @@ async fn execute_provider_update(
     let precondition = remote_precondition(item, reference);
     let update =
         ExternalTaskUpdate::new(supported.to_vec()).with_precondition_updated_at(precondition);
+    super::scope::renew_scope_attempt(board, attempt).await?;
     let outcome = client
         .update_task(item, reference, update)
         .await
@@ -253,36 +264,44 @@ async fn persist_linked_update(
         )
         .await
     {
-        persist_push_conflicts(board, item, &remote, &supported)
-            .await
-            .map_err(SyncClientError::Local)?;
         operations.push(push_operation(
             client.provider(),
             item,
             updated_ref,
             false,
             false,
-            supported,
+            supported.clone(),
             unsupported,
         ));
-        return Err(SyncClientError::Local(error));
-    }
-    if unsupported.is_empty() {
-        board
-            .replace_open_sync_conflicts(&item.id, client.provider(), &updated_ref.external_id, &[])
+        persist_push_conflicts(board, item, &remote, &supported)
             .await
             .map_err(SyncClientError::Local)?;
+        return Err(SyncClientError::Local(error));
     }
-    republish_github_board_ready(client.provider());
     operations.push(push_operation(
         client.provider(),
         item,
-        updated_ref,
+        updated_ref.clone(),
         false,
         true,
-        supported,
+        supported.clone(),
         unsupported,
     ));
+    let snapshot = board
+        .item_snapshot(&item.id)
+        .await
+        .map_err(SyncClientError::Local)?;
+    board
+        .supersede_open_sync_conflicts(
+            &item.id,
+            client.provider(),
+            &updated_ref.external_id,
+            snapshot.item_revision,
+            &supported,
+        )
+        .await
+        .map_err(SyncClientError::Local)?;
+    republish_github_board_ready(client.provider());
     Ok(())
 }
 
@@ -292,40 +311,17 @@ async fn persist_push_conflicts(
     remote: &ExternalTask,
     fields: &[ExternalSyncField],
 ) -> Result<(), CliError> {
-    let item = latest_item(board, expected_item).await?;
-    let item_revision = board.item_revision(&item.id).await?;
-    let conflicts = build_sync_conflicts(&item, remote, fields, item_revision);
+    let snapshot = board.item_snapshot(&expected_item.id).await?;
+    let conflicts = build_sync_conflicts(&snapshot.item, remote, fields, snapshot.item_revision);
     board
         .replace_open_sync_conflicts(
-            &item.id,
+            &snapshot.item.id,
             remote.reference.provider,
             &remote.reference.external_id,
+            snapshot.item_revision,
             &conflicts,
         )
         .await
-}
-
-async fn latest_item(
-    board: &dyn TaskBoardSyncStore,
-    expected_item: &TaskBoardItem,
-) -> Result<TaskBoardItem, CliError> {
-    Ok(board
-        .list_items_including_deleted()
-        .await?
-        .into_iter()
-        .find(|item| item.id == expected_item.id)
-        .unwrap_or_else(|| expected_item.clone()))
-}
-
-fn created_remote_task(item: &TaskBoardItem, reference: ExternalTaskRef) -> ExternalTask {
-    ExternalTask {
-        reference,
-        title: item.title.clone(),
-        body: item.body.clone(),
-        status: TaskBoardStatus::Backlog,
-        project_id: item.project_id.clone(),
-        updated_at: None,
-    }
 }
 
 fn updated_remote_task(
@@ -366,9 +362,7 @@ fn updated_remote_task(
                 .and_then(|state| state.project_id.clone())
                 .or_else(|| item.project_id.clone())
         },
-        updated_at: provider_revision
-            .map(ToOwned::to_owned)
-            .or_else(|| state.and_then(|state| state.updated_at.clone())),
+        updated_at: provider_revision.map(ToOwned::to_owned),
     }
 }
 

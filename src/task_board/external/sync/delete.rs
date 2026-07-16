@@ -1,5 +1,6 @@
 use crate::task_board::external::{
-    ExternalProvider, ExternalSyncClient, ExternalSyncField, ExternalTaskRef,
+    ExternalProvider, ExternalProviderScopeAttempt, ExternalSyncClient, ExternalSyncField,
+    ExternalTaskRef,
 };
 use crate::task_board::types::TaskBoardItem;
 
@@ -12,6 +13,7 @@ pub(super) async fn delete_remote_tombstones(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), SyncClientError> {
     if !client.allows_delete() {
@@ -40,6 +42,7 @@ pub(super) async fn delete_remote_tombstones(
             )));
             continue;
         }
+        super::scope::renew_scope_attempt(board, attempt).await?;
         client
             .delete_task(&item, &reference)
             .await

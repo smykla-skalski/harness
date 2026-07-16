@@ -6,6 +6,7 @@ use std::thread;
 use serde_json::json;
 
 use super::*;
+use crate::github_api::acquire_global_budget_test_lock;
 
 #[test]
 fn github_inbox_search_queries_use_github_all_state_issue_form() {
@@ -41,6 +42,7 @@ fn search_label_filter_admits_only_matching_labels() {
 
 #[tokio::test]
 async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
+    let _guard = acquire_global_budget_test_lock().await;
     let (endpoint, requests, handle) = spawn_sequence_mock(vec![
         MockResponse::json(200, viewer_response("octo-user")),
         MockResponse::json(
@@ -79,6 +81,7 @@ async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
 
 #[tokio::test]
 async fn github_inbox_pull_imports_review_requests_as_backlog() {
+    let _guard = acquire_global_budget_test_lock().await;
     let (endpoint, requests, handle) = spawn_sequence_mock(vec![
         MockResponse::json(200, viewer_response("octo-user")),
         MockResponse::json(200, empty_search_response()),
@@ -101,6 +104,7 @@ async fn github_inbox_pull_imports_review_requests_as_backlog() {
 
 #[tokio::test]
 async fn github_inbox_pull_maps_closed_assigned_issues_to_done() {
+    let _guard = acquire_global_budget_test_lock().await;
     let (endpoint, _requests, handle) = spawn_sequence_mock(vec![
         MockResponse::json(200, viewer_response("octo-user")),
         MockResponse::json(
@@ -120,6 +124,7 @@ async fn github_inbox_pull_maps_closed_assigned_issues_to_done() {
 
 #[tokio::test]
 async fn github_inbox_pull_fails_when_no_repository_can_be_pulled() {
+    let _guard = acquire_global_budget_test_lock().await;
     let (endpoint, _requests, handle) = spawn_sequence_mock(vec![
         MockResponse::json(200, viewer_response("octo-user")),
         MockResponse::json(

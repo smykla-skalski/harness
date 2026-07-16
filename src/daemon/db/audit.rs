@@ -8,7 +8,7 @@ use crate::daemon::protocol::{
 use super::{AsyncDaemonDb, CliError, db_error};
 
 #[allow(dead_code)]
-const UPSERT_AUDIT_EVENT_SQL: &str = "
+pub(in crate::daemon::db) const UPSERT_AUDIT_EVENT_SQL: &str = "
 INSERT INTO audit_events (
     id, recorded_at, source, category, kind, severity, outcome, title, summary,
     subject, actor, correlation_id, action_key, payload_json, legacy_message, related_urls_json
