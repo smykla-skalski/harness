@@ -51,6 +51,7 @@ async fn push_updates_existing_linked_remote_and_records_changed_fields() {
         .expect("sync state");
     assert_eq!(state.title.as_deref(), Some("Local title"));
     assert_eq!(state.status, Some(TaskBoardStatus::Backlog));
+    assert_eq!(state.updated_at.as_deref(), Some("provider-revision-2"));
 }
 
 #[tokio::test]
@@ -270,6 +271,100 @@ async fn linked_push_reports_provider_unsupported_fields() {
     assert!(!operations[0].applied);
 }
 
+#[tokio::test]
+async fn scoped_sync_keeps_successful_repository_when_another_repository_fails() {
+    let temp = tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![
+        Box::new(ScopedPullClient::failing("acme/broken")),
+        Box::new(ScopedPullClient::successful(
+            "acme/widgets",
+            ExternalTask {
+                reference: ExternalTaskRef::new(ExternalProvider::GitHub, "acme/widgets#17"),
+                title: "Imported task".into(),
+                body: String::new(),
+                status: TaskBoardStatus::Backlog,
+                project_id: Some("acme/widgets".into()),
+                updated_at: Some("2026-07-15T10:00:00Z".into()),
+            },
+        )),
+    ];
+
+    let batch = sync_external_tasks_scoped(
+        &board,
+        ExternalSyncOptions {
+            provider: Some(ExternalProvider::GitHub),
+            direction: ExternalSyncDirection::Pull,
+            conflict_policy: ExternalSyncConflictPolicy::Report,
+            dry_run: false,
+            status: None,
+        },
+        &clients,
+    )
+    .await
+    .expect("partial sync succeeds");
+
+    assert_eq!(batch.attempted_scope_count(), 2);
+    assert_eq!(batch.failed_scope_count(), 1);
+    assert_eq!(batch.operations.len(), 1);
+    let imported = board
+        .list(None)
+        .expect("list imported items")
+        .into_iter()
+        .find(|item| item.title == "Imported task")
+        .expect("imported item");
+    assert_eq!(
+        imported.execution_repository.as_deref(),
+        Some("acme/widgets")
+    );
+}
+
+struct ScopedPullClient {
+    scope_id: String,
+    result: Result<Vec<ExternalTask>, &'static str>,
+}
+
+impl ScopedPullClient {
+    fn failing(scope_id: &str) -> Self {
+        Self {
+            scope_id: scope_id.into(),
+            result: Err("repository unavailable"),
+        }
+    }
+
+    fn successful(scope_id: &str, task: ExternalTask) -> Self {
+        Self {
+            scope_id: scope_id.into(),
+            result: Ok(vec![task]),
+        }
+    }
+}
+
+#[async_trait]
+impl ExternalSyncClient for ScopedPullClient {
+    fn provider(&self) -> ExternalProvider {
+        ExternalProvider::GitHub
+    }
+
+    fn scope_id(&self) -> String {
+        self.scope_id.clone()
+    }
+
+    fn allows_push(&self) -> bool {
+        false
+    }
+
+    async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
+        self.result
+            .clone()
+            .map_err(|message| crate::errors::CliErrorKind::workflow_io(message).into())
+    }
+
+    async fn push_task(&self, _item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
+        unreachable!("pull-only test client")
+    }
+}
+
 struct UpdateFakeSyncClient {
     provider: ExternalProvider,
     capabilities: ExternalProviderCapabilities,
@@ -330,7 +425,10 @@ impl ExternalSyncClient for UpdateFakeSyncClient {
             .lock()
             .expect("updates")
             .push((reference.external_id.clone(), update.changed_fields));
-        Ok(ExternalUpdateOutcome::Applied(reference.clone()))
+        Ok(ExternalUpdateOutcome::Applied {
+            reference: reference.clone(),
+            provider_revision: Some("provider-revision-2".into()),
+        })
     }
 }
 
@@ -346,7 +444,7 @@ fn linked_item(id: &str, title: &str, body: &str, status: TaskBoardStatus) -> Ta
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Old title".to_string()),
         body: Some("Old body".to_string()),
-        status: Some(TaskBoardStatus::Todo),
+        status: Some(TaskBoardStatus::Backlog),
         project_id: None,
         updated_at: Some("2026-05-14T00:00:00Z".to_string()),
         synced_at: Some("2026-05-14T00:00:00Z".to_string()),

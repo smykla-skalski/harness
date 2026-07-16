@@ -4,7 +4,7 @@ use crate::task_board::{
     ExternalProvider, ExternalRefProvider, ExternalSyncClient, ExternalSyncConfig, ExternalTaskRef,
     GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, GitHubInboxSyncClient, GitHubSyncClient,
     HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV,
-    TodoistSyncClient,
+    TodoistSyncClient, configured_sync_clients,
 };
 
 #[test]
@@ -146,4 +146,27 @@ async fn github_sync_client_can_disable_pull_for_inbox_overlap() {
 
     assert!(!client.allows_pull());
     assert!(client.allows_push());
+}
+
+#[test]
+fn configured_clients_split_provider_filters_into_independent_scopes() {
+    let config = ExternalSyncConfig::default()
+        .with_github_token_override(Some("token"))
+        .with_github_inbox_repositories_override(&["Acme/Widgets".into(), "acme/tools".into()])
+        .with_todoist_token_override(Some("token"))
+        .with_todoist_import_project_ids_override(&["project-1".into(), "project-2".into()]);
+
+    let github = configured_sync_clients(&config, Some(ExternalProvider::GitHub))
+        .expect("GitHub clients")
+        .into_iter()
+        .map(|client| client.scope_id())
+        .collect::<Vec<_>>();
+    let todoist = configured_sync_clients(&config, Some(ExternalProvider::Todoist))
+        .expect("Todoist clients")
+        .into_iter()
+        .map(|client| client.scope_id())
+        .collect::<Vec<_>>();
+
+    assert_eq!(github, vec!["linked", "acme/widgets", "acme/tools"]);
+    assert_eq!(todoist, vec!["project-1", "project-2"]);
 }

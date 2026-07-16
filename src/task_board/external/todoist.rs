@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
 
-use super::super::types::{TaskBoardItem, TaskBoardStatus};
+use super::super::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use super::{
     ExternalProvider, ExternalProviderCapabilities, ExternalSyncClient, ExternalSyncConfig,
     ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
@@ -93,6 +93,29 @@ impl ExternalSyncClient for TodoistSyncClient {
         ExternalProvider::Todoist
     }
 
+    fn scope_id(&self) -> String {
+        match self.import_project_ids.as_slice() {
+            [project_id] => project_id.clone(),
+            _ => "all".into(),
+        }
+    }
+
+    fn scope_for_item(&self, item: &TaskBoardItem) -> String {
+        if self.import_project_ids.is_empty() {
+            return self.scope_id();
+        }
+        item.project_id
+            .clone()
+            .or_else(|| {
+                item.external_refs
+                    .iter()
+                    .find(|reference| reference.provider == ExternalRefProvider::Todoist)
+                    .and_then(|reference| reference.sync_state.as_ref())
+                    .and_then(|state| state.project_id.clone())
+            })
+            .unwrap_or_default()
+    }
+
     fn capabilities(&self) -> ExternalProviderCapabilities {
         ExternalProviderCapabilities::with_update_fields([
             ExternalSyncField::Title,
@@ -160,13 +183,20 @@ impl ExternalSyncClient for TodoistSyncClient {
             }
         }
         let mut updated_reference = reference.clone();
+        let mut provider_revision = None;
         if update.changes_metadata() {
-            updated_reference = self.update_task_metadata(item, reference, &update).await?;
+            let updated = self.update_task_metadata(item, reference, &update).await?;
+            updated_reference = updated.reference();
+            provider_revision = updated.updated_at;
         }
         if update.changes_status() {
             self.update_task_status(item, reference).await?;
+            provider_revision = None;
         }
-        Ok(ExternalUpdateOutcome::Applied(updated_reference))
+        Ok(ExternalUpdateOutcome::Applied {
+            reference: updated_reference,
+            provider_revision,
+        })
     }
 
     fn allows_delete(&self) -> bool {
@@ -210,7 +240,7 @@ impl TodoistSyncClient {
         item: &TaskBoardItem,
         reference: &ExternalTaskRef,
         update: &ExternalTaskUpdate,
-    ) -> Result<ExternalTaskRef, CliError> {
+    ) -> Result<TodoistTask, CliError> {
         let request = TodoistUpdateTaskRequest {
             content: update
                 .changed_fields
@@ -239,7 +269,7 @@ impl TodoistSyncClient {
             .json::<TodoistTask>()
             .await
             .map_err(todoist_sync_error)?;
-        Ok(task.reference())
+        Ok(task)
     }
 
     async fn update_task_status(

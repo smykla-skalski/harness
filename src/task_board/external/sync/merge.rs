@@ -67,13 +67,20 @@ pub(super) fn replace_synced_ref(
     current: &ExternalTaskRef,
     updated: &ExternalTaskRef,
     changed_fields: &[ExternalSyncField],
+    provider_revision: Option<&str>,
 ) -> Vec<ExternalRef> {
     let provider = current.provider.into();
     item.external_refs
         .iter()
         .map(|candidate| {
             if candidate.provider == provider && candidate.external_id == current.external_id {
-                synced_ref_from_update(candidate, updated.clone(), item, changed_fields)
+                synced_ref_from_update(
+                    candidate,
+                    updated.clone(),
+                    item,
+                    changed_fields,
+                    provider_revision,
+                )
             } else {
                 candidate.clone()
             }
@@ -84,9 +91,10 @@ pub(super) fn replace_synced_ref(
 pub(super) fn synced_ref_from_item(
     reference: ExternalTaskRef,
     item: &TaskBoardItem,
+    provider_revision: Option<&str>,
 ) -> ExternalRef {
     let mut reference = reference.into_core_ref();
-    reference.sync_state = Some(sync_state_from_created_item(item));
+    reference.sync_state = Some(sync_state_from_created_item(item, provider_revision));
     reference
 }
 
@@ -144,13 +152,16 @@ pub(super) fn changed_fields(patch: &TaskBoardItemPatch) -> Vec<ExternalSyncFiel
     fields
 }
 
-fn sync_state_from_created_item(item: &TaskBoardItem) -> ExternalRefSyncState {
+fn sync_state_from_created_item(
+    item: &TaskBoardItem,
+    provider_revision: Option<&str>,
+) -> ExternalRefSyncState {
     ExternalRefSyncState {
         title: Some(item.title.clone()),
         body: Some(item.body.clone()),
         status: Some(TaskBoardStatus::Backlog),
         project_id: item.project_id.clone(),
-        updated_at: None,
+        updated_at: provider_revision.map(ToOwned::to_owned),
         synced_at: Some(utc_now()),
     }
 }
@@ -160,6 +171,7 @@ fn synced_ref_from_update(
     updated: ExternalTaskRef,
     item: &TaskBoardItem,
     changed_fields: &[ExternalSyncField],
+    provider_revision: Option<&str>,
 ) -> ExternalRef {
     let mut reference = updated.into_core_ref();
     let mut state = current.sync_state.clone().unwrap_or_default();
@@ -176,7 +188,7 @@ fn synced_ref_from_update(
     if changed_fields.contains(&ExternalSyncField::Project) {
         state.project_id.clone_from(&item.project_id);
     }
-    state.updated_at = None;
+    state.updated_at = provider_revision.map(ToOwned::to_owned);
     state.synced_at = Some(utc_now());
     reference.sync_state = Some(state);
     reference

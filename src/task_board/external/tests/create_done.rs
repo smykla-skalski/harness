@@ -210,6 +210,9 @@ impl ExternalSyncClient for CreateDoneClient {
         if self.fail_next_update.swap(false, Ordering::SeqCst) {
             return Err(CliErrorKind::workflow_io("simulated status update failure").into());
         }
-        Ok(ExternalUpdateOutcome::Applied(reference.clone()))
+        Ok(ExternalUpdateOutcome::Applied {
+            reference: reference.clone(),
+            provider_revision: None,
+        })
     }
 }

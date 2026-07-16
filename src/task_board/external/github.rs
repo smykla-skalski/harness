@@ -11,6 +11,7 @@ use crate::github_api::{
     GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
     retry_stable_read,
 };
+use crate::task_board::normalize_repository_slug;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
 use super::targeting::github_repository_for_item;
@@ -176,6 +177,24 @@ impl ExternalSyncClient for GitHubSyncClient {
         ExternalProvider::GitHub
     }
 
+    fn scope_id(&self) -> String {
+        self.repository.as_ref().map_or_else(
+            || "linked".into(),
+            |repository| {
+                normalize_repository_slug(Some(&repository.slug()))
+                    .expect("parsed GitHub repository must have a normalized slug")
+            },
+        )
+    }
+
+    fn scope_for_item(&self, item: &TaskBoardItem) -> String {
+        if self.repository.is_none() {
+            return self.scope_id();
+        }
+        normalize_repository_slug(github_repository_for_item(item))
+            .unwrap_or_else(|| self.scope_id())
+    }
+
     fn allows_pull(&self) -> bool {
         self.pull_enabled
     }
@@ -237,13 +256,14 @@ impl ExternalSyncClient for GitHubSyncClient {
         let issue = self
             .patch_issue(&repository, issue_number, serde_json::Value::Object(body))
             .await?;
-        Ok(ExternalUpdateOutcome::Applied(
-            ExternalTaskRef::new(
+        Ok(ExternalUpdateOutcome::Applied {
+            reference: ExternalTaskRef::new(
                 ExternalProvider::GitHub,
                 github_external_id(&repository, issue.number),
             )
             .with_url(issue.html_url),
-        ))
+            provider_revision: issue.updated_at,
+        })
     }
 
     fn allows_delete(&self) -> bool {
@@ -388,6 +408,8 @@ fn github_issue_state(status: TaskBoardStatus) -> &'static str {
 struct GitHubIssueResponse {
     number: u64,
     html_url: String,
+    #[serde(default)]
+    updated_at: Option<String>,
 }
 
 fn github_write_descriptor(operation: &str) -> GitHubRequestDescriptor {

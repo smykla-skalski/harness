@@ -10,9 +10,14 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{TaskBoardSyncRequest, TaskBoardSyncResponse};
 use crate::errors::CliError;
 use crate::task_board::{
-    ExternalProvider, ExternalSyncAction, ExternalSyncConflictPolicy, ExternalSyncDirection,
-    ExternalSyncOperation,
+    ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncOperation,
 };
+
+use super::SyncExecutionMetrics;
+use metrics::{add_execution_metrics, add_summary_counts, applied_operation_count, conflict_count};
+
+#[path = "sync_audit_metrics.rs"]
+mod metrics;
 
 const BACKGROUND_FAILURE_REPEAT_INTERVAL: Duration = Duration::from_mins(15);
 
@@ -145,6 +150,7 @@ pub(super) async fn record_request_result(
     request: &TaskBoardSyncRequest,
     trigger: TaskBoardSyncAuditTrigger,
     result: &Result<TaskBoardSyncResponse, CliError>,
+    metrics: &SyncExecutionMetrics,
 ) {
     let operations = result
         .as_ref()
@@ -154,10 +160,11 @@ pub(super) async fn record_request_result(
         db,
         trigger,
         result.as_ref().err(),
-        operations
-            .unwrap_or_default()
-            .iter()
-            .any(|operation| operation.applied),
+        metrics.attempted_scope_count > 0
+            || operations
+                .unwrap_or_default()
+                .iter()
+                .any(|operation| operation.applied),
     );
     let AuditDecision::Record { recovered } = decision else {
         return;
@@ -171,6 +178,7 @@ pub(super) async fn record_request_result(
         "dry_run": request.dry_run,
     });
     add_recovery(&mut payload, recovered);
+    add_execution_metrics(&mut payload, metrics);
     if let Ok(summary) = result {
         add_summary_counts(&mut payload, summary.total, &summary.operations);
     }
@@ -298,39 +306,11 @@ fn add_recovery(payload: &mut Value, recovered: bool) {
     }
 }
 
-fn add_summary_counts(
-    payload: &mut Value,
-    total_items: usize,
-    operations: &[ExternalSyncOperation],
-) {
-    payload["total_items"] = json!(total_items);
-    add_operation_counts(payload, operations);
-}
-
-fn add_operation_counts(payload: &mut Value, operations: &[ExternalSyncOperation]) {
-    payload["operation_count"] = json!(operations.len());
-    payload["applied_operation_count"] = json!(applied_operation_count(operations));
-    payload["conflict_count"] = json!(conflict_count(operations));
-}
-
-fn applied_operation_count(operations: &[ExternalSyncOperation]) -> usize {
-    operations
-        .iter()
-        .filter(|operation| operation.applied)
-        .count()
-}
-
-fn conflict_count(operations: &[ExternalSyncOperation]) -> usize {
-    operations
-        .iter()
-        .filter(|operation| operation.action == ExternalSyncAction::Conflict)
-        .count()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::errors::CliErrorKind;
+    use crate::task_board::ExternalSyncAction;
 
     #[test]
     fn requested_sync_always_records_and_background_requires_a_change() {
@@ -488,6 +468,33 @@ mod tests {
         assert_eq!(payload["applied_operation_count"], 1);
         assert_eq!(payload["conflict_count"], 1);
         assert!(payload.get("operations").is_none());
+    }
+
+    #[test]
+    fn scope_attempt_counts_distinguish_real_sync_from_backoff_noop() {
+        let mut payload = json!({});
+        add_execution_metrics(
+            &mut payload,
+            &SyncExecutionMetrics {
+                attempted_scope_count: 2,
+                result_scope_count: 5,
+                succeeded_scope_count: 1,
+                failed_scope_count: 1,
+                backing_off_scope_count: 3,
+                operation_count: 4,
+                applied_operation_count: 2,
+                conflict_count: 1,
+            },
+        );
+
+        assert_eq!(payload["attempted_scope_count"], 2);
+        assert_eq!(payload["result_scope_count"], 5);
+        assert_eq!(payload["succeeded_scope_count"], 1);
+        assert_eq!(payload["failed_scope_count"], 1);
+        assert_eq!(payload["backing_off_scope_count"], 3);
+        assert_eq!(payload["operation_count"], 4);
+        assert_eq!(payload["applied_operation_count"], 2);
+        assert_eq!(payload["conflict_count"], 1);
     }
 
     fn operation(applied: bool, action: ExternalSyncAction) -> ExternalSyncOperation {

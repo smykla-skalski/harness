@@ -4,10 +4,12 @@ use async_trait::async_trait;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::github_api::GitHubProtectedClient;
+use crate::task_board::external::targeting::github_repository_for_item;
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalTask, ExternalTaskRef,
     normalize_token,
 };
+use crate::task_board::normalize_repository_slug;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
 use super::{
@@ -107,6 +109,21 @@ impl fmt::Debug for GitHubInboxSyncClient {
 impl ExternalSyncClient for GitHubInboxSyncClient {
     fn provider(&self) -> ExternalProvider {
         ExternalProvider::GitHub
+    }
+
+    fn scope_id(&self) -> String {
+        self.repositories.first().map_or_else(
+            || "inbox".into(),
+            |repository| {
+                normalize_repository_slug(Some(&repository.slug()))
+                    .expect("parsed GitHub repository must have a normalized slug")
+            },
+        )
+    }
+
+    fn scope_for_item(&self, item: &TaskBoardItem) -> String {
+        normalize_repository_slug(github_repository_for_item(item))
+            .unwrap_or_else(|| self.scope_id())
     }
 
     fn allows_push(&self) -> bool {
