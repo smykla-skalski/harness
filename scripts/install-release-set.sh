@@ -472,6 +472,17 @@ backup_entrypoint() {
   entrypoint_backup_paths+=("$backup")
 }
 
+remove_inactive_managed_entrypoints() {
+  local name path
+  for name in "${HARNESS_RELEASE_INACTIVE_BINARIES[@]}"; do
+    path="$(stable_path "$name")"
+    if is_managed_link "$name" "$path"; then
+      backup_entrypoint "$path"
+      command rm -f "$path"
+    fi
+  done
+}
+
 managed_link_target() {
   printf '%s/current/bin/%s\n' "$install_root" "$1"
 }
@@ -1040,6 +1051,7 @@ current_may_have_changed=1
 # Activate the complete candidate before publishing any new stable entrypoint.
 # Existing entrypoints switch with `current`; first-install links are never dangling.
 atomic_replace_symlink "$candidate_id" "$current_link"
+remove_inactive_managed_entrypoints
 if [[ "${HARNESS_INSTALL_TEST_FAIL_AFTER_ACTIVATION:-0}" == "1" ]]; then
   printf 'injected post-activation failure\n' >&2
   exit 97

@@ -7,24 +7,46 @@
 HARNESS_RELEASE_BINARIES=(
   harness
   harness-daemon
-  harness-systemd
+)
+# shellcheck disable=SC2034
+HARNESS_RELEASE_BUILD_LEAVES=(
+  harness
+  daemon
+)
+# shellcheck disable=SC2034
+HARNESS_RELEASE_INACTIVE_BINARIES=()
+
+harness_release_host_os="${HARNESS_RELEASE_HOST_OS:-$(command uname -s)}"
+case "$harness_release_host_os" in
+  Linux)
+    HARNESS_RELEASE_BINARIES+=(harness-systemd)
+    HARNESS_RELEASE_BUILD_LEAVES+=(systemd)
+    ;;
+  Darwin)
+    HARNESS_RELEASE_INACTIVE_BINARIES=(harness-systemd)
+    ;;
+  *)
+    printf 'unsupported release build host OS: %s\n' "$harness_release_host_os" >&2
+    exit 2
+    ;;
+esac
+
+HARNESS_RELEASE_BINARIES+=(
   harness-bridge
   harness-mcp
   harness-hook
   harness-codex-acp
   harness-openrouter-agent
 )
-# shellcheck disable=SC2034
-HARNESS_RELEASE_BUILD_LEAVES=(
-  harness
-  daemon
-  systemd
+HARNESS_RELEASE_BUILD_LEAVES+=(
   bridge
   mcp
   hook
   codex
   openrouter
 )
+unset harness_release_host_os
+
 # shellcheck disable=SC2034
 HARNESS_RELEASE_ALL_BINARIES=("${HARNESS_RELEASE_BINARIES[@]}" aff)
 # shellcheck disable=SC2034

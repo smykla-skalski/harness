@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)"
+export HARNESS_RELEASE_HOST_OS=Linux
 # shellcheck source=scripts/lib/release-set.sh
 source "$ROOT/scripts/lib/release-set.sh"
 SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/release-install-test-$$.XXXXXX")"
@@ -267,6 +268,107 @@ scenario_build_group_allocates_one_budget() {
   assert_contains "--locked --manifest-path crates/harness-codex-acp/Cargo.toml" \
     "$(command cat "$events")" || ok=0
   assert_not_contains "--workspace --bins" "$(command cat "$events")" || ok=0
+  if (( ok )); then pass; fi
+}
+
+scenario_release_inventory_is_platform_aware() {
+  start_test "release inventory includes systemd only on Linux"
+  local sandbox="$SANDBOX/platform-inventory"
+  local linux_inventory darwin_inventory
+  command mkdir -p "$sandbox"
+
+  linux_inventory="$(
+    HARNESS_RELEASE_HOST_OS=Linux bash -c '
+      source "$1"
+      printf "binaries=%s\n" "${HARNESS_RELEASE_BINARIES[*]}"
+      printf "leaves=%s\n" "${HARNESS_RELEASE_BUILD_LEAVES[*]}"
+    ' bash "$ROOT/scripts/lib/release-set.sh"
+  )"
+  darwin_inventory="$(
+    HARNESS_RELEASE_HOST_OS=Darwin bash -c '
+      source "$1"
+      printf "binaries=%s\n" "${HARNESS_RELEASE_BINARIES[*]}"
+      printf "leaves=%s\n" "${HARNESS_RELEASE_BUILD_LEAVES[*]}"
+    ' bash "$ROOT/scripts/lib/release-set.sh"
+  )"
+
+  local ok=1
+  assert_contains "binaries=harness harness-daemon harness-systemd harness-bridge harness-mcp harness-hook harness-codex-acp harness-openrouter-agent" "$linux_inventory" || ok=0
+  assert_contains "leaves=harness daemon systemd bridge mcp hook codex openrouter" "$linux_inventory" || ok=0
+  assert_not_contains "harness-systemd" "$darwin_inventory" || ok=0
+  assert_contains "binaries=harness harness-daemon harness-bridge harness-mcp harness-hook harness-codex-acp harness-openrouter-agent" "$darwin_inventory" || ok=0
+  assert_contains "leaves=harness daemon bridge mcp hook codex openrouter" "$darwin_inventory" || ok=0
+  if (( ok )); then pass; fi
+}
+
+scenario_darwin_excludes_systemd_and_migrates_managed_link() {
+  start_test "Darwin excludes systemd and transactionally removes its managed link"
+  local sandbox="$SANDBOX/darwin-systemd"
+  local build_events="$sandbox/build-events"
+  local old_target failed_target active_target status=0 name
+  local ok=1
+  command mkdir -p "$sandbox"
+  write_fake_cargo "$sandbox/fake-bin"
+
+  PATH="$sandbox/fake-bin:/usr/bin:/bin" \
+    BASH_ENV=/dev/null \
+    HARNESS_CARGO_BIN="$sandbox/fake-bin/cargo" \
+    CARGO_TARGET_DIR="$sandbox/build-target" \
+    CARGO_BUILD_JOBS="${#HARNESS_RELEASE_ALL_BUILD_LEAVES[@]}" \
+    FAKE_CARGO_EVENTS="$build_events" \
+    HARNESS_RELEASE_HOST_OS=Darwin \
+    "$ROOT/scripts/cargo-local.sh" --with-group-lease \
+    "$ROOT/scripts/build-release-set.sh" all >/dev/null
+
+  assert_not_contains "leaf=systemd" "$(command cat "$build_events")" || ok=0
+  assert_not_contains "-p harness-systemd" "$(command cat "$build_events")" || ok=0
+
+  write_fake_release_set "$sandbox/target" 47.0.0
+  run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  old_target="$(command readlink "$sandbox/install-root/current")"
+  assert_contains "harness-systemd 47.0.0" \
+    "$("$sandbox/bin/harness-systemd" --version)" || ok=0
+
+  write_fake_release_set "$sandbox/target" 48.0.0
+  command rm -f "$sandbox/target/release/harness-systemd"
+  HARNESS_RELEASE_HOST_OS=Darwin \
+    HARNESS_INSTALL_TEST_FAIL_AFTER_ACTIVATION=1 \
+    run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all \
+    >/dev/null 2>&1 || status=$?
+  failed_target="$(command readlink "$sandbox/install-root/current")"
+  if (( status != 97 )); then
+    fail "expected injected Darwin activation failure status 97, got $status"
+    ok=0
+  fi
+  if [[ "$failed_target" != "$old_target" ]]; then
+    fail "failed Darwin install did not restore the previous current target"
+    ok=0
+  fi
+  assert_contains "harness-systemd 47.0.0" \
+    "$("$sandbox/bin/harness-systemd" --version)" || ok=0
+
+  HARNESS_RELEASE_HOST_OS=Darwin \
+    run_installer "$sandbox" "$ROOT/scripts/install-release-set.sh" all >/dev/null
+  active_target="$(command readlink "$sandbox/install-root/current")"
+  for name in "${HARNESS_BINARIES[@]}"; do
+    [[ "$name" != harness-systemd ]] || continue
+    [[ -L "$sandbox/bin/$name" && -x "$sandbox/bin/$name" ]] || {
+      fail "Darwin install is missing managed entrypoint $name"
+      ok=0
+    }
+  done
+  [[ ! -e "$sandbox/bin/harness-systemd" && ! -L "$sandbox/bin/harness-systemd" ]] || {
+    fail "Darwin install retained the managed harness-systemd entrypoint"
+    ok=0
+  }
+  [[ ! -e "$sandbox/install-root/$active_target/bin/harness-systemd" ]] || {
+    fail "Darwin release candidate contains harness-systemd"
+    ok=0
+  }
+  [[ -x "$sandbox/install-root/$old_target/bin/harness-systemd" ]] || {
+    fail "Darwin migration mutated the retained Linux rollback release"
+    ok=0
+  }
   if (( ok )); then pass; fi
 }
 
@@ -1298,6 +1400,8 @@ scenario_legacy_detector_is_read_only_and_blocks_activation() {
 }
 
 run_all() {
+  scenario_release_inventory_is_platform_aware
+  scenario_darwin_excludes_systemd_and_migrates_managed_link
   scenario_build_group_allocates_one_budget
   scenario_missing_build_artifact_aborts_publication
   scenario_build_group_cancels_siblings

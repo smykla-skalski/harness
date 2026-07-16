@@ -155,13 +155,15 @@ run = "./scripts/tests/test-release-install.sh"
 description = "Run unit tests"
 run = [
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime",
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-protocol -p harness-systemd -p harness-systemd-protocol -p harness-telemetry -p harness-testkit",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-testkit",
+  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd",
 ]
 
 [tasks."test:integration"]
 description = "Run fast integration tests in parallel with process isolation"
 run = [
-  "./scripts/cargo-local.sh build -p harness-daemon -p harness-systemd -p harness-bridge -p harness-mcp",
+  "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
+  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build -p harness-systemd",
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime",
 ]
 
@@ -172,14 +174,15 @@ run = [
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon --test systemd_compat",
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-hook --test standalone",
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-mcp --test cli --test dependency_guard",
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd --test dependency_guard",
+  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd --test dependency_guard",
 ]
 
 [tasks."test:slow"]
 description = "Run self-contained ignored tests; use test:perf for timing budgets and e2e:swarm:full for the real-runtime swarm lane"
 run = [
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime --run-ignored only -E 'test(=agents::acp::throughput_bench::tests::throughput_meets_threshold)'",
-  "./scripts/cargo-local.sh build -p harness-daemon -p harness-systemd -p harness-bridge -p harness-mcp",
+  "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
+  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build -p harness-systemd",
   "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime --run-ignored only -E 'not test(~integration::daemon_perf::) and not test(=integration::commands::session::swarm_full_flow::swarm_full_flow_mise_lane_passes)'",
 ]
 
@@ -216,16 +219,16 @@ run = [
 [tasks."remote-daemon:systemd-e2e"]
 description = "Run the real Linux systemd lifecycle and effective security proof"
 run = [
-  "./scripts/cargo-local.sh build --release -p harness-daemon",
-  "./scripts/cargo-local.sh build --release -p harness-systemd --features remote-systemd-e2e-faults",
-  "./scripts/cargo-local.sh nextest run --release --config-file .config/nextest.toml --user-config-file none -p harness --test remote_systemd_e2e --features full-runtime,remote-systemd-e2e-faults --run-ignored only --success-output immediate --failure-output immediate -E 'test(=remote_systemd_e2e_proves_lifecycle_and_effective_security)'",
+  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build --release -p harness-daemon",
+  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh build --release -p harness-systemd --features remote-systemd-e2e-faults",
+  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh nextest run --release --config-file .config/nextest.toml --user-config-file none -p harness --test remote_systemd_e2e --features full-runtime,remote-systemd-e2e-faults --run-ignored only --success-output immediate --failure-output immediate -E 'test(=remote_systemd_e2e_proves_lifecycle_and_effective_security)'",
 ]
 
 [tasks."systemd:check"]
 description = "Run standalone harness-systemd tests, dependency guard, and pedantic Clippy"
 run = [
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd",
-  "./scripts/cargo-local.sh clippy --all-targets -p harness-systemd",
+  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-systemd",
+  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh clippy --all-targets -p harness-systemd",
 ]
 
 [tasks.codegen]
@@ -292,7 +295,7 @@ run = [
   "./scripts/cargo-local.sh check -p harness-bridge --bin harness-bridge",
   "./scripts/cargo-local.sh check -p harness-mcp --bin harness-mcp",
   "./scripts/cargo-local.sh check -p harness-daemon --bin harness-daemon",
-  "./scripts/cargo-local.sh check -p harness-systemd --bin harness-systemd",
+  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh check -p harness-systemd --bin harness-systemd",
 ]
 
 [tasks."harness:check:rust"]
@@ -300,7 +303,7 @@ hide = true
 run = [
   "./scripts/cargo-local.sh clippy -p harness --lib --bins",
   "./scripts/cargo-local.sh clippy --all-targets -p harness-command -p harness-daemon-client -p harness-protocol -p harness-systemd-protocol -p harness-telemetry -p harness-daemon -p harness-bridge -p harness-mcp -p harness-hook -p policy-codegen",
-  "./scripts/cargo-local.sh clippy --all-targets -p harness-systemd",
+  "./scripts/run-linux-only.sh ./scripts/cargo-local.sh clippy --all-targets -p harness-systemd",
 ]
 
 [tasks."aff:check"]
