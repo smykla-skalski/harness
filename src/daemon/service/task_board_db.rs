@@ -17,9 +17,9 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::sync_external_tasks_scoped;
 use crate::task_board::planning::PlanningTransition;
 use crate::task_board::{
-    ExternalRef, ExternalSyncConfig, Machine, PlanningState, SpawnGateSwitches, TaskBoardItem,
-    TaskBoardWorkflowState, approve_plan, begin_planning, build_audit_summary_with_policy,
-    build_machine_summaries, build_project_summaries,
+    ExternalRef, ExternalSyncClient, ExternalSyncConfig, Machine, PlanningState, SpawnGateSwitches,
+    TaskBoardItem, TaskBoardWorkflowState, approve_plan, begin_planning,
+    build_audit_summary_with_policy, build_machine_summaries, build_project_summaries,
     configured_sync_clients_without_review_requests, revoke_plan, submit_plan,
 };
 use crate::workspace::utc_now;
@@ -33,7 +33,7 @@ mod reviews_sync;
 mod sync_audit;
 
 pub(crate) use reviews_sync::reconcile_shared_review_items_db;
-use reviews_sync::shared_review_request_client;
+use reviews_sync::shared_review_request_clients;
 use sync_audit::SyncExecutionMetrics;
 pub(crate) use sync_audit::{
     ReviewsProjectionAuditSummary, record_reviews_projection_result,
@@ -261,9 +261,12 @@ async fn sync_task_board_db_inner(
 ) -> Result<TaskBoardSyncResponse, CliError> {
     let config = active_external_sync_config_db(db).await?;
     let mut clients = configured_sync_clients_without_review_requests(&config, request.provider)?;
-    if let Some(shared_reviews) = shared_review_request_client(db, request).await? {
-        clients.push(Box::new(shared_reviews));
-    }
+    clients.extend(
+        shared_review_request_clients(db, request)
+            .await?
+            .into_iter()
+            .map(|client| Box::new(client) as Box<dyn ExternalSyncClient>),
+    );
     super::task_board::log_sync_request(request, &config, clients.len());
     super::task_board::ensure_sync_request_can_run(request, &config, &clients)?;
     let batch =

@@ -7,6 +7,21 @@ use crate::task_board::external::{
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::{ExternalProvider, TaskBoardItem, TaskBoardStatus, TaskBoardSyncConflict};
 
+#[derive(Debug, Clone)]
+pub(crate) struct TaskBoardSyncItemSnapshot {
+    pub(crate) item: TaskBoardItem,
+    pub(crate) item_revision: i64,
+}
+
+impl TaskBoardSyncItemSnapshot {
+    pub(crate) const fn new(item: TaskBoardItem, item_revision: i64) -> Self {
+        Self {
+            item,
+            item_revision,
+        }
+    }
+}
+
 #[async_trait]
 pub(crate) trait TaskBoardSyncStore: Send + Sync {
     async fn list_items(
@@ -21,7 +36,7 @@ pub(crate) trait TaskBoardSyncStore: Send + Sync {
         patch: TaskBoardItemPatch,
     ) -> Result<TaskBoardItem, CliError>;
 
-    async fn item_revision(&self, item_id: &str) -> Result<i64, CliError>;
+    async fn item_snapshot(&self, item_id: &str) -> Result<TaskBoardSyncItemSnapshot, CliError>;
 
     async fn provider_scope_state(
         &self,
@@ -35,6 +50,12 @@ pub(crate) trait TaskBoardSyncStore: Send + Sync {
         scope_id: &str,
         now: &str,
     ) -> Result<ExternalProviderScopeAttemptDecision, CliError>;
+
+    async fn renew_provider_scope_attempt(
+        &self,
+        attempt: &ExternalProviderScopeAttempt,
+        now: &str,
+    ) -> Result<(), CliError>;
 
     async fn complete_provider_scope_success(
         &self,
@@ -54,6 +75,7 @@ pub(crate) trait TaskBoardSyncStore: Send + Sync {
         item_id: &str,
         provider: ExternalProvider,
         external_ref: &str,
+        item_revision: i64,
         conflicts: &[TaskBoardSyncConflict],
     ) -> Result<(), CliError>;
 }

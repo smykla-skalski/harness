@@ -259,6 +259,7 @@ async fn record_open_title_conflict(db: &AsyncDaemonDb, item_id: &str) {
         item_id,
         ExternalProvider::Todoist,
         "remote-1",
+        revision,
         &[TaskBoardSyncConflict {
             conflict_id: format!("conflict-{item_id}"),
             item_id: item_id.into(),
@@ -336,8 +337,8 @@ impl TaskBoardSyncStore for FailingPersistenceStore {
         Err(CliErrorKind::concurrent_modification("local CAS failed").into())
     }
 
-    async fn item_revision(&self, _item_id: &str) -> Result<i64, CliError> {
-        Ok(2)
+    async fn item_snapshot(&self, _item_id: &str) -> Result<TaskBoardSyncItemSnapshot, CliError> {
+        Ok(TaskBoardSyncItemSnapshot::new(self.item.clone(), 2))
     }
 
     async fn provider_scope_state(
@@ -364,6 +365,14 @@ impl TaskBoardSyncStore for FailingPersistenceStore {
         ))
     }
 
+    async fn renew_provider_scope_attempt(
+        &self,
+        _attempt: &ExternalProviderScopeAttempt,
+        _now: &str,
+    ) -> Result<(), CliError> {
+        Ok(())
+    }
+
     async fn complete_provider_scope_success(
         &self,
         _attempt: &ExternalProviderScopeAttempt,
@@ -386,6 +395,7 @@ impl TaskBoardSyncStore for FailingPersistenceStore {
         _item_id: &str,
         _provider: ExternalProvider,
         _external_ref: &str,
+        _item_revision: i64,
         conflicts: &[TaskBoardSyncConflict],
     ) -> Result<(), CliError> {
         *self.conflicts.lock().expect("conflicts") = conflicts.to_vec();

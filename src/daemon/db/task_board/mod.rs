@@ -11,14 +11,19 @@ mod mapper;
 mod policy_queues;
 mod policy_runs;
 mod provider_sync;
+mod provider_sync_conflicts;
 mod rows;
 
 #[cfg(test)]
 mod provider_sync_backoff_tests;
 #[cfg(test)]
+mod provider_sync_conflict_revision_tests;
+#[cfg(test)]
 mod provider_sync_fencing_tests;
 #[cfg(test)]
 mod provider_sync_publication_tests;
+#[cfg(test)]
+mod provider_sync_renewal_tests;
 #[cfg(test)]
 mod provider_sync_tests;
 

@@ -8,7 +8,7 @@ use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 use crate::task_board::{ExternalProvider, TaskBoardSyncConflict};
 
-use super::TaskBoardSyncStore;
+use super::{TaskBoardSyncItemSnapshot, TaskBoardSyncStore};
 
 #[async_trait]
 impl TaskBoardSyncStore for TaskBoardStore {
@@ -63,8 +63,16 @@ impl TaskBoardSyncStore for TaskBoardStore {
         .map_err(|error| sync_join_error("update item", error))?
     }
 
-    async fn item_revision(&self, _item_id: &str) -> Result<i64, CliError> {
-        Ok(0)
+    async fn item_snapshot(&self, item_id: &str) -> Result<TaskBoardSyncItemSnapshot, CliError> {
+        let board = self.clone();
+        let item_id = item_id.to_owned();
+        tokio::task::spawn_blocking(move || {
+            board
+                .get(&item_id)
+                .map(|item| TaskBoardSyncItemSnapshot::new(item, 0))
+        })
+        .await
+        .map_err(|error| sync_join_error("load item snapshot", error))?
     }
 
     async fn provider_scope_state(
@@ -91,6 +99,14 @@ impl TaskBoardSyncStore for TaskBoardStore {
         ))
     }
 
+    async fn renew_provider_scope_attempt(
+        &self,
+        _attempt: &ExternalProviderScopeAttempt,
+        _now: &str,
+    ) -> Result<(), CliError> {
+        Ok(())
+    }
+
     async fn complete_provider_scope_success(
         &self,
         _attempt: &ExternalProviderScopeAttempt,
@@ -113,6 +129,7 @@ impl TaskBoardSyncStore for TaskBoardStore {
         _item_id: &str,
         _provider: ExternalProvider,
         _external_ref: &str,
+        _item_revision: i64,
         _conflicts: &[TaskBoardSyncConflict],
     ) -> Result<(), CliError> {
         Ok(())

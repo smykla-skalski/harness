@@ -4,6 +4,7 @@ use crate::daemon::db::{AsyncDaemonDb, db_error};
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
+    TaskBoardSyncItemSnapshot,
 };
 use crate::task_board::store::{TaskBoardItemPatch, apply_patch};
 use crate::task_board::{
@@ -50,10 +51,10 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         .ok_or_else(|| db_error("Task Board sync update produced no mutation"))
     }
 
-    async fn item_revision(&self, item_id: &str) -> Result<i64, CliError> {
+    async fn item_snapshot(&self, item_id: &str) -> Result<TaskBoardSyncItemSnapshot, CliError> {
         self.task_board_item_snapshot(item_id)
             .await
-            .map(|snapshot| snapshot.item_revision)
+            .map(|snapshot| TaskBoardSyncItemSnapshot::new(snapshot.item, snapshot.item_revision))
     }
 
     async fn provider_scope_state(
@@ -72,6 +73,15 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         now: &str,
     ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
         self.begin_task_board_provider_scope_attempt(provider, scope_id, now)
+            .await
+    }
+
+    async fn renew_provider_scope_attempt(
+        &self,
+        attempt: &ExternalProviderScopeAttempt,
+        now: &str,
+    ) -> Result<(), CliError> {
+        self.renew_task_board_provider_scope_attempt(attempt, now)
             .await
     }
 
@@ -99,10 +109,17 @@ impl TaskBoardSyncStore for AsyncDaemonDb {
         item_id: &str,
         provider: ExternalProvider,
         external_ref: &str,
+        item_revision: i64,
         conflicts: &[TaskBoardSyncConflict],
     ) -> Result<(), CliError> {
-        self.replace_open_task_board_sync_conflicts(item_id, provider, external_ref, conflicts)
-            .await
+        self.replace_open_task_board_sync_conflicts(
+            item_id,
+            provider,
+            external_ref,
+            item_revision,
+            conflicts,
+        )
+        .await
     }
 }
 

@@ -1,5 +1,6 @@
 use crate::errors::CliError;
 use crate::github_api::republish_current_data_change;
+use crate::task_board::external::ExternalProviderScopeAttempt;
 use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
@@ -19,6 +20,7 @@ pub(super) async fn push_board_tasks(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), SyncClientError> {
     let items = board
@@ -27,7 +29,7 @@ pub(super) async fn push_board_tasks(
         .map_err(SyncClientError::Local)?;
     let scope_id = client.scope_id();
     for item in &items {
-        push_board_item(board, options, client, item, &scope_id, operations).await?;
+        push_board_item(board, options, client, attempt, item, &scope_id, operations).await?;
     }
     Ok(())
 }
@@ -36,6 +38,7 @@ async fn push_board_item(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
     item: &TaskBoardItem,
     scope_id: &str,
     operations: &mut Vec<ExternalSyncOperation>,
@@ -46,9 +49,9 @@ async fn push_board_item(
         return Ok(());
     }
     if let Some(reference) = provider_ref(item, client.provider()) {
-        update_linked_remote(board, options, client, item, reference, operations).await
+        update_linked_remote(board, options, client, attempt, item, reference, operations).await
     } else {
-        create_remote_item(board, options, client, item, operations).await
+        create_remote_item(board, options, client, attempt, item, operations).await
     }
 }
 
@@ -56,6 +59,7 @@ async fn create_remote_item(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
     item: &TaskBoardItem,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), SyncClientError> {
@@ -72,6 +76,7 @@ async fn create_remote_item(
         ));
         return Ok(());
     }
+    super::scope::renew_scope_attempt(board, attempt).await?;
     let reference = client
         .push_task(item)
         .await
@@ -117,7 +122,10 @@ async fn create_remote_item(
         Vec::new(),
     ));
     if canonical_external_status(item.status) == TaskBoardStatus::Done {
-        update_linked_remote(board, options, client, &linked, reference, operations).await?;
+        update_linked_remote(
+            board, options, client, attempt, &linked, reference, operations,
+        )
+        .await?;
     }
     Ok(())
 }
@@ -126,6 +134,7 @@ async fn update_linked_remote(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
     item: &TaskBoardItem,
     reference: ExternalTaskRef,
     operations: &mut Vec<ExternalSyncOperation>,
@@ -148,8 +157,10 @@ async fn update_linked_remote(
         ));
         return Ok(());
     }
-    let Some(applied) =
-        execute_provider_update(board, client, item, &reference, &supported, operations).await?
+    let Some(applied) = execute_provider_update(
+        board, client, attempt, item, &reference, &supported, operations,
+    )
+    .await?
     else {
         return Ok(());
     };
@@ -174,6 +185,7 @@ struct AppliedRemoteUpdate {
 async fn execute_provider_update(
     board: &dyn TaskBoardSyncStore,
     client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
     item: &TaskBoardItem,
     reference: &ExternalTaskRef,
     supported: &[ExternalSyncField],
@@ -182,6 +194,7 @@ async fn execute_provider_update(
     let precondition = remote_precondition(item, reference);
     let update =
         ExternalTaskUpdate::new(supported.to_vec()).with_precondition_updated_at(precondition);
+    super::scope::renew_scope_attempt(board, attempt).await?;
     let outcome = client
         .update_task(item, reference, update)
         .await
@@ -268,8 +281,18 @@ async fn persist_linked_update(
         return Err(SyncClientError::Local(error));
     }
     if unsupported.is_empty() {
+        let snapshot = board
+            .item_snapshot(&item.id)
+            .await
+            .map_err(SyncClientError::Local)?;
         board
-            .replace_open_sync_conflicts(&item.id, client.provider(), &updated_ref.external_id, &[])
+            .replace_open_sync_conflicts(
+                &item.id,
+                client.provider(),
+                &updated_ref.external_id,
+                snapshot.item_revision,
+                &[],
+            )
             .await
             .map_err(SyncClientError::Local)?;
     }
@@ -292,29 +315,17 @@ async fn persist_push_conflicts(
     remote: &ExternalTask,
     fields: &[ExternalSyncField],
 ) -> Result<(), CliError> {
-    let item = latest_item(board, expected_item).await?;
-    let item_revision = board.item_revision(&item.id).await?;
-    let conflicts = build_sync_conflicts(&item, remote, fields, item_revision);
+    let snapshot = board.item_snapshot(&expected_item.id).await?;
+    let conflicts = build_sync_conflicts(&snapshot.item, remote, fields, snapshot.item_revision);
     board
         .replace_open_sync_conflicts(
-            &item.id,
+            &snapshot.item.id,
             remote.reference.provider,
             &remote.reference.external_id,
+            snapshot.item_revision,
             &conflicts,
         )
         .await
-}
-
-async fn latest_item(
-    board: &dyn TaskBoardSyncStore,
-    expected_item: &TaskBoardItem,
-) -> Result<TaskBoardItem, CliError> {
-    Ok(board
-        .list_items_including_deleted()
-        .await?
-        .into_iter()
-        .find(|item| item.id == expected_item.id)
-        .unwrap_or_else(|| expected_item.clone()))
 }
 
 fn created_remote_task(item: &TaskBoardItem, reference: ExternalTaskRef) -> ExternalTask {

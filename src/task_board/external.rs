@@ -34,8 +34,8 @@ pub use sync::{
     configured_sync_clients,
 };
 pub(crate) use sync::{
-    TaskBoardSyncStore, configured_sync_clients_without_review_requests, sync_external_tasks,
-    sync_external_tasks_scoped,
+    TaskBoardSyncItemSnapshot, TaskBoardSyncStore, configured_sync_clients_without_review_requests,
+    sync_external_tasks, sync_external_tasks_scoped,
 };
 pub use todoist::TodoistSyncClient;
 

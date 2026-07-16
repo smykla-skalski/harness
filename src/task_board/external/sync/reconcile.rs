@@ -28,17 +28,23 @@ pub(super) async fn reconcile_existing_item(
     task: ExternalTask,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
-    let conflict_fields = pull_conflict_fields(item, &task);
     let reports_conflicts = matches!(options.direction, ExternalSyncDirection::Both)
         && matches!(options.conflict_policy, ExternalSyncConflictPolicy::Report);
-    if reports_conflicts && !options.dry_run {
-        let item_revision = board.item_revision(&item.id).await?;
-        let conflicts = build_sync_conflicts(item, &task, &conflict_fields, item_revision);
+    let snapshot = if reports_conflicts && !options.dry_run {
+        Some(board.item_snapshot(&item.id).await?)
+    } else {
+        None
+    };
+    let item = snapshot.as_ref().map_or(item, |snapshot| &snapshot.item);
+    let conflict_fields = pull_conflict_fields(item, &task);
+    if let Some(snapshot) = &snapshot {
+        let conflicts = build_sync_conflicts(item, &task, &conflict_fields, snapshot.item_revision);
         board
             .replace_open_sync_conflicts(
                 &item.id,
                 provider,
                 &task.reference.external_id,
+                snapshot.item_revision,
                 &conflicts,
             )
             .await?;
@@ -122,8 +128,15 @@ async fn supersede_resolved_conflicts(
         ExternalSyncConflictPolicy::PreferLocal => conflict_fields.is_empty(),
     };
     if resolved && !options.dry_run {
+        let snapshot = board.item_snapshot(&item.id).await?;
         board
-            .replace_open_sync_conflicts(&item.id, provider, &task.reference.external_id, &[])
+            .replace_open_sync_conflicts(
+                &item.id,
+                provider,
+                &task.reference.external_id,
+                snapshot.item_revision,
+                &[],
+            )
             .await?;
     }
     Ok(())
@@ -285,7 +298,7 @@ mod tests {
     use crate::task_board::TaskBoardSyncConflict;
     use crate::task_board::external::{
         ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
-        ExternalProviderScopeState, ExternalSyncDirection,
+        ExternalProviderScopeState, ExternalSyncDirection, TaskBoardSyncItemSnapshot,
     };
 
     #[tokio::test]
@@ -348,8 +361,11 @@ mod tests {
             Err(CliErrorKind::concurrent_modification("concurrent test edit").into())
         }
 
-        async fn item_revision(&self, _item_id: &str) -> Result<i64, CliError> {
-            Ok(0)
+        async fn item_snapshot(
+            &self,
+            _item_id: &str,
+        ) -> Result<TaskBoardSyncItemSnapshot, CliError> {
+            Ok(TaskBoardSyncItemSnapshot::new(self.latest.clone(), 0))
         }
 
         async fn provider_scope_state(
@@ -367,6 +383,14 @@ mod tests {
             _now: &str,
         ) -> Result<ExternalProviderScopeAttemptDecision, CliError> {
             unreachable!("reconciliation test does not begin provider attempts")
+        }
+
+        async fn renew_provider_scope_attempt(
+            &self,
+            _attempt: &ExternalProviderScopeAttempt,
+            _now: &str,
+        ) -> Result<(), CliError> {
+            unreachable!("reconciliation test does not renew provider attempts")
         }
 
         async fn complete_provider_scope_success(
@@ -391,6 +415,7 @@ mod tests {
             _item_id: &str,
             _provider: ExternalProvider,
             _external_ref: &str,
+            _item_revision: i64,
             _conflicts: &[TaskBoardSyncConflict],
         ) -> Result<(), CliError> {
             Ok(())

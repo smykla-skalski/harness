@@ -83,7 +83,7 @@ async fn sync_admitted_scope(
 ) -> Result<(), CliError> {
     let provider = scope.provider();
     let scope_id = scope.scope_id().to_owned();
-    match sync_client(board, options, client, &mut batch.operations).await {
+    match sync_client(board, options, client, attempt, &mut batch.operations).await {
         Ok(base_revision) => {
             if let Some(attempt) = attempt {
                 board
@@ -151,28 +151,53 @@ async fn sync_client(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<Option<String>, SyncClientError> {
-    let mut base_revision = None;
-    if direction_allows_pull(options.direction) && client.allows_pull() {
-        let tasks = client
-            .pull_tasks()
-            .await
-            .map_err(SyncClientError::Provider)?;
-        base_revision = tasks
-            .iter()
-            .filter_map(|task| task.updated_at.as_ref())
-            .max()
-            .cloned();
-        pull_provider_tasks(board, options, client, tasks, operations)
-            .await
-            .map_err(SyncClientError::Local)?;
-    }
-    if direction_allows_push(options.direction) && client.allows_push() {
-        push_board_tasks(board, options, client, operations).await?;
-        delete_remote_tombstones(board, options, client, operations).await?;
-    }
+    let base_revision = pull_client_tasks(board, options, client, attempt, operations).await?;
+    push_client_tasks(board, options, client, attempt, operations).await?;
     Ok(base_revision)
+}
+
+async fn pull_client_tasks(
+    board: &dyn TaskBoardSyncStore,
+    options: ExternalSyncOptions,
+    client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
+    operations: &mut Vec<ExternalSyncOperation>,
+) -> Result<Option<String>, SyncClientError> {
+    if !direction_allows_pull(options.direction) || !client.allows_pull() {
+        return Ok(None);
+    }
+    super::scope::renew_scope_attempt(board, attempt).await?;
+    let tasks = client
+        .pull_tasks()
+        .await
+        .map_err(SyncClientError::Provider)?;
+    super::scope::renew_scope_attempt(board, attempt).await?;
+    let base_revision = tasks
+        .iter()
+        .filter_map(|task| task.updated_at.as_ref())
+        .max()
+        .cloned();
+    pull_provider_tasks(board, options, client, tasks, operations)
+        .await
+        .map_err(SyncClientError::Local)?;
+    Ok(base_revision)
+}
+
+async fn push_client_tasks(
+    board: &dyn TaskBoardSyncStore,
+    options: ExternalSyncOptions,
+    client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
+    operations: &mut Vec<ExternalSyncOperation>,
+) -> Result<(), SyncClientError> {
+    if direction_allows_push(options.direction) && client.allows_push() {
+        push_board_tasks(board, options, client, attempt, operations).await?;
+        delete_remote_tombstones(board, options, client, attempt, operations).await?;
+    }
+    Ok(())
 }
 
 fn direction_allows_pull(direction: ExternalSyncDirection) -> bool {

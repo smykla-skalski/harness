@@ -130,6 +130,7 @@ async fn replacing_conflicts_keeps_current_fields_and_supersedes_removed_fields(
         "task-1",
         ExternalProvider::GitHub,
         "acme/widgets#17",
+        1,
         &[title.clone(), status],
     )
     .await
@@ -146,6 +147,7 @@ async fn replacing_conflicts_keeps_current_fields_and_supersedes_removed_fields(
         "task-1",
         ExternalProvider::GitHub,
         "acme/widgets#17",
+        1,
         &[title],
     )
     .await

@@ -19,6 +19,8 @@ mod conflicts;
 mod delete;
 mod import;
 #[cfg(test)]
+mod lease_tests;
+#[cfg(test)]
 mod legacy_store;
 mod lookup;
 mod merge;
@@ -36,7 +38,7 @@ use push::push_board_tasks;
 use reconcile::reconcile_existing_item;
 use scope::SyncClientError;
 use stale_reviews::reconcile_stale_github_review_requests;
-pub(crate) use store::TaskBoardSyncStore;
+pub(crate) use store::{TaskBoardSyncItemSnapshot, TaskBoardSyncStore};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]

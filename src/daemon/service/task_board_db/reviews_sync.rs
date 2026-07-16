@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::SecondsFormat;
@@ -12,26 +13,46 @@ use crate::reviews::{ReviewItem, ReviewPullRequestState, ReviewsQueryRequest};
 use crate::task_board::{
     ExternalProvider, ExternalSyncClient, ExternalSyncDirection, ExternalSyncOperation,
     ExternalSyncOptions, ExternalTask, ExternalTaskRef, TaskBoardItem, TaskBoardStatus,
-    sync_external_tasks,
+    normalize_repository_slug, sync_external_tasks,
 };
 
 pub(super) struct SharedReviewRequestClient {
+    repository: String,
     tasks: Option<Vec<ExternalTask>>,
     query: Option<SharedReviewQuery>,
     authoritative_review_inbox: bool,
-    github_revision_guard: AsyncMutex<Option<OwnedMutexGuard<()>>>,
+    github_revision_guard: SharedGitHubRevisionGuard,
 }
 
 struct SharedReviewQuery {
     request: ReviewsQueryRequest,
-    repositories: Vec<String>,
     labels: Vec<String>,
+}
+
+type SharedGitHubRevisionGuard = Arc<AsyncMutex<Option<HeldGitHubRevisionGuard>>>;
+
+struct HeldGitHubRevisionGuard {
+    revision: u64,
+    _guard: OwnedMutexGuard<()>,
 }
 
 #[async_trait]
 impl ExternalSyncClient for SharedReviewRequestClient {
     fn provider(&self) -> ExternalProvider {
         ExternalProvider::GitHub
+    }
+
+    fn scope_id(&self) -> String {
+        self.repository.clone()
+    }
+
+    fn scope_for_item(&self, item: &TaskBoardItem) -> String {
+        normalize_repository_slug(
+            item.execution_repository
+                .as_deref()
+                .or(item.project_id.as_deref()),
+        )
+        .unwrap_or_else(|| self.scope_id())
     }
 
     fn allows_push(&self) -> bool {
@@ -52,16 +73,13 @@ impl ExternalSyncClient for SharedReviewRequestClient {
             .expect("shared Reviews client has tasks or a query");
         let source =
             super::super::reviews::query_reviews_repositories_source(&query.request).await?;
-        let revision_guard = stable_data_revision_guard(source.github_data_revision)
-            .await
-            .ok_or_else(|| {
-                CliError::from(CliErrorKind::concurrent_modification(
-                    "GitHub data changed before Task Board could reconcile the Reviews snapshot",
-                ))
-            })?;
-        let tasks =
-            review_external_tasks(&query.repositories, &query.labels, &source.response.items);
-        *self.github_revision_guard.lock().await = Some(revision_guard);
+        self.hold_github_revision(source.github_data_revision)
+            .await?;
+        let tasks = review_external_tasks(
+            std::slice::from_ref(&self.repository),
+            &query.labels,
+            &source.response.items,
+        );
         Ok(tasks)
     }
 
@@ -70,10 +88,30 @@ impl ExternalSyncClient for SharedReviewRequestClient {
     }
 }
 
-pub(super) async fn shared_review_request_client(
+impl SharedReviewRequestClient {
+    async fn hold_github_revision(&self, revision: u64) -> Result<(), CliError> {
+        let mut held = self.github_revision_guard.lock().await;
+        if let Some(current) = held.as_ref() {
+            if current.revision == revision {
+                return Ok(());
+            }
+            return Err(github_revision_changed_error());
+        }
+        let guard = stable_data_revision_guard(revision)
+            .await
+            .ok_or_else(github_revision_changed_error)?;
+        *held = Some(HeldGitHubRevisionGuard {
+            revision,
+            _guard: guard,
+        });
+        Ok(())
+    }
+}
+
+pub(super) async fn shared_review_request_clients(
     db: &AsyncDaemonDb,
     request: &TaskBoardSyncRequest,
-) -> Result<Option<SharedReviewRequestClient>, CliError> {
+) -> Result<Vec<SharedReviewRequestClient>, CliError> {
     if !matches!(
         request.direction,
         ExternalSyncDirection::Pull | ExternalSyncDirection::Both
@@ -81,25 +119,16 @@ pub(super) async fn shared_review_request_client(
         .provider
         .is_some_and(|provider| provider != ExternalProvider::GitHub)
     {
-        return Ok(None);
+        return Ok(Vec::new());
     }
     let settings = db.task_board_orchestrator_settings().await?;
     if settings.github_inbox.repositories.is_empty() {
-        return Ok(None);
+        return Ok(Vec::new());
     }
-    Ok(Some(SharedReviewRequestClient {
-        tasks: None,
-        query: Some(SharedReviewQuery {
-            request: ReviewsQueryRequest {
-                repositories: settings.github_inbox.repositories.clone(),
-                ..ReviewsQueryRequest::default()
-            },
-            repositories: settings.github_inbox.repositories,
-            labels: settings.github_inbox.label_filter,
-        }),
-        authoritative_review_inbox: true,
-        github_revision_guard: AsyncMutex::new(None),
-    }))
+    Ok(shared_review_query_clients(
+        &settings.github_inbox.repositories,
+        &settings.github_inbox.label_filter,
+    ))
 }
 
 pub(crate) async fn reconcile_shared_review_items_db(
@@ -118,15 +147,16 @@ pub(crate) async fn reconcile_shared_review_items_db(
         })
         .map(review_key)
         .collect::<HashSet<_>>();
-    let Some(client) = shared_review_request_client_from_settings(
+    let clients = shared_review_request_clients_from_settings(
         &settings.github_inbox.repositories,
         &settings.github_inbox.label_filter,
         items,
         false,
-    ) else {
+    );
+    if clients.is_empty() {
         return Ok((configured_keys, Vec::new()));
-    };
-    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
+    }
+    let clients = boxed_review_clients(clients);
     let operations = sync_external_tasks(
         db,
         ExternalSyncOptions {
@@ -141,22 +171,74 @@ pub(crate) async fn reconcile_shared_review_items_db(
     Ok((configured_keys, operations))
 }
 
-fn shared_review_request_client_from_settings(
+fn shared_review_request_clients_from_settings(
     repositories: &[String],
     labels: &[String],
     items: &[ReviewItem],
     authoritative_review_inbox: bool,
-) -> Option<SharedReviewRequestClient> {
-    if repositories.is_empty() {
-        return None;
-    }
-    let tasks = review_external_tasks(repositories, labels, items);
-    Some(SharedReviewRequestClient {
-        tasks: Some(tasks),
-        query: None,
-        authoritative_review_inbox,
-        github_revision_guard: AsyncMutex::new(None),
-    })
+) -> Vec<SharedReviewRequestClient> {
+    normalized_repositories(repositories)
+        .into_iter()
+        .map(|repository| SharedReviewRequestClient {
+            tasks: Some(review_external_tasks(
+                std::slice::from_ref(&repository),
+                labels,
+                items,
+            )),
+            query: None,
+            repository,
+            authoritative_review_inbox,
+            github_revision_guard: Arc::new(AsyncMutex::new(None)),
+        })
+        .collect()
+}
+
+fn shared_review_query_clients(
+    repositories: &[String],
+    labels: &[String],
+) -> Vec<SharedReviewRequestClient> {
+    let github_revision_guard = Arc::new(AsyncMutex::new(None));
+    normalized_repositories(repositories)
+        .into_iter()
+        .map(|repository| SharedReviewRequestClient {
+            tasks: None,
+            query: Some(SharedReviewQuery {
+                request: ReviewsQueryRequest {
+                    repositories: vec![repository.clone()],
+                    ..ReviewsQueryRequest::default()
+                },
+                labels: labels.to_vec(),
+            }),
+            repository,
+            authoritative_review_inbox: true,
+            github_revision_guard: Arc::clone(&github_revision_guard),
+        })
+        .collect()
+}
+
+fn boxed_review_clients(
+    clients: Vec<SharedReviewRequestClient>,
+) -> Vec<Box<dyn ExternalSyncClient>> {
+    clients
+        .into_iter()
+        .map(|client| Box::new(client) as Box<dyn ExternalSyncClient>)
+        .collect()
+}
+
+fn normalized_repositories(repositories: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    repositories
+        .iter()
+        .filter_map(|repository| normalize_repository_slug(Some(repository.as_str())))
+        .filter(|repository| seen.insert(repository.clone()))
+        .collect()
+}
+
+fn github_revision_changed_error() -> CliError {
+    CliErrorKind::concurrent_modification(
+        "GitHub data changed before Task Board could reconcile the Reviews snapshot",
+    )
+    .into()
 }
 
 fn review_external_tasks(
@@ -215,3 +297,7 @@ fn review_external_task(item: &ReviewItem) -> ExternalTask {
         updated_at: Some(item.updated_at.to_rfc3339_opts(SecondsFormat::Secs, true)),
     }
 }
+
+#[cfg(test)]
+#[path = "reviews_sync_tests.rs"]
+mod tests;
