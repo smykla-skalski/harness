@@ -79,7 +79,7 @@ async fn todoist_metadata_write_without_revision_does_not_reuse_precondition() {
         ),
         (
             "200 OK",
-            r#"{"id":"remote-1","content":"Updated title","description":"Body"}"#,
+            r#"{"id":"remote-1","content":"Updated title","description":"Body","project_id":"project-1","updated_at":null}"#,
         ),
     ]);
     let client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");

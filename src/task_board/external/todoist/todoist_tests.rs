@@ -7,14 +7,23 @@ use serde_json::Value;
 
 use super::*;
 
+mod move_tests;
+mod pagination_tests;
+mod request_id_tests;
 mod revision_tests;
 
 #[derive(Debug, Default)]
 struct CapturedRequest {
+    method: String,
     path: String,
     authorization: Option<String>,
     request_id: Option<String>,
     body: String,
+}
+
+#[test]
+fn todoist_production_base_uses_official_v1_api() {
+    assert_eq!(TODOIST_API_BASE, "https://api.todoist.com/api/v1");
 }
 
 #[test]
@@ -29,30 +38,14 @@ fn todoist_capabilities_include_status_updates() {
     );
 }
 
-#[test]
-fn todoist_status_endpoint_closes_done_and_reopens_other_statuses() {
-    assert_eq!(
-        status_endpoint("task-1", TaskBoardStatus::Done),
-        "tasks/task-1/close"
-    );
-    assert_eq!(
-        status_endpoint("task-1", TaskBoardStatus::Todo),
-        "tasks/task-1/reopen"
-    );
-    assert_eq!(
-        status_endpoint("task-1", TaskBoardStatus::Backlog),
-        "tasks/task-1/reopen"
-    );
-}
-
 #[tokio::test]
-async fn todoist_update_task_closes_remote_when_local_status_is_done() {
+async fn todoist_status_only_close_canonicalizes_missing_reference_url() {
     let (endpoint, captured, handle) = spawn_status_mock();
     let client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");
     let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
     let item = local_item_with_status(TaskBoardStatus::Done);
 
-    client
+    let outcome = client
         .update_task(
             &item,
             &reference,
@@ -61,6 +54,7 @@ async fn todoist_update_task_closes_remote_when_local_status_is_done() {
         .await
         .expect("update task status");
 
+    assert_status_update_reference(outcome);
     handle.join().expect("mock server");
     let captured = captured.lock().expect("captured request");
     assert_eq!(captured.path, "/tasks/remote-1/close");
@@ -69,13 +63,14 @@ async fn todoist_update_task_closes_remote_when_local_status_is_done() {
 }
 
 #[tokio::test]
-async fn todoist_update_task_reopens_remote_when_local_status_is_not_done() {
+async fn todoist_status_only_reopen_replaces_legacy_reference_url() {
     let (endpoint, captured, handle) = spawn_status_mock();
     let client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");
-    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
+    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1")
+        .with_url("https://legacy.todoist.invalid/task/remote-1");
     let item = local_item_with_status(TaskBoardStatus::InProgress);
 
-    client
+    let outcome = client
         .update_task(
             &item,
             &reference,
@@ -84,11 +79,27 @@ async fn todoist_update_task_reopens_remote_when_local_status_is_not_done() {
         .await
         .expect("update task status");
 
+    assert_status_update_reference(outcome);
     handle.join().expect("mock server");
     let captured = captured.lock().expect("captured request");
     assert_eq!(captured.path, "/tasks/remote-1/reopen");
     assert_eq!(captured.authorization.as_deref(), Some("Bearer token"));
     assert!(captured.body.is_empty());
+}
+
+fn assert_status_update_reference(outcome: ExternalUpdateOutcome) {
+    let ExternalUpdateOutcome::Applied {
+        reference,
+        provider_revision,
+    } = outcome
+    else {
+        panic!("status update must be applied");
+    };
+    assert_eq!(
+        reference.url.as_deref(),
+        Some("https://app.todoist.com/app/task/remote-1")
+    );
+    assert_eq!(provider_revision, None);
 }
 
 #[tokio::test]
@@ -113,6 +124,10 @@ async fn todoist_push_task_posts_metadata_payload() {
         outcome.provider_project_id.as_deref(),
         Some("provider-project")
     );
+    assert_eq!(
+        outcome.reference.url.as_deref(),
+        Some("https://app.todoist.com/app/task/remote-1")
+    );
     handle.join().expect("mock server");
     let captured = captured.lock().expect("captured request");
     assert_eq!(captured.path, "/tasks");
@@ -126,25 +141,33 @@ async fn todoist_push_task_posts_metadata_payload() {
 #[tokio::test]
 async fn todoist_update_task_posts_changed_metadata_payload() {
     let (endpoint, captured, handle) = spawn_json_mock(
-        r#"{"id":"remote-1","content":"Remote title","description":"Remote body"}"#,
+        r#"{"id":"remote-1","content":"Remote title","description":"Remote body","project_id":"project-2","updated_at":null}"#,
     );
     let client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");
     let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
     let item = local_item("Updated title", "Updated body", Some("project-2"));
 
-    client
+    let outcome = client
         .update_task(
             &item,
             &reference,
-            ExternalTaskUpdate::new(vec![
-                ExternalSyncField::Title,
-                ExternalSyncField::Body,
-                ExternalSyncField::Project,
-            ]),
+            ExternalTaskUpdate::new(vec![ExternalSyncField::Title, ExternalSyncField::Body]),
         )
         .await
         .expect("update task metadata");
 
+    let ExternalUpdateOutcome::Applied {
+        reference,
+        provider_revision,
+    } = outcome
+    else {
+        panic!("metadata update must be applied");
+    };
+    assert_eq!(
+        reference.url.as_deref(),
+        Some("https://app.todoist.com/app/task/remote-1")
+    );
+    assert_eq!(provider_revision, None);
     handle.join().expect("mock server");
     let captured = captured.lock().expect("captured request");
     assert_eq!(captured.path, "/tasks/remote-1");
@@ -152,7 +175,7 @@ async fn todoist_update_task_posts_changed_metadata_payload() {
     let body = body_json(&captured.body);
     assert_eq!(body["content"], "Updated title");
     assert_eq!(body["description"], "Updated body");
-    assert_eq!(body["project_id"], "project-2");
+    assert!(body.get("project_id").is_none());
 }
 
 #[tokio::test]
@@ -183,6 +206,10 @@ async fn todoist_precondition_failure_returns_current_remote_snapshot() {
     assert_eq!(current.project_id.as_deref(), Some("project-1"));
     assert_eq!(current.updated_at.as_deref(), Some("provider-revision-2"));
     assert_eq!(
+        current.reference.url.as_deref(),
+        Some("https://app.todoist.com/app/task/remote-1")
+    );
+    assert_eq!(
         captured.lock().expect("captured request").path,
         "/tasks/remote-1"
     );
@@ -197,41 +224,6 @@ fn todoist_update_classifies_metadata_and_status_changes() {
     assert!(!metadata.changes_status());
     assert!(!status.changes_metadata());
     assert!(status.changes_status());
-}
-
-#[test]
-fn todoist_request_ids_are_stable_for_safe_retries_and_change_with_intent() {
-    let item = local_item("Title", "Body", Some("project-1"));
-
-    assert_eq!(
-        todoist_request_id("create", &item, None),
-        todoist_request_id("create", &item, None)
-    );
-    assert_ne!(
-        todoist_request_id("create", &item, None),
-        todoist_request_id("update-metadata", &item, Some("remote-1"))
-    );
-    let edited = local_item("Edited title", "Body", Some("project-1"));
-    assert_ne!(
-        todoist_request_id("create", &item, None),
-        todoist_request_id("create", &edited, None)
-    );
-}
-
-#[test]
-fn todoist_request_id_status_uses_stable_wire_values() {
-    assert_eq!(
-        todoist_request_id_status(TaskBoardStatus::InProgress),
-        "in_progress"
-    );
-    assert_eq!(
-        todoist_request_id_status(TaskBoardStatus::HumanRequired),
-        "human_required"
-    );
-    assert_eq!(
-        todoist_request_id_status(TaskBoardStatus::NeedsYou),
-        "needs_you"
-    );
 }
 
 #[test]
@@ -255,11 +247,14 @@ fn todoist_project_filter_admits_only_matching_project_ids() {
 
 #[tokio::test]
 async fn todoist_pull_drops_tasks_outside_project_filter() {
-    let body = r#"[
-        {"id":"a","content":"In scope","description":"","project_id":"proj-keep"},
-        {"id":"b","content":"Out of scope","description":"","project_id":"proj-skip"},
-        {"id":"c","content":"No project","description":""}
-    ]"#;
+    let body = r#"{
+        "results": [
+            {"id":"a","content":"In scope","description":"","project_id":"proj-keep"},
+            {"id":"b","content":"Out of scope","description":"","project_id":"proj-skip"},
+            {"id":"c","content":"No project","description":""}
+        ],
+        "next_cursor": null
+    }"#;
     let (endpoint, _captured, handle) = spawn_json_mock_response(body);
     let mut config = ExternalSyncConfig::default()
         .with_todoist_token_override(Some("token"))
@@ -275,6 +270,10 @@ async fn todoist_pull_drops_tasks_outside_project_filter() {
     assert_eq!(tasks[0].reference.external_id, "a");
     assert_eq!(tasks[0].status, TaskBoardStatus::Backlog);
     assert_eq!(tasks[0].project_id.as_deref(), Some("proj-keep"));
+    assert_eq!(
+        tasks[0].reference.url.as_deref(),
+        Some("https://app.todoist.com/app/task/a")
+    );
 }
 
 fn spawn_json_mock_response(
@@ -320,7 +319,7 @@ fn spawn_status_mock() -> (String, Arc<Mutex<CapturedRequest>>, thread::JoinHand
         let (mut stream, _) = listener.accept().expect("accept");
         let request = read_http_request(&mut stream);
         *captured_clone.lock().expect("captured request") = capture_request(&request);
-        write_http_response(&mut stream, "204 No Content", "");
+        write_json_response(&mut stream, "{}");
     });
     (endpoint, captured, handle)
 }
@@ -367,10 +366,15 @@ fn spawn_sequence_mock(
 }
 
 fn capture_request(request: &str) -> CapturedRequest {
-    let path = request
-        .lines()
+    let request_line = request.lines().next().unwrap_or_default();
+    let method = request_line
+        .split_whitespace()
         .next()
-        .and_then(|line| line.split_whitespace().nth(1))
+        .unwrap_or_default()
+        .to_string();
+    let path = request_line
+        .split_whitespace()
+        .nth(1)
         .unwrap_or_default()
         .to_string();
     let authorization = request.lines().find_map(|line| {
@@ -391,6 +395,7 @@ fn capture_request(request: &str) -> CapturedRequest {
         .unwrap_or_default()
         .to_string();
     CapturedRequest {
+        method,
         path,
         authorization,
         request_id,
