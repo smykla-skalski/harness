@@ -329,7 +329,7 @@ pub async fn serve_tcp(
 /// Serve the daemon's HTTP API.
 ///
 /// # Errors
-/// Returns `CliError` on listener failures.
+/// Returns `CliError` on listener or systemd readiness-notification failures.
 pub(crate) async fn serve<L>(
     listener: L,
     state: DaemonHttpState,
@@ -369,6 +369,10 @@ where
     });
 
     let app = daemon_http_router(state);
+    if *shutdown_rx.borrow() {
+        return Ok(());
+    }
+    super::systemd_notify::notify_ready()?;
 
     axum::serve(
         listener,

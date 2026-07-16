@@ -1,14 +1,39 @@
-use std::io::ErrorKind;
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use fs_err as fs;
 use serde::Serialize;
 
 use crate::errors::{CliError, CliErrorKind};
 
 use super::remote_systemd::RemoteSystemdInstallPlan;
+
+const SYSTEMCTL_OUTPUT_ENVIRONMENT: [(&str, &str); 9] = [
+    ("LC_ALL", "C"),
+    ("SYSTEMD_COLORS", "0"),
+    ("SYSTEMD_LOG_COLOR", "0"),
+    ("SYSTEMD_LOG_LEVEL", "info"),
+    ("SYSTEMD_LOG_LOCATION", "0"),
+    ("SYSTEMD_LOG_TARGET", "console"),
+    ("SYSTEMD_LOG_TID", "0"),
+    ("SYSTEMD_LOG_TIME", "0"),
+    ("SYSTEMD_URLIFY", "0"),
+];
+
+mod install_files;
+mod uninstall;
+mod unit_name;
+
+use install_files::{
+    validate_install_binary, validate_install_environment, write_if_missing, write_unit_if_missing,
+};
+#[cfg(test)]
+pub(crate) use uninstall::uninstall_remote_systemd_with_cgroup_root;
+pub(crate) use uninstall::{preflight_uninstall_managed_binary, uninstall_remote_systemd_with};
+pub(super) use unit_name::{
+    CanonicalRemoteSystemdUnit, parse_remote_systemd_unit_arg, unit_service_name,
+    validate_canonical_unit_name, validate_path_outside_unit_directory,
+    validate_systemd_directive_path,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct RemoteSystemdCommandOutput {
@@ -49,6 +74,7 @@ pub(crate) struct RemoteSystemdUninstallReport {
     pub daemon_reloaded: bool,
 }
 
+#[cfg(test)]
 pub(crate) fn install_remote_systemd_with<RunSystemctl>(
     plan: &RemoteSystemdInstallPlan,
     run_systemctl: &RunSystemctl,
@@ -56,14 +82,32 @@ pub(crate) fn install_remote_systemd_with<RunSystemctl>(
 where
     RunSystemctl: Fn(&[String]) -> Result<RemoteSystemdCommandOutput, CliError>,
 {
-    let unit_written = write_if_changed(&plan.unit_path, &plan.unit_contents, 0o644)?;
+    install_remote_systemd_with_pre_enable(plan, run_systemctl, &mut || Ok(()))
+}
+
+pub(crate) fn install_remote_systemd_with_pre_enable<RunSystemctl, BeforeEnable>(
+    plan: &RemoteSystemdInstallPlan,
+    run_systemctl: &RunSystemctl,
+    before_enable: &mut BeforeEnable,
+) -> Result<RemoteSystemdInstallReport, CliError>
+where
+    RunSystemctl: Fn(&[String]) -> Result<RemoteSystemdCommandOutput, CliError>,
+    BeforeEnable: FnMut() -> Result<(), CliError>,
+{
+    validate_install_binary(&plan.binary_path)?;
+    let unit_written =
+        write_unit_if_missing(&plan.unit_path, &plan.unit_contents, &plan.unit, 0o644)?;
     let env_written = write_if_missing(&plan.env_path, &plan.env_contents, 0o600)?;
+    validate_install_environment(&plan.env_path)?;
     run_checked(run_systemctl, &["daemon-reload".to_string()])?;
+    validate_effective_install_unit(plan, run_systemctl)?;
+    before_enable()?;
     run_checked(
         run_systemctl,
         &[
             "enable".to_string(),
             "--now".to_string(),
+            "--".to_string(),
             unit_service_name(&plan.unit),
         ],
     )?;
@@ -78,45 +122,76 @@ where
     })
 }
 
-pub(crate) fn uninstall_remote_systemd_with<RunSystemctl>(
-    unit: &str,
-    unit_path: &Path,
-    env_path: &Path,
+fn validate_effective_install_unit<RunSystemctl>(
+    plan: &RemoteSystemdInstallPlan,
     run_systemctl: &RunSystemctl,
-) -> Result<RemoteSystemdUninstallReport, CliError>
+) -> Result<(), CliError>
 where
     RunSystemctl: Fn(&[String]) -> Result<RemoteSystemdCommandOutput, CliError>,
 {
-    validate_unit_name(unit)?;
-    let service = unit_service_name(unit);
-    let disable_result = run_systemctl(&["disable".to_string(), "--now".to_string(), service]);
-    let unit_removed = remove_if_exists(unit_path)?;
-    let env_removed = remove_if_exists(env_path)?;
-    run_checked(run_systemctl, &["daemon-reload".to_string()])?;
-    let (disabled, disable_exit_code, disable_error) = disable_report(disable_result);
-    Ok(RemoteSystemdUninstallReport {
-        unit: unit.to_string(),
-        unit_path: unit_path.to_path_buf(),
-        env_path: env_path.to_path_buf(),
-        unit_removed,
-        env_removed,
-        disabled,
-        disable_exit_code,
-        disable_error,
-        daemon_reloaded: true,
-    })
+    let output = run_systemctl(&[
+        "show".to_string(),
+        "--property=LoadState".to_string(),
+        "--property=FragmentPath".to_string(),
+        "--property=DropInPaths".to_string(),
+        "--".to_string(),
+        unit_service_name(&plan.unit),
+    ])?;
+    if output.exit_code != 0 {
+        return Err(CliErrorKind::workflow_io(format!(
+            "inspect effective systemd unit {} before start: {}",
+            plan.unit,
+            output.stderr.trim()
+        ))
+        .into());
+    }
+    let load_state = required_systemd_property(&output.stdout, "LoadState")?;
+    let fragment_path = required_systemd_property(&output.stdout, "FragmentPath")?;
+    let drop_ins = required_systemd_property(&output.stdout, "DropInPaths")?;
+    if load_state == "loaded" && Path::new(fragment_path) == plan.unit_path && drop_ins.is_empty() {
+        Ok(())
+    } else {
+        Err(CliErrorKind::workflow_io(format!(
+            "refusing to start systemd unit {} with unexpected effective sources (LoadState={load_state}, FragmentPath={fragment_path}, DropInPaths={drop_ins})",
+            plan.unit
+        ))
+        .into())
+    }
+}
+
+fn required_systemd_property<'a>(output: &'a str, name: &str) -> Result<&'a str, CliError> {
+    let mut values = output
+        .lines()
+        .filter_map(|line| line.strip_prefix(name)?.strip_prefix('='));
+    let value = values.next().ok_or_else(|| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "systemctl show omitted {name}"
+        )))
+    })?;
+    if values.next().is_some() {
+        Err(CliErrorKind::workflow_io(format!("systemctl show returned duplicate {name}")).into())
+    } else {
+        Ok(value)
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn effective_install_show_for_tests(plan: &RemoteSystemdInstallPlan) -> String {
+    format!(
+        "LoadState=loaded\nFragmentPath={}\nDropInPaths=\n",
+        plan.unit_path.display()
+    )
 }
 
 pub(super) fn run_systemctl(args: &[String]) -> Result<RemoteSystemdCommandOutput, CliError> {
-    let output = Command::new("systemctl")
-        .args(args)
-        .output()
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "run systemctl {}: {error}",
-                shell_words::join(args.iter().map(String::as_str))
-            )))
-        })?;
+    let mut command = systemctl_command();
+    command.args(args);
+    let output = command.output().map_err(|error| {
+        CliError::from(CliErrorKind::workflow_io(format!(
+            "run systemctl {}: {error}",
+            shell_words::join(args.iter().map(String::as_str))
+        )))
+    })?;
     Ok(RemoteSystemdCommandOutput {
         exit_code: output.status.code().unwrap_or(1),
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
@@ -124,252 +199,10 @@ pub(super) fn run_systemctl(args: &[String]) -> Result<RemoteSystemdCommandOutpu
     })
 }
 
-pub(super) fn unit_service_name(unit: &str) -> String {
-    if unit.ends_with(".service") {
-        unit.to_string()
-    } else {
-        format!("{unit}.service")
-    }
-}
-
-pub(super) fn normalize_unit_name(unit: &str) -> &str {
-    unit.strip_suffix(".service").unwrap_or(unit)
-}
-
-pub(super) fn validate_unit_name(unit: &str) -> Result<(), CliError> {
-    if !unit.is_empty()
-        && !unit.contains('/')
-        && !unit.contains('\\')
-        && !unit.contains("..")
-        && unit
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
-    {
-        return Ok(());
-    }
-    Err(CliErrorKind::workflow_parse(format!("unsafe systemd unit name '{unit}'")).into())
-}
-
-fn write_if_changed(path: &Path, contents: &str, mode: u32) -> Result<bool, CliError> {
-    if matches!(fs::read_to_string(path), Ok(existing) if existing == contents) {
-        set_file_mode(path, mode)?;
-        return Ok(false);
-    }
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "create directory {}: {error}",
-                parent.display()
-            )))
-        })?;
-    }
-    write_atomic(path, contents, mode)?;
-    Ok(true)
-}
-
-fn write_if_missing(path: &Path, contents: &str, mode: u32) -> Result<bool, CliError> {
-    if secure_existing_regular_file(path, mode)? {
-        return Ok(false);
-    }
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "create directory {}: {error}",
-                parent.display()
-            )))
-        })?;
-    }
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "create temp file for {}: {error}",
-            path.display()
-        )))
-    })?;
-    set_file_mode(temp.path(), mode)?;
-    temp.write_all(contents.as_bytes()).map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "write temp file for {}: {error}",
-            path.display()
-        )))
-    })?;
-    temp.flush().map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "flush temp file for {}: {error}",
-            path.display()
-        )))
-    })?;
-    match temp.persist_noclobber(path) {
-        Ok(_) => Ok(true),
-        Err(error) if error.error.kind() == ErrorKind::AlreadyExists => {
-            if secure_existing_regular_file(path, mode)? {
-                Ok(false)
-            } else {
-                Err(CliErrorKind::workflow_io(format!(
-                    "environment file {} disappeared during installation",
-                    path.display()
-                ))
-                .into())
-            }
-        }
-        Err(error) => {
-            Err(
-                CliErrorKind::workflow_io(format!("persist {}: {}", path.display(), error.error))
-                    .into(),
-            )
-        }
-    }
-}
-
-fn secure_existing_regular_file(path: &Path, mode: u32) -> Result<bool, CliError> {
-    let metadata = match fs::symlink_metadata(path) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(false),
-        Err(error) => {
-            return Err(CliErrorKind::workflow_io(format!(
-                "inspect environment file {}: {error}",
-                path.display()
-            ))
-            .into());
-        }
-    };
-    if metadata.file_type().is_symlink() {
-        return Err(CliErrorKind::workflow_io(format!(
-            "refusing symbolic link environment file {}",
-            path.display()
-        ))
-        .into());
-    }
-    if !metadata.is_file() {
-        return Err(CliErrorKind::workflow_io(format!(
-            "environment file {} is not a regular file",
-            path.display()
-        ))
-        .into());
-    }
-    set_existing_file_mode(path, mode)?;
-    Ok(true)
-}
-
-fn write_atomic(path: &Path, contents: &str, mode: u32) -> Result<(), CliError> {
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "create temp file for {}: {error}",
-            path.display()
-        )))
-    })?;
-    set_file_mode(temp.path(), mode)?;
-    temp.write_all(contents.as_bytes()).map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "write temp file for {}: {error}",
-            path.display()
-        )))
-    })?;
-    temp.flush().map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "flush temp file for {}: {error}",
-            path.display()
-        )))
-    })?;
-    temp.persist(path)
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "persist {}: {}",
-                path.display(),
-                error.error
-            )))
-        })
-        .map(|_| ())
-}
-
-fn remove_if_exists(path: &Path) -> Result<bool, CliError> {
-    match fs::remove_file(path) {
-        Ok(()) => Ok(true),
-        Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
-        Err(error) => {
-            Err(CliErrorKind::workflow_io(format!("remove {}: {error}", path.display())).into())
-        }
-    }
-}
-
-fn disable_report(
-    result: Result<RemoteSystemdCommandOutput, CliError>,
-) -> (bool, Option<i32>, Option<String>) {
-    match result {
-        Ok(output) => {
-            let error = if output.exit_code == 0 {
-                None
-            } else {
-                Some(output.stderr.trim().to_string())
-            };
-            (output.exit_code == 0, Some(output.exit_code), error)
-        }
-        Err(error) => (false, None, Some(error.to_string())),
-    }
-}
-
-#[cfg(unix)]
-fn set_file_mode(path: &Path, mode: u32) -> Result<(), CliError> {
-    use std::fs::Permissions;
-    use std::os::unix::fs::PermissionsExt;
-
-    fs::set_permissions(path, Permissions::from_mode(mode)).map_err(|error| {
-        CliError::from(CliErrorKind::workflow_io(format!(
-            "set permissions {}: {error}",
-            path.display()
-        )))
-    })
-}
-
-#[cfg(not(unix))]
-fn set_file_mode(_path: &Path, _mode: u32) -> Result<(), CliError> {
-    Ok(())
-}
-
-#[cfg(unix)]
-fn set_existing_file_mode(path: &Path, mode: u32) -> Result<(), CliError> {
-    use std::fs::{OpenOptions, Permissions};
-    use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
-
-    let file = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(path)
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "open regular environment file {}: {error}",
-                path.display()
-            )))
-        })?;
-    if !file
-        .metadata()
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "inspect open environment file {}: {error}",
-                path.display()
-            )))
-        })?
-        .is_file()
-    {
-        return Err(CliErrorKind::workflow_io(format!(
-            "environment file {} is not a regular file",
-            path.display()
-        ))
-        .into());
-    }
-    file.set_permissions(Permissions::from_mode(mode))
-        .map_err(|error| {
-            CliError::from(CliErrorKind::workflow_io(format!(
-                "set permissions {}: {error}",
-                path.display()
-            )))
-        })
-}
-
-#[cfg(not(unix))]
-fn set_existing_file_mode(path: &Path, mode: u32) -> Result<(), CliError> {
-    set_file_mode(path, mode)
+fn systemctl_command() -> Command {
+    let mut command = Command::new("systemctl");
+    command.envs(SYSTEMCTL_OUTPUT_ENVIRONMENT);
+    command
 }
 
 fn run_checked<RunSystemctl>(runner: &RunSystemctl, args: &[String]) -> Result<(), CliError>
@@ -387,4 +220,23 @@ where
         output.stderr.trim()
     ))
     .into())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsStr;
+
+    use super::{SYSTEMCTL_OUTPUT_ENVIRONMENT, systemctl_command};
+
+    #[test]
+    fn systemctl_command_normalizes_diagnostic_output() {
+        let command = systemctl_command();
+        for (expected_key, expected_value) in SYSTEMCTL_OUTPUT_ENVIRONMENT {
+            let actual = command
+                .get_envs()
+                .find(|(key, _)| *key == OsStr::new(expected_key))
+                .and_then(|(_, value)| value);
+            assert_eq!(actual, Some(OsStr::new(expected_value)));
+        }
+    }
 }

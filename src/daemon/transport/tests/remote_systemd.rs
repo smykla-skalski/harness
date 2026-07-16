@@ -9,8 +9,10 @@ use super::super::remote_systemd::{
     systemd_daemon_root_for_tests,
 };
 use super::super::remote_systemd_lifecycle::{
-    RemoteSystemdCommandOutput, install_remote_systemd_with, uninstall_remote_systemd_with,
+    RemoteSystemdCommandOutput, effective_install_show_for_tests, install_remote_systemd_with,
 };
+use super::super::remote_systemd_upgrade::validated_recovery_store_path_for_tests;
+use super::trusted_test_executable;
 
 #[derive(Debug, Parser)]
 struct DaemonRemoteCommandTestHarness {
@@ -25,6 +27,33 @@ fn remote_systemd_management_root_uses_private_state_directory() {
         PathBuf::from("/var/lib/private/harness-remote-proof/harness/daemon/external")
     );
     assert!(systemd_daemon_root_for_tests("../unsafe").is_err());
+    assert!(systemd_daemon_root_for_tests("-unsafe-option").is_err());
+}
+
+#[test]
+fn recovery_store_rejects_root_and_nested_paths_before_mutation() {
+    assert!(validated_recovery_store_path_for_tests(PathBuf::from("/").as_path()).is_err());
+    for unit in [".service", "unit.service", "unit.service.service"] {
+        assert!(
+            validated_recovery_store_path_for_tests(
+                PathBuf::from(format!("/var/lib/harness/remote-systemd/{unit}")).as_path()
+            )
+            .is_err()
+        );
+    }
+    assert!(
+        validated_recovery_store_path_for_tests(
+            PathBuf::from("/var/lib/harness/remote-systemd/unit/nested").as_path()
+        )
+        .is_err()
+    );
+    assert_eq!(
+        validated_recovery_store_path_for_tests(
+            PathBuf::from("/var/lib/harness/remote-systemd/harness-remote").as_path()
+        )
+        .expect("valid recovery store"),
+        PathBuf::from("/var/lib/harness/remote-systemd/harness-remote")
+    );
 }
 
 #[test]
@@ -206,7 +235,7 @@ fn remote_systemd_default_env_path_strips_service_suffix() {
         &args,
         PathBuf::from("/usr/local/bin/harness"),
         PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
-        default_env_path_for_tests("harness-remote-daemon.service"),
+        default_env_path_for_tests("harness-remote-daemon.service").expect("default env path"),
     )
     .expect("systemd install plan");
 
@@ -225,66 +254,27 @@ fn remote_systemd_default_env_path_strips_service_suffix() {
             .contains("StateDirectory=harness-remote-daemon.service")
     );
     assert_eq!(
-        default_env_path_for_tests("harness-remote-daemon"),
+        default_env_path_for_tests("harness-remote-daemon").expect("bare default env path"),
         PathBuf::from("/etc/harness/harness-remote-daemon.env")
     );
     assert_eq!(
-        default_env_path_for_tests("harness-remote-daemon.service"),
+        default_env_path_for_tests("harness-remote-daemon.service")
+            .expect("suffixed default env path"),
         PathBuf::from("/etc/harness/harness-remote-daemon.env")
     );
 }
 
 #[test]
 fn remote_systemd_status_rejects_unsafe_unit_name() {
-    let parsed = DaemonRemoteCommandTestHarness::try_parse_from([
+    let error = DaemonRemoteCommandTestHarness::try_parse_from([
         "test",
         "status",
         "--unit",
         "../harness-remote-daemon",
     ])
-    .expect("parse status")
-    .command;
+    .expect_err("reject unsafe unit during parsing");
 
-    let DaemonRemoteCommand::Status(args) = parsed else {
-        panic!("expected status");
-    };
-
-    assert!(args.validate_for_tests().is_err());
-}
-
-#[test]
-fn remote_systemd_uninstall_reports_disable_failure() {
-    let temp = tempdir().expect("temp dir");
-    let unit_path = temp.path().join("systemd").join("remote.service");
-    let env_path = temp.path().join("harness").join("remote.env");
-    std::fs::create_dir_all(unit_path.parent().expect("unit parent")).expect("unit dir");
-    std::fs::create_dir_all(env_path.parent().expect("env parent")).expect("env dir");
-    std::fs::write(&unit_path, "unit").expect("write unit");
-    std::fs::write(&env_path, "env").expect("write env");
-    let runner = |args: &[String]| {
-        if args.first().map(String::as_str) == Some("disable") {
-            return Ok(RemoteSystemdCommandOutput {
-                exit_code: 5,
-                stdout: String::new(),
-                stderr: "unit not loaded".to_string(),
-            });
-        }
-        Ok(RemoteSystemdCommandOutput {
-            exit_code: 0,
-            stdout: String::new(),
-            stderr: String::new(),
-        })
-    };
-
-    let report = uninstall_remote_systemd_with("remote", &unit_path, &env_path, &runner)
-        .expect("uninstall continues after disable failure");
-
-    assert!(!report.disabled);
-    assert_eq!(report.disable_exit_code, Some(5));
-    assert_eq!(report.disable_error.as_deref(), Some("unit not loaded"));
-    assert!(report.unit_removed);
-    assert!(report.env_removed);
-    assert!(report.daemon_reloaded);
+    assert!(error.to_string().contains("unsafe or noncanonical"));
 }
 
 #[test]
@@ -297,7 +287,6 @@ fn remote_systemd_install_preserves_preprovisioned_environment_idempotently() {
     let env_path = temp.path().join("harness").join("remote-daemon.env");
     std::fs::create_dir_all(unit_path.parent().expect("unit parent")).expect("unit dir");
     std::fs::create_dir_all(env_path.parent().expect("env parent")).expect("env dir");
-    std::fs::write(&unit_path, "stale unit").expect("write stale unit");
     let provisioned_env = concat!(
         "HARNESS_REMOTE_ACME_DIRECTORY_URL=",
         "https://acme-staging-v02.api.letsencrypt.org/directory\n",
@@ -313,15 +302,19 @@ fn remote_systemd_install_preserves_preprovisioned_environment_idempotently() {
     ]);
     let plan = RemoteSystemdInstallPlan::for_tests(
         &args,
-        PathBuf::from("/usr/local/bin/harness"),
+        trusted_test_executable(temp.path()),
         unit_path.clone(),
         env_path.clone(),
     )
     .expect("systemd install plan");
-    let runner = |_args: &[String]| {
+    let runner = |systemctl_args: &[String]| {
         Ok(RemoteSystemdCommandOutput {
             exit_code: 0,
-            stdout: String::new(),
+            stdout: if systemctl_args.first().map(String::as_str) == Some("show") {
+                effective_install_show_for_tests(&plan)
+            } else {
+                String::new()
+            },
             stderr: String::new(),
         })
     };
@@ -345,36 +338,82 @@ fn remote_systemd_install_preserves_preprovisioned_environment_idempotently() {
 }
 
 #[test]
-fn remote_systemd_uninstall_is_idempotent() {
+fn remote_systemd_install_refuses_legacy_readiness_conversion_before_mutation() {
     let temp = tempdir().expect("temp dir");
-    let unit_path = temp
-        .path()
-        .join("systemd")
-        .join("harness-remote-daemon.service");
-    let env_path = temp.path().join("harness").join("remote-daemon.env");
+    let unit_path = temp.path().join("systemd").join("remote.service");
+    let env_path = temp.path().join("harness").join("remote.env");
     std::fs::create_dir_all(unit_path.parent().expect("unit parent")).expect("unit dir");
     std::fs::create_dir_all(env_path.parent().expect("env parent")).expect("env dir");
-    std::fs::write(&unit_path, "unit").expect("write unit");
-    std::fs::write(&env_path, "env").expect("write env");
-    let runner = |_args: &[String]| {
-        Ok(RemoteSystemdCommandOutput {
-            exit_code: 0,
-            stdout: String::new(),
-            stderr: String::new(),
-        })
+    let legacy = "[Unit]\nDescription=legacy\n[Service]\nType=simple\nExecStart=/bin/false\n";
+    std::fs::write(&unit_path, legacy).expect("write legacy unit");
+    std::fs::write(&env_path, "KEEP=1\n").expect("write environment");
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+    ]);
+    let plan = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        trusted_test_executable(temp.path()),
+        unit_path.clone(),
+        env_path.clone(),
+    )
+    .expect("systemd install plan");
+    let runner = |_args: &[String]| -> Result<RemoteSystemdCommandOutput, crate::errors::CliError> {
+        panic!("legacy refusal must happen before systemctl")
     };
 
-    let first =
-        uninstall_remote_systemd_with("harness-remote-daemon", &unit_path, &env_path, &runner)
-            .expect("first uninstall");
-    let second =
-        uninstall_remote_systemd_with("harness-remote-daemon", &unit_path, &env_path, &runner)
-            .expect("second uninstall");
+    let error = install_remote_systemd_with(&plan, &runner)
+        .expect_err("legacy unit requires transactional upgrade");
 
-    assert!(first.unit_removed);
-    assert!(first.env_removed);
-    assert!(!second.unit_removed);
-    assert!(!second.env_removed);
+    assert!(error.to_string().contains("use upgrade-systemd"));
+    assert_eq!(
+        std::fs::read_to_string(&unit_path).expect("legacy unit"),
+        legacy
+    );
+    assert_eq!(
+        std::fs::read_to_string(&env_path).expect("environment"),
+        "KEEP=1\n"
+    );
+}
+
+#[test]
+fn remote_systemd_install_refuses_notify_unit_drift_before_mutation() {
+    let temp = tempdir().expect("temp dir");
+    let unit_path = temp.path().join("systemd").join("remote.service");
+    let env_path = temp.path().join("harness").join("remote.env");
+    std::fs::create_dir_all(unit_path.parent().expect("unit parent")).expect("unit dir");
+    std::fs::create_dir_all(env_path.parent().expect("env parent")).expect("env dir");
+    let drifted = "[Service]\nType=notify\nNotifyAccess=main\nExecStart=/bin/false\n";
+    std::fs::write(&unit_path, drifted).expect("write drifted unit");
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+    ]);
+    let plan = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        trusted_test_executable(temp.path()),
+        unit_path.clone(),
+        env_path,
+    )
+    .expect("systemd install plan");
+    let runner = |_args: &[String]| -> Result<RemoteSystemdCommandOutput, crate::errors::CliError> {
+        panic!("unit drift refusal must happen before systemctl")
+    };
+
+    let error = install_remote_systemd_with(&plan, &runner)
+        .expect_err("notify unit drift requires transactional upgrade");
+
+    assert!(error.to_string().contains("differs"));
+    assert_eq!(
+        std::fs::read_to_string(&unit_path).expect("drifted unit"),
+        drifted
+    );
 }
 
 fn install_args<const N: usize>(args: [&str; N]) -> DaemonRemoteSystemdInstallArgs {

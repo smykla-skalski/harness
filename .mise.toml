@@ -214,8 +214,8 @@ run = [
 [tasks."remote-daemon:systemd-e2e"]
 description = "Run the real Linux systemd lifecycle and effective security proof"
 run = [
-  "./scripts/cargo-local.sh build -p harness-daemon",
-  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test remote_systemd_e2e --features full-runtime --run-ignored only --success-output immediate --failure-output immediate -E 'test(=remote_systemd_e2e_proves_lifecycle_and_effective_security)'",
+  "./scripts/cargo-local.sh build --release -p harness-daemon --features remote-systemd-e2e-faults",
+  "./scripts/cargo-local.sh nextest run --release --config-file .config/nextest.toml --user-config-file none -p harness --test remote_systemd_e2e --features full-runtime,remote-systemd-e2e-faults --run-ignored only --success-output immediate --failure-output immediate -E 'test(=remote_systemd_e2e_proves_lifecycle_and_effective_security)'",
 ]
 
 [tasks.codegen]

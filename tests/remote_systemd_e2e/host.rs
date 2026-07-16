@@ -1,4 +1,3 @@
-use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -7,24 +6,28 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::Value;
 use tempfile::TempDir;
 
+use super::cleanup::SystemdCleanup;
 use super::ports::LowPortPairLease;
+use super::systemd_assertions::{assert_lifecycle_guards_released, assert_private_root_directory};
+use super::upgrade::{RemoteSystemdUpgrade, file_digest};
 
 pub struct RemoteSystemdHost {
     _temp: TempDir,
-    unit: String,
+    pub(super) unit: String,
     service: String,
     domain: String,
     binary_source: PathBuf,
-    binary_path: PathBuf,
-    unit_path: PathBuf,
-    env_path: PathBuf,
+    pub(super) binary_path: PathBuf,
+    pub(super) upgrade: RemoteSystemdUpgrade,
+    pub(super) env_path: PathBuf,
     ca_path: PathBuf,
-    state_path: PathBuf,
+    pub(super) state_path: PathBuf,
     fake_ca_root: PathBuf,
     dns_log: PathBuf,
     https_port: u16,
     http_port: u16,
     _port_lease: LowPortPairLease,
+    cleanup: SystemdCleanup,
 }
 
 impl RemoteSystemdHost {
@@ -41,13 +44,30 @@ impl RemoteSystemdHost {
         let port_lease = LowPortPairLease::acquire()?;
         let https_port = port_lease.https_port();
         let http_port = port_lease.http_port();
+        let binary_source = assert_cmd::cargo::cargo_bin("harness-daemon");
+        let upgrade = RemoteSystemdUpgrade::new(&binary_source, temp.path(), &unit)?;
+        let binary_path = PathBuf::from(format!("/usr/local/libexec/{unit}"));
+        let unit_path = PathBuf::from(format!("/etc/systemd/system/{unit}.service"));
+        let env_path = PathBuf::from(format!("/etc/harness/{unit}.env"));
+        let ca_path = PathBuf::from(format!("/etc/harness/{unit}-ca.pem"));
+        let state_path = PathBuf::from(format!("/var/lib/private/{unit}"));
+        let cleanup = SystemdCleanup::new(
+            &binary_source,
+            &unit,
+            &unit_path,
+            &env_path,
+            &ca_path,
+            &binary_path,
+            &state_path,
+            upgrade.transaction_path(),
+        )?;
         Ok(Self {
-            binary_source: assert_cmd::cargo::cargo_bin("harness-daemon"),
-            binary_path: PathBuf::from(format!("/usr/local/libexec/{unit}")),
-            unit_path: PathBuf::from(format!("/etc/systemd/system/{unit}.service")),
-            env_path: PathBuf::from(format!("/etc/harness/{unit}.env")),
-            ca_path: PathBuf::from(format!("/etc/harness/{unit}-ca.pem")),
-            state_path: PathBuf::from(format!("/var/lib/private/{unit}")),
+            binary_source,
+            binary_path,
+            upgrade,
+            env_path,
+            ca_path,
+            state_path,
             fake_ca_root: temp.path().join("fake-acme-ca.pem"),
             dns_log: temp.path().join("dns-hook.log"),
             service: format!("{unit}.service"),
@@ -56,15 +76,22 @@ impl RemoteSystemdHost {
             https_port,
             http_port,
             _port_lease: port_lease,
+            cleanup,
             _temp: temp,
         })
     }
 
     pub fn assert_prerequisites(&self) -> Result<(), String> {
+        if !cfg!(feature = "remote-systemd-e2e-faults") {
+            return Err(
+                "real systemd E2E requires the remote-systemd-e2e-faults feature".to_string(),
+            );
+        }
         if !Path::new("/run/systemd/system").is_dir() {
             return Err("systemd is not PID 1 on this Linux host".to_string());
         }
         checked(command("systemd-analyze", ["--version"]), "inspect systemd")?;
+        checked(command("sqlite3", ["--version"]), "inspect sqlite3")?;
         checked(sudo(["true"]), "verify passwordless sudo")?;
         let output = checked(
             command("sysctl", ["-n", "net.ipv4.ip_unprivileged_port_start"]),
@@ -96,6 +123,14 @@ impl RemoteSystemdHost {
 
     pub fn dns_log(&self) -> &Path {
         &self.dns_log
+    }
+
+    pub fn valid_candidate_path(&self) -> &Path {
+        self.upgrade.valid_candidate_path()
+    }
+
+    pub fn spoofed_candidate_path(&self) -> &Path {
+        self.upgrade.spoofed_candidate_path()
     }
 
     pub fn prepare(&self, directory_url: &str, ca_pem: &str) -> Result<(), String> {
@@ -168,6 +203,15 @@ impl RemoteSystemdHost {
         json_output(command, "uninstall remote systemd unit")
     }
 
+    pub fn upgrade(&self, candidate_path: &Path) -> Result<(i32, Value), String> {
+        self.upgrade.run(
+            &self.binary_path,
+            &self.unit,
+            &self.env_path,
+            candidate_path,
+        )
+    }
+
     pub fn create_pairing(&self, role: &str) -> Result<Value, String> {
         let mut command = sudo(["env"]);
         command
@@ -192,7 +236,25 @@ impl RemoteSystemdHost {
             command("systemctl", ["is-enabled", self.service.as_str()]),
             "verify systemd unit enabled",
         )?;
-        Ok(())
+        for (property, expected) in [
+            ("ActiveState", "active"),
+            ("SubState", "running"),
+            ("Type", "notify"),
+            ("NotifyAccess", "main"),
+            ("TimeoutStartUSec", "20min"),
+        ] {
+            let actual = self.systemd_property(property)?;
+            if actual != expected {
+                return Err(format!(
+                    "effective systemd property {property} was {actual:?}, expected {expected:?}"
+                ));
+            }
+        }
+        assert_lifecycle_guards_released(&self.unit, &self.systemd_property("DropInPaths")?)
+    }
+
+    pub fn assert_transaction_store_private(&self) -> Result<(), String> {
+        assert_private_root_directory(self.upgrade.transaction_path(), "systemd transaction store")
     }
 
     pub fn assert_cli_status(&self) -> Result<(), String> {
@@ -273,17 +335,19 @@ impl RemoteSystemdHost {
     }
 
     pub fn environment_digest(&self) -> Result<String, String> {
-        let output = checked(
-            sudo([OsStr::new("sha256sum"), self.env_path.as_os_str()]),
-            "hash remote systemd environment",
-        )?;
-        stdout(&output, "environment digest").and_then(|value| {
-            value
-                .split_whitespace()
-                .next()
-                .map(str::to_string)
-                .ok_or_else(|| "sha256sum omitted environment digest".to_string())
-        })
+        file_digest(&self.env_path, "remote systemd environment")
+    }
+
+    pub fn installed_binary_digest(&self) -> Result<String, String> {
+        file_digest(&self.binary_path, "installed remote systemd binary")
+    }
+
+    pub fn assert_candidate_database_corruption(&self, report: &Value) -> Result<(), String> {
+        self.upgrade
+            .assert_database_corruption_marker(&self.state_path, &self.service, report)
+            .map_err(|error| {
+                self.with_diagnostics(format!("{error}; automatic rollback report: {report}"))
+            })
     }
 
     pub fn restart(&self) -> Result<(), String> {
@@ -294,19 +358,8 @@ impl RemoteSystemdHost {
         self.assert_active_and_enabled()
     }
 
-    pub fn assert_uninstalled(&self) -> Result<(), String> {
-        let active = command("systemctl", ["is-active", self.service.as_str()])
-            .output()
-            .map_err(|error| format!("inspect uninstalled systemd unit: {error}"))?;
-        if active.status.success() {
-            return Err("uninstalled systemd unit remained active".to_string());
-        }
-        for path in [&self.unit_path, &self.env_path] {
-            if path.exists() {
-                return Err(format!("uninstall left {} behind", path.display()));
-            }
-        }
-        Ok(())
+    pub fn cleanup_strict(&self) -> Result<(), String> {
+        self.cleanup.run()
     }
 
     pub fn with_diagnostics(&self, error: String) -> String {
@@ -337,24 +390,7 @@ impl RemoteSystemdHost {
     }
 
     fn cleanup(&self) {
-        let _ = sudo(["systemctl", "disable", "--now", self.service.as_str()]).output();
-        let _ = sudo([
-            OsStr::new("rm"),
-            OsStr::new("-f"),
-            self.unit_path.as_os_str(),
-            self.env_path.as_os_str(),
-            self.ca_path.as_os_str(),
-            self.binary_path.as_os_str(),
-        ])
-        .output();
-        let _ = sudo([
-            OsStr::new("rm"),
-            OsStr::new("-rf"),
-            self.state_path.as_os_str(),
-        ])
-        .output();
-        let _ = sudo(["systemctl", "daemon-reload"]).output();
-        let _ = sudo(["systemctl", "reset-failed", self.service.as_str()]).output();
+        self.cleanup.best_effort();
     }
 }
 

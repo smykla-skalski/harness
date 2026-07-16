@@ -6,8 +6,10 @@ use tempfile::tempdir;
 
 use super::super::remote_systemd::{DaemonRemoteSystemdInstallArgs, RemoteSystemdInstallPlan};
 use super::super::remote_systemd_lifecycle::{
-    RemoteSystemdCommandOutput, install_remote_systemd_with,
+    RemoteSystemdCommandOutput, effective_install_show_for_tests, install_remote_systemd_with,
 };
+use super::super::remote_systemd_upgrade_lifecycle::notify_unit_contents_for_tests;
+use super::trusted_test_executable;
 
 #[test]
 fn remote_systemd_install_enables_and_starts_remote_serve() {
@@ -26,7 +28,7 @@ fn remote_systemd_install_enables_and_starts_remote_serve() {
     ]);
     let plan = RemoteSystemdInstallPlan::for_tests(
         &args,
-        PathBuf::from("/usr/local/bin/harness"),
+        trusted_test_executable(temp.path()),
         unit_path,
         env_path,
     )
@@ -36,7 +38,11 @@ fn remote_systemd_install_enables_and_starts_remote_serve() {
         calls.borrow_mut().push(args.to_vec());
         Ok(RemoteSystemdCommandOutput {
             exit_code: 0,
-            stdout: String::new(),
+            stdout: if args.first().map(String::as_str) == Some("show") {
+                effective_install_show_for_tests(&plan)
+            } else {
+                String::new()
+            },
             stderr: String::new(),
         })
     };
@@ -50,11 +56,43 @@ fn remote_systemd_install_enables_and_starts_remote_serve() {
         [
             vec!["daemon-reload".to_string()],
             vec![
+                "show".to_string(),
+                "--property=LoadState".to_string(),
+                "--property=FragmentPath".to_string(),
+                "--property=DropInPaths".to_string(),
+                "--".to_string(),
+                "harness-remote-daemon.service".to_string(),
+            ],
+            vec![
                 "enable".to_string(),
                 "--now".to_string(),
+                "--".to_string(),
                 "harness-remote-daemon.service".to_string(),
             ],
         ]
+    );
+}
+
+#[test]
+fn remote_systemd_install_unit_is_upgrade_canonical() {
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+    ]);
+    let plan = RemoteSystemdInstallPlan::for_tests(
+        &args,
+        PathBuf::from("/usr/local/bin/harness"),
+        PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+        PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+    )
+    .expect("systemd install plan");
+
+    assert_eq!(
+        notify_unit_contents_for_tests(&plan.unit_contents).expect("canonical notify unit"),
+        plan.unit_contents
     );
 }
 
@@ -134,6 +172,46 @@ fn remote_systemd_plan_rejects_relative_env_path() {
             .to_string()
             .contains("systemd environment path must be absolute")
     );
+}
+
+#[test]
+fn remote_systemd_plan_rejects_binary_and_environment_inside_dynamic_user_state() {
+    let args = install_args([
+        "test",
+        "--domain",
+        "daemon.example.com",
+        "--acme-email",
+        "ops@example.com",
+    ]);
+    let state_directory = PathBuf::from("/var/lib/private/harness-remote-daemon");
+
+    for (label, binary_path, environment_path) in [
+        (
+            "binary",
+            state_directory.join("bin/harness"),
+            PathBuf::from("/etc/harness/harness-remote-daemon.env"),
+        ),
+        (
+            "environment",
+            PathBuf::from("/usr/local/bin/harness"),
+            state_directory.join("harness.env"),
+        ),
+    ] {
+        let error = RemoteSystemdInstallPlan::for_tests(
+            &args,
+            binary_path,
+            PathBuf::from("/etc/systemd/system/harness-remote-daemon.service"),
+            environment_path,
+        )
+        .expect_err("reject path inside DynamicUser state directory");
+
+        assert!(
+            error.to_string().contains(&format!(
+                "systemd {label} path must be outside DynamicUser state directory"
+            )),
+            "{error}"
+        );
+    }
 }
 
 #[test]

@@ -10,27 +10,36 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::control::print_json;
 use super::remote::DaemonRemoteServeArgs;
+use super::remote_systemd_lifecycle::{CanonicalRemoteSystemdUnit, RemoteSystemdInstallReport};
 use super::remote_systemd_lifecycle::{
-    RemoteSystemdInstallReport, install_remote_systemd_with, normalize_unit_name, run_systemctl,
-    uninstall_remote_systemd_with, unit_service_name, validate_unit_name,
+    install_remote_systemd_with_pre_enable, run_systemctl, uninstall_remote_systemd_with,
+};
+use super::remote_systemd_lifecycle::{
+    parse_remote_systemd_unit_arg, preflight_uninstall_managed_binary,
+    validate_canonical_unit_name, validate_path_outside_unit_directory,
+    validate_systemd_directive_path,
+};
+use super::remote_systemd_upgrade_lifecycle::{
+    BindMode, LockedLifecycle, cleanup_recovery_artifacts, ensure_systemd_lifecycle_unarmed,
 };
 
 const DEFAULT_UNIT: &str = "harness-remote-daemon";
 const SYSTEMD_UNIT_DIR: &str = "/etc/systemd/system";
 const SYSTEMD_ENV_DIR: &str = "/etc/harness";
 const SYSTEMD_PRIVATE_STATE_DIR: &str = "/var/lib/private";
+const SYSTEMD_TRANSACTION_DIR: &str = "/var/lib/harness/remote-systemd";
 
 #[derive(Debug, Clone, Args)]
 pub struct DaemonRemoteSystemdUnitArgs {
     /// systemd unit name.
-    #[arg(long, default_value = DEFAULT_UNIT)]
+    #[arg(long, default_value = DEFAULT_UNIT, value_parser = parse_remote_systemd_unit_arg)]
     pub unit: String,
 }
 
 #[derive(Debug, Clone, Args)]
 pub struct DaemonRemoteSystemdArgs {
     /// systemd unit name.
-    #[arg(long, default_value = DEFAULT_UNIT)]
+    #[arg(long, default_value = DEFAULT_UNIT, value_parser = parse_remote_systemd_unit_arg)]
     pub unit: String,
     /// Path for the `EnvironmentFile` referenced by the service unit.
     #[arg(long)]
@@ -62,21 +71,31 @@ pub struct DaemonRemoteSystemdInstallArgs {
 
 impl Execute for DaemonRemoteSystemdInstallArgs {
     fn execute(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let unit = CanonicalRemoteSystemdUnit::from_canonical(&self.systemd.unit)?;
         let binary = self.resolve_binary_path()?;
-        let unit_path = default_unit_path(&self.systemd.unit);
+        let unit_path = unit.unit_path(Path::new(SYSTEMD_UNIT_DIR));
         let env_path = self
             .env_file
             .clone()
-            .unwrap_or_else(|| default_env_path(&self.systemd.unit));
-        let plan = RemoteSystemdInstallPlan::new(self, binary, unit_path, env_path)?;
+            .unwrap_or_else(|| unit.environment_path(Path::new(SYSTEMD_ENV_DIR)));
+        let plan =
+            RemoteSystemdInstallPlan::new(self, unit.into_string(), binary, unit_path, env_path)?;
 
         if self.dry_run {
             print_install_response(&RemoteSystemdInstallResponse::dry_run(plan), self.json)?;
             return Ok(0);
         }
         ensure_linux_systemd()?;
-
-        let report = install_remote_systemd_with(&plan, &run_systemctl)?;
+        super::remote_systemd_upgrade::ensure_root()?;
+        let transaction_root = Path::new(SYSTEMD_TRANSACTION_DIR);
+        let store_path = transaction_root.join(&plan.unit);
+        let locked = LockedLifecycle::acquire(transaction_root, &plan.unit, &store_path)?;
+        ensure_systemd_lifecycle_unarmed(&store_path)?;
+        let mut lifecycle =
+            locked.bind(&plan.binary_path, BindMode::InstallOrMatch, &run_systemctl)?;
+        let mut persist_claim = || lifecycle.persist_claim(&run_systemctl);
+        let report =
+            install_remote_systemd_with_pre_enable(&plan, &run_systemctl, &mut persist_claim)?;
         print_install_response(
             &RemoteSystemdInstallResponse::applied(plan, report),
             self.json,
@@ -91,15 +110,50 @@ impl DaemonRemoteSystemdArgs {
     /// # Errors
     /// Returns [`CliError`] when Linux systemd is unavailable or file removal fails.
     pub fn uninstall(&self, _context: &AppContext) -> Result<i32, CliError> {
+        let unit = self.canonical_unit()?;
+        let env_path = self.env_path(&unit);
+        validate_systemd_directive_path("environment", &env_path)?;
+        validate_path_outside_unit_directory(
+            "environment",
+            &env_path,
+            Path::new(SYSTEMD_PRIVATE_STATE_DIR),
+            unit.as_str(),
+        )?;
         ensure_linux_systemd()?;
-        let unit_path = default_unit_path(&self.unit);
-        let env_path = self.env_path();
+        super::remote_systemd_upgrade::ensure_root()?;
+        let unit_path = unit.unit_path(Path::new(SYSTEMD_UNIT_DIR));
+        let transaction_root = Path::new(SYSTEMD_TRANSACTION_DIR);
+        let store_path = unit.child_path(transaction_root);
+        let locked = LockedLifecycle::acquire(transaction_root, unit.as_str(), &store_path)?;
+        ensure_systemd_lifecycle_unarmed(&store_path)?;
+        let managed_binary = preflight_uninstall_managed_binary(&unit_path, &env_path)?;
+        let existing_claim = locked.claim_for_unit()?;
+        let claimed = match (managed_binary.as_deref(), existing_claim.as_ref()) {
+            (Some(binary_path), Some(_)) => {
+                Some(locked.bind(binary_path, BindMode::ExistingOnly, &run_systemctl)?)
+            }
+            (Some(binary_path), None) => {
+                locked.validate_legacy_uninstall_binary(binary_path, &run_systemctl)?;
+                None
+            }
+            (None, Some(claim)) => {
+                let binary_path = claim.binary_path();
+                let bind_mode = BindMode::ExistingOnly;
+                let claimed = locked.bind(binary_path, bind_mode, &run_systemctl)?;
+                Some(claimed)
+            }
+            (None, None) => None,
+        };
+        cleanup_recovery_artifacts(unit.as_str(), &unit_path, &store_path, &run_systemctl)?;
         let report =
-            uninstall_remote_systemd_with(&self.unit, &unit_path, &env_path, &run_systemctl)?;
+            uninstall_remote_systemd_with(unit.as_str(), &unit_path, &env_path, &run_systemctl)?;
+        if let Some(claimed) = claimed {
+            let _locked = claimed.remove_claim()?;
+        }
         if self.json {
             print_json(&report)?;
         } else if report.unit_removed || report.env_removed {
-            println!("removed {}", self.unit);
+            println!("removed {}", unit.as_str());
         } else {
             println!("not installed");
         }
@@ -111,12 +165,12 @@ impl DaemonRemoteSystemdArgs {
     /// # Errors
     /// Returns [`CliError`] when Linux systemd is unavailable or status execution fails.
     pub fn status(&self, _context: &AppContext) -> Result<i32, CliError> {
-        self.validate()?;
+        let unit = self.canonical_unit()?;
         ensure_linux_systemd()?;
-        let output = run_systemctl(&["status".to_string(), unit_service_name(&self.unit)])?;
+        let output = run_systemctl(&["status".to_string(), unit.service_name()])?;
         let response = RemoteSystemdStatusResponse {
-            unit: self.unit.clone(),
-            env_path: self.env_path(),
+            unit: unit.as_str().to_string(),
+            env_path: self.env_path(&unit),
             exit_code: output.exit_code,
             stdout: output.stdout,
             stderr: output.stderr,
@@ -132,19 +186,14 @@ impl DaemonRemoteSystemdArgs {
 }
 
 impl DaemonRemoteSystemdArgs {
-    fn validate(&self) -> Result<(), CliError> {
-        validate_unit_name(&self.unit)
+    fn canonical_unit(&self) -> Result<CanonicalRemoteSystemdUnit, CliError> {
+        CanonicalRemoteSystemdUnit::from_canonical(&self.unit)
     }
 
-    fn env_path(&self) -> PathBuf {
+    fn env_path(&self, unit: &CanonicalRemoteSystemdUnit) -> PathBuf {
         self.env_file
             .clone()
-            .unwrap_or_else(|| default_env_path(&self.unit))
-    }
-
-    #[cfg(test)]
-    pub(crate) fn validate_for_tests(&self) -> Result<(), CliError> {
-        self.validate()
+            .unwrap_or_else(|| unit.environment_path(Path::new(SYSTEMD_ENV_DIR)))
     }
 }
 
@@ -181,29 +230,32 @@ impl RemoteSystemdInstallPlan {
     /// Returns [`CliError`] when the remote serve contract is invalid or the unit is unsafe.
     pub(crate) fn new(
         args: &DaemonRemoteSystemdInstallArgs,
+        unit: String,
         binary_path: PathBuf,
         unit_path: PathBuf,
         env_path: PathBuf,
     ) -> Result<Self, CliError> {
-        let unit = normalize_unit_name(&args.systemd.unit);
-        validate_unit_name(unit)?;
+        validate_canonical_unit_name(&unit)?;
         let serve_config = args.serve.contract_config()?;
         validate_systemd_directive_path("binary", &binary_path)?;
         validate_systemd_directive_path("environment", &env_path)?;
+        let dynamic_user_root = Path::new(SYSTEMD_PRIVATE_STATE_DIR);
+        validate_path_outside_unit_directory("binary", &binary_path, dynamic_user_root, &unit)?;
+        validate_path_outside_unit_directory("environment", &env_path, dynamic_user_root, &unit)?;
         validate_systemd_exec_value("domain", &serve_config.domain)?;
         validate_systemd_exec_value("host", &serve_config.host)?;
         validate_systemd_exec_value("acme email", &serve_config.acme_email)?;
         let needs_bind_capability = serve_config.https_port < 1024 || serve_config.http_port < 1024;
         let unit_contents = render_unit(
-            unit,
+            &unit,
             &binary_path,
             &env_path,
             &serve_config,
             needs_bind_capability,
         );
-        let env_contents = render_env_file(unit);
+        let env_contents = render_env_file(&unit);
         Ok(Self {
-            unit: unit.to_string(),
+            unit,
             binary_path,
             unit_path,
             env_path,
@@ -220,7 +272,8 @@ impl RemoteSystemdInstallPlan {
         unit_path: PathBuf,
         env_path: PathBuf,
     ) -> Result<Self, CliError> {
-        Self::new(args, binary_path, unit_path, env_path)
+        let unit = CanonicalRemoteSystemdUnit::from_canonical(&args.systemd.unit)?;
+        Self::new(args, unit.into_string(), binary_path, unit_path, env_path)
     }
 }
 
@@ -297,7 +350,10 @@ fn render_unit(
          Wants=network-online.target\n\
          \n\
          [Service]\n\
-         Type=simple\n\
+         Type=notify\n\
+         NotifyAccess=main\n\
+         TimeoutStartSec=20min\n\
+         KillMode=control-group\n\
          EnvironmentFile={}\n\
          Environment=HARNESS_DAEMON_DATA_HOME=%S/{unit}\n\
          Environment=XDG_DATA_HOME=%S/{unit}\n\
@@ -375,32 +431,6 @@ fn remote_serve_command(binary_path: &Path, config: &RemoteDaemonServeConfig) ->
     command
 }
 
-fn validate_systemd_directive_path(label: &str, path: &Path) -> Result<(), CliError> {
-    let rendered = path.as_os_str().to_string_lossy();
-    if !path.is_absolute() {
-        return Err(CliErrorKind::workflow_parse(format!(
-            "systemd {label} path must be absolute: {}",
-            path.display()
-        ))
-        .into());
-    }
-    if rendered.chars().any(char::is_whitespace) {
-        return Err(CliErrorKind::workflow_parse(format!(
-            "systemd {label} path contains whitespace: {}",
-            path.display()
-        ))
-        .into());
-    }
-    if rendered.contains('%') {
-        return Err(CliErrorKind::workflow_parse(format!(
-            "systemd {label} path cannot contain '%': {}",
-            path.display()
-        ))
-        .into());
-    }
-    Ok(())
-}
-
 fn validate_systemd_exec_value(label: &str, value: &str) -> Result<(), CliError> {
     if value.chars().any(char::is_control) {
         return Err(CliErrorKind::workflow_parse(format!(
@@ -447,18 +477,8 @@ fn render_env_file(unit: &str) -> String {
     format!("# harness remote daemon environment for {unit}\n")
 }
 
-fn default_unit_path(unit: &str) -> PathBuf {
-    Path::new(SYSTEMD_UNIT_DIR).join(unit_service_name(unit))
-}
-
-fn default_env_path(unit: &str) -> PathBuf {
-    let unit = normalize_unit_name(unit);
-    Path::new(SYSTEMD_ENV_DIR).join(format!("{unit}.env"))
-}
-
 pub(super) fn systemd_daemon_root(unit: &str) -> Result<PathBuf, CliError> {
-    let unit = normalize_unit_name(unit);
-    validate_unit_name(unit)?;
+    validate_canonical_unit_name(unit)?;
     Ok(Path::new(SYSTEMD_PRIVATE_STATE_DIR)
         .join(unit)
         .join("harness")
@@ -467,13 +487,15 @@ pub(super) fn systemd_daemon_root(unit: &str) -> Result<PathBuf, CliError> {
 }
 
 #[cfg(test)]
-pub(crate) fn default_env_path_for_tests(unit: &str) -> PathBuf {
-    default_env_path(unit)
+pub(crate) fn default_env_path_for_tests(unit: &str) -> Result<PathBuf, CliError> {
+    let unit = CanonicalRemoteSystemdUnit::parse(unit)?;
+    Ok(unit.environment_path(Path::new(SYSTEMD_ENV_DIR)))
 }
 
 #[cfg(test)]
 pub(crate) fn systemd_daemon_root_for_tests(unit: &str) -> Result<PathBuf, CliError> {
-    systemd_daemon_root(unit)
+    let unit = CanonicalRemoteSystemdUnit::parse(unit)?;
+    systemd_daemon_root(unit.as_str())
 }
 
 pub(super) fn ensure_linux_systemd() -> Result<(), CliError> {

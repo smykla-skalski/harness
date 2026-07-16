@@ -109,7 +109,7 @@ portable-pty = { version = "0.9.0", optional = true }
 vt100 = { version = "0.16.2", optional = true }
 crossterm = "0.29.0"
 libc = "0.2"
-nix = { version = "0.31", features = ["signal"], optional = true }
+nix = { version = "0.31", features = ["fs", "signal", "socket", "user"], optional = true }
 signal-hook = { version = "0.4", optional = true }
 agent-client-protocol = { version = "=0.12.1", features = ["unstable_session_model"], optional = true }
 hickory-resolver = { version = "0.26.1", optional = true }
@@ -166,6 +166,7 @@ kuma = []
 helm = []
 k3d = []
 compose = []
+remote-systemd-e2e-faults = []
 tokio-console = ["harness-telemetry/tokio-console"]
 
 [[example]]
@@ -189,4 +190,4 @@ unnecessary_to_owned = { level = "deny", priority = 2 }
 
 [lints.rust]
 unused = { level = "deny", priority = 1 }
-unexpected_cfgs = { level = "deny", priority = 2, check-cfg = ['cfg(feature, values("tokio-console"))'] }
+unexpected_cfgs = { level = "deny", priority = 2, check-cfg = ['cfg(feature, values("remote-systemd-e2e-faults", "tokio-console"))'] }

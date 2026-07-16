@@ -11,6 +11,8 @@ mod remote_systemd;
 mod remote_systemd_lifecycle;
 mod remote_systemd_plan;
 mod remote_systemd_security;
+mod remote_systemd_uninstall;
+mod remote_systemd_upgrade;
 
 use std::path::{Path, PathBuf};
 
@@ -18,6 +20,16 @@ use clap::Parser;
 
 use super::control::{restart_daemon_with, stop_daemon_with};
 use super::{DaemonCommand, HARNESS_MONITOR_APP_GROUP_ID};
+
+fn trusted_test_executable(root: &Path) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let path = root.join("harness-test-binary");
+    std::fs::write(&path, "test binary").expect("write test binary");
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+        .expect("set test binary permissions");
+    path
+}
 
 #[derive(Debug, Parser)]
 struct DaemonCommandTestHarness {

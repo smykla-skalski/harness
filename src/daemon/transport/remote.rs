@@ -26,6 +26,9 @@ use super::remote_pair_reviews::DaemonRemotePairReviewsArgs;
 use super::remote_pairing_invitation::build_remote_pairing_invitation;
 use super::remote_serve::execute_remote_serve;
 use super::remote_systemd::{DaemonRemoteSystemdArgs, DaemonRemoteSystemdInstallArgs};
+use super::remote_systemd_upgrade::{
+    DaemonRemoteSystemdRecoverArgs, DaemonRemoteSystemdRollbackArgs, DaemonRemoteSystemdUpgradeArgs,
+};
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum DaemonRemoteCommand {
@@ -50,6 +53,13 @@ pub enum DaemonRemoteCommand {
     Doctor,
     /// Install a hardened Linux systemd service.
     InstallSystemd(DaemonRemoteSystemdInstallArgs),
+    /// Transactionally upgrade the Linux systemd service and its database state.
+    UpgradeSystemd(DaemonRemoteSystemdUpgradeArgs),
+    /// Restore the previous Linux systemd binary and database state.
+    RollbackSystemd(DaemonRemoteSystemdRollbackArgs),
+    /// Recover an interrupted systemd transaction. Used by the recovery timer.
+    #[command(hide = true)]
+    RecoverSystemd(DaemonRemoteSystemdRecoverArgs),
     /// Remove the Linux systemd service.
     UninstallSystemd(DaemonRemoteSystemdArgs),
     /// Show Linux systemd service status.
@@ -64,6 +74,9 @@ impl Execute for DaemonRemoteCommand {
             Self::Acme { command } => command.execute(context),
             Self::Serve(args) => execute_remote_serve(args),
             Self::InstallSystemd(args) => args.execute(context),
+            Self::UpgradeSystemd(args) => args.execute(context),
+            Self::RollbackSystemd(args) => args.execute(context),
+            Self::RecoverSystemd(args) => args.execute(context),
             Self::UninstallSystemd(args) => args.uninstall(context),
             Self::Status(args) => args.status(context),
             Self::Doctor => execute_remote_doctor(),

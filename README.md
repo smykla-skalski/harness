@@ -387,6 +387,8 @@ The test presents a real TXT record, waits for authoritative visibility, forces 
 
 `mise run remote-daemon:systemd-e2e` is the opt-in proof for a real Linux host running systemd with passwordless `sudo`. It installs a uniquely named hardened unit with the built test binary, issues a certificate through the self-contained fake ACME server, proves an authenticated HTTPS request on ports below 1024, requires an effective `systemd-analyze security` exposure no greater than `1.4`, verifies the dynamic non-root identity and bind capability, repeats installation without restarting the service or changing its environment, restarts with persisted client credentials, exercises CLI status and uninstall, and removes every host artifact through a cleanup guard.
 
+For production installation, transactional upgrades, database-safe rollback, and interrupted-upgrade recovery, see [Remote daemon systemd upgrades](docs/remote-systemd-upgrades.md).
+
 The macOS Harness Monitor app lives under `apps/harness-monitor/`. The Xcode project is generated from the Tuist manifests (`Project.swift`, `Tuist/Package.swift`); the generated `HarnessMonitor.xcodeproj` and `HarnessMonitor.xcworkspace` are not tracked. Run `mise run monitor:generate` to materialize them before opening the project in Xcode.
 Its fast lint lane runs `swift format` directly and runs `swiftlint lint` outside the Xcode build graph with a shared cache. Build-based sandbox and daemon validation now live in `mise run monitor:quality-gate`, so routine linting stays off the daemon/Xcode path.
 

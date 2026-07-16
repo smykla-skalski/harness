@@ -106,6 +106,8 @@ pub mod service;
 pub mod snapshot;
 pub mod state;
 #[cfg(feature = "daemon-runtime")]
+mod systemd_notify;
+#[cfg(feature = "daemon-runtime")]
 pub(crate) mod task_board_managed_agents;
 #[cfg(feature = "daemon-runtime")]
 pub mod timeline;
