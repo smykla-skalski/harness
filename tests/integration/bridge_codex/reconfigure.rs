@@ -5,11 +5,12 @@ fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
-    let codex_port = unused_local_port();
+    let codex_port_lease = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port = codex_port_lease.port();
     let codex_port_text = codex_port.to_string();
     let codex_endpoint = format!("ws://127.0.0.1:{codex_port}");
 
-    let mut bridge = ManagedChild::spawn(
+    let mut bridge = ManagedChild::spawn_with_port_lease(
         Command::new(bridge_binary())
             .args([
                 "start",
@@ -29,6 +30,7 @@ fn bridge_reconfigure_enables_codex_without_restarting_bridge() {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
+        codex_port_lease,
     )
     .expect("spawn bridge");
 
@@ -64,10 +66,11 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
     let tmp = tempdir().expect("tempdir");
     let host_home = ensure_host_home(tmp.path());
     let mock_codex = create_mock_codex(tmp.path());
-    let codex_port = unused_local_port();
+    let codex_port_lease = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port = codex_port_lease.port();
     let codex_port_text = codex_port.to_string();
 
-    let mut bridge = ManagedChild::spawn(
+    let mut bridge = ManagedChild::spawn_with_port_lease(
         Command::new(bridge_binary())
             .args(["start", "--codex-port", &codex_port_text, "--codex-path"])
             .arg(&mock_codex)
@@ -80,6 +83,7 @@ fn bridge_reconfigure_persists_capabilities_across_restart() {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
+        codex_port_lease,
     )
     .expect("spawn bridge");
 

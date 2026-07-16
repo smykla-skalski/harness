@@ -24,6 +24,63 @@ fn daemon_stop_stops_running_manual_daemon() {
 }
 
 #[test]
+fn parallel_manual_daemons_keep_migration_databases_isolated() {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let xdg_a = tmp.path().join("xdg-a");
+    let xdg_b = tmp.path().join("xdg-b");
+    let poisoned_shared_root = tmp.path().join("shared-daemon-root");
+    for path in [&home, &xdg_a, &xdg_b, &poisoned_shared_root] {
+        std::fs::create_dir_all(path).expect("create test directory");
+    }
+
+    let mut command_a = Command::new(daemon_binary());
+    command_a
+        .env("HARNESS_DAEMON_DATA_HOME", &poisoned_shared_root)
+        .env("HARNESS_APP_GROUP_ID", "test.shared");
+    configure_daemon_serve_command(&mut command_a, &home, &xdg_a, &[]);
+    let mut command_b = Command::new(daemon_binary());
+    command_b
+        .env("HARNESS_DAEMON_DATA_HOME", &poisoned_shared_root)
+        .env("HARNESS_APP_GROUP_ID", "test.shared");
+    configure_daemon_serve_command(&mut command_b, &home, &xdg_b, &[]);
+
+    let mut daemon_a = ManagedChild::spawn(&mut command_a).expect("spawn daemon A");
+    let mut daemon_b = ManagedChild::spawn(&mut command_b).expect("spawn daemon B");
+    let status_a = wait_for_daemon_ready(&home, &xdg_a);
+    let status_b = wait_for_daemon_ready(&home, &xdg_b);
+    assert_eq!(
+        status_a.manifest.expect("daemon A manifest").pid,
+        daemon_a.id()
+    );
+    assert_eq!(
+        status_b.manifest.expect("daemon B manifest").pid,
+        daemon_b.id()
+    );
+
+    let db_a = xdg_a.join("harness/daemon/managed/harness.db");
+    let db_b = xdg_b.join("harness/daemon/managed/harness.db");
+    assert!(db_a.is_file(), "daemon A database missing");
+    assert!(db_b.is_file(), "daemon B database missing");
+    assert!(
+        !poisoned_shared_root
+            .join("harness/daemon/managed/harness.db")
+            .exists()
+    );
+
+    for xdg in [&xdg_a, &xdg_b] {
+        let output = run_harness(&home, xdg, &["daemon", "stop"]);
+        assert!(
+            output.status.success(),
+            "daemon stop failed: {}",
+            output_text(&output)
+        );
+    }
+    wait_for_child_exit(&mut daemon_a);
+    wait_for_child_exit(&mut daemon_b);
+}
+
+#[test]
 fn daemon_restart_starts_manual_daemon_when_offline() {
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path().join("home");

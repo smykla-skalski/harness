@@ -31,6 +31,8 @@ mod direct_session_bootstrap;
 mod direct_session_leader;
 mod direct_session_start;
 mod direct_sessions;
+mod idle_signal_fixture;
+use idle_signal_fixture::*;
 mod leave;
 mod observe;
 mod review_improver;

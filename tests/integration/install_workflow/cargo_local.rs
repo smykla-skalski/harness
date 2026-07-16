@@ -6,17 +6,20 @@ use tempfile::tempdir;
 use super::support::{parse_env_output, write_fake_shell_tool};
 
 #[test]
-fn cargo_local_script_falls_back_to_repo_local_tmpdir_when_tmpdir_is_missing() {
+fn cargo_local_script_uses_short_external_tmpdir_when_tmpdir_is_missing() {
     let tmp = tempdir().expect("tempdir");
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let missing_sccache = tmp.path().join("missing-sccache");
+    let session_id = format!("cargo-local-missing-tmpdir-{}", std::process::id());
 
     let output = Command::new("/bin/bash")
         .arg(repo.join("scripts/cargo-local.sh"))
         .arg("--print-env")
         .current_dir(&repo)
         .env("HOME", tmp.path().join("home"))
+        .env("SCCACHE_BIN", &missing_sccache)
         .env_remove("TMPDIR")
-        .env_remove("CODEX_SESSION_ID")
+        .env("CODEX_SESSION_ID", session_id)
         .env_remove("CODEX_THREAD_ID")
         .env_remove("CLAUDE_SESSION_ID")
         .env_remove("GEMINI_SESSION_ID")
@@ -35,17 +38,25 @@ fn cargo_local_script_falls_back_to_repo_local_tmpdir_when_tmpdir_is_missing() {
     let env = parse_env_output(&output.stdout);
     let tmpdir = env.get("TMPDIR").expect("TMPDIR line");
     let common_repo_root = resolve_common_repo_root(&repo);
-    assert_eq!(
-        tmpdir,
-        &format!(
-            "{}/target/.cargo-local/tmp/local/",
-            common_repo_root.display()
-        )
+    let fallback = Path::new(tmpdir.trim_end_matches('/'));
+    assert!(
+        tmpdir.starts_with("/tmp/harness-cargo-") && tmpdir.ends_with('/'),
+        "expected short external TMPDIR, got {tmpdir}"
     );
     assert!(
-        Path::new(tmpdir).is_dir(),
-        "expected repo-local tmpdir to exist: {tmpdir}"
+        tmpdir.len() < 64,
+        "external TMPDIR should remain short: {tmpdir}"
     );
+    assert!(
+        !fallback.starts_with(&repo) && !fallback.starts_with(&common_repo_root),
+        "fallback must stay outside checkout and common repo: {tmpdir}"
+    );
+    assert!(
+        fallback.is_dir(),
+        "expected external tmpdir to exist: {tmpdir}"
+    );
+
+    std::fs::remove_dir(fallback).expect("remove external tmpdir");
 }
 
 fn resolve_common_repo_root(repo: &Path) -> PathBuf {
@@ -105,6 +116,57 @@ fn cargo_local_script_preserves_explicit_writable_tmpdir() {
         env.get("TMPDIR").expect("TMPDIR line"),
         &explicit_tmpdir.display().to_string()
     );
+}
+
+#[test]
+fn cargo_local_script_uses_short_external_tmpdir_when_tmpdir_is_unusable() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let unusable_tmpdir = tmp.path().join("not-a-directory");
+    let missing_sccache = tmp.path().join("missing-sccache");
+    let session_id = format!("cargo-local-unusable-tmpdir-{}", std::process::id());
+    std::fs::write(&unusable_tmpdir, "not a directory").expect("write unusable TMPDIR");
+
+    let output = Command::new("/bin/bash")
+        .arg(repo.join("scripts/cargo-local.sh"))
+        .arg("--print-env")
+        .current_dir(&repo)
+        .env("HOME", tmp.path().join("home"))
+        .env("SCCACHE_BIN", &missing_sccache)
+        .env("TMPDIR", &unusable_tmpdir)
+        .env("CODEX_SESSION_ID", session_id)
+        .env_remove("CODEX_THREAD_ID")
+        .env_remove("CLAUDE_SESSION_ID")
+        .env_remove("GEMINI_SESSION_ID")
+        .env_remove("COPILOT_SESSION_ID")
+        .env_remove("OPENCODE_SESSION_ID")
+        .output()
+        .expect("run cargo-local script");
+
+    assert!(
+        output.status.success(),
+        "script failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let env = parse_env_output(&output.stdout);
+    let tmpdir = env.get("TMPDIR").expect("TMPDIR line");
+    let fallback = Path::new(tmpdir.trim_end_matches('/'));
+    assert!(
+        tmpdir.starts_with("/tmp/harness-cargo-") && tmpdir.ends_with('/'),
+        "expected short external TMPDIR, got {tmpdir}"
+    );
+    assert!(
+        tmpdir.len() < 64,
+        "external TMPDIR should remain short: {tmpdir}"
+    );
+    assert!(
+        fallback.is_dir(),
+        "expected external tmpdir to exist: {tmpdir}"
+    );
+
+    std::fs::remove_dir(fallback).expect("remove external tmpdir");
 }
 
 #[test]

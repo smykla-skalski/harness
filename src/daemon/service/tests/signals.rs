@@ -103,7 +103,7 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
         let signal_dir = runtime::runtime_for_name("codex")
             .expect("codex runtime")
             .signal_dir(project, worker_session_id);
-        let script_path = write_idle_signal_script(
+        let script = write_idle_signal_script(
             project,
             &signal_dir,
             worker_session_id,
@@ -122,7 +122,7 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
                     name: Some("idle worker".into()),
                     prompt: None,
                     project_dir: Some(project.to_string_lossy().into()),
-                    argv: vec!["sh".into(), script_path.to_string_lossy().into_owned()],
+                    argv: vec!["sh".into(), script.path().to_string_lossy().into_owned()],
                     rows: 5,
                     cols: 40,
                     persona: None,
@@ -139,6 +139,7 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
         manager
             .signal_ready(&snapshot.tui_id)
             .expect("signal ready");
+        script.wait_until_ready();
 
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some(worker_session_id))], || {
             let db_guard = db.lock().expect("db lock");
@@ -182,8 +183,9 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
                 Some(&db_guard),
                 Some(&manager),
             )
-            .expect("send signal")
         };
+        manager.stop(&snapshot.tui_id).expect("stop agent tui");
+        let detail = detail.expect("send signal");
 
         let signal = detail
             .signals
@@ -211,6 +213,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
         db_slot.set(Arc::clone(&db)).expect("db slot");
         let (sender, _) = broadcast::channel(8);
         let manager = AgentTuiManagerHandle::new(sender, db_slot, false);
+        manager.set_ack_timeout(Duration::from_millis(200));
 
         {
             let db_guard = db.lock().expect("db lock");
@@ -228,7 +231,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
         let signal_dir = runtime::runtime_for_name("codex")
             .expect("codex runtime")
             .signal_dir(project, worker_session_id);
-        let script_path = write_idle_signal_script(
+        let script = write_idle_signal_script(
             project,
             &signal_dir,
             worker_session_id,
@@ -247,7 +250,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
                     name: Some("sleepy worker".into()),
                     prompt: None,
                     project_dir: Some(project.to_string_lossy().into()),
-                    argv: vec!["sh".into(), script_path.to_string_lossy().into_owned()],
+                    argv: vec!["sh".into(), script.path().to_string_lossy().into_owned()],
                     rows: 5,
                     cols: 40,
                     persona: None,
@@ -263,6 +266,7 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
         manager
             .signal_ready(&snapshot.tui_id)
             .expect("signal ready");
+        script.wait_until_ready();
 
         let joined = temp_env::with_vars([("CODEX_SESSION_ID", Some(worker_session_id))], || {
             let db_guard = db.lock().expect("db lock");
@@ -306,8 +310,9 @@ fn send_signal_db_direct_warns_when_idle_tui_ack_times_out() {
                 Some(&db_guard),
                 Some(&manager),
             )
-            .expect("send signal")
         };
+        manager.stop(&snapshot.tui_id).expect("stop agent tui");
+        let detail = detail.expect("send signal");
 
         let signal = detail
             .signals

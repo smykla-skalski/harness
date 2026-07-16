@@ -1,7 +1,13 @@
 nextest-version = "0.9.140"
 
+[profile.default]
+test-threads = "num-cpus"
+fail-fast = false
+status-level = "fail"
+final-status-level = "fail"
+
 [profile.rust-timing]
-test-threads = 1
+test-threads = "num-cpus"
 retries = 0
 fail-fast = false
 status-level = "slow"

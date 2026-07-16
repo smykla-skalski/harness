@@ -213,7 +213,8 @@ async fn attempt_active_signal_delivery_async(
     .await;
     let ack = {
         let ack_coords = delivery.coords();
-        let Some(ack) = handled_active_signal_ack_wait_result(&ack_coords, ack_result) else {
+        let Some(ack) = handled_active_signal_ack_wait_result(&ack_coords, ack_result, ack_timeout)
+        else {
             return Ok(false);
         };
         ack

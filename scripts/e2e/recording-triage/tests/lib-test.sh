@@ -20,6 +20,10 @@ recording_triage_test_skip_unless_binary() {
   local repo_root="$1"
   local debug_path="$repo_root/apps/harness-monitor/Tools/HarnessMonitorE2E/.build/debug/harness-monitor-e2e"
   local release_path="$repo_root/apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e"
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    printf 'skipping: harness-monitor-e2e tests require macOS\n'
+    exit 0
+  fi
   # Prefer the freshly-compiled debug binary so tests always exercise the
   # current source instead of a stale release artefact left over from a prior
   # mise run monitor:macos:tools:build:e2e invocation.
@@ -38,6 +42,31 @@ recording_triage_test_skip_unless_binary() {
 recording_triage_test_make_run_dir() {
   local prefix="$1"
   mktemp -d -t "recording-triage-${prefix}.XXXXXX"
+}
+
+recording_triage_test_set_mtime() {
+  local path="$1"
+  local timestamp="$2"
+  python3 - "$path" "$timestamp" <<'PY'
+import datetime
+import os
+import sys
+
+path, timestamp = sys.argv[1:]
+parsed = datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+nanoseconds = int(parsed.timestamp() * 1_000_000_000)
+open(path, "a", encoding="utf-8").close()
+os.utime(path, ns=(nanoseconds, nanoseconds))
+PY
+}
+
+recording_triage_test_mtime_seconds() {
+  python3 - "$1" <<'PY'
+import os
+import sys
+
+print(int(os.stat(sys.argv[1]).st_mtime))
+PY
 }
 
 recording_triage_test_seed_run() {

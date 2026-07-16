@@ -23,7 +23,7 @@ printf 'ready\n' >"$SRC_FILE"
 # copy that drops the timestamp immediately fails the assertion.
 TARGET_TS='200001020304.05'
 touch -t "$TARGET_TS" "$SRC_FILE"
-EXPECTED_MTIME="$(/usr/bin/stat -f '%m' "$SRC_FILE")"
+EXPECTED_MTIME="$(recording_triage_test_mtime_seconds "$SRC_FILE")"
 
 if ! command -v e2e_copy_path_if_exists >/dev/null 2>&1; then
   printf 'expected e2e_copy_path_if_exists to be defined in scripts/e2e/lib.sh\n' >&2
@@ -37,7 +37,7 @@ if [[ ! -f "$DEST_DIR/act1.ready" ]]; then
   exit 1
 fi
 
-ACTUAL_MTIME="$(/usr/bin/stat -f '%m' "$DEST_DIR/act1.ready")"
+ACTUAL_MTIME="$(recording_triage_test_mtime_seconds "$DEST_DIR/act1.ready")"
 if [[ "$ACTUAL_MTIME" != "$EXPECTED_MTIME" ]]; then
   printf 'mtime not preserved: expected=%s actual=%s\n' \
     "$EXPECTED_MTIME" "$ACTUAL_MTIME" >&2
@@ -47,7 +47,7 @@ fi
 # Also exercise the single-file branch.
 SINGLE_DEST="$WORKDIR/single.ready"
 e2e_copy_path_if_exists "$SRC_FILE" "$SINGLE_DEST"
-ACTUAL_SINGLE_MTIME="$(/usr/bin/stat -f '%m' "$SINGLE_DEST")"
+ACTUAL_SINGLE_MTIME="$(recording_triage_test_mtime_seconds "$SINGLE_DEST")"
 if [[ "$ACTUAL_SINGLE_MTIME" != "$EXPECTED_MTIME" ]]; then
   printf 'single-file mtime not preserved: expected=%s actual=%s\n' \
     "$EXPECTED_MTIME" "$ACTUAL_SINGLE_MTIME" >&2

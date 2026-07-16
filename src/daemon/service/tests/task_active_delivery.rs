@@ -45,7 +45,7 @@ fn drop_task_async_actively_delivers_to_idle_tui_agent() {
                 let signal_dir = runtime::runtime_for_name("codex")
                     .expect("codex runtime")
                     .signal_dir(project, worker_session_id);
-                let script_path = write_idle_signal_script(
+                let script = write_idle_signal_script(
                     project,
                     &signal_dir,
                     worker_session_id,
@@ -64,7 +64,7 @@ fn drop_task_async_actively_delivers_to_idle_tui_agent() {
                             name: Some("idle worker".into()),
                             prompt: None,
                             project_dir: Some(project.to_string_lossy().into()),
-                            argv: vec!["sh".into(), script_path.to_string_lossy().into_owned()],
+                            argv: vec!["sh".into(), script.path().to_string_lossy().into_owned()],
                             rows: 5,
                             cols: 40,
                             persona: None,
@@ -80,6 +80,7 @@ fn drop_task_async_actively_delivers_to_idle_tui_agent() {
                 manager
                     .signal_ready(&snapshot.tui_id)
                     .expect("signal ready");
+                script.wait_until_ready();
 
                 let joined = join_session_direct_async(
                     session_id,
@@ -136,8 +137,9 @@ fn drop_task_async_actively_delivers_to_idle_tui_agent() {
                     &async_db,
                     crate::daemon::service::WakeDispatch::new(Some(&manager), None),
                 )
-                .await
-                .expect("drop task");
+                .await;
+                manager.stop(&snapshot.tui_id).expect("stop agent tui");
+                let dropped = dropped.expect("drop task");
 
                 let task = dropped
                     .tasks

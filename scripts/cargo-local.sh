@@ -205,6 +205,49 @@ tmpdir_is_usable() {
   rm -f "$probe"
 }
 
+prepare_private_tmpdir() {
+  local path="$1"
+
+  if [[ -L "$path" ]]; then
+    return 1
+  fi
+  if [[ -e "$path" ]]; then
+    [[ -d "$path" && -O "$path" ]] || return 1
+  else
+    (umask 077 && mkdir "$path") 2>/dev/null || true
+    [[ ! -L "$path" && -d "$path" && -O "$path" ]] || return 1
+  fi
+
+  chmod 700 "$path" || return 1
+  tmpdir_is_usable "$path"
+}
+
+configure_tmpdir() {
+  local external_fallback repo_fallback tmpdir_id
+
+  if tmpdir_is_usable "${TMPDIR:-}"; then
+    return 0
+  fi
+
+  tmpdir_id="$(short_hash "${UID:-${USER:-user}}:$COMMON_REPO_ROOT:$ROOT:$target_segment")"
+  external_fallback="/tmp/harness-cargo-$tmpdir_id"
+  if tmpdir_is_usable "/tmp"; then
+    if ! prepare_private_tmpdir "$external_fallback"; then
+      printf 'failed to prepare writable TMPDIR at %s\n' "$external_fallback" >&2
+      return 1
+    fi
+    export TMPDIR="$external_fallback/"
+    return 0
+  fi
+
+  repo_fallback="$COMMON_REPO_ROOT/target/.cargo-local/tmp/$target_segment"
+  if ! mkdir -p "$repo_fallback" || ! tmpdir_is_usable "$repo_fallback"; then
+    printf 'failed to prepare writable TMPDIR at %s\n' "$repo_fallback" >&2
+    return 1
+  fi
+  export TMPDIR="$repo_fallback/"
+}
+
 cleanup_stale_leases() {
   local lease_file pid
 
@@ -300,6 +343,29 @@ default_jobs() {
   printf '%s\n' "$base_jobs"
 }
 
+default_test_jobs() {
+  local cpu_count max_jobs test_jobs
+  cpu_count="$(detect_cpu_count)"
+
+  if [[ -n "$session_id" ]]; then
+    max_jobs=8
+  else
+    max_jobs=12
+  fi
+  test_jobs=$cpu_count
+  if (( test_jobs > max_jobs )); then
+    test_jobs=$max_jobs
+  fi
+  if (( active_build_count > 1 )); then
+    test_jobs=$(((test_jobs + active_build_count - 1) / active_build_count))
+  fi
+  if (( test_jobs < 2 )); then
+    test_jobs=2
+  fi
+
+  printf '%s\n' "$test_jobs"
+}
+
 session_id="$(first_nonempty_env \
   CODEX_SESSION_ID \
   CODEX_THREAD_ID \
@@ -326,15 +392,7 @@ if [[ -n "$session_id" ]]; then
   target_segment="agent-$(sanitize_segment "$session_id")"
 fi
 
-if ! tmpdir_is_usable "${TMPDIR:-}"; then
-  tmpdir_fallback="$COMMON_REPO_ROOT/target/.cargo-local/tmp/$target_segment"
-  mkdir -p "$tmpdir_fallback"
-  if ! tmpdir_is_usable "$tmpdir_fallback"; then
-    printf 'failed to prepare writable TMPDIR at %s\n' "$tmpdir_fallback" >&2
-    exit 1
-  fi
-  export TMPDIR="$tmpdir_fallback/"
-fi
+configure_tmpdir
 
 resolve_sccache_bin || true
 if [[ -n "${SCCACHE_BIN:-}" ]]; then
@@ -349,10 +407,18 @@ fi
 
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${HARNESS_CARGO_TARGET_DIR:-$COMMON_REPO_ROOT/target/dev/$target_segment}}"
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${HARNESS_CARGO_JOBS:-$(default_jobs)}}"
+export NEXTEST_TEST_THREADS="${NEXTEST_TEST_THREADS:-${HARNESS_NEXTEST_JOBS:-$(default_test_jobs)}}"
+if [[ "$NEXTEST_TEST_THREADS" != "num-cpus" ]] \
+  && [[ ! "$NEXTEST_TEST_THREADS" =~ ^([2-9]|[1-9][0-9]+)$ ]]; then
+  printf 'NEXTEST_TEST_THREADS must be num-cpus or an integer greater than one (got %s)\n' \
+    "$NEXTEST_TEST_THREADS" >&2
+  exit 2
+fi
 
 if [[ "${1:-}" == "--print-env" ]]; then
   printf 'CARGO_TARGET_DIR=%s\n' "$CARGO_TARGET_DIR"
   printf 'CARGO_BUILD_JOBS=%s\n' "$CARGO_BUILD_JOBS"
+  printf 'NEXTEST_TEST_THREADS=%s\n' "$NEXTEST_TEST_THREADS"
   printf 'CARGO_BUILD_BUILD_DIR=%s\n' "${CARGO_BUILD_BUILD_DIR:-}"
   printf 'ACTIVE_BUILD_COUNT=%s\n' "$active_build_count"
   if [[ -n "$session_id" ]]; then

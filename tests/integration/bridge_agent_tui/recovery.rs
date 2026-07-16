@@ -9,7 +9,7 @@ use harness::session::service;
 use harness::session::types::SessionRole;
 use tokio::sync::broadcast;
 
-use super::support::{create_mock_codex, unused_local_port};
+use super::support::create_mock_codex;
 use super::*;
 
 #[test]
@@ -23,10 +23,11 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
     std::fs::create_dir_all(&mock_bin).expect("create mock bin");
     write_mock_codex_tui(&mock_bin);
     let mock_codex = create_mock_codex(tmp.path());
-    let codex_port_text = unused_local_port().to_string();
+    let codex_port = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port_text = codex_port.port().to_string();
     let path_env = prefixed_path_env(&mock_bin);
 
-    let mut bridge = ManagedChild::spawn(
+    let mut bridge = ManagedChild::spawn_with_port_lease(
         Command::new(bridge_binary())
             .args([
                 "start",
@@ -45,6 +46,7 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
+        codex_port,
     )
     .expect("spawn bridge");
     let _state = wait_for_bridge_state(tmp.path());
@@ -75,23 +77,7 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
             .expect("build request")
     });
 
-    let current_state = with_bridge_env(tmp.path(), &host_home, || {
-        service::session_status(&session_id, &project)
-    })
-    .expect("session status");
-    let db_path = tmp.path().join("daemon.sqlite3");
-    let db = DaemonDb::open(&db_path).expect("open daemon db");
-    let discovered = harness::daemon::index::discovered_project_for_checkout(&project);
-    db.sync_project(&discovered).expect("sync project");
-    db.sync_session(&discovered.project_id, &current_state)
-        .expect("sync session");
-
-    let db_slot = std::sync::Arc::new(std::sync::OnceLock::new());
-    db_slot
-        .set(std::sync::Arc::new(std::sync::Mutex::new(db)))
-        .expect("install db");
-    let (sender, _receiver) = broadcast::channel(8);
-    let manager = AgentTuiManagerHandle::new(sender, std::sync::Arc::clone(&db_slot), true);
+    let manager = recovery_manager(tmp.path(), &host_home, &project, &session_id);
     let snapshot = with_bridge_env(tmp.path(), &host_home, || {
         manager.start(&session_id, &request)
     })
@@ -113,6 +99,30 @@ fn sandboxed_recovery_prompt_routes_through_bridge() {
         output_text(&stop_output)
     );
     wait_for_bridge_exit(&mut bridge);
+}
+
+fn recovery_manager(
+    root: &Path,
+    host_home: &Path,
+    project: &Path,
+    session_id: &str,
+) -> AgentTuiManagerHandle {
+    let current_state = with_bridge_env(root, host_home, || {
+        service::session_status(session_id, project)
+    })
+    .expect("session status");
+    let db = DaemonDb::open(&root.join("daemon.sqlite3")).expect("open daemon db");
+    let discovered = harness::daemon::index::discovered_project_for_checkout(project);
+    db.sync_project(&discovered).expect("sync project");
+    db.sync_session(&discovered.project_id, &current_state)
+        .expect("sync session");
+
+    let db_slot = std::sync::Arc::new(std::sync::OnceLock::new());
+    db_slot
+        .set(std::sync::Arc::new(std::sync::Mutex::new(db)))
+        .expect("install db");
+    let (sender, _receiver) = broadcast::channel(8);
+    AgentTuiManagerHandle::new(sender, db_slot, true)
 }
 
 fn with_bridge_env<T>(root: &Path, host_home: &Path, action: impl FnOnce() -> T) -> T {

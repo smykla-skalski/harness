@@ -1,4 +1,3 @@
-use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::thread;
@@ -137,14 +136,6 @@ PY
     std::fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755))
         .expect("chmod mock codex");
     script
-}
-
-pub(super) fn unused_local_port() -> u16 {
-    TcpListener::bind(("127.0.0.1", 0))
-        .expect("bind local port")
-        .local_addr()
-        .expect("read local addr")
-        .port()
 }
 
 pub(super) fn bridge_binary() -> PathBuf {

@@ -8,6 +8,7 @@ use super::DaemonClient;
 use super::connection::try_build_client;
 use super::test_support::{fake_running_xdg_daemon, read_http_request, write_http_response};
 use crate::daemon::state::{self, DaemonManifest, HostBridgeManifest};
+#[cfg(target_os = "macos")]
 use crate::daemon::transport::HARNESS_MONITOR_APP_GROUP_ID;
 
 #[test]
@@ -20,36 +21,7 @@ fn try_build_client_requires_authenticated_api_readiness() {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
 
-    let server = thread::spawn(move || {
-        for request_index in 0..3 {
-            let (mut stream, _) = listener.accept().expect("accept");
-            let request = read_http_request(&mut stream);
-            let request_lower = request.to_ascii_lowercase();
-            assert!(
-                request_lower.contains("authorization: bearer test-token"),
-                "missing bearer auth: {request}"
-            );
-            if request.starts_with("GET /v1/health ") {
-                write_http_response(&mut stream, "200 OK", "text/plain", "ok");
-                continue;
-            }
-            assert!(
-                request.starts_with("GET /v1/ready "),
-                "unexpected probe request: {request}"
-            );
-            let status = if request_index == 1 {
-                "503 Service Unavailable"
-            } else {
-                "200 OK"
-            };
-            let body = if request_index == 1 {
-                "{\"error\":\"warming up\"}"
-            } else {
-                "{\"ready\":true,\"daemon_epoch\":\"test\"}"
-            };
-            write_http_response(&mut stream, status, "application/json", body);
-        }
-    });
+    let server = spawn_warming_readiness_server(listener);
 
     temp_env::with_vars(
         [
@@ -102,6 +74,7 @@ fn try_build_client_requires_authenticated_api_readiness() {
     server.join().expect("server");
 }
 
+#[cfg(target_os = "macos")]
 #[test]
 fn try_build_client_discovers_running_app_group_daemon_when_default_root_is_empty() {
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -133,36 +106,7 @@ fn try_build_client_discovers_running_app_group_daemon_when_default_root_is_empt
 
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let endpoint = format!("http://{}", listener.local_addr().expect("addr"));
-    let server = thread::spawn(move || {
-        for request_index in 0..3 {
-            let (mut stream, _) = listener.accept().expect("accept");
-            let request = read_http_request(&mut stream);
-            let request_lower = request.to_ascii_lowercase();
-            assert!(
-                request_lower.contains("authorization: bearer test-token"),
-                "missing bearer auth: {request}"
-            );
-            if request.starts_with("GET /v1/health ") {
-                write_http_response(&mut stream, "200 OK", "text/plain", "ok");
-                continue;
-            }
-            assert!(
-                request.starts_with("GET /v1/ready "),
-                "unexpected probe request: {request}"
-            );
-            let status = if request_index == 1 {
-                "503 Service Unavailable"
-            } else {
-                "200 OK"
-            };
-            let body = if request_index == 1 {
-                "{\"error\":\"warming up\"}"
-            } else {
-                "{\"ready\":true,\"daemon_epoch\":\"test\"}"
-            };
-            write_http_response(&mut stream, status, "application/json", body);
-        }
-    });
+    let server = spawn_warming_readiness_server(listener);
 
     temp_env::with_vars(
         [
@@ -207,6 +151,39 @@ fn try_build_client_discovers_running_app_group_daemon_when_default_root_is_empt
     );
 
     server.join().expect("server");
+}
+
+fn spawn_warming_readiness_server(listener: TcpListener) -> thread::JoinHandle<()> {
+    thread::spawn(move || {
+        for request_index in 0..3 {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let request = read_http_request(&mut stream);
+            let request_lower = request.to_ascii_lowercase();
+            assert!(
+                request_lower.contains("authorization: bearer test-token"),
+                "missing bearer auth: {request}"
+            );
+            if request.starts_with("GET /v1/health ") {
+                write_http_response(&mut stream, "200 OK", "text/plain", "ok");
+                continue;
+            }
+            assert!(
+                request.starts_with("GET /v1/ready "),
+                "unexpected probe request: {request}"
+            );
+            let status = if request_index == 1 {
+                "503 Service Unavailable"
+            } else {
+                "200 OK"
+            };
+            let body = if request_index == 1 {
+                "{\"error\":\"warming up\"}"
+            } else {
+                "{\"ready\":true,\"daemon_epoch\":\"test\"}"
+            };
+            write_http_response(&mut stream, status, "application/json", body);
+        }
+    })
 }
 
 #[test]

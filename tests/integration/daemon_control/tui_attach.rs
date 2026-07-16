@@ -233,6 +233,11 @@ impl AttachedTuiSession {
         command.env("HARNESS_HOST_HOME", home);
         command.env("HOME", home);
         command.env("XDG_DATA_HOME", xdg);
+        command.env("HARNESS_DAEMON_DATA_HOME", xdg);
+        command.env_remove("HARNESS_APP_GROUP_ID");
+        command.env_remove("HARNESS_DAEMON_OWNERSHIP");
+        command.env_remove("HARNESS_SANDBOXED");
+        command.env_remove("CLAUDE_SESSION_ID");
         let child = pair
             .slave
             .spawn_command(command)

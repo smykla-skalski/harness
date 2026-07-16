@@ -11,7 +11,7 @@ use super::signals::{
 use super::sync_support::read_runtime_acknowledgments_async;
 use super::wake_route::{WakeDispatch, WakeRoute, log_wake_attempt, wake_route_for_registration};
 use super::{
-    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, CliError, CliErrorKind,
+    ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, CliError, CliErrorKind, Duration,
     ManagedTuiWake, Path, PathBuf, SessionTransition, SignalAckRequest, SignalCoords,
     build_log_entry, effective_project_dir, session_not_found, session_service, snapshot,
     sync_file_state_for_resolved, task_drop_effect_signal_records, write_task_start_signals,
@@ -127,8 +127,9 @@ async fn wait_for_task_start_ack_async(
     project_dir: &Path,
     signal_session_id: &str,
     signal_id: &str,
+    timeout: Duration,
 ) -> Result<Option<SignalAck>, CliError> {
-    let deadline = TokioInstant::now() + ACTIVE_SIGNAL_ACK_TIMEOUT;
+    let deadline = TokioInstant::now() + timeout;
     loop {
         if let Some(ack) = read_runtime_acknowledgments_async(
             runtime,
@@ -239,14 +240,19 @@ async fn wake_tui_async(
     if !woke_tui {
         return;
     }
+    let ack_timeout = managed_tui
+        .manager
+        .ack_timeout_override()
+        .unwrap_or(ACTIVE_SIGNAL_ACK_TIMEOUT);
     let ack_result = wait_for_task_start_ack_async(
         runtime,
         project_dir,
         &record.signal_session_id,
         &record.signal.signal_id,
+        ack_timeout,
     )
     .await;
-    let Some(ack) = handled_active_signal_ack_wait_result(&coords, ack_result) else {
+    let Some(ack) = handled_active_signal_ack_wait_result(&coords, ack_result, ack_timeout) else {
         return;
     };
     let ack_request = SignalAckRequest {

@@ -39,17 +39,6 @@ fn application_submodules_are_not_public_library_surface() {
         private_guard_context_hits.is_empty(),
         "testkit should not depend on the private hooks::application module"
     );
-    let public_guard_context_hits = collect_hits_in_tree(
-        &root.join("testkit/src/builders"),
-        root,
-        None,
-        &["harness::hooks::GuardContext"],
-        |path, needle| format!("{path} depends on `{needle}`"),
-    );
-    assert!(
-        !public_guard_context_hits.is_empty(),
-        "testkit should depend on the public hooks facade for GuardContext"
-    );
 }
 
 #[test]

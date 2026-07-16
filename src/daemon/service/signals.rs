@@ -1,3 +1,4 @@
+use super::signals_timeout::warn_active_signal_delivery_timeout;
 use super::wake_route::{WakeDispatch, WakeRoute, log_wake_attempt, wake_route_for_registration};
 use super::{
     ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, AckResult, AgentRegistration,
@@ -6,7 +7,7 @@ use super::{
     acknowledged_signal_record, agents_runtime, broadcast_session_snapshot, build_log_entry,
     build_signal_ack, effective_project_dir, index, pending_signal_record,
     project_dir_for_db_session, record_signal_ack, refresh_signal_index_for_db, session_detail,
-    session_detail_from_daemon_db, session_not_found, session_service, state, thread, utc_now,
+    session_detail_from_daemon_db, session_not_found, session_service, thread, utc_now,
 };
 use crate::daemon::agent_acp::AcpWakePrompt;
 use crate::daemon::protocol::CodexSteerRequest;
@@ -192,6 +193,7 @@ pub(crate) fn process_active_signal_ack(
             &coords.signal.signal_id,
             ack_timeout,
         ),
+        ack_timeout,
     ) else {
         return false;
     };
@@ -202,6 +204,7 @@ pub(crate) fn process_active_signal_ack(
 pub(crate) fn handled_active_signal_ack_wait_result(
     coords: &SignalCoords<'_>,
     ack_result: Result<Option<SignalAck>, CliError>,
+    ack_timeout: Duration,
 ) -> Option<SignalAck> {
     match ack_result {
         Ok(Some(ack)) => Some(ack),
@@ -210,6 +213,7 @@ pub(crate) fn handled_active_signal_ack_wait_result(
                 coords.session_id,
                 coords.agent_id,
                 &coords.signal.signal_id,
+                ack_timeout,
             );
             None
         }
@@ -295,29 +299,6 @@ pub(crate) fn wait_for_signal_ack(
     }
 }
 
-pub(crate) fn warn_active_signal_delivery_timeout(
-    session_id: &str,
-    agent_id: &str,
-    signal_id: &str,
-) {
-    state::append_event_best_effort(
-        "warn",
-        &active_signal_delivery_timeout_message(session_id, agent_id, signal_id),
-    );
-    log_active_signal_delivery_timeout(session_id, agent_id, signal_id);
-}
-
-pub(crate) fn active_signal_delivery_timeout_message(
-    session_id: &str,
-    agent_id: &str,
-    signal_id: &str,
-) -> String {
-    format!(
-        "session '{session_id}' signal '{signal_id}' to agent '{agent_id}' stayed pending after active TUI wake-up for {} ms",
-        ACTIVE_SIGNAL_ACK_TIMEOUT.as_millis()
-    )
-}
-
 #[expect(
     clippy::cognitive_complexity,
     reason = "structured tracing macro expansion inflates this simple logging helper"
@@ -357,24 +338,6 @@ pub(crate) fn warn_active_signal_ack_record_failure(coords: &SignalCoords<'_>, e
         agent_id = coords.agent_id,
         signal_id = %coords.signal.signal_id,
         "failed to record actively delivered signal acknowledgment"
-    );
-}
-
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "structured tracing macro expansion inflates this simple logging helper"
-)]
-pub(crate) fn log_active_signal_delivery_timeout(
-    session_id: &str,
-    agent_id: &str,
-    signal_id: &str,
-) {
-    tracing::warn!(
-        session_id,
-        agent_id,
-        signal_id,
-        timeout_ms = ACTIVE_SIGNAL_ACK_TIMEOUT.as_millis(),
-        "active TUI signal delivery timed out"
     );
 }
 

@@ -392,22 +392,23 @@ git     X      u    16u  unix 0x123  0t0           fsmonitor--daemon.ipc
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn("live=1 orphan=1 redundant=1", completed.stdout)
 
-    def test_canonicalization_collapses_tmp_vs_private_tmp(self) -> None:
-        # macOS lsof prints `/tmp/foo` for some daemons and `/private/tmp/foo`
-        # for others against the same physical directory (the system /tmp is
-        # a symlink to /private/tmp). Without path canonicalization the
-        # duplicate is missed. With canonicalization, both daemons collapse
-        # to the same gitdir key and the older one is marked redundant.
-        with tempfile.TemporaryDirectory(dir="/private/tmp") as repo_str:
-            repo_dir = Path(repo_str)
+    def test_canonicalization_collapses_symlink_alias(self) -> None:
+        # lsof can report two lexical paths to the same physical directory.
+        # Without path canonicalization the duplicate is missed. With
+        # canonicalization, both daemons collapse to the same gitdir key and
+        # the older one is marked redundant.
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            repo_dir = tmp_dir / "real"
             (repo_dir / ".git" / "worktrees" / "active").mkdir(parents=True)
-            alias_dir = Path("/tmp") / repo_dir.relative_to("/private/tmp")
-            self.assertTrue(alias_dir.exists(), "tmp/private/tmp alias must hold")
-            lsof_via_private = self._linked_worktree_lsof(repo_dir, "active")
+            alias_dir = tmp_dir / "alias"
+            alias_dir.symlink_to(repo_dir, target_is_directory=True)
+            self.assertTrue(alias_dir.exists(), "symlink alias must resolve")
+            lsof_via_real = self._linked_worktree_lsof(repo_dir, "active")
             lsof_via_alias = self._linked_worktree_lsof(alias_dir, "active")
             completed, _ = self.run_script(
                 fake_lsof_outputs={
-                    "1300": lsof_via_private,
+                    "1300": lsof_via_real,
                     "1301": lsof_via_alias,
                 },
                 fake_pgrep_pids=["1300", "1301"],

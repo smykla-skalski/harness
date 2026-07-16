@@ -8,6 +8,9 @@ use harness::session::types::{SessionRole, TaskSeverity};
 use harness::workspace::utc_now;
 use harness_testkit::{init_git_repo_with_seed, with_isolated_harness_env};
 
+const SESSION_A: &str = "50000000-0000-4000-8000-000000000001";
+const SESSION_B: &str = "50000000-0000-4000-8000-000000000002";
+
 /// Seed two projects with sessions, agents, tasks, and a daemon manifest.
 fn seed_workspace(tmp: &std::path::Path) {
     state::ensure_daemon_dirs().expect("dirs");
@@ -34,10 +37,20 @@ fn seed_workspace(tmp: &std::path::Path) {
         init_git_repo_with_seed(project);
     }
 
-    let state_a = session_service::start_session("", "comparison-a", &project_a, Some("cmp1"))
-        .expect("start cmp1");
+    session_service::start_session("", "comparison-a", &project_a, Some(SESSION_A))
+        .expect("start comparison session A");
+    let state_a = session_service::join_session(
+        SESSION_A,
+        SessionRole::Leader,
+        "claude",
+        &[],
+        None,
+        &project_a,
+        None,
+    )
+    .expect("join comparison leader A");
     session_service::join_session(
-        "cmp1",
+        SESSION_A,
         SessionRole::Worker,
         "codex",
         &[],
@@ -45,20 +58,26 @@ fn seed_workspace(tmp: &std::path::Path) {
         &project_a,
         None,
     )
-    .expect("join cmp1");
+    .expect("join comparison session A");
 
-    let state_b = session_service::start_session("", "comparison-b", &project_b, Some("cmp2"))
-        .expect("start cmp2");
+    session_service::start_session("", "comparison-b", &project_b, Some(SESSION_B))
+        .expect("start comparison session B");
+    let state_b = session_service::join_session(
+        SESSION_B,
+        SessionRole::Leader,
+        "claude",
+        &[],
+        None,
+        &project_b,
+        None,
+    )
+    .expect("join comparison leader B");
 
     for (session_id, project_dir, session_state) in [
-        ("cmp1", project_a.as_path(), &state_a),
-        ("cmp2", project_b.as_path(), &state_b),
+        (SESSION_A, project_a.as_path(), &state_a),
+        (SESSION_B, project_b.as_path(), &state_b),
     ] {
-        let leader = session_state
-            .agents
-            .keys()
-            .find(|id| id.starts_with("claude"))
-            .expect("leader agent");
+        let leader = session_state.leader_id.as_deref().expect("leader agent");
         for i in 0..2 {
             session_service::create_task(
                 session_id,
@@ -155,8 +174,8 @@ fn file_and_db_reads_produce_identical_output() {
         );
 
         // --- session_detail ---
-        let file_detail = service::session_detail("cmp1", None).expect("file detail");
-        let db_detail = service::session_detail("cmp1", Some(&db)).expect("db detail");
+        let file_detail = service::session_detail(SESSION_A, None).expect("file detail");
+        let db_detail = service::session_detail(SESSION_A, Some(&db)).expect("db detail");
         let file_json = to_normalized_json(&file_detail);
         let db_json = to_normalized_json(&db_detail);
         // Compare key fields (full JSON may differ in ordering of
@@ -175,8 +194,8 @@ fn file_and_db_reads_produce_identical_output() {
         );
 
         // --- session_timeline ---
-        let file_timeline = service::session_timeline("cmp1", None).expect("file timeline");
-        let db_timeline = service::session_timeline("cmp1", Some(&db)).expect("db timeline");
+        let file_timeline = service::session_timeline(SESSION_A, None).expect("file timeline");
+        let db_timeline = service::session_timeline(SESSION_A, Some(&db)).expect("db timeline");
         assert_eq!(
             file_timeline.len(),
             db_timeline.len(),

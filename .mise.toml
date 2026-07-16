@@ -154,63 +154,68 @@ run = "./scripts/tests/test-release-install.sh"
 [tasks."test:unit"]
 description = "Run unit tests"
 run = [
-  "./scripts/cargo-local.sh test --quiet --lib --features full-runtime -- --test-threads=1 --format terse",
-  "./scripts/cargo-local.sh test --quiet -p harness-command -p harness-daemon-client -p harness-protocol -p harness-telemetry -p harness-testkit",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-command -p harness-daemon-client -p harness-protocol -p harness-telemetry -p harness-testkit",
 ]
 
 [tasks."test:integration"]
-description = "Run integration tests (fast only, single-threaded for env safety)"
+description = "Run fast integration tests in parallel with process isolation"
 run = [
   "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
-  "./scripts/cargo-local.sh test --quiet --test integration --features full-runtime -- --test-threads=1 --format terse",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime",
 ]
 
 [tasks."test:workers"]
 description = "Run standalone worker integration and parity tests"
 run = [
-  "./scripts/cargo-local.sh test --quiet -p harness-daemon -p harness-bridge --test standalone_parity -- --format terse",
-  "./scripts/cargo-local.sh test --quiet -p harness-hook --test standalone -- --format terse",
-  "./scripts/cargo-local.sh test --quiet -p harness-mcp --test cli --test dependency_guard -- --format terse",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-daemon -p harness-bridge --test standalone_parity",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-hook --test standalone",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-mcp --test cli --test dependency_guard",
 ]
 
 [tasks."test:slow"]
-description = "Run ignored slow tests (fake toolchain, ENV_LOCK)"
+description = "Run self-contained ignored tests; use test:perf for timing budgets and e2e:swarm:full for the real-runtime swarm lane"
 run = [
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --lib --features full-runtime --run-ignored only -E 'test(=agents::acp::throughput_bench::tests::throughput_meets_threshold)'",
   "./scripts/cargo-local.sh build -p harness-daemon -p harness-bridge -p harness-mcp",
-  "./scripts/cargo-local.sh test --quiet --test integration --features full-runtime -- --ignored --test-threads=1 --format terse",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime --run-ignored only -E 'not test(~integration::daemon_perf::) and not test(=integration::commands::session::swarm_full_flow::swarm_full_flow_mise_lane_passes)'",
 ]
+
+[tasks."test:perf"]
+description = "Run ignored Rust performance budgets in their own parallel process-isolated lane"
+run = "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime --run-ignored only -E 'test(~integration::daemon_perf::)'"
 
 [tasks."test:profile:compile"]
 description = "Profile reproducible Rust test compilation and capture Cargo/sccache artifacts"
 run = "./scripts/profile-rust-tests.sh compile"
 
 [tasks."test:profile:unit"]
-description = "Profile root Rust unit tests serially with nextest timing artifacts"
+description = "Profile root Rust unit tests in parallel with nextest timing artifacts"
 run = "./scripts/profile-rust-tests.sh unit"
 
 [tasks."test:profile:integration"]
-description = "Profile root Rust integration tests serially with nextest timing artifacts"
+description = "Profile root Rust integration tests in parallel with nextest timing artifacts"
 run = "./scripts/profile-rust-tests.sh integration"
 
 [tasks."remote-daemon:e2e"]
 description = "Run the real remote daemon ACME, HTTPS, WSS, pairing, and revocation proof"
 run = [
   "./scripts/cargo-local.sh build -p harness-daemon",
-  "./scripts/cargo-local.sh test --quiet --test remote_daemon_e2e --features full-runtime -- --ignored --test-threads=1 --format terse",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test remote_daemon_e2e --features full-runtime --run-ignored only",
 ]
 
 [tasks."remote-daemon:public-acme-e2e"]
 description = "Run the Linux Let's Encrypt staging proof for TLS-ALPN-01, HTTP-01, and DNS-01"
 run = [
   "./scripts/cargo-local.sh build -p harness-daemon",
-  "./scripts/cargo-local.sh test --quiet --test remote_daemon_public_acme_e2e --features full-runtime remote_daemon_public_acme_staging_proves_all_challenges -- --ignored --nocapture --test-threads=1",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test remote_daemon_public_acme_e2e --features full-runtime --run-ignored only --success-output immediate --failure-output immediate -E 'test(=remote_daemon_public_acme_staging_proves_all_challenges)'",
 ]
 
 [tasks."remote-daemon:systemd-e2e"]
 description = "Run the real Linux systemd lifecycle and effective security proof"
 run = [
   "./scripts/cargo-local.sh build -p harness-daemon",
-  "./scripts/cargo-local.sh test --quiet --test remote_systemd_e2e --features full-runtime -- --ignored --nocapture --test-threads=1",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test remote_systemd_e2e --features full-runtime --run-ignored only --success-output immediate --failure-output immediate -E 'test(=remote_systemd_e2e_proves_lifecycle_and_effective_security)'",
 ]
 
 [tasks.codegen]
@@ -626,8 +631,8 @@ run = "./scripts/host-metrics.sh build-darwin-exporter"
 [tasks."mcp:test"]
 description = "Run harness MCP server unit and integration tests"
 run = [
-  "./scripts/cargo-local.sh test -p harness-mcp --all-targets -- --test-threads=1",
-  "./scripts/cargo-local.sh test --test integration mcp:: -- --test-threads=1",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness-mcp --all-targets",
+  "./scripts/cargo-local.sh nextest run --config-file .config/nextest.toml --user-config-file none -p harness --test integration --features full-runtime -E 'test(~mcp::)'",
 ]
 
 [tasks."mcp:test:registry"]

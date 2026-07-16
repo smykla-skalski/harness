@@ -66,6 +66,189 @@ print_cargo_env() {
   )
 }
 
+print_tmpdir_env() {
+  local session_id="$1" configured_tmpdir="${2:-}"
+  (
+    unset SCCACHE_SERVER_UDS SCCACHE_SERVER_PORT SCCACHE_NO_DAEMON
+    unset SCCACHE_BASEDIRS SCCACHE_IDLE_TIMEOUT SCCACHE_CACHE_SIZE SCCACHE_VERSION
+    unset HARNESS_SCCACHE_TMPDIR
+    unset CODEX_SESSION_ID CODEX_THREAD_ID CLAUDE_SESSION_ID CLAUDE_CODE_SESSION_ID
+    unset GEMINI_SESSION_ID COPILOT_SESSION_ID OPENCODE_SESSION_ID
+    if [[ -n "$configured_tmpdir" ]]; then
+      export TMPDIR="$configured_tmpdir"
+    else
+      unset TMPDIR
+    fi
+    SCCACHE_BIN="$SANDBOX/missing-sccache" \
+      RUSTC_WRAPPER='' \
+      CODEX_SESSION_ID="$session_id" \
+      HARNESS_CARGO_SKIP_LEASE=1 \
+      HARNESS_CARGO_ACTIVE_BUILD_COUNT=1 \
+      "$ROOT/scripts/cargo-local.sh" --print-env
+  )
+}
+
+scenario_missing_tmpdir_uses_short_external_fallback() {
+  local first second other fallback other_fallback test_threads
+
+  first="$(print_tmpdir_env "cargo-local-tmp-a-$$")"
+  second="$(print_tmpdir_env "cargo-local-tmp-a-$$")"
+  other="$(print_tmpdir_env "cargo-local-tmp-b-$$")"
+  fallback="$(awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$first")"
+  other_fallback="$(
+    awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$other"
+  )"
+  test_threads="$(
+    awk -F= '$1 == "NEXTEST_TEST_THREADS" { print substr($0, index($0, "=") + 1) }' <<<"$first"
+  )"
+
+  if [[ "$fallback" == /tmp/harness-cargo-*/ ]] \
+    && (( ${#fallback} < 64 )) \
+    && [[ ! -L "${fallback%/}" ]] \
+    && [[ -O "${fallback%/}" ]] \
+    && assert_line "TMPDIR=$fallback" "$second" \
+    && [[ "$fallback" != "$other_fallback" ]] \
+    && [[ -d "${fallback%/}" ]] \
+    && [[ "$fallback" != "$ROOT/"* ]] \
+    && [[ "$fallback" != "$COMMON_REPO_ROOT/"* ]] \
+    && [[ "$test_threads" =~ ^[0-9]+$ ]] \
+    && (( test_threads >= 2 )); then
+    pass "missing TMPDIR uses a stable short external repo/session fallback"
+  else
+    fail "missing TMPDIR fallback was not short, external, and session-scoped: $first"
+  fi
+
+  rm -rf "${fallback%/}" "${other_fallback%/}"
+}
+
+scenario_concurrent_tmpdir_creation_is_idempotent() {
+  local barrier="$SANDBOX/mkdir-barrier"
+  local fake_bin="$SANDBOX/mkdir-bin"
+  local first="$SANDBOX/concurrent-first.out"
+  local second="$SANDBOX/concurrent-second.out"
+  local real_mkdir session_id first_pid second_pid first_status second_status fallback
+  real_mkdir="$(command -v mkdir)"
+  session_id="cargo-local-concurrent-tmp-$$"
+  mkdir -p "$barrier" "$fake_bin"
+  cat >"$fake_bin/mkdir" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+target="${!#}"
+if [[ "$target" == /tmp/harness-cargo-* ]]; then
+  : >"$HARNESS_TEST_MKDIR_BARRIER/$$"
+  for _ in {1..200}; do
+    count=0
+    for marker in "$HARNESS_TEST_MKDIR_BARRIER"/*; do
+      [[ -e "$marker" ]] && count=$((count + 1))
+    done
+    (( count >= 2 )) && break
+    sleep 0.01
+  done
+fi
+exec "$HARNESS_TEST_REAL_MKDIR" "$@"
+EOF
+  chmod +x "$fake_bin/mkdir"
+
+  PATH="$fake_bin:$PATH" HARNESS_TEST_MKDIR_BARRIER="$barrier" \
+    HARNESS_TEST_REAL_MKDIR="$real_mkdir" print_tmpdir_env "$session_id" >"$first" 2>&1 &
+  first_pid=$!
+  PATH="$fake_bin:$PATH" HARNESS_TEST_MKDIR_BARRIER="$barrier" \
+    HARNESS_TEST_REAL_MKDIR="$real_mkdir" print_tmpdir_env "$session_id" >"$second" 2>&1 &
+  second_pid=$!
+
+  set +e
+  wait "$first_pid"
+  first_status=$?
+  wait "$second_pid"
+  second_status=$?
+  set -e
+
+  fallback="$(
+    awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' "$first"
+  )"
+  if (( first_status == 0 && second_status == 0 )) \
+    && [[ -n "$fallback" ]] \
+    && grep -Fxq -- "TMPDIR=$fallback" "$second"; then
+    pass "concurrent same-session TMPDIR creation is idempotent"
+  else
+    fail "concurrent TMPDIR creation failed: first=$(<"$first") second=$(<"$second")"
+  fi
+  rm -rf "${fallback%/}"
+}
+
+scenario_unusable_tmpdir_uses_short_external_fallback() {
+  local unusable="$SANDBOX/not-a-directory" output fallback
+  : >"$unusable"
+
+  output="$(print_tmpdir_env "cargo-local-unusable-tmp-$$" "$unusable")"
+  fallback="$(
+    awk -F= '$1 == "TMPDIR" { print substr($0, index($0, "=") + 1) }' <<<"$output"
+  )"
+
+  if [[ "$fallback" == /tmp/harness-cargo-*/ ]] \
+    && (( ${#fallback} < 64 )) \
+    && [[ -d "${fallback%/}" ]]; then
+    pass "unusable TMPDIR uses a short external fallback"
+  else
+    fail "unusable TMPDIR did not use the short external fallback: $output"
+  fi
+
+  rm -rf "${fallback%/}"
+}
+
+scenario_usable_tmpdir_is_preserved() {
+  local explicit="$SANDBOX/explicit-tmp" output
+  mkdir -p "$explicit"
+
+  output="$(print_tmpdir_env "cargo-local-explicit-tmp-$$" "$explicit/")"
+  if assert_line "TMPDIR=$explicit/" "$output"; then
+    pass "usable explicit TMPDIR is preserved"
+  else
+    fail "usable explicit TMPDIR was replaced: $output"
+  fi
+}
+
+scenario_single_thread_nextest_override_is_rejected() {
+  local output single_thread status
+  single_thread="$((2 - 1))"
+
+  set +e
+  output="$(
+    NEXTEST_TEST_THREADS="$single_thread" \
+      print_tmpdir_env "cargo-local-serial-nextest-$$" 2>&1
+  )"
+  status=$?
+  set -e
+
+  if (( status == 2 )) \
+    && assert_contains "NEXTEST_TEST_THREADS must be num-cpus or an integer greater than one" \
+      "$output"; then
+    pass "single-thread nextest override is rejected"
+  else
+    fail "single-thread nextest override should fail with status 2: $output"
+  fi
+}
+
+scenario_noncanonical_nextest_override_is_rejected() {
+  local invalid_threads="08" output status
+
+  set +e
+  output="$(
+    NEXTEST_TEST_THREADS="$invalid_threads" \
+      print_tmpdir_env "cargo-local-noncanonical-nextest-$$" 2>&1
+  )"
+  status=$?
+  set -e
+
+  if (( status == 2 )) \
+    && assert_contains "NEXTEST_TEST_THREADS must be num-cpus or an integer greater than one" \
+      "$output"; then
+    pass "noncanonical nextest override is rejected cleanly"
+  else
+    fail "noncanonical nextest override should fail with status 2: $output"
+  fi
+}
+
 scenario_supported_sccache_is_resolved_once() {
   local fake_bin="$SANDBOX/supported-bin"
   local tmpdir="$SANDBOX/supported-tmp"
@@ -151,6 +334,12 @@ EOF
   fi
 }
 
+scenario_missing_tmpdir_uses_short_external_fallback
+scenario_concurrent_tmpdir_creation_is_idempotent
+scenario_unusable_tmpdir_uses_short_external_fallback
+scenario_usable_tmpdir_is_preserved
+scenario_single_thread_nextest_override_is_rejected
+scenario_noncanonical_nextest_override_is_rejected
 scenario_supported_sccache_is_resolved_once
 scenario_old_explicit_sccache_is_disabled
 scenario_failed_lsof_preserves_unknown_sockets

@@ -12,6 +12,7 @@ use crate::telemetry::{current_trace_headers, current_trace_id, record_daemon_cl
 
 impl DaemonClient {
     pub(super) fn get<Res: DeserializeOwned>(&self, path: &str) -> Result<Res, CliError> {
+        let runtime = &*RUNTIME;
         let request_id = Uuid::new_v4().to_string();
         let start = Instant::now();
         let url = format!("{}{path}", self.endpoint);
@@ -19,7 +20,7 @@ impl DaemonClient {
         let _guard = span.enter();
         record_trace_id(&span);
         let propagation_headers = current_trace_headers();
-        let response = RUNTIME.block_on(async {
+        let response = runtime.block_on(async {
             let mut request = self
                 .http
                 .get(&url)
@@ -39,6 +40,7 @@ impl DaemonClient {
         path: &str,
         query: &[(&str, &str)],
     ) -> Result<Res, CliError> {
+        let runtime = &*RUNTIME;
         let request_id = Uuid::new_v4().to_string();
         let start = Instant::now();
         let url = format!("{}{path}", self.endpoint);
@@ -46,7 +48,7 @@ impl DaemonClient {
         let _guard = span.enter();
         record_trace_id(&span);
         let propagation_headers = current_trace_headers();
-        let response = RUNTIME.block_on(async {
+        let response = runtime.block_on(async {
             let mut request = self
                 .http
                 .get(&url)
@@ -71,6 +73,7 @@ impl DaemonClient {
         path: &str,
         query: &[(&str, &str)],
     ) -> Result<Option<Res>, CliError> {
+        let runtime = &*RUNTIME;
         let request_id = Uuid::new_v4().to_string();
         let start = Instant::now();
         let url = format!("{}{path}", self.endpoint);
@@ -78,7 +81,7 @@ impl DaemonClient {
         let _guard = span.enter();
         record_trace_id(&span);
         let propagation_headers = current_trace_headers();
-        let response = RUNTIME.block_on(async {
+        let response = runtime.block_on(async {
             let mut request = self
                 .http
                 .get(&url)
@@ -99,6 +102,7 @@ impl DaemonClient {
         path: &str,
         body: &Req,
     ) -> Result<Res, CliError> {
+        let runtime = &*RUNTIME;
         let request_id = Uuid::new_v4().to_string();
         let start = Instant::now();
         let url = format!("{}{path}", self.endpoint);
@@ -106,7 +110,7 @@ impl DaemonClient {
         let _guard = span.enter();
         record_trace_id(&span);
         let propagation_headers = current_trace_headers();
-        let response = RUNTIME.block_on(async {
+        let response = runtime.block_on(async {
             let mut request = self
                 .http
                 .post(&url)
@@ -127,6 +131,7 @@ impl DaemonClient {
         path: &str,
         body: &Req,
     ) -> Result<Res, CliError> {
+        let runtime = &*RUNTIME;
         let request_id = Uuid::new_v4().to_string();
         let start = Instant::now();
         let url = format!("{}{path}", self.endpoint);
@@ -134,7 +139,7 @@ impl DaemonClient {
         let _guard = span.enter();
         record_trace_id(&span);
         let propagation_headers = current_trace_headers();
-        let response = RUNTIME.block_on(async {
+        let response = runtime.block_on(async {
             let mut request = self
                 .http
                 .put(&url)
@@ -151,6 +156,7 @@ impl DaemonClient {
     }
 
     pub(super) fn delete<Res: DeserializeOwned>(&self, path: &str) -> Result<Res, CliError> {
+        let runtime = &*RUNTIME;
         let request_id = Uuid::new_v4().to_string();
         let start = Instant::now();
         let url = format!("{}{path}", self.endpoint);
@@ -158,7 +164,7 @@ impl DaemonClient {
         let _guard = span.enter();
         record_trace_id(&span);
         let propagation_headers = current_trace_headers();
-        let response = RUNTIME.block_on(async {
+        let response = runtime.block_on(async {
             let mut request = self
                 .http
                 .delete(&url)

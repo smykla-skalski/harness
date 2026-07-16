@@ -5,10 +5,12 @@ use fs_err as fs;
 use tempfile::tempdir;
 
 use super::operations::{
-    best_effort_bootout, install_launch_agent_with, remove_launch_agent_with,
-    restart_launch_agent_with,
+    best_effort_bootout, install_launch_agent_with_platform, remove_launch_agent_with_platform,
+    restart_launch_agent_with_platform,
 };
-use super::status::{LaunchctlPrintStatus, launch_agent_status_with, parse_launchctl_print};
+use super::status::{
+    LaunchctlPrintStatus, launch_agent_status_with_platform, parse_launchctl_print,
+};
 use super::support::{
     CommandOutput, launchd_domain_target, launchd_service_target, launchd_service_target_for,
 };
@@ -56,28 +58,32 @@ fn launch_agent_install_and_remove_round_trip() {
             ),
         ],
         || {
-            let path = install_launch_agent_with(Path::new("/tmp/harness-bin"), &runner)
-                .expect("install launch agent");
+            let path =
+                install_launch_agent_with_platform(Path::new("/tmp/harness-bin"), &runner, true)
+                    .expect("install launch agent");
             assert_eq!(path, state::launch_agent_path());
             assert!(path.is_file());
 
-            let status = launch_agent_status_with(&|args| {
-                if args.first().is_some_and(|value| value == "print") {
-                    return Ok(CommandOutput {
-                        exit_code: 0,
-                        stdout: format!(
-                            r"{service} = {{
+            let status = launch_agent_status_with_platform(
+                &|args| {
+                    if args.first().is_some_and(|value| value == "print") {
+                        return Ok(CommandOutput {
+                            exit_code: 0,
+                            stdout: format!(
+                                r"{service} = {{
     state = running
     pid = 4242
     last exit code = 0
 }}",
-                            service = launchd_service_target()
-                        ),
-                        stderr: String::new(),
-                    });
-                }
-                runner(args)
-            });
+                                service = launchd_service_target()
+                            ),
+                            stderr: String::new(),
+                        });
+                    }
+                    runner(args)
+                },
+                true,
+            );
             assert!(status.installed);
             assert!(status.loaded);
             assert_eq!(status.label, LAUNCH_AGENT_LABEL);
@@ -90,7 +96,7 @@ fn launch_agent_install_and_remove_round_trip() {
             assert!(plist.contains("daemon"));
             assert!(plist.contains("serve"));
 
-            assert!(remove_launch_agent_with(&runner).expect("remove launch agent"));
+            assert!(remove_launch_agent_with_platform(&runner, true).expect("remove launch agent"));
             assert!(!path.exists());
             assert!(
                 calls
@@ -139,8 +145,9 @@ fn install_launch_agent_removes_legacy_plist() {
                 .expect("create legacy launch agent dir");
             fs::write(&legacy_path, "legacy plist").expect("write legacy plist");
 
-            let path = install_launch_agent_with(Path::new("/tmp/harness-bin"), &runner)
-                .expect("install launch agent");
+            let path =
+                install_launch_agent_with_platform(Path::new("/tmp/harness-bin"), &runner, true)
+                    .expect("install launch agent");
 
             assert!(path.is_file());
             assert!(!legacy_path.exists());
@@ -184,7 +191,7 @@ fn restart_launch_agent_uses_existing_plist() {
                 .expect("create launch agent dir");
             fs::write(&path, "plist").expect("write plist");
 
-            restart_launch_agent_with(&runner).expect("restart launch agent");
+            restart_launch_agent_with_platform(&runner, true).expect("restart launch agent");
 
             let calls = calls.lock().expect("lock");
             assert_eq!(
@@ -255,9 +262,12 @@ fn restart_launch_agent_requires_installed_plist() {
             ),
         ],
         || {
-            let error = restart_launch_agent_with(&|_args| {
-                panic!("runner should not be called when plist is missing");
-            })
+            let error = restart_launch_agent_with_platform(
+                &|_args| {
+                    panic!("runner should not be called when plist is missing");
+                },
+                true,
+            )
             .expect_err("restart should fail without a plist");
             assert!(
                 error
@@ -289,14 +299,17 @@ fn parse_launchctl_print_extracts_runtime_fields() {
 
 #[test]
 fn launch_agent_status_marks_missing_service_as_not_loaded() {
-    let status = launch_agent_status_with(&|args| {
-        assert_eq!(args.first().map(String::as_str), Some("print"));
-        Ok(CommandOutput {
-            exit_code: 1,
-            stdout: String::new(),
-            stderr: "Could not find service \"io.harness.daemon\"".to_string(),
-        })
-    });
+    let status = launch_agent_status_with_platform(
+        &|args| {
+            assert_eq!(args.first().map(String::as_str), Some("print"));
+            Ok(CommandOutput {
+                exit_code: 1,
+                stdout: String::new(),
+                stderr: "Could not find service \"io.harness.daemon\"".to_string(),
+            })
+        },
+        true,
+    );
     assert!(!status.loaded);
     assert!(status.status_error.is_none());
 }
@@ -318,37 +331,40 @@ fn launch_agent_status_coalesces_legacy_runtime_into_current_contract() {
                 .expect("create legacy launch agent dir");
             fs::write(&legacy_path, "legacy plist").expect("write legacy plist");
 
-            let status = launch_agent_status_with(&|args| {
-                assert_eq!(args.first().map(String::as_str), Some("print"));
+            let status = launch_agent_status_with_platform(
+                &|args| {
+                    assert_eq!(args.first().map(String::as_str), Some("print"));
 
-                if args
-                    .get(1)
-                    .is_some_and(|value| value == &launchd_service_target())
-                {
-                    return Ok(CommandOutput {
-                        exit_code: 1,
-                        stdout: String::new(),
-                        stderr: "Could not find service".to_string(),
-                    });
-                }
+                    if args
+                        .get(1)
+                        .is_some_and(|value| value == &launchd_service_target())
+                    {
+                        return Ok(CommandOutput {
+                            exit_code: 1,
+                            stdout: String::new(),
+                            stderr: "Could not find service".to_string(),
+                        });
+                    }
 
-                assert_eq!(
-                    args.get(1),
-                    Some(&launchd_service_target_for(LEGACY_LAUNCH_AGENT_LABEL))
-                );
-                Ok(CommandOutput {
-                    exit_code: 0,
-                    stdout: format!(
-                        r"{service} = {{
+                    assert_eq!(
+                        args.get(1),
+                        Some(&launchd_service_target_for(LEGACY_LAUNCH_AGENT_LABEL))
+                    );
+                    Ok(CommandOutput {
+                        exit_code: 0,
+                        stdout: format!(
+                            r"{service} = {{
     state = running
     pid = 4242
     last exit code = 0
 }}",
-                        service = launchd_service_target_for(LEGACY_LAUNCH_AGENT_LABEL)
-                    ),
-                    stderr: String::new(),
-                })
-            });
+                            service = launchd_service_target_for(LEGACY_LAUNCH_AGENT_LABEL)
+                        ),
+                        stderr: String::new(),
+                    })
+                },
+                true,
+            );
 
             assert!(status.installed);
             assert!(status.loaded);

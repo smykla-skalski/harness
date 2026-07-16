@@ -63,11 +63,12 @@ fn sandboxed_codex_run_succeeds_immediately_after_bridge_start_with_codex() {
     init_git_repo(&project);
 
     let mock_codex = create_mock_codex(tmp.path());
-    let codex_port = unused_local_port();
+    let codex_port_lease = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port = codex_port_lease.port();
     let codex_port_text = codex_port.to_string();
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
     let _initial_status = wait_for_daemon_ready(&home, &xdg);
-    let mut bridge = spawn_bridge(
+    let mut bridge = spawn_bridge_with_port_lease(
         &home,
         &xdg,
         &[
@@ -78,6 +79,7 @@ fn sandboxed_codex_run_succeeds_immediately_after_bridge_start_with_codex() {
             "--codex-path",
             mock_codex.to_str().expect("utf8 codex path"),
         ],
+        codex_port_lease,
     );
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex"]);
     let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
@@ -139,11 +141,12 @@ fn sandboxed_agent_tui_start_returns_501_when_bridge_excludes_agent_tui() {
     init_git_repo(&project);
 
     let mock_codex = create_mock_codex(tmp.path());
-    let codex_port = unused_local_port();
+    let codex_port_lease = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port = codex_port_lease.port();
     let codex_port_text = codex_port.to_string();
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
     let _initial_status = wait_for_daemon_ready(&home, &xdg);
-    let mut bridge = spawn_bridge(
+    let mut bridge = spawn_bridge_with_port_lease(
         &home,
         &xdg,
         &[
@@ -154,6 +157,7 @@ fn sandboxed_agent_tui_start_returns_501_when_bridge_excludes_agent_tui() {
             "--codex-path",
             mock_codex.to_str().expect("utf8 codex path"),
         ],
+        codex_port_lease,
     );
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex"]);
     let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
@@ -212,11 +216,12 @@ fn sandboxed_agent_tui_start_succeeds_after_http_bridge_reconfigure_enable() {
     init_git_repo(&project);
 
     let mock_codex = create_mock_codex(tmp.path());
-    let codex_port = unused_local_port();
+    let codex_port_lease = TcpPortLease::acquire().expect("reserve codex port");
+    let codex_port = codex_port_lease.port();
     let codex_port_text = codex_port.to_string();
     let mut daemon = spawn_daemon_serve_with_args(&home, &xdg, &["--sandboxed"]);
     let _initial_status = wait_for_daemon_ready(&home, &xdg);
-    let mut bridge = spawn_bridge(
+    let mut bridge = spawn_bridge_with_port_lease(
         &home,
         &xdg,
         &[
@@ -227,6 +232,7 @@ fn sandboxed_agent_tui_start_succeeds_after_http_bridge_reconfigure_enable() {
             "--codex-path",
             mock_codex.to_str().expect("utf8 codex path"),
         ],
+        codex_port_lease,
     );
     let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &["codex"]);
     let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
@@ -336,47 +342,61 @@ fn sandboxed_bridge_reconfigure_disable_agent_tui_requires_force_over_http() {
     );
     assert_eq!(start_status, 200, "unexpected body: {start_body}");
 
-    let (reconfigure_status, reconfigure_body) = post_json(
-        &endpoint,
-        &token,
-        "/v1/bridge/reconfigure",
-        json!({
-            "disable": ["agent-tui"],
-        }),
-    );
-    assert_eq!(
-        reconfigure_status, 409,
-        "unexpected body: {reconfigure_body}"
-    );
-    assert_eq!(reconfigure_body["error"]["code"], "KSRCLI092");
+    assert_disable_without_force_conflicts(&endpoint, &token);
+    force_disable_agent_tui(&endpoint, &token);
+    let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &[]);
+    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
+
+    assert_agent_tui_restart_disabled(&endpoint, &token, &session.session_id);
+
+    let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
     assert!(
-        reconfigure_body["error"]["message"]
+        bridge_stop_output.status.success(),
+        "bridge stop failed: {}",
+        output_text(&bridge_stop_output)
+    );
+    wait_for_child_exit(&mut bridge);
+
+    daemon.kill().expect("kill daemon");
+    wait_for_child_exit(&mut daemon);
+}
+
+fn assert_disable_without_force_conflicts(endpoint: &str, token: &str) {
+    let (status, body) = post_json(
+        endpoint,
+        token,
+        "/v1/bridge/reconfigure",
+        json!({ "disable": ["agent-tui"] }),
+    );
+    assert_eq!(status, 409, "unexpected body: {body}");
+    assert_eq!(body["error"]["code"], "KSRCLI092");
+    assert!(
+        body["error"]["message"]
             .as_str()
             .is_some_and(|message| message.contains("--force")),
-        "unexpected body: {reconfigure_body}"
+        "unexpected body: {body}"
     );
+}
 
-    let (forced_status, forced_body) = post_json(
-        &endpoint,
-        &token,
+fn force_disable_agent_tui(endpoint: &str, token: &str) {
+    let (status, body) = post_json(
+        endpoint,
+        token,
         "/v1/bridge/reconfigure",
         json!({
             "disable": ["agent-tui"],
             "force": true,
         }),
     );
-    assert_eq!(forced_status, 200, "unexpected body: {forced_body}");
-    assert!(forced_body["capabilities"]["agent-tui"].is_null());
-    let _bridge_status = wait_for_bridge_capabilities(&home, &xdg, &[]);
-    let _daemon_ready = wait_for_daemon_ready(&home, &xdg);
+    assert_eq!(status, 200, "unexpected body: {body}");
+    assert!(body["capabilities"]["agent-tui"].is_null());
+}
 
+fn assert_agent_tui_restart_disabled(endpoint: &str, token: &str, session_id: &str) {
     let (restart_status, restart_body) = post_json(
-        &endpoint,
-        &token,
-        &format!(
-            "/v1/sessions/{}/managed-agents/terminal",
-            session.session_id
-        ),
+        endpoint,
+        token,
+        &format!("/v1/sessions/{session_id}/managed-agents/terminal"),
         json!({
             "runtime": "codex",
             "name": "Excluded again",
@@ -389,15 +409,4 @@ fn sandboxed_bridge_reconfigure_disable_agent_tui_requires_force_over_http() {
     assert_eq!(restart_status, 501, "unexpected body: {restart_body}");
     assert_eq!(restart_body["error"], "sandbox-disabled");
     assert_eq!(restart_body["feature"], "agent-tui.host-bridge");
-
-    let bridge_stop_output = run_harness(&home, &xdg, &["bridge", "stop"]);
-    assert!(
-        bridge_stop_output.status.success(),
-        "bridge stop failed: {}",
-        output_text(&bridge_stop_output)
-    );
-    wait_for_child_exit(&mut bridge);
-
-    daemon.kill().expect("kill daemon");
-    wait_for_child_exit(&mut daemon);
 }
