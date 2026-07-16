@@ -152,7 +152,7 @@ async fn status_from_state(
         let control = db.task_board_automation_control().await?;
         (
             control.desired_mode != TaskBoardAutomationDesiredMode::Off,
-            control.admission_state != TaskBoardAutomationAdmissionState::Stopped,
+            control.admission_state == TaskBoardAutomationAdmissionState::Accepting,
         )
     } else {
         (state.enabled, state.running)
@@ -185,6 +185,8 @@ mod tests {
     use sqlx::query_scalar;
 
     use super::*;
+    use crate::daemon::db::{TaskBoardAutomationRunAdmission, TaskBoardRunAcquireRequest};
+    use crate::task_board::{TaskBoardAutomationRunTrigger, TaskBoardAutomationScope};
 
     #[test]
     fn step_mode_selects_step_admission() {
@@ -250,5 +252,49 @@ mod tests {
             control.admission_state,
             TaskBoardAutomationAdmissionState::Stopped
         );
+    }
+
+    #[tokio::test]
+    async fn durable_status_is_not_running_while_control_is_draining() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+            .await
+            .expect("open database");
+        let now = Utc::now();
+        db.start_task_board_automation(TaskBoardAutomationDesiredMode::Continuous, now)
+            .await
+            .expect("start automation");
+        let admission = db
+            .try_acquire_task_board_automation_run(&TaskBoardRunAcquireRequest {
+                run_id: "run-status-draining".into(),
+                trigger: TaskBoardAutomationRunTrigger::Scheduled,
+                actor: Some("scheduler-test".into()),
+                dry_run: false,
+                scope: TaskBoardAutomationScope::default(),
+                lease_owner: "scheduler-test-owner".into(),
+                now,
+            })
+            .await
+            .expect("acquire active run");
+        assert!(matches!(
+            admission,
+            TaskBoardAutomationRunAdmission::Acquired(_)
+        ));
+        db.stop_task_board_automation(Utc::now())
+            .await
+            .expect("start draining");
+
+        let status = status_from_state(
+            &db,
+            db.task_board_orchestrator_state()
+                .await
+                .expect("load orchestrator state"),
+            true,
+        )
+        .await
+        .expect("load durable status");
+
+        assert!(!status.enabled);
+        assert!(!status.running);
     }
 }
