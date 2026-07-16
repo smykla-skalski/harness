@@ -142,7 +142,7 @@ extension PreviewHarnessClient {
 
 extension TaskBoardStatus {
   private static let previewTaskStatusByBoardStatus: [Self: TaskStatus] = [
-    .umbrella: .open,
+    .backlog: .open,
     .todo: .open,
     .planning: .open,
     .agenticReview: .open,

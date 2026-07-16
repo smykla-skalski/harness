@@ -7,6 +7,8 @@ use super::*;
 use crate::task_board::store::TaskBoardStore;
 use crate::task_board::types::{ExternalRefSyncState, TaskBoardItem, TaskBoardStatus};
 
+mod status_roundtrip_tests;
+
 #[tokio::test]
 async fn push_updates_existing_linked_remote_and_records_changed_fields() {
     let temp = tempdir().expect("tempdir");
@@ -48,6 +50,7 @@ async fn push_updates_existing_linked_remote_and_records_changed_fields() {
         .as_ref()
         .expect("sync state");
     assert_eq!(state.title.as_deref(), Some("Local title"));
+    assert_eq!(state.status, Some(TaskBoardStatus::Backlog));
 }
 
 #[tokio::test]
@@ -68,7 +71,7 @@ async fn both_direction_reports_conflict_by_default_without_writing() {
             "remote-1",
             "Remote edit",
             "Old body",
-            TaskBoardStatus::Todo,
+            TaskBoardStatus::Backlog,
         )],
     ))];
 
@@ -111,7 +114,7 @@ async fn prefer_remote_applies_remote_conflict_side() {
             "remote-1",
             "Remote edit",
             "Old body",
-            TaskBoardStatus::Todo,
+            TaskBoardStatus::Backlog,
         )],
     ))];
 
@@ -156,7 +159,7 @@ async fn prefer_local_updates_remote_conflict_side() {
             "remote-1",
             "Remote edit",
             "Old body",
-            TaskBoardStatus::Todo,
+            TaskBoardStatus::Backlog,
         )],
     );
     let updates = client.updates.clone();

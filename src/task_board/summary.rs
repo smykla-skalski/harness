@@ -238,7 +238,7 @@ fn is_github_repo(project_id: &str) -> bool {
 
 fn status_counts(items: &[TaskBoardItem]) -> Vec<TaskBoardStatusCount> {
     let statuses = [
-        TaskBoardStatus::Umbrella,
+        TaskBoardStatus::Backlog,
         TaskBoardStatus::Todo,
         TaskBoardStatus::Planning,
         TaskBoardStatus::InProgress,

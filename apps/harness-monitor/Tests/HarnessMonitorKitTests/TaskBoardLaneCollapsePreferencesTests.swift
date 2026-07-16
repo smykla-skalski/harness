@@ -70,4 +70,15 @@ struct TaskBoardLaneCollapsePreferencesTests {
       )
     )
   }
+
+  @Test("Legacy Umbrella override loads as Backlog and writes canonically")
+  func legacyUmbrellaOverrideLoadsAsBacklogAndWritesCanonically() {
+    let overrides = TaskBoardLaneCollapsePreferences.overrides(
+      from: #"{"umbrella":false}"#
+    )
+    let canonicalRawValue = TaskBoardLaneCollapsePreferences.rawValue(for: overrides)
+
+    #expect(overrides[.backlog] == false)
+    #expect(canonicalRawValue == #"{"backlog":false}"#)
+  }
 }

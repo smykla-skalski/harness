@@ -28,7 +28,7 @@ use errors::{github_sync_error_with_context, warn_github_message};
 pub use inbox::GitHubInboxSyncClient;
 pub(crate) use review_projection::{
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
-    reconciled_review_status,
+    reconciled_external_status,
 };
 #[derive(Clone)]
 pub struct GitHubSyncClient {
@@ -372,7 +372,7 @@ fn github_issue_search_status(state: &str) -> TaskBoardStatus {
     if state.eq_ignore_ascii_case("closed") {
         TaskBoardStatus::Done
     } else {
-        TaskBoardStatus::Todo
+        TaskBoardStatus::Backlog
     }
 }
 
@@ -401,7 +401,7 @@ fn github_inbox_issue_status(state: &str) -> TaskBoardStatus {
     if state.eq_ignore_ascii_case("closed") {
         TaskBoardStatus::Done
     } else {
-        TaskBoardStatus::Todo
+        TaskBoardStatus::Backlog
     }
 }
 
@@ -444,4 +444,15 @@ pub(super) fn search_label_matches_filter(
             .iter()
             .any(|wanted| name.eq_ignore_ascii_case(wanted.trim()))
     })
+}
+
+#[cfg(test)]
+mod status_tests {
+    use super::*;
+
+    #[test]
+    fn github_issue_search_status_maps_open_to_backlog_and_closed_to_done() {
+        assert_eq!(github_issue_search_status("OPEN"), TaskBoardStatus::Backlog);
+        assert_eq!(github_issue_search_status("closed"), TaskBoardStatus::Done);
+    }
 }

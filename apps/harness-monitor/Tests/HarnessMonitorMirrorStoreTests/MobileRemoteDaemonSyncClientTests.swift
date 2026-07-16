@@ -127,6 +127,11 @@ final class MobileRemoteDaemonSyncClientTests: XCTestCase {
     )
     XCTAssertEqual(futureItem.statusTitle, "future_status")
     XCTAssertEqual(futureItem.priorityTitle, "hyper_priority")
+    let legacyItem = try XCTUnwrap(
+      snapshot.taskBoardItems.first { $0.id == "board-legacy-umbrella" }
+    )
+    XCTAssertEqual(legacyItem.status, "backlog")
+    XCTAssertEqual(legacyItem.statusTitle, "Backlog")
     XCTAssertEqual(snapshot.stations.first?.needsYouCount, 2)
     XCTAssertEqual(snapshot.needsYouCount, 2)
   }
@@ -459,6 +464,17 @@ private let taskBoardResponse = """
         "agent_mode": "headless",
         "created_at": "2026-07-10T12:00:00Z",
         "updated_at": "2026-07-10T13:03:00Z"
+      },
+      {
+        "schema_version": 1,
+        "id": "board-legacy-umbrella",
+        "title": "Legacy status",
+        "body": "",
+        "status": "umbrella",
+        "priority": "medium",
+        "agent_mode": "headless",
+        "created_at": "2026-07-10T12:00:00Z",
+        "updated_at": "2026-07-10T13:04:00Z"
       }
     ]
   }

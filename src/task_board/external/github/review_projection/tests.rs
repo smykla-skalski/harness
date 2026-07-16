@@ -3,70 +3,13 @@ use tempfile::tempdir;
 use super::*;
 use crate::task_board::types::{ExternalRefSyncState, PlanningState, TaskBoardItem};
 
+mod status_tests;
+
 fn review_sync_state(status: TaskBoardStatus, updated_at: &str) -> ExternalRefSyncState {
     ExternalRefSyncState {
         status: Some(status),
         updated_at: Some(updated_at.to_owned()),
         ..ExternalRefSyncState::default()
-    }
-}
-
-#[test]
-fn review_status_reconciliation_uses_the_last_sync_as_shared_truth() {
-    assert_eq!(
-        reconciled_review_status(
-            TaskBoardStatus::InProgress,
-            Some(TaskBoardStatus::Todo),
-            TaskBoardStatus::Todo,
-        ),
-        TaskBoardStatus::InProgress
-    );
-    assert_eq!(
-        reconciled_review_status(
-            TaskBoardStatus::Todo,
-            Some(TaskBoardStatus::Todo),
-            TaskBoardStatus::Done,
-        ),
-        TaskBoardStatus::Done
-    );
-    assert_eq!(
-        reconciled_review_status(
-            TaskBoardStatus::InProgress,
-            Some(TaskBoardStatus::Todo),
-            TaskBoardStatus::Done,
-        ),
-        TaskBoardStatus::InProgress
-    );
-    assert_eq!(
-        reconciled_review_status(
-            TaskBoardStatus::Done,
-            Some(TaskBoardStatus::Done),
-            TaskBoardStatus::Todo,
-        ),
-        TaskBoardStatus::Todo
-    );
-    assert_eq!(
-        reconciled_review_status(TaskBoardStatus::Todo, None, TaskBoardStatus::Done),
-        TaskBoardStatus::Done
-    );
-    assert_eq!(
-        reconciled_review_status(TaskBoardStatus::InProgress, None, TaskBoardStatus::Done),
-        TaskBoardStatus::InProgress
-    );
-}
-
-#[test]
-fn review_status_reconciliation_canonicalizes_legacy_shared_truth() {
-    for (current, last_synced) in [
-        (TaskBoardStatus::Todo, TaskBoardStatus::New),
-        (TaskBoardStatus::AgenticReview, TaskBoardStatus::PlanReview),
-        (TaskBoardStatus::HumanRequired, TaskBoardStatus::NeedsYou),
-        (TaskBoardStatus::Failed, TaskBoardStatus::Blocked),
-    ] {
-        assert_eq!(
-            reconciled_review_status(current, Some(last_synced), TaskBoardStatus::Done),
-            TaskBoardStatus::Done
-        );
     }
 }
 
@@ -183,7 +126,7 @@ fn active_review_request_preserves_local_workflow_progress() {
         external_id: "example/repo#42".into(),
         url: Some("https://github.com/example/repo/pull/42".into()),
         sync_state: Some(review_sync_state(
-            TaskBoardStatus::Todo,
+            TaskBoardStatus::Backlog,
             "2026-07-11T10:00:00Z",
         )),
     }];
@@ -272,7 +215,7 @@ fn completed_remote_review_does_not_interrupt_active_execution() {
         external_id: "example/repo#42".into(),
         url: Some("https://github.com/example/repo/pull/42".into()),
         sync_state: Some(review_sync_state(
-            TaskBoardStatus::Todo,
+            TaskBoardStatus::Backlog,
             "2026-07-11T10:00:00Z",
         )),
     }];
@@ -328,7 +271,7 @@ fn candidate_projection_reloads_refs_edited_after_listing() {
         external_id: "example/repo#42".into(),
         url: Some("https://github.com/example/repo/pull/42".into()),
         sync_state: Some(review_sync_state(
-            TaskBoardStatus::Todo,
+            TaskBoardStatus::Backlog,
             "2026-07-11T10:00:00Z",
         )),
     }];
@@ -413,7 +356,7 @@ fn active_imported_reviews_are_discovered_for_exact_resolution() {
         external_id: "Example/Repo#42".into(),
         url: Some("https://github.com/Example/Repo/pull/42".into()),
         sync_state: Some(review_sync_state(
-            TaskBoardStatus::Todo,
+            TaskBoardStatus::Backlog,
             "2026-07-11T10:00:00Z",
         )),
     }];

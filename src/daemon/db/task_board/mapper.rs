@@ -4,10 +4,7 @@ use serde_json::Value;
 
 use super::rows::{ExternalRefRow, ItemRow, MachineRow};
 use crate::daemon::db::{CliError, db_error};
-use crate::task_board::{
-    AgentMode, ExternalRef, ExternalRefProvider, Machine, PlanningState, TaskBoardItem,
-    TaskBoardPriority, TaskBoardStatus, TaskBoardWorkflowKind, TaskBoardWorkflowState, TaskUsage,
-};
+use crate::task_board::{ExternalRef, Machine, TaskBoardItem};
 
 pub(super) fn item_from_rows(
     row: ItemRow,
@@ -98,17 +95,4 @@ pub(super) fn label<T: Serialize>(value: T, context: &str) -> Result<String, Cli
 fn parse_label<T: DeserializeOwned>(value: &str, context: &str) -> Result<T, CliError> {
     serde_json::from_value(Value::String(value.to_owned()))
         .map_err(|error| db_error(format!("parse {context}: {error}")))
-}
-
-#[allow(dead_code)]
-fn assert_mapper_types_are_used(
-    _status: TaskBoardStatus,
-    _priority: TaskBoardPriority,
-    _mode: AgentMode,
-    _workflow_kind: TaskBoardWorkflowKind,
-    _provider: ExternalRefProvider,
-    _planning: PlanningState,
-    _workflow: TaskBoardWorkflowState,
-    _usage: TaskUsage,
-) {
 }

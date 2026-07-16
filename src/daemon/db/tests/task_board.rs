@@ -114,6 +114,73 @@ async fn task_board_items_round_trip_and_mutate_atomically() {
 }
 
 #[tokio::test]
+async fn v36_umbrella_rows_open_and_rewrite_as_backlog() {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join("harness.db");
+    {
+        let db = DaemonDb::open(&path).expect("create current database");
+        db.connection()
+            .execute_batch(
+                "INSERT INTO task_board_items (
+                     item_id, schema_version, title, body, status, priority, tags_json,
+                     project_id, target_project_types_json, agent_mode, imported_from_provider,
+                     planning_json, workflow_json, session_id, work_item_id, usage_json,
+                     created_at, updated_at, deleted_at, revision, workflow_kind
+                 ) VALUES (
+                     'legacy-umbrella', 1, 'Legacy', '', 'umbrella', 'medium', '[]',
+                     NULL, '[]', 'headless', 'github', '{}', '{}', NULL, NULL, '{}',
+                     '2026-07-16T00:00:00Z', '2026-07-16T00:00:00Z', NULL, 1, 'review'
+                 );
+                 INSERT INTO task_board_external_refs (
+                     item_id, position, provider, external_id, sync_state_json
+                 ) VALUES (
+                     'legacy-umbrella', 0, 'github', '42', '{\"status\":\"umbrella\"}'
+                 );
+                 UPDATE schema_meta SET value = '36' WHERE key = 'version';",
+            )
+            .expect("seed v36 umbrella rows");
+    }
+
+    let db = AsyncDaemonDb::connect(&path)
+        .await
+        .expect("open migrated database");
+    let loaded = db
+        .task_board_item("legacy-umbrella")
+        .await
+        .expect("load migrated item");
+    assert_eq!(loaded.status, TaskBoardStatus::Backlog);
+    assert_eq!(
+        loaded.external_refs[0]
+            .sync_state
+            .as_ref()
+            .and_then(|state| state.status),
+        Some(TaskBoardStatus::Backlog)
+    );
+    db.update_task_board_item("legacy-umbrella", |item| {
+        item.title = "Canonical".to_string();
+        Ok(true)
+    })
+    .await
+    .expect("rewrite migrated item")
+    .expect("item changed");
+    drop(db);
+
+    let conn = Connection::open(&path).expect("inspect migrated database");
+    let (status, sync_status): (String, String) = conn
+        .query_row(
+            "SELECT item.status, json_extract(reference.sync_state_json, '$.status')
+             FROM task_board_items AS item
+             JOIN task_board_external_refs AS reference ON reference.item_id = item.item_id
+             WHERE item.item_id = 'legacy-umbrella'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("read canonical status values");
+    assert_eq!(status, "backlog");
+    assert_eq!(sync_status, "backlog");
+}
+
+#[tokio::test]
 async fn task_board_singletons_and_machine_registry_round_trip() {
     let dir = tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))

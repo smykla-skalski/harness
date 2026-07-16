@@ -10,7 +10,7 @@ struct TaskBoardInboxTests {
   func inboxLanesUseGlobalBoardOrdering() {
     #expect(
       TaskBoardInboxLane.allCases == [
-        .umbrella,
+        .backlog,
         .todo,
         .planning,
         .inProgress,
@@ -90,7 +90,7 @@ struct TaskBoardInboxTests {
       ])
     #expect(
       snapshot.items.map(\.lane) == [
-        .todo,
+        .backlog,
         .todo,
         .inProgress,
         .toReview,
@@ -111,9 +111,19 @@ struct TaskBoardInboxTests {
     #expect(TaskBoardInboxLane(status: TaskStatus.awaitingReview) == .toReview)
     #expect(TaskBoardInboxLane(status: TaskStatus.inReview) == .inReview)
     #expect(TaskBoardInboxLane(status: TaskStatus.inProgress) == .inProgress)
-    #expect(TaskBoardInboxLane(status: TaskStatus.open) == .todo)
+    #expect(TaskBoardInboxLane(status: TaskStatus.open) == .backlog)
     #expect(TaskBoardInboxLane(status: TaskStatus.done) == nil)
 
+    #expect(
+      TaskBoardInboxLane(
+        task: makeTask(
+          id: "unassigned",
+          status: .open,
+          severity: .medium,
+          updatedAt: "2026-05-14T08:00:00Z"
+        )
+      ) == .backlog
+    )
     #expect(
       TaskBoardInboxLane(
         task: makeTask(
@@ -140,7 +150,7 @@ struct TaskBoardInboxTests {
 
   @Test("Task board item status maps to global board lanes")
   func taskBoardItemStatusMapsToGlobalBoardLanes() {
-    #expect(TaskBoardInboxLane(status: TaskBoardStatus.umbrella) == .umbrella)
+    #expect(TaskBoardInboxLane(status: TaskBoardStatus.backlog) == .backlog)
     #expect(TaskBoardInboxLane(status: TaskBoardStatus.todo) == .todo)
     #expect(TaskBoardInboxLane(status: TaskBoardStatus.planning) == .planning)
     #expect(TaskBoardInboxLane(status: TaskBoardStatus.inProgress) == .inProgress)

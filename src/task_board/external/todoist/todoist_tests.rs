@@ -36,6 +36,10 @@ fn todoist_status_endpoint_closes_done_and_reopens_other_statuses() {
         status_endpoint("task-1", TaskBoardStatus::Todo),
         "tasks/task-1/reopen"
     );
+    assert_eq!(
+        status_endpoint("task-1", TaskBoardStatus::Backlog),
+        "tasks/task-1/reopen"
+    );
 }
 
 #[tokio::test]
@@ -187,6 +191,7 @@ async fn todoist_pull_drops_tasks_outside_project_filter() {
     handle.join().expect("mock server");
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].reference.external_id, "a");
+    assert_eq!(tasks[0].status, TaskBoardStatus::Backlog);
     assert_eq!(tasks[0].project_id.as_deref(), Some("proj-keep"));
 }
 

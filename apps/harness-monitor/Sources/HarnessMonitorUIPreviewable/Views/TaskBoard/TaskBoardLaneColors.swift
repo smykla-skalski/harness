@@ -35,7 +35,7 @@ func taskBoardStatusColor(for status: TaskBoardStatus) -> Color {
     HarnessMonitorTheme.danger
   case .planning, .inProgress:
     HarnessMonitorTheme.warmAccent
-  case .umbrella, .new, .todo:
+  case .backlog, .new, .todo:
     HarnessMonitorTheme.accent
   case .done:
     HarnessMonitorTheme.secondaryInk

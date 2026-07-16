@@ -242,6 +242,33 @@ fn settings_read_repairs_legacy_dispatch_status_filter_on_disk() {
 }
 
 #[test]
+fn settings_read_repairs_umbrella_filter_to_backlog_on_disk() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("board");
+    fs::create_dir_all(&root).expect("create board root");
+    let settings_path = root.join(SETTINGS_FILE);
+    fs::write(
+        &settings_path,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "dispatch_status_filter": "umbrella"
+        }))
+        .expect("serialize settings"),
+    )
+    .expect("write settings");
+    let orchestrator = TaskBoardOrchestrator::new(root);
+
+    let settings = orchestrator.settings().expect("load settings");
+
+    assert_eq!(
+        settings.dispatch_status_filter,
+        Some(TaskBoardStatus::Backlog)
+    );
+    let contents = fs::read_to_string(settings_path).expect("read repaired settings");
+    assert!(contents.contains("\"dispatch_status_filter\": \"backlog\""));
+    assert!(!contents.contains("\"dispatch_status_filter\": \"umbrella\""));
+}
+
+#[test]
 fn settings_update_writes_current_dispatch_status_filter() {
     let temp = tempdir().expect("tempdir");
     let root = temp.path().join("board");

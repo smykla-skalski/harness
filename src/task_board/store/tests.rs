@@ -8,6 +8,9 @@ use crate::task_board::types::{
 };
 use fs_err as fs;
 
+#[path = "legacy_umbrella_tests.rs"]
+mod legacy_umbrella_tests;
+
 fn seed_item(store: &TaskBoardStore, id: &str, title: &str) {
     let item = TaskBoardItem::new(
         id.into(),
@@ -243,7 +246,7 @@ fn list_keeps_filter_and_sort_across_parallel_parse() {
         item.status = if index % 2 == 0 {
             TaskBoardStatus::InProgress
         } else {
-            TaskBoardStatus::Umbrella
+            TaskBoardStatus::Backlog
         };
         item.priority = TaskBoardPriority::High;
         store

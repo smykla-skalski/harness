@@ -456,8 +456,46 @@ fn apply_optional_patch<T>(target: &mut Option<T>, patch: OptionalFieldPatch<T>)
 
 pub(crate) fn read_path(path: &Path) -> Result<TaskBoardItem, CliError> {
     let text = io::read_text(path)?;
-    let parsed = io::parse_frontmatter::<TaskBoardFrontmatter>(&text, &path.display().to_string())?;
-    Ok(parsed.frontmatter.into_item(parsed.body))
+    let label = path.display().to_string();
+    let parsed = io::parse_frontmatter::<serde_json::Value>(&text, &label)?;
+    let mut document = parsed.frontmatter;
+    normalize_legacy_umbrella_statuses(&mut document);
+    let frontmatter: TaskBoardFrontmatter = serde_json::from_value(document)
+        .map_err(|error| CliErrorKind::workflow_parse(format!("{label} frontmatter: {error}")))?;
+    Ok(frontmatter.into_item(parsed.body))
+}
+
+fn normalize_legacy_umbrella_statuses(document: &mut serde_json::Value) {
+    let Some(frontmatter) = document.as_object_mut() else {
+        return;
+    };
+    if let Some(status) = frontmatter.get_mut("status") {
+        normalize_legacy_status(status);
+    }
+    let Some(external_refs) = frontmatter
+        .get_mut("external_refs")
+        .and_then(serde_json::Value::as_array_mut)
+    else {
+        return;
+    };
+    for external_ref in external_refs {
+        let Some(sync_state) = external_ref
+            .as_object_mut()
+            .and_then(|mapping| mapping.get_mut("sync_state"))
+            .and_then(serde_json::Value::as_object_mut)
+        else {
+            continue;
+        };
+        if let Some(status) = sync_state.get_mut("status") {
+            normalize_legacy_status(status);
+        }
+    }
+}
+
+fn normalize_legacy_status(value: &mut serde_json::Value) {
+    if value.as_str() == Some("umbrella") {
+        *value = serde_json::Value::String("backlog".to_string());
+    }
 }
 
 #[cfg(test)]

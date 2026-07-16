@@ -366,7 +366,7 @@ enum TaskBoardOverviewItemBehavior {
 extension TaskBoardInboxLane {
   var taskDropStatus: TaskStatus? {
     switch self {
-    case .umbrella, .todo, .planning:
+    case .backlog, .todo, .planning:
       .open
     case .inProgress:
       .inProgress
@@ -383,8 +383,8 @@ extension TaskBoardInboxLane {
 
   var taskBoardDropStatus: TaskBoardStatus {
     switch self {
-    case .umbrella:
-      .umbrella
+    case .backlog:
+      .backlog
     case .todo:
       .todo
     case .planning:

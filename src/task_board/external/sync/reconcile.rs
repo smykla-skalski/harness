@@ -3,11 +3,9 @@ use crate::task_board::external::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalTask, ExternalTaskRef,
 };
 use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
-use crate::task_board::types::{
-    ExternalRef, ExternalRefProvider, ExternalRefSyncState, TaskBoardItem, TaskBoardStatus,
-};
+use crate::task_board::types::{ExternalRef, ExternalRefSyncState, TaskBoardItem, TaskBoardStatus};
 
-use super::super::github::reconciled_review_status;
+use super::super::github::reconciled_external_status;
 use super::merge::{
     changed_fields, external_ref_matches, matching_ref, pull_conflict_fields, sync_state_from_task,
 };
@@ -120,23 +118,10 @@ fn reconciliation_patch(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardI
 }
 
 fn reconciled_status(item: &TaskBoardItem, task: &ExternalTask) -> TaskBoardStatus {
-    if !is_github_review_request(item, task) {
-        return task.status;
-    }
     let last_synced_status = matching_ref(item, &task.reference, task.project_id.as_deref())
         .and_then(|reference| reference.sync_state.as_ref())
         .and_then(|state| state.status);
-    reconciled_review_status(item.status, last_synced_status, task.status)
-}
-
-fn is_github_review_request(item: &TaskBoardItem, task: &ExternalTask) -> bool {
-    item.imported_from_provider == Some(ExternalRefProvider::GitHub)
-        && task.reference.provider == ExternalProvider::GitHub
-        && task
-            .reference
-            .url
-            .as_deref()
-            .is_some_and(|url| url.contains("/pull/"))
+    reconciled_external_status(item.status, last_synced_status, task.status)
 }
 
 fn has_reconciliation_change(patch: &TaskBoardItemPatch) -> bool {

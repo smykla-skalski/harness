@@ -47,8 +47,7 @@ Common read flag: `--json`.
 Each task carries:
 
 - `id`, `title`, `body`
-- `status`: `new`, `planning`, `plan_review`, `needs_you`, `todo`,
-  `in_progress`, `in_review`, `done`, `blocked`
+- `status`: `backlog`, `todo`, `planning`, `in_progress`, `agentic_review`, `testing`, `in_review`, `to_review`, `human_required`, `failed`, `done`
 - `priority`: `low`, `medium`, `high`, `critical`
 - `agent_mode`: `headless`, `interactive`, `planning`, `evaluate`
 - `tags`, optional `project_id`, external refs, planning metadata, and optional
@@ -66,14 +65,13 @@ Priority maps to dispatch severity when session plans are built:
 ## Status Flow
 
 ```text
-new -> planning -> plan_review -> todo -> in_progress -> in_review -> done
-           |                         |          |
-           v                         v          v
-        blocked                   blocked    blocked
+backlog -> planning -> agentic_review -> todo -> in_progress -> testing -> in_review -> done
+                                               |              |
+                                               v              v
+                                         human_required     failed
 ```
 
-`blocked` means the task cannot proceed without new input, an external
-dependency, or a planning/review decision.
+`backlog` is unprocessed intake. `todo` means the task has been prioritized and ordered for planning approval or dispatch. `human_required` means the task needs human input or a planning/review decision, while `failed` records unsuccessful workflow execution.
 
 Dispatch readiness requires:
 
@@ -85,12 +83,7 @@ Dispatch readiness requires:
 
 The CLI sets `approved_at` when `--approved-by` is provided.
 
-Standard GitHub issue sync still imports repo-scoped `todo` items with a
-synthesized planning summary. The separate GitHub inbox flow for selected repos
-imports issues assigned to you and pull requests requesting your review as
-repo-scoped `todo` items. Imported items still require planning approval before
-dispatch. Review-request inbox items that GitHub no longer reports for you are
-automatically resolved on the next pull sync.
+Standard GitHub issue sync imports new open repo-scoped items into `backlog` with a synthesized planning summary. The separate GitHub inbox flow for selected repos imports new issues assigned to you and pull requests requesting your review into `backlog`. Todoist imports also enter `backlog`. Backlog items are not dispatchable; take an item through planning and approval, which moves the approved prioritized item to `todo`. Existing synced Todo items are not moved automatically. Closed external items map to `done`, and review-request inbox items that GitHub no longer reports for you are automatically resolved on the next pull sync.
 
 ## Intake And Planning
 
@@ -226,11 +219,7 @@ harness task-board orchestrator settings --json
 - `audit` gives total, ready, blocked, and by-status counts.
 - `project` groups local items by `project_id` and ready count.
 - `machine` groups local items by `agent_mode` and ready count.
-- `sync` reports external-provider configuration, linked, pushable, and blocked
-  counts plus previewed/applied operations. `--provider` narrows the provider,
-  `--direction` narrows pull/push intent, and `--apply` persists external
-  changes instead of previewing them. GitHub pull imports preserve `owner/repo`
-  in `project_id` and synthesize dispatch-ready planning approval.
+- `sync` reports external-provider configuration, linked, pushable, and blocked counts plus previewed/applied operations. `--provider` narrows the provider, `--direction` narrows pull/push intent, and `--apply` persists external changes instead of previewing them. GitHub pull imports preserve `owner/repo` in `project_id`, enter `backlog`, and synthesize a planning summary without approving or dispatching the task.
 - `dispatch` reports the session, worker, reviewer, and evaluator intent for
   each selected board item, including readiness block reasons. Daemon HTTP and
   WebSocket dispatch routes use the same executor, so apply/broadcast behavior
@@ -381,8 +370,7 @@ harness task-board policy grant-resolve <grant-id> --deny --actor <actor> --json
 
 - Prefer many small tasks over one broad task. Each task needs one clear close
   condition.
-- Do not dispatch `new`, `planning`, `plan_review`, `needs_you`,
-  `in_progress`, `in_review`, `done`, or `blocked` items.
+- Do not dispatch `backlog`, `planning`, `agentic_review`, `in_progress`, `testing`, `in_review`, `to_review`, `human_required`, `failed`, or `done` items.
 - Do not bypass the planning/review gate by setting `todo` without
   `--planning-summary` and `--approved-by`.
 - Use `delete` for tombstones; do not mutate task-board storage directly.

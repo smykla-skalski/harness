@@ -95,6 +95,7 @@ mod schema_v33;
 mod schema_v34;
 mod schema_v35;
 mod schema_v36;
+mod schema_v37;
 #[allow(dead_code)]
 mod task_board;
 #[allow(unused_imports)]
@@ -296,7 +297,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "36";
+pub(crate) const SCHEMA_VERSION: &str = "37";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

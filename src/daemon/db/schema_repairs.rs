@@ -161,6 +161,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v34::run(&db.conn)?;
     super::schema_v35::run(&db.conn)?;
     super::schema_v36::run(&db.conn)?;
+    super::schema_v37::run(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

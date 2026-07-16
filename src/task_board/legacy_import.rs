@@ -35,6 +35,8 @@ use super::types::{CURRENT_TASK_BOARD_ITEM_VERSION, TaskBoardItem};
 use crate::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io::read_json_typed;
 
+mod status_compat;
+
 const SETTINGS_FILE: &str = "orchestrator-settings.json";
 const STATE_FILE: &str = "orchestrator-state.json";
 const RUNS_FILE: &str = "policy-workflow-runs-v1.json";
@@ -93,7 +95,7 @@ impl LegacyTaskBoardSnapshot {
         let settings_path = root.join(SETTINGS_FILE);
         track_if_file(&settings_path, &mut source_paths)?;
         let settings = parse_persisted_settings_read_only(&settings_path)?.unwrap_or_default();
-        let state = load_optional(root, STATE_FILE, &mut source_paths)?;
+        let state = status_compat::load_orchestrator_state(root, STATE_FILE, &mut source_paths)?;
         let runs: PolicyWorkflowRunsDocument = load_optional(root, RUNS_FILE, &mut source_paths)?;
         ensure_schema(
             RUNS_FILE,

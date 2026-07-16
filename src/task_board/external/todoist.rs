@@ -332,7 +332,7 @@ impl From<TodoistTask> for ExternalTask {
             reference: task.reference(),
             title: task.content,
             body: task.description,
-            status: TaskBoardStatus::Todo,
+            status: TaskBoardStatus::Backlog,
             project_id: task.project_id,
             updated_at: task.updated_at,
         }

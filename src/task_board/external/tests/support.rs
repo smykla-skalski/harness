@@ -95,7 +95,7 @@ pub(super) fn external_task(external_id: &str, title: &str) -> ExternalTask {
         reference: ExternalTaskRef::new(ExternalProvider::Todoist, external_id),
         title: title.to_owned(),
         body: String::new(),
-        status: TaskBoardStatus::Todo,
+        status: TaskBoardStatus::Backlog,
         project_id: None,
         updated_at: None,
     }
@@ -106,7 +106,7 @@ pub(super) fn github_external_task(
     title: &str,
     project_id: &str,
 ) -> ExternalTask {
-    github_external_task_with_status(external_id, title, project_id, TaskBoardStatus::Todo)
+    github_external_task_with_status(external_id, title, project_id, TaskBoardStatus::Backlog)
 }
 
 pub(super) fn github_external_task_with_status(
@@ -152,7 +152,7 @@ fn github_review_request_ref(external_id: &str) -> ExternalRef {
     reference.sync_state = Some(ExternalRefSyncState {
         title: Some("Review requested".to_owned()),
         body: Some("Please review the pull request.".to_owned()),
-        status: Some(TaskBoardStatus::Todo),
+        status: Some(TaskBoardStatus::Backlog),
         project_id: Some("owner/repo".to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_owned()),
         synced_at: Some("2026-05-14T03:00:00Z".to_owned()),

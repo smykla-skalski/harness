@@ -148,7 +148,7 @@ pub enum TaskBoardWorkflowStatus {
 #[value(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum TaskBoardStatus {
-    Umbrella,
+    Backlog,
     #[default]
     Todo,
     Planning,
@@ -274,4 +274,29 @@ pub struct TaskUsage {
 )]
 fn is_zero(value: &u32) -> bool {
     *value == 0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TaskBoardStatus;
+
+    #[test]
+    fn backlog_is_the_canonical_status_wire_value() {
+        assert_eq!(
+            serde_json::to_string(&TaskBoardStatus::Backlog).expect("serialize backlog"),
+            "\"backlog\""
+        );
+        assert_eq!(
+            serde_json::from_str::<TaskBoardStatus>("\"backlog\"").expect("deserialize backlog"),
+            TaskBoardStatus::Backlog
+        );
+    }
+
+    #[test]
+    fn public_status_wire_rejects_legacy_umbrella() {
+        assert!(
+            serde_json::from_str::<TaskBoardStatus>("\"umbrella\"").is_err(),
+            "legacy umbrella is accepted only at persisted-data migration boundaries"
+        );
+    }
 }
