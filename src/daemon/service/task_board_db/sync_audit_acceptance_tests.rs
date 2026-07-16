@@ -81,6 +81,9 @@ async fn requested_partial_batch_records_scope_and_operation_evidence() {
 
     let events = sync_events(&db).await;
     assert_eq!(events.len(), 1);
+    assert_eq!(events[0].severity, "warning");
+    assert_eq!(events[0].outcome, "failure");
+    assert!(events[0].summary.contains("1 failed scope"));
     let payload = payload(&events[0]);
     assert_eq!(payload["operation_count"].as_u64(), Some(1));
     assert_eq!(payload["observed_operation_count"].as_u64(), Some(2));
@@ -256,10 +259,55 @@ async fn orchestrator_records_backoff_once_and_suppresses_unchanged_repeat() {
 
     let events = sync_events(&db).await;
     assert_eq!(events.len(), 1);
+    assert_eq!(events[0].severity, "warning");
+    assert_eq!(events[0].outcome, "waiting");
+    assert!(events[0].summary.contains("backing off"));
     assert_eq!(
         payload(&events[0])["scope_outcomes"][0]["outcome"].as_str(),
         Some("backing_off")
     );
+}
+
+#[tokio::test]
+async fn concurrent_identical_background_audits_persist_once() {
+    let (_dir, db) = open_db().await;
+    let request = TaskBoardSyncRequest::default();
+    let provider_error = CliErrorKind::workflow_io("provider unavailable").into();
+    let batch = batch(
+        Vec::new(),
+        vec![ExternalSyncScopeOutcome::failed(
+            ExternalProvider::GitHub,
+            "acme/api".into(),
+            &provider_error,
+        )],
+        Some(provider_error),
+    );
+    let mut metrics = SyncExecutionMetrics::default();
+    metrics.capture(&batch);
+    let result = batch
+        .into_completed()
+        .map(|completed| sync_summary(completed.operations));
+
+    let (first, second) = tokio::join!(
+        record_request_result(
+            &db,
+            &request,
+            TaskBoardSyncAuditTrigger::Orchestrator,
+            &result,
+            &metrics,
+        ),
+        record_request_result(
+            &db,
+            &request,
+            TaskBoardSyncAuditTrigger::Orchestrator,
+            &result,
+            &metrics,
+        ),
+    );
+
+    first.expect("record initial background failure");
+    second.expect("suppress concurrent duplicate");
+    assert_eq!(sync_events(&db).await.len(), 1);
 }
 
 #[tokio::test]

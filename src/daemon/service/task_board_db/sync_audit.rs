@@ -8,8 +8,8 @@ use crate::task_board::{
 };
 
 use metrics::{add_execution_metrics, add_summary_counts, applied_operation_count, conflict_count};
-use persistence::persist_sync_audit_result;
-use state::{AuditObservation, PendingAudit, plan_audit};
+use persistence::{SyncAuditClassification, persist_sync_audit_result};
+use state::{AuditObservation, PendingAudit, acquire_audit_lane, plan_audit};
 
 #[path = "sync_audit_metrics.rs"]
 mod metrics;
@@ -91,6 +91,7 @@ pub(super) async fn record_request_result(
     result: &Result<TaskBoardSyncResponse, CliError>,
     metrics: &SyncExecutionMetrics,
 ) -> Result<(), CliError> {
+    let _audit_lane = acquire_audit_lane(db, trigger).await;
     let observation = AuditObservation::for_request(result.as_ref().err(), metrics);
     let Some(pending) = plan_audit(db, trigger, observation) else {
         return Ok(());
@@ -101,7 +102,8 @@ pub(super) async fn record_request_result(
     if let Ok(summary) = result {
         add_summary_counts(&mut payload, summary.total, &summary.operations);
     }
-    persist_sync_audit_result(db, trigger, payload, result).await?;
+    let classification = SyncAuditClassification::for_request(result, metrics);
+    persist_sync_audit_result(db, trigger, payload, classification, result).await?;
     pending.commit();
     Ok(())
 }
@@ -130,6 +132,7 @@ async fn record_reviews_result(
     trigger: TaskBoardSyncAuditTrigger,
     result: &Result<ReviewsProjectionAuditSummary, CliError>,
 ) {
+    let _audit_lane = acquire_audit_lane(db, trigger).await;
     let Some(pending) = reviews_pending_audit(db, trigger, result) else {
         return;
     };
@@ -166,7 +169,10 @@ async fn persist_reviews_audit(
     payload: Value,
     result: &Result<ReviewsProjectionAuditSummary, CliError>,
 ) {
-    if let Err(error) = persist_sync_audit_result(db, trigger, payload, result).await {
+    let classification = SyncAuditClassification::for_result(result);
+    if let Err(error) =
+        persist_sync_audit_result(db, trigger, payload, classification, result).await
+    {
         log_reviews_audit_failure(trigger, &error);
         return;
     }

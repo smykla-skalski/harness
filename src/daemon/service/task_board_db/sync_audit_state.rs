@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::sync::{Mutex, OnceLock, PoisonError};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError, Weak};
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
+use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::errors::CliError;
@@ -14,6 +15,9 @@ use super::metrics::{ScopeAuditEvidence, ScopeOutcomeKind, SyncExecutionMetrics}
 const BACKGROUND_FAILURE_REPEAT_INTERVAL: Duration = Duration::from_mins(15);
 
 static BACKGROUND_AUDIT_STATE: OnceLock<Mutex<BackgroundAuditState>> = OnceLock::new();
+static AUDIT_LANES: OnceLock<Mutex<HashMap<AuditLaneKey, Weak<AsyncMutex<()>>>>> = OnceLock::new();
+
+type AuditLaneKey = (u64, TaskBoardSyncAuditTrigger);
 
 #[derive(Debug, Clone)]
 pub(super) struct AuditObservation {
@@ -102,6 +106,23 @@ pub(super) fn plan_audit(
     )
 }
 
+pub(super) async fn acquire_audit_lane(
+    db: &AsyncDaemonDb,
+    trigger: TaskBoardSyncAuditTrigger,
+) -> OwnedMutexGuard<()> {
+    let key = (database_fingerprint(db), trigger);
+    let lane = {
+        let mut lanes = audit_lanes().lock().unwrap_or_else(PoisonError::into_inner);
+        lanes.retain(|_, lane| lane.strong_count() > 0);
+        lanes.get(&key).and_then(Weak::upgrade).unwrap_or_else(|| {
+            let lane = Arc::new(AsyncMutex::new(()));
+            lanes.insert(key, Arc::downgrade(&lane));
+            lane
+        })
+    };
+    lane.lock_owned().await
+}
+
 fn plan_audit_at(
     database_fingerprint: u64,
     trigger: TaskBoardSyncAuditTrigger,
@@ -122,6 +143,10 @@ fn plan_audit_at(
 
 fn background_state() -> &'static Mutex<BackgroundAuditState> {
     BACKGROUND_AUDIT_STATE.get_or_init(|| Mutex::new(BackgroundAuditState::default()))
+}
+
+fn audit_lanes() -> &'static Mutex<HashMap<AuditLaneKey, Weak<AsyncMutex<()>>>> {
+    AUDIT_LANES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 #[derive(Debug, Default)]
