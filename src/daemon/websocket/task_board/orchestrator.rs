@@ -1,3 +1,6 @@
+use std::future::Future;
+use std::pin::Pin;
+
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
@@ -24,7 +27,9 @@ pub(super) async fn dispatch_method(
             Some(dispatch_task_board_orchestrator_stop(request, state).await)
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_RUN_ONCE => {
-            Some(Box::pin(dispatch_task_board_orchestrator_run_once(request, state)).await)
+            let future: Pin<Box<dyn Future<Output = WsResponse> + Send + '_>> =
+                Box::pin(dispatch_task_board_orchestrator_run_once(request, state));
+            Some(future.await)
         }
         ws_methods::TASK_BOARD_ORCHESTRATOR_SETTINGS_GET => {
             Some(dispatch_task_board_orchestrator_settings_get(request, state).await)
