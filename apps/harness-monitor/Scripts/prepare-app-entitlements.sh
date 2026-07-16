@@ -6,6 +6,8 @@ APP_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 
 project_temp_dir="${PROJECT_TEMP_DIR:?missing PROJECT_TEMP_DIR}"
 output_dir="$project_temp_dir/GeneratedAppEntitlements"
+build_invocation_path="$project_temp_dir/HarnessMonitor-daemon-build-invocation.id"
+build_invocation_tmp="$build_invocation_path.staging"
 
 copy_entitlements() {
   local target_name="$1"
@@ -23,6 +25,8 @@ copy_entitlements() {
 }
 
 /bin/mkdir -p "$output_dir"
+/usr/bin/uuidgen >"$build_invocation_tmp"
+/bin/mv -f "$build_invocation_tmp" "$build_invocation_path"
 copy_entitlements "HarnessMonitor" "HarnessMonitor.entitlements"
 copy_entitlements "HarnessMonitorExternalDaemon" "HarnessMonitorExternalDaemon.entitlements"
 copy_entitlements "HarnessMonitorUITestHost" "HarnessMonitorUITestHost.entitlements"

@@ -106,6 +106,10 @@ monitor_shell_scripts=(
   "$ROOT"/apps/harness-monitor/Scripts/*.sh
   "$ROOT"/apps/harness-monitor/Scripts/lib/*.sh
 )
+monitor_python_scripts=(
+  "$ROOT"/apps/harness-monitor/Scripts/*.py
+  "$ROOT"/apps/harness-monitor/Scripts/lib/*.py
+)
 monitor_python_tests_dir="$ROOT/apps/harness-monitor/Scripts/tests"
 monitor_python_tests=("$ROOT"/apps/harness-monitor/Scripts/tests/*.py)
 monitor_python_fast_tests=()
@@ -137,6 +141,9 @@ if [[ "$mode" != "--tests" ]]; then
 
   if (( ${#python_scripts[@]} > 0 )); then
     python3 -m py_compile "${python_scripts[@]}"
+  fi
+  if (( ${#monitor_python_scripts[@]} > 0 )); then
+    python3 -m py_compile "${monitor_python_scripts[@]}"
   fi
   if (( ${#monitor_python_tests[@]} > 0 )); then
     python3 -m py_compile "${monitor_python_tests[@]}"

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 import plistlib
 import subprocess
 import tempfile
@@ -12,6 +14,13 @@ HELPER_PATH = (
 )
 CARGO_HELPER_PATH = (
     Path(__file__).resolve().parents[1] / "lib" / "daemon-cargo-build.sh"
+)
+INPUT_STATE_HELPER_PATH = (
+    Path(__file__).resolve().parents[1] / "lib" / "daemon-input-state.py"
+)
+BUILD_SCRIPT_PATH = Path(__file__).resolve().parents[1] / "build-daemon-agent.sh"
+PREPARE_ENTITLEMENTS_PATH = (
+    Path(__file__).resolve().parents[1] / "prepare-app-entitlements.sh"
 )
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "bundle-daemon-agent.sh"
 DAEMON_INFO_PLIST_PATH = (
@@ -35,8 +44,6 @@ def _isolated_subprocess_env() -> dict:
     real repo where mise's hook-env re-affirms the pinned toolchain instead
     of stripping it; the test repo lacks `.mise.toml`, so unsetting BASH_ENV
     is the equivalent isolation."""
-    import os
-
     isolated = dict(os.environ)
     isolated.pop("BASH_ENV", None)
     return isolated
@@ -73,6 +80,34 @@ def run_build_helper(script: str) -> str:
     return completed.stdout.strip()
 
 
+def _read_source_manifest(path: Path) -> list[Path]:
+    return [
+        Path(os.fsdecode(entry))
+        for entry in path.read_bytes().split(b"\0")
+        if entry
+    ]
+
+
+def _bundle_stamp_lines(daemon_source: Path) -> list[str]:
+    daemon_stat = daemon_source.stat()
+    return [
+        f"daemon_source={daemon_source}",
+        f"daemon_source_stat={int(daemon_stat.st_mtime)}:{daemon_stat.st_size}",
+        "codesign_identity=fake-identity",
+        "timestamp_flag=--timestamp=none",
+        "launch_agent_label=Q498EB36N4.io.harnessmonitor.daemon",
+        "app_group_id=test.group",
+        "marketing_version=1.2.3",
+        "daemon_data_home=/tmp/test-daemon-home",
+        "codex_ws_port=4242",
+        "runtime_lane=test-lane",
+        "daemon_plist_sha=missing",
+        "legacy_managed_plist_sha=missing",
+        "legacy_plist_sha=missing",
+        "entitlements_sha=missing",
+    ]
+
+
 class BundleDaemonAgentScriptTests(unittest.TestCase):
     def test_main_app_test_actions_do_not_skip_bundling(self) -> None:
         script = SCRIPT_PATH.read_text(encoding="utf-8")
@@ -82,6 +117,51 @@ class BundleDaemonAgentScriptTests(unittest.TestCase):
             script,
         )
         self.assertIn("if is_test_bundle_target; then", script)
+
+
+class DaemonInputStateScriptTests(unittest.TestCase):
+    def test_freshness_uses_one_batched_input_state_process(self) -> None:
+        source = CARGO_HELPER_PATH.read_text()
+
+        self.assertTrue(INPUT_STATE_HELPER_PATH.is_file())
+        self.assertIn(
+            '/usr/bin/python3 "$DAEMON_INPUT_STATE_HELPER" state',
+            source,
+        )
+        self.assertNotIn(
+            'shasum -a 256 "$path"',
+            source,
+        )
+
+    def test_prepare_entitlements_rotates_build_invocation_token(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_temp_dir = Path(tmp_dir) / "HarnessMonitor.build"
+            env = _isolated_subprocess_env()
+            env["PROJECT_TEMP_DIR"] = str(project_temp_dir)
+
+            subprocess.run(
+                ["bash", str(PREPARE_ENTITLEMENTS_PATH)],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            token_path = (
+                project_temp_dir / "HarnessMonitor-daemon-build-invocation.id"
+            )
+            first_token = token_path.read_text()
+
+            subprocess.run(
+                ["bash", str(PREPARE_ENTITLEMENTS_PATH)],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            second_token = token_path.read_text()
+
+            self.assertNotEqual(first_token, second_token)
+            self.assertEqual(len(second_token.strip()), 36)
 
 
 class DaemonInfoPlistTests(unittest.TestCase):
@@ -434,7 +514,10 @@ class DaemonStagedBinaryTests(unittest.TestCase):
             self.assertTrue(staged_path.is_file())
             self.assertEqual(staged_path.read_text(), "binary\n")
             self.assertTrue(staged_path.stat().st_mode & 0o111)
-            self.assertTrue(Path(f"{staged_binary}.inputs").is_file())
+            state = json.loads(Path(f"{staged_binary}.inputs").read_text())
+            self.assertEqual(state["version"], 2)
+            self.assertGreater(state["input_count"], 0)
+            self.assertTrue(Path(f"{staged_binary}.sources").is_file())
 
     def test_bundle_resolution_reuses_fresh_staged_binary_without_cargo(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -447,20 +530,24 @@ class DaemonStagedBinaryTests(unittest.TestCase):
             source_binary.chmod(0o755)
             staged_binary = run_build_helper(
                 f'export PROJECT_DIR="{project_dir}"; '
+                f'export CARGO_BIN="{fake_cargo}"; '
                 f'export CARGO_TARGET_DIR="{target_dir}"; '
                 f'stage_daemon_binary "{source_binary}"'
             )
+            trace_path = Path(tmp_dir) / "input-state-trace.txt"
 
             resolved_binary = run_build_helper(
                 f'export PROJECT_DIR="{project_dir}"; '
                 f'export CARGO_BIN="{fake_cargo}"; '
                 f'export CARGO_TARGET_DIR="{target_dir}"; '
                 f'export CAPTURED_ENV_PATH="{captured_env_path}"; '
+                f'export HARNESS_MONITOR_DAEMON_INPUT_STATE_TRACE_PATH="{trace_path}"; '
                 "resolve_daemon_binary_for_bundle"
             )
 
             self.assertEqual(resolved_binary, staged_binary)
             self.assertFalse(captured_env_path.exists(), "cargo must not run when staged binary is fresh")
+            self.assertEqual(trace_path.read_text().splitlines(), ["state"])
 
     def test_bundle_resolution_builds_and_stages_when_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -488,19 +575,24 @@ class DaemonStagedBinaryTests(unittest.TestCase):
                 layout["env"]
                 + f'stage_daemon_binary "{layout["source_binary"]}"'
             )
-            source_manifest = Path(f"{staged_binary}.sources").read_text()
-            state = Path(f"{staged_binary}.inputs").read_text()
+            source_manifest = _read_source_manifest(
+                Path(f"{staged_binary}.sources")
+            )
+            state = json.loads(Path(f"{staged_binary}.inputs").read_text())
 
-            self.assertIn(str(layout["daemon_source"]), source_manifest)
-            self.assertIn(str(layout["protocol_source"]), source_manifest)
-            self.assertNotIn(str(layout["workflow_source"]), source_manifest)
-            self.assertIn("crates/harness-daemon/Cargo.toml", state)
-            self.assertIn("crates/harness-protocol/Cargo.toml", state)
-            self.assertIn("Cargo.lock", state)
-            self.assertIn("rust-toolchain.toml", state)
-            self.assertIn(".cargo/config.toml", state)
-            self.assertIn("scripts/rustc-cache-wrapper.sh", state)
-            self.assertIn("io.harnessmonitor.daemon.Info.plist", state)
+            self.assertIn(layout["daemon_source"], source_manifest)
+            self.assertIn(layout["protocol_source"], source_manifest)
+            self.assertNotIn(layout["workflow_source"], source_manifest)
+            self.assertEqual(state["metadata"]["profile"], "debug")
+            self.assertEqual(
+                state["metadata"]["features"],
+                "harness-daemon/tokio-console",
+            )
+            self.assertEqual(
+                state["metadata"]["rustflags"],
+                "config-plus-daemon-info-linker-args",
+            )
+            self.assertEqual(state["metadata"]["toolchain"], "stable")
 
             layout["daemon_source"].write_text("pub fn daemon_changed() {}\n")
             freshness = run_build_helper(
@@ -568,8 +660,8 @@ class DaemonStagedBinaryTests(unittest.TestCase):
                 + f'stage_daemon_binary "{layout["source_binary"]}" >/dev/null'
             )
             self.assertIn(
-                new_module.as_posix(),
-                Path(f"{staged_binary}.sources").read_text(),
+                new_module,
+                _read_source_manifest(Path(f"{staged_binary}.sources")),
             )
 
             new_module.write_text("pub fn new_module_changed() {}\n")
@@ -577,6 +669,118 @@ class DaemonStagedBinaryTests(unittest.TestCase):
                 layout["env"]
                 + f'daemon_staged_binary_is_fresh "{staged_binary}" '
                 "&& printf yes || printf no"
+            )
+            self.assertEqual(freshness, "no")
+
+    def test_directory_dep_info_tracks_regular_files_and_new_untracked_inputs(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            layout = _setup_dep_info_freshness_layout(
+                Path(tmp_dir) / "layout with spaces"
+            )
+            daemon_source = layout["daemon_source"]
+            daemon_source_dir = daemon_source.parent
+            nested_source = daemon_source_dir / "nested" / "existing.rs"
+            nested_source.parent.mkdir()
+            nested_source.write_text("pub fn existing() {}\n")
+            _write_dep_info(
+                layout["source_binary"],
+                [daemon_source_dir, layout["protocol_source"]],
+            )
+
+            staged_binary = run_build_helper(
+                layout["env"]
+                + f'stage_daemon_binary "{layout["source_binary"]}"'
+            )
+            manifest_path = Path(f"{staged_binary}.sources")
+            manifest = _read_source_manifest(manifest_path)
+            self.assertIn(daemon_source_dir, manifest)
+            self.assertIn(b"\0", manifest_path.read_bytes())
+
+            nested_source.write_text("pub fn existing_changed() {}\n")
+            freshness = run_build_helper(
+                layout["env"]
+                + f'daemon_staged_binary_is_fresh "{staged_binary}" '
+                "&& printf yes || printf no"
+            )
+            self.assertEqual(freshness, "no")
+
+            nested_source.write_text("pub fn existing() {}\n")
+            run_build_helper(
+                layout["env"]
+                + f'stage_daemon_binary "{layout["source_binary"]}" >/dev/null'
+            )
+            untracked_source = daemon_source_dir / "new_untracked.rs"
+            untracked_source.write_text("pub fn untracked() {}\n")
+            freshness = run_build_helper(
+                layout["env"]
+                + f'daemon_staged_binary_is_fresh "{staged_binary}" '
+                "&& printf yes || printf no"
+            )
+            self.assertEqual(freshness, "no")
+
+    def test_build_metadata_and_global_inputs_invalidate_staged_binary(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            layout = _setup_dep_info_freshness_layout(Path(tmp_dir))
+            base_env = (
+                layout["env"]
+                + 'export MARKETING_VERSION="1.2.3"; '
+                + 'export RUSTC_WRAPPER="/tmp/wrapper-a"; '
+                + 'export MACOSX_DEPLOYMENT_TARGET="26.0"; '
+            )
+            staged_binary = run_build_helper(
+                base_env
+                + f'stage_daemon_binary "{layout["source_binary"]}"'
+            )
+            state = json.loads(Path(f"{staged_binary}.inputs").read_text())
+            self.assertEqual(state["metadata"]["marketing_version"], "1.2.3")
+            self.assertEqual(
+                state["metadata"]["rustc_wrapper"],
+                "/tmp/wrapper-a",
+            )
+            self.assertEqual(
+                state["metadata"]["macosx_deployment_target"],
+                "26.0",
+            )
+
+            for changed_environment in (
+                'export MARKETING_VERSION="1.2.4"; ',
+                'export RUSTC_WRAPPER="/tmp/wrapper-b"; ',
+                'export MACOSX_DEPLOYMENT_TARGET="27.0"; ',
+            ):
+                with self.subTest(changed_environment=changed_environment):
+                    freshness = run_build_helper(
+                        base_env
+                        + changed_environment
+                        + f'daemon_staged_binary_is_fresh "{staged_binary}" '
+                        + "&& printf yes || printf no"
+                    )
+                    self.assertEqual(freshness, "no")
+
+            repo_root = layout["repo_root"]
+            toolchain_path = repo_root / "rust-toolchain.toml"
+            toolchain_path.write_text(
+                '[toolchain]\nchannel = "nightly-2026-05-19"\n'
+            )
+            freshness = run_build_helper(
+                base_env
+                + f'daemon_staged_binary_is_fresh "{staged_binary}" '
+                + "&& printf yes || printf no"
+            )
+            self.assertEqual(freshness, "no")
+            toolchain_path.write_text('[toolchain]\nchannel = "stable"\n')
+
+            cargo_config = repo_root / ".cargo" / "config.toml"
+            cargo_config.write_text(
+                '[build]\nrustflags = ["--cfg", "changed"]\n'
+            )
+            freshness = run_build_helper(
+                base_env
+                + f'daemon_staged_binary_is_fresh "{staged_binary}" '
+                + "&& printf yes || printf no"
             )
             self.assertEqual(freshness, "no")
 
@@ -834,24 +1038,9 @@ class BundleStampShortcutTests(unittest.TestCase):
             daemon_target.chmod(0o755)
             plist_target.write_text("plist\n")
 
-            daemon_stat = daemon_source.stat()
-            stamp_lines = [
-                f"daemon_source={daemon_source}",
-                f"daemon_source_stat={int(daemon_stat.st_mtime)}:{daemon_stat.st_size}",
-                "codesign_identity=fake-identity",
-                "timestamp_flag=--timestamp=none",
-                "launch_agent_label=Q498EB36N4.io.harnessmonitor.daemon",
-                "app_group_id=test.group",
-                "marketing_version=1.2.3",
-                "daemon_data_home=/tmp/test-daemon-home",
-                "codex_ws_port=4242",
-                "runtime_lane=test-lane",
-                "daemon_plist_sha=missing",
-                "legacy_managed_plist_sha=missing",
-                "legacy_plist_sha=missing",
-                "entitlements_sha=missing",
-            ]
-            bundle_stamp_path.write_text("\n".join(stamp_lines) + "\n")
+            bundle_stamp_path.write_text(
+                "\n".join(_bundle_stamp_lines(daemon_source)) + "\n"
+            )
 
             env = {
                 "HOME": tempfile.gettempdir(),
@@ -878,6 +1067,133 @@ class BundleStampShortcutTests(unittest.TestCase):
             )
 
             self.assertEqual(completed.returncode, 0, msg=completed.stderr)
+
+    def test_pre_action_ready_stamp_avoids_bundle_state_recompute(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            project_dir, target_dir, captured_env_path, fake_cargo = (
+                _setup_fake_daemon_layout(root)
+            )
+            source_binary = target_dir / "debug" / "harness-daemon"
+            source_binary.write_text("staged\n")
+            source_binary.chmod(0o755)
+            env = _isolated_subprocess_env()
+            env.update(
+                {
+                    "CAPTURED_ENV_PATH": str(captured_env_path),
+                    "CARGO_BIN": str(fake_cargo),
+                    "CARGO_TARGET_DIR": str(target_dir),
+                    "MARKETING_VERSION": "1.2.3",
+                    "PROJECT_DIR": str(project_dir),
+                }
+            )
+            stage = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    (
+                        f'unset BASH_ENV; source "{HELPER_PATH}"; '
+                        f'source "{CARGO_HELPER_PATH}"; '
+                        f'stage_daemon_binary "{source_binary}"'
+                    ),
+                ],
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(stage.returncode, 0, msg=stage.stderr)
+            staged_binary = Path(stage.stdout.strip())
+
+            project_temp_dir = root / "HarnessMonitor.build"
+            project_temp_dir.mkdir()
+            invocation_token = (
+                project_temp_dir
+                / "HarnessMonitor-daemon-build-invocation.id"
+            )
+            invocation_token.write_text("current-build-token\n")
+            trace_path = root / "input-state-trace.txt"
+            env.update(
+                {
+                    "HARNESS_MONITOR_DAEMON_INPUT_STATE_TRACE_PATH": str(
+                        trace_path
+                    ),
+                    "PROJECT_TEMP_DIR": str(project_temp_dir),
+                }
+            )
+
+            pre_action = subprocess.run(
+                ["bash", str(BUILD_SCRIPT_PATH)],
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(
+                pre_action.returncode,
+                0,
+                msg=pre_action.stderr,
+            )
+            ready_path = (
+                project_temp_dir / "HarnessMonitor-daemon-staged-ready.id"
+            )
+            self.assertEqual(
+                ready_path.read_text(),
+                invocation_token.read_text(),
+            )
+
+            target_build_dir = root / "build"
+            derived_dir = root / "derived"
+            daemon_target = (
+                target_build_dir / "Contents" / "Helpers" / "harness-daemon"
+            )
+            plist_target = (
+                target_build_dir
+                / "Contents"
+                / "Library"
+                / "LaunchAgents"
+                / "Q498EB36N4.io.harnessmonitor.daemon.plist"
+            )
+            daemon_target.parent.mkdir(parents=True)
+            plist_target.parent.mkdir(parents=True)
+            derived_dir.mkdir()
+            daemon_target.write_text("bundled\n")
+            daemon_target.chmod(0o755)
+            plist_target.write_text("plist\n")
+            bundle_stamp_path = (
+                derived_dir / "HarnessMonitor-bundle-daemon-agent.stamp"
+            )
+            bundle_stamp_path.write_text(
+                "\n".join(_bundle_stamp_lines(staged_binary)) + "\n"
+            )
+            env.update(
+                {
+                    "CONTENTS_FOLDER_PATH": "Contents",
+                    "DERIVED_FILE_DIR": str(derived_dir),
+                    "EXPANDED_CODE_SIGN_IDENTITY": "fake-identity",
+                    "HARNESS_APP_GROUP_ID": "test.group",
+                    "HARNESS_CODEX_WS_PORT": "4242",
+                    "HARNESS_DAEMON_DATA_HOME": "/tmp/test-daemon-home",
+                    "HARNESS_MONITOR_RUNTIME_LANE": "test-lane",
+                    "TARGET_BUILD_DIR": str(target_build_dir),
+                    "TARGET_NAME": "HarnessMonitor",
+                }
+            )
+
+            bundle_phase = subprocess.run(
+                ["bash", str(self.BUNDLE_SCRIPT)],
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(
+                bundle_phase.returncode,
+                0,
+                msg=bundle_phase.stderr,
+            )
+            self.assertEqual(trace_path.read_text().splitlines(), ["state"])
+            self.assertFalse(
+                captured_env_path.exists(),
+                "cargo must not run across the warm pre-action and bundle",
+            )
 
 
 def _setup_fake_daemon_layout(tmp_dir: Path):

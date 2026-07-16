@@ -51,6 +51,7 @@ public enum BuildPhases {
                 "$(PROJECT_DIR)/Scripts/bundle-daemon-agent.sh",
                 "$(PROJECT_DIR)/Scripts/lib/daemon-bundle-env.sh",
                 "$(PROJECT_DIR)/Scripts/lib/daemon-cargo-build.sh",
+                "$(PROJECT_DIR)/Scripts/lib/daemon-input-state.py",
                 "$(PROJECT_DIR)/Scripts/lib/monitor-lanes.sh",
                 "$(PROJECT_DIR)/Scripts/lib/swift-tool-env.sh",
                 "$(PROJECT_DIR)/Resources/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist",
@@ -70,11 +71,10 @@ public enum BuildPhases {
                 "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.harnessmonitor.daemon.plist",
                 "$(DERIVED_FILE_DIR)/$(TARGET_NAME)-bundle-daemon-agent.stamp"
             ],
-            // The bundle phase's inputPaths can't enumerate every Rust source file,
-            // so dependency analysis was skipping the phase whenever scripts and
-            // plists were untouched even after cargo produced a fresh helper. Run
-            // unconditionally - bundle-daemon-agent.sh delegates freshness to
-            // cargo, which no-ops when the binary is already up to date.
+            // Rust compiler inputs are discovered dynamically from Cargo dep-info,
+            // so Xcode cannot model the complete input set here. Keep this phase
+            // unconditional; the pre-action publishes a same-invocation ready
+            // stamp, while fallback builds use one batched content digest.
             basedOnDependencyAnalysis: false
         )
     }
