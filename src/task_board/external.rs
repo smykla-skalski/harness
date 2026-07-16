@@ -127,7 +127,7 @@ impl ExternalTaskRef {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExternalCreateOutcome {
     pub reference: ExternalTaskRef,
     pub provider_revision: Option<String>,

@@ -142,6 +142,7 @@ fn all_tables_exist() {
         "task_board_admission_leases",
         "task_board_execution_attempts",
         "task_board_execution_hosts",
+        "task_board_external_create_intents",
         "task_board_external_refs",
         "task_board_imports",
         "task_board_identity",

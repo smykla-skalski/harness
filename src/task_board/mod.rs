@@ -2,6 +2,7 @@ pub mod automation;
 pub mod dispatch;
 pub mod evaluation;
 pub mod external;
+mod external_create_intents;
 pub mod git_identity_defaults;
 pub mod github;
 #[allow(dead_code)]
@@ -57,6 +58,12 @@ pub(crate) use external::{
     TaskBoardSyncStore, configured_sync_clients_without_review_requests,
     imported_review_references_from_items, reconcile_review_item_from_snapshots,
     sync_external_tasks,
+};
+pub(crate) use external_create_intents::{
+    TaskBoardExternalCreateBegin, TaskBoardExternalCreateEvidence, TaskBoardExternalCreateExisting,
+    TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateFinalizeResult,
+    TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
+    TaskBoardExternalCreateReceipt, TaskBoardExternalCreateSnapshot,
 };
 pub use git_identity_defaults::{
     TaskBoardEnvDefaults, TaskBoardGhCliDefaults, TaskBoardGitConfigDefaults,
