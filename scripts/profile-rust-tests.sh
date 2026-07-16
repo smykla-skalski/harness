@@ -108,7 +108,8 @@ capture_cargo_local_env() {
 
   while IFS='=' read -r key value; do
     case "$key" in
-      SCCACHE_BIN | SCCACHE_SERVER_UDS | SCCACHE_IDLE_TIMEOUT | SCCACHE_CACHE_SIZE | SCCACHE_BASEDIRS | HARNESS_SCCACHE_TMPDIR)
+      SCCACHE_BIN | SCCACHE_VERSION | SCCACHE_SERVER_UDS | SCCACHE_IDLE_TIMEOUT \
+        | SCCACHE_CACHE_SIZE | SCCACHE_BASEDIRS | HARNESS_SCCACHE_TMPDIR)
         if [[ -n "$value" ]]; then
           export "$key=$value"
         fi
