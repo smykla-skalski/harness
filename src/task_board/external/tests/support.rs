@@ -3,6 +3,9 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 
 use crate::errors::CliError;
+use crate::task_board::external::{
+    ExternalCreateLease, ExternalCreateProbe, ExternalCreateRecoveryClient, ExternalCreateRequest,
+};
 use crate::task_board::{
     ExternalProvider, ExternalRef, ExternalRefProvider, ExternalRefSyncState, ExternalSyncClient,
     ExternalTask, ExternalTaskRef, PlanningState, TaskBoardItem, TaskBoardStatus,
@@ -57,6 +60,10 @@ impl ExternalSyncClient for FakeSyncClient {
         self.provider
     }
 
+    fn external_create_recovery(&self) -> Option<&dyn ExternalCreateRecoveryClient> {
+        Some(self)
+    }
+
     fn allows_delete(&self) -> bool {
         self.allows_delete
     }
@@ -87,6 +94,56 @@ impl ExternalSyncClient for FakeSyncClient {
             .expect("delete log should not be poisoned")
             .push(reference.external_id.clone());
         Ok(())
+    }
+}
+
+#[async_trait]
+impl ExternalCreateRecoveryClient for FakeSyncClient {
+    fn provider(&self) -> ExternalProvider {
+        self.provider
+    }
+
+    fn supports_target(&self, provider_target: &str) -> bool {
+        provider_target == self.scope_id()
+    }
+
+    async fn create_started(
+        &self,
+        request: &ExternalCreateRequest,
+        lease: &dyn ExternalCreateLease,
+    ) -> Result<ExternalTask, CliError> {
+        lease.renew().await?;
+        self.pushed
+            .lock()
+            .expect("push log should not be poisoned")
+            .push(request.item_id().into());
+        Ok(task_from_create_request(self.provider, request))
+    }
+
+    async fn recover_existing(
+        &self,
+        request: &ExternalCreateRequest,
+        lease: &dyn ExternalCreateLease,
+    ) -> Result<ExternalCreateProbe, CliError> {
+        lease.renew().await?;
+        Ok(ExternalCreateProbe::Found(task_from_create_request(
+            self.provider,
+            request,
+        )))
+    }
+}
+
+fn task_from_create_request(
+    provider: ExternalProvider,
+    request: &ExternalCreateRequest,
+) -> ExternalTask {
+    ExternalTask {
+        reference: ExternalTaskRef::new(provider, request.item_id()),
+        title: request.title().into(),
+        body: request.body().into(),
+        status: TaskBoardStatus::Backlog,
+        project_id: None,
+        updated_at: None,
     }
 }
 

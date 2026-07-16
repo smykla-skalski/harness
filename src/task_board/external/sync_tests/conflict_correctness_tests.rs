@@ -109,6 +109,51 @@ async fn prefer_remote_supersedes_existing_open_conflict() {
 }
 
 #[tokio::test]
+async fn pull_report_supersedes_only_converged_known_conflict_fields() {
+    let dir = tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        .await
+        .expect("database");
+    let item = linked_item(
+        "task-pull-report",
+        "Local edit",
+        "Old body",
+        TaskBoardStatus::Todo,
+    );
+    db.create_task_board_item(item).await.expect("create item");
+    record_open_title_and_future_conflicts(&db, "task-pull-report").await;
+    let client = UpdateFakeSyncClient::new(
+        ExternalProvider::Todoist,
+        vec![ExternalSyncField::Title],
+        vec![remote_task(
+            "remote-1",
+            "Remote edit",
+            "Old body",
+            TaskBoardStatus::Backlog,
+        )],
+    );
+    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(client)];
+
+    sync_external_tasks(&db, pull_report_options(), &clients)
+        .await
+        .expect("pull report sync");
+
+    assert_eq!(
+        db.task_board_item("task-pull-report")
+            .await
+            .expect("item")
+            .title,
+        "Remote edit"
+    );
+    let open = db
+        .open_task_board_sync_conflicts()
+        .await
+        .expect("open conflicts");
+    assert_eq!(open.len(), 1);
+    assert_eq!(open[0].field, "future_field");
+}
+
+#[tokio::test]
 async fn prefer_local_supersedes_conflict_after_remote_and_local_state_converge() {
     let dir = tempdir().expect("tempdir");
     let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
@@ -202,37 +247,6 @@ async fn remote_update_with_failed_local_persistence_records_conflict_evidence()
     );
 }
 
-#[tokio::test]
-async fn remote_create_with_failed_local_link_persists_created_reference_evidence() {
-    let item = TaskBoardItem::new(
-        "task-create-cas".into(),
-        "Created remotely".into(),
-        "Body".into(),
-        "2026-07-16T10:00:00Z".into(),
-    );
-    let store = FailingPersistenceStore::new(item);
-    let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(CreateSyncClient)];
-
-    let error = sync_external_tasks(&store, push_options(), &clients)
-        .await
-        .expect_err("local link persistence must fail");
-
-    assert_eq!(error.code(), "WORKFLOW_CONCURRENT");
-    let conflicts = store.conflicts.lock().expect("conflicts");
-    let title = conflicts
-        .iter()
-        .find(|conflict| conflict.field == "title")
-        .expect("title conflict");
-    assert_eq!(title.external_ref, "remote-created");
-    assert_eq!(title.base_value, serde_json::Value::Null);
-    assert_eq!(title.local_value, serde_json::json!("Created remotely"));
-    assert_eq!(title.remote_value, serde_json::json!("Created remotely"));
-    assert_eq!(
-        title.provider_revision.as_deref(),
-        Some("provider-revision-1")
-    );
-}
-
 fn push_options() -> ExternalSyncOptions {
     ExternalSyncOptions {
         provider: Some(ExternalProvider::Todoist),
@@ -253,33 +267,59 @@ fn both_options(conflict_policy: ExternalSyncConflictPolicy) -> ExternalSyncOpti
     }
 }
 
+fn pull_report_options() -> ExternalSyncOptions {
+    ExternalSyncOptions {
+        provider: Some(ExternalProvider::Todoist),
+        direction: ExternalSyncDirection::Pull,
+        conflict_policy: ExternalSyncConflictPolicy::Report,
+        dry_run: false,
+        status: None,
+    }
+}
+
 async fn record_open_title_conflict(db: &AsyncDaemonDb, item_id: &str) {
+    record_open_conflicts(db, item_id, &["title"]).await;
+}
+
+async fn record_open_title_and_future_conflicts(db: &AsyncDaemonDb, item_id: &str) {
+    record_open_conflicts(db, item_id, &["title", "future_field"]).await;
+}
+
+async fn record_open_conflicts(db: &AsyncDaemonDb, item_id: &str, fields: &[&str]) {
     let revision = db
         .task_board_item_snapshot(item_id)
         .await
         .expect("item snapshot")
         .item_revision;
+    let conflicts = fields
+        .iter()
+        .map(|field| open_conflict(item_id, field, revision))
+        .collect::<Vec<_>>();
     db.replace_open_task_board_sync_conflicts(
         item_id,
         ExternalProvider::Todoist,
         "remote-1",
         revision,
-        &[TaskBoardSyncConflict {
-            conflict_id: format!("conflict-{item_id}"),
-            item_id: item_id.into(),
-            provider: ExternalRefProvider::Todoist,
-            external_ref: "remote-1".into(),
-            field: "title".into(),
-            base_value: serde_json::json!("Old title"),
-            local_value: serde_json::json!("Local edit"),
-            remote_value: serde_json::json!("Remote edit"),
-            item_revision: revision,
-            provider_revision: Some("2026-05-14T01:00:00Z".into()),
-            state: TaskBoardConflictState::Open,
-        }],
+        &conflicts,
     )
     .await
     .expect("record conflict");
+}
+
+fn open_conflict(item_id: &str, field: &str, revision: i64) -> TaskBoardSyncConflict {
+    TaskBoardSyncConflict {
+        conflict_id: format!("conflict-{item_id}-{field}"),
+        item_id: item_id.into(),
+        provider: ExternalRefProvider::Todoist,
+        external_ref: "remote-1".into(),
+        field: field.into(),
+        base_value: serde_json::json!("Old value"),
+        local_value: serde_json::json!("Local value"),
+        remote_value: serde_json::json!("Remote value"),
+        item_revision: revision,
+        provider_revision: Some("2026-05-14T01:00:00Z".into()),
+        state: TaskBoardConflictState::Open,
+    }
 }
 
 struct FailingPersistenceStore {
@@ -296,36 +336,7 @@ impl FailingPersistenceStore {
     }
 }
 
-struct CreateSyncClient;
-
-#[async_trait]
-impl ExternalSyncClient for CreateSyncClient {
-    fn provider(&self) -> ExternalProvider {
-        ExternalProvider::Todoist
-    }
-
-    async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
-        Ok(Vec::new())
-    }
-
-    async fn push_task(&self, _item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
-        Ok(ExternalTaskRef::new(
-            ExternalProvider::Todoist,
-            "remote-created",
-        ))
-    }
-
-    async fn push_task_with_outcome(
-        &self,
-        item: &TaskBoardItem,
-    ) -> Result<ExternalCreateOutcome, CliError> {
-        Ok(ExternalCreateOutcome {
-            reference: self.push_task(item).await?,
-            provider_revision: Some("provider-revision-1".into()),
-            provider_project_id: Some("provider-project".into()),
-        })
-    }
-}
+impl crate::task_board::TaskBoardExternalCreateStore for FailingPersistenceStore {}
 
 #[async_trait]
 impl TaskBoardSyncStore for FailingPersistenceStore {

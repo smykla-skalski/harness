@@ -55,9 +55,9 @@ pub use external::{
 };
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use external::{
-    TaskBoardSyncStore, configured_sync_clients_without_review_requests,
-    imported_review_references_from_items, reconcile_review_item_from_snapshots,
-    sync_external_tasks,
+    TaskBoardExternalCreateStore, TaskBoardSyncStore,
+    configured_sync_clients_without_review_requests, imported_review_references_from_items,
+    reconcile_review_item_from_snapshots, sync_external_tasks,
 };
 pub(crate) use external_create_intents::{
     TaskBoardExternalCreateBegin, TaskBoardExternalCreateEvidence, TaskBoardExternalCreateExisting,

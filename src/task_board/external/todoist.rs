@@ -7,15 +7,18 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::super::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use super::{
-    ExternalCreateOutcome, ExternalProvider, ExternalProviderCapabilities, ExternalSyncClient,
-    ExternalSyncConfig, ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
-    ExternalUpdateOutcome, non_empty_body, normalize_token,
+    ExternalCreateOutcome, ExternalCreateRecoveryClient, ExternalProvider,
+    ExternalProviderCapabilities, ExternalSyncClient, ExternalSyncConfig, ExternalSyncField,
+    ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome, non_empty_body,
+    normalize_token,
 };
 
 #[cfg(test)]
 use move_task::TodoistMoveTaskRequest;
 use request_id::{TodoistRequestIntent, TodoistStatusAction};
 
+#[path = "todoist/create_recovery.rs"]
+mod create_recovery;
 #[path = "todoist/move_task.rs"]
 mod move_task;
 #[path = "todoist/pagination.rs"]
@@ -24,6 +27,7 @@ mod pagination;
 mod request_id;
 
 const TODOIST_API_BASE: &str = "https://api.todoist.com/api/v1";
+const TODOIST_ALL_SCOPE: &str = "all";
 const TODOIST_TASK_URL_BASE: &str = "https://app.todoist.com/app/task";
 
 #[derive(Clone)]
@@ -105,10 +109,18 @@ impl ExternalSyncClient for TodoistSyncClient {
         ExternalProvider::Todoist
     }
 
+    #[allow(
+        private_interfaces,
+        reason = "provider-create recovery is intentionally crate-private"
+    )]
+    fn external_create_recovery(&self) -> Option<&dyn ExternalCreateRecoveryClient> {
+        Some(self)
+    }
+
     fn scope_id(&self) -> String {
         match self.import_project_ids.as_slice() {
             [project_id] => project_id.clone(),
-            _ => "all".into(),
+            _ => TODOIST_ALL_SCOPE.into(),
         }
     }
 
@@ -159,17 +171,7 @@ impl ExternalSyncClient for TodoistSyncClient {
             request: &request,
         }
         .request_id();
-        let task = self
-            .write_request(self.client.post(self.endpoint("tasks")), &request_id)
-            .json(&request)
-            .send()
-            .await
-            .map_err(todoist_sync_error)?
-            .error_for_status()
-            .map_err(todoist_sync_error)?
-            .json::<TodoistTask>()
-            .await
-            .map_err(todoist_sync_error)?;
+        let task = self.create_task(&request, &request_id).await?;
         Ok(ExternalCreateOutcome {
             reference: task.reference(),
             provider_revision: task.updated_at,
@@ -263,6 +265,23 @@ impl ExternalSyncClient for TodoistSyncClient {
 }
 
 impl TodoistSyncClient {
+    async fn create_task(
+        &self,
+        request: &TodoistCreateTaskRequest,
+        request_id: &str,
+    ) -> Result<TodoistTask, CliError> {
+        self.write_request(self.client.post(self.endpoint("tasks")), request_id)
+            .json(request)
+            .send()
+            .await
+            .map_err(todoist_sync_error)?
+            .error_for_status()
+            .map_err(todoist_sync_error)?
+            .json::<TodoistTask>()
+            .await
+            .map_err(todoist_sync_error)
+    }
+
     fn write_request(
         &self,
         request: reqwest::RequestBuilder,

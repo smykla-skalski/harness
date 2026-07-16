@@ -5,7 +5,7 @@ use std::thread;
 
 use super::super::*;
 use super::GitHubIssueResponse;
-use crate::github_api::GitHubProtectedClient;
+use crate::github_api::{GitHubProtectedClient, acquire_global_budget_test_lock};
 
 #[derive(Debug, Default)]
 struct CapturedRequest {
@@ -45,6 +45,7 @@ fn github_create_uses_configured_repository_and_returns_provider_revision() {
 
 #[tokio::test]
 async fn stale_github_precondition_returns_fresh_remote_snapshot_without_patch() {
+    let _guard = acquire_global_budget_test_lock().await;
     let (endpoint, captured, handle) = spawn_sequence_mock(vec![
         issue_revision_response("provider-revision-2"),
         issue_response(
@@ -87,6 +88,7 @@ async fn stale_github_precondition_returns_fresh_remote_snapshot_without_patch()
 
 #[tokio::test]
 async fn matching_github_precondition_reads_fresh_then_patches() {
+    let _guard = acquire_global_budget_test_lock().await;
     let (endpoint, captured, handle) = spawn_sequence_mock(vec![
         issue_revision_response("provider-revision-1"),
         issue_response("Base title", "Remote body", "open", "provider-revision-1"),

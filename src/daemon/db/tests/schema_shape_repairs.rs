@@ -94,6 +94,29 @@ async fn async_connect_refuses_nonunique_external_create_index_with_expected_nam
 }
 
 #[tokio::test]
+async fn async_connect_refuses_malformed_pending_follow_up_index() {
+    let tmp = tempdir().expect("tempdir");
+    let db_path = tmp.path().join("harness.db");
+    let sync_db = DaemonDb::open(&db_path).expect("open sync daemon db");
+    sync_db
+        .connection()
+        .execute_batch(
+            "DROP INDEX idx_task_board_external_create_intents_pending_follow_up;
+             CREATE INDEX idx_task_board_external_create_intents_pending_follow_up
+             ON task_board_external_create_intents(provider, attached_at, intent_id)
+             WHERE state = 'attached';",
+        )
+        .expect("replace pending follow-up index");
+    drop(sync_db);
+
+    let error = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect_err("malformed pending follow-up index must fail closed");
+
+    assert!(error.to_string().contains("pending_follow_up"));
+}
+
+#[tokio::test]
 async fn async_connect_inspects_malformed_indexes_even_when_another_index_is_missing() {
     let tmp = tempdir().expect("tempdir");
     let db_path = tmp.path().join("harness.db");
@@ -240,8 +263,8 @@ async fn async_connect_refuses_each_omitted_external_create_constraint() {
         ),
         (
             "created attachment null",
-            "AND attached_item_revision IS NULL\n            AND updated_at = outcome_recorded_at",
-            "AND attached_item_revision IS attached_item_revision\n            AND updated_at = outcome_recorded_at",
+            "AND attached_item_revision IS NULL\n            AND follow_up_completed_at IS NULL",
+            "AND attached_item_revision IS attached_item_revision\n            AND follow_up_completed_at IS NULL",
         ),
         (
             "attached timestamp",
@@ -257,6 +280,16 @@ async fn async_connect_refuses_each_omitted_external_create_constraint() {
             "attached revision",
             "AND attached_item_revision IS NOT NULL",
             "AND attached_item_revision IS attached_item_revision",
+        ),
+        (
+            "in-flight follow-up null",
+            "AND follow_up_completed_at IS NULL\n            AND follow_up_audit_event_id IS NULL\n            AND updated_at = created_at",
+            "AND follow_up_completed_at IS follow_up_completed_at\n            AND follow_up_audit_event_id IS NULL\n            AND updated_at = created_at",
+        ),
+        (
+            "attached follow-up pair",
+            "follow_up_completed_at IS NULL\n                    AND follow_up_audit_event_id IS NULL",
+            "follow_up_completed_at IS follow_up_completed_at\n                    AND follow_up_audit_event_id IS NULL",
         ),
     ] {
         let mutated = migration.replacen(required, weakened, 1);

@@ -166,6 +166,7 @@ async fn terminal_local_error_keeps_captured_batch_evidence() {
             ExternalSyncAction::Pull,
             "task-before-local-failure",
         )],
+        external_create_follow_ups: Vec::new(),
         scope_outcomes: vec![ExternalSyncScopeOutcome::failed(
             ExternalProvider::Todoist,
             "scope/primary".into(),
@@ -460,6 +461,7 @@ fn batch(
 ) -> ExternalSyncBatch {
     ExternalSyncBatch {
         operations,
+        external_create_follow_ups: Vec::new(),
         scope_outcomes,
         first_provider_failure,
         terminal_error: None,

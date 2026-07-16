@@ -11,11 +11,12 @@ use crate::task_board::types::{ExternalRef, ExternalRefSyncState, TaskBoardItem,
 use super::super::github::reconciled_external_status;
 use super::conflicts::build_sync_conflicts;
 use super::merge::{
-    changed_fields, external_ref_matches, matching_ref, pull_conflict_fields, sync_state_from_task,
+    changed_fields, external_ref_matches, matching_ref, pull_conflict_fields,
+    pull_resolution_fields, sync_state_from_task,
 };
 use super::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
-    OperationDraft, TaskBoardSyncStore, operation,
+    OperationDraft, TaskBoardSyncStore, canonical_external_status, operation,
 };
 
 #[expect(
@@ -139,24 +140,51 @@ async fn supersede_resolved_conflicts(
     task: &ExternalTask,
     conflict_fields: &[ExternalSyncField],
 ) -> Result<(), CliError> {
-    let resolved = match options.conflict_policy {
-        ExternalSyncConflictPolicy::Report => false,
+    if options.dry_run || !conflicts_are_resolved(options, conflict_fields) {
+        return Ok(());
+    }
+    let snapshot = board.item_snapshot(&item.id).await?;
+    let resolved_fields = converged_pull_fields(&snapshot.item, task);
+    board
+        .supersede_open_sync_conflicts(
+            &item.id,
+            provider,
+            &task.reference.external_id,
+            snapshot.item_revision,
+            &resolved_fields,
+        )
+        .await
+}
+
+fn conflicts_are_resolved(
+    options: ExternalSyncOptions,
+    conflict_fields: &[ExternalSyncField],
+) -> bool {
+    match options.conflict_policy {
+        ExternalSyncConflictPolicy::Report => {
+            matches!(options.direction, ExternalSyncDirection::Pull)
+        }
         ExternalSyncConflictPolicy::PreferRemote => true,
         ExternalSyncConflictPolicy::PreferLocal => conflict_fields.is_empty(),
-    };
-    if resolved && !options.dry_run {
-        let snapshot = board.item_snapshot(&item.id).await?;
-        board
-            .replace_open_sync_conflicts(
-                &item.id,
-                provider,
-                &task.reference.external_id,
-                snapshot.item_revision,
-                &[],
-            )
-            .await?;
     }
-    Ok(())
+}
+
+fn converged_pull_fields(item: &TaskBoardItem, task: &ExternalTask) -> Vec<ExternalSyncField> {
+    pull_resolution_fields(task)
+        .into_iter()
+        .filter(|field| match field {
+            ExternalSyncField::Title => item.title == task.title,
+            ExternalSyncField::Body => item.body == task.body,
+            ExternalSyncField::Status => {
+                canonical_external_status(item.status) == canonical_external_status(task.status)
+            }
+            ExternalSyncField::Project => item.project_id == task.project_id,
+            ExternalSyncField::Url => {
+                matching_ref(item, &task.reference, task.project_id.as_deref())
+                    .is_some_and(|reference| reference.url == task.reference.url)
+            }
+        })
+        .collect()
 }
 
 async fn latest_item_still_needs_reconciliation(
@@ -353,6 +381,8 @@ mod tests {
     struct ConcurrentEditStore {
         latest: TaskBoardItem,
     }
+
+    impl crate::task_board::TaskBoardExternalCreateStore for ConcurrentEditStore {}
 
     #[async_trait]
     impl TaskBoardSyncStore for ConcurrentEditStore {

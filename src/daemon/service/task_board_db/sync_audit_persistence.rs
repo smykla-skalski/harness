@@ -5,6 +5,7 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{HarnessMonitorAuditEvent, StreamEvent};
 use crate::daemon::service::observe_sender;
 use crate::errors::CliError;
+use crate::task_board::TaskBoardExternalCreateIntent;
 use crate::workspace::utc_now;
 
 use super::TaskBoardSyncAuditTrigger;
@@ -78,6 +79,19 @@ pub(super) async fn persist_sync_audit_result<T>(
     let event = sync_audit_event(trigger, payload_json, classification, result);
     db.upsert_audit_event(&event).await?;
     broadcast_audit_event(&event);
+    Ok(())
+}
+
+pub(in crate::daemon::service::task_board_db) async fn record_external_create_follow_ups(
+    db: &AsyncDaemonDb,
+    intents: &[TaskBoardExternalCreateIntent],
+) -> Result<(), CliError> {
+    for event in db
+        .complete_task_board_external_create_follow_ups(intents)
+        .await?
+    {
+        broadcast_audit_event(&event);
+    }
     Ok(())
 }
 

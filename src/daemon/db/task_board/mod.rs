@@ -12,6 +12,7 @@ mod policy_queues;
 mod policy_runs;
 mod provider_external_create_evidence;
 mod provider_external_create_finalize;
+mod provider_external_create_follow_up;
 mod provider_external_create_rows;
 mod provider_external_creates;
 mod provider_sync;
@@ -20,6 +21,8 @@ mod rows;
 
 #[cfg(test)]
 mod provider_external_create_finalize_tests;
+#[cfg(test)]
+mod provider_external_create_follow_up_tests;
 #[cfg(test)]
 mod provider_external_create_optional_evidence_tests;
 #[cfg(test)]

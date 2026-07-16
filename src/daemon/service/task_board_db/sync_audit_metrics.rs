@@ -118,6 +118,11 @@ impl SyncExecutionMetrics {
     pub(super) fn scope_outcomes(&self) -> &[ScopeAuditEvidence] {
         &self.scope_outcomes
     }
+
+    #[cfg(test)]
+    pub(in crate::daemon::service::task_board_db) fn operations(&self) -> &[ExternalSyncOperation] {
+        &self.operations
+    }
 }
 
 pub(super) fn add_summary_counts(

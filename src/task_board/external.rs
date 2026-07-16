@@ -36,13 +36,18 @@ pub(crate) use scopes::{
     ExternalProviderScopeAvailability, ExternalProviderScopeHealth, ExternalProviderScopeIdentity,
     ExternalProviderScopeState, ExternalSyncBatch, ExternalSyncScopeOutcome,
 };
+#[cfg(test)]
+pub(crate) use sync::sync_external_tasks_scoped;
 pub use sync::{
     ExternalSyncAction, ExternalSyncDirection, ExternalSyncOperation, ExternalSyncOptions,
     configured_sync_clients,
 };
 pub(crate) use sync::{
-    TaskBoardSyncItemSnapshot, TaskBoardSyncStore, configured_sync_clients_without_review_requests,
-    sync_external_tasks, sync_external_tasks_scoped,
+    TaskBoardExternalCreateStore, TaskBoardSyncItemSnapshot, TaskBoardSyncStore,
+    assign_external_create_recovery, blocked_external_create_follow_ups,
+    blocked_external_create_recovery, configured_sync_clients_without_review_requests,
+    load_external_create_recovery_work, prepare_external_create_recovery, sync_external_tasks,
+    sync_external_tasks_scoped_with_recovery,
 };
 pub use todoist::TodoistSyncClient;
 

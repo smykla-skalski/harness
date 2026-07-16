@@ -4,19 +4,20 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
+use crate::task_board::TaskBoardExternalCreateIntent;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
 
 use super::targeting::{board_project_id_for_task, execution_repository_for_task};
 use super::{
-    ExternalCreateOutcome, ExternalProvider, ExternalSyncClient, ExternalSyncConfig,
-    ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask, ExternalTaskRef,
-    ExternalTaskUpdate, ExternalUpdateOutcome, GitHubInboxSyncClient, GitHubSyncClient,
-    TodoistSyncClient, canonical_external_status,
+    ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalSyncConflictPolicy,
+    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
+    GitHubInboxSyncClient, GitHubSyncClient, TodoistSyncClient, canonical_external_status,
 };
 
 mod batch;
 mod conflicts;
+mod create_recovery;
 mod delete;
 #[cfg(test)]
 mod evidence_tests;
@@ -33,7 +34,14 @@ mod scope;
 mod stale_reviews;
 mod store;
 
-pub(crate) use batch::{sync_external_tasks, sync_external_tasks_scoped};
+#[cfg(test)]
+pub(crate) use batch::sync_external_tasks_scoped;
+pub(crate) use batch::{sync_external_tasks, sync_external_tasks_scoped_with_recovery};
+pub(crate) use create_recovery::{
+    assign_external_create_recovery, blocked_external_create_follow_ups,
+    blocked_external_create_recovery, load_external_create_recovery_work,
+    prepare_external_create_recovery,
+};
 use import::{external_item_id, imported_external_planning};
 use lookup::{OperationDraft, build_external_ref_index, item_for_ref, operation, provider_ref};
 use merge::{matching_ref, pull_create_fields, sync_state_from_task};
@@ -41,7 +49,9 @@ use push::push_board_tasks;
 use reconcile::reconcile_existing_item;
 use scope::SyncClientError;
 use stale_reviews::reconcile_stale_github_review_requests;
-pub(crate) use store::{TaskBoardSyncItemSnapshot, TaskBoardSyncStore};
+pub(crate) use store::{
+    TaskBoardExternalCreateStore, TaskBoardSyncItemSnapshot, TaskBoardSyncStore,
+};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
 #[value(rename_all = "snake_case")]
@@ -208,7 +218,17 @@ async fn pull_provider_tasks(
     client: &dyn ExternalSyncClient,
     tasks: Vec<ExternalTask>,
     operations: &mut Vec<ExternalSyncOperation>,
-) -> Result<(), CliError> {
+    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
+) -> Result<bool, CliError> {
+    let (tasks, recovered_create) = create_recovery::suppress_known_create_markers(
+        board,
+        client,
+        tasks,
+        operations,
+        follow_ups,
+        options.dry_run,
+    )
+    .await?;
     let board_items = board.list_items(None).await?;
     let item_index = build_external_ref_index(&board_items);
     for task in tasks.iter().cloned() {
@@ -273,7 +293,7 @@ async fn pull_provider_tasks(
         operations,
     )
     .await?;
-    Ok(())
+    Ok(recovered_create)
 }
 
 fn existing_pull_matches_status_filter(

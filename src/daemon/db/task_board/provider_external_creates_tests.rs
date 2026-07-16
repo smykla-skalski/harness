@@ -298,6 +298,11 @@ fn transition_timestamp_advances_when_wall_clock_has_not() {
     );
 }
 
+#[test]
+fn transition_timestamp_fails_closed_at_the_persisted_range_boundary() {
+    next_timestamp("9999-12-31T23:59:59Z").expect_err("maximum persisted timestamp cannot advance");
+}
+
 #[tokio::test]
 async fn record_and_finalize_advance_persisted_clock_without_wall_clock_rollover() {
     let dir = tempdir().expect("tempdir");

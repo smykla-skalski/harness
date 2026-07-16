@@ -37,6 +37,24 @@ const LIST_IN_FLIGHT_PROVIDER_INTENTS_SQL: &str =
      FROM task_board_external_create_intents
      WHERE provider = ?1 AND state = 'in_flight'
      ORDER BY created_at, intent_id";
+const LIST_PENDING_PROVIDER_FOLLOW_UPS_SQL: &str =
+    "SELECT intent_id, item_id, item_revision, provider, scope_id, create_key, state,
+            create_snapshot_json, changed_fields_json, outcome_json, external_ref_json,
+            created_at, outcome_recorded_at, attached_at, attached_item_revision, updated_at
+     FROM task_board_external_create_intents
+     WHERE provider = ?1 AND state = 'attached'
+       AND follow_up_completed_at IS NULL
+       AND follow_up_audit_event_id IS NULL
+     ORDER BY scope_id, attached_at, intent_id";
+const LIST_PENDING_FOLLOW_UPS_SQL: &str =
+    "SELECT intent_id, item_id, item_revision, provider, scope_id, create_key, state,
+            create_snapshot_json, changed_fields_json, outcome_json, external_ref_json,
+            created_at, outcome_recorded_at, attached_at, attached_item_revision, updated_at
+     FROM task_board_external_create_intents
+     WHERE state = 'attached'
+       AND follow_up_completed_at IS NULL
+       AND follow_up_audit_event_id IS NULL
+     ORDER BY provider, scope_id, attached_at, intent_id";
 const LOAD_INTENT_BY_CREATE_KEY_SQL: &str =
     "SELECT intent_id, item_id, item_revision, provider, scope_id, create_key, state,
             create_snapshot_json, changed_fields_json, outcome_json, external_ref_json,
@@ -201,6 +219,26 @@ impl AsyncDaemonDb {
                 .await,
             "list provider task-board external create intents",
         )
+    }
+
+    pub(crate) async fn list_pending_task_board_external_create_follow_ups(
+        &self,
+        provider: Option<ExternalProvider>,
+    ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
+        let rows = match provider {
+            Some(provider) => {
+                query_as::<_, ExternalCreateIntentRow>(LIST_PENDING_PROVIDER_FOLLOW_UPS_SQL)
+                    .bind(provider_label(provider))
+                    .fetch_all(self.pool())
+                    .await
+            }
+            None => {
+                query_as::<_, ExternalCreateIntentRow>(LIST_PENDING_FOLLOW_UPS_SQL)
+                    .fetch_all(self.pool())
+                    .await
+            }
+        };
+        load_intents(rows, "list pending task-board external create follow-ups")
     }
 
     pub(crate) async fn task_board_external_create_intent_by_create_key(

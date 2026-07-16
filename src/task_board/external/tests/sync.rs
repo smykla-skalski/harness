@@ -3,6 +3,7 @@ mod execution_repository_tests;
 use tempfile::tempdir;
 
 use super::support::{FakeSyncClient, external_task};
+use crate::daemon::db::AsyncDaemonDb;
 use crate::task_board::{
     ExternalProvider, ExternalRefProvider, ExternalRefSyncState, ExternalSyncAction,
     ExternalSyncClient, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncField,
@@ -49,7 +50,9 @@ async fn fake_client_pushes_task_without_network() {
 #[tokio::test]
 async fn sync_external_tasks_uses_injected_clients_without_network() {
     let temp = tempdir().expect("tempdir");
-    let board = TaskBoardStore::new(temp.path().join("board"));
+    let board = AsyncDaemonDb::connect(&temp.path().join("harness.db"))
+        .await
+        .expect("database");
     let mut local = TaskBoardItem::new(
         "local-1".to_owned(),
         "Local task".to_owned(),
@@ -58,7 +61,8 @@ async fn sync_external_tasks_uses_injected_clients_without_network() {
     );
     local.status = TaskBoardStatus::Todo;
     board
-        .create("Local task", "Body", local)
+        .create_task_board_item(local)
+        .await
         .expect("create local task");
     let clients: Vec<Box<dyn ExternalSyncClient>> = vec![Box::new(FakeSyncClient::new(
         ExternalProvider::Todoist,
@@ -91,9 +95,15 @@ async fn sync_external_tasks_uses_injected_clients_without_network() {
             && operation.external_id.as_deref() == Some("local-1")
             && operation.applied
     }));
-    let pulled = board.get("todoist-remote-1").expect("load pulled task");
+    let pulled = board
+        .task_board_item("todoist-remote-1")
+        .await
+        .expect("load pulled task");
     assert_eq!(pulled.title, "Remote task");
-    let pushed = board.get("local-1").expect("load pushed task");
+    let pushed = board
+        .task_board_item("local-1")
+        .await
+        .expect("load pushed task");
     assert!(pushed.external_refs.iter().any(|reference| {
         reference.provider == ExternalRefProvider::Todoist && reference.external_id == "local-1"
     }));

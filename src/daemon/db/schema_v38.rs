@@ -52,6 +52,7 @@ mod tests {
             "idx_task_board_external_create_intents_one_active",
             "idx_task_board_external_create_intents_active_scope_state",
             "idx_task_board_external_create_intents_created_recovery",
+            "idx_task_board_external_create_intents_pending_follow_up",
             "idx_task_board_external_create_intents_item_history",
         ] {
             let exists: i64 = db

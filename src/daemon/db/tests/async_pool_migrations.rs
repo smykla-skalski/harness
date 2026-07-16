@@ -179,7 +179,7 @@ fn shipped_daemon_async_migration_checksums_remain_stable() {
         ),
         (
             "0032_daemon_v38_task_board_external_create_intents.sql",
-            "C96DD78DA86E8A5D63E71F543A084FE0003814CDDA92F551ABEB06C422F96AEAB4A4C49CCF1AF8603C055DF0CCF990AF",
+            "C7D2FB56584DD8D1DE324D944A13B1B5F73F1DE76A78A36E12F9C2CB4485E6B437AA03C5214D8B1DF13743276318FB3E",
         ),
     ];
     let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/daemon/db/migrations");

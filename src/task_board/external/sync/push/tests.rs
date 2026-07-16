@@ -6,7 +6,7 @@ use super::*;
 use crate::errors::CliErrorKind;
 use crate::task_board::external::{
     ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
-    ExternalSyncDirection, TaskBoardSyncItemSnapshot,
+    TaskBoardSyncItemSnapshot,
 };
 use crate::task_board::store::apply_patch;
 use crate::task_board::{ExternalRefSyncState, TaskBoardSyncConflict};
@@ -52,34 +52,6 @@ async fn linked_push_is_not_applied_when_required_local_persistence_fails() {
     assert_eq!(conflicts.len(), 1);
     assert_eq!(conflicts[0].local_value, serde_json::json!("Local edit"));
     assert_eq!(conflicts[0].item_revision, 2);
-}
-
-#[tokio::test]
-async fn remote_create_evidence_survives_conflict_persistence_failure() {
-    let item = TaskBoardItem::new(
-        "task-create".into(),
-        "Create remotely".into(),
-        "Body".into(),
-        "2026-07-16T10:00:00Z".into(),
-    );
-    let store = failing_store(&item, false, Some("conflict persistence failed"));
-    let mut operations = Vec::new();
-
-    let error = create_remote_item(
-        &store,
-        push_options(),
-        &CreateClient,
-        None,
-        &item,
-        &mut operations,
-    )
-    .await
-    .expect_err("local link and conflict persistence must fail");
-
-    assert!(matches!(error, SyncClientError::Local(_)));
-    assert_eq!(operations.len(), 1);
-    assert_eq!(operations[0].external_id.as_deref(), Some("remote-created"));
-    assert!(!operations[0].applied);
 }
 
 #[tokio::test]
@@ -234,26 +206,6 @@ impl ExternalSyncClient for UpdateClient {
     }
 }
 
-struct CreateClient;
-
-#[async_trait]
-impl ExternalSyncClient for CreateClient {
-    fn provider(&self) -> ExternalProvider {
-        ExternalProvider::Todoist
-    }
-
-    async fn pull_tasks(&self) -> Result<Vec<ExternalTask>, CliError> {
-        unreachable!("direct create test")
-    }
-
-    async fn push_task(&self, _item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
-        Ok(ExternalTaskRef::new(
-            ExternalProvider::Todoist,
-            "remote-created",
-        ))
-    }
-}
-
 struct FailingStore {
     item: TaskBoardItem,
     listed_item: TaskBoardItem,
@@ -262,6 +214,8 @@ struct FailingStore {
     update_succeeds: bool,
     conflict_error: Option<&'static str>,
 }
+
+impl crate::task_board::TaskBoardExternalCreateStore for FailingStore {}
 
 #[async_trait]
 impl TaskBoardSyncStore for FailingStore {
@@ -357,6 +311,19 @@ impl TaskBoardSyncStore for FailingStore {
         *self.conflicts.lock().expect("conflicts") = conflicts.to_vec();
         Ok(())
     }
+
+    async fn supersede_open_sync_conflicts(
+        &self,
+        _item_id: &str,
+        _provider: ExternalProvider,
+        _external_ref: &str,
+        _item_revision: i64,
+        _resolved_fields: &[ExternalSyncField],
+    ) -> Result<(), CliError> {
+        self.conflict_error.map_or(Ok(()), |message| {
+            Err(CliErrorKind::workflow_io(message).into())
+        })
+    }
 }
 
 fn failing_store(
@@ -371,13 +338,5 @@ fn failing_store(
         updated_items: Mutex::new(Vec::new()),
         update_succeeds,
         conflict_error,
-    }
-}
-
-fn push_options() -> ExternalSyncOptions {
-    ExternalSyncOptions {
-        direction: ExternalSyncDirection::Push,
-        dry_run: false,
-        ..ExternalSyncOptions::default()
     }
 }

@@ -240,9 +240,18 @@ pub(super) fn next_timestamp(previous: &str) -> Result<String, CliError> {
     let next = if now > previous {
         now
     } else {
-        previous + Duration::seconds(1)
+        previous
+            .checked_add_signed(Duration::seconds(1))
+            .ok_or_else(|| db_error("external create timestamp cannot advance"))?
     };
-    Ok(next.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+    let next = next.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    if next.len() == 20 {
+        Ok(next)
+    } else {
+        Err(db_error(
+            "external create timestamp advances beyond the persisted timestamp range",
+        ))
+    }
 }
 
 pub(super) fn provider_label(provider: ExternalProvider) -> &'static str {

@@ -47,10 +47,6 @@ impl AsyncDaemonDb {
             .map_err(|error| db_error(format!("commit task-board sync conflicts: {error}")))
     }
 
-    #[expect(
-        clippy::cognitive_complexity,
-        reason = "field-scoped supersession keeps revision validation and one atomic publication"
-    )]
     pub(crate) async fn supersede_open_task_board_sync_conflicts(
         &self,
         item_id: &str,
@@ -62,27 +58,17 @@ impl AsyncDaemonDb {
         let mut transaction = self
             .begin_immediate_transaction("task board sync conflict supersession")
             .await?;
-        require_item_revision(transaction.as_mut(), item_id, item_revision).await?;
         let resolved_at = utc_now();
-        let mut changed = false;
-        for field in resolved_fields {
-            changed |= query(
-                "UPDATE task_board_sync_conflicts
-                 SET state = 'superseded', resolved_at = ?5
-                 WHERE item_id = ?1 AND provider = ?2 AND external_ref = ?3
-                   AND field = ?4 AND state = 'open'",
-            )
-            .bind(item_id)
-            .bind(provider_label(provider))
-            .bind(external_ref)
-            .bind(field_label(*field))
-            .bind(&resolved_at)
-            .execute(transaction.as_mut())
-            .await
-            .map_err(|error| db_error(format!("supersede task-board sync field: {error}")))?
-            .rows_affected()
-                > 0;
-        }
+        let changed = supersede_open_sync_conflicts_in_connection(
+            transaction.as_mut(),
+            item_id,
+            provider,
+            external_ref,
+            item_revision,
+            resolved_fields,
+            &resolved_at,
+        )
+        .await?;
         if changed {
             bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
         }
@@ -108,6 +94,38 @@ impl AsyncDaemonDb {
         .map_err(|error| db_error(format!("list task-board sync conflicts: {error}")))?;
         rows.into_iter().map(ConflictRow::into_conflict).collect()
     }
+}
+
+pub(super) async fn supersede_open_sync_conflicts_in_connection(
+    connection: &mut SqliteConnection,
+    item_id: &str,
+    provider: ExternalProvider,
+    external_ref: &str,
+    item_revision: i64,
+    resolved_fields: &[ExternalSyncField],
+    resolved_at: &str,
+) -> Result<bool, CliError> {
+    require_item_revision(connection, item_id, item_revision).await?;
+    let mut changed = false;
+    for field in resolved_fields {
+        changed |= query(
+            "UPDATE task_board_sync_conflicts
+             SET state = 'superseded', resolved_at = ?5
+             WHERE item_id = ?1 AND provider = ?2 AND external_ref = ?3
+               AND field = ?4 AND state = 'open'",
+        )
+        .bind(item_id)
+        .bind(provider_label(provider))
+        .bind(external_ref)
+        .bind(field_label(*field))
+        .bind(resolved_at)
+        .execute(&mut *connection)
+        .await
+        .map_err(|error| db_error(format!("supersede task-board sync field: {error}")))?
+        .rows_affected()
+            > 0;
+    }
+    Ok(changed)
 }
 
 fn require_conflict_revisions(

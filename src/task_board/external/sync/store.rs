@@ -1,11 +1,16 @@
 use async_trait::async_trait;
 
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::{
-    ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision, ExternalProviderScopeState,
+    ExternalCreateOutcome, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
+    ExternalProviderScopeState,
 };
 use crate::task_board::store::TaskBoardItemPatch;
-use crate::task_board::{ExternalProvider, TaskBoardItem, TaskBoardStatus, TaskBoardSyncConflict};
+use crate::task_board::{
+    ExternalProvider, ExternalRef, ExternalSyncField, TaskBoardExternalCreateBegin,
+    TaskBoardExternalCreateFinalizeResult, TaskBoardExternalCreateIntent, TaskBoardItem,
+    TaskBoardStatus, TaskBoardSyncConflict,
+};
 
 #[derive(Debug, Clone)]
 pub(crate) struct TaskBoardSyncItemSnapshot {
@@ -23,7 +28,64 @@ impl TaskBoardSyncItemSnapshot {
 }
 
 #[async_trait]
-pub(crate) trait TaskBoardSyncStore: Send + Sync {
+pub(crate) trait TaskBoardExternalCreateStore: Send + Sync {
+    async fn begin_external_create_intent(
+        &self,
+        _item_id: &str,
+        _provider: ExternalProvider,
+        _scope_id: &str,
+        _provider_target: &str,
+    ) -> Result<TaskBoardExternalCreateBegin, CliError> {
+        Err(durable_external_create_store_required())
+    }
+
+    async fn record_external_create_outcome(
+        &self,
+        _intent: &TaskBoardExternalCreateIntent,
+        _outcome: &ExternalCreateOutcome,
+        _provider_baseline: &ExternalRef,
+    ) -> Result<TaskBoardExternalCreateIntent, CliError> {
+        Err(durable_external_create_store_required())
+    }
+
+    async fn finalize_external_create_intent(
+        &self,
+        _intent: &TaskBoardExternalCreateIntent,
+    ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
+        Err(durable_external_create_store_required())
+    }
+
+    async fn list_created_external_create_intents(
+        &self,
+    ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
+        Err(durable_external_create_store_required())
+    }
+
+    async fn list_in_flight_external_create_intents(
+        &self,
+        _provider: ExternalProvider,
+    ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
+        Err(durable_external_create_store_required())
+    }
+
+    async fn external_create_intent_by_create_key(
+        &self,
+        _provider: ExternalProvider,
+        _create_key: &str,
+    ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
+        Err(durable_external_create_store_required())
+    }
+
+    async fn list_pending_external_create_follow_ups(
+        &self,
+        _provider: Option<ExternalProvider>,
+    ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
+        Err(durable_external_create_store_required())
+    }
+}
+
+#[async_trait]
+pub(crate) trait TaskBoardSyncStore: TaskBoardExternalCreateStore {
     async fn list_items(
         &self,
         status: Option<TaskBoardStatus>,
@@ -78,4 +140,22 @@ pub(crate) trait TaskBoardSyncStore: Send + Sync {
         item_revision: i64,
         conflicts: &[TaskBoardSyncConflict],
     ) -> Result<(), CliError>;
+
+    async fn supersede_open_sync_conflicts(
+        &self,
+        _item_id: &str,
+        _provider: ExternalProvider,
+        _external_ref: &str,
+        _item_revision: i64,
+        _resolved_fields: &[ExternalSyncField],
+    ) -> Result<(), CliError> {
+        Err(CliErrorKind::workflow_io(
+            "field-scoped task-board conflict supersession is unavailable",
+        )
+        .into())
+    }
+}
+
+fn durable_external_create_store_required() -> CliError {
+    CliErrorKind::workflow_io("durable task-board external-create storage is unavailable").into()
 }

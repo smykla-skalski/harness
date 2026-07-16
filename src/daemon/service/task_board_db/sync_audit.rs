@@ -19,6 +19,7 @@ mod persistence;
 mod state;
 
 pub(super) use metrics::SyncExecutionMetrics;
+pub(super) use persistence::record_external_create_follow_ups;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum TaskBoardSyncAuditTrigger {

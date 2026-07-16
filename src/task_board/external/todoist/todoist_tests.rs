@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use super::*;
 
+mod create_recovery_tests;
 mod move_tests;
 mod pagination_tests;
 mod request_id_tests;

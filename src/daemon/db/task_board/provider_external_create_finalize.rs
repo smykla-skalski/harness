@@ -1,4 +1,4 @@
-use sqlx::{Sqlite, Transaction, query_as};
+use sqlx::{Sqlite, SqliteConnection, Transaction, query_as};
 
 use super::items::{bump_change_in_tx, load_item_in_tx, replace_item_in_tx};
 use super::provider_external_create_evidence::{
@@ -8,14 +8,16 @@ use super::provider_external_create_rows::{
     create_conflict, load_intent_by_id, next_timestamp, provider_label, require_same_intent,
     update_attached_receipt,
 };
+use super::provider_sync_conflicts::supersede_open_sync_conflicts_in_connection;
 use super::{ITEMS_CHANGE_SCOPE, ORCHESTRATOR_CHANGE_SCOPE};
 use crate::daemon::db::{AsyncDaemonDb, CliError, db_error};
 use crate::task_board::{
-    ExternalProvider, ExternalRef, TaskBoardExternalCreateEvidence,
+    ExternalProvider, ExternalRef, ExternalSyncField, TaskBoardExternalCreateEvidence,
     TaskBoardExternalCreateFinalizeDisposition, TaskBoardExternalCreateFinalizeResult,
     TaskBoardExternalCreateIntent, TaskBoardExternalCreateIntentState,
-    TaskBoardExternalCreateReceipt, TaskBoardItem, normalize_repository_slug,
+    TaskBoardExternalCreateReceipt, TaskBoardItem, TaskBoardStatus, normalize_repository_slug,
 };
+use crate::workspace::utc_now;
 
 impl AsyncDaemonDb {
     #[expect(
@@ -60,7 +62,7 @@ impl AsyncDaemonDb {
         ) {
             return Err(create_conflict(&stored, "intent is not ready to finalize"));
         }
-        let Some((mut item, item_revision)) =
+        let Some((item, item_revision)) =
             load_item_in_tx(&mut transaction, &stored.item_id).await?
         else {
             commit(transaction, "missing-item task-board external create").await?;
@@ -88,33 +90,66 @@ impl AsyncDaemonDb {
                 item_revision,
                 &attached_at,
                 provider_target.as_deref(),
+                &expected.provider_baseline,
             )
             .await;
         }
-        apply_provider_identity(&mut item, &stored, provider_target.as_deref())?;
-        item.external_refs.push(expected.provider_baseline.clone());
-        if item.updated_at.as_str() < attached_at.as_str() {
-            item.updated_at.clone_from(&attached_at);
-        }
-        let attached_item_revision = item_revision + 1;
-        replace_item_in_tx(&mut transaction, &item, attached_item_revision).await?;
-        update_attached_receipt(
-            &mut transaction,
-            &stored,
+        finalize_new_link(
+            transaction,
+            stored,
+            item,
+            item_revision,
             &attached_at,
-            attached_item_revision,
+            provider_target.as_deref(),
+            &expected.provider_baseline,
         )
-        .await?;
-        bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
-        commit(transaction, "task-board external create finalize").await?;
-        let attached = attached_intent(stored, &attached_at, attached_item_revision)?;
-        Ok(finalize_result(
-            attached,
-            Some(item),
-            Some(attached_item_revision),
-            TaskBoardExternalCreateFinalizeDisposition::Attached,
-        ))
+        .await
     }
+}
+
+async fn finalize_new_link(
+    mut transaction: Transaction<'_, Sqlite>,
+    stored: TaskBoardExternalCreateIntent,
+    mut item: TaskBoardItem,
+    item_revision: i64,
+    attached_at: &str,
+    provider_target: Option<&str>,
+    provider_baseline: &ExternalRef,
+) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
+    apply_provider_identity(&mut item, &stored, provider_target)?;
+    item.external_refs.push(provider_baseline.clone());
+    if item.updated_at.as_str() < attached_at {
+        attached_at.clone_into(&mut item.updated_at);
+    }
+    let attached_item_revision = item_revision + 1;
+    replace_item_in_tx(&mut transaction, &item, attached_item_revision).await?;
+    update_attached_receipt(
+        &mut transaction,
+        &stored,
+        attached_at,
+        attached_item_revision,
+    )
+    .await?;
+    let conflicts_changed = supersede_create_conflicts(
+        transaction.as_mut(),
+        &stored,
+        &item,
+        attached_item_revision,
+        provider_baseline,
+    )
+    .await?;
+    bump_change_in_tx(&mut transaction, ITEMS_CHANGE_SCOPE).await?;
+    if conflicts_changed {
+        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    }
+    commit(transaction, "task-board external create finalize").await?;
+    let attached = attached_intent(stored, attached_at, attached_item_revision)?;
+    Ok(finalize_result(
+        attached,
+        Some(item),
+        Some(attached_item_revision),
+        TaskBoardExternalCreateFinalizeDisposition::Attached,
+    ))
 }
 
 async fn finalize_existing_link(
@@ -124,6 +159,7 @@ async fn finalize_existing_link(
     item_revision: i64,
     attached_at: &str,
     provider_target: Option<&str>,
+    provider_baseline: &ExternalRef,
 ) -> Result<TaskBoardExternalCreateFinalizeResult, CliError> {
     let identity_changed = apply_provider_identity(&mut item, &stored, provider_target)?;
     let attached_item_revision = if identity_changed {
@@ -143,6 +179,14 @@ async fn finalize_existing_link(
         attached_item_revision,
     )
     .await?;
+    let conflicts_changed = supersede_create_conflicts(
+        transaction.as_mut(),
+        &stored,
+        &item,
+        attached_item_revision,
+        provider_baseline,
+    )
+    .await?;
     bump_change_in_tx(
         &mut transaction,
         if identity_changed {
@@ -152,6 +196,9 @@ async fn finalize_existing_link(
         },
     )
     .await?;
+    if identity_changed && conflicts_changed {
+        bump_change_in_tx(&mut transaction, ORCHESTRATOR_CHANGE_SCOPE).await?;
+    }
     commit(transaction, "task-board external create linked receipt").await?;
     let attached = attached_intent(stored, attached_at, attached_item_revision)?;
     Ok(finalize_result(
@@ -160,6 +207,59 @@ async fn finalize_existing_link(
         Some(attached_item_revision),
         TaskBoardExternalCreateFinalizeDisposition::AlreadyLinked,
     ))
+}
+
+async fn supersede_create_conflicts(
+    connection: &mut SqliteConnection,
+    intent: &TaskBoardExternalCreateIntent,
+    item: &TaskBoardItem,
+    item_revision: i64,
+    baseline: &ExternalRef,
+) -> Result<bool, CliError> {
+    let fields = proven_create_fields(intent, item, baseline);
+    supersede_open_sync_conflicts_in_connection(
+        connection,
+        &intent.item_id,
+        intent.provider,
+        &baseline.external_id,
+        item_revision,
+        &fields,
+        &utc_now(),
+    )
+    .await
+}
+
+fn proven_create_fields(
+    intent: &TaskBoardExternalCreateIntent,
+    item: &TaskBoardItem,
+    baseline: &ExternalRef,
+) -> Vec<ExternalSyncField> {
+    let Some(state) = baseline.sync_state.as_ref() else {
+        return Vec::new();
+    };
+    intent
+        .changed_fields
+        .iter()
+        .copied()
+        .filter(|field| match field {
+            ExternalSyncField::Title => state.title.as_deref() == Some(&item.title),
+            ExternalSyncField::Body => state.body.as_deref() == Some(&item.body),
+            ExternalSyncField::Status => {
+                state.status.map(canonical_provider_status)
+                    == Some(canonical_provider_status(item.status))
+            }
+            ExternalSyncField::Project => state.project_id == item.project_id,
+            ExternalSyncField::Url => false,
+        })
+        .collect()
+}
+
+fn canonical_provider_status(status: TaskBoardStatus) -> TaskBoardStatus {
+    if status.canonical_persisted_status() == TaskBoardStatus::Done {
+        TaskBoardStatus::Done
+    } else {
+        TaskBoardStatus::Backlog
+    }
 }
 
 async fn require_identity_not_linked_elsewhere(

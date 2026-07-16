@@ -84,6 +84,8 @@ const EXPECTED_COLUMNS: &[ExpectedColumn] = &[
     ExpectedColumn::optional("outcome_recorded_at", "TEXT"),
     ExpectedColumn::optional("attached_at", "TEXT"),
     ExpectedColumn::optional("attached_item_revision", "INTEGER"),
+    ExpectedColumn::optional("follow_up_completed_at", "TEXT"),
+    ExpectedColumn::optional("follow_up_audit_event_id", "TEXT"),
     ExpectedColumn::required("updated_at", "TEXT"),
 ];
 
@@ -121,6 +123,20 @@ const INDEX_SHAPES: &[IndexShape] = &[
         partial: true,
         columns: &[("outcome_recorded_at", false), ("intent_id", false)],
         predicate: Some("where state = 'created'"),
+    },
+    IndexShape {
+        name: "idx_task_board_external_create_intents_pending_follow_up",
+        unique: false,
+        partial: true,
+        columns: &[
+            ("provider", false),
+            ("scope_id", false),
+            ("attached_at", false),
+            ("intent_id", false),
+        ],
+        predicate: Some(
+            "where state = 'attached' and follow_up_completed_at is null and follow_up_audit_event_id is null",
+        ),
     },
     IndexShape {
         name: "idx_task_board_external_create_intents_item_history",

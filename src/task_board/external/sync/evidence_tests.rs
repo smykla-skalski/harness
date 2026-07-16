@@ -201,6 +201,8 @@ struct EvidenceStore {
     failure_completions: AtomicUsize,
 }
 
+impl TaskBoardExternalCreateStore for EvidenceStore {}
+
 impl EvidenceStore {
     fn with_create_limit(successful_creates: usize) -> Self {
         Self {
@@ -348,6 +350,19 @@ impl TaskBoardSyncStore for EvidenceStore {
         _external_ref: &str,
         _item_revision: i64,
         _conflicts: &[TaskBoardSyncConflict],
+    ) -> Result<(), CliError> {
+        self.conflict_error.map_or(Ok(()), |message| {
+            Err(CliErrorKind::workflow_io(message).into())
+        })
+    }
+
+    async fn supersede_open_sync_conflicts(
+        &self,
+        _item_id: &str,
+        _provider: ExternalProvider,
+        _external_ref: &str,
+        _item_revision: i64,
+        _resolved_fields: &[ExternalSyncField],
     ) -> Result<(), CliError> {
         self.conflict_error.map_or(Ok(()), |message| {
             Err(CliErrorKind::workflow_io(message).into())

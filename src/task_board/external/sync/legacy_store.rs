@@ -6,9 +6,42 @@ use crate::task_board::external::{
 };
 use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
-use crate::task_board::{ExternalProvider, TaskBoardSyncConflict};
+use crate::task_board::{
+    ExternalProvider, ExternalSyncField, TaskBoardExternalCreateIntent, TaskBoardSyncConflict,
+};
 
-use super::{TaskBoardSyncItemSnapshot, TaskBoardSyncStore};
+use super::{TaskBoardExternalCreateStore, TaskBoardSyncItemSnapshot, TaskBoardSyncStore};
+
+#[async_trait]
+impl TaskBoardExternalCreateStore for TaskBoardStore {
+    async fn list_created_external_create_intents(
+        &self,
+    ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
+        Ok(Vec::new())
+    }
+
+    async fn list_in_flight_external_create_intents(
+        &self,
+        _provider: ExternalProvider,
+    ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
+        Ok(Vec::new())
+    }
+
+    async fn external_create_intent_by_create_key(
+        &self,
+        _provider: ExternalProvider,
+        _create_key: &str,
+    ) -> Result<Option<TaskBoardExternalCreateIntent>, CliError> {
+        Ok(None)
+    }
+
+    async fn list_pending_external_create_follow_ups(
+        &self,
+        _provider: Option<ExternalProvider>,
+    ) -> Result<Vec<TaskBoardExternalCreateIntent>, CliError> {
+        Ok(Vec::new())
+    }
+}
 
 #[async_trait]
 impl TaskBoardSyncStore for TaskBoardStore {
@@ -134,6 +167,17 @@ impl TaskBoardSyncStore for TaskBoardStore {
     ) -> Result<(), CliError> {
         Ok(())
     }
+
+    async fn supersede_open_sync_conflicts(
+        &self,
+        _item_id: &str,
+        _provider: ExternalProvider,
+        _external_ref: &str,
+        _item_revision: i64,
+        _resolved_fields: &[ExternalSyncField],
+    ) -> Result<(), CliError> {
+        Ok(())
+    }
 }
 
 fn sync_join_error(operation: &str, error: tokio::task::JoinError) -> CliError {
@@ -141,4 +185,22 @@ fn sync_join_error(operation: &str, error: tokio::task::JoinError) -> CliError {
         "task-board external sync {operation} worker failed: {error}"
     ))
     .into()
+}
+
+#[tokio::test]
+async fn non_durable_store_rejects_external_create_admission() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let board = TaskBoardStore::new(temp.path().join("board"));
+
+    let error = TaskBoardExternalCreateStore::begin_external_create_intent(
+        &board,
+        "task-create",
+        ExternalProvider::Todoist,
+        "todoist:scope",
+        "todoist-project",
+    )
+    .await
+    .expect_err("non-durable create admission must fail closed");
+
+    assert_eq!(error.code(), "WORKFLOW_IO");
 }

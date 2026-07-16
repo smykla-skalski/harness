@@ -1,4 +1,5 @@
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
+use crate::task_board::TaskBoardExternalCreateIntent;
 use crate::task_board::external::{
     ExternalProvider, ExternalProviderScopeAttempt, ExternalProviderScopeAttemptDecision,
     ExternalProviderScopeAvailability, ExternalProviderScopeIdentity, ExternalSyncBatch,
@@ -6,6 +7,9 @@ use crate::task_board::external::{
 };
 use crate::workspace::utc_now;
 
+use super::create_recovery::{
+    ExternalCreateRecoveryPlan, ExternalCreateScopeRecovery, recover_scope_intents,
+};
 use super::delete::delete_remote_tombstones;
 use super::lookup::provider_is_allowed;
 use super::{
@@ -32,17 +36,49 @@ pub(crate) async fn sync_external_tasks_scoped(
     options: ExternalSyncOptions,
     clients: &[Box<dyn ExternalSyncClient>],
 ) -> Result<ExternalSyncBatch, CliError> {
-    let mut batch = BatchAccumulator::default();
+    sync_external_tasks_scoped_with_recovery(
+        board,
+        options,
+        clients,
+        ExternalCreateRecoveryPlan::default(),
+    )
+    .await
+}
+
+pub(crate) async fn sync_external_tasks_scoped_with_recovery(
+    board: &dyn TaskBoardSyncStore,
+    options: ExternalSyncOptions,
+    clients: &[Box<dyn ExternalSyncClient>],
+    mut recovery: ExternalCreateRecoveryPlan,
+) -> Result<ExternalSyncBatch, CliError> {
+    let mut batch = BatchAccumulator {
+        operations: recovery.take_operations(),
+        external_create_follow_ups: recovery.take_follow_ups(),
+        ..BatchAccumulator::default()
+    };
     for client in clients {
         if provider_is_allowed(client.provider(), options.provider) {
-            sync_scope(board, options, client.as_ref(), &mut batch).await?;
+            let scope = ExternalProviderScopeIdentity::for_client(client.as_ref());
+            let recovery_scope = recovery.take_scope(scope.provider(), scope.scope_id());
+            sync_scope(board, options, client.as_ref(), &recovery_scope, &mut batch).await?;
             if batch.terminal_error.is_some() {
                 break;
             }
         }
     }
+    if batch.terminal_error.is_none() && recovery.has_recovery() {
+        let blocked = recovery.into_blocked(
+            CliErrorKind::workflow_io(
+                "provider create recovery has no configured client for its persisted scope",
+            )
+            .into(),
+        );
+        batch.scope_outcomes.extend(blocked.scope_outcomes);
+        batch.terminal_error = blocked.terminal_error;
+    }
     Ok(ExternalSyncBatch {
         operations: batch.operations,
+        external_create_follow_ups: batch.external_create_follow_ups,
         scope_outcomes: batch.scope_outcomes,
         first_provider_failure: batch.first_provider_failure,
         terminal_error: batch.terminal_error,
@@ -52,6 +88,7 @@ pub(crate) async fn sync_external_tasks_scoped(
 #[derive(Default)]
 struct BatchAccumulator {
     operations: Vec<ExternalSyncOperation>,
+    external_create_follow_ups: Vec<TaskBoardExternalCreateIntent>,
     scope_outcomes: Vec<ExternalSyncScopeOutcome>,
     first_provider_failure: Option<CliError>,
     terminal_error: Option<CliError>,
@@ -61,6 +98,7 @@ async fn sync_scope(
     board: &dyn TaskBoardSyncStore,
     options: ExternalSyncOptions,
     client: &dyn ExternalSyncClient,
+    recovery: &ExternalCreateScopeRecovery,
     batch: &mut BatchAccumulator,
 ) -> Result<(), CliError> {
     let scope = ExternalProviderScopeIdentity::for_client(client);
@@ -75,7 +113,16 @@ async fn sync_scope(
             return Ok(());
         }
     };
-    sync_admitted_scope(board, options, client, &scope, attempt.as_ref(), batch).await
+    sync_admitted_scope(
+        board,
+        options,
+        client,
+        &scope,
+        attempt.as_ref(),
+        recovery,
+        batch,
+    )
+    .await
 }
 
 async fn sync_admitted_scope(
@@ -84,12 +131,88 @@ async fn sync_admitted_scope(
     client: &dyn ExternalSyncClient,
     scope: &ExternalProviderScopeIdentity,
     attempt: Option<&ExternalProviderScopeAttempt>,
+    recovery: &ExternalCreateScopeRecovery,
     batch: &mut BatchAccumulator,
 ) -> Result<(), CliError> {
     let provider = scope.provider();
     let scope_id = scope.scope_id().to_owned();
-    match sync_client(board, options, client, attempt, &mut batch.operations).await {
-        Ok(base_revision) => {
+    let sync_result = run_scope_work(
+        board,
+        options,
+        client,
+        attempt,
+        &recovery.intents,
+        &mut batch.operations,
+        &mut batch.external_create_follow_ups,
+    )
+    .await?;
+    finish_scope_work(
+        board,
+        attempt,
+        provider,
+        scope_id,
+        recovery.touched,
+        sync_result,
+        batch,
+    )
+    .await
+}
+
+async fn run_scope_work(
+    board: &dyn TaskBoardSyncStore,
+    options: ExternalSyncOptions,
+    client: &dyn ExternalSyncClient,
+    attempt: Option<&ExternalProviderScopeAttempt>,
+    recovery_intents: &[TaskBoardExternalCreateIntent],
+    operations: &mut Vec<ExternalSyncOperation>,
+    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
+) -> Result<Result<SyncClientResult, SyncClientError>, CliError> {
+    if recovery_intents.is_empty() {
+        return Ok(sync_client(board, options, client, attempt, operations, follow_ups).await);
+    }
+    let Some(attempt) = attempt else {
+        return Err(CliErrorKind::workflow_io(
+            "provider create recovery requires a persisted scope attempt",
+        )
+        .into());
+    };
+    if let Err(error) = recover_scope_intents(
+        board,
+        client,
+        attempt,
+        recovery_intents,
+        operations,
+        follow_ups,
+    )
+    .await
+    {
+        return Ok(Err(error));
+    }
+    Ok(sync_client(
+        board,
+        options,
+        client,
+        Some(attempt),
+        operations,
+        follow_ups,
+    )
+    .await)
+}
+
+async fn finish_scope_work(
+    board: &dyn TaskBoardSyncStore,
+    attempt: Option<&ExternalProviderScopeAttempt>,
+    provider: ExternalProvider,
+    scope_id: String,
+    recovery_touched: bool,
+    sync_result: Result<SyncClientResult, SyncClientError>,
+    batch: &mut BatchAccumulator,
+) -> Result<(), CliError> {
+    match sync_result {
+        Ok(result) => {
+            let base_revision = (!recovery_touched && !result.durable_create)
+                .then_some(result.base_revision)
+                .flatten();
             record_scope_success(
                 board,
                 attempt,
@@ -238,10 +361,25 @@ async fn sync_client(
     client: &dyn ExternalSyncClient,
     attempt: Option<&ExternalProviderScopeAttempt>,
     operations: &mut Vec<ExternalSyncOperation>,
-) -> Result<Option<String>, SyncClientError> {
-    let base_revision = pull_client_tasks(board, options, client, attempt, operations).await?;
-    push_client_tasks(board, options, client, attempt, operations).await?;
-    Ok(base_revision)
+    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
+) -> Result<SyncClientResult, SyncClientError> {
+    let pull = pull_client_tasks(board, options, client, attempt, operations, follow_ups).await?;
+    let pushed_create =
+        push_client_tasks(board, options, client, attempt, operations, follow_ups).await?;
+    Ok(SyncClientResult {
+        base_revision: pull.base_revision,
+        durable_create: pull.recovered_create || pushed_create,
+    })
+}
+
+struct SyncClientResult {
+    base_revision: Option<String>,
+    durable_create: bool,
+}
+
+struct PullClientResult {
+    base_revision: Option<String>,
+    recovered_create: bool,
 }
 
 async fn pull_client_tasks(
@@ -250,9 +388,13 @@ async fn pull_client_tasks(
     client: &dyn ExternalSyncClient,
     attempt: Option<&ExternalProviderScopeAttempt>,
     operations: &mut Vec<ExternalSyncOperation>,
-) -> Result<Option<String>, SyncClientError> {
+    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
+) -> Result<PullClientResult, SyncClientError> {
     if !direction_allows_pull(options.direction) || !client.allows_pull() {
-        return Ok(None);
+        return Ok(PullClientResult {
+            base_revision: None,
+            recovered_create: false,
+        });
     }
     super::scope::renew_scope_attempt(board, attempt).await?;
     let tasks = client
@@ -265,10 +407,14 @@ async fn pull_client_tasks(
         .filter_map(|task| task.updated_at.as_ref())
         .max()
         .cloned();
-    pull_provider_tasks(board, options, client, tasks, operations)
-        .await
-        .map_err(SyncClientError::Local)?;
-    Ok(base_revision)
+    let recovered_create =
+        pull_provider_tasks(board, options, client, tasks, operations, follow_ups)
+            .await
+            .map_err(SyncClientError::Local)?;
+    Ok(PullClientResult {
+        base_revision,
+        recovered_create,
+    })
 }
 
 async fn push_client_tasks(
@@ -277,12 +423,15 @@ async fn push_client_tasks(
     client: &dyn ExternalSyncClient,
     attempt: Option<&ExternalProviderScopeAttempt>,
     operations: &mut Vec<ExternalSyncOperation>,
-) -> Result<(), SyncClientError> {
+    follow_ups: &mut Vec<TaskBoardExternalCreateIntent>,
+) -> Result<bool, SyncClientError> {
     if direction_allows_push(options.direction) && client.allows_push() {
-        push_board_tasks(board, options, client, attempt, operations).await?;
+        let created =
+            push_board_tasks(board, options, client, attempt, operations, follow_ups).await?;
         delete_remote_tombstones(board, options, client, attempt, operations).await?;
+        return Ok(created);
     }
-    Ok(())
+    Ok(false)
 }
 
 fn direction_allows_pull(direction: ExternalSyncDirection) -> bool {

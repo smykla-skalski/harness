@@ -89,21 +89,6 @@ pub(super) fn replace_synced_ref(
         .collect()
 }
 
-pub(super) fn synced_ref_from_item(
-    reference: ExternalTaskRef,
-    item: &TaskBoardItem,
-    provider_project_id: Option<&str>,
-    provider_revision: Option<&str>,
-) -> ExternalRef {
-    let mut reference = reference.into_core_ref();
-    reference.sync_state = Some(sync_state_from_created_item(
-        item,
-        provider_project_id,
-        provider_revision,
-    ));
-    reference
-}
-
 pub(super) fn sync_state_from_task(task: &ExternalTask) -> ExternalRefSyncState {
     ExternalRefSyncState {
         title: Some(task.title.clone()),
@@ -126,6 +111,19 @@ pub(super) fn pull_create_fields(task: &ExternalTask) -> Vec<ExternalSyncField> 
     }
     if task.reference.url.is_some() {
         fields.push(ExternalSyncField::Url);
+    }
+    fields
+}
+
+pub(super) fn pull_resolution_fields(task: &ExternalTask) -> Vec<ExternalSyncField> {
+    let mut fields = vec![
+        ExternalSyncField::Title,
+        ExternalSyncField::Body,
+        ExternalSyncField::Status,
+        ExternalSyncField::Url,
+    ];
+    if provider_project_maps_to_board(task.reference.provider) {
+        fields.push(ExternalSyncField::Project);
     }
     fields
 }
@@ -159,21 +157,6 @@ pub(super) fn changed_fields(patch: &TaskBoardItemPatch) -> Vec<ExternalSyncFiel
         ExternalSyncField::Project,
     );
     fields
-}
-
-fn sync_state_from_created_item(
-    item: &TaskBoardItem,
-    provider_project_id: Option<&str>,
-    provider_revision: Option<&str>,
-) -> ExternalRefSyncState {
-    ExternalRefSyncState {
-        title: Some(item.title.clone()),
-        body: Some(item.body.clone()),
-        status: Some(TaskBoardStatus::Backlog),
-        project_id: provider_project_id.map(ToOwned::to_owned),
-        updated_at: provider_revision.map(ToOwned::to_owned),
-        synced_at: Some(utc_now()),
-    }
 }
 
 fn synced_ref_from_update(

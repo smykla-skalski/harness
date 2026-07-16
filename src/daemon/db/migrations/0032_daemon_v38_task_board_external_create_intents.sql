@@ -34,6 +34,16 @@ CREATE TABLE IF NOT EXISTS task_board_external_create_intents (
                                   OR attached_at GLOB '????-??-??T??:??:??Z'
                               ),
     attached_item_revision INTEGER,
+    follow_up_completed_at TEXT
+                              CHECK (
+                                  follow_up_completed_at IS NULL
+                                  OR follow_up_completed_at GLOB '????-??-??T??:??:??Z'
+                              ),
+    follow_up_audit_event_id TEXT
+                                 CHECK (
+                                     follow_up_audit_event_id IS NULL
+                                     OR length(follow_up_audit_event_id) > 0
+                                 ),
     updated_at            TEXT NOT NULL
                               CHECK (updated_at GLOB '????-??-??T??:??:??Z'),
     CHECK (
@@ -44,6 +54,8 @@ CREATE TABLE IF NOT EXISTS task_board_external_create_intents (
             AND outcome_recorded_at IS NULL
             AND attached_at IS NULL
             AND attached_item_revision IS NULL
+            AND follow_up_completed_at IS NULL
+            AND follow_up_audit_event_id IS NULL
             AND updated_at = created_at
         )
         OR
@@ -57,6 +69,8 @@ CREATE TABLE IF NOT EXISTS task_board_external_create_intents (
             AND outcome_recorded_at > created_at
             AND attached_at IS NULL
             AND attached_item_revision IS NULL
+            AND follow_up_completed_at IS NULL
+            AND follow_up_audit_event_id IS NULL
             AND updated_at = outcome_recorded_at
         )
         OR
@@ -72,6 +86,18 @@ CREATE TABLE IF NOT EXISTS task_board_external_create_intents (
             AND attached_at > outcome_recorded_at
             AND attached_item_revision IS NOT NULL
             AND attached_item_revision >= item_revision
+            AND (
+                (
+                    follow_up_completed_at IS NULL
+                    AND follow_up_audit_event_id IS NULL
+                )
+                OR
+                (
+                    follow_up_completed_at IS NOT NULL
+                    AND follow_up_audit_event_id IS NOT NULL
+                    AND follow_up_completed_at > attached_at
+                )
+            )
             AND updated_at = attached_at
         )
     )
@@ -93,6 +119,14 @@ CREATE INDEX IF NOT EXISTS idx_task_board_external_create_intents_active_scope_s
 CREATE INDEX IF NOT EXISTS idx_task_board_external_create_intents_created_recovery
     ON task_board_external_create_intents(outcome_recorded_at, intent_id)
     WHERE state = 'created';
+
+CREATE INDEX IF NOT EXISTS idx_task_board_external_create_intents_pending_follow_up
+    ON task_board_external_create_intents(
+        provider, scope_id, attached_at, intent_id
+    )
+    WHERE state = 'attached'
+      AND follow_up_completed_at IS NULL
+      AND follow_up_audit_event_id IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_task_board_external_create_intents_item_history
     ON task_board_external_create_intents(item_id, provider, updated_at DESC, intent_id);

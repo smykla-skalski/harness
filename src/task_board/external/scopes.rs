@@ -3,6 +3,7 @@ use chrono::DateTime;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::{ExternalProvider, ExternalSyncClient, ExternalSyncOperation};
+use crate::task_board::TaskBoardExternalCreateIntent;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ExternalProviderScopeIdentity {
@@ -209,6 +210,7 @@ impl ExternalSyncScopeOutcome {
 #[derive(Debug)]
 pub(crate) struct ExternalSyncBatch {
     pub(crate) operations: Vec<ExternalSyncOperation>,
+    pub(crate) external_create_follow_ups: Vec<TaskBoardExternalCreateIntent>,
     pub(crate) scope_outcomes: Vec<ExternalSyncScopeOutcome>,
     pub(crate) first_provider_failure: Option<CliError>,
     pub(crate) terminal_error: Option<CliError>,
