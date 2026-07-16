@@ -466,8 +466,13 @@ fn verify_existing_marker(
     marker: &TaskBoardImportMarker,
     snapshot: &LegacyTaskBoardSnapshot,
 ) -> Result<(), CliError> {
-    if marker.source_digest == snapshot.source_digest
-        && marker.canonical_model_digest == snapshot.canonical_digest
+    if marker.source_digest != snapshot.source_digest {
+        return Err(db_error(
+            "legacy Task Board source changed after the database import completed",
+        ));
+    }
+    if marker.source_kind == EMPTY_DATABASE_SOURCE
+        || marker.canonical_model_digest == snapshot.canonical_digest
     {
         return Ok(());
     }

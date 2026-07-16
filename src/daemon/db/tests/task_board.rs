@@ -1,8 +1,6 @@
 use tempfile::tempdir;
 
 use super::*;
-use crate::task_board::TaskBoardStore;
-use crate::task_board::legacy_import::LegacyTaskBoardSnapshot;
 use crate::task_board::policy_graph::PolicyWaitCondition;
 use crate::task_board::policy_runtime::handoff_outbox::HandoffRecord;
 use crate::task_board::policy_runtime::models::{
@@ -17,6 +15,7 @@ use crate::task_board::{
 };
 
 mod dispatch;
+mod imports;
 
 #[tokio::test]
 async fn task_board_instance_identity_is_stable_per_database() {
@@ -427,68 +426,4 @@ async fn malformed_policy_queue_timestamps_are_pruned_on_next_mutation() {
     let handoffs = db.policy_handoff_records().await.expect("handoffs");
     assert_eq!(handoffs.len(), 1);
     assert_eq!(handoffs[0].handoff_key, "valid");
-}
-
-#[tokio::test]
-async fn legacy_snapshot_import_is_atomic_and_idempotent() {
-    let legacy = tempdir().expect("legacy root");
-    let store = TaskBoardStore::new(legacy.path().to_path_buf());
-    let item = TaskBoardItem::new(
-        "task-imported".to_owned(),
-        "Imported".to_owned(),
-        "Body".to_owned(),
-        "2026-07-11T10:00:00Z".to_owned(),
-    );
-    store
-        .create(&item.title, &item.body, item.clone())
-        .expect("write legacy item");
-    crate::infra::io::write_json_pretty(
-        &legacy.path().join("orchestrator-settings.json"),
-        &TaskBoardOrchestratorSettings::default(),
-    )
-    .expect("write settings");
-    crate::infra::io::write_json_pretty(
-        &legacy.path().join("orchestrator-state.json"),
-        &TaskBoardOrchestratorState::default(),
-    )
-    .expect("write state");
-    let snapshot = LegacyTaskBoardSnapshot::load(legacy.path()).expect("load snapshot");
-    assert_eq!(snapshot.items.len(), 1);
-
-    let database = tempdir().expect("database root");
-    let db = AsyncDaemonDb::connect(&database.path().join("harness.db"))
-        .await
-        .expect("open db");
-    let imported = db
-        .import_legacy_task_board(
-            &snapshot,
-            Some(legacy.path()),
-            &TaskBoardGitRuntimeConfig::default(),
-            None,
-        )
-        .await
-        .expect("import snapshot");
-    assert!(imported.imported);
-    assert!(imported.change_revision > 0);
-    assert_eq!(
-        db.task_board_item(&item.id).await.expect("imported item"),
-        item
-    );
-
-    let repeated = db
-        .import_legacy_task_board(
-            &snapshot,
-            Some(legacy.path()),
-            &TaskBoardGitRuntimeConfig::default(),
-            None,
-        )
-        .await
-        .expect("repeat import");
-    assert!(!repeated.imported);
-    assert!(
-        db.task_board_import_marker("legacy_global_board")
-            .await
-            .expect("marker")
-            .is_some()
-    );
 }
