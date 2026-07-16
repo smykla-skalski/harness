@@ -1,5 +1,7 @@
 use crate::errors::CliError;
-use crate::task_board::external::targeting::execution_repository_for_task;
+use crate::task_board::external::targeting::{
+    execution_repository_for_task, provider_project_maps_to_board,
+};
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask, ExternalTaskRef,
 };
@@ -199,7 +201,8 @@ fn reconciliation_patch(
     if item.status != status {
         patch.status = Some(status);
     }
-    if item.project_id != task.project_id
+    if provider_project_maps_to_board(task.reference.provider)
+        && item.project_id != task.project_id
         && should_apply_remote(
             sync_state.map(|state| &state.project_id),
             &item.project_id,

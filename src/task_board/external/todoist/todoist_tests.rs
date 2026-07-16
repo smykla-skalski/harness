@@ -7,6 +7,8 @@ use serde_json::Value;
 
 use super::*;
 
+mod revision_tests;
+
 #[derive(Debug, Default)]
 struct CapturedRequest {
     path: String,
@@ -92,14 +94,25 @@ async fn todoist_update_task_reopens_remote_when_local_status_is_not_done() {
 #[tokio::test]
 async fn todoist_push_task_posts_metadata_payload() {
     let (endpoint, captured, handle) = spawn_json_mock(
-        r#"{"id":"remote-1","content":"Remote title","description":"Remote body"}"#,
+        r#"{"id":"remote-1","content":"Remote title","description":"Remote body","project_id":"provider-project","updated_at":"provider-revision-1"}"#,
     );
     let client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");
     let item = local_item("Local title", "Local body", Some("project-1"));
 
-    let reference = client.push_task(&item).await.expect("push task");
+    let outcome = client
+        .push_task_with_outcome(&item)
+        .await
+        .expect("push task");
 
-    assert_eq!(reference.external_id, "remote-1");
+    assert_eq!(outcome.reference.external_id, "remote-1");
+    assert_eq!(
+        outcome.provider_revision.as_deref(),
+        Some("provider-revision-1")
+    );
+    assert_eq!(
+        outcome.provider_project_id.as_deref(),
+        Some("provider-project")
+    );
     handle.join().expect("mock server");
     let captured = captured.lock().expect("captured request");
     assert_eq!(captured.path, "/tasks");
@@ -140,45 +153,6 @@ async fn todoist_update_task_posts_changed_metadata_payload() {
     assert_eq!(body["content"], "Updated title");
     assert_eq!(body["description"], "Updated body");
     assert_eq!(body["project_id"], "project-2");
-}
-
-#[tokio::test]
-async fn todoist_status_write_preserves_metadata_provider_revision() {
-    let (endpoint, captured, handle) = spawn_sequence_mock(vec![
-        (
-            "200 OK",
-            r#"{"id":"remote-1","content":"Updated title","description":"Body","updated_at":"provider-revision-2"}"#,
-        ),
-        ("204 No Content", ""),
-    ]);
-    let client = TodoistSyncClient::new_with_api_base("token", endpoint).expect("client");
-    let reference = ExternalTaskRef::new(ExternalProvider::Todoist, "remote-1");
-    let mut item = local_item("Updated title", "Body", None);
-    item.status = TaskBoardStatus::Done;
-
-    let outcome = client
-        .update_task(
-            &item,
-            &reference,
-            ExternalTaskUpdate::new(vec![ExternalSyncField::Title, ExternalSyncField::Status]),
-        )
-        .await
-        .expect("update metadata and status");
-
-    handle.join().expect("mock server");
-    let ExternalUpdateOutcome::Applied {
-        provider_revision, ..
-    } = outcome
-    else {
-        panic!("update must be applied");
-    };
-    assert_eq!(provider_revision.as_deref(), Some("provider-revision-2"));
-    let captured = captured.lock().expect("captured requests");
-    assert_eq!(captured.len(), 2);
-    assert_eq!(captured[0].path, "/tasks/remote-1");
-    assert_eq!(captured[1].path, "/tasks/remote-1/close");
-    assert!(captured.iter().all(|request| request.request_id.is_some()));
-    assert_ne!(captured[0].request_id, captured[1].request_id);
 }
 
 #[tokio::test]

@@ -7,11 +7,12 @@ use crate::errors::CliError;
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
 
-use super::targeting::execution_repository_for_task;
+use super::targeting::{board_project_id_for_task, execution_repository_for_task};
 use super::{
-    ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalSyncConflictPolicy,
-    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
-    GitHubInboxSyncClient, GitHubSyncClient, TodoistSyncClient, canonical_external_status,
+    ExternalCreateOutcome, ExternalProvider, ExternalSyncClient, ExternalSyncConfig,
+    ExternalSyncConflictPolicy, ExternalSyncField, ExternalTask, ExternalTaskRef,
+    ExternalTaskUpdate, ExternalUpdateOutcome, GitHubInboxSyncClient, GitHubSyncClient,
+    TodoistSyncClient, canonical_external_status,
 };
 
 mod batch;
@@ -314,7 +315,7 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
         now,
     );
     item.status = canonical_external_status(task.status);
-    item.project_id.clone_from(&task.project_id);
+    item.project_id = board_project_id_for_task(task);
     item.execution_repository = execution_repository_for_task(task);
     let mut reference = task.reference.clone().into_core_ref();
     reference.sync_state = Some(sync_state_from_task(task));

@@ -127,6 +127,13 @@ impl ExternalTaskRef {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExternalCreateOutcome {
+    pub reference: ExternalTaskRef,
+    pub provider_revision: Option<String>,
+    pub provider_project_id: Option<String>,
+}
+
 impl From<ExternalRef> for ExternalTaskRef {
     fn from(reference: ExternalRef) -> Self {
         Self {
@@ -382,6 +389,23 @@ pub trait ExternalSyncClient: Send + Sync {
     /// # Errors
     /// Returns provider or transport errors surfaced by the implementation.
     async fn push_task(&self, item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError>;
+
+    /// Push one task-board item and return provider state needed for later writes.
+    ///
+    /// # Errors
+    /// Returns provider or transport errors surfaced by the implementation.
+    async fn push_task_with_outcome(
+        &self,
+        item: &TaskBoardItem,
+    ) -> Result<ExternalCreateOutcome, CliError> {
+        Ok(ExternalCreateOutcome {
+            reference: self.push_task(item).await?,
+            provider_revision: None,
+            provider_project_id: (self.provider() != ExternalProvider::GitHub)
+                .then(|| item.project_id.clone())
+                .flatten(),
+        })
+    }
 
     /// Update one linked provider task.
     ///

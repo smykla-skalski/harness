@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use super::super::*;
+use super::GitHubIssueResponse;
 use crate::github_api::GitHubProtectedClient;
 
 #[derive(Debug, Default)]
@@ -11,6 +12,35 @@ struct CapturedRequest {
     method: String,
     path: String,
     body: String,
+}
+
+#[test]
+fn github_create_uses_configured_repository_and_returns_provider_revision() {
+    let client = sync_client("http://127.0.0.1:1");
+    let item = local_item();
+    let repository = client
+        .repository_for(Some(&item))
+        .expect("configured repository");
+    let issue = GitHubIssueResponse {
+        number: 17,
+        html_url: "https://github.test/acme/widgets/issues/17".to_owned(),
+        title: "Local edit".to_owned(),
+        body: Some("Local body".to_owned()),
+        state: "open".to_owned(),
+        updated_at: Some("provider-revision-1".to_owned()),
+    };
+
+    let outcome = created_issue_outcome(&repository, issue);
+
+    assert_eq!(
+        outcome.reference.external_id, "acme/widgets#17",
+        "provider reference must identify the configured repository"
+    );
+    assert_eq!(
+        outcome.provider_revision.as_deref(),
+        Some("provider-revision-1")
+    );
+    assert_eq!(outcome.provider_project_id.as_deref(), Some("acme/widgets"));
 }
 
 #[tokio::test]
@@ -115,7 +145,7 @@ fn local_item() -> TaskBoardItem {
         "Local body".into(),
         "2026-07-16T10:00:00Z".into(),
     );
-    item.project_id = Some("acme/widgets".into());
+    item.project_id = Some("portfolio-a".into());
     item
 }
 

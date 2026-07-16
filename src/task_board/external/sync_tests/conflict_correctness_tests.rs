@@ -227,6 +227,10 @@ async fn remote_create_with_failed_local_link_persists_created_reference_evidenc
     assert_eq!(title.base_value, serde_json::Value::Null);
     assert_eq!(title.local_value, serde_json::json!("Created remotely"));
     assert_eq!(title.remote_value, serde_json::json!("Created remotely"));
+    assert_eq!(
+        title.provider_revision.as_deref(),
+        Some("provider-revision-1")
+    );
 }
 
 fn push_options() -> ExternalSyncOptions {
@@ -309,6 +313,17 @@ impl ExternalSyncClient for CreateSyncClient {
             ExternalProvider::Todoist,
             "remote-created",
         ))
+    }
+
+    async fn push_task_with_outcome(
+        &self,
+        item: &TaskBoardItem,
+    ) -> Result<ExternalCreateOutcome, CliError> {
+        Ok(ExternalCreateOutcome {
+            reference: self.push_task(item).await?,
+            provider_revision: Some("provider-revision-1".into()),
+            provider_project_id: Some("provider-project".into()),
+        })
     }
 }
 

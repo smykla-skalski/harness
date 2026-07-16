@@ -1,7 +1,8 @@
 use crate::errors::CliError;
 use crate::github_api::republish_current_data_change;
 use crate::task_board::external::ExternalProviderScopeAttempt;
-use crate::task_board::store::TaskBoardItemPatch;
+use crate::task_board::external::targeting::provider_project_maps_to_board;
+use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
 use super::conflicts::build_sync_conflicts;
@@ -11,9 +12,10 @@ use super::merge::{
     replace_synced_ref, split_supported_fields, synced_ref_from_item,
 };
 use super::{
-    ExternalProvider, ExternalSyncAction, ExternalSyncClient, ExternalSyncField,
-    ExternalSyncOperation, ExternalSyncOptions, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
-    ExternalUpdateOutcome, SyncClientError, TaskBoardSyncStore, canonical_external_status,
+    ExternalCreateOutcome, ExternalProvider, ExternalSyncAction, ExternalSyncClient,
+    ExternalSyncField, ExternalSyncOperation, ExternalSyncOptions, ExternalTask, ExternalTaskRef,
+    ExternalTaskUpdate, ExternalUpdateOutcome, SyncClientError, TaskBoardSyncStore,
+    canonical_external_status,
 };
 
 pub(super) async fn push_board_tasks(
@@ -63,7 +65,7 @@ async fn create_remote_item(
     item: &TaskBoardItem,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), SyncClientError> {
-    let changed_fields = push_create_fields(item);
+    let changed_fields = push_create_fields(item, client.provider());
     if options.dry_run {
         operations.push(push_operation(
             client.provider(),
@@ -77,16 +79,31 @@ async fn create_remote_item(
         return Ok(());
     }
     super::scope::renew_scope_attempt(board, attempt).await?;
-    let reference = client
-        .push_task(item)
+    let ExternalCreateOutcome {
+        reference,
+        provider_revision,
+        provider_project_id,
+    } = client
+        .push_task_with_outcome(item)
         .await
         .map_err(SyncClientError::Provider)?;
     let mut refs = item.external_refs.clone();
-    refs.push(synced_ref_from_item(reference.clone(), item, None));
+    refs.push(synced_ref_from_item(
+        reference.clone(),
+        item,
+        provider_project_id.as_deref(),
+        provider_revision.as_deref(),
+    ));
+    let project_id =
+        provider_project_patch(item, client.provider(), provider_project_id.as_deref());
+    let execution_repository =
+        provider_repository_patch(item, client.provider(), provider_project_id.as_deref());
     let linked = match board
         .update_item(
             item,
             TaskBoardItemPatch {
+                project_id,
+                execution_repository,
                 external_refs: Some(refs),
                 ..TaskBoardItemPatch::default()
             },
@@ -95,7 +112,12 @@ async fn create_remote_item(
     {
         Ok(linked) => linked,
         Err(error) => {
-            let remote = created_remote_task(item, reference.clone());
+            let remote = created_remote_task(
+                item,
+                reference.clone(),
+                provider_project_id,
+                provider_revision,
+            );
             persist_push_conflicts(board, item, &remote, &changed_fields)
                 .await
                 .map_err(SyncClientError::Local)?;
@@ -128,6 +150,38 @@ async fn create_remote_item(
         .await?;
     }
     Ok(())
+}
+
+fn provider_project_patch(
+    item: &TaskBoardItem,
+    provider: ExternalProvider,
+    provider_project_id: Option<&str>,
+) -> OptionalFieldPatch<String> {
+    if !provider_project_maps_to_board(provider)
+        || item.project_id.as_deref() == provider_project_id
+    {
+        return OptionalFieldPatch::Unchanged;
+    }
+    provider_project_id
+        .map(ToOwned::to_owned)
+        .map_or(OptionalFieldPatch::Clear, OptionalFieldPatch::Set)
+}
+
+fn provider_repository_patch(
+    item: &TaskBoardItem,
+    provider: ExternalProvider,
+    provider_project_id: Option<&str>,
+) -> OptionalFieldPatch<String> {
+    if provider != ExternalProvider::GitHub {
+        return OptionalFieldPatch::Unchanged;
+    }
+    let Some(provider_project_id) = provider_project_id else {
+        return OptionalFieldPatch::Unchanged;
+    };
+    if item.execution_repository.as_deref() == Some(provider_project_id) {
+        return OptionalFieldPatch::Unchanged;
+    }
+    OptionalFieldPatch::Set(provider_project_id.to_owned())
 }
 
 async fn update_linked_remote(
@@ -328,14 +382,19 @@ async fn persist_push_conflicts(
         .await
 }
 
-fn created_remote_task(item: &TaskBoardItem, reference: ExternalTaskRef) -> ExternalTask {
+fn created_remote_task(
+    item: &TaskBoardItem,
+    reference: ExternalTaskRef,
+    provider_project_id: Option<String>,
+    provider_revision: Option<String>,
+) -> ExternalTask {
     ExternalTask {
         reference,
         title: item.title.clone(),
         body: item.body.clone(),
         status: TaskBoardStatus::Backlog,
-        project_id: item.project_id.clone(),
-        updated_at: None,
+        project_id: provider_project_id,
+        updated_at: provider_revision,
     }
 }
 

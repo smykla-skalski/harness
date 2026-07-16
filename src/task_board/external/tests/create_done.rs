@@ -6,10 +6,10 @@ use tempfile::tempdir;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::{
-    ExternalProvider, ExternalProviderCapabilities, ExternalSyncAction, ExternalSyncClient,
-    ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncField, ExternalSyncOptions,
-    ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome, TaskBoardItem,
-    TaskBoardStatus, TaskBoardStore, sync_external_tasks,
+    ExternalCreateOutcome, ExternalProvider, ExternalProviderCapabilities, ExternalSyncAction,
+    ExternalSyncClient, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncField,
+    ExternalSyncOptions, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
+    TaskBoardItem, TaskBoardStatus, TaskBoardStore, sync_external_tasks,
 };
 
 #[tokio::test]
@@ -25,7 +25,10 @@ async fn newly_created_done_item_is_linked_then_closed() {
     assert_eq!(pushes.lock().expect("push log").as_slice(), ["done-1"]);
     assert_eq!(
         updates.lock().expect("update log").as_slice(),
-        [vec![ExternalSyncField::Status]]
+        [CapturedUpdate {
+            changed_fields: vec![ExternalSyncField::Status],
+            precondition_updated_at: Some("provider-revision-1".into()),
+        }]
     );
     assert_eq!(operations.len(), 2);
     assert_eq!(
@@ -36,7 +39,10 @@ async fn newly_created_done_item_is_linked_then_closed() {
         operations[1].changed_fields,
         vec![ExternalSyncField::Status]
     );
-    assert_eq!(stored_sync_status(&board), TaskBoardStatus::Done);
+    let state = stored_sync_state(&board);
+    assert_eq!(state.status, Some(TaskBoardStatus::Done));
+    assert_eq!(state.updated_at.as_deref(), Some("provider-revision-2"));
+    assert_eq!(state.project_id.as_deref(), Some("provider-project"));
 }
 
 #[tokio::test]
@@ -53,7 +59,9 @@ async fn failed_close_keeps_link_and_retry_does_not_create_duplicate() {
         .expect_err("first close should fail");
 
     assert_eq!(pushes.lock().expect("push log").as_slice(), ["done-1"]);
-    assert_eq!(stored_sync_status(&board), TaskBoardStatus::Backlog);
+    let state = stored_sync_state(&board);
+    assert_eq!(state.status, Some(TaskBoardStatus::Backlog));
+    assert_eq!(state.updated_at.as_deref(), Some("provider-revision-1"));
     assert_eq!(
         board
             .get("done-1")
@@ -68,8 +76,14 @@ async fn failed_close_keeps_link_and_retry_does_not_create_duplicate() {
         .expect("retry closes linked item");
 
     assert_eq!(pushes.lock().expect("push log").as_slice(), ["done-1"]);
-    assert_eq!(updates.lock().expect("update log").len(), 2);
-    assert_eq!(stored_sync_status(&board), TaskBoardStatus::Done);
+    let updates = updates.lock().expect("update log");
+    assert_eq!(updates.len(), 2);
+    assert!(updates.iter().all(|update| {
+        update.precondition_updated_at.as_deref() == Some("provider-revision-1")
+    }));
+    let state = stored_sync_state(&board);
+    assert_eq!(state.status, Some(TaskBoardStatus::Done));
+    assert_eq!(state.updated_at.as_deref(), Some("provider-revision-2"));
 }
 
 #[tokio::test]
@@ -92,7 +106,10 @@ async fn create_only_provider_reports_done_status_as_unsupported() {
         vec![ExternalSyncField::Status]
     );
     assert!(!operations[1].applied);
-    assert_eq!(stored_sync_status(&board), TaskBoardStatus::Backlog);
+    let state = stored_sync_state(&board);
+    assert_eq!(state.status, Some(TaskBoardStatus::Backlog));
+    assert_eq!(state.updated_at.as_deref(), Some("provider-revision-1"));
+    assert_eq!(state.project_id.as_deref(), Some("provider-project"));
 }
 
 async fn sync(
@@ -128,7 +145,7 @@ fn board_with_done_item(path: &std::path::Path) -> TaskBoardStore {
     board
 }
 
-fn stored_sync_status(board: &TaskBoardStore) -> TaskBoardStatus {
+fn stored_sync_state(board: &TaskBoardStore) -> crate::task_board::ExternalRefSyncState {
     board
         .get("done-1")
         .expect("stored item")
@@ -136,16 +153,20 @@ fn stored_sync_status(board: &TaskBoardStore) -> TaskBoardStatus {
         .first()
         .expect("external reference")
         .sync_state
-        .as_ref()
+        .clone()
         .expect("sync state")
-        .status
-        .expect("sync status")
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct CapturedUpdate {
+    changed_fields: Vec<ExternalSyncField>,
+    precondition_updated_at: Option<String>,
 }
 
 struct CreateDoneClient {
     capabilities: ExternalProviderCapabilities,
     pushes: Arc<Mutex<Vec<String>>>,
-    updates: Arc<Mutex<Vec<Vec<ExternalSyncField>>>>,
+    updates: Arc<Mutex<Vec<CapturedUpdate>>>,
     fail_next_update: AtomicBool,
 }
 
@@ -197,6 +218,17 @@ impl ExternalSyncClient for CreateDoneClient {
         ))
     }
 
+    async fn push_task_with_outcome(
+        &self,
+        item: &TaskBoardItem,
+    ) -> Result<ExternalCreateOutcome, CliError> {
+        Ok(ExternalCreateOutcome {
+            reference: self.push_task(item).await?,
+            provider_revision: Some("provider-revision-1".into()),
+            provider_project_id: Some("provider-project".into()),
+        })
+    }
+
     async fn update_task(
         &self,
         _item: &TaskBoardItem,
@@ -206,13 +238,16 @@ impl ExternalSyncClient for CreateDoneClient {
         self.updates
             .lock()
             .expect("update log")
-            .push(update.changed_fields);
+            .push(CapturedUpdate {
+                changed_fields: update.changed_fields,
+                precondition_updated_at: update.precondition_updated_at,
+            });
         if self.fail_next_update.swap(false, Ordering::SeqCst) {
             return Err(CliErrorKind::workflow_io("simulated status update failure").into());
         }
         Ok(ExternalUpdateOutcome::Applied {
             reference: reference.clone(),
-            provider_revision: None,
+            provider_revision: Some("provider-revision-2".into()),
         })
     }
 }

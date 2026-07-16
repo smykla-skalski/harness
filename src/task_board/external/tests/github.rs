@@ -2,9 +2,9 @@ use tempfile::tempdir;
 
 use super::support::{FakeSyncClient, github_external_task, github_external_task_with_status};
 use crate::task_board::{
-    ExternalProvider, ExternalRefProvider, ExternalSyncClient, ExternalSyncConflictPolicy,
-    ExternalSyncDirection, ExternalSyncOptions, ExternalTaskRef, TaskBoardItem, TaskBoardStatus,
-    TaskBoardStore, build_dispatch_plan, sync_external_tasks,
+    ExternalProvider, ExternalRef, ExternalRefProvider, ExternalRefSyncState, ExternalSyncClient,
+    ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncOptions, ExternalTaskRef,
+    TaskBoardItem, TaskBoardStatus, TaskBoardStore, build_dispatch_plan, sync_external_tasks,
 };
 
 #[tokio::test]
@@ -35,7 +35,8 @@ async fn sync_external_tasks_imports_github_tasks_with_plan_pending_approval() {
         .get("github-7-7902699be42c8a8e46fbbb4501726517")
         .expect("load imported github task");
     assert_eq!(item.status, TaskBoardStatus::Backlog);
-    assert_eq!(item.project_id.as_deref(), Some("owner/repo"));
+    assert_eq!(item.project_id, None);
+    assert_eq!(item.execution_repository.as_deref(), Some("owner/repo"));
     assert!(item.planning.approved_by.is_none());
     assert!(item.planning.approved_at.is_none());
     assert!(
@@ -82,7 +83,8 @@ async fn sync_external_tasks_imports_github_inbox_items_as_backlog_with_plan_pen
         .get("github-owner-repo-19-983c1507241b6007ac5729cfcea78b64")
         .expect("load imported github inbox task");
     assert_eq!(item.status, TaskBoardStatus::Backlog);
-    assert_eq!(item.project_id.as_deref(), Some("owner/repo"));
+    assert_eq!(item.project_id, None);
+    assert_eq!(item.execution_repository.as_deref(), Some("owner/repo"));
     assert!(item.planning.summary.is_some());
     assert!(item.planning.approved_by.is_none());
     assert!(item.planning.approved_at.is_none());
@@ -145,9 +147,9 @@ async fn sync_external_tasks_reconciles_legacy_github_refs_by_project_scope() {
         "2026-05-14T00:00:00Z".to_owned(),
     );
     primary.status = TaskBoardStatus::Todo;
-    primary.project_id = Some("owner/repo".to_owned());
-    primary.external_refs =
-        vec![ExternalTaskRef::new(ExternalProvider::GitHub, "7").into_core_ref()];
+    primary.project_id = Some("portfolio-primary".to_owned());
+    primary.execution_repository = Some("owner/repo".to_owned());
+    primary.external_refs = vec![legacy_github_ref("7", "portfolio-primary")];
     board
         .create("Old title", "Body", primary)
         .expect("create primary task");
@@ -159,9 +161,9 @@ async fn sync_external_tasks_reconciles_legacy_github_refs_by_project_scope() {
         "2026-05-14T00:00:00Z".to_owned(),
     );
     secondary.status = TaskBoardStatus::Todo;
-    secondary.project_id = Some("other/repo".to_owned());
-    secondary.external_refs =
-        vec![ExternalTaskRef::new(ExternalProvider::GitHub, "7").into_core_ref()];
+    secondary.project_id = Some("portfolio-secondary".to_owned());
+    secondary.execution_repository = Some("other/repo".to_owned());
+    secondary.external_refs = vec![legacy_github_ref("7", "portfolio-secondary")];
     board
         .create("Other title", "Body", secondary)
         .expect("create secondary task");
@@ -196,6 +198,8 @@ async fn sync_external_tasks_reconciles_legacy_github_refs_by_project_scope() {
         .get("legacy-owner-repo")
         .expect("load reconciled legacy task");
     assert_eq!(updated.title, "Updated title");
+    assert_eq!(updated.project_id.as_deref(), Some("portfolio-primary"));
+    assert_eq!(updated.execution_repository.as_deref(), Some("owner/repo"));
     assert!(updated.external_refs.iter().any(|reference| {
         reference.provider == ExternalRefProvider::GitHub && reference.external_id == "owner/repo#7"
     }));
@@ -204,7 +208,21 @@ async fn sync_external_tasks_reconciles_legacy_github_refs_by_project_scope() {
         .get("legacy-other-repo")
         .expect("load other repo task");
     assert_eq!(untouched.title, "Other title");
+    assert_eq!(untouched.project_id.as_deref(), Some("portfolio-secondary"));
+    assert_eq!(
+        untouched.execution_repository.as_deref(),
+        Some("other/repo")
+    );
     assert!(untouched.external_refs.iter().any(|reference| {
         reference.provider == ExternalRefProvider::GitHub && reference.external_id == "7"
     }));
+}
+
+fn legacy_github_ref(external_id: &str, stale_project_id: &str) -> ExternalRef {
+    let mut reference = ExternalTaskRef::new(ExternalProvider::GitHub, external_id).into_core_ref();
+    reference.sync_state = Some(ExternalRefSyncState {
+        project_id: Some(stale_project_id.to_owned()),
+        ..ExternalRefSyncState::default()
+    });
+    reference
 }

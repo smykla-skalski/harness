@@ -9,9 +9,9 @@ use crate::errors::{CliError, CliErrorKind};
 
 use super::super::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use super::{
-    ExternalProvider, ExternalProviderCapabilities, ExternalSyncClient, ExternalSyncConfig,
-    ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
-    non_empty_body, normalize_token,
+    ExternalCreateOutcome, ExternalProvider, ExternalProviderCapabilities, ExternalSyncClient,
+    ExternalSyncConfig, ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
+    ExternalUpdateOutcome, non_empty_body, normalize_token,
 };
 
 const TODOIST_API_BASE: &str = "https://api.todoist.com/rest/v2";
@@ -151,6 +151,13 @@ impl ExternalSyncClient for TodoistSyncClient {
     }
 
     async fn push_task(&self, item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
+        Ok(self.push_task_with_outcome(item).await?.reference)
+    }
+
+    async fn push_task_with_outcome(
+        &self,
+        item: &TaskBoardItem,
+    ) -> Result<ExternalCreateOutcome, CliError> {
         let request = TodoistCreateTaskRequest {
             content: item.title.clone(),
             description: non_empty_body(&item.body),
@@ -168,7 +175,11 @@ impl ExternalSyncClient for TodoistSyncClient {
             .json::<TodoistTask>()
             .await
             .map_err(todoist_sync_error)?;
-        Ok(task.reference())
+        Ok(ExternalCreateOutcome {
+            reference: task.reference(),
+            provider_revision: task.updated_at,
+            provider_project_id: task.project_id,
+        })
     }
 
     async fn update_task(
@@ -187,15 +198,27 @@ impl ExternalSyncClient for TodoistSyncClient {
                 });
             }
         }
+        let changes_metadata = update.changes_metadata();
+        let changes_status = update.changes_status();
+        let closes_task = changes_status && item.status == TaskBoardStatus::Done;
         let mut updated_reference = reference.clone();
-        let mut provider_revision = update.precondition_updated_at.clone();
-        if update.changes_metadata() {
+        let mut provider_revision = None;
+        if changes_status && changes_metadata && !closes_task {
+            self.update_task_status(item, reference).await?;
+        }
+        if changes_metadata {
             let updated = self.update_task_metadata(item, reference, &update).await?;
             updated_reference = updated.reference();
-            provider_revision = updated.updated_at.or(provider_revision);
+            provider_revision = updated.updated_at;
         }
-        if update.changes_status() {
+        if changes_status && (!changes_metadata || closes_task) {
             self.update_task_status(item, reference).await?;
+        }
+        if changes_metadata && closes_task {
+            // Todoist close returns no task and archived tasks are not available
+            // through the active-task read endpoint. Never report the metadata
+            // revision as though it followed the close mutation.
+            provider_revision = None;
         }
         Ok(ExternalUpdateOutcome::Applied {
             reference: updated_reference,

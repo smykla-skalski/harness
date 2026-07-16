@@ -1,6 +1,16 @@
-use crate::task_board::{TaskBoardItem, normalize_repository_slug};
+use crate::task_board::{ExternalRefProvider, TaskBoardItem, normalize_repository_slug};
 
 use super::{ExternalProvider, ExternalTask};
+
+pub(super) fn provider_project_maps_to_board(provider: ExternalProvider) -> bool {
+    provider != ExternalProvider::GitHub
+}
+
+pub(super) fn board_project_id_for_task(task: &ExternalTask) -> Option<String> {
+    provider_project_maps_to_board(task.reference.provider)
+        .then(|| task.project_id.clone())
+        .flatten()
+}
 
 pub(super) fn execution_repository_for_task(task: &ExternalTask) -> Option<String> {
     (task.reference.provider == ExternalProvider::GitHub)
@@ -9,9 +19,13 @@ pub(super) fn execution_repository_for_task(task: &ExternalTask) -> Option<Strin
 }
 
 pub(super) fn github_repository_for_item(item: &TaskBoardItem) -> Option<&str> {
-    item.execution_repository
-        .as_deref()
-        .or(item.project_id.as_deref())
+    item.execution_repository.as_deref().or_else(|| {
+        item.external_refs
+            .iter()
+            .any(|reference| reference.provider == ExternalRefProvider::GitHub)
+            .then_some(item.project_id.as_deref())
+            .flatten()
+    })
 }
 
 #[cfg(test)]
@@ -50,6 +64,19 @@ mod tests {
         item.execution_repository = Some("acme/target".into());
 
         assert_eq!(github_repository_for_item(&item), Some("acme/target"));
+    }
+
+    #[test]
+    fn unlinked_project_identity_is_not_a_github_repository() {
+        let mut item = TaskBoardItem::new(
+            "task-1".into(),
+            "Task".into(),
+            String::new(),
+            "2026-07-15T00:00:00Z".into(),
+        );
+        item.project_id = Some("portfolio-a".into());
+
+        assert_eq!(github_repository_for_item(&item), None);
     }
 
     fn external_task(provider: ExternalProvider, project_id: Option<&str>) -> ExternalTask {

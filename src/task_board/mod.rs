@@ -44,12 +44,13 @@ pub use evaluation::{
     skipped_unlinked_record,
 };
 pub use external::{
-    ExternalProvider, ExternalProviderCapabilities, ExternalSyncAction, ExternalSyncClient,
-    ExternalSyncConfig, ExternalSyncConflictPolicy, ExternalSyncDirection, ExternalSyncField,
-    ExternalSyncOperation, ExternalSyncOptions, ExternalTask, ExternalTaskRef, ExternalTaskUpdate,
-    ExternalUpdateOutcome, GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV, GitHubInboxSyncClient,
-    GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_TOKEN_ENV,
-    HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient, configured_sync_clients,
+    ExternalCreateOutcome, ExternalProvider, ExternalProviderCapabilities, ExternalSyncAction,
+    ExternalSyncClient, ExternalSyncConfig, ExternalSyncConflictPolicy, ExternalSyncDirection,
+    ExternalSyncField, ExternalSyncOperation, ExternalSyncOptions, ExternalTask, ExternalTaskRef,
+    ExternalTaskUpdate, ExternalUpdateOutcome, GH_TOKEN_ENV, GITHUB_REPOSITORY_ENV,
+    GitHubInboxSyncClient, GitHubSyncClient, HARNESS_GITHUB_REPOSITORY_ENV,
+    HARNESS_GITHUB_TOKEN_ENV, HARNESS_TODOIST_TOKEN_ENV, TodoistSyncClient,
+    configured_sync_clients,
 };
 #[cfg(any(test, feature = "daemon-runtime"))]
 pub(crate) use external::{
