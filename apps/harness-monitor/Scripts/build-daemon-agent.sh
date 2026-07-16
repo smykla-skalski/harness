@@ -30,8 +30,10 @@ source "$SCRIPT_DIR/lib/daemon-cargo-build.sh"
 repo_root="$(resolve_repo_root)"
 staged_daemon_binary="$(daemon_staged_binary_path "$repo_root")"
 if daemon_staged_binary_is_fresh "$staged_daemon_binary" "$repo_root"; then
+  daemon_mark_staged_binary_ready "$staged_daemon_binary"
   exit 0
 fi
 
 daemon_binary="$(build_daemon_binary | /usr/bin/tail -n 1)"
-stage_daemon_binary "$daemon_binary" "$repo_root" >/dev/null
+staged_daemon_binary="$(stage_daemon_binary "$daemon_binary" "$repo_root")"
+daemon_mark_staged_binary_ready "$staged_daemon_binary"

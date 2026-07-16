@@ -52,6 +52,7 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
         source = BUILD_PHASES_SOURCE.read_text()
 
         required_inputs = (
+            '"$(PROJECT_DIR)/Scripts/lib/daemon-input-state.py"',
             '"$(PROJECT_DIR)/Resources/LaunchAgents/Q498EB36N4.io.harnessmonitor.daemon.plist"',
             '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist"',
             '"$(PROJECT_DIR)/Resources/LaunchAgents/io.harnessmonitor.daemon.plist"',
@@ -65,8 +66,8 @@ class XcodeBuildPhaseEntryTests(unittest.TestCase):
             with self.subTest(required_input=required_input):
                 self.assertIn(required_input, source)
 
-        # bundleDaemonAgent opts out because cargo sources can't be enumerated
-        # in inputPaths; all other sandboxed phases must use dependency analysis.
+        # bundleDaemonAgent opts out because Cargo discovers Rust inputs
+        # dynamically; all other sandboxed phases use dependency analysis.
         self.assertEqual(source.count("basedOnDependencyAnalysis: false"), 1)
 
     def test_entry_script_unsets_swift_debug_environment_before_bash_starts(

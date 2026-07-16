@@ -6,6 +6,9 @@
 # shellcheck source=apps/harness-monitor/Scripts/lib/swift-tool-env.sh
 source "$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/swift-tool-env.sh"
 sanitize_xcode_only_swift_environment
+DAEMON_INPUT_STATE_HELPER="$(
+  CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
+)/daemon-input-state.py"
 
 # Hard-fail when a standalone rust install (Homebrew, MacPorts) is present at
 # one of the listed paths. The rustc-cache-wrapper at
@@ -237,6 +240,14 @@ daemon_build_profile_dir() {
   fi
 }
 
+daemon_build_features() {
+  printf '%s\n' "harness-daemon/tokio-console"
+}
+
+daemon_rustflags_contract() {
+  printf '%s\n' "config-plus-daemon-info-linker-args"
+}
+
 daemon_binary_output_path() {
   local target_dir profile_dir
   target_dir="$(resolve_cargo_target_dir)"
@@ -277,81 +288,10 @@ daemon_binary_dep_info_path() {
   printf '%s.d\n' "$source_binary"
 }
 
-# Print the first Makefile rule from Cargo's binary dep-info as one logical
-# line. Cargo's top-level `harness-daemon.d` already contains the exact union
-# of source inputs for the binary and every locally compiled dependency.
-daemon_dep_info_rule() {
-  local dep_info_path="$1"
-  /usr/bin/awk '
-    NR == 1 { sub(/^[^:]*:[[:space:]]*/, "") }
-    {
-      continued = sub(/\\$/, "")
-      printf "%s%s", $0, continued ? " " : "\n"
-      if (!continued) exit
-    }
-  ' "$dep_info_path"
-}
-
-daemon_compiler_input_files() {
-  local dep_info_path="$1"
-  local repo_root="${2:-${repo_root:-$(resolve_repo_root)}}"
-  local path
-
-  if [ ! -r "$dep_info_path" ]; then
-    printf 'daemon-cargo-build: compiler dep-info missing at %s\n' "$dep_info_path" >&2
-    return 1
-  fi
-
-  while IFS= read -r path; do
-    [ -n "$path" ] || continue
-    case "$path" in
-      "$repo_root"/*)
-        [ -e "$path" ] || [ -L "$path" ] || continue
-        printf '%s\n' "$path"
-        ;;
-      /*)
-        # Registry and toolchain sources are represented by Cargo.lock and the
-        # pinned toolchain, not copied into the worktree input manifest.
-        ;;
-      *)
-        path="$repo_root/$path"
-        [ -e "$path" ] || [ -L "$path" ] || continue
-        printf '%s\n' "$path"
-        ;;
-    esac
-  done < <(daemon_dep_info_rule "$dep_info_path" | /usr/bin/xargs -n 1 printf '%s\n')
-}
-
-daemon_source_manifests() {
-  local repo_root="$1"
-  local source_manifest="$2"
-  local path parent
-
-  [ -f "$repo_root/Cargo.toml" ] && printf '%s\n' "$repo_root/Cargo.toml"
-  while IFS= read -r path; do
-    [ -n "$path" ] || continue
-    parent="$(dirname "$path")"
-    while [ "$parent" != "$repo_root" ] && [ "$parent" != "/" ]; do
-      [ -f "$parent/Cargo.toml" ] && printf '%s\n' "$parent/Cargo.toml"
-      parent="$(dirname "$parent")"
-    done
-  done <"$source_manifest"
-}
-
-daemon_input_files() {
+daemon_current_input_state() {
   local repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
   local source_manifest="${2:-$(daemon_staged_binary_sources_path "$repo_root")}"
-  local path
-  local -a global_inputs=(
-    "$repo_root/Cargo.toml"
-    "$repo_root/Cargo.lock"
-    "$repo_root/rust-toolchain.toml"
-    "$repo_root/.cargo"
-    "$repo_root/scripts/rustc-cache-wrapper.sh"
-    "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist"
-    "${BASH_SOURCE[0]}"
-    "$(dirname -- "${BASH_SOURCE[0]}")/daemon-bundle-env.sh"
-  )
+  local pinned_channel
 
   if [ ! -r "$source_manifest" ]; then
     printf 'daemon-cargo-build: staged compiler input manifest missing at %s\n' \
@@ -359,38 +299,72 @@ daemon_input_files() {
     return 1
   fi
 
-  for path in "${global_inputs[@]}"; do
-    [ -e "$path" ] || continue
-    if [ -d "$path" ]; then
-      /usr/bin/find "$path" \( -type f -o -type l \) -print
-    else
-      printf '%s\n' "$path"
-    fi
-  done
-
-  daemon_source_manifests "$repo_root" "$source_manifest"
-  /bin/cat "$source_manifest"
+  pinned_channel="$(resolve_pinned_toolchain_channel "$repo_root")"
+  /usr/bin/python3 "$DAEMON_INPUT_STATE_HELPER" state \
+    --repo-root "$repo_root" \
+    --source-manifest "$source_manifest" \
+    --global-input "$repo_root/Cargo.toml" \
+    --global-input "$repo_root/Cargo.lock" \
+    --global-input "$repo_root/rust-toolchain.toml" \
+    --global-input "$repo_root/.cargo" \
+    --global-input "$repo_root/scripts/rustc-cache-wrapper.sh" \
+    --global-input "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist" \
+    --global-input "${BASH_SOURCE[0]}" \
+    --global-input "$(dirname -- "${BASH_SOURCE[0]}")/daemon-bundle-env.sh" \
+    --metadata "profile=$(daemon_build_profile_dir)" \
+    --metadata "features=$(daemon_build_features)" \
+    --metadata "marketing_version=${MARKETING_VERSION:-}" \
+    --metadata "toolchain=$pinned_channel" \
+    --metadata "rustflags=$(daemon_rustflags_contract)" \
+    --metadata "rustc_wrapper=${RUSTC_WRAPPER:-}" \
+    --metadata "cargo_bin=${CARGO_BIN:-$HOME/.cargo/bin/cargo}" \
+    --metadata "macosx_deployment_target=${MACOSX_DEPLOYMENT_TARGET:-}" \
+    --metadata "cc=${CC:-}" \
+    --metadata "cc_aarch64_apple_darwin=${CC_aarch64_apple_darwin:-}" \
+    --metadata "cc_x86_64_apple_darwin=${CC_x86_64_apple_darwin:-}" \
+    --metadata "developer_dir=${DEVELOPER_DIR:-}" \
+    --metadata "sdkroot=${SDKROOT:-}"
 }
 
-daemon_current_input_state() {
-  local repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
-  local source_manifest="${2:-$(daemon_staged_binary_sources_path "$repo_root")}"
-  local input_files path relative digest
+daemon_build_invocation_token_path() {
+  [ -n "${PROJECT_TEMP_DIR:-}" ] || return 1
+  printf '%s/HarnessMonitor-daemon-build-invocation.id\n' "$PROJECT_TEMP_DIR"
+}
 
-  input_files="$(daemon_input_files "$repo_root" "$source_manifest")" || return 1
-  printf '@profile\t%s\n' "$(daemon_build_profile_dir)"
-  printf '@features\tharness-daemon/tokio-console\n'
-  printf '@marketing-version\t%s\n' "${MARKETING_VERSION:-}"
-  printf '@rustflags\tconfig-plus-daemon-info-linker-args\n'
-  while IFS= read -r path; do
-    relative="${path#"$repo_root"/}"
-    if [ -L "$path" ]; then
-      digest="link:$(/usr/bin/readlink "$path")"
-    else
-      digest="$(/usr/bin/shasum -a 256 "$path" | /usr/bin/awk '{print $1}')"
-    fi
-    printf '%s\t%s\n' "$relative" "$digest"
-  done < <(printf '%s\n' "$input_files" | LC_ALL=C /usr/bin/sort -u)
+daemon_staged_binary_ready_path() {
+  [ -n "${PROJECT_TEMP_DIR:-}" ] || return 1
+  printf '%s/HarnessMonitor-daemon-staged-ready.id\n' "$PROJECT_TEMP_DIR"
+}
+
+daemon_mark_staged_binary_ready() {
+  local staged_binary="$1"
+  local invocation_token_path ready_path ready_tmp
+
+  [ -x "$staged_binary" ] || return 1
+  invocation_token_path="$(daemon_build_invocation_token_path)" || return 0
+  ready_path="$(daemon_staged_binary_ready_path)" || return 0
+  [ -s "$invocation_token_path" ] || return 0
+  ready_tmp="$ready_path.staging"
+  (
+    set -e
+    trap '/bin/rm -f "$ready_tmp"' EXIT
+    /bin/cp "$invocation_token_path" "$ready_tmp"
+    /bin/mv -f "$ready_tmp" "$ready_path"
+  )
+}
+
+daemon_staged_binary_is_ready_for_current_invocation() {
+  local staged_binary="$1"
+  local invocation_token_path ready_path
+
+  [ -x "$staged_binary" ] || return 1
+  [ -f "$staged_binary.inputs" ] || return 1
+  [ -f "$staged_binary.sources" ] || return 1
+  invocation_token_path="$(daemon_build_invocation_token_path)" || return 1
+  ready_path="$(daemon_staged_binary_ready_path)" || return 1
+  [ -s "$invocation_token_path" ] || return 1
+  [ -s "$ready_path" ] || return 1
+  /usr/bin/cmp -s "$invocation_token_path" "$ready_path"
 }
 
 daemon_staged_binary_is_fresh() {
@@ -412,7 +386,7 @@ stage_daemon_binary() {
   local source_binary="$1"
   local repo_root="${2:-${repo_root:-$(resolve_repo_root)}}"
   local staged_binary staged_dir staged_binary_tmp state_path state_tmp
-  local source_manifest source_manifest_tmp dep_info_path current_state compiler_inputs
+  local source_manifest source_manifest_tmp dep_info_path current_state
 
   staged_binary="$(daemon_staged_binary_path "$repo_root")"
   staged_dir="$(dirname "$staged_binary")"
@@ -424,11 +398,17 @@ stage_daemon_binary() {
   dep_info_path="${HARNESS_MONITOR_DAEMON_DEP_INFO_PATH:-$(daemon_binary_dep_info_path "$source_binary")}"
 
   /bin/mkdir -p "$staged_dir"
-  compiler_inputs="$(daemon_compiler_input_files "$dep_info_path" "$repo_root")" || {
+  if [ ! -r "$dep_info_path" ]; then
+    printf 'daemon-cargo-build: compiler dep-info missing at %s\n' "$dep_info_path" >&2
+    return 1
+  fi
+  /usr/bin/python3 "$DAEMON_INPUT_STATE_HELPER" manifest \
+    --dep-info "$dep_info_path" \
+    --repo-root "$repo_root" \
+    --output "$source_manifest_tmp" || {
     /bin/rm -f "$source_manifest_tmp"
     return 1
   }
-  printf '%s\n' "$compiler_inputs" | LC_ALL=C /usr/bin/sort -u >"$source_manifest_tmp"
   if [ ! -s "$source_manifest_tmp" ]; then
     printf 'daemon-cargo-build: compiler dep-info contained no worktree inputs: %s\n' \
       "$dep_info_path" >&2
@@ -440,6 +420,7 @@ stage_daemon_binary() {
     return 1
   }
   (
+    set -e
     trap '/bin/rm -f "$staged_binary_tmp" "$state_tmp" "$source_manifest_tmp"' EXIT
     /bin/cp -p "$source_binary" "$staged_binary_tmp"
     /bin/chmod 755 "$staged_binary_tmp"
@@ -447,7 +428,7 @@ stage_daemon_binary() {
     /bin/mv -f "$staged_binary_tmp" "$staged_binary"
     /bin/mv -f "$source_manifest_tmp" "$source_manifest"
     /bin/mv -f "$state_tmp" "$state_path"
-  )
+  ) || return 1
 
   printf '%s\n' "$staged_binary"
 }
@@ -457,6 +438,10 @@ resolve_daemon_binary_for_bundle() {
   local staged_binary built_binary
 
   staged_binary="$(daemon_staged_binary_path "$repo_root")"
+  if daemon_staged_binary_is_ready_for_current_invocation "$staged_binary"; then
+    printf '%s\n' "$staged_binary"
+    return 0
+  fi
   if daemon_staged_binary_is_fresh "$staged_binary" "$repo_root"; then
     printf '%s\n' "$staged_binary"
     return 0
@@ -464,7 +449,9 @@ resolve_daemon_binary_for_bundle() {
 
   built_binary="$(build_daemon_binary | /usr/bin/tail -n 1)"
   stage_daemon_binary "$built_binary" "$repo_root" >/dev/null
-  printf '%s\n' "$(daemon_staged_binary_path "$repo_root")"
+  staged_binary="$(daemon_staged_binary_path "$repo_root")"
+  daemon_mark_staged_binary_ready "$staged_binary"
+  printf '%s\n' "$staged_binary"
 }
 
 build_daemon_binary() {
@@ -476,11 +463,13 @@ build_daemon_binary() {
 
   local profile_dir
   profile_dir="$(daemon_build_profile_dir)"
+  local features
+  features="$(daemon_build_features)"
   local cargo_args=(
     rustc
     --package harness-daemon
     --bin harness-daemon
-    --features harness-daemon/tokio-console
+    --features "$features"
   )
   if [ "$profile_dir" = "release" ]; then
     cargo_args+=(--release)
