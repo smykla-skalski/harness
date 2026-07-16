@@ -48,7 +48,10 @@ pub(super) async fn dispatch_known_method(
     if let Some(response) = dispatch_reviews_method(request, state).await {
         return Some(response);
     }
-    if let Some(response) = Box::pin(dispatch_task_board_method(request, state, connection)).await {
+    if request.method.starts_with("task_board.")
+        && let Some(response) =
+            Box::pin(dispatch_task_board_method(request, state, connection)).await
+    {
         return Some(response);
     }
     if let Some(response) = dispatch_core_method(request, state, connection).await {
