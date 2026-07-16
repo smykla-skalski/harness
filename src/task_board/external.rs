@@ -142,6 +142,22 @@ pub struct ExternalTask {
     pub updated_at: Option<String>,
 }
 
+pub(super) fn canonical_external_status(status: TaskBoardStatus) -> TaskBoardStatus {
+    if status.canonical_persisted_status() == TaskBoardStatus::Done {
+        TaskBoardStatus::Done
+    } else {
+        TaskBoardStatus::Backlog
+    }
+}
+
+pub(super) fn local_external_status(status: TaskBoardStatus) -> Option<TaskBoardStatus> {
+    match status.canonical_persisted_status() {
+        TaskBoardStatus::Backlog | TaskBoardStatus::Todo => Some(TaskBoardStatus::Backlog),
+        TaskBoardStatus::Done => Some(TaskBoardStatus::Done),
+        _ => None,
+    }
+}
+
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct ExternalSyncConfig {
     pub github_token: Option<String>,

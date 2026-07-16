@@ -57,6 +57,19 @@ struct TaskBoardLaneAppearancePreferencesTests {
     #expect(restoredAppearance.hasOverride(for: .agenticReview))
   }
 
+  @Test("Legacy Umbrella override loads as Backlog and writes canonically")
+  func legacyUmbrellaOverrideLoadsAsBacklogAndWritesCanonically() {
+    let legacyRawValue = #"{"umbrella":{"colorToken":"purple","symbolName":"archivebox"}}"#
+
+    let overrides = TaskBoardLaneAppearancePreferences.overrides(from: legacyRawValue)
+    let canonicalRawValue = TaskBoardLaneAppearancePreferences.rawValue(for: overrides)
+
+    #expect(overrides[.backlog]?.colorToken == .purple)
+    #expect(overrides[.backlog]?.symbolName == "archivebox")
+    #expect(canonicalRawValue.contains(#""backlog""#))
+    #expect(!canonicalRawValue.contains("umbrella"))
+  }
+
   @Test("Hidden symbols persist through UserDefaults")
   func hiddenSymbolsPersistThroughUserDefaults() throws {
     let suiteName = "TaskBoardLaneAppearancePreferencesTests.\(UUID().uuidString)"

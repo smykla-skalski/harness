@@ -207,7 +207,7 @@ async fn cached_reviews_query_creates_only_matching_task_board_reviews_idempoten
     assert_eq!(revision_after_second, revision_after_first);
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].title, "Review acme/api#17");
-    assert_eq!(items[0].status, TaskBoardStatus::Todo);
+    assert_eq!(items[0].status, TaskBoardStatus::Backlog);
     assert_eq!(items[0].project_id.as_deref(), Some("acme/api"));
     assert_eq!(
         items[0].external_refs[0].external_id, "acme/api#17",
@@ -239,7 +239,7 @@ async fn cached_reviews_projection_preserves_user_selected_status() {
         .expect("initial cached projection");
     let item = db.list_task_board_items(None).await.expect("list board")[0].clone();
     for status in [
-        TaskBoardStatus::Umbrella,
+        TaskBoardStatus::Backlog,
         TaskBoardStatus::Todo,
         TaskBoardStatus::Planning,
         TaskBoardStatus::InProgress,
@@ -313,7 +313,7 @@ async fn cached_reviews_projection_reopens_done_task_when_review_is_requested_ag
     let updated = db.task_board_item(&item.id).await.expect("load task");
 
     assert!(projected.from_cache);
-    assert_eq!(updated.status, TaskBoardStatus::Todo);
+    assert_eq!(updated.status, TaskBoardStatus::Backlog);
 }
 
 #[tokio::test]
@@ -404,13 +404,13 @@ async fn targeted_missing_refresh_completes_only_matching_imported_review() {
             .and_then(|state| state.status),
         Some(TaskBoardStatus::Done)
     );
-    assert_eq!(unrelated.status, TaskBoardStatus::HumanRequired);
+    assert_eq!(unrelated.status, TaskBoardStatus::Backlog);
     assert_eq!(
         unrelated.external_refs[0]
             .sync_state
             .as_ref()
             .and_then(|state| state.status),
-        Some(TaskBoardStatus::HumanRequired)
+        Some(TaskBoardStatus::Backlog)
     );
 
     let revision_after_first = db.task_board_revision().await.expect("first revision");
@@ -455,7 +455,7 @@ async fn create_imported_review(db: &AsyncDaemonDb, item_id: &str, repository: &
         String::new(),
         "2026-07-11T12:00:00Z".into(),
     );
-    item.status = TaskBoardStatus::HumanRequired;
+    item.status = TaskBoardStatus::Backlog;
     item.project_id = Some(repository.to_owned());
     item.imported_from_provider = Some(ExternalRefProvider::GitHub);
     item.external_refs = vec![ExternalRef {
@@ -463,7 +463,7 @@ async fn create_imported_review(db: &AsyncDaemonDb, item_id: &str, repository: &
         external_id: format!("{repository}#{number}"),
         url: Some(format!("https://github.com/{repository}/pull/{number}")),
         sync_state: Some(ExternalRefSyncState {
-            status: Some(TaskBoardStatus::HumanRequired),
+            status: Some(TaskBoardStatus::Backlog),
             updated_at: Some("2026-07-11T12:00:00Z".into()),
             ..ExternalRefSyncState::default()
         }),

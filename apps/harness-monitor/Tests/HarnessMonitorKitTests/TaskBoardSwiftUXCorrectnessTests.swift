@@ -201,25 +201,25 @@ struct TaskBoardSwiftUXCorrectnessTests {
 
   // MARK: - #31 drag preserves source status
 
-  @Test("Dragging a planning item into Umbrella applies umbrella status")
-  func draggingPlanningItemIntoUmbrellaAppliesUmbrellaStatus() {
+  @Test("Dragging a planning item into Backlog applies backlog status")
+  func draggingPlanningItemIntoBacklogAppliesBacklogStatus() {
     let item = sampleTaskBoardItem(status: .planning)
-    let resolved = TaskBoardInboxLane.umbrella.taskBoardDropStatus(for: item)
-    #expect(resolved == .umbrella)
+    let resolved = TaskBoardInboxLane.backlog.taskBoardDropStatus(for: item)
+    #expect(resolved == .backlog)
   }
 
-  @Test("Dragging a new item into Umbrella applies umbrella status")
-  func draggingNewItemIntoUmbrellaAppliesUmbrellaStatus() {
+  @Test("Dragging a new item into Backlog applies backlog status")
+  func draggingNewItemIntoBacklogAppliesBacklogStatus() {
     let item = sampleTaskBoardItem(status: .new)
-    let resolved = TaskBoardInboxLane.umbrella.taskBoardDropStatus(for: item)
-    #expect(resolved == .umbrella)
+    let resolved = TaskBoardInboxLane.backlog.taskBoardDropStatus(for: item)
+    #expect(resolved == .backlog)
   }
 
-  @Test("Dragging a todo item into Umbrella applies umbrella status")
-  func draggingTodoItemIntoUmbrellaAppliesUmbrellaStatus() {
+  @Test("Dragging a todo item into Backlog applies backlog status")
+  func draggingTodoItemIntoBacklogAppliesBacklogStatus() {
     let item = sampleTaskBoardItem(status: .todo)
-    let resolved = TaskBoardInboxLane.umbrella.taskBoardDropStatus(for: item)
-    #expect(resolved == .umbrella)
+    let resolved = TaskBoardInboxLane.backlog.taskBoardDropStatus(for: item)
+    #expect(resolved == .backlog)
   }
 
   // MARK: - #33 ordered unique lines

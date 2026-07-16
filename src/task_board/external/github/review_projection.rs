@@ -9,6 +9,8 @@ use crate::task_board::store::TaskBoardStore;
 use crate::task_board::types::{ExternalRef, ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
 
+use super::super::{canonical_external_status, local_external_status};
+
 #[cfg(test)]
 pub(crate) fn reconcile_pull_request_snapshots(
     board: &TaskBoardStore,
@@ -117,7 +119,7 @@ fn projection_patch(
         .sync_state
         .as_ref()
         .and_then(|state| state.status);
-    let status = reconciled_review_status(item.status, last_synced_status, observed_status);
+    let status = reconciled_external_status(item.status, last_synced_status, observed_status);
     let mut external_refs = item.external_refs.clone();
     let sync_state_changed = update_sync_state(
         &mut external_refs[reference_index],
@@ -191,22 +193,30 @@ fn observed_review_status(snapshot: &GitHubPullRequestSnapshot) -> Option<TaskBo
         return Some(TaskBoardStatus::Done);
     }
     if snapshot.viewer_review_requested == Some(true) {
-        return Some(TaskBoardStatus::Todo);
+        return Some(TaskBoardStatus::Backlog);
     }
     None
 }
 
-pub(crate) fn reconciled_review_status(
+pub(crate) fn reconciled_external_status(
     current: TaskBoardStatus,
     last_synced: Option<TaskBoardStatus>,
     observed: TaskBoardStatus,
 ) -> TaskBoardStatus {
     let current = current.canonical_persisted_status();
-    let observed = observed.canonical_persisted_status();
-    let last_synced = last_synced
-        .unwrap_or(TaskBoardStatus::Todo)
-        .canonical_persisted_status();
-    if current == last_synced {
+    let observed = canonical_external_status(observed);
+    let Some(current_external) = local_external_status(current) else {
+        return current;
+    };
+    let Some(last_external) = last_synced.map(canonical_external_status) else {
+        return if current_external == TaskBoardStatus::Backlog && observed == TaskBoardStatus::Done
+        {
+            TaskBoardStatus::Done
+        } else {
+            current
+        };
+    };
+    if current_external == last_external && observed != current_external {
         observed
     } else {
         current

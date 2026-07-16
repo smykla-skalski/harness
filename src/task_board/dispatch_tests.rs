@@ -206,6 +206,23 @@ fn ready_dispatch_plan_maps_board_fields_to_session_task_intent() {
 }
 
 #[test]
+fn backlog_items_are_not_dispatchable() {
+    let mut item = ready_item();
+    item.status = TaskBoardStatus::Backlog;
+
+    let plan = build_dispatch_plan(&item);
+
+    assert_eq!(
+        plan.readiness,
+        DispatchReadiness::Blocked {
+            reason: DispatchBlockReason::Status {
+                status: TaskBoardStatus::Backlog,
+            },
+        }
+    );
+}
+
+#[test]
 fn dispatch_plan_decodes_legacy_payload_without_rendered_prompt() {
     let plan = build_dispatch_plan(&ready_item());
     let mut value = serde_json::to_value(&plan).expect("serialize plan");

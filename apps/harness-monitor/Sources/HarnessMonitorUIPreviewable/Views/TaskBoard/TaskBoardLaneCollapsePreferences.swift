@@ -10,12 +10,19 @@ enum TaskBoardLaneCollapsePreferences {
       return [:]
     }
     let decoded = (try? JSONDecoder().decode([String: Bool].self, from: data)) ?? [:]
-    return decoded.reduce(into: [:]) { result, entry in
+    var overrides: [TaskBoardInboxLane: Bool] = decoded.reduce(into: [:]) { result, entry in
+      guard entry.key != "umbrella" else {
+        return
+      }
       guard let lane = TaskBoardInboxLane(rawValue: entry.key) else {
         return
       }
       result[lane] = entry.value
     }
+    if overrides[.backlog] == nil, let legacyOverride = decoded["umbrella"] {
+      overrides[.backlog] = legacyOverride
+    }
+    return overrides
   }
 
   static func rawValue(for overrides: [TaskBoardInboxLane: Bool]) -> String {

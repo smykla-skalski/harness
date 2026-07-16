@@ -20,7 +20,7 @@ public struct TaskBoardCapabilities: Codable, Equatable, Sendable {
 
 extension TaskBoardStatus {
   public static let currentLaneCases: [Self] = [
-    .umbrella,
+    .backlog,
     .todo,
     .planning,
     .inProgress,
@@ -49,8 +49,8 @@ extension TaskBoardStatus {
 
   public var title: String {
     switch self {
-    case .umbrella:
-      "Umbrella"
+    case .backlog:
+      "Backlog"
     case .todo:
       "Todo"
     case .new:

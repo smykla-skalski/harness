@@ -74,11 +74,11 @@ async fn github_inbox_pull_skips_failed_repository_and_keeps_pullable_tasks() {
     assert!(requests[2].contains("repo:good/repo"));
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].reference.external_id, "good/repo#7");
-    assert_eq!(tasks[0].status, TaskBoardStatus::Todo);
+    assert_eq!(tasks[0].status, TaskBoardStatus::Backlog);
 }
 
 #[tokio::test]
-async fn github_inbox_pull_imports_review_requests_as_todo() {
+async fn github_inbox_pull_imports_review_requests_as_backlog() {
     let (endpoint, requests, handle) = spawn_sequence_mock(vec![
         MockResponse::json(200, viewer_response("octo-user")),
         MockResponse::json(200, empty_search_response()),
@@ -96,7 +96,26 @@ async fn github_inbox_pull_imports_review_requests_as_todo() {
     assert_eq!(requests.len(), 3);
     assert!(requests[2].contains("review-requested:octo-user"));
     assert_eq!(tasks.len(), 1);
-    assert_eq!(tasks[0].status, TaskBoardStatus::Todo);
+    assert_eq!(tasks[0].status, TaskBoardStatus::Backlog);
+}
+
+#[tokio::test]
+async fn github_inbox_pull_maps_closed_assigned_issues_to_done() {
+    let (endpoint, _requests, handle) = spawn_sequence_mock(vec![
+        MockResponse::json(200, viewer_response("octo-user")),
+        MockResponse::json(
+            200,
+            search_response_with_issue_state("https://example.test/good/7", "CLOSED"),
+        ),
+        MockResponse::json(200, empty_search_response()),
+    ]);
+    let client = inbox_client_with_base_uri(endpoint, &["good/repo"]);
+
+    let tasks = client.pull_tasks().await.expect("inbox pull");
+
+    handle.join().expect("mock server");
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(tasks[0].status, TaskBoardStatus::Done);
 }
 
 #[tokio::test]
@@ -156,6 +175,10 @@ fn inbox_client_with_base_uri(base_uri: String, repositories: &[&str]) -> GitHub
 }
 
 fn search_response_with_issue(url: &str) -> serde_json::Value {
+    search_response_with_issue_state(url, "OPEN")
+}
+
+fn search_response_with_issue_state(url: &str, state: &str) -> serde_json::Value {
     json!({
         "data": {
             "search": {
@@ -168,7 +191,7 @@ fn search_response_with_issue(url: &str) -> serde_json::Value {
                     "title": "Keep pullable repo",
                     "body": null,
                     "url": url,
-                    "state": "OPEN",
+                    "state": state,
                     "updatedAt": "2026-05-19T00:00:00Z",
                     "labels": { "nodes": [] }
                 }]

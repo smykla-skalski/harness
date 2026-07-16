@@ -6,8 +6,7 @@ use crate::daemon::protocol::{
     PolicyTransferDumpRequest, PolicyTransferImportRequest, PolicyTransferWorkspaceMetadata,
 };
 use crate::task_board::policy_graph::{
-    PolicyCanvasRecord, PolicyCanvasWorkspace, PolicyGraphMode, apply_rename,
-    apply_scenario_create,
+    PolicyCanvasRecord, PolicyCanvasWorkspace, PolicyGraphMode, apply_rename, apply_scenario_create,
 };
 
 use super::{dump_policies, import_policies};

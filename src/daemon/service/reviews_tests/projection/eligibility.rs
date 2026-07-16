@@ -53,7 +53,7 @@ async fn observed_label_and_repository_eligibility_loss_completes_only_matching_
     );
     assert_eq!(
         status_for_repository(&after_label_loss, "eligibility/web"),
-        TaskBoardStatus::Todo,
+        TaskBoardStatus::Backlog,
         "a per-repository observation must not globally stale unrelated tasks"
     );
 

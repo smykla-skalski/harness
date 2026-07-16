@@ -169,11 +169,7 @@ fn validate_document(policy_id: &str, field: &str, document: &PolicyGraph) -> Re
 }
 
 fn validate_layout(policy_id: &str, field: &str, document: &PolicyGraph) -> Result<(), CliError> {
-    let node_ids: HashSet<&str> = document
-        .nodes
-        .iter()
-        .map(|node| node.id.as_str())
-        .collect();
+    let node_ids: HashSet<&str> = document.nodes.iter().map(|node| node.id.as_str()).collect();
     let mut seen = HashSet::with_capacity(document.layout.nodes.len());
     let mut actual = Vec::with_capacity(document.layout.nodes.len());
     for layout in &document.layout.nodes {

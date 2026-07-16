@@ -224,6 +224,22 @@ fn parse_task_board_update_planning_fields() {
 }
 
 #[test]
+fn parse_task_board_backlog_status_and_reject_legacy_umbrella() {
+    let cli = Cli::try_parse_from(["harness", "task-board", "list", "--status", "backlog"])
+        .expect("parse backlog status");
+    match task_board_command(cli.command) {
+        TaskBoardCommand::List(args) => {
+            assert_eq!(args.status, Some(TaskBoardStatus::Backlog));
+        }
+        _ => panic!("expected TaskBoard List"),
+    }
+
+    assert!(
+        Cli::try_parse_from(["harness", "task-board", "list", "--status", "umbrella",]).is_err()
+    );
+}
+
+#[test]
 fn parse_task_board_orchestrator_runtime_config_and_tokens() {
     let runtime_config = Cli::try_parse_from([
         "harness",

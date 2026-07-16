@@ -16,7 +16,7 @@ public struct TaskBoardItemEntity: AppEntity, Identifiable, Sendable {
   public let projectId: String?
 
   private static let symbolByStatus: [TaskBoardStatusEnum: String] = [
-    .umbrella: "umbrella",
+    .backlog: "tray",
     .todo: "tray.and.arrow.down",
     .planning: "list.clipboard",
     .inProgress: "arrow.triangle.2.circlepath",

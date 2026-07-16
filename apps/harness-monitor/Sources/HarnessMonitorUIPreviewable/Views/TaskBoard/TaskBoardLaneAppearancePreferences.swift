@@ -181,12 +181,20 @@ enum TaskBoardLaneAppearancePreferences {
     let decoded =
       (try? JSONDecoder()
         .decode([String: TaskBoardLaneAppearanceOverride].self, from: data)) ?? [:]
-    return decoded.reduce(into: [:]) { result, entry in
-      guard let lane = TaskBoardInboxLane(rawValue: entry.key), !entry.value.isEmpty else {
-        return
+    var overrides: [TaskBoardInboxLane: TaskBoardLaneAppearanceOverride] = [:]
+    for (key, value) in decoded where key != "umbrella" && !value.isEmpty {
+      guard let lane = TaskBoardInboxLane(rawValue: key) else {
+        continue
       }
-      result[lane] = entry.value
+      overrides[lane] = value
     }
+    if overrides[.backlog] == nil,
+      let legacyOverride = decoded["umbrella"],
+      !legacyOverride.isEmpty
+    {
+      overrides[.backlog] = legacyOverride
+    }
+    return overrides
   }
 
   static func rawValue(
@@ -325,7 +333,7 @@ enum TaskBoardLaneAppearancePreferences {
 
   static func defaultColorToken(for lane: TaskBoardInboxLane) -> TaskBoardLaneColorToken {
     switch lane {
-    case .umbrella:
+    case .backlog:
       .warmAccent
     case .todo:
       .secondaryInk

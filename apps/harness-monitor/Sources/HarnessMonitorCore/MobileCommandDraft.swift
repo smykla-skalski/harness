@@ -222,8 +222,8 @@ public struct MobileCommandDraft: Equatable, Sendable {
 
   private var knownTaskBoardStatuses: Set<String> {
     [
-      "new", "planning", "plan_review", "needs_you", "todo", "in_progress", "in_review",
-      "done", "blocked",
+      "backlog", "todo", "planning", "in_progress", "agentic_review", "testing", "in_review",
+      "to_review", "human_required", "failed", "done",
     ]
   }
 

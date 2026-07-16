@@ -11,7 +11,7 @@ use crate::workspace::utc_now;
 use super::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalSyncConflictPolicy,
     ExternalSyncField, ExternalTask, ExternalTaskRef, ExternalTaskUpdate, ExternalUpdateOutcome,
-    GitHubInboxSyncClient, GitHubSyncClient, TodoistSyncClient,
+    GitHubInboxSyncClient, GitHubSyncClient, TodoistSyncClient, canonical_external_status,
 };
 
 mod delete;
@@ -245,12 +245,7 @@ async fn pull_provider_tasks(
     client: &dyn ExternalSyncClient,
     operations: &mut Vec<ExternalSyncOperation>,
 ) -> Result<(), CliError> {
-    let tasks = client
-        .pull_tasks()
-        .await?
-        .into_iter()
-        .filter(|task| options.status.is_none_or(|status| task.status == status))
-        .collect::<Vec<_>>();
+    let tasks = client.pull_tasks().await?;
     let board_items = board.list_items(None).await?;
     let item_index = build_external_ref_index(&board_items);
     for task in tasks.iter().cloned() {
@@ -260,8 +255,14 @@ async fn pull_provider_tasks(
             &task.reference,
             task.project_id.as_deref(),
         ) {
+            if !existing_pull_matches_status_filter(options.status, item, &task) {
+                continue;
+            }
             reconcile_existing_item(board, options, client.provider(), item, task, operations)
                 .await?;
+            continue;
+        }
+        if !new_pull_matches_status_filter(options.status, &task) {
             continue;
         }
         if options.dry_run {
@@ -311,6 +312,25 @@ async fn pull_provider_tasks(
     )
     .await?;
     Ok(())
+}
+
+fn existing_pull_matches_status_filter(
+    filter: Option<TaskBoardStatus>,
+    item: &TaskBoardItem,
+    task: &ExternalTask,
+) -> bool {
+    filter.is_none_or(|filter| {
+        let filter = filter.canonical_persisted_status();
+        filter == TaskBoardStatus::Todo
+            || item.status.canonical_persisted_status() == filter
+            || task.status.canonical_persisted_status() == filter
+    })
+}
+
+fn new_pull_matches_status_filter(filter: Option<TaskBoardStatus>, task: &ExternalTask) -> bool {
+    filter.is_none_or(|filter| {
+        task.status.canonical_persisted_status() == filter.canonical_persisted_status()
+    })
 }
 
 async fn find_item_for_task(
@@ -365,7 +385,7 @@ async fn create_remote_item(
     let reference = client.push_task(item).await?;
     let mut refs = item.external_refs.clone();
     refs.push(synced_ref_from_item(reference.clone(), item));
-    board
+    let linked = board
         .update_item(
             item,
             TaskBoardItemPatch {
@@ -379,12 +399,15 @@ async fn create_remote_item(
         provider: client.provider(),
         action: ExternalSyncAction::Push,
         board_item_id: Some(item.id.clone()),
-        reference,
+        reference: reference.clone(),
         dry_run: false,
         applied: true,
         changed_fields: push_create_fields(item),
         unsupported_fields: Vec::new(),
     }));
+    if canonical_external_status(item.status) == TaskBoardStatus::Done {
+        update_linked_remote(board, options, client, &linked, reference, operations).await?;
+    }
     Ok(())
 }
 
@@ -436,6 +459,7 @@ async fn update_linked_remote(
             return Ok(());
         }
     };
+    let refs = replace_synced_ref(item, &reference, &updated_ref, &supported);
     operations.push(operation(OperationDraft {
         provider: client.provider(),
         action: ExternalSyncAction::Push,
@@ -446,7 +470,6 @@ async fn update_linked_remote(
         changed_fields: supported,
         unsupported_fields: unsupported,
     }));
-    let refs = replace_synced_ref(item, &reference, &updated_ref);
     board
         .update_item(
             item,
@@ -480,7 +503,7 @@ fn create_item_from_external(task: &ExternalTask) -> TaskBoardItem {
         task.body.clone(),
         now,
     );
-    item.status = task.status;
+    item.status = canonical_external_status(task.status);
     item.project_id.clone_from(&task.project_id);
     let mut reference = task.reference.clone().into_core_ref();
     reference.sync_state = Some(sync_state_from_task(task));

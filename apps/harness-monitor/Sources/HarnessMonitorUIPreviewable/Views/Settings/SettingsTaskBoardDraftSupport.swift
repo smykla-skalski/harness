@@ -3,7 +3,7 @@ import HarnessMonitorKit
 
 enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
   case all
-  case umbrella
+  case backlog
   case todo
   case planning
   case inProgress
@@ -15,7 +15,7 @@ enum DispatchStatusFilterChoice: String, CaseIterable, Hashable {
   case failed
 
   private static let statusChoices: [TaskBoardStatus: Self] = [
-    .umbrella: .umbrella,
+    .backlog: .backlog,
     .todo: .todo,
     .planning: .planning,
     .inProgress: .inProgress,
@@ -36,7 +36,7 @@ extension DispatchStatusFilterChoice {
   var title: String {
     switch self {
     case .all: "All Items"
-    case .umbrella: "Umbrella"
+    case .backlog: "Backlog"
     case .todo: "Todo"
     case .planning: "Planning"
     case .inProgress: "In Progress"
@@ -52,7 +52,7 @@ extension DispatchStatusFilterChoice {
   var status: TaskBoardStatus? {
     switch self {
     case .all: nil
-    case .umbrella: .umbrella
+    case .backlog: .backlog
     case .todo: .todo
     case .planning: .planning
     case .inProgress: .inProgress

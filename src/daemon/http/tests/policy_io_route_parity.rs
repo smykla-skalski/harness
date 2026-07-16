@@ -55,9 +55,7 @@ async fn run_policy_transfer_dump_above_remote_body_limit() {
         .async_db
         .get()
         .expect("test async db")
-        .replace_policy_workspace(
-            &crate::task_board::policy_graph::PolicyCanvasWorkspace::seeded(),
-        )
+        .replace_policy_workspace(&crate::task_board::policy_graph::PolicyCanvasWorkspace::seeded())
         .await
         .expect("seed policy workspace");
     let (base_url, server) = serve_http(state).await;
@@ -91,9 +89,7 @@ async fn run_policy_transfer_larger_remote_body() {
         .async_db
         .get()
         .expect("test async db")
-        .replace_policy_workspace(
-            &crate::task_board::policy_graph::PolicyCanvasWorkspace::seeded(),
-        )
+        .replace_policy_workspace(&crate::task_board::policy_graph::PolicyCanvasWorkspace::seeded())
         .await
         .expect("seed policy workspace");
     let (base_url, server) = serve_http(state).await;

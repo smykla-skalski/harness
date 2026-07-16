@@ -6,7 +6,7 @@ use crate::task_board::store::TaskBoardItemPatch;
 use crate::task_board::types::{ExternalRefProvider, TaskBoardItem, TaskBoardStatus};
 use crate::workspace::utc_now;
 
-use super::super::github::reconciled_review_status;
+use super::super::github::reconciled_external_status;
 use super::merge::{external_ref_matches, matching_ref};
 use super::{ExternalSyncAction, ExternalSyncOperation, ExternalSyncOptions, TaskBoardSyncStore};
 
@@ -50,9 +50,12 @@ pub(super) async fn reconcile_stale_github_review_requests(
 }
 
 fn allows_stale_review_reconcile(options: ExternalSyncOptions) -> bool {
-    options
-        .status
-        .is_none_or(|status| status == TaskBoardStatus::Todo)
+    options.status.is_none_or(|status| {
+        matches!(
+            status.canonical_persisted_status(),
+            TaskBoardStatus::Backlog | TaskBoardStatus::Todo
+        )
+    })
 }
 
 fn stale_review_request_operation(
@@ -81,7 +84,7 @@ fn stale_review_request_patch(
     let last_synced_status = matching_ref(item, reference, item.project_id.as_deref())
         .and_then(|reference| reference.sync_state.as_ref())
         .and_then(|state| state.status);
-    let status = reconciled_review_status(item.status, last_synced_status, TaskBoardStatus::Done);
+    let status = reconciled_external_status(item.status, last_synced_status, TaskBoardStatus::Done);
     let mut patch = TaskBoardItemPatch {
         status: (item.status != status).then_some(status),
         ..TaskBoardItemPatch::default()

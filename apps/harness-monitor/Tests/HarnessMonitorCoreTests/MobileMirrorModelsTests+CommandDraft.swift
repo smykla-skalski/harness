@@ -137,6 +137,36 @@ extension MobileMirrorModelsCommandTests {
     }
   }
 
+  func testCommandDraftAcceptsBacklogAndRejectsLegacyUmbrellaStatus() {
+    let target = MobileCommandTarget(
+      stationID: "station",
+      taskID: "task-1",
+      targetRevision: 12
+    )
+
+    XCTAssertNoThrow(
+      try MobileCommandDraft(
+        kind: .taskBoardDispatch,
+        confirmationText: "Dispatch task.",
+        target: target,
+        payload: ["status": "backlog"]
+      ).validate()
+    )
+    XCTAssertThrowsError(
+      try MobileCommandDraft(
+        kind: .taskBoardDispatch,
+        confirmationText: "Dispatch task.",
+        target: target,
+        payload: ["status": "umbrella"]
+      ).validate()
+    ) { error in
+      XCTAssertEqual(
+        error as? MobileCommandDraftValidationError,
+        .invalidPayload(key: "status", value: "umbrella")
+      )
+    }
+  }
+
   func testCommandDraftRejectsInvalidAgentStartPayloads() {
     let target = MobileCommandTarget(
       stationID: "station",

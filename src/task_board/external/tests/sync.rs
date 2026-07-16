@@ -20,6 +20,7 @@ async fn fake_client_pulls_tasks_without_network() {
     assert_eq!(client.provider(), ExternalProvider::Todoist);
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].title, "Remote task");
+    assert_eq!(tasks[0].status, TaskBoardStatus::Backlog);
 }
 
 #[tokio::test]
@@ -152,7 +153,7 @@ async fn sync_external_tasks_dry_run_does_not_write_board() {
 }
 
 #[tokio::test]
-async fn sync_external_tasks_reconciles_existing_provider_ref() {
+async fn sync_external_tasks_reconciles_closed_existing_provider_ref() {
     let temp = tempdir().expect("tempdir");
     let board = TaskBoardStore::new(temp.path().join("board"));
     let mut local = TaskBoardItem::new(
@@ -175,7 +176,7 @@ async fn sync_external_tasks_reconciles_existing_provider_ref() {
             .with_url("https://example.test/new"),
         title: "New title".to_owned(),
         body: "New body".to_owned(),
-        status: TaskBoardStatus::Failed,
+        status: TaskBoardStatus::Done,
         project_id: Some("provider/project".to_owned()),
         updated_at: Some("2026-05-14T03:00:00Z".to_string()),
     };
@@ -205,7 +206,7 @@ async fn sync_external_tasks_reconciles_existing_provider_ref() {
     let updated = board.get("local-1").expect("load reconciled task");
     assert_eq!(updated.title, "New title");
     assert_eq!(updated.body, "New body");
-    assert_eq!(updated.status, TaskBoardStatus::Failed);
+    assert_eq!(updated.status, TaskBoardStatus::Done);
     assert_eq!(updated.project_id.as_deref(), Some("provider/project"));
     assert!(updated.external_refs.iter().any(|reference| {
         reference.provider == ExternalRefProvider::Todoist

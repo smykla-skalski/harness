@@ -128,7 +128,7 @@ fn task_board_list_serializes_status_as_query() {
 
     let items = client_with(endpoint)
         .list_task_board_items(&TaskBoardListItemsRequest {
-            status: Some(TaskBoardStatus::Todo),
+            status: Some(TaskBoardStatus::Backlog),
         })
         .expect("list items");
     handle.join().expect("server");
@@ -136,7 +136,7 @@ fn task_board_list_serializes_status_as_query() {
     assert_eq!(items.len(), 1);
     assert_eq!(
         *request_line.lock().expect("request line"),
-        "GET /v1/task-board/items?status=todo HTTP/1.1"
+        "GET /v1/task-board/items?status=backlog HTTP/1.1"
     );
 }
 

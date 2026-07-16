@@ -2,7 +2,7 @@ import Foundation
 
 @frozen
 public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
-  case umbrella
+  case backlog
   case todo
   case planning
   case inProgress = "in_progress"
@@ -14,7 +14,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
   case failed
 
   private static let orderedCases: [Self] = [
-    .umbrella,
+    .backlog,
     .todo,
     .planning,
     .inProgress,
@@ -27,7 +27,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
   ]
 
   private static let laneByTaskBoardStatus: [TaskBoardStatus: Self] = [
-    .umbrella: .umbrella,
+    .backlog: .backlog,
     .todo: .todo,
     .planning: .planning,
     .inProgress: .inProgress,
@@ -48,14 +48,14 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
   }
 
   public static var active: Self { .inProgress }
-  public static var open: Self { .todo }
+  public static var open: Self { .backlog }
 
   public var id: String { rawValue }
 
   public var title: String {
     switch self {
-    case .umbrella:
-      "Umbrella"
+    case .backlog:
+      "Backlog"
     case .todo:
       "Todo"
     case .planning:
@@ -79,8 +79,8 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
 
   public var systemImage: String {
     switch self {
-    case .umbrella:
-      "umbrella"
+    case .backlog:
+      "tray"
     case .todo:
       "tray.and.arrow.down"
     case .planning:
@@ -113,7 +113,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
     case .inProgress:
       self = .inProgress
     case .open:
-      self = .todo
+      self = task.assignedTo != nil || task.queuedAt != nil ? .todo : .backlog
     case .done:
       return nil
     }
@@ -130,7 +130,7 @@ public enum TaskBoardInboxLane: String, CaseIterable, Identifiable, Sendable {
     case .inProgress:
       self = .inProgress
     case .open:
-      self = .todo
+      self = .backlog
     case .done:
       return nil
     }

@@ -3,7 +3,7 @@ import Foundation
 import HarnessMonitorKit
 
 public enum TaskBoardStatusEnum: String, AppEnum, Sendable {
-  case umbrella
+  case backlog
   case todo
   case planning
   case inProgress
@@ -16,7 +16,7 @@ public enum TaskBoardStatusEnum: String, AppEnum, Sendable {
   case done
 
   private static let intentStatusByDaemonStatus: [TaskBoardStatus: Self] = [
-    .umbrella: .umbrella,
+    .backlog: .backlog,
     .todo: .todo,
     .planning: .planning,
     .inProgress: .inProgress,
@@ -39,7 +39,7 @@ public enum TaskBoardStatusEnum: String, AppEnum, Sendable {
 
   public static var caseDisplayRepresentations: [Self: DisplayRepresentation] {
     [
-      .umbrella: DisplayRepresentation(title: "Umbrella"),
+      .backlog: DisplayRepresentation(title: "Backlog"),
       .todo: DisplayRepresentation(title: "Todo"),
       .planning: DisplayRepresentation(title: "Planning"),
       .inProgress: DisplayRepresentation(title: "In Progress"),
@@ -54,12 +54,12 @@ public enum TaskBoardStatusEnum: String, AppEnum, Sendable {
   }
 
   public init(daemonValue: TaskBoardStatus) {
-    self = Self.intentStatusByDaemonStatus[daemonValue] ?? .todo
+    self = Self.intentStatusByDaemonStatus[daemonValue] ?? .backlog
   }
 
   public var daemonValue: TaskBoardStatus {
     switch self {
-    case .umbrella: .umbrella
+    case .backlog: .backlog
     case .todo: .todo
     case .planning: .planning
     case .inProgress: .inProgress
